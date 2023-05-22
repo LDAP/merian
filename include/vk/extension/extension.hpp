@@ -14,4 +14,5 @@ class Extension {
         return {};
     }
     void on_instance_created(vk::Instance&) {}
+    void on_destroy(vk::Instance&) {}
 };

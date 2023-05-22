@@ -57,3 +57,12 @@ Context::Context() {
 
     VULKAN_HPP_DEFAULT_DISPATCHER.init(instance);
 }
+
+Context::~Context() {
+    for (auto& ext : extensions) {
+        spdlog::debug("destroy extension {}", ext->name());
+        ext->on_destroy(instance);
+    }
+    spdlog::debug("destroy instance");
+    instance.destroy();
+}

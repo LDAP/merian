@@ -74,3 +74,7 @@ void ExtensionDebugUtils::on_instance_created(vk::Instance& instance) {
     };
     messenger = instance.createDebugUtilsMessengerEXT(create_info);
 }
+
+void ExtensionDebugUtils::on_destroy(vk::Instance& instance) {
+  instance.destroyDebugUtilsMessengerEXT(messenger);
+}

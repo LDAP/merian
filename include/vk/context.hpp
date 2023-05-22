@@ -7,6 +7,7 @@
 class Context {
   public:
     Context();
+    ~Context();
 
   public:
     vk::Instance instance;

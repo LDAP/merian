@@ -27,6 +27,7 @@ class ExtensionDebugUtils : public Extension {
         };
     }
     void on_instance_created(vk::Instance&);
+    void on_destroy(vk::Instance&);
 
   private:
     vk::DebugUtilsMessengerEXT messenger;
