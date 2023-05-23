@@ -1,3 +1,4 @@
+#include <spdlog/spdlog.h>
 #include <vk/extension/extension_debug_utils.hpp>
 
 #include <iostream>
@@ -9,58 +10,81 @@
 VKAPI_ATTR VkBool32 VKAPI_CALL ExtensionDebugUtils::messenger_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageTypes,
     VkDebugUtilsMessengerCallbackDataEXT const* pCallbackData, void* /*pUserData*/) {
-    // if (enableValidationLayers) {
-    //     if (pCallbackData->messageIdNumber == 648835635) {
-    //         // UNASSIGNED-khronos-Validation-debug-build-warning-message
-    //         return VK_FALSE;
-    //     }
-    //     if (pCallbackData->messageIdNumber == 767975156) {
-    //         // UNASSIGNED-BestPractices-vkCreateInstance-specialuse-extension
-    //         return VK_FALSE;
-    //     }
-    // }
 
-    std::cerr << vk::to_string(static_cast<vk::DebugUtilsMessageSeverityFlagBitsEXT>(messageSeverity)) << ": "
-              << vk::to_string(static_cast<vk::DebugUtilsMessageTypeFlagsEXT>(messageTypes)) << ":\n";
-    std::cerr << "\t"
-              << "messageIDName   = <" << pCallbackData->pMessageIdName << ">\n";
-    std::cerr << "\t"
-              << "messageIdNumber = " << pCallbackData->messageIdNumber << "\n";
-    std::cerr << "\t"
-              << "message         = <" << pCallbackData->pMessage << ">\n";
+    if (pCallbackData->messageIdNumber == 648835635) {
+        // UNASSIGNED-khronos-Validation-debug-build-warning-message
+        return VK_FALSE;
+    }
+    if (pCallbackData->messageIdNumber == 767975156) {
+        // UNASSIGNED-BestPractices-vkCreateInstance-specialuse-extension
+        return VK_FALSE;
+    }
+
+    spdlog::level::level_enum severity;
+    if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
+        severity = spdlog::level::level_enum::err;
+    } else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
+        severity = spdlog::level::level_enum::warn;
+    } else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) {
+        severity = spdlog::level::level_enum::info;
+    } else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) {
+        severity = spdlog::level::level_enum::trace;
+    } else {
+        severity = spdlog::level::level_enum::err;
+    }
+
+    std::string msg_type = vk::to_string(static_cast<vk::DebugUtilsMessageTypeFlagsEXT>(messageTypes));
+    spdlog::log(severity, "[{}] [{}] [{}]\n{}", msg_type, pCallbackData->pMessageIdName, pCallbackData->messageIdNumber,
+                pCallbackData->pMessage);
+
     if (0 < pCallbackData->queueLabelCount) {
-        std::cerr << "\t"
-                  << "Queue Labels:\n";
+        std::string additional_info;
+        additional_info += "Queue Labels:\n";
         for (uint8_t i = 0; i < pCallbackData->queueLabelCount; i++) {
-            std::cerr << "\t\t"
-                      << "labelName = <" << pCallbackData->pQueueLabels[i].pLabelName << ">\n";
+            additional_info += "\t\t";
+            additional_info += "labelName = <";
+            additional_info += pCallbackData->pQueueLabels[i].pLabelName ;
+            additional_info += ">\n";
         }
+        spdlog::log(severity, additional_info);
     }
     if (0 < pCallbackData->cmdBufLabelCount) {
-        std::cerr << "\t"
-                  << "CommandBuffer Labels:\n";
+        std::string additional_info;
+        additional_info += "CommandBuffer Labels:\n";
         for (uint8_t i = 0; i < pCallbackData->cmdBufLabelCount; i++) {
-            std::cerr << "\t\t"
-                      << "labelName = <" << pCallbackData->pCmdBufLabels[i].pLabelName << ">\n";
+            additional_info += "\t\t";
+            additional_info += "labelName = <";
+            additional_info += pCallbackData->pCmdBufLabels[i].pLabelName;
+            additional_info += ">\n";
         }
+        spdlog::log(severity, additional_info);
     }
     if (0 < pCallbackData->objectCount) {
-        std::cerr << "\t"
-                  << "Objects:\n";
+        std::string additional_info;
+        additional_info += "Objects:\n";
         for (uint8_t i = 0; i < pCallbackData->objectCount; i++) {
-            std::cerr << "\t\t"
-                      << "Object " << i << "\n";
-            std::cerr << "\t\t\t"
-                      << "objectType   = "
-                      << vk::to_string(static_cast<vk::ObjectType>(pCallbackData->pObjects[i].objectType)) << "\n";
-            std::cerr << "\t\t\t"
-                      << "objectHandle = " << pCallbackData->pObjects[i].objectHandle << "\n";
+            additional_info += "\t";
+            additional_info += "Object ";
+            additional_info += i;
+            additional_info += "\n";
+            additional_info += "\t\t";
+            additional_info += "objectType   = ";
+            additional_info += vk::to_string(static_cast<vk::ObjectType>(pCallbackData->pObjects[i].objectType));
+            additional_info += "\n";
+            additional_info += "\t\t";
+            additional_info += "objectHandle = ";
+            additional_info += pCallbackData->pObjects[i].objectHandle;
+            additional_info += "\n";
             if (pCallbackData->pObjects[i].pObjectName) {
-                std::cerr << "\t\t\t"
-                          << "objectName   = <" << pCallbackData->pObjects[i].pObjectName << ">\n";
+                additional_info += "\t\t";
+                additional_info += "objectName   = <";
+                additional_info += pCallbackData->pObjects[i].pObjectName;
+                additional_info += ">\n";
             }
         }
+        spdlog::log(severity, additional_info);
     }
+
     return VK_TRUE;
 }
 
