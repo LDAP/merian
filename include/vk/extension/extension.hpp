@@ -4,6 +4,9 @@
 #include <vector>
 #include <vulkan/vulkan.hpp>
 
+// cyclic -> forward definition
+class Context;
+
 class Extension {
   public:
     virtual ~Extension() = 0;
@@ -28,7 +31,7 @@ class Extension {
         return p_next;
     }
     virtual void on_instance_created(vk::Instance&) {}
-    virtual void on_destroy(vk::Instance&) {}
+    virtual void on_destroy_instance(vk::Instance&) {}
     virtual bool accept_graphics_queue(vk::PhysicalDevice&, std::size_t) {
         return true;
     }
@@ -43,7 +46,8 @@ class Extension {
         return p_next;
     }
     virtual void on_device_created(vk::Device&) {}
-    // virtual void on_context_created(Context&) {}
+    virtual void on_context_created(Context&) {}
+    virtual void on_destroy_context(Context&) {}
     virtual bool extension_supported(vk::PhysicalDevice&, std::vector<vk::ExtensionProperties>& extension_properties) {
         bool supported = true;
         for (const char* required_extension : required_device_extension_names()) {

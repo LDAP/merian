@@ -39,7 +39,7 @@ class ExtensionDebugUtils : public Extension {
         return {};
     }
     void on_instance_created(vk::Instance&) override;
-    void on_destroy(vk::Instance&) override;
+    void on_destroy_instance(vk::Instance&) override;
     void* on_create_instance(void* p_next) override;
 
     // Own methods

@@ -36,10 +36,24 @@ class ExtensionGLFW : public Extension {
         };
     }
     void on_instance_created(vk::Instance&) override;
-    void on_destroy(vk::Instance&) override;
+    void on_destroy_instance(vk::Instance&) override;
     bool accept_graphics_queue(vk::PhysicalDevice&, std::size_t) override;
+    void on_context_created(Context&) override;
+    void on_destroy_context(Context& context) override;
+
+    // own methods
+    void recreate_swapchain(Context& context);
+    /* Destroys swapchain and image views */
+    void destroy_swapchain(Context& context);
+    /* Destroys image views only (for recreate) */
+    void destroy_image_views(Context& context);
 
   public:
     GLFWwindow* window;
     vk::SurfaceKHR surface;
+    vk::SurfaceFormatKHR surface_format;
+    vk::Extent2D extent2D;
+    vk::SwapchainKHR swapchain = VK_NULL_HANDLE;
+    std::vector<vk::Image> swapchain_images;
+    std::vector<vk::ImageView> swapchain_image_views;
 };

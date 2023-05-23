@@ -68,15 +68,15 @@ Context::Context(uint32_t vendor_id, uint32_t device_id) {
     create_device_and_queues();
     create_command_pools();
 
-    // for (auto& ext : extensions) {
-    //     ext->on_context_created(*this);
-    // }
+    for (auto& ext : extensions) {
+        ext->on_context_created(*this);
+    }
 }
 
 void destroy_extensions(Context& context, std::vector<Extension*> extensions) {
     for (auto& ext : extensions) {
         spdlog::debug("destroy extension {}", ext->name());
-        ext->on_destroy(context.instance);
+        ext->on_destroy_instance(context.instance);
         delete ext;
 
         for (std::size_t i = 0; context.extensions.size(); i++) {
@@ -90,6 +90,10 @@ void destroy_extensions(Context& context, std::vector<Extension*> extensions) {
 }
 
 Context::~Context() {
+    for (auto& ext : extensions) {
+        ext->on_destroy_context(*this);
+    }
+
     spdlog::debug("destroy command pools");
     device.destroyCommandPool(cmd_pool_graphics);
     device.destroyCommandPool(cmd_pool_transfer);
