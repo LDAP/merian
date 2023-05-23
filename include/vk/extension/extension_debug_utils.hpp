@@ -43,6 +43,11 @@ class ExtensionDebugUtils : public Extension {
     void* on_create_instance(void* p_next) override;
 
     // Own methods
+    template <typename T> void set_object_name(vk::Device& device, T handle, std::string name) {
+        vk::DebugUtilsObjectNameInfoEXT infoEXT(handle.objectType, uint64_t(static_cast<typename T::CType>(handle)),
+                                                name.c_str());
+        device.setDebugUtilsObjectNameEXT(infoEXT);
+    }
     static VKAPI_ATTR VkBool32 VKAPI_CALL messenger_callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
                                                              VkDebugUtilsMessageTypeFlagsEXT messageTypes,
                                                              VkDebugUtilsMessengerCallbackDataEXT const* pCallbackData,

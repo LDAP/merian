@@ -3,6 +3,7 @@
 #include "vk/extension/extension_float_atomics.hpp"
 #include "vk/extension/extension_glfw.hpp"
 #include "vk/extension/extension_raytrace.hpp"
+#include "vk/extension/extension_v12.hpp"
 
 #include <GLFW/glfw3.h>
 #include <spdlog/spdlog.h>
@@ -48,6 +49,7 @@ Context::Context(uint32_t vendor_id, uint32_t device_id) {
 #endif
     extensions.push_back(new ExtensionGLFW());
     extensions.push_back(new ExtensionRaytraceQuery());
+    extensions.push_back(new ExtensionV12());
     extensions.push_back(new ExtensionFloatAtomics());
 
     spdlog::debug("Active extensions:");
@@ -62,6 +64,13 @@ Context::Context(uint32_t vendor_id, uint32_t device_id) {
         ext->on_instance_created(instance);
     }
     prepare_physical_device(vendor_id, device_id);
+    find_queues();
+    create_device_and_queues();
+    create_command_pools();
+
+    // for (auto& ext : extensions) {
+    //     ext->on_context_created(*this);
+    // }
 }
 
 void destroy_extensions(Context& context, std::vector<Extension*> extensions) {
@@ -69,7 +78,7 @@ void destroy_extensions(Context& context, std::vector<Extension*> extensions) {
         spdlog::debug("destroy extension {}", ext->name());
         ext->on_destroy(context.instance);
         delete ext;
-        
+
         for (std::size_t i = 0; context.extensions.size(); i++) {
             if (context.extensions[i] == ext) {
                 std::swap(context.extensions[i], context.extensions[context.extensions.size() - 1]);
@@ -81,21 +90,27 @@ void destroy_extensions(Context& context, std::vector<Extension*> extensions) {
 }
 
 Context::~Context() {
+    spdlog::debug("destroy command pools");
+    device.destroyCommandPool(cmd_pool_graphics);
+    device.destroyCommandPool(cmd_pool_transfer);
+
+    spdlog::debug("destroy device");
+    device.destroy();
+
     destroy_extensions(*this, extensions);
+
     spdlog::debug("destroy instance");
     instance.destroy();
 }
 
 void Context::create_instance() {
-    std::vector<const char*> layer_names;
-    std::vector<const char*> extension_names;
     for (auto& ext : extensions) {
         insert_all(layer_names, ext->required_layer_names());
-        insert_all(extension_names, ext->required_instance_extension_names());
+        insert_all(instance_extension_names, ext->required_instance_extension_names());
     }
 
-    spdlog::debug("requested layers: [{}]", fmt::join(layer_names, ", "));
-    spdlog::debug("requested extensions: [{}]", fmt::join(extension_names, ", "));
+    spdlog::debug("required layers: [{}]", fmt::join(layer_names, ", "));
+    spdlog::debug("required instance extensions: [{}]", fmt::join(instance_extension_names, ", "));
 
     check_layer_support(layer_names);
 
@@ -109,8 +124,8 @@ void Context::create_instance() {
         &application_info,
         static_cast<uint32_t>(layer_names.size()),
         layer_names.data(),
-        static_cast<uint32_t>(extension_names.size()),
-        extension_names.data(),
+        static_cast<uint32_t>(instance_extension_names.size()),
+        instance_extension_names.data(),
         p_next,
     };
 
@@ -152,20 +167,8 @@ void Context::prepare_physical_device(uint32_t vendor_id, uint32_t device_id) {
     spdlog::debug("Checking extension support...");
     std::vector<Extension*> not_supported;
     for (auto& ext : extensions) {
-        bool extensions_found = true;
-        for (const char* required_extension : ext->required_device_extension_names()) {
-            bool extension_found = false;
-            for (auto& props : extension_properties) {
-                if (!strcmp(props.extensionName, required_extension)) {
-                    extension_found = true;
-                }
-            }
-            if (!extension_found) {
-                extensions_found = false;
-            }
-        }
-        if (!extensions_found) {
-            spdlog::warn("Extension {} not supported, disableing...", ext->name());
+        if (!ext->extension_supported(physical_device, extension_properties)) {
+            spdlog::info("Extension {} not supported, disabling...", ext->name());
             not_supported.push_back(ext);
         } else {
             spdlog::debug("Extension {} supported", ext->name());
@@ -176,6 +179,8 @@ void Context::prepare_physical_device(uint32_t vendor_id, uint32_t device_id) {
 
 void Context::find_queues() {
     std::vector<vk::QueueFamilyProperties> queue_family_props = physical_device.getQueueFamilyProperties();
+    int queue_idx_graphics = -1;
+    int queue_idx_transfer = -1;
 
     for (std::size_t i = 0; i < queue_family_props.size(); i++) {
         if (!queue_family_props[i].queueCount)
@@ -204,8 +209,53 @@ void Context::find_queues() {
     if (queue_idx_graphics < 0 || queue_idx_transfer < 0) {
         throw std::runtime_error("could not find a suitable Vulkan queue family!");
     } else {
-        spdlog::debug("found suitable Vulkan queue famies: {} {}", queue_idx_graphics, queue_idx_transfer);
+        spdlog::debug("found suitable vulkan queue families: {} {}", queue_idx_graphics, queue_idx_transfer);
+        this->queue_idx_graphics = queue_idx_graphics;
+        this->queue_idx_transfer = queue_idx_transfer;
     }
 }
 
-void Context::create_device_and_queues() {}
+void Context::create_device_and_queues() {
+    std::vector<vk::DeviceQueueCreateInfo> queue_create_infos;
+    float queue_priority = 1.0f;
+
+    queue_create_infos.push_back({{}, queue_idx_graphics, 1U, &queue_priority});
+    if (queue_idx_graphics != queue_idx_transfer) {
+        queue_create_infos.push_back({{}, queue_idx_transfer, 1U, &queue_priority});
+    }
+
+    std::vector<const char*> required_device_extensions;
+    for (auto& ext : extensions) {
+        insert_all(required_device_extensions, ext->required_device_extension_names());
+    }
+    spdlog::debug("required device extensions: [{}]", fmt::join(required_device_extensions, ", "));
+
+    void* p_next = nullptr;
+    for (auto& ext : extensions) {
+        p_next = ext->on_create_device(p_next);
+    }
+    vk::PhysicalDeviceFeatures2 physical_device_features_2 = physical_device.getFeatures2();
+    physical_device_features_2.pNext = p_next;
+
+    vk::DeviceCreateInfo device_create_info{
+        {}, queue_create_infos, layer_names, required_device_extensions, nullptr, &physical_device_features_2};
+
+    device = physical_device.createDevice(device_create_info);
+    spdlog::debug("device created");
+
+    for (auto& ext : extensions) {
+        ext->on_device_created(device);
+    }
+
+    queue_graphics = device.getQueue(queue_idx_graphics, 0);
+    queue_transfer = device.getQueue(queue_idx_transfer, 0);
+    spdlog::debug("queues created");
+}
+
+void Context::create_command_pools() {
+    vk::CommandPoolCreateInfo cpi_graphics({vk::CommandPoolCreateFlagBits::eResetCommandBuffer}, queue_idx_graphics);
+    cmd_pool_graphics = device.createCommandPool(cpi_graphics);
+    vk::CommandPoolCreateInfo cpi_transfer({vk::CommandPoolCreateFlagBits::eResetCommandBuffer}, queue_idx_transfer);
+    cmd_pool_transfer = device.createCommandPool(cpi_transfer);
+    spdlog::debug("command pools created");
+}

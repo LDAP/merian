@@ -1,8 +1,14 @@
+#pragma once
+
 #include "vk/extension/extension.hpp"
 
 class ExtensionRaytraceQuery : public Extension {
   public:
-    ExtensionRaytraceQuery() {}
+    ExtensionRaytraceQuery() {
+        acceleration_structure_features.accelerationStructure = VK_TRUE;
+        ray_query_features.pNext = &acceleration_structure_features;
+        ray_query_features.rayQuery = VK_TRUE;
+    }
     ~ExtensionRaytraceQuery() {}
     std::string name() const override {
         return "ExtensionRaytraceQuery";
@@ -16,4 +22,13 @@ class ExtensionRaytraceQuery : public Extension {
             VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,    VK_KHR_RAY_QUERY_EXTENSION_NAME,
         };
     }
+    void* on_create_device(void* p_next) override {
+        acceleration_structure_features.pNext = p_next;
+        return &ray_query_features;
+    }
+
+
+  private:
+    vk::PhysicalDeviceAccelerationStructureFeaturesKHR acceleration_structure_features;
+    vk::PhysicalDeviceRayQueryFeaturesKHR ray_query_features;
 };
