@@ -1,18 +1,29 @@
 #pragma once
-
-#include "vk/context.hpp"
+#define VK_ENABLE_BETA_EXTENSIONS
+#define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
+#include <vulkan/vulkan.hpp>
 #include <vector>
 
 class Extension {
   public:
     virtual ~Extension() = 0;
     virtual std::string name() const = 0;
-    std::vector<const char*> required_extension_names() const {
+    virtual std::vector<const char*> required_extension_names() const {
         return {};
     }
-    std::vector<const char*> required_layer_names() const {
+    virtual std::vector<const char*> required_layer_names() const {
         return {};
     }
-    void on_instance_created(vk::Instance&) {}
-    void on_destroy(vk::Instance&) {}
+    /**
+     * Append structs to InstanceCreateInfo.
+     * 
+     * If a struct should be appended, set pNext of your struct to the supplied pointer,
+     * then return a pointer to your struct.
+     * If nothing should be appended, return the supplied pointer.
+     */
+    virtual void* on_create_instance(void* p_next) {
+      return p_next;
+    }
+    virtual void on_instance_created(vk::Instance&) {}
+    virtual void on_destroy(vk::Instance&) {}
 };

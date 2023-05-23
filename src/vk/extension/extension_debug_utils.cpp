@@ -6,10 +6,9 @@
 /*
     This is the function in which errors will go through to be displayed.
 */
-VKAPI_ATTR VkBool32 VKAPI_CALL debugUtilsMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-                                                           VkDebugUtilsMessageTypeFlagsEXT messageTypes,
-                                                           VkDebugUtilsMessengerCallbackDataEXT const* pCallbackData,
-                                                           void* /*pUserData*/) {
+VKAPI_ATTR VkBool32 VKAPI_CALL ExtensionDebugUtils::messenger_callback(
+    VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageTypes,
+    VkDebugUtilsMessengerCallbackDataEXT const* pCallbackData, void* /*pUserData*/) {
     // if (enableValidationLayers) {
     //     if (pCallbackData->messageIdNumber == 648835635) {
     //         // UNASSIGNED-khronos-Validation-debug-build-warning-message
@@ -65,16 +64,16 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debugUtilsMessengerCallback(VkDebugUtilsMessageSe
     return VK_TRUE;
 }
 
+void* ExtensionDebugUtils::on_create_instance(void* p_next) {
+    this->create_info.setPNext(p_next);
+    return &this->create_info;
+}
+
 void ExtensionDebugUtils::on_instance_created(vk::Instance& instance) {
-    vk::DebugUtilsMessengerCreateInfoEXT create_info{
-        {},
-        SEVERITY::eWarning | SEVERITY::eError,
-        MESSAGE::eGeneral | MESSAGE::ePerformance | MESSAGE::eValidation,
-        &debugUtilsMessengerCallback,
-    };
+    this->create_info.setPNext(nullptr);
     messenger = instance.createDebugUtilsMessengerEXT(create_info);
 }
 
 void ExtensionDebugUtils::on_destroy(vk::Instance& instance) {
-  instance.destroyDebugUtilsMessengerEXT(messenger);
+    instance.destroyDebugUtilsMessengerEXT(messenger);
 }

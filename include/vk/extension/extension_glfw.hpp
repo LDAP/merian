@@ -6,10 +6,10 @@
 class ExtensionGLFW : public Extension {
   public:
     ~ExtensionGLFW() {}
-    std::string name() const {
+    std::string name() const override {
         return "ExtensionGLFW";
     }
-    std::vector<const char*> required_extension_names() const {
+    std::vector<const char*> required_extension_names() const override {
         std::vector<const char*> required_extensions;
         uint32_t count;
         const char** extensions = glfwGetRequiredInstanceExtensions(&count);

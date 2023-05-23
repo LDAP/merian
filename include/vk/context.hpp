@@ -1,7 +1,6 @@
 #pragma once
 
-#define VK_ENABLE_BETA_EXTENSIONS
-#define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
+#include "vk/extension/extension.hpp"
 #include <vulkan/vulkan.hpp>
 
 class Context {
@@ -9,6 +8,10 @@ class Context {
     Context();
     ~Context();
 
+  private:
+    void create_instance();
+
   public:
     vk::Instance instance;
+    std::vector<Extension*> extensions;
 };
