@@ -8,10 +8,13 @@ class Extension {
   public:
     virtual ~Extension() = 0;
     virtual std::string name() const = 0;
-    virtual std::vector<const char*> required_extension_names() const {
+    virtual std::vector<const char*> required_instance_extension_names() const {
         return {};
     }
     virtual std::vector<const char*> required_layer_names() const {
+        return {};
+    }
+    virtual std::vector<const char*> required_device_extension_names() const {
         return {};
     }
     /**
@@ -26,4 +29,5 @@ class Extension {
     }
     virtual void on_instance_created(vk::Instance&) {}
     virtual void on_destroy(vk::Instance&) {}
+    virtual bool accept_graphics_queue(vk::PhysicalDevice&, std::size_t) { return true; }
 };

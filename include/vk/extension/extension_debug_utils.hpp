@@ -24,7 +24,7 @@ class ExtensionDebugUtils : public Extension {
     std::string name() const override {
         return "ExtensionDebugUtils";
     }
-    std::vector<const char*> required_extension_names() const override {
+    std::vector<const char*> required_instance_extension_names() const override {
         return {
             VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
             VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
@@ -35,15 +35,18 @@ class ExtensionDebugUtils : public Extension {
             "VK_LAYER_KHRONOS_validation",
         };
     }
+    std::vector<const char*> required_device_extension_names() const override {
+        return {};
+    }
     void on_instance_created(vk::Instance&) override;
     void on_destroy(vk::Instance&) override;
     void* on_create_instance(void* p_next) override;
 
     // Own methods
     static VKAPI_ATTR VkBool32 VKAPI_CALL messenger_callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-                                                      VkDebugUtilsMessageTypeFlagsEXT messageTypes,
-                                                      VkDebugUtilsMessengerCallbackDataEXT const* pCallbackData,
-                                                      void* /*pUserData*/);
+                                                             VkDebugUtilsMessageTypeFlagsEXT messageTypes,
+                                                             VkDebugUtilsMessengerCallbackDataEXT const* pCallbackData,
+                                                             void* /*pUserData*/);
 
   private:
     vk::DebugUtilsMessengerCreateInfoEXT create_info;
