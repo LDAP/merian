@@ -139,8 +139,12 @@ void ExtensionGLFW::recreate_swapchain(Context& context) {
         swapchain_image_views.push_back(context.device.createImageView(createInfo));
     }
     // clang-format on
-
     spdlog::debug("created swapchain");
+
+    if (old_swapchain) {
+        spdlog::debug("destroy old swapchain");
+        context.device.destroySwapchainKHR(old_swapchain);
+    }
 }
 
 void ExtensionGLFW::destroy_image_views(Context& context) {
