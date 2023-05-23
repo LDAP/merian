@@ -139,6 +139,7 @@ void Context::prepare_physical_device(uint32_t vendor_id, uint32_t device_id) {
         throw std::runtime_error("No vulkan device found!");
     }
 
+    // TODO: Sort by score (e.g. prefer dedicated GPU)
     long selected = -1;
     for (std::size_t i = 0; i < devices.size(); i++) {
         vk::PhysicalDeviceProperties2 props = devices[i].getProperties2();
@@ -190,6 +191,7 @@ void Context::find_queues() {
         const int supports_compute = queue_family_props[i].queueFlags & vk::QueueFlagBits::eCompute ? true : false;
         const int supports_transfer = queue_family_props[i].queueFlags & vk::QueueFlagBits::eTransfer ? true : false;
 
+        // TODO: What if separate queues are necessary for compute / graphics?
         if (queue_idx_graphics < 0 && supports_graphics && supports_compute) {
             bool accept = true;
             for (auto& ext : extensions) {
