@@ -52,7 +52,7 @@ Context::Context(uint32_t vendor_id, uint32_t device_id) {
     extensions.push_back(new ExtensionV12());
     extensions.push_back(new ExtensionFloatAtomics());
 
-    spdlog::debug("Active extensions:");
+    spdlog::debug("active extensions:");
     for (auto& ext : extensions) {
         spdlog::debug("{}", ext->name());
     }
@@ -147,7 +147,7 @@ void Context::prepare_physical_device(uint32_t vendor_id, uint32_t device_id) {
     long selected = -1;
     for (std::size_t i = 0; i < devices.size(); i++) {
         vk::PhysicalDeviceProperties2 props = devices[i].getProperties2();
-        spdlog::info("Found physical device {}, vendor id: {}, device id: {}", props.properties.deviceName,
+        spdlog::info("found physical device {}, vendor id: {}, device id: {}", props.properties.deviceName,
                      props.properties.vendorID, props.properties.deviceID);
         if ((vendor_id == (uint32_t)-1 || vendor_id == props.properties.vendorID) &&
             (device_id == (uint32_t)-1 || device_id == props.properties.deviceID)) {
@@ -161,7 +161,7 @@ void Context::prepare_physical_device(uint32_t vendor_id, uint32_t device_id) {
     }
     physical_device = devices[selected];
     physical_device_props = physical_device.getProperties();
-    spdlog::info("Selected physical device {}, vendor id: {}, device id: {}",
+    spdlog::info("selected physical device {}, vendor id: {}, device id: {}",
                  physical_device_props.properties.deviceName, physical_device_props.properties.vendorID,
                  physical_device_props.properties.deviceID);
 
@@ -169,14 +169,14 @@ void Context::prepare_physical_device(uint32_t vendor_id, uint32_t device_id) {
     physical_device_memory_properties = physical_device.getMemoryProperties2();
     extension_properties = physical_device.enumerateDeviceExtensionProperties();
 
-    spdlog::debug("Checking extension support...");
+    spdlog::debug("checking extension support...");
     std::vector<Extension*> not_supported;
     for (auto& ext : extensions) {
         if (!ext->extension_supported(physical_device, extension_properties)) {
-            spdlog::info("Extension {} not supported, disabling...", ext->name());
+            spdlog::info("extension {} not supported, disabling...", ext->name());
             not_supported.push_back(ext);
         } else {
-            spdlog::debug("Extension {} supported", ext->name());
+            spdlog::debug("extension {} supported", ext->name());
         }
     }
     destroy_extensions(*this, not_supported);
