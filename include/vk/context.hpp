@@ -1,5 +1,6 @@
 #pragma once
 #include "vk/extension/extension.hpp"
+#include <mutex>
 #include <vulkan/vulkan.hpp>
 
 class Context {
@@ -33,6 +34,8 @@ class Context {
     vk::Device device;
     vk::Queue queue_graphics; // used for both graphics and compute
     vk::Queue queue_transfer;
+    std::mutex queue_graphics_mutex;
+    std::mutex queue_transfer_mutex;
     // in create_command_pools
     vk::CommandPool cmd_pool_graphics;
     vk::CommandPool cmd_pool_transfer;
