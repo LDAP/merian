@@ -17,11 +17,10 @@ class Context {
     void create_command_pools();
 
   private: // Helper
-    void extensions_check_device_extension_support(vk::PhysicalDevice& physical_device,
-                                                   std::vector<vk::ExtensionProperties>& extension_properties,
-                                                   std::vector<Extension*>& extensions);
-    void extensions_check_instance_layer_support(std::vector<Extension*>& extensions);
-    void extensions_check_instance_extension_support(std::vector<Extension*>& extensions);
+    void extensions_check_instance_layer_support();
+    void extensions_check_instance_extension_support();
+    void extensions_check_device_extension_support();
+    void extensions_self_check_support();
     void destroy_extensions(std::vector<Extension*> extensions);
 
   public:
@@ -35,7 +34,7 @@ class Context {
     vk::PhysicalDeviceProperties2 physical_device_props;
     vk::PhysicalDeviceFeatures2 physical_device_features;
     vk::PhysicalDeviceMemoryProperties2 physical_device_memory_properties;
-    std::vector<vk::ExtensionProperties> extension_properties;
+    std::vector<vk::ExtensionProperties> physical_device_extension_properties;
     // in find_queues
     uint32_t queue_idx_graphics = -1;
     uint32_t queue_idx_transfer = -1;

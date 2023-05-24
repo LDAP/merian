@@ -20,11 +20,7 @@ class ExtensionFloatAtomics : public Extension {
         atomic_features.pNext = p_next;
         return &atomic_features;
     }
-    bool extension_supported(vk::PhysicalDevice& physical_device, std::vector<vk::ExtensionProperties>& extension_properties) override {
-        if (!Extension::extension_supported(physical_device, extension_properties)) {
-            return false;
-        }
-
+    bool extension_supported(vk::PhysicalDevice& physical_device) override {
         vk::PhysicalDeviceShaderAtomicFloatFeaturesEXT atomic_features;
         vk::PhysicalDeviceFeatures2 physical_device_features_2;
         physical_device_features_2.setPNext(&atomic_features);

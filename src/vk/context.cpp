@@ -64,8 +64,8 @@ Context::~Context() {
 }
 
 void Context::create_instance() {
-    extensions_check_instance_layer_support(extensions);
-    extensions_check_instance_extension_support(extensions);
+    extensions_check_instance_layer_support();
+    extensions_check_instance_extension_support();
 
     for (auto& ext : extensions) {
         insert_all(instance_layer_names, ext->required_instance_layer_names());
@@ -132,9 +132,10 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id, uint32_t filter
 
     physical_device_features = physical_device.getFeatures2();
     physical_device_memory_properties = physical_device.getMemoryProperties2();
-    extension_properties = physical_device.enumerateDeviceExtensionProperties();
+    physical_device_extension_properties = physical_device.enumerateDeviceExtensionProperties();
 
-    extensions_check_device_extension_support(physical_device, extension_properties, extensions);
+    extensions_check_device_extension_support();
+    extensions_self_check_support();
 }
 
 void Context::find_queues() {
@@ -226,7 +227,7 @@ void Context::create_command_pools() {
 // HELPERS
 ////////////
 
-void Context::extensions_check_instance_layer_support(std::vector<Extension*>& extensions) {
+void Context::extensions_check_instance_layer_support() {
     spdlog::debug("extensions: checking instance layer support...");
     std::vector<Extension*> not_supported;
     std::vector<vk::LayerProperties> layer_props = vk::enumerateInstanceLayerProperties();
@@ -253,7 +254,7 @@ void Context::extensions_check_instance_layer_support(std::vector<Extension*>& e
     destroy_extensions(not_supported);
 }
 
-void Context::extensions_check_instance_extension_support(std::vector<Extension*>& extensions) {
+void Context::extensions_check_instance_extension_support() {
     spdlog::debug("extensions: checking instance extension support...");
     std::vector<Extension*> not_supported;
     std::vector<vk::ExtensionProperties> extension_props = vk::enumerateInstanceExtensionProperties();
@@ -280,14 +281,39 @@ void Context::extensions_check_instance_extension_support(std::vector<Extension*
     destroy_extensions(not_supported);
 }
 
-void Context::extensions_check_device_extension_support(vk::PhysicalDevice& physical_device,
-                                                        std::vector<vk::ExtensionProperties>& extension_properties,
-                                                        std::vector<Extension*>& extensions) {
+void Context::extensions_check_device_extension_support() {
     spdlog::debug("extensions: checking device extension support...");
     std::vector<Extension*> not_supported;
+    std::vector<vk::ExtensionProperties> extension_props = physical_device.enumerateDeviceExtensionProperties();
+
     for (auto& ext : extensions) {
-        if (!ext->extension_supported(physical_device, extension_properties)) {
+        std::vector<const char*> device_extensions = ext->required_device_extension_names();
+        bool all_extensions_found = true;
+        for (auto& layer : device_extensions) {
+            bool extension_found = false;
+            for (auto& extension_prop : extension_props) {
+                if (!strcmp(extension_prop.extensionName, layer)) {
+                    extension_found = true;
+                    break;
+                }
+            }
+            all_extensions_found &= extension_found;
+        }
+        if (!all_extensions_found) {
             spdlog::warn("extension {} not supported (device extension missing), disabling...", ext->name());
+            not_supported.push_back(ext);
+            ext->supported = false;
+        }
+    }
+    destroy_extensions(not_supported);
+}
+
+void Context::extensions_self_check_support() {
+    spdlog::debug("extensions: self-check support...");
+    std::vector<Extension*> not_supported;
+    for (auto& ext : extensions) {
+        if (!ext->extension_supported(physical_device)) {
+            spdlog::warn("extension {} not supported (self-check failed), disabling...", ext->name());
             ext->supported = false;
             not_supported.push_back(ext);
         }

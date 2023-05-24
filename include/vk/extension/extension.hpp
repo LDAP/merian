@@ -9,7 +9,7 @@ class Context;
 
 /**
  * @brief      An extension to the Vulkan Context.
- * 
+ *
  * An extension can enable layers and Vulkan instance and device extensions (_EXT), as well as
  * hook into the context creation process. Extensions are checked for compatibility and the result
  * can be retrived using is_supported().
@@ -62,28 +62,18 @@ class Extension {
     }
     virtual void on_device_created(vk::Device&) {}
     virtual void on_context_created(Context&) {}
+    /* Called after device is idle and before context is destroyed. */
     virtual void on_destroy_context(Context&) {}
-    virtual bool extension_supported(vk::PhysicalDevice&, std::vector<vk::ExtensionProperties>& extension_properties) {
-        bool supported = true;
-        for (const char* required_extension : required_device_extension_names()) {
-            bool extension_found = false;
-            for (auto& props : extension_properties) {
-                if (!strcmp(props.extensionName, required_extension)) {
-                    extension_found = true;
-                }
-            }
-            if (!extension_found) {
-                supported = false;
-            }
-        }
-        return supported;
+    /* Custom check for compatibility after the physical device is ready. */
+    virtual bool extension_supported(vk::PhysicalDevice&) {
+        return true;
     }
     /* Only valid after context initialization */
     virtual bool is_supported() final {
         return supported;
     }
 
-private:
+  private:
     // written by Context
     bool supported = true;
 };
