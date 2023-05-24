@@ -72,8 +72,8 @@ void Context::create_instance() {
         insert_all(instance_extension_names, ext->required_instance_extension_names());
     }
 
-    spdlog::debug("required layers: [{}]", fmt::join(instance_layer_names, ", "));
-    spdlog::debug("required instance extensions: [{}]", fmt::join(instance_extension_names, ", "));
+    spdlog::debug("enabling instance layers: [{}]", fmt::join(instance_layer_names, ", "));
+    spdlog::debug("enabling instance extensions: [{}]", fmt::join(instance_extension_names, ", "));
 
     void* p_next = nullptr;
     for (auto& ext : extensions) {
@@ -121,7 +121,7 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id, uint32_t filter
     }
 
     if (selected == -1) {
-        throw std::runtime_error(fmt::format("No vulkan device found with vendor id: {}, device id: {}! (-1 means any)",
+        throw std::runtime_error(fmt::format("no vulkan device found with vendor id: {}, device id: {}! (-1 means any)",
                                              filter_vendor_id, filter_device_id));
     }
     physical_device = devices[selected];
@@ -190,7 +190,7 @@ void Context::create_device_and_queues() {
     for (auto& ext : extensions) {
         insert_all(required_device_extensions, ext->required_device_extension_names());
     }
-    spdlog::debug("required device extensions: [{}]", fmt::join(required_device_extensions, ", "));
+    spdlog::debug("enabling device extensions: [{}]", fmt::join(required_device_extensions, ", "));
 
     void* p_next = nullptr;
     for (auto& ext : extensions) {
