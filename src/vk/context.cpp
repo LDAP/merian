@@ -16,6 +16,8 @@ Context::Context(std::vector<Extension*> desired_extensions, std::string applica
                  uint32_t application_vk_version, uint32_t filter_vendor_id, uint32_t filter_device_id,
                  std::string filter_device_name)
     : extensions(desired_extensions) {
+    spdlog::info("This is {} {}", MERIAN_PROJECT_NAME, MERIAN_VERSION);
+
     // Init dynamic loader
     static vk::DynamicLoader dl;
     static PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr =

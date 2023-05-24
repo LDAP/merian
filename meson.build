@@ -48,7 +48,6 @@ endforeach
 # Main targets
 # Keep sorted
 src_files = files(
-    'src/merian.cpp',
     'src/vk/context.cpp',
     'src/vk/extension/extension.cpp',
     'src/vk/extension/extension_debug_utils.cpp',
@@ -58,7 +57,7 @@ inc_dirs = [
     'include'
 ]
 
-exe = executable(
+lib = library(
     'merian',
     src_files,
     dependencies: [
@@ -70,5 +69,3 @@ exe = executable(
     include_directories: inc_dirs,
     install : true
 )
-
-test('basic', exe)
