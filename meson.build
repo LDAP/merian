@@ -39,7 +39,9 @@ foreach s : shaders
         'shader @0@'.format(s),
         command : [glslc, '-Ires/shader', '-V', '@INPUT@', '-o',  '@OUTPUT@'],
         input : s, 
-        output : '@BASENAME@.spv'
+        output : '@BASENAME@.spv',
+        install_dir: 'assets/shader'
+        install: true
     )
 endforeach
 
