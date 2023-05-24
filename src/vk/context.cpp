@@ -196,6 +196,7 @@ void Context::create_device_and_queues() {
     for (auto& ext : extensions) {
         p_next = ext->on_create_device(p_next);
     }
+    // TODO: This enables all features which may be overkill
     vk::PhysicalDeviceFeatures2 physical_device_features_2 = physical_device.getFeatures2();
     physical_device_features_2.pNext = p_next;
 
