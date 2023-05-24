@@ -69,3 +69,8 @@ lib = library(
     include_directories: inc_dirs,
     install : true
 )
+
+merian_dep = declare_dependency(
+    link_with : lib,
+    include_directories : inc_dirs
+)
