@@ -44,6 +44,8 @@ Context::Context(std::vector<Extension*> desired_extensions, uint32_t filter_ven
 }
 
 Context::~Context() {
+    device.waitIdle();
+
     for (auto& ext : extensions) {
         ext->on_destroy_context(*this);
     }
