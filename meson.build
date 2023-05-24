@@ -40,7 +40,7 @@ foreach s : shaders
         command : [glslc, '-Ires/shader', '-V', '@INPUT@', '-o',  '@OUTPUT@'],
         input : s, 
         output : '@BASENAME@.spv',
-        install_dir: 'assets/shader'
+        install_dir: 'assets/shader',
         install: true
     )
 endforeach
