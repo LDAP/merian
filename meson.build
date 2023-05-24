@@ -25,8 +25,8 @@ add_project_arguments('-DPROJECT_NAME="@0@"'.format(meson.project_name()), langu
 # Dependencies
 fmt = dependency('fmt', version : ['>=8.1.1'], fallback : ['fmt', 'fmt_dep'])
 spdlog = dependency('spdlog', version : ['>=1.10.0'], fallback : ['spdlog', 'spdlog_dep'], default_options : ['external_fmt=enabled'])
-vulkan = dependency('vulkan')
-glfw = dependency('glfw3')
+vulkan = dependency('vulkan', version: ['>=1.3.0'])
+glfw = dependency('glfw3', version: ['>=3.3.0'])
 
 # Shaders
 glslc = find_program('glslangValidator')
