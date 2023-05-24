@@ -16,11 +16,11 @@ endif
 
 commit = run_command('git', 'rev-parse', 'HEAD', check: true)
 version_split = meson.project_version().split('.')
-add_project_arguments('-DVERSION="@0@ (@1@)"'.format(meson.project_version(), commit.stdout().strip()), language : 'cpp')
-add_project_arguments('-DVERSION_MAJOR=@0@'.format(version_split[0]), language : 'cpp')
-add_project_arguments('-DVERSION_MINOR=@0@'.format(version_split[1]), language : 'cpp')
-add_project_arguments('-DVERSION_PATCH=@0@'.format(version_split[2]), language : 'cpp')
-add_project_arguments('-DPROJECT_NAME="@0@"'.format(meson.project_name()), language : 'cpp')
+add_project_arguments('-DMERIAN_VERSION="@0@ (@1@)"'.format(meson.project_version(), commit.stdout().strip()), language : 'cpp')
+add_project_arguments('-DMERIAN_VERSION_MAJOR=@0@'.format(version_split[0]), language : 'cpp')
+add_project_arguments('-DMERIAN_VERSION_MINOR=@0@'.format(version_split[1]), language : 'cpp')
+add_project_arguments('-DMERIAN_VERSION_PATCH=@0@'.format(version_split[2]), language : 'cpp')
+add_project_arguments('-DMERIAN_PROJECT_NAME="@0@"'.format(meson.project_name()), language : 'cpp')
 
 # Dependencies
 fmt = dependency('fmt', version : ['>=8.1.1'], fallback : ['fmt', 'fmt_dep'])

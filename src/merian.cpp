@@ -18,7 +18,7 @@ int main(int argc, char** argv) {
         std::cout << argv[0] << "takes no arguments.\n";
         return 1;
     }
-    std::cout << "This is " << PROJECT_NAME << " " << VERSION << ".\n";
+    std::cout << "This is " << MERIAN_PROJECT_NAME << " " << MERIAN_VERSION << ".\n";
 
     setup_logging();
 

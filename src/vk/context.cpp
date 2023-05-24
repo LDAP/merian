@@ -78,8 +78,8 @@ void Context::create_instance(std::string application_name, uint32_t application
     vk::ApplicationInfo application_info{
         application_name.c_str(),
         application_vk_version,
-        PROJECT_NAME,
-        VK_MAKE_VERSION(VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH),
+        MERIAN_PROJECT_NAME,
+        VK_MAKE_VERSION(MERIAN_VERSION_MAJOR, MERIAN_VERSION_MINOR, MERIAN_VERSION_PATCH),
         VK_API_VERSION_1_3,
     };
 

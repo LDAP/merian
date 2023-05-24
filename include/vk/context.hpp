@@ -5,7 +5,7 @@
 
 class Context {
   public:
-    Context(std::vector<Extension*> extensions, std::string application_name = PROJECT_NAME,
+    Context(std::vector<Extension*> extensions, std::string application_name = MERIAN_PROJECT_NAME,
             uint32_t application_vk_version = VK_MAKE_VERSION(1, 0, 0), uint32_t filter_vendor_id = -1,
             uint32_t filter_device_id = -1, std::string filter_device_name = "");
     ~Context();

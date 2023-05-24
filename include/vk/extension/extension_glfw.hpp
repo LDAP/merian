@@ -7,7 +7,7 @@
 
 class ExtensionGLFW : public Extension {
   public:
-    ExtensionGLFW(int width = 1280, int height = 720, const char* title = PROJECT_NAME) {
+    ExtensionGLFW(int width = 1280, int height = 720, const char* title = MERIAN_PROJECT_NAME) {
         if (!glfwInit())
             throw std::runtime_error("GLFW initialization failed!");
         if (!glfwVulkanSupported())
