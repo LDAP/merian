@@ -46,6 +46,7 @@ class Extension {
     virtual void on_instance_created(vk::Instance&) {}
     /* Called when before the instance is destroyed or if the extension is determined as unsupported */
     virtual void on_destroy_instance(vk::Instance&) {}
+    /* E.g. to dismiss a queue that does not support present-to-surface. */
     virtual bool accept_graphics_queue(vk::PhysicalDevice&, std::size_t) {
         return true;
     }
