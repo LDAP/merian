@@ -3,6 +3,10 @@
 #include <mutex>
 #include <vulkan/vulkan.hpp>
 
+/* Initializes the Vulkan instance and device and holds core objects.
+ * 
+ * Extensions can extend the functionality and hook into the creation process.
+ */
 class Context {
   public:
     Context(std::vector<Extension*> extensions, std::string application_name = MERIAN_PROJECT_NAME,
