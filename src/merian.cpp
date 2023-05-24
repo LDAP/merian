@@ -1,3 +1,8 @@
+#include "vk/extension/extension_debug_utils.hpp"
+#include "vk/extension/extension_float_atomics.hpp"
+#include "vk/extension/extension_glfw.hpp"
+#include "vk/extension/extension_raytrace.hpp"
+#include "vk/extension/extension_v12.hpp"
 #include <iostream>
 #include <spdlog/spdlog.h>
 #include <vk/context.hpp>
@@ -17,7 +22,22 @@ int main(int argc, char** argv) {
 
     setup_logging();
 
-    Context();
+    std::vector<Extension*> extensions;
+
+#ifdef DEBUG
+    extensions.push_back(new ExtensionDebugUtils());
+#endif
+    extensions.push_back(new ExtensionGLFW());
+    extensions.push_back(new ExtensionRaytraceQuery());
+    extensions.push_back(new ExtensionV12());
+    extensions.push_back(new ExtensionFloatAtomics());
+    {
+        Context context(extensions);
+    }
+
+    for (auto& ext : extensions) {
+        delete ext;
+    }
 
     return 0;
 }

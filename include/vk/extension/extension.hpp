@@ -7,16 +7,29 @@
 // cyclic -> forward definition
 class Context;
 
+/**
+ * @brief      An extension to the Vulkan Context.
+ * 
+ * An extension can enable layers and Vulkan instance and device extensions (_EXT), as well as
+ * hook into the context creation process. Extensions are checked for compatibility and the result
+ * can be retrived using is_supported().
+ */
 class Extension {
+
+    friend Context;
+
   public:
     virtual ~Extension() = 0;
     virtual std::string name() const = 0;
+    /* Extensions that should be enabled instance-wide. */
     virtual std::vector<const char*> required_instance_extension_names() const {
         return {};
     }
-    virtual std::vector<const char*> required_layer_names() const {
+    /* Layers that should be enabled instance-wide. */
+    virtual std::vector<const char*> required_instance_layer_names() const {
         return {};
     }
+    /* Extensions that should be enabled device-wide. */
     virtual std::vector<const char*> required_device_extension_names() const {
         return {};
     }
@@ -31,6 +44,7 @@ class Extension {
         return p_next;
     }
     virtual void on_instance_created(vk::Instance&) {}
+    /* Called when before the instance is destroyed or if the extension is determined as unsupported */
     virtual void on_destroy_instance(vk::Instance&) {}
     virtual bool accept_graphics_queue(vk::PhysicalDevice&, std::size_t) {
         return true;
@@ -63,4 +77,12 @@ class Extension {
         }
         return supported;
     }
+    /* Only valid after context initialization */
+    virtual bool is_supported() final {
+        return supported;
+    }
+
+private:
+    // written by Context
+    bool supported = true;
 };

@@ -30,7 +30,7 @@ class ExtensionDebugUtils : public Extension {
             VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
         };
     }
-    std::vector<const char*> required_layer_names() const override {
+    std::vector<const char*> required_instance_layer_names() const override {
         return {
             "VK_LAYER_KHRONOS_validation",
         };
@@ -55,5 +55,5 @@ class ExtensionDebugUtils : public Extension {
 
   private:
     vk::DebugUtilsMessengerCreateInfoEXT create_info;
-    vk::DebugUtilsMessengerEXT messenger;
+    vk::DebugUtilsMessengerEXT messenger = VK_NULL_HANDLE;
 };

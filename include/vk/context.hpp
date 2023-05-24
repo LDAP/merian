@@ -5,20 +5,29 @@
 
 class Context {
   public:
-    Context(uint32_t vendor_id = -1, uint32_t device_id = -1);
+    Context(std::vector<Extension*> extensions, uint32_t filter_vendor_id = -1, uint32_t filter_device_id = -1,
+            std::string filter_device_name = "");
     ~Context();
 
   private:
     void create_instance();
-    void prepare_physical_device(uint32_t vendor_id = -1, uint32_t device_id = -1);
+    void prepare_physical_device(uint32_t filter_vendor_id, uint32_t filter_device_id, std::string filter_device_name);
     void find_queues();
     void create_device_and_queues();
     void create_command_pools();
 
+  private: // Helper
+    void extensions_check_device_extension_support(vk::PhysicalDevice& physical_device,
+                                                   std::vector<vk::ExtensionProperties>& extension_properties,
+                                                   std::vector<Extension*>& extensions);
+    void extensions_check_instance_layer_support(std::vector<Extension*>& extensions);
+    void extensions_check_instance_extension_support(std::vector<Extension*>& extensions);
+    void destroy_extensions(std::vector<Extension*> extensions);
+
   public:
     std::vector<Extension*> extensions;
     // in create_instance
-    std::vector<const char*> layer_names;
+    std::vector<const char*> instance_layer_names;
     std::vector<const char*> instance_extension_names;
     vk::Instance instance;
     // in prepare_physical_device
