@@ -12,13 +12,8 @@
 
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
-static const vk::ApplicationInfo application_info{
-    PROJECT_NAME,       VK_MAKE_VERSION(VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH),
-    PROJECT_NAME,       VK_MAKE_VERSION(VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH),
-    VK_API_VERSION_1_3,
-};
-
-Context::Context(std::vector<Extension*> desired_extensions, uint32_t filter_vendor_id, uint32_t filter_device_id,
+Context::Context(std::vector<Extension*> desired_extensions, std::string application_name,
+                 uint32_t application_vk_version, uint32_t filter_vendor_id, uint32_t filter_device_id,
                  std::string filter_device_name)
     : extensions(desired_extensions) {
     // Init dynamic loader
@@ -32,7 +27,7 @@ Context::Context(std::vector<Extension*> desired_extensions, uint32_t filter_ven
         spdlog::trace("{}", ext->name());
     }
 
-    create_instance();
+    create_instance(application_name, application_vk_version);
     prepare_physical_device(filter_vendor_id, filter_device_id, filter_device_name);
     find_queues();
     create_device_and_queues();
@@ -63,7 +58,7 @@ Context::~Context() {
     instance.destroy();
 }
 
-void Context::create_instance() {
+void Context::create_instance(std::string application_name, uint32_t application_vk_version) {
     extensions_check_instance_layer_support();
     extensions_check_instance_extension_support();
 
@@ -79,6 +74,14 @@ void Context::create_instance() {
     for (auto& ext : extensions) {
         p_next = ext->on_create_instance(p_next);
     }
+
+    vk::ApplicationInfo application_info{
+        application_name.c_str(),
+        application_vk_version,
+        PROJECT_NAME,
+        VK_MAKE_VERSION(VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH),
+        VK_API_VERSION_1_3,
+    };
 
     vk::InstanceCreateInfo instance_create_info{
         {},

@@ -5,12 +5,13 @@
 
 class Context {
   public:
-    Context(std::vector<Extension*> extensions, uint32_t filter_vendor_id = -1, uint32_t filter_device_id = -1,
-            std::string filter_device_name = "");
+    Context(std::vector<Extension*> extensions, std::string application_name = PROJECT_NAME,
+            uint32_t application_vk_version = VK_MAKE_VERSION(1, 0, 0), uint32_t filter_vendor_id = -1,
+            uint32_t filter_device_id = -1, std::string filter_device_name = "");
     ~Context();
 
   private:
-    void create_instance();
+    void create_instance(std::string application_name, uint32_t application_vk_version);
     void prepare_physical_device(uint32_t filter_vendor_id, uint32_t filter_device_id, std::string filter_device_name);
     void find_queues();
     void create_device_and_queues();
@@ -25,6 +26,8 @@ class Context {
 
   public:
     std::vector<Extension*> extensions;
+    std::string application_name;
+    uint32_t application_vk_version;
     // in create_instance
     std::vector<const char*> instance_layer_names;
     std::vector<const char*> instance_extension_names;
