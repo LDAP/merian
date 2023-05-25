@@ -1,7 +1,12 @@
 #pragma once
-#include "vk/extension/extension.hpp"
 #include <mutex>
+
+#define VK_ENABLE_BETA_EXTENSIONS
+#define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 #include <vulkan/vulkan.hpp>
+
+// cyclic -> forward definition
+class Extension;
 
 /* Initializes the Vulkan instance and device and holds core objects.
  * 
@@ -9,12 +14,12 @@
  */
 class Context {
   public:
-    Context(std::vector<Extension*> extensions, std::string application_name = MERIAN_PROJECT_NAME,
+    Context(std::vector<Extension*> extensions, std::string application_name = "",
             uint32_t application_vk_version = VK_MAKE_VERSION(1, 0, 0), uint32_t filter_vendor_id = -1,
             uint32_t filter_device_id = -1, std::string filter_device_name = "");
     ~Context();
 
-  private:
+  private: // Vulkan initialization
     void create_instance(std::string application_name, uint32_t application_vk_version);
     void prepare_physical_device(uint32_t filter_vendor_id, uint32_t filter_device_id, std::string filter_device_name);
     void find_queues();
@@ -28,8 +33,10 @@ class Context {
     void extensions_self_check_support();
     void destroy_extensions(std::vector<Extension*> extensions);
 
-  public:
+  private:
     std::vector<Extension*> extensions;
+
+  public:
     std::string application_name;
     uint32_t application_vk_version;
     // in create_instance
