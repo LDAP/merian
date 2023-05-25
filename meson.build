@@ -48,10 +48,10 @@ endforeach
 # Main targets
 # Keep sorted
 src_files = files(
+    'src/utils/stopwatch.cpp',
     'src/vk/context.cpp',
     'src/vk/extension/extension.cpp',
-    'src/vk/extension/extension_debug_utils.cpp',
-    'src/vk/extension/extension_glfw.cpp',
+    'src/vk/extension/extension_stopwatch.cpp',
     'src/vk/extension/extension_vk_debug_utils.cpp',
     'src/vk/extension/extension_vk_glfw.cpp',
 )
