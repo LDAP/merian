@@ -1,9 +1,4 @@
 #include "utils/vector_utils.hpp"
-#include "vk/extension/extension_debug_utils.hpp"
-#include "vk/extension/extension_float_atomics.hpp"
-#include "vk/extension/extension_glfw.hpp"
-#include "vk/extension/extension_raytrace.hpp"
-#include "vk/extension/extension_v12.hpp"
 
 #include <GLFW/glfw3.h>
 #include <spdlog/spdlog.h>

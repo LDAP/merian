@@ -1,11 +1,8 @@
 #pragma once
-#define VK_ENABLE_BETA_EXTENSIONS
-#define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
-#include <vector>
-#include <vulkan/vulkan.hpp>
 
-// cyclic -> forward definition
-class Context;
+#include "vk/context.hpp"
+#include <vector>
+
 
 /**
  * @brief      An extension to the Vulkan Context.

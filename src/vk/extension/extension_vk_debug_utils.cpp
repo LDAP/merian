@@ -1,5 +1,5 @@
 #include <spdlog/spdlog.h>
-#include <vk/extension/extension_debug_utils.hpp>
+#include <vk/extension/extension_vk_debug_utils.hpp>
 
 #include <iostream>
 #include <vulkan/vulkan.hpp>
@@ -7,7 +7,7 @@
 /*
     This is the function in which errors will go through to be displayed.
 */
-VKAPI_ATTR VkBool32 VKAPI_CALL ExtensionDebugUtils::messenger_callback(
+VKAPI_ATTR VkBool32 VKAPI_CALL ExtensionVkDebugUtils::messenger_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageTypes,
     VkDebugUtilsMessengerCallbackDataEXT const* pCallbackData, void* /*pUserData*/) {
 
@@ -88,17 +88,17 @@ VKAPI_ATTR VkBool32 VKAPI_CALL ExtensionDebugUtils::messenger_callback(
     return VK_TRUE;
 }
 
-void* ExtensionDebugUtils::on_create_instance(void* p_next) {
+void* ExtensionVkDebugUtils::on_create_instance(void* p_next) {
     this->create_info.setPNext(p_next);
     return &this->create_info;
 }
 
-void ExtensionDebugUtils::on_instance_created(vk::Instance& instance) {
+void ExtensionVkDebugUtils::on_instance_created(vk::Instance& instance) {
     this->create_info.setPNext(nullptr);
     messenger = instance.createDebugUtilsMessengerEXT(create_info);
 }
 
-void ExtensionDebugUtils::on_destroy_instance(vk::Instance& instance) {
+void ExtensionVkDebugUtils::on_destroy_instance(vk::Instance& instance) {
     if (messenger) {
         spdlog::debug("destroy DebugUtilsMessengerEXT");
         instance.destroyDebugUtilsMessengerEXT(messenger);

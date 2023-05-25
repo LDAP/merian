@@ -52,6 +52,8 @@ src_files = files(
     'src/vk/extension/extension.cpp',
     'src/vk/extension/extension_debug_utils.cpp',
     'src/vk/extension/extension_glfw.cpp',
+    'src/vk/extension/extension_vk_debug_utils.cpp',
+    'src/vk/extension/extension_vk_glfw.cpp',
 )
 inc_dirs = [
     'include'

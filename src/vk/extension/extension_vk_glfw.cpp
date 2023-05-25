@@ -1,8 +1,8 @@
-#include "vk/extension/extension_glfw.hpp"
+#include "vk/extension/extension_vk_glfw.hpp"
 #include <spdlog/spdlog.h>
 #include <vk/context.hpp>
 
-void ExtensionGLFW::on_instance_created(vk::Instance& instance) {
+void ExtensionVkGLFW::on_instance_created(vk::Instance& instance) {
     auto psurf = VkSurfaceKHR(surface);
     if (glfwCreateWindowSurface(instance, window, NULL, &psurf))
         throw std::runtime_error("Surface creation failed!");
@@ -10,23 +10,23 @@ void ExtensionGLFW::on_instance_created(vk::Instance& instance) {
     spdlog::debug("created surface");
 }
 
-void ExtensionGLFW::on_destroy_instance(vk::Instance& instance) {
+void ExtensionVkGLFW::on_destroy_instance(vk::Instance& instance) {
     spdlog::debug("destroy surface");
     instance.destroySurfaceKHR(surface);
 }
 
-bool ExtensionGLFW::accept_graphics_queue(vk::PhysicalDevice& physical_device, std::size_t queue_family_index) {
+bool ExtensionVkGLFW::accept_graphics_queue(vk::PhysicalDevice& physical_device, std::size_t queue_family_index) {
     if (physical_device.getSurfaceSupportKHR(queue_family_index, surface)) {
         return true;
     }
     return false;
 }
 
-void ExtensionGLFW::on_context_created(Context& context) {
+void ExtensionVkGLFW::on_context_created(Context& context) {
     recreate_swapchain(context);
 }
 
-void ExtensionGLFW::on_destroy_context(Context& context) {
+void ExtensionVkGLFW::on_destroy_context(Context& context) {
     destroy_swapchain(context);
 }
 
@@ -41,6 +41,8 @@ vk::PresentModeKHR select_present_mode(std::vector<vk::PresentModeKHR>& present_
 
 vk::SurfaceFormatKHR select_surface_format(std::vector<vk::SurfaceFormatKHR>& surface_formats) {
     for (const auto& surface_format : surface_formats) {
+        // SRGB: Vulkan does the gamma correction?
+        // UNORM: We have to gamma correct?
         if (surface_format.format == vk::Format::eR8G8B8A8Srgb &&
             surface_format.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear) {
             return surface_format;
@@ -64,7 +66,7 @@ vk::Extent2D select_extent2D(vk::SurfaceCapabilitiesKHR capabilities, GLFWwindow
     return extent;
 }
 
-void ExtensionGLFW::recreate_swapchain(Context& context) {
+void ExtensionVkGLFW::recreate_swapchain(Context& context) {
     vk::SwapchainKHR old_swapchain;
     if (swapchain) {
         spdlog::debug("recreate swapchain");
@@ -147,7 +149,7 @@ void ExtensionGLFW::recreate_swapchain(Context& context) {
     }
 }
 
-void ExtensionGLFW::destroy_image_views(Context& context) {
+void ExtensionVkGLFW::destroy_image_views(Context& context) {
     spdlog::debug("destroy image views");
     for (auto imageView : swapchain_image_views) {
         context.device.destroyImageView(imageView);
@@ -156,7 +158,7 @@ void ExtensionGLFW::destroy_image_views(Context& context) {
     swapchain_images.resize(0);
 }
 
-void ExtensionGLFW::destroy_swapchain(Context& context) {
+void ExtensionVkGLFW::destroy_swapchain(Context& context) {
     spdlog::debug("destroy swapchain");
 
     if (!swapchain) {

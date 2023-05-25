@@ -8,21 +8,21 @@
 using SEVERITY = vk::DebugUtilsMessageSeverityFlagBitsEXT;
 using MESSAGE = vk::DebugUtilsMessageTypeFlagBitsEXT;
 
-class ExtensionDebugUtils : public Extension {
+class ExtensionVkDebugUtils : public Extension {
   public:
-    ExtensionDebugUtils() {
+    ExtensionVkDebugUtils() {
         create_info = {
             {},
             SEVERITY::eWarning | SEVERITY::eError,
             MESSAGE::eGeneral | MESSAGE::ePerformance | MESSAGE::eValidation,
-            &ExtensionDebugUtils::messenger_callback,
+            &ExtensionVkDebugUtils::messenger_callback,
         };
     }
 
     // Overrides
-    ~ExtensionDebugUtils() {}
+    ~ExtensionVkDebugUtils() {}
     std::string name() const override {
-        return "ExtensionDebugUtils";
+        return "ExtensionVkDebugUtils";
     }
     std::vector<const char*> required_instance_extension_names() const override {
         return {

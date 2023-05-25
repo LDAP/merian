@@ -2,16 +2,16 @@
 
 #include "vk/extension/extension.hpp"
 
-class ExtensionRaytraceQuery : public Extension {
+class ExtensionVkRaytraceQuery : public Extension {
   public:
-    ExtensionRaytraceQuery() {
+    ExtensionVkRaytraceQuery() {
         acceleration_structure_features.accelerationStructure = VK_TRUE;
         ray_query_features.pNext = &acceleration_structure_features;
         ray_query_features.rayQuery = VK_TRUE;
     }
-    ~ExtensionRaytraceQuery() {}
+    ~ExtensionVkRaytraceQuery() {}
     std::string name() const override {
-        return "ExtensionRaytraceQuery";
+        return "ExtensionVkRaytraceQuery";
     }
     std::vector<const char*> required_device_extension_names() const override {
         return {

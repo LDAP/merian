@@ -1,15 +1,15 @@
 #pragma once
 
 #include "vk/extension/extension.hpp"
-class ExtensionFloatAtomics : public Extension {
+class ExtensionVkFloatAtomics : public Extension {
   public:
-    ExtensionFloatAtomics() {
+    ExtensionVkFloatAtomics() {
         atomic_features.shaderImageFloat32Atomics = VK_TRUE;
         atomic_features.shaderImageFloat32AtomicAdd = VK_TRUE;
     }
-    ~ExtensionFloatAtomics() {}
+    ~ExtensionVkFloatAtomics() {}
     std::string name() const override {
-        return "ExtensionFloatAtomics";
+        return "ExtensionVkFloatAtomics";
     }
     std::vector<const char*> required_device_extension_names() const override {
         return {

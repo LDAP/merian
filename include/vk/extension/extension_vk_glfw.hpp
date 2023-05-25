@@ -5,9 +5,9 @@
 #include <GLFW/glfw3.h>
 // clang-format on
 
-class ExtensionGLFW : public Extension {
+class ExtensionVkGLFW : public Extension {
   public:
-    ExtensionGLFW(int width = 1280, int height = 720, const char* title = MERIAN_PROJECT_NAME) {
+    ExtensionVkGLFW(int width = 1280, int height = 720, const char* title = "") {
         if (!glfwInit())
             throw std::runtime_error("GLFW initialization failed!");
         if (!glfwVulkanSupported())
@@ -17,11 +17,11 @@ class ExtensionGLFW : public Extension {
         glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
         window = glfwCreateWindow(width, height, title, nullptr, nullptr);
     }
-    ~ExtensionGLFW() {
+    ~ExtensionVkGLFW() {
         glfwDestroyWindow(window);
     }
     std::string name() const override {
-        return "ExtensionGLFW";
+        return "ExtensionVkGLFW";
     }
     std::vector<const char*> required_instance_extension_names() const override {
         std::vector<const char*> required_extensions;
