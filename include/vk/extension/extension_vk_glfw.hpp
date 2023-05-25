@@ -7,7 +7,14 @@
 
 class ExtensionVkGLFW : public Extension {
   public:
-    ExtensionVkGLFW(int width = 1280, int height = 720, const char* title = "") {
+    /**
+     * @param[in]  preferred_surface_formats  The preferred surface formats in decreasing priority
+     * @param[in]  fallback_format            The fallback format if non of the preferred formats is available
+     */
+    ExtensionVkGLFW(int width = 1280, int height = 720, const char* title = "",
+                    std::vector<vk::SurfaceFormatKHR> preferred_surface_formats = {vk::Format::eR8G8B8A8Srgb,
+                                                                                   vk::Format::eB8G8R8A8Srgb})
+        : preferred_surface_formats(preferred_surface_formats) {
         if (!glfwInit())
             throw std::runtime_error("GLFW initialization failed!");
         if (!glfwVulkanSupported())
@@ -47,6 +54,9 @@ class ExtensionVkGLFW : public Extension {
     void destroy_swapchain(Context& context);
     /* Destroys image views only (for recreate) */
     void destroy_image_views(Context& context);
+
+  private:
+    std::vector<vk::SurfaceFormatKHR> preferred_surface_formats;
 
   public:
     GLFWwindow* window;

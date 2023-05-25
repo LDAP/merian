@@ -39,16 +39,21 @@ vk::PresentModeKHR select_present_mode(std::vector<vk::PresentModeKHR>& present_
     return present_modes[0];
 }
 
-vk::SurfaceFormatKHR select_surface_format(std::vector<vk::SurfaceFormatKHR>& surface_formats) {
-    for (const auto& surface_format : surface_formats) {
-        // SRGB: Vulkan does the gamma correction?
-        // UNORM: We have to gamma correct?
-        if (surface_format.format == vk::Format::eR8G8B8A8Srgb &&
-            surface_format.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear) {
-            return surface_format;
+vk::SurfaceFormatKHR select_surface_format(std::vector<vk::SurfaceFormatKHR>& available,
+                                           std::vector<vk::SurfaceFormatKHR>& preffered) {
+    if (available.empty())
+        throw std::runtime_error{"no surface format available!"};
+
+    for (const auto& preferred_format : preffered) {
+        for (const auto& available_format : available) {
+            if (available_format.format == preferred_format.format) {
+                return available_format;
+            }
         }
     }
-    return surface_formats[0];
+
+    spdlog::warn("preferred surface format not available! using first available format!");
+    return available[0];
 }
 
 vk::Extent2D select_extent2D(vk::SurfaceCapabilitiesKHR capabilities, GLFWwindow* window) {
@@ -86,9 +91,9 @@ void ExtensionVkGLFW::recreate_swapchain(Context& context) {
     if (present_modes.size() == 0)
         throw std::runtime_error("Surface doesn't support any present modes!");
 
-    // Surface format selection
-    // TODO: vkdt does here different things
-    surface_format = select_surface_format(surface_formats);
+    surface_format = select_surface_format(surface_formats, preferred_surface_formats);
+    spdlog::debug("selected surface format {}, color space {}", vk::to_string(surface_format.format),
+                  vk::to_string(surface_format.colorSpace));
     // TODO: vkdt does here different things
     vk::PresentModeKHR present_mode = select_present_mode(present_modes);
     extent2D = select_extent2D(capabilities, window);
