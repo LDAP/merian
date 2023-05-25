@@ -4,6 +4,20 @@
 #include <iostream>
 #include <vulkan/vulkan.hpp>
 
+spdlog::level::level_enum get_severity(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity) {
+    if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
+        return spdlog::level::level_enum::err;
+    } else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
+        return spdlog::level::level_enum::warn;
+    } else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) {
+        return spdlog::level::level_enum::info;
+    } else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) {
+        return spdlog::level::level_enum::trace;
+    } else {
+        return spdlog::level::level_enum::err;
+    }
+}
+
 /*
     This is the function in which errors will go through to be displayed.
 */
@@ -20,19 +34,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL ExtensionVkDebugUtils::messenger_callback(
         return VK_FALSE;
     }
 
-    spdlog::level::level_enum severity;
-    if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
-        severity = spdlog::level::level_enum::err;
-    } else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
-        severity = spdlog::level::level_enum::warn;
-    } else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) {
-        severity = spdlog::level::level_enum::info;
-    } else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) {
-        severity = spdlog::level::level_enum::trace;
-    } else {
-        severity = spdlog::level::level_enum::err;
-    }
-
+    spdlog::level::level_enum severity = get_severity(messageSeverity);
     std::string msg_type = vk::to_string(static_cast<vk::DebugUtilsMessageTypeFlagsEXT>(messageTypes));
     spdlog::log(severity, "[{}] [{}] [{}]\n{}", msg_type, pCallbackData->pMessageIdName, pCallbackData->messageIdNumber,
                 pCallbackData->pMessage);
@@ -85,7 +87,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL ExtensionVkDebugUtils::messenger_callback(
         spdlog::log(severity, additional_info);
     }
 
-    return VK_TRUE;
+    return VK_FALSE;
 }
 
 void* ExtensionVkDebugUtils::on_create_instance(void* p_next) {
