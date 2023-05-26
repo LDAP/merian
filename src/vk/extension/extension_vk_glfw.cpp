@@ -2,7 +2,7 @@
 #include <spdlog/spdlog.h>
 #include <vk/context.hpp>
 
-void ExtensionVkGLFW::on_instance_created(vk::Instance& instance) {
+void ExtensionVkGLFW::on_instance_created(const vk::Instance& instance) {
     auto psurf = VkSurfaceKHR(surface);
     if (glfwCreateWindowSurface(instance, window, NULL, &psurf))
         throw std::runtime_error("Surface creation failed!");
@@ -10,33 +10,55 @@ void ExtensionVkGLFW::on_instance_created(vk::Instance& instance) {
     spdlog::debug("created surface");
 }
 
-void ExtensionVkGLFW::on_destroy_instance(vk::Instance& instance) {
+void ExtensionVkGLFW::on_destroy_instance(const vk::Instance& instance) {
     spdlog::debug("destroy surface");
     instance.destroySurfaceKHR(surface);
 }
 
-bool ExtensionVkGLFW::accept_graphics_queue(vk::PhysicalDevice& physical_device, std::size_t queue_family_index) {
+bool ExtensionVkGLFW::accept_graphics_queue(const vk::PhysicalDevice& physical_device, std::size_t queue_family_index) {
     if (physical_device.getSurfaceSupportKHR(queue_family_index, surface)) {
         return true;
     }
     return false;
 }
 
-void ExtensionVkGLFW::on_context_created(Context& context) {
-    recreate_swapchain(context);
+void ExtensionVkGLFW::on_physical_device_selected(const vk::PhysicalDevice& physical_device) {
+    this->physical_device = physical_device;
 }
 
-void ExtensionVkGLFW::on_destroy_context(Context& context) {
-    destroy_swapchain(context);
+void ExtensionVkGLFW::on_device_created(const vk::Device& device) {
+    this->device = device;
+    recreate_swapchain();
 }
 
-vk::PresentModeKHR select_present_mode(std::vector<vk::PresentModeKHR>& present_modes) {
-    for (const auto& present_mode : present_modes) {
-        if (present_mode == vk::PresentModeKHR::eImmediate) {
-            return present_mode;
+void ExtensionVkGLFW::on_destroy_device(const vk::Device&) {
+    destroy_swapchain();
+    this->device = VK_NULL_HANDLE;
+    this->physical_device = VK_NULL_HANDLE;
+}
+
+vk::PresentModeKHR select_present_mode(std::vector<vk::PresentModeKHR>& present_modes, bool vsync,
+                                       vk::PresentModeKHR preferred_vsync_off_mode) {
+    // Everyone must support FIFO
+    vk::PresentModeKHR best = vk::PresentModeKHR::eFifo;
+
+    if (vsync) {
+        return best;
+    } else {
+        // Find a faster mode
+        for (const auto& present_mode : present_modes) {
+            if (present_mode == preferred_vsync_off_mode) {
+                return present_mode;
+            }
+            if (present_mode == vk::PresentModeKHR::eImmediate || present_mode == vk::PresentModeKHR::eMailbox) {
+                best = present_mode;
+            }
         }
     }
-    return present_modes[0];
+
+    spdlog::debug("vsync disabled but mode {} could not be found! Using {}", vk::to_string(preferred_vsync_off_mode),
+                  vk::to_string(best));
+    return best;
 }
 
 vk::SurfaceFormatKHR select_surface_format(std::vector<vk::SurfaceFormatKHR>& available,
@@ -71,20 +93,20 @@ vk::Extent2D select_extent2D(vk::SurfaceCapabilitiesKHR capabilities, GLFWwindow
     return extent;
 }
 
-void ExtensionVkGLFW::recreate_swapchain(Context& context) {
+void ExtensionVkGLFW::recreate_swapchain() {
     vk::SwapchainKHR old_swapchain;
     if (swapchain) {
         spdlog::debug("recreate swapchain");
         old_swapchain = swapchain;
-        destroy_image_views(context);
+        destroy_image_views();
     } else {
         spdlog::debug("create swapchain");
         old_swapchain = VK_NULL_HANDLE;
     }
 
-    auto capabilities = context.physical_device.getSurfaceCapabilitiesKHR(surface);
-    auto surface_formats = context.physical_device.getSurfaceFormatsKHR(surface);
-    auto present_modes = context.physical_device.getSurfacePresentModesKHR(surface);
+    auto capabilities = physical_device.getSurfaceCapabilitiesKHR(surface);
+    auto surface_formats = physical_device.getSurfaceFormatsKHR(surface);
+    auto present_modes = physical_device.getSurfacePresentModesKHR(surface);
 
     if (surface_formats.size() == 0)
         throw std::runtime_error("Surface doesn't support any surface formats!");
@@ -95,7 +117,7 @@ void ExtensionVkGLFW::recreate_swapchain(Context& context) {
     spdlog::debug("selected surface format {}, color space {}", vk::to_string(surface_format.format),
                   vk::to_string(surface_format.colorSpace));
     // TODO: vkdt does here different things
-    vk::PresentModeKHR present_mode = select_present_mode(present_modes);
+    vk::PresentModeKHR present_mode = select_present_mode(present_modes, vsync, preferred_vsync_off_mode);
     extent2D = select_extent2D(capabilities, window);
 
     uint32_t num_images = capabilities.minImageCount;
@@ -122,8 +144,8 @@ void ExtensionVkGLFW::recreate_swapchain(Context& context) {
         old_swapchain
     );
 
-    swapchain = context.device.createSwapchainKHR(createInfo, nullptr);
-    swapchain_images = context.device.getSwapchainImagesKHR(swapchain);
+    swapchain = device.createSwapchainKHR(createInfo, nullptr);
+    swapchain_images = device.getSwapchainImagesKHR(swapchain);
     swapchain_image_views.resize(0);
     
     for (auto image : swapchain_images) {
@@ -143,34 +165,34 @@ void ExtensionVkGLFW::recreate_swapchain(Context& context) {
                 0, 1, 0, 1
             }
         );
-        swapchain_image_views.push_back(context.device.createImageView(createInfo));
+        swapchain_image_views.push_back(device.createImageView(createInfo));
     }
     // clang-format on
     spdlog::debug("created swapchain");
 
     if (old_swapchain) {
         spdlog::debug("destroy old swapchain");
-        context.device.destroySwapchainKHR(old_swapchain);
+        device.destroySwapchainKHR(old_swapchain);
     }
 }
 
-void ExtensionVkGLFW::destroy_image_views(Context& context) {
+void ExtensionVkGLFW::destroy_image_views() {
     spdlog::debug("destroy image views");
     for (auto imageView : swapchain_image_views) {
-        context.device.destroyImageView(imageView);
+        device.destroyImageView(imageView);
     }
     swapchain_image_views.resize(0);
     swapchain_images.resize(0);
 }
 
-void ExtensionVkGLFW::destroy_swapchain(Context& context) {
+void ExtensionVkGLFW::destroy_swapchain() {
     spdlog::debug("destroy swapchain");
 
     if (!swapchain) {
         spdlog::debug("swapchain already destroyed");
         return;
     }
-    destroy_image_views(context);
-    context.device.destroySwapchainKHR(swapchain);
+    destroy_image_views();
+    device.destroySwapchainKHR(swapchain);
     swapchain = VK_NULL_HANDLE;
 }

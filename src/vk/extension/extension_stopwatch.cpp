@@ -2,7 +2,7 @@
 
 #define SW_QUERY_COUNT 2
 
-void ExtensionStopwatch::on_context_created(Context& context) {
+void ExtensionStopwatch::on_context_created(const Context& context) {
     vk::QueryPoolCreateInfo createInfo({}, vk::QueryType::eTimestamp, SW_QUERY_COUNT);
     query_pool = context.device.createQueryPool(createInfo);
 
@@ -10,7 +10,7 @@ void ExtensionStopwatch::on_context_created(Context& context) {
     timestamp_period = properties.limits.timestampPeriod;
 }
 
-void ExtensionStopwatch::on_destroy_context(Context& context) {
+void ExtensionStopwatch::on_destroy_context(const Context& context) {
     context.device.destroyQueryPool(query_pool);
 }
 

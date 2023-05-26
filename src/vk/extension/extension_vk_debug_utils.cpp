@@ -91,12 +91,12 @@ void* ExtensionVkDebugUtils::on_create_instance(void* p_next) {
     return &this->create_info;
 }
 
-void ExtensionVkDebugUtils::on_instance_created(vk::Instance& instance) {
+void ExtensionVkDebugUtils::on_instance_created(const vk::Instance& instance) {
     this->create_info.setPNext(nullptr);
     messenger = instance.createDebugUtilsMessengerEXT(create_info);
 }
 
-void ExtensionVkDebugUtils::on_destroy_instance(vk::Instance& instance) {
+void ExtensionVkDebugUtils::on_destroy_instance(const vk::Instance& instance) {
     if (messenger) {
         spdlog::debug("destroy DebugUtilsMessengerEXT");
         instance.destroyDebugUtilsMessengerEXT(messenger);

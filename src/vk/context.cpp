@@ -38,6 +38,7 @@ Context::Context(std::vector<Extension*> desired_extensions, std::string applica
 Context::~Context() {
     device.waitIdle();
 
+    spdlog::debug("destroy context");
     for (auto& ext : extensions) {
         ext->on_destroy_context(*this);
     }
@@ -47,12 +48,18 @@ Context::~Context() {
     device.destroyCommandPool(cmd_pool_transfer);
 
     spdlog::debug("destroy device");
+    for (auto& ext : extensions) {
+        ext->on_destroy_device(device);
+    }
     device.destroy();
 
-    destroy_extensions(extensions);
-
     spdlog::debug("destroy instance");
+    for (auto& ext : extensions) {
+        ext->on_destroy_instance(instance);
+    }
     instance.destroy();
+    
+    spdlog::debug("context destroyed");
 }
 
 void Context::create_instance(std::string application_name, uint32_t application_vk_version) {
@@ -133,6 +140,10 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id, uint32_t filter
     physical_device_features = physical_device.getFeatures2();
     physical_device_memory_properties = physical_device.getMemoryProperties2();
     physical_device_extension_properties = physical_device.enumerateDeviceExtensionProperties();
+
+    for (auto& ext : extensions) {
+        ext->on_physical_device_selected(physical_device);
+    }
 
     extensions_check_device_extension_support();
     extensions_self_check_support();
@@ -324,7 +335,7 @@ void Context::extensions_self_check_support() {
 
 void Context::destroy_extensions(std::vector<Extension*> extensions) {
     for (auto& ext : extensions) {
-        spdlog::debug("destroy extension {}", ext->name());
+        spdlog::debug("remove extension {} from context", ext->name());
         ext->on_destroy_instance(this->instance);
 
         for (std::size_t i = 0; this->extensions.size(); i++) {

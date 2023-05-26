@@ -41,9 +41,9 @@ class ExtensionVkDebugUtils : public Extension {
     std::vector<const char*> required_device_extension_names() const override {
         return {};
     }
-    void on_instance_created(vk::Instance&) override;
-    void on_destroy_instance(vk::Instance&) override;
-    void* on_create_instance(void* p_next) override;
+    void on_instance_created(const vk::Instance&) override;
+    void on_destroy_instance(const vk::Instance&) override;
+    void* on_create_instance(void* const p_next) override;
 
     // Own methods
     template <typename T> void set_object_name(vk::Device& device, T handle, std::string name) {

@@ -15,7 +15,7 @@ class ExtensionVkV12 : public Extension {
     std::string name() const override {
         return "ExtensionVkV12";
     }
-    void* on_create_device(void* p_next) override {
+    void* on_create_device(void* const p_next) override {
         v12f.pNext = p_next;
         return &v12f;
     }

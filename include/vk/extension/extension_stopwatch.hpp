@@ -11,8 +11,8 @@ class ExtensionStopwatch : public Extension {
     std::string name() const override {
         return "ExtensionStopwatch";
     }
-    void on_context_created(Context&) override;
-    void on_destroy_context(Context&) override;
+    void on_context_created(const Context&) override;
+    void on_destroy_context(const Context&) override;
 
   public: // own methods
     /* Resets the query pool and writes the first timestamp */

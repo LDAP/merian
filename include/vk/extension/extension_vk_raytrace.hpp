@@ -22,7 +22,7 @@ class ExtensionVkRaytraceQuery : public Extension {
             VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,    VK_KHR_RAY_QUERY_EXTENSION_NAME,
         };
     }
-    void* on_create_device(void* p_next) override {
+    void* on_create_device(void* const p_next) override {
         acceleration_structure_features.pNext = p_next;
         return &ray_query_features;
     }

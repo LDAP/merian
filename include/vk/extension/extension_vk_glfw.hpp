@@ -13,8 +13,9 @@ class ExtensionVkGLFW : public Extension {
      */
     ExtensionVkGLFW(int width = 1280, int height = 720, const char* title = "",
                     std::vector<vk::SurfaceFormatKHR> preferred_surface_formats = {vk::Format::eR8G8B8A8Srgb,
-                                                                                   vk::Format::eB8G8R8A8Srgb})
-        : preferred_surface_formats(preferred_surface_formats) {
+                                                                                   vk::Format::eB8G8R8A8Srgb},
+                    vk::PresentModeKHR preferred_vsync_off_mode = vk::PresentModeKHR::eMailbox)
+        : preferred_surface_formats(preferred_surface_formats), preferred_vsync_off_mode(preferred_vsync_off_mode) {
         if (!glfwInit())
             throw std::runtime_error("GLFW initialization failed!");
         if (!glfwVulkanSupported())
@@ -42,21 +43,30 @@ class ExtensionVkGLFW : public Extension {
             VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         };
     }
-    void on_instance_created(vk::Instance&) override;
-    void on_destroy_instance(vk::Instance&) override;
-    bool accept_graphics_queue(vk::PhysicalDevice&, std::size_t) override;
-    void on_context_created(Context&) override;
-    void on_destroy_context(Context& context) override;
+    void on_instance_created(const vk::Instance&) override;
+    void on_destroy_instance(const vk::Instance&) override;
+    bool accept_graphics_queue(const vk::PhysicalDevice&, std::size_t) override;
+    void on_physical_device_selected(const vk::PhysicalDevice&) override;
+    void on_device_created(const vk::Device&) override;
+    void on_destroy_device(const vk::Device&) override;
 
     // own methods
-    void recreate_swapchain(Context& context);
+    void recreate_swapchain();
+    void set_vsync(bool state) {
+        if (state != vsync) {
+            recreate_swapchain();
+        }
+    }
+
+  private:
     /* Destroys swapchain and image views */
-    void destroy_swapchain(Context& context);
+    void destroy_swapchain();
     /* Destroys image views only (for recreate) */
-    void destroy_image_views(Context& context);
+    void destroy_image_views();
 
   private:
     std::vector<vk::SurfaceFormatKHR> preferred_surface_formats;
+    vk::PresentModeKHR preferred_vsync_off_mode;
 
   public:
     GLFWwindow* window;
@@ -66,4 +76,7 @@ class ExtensionVkGLFW : public Extension {
     vk::SwapchainKHR swapchain = VK_NULL_HANDLE;
     std::vector<vk::Image> swapchain_images;
     std::vector<vk::ImageView> swapchain_image_views;
+    bool vsync = false;
+    vk::Device device = VK_NULL_HANDLE;
+    vk::PhysicalDevice physical_device = VK_NULL_HANDLE;
 };
