@@ -54,7 +54,7 @@ class ExtensionVkDebugUtils : public Extension {
     static VKAPI_ATTR VkBool32 VKAPI_CALL messenger_callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
                                                              VkDebugUtilsMessageTypeFlagsEXT messageTypes,
                                                              VkDebugUtilsMessengerCallbackDataEXT const* pCallbackData,
-                                                             void* /*pUserData*/);
+                                                             void* pUserData);
 
   private:
     const std::unordered_set<int32_t> ignore_message_ids;
