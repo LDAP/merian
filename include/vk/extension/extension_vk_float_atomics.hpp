@@ -1,16 +1,16 @@
 #pragma once
 
 #include "vk/extension/extension.hpp"
+
+namespace merian {
+
 class ExtensionVkFloatAtomics : public Extension {
   public:
-    ExtensionVkFloatAtomics() {
+    ExtensionVkFloatAtomics() : Extension("ExtensionVkFloatAtomics") {
         atomic_features.shaderImageFloat32Atomics = VK_TRUE;
         atomic_features.shaderImageFloat32AtomicAdd = VK_TRUE;
     }
     ~ExtensionVkFloatAtomics() {}
-    std::string name() const override {
-        return "ExtensionVkFloatAtomics";
-    }
     std::vector<const char*> required_device_extension_names() const override {
         return {
             VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME,
@@ -32,3 +32,5 @@ class ExtensionVkFloatAtomics : public Extension {
   private:
     vk::PhysicalDeviceShaderAtomicFloatFeaturesEXT atomic_features;
 };
+
+} // namespace merian

@@ -16,11 +16,18 @@ The Context can be extended by Extensions. The extensions can hook into the cont
 
 #### Current extensions:
 
+Common:
 - `ExtensionDebugUtils`: Enables Validation Layers.
-- `ExtensionFloatAtomics`: Enables float atomics (`VK_EXT_shader_atomic_float`).
 - `ExtensionGLFW`: Initializes GLFW and creates window, surface and swapchain.
-- `ExtensionRaytrace`: Enables ray tracing (ray query) extensions and provides access to common functions.
+
+Features:
+- `ExtensionFloatAtomics`: Enables float atomics (`VK_EXT_shader_atomic_float`).
 - `ExtensionV12`: Enables Vulkan 1.2 features.
+
+Ray tracing:
+- `ExtensionVkRayTracingPipeline`: Enables ray tracing pipeline extensions and provides access to common functions.
+- `ExtensionVkRayQuery`: Enables ray query extensions and provides access to common functions.
+- `ExtensionVkAccelerationStructure`: Build and manage ray tracing acceleration structures extensions and provides access to common functions.
 
 
 ## Building
@@ -32,3 +39,4 @@ meson setup build --buildtype=debug
 
 meson compile -C build
 ```
+

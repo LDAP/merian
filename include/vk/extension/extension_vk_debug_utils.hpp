@@ -6,13 +6,15 @@
 #include <vk/extension/extension.hpp>
 #include <vulkan/vulkan.hpp>
 
+namespace merian {
+
 using SEVERITY = vk::DebugUtilsMessageSeverityFlagBitsEXT;
 using MESSAGE = vk::DebugUtilsMessageTypeFlagBitsEXT;
 
 class ExtensionVkDebugUtils : public Extension {
   public:
     ExtensionVkDebugUtils(std::unordered_set<int32_t> ignore_message_ids = {648835635, 767975156})
-        : ignore_message_ids(ignore_message_ids) {
+        : Extension("ExtensionVkDebugUtils"), ignore_message_ids(ignore_message_ids) {
         create_info = {
             {},
             SEVERITY::eWarning | SEVERITY::eError,
@@ -24,9 +26,6 @@ class ExtensionVkDebugUtils : public Extension {
 
     // Overrides
     ~ExtensionVkDebugUtils() {}
-    std::string name() const override {
-        return "ExtensionVkDebugUtils";
-    }
     std::vector<const char*> required_instance_extension_names() const override {
         return {
             VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
@@ -61,3 +60,5 @@ class ExtensionVkDebugUtils : public Extension {
     vk::DebugUtilsMessengerCreateInfoEXT create_info;
     vk::DebugUtilsMessengerEXT messenger = VK_NULL_HANDLE;
 };
+
+} // namespace merian

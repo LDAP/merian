@@ -7,6 +7,8 @@
 
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
+namespace merian {
+
 Context::Context(std::vector<Extension*> desired_extensions, std::string application_name,
                  uint32_t application_vk_version, uint32_t filter_vendor_id, uint32_t filter_device_id,
                  std::string filter_device_name)
@@ -21,7 +23,7 @@ Context::Context(std::vector<Extension*> desired_extensions, std::string applica
 
     logger->trace("supplied extensions:");
     for (auto& ext : extensions) {
-        logger->trace("{}", ext->name());
+        logger->trace("{}", ext->name);
     }
 
     create_instance(application_name, application_vk_version);
@@ -82,10 +84,8 @@ void Context::create_instance(std::string application_name, uint32_t application
     }
 
     vk::ApplicationInfo application_info{
-        application_name.c_str(),
-        application_vk_version,
-        MERIAN_PROJECT_NAME,
-        VK_MAKE_VERSION(MERIAN_VERSION_MAJOR, MERIAN_VERSION_MINOR, MERIAN_VERSION_PATCH),
+        application_name.c_str(), application_vk_version,
+        MERIAN_PROJECT_NAME,      VK_MAKE_VERSION(MERIAN_VERSION_MAJOR, MERIAN_VERSION_MINOR, MERIAN_VERSION_PATCH),
         VK_API_VERSION_1_3,
     };
 
@@ -261,7 +261,7 @@ void Context::extensions_check_instance_layer_support() {
             all_layers_found &= layer_found;
         }
         if (!all_layers_found) {
-            spdlog::warn("extension {} not supported (instance layer missing), disabling...", ext->name());
+            spdlog::warn("extension {} not supported (instance layer missing), disabling...", ext->name);
             not_supported.push_back(ext);
             ext->supported = false;
         }
@@ -288,7 +288,7 @@ void Context::extensions_check_instance_extension_support() {
             all_extensions_found &= extension_found;
         }
         if (!all_extensions_found) {
-            spdlog::warn("extension {} not supported (instance extension missing), disabling...", ext->name());
+            spdlog::warn("extension {} not supported (instance extension missing), disabling...", ext->name);
             not_supported.push_back(ext);
             ext->supported = false;
         }
@@ -315,7 +315,7 @@ void Context::extensions_check_device_extension_support() {
             all_extensions_found &= extension_found;
         }
         if (!all_extensions_found) {
-            spdlog::warn("extension {} not supported (device extension missing), disabling...", ext->name());
+            spdlog::warn("extension {} not supported (device extension missing), disabling...", ext->name);
             not_supported.push_back(ext);
             ext->supported = false;
         }
@@ -328,7 +328,7 @@ void Context::extensions_self_check_support() {
     std::vector<Extension*> not_supported;
     for (auto& ext : extensions) {
         if (!ext->extension_supported(physical_device)) {
-            spdlog::warn("extension {} not supported (self-check failed), disabling...", ext->name());
+            spdlog::warn("extension {} not supported (self-check failed), disabling...", ext->name);
             ext->supported = false;
             not_supported.push_back(ext);
         }
@@ -338,7 +338,7 @@ void Context::extensions_self_check_support() {
 
 void Context::destroy_extensions(std::vector<Extension*> extensions) {
     for (auto& ext : extensions) {
-        logger->debug("remove extension {} from context", ext->name());
+        logger->debug("remove extension {} from context", ext->name);
         ext->on_destroy_instance(this->instance);
 
         for (std::size_t i = 0; this->extensions.size(); i++) {
@@ -350,3 +350,5 @@ void Context::destroy_extensions(std::vector<Extension*> extensions) {
         }
     }
 }
+
+} // namespace merian

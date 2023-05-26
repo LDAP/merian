@@ -4,13 +4,12 @@
 
 #include <optional>
 
+namespace merian {
+
 class ExtensionStopwatch : public Extension {
   public:
-    ExtensionStopwatch() {}
+    ExtensionStopwatch() : Extension("ExtensionStopwatch") {}
     ~ExtensionStopwatch() {}
-    std::string name() const override {
-        return "ExtensionStopwatch";
-    }
     void on_context_created(const Context&) override;
     void on_destroy_context(const Context&) override;
 
@@ -32,3 +31,5 @@ class ExtensionStopwatch : public Extension {
     vk::QueryPool query_pool;
     float timestamp_period;
 };
+
+} // namespace merian

@@ -6,11 +6,13 @@
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 #include <vulkan/vulkan.hpp>
 
+namespace merian {
+
 // cyclic -> forward definition
 class Extension;
 
 /* Initializes the Vulkan instance and device and holds core objects.
- * 
+ *
  * Extensions can extend the functionality and hook into the creation process.
  */
 class Context {
@@ -64,3 +66,5 @@ class Context {
     vk::CommandPool cmd_pool_graphics;
     vk::CommandPool cmd_pool_transfer;
 };
+
+} // namespace merian

@@ -1,7 +1,10 @@
 #pragma once
 
 #include "vk/context.hpp"
+#include <spdlog/spdlog.h>
 #include <vector>
+
+namespace merian {
 
 /**
  * @brief      An extension to the Vulkan Context.
@@ -18,8 +21,9 @@ class Extension {
     friend Context;
 
   public:
+    Extension(std::string name) : name(name), logger(spdlog::default_logger()->clone(name)) {}
+
     virtual ~Extension() = 0;
-    virtual std::string name() const = 0;
 
     // REQUIREMENTS
 
@@ -87,7 +91,15 @@ class Extension {
         return supported;
     }
 
+  public:
+    const std::string name;
+
   private:
     // written by Context
     bool supported = true;
+
+  protected:
+    std::shared_ptr<spdlog::logger> logger;
 };
+
+} // namespace merian

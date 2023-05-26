@@ -4,6 +4,8 @@
 #include <iostream>
 #include <vulkan/vulkan.hpp>
 
+namespace merian {
+
 spdlog::level::level_enum get_severity(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity) {
     if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
         return spdlog::level::level_enum::err;
@@ -41,7 +43,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL ExtensionVkDebugUtils::messenger_callback(
         for (uint8_t i = 0; i < pCallbackData->queueLabelCount; i++) {
             additional_info += "\t\t";
             additional_info += "labelName = <";
-            additional_info += pCallbackData->pQueueLabels[i].pLabelName ;
+            additional_info += pCallbackData->pQueueLabels[i].pLabelName;
             additional_info += ">\n";
         }
         spdlog::log(severity, additional_info);
@@ -102,3 +104,5 @@ void ExtensionVkDebugUtils::on_destroy_instance(const vk::Instance& instance) {
         instance.destroyDebugUtilsMessengerEXT(messenger);
     }
 }
+
+} // namespace merian

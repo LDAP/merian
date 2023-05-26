@@ -1,5 +1,7 @@
 #include "utils/stopwatch.hpp"
 
+namespace merian {
+
 Stopwatch::Stopwatch() {
     reset();
 }
@@ -22,3 +24,5 @@ double Stopwatch::seconds() const {
     auto end = chrono_clock::now();
     return std::chrono::duration<double>(end - start).count();
 }
+
+} // namespace merian

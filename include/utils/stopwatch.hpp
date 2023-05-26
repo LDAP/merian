@@ -2,12 +2,13 @@
 
 #include <chrono>
 
+namespace merian {
+
 class Stopwatch {
-    private:
+  private:
     using chrono_clock = std::chrono::high_resolution_clock;
 
-
-public:
+  public:
     /* Creates and starts the stopwatch */
     Stopwatch();
     void reset();
@@ -15,8 +16,8 @@ public:
     double millis() const;
     double seconds() const;
 
-private:
+  private:
     chrono_clock::time_point start;
-
-
 };
+
+} // namespace merian

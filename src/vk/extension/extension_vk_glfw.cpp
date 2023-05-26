@@ -22,6 +22,8 @@
 #include <spdlog/spdlog.h>
 #include <vk/context.hpp>
 
+namespace merian {
+
 void ExtensionVkGLFW::on_instance_created(const vk::Instance& instance) {
     auto psurf = VkSurfaceKHR(surface);
     if (glfwCreateWindowSurface(instance, window, NULL, &psurf))
@@ -150,23 +152,23 @@ vk::Extent2D ExtensionVkGLFW::recreate_swapchain(int width, int height) {
 
     // clang-format off
     vk::SwapchainCreateInfoKHR createInfo(
-        vk::SwapchainCreateFlagBitsKHR(),
-        surface,
-        num_images,
-        surface_format.format,
-        surface_format.colorSpace,
-        extent,
-        1,
-        vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferDst,
-        vk::SharingMode::eExclusive,
-        0,
-        nullptr,
-        pre_transform,
-        vk::CompositeAlphaFlagBitsKHR::eOpaque,
-        present_mode,
-        false,
-        old_swapchain
-    );
+                                          vk::SwapchainCreateFlagBitsKHR(),
+                                          surface,
+                                          num_images,
+                                          surface_format.format,
+                                          surface_format.colorSpace,
+                                          extent,
+                                          1,
+                                          vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferDst,
+                                          vk::SharingMode::eExclusive,
+                                          0,
+                                          nullptr,
+                                          pre_transform,
+                                          vk::CompositeAlphaFlagBitsKHR::eOpaque,
+                                          present_mode,
+                                          false,
+                                          old_swapchain
+                                          );
 
     swapchain = device.createSwapchainKHR(createInfo, nullptr);
 
@@ -190,21 +192,21 @@ vk::Extent2D ExtensionVkGLFW::recreate_swapchain(int width, int height) {
 
         // View
         vk::ImageViewCreateInfo createInfo(
-            vk::ImageViewCreateFlagBits(),
-            entry.image,
-            vk::ImageViewType::e2D,
-            surface_format.format,
-            {
-                vk::ComponentSwizzle::eR,
-                vk::ComponentSwizzle::eG,
-                vk::ComponentSwizzle::eB,
-                vk::ComponentSwizzle::eA
-            },
-            {
-                vk::ImageAspectFlagBits::eColor,
-                0, 1, 0, 1
-            }
-        );
+                                           vk::ImageViewCreateFlagBits(),
+                                           entry.image,
+                                           vk::ImageViewType::e2D,
+                                           surface_format.format,
+                                           {
+                                            vk::ComponentSwizzle::eR,
+                                            vk::ComponentSwizzle::eG,
+                                            vk::ComponentSwizzle::eB,
+                                            vk::ComponentSwizzle::eA
+                                        },
+                                        {
+                                            vk::ImageAspectFlagBits::eColor,
+                                            0, 1, 0, 1
+                                        }
+                                        );
         entry.imageView = device.createImageView(createInfo);
 
         // Semaphore
@@ -306,12 +308,12 @@ vk::Result ExtensionVkGLFW::present(vk::Queue queue) {
     vk::Semaphore& written = current_written_semaphore();
     vk::PresentInfoKHR present_info{
         1,
-        &written,  // wait until the user is done writing to the image
-        1,
-        &swapchain,       
-        &current_image_idx,                  
+        &written, // wait until the user is done writing to the image
+        1,        &swapchain, &current_image_idx,
     };
     current_semaphore_idx++;
 
     return queue.presentKHR(present_info);
 }
+
+} // namespace merian

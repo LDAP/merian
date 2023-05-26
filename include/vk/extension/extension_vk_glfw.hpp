@@ -8,6 +8,8 @@
 #include <GLFW/glfw3.h>
 // clang-format on
 
+namespace merian {
+
 /*
  * @brief      Initializes GLFW and manages swapchain, images and views as well as acquiring and presenting.
  *
@@ -82,8 +84,8 @@ class ExtensionVkGLFW : public Extension {
                     std::vector<vk::SurfaceFormatKHR> preferred_surface_formats = {vk::Format::eR8G8B8A8Srgb,
                                                                                    vk::Format::eB8G8R8A8Srgb},
                     vk::PresentModeKHR preferred_vsync_off_mode = vk::PresentModeKHR::eMailbox)
-        : preferred_surface_formats(preferred_surface_formats), preferred_vsync_off_mode(preferred_vsync_off_mode),
-          logger(spdlog::default_logger()->clone(name())) {
+        : Extension("ExtensionVkGLFW"), preferred_surface_formats(preferred_surface_formats),
+          preferred_vsync_off_mode(preferred_vsync_off_mode) {
         if (!glfwInit())
             throw std::runtime_error("GLFW initialization failed!");
         if (!glfwVulkanSupported())
@@ -95,9 +97,6 @@ class ExtensionVkGLFW : public Extension {
     }
     ~ExtensionVkGLFW() {
         glfwDestroyWindow(window);
-    }
-    std::string name() const override {
-        return "ExtensionVkGLFW";
     }
     std::vector<const char*> required_instance_extension_names() const override {
         std::vector<const char*> required_extensions;
@@ -189,7 +188,6 @@ class ExtensionVkGLFW : public Extension {
   private:
     std::vector<vk::SurfaceFormatKHR> preferred_surface_formats;
     vk::PresentModeKHR preferred_vsync_off_mode;
-    std::shared_ptr<spdlog::logger> logger;
     bool vsync = false;
 
     vk::Device device = VK_NULL_HANDLE;
@@ -215,3 +213,5 @@ class ExtensionVkGLFW : public Extension {
     // You should never access the swapchain directly
     vk::SwapchainKHR swapchain = VK_NULL_HANDLE;
 };
+
+} // namespace merian

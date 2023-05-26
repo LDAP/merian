@@ -4,6 +4,8 @@
 #include <fmt/format.h>
 #include <vector>
 
+namespace merian {
+
 template <class T> void insert_all(std::vector<T>& to, std::vector<T> const& from) {
     std::copy(std::begin(from), std::end(from), std::back_inserter(to));
 }
@@ -18,3 +20,5 @@ template <class T> void remove_duplicates(std::vector<T>& vector) {
     std::sort(vector.begin(), vector.end());
     vector.erase(std::unique(vector.begin(), vector.end()), vector.end());
 }
+
+} // namespace merian

@@ -2,6 +2,8 @@
 
 #define SW_QUERY_COUNT 2
 
+namespace merian {
+
 void ExtensionStopwatch::on_context_created(const Context& context) {
     vk::QueryPoolCreateInfo createInfo({}, vk::QueryType::eTimestamp, SW_QUERY_COUNT);
     query_pool = context.device.createQueryPool(createInfo);
@@ -49,3 +51,5 @@ std::optional<double> ExtensionStopwatch::get_seconds(vk::Device& device) {
         return std::nullopt;
     }
 }
+
+} // namespace merian
