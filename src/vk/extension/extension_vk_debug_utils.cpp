@@ -23,14 +23,10 @@ spdlog::level::level_enum get_severity(VkDebugUtilsMessageSeverityFlagBitsEXT me
 */
 VKAPI_ATTR VkBool32 VKAPI_CALL ExtensionVkDebugUtils::messenger_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageTypes,
-    VkDebugUtilsMessengerCallbackDataEXT const* pCallbackData, void* /*pUserData*/) {
+    VkDebugUtilsMessengerCallbackDataEXT const* pCallbackData, void* pUserData) {
 
-    if (pCallbackData->messageIdNumber == 648835635) {
-        // UNASSIGNED-khronos-Validation-debug-build-warning-message
-        return VK_FALSE;
-    }
-    if (pCallbackData->messageIdNumber == 767975156) {
-        // UNASSIGNED-BestPractices-vkCreateInstance-specialuse-extension
+    std::unordered_set<int32_t>* ignore_message_ids = static_cast<std::unordered_set<int32_t>*>(pUserData);
+    if (ignore_message_ids->contains(pCallbackData->messageIdNumber)) {
         return VK_FALSE;
     }
 

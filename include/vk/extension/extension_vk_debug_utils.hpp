@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iostream>
+#include <unordered_set>
 #include <vk/context.hpp>
 #include <vk/extension/extension.hpp>
 #include <vulkan/vulkan.hpp>
@@ -10,12 +11,14 @@ using MESSAGE = vk::DebugUtilsMessageTypeFlagBitsEXT;
 
 class ExtensionVkDebugUtils : public Extension {
   public:
-    ExtensionVkDebugUtils() {
+    ExtensionVkDebugUtils(std::unordered_set<int32_t> ignore_message_ids = {648835635, 767975156})
+        : ignore_message_ids(ignore_message_ids) {
         create_info = {
             {},
             SEVERITY::eWarning | SEVERITY::eError,
             MESSAGE::eGeneral | MESSAGE::ePerformance | MESSAGE::eValidation,
             &ExtensionVkDebugUtils::messenger_callback,
+            &ignore_message_ids,
         };
     }
 
@@ -54,6 +57,7 @@ class ExtensionVkDebugUtils : public Extension {
                                                              void* /*pUserData*/);
 
   private:
+    const std::unordered_set<int32_t> ignore_message_ids;
     vk::DebugUtilsMessengerCreateInfoEXT create_info;
     vk::DebugUtilsMessengerEXT messenger = VK_NULL_HANDLE;
 };
