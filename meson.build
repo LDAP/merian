@@ -54,6 +54,7 @@ src_files = files(
     'src/vk/extension/extension_stopwatch.cpp',
     'src/vk/extension/extension_vk_debug_utils.cpp',
     'src/vk/extension/extension_vk_glfw.cpp',
+    'src/vk/sampler/sampler_pool.cpp'
 )
 inc_dirs = [
     'include'
