@@ -1,9 +1,8 @@
 #pragma once
+
 #include <mutex>
 #include <spdlog/logger.h>
 
-#define VK_ENABLE_BETA_EXTENSIONS
-#define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 #include <vulkan/vulkan.hpp>
 
 namespace merian {
@@ -42,7 +41,6 @@ class Context {
   public:
     std::string application_name;
     uint32_t application_vk_version;
-    std::shared_ptr<spdlog::logger> logger;
     // in create_instance
     std::vector<const char*> instance_layer_names;
     std::vector<const char*> instance_extension_names;

@@ -5,6 +5,8 @@
 namespace merian {
 
 void ExtensionStopwatch::on_context_created(const Context& context) {
+    this->device = context.device;
+
     vk::QueryPoolCreateInfo createInfo({}, vk::QueryType::eTimestamp, SW_QUERY_COUNT);
     query_pool = context.device.createQueryPool(createInfo);
 
@@ -14,6 +16,8 @@ void ExtensionStopwatch::on_context_created(const Context& context) {
 
 void ExtensionStopwatch::on_destroy_context(const Context& context) {
     context.device.destroyQueryPool(query_pool);
+
+    this->device = VK_NULL_HANDLE;
 }
 
 void ExtensionStopwatch::start_stopwatch(vk::CommandBuffer& cb, vk::PipelineStageFlagBits pipeline_stage) {
@@ -25,7 +29,7 @@ void ExtensionStopwatch::stop_stopwatch(vk::CommandBuffer& cb, vk::PipelineStage
     cb.writeTimestamp(pipeline_stage, query_pool, 1);
 }
 
-std::optional<uint32_t> ExtensionStopwatch::get_nanos(vk::Device& device) {
+std::optional<uint32_t> ExtensionStopwatch::get_nanos() {
     uint64_t timestamps[2];
     vk::Result result = device.getQueryPoolResults(query_pool, 0, 2, sizeof(timestamps), &timestamps,
                                                    sizeof(timestamps[0]), vk::QueryResultFlagBits::e64);
@@ -35,16 +39,16 @@ std::optional<uint32_t> ExtensionStopwatch::get_nanos(vk::Device& device) {
     uint64_t timediff = timestamps[1] - timestamps[0];
     return timestamp_period * timediff;
 }
-std::optional<double> ExtensionStopwatch::get_millis(vk::Device& device) {
-    std::optional<uint32_t> nanos = get_nanos(device);
+std::optional<double> ExtensionStopwatch::get_millis() {
+    std::optional<uint32_t> nanos = get_nanos();
     if (nanos.has_value()) {
         return nanos.value() / (double)1e6;
     } else {
         return std::nullopt;
     }
 }
-std::optional<double> ExtensionStopwatch::get_seconds(vk::Device& device) {
-    std::optional<uint32_t> nanos = get_nanos(device);
+std::optional<double> ExtensionStopwatch::get_seconds() {
+    std::optional<uint32_t> nanos = get_nanos();
     if (nanos.has_value()) {
         return nanos.value() / (double)1e9;
     } else {

@@ -1,23 +1,3 @@
-/*
- * Some parts of this code are taken from https://github.com/nvpro-samples/nvpro_core
- * which is licensed under:
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- * SPDX-FileCopyrightText: Copyright (c) 2014-2021 NVIDIA CORPORATION
- * SPDX-License-Identifier: Apache-2.0
- */
-
 #include "vk/extension/extension_vk_glfw.hpp"
 #include <spdlog/spdlog.h>
 #include <vk/context.hpp>
@@ -29,11 +9,11 @@ void ExtensionVkGLFW::on_instance_created(const vk::Instance& instance) {
     if (glfwCreateWindowSurface(instance, window, NULL, &psurf))
         throw std::runtime_error("Surface creation failed!");
     surface = vk::SurfaceKHR(psurf);
-    logger->debug("created surface");
+    SPDLOG_DEBUG("created surface");
 }
 
 void ExtensionVkGLFW::on_destroy_instance(const vk::Instance& instance) {
-    logger->debug("destroy surface");
+    SPDLOG_DEBUG("destroy surface");
     instance.destroySurfaceKHR(surface);
 }
 
@@ -66,7 +46,7 @@ bool ExtensionVkGLFW::accept_graphics_queue(const vk::PhysicalDevice& physical_d
         }
     }
 
-    logger->debug("vsync disabled but mode {} could not be found! Using {}", vk::to_string(preferred_vsync_off_mode),
+    SPDLOG_DEBUG("vsync disabled but mode {} could not be found! Using {}", vk::to_string(preferred_vsync_off_mode),
                   vk::to_string(best));
     return best;
 }
@@ -98,7 +78,7 @@ void ExtensionVkGLFW::on_physical_device_selected(const vk::PhysicalDevice& phys
     surface_format = select_surface_format(surface_formats, preferred_surface_formats);
     present_mode = select_present_mode();
 
-    logger->debug("selected surface format {}, color space {}", vk::to_string(surface_format.format),
+    SPDLOG_DEBUG("selected surface format {}, color space {}", vk::to_string(surface_format.format),
                   vk::to_string(surface_format.colorSpace));
 }
 
@@ -129,10 +109,10 @@ vk::Extent2D make_extent2D(vk::SurfaceCapabilitiesKHR capabilities, int width, i
 vk::Extent2D ExtensionVkGLFW::recreate_swapchain(int width, int height) {
     vk::SwapchainKHR old_swapchain;
     if (swapchain) {
-        logger->debug("recreate swapchain");
+        SPDLOG_DEBUG("recreate swapchain");
         old_swapchain = swapchain;
     } else {
-        logger->debug("create swapchain");
+        SPDLOG_DEBUG("create swapchain");
         old_swapchain = VK_NULL_HANDLE;
     }
 
@@ -173,7 +153,7 @@ vk::Extent2D ExtensionVkGLFW::recreate_swapchain(int width, int height) {
     swapchain = device.createSwapchainKHR(createInfo, nullptr);
 
     if (old_swapchain) {
-        logger->debug("destroy old swapchain");
+        SPDLOG_DEBUG("destroy old swapchain");
         device.destroySwapchainKHR(old_swapchain);
         destroy_entries();
     }
@@ -239,17 +219,17 @@ vk::Extent2D ExtensionVkGLFW::recreate_swapchain(int width, int height) {
     cur_height = height;
 
     // clang-format on
-    logger->debug("created swapchain");
+    SPDLOG_DEBUG("created swapchain");
     return extent;
 }
 
 void ExtensionVkGLFW::destroy_entries() {
-    logger->debug("destroy entries");
+    SPDLOG_DEBUG("destroy entries");
     for (auto& entry : entries) {
         device.destroyImageView(entry.imageView);
     }
 
-    logger->debug("destroy semaphores");
+    SPDLOG_DEBUG("destroy semaphores");
     for (auto& semaphore_group : semaphore_groups) {
         device.destroySemaphore(semaphore_group.read_semaphore);
         device.destroySemaphore(semaphore_group.written_semaphore);
@@ -261,10 +241,10 @@ void ExtensionVkGLFW::destroy_entries() {
 }
 
 void ExtensionVkGLFW::destroy_swapchain() {
-    logger->debug("destroy swapchain");
+    SPDLOG_DEBUG("destroy swapchain");
 
     if (!swapchain) {
-        logger->debug("swapchain already destroyed");
+        SPDLOG_DEBUG("swapchain already destroyed");
         return;
     }
     destroy_entries();

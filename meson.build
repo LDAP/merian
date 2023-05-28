@@ -8,11 +8,17 @@ project(
     ]
 )
 
+cmake = import('cmake')
+
 # Debug configuration
 if get_option('buildtype').startswith('debug')
   add_project_arguments('-DDEBUG', language : 'cpp')
   add_project_arguments('-DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_DEBUG', language : 'cpp')
 endif
+
+# Vulkan dynamic loader (VULKAN_HPP_DEFAULT_DISPATCHER initialized in Context)
+add_project_arguments('-DVK_ENABLE_BETA_EXTENSIONS', language : 'cpp')
+add_project_arguments('-DVULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1', language : 'cpp')
 
 commit = run_command('git', 'rev-parse', 'HEAD', check: true)
 version_split = meson.project_version().split('.')
@@ -51,13 +57,22 @@ src_files = files(
     'src/utils/stopwatch.cpp',
     'src/vk/context.cpp',
     'src/vk/extension/extension.cpp',
+    'src/vk/extension/extension_resources.cpp',
     'src/vk/extension/extension_stopwatch.cpp',
     'src/vk/extension/extension_vk_debug_utils.cpp',
     'src/vk/extension/extension_vk_glfw.cpp',
-    'src/vk/sampler/sampler_pool.cpp'
+    'src/vk/memory/buffer_suballocator.cpp',
+    'src/vk/memory/memory_allocator.cpp',
+    'src/vk/memory/memory_allocator_vma.cpp',
+    'src/vk/memory/resource_allocator.cpp',
+    'src/vk/memory/staging_memory_manager.cpp',
+    'src/vk/memory/vma.cpp',
+    'src/vk/sampler/sampler_pool.cpp',
+    'src/vk/utils/barriers.cpp',
 )
 inc_dirs = [
-    'include'
+    'include',
+    cmake.subproject('VulkanMemoryAllocator').include_directories('VulkanMemoryAllocator')
 ]
 
 lib = library(

@@ -21,7 +21,7 @@ class Extension {
     friend Context;
 
   public:
-    Extension(std::string name) : name(name), logger(spdlog::default_logger()->clone(name)) {}
+    Extension(std::string name) : name(name) {}
 
     virtual ~Extension() = 0;
 
@@ -97,9 +97,6 @@ class Extension {
   private:
     // written by Context
     bool supported = true;
-
-  protected:
-    std::shared_ptr<spdlog::logger> logger;
 };
 
 } // namespace merian

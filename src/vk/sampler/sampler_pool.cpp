@@ -28,7 +28,7 @@ SamplerPool::~SamplerPool() {
     spdlog::debug("destroy sampler pool");
 
     if (!sampler_map.empty()) {
-      spdlog::debug("SamplerPool still contains {} sampler at destruction", sampler_map.size());
+      spdlog::debug("SamplerPool still contains {} samplers at destruction", sampler_map.size());
     }
 
     for (auto it : entries) {

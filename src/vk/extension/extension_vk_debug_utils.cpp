@@ -100,7 +100,7 @@ void ExtensionVkDebugUtils::on_instance_created(const vk::Instance& instance) {
 
 void ExtensionVkDebugUtils::on_destroy_instance(const vk::Instance& instance) {
     if (messenger) {
-        spdlog::debug("destroy DebugUtilsMessengerEXT");
+        SPDLOG_DEBUG("destroy DebugUtilsMessengerEXT");
         instance.destroyDebugUtilsMessengerEXT(messenger);
     }
 }

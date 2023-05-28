@@ -12,8 +12,8 @@ namespace merian {
 Context::Context(std::vector<Extension*> desired_extensions, std::string application_name,
                  uint32_t application_vk_version, uint32_t filter_vendor_id, uint32_t filter_device_id,
                  std::string filter_device_name)
-    : extensions(desired_extensions), logger(spdlog::default_logger()->clone("Context")) {
-    logger->info("This is {} {}", MERIAN_PROJECT_NAME, MERIAN_VERSION);
+    : extensions(desired_extensions) {
+    SPDLOG_INFO("This is {} {}", MERIAN_PROJECT_NAME, MERIAN_VERSION);
 
     // Init dynamic loader
     static vk::DynamicLoader dl;
@@ -21,9 +21,10 @@ Context::Context(std::vector<Extension*> desired_extensions, std::string applica
         dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
     VULKAN_HPP_DEFAULT_DISPATCHER.init(vkGetInstanceProcAddr);
 
-    logger->trace("supplied extensions:");
+    SPDLOG_TRACE("supplied extensions:");
     for (auto& ext : extensions) {
-        logger->trace("{}", ext->name);
+        (void) ext;
+        SPDLOG_TRACE("{}", ext->name);
     }
 
     create_instance(application_name, application_vk_version);
@@ -40,28 +41,28 @@ Context::Context(std::vector<Extension*> desired_extensions, std::string applica
 Context::~Context() {
     device.waitIdle();
 
-    logger->debug("destroy context");
+    SPDLOG_DEBUG("destroy context");
     for (auto& ext : extensions) {
         ext->on_destroy_context(*this);
     }
 
-    logger->debug("destroy command pools");
+    SPDLOG_DEBUG("destroy command pools");
     device.destroyCommandPool(cmd_pool_graphics);
     device.destroyCommandPool(cmd_pool_transfer);
 
-    logger->debug("destroy device");
+    SPDLOG_DEBUG("destroy device");
     for (auto& ext : extensions) {
         ext->on_destroy_device(device);
     }
     device.destroy();
 
-    logger->debug("destroy instance");
+    SPDLOG_DEBUG("destroy instance");
     for (auto& ext : extensions) {
         ext->on_destroy_instance(instance);
     }
     instance.destroy();
 
-    logger->debug("context destroyed");
+    SPDLOG_DEBUG("context destroyed");
 }
 
 void Context::create_instance(std::string application_name, uint32_t application_vk_version) {
@@ -75,8 +76,8 @@ void Context::create_instance(std::string application_name, uint32_t application
     remove_duplicates(instance_layer_names);
     remove_duplicates(instance_extension_names);
 
-    logger->debug("enabling instance layers: [{}]", fmt::join(instance_layer_names, ", "));
-    logger->debug("enabling instance extensions: [{}]", fmt::join(instance_extension_names, ", "));
+    SPDLOG_DEBUG("enabling instance layers: [{}]", fmt::join(instance_layer_names, ", "));
+    SPDLOG_DEBUG("enabling instance extensions: [{}]", fmt::join(instance_extension_names, ", "));
 
     void* p_next = nullptr;
     for (auto& ext : extensions) {
@@ -100,7 +101,7 @@ void Context::create_instance(std::string application_name, uint32_t application
     };
 
     instance = vk::createInstance(instance_create_info);
-    logger->debug("instance created");
+    SPDLOG_DEBUG("instance created");
 
     // Must happen before on_instance_created since it requires dynamic loading
     VULKAN_HPP_DEFAULT_DISPATCHER.init(instance);
@@ -120,7 +121,7 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id, uint32_t filter
     long selected = -1;
     for (std::size_t i = 0; i < devices.size(); i++) {
         vk::PhysicalDeviceProperties2 props = devices[i].getProperties2();
-        logger->info("found physical device {}, vendor id: {}, device id: {}", props.properties.deviceName,
+        SPDLOG_INFO("found physical device {}, vendor id: {}, device id: {}", props.properties.deviceName,
                      props.properties.vendorID, props.properties.deviceID);
         if ((filter_vendor_id == (uint32_t)-1 || filter_vendor_id == props.properties.vendorID) &&
             (filter_device_id == (uint32_t)-1 || filter_device_id == props.properties.deviceID) &&
@@ -135,7 +136,7 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id, uint32_t filter
     }
     physical_device = devices[selected];
     physical_device_props = physical_device.getProperties();
-    logger->info("selected physical device {}, vendor id: {}, device id: {}",
+    SPDLOG_INFO("selected physical device {}, vendor id: {}, device id: {}",
                  physical_device_props.properties.deviceName, physical_device_props.properties.vendorID,
                  physical_device_props.properties.deviceID);
 
@@ -184,7 +185,7 @@ void Context::find_queues() {
     if (queue_idx_graphics < 0 || queue_idx_transfer < 0) {
         throw std::runtime_error("could not find a suitable Vulkan queue family!");
     } else {
-        logger->debug("found suitable vulkan queue families: {} {}", queue_idx_graphics, queue_idx_transfer);
+        SPDLOG_DEBUG("found suitable vulkan queue families: {} {}", queue_idx_graphics, queue_idx_transfer);
         this->queue_idx_graphics = queue_idx_graphics;
         this->queue_idx_transfer = queue_idx_transfer;
     }
@@ -204,7 +205,7 @@ void Context::create_device_and_queues() {
         insert_all(required_device_extensions, ext->required_device_extension_names());
     }
     remove_duplicates(required_device_extensions);
-    logger->debug("enabling device extensions: [{}]", fmt::join(required_device_extensions, ", "));
+    SPDLOG_DEBUG("enabling device extensions: [{}]", fmt::join(required_device_extensions, ", "));
 
     void* p_next = nullptr;
     for (auto& ext : extensions) {
@@ -218,7 +219,7 @@ void Context::create_device_and_queues() {
         {}, queue_create_infos, instance_layer_names, required_device_extensions, nullptr, &physical_device_features_2};
 
     device = physical_device.createDevice(device_create_info);
-    logger->debug("device created");
+    SPDLOG_DEBUG("device created");
 
     VULKAN_HPP_DEFAULT_DISPATCHER.init(device);
     for (auto& ext : extensions) {
@@ -227,7 +228,7 @@ void Context::create_device_and_queues() {
 
     queue_graphics = device.getQueue(queue_idx_graphics, 0);
     queue_transfer = device.getQueue(queue_idx_transfer, 0);
-    logger->debug("queues created");
+    SPDLOG_DEBUG("queues created");
 }
 
 void Context::create_command_pools() {
@@ -235,7 +236,7 @@ void Context::create_command_pools() {
     cmd_pool_graphics = device.createCommandPool(cpi_graphics);
     vk::CommandPoolCreateInfo cpi_transfer({vk::CommandPoolCreateFlagBits::eResetCommandBuffer}, queue_idx_transfer);
     cmd_pool_transfer = device.createCommandPool(cpi_transfer);
-    logger->debug("command pools created");
+    SPDLOG_DEBUG("command pools created");
 }
 
 ////////////
@@ -243,7 +244,7 @@ void Context::create_command_pools() {
 ////////////
 
 void Context::extensions_check_instance_layer_support() {
-    logger->debug("extensions: checking instance layer support...");
+    SPDLOG_DEBUG("extensions: checking instance layer support...");
     std::vector<Extension*> not_supported;
     std::vector<vk::LayerProperties> layer_props = vk::enumerateInstanceLayerProperties();
 
@@ -270,7 +271,7 @@ void Context::extensions_check_instance_layer_support() {
 }
 
 void Context::extensions_check_instance_extension_support() {
-    logger->debug("extensions: checking instance extension support...");
+    SPDLOG_DEBUG("extensions: checking instance extension support...");
     std::vector<Extension*> not_supported;
     std::vector<vk::ExtensionProperties> extension_props = vk::enumerateInstanceExtensionProperties();
 
@@ -297,7 +298,7 @@ void Context::extensions_check_instance_extension_support() {
 }
 
 void Context::extensions_check_device_extension_support() {
-    logger->debug("extensions: checking device extension support...");
+    SPDLOG_DEBUG("extensions: checking device extension support...");
     std::vector<Extension*> not_supported;
     std::vector<vk::ExtensionProperties> extension_props = physical_device.enumerateDeviceExtensionProperties();
 
@@ -324,7 +325,7 @@ void Context::extensions_check_device_extension_support() {
 }
 
 void Context::extensions_self_check_support() {
-    logger->debug("extensions: self-check support...");
+    SPDLOG_DEBUG("extensions: self-check support...");
     std::vector<Extension*> not_supported;
     for (auto& ext : extensions) {
         if (!ext->extension_supported(physical_device)) {
@@ -338,7 +339,7 @@ void Context::extensions_self_check_support() {
 
 void Context::destroy_extensions(std::vector<Extension*> extensions) {
     for (auto& ext : extensions) {
-        logger->debug("remove extension {} from context", ext->name);
+        SPDLOG_DEBUG("remove extension {} from context", ext->name);
         ext->on_destroy_instance(this->instance);
 
         for (std::size_t i = 0; this->extensions.size(); i++) {

@@ -21,15 +21,16 @@ class ExtensionStopwatch : public Extension {
     void stop_stopwatch(vk::CommandBuffer& cb,
                         vk::PipelineStageFlagBits pipeline_stage = vk::PipelineStageFlagBits::eAllCommands);
     /* Returns the result or none if getQueryPoolResults fails */
-    std::optional<uint32_t> get_nanos(vk::Device& device);
+    std::optional<uint32_t> get_nanos();
     /* Returns the result or none if getQueryPoolResults fails */
-    std::optional<double> get_millis(vk::Device& device);
+    std::optional<double> get_millis();
     /* Returns the result or none if getQueryPoolResults fails */
-    std::optional<double> get_seconds(vk::Device& device);
+    std::optional<double> get_seconds();
 
   private:
     vk::QueryPool query_pool;
     float timestamp_period;
+    vk::Device device = VK_NULL_HANDLE;
 };
 
 } // namespace merian
