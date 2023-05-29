@@ -50,6 +50,10 @@ Context::~Context() {
     device.destroyCommandPool(cmd_pool_graphics);
     device.destroyCommandPool(cmd_pool_transfer);
 
+    SPDLOG_DEBUG("destroy queue");
+    delete queue_graphics;
+    delete queue_transfer;
+
     SPDLOG_DEBUG("destroy device");
     for (auto& ext : extensions) {
         ext->on_destroy_device(device);
@@ -226,8 +230,8 @@ void Context::create_device_and_queues() {
         ext->on_device_created(device);
     }
 
-    queue_graphics = device.getQueue(queue_idx_graphics, 0);
-    queue_transfer = device.getQueue(queue_idx_transfer, 0);
+    queue_graphics = new QueueContainer(device, queue_idx_graphics, 0);
+    queue_transfer = new QueueContainer(device, queue_idx_transfer, 0);
     SPDLOG_DEBUG("queues created");
 }
 

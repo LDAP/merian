@@ -1,5 +1,7 @@
 #pragma once
 
+#include "vk/command/queue_container.hpp"
+
 #include <mutex>
 #include <spdlog/logger.h>
 
@@ -56,10 +58,8 @@ class Context {
     uint32_t queue_idx_transfer = -1;
     // in create_device_and_queues
     vk::Device device;
-    vk::Queue queue_graphics; // used for both graphics and compute
-    vk::Queue queue_transfer;
-    std::mutex queue_graphics_mutex;
-    std::mutex queue_transfer_mutex;
+    QueueContainer* queue_graphics; // used for both graphics and compute
+    QueueContainer* queue_transfer;
     // in create_command_pools
     vk::CommandPool cmd_pool_graphics;
     vk::CommandPool cmd_pool_transfer;
