@@ -45,7 +45,16 @@ template <uint32_t RING_SIZE = 3> class RingCommandPool {
         }
     }
 
-    void reset() {}
+    void reset() {
+        for (uint32_t i = 0; i < RING_SIZE; i++) {
+            device.destroyCommandPool(pools[i].pool);
+            pools[i].cmds.clear();
+        }
+        for (uint32_t i = 0; i < RING_SIZE; i++) {
+            vk::CommandPoolCreateInfo info{create_flags, queue_family_index};
+            pools[i].pool = device.createCommandPool(info);
+        }
+    }
 
     // Like set_cycle(uint32_t cycle) but advances the cycle internally by one
     void set_cycle() {
@@ -72,7 +81,7 @@ template <uint32_t RING_SIZE = 3> class RingCommandPool {
                         bool begin = false,
                         vk::CommandBufferUsageFlags flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
                         const vk::CommandBufferInheritanceInfo* pInheritanceInfo = nullptr) {
-        return createCommandBuffers(level, 1, begin, flags, pInheritanceInfo);
+        return createCommandBuffers(level, 1, begin, flags, pInheritanceInfo)[0];
     }
 
     // ensure proper cycle or frame is set
