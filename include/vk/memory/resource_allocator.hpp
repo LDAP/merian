@@ -108,7 +108,7 @@ class ResourceAllocator {
 
     //--------------------------------------------------------------------------------------------------
 
-    AccelKHR createAccelerationStructure(vk::DeviceSize size, vk::AccelerationStructureTypeKHR type);
+    AccelerationStructure createAccelerationStructure(vk::DeviceSize size, vk::AccelerationStructureTypeKHR type);
 
     //--------------------------------------------------------------------------------------------------
 
@@ -125,7 +125,7 @@ class ResourceAllocator {
     //
     void destroy(Buffer& b_);
     void destroy(Image& i_);
-    void destroy(AccelKHR& a_);
+    void destroy(AccelerationStructure& a_);
     void destroy(Texture& t_);
 
     //--------------------------------------------------------------------------------------------------

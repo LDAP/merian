@@ -216,14 +216,14 @@ Texture ResourceAllocator::createTexture(const vk::CommandBuffer& cmdBuf,
     return resultTexture;
 }
 
-AccelKHR ResourceAllocator::createAccelerationStructure(vk::DeviceSize size, vk::AccelerationStructureTypeKHR type) {
-    AccelKHR resultAccel;
+AccelerationStructure ResourceAllocator::createAccelerationStructure(vk::DeviceSize size, vk::AccelerationStructureTypeKHR type) {
+    AccelerationStructure resultAccel;
     // Allocating the buffer to hold the acceleration structure
     resultAccel.buffer = createBuffer(size, vk::BufferUsageFlagBits::eAccelerationStructureStorageKHR |
                                                 vk::BufferUsageFlagBits::eShaderDeviceAddress);
     // Setting the buffer
     vk::AccelerationStructureCreateInfoKHR createInfo{{}, resultAccel.buffer.buffer, {}, size, type};
-    check_result(m_device.createAccelerationStructureKHR(&createInfo, nullptr, &resultAccel.accel),
+    check_result(m_device.createAccelerationStructureKHR(&createInfo, nullptr, &resultAccel.as),
                  "could not create acceleration structure");
 
     return resultAccel;
@@ -276,11 +276,11 @@ void ResourceAllocator::destroy(Texture& t_) {
     t_ = Texture();
 }
 
-void ResourceAllocator::destroy(AccelKHR& a_) {
-    m_device.destroyAccelerationStructureKHR(a_.accel, nullptr);
+void ResourceAllocator::destroy(AccelerationStructure& a_) {
+    m_device.destroyAccelerationStructureKHR(a_.as, nullptr);
     destroy(a_.buffer);
 
-    a_ = AccelKHR();
+    a_ = AccelerationStructure();
 }
 
 void* ResourceAllocator::map(const Buffer& buffer) {

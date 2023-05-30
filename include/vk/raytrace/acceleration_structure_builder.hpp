@@ -123,8 +123,8 @@ class AccelerationStructureBuilder {
         vk::AccelerationStructureBuildSizesInfoKHR sizeInfo;
         const vk::AccelerationStructureBuildRangeInfoKHR* rangeInfo;
 
-        AccelKHR as;        // result acceleration structure
-        AccelKHR cleanupAS; // used for old AS when compacting
+        AccelerationStructure as;        // result acceleration structure
+        AccelerationStructure cleanupAS; // used for old AS when compacting
     };
 
     void cmdCreateTLAS(vk::CommandBuffer& cmdBuf,                    // Command buffer
@@ -151,8 +151,8 @@ class AccelerationStructureBuilder {
     ResourceAllocator& resource_allocator;
     QueueContainer& queue;
 
-    std::vector<AccelKHR> vec_blas; // Bottom-level acceleration structure
-    AccelKHR tlas;                  // Top-level acceleration structure
+    std::vector<AccelerationStructure> vec_blas; // Bottom-level acceleration structure
+    AccelerationStructure tlas;                  // Top-level acceleration structure
 };
 
 } // namespace merian

@@ -13,6 +13,8 @@ struct Buffer {
     MemHandle memHandle{nullptr};
     vk::BufferUsageFlags usage;
 
+    // -----------------------------------------------------------
+
     vk::BufferDeviceAddressInfo get_buffer_device_address_info() {
         return vk::BufferDeviceAddressInfo{buffer};
     }
@@ -34,9 +36,16 @@ struct Texture {
     vk::DescriptorImageInfo descriptor{};
 };
 
-struct AccelKHR {
-    vk::AccelerationStructureKHR accel = VK_NULL_HANDLE;
+struct AccelerationStructure {
+    vk::AccelerationStructureKHR as = VK_NULL_HANDLE;
     Buffer buffer;
+
+    // -----------------------------------------------------------
+
+    vk::DeviceAddress get_acceleration_structure_device_address(vk::Device& device) {
+        vk::AccelerationStructureDeviceAddressInfoKHR address_info{as};
+        return device.getAccelerationStructureAddressKHR(address_info);
+    }
 };
 
 } // namespace merian

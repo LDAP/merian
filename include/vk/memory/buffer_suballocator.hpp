@@ -133,10 +133,12 @@ class BufferSubAllocator {
     BufferSubAllocator(BufferSubAllocator const&) = delete;
     BufferSubAllocator& operator=(BufferSubAllocator const&) = delete;
 
-    BufferSubAllocator() {
-    }
-    BufferSubAllocator(MemoryAllocator* memAllocator, vk::DeviceSize blockSize, vk::BufferUsageFlags bufferUsageFlags,
-                       vk::MemoryPropertyFlags memPropFlags = vk::MemoryPropertyFlagBits::eDeviceLocal, bool mapped = false,
+    BufferSubAllocator() {}
+    BufferSubAllocator(MemoryAllocator* memAllocator,
+                       vk::DeviceSize blockSize,
+                       vk::BufferUsageFlags bufferUsageFlags,
+                       vk::MemoryPropertyFlags memPropFlags = vk::MemoryPropertyFlagBits::eDeviceLocal,
+                       bool mapped = false,
                        const std::vector<uint32_t>& sharingQueueFamilyIndices = std::vector<uint32_t>()) {
         init(memAllocator, blockSize, bufferUsageFlags, memPropFlags, mapped, sharingQueueFamilyIndices);
     }
@@ -145,8 +147,11 @@ class BufferSubAllocator {
         deinit();
     }
 
-    void init(MemoryAllocator* memallocator, vk::DeviceSize blockSize, vk::BufferUsageFlags bufferUsageFlags,
-              vk::MemoryPropertyFlags memPropFlags = vk::MemoryPropertyFlagBits::eDeviceLocal, bool mapped = false,
+    void init(MemoryAllocator* memallocator,
+              vk::DeviceSize blockSize,
+              vk::BufferUsageFlags bufferUsageFlags,
+              vk::MemoryPropertyFlags memPropFlags = vk::MemoryPropertyFlagBits::eDeviceLocal,
+              bool mapped = false,
               const std::vector<uint32_t>& sharingQueues = std::vector<uint32_t>());
     void deinit();
 
