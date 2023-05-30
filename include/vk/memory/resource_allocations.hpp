@@ -11,6 +11,16 @@ namespace merian {
 struct Buffer {
     vk::Buffer buffer = VK_NULL_HANDLE;
     MemHandle memHandle{nullptr};
+    vk::BufferUsageFlags usage;
+
+    vk::BufferDeviceAddressInfo get_buffer_device_address_info() {
+        return vk::BufferDeviceAddressInfo{buffer};
+    }
+
+    vk::DeviceAddress get_device_address(vk::Device& device) {
+        assert(usage | vk::BufferUsageFlagBits::eShaderDeviceAddress);
+        return device.getBufferAddress(get_buffer_device_address_info());
+    }
 };
 
 struct Image {

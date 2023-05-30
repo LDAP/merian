@@ -4,8 +4,11 @@
 
 namespace merian {
 
-ResourceAllocator::ResourceAllocator(vk::Device device, vk::PhysicalDevice physicalDevice, MemoryAllocator* memAllocator,
-                                     SamplerPool& samplerPool, vk::DeviceSize stagingBlockSize)
+ResourceAllocator::ResourceAllocator(vk::Device device,
+                                     vk::PhysicalDevice physicalDevice,
+                                     MemoryAllocator* memAllocator,
+                                     SamplerPool& samplerPool,
+                                     vk::DeviceSize stagingBlockSize)
     : m_samplerPool(samplerPool) {
     init(device, physicalDevice, memAllocator, stagingBlockSize);
 }
@@ -14,7 +17,9 @@ ResourceAllocator::~ResourceAllocator() {
     deinit();
 }
 
-void ResourceAllocator::init(vk::Device device, vk::PhysicalDevice physicalDevice, MemoryAllocator* memAlloc,
+void ResourceAllocator::init(vk::Device device,
+                             vk::PhysicalDevice physicalDevice,
+                             MemoryAllocator* memAlloc,
                              vk::DeviceSize stagingBlockSize) {
     m_device = device;
     m_physicalDevice = physicalDevice;
@@ -32,6 +37,7 @@ Buffer ResourceAllocator::createBuffer(const vk::BufferCreateInfo& info_,
     Buffer resultBuffer;
     // Create Buffer (can be overloaded)
     CreateBufferEx(info_, &resultBuffer.buffer);
+    resultBuffer.usage = info_.usage;
 
     // Find memory requirements
     vk::MemoryRequirements2 memReqs;
@@ -65,14 +71,18 @@ Buffer ResourceAllocator::createBuffer(const vk::BufferCreateInfo& info_,
     return resultBuffer;
 }
 
-Buffer ResourceAllocator::createBuffer(vk::DeviceSize size_, vk::BufferUsageFlags usage_,
+Buffer ResourceAllocator::createBuffer(vk::DeviceSize size_,
+                                       vk::BufferUsageFlags usage_,
                                        const vk::MemoryPropertyFlags memUsage_) {
     vk::BufferCreateInfo info{{}, size_, vk::BufferUsageFlagBits::eTransferDst | usage_};
     return createBuffer(info, memUsage_);
 }
 
-Buffer ResourceAllocator::createBuffer(const vk::CommandBuffer& cmdBuf, const vk::DeviceSize& size_, const void* data_,
-                                       vk::BufferUsageFlags usage_, vk::MemoryPropertyFlags memProps) {
+Buffer ResourceAllocator::createBuffer(const vk::CommandBuffer& cmdBuf,
+                                       const vk::DeviceSize& size_,
+                                       const void* data_,
+                                       vk::BufferUsageFlags usage_,
+                                       vk::MemoryPropertyFlags memProps) {
     vk::BufferCreateInfo createInfoR{{}, size_, usage_ | vk::BufferUsageFlagBits::eTransferDst};
     Buffer resultBuffer = createBuffer(createInfoR, memProps);
 
@@ -115,8 +125,11 @@ Image ResourceAllocator::createImage(const vk::ImageCreateInfo& info_, const vk:
     return resultImage;
 }
 
-Image ResourceAllocator::createImage(const vk::CommandBuffer& cmdBuf, size_t size_, const void* data_,
-                                     const vk::ImageCreateInfo& info_, const vk::ImageLayout& layout_) {
+Image ResourceAllocator::createImage(const vk::CommandBuffer& cmdBuf,
+                                     size_t size_,
+                                     const void* data_,
+                                     const vk::ImageCreateInfo& info_,
+                                     const vk::ImageLayout& layout_) {
     Image resultImage = createImage(info_, vk::MemoryPropertyFlagBits::eDeviceLocal);
 
     // Copy the data to staging buffer than to image
@@ -142,7 +155,8 @@ Image ResourceAllocator::createImage(const vk::CommandBuffer& cmdBuf, size_t siz
     return resultImage;
 }
 
-merian::Texture ResourceAllocator::createTexture(const Image& image, const vk::ImageViewCreateInfo& imageViewCreateInfo,
+merian::Texture ResourceAllocator::createTexture(const Image& image,
+                                                 const vk::ImageViewCreateInfo& imageViewCreateInfo,
                                                  const vk::SamplerCreateInfo& samplerCreateInfo) {
     Texture resultTexture = createTexture(image, imageViewCreateInfo);
     resultTexture.descriptor.sampler = m_samplerPool.acquireSampler(samplerCreateInfo);
@@ -163,9 +177,12 @@ Texture ResourceAllocator::createTexture(const Image& image, const vk::ImageView
     return resultTexture;
 }
 
-Texture ResourceAllocator::createTexture(const vk::CommandBuffer& cmdBuf, size_t size_, const void* data_,
+Texture ResourceAllocator::createTexture(const vk::CommandBuffer& cmdBuf,
+                                         size_t size_,
+                                         const void* data_,
                                          const vk::ImageCreateInfo& info_,
-                                         const vk::SamplerCreateInfo& samplerCreateInfo, const vk::ImageLayout& layout_,
+                                         const vk::SamplerCreateInfo& samplerCreateInfo,
+                                         const vk::ImageLayout& layout_,
                                          bool isCube) {
     Image image = createImage(cmdBuf, size_, data_, info_, layout_);
 
@@ -199,14 +216,14 @@ Texture ResourceAllocator::createTexture(const vk::CommandBuffer& cmdBuf, size_t
     return resultTexture;
 }
 
-AccelKHR ResourceAllocator::createAcceleration(vk::AccelerationStructureCreateInfoKHR& accel_) {
+AccelKHR ResourceAllocator::createAccelerationStructure(vk::DeviceSize size, vk::AccelerationStructureTypeKHR type) {
     AccelKHR resultAccel;
     // Allocating the buffer to hold the acceleration structure
-    resultAccel.buffer = createBuffer(accel_.size, vk::BufferUsageFlagBits::eAccelerationStructureStorageKHR |
-                                                       vk::BufferUsageFlagBits::eShaderDeviceAddress);
+    resultAccel.buffer = createBuffer(size, vk::BufferUsageFlagBits::eAccelerationStructureStorageKHR |
+                                                vk::BufferUsageFlagBits::eShaderDeviceAddress);
     // Setting the buffer
-    accel_.buffer = resultAccel.buffer.buffer;
-    check_result(m_device.createAccelerationStructureKHR(&accel_, nullptr, &resultAccel.accel),
+    vk::AccelerationStructureCreateInfoKHR createInfo{{}, resultAccel.buffer.buffer, {}, size, type};
+    check_result(m_device.createAccelerationStructureKHR(&createInfo, nullptr, &resultAccel.accel),
                  "could not create acceleration structure");
 
     return resultAccel;

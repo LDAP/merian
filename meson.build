@@ -67,6 +67,7 @@ src_files = files(
     'src/vk/memory/resource_allocator.cpp',
     'src/vk/memory/staging_memory_manager.cpp',
     'src/vk/memory/vma.cpp',
+    'src/vk/raytrace/acceleration_structure_builder.cpp',
     'src/vk/sampler/sampler_pool.cpp',
     'src/vk/utils/barriers.cpp',
 )

@@ -1,3 +1,5 @@
+#pragma once
+
 #include "vk/extension/extension.hpp"
 
 #include "vk/memory/resource_allocator.hpp"

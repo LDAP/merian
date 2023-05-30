@@ -1,3 +1,5 @@
+#pragma once
+
 inline void debugbreak() {
 
 #if defined(_MSVC_LANG)

@@ -137,7 +137,10 @@ class ExtensionVkGLFW : public Extension {
     }
     /* Recreates the swapchain if necessary */
     std::optional<SwapchainAcquireResult> aquire_custom(int width, int height);
+
     vk::Result present(vk::Queue queue);
+
+    void present(QueueContainer& queue);
 
     /* Semaphore only valid until the next present() */
     vk::Semaphore& current_read_semaphore() {

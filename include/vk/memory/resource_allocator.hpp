@@ -15,15 +15,21 @@ class ResourceAllocator {
     ResourceAllocator& operator=(ResourceAllocator const&) = delete;
     ResourceAllocator() = delete;
 
-    ResourceAllocator(vk::Device device, vk::PhysicalDevice physicalDevice, MemoryAllocator* memAllocator,
-                      SamplerPool& m_samplerPool, vk::DeviceSize stagingBlockSize = NVVK_DEFAULT_STAGING_BLOCKSIZE);
+    ResourceAllocator(vk::Device device,
+                      vk::PhysicalDevice physicalDevice,
+                      MemoryAllocator* memAllocator,
+                      SamplerPool& m_samplerPool,
+                      vk::DeviceSize stagingBlockSize = NVVK_DEFAULT_STAGING_BLOCKSIZE);
 
     // All staging buffers must be cleared before
     virtual ~ResourceAllocator();
 
     //--------------------------------------------------------------------------------------------------
+
     // Initialization of the allocator
-    void init(vk::Device device, vk::PhysicalDevice physicalDevice, MemoryAllocator* memAlloc,
+    void init(vk::Device device,
+              vk::PhysicalDevice physicalDevice,
+              MemoryAllocator* memAlloc,
               vk::DeviceSize stagingBlockSize = NVVK_DEFAULT_STAGING_BLOCKSIZE);
 
     void deinit();
@@ -33,63 +39,79 @@ class ResourceAllocator {
     }
 
     //--------------------------------------------------------------------------------------------------
+
     // Basic buffer creation
     Buffer createBuffer(const vk::BufferCreateInfo& info_,
-                              const vk::MemoryPropertyFlags memUsage_ = vk::MemoryPropertyFlagBits::eDeviceLocal);
+                        const vk::MemoryPropertyFlags memUsage_ = vk::MemoryPropertyFlagBits::eDeviceLocal);
 
-    //--------------------------------------------------------------------------------------------------
     // Simple buffer creation
     // implicitly sets VK_BUFFER_USAGE_TRANSFER_DST_BIT
-    Buffer createBuffer(vk::DeviceSize size_ = 0, vk::BufferUsageFlags usage_ = vk::BufferUsageFlags(),
-                              const vk::MemoryPropertyFlags memUsage_ = vk::MemoryPropertyFlagBits::eDeviceLocal);
+    Buffer createBuffer(vk::DeviceSize size_ = 0,
+                        vk::BufferUsageFlags usage_ = vk::BufferUsageFlags(),
+                        const vk::MemoryPropertyFlags memUsage_ = vk::MemoryPropertyFlagBits::eDeviceLocal);
 
-    //--------------------------------------------------------------------------------------------------
     // Simple buffer creation with data uploaded through staging manager
     // implicitly sets VK_BUFFER_USAGE_TRANSFER_DST_BIT
-    Buffer createBuffer(const vk::CommandBuffer& cmdBuf, const vk::DeviceSize& size_, const void* data_,
-                              vk::BufferUsageFlags usage_,
-                              vk::MemoryPropertyFlags memProps = vk::MemoryPropertyFlagBits::eDeviceLocal);
+    Buffer createBuffer(const vk::CommandBuffer& cmdBuf,
+                        const vk::DeviceSize& size_,
+                        const void* data_,
+                        vk::BufferUsageFlags usage_,
+                        vk::MemoryPropertyFlags memProps = vk::MemoryPropertyFlagBits::eDeviceLocal);
 
-    //--------------------------------------------------------------------------------------------------
     // Simple buffer creation with data uploaded through staging manager
     // implicitly sets VK_BUFFER_USAGE_TRANSFER_DST_BIT
     template <typename T>
-    Buffer createBuffer(const vk::CommandBuffer& cmdBuf, const std::vector<T>& data_, vk::BufferUsageFlags usage_,
-                              vk::MemoryPropertyFlags memProps_ = vk::MemoryPropertyFlagBits::eDeviceLocal) {
+    Buffer createBuffer(const vk::CommandBuffer& cmdBuf,
+                        const std::vector<T>& data_,
+                        vk::BufferUsageFlags usage_,
+                        vk::MemoryPropertyFlags memProps_ = vk::MemoryPropertyFlagBits::eDeviceLocal) {
         return createBuffer(cmdBuf, sizeof(T) * data_.size(), data_.data(), usage_, memProps_);
     }
 
     //--------------------------------------------------------------------------------------------------
+
+    Buffer createScratchBuffer(vk::DeviceSize size) {
+        return createBuffer(size,
+                            vk::BufferUsageFlagBits::eShaderDeviceAddress | vk::BufferUsageFlagBits::eStorageBuffer);
+    }
+
+    //--------------------------------------------------------------------------------------------------
+
     // Basic image creation
     Image createImage(const vk::ImageCreateInfo& info_,
-                            const vk::MemoryPropertyFlags memUsage_ = vk::MemoryPropertyFlagBits::eDeviceLocal);
+                      const vk::MemoryPropertyFlags memUsage_ = vk::MemoryPropertyFlagBits::eDeviceLocal);
 
-    //--------------------------------------------------------------------------------------------------
     // Create an image with data uploaded through staging manager
-    Image createImage(const vk::CommandBuffer& cmdBuf, size_t size_, const void* data_,
-                            const vk::ImageCreateInfo& info_,
-                            const vk::ImageLayout& layout_ = vk::ImageLayout::eShaderReadOnlyOptimal);
+    Image createImage(const vk::CommandBuffer& cmdBuf,
+                      size_t size_,
+                      const void* data_,
+                      const vk::ImageCreateInfo& info_,
+                      const vk::ImageLayout& layout_ = vk::ImageLayout::eShaderReadOnlyOptimal);
 
-    //--------------------------------------------------------------------------------------------------
     // other variants could exist with a few defaults but we already have makeImage2DViewCreateInfo()
     // we could always override viewCreateInfo.image
     Texture createTexture(const Image& image, const vk::ImageViewCreateInfo& imageViewCreateInfo);
-    Texture createTexture(const Image& image, const vk::ImageViewCreateInfo& imageViewCreateInfo,
-                                const vk::SamplerCreateInfo& samplerCreateInfo);
+    Texture createTexture(const Image& image,
+                          const vk::ImageViewCreateInfo& imageViewCreateInfo,
+                          const vk::SamplerCreateInfo& samplerCreateInfo);
 
-    //--------------------------------------------------------------------------------------------------
     // shortcut that creates the image for the texture
     // - creates the image
     // - creates the texture part by associating image and sampler
-    //
-    Texture createTexture(const vk::CommandBuffer& cmdBuf, size_t size_, const void* data_,
-                                const vk::ImageCreateInfo& info_, const vk::SamplerCreateInfo& samplerCreateInfo,
-                                const vk::ImageLayout& layout_ = vk::ImageLayout::eShaderReadOnlyOptimal,
-                                bool isCube = false);
-
-    AccelKHR createAcceleration(vk::AccelerationStructureCreateInfoKHR& accel_);
+    Texture createTexture(const vk::CommandBuffer& cmdBuf,
+                          size_t size_,
+                          const void* data_,
+                          const vk::ImageCreateInfo& info_,
+                          const vk::SamplerCreateInfo& samplerCreateInfo,
+                          const vk::ImageLayout& layout_ = vk::ImageLayout::eShaderReadOnlyOptimal,
+                          bool isCube = false);
 
     //--------------------------------------------------------------------------------------------------
+
+    AccelKHR createAccelerationStructure(vk::DeviceSize size, vk::AccelerationStructureTypeKHR type);
+
+    //--------------------------------------------------------------------------------------------------
+
     // implicit staging operations triggered by create are managed here
     void finalizeStaging(vk::Fence fence = VK_NULL_HANDLE);
     void finalizeAndReleaseStaging(vk::Fence fence = VK_NULL_HANDLE);

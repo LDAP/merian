@@ -1,3 +1,5 @@
+#pragma once
+
 namespace merian {
 
 /* Aligns number to alignment by "rounding up" */

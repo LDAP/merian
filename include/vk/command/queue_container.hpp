@@ -1,5 +1,6 @@
 #pragma once
 
+#include "vk/command/command_pool.hpp"
 #include "vk/utils/check_result.hpp"
 
 #include <mutex>
@@ -15,9 +16,19 @@ class QueueContainer {
   public:
     QueueContainer() = delete;
 
-    QueueContainer(vk::Queue& queue) : queue(queue) {}
-    QueueContainer(vk::Device& device, uint32_t queue_family_index, uint32_t queue_index) {
-        queue = device.getQueue(queue_family_index, queue_index);
+    QueueContainer(vk::Queue& queue, uint32_t queue_family_index)
+        : queue(queue), queue_family_index(queue_family_index) {}
+    QueueContainer(vk::Device& device, uint32_t queue_family_index, uint32_t queue_index)
+        : queue(device.getQueue(queue_family_index, queue_index)), queue_family_index(queue_family_index) {
+    }
+
+    void submit(CommandPool& pool,
+                vk::Fence fence = VK_NULL_HANDLE,
+                const std::vector<vk::Semaphore>& wait_semaphores = {},
+                const std::vector<vk::Semaphore>& signal_semaphores = {},
+                const vk::PipelineStageFlags& wait_dst_stage_mask = {}) {
+        vk::SubmitInfo submit_info{wait_semaphores, wait_dst_stage_mask, pool.cmds, signal_semaphores};
+        submit(submit_info, fence);
     }
 
     void submit(std::vector<vk::CommandBuffer>& command_buffers,
@@ -36,12 +47,26 @@ class QueueContainer {
         submit(submit_info, fence);
     }
 
-    void submit(vk::SubmitInfo& submit_info, vk::Fence fence = VK_NULL_HANDLE) {
+    void submit(vk::SubmitInfo& submit_info, vk::Fence fence = VK_NULL_HANDLE, uint32_t submit_count = 1) {
         std::lock_guard<std::mutex> lock_guard(mutex);
-        check_result(queue.submit(1, &submit_info, fence), "queue submit failed");
+        check_result(queue.submit(submit_count, &submit_info, fence), "queue submit failed");
     }
 
-    // Submits the command buffers then waits using waitIdle()
+    void submit(std::vector<vk::SubmitInfo>& submit_infos, vk::Fence fence = VK_NULL_HANDLE) {
+        std::lock_guard<std::mutex> lock_guard(mutex);
+        queue.submit(submit_infos, fence);
+    }
+
+    void submit_wait(CommandPool& pool,
+                vk::Fence fence = VK_NULL_HANDLE,
+                const std::vector<vk::Semaphore>& wait_semaphores = {},
+                const std::vector<vk::Semaphore>& signal_semaphores = {},
+                const vk::PipelineStageFlags& wait_dst_stage_mask = {}) {
+        vk::SubmitInfo submit_info{wait_semaphores, wait_dst_stage_mask, pool.cmds, signal_semaphores};
+        submit_wait(submit_info, fence);
+    }
+
+    // Submits the command buffers then waits using waitIdle(), try to not use the _wait variants
     void submit_wait(std::vector<vk::CommandBuffer>& command_buffers,
                      vk::Fence fence = VK_NULL_HANDLE,
                      const std::vector<vk::Semaphore>& wait_semaphores = {},
@@ -51,6 +76,7 @@ class QueueContainer {
         submit(submit_info, fence);
     }
 
+    // Submits the command buffers then waits using waitIdle(), try to not use the _wait variants
     void submit_wait(vk::CommandBuffer& command_buffer, vk::Fence fence = VK_NULL_HANDLE) {
         vk::SubmitInfo submit_info{
             {}, {}, {}, 1, &command_buffer,
@@ -58,15 +84,31 @@ class QueueContainer {
         submit_wait(submit_info, fence);
     }
 
-    // Submits then waits using waitIdle()
+    // Submits then waits using waitIdle(), try to not use the _wait variants
     void submit_wait(vk::SubmitInfo& submit_info, vk::Fence fence = VK_NULL_HANDLE) {
         std::lock_guard<std::mutex> lock_guard(mutex);
         check_result(queue.submit(1, &submit_info, fence), "queue submit failed");
         queue.waitIdle();
     }
 
-  public:
-    vk::Queue queue;
+    void present(vk::PresentInfoKHR& present_info) {
+        std::lock_guard<std::mutex> lock_guard(mutex);
+        check_result(queue.presentKHR(&present_info), "present failed");
+    }
+
+    uint32_t get_queue_family_index() const {
+        return queue_family_index;
+    }
+
+    // Returns the queue. Try to not use the queue directly.
+    vk::Queue get_queue() const {
+        return queue;
+    }
+
+  private:
+    // Try to not use the queue directly
+    const vk::Queue queue;
+    const uint32_t queue_family_index;
     std::mutex mutex;
 };
 

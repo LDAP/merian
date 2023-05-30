@@ -296,4 +296,17 @@ vk::Result ExtensionVkGLFW::present(vk::Queue queue) {
     return queue.presentKHR(present_info);
 }
 
+void ExtensionVkGLFW::present(QueueContainer& queue) {
+    vk::Semaphore& written = current_written_semaphore();
+    vk::PresentInfoKHR present_info{
+        1,
+        &written, // wait until the user is done writing to the image
+        1,        &swapchain, &current_image_idx,
+    };
+    current_semaphore_idx++;
+
+    queue.present(present_info);
+}
+
+
 } // namespace merian

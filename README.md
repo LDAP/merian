@@ -17,7 +17,25 @@ The default dispatcher is initialized in `Context`.
 The `Context` class initializes and destroys a Vulkan device and holds core objects (PhysicalDevice, Device, Queues, ...).
 
 ### Extensions
-The Context can be extended by Extensions. The extensions can hook into the context creation process and enable Vulkan instance/device layers and extensions as well as features.
+The Context can be extended by Extensions. The extensions can hook into the context creation process and enable Vulkan instance/device layers and extensions as well as features. Note: Extension can only be used after `Context` is initialized.
+
+```c++
+
+int main() {
+    merian::ExtensionVkDebugUtils debugUtils;
+    merian::ExtensionVkGLFW extGLFW;
+    merian::ExtensionResources resources;
+    std::vector<merian::Extension*> extensions = {
+        &extGLFW,
+        &debugUtils,
+        &resources
+    };
+
+    merian::Context app(extensions, "My beautiful app");
+
+    // use extensions...
+}
+```
 
 #### Naming conventions:
 
@@ -49,6 +67,48 @@ Ray tracing:
 - `MemoryAllocator`: Interface for memory allocators (called MemoryAllocator in NVPro Core). Memory requirements are described by `MemAllocateInfo` and memory is referenced by `MemHandle`. 
 - `MemoryAllocatorVMA`: A implementation of `MemoryAllocator` using the [Vulkan Memory Allocator](https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator) (VMA).
 - `ResourceAllocator`: Uses a `MemoryAllocator` to create and destroy resources.
+- `QueueContainer`: Holds a queue together with its mutex. Provides convenience methods to submit using the mutex.
+- `Ring*`:
+    In real-time processing, the CPU typically generates commands 
+    in advance to the GPU and send them in batches for execution.
+
+    To avoid having the CPU to wait for the GPU'S completion and let it "race ahead"
+    we make use of double, or tripple-buffering techniques, where we cycle through
+    a pool of resources every frame. We know that those resources are currently 
+    not in use by the GPU and can therefore manipulate them directly.
+  
+    Especially in Vulkan it is the developer's responsibility to avoid such
+    access of resources that are in-flight.
+
+    The "Ring" classes cycle through a pool of resources. The default value
+    is set to allow two frames in-flight, assuming one fence is used per-frame.
+
+    >Cite from https://github.com/nvpro-samples/nvpro_core/blob/master/nvvk/commands_vk.hpp
+
+    ```c++
+    int main() {
+        //...
+
+        frame++;
+
+        // wait until we can use the new cycle 
+        // (very rare if we use the fence at then end once per-frame)
+        ringFences.setCycleAndWait(frame);
+
+        // update cycle state, allows recycling of old resources
+        auto& cycle = ringPool.setCycle( frame );
+
+        VkCommandBuffer cmd = cycle.createCommandBuffer(...);
+        
+        //... do stuff / submit etc...
+        VkFence fence = ringFences.getFence();
+
+        // use this fence in the submit
+        queue_container.submit(cmd, fence);
+
+        //...
+    }
+    ```
 
 ## Building
 
