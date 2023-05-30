@@ -1,21 +1,15 @@
+#include <cmath>
 #include <cstdint>
+#include <fmt/format.h>
 #include <string>
-#include <sstream>
+#include <vector>
 
 namespace merian {
 
-    inline std::string format_size(uint64_t size) {
-        std::ostringstream oss;
-        if (size < 1024) {
-            oss << size << " B";
-        } else if (size < 1024 * 1024) {
-            oss << size / 1024.f << " KB";
-        } else if (size < 1024 * 1024 * 1024) {
-            oss << size / (1024.0f * 1024.0f) << " MB";
-        } else {
-            oss << size / (1024.0f * 1024.0f * 1024.0f) << " GB";
-        }
-        return oss.str();
-    }
-
+inline std::string format_size(const uint64_t size) {
+    std::vector<const char*> units = {"B", "KB", "MB", "GB", "TB"};
+    std::size_t unit_index = std::min((std::size_t) std::log2(size) / 10, units.size() - 1);
+    return fmt::format("{} {}", size / std::pow(1024, unit_index), units[unit_index]);
 }
+
+} // namespace merian
