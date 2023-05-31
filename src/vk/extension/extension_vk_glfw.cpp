@@ -1,6 +1,7 @@
-#include "vk/extension/extension_vk_glfw.hpp"
+#include "merian/vk/extension/extension_vk_glfw.hpp"
+#include "merian/vk/context.hpp"
+
 #include <spdlog/spdlog.h>
-#include <vk/context.hpp>
 
 namespace merian {
 

@@ -1,7 +1,6 @@
-#include <vk/memory/memory_allocator_vma.hpp>
-
-#include "utils/debug.hpp"
-#include "vk/utils/check_result.hpp"
+#include "merian/vk/memory/memory_allocator_vma.hpp"
+#include "merian/utils/debug.hpp"
+#include "merian/vk/utils/check_result.hpp"
 
 namespace merian {
 

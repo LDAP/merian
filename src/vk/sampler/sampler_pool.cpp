@@ -18,7 +18,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "vk/sampler/sampler_pool.hpp"
+#include "merian/vk/sampler/sampler_pool.hpp"
 #include <spdlog/spdlog.h>
 
 namespace merian {

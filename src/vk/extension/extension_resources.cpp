@@ -1,5 +1,5 @@
-#include "vk/extension/extension_resources.hpp"
-#include "vk/memory/memory_allocator_vma.hpp"
+#include "merian/vk/extension/extension_resources.hpp"
+#include "merian/vk/memory/memory_allocator_vma.hpp"
 
 namespace merian {
 

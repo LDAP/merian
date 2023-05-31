@@ -1,4 +1,4 @@
-#include "vk/raytrace/acceleration_structure_builder.hpp"
+#include "merian/vk/raytrace/acceleration_structure_builder.hpp"
 #include <numeric>
 
 namespace merian {

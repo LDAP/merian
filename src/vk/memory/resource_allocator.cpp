@@ -1,6 +1,6 @@
-#include "vk/memory/resource_allocator.hpp"
-#include "vk/utils/barriers.hpp"
-#include "vk/utils/check_result.hpp"
+#include "merian/vk/memory/resource_allocator.hpp"
+#include "merian/vk/utils/barriers.hpp"
+#include "merian/vk/utils/check_result.hpp"
 
 namespace merian {
 

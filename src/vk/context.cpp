@@ -1,9 +1,9 @@
-#include "utils/vector_utils.hpp"
+#include "merian/utils/vector_utils.hpp"
+#include "merian/vk/context.hpp"
+#include "merian/vk/extension/extension.hpp"
 
 #include <GLFW/glfw3.h>
 #include <spdlog/spdlog.h>
-#include <vk/context.hpp>
-#include <vk/extension/extension.hpp>
 
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 

@@ -1,4 +1,4 @@
-#include "utils/renderdoc.hpp"
+#include "merian/utils/renderdoc.hpp"
 
 #ifdef RENDERDOC_AVAILABLE
 #include "renderdoc_app.h"

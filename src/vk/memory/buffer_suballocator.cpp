@@ -1,4 +1,4 @@
-#include "vk/memory/buffer_suballocator.hpp"
+#include "merian/vk/memory/buffer_suballocator.hpp"
 
 namespace merian {
 
