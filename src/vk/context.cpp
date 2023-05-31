@@ -1,19 +1,26 @@
-#include "merian/utils/vector_utils.hpp"
 #include "merian/vk/context.hpp"
+#include "merian/utils/vector_utils.hpp"
 #include "merian/vk/extension/extension.hpp"
 
 #include <GLFW/glfw3.h>
 #include <spdlog/spdlog.h>
+#include <tuple>
 
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
 namespace merian {
 
-Context::Context(std::vector<Extension*> desired_extensions, std::string application_name,
-                 uint32_t application_vk_version, uint32_t filter_vendor_id, uint32_t filter_device_id,
+Context::Context(std::vector<Extension*> desired_extensions,
+                 std::string application_name,
+                 uint32_t application_vk_version,
+                 uint32_t preffered_number_compute_queues,
+                 uint32_t filter_vendor_id,
+                 uint32_t filter_device_id,
                  std::string filter_device_name)
     : extensions(desired_extensions) {
-    SPDLOG_INFO("This is {} {}", MERIAN_PROJECT_NAME, MERIAN_VERSION);
+    assert(preffered_number_compute_queues >= 0);
+
+    SPDLOG_INFO("This is {} {}. Context initializing...", MERIAN_PROJECT_NAME, MERIAN_VERSION);
 
     // Init dynamic loader
     static vk::DynamicLoader dl;
@@ -23,19 +30,21 @@ Context::Context(std::vector<Extension*> desired_extensions, std::string applica
 
     SPDLOG_TRACE("supplied extensions:");
     for (auto& ext : extensions) {
-        (void) ext;
+        (void)ext;
         SPDLOG_TRACE("{}", ext->name);
     }
 
     create_instance(application_name, application_vk_version);
     prepare_physical_device(filter_vendor_id, filter_device_id, filter_device_name);
     find_queues();
-    create_device_and_queues();
+    create_device_and_queues(preffered_number_compute_queues);
     create_command_pools();
 
     for (auto& ext : extensions) {
         ext->on_context_created(*this);
     }
+
+    SPDLOG_INFO("Context ready.");
 }
 
 Context::~Context() {
@@ -47,12 +56,27 @@ Context::~Context() {
     }
 
     SPDLOG_DEBUG("destroy command pools");
-    device.destroyCommandPool(cmd_pool_graphics);
-    device.destroyCommandPool(cmd_pool_transfer);
+    if (cmd_pool_GCT.has_value())
+        device.destroyCommandPool(cmd_pool_GCT.value());
+    if (cmd_pool_T.has_value())
+        device.destroyCommandPool(cmd_pool_T.value());
+    if (cmd_pool_C.has_value())
+        device.destroyCommandPool(cmd_pool_C.value());
 
-    SPDLOG_DEBUG("destroy queue");
-    delete queue_graphics;
-    delete queue_transfer;
+    SPDLOG_DEBUG("destroy queues");
+    if (!queue_GCT.unique())
+        SPDLOG_WARN("graphics queue shared-ptr is not unique. Make sure to release your references!");
+    queue_GCT.reset();
+    if (!queue_T.unique())
+        SPDLOG_WARN("transfer queue shared-ptr is not unique. Make sure to release your references!");
+    queue_T.reset();
+
+    queue_C.reset();
+    for (std::size_t i = 0; i < queues_C.size(); i++) {
+        if (!queues_C[i].unique())
+            SPDLOG_WARN("compute queue {} shared-ptr is not unique. Make sure to release your references!", i);
+    }
+    queues_C.clear();
 
     SPDLOG_DEBUG("destroy device");
     for (auto& ext : extensions) {
@@ -114,7 +138,8 @@ void Context::create_instance(std::string application_name, uint32_t application
     }
 }
 
-void Context::prepare_physical_device(uint32_t filter_vendor_id, uint32_t filter_device_id,
+void Context::prepare_physical_device(uint32_t filter_vendor_id,
+                                      uint32_t filter_device_id,
                                       std::string filter_device_name) {
     std::vector<vk::PhysicalDevice> devices = instance.enumeratePhysicalDevices();
     if (devices.empty()) {
@@ -126,7 +151,7 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id, uint32_t filter
     for (std::size_t i = 0; i < devices.size(); i++) {
         vk::PhysicalDeviceProperties2 props = devices[i].getProperties2();
         SPDLOG_INFO("found physical device {}, vendor id: {}, device id: {}", props.properties.deviceName,
-                     props.properties.vendorID, props.properties.deviceID);
+                    props.properties.vendorID, props.properties.deviceID);
         if ((filter_vendor_id == (uint32_t)-1 || filter_vendor_id == props.properties.vendorID) &&
             (filter_device_id == (uint32_t)-1 || filter_device_id == props.properties.deviceID) &&
             (filter_device_name == "" || filter_device_name == props.properties.deviceName)) {
@@ -141,8 +166,8 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id, uint32_t filter
     physical_device = devices[selected];
     physical_device_props = physical_device.getProperties();
     SPDLOG_INFO("selected physical device {}, vendor id: {}, device id: {}",
-                 physical_device_props.properties.deviceName, physical_device_props.properties.vendorID,
-                 physical_device_props.properties.deviceID);
+                physical_device_props.properties.deviceName, physical_device_props.properties.vendorID,
+                physical_device_props.properties.deviceID);
 
     physical_device_features = physical_device.getFeatures2();
     physical_device_memory_properties = physical_device.getMemoryProperties2();
@@ -158,50 +183,127 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id, uint32_t filter
 
 void Context::find_queues() {
     std::vector<vk::QueueFamilyProperties> queue_family_props = physical_device.getQueueFamilyProperties();
-    int queue_idx_graphics = -1;
-    int queue_idx_transfer = -1;
 
+    if (queue_family_props.empty()) {
+        throw std::runtime_error{"no queue families available!"};
+    }
+    SPDLOG_DEBUG("number of queue families available: {}", queue_family_props.size());
+
+    using Flags = vk::QueueFlagBits;
+
+    // We calc all possible index candidates then sort the list to get best match.
+    // (GCT found, additional T found, additional C found, number remaining compute queues, GCT family index, T family
+    // index, C family index)
+    std::vector<std::tuple<bool, bool, bool, uint32_t, uint32_t, uint32_t, uint32_t>> candidates;
+
+#ifdef DEBUG
     for (std::size_t i = 0; i < queue_family_props.size(); i++) {
-        if (!queue_family_props[i].queueCount)
-            continue;
+        const bool supports_graphics = queue_family_props[i].queueFlags & Flags::eGraphics ? true : false;
+        const bool supports_transfer = queue_family_props[i].queueFlags & Flags::eTransfer ? true : false;
+        const bool supports_compute = queue_family_props[i].queueFlags & Flags::eCompute ? true : false;
+        SPDLOG_DEBUG("queue familiy {}: supports graphics: {} transfer: {} compute: {}, count {}", i, supports_graphics,
+                     supports_transfer, supports_compute, queue_family_props[i].queueCount);
+    }
+#endif
 
-        const bool supports_graphics = queue_family_props[i].queueFlags & vk::QueueFlagBits::eGraphics ? true : false;
-        const int supports_compute = queue_family_props[i].queueFlags & vk::QueueFlagBits::eCompute ? true : false;
-        const int supports_transfer = queue_family_props[i].queueFlags & vk::QueueFlagBits::eTransfer ? true : false;
+    std::vector<uint32_t> queue_counts(queue_family_props.size());
+    for (uint32_t i = 0; i < queue_family_props.size(); i++)
+        queue_counts[i] = queue_family_props[i].queueCount;
 
-        // TODO: What if separate queues are necessary for compute / graphics?
-        if (queue_idx_graphics < 0 && supports_graphics && supports_compute) {
-            bool accept = true;
-            for (auto& ext : extensions) {
-                if (!ext->accept_graphics_queue(physical_device, i)) {
-                    accept = false;
-                    break;
+    for (uint32_t queue_family_idx_GCT = 0; queue_family_idx_GCT < queue_family_props.size(); queue_family_idx_GCT++) {
+        for (uint32_t queue_family_idx_T = 0; queue_family_idx_T < queue_family_props.size(); queue_family_idx_T++) {
+            for (uint32_t queue_family_idx_C = 0; queue_family_idx_C < queue_family_props.size();
+                 queue_family_idx_C++) {
+
+                // Make sure we do not request more queues that are available!
+                std::vector<uint32_t> remaining_queue_count = queue_counts;
+                bool found_GCT = false;
+                bool found_T = false;
+                bool found_C = false;
+                uint32_t num_compute_queues = 0;
+
+                // Prio 1: GCT
+                if ((queue_family_props[queue_family_idx_GCT].queueFlags & Flags::eGraphics) &&
+                    (queue_family_props[queue_family_idx_GCT].queueFlags & Flags::eCompute) &&
+                    (queue_family_props[queue_family_idx_GCT].queueFlags & Flags::eTransfer) &&
+                    remaining_queue_count[queue_family_idx_GCT] > 0) {
+                    found_GCT = true;
+                    remaining_queue_count[queue_family_idx_GCT]--;
                 }
+                // Prio 2: T (additional)
+                if ((queue_family_props[queue_family_idx_T].queueFlags & Flags::eTransfer) &&
+                    remaining_queue_count[queue_family_idx_T] > 0) {
+                    found_T = true;
+                    remaining_queue_count[queue_family_idx_T]--;
+                }
+                // Prio 3: C (additional)
+                if ((queue_family_props[queue_family_idx_C].queueFlags & Flags::eCompute) &&
+                    remaining_queue_count[queue_family_idx_C] > 0) {
+                    found_C = true;
+                    // we do not need to reduce remaining_queue_count[queue_family_idx_C] since its the last prio
+                    // get number remaining instead
+                    num_compute_queues = remaining_queue_count[queue_family_idx_C];
+                }
+
+                candidates.emplace_back(found_GCT, found_T, found_C, num_compute_queues, queue_family_idx_GCT,
+                                        queue_family_idx_T, queue_family_idx_C);
             }
-            if (accept)
-                queue_idx_graphics = i;
-        }
-        if ((queue_idx_transfer < 0 || queue_idx_graphics == queue_idx_transfer) && supports_transfer) {
-            queue_idx_transfer = i;
         }
     }
 
-    if (queue_idx_graphics < 0 || queue_idx_transfer < 0) {
-        throw std::runtime_error("could not find a suitable Vulkan queue family!");
-    } else {
-        SPDLOG_DEBUG("found suitable vulkan queue families: {} {}", queue_idx_graphics, queue_idx_transfer);
-        this->queue_idx_graphics = queue_idx_graphics;
-        this->queue_idx_transfer = queue_idx_transfer;
+    // Descending order
+    std::sort(candidates.begin(), candidates.end(), std::greater<>());
+    auto best = candidates[0];
+
+    bool found_GCT = std::get<0>(best);
+    bool found_T = std::get<1>(best);
+    bool found_C = std::get<2>(best);
+
+    if (!found_GCT || !found_T || !found_C) {
+        SPDLOG_WARN("not all requested queue families found! GCT: {} T: {} C: {}", found_GCT, found_T, found_C);
     }
+
+    this->queue_family_idx_GCT = found_GCT ? std::get<4>(best) : -1;
+    this->queue_family_idx_T = found_T ? std::get<5>(best) : -1;
+    this->queue_family_idx_C = found_C ? std::get<6>(best) : -1;
+
+    SPDLOG_DEBUG("found vulkan queue families indices: GCT: {} T: {} C: {}", queue_family_idx_GCT, queue_family_idx_T,
+                 queue_family_idx_C);
 }
 
-void Context::create_device_and_queues() {
-    std::vector<vk::DeviceQueueCreateInfo> queue_create_infos;
-    float queue_priority = 1.0f;
+void Context::create_device_and_queues(uint32_t preferred_number_compute_queues) {
+    std::vector<vk::QueueFamilyProperties> queue_family_props = physical_device.getQueueFamilyProperties();
+    std::vector<uint32_t> count_per_family(queue_family_props.size());
+    uint32_t actual_number_compute_queues = 0;
+    uint32_t queue_idx_GCT = 0;
+    uint32_t queue_idx_T = 0;
+    std::vector<uint32_t> queue_idx_C;
 
-    queue_create_infos.push_back({{}, queue_idx_graphics, 1U, &queue_priority});
-    if (queue_idx_graphics != queue_idx_transfer) {
-        queue_create_infos.push_back({{}, queue_idx_transfer, 1U, &queue_priority});
+    if (queue_family_idx_GCT >= 0) {
+        queue_idx_GCT = count_per_family[queue_family_idx_GCT]++;
+        SPDLOG_DEBUG("queue index GCT: {}", queue_idx_GCT);
+    }
+    if (queue_family_idx_T >= 0) {
+        queue_idx_T = count_per_family[queue_family_idx_T]++;
+        SPDLOG_DEBUG("queue index T: {}", queue_idx_T);
+    }
+    if (queue_family_idx_C >= 0) {
+        uint32_t remaining_compute_queues =
+            queue_family_props[queue_family_idx_C].queueCount - count_per_family[queue_family_idx_C];
+        actual_number_compute_queues = std::min(remaining_compute_queues, preferred_number_compute_queues);
+
+        for (uint32_t i = 0; i < actual_number_compute_queues; i++) {
+            queue_idx_C.emplace_back(count_per_family[queue_family_idx_C]++);
+        }
+        SPDLOG_DEBUG("queue indices C: {}", fmt::join(queue_idx_C, ", "));
+    }
+
+    float queue_priority = 1.0f;
+    std::vector<vk::DeviceQueueCreateInfo> queue_create_infos;
+    for (uint32_t queue_familiy_idx = 0; queue_familiy_idx < queue_family_props.size(); queue_familiy_idx++) {
+        if (count_per_family[queue_familiy_idx] > 0) {
+            queue_create_infos.push_back({{}, queue_familiy_idx, count_per_family[queue_familiy_idx], &queue_priority});
+        }
     }
 
     std::vector<const char*> required_device_extensions;
@@ -230,16 +332,33 @@ void Context::create_device_and_queues() {
         ext->on_device_created(device);
     }
 
-    queue_graphics = new QueueContainer(device, queue_idx_graphics, 0);
-    queue_transfer = new QueueContainer(device, queue_idx_transfer, 0);
+    if (queue_family_idx_GCT >= 0)
+        queue_GCT = std::make_shared<QueueContainer>(device, queue_family_idx_GCT, queue_idx_GCT);
+    if (queue_family_idx_T >= 0)
+        queue_T = std::make_shared<QueueContainer>(device, queue_family_idx_T, queue_idx_T);
+    if (queue_family_idx_T >= 0) {
+        for (auto queue_idx : queue_idx_C) {
+            queues_C.push_back(std::make_shared<QueueContainer>(device, queue_family_idx_C, queue_idx));
+        }
+        queue_C = queues_C[0];
+    }
+
     SPDLOG_DEBUG("queues created");
 }
 
 void Context::create_command_pools() {
-    vk::CommandPoolCreateInfo cpi_graphics({vk::CommandPoolCreateFlagBits::eResetCommandBuffer}, queue_idx_graphics);
-    cmd_pool_graphics = device.createCommandPool(cpi_graphics);
-    vk::CommandPoolCreateInfo cpi_transfer({vk::CommandPoolCreateFlagBits::eResetCommandBuffer}, queue_idx_transfer);
-    cmd_pool_transfer = device.createCommandPool(cpi_transfer);
+    if (queue_family_idx_GCT) {
+        vk::CommandPoolCreateInfo cpi_graphics({vk::CommandPoolCreateFlagBits::eResetCommandBuffer}, queue_family_idx_GCT);
+        cmd_pool_GCT = device.createCommandPool(cpi_graphics);
+    }
+    if (queue_family_idx_T) {
+        vk::CommandPoolCreateInfo cpi_transfer({vk::CommandPoolCreateFlagBits::eResetCommandBuffer}, queue_family_idx_T);
+        cmd_pool_T = device.createCommandPool(cpi_transfer);
+    }
+    if (queue_family_idx_C) {
+        vk::CommandPoolCreateInfo cpi_compute({vk::CommandPoolCreateFlagBits::eResetCommandBuffer}, queue_family_idx_C);
+        cmd_pool_C = device.createCommandPool(cpi_compute);
+    }
     SPDLOG_DEBUG("command pools created");
 }
 

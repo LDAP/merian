@@ -143,3 +143,9 @@ meson compile -C build
     SPDX-FileCopyrightText: Copyright (c) 2019-2021 NVIDIA CORPORATION
     SPDX-License-Identifier: Apache-2.0
     ```
+
+
+## ToDO
+
+- Replace lots of manual `destroy()` with shared_ptrs and weak shared_ptrs. Especially in resource management, extensions and pools. (When child objects have pointers to their parent they are destroyed before the parent is destroyed.)
+- Extract Swapchain from ExtensionGLFW
