@@ -22,7 +22,7 @@ class ExtensionVkDebugUtils : public Extension {
             SEVERITY::eWarning | SEVERITY::eError,
             MESSAGE::eGeneral | MESSAGE::ePerformance | MESSAGE::eValidation,
             &ExtensionVkDebugUtils::messenger_callback,
-            &ignore_message_ids,
+            &this->ignore_message_ids,
         };
     }
 
@@ -58,7 +58,7 @@ class ExtensionVkDebugUtils : public Extension {
                                                              void* pUserData);
 
   private:
-    const std::unordered_set<int32_t> ignore_message_ids;
+    std::unordered_set<int32_t> ignore_message_ids;
     vk::DebugUtilsMessengerCreateInfoEXT create_info;
     vk::DebugUtilsMessengerEXT messenger = VK_NULL_HANDLE;
 };
