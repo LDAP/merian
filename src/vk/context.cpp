@@ -191,7 +191,7 @@ void Context::find_queues() {
 
     using Flags = vk::QueueFlagBits;
 
-    // We calc all possible index candidates then sort the list to get best match.
+    // We calculate all possible index candidates then sort descending the list to get the best match.
     // (GCT found, additional T found, additional C found, number remaining compute queues, GCT family index, T family
     // index, C family index)
     std::vector<std::tuple<bool, bool, bool, uint32_t, uint32_t, uint32_t, uint32_t>> candidates;
@@ -201,7 +201,7 @@ void Context::find_queues() {
         const bool supports_graphics = queue_family_props[i].queueFlags & Flags::eGraphics ? true : false;
         const bool supports_transfer = queue_family_props[i].queueFlags & Flags::eTransfer ? true : false;
         const bool supports_compute = queue_family_props[i].queueFlags & Flags::eCompute ? true : false;
-        SPDLOG_DEBUG("queue familiy {}: supports graphics: {} transfer: {} compute: {}, count {}", i, supports_graphics,
+        SPDLOG_DEBUG("queue family {}: supports graphics: {} transfer: {} compute: {}, count {}", i, supports_graphics,
                      supports_transfer, supports_compute, queue_family_props[i].queueCount);
     }
 #endif
@@ -267,7 +267,7 @@ void Context::find_queues() {
     this->queue_family_idx_T = found_T ? std::get<5>(best) : -1;
     this->queue_family_idx_C = found_C ? std::get<6>(best) : -1;
 
-    SPDLOG_DEBUG("found vulkan queue families indices: GCT: {} T: {} C: {}", queue_family_idx_GCT, queue_family_idx_T,
+    SPDLOG_DEBUG("determined queue families indices: GCT: {} T: {} C: {}", queue_family_idx_GCT, queue_family_idx_T,
                  queue_family_idx_C);
 }
 
@@ -295,7 +295,7 @@ void Context::create_device_and_queues(uint32_t preferred_number_compute_queues)
         for (uint32_t i = 0; i < actual_number_compute_queues; i++) {
             queue_idx_C.emplace_back(count_per_family[queue_family_idx_C]++);
         }
-        SPDLOG_DEBUG("queue indices C: {}", fmt::join(queue_idx_C, ", "));
+        SPDLOG_DEBUG("queue indices C: [{}]", fmt::join(queue_idx_C, ", "));
     }
 
     float queue_priority = 1.0f;
