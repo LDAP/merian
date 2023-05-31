@@ -36,28 +36,11 @@ glfw = dependency('glfw3', version: ['>=3.3.0'])
 glm = dependency('glm', fallback : ['glm', 'glm_dep'], version: ['>=0.9.9.8'])
 tol = cmake.subproject('tinyobjloader').dependency('tinyobjloader')
 
-
-# Shaders
-glslc = find_program('glslangValidator')
-shaders = files(
-
-)
-shader_targets = []
-foreach s : shaders
-    shaders += custom_target(
-        'shader @0@'.format(s),
-        command : [glslc, '-Ires/shader', '-V', '@INPUT@', '-o',  '@OUTPUT@'],
-        input : s, 
-        output : '@BASENAME@.spv',
-        install_dir: 'assets/shader',
-        install: true
-    )
-endforeach
-
 # Main targets
 # Keep sorted
 src_files = files(
     'src/utils/stopwatch.cpp',
+    'src/utils/renderdoc.cpp',
     'src/vk/context.cpp',
     'src/vk/extension/extension.cpp',
     'src/vk/extension/extension_resources.cpp',
@@ -85,10 +68,10 @@ lib = static_library(
     dependencies: [
         fmt,
         glfw,
-        spdlog,
-        vulkan,
         glm,
+        spdlog,
         tol,
+        vulkan,
     ],
     include_directories: inc_dirs,
     install : true
