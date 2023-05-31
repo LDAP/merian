@@ -17,7 +17,7 @@ uint64_t Stopwatch::nanos() const {
 
 double Stopwatch::millis() const {
     auto end = chrono_clock::now();
-    return std::chrono::duration<double, std::nano>(end - start).count();
+    return std::chrono::duration<double, std::milli>(end - start).count();
 }
 
 double Stopwatch::seconds() const {
