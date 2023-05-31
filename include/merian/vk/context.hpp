@@ -80,20 +80,22 @@ class Context {
     // the vk::Device for this Context
     vk::Device device;
 
-    // can be used for both graphics and compute
+    // can be nullptr in very rare occasions, you can check that with if (shrd_ptr) {...}
     std::shared_ptr<QueueContainer> queue_GCT;
-    // Convenience pointer to the first queue in the queues_C vector
-    std::shared_ptr<QueueContainer> queue_C;
+    // can be nullptr in very rare occasions, you can check that with if (shrd_ptr) {...}
     std::shared_ptr<QueueContainer> queue_T;
+    // convenience pointer to the first queue in the queues_C vector
+    // can be nullptr in very rare occasions, you can check that with if (shrd_ptr) {...}
+    std::shared_ptr<QueueContainer> queue_C;
     std::vector<std::shared_ptr<QueueContainer>> queues_C;
 
     // in create_command_pools
 
-    // Convenience command pool for graphics and compute
+    // Convenience command pool for graphics and compute (can be nullopt in very rare occasions)
     std::optional<vk::CommandPool> cmd_pool_GCT;
-    // Convenience command pool for transfer
+    // Convenience command pool for transfer (can be nullopt in very rare occasions)
     std::optional<vk::CommandPool> cmd_pool_T;
-    // Convenience command pool for compute
+    // Convenience command pool for compute (can be nullopt in very rare occasions)
     std::optional<vk::CommandPool> cmd_pool_C;
 };
 
