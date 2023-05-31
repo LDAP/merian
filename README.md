@@ -110,6 +110,12 @@ Ray tracing:
     }
     ```
 
+- `Camera`: Helper class to calculate view and projection matrices.
+- `CameraAnimator`: Helper class to smooth camera motion.
+- `CameraController`: Helper class to control a camera with high level commands.
+- `Renderdoc`: Helper class to enable start frame capturing for RenderDoc.
+- `FileLoader`: Helper class to find and load files from search paths.
+
 ## Building
 
 ```bash
