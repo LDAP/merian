@@ -33,6 +33,9 @@ fmt = dependency('fmt', version : ['>=8.1.1'], fallback : ['fmt', 'fmt_dep'])
 spdlog = dependency('spdlog', version : ['>=1.10.0'], fallback : ['spdlog', 'spdlog_dep'], default_options : ['external_fmt=enabled'])
 vulkan = dependency('vulkan', version: ['>=1.3.0'])
 glfw = dependency('glfw3', version: ['>=3.3.0'])
+glm = dependency('glm', fallback : ['glm', 'glm_dep'], version: ['>=0.9.9.8'])
+tol = cmake.subproject('tinyobjloader').dependency('tinyobjloader')
+
 
 # Shaders
 glslc = find_program('glslangValidator')
@@ -76,7 +79,7 @@ inc_dirs = [
     cmake.subproject('VulkanMemoryAllocator').include_directories('VulkanMemoryAllocator')
 ]
 
-lib = library(
+lib = static_library(
     'merian',
     src_files,
     dependencies: [
@@ -84,6 +87,8 @@ lib = library(
         glfw,
         spdlog,
         vulkan,
+        glm,
+        tol,
     ],
     include_directories: inc_dirs,
     install : true
