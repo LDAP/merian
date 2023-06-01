@@ -20,40 +20,37 @@ void ExtensionStopwatch::on_destroy_context(const Context& context) {
     this->device = VK_NULL_HANDLE;
 }
 
-void ExtensionStopwatch::start_stopwatch(vk::CommandBuffer& cb, vk::PipelineStageFlagBits pipeline_stage) {
-    cb.resetQueryPool(query_pool, 0, 2);
-    cb.writeTimestamp(pipeline_stage, query_pool, 0);
+void ExtensionStopwatch::start_stopwatch(vk::CommandBuffer& cb,
+                                         vk::PipelineStageFlagBits pipeline_stage,
+                                         uint32_t stopwatch_id) {
+    cb.resetQueryPool(query_pool, stopwatch_id * SW_QUERY_COUNT, SW_QUERY_COUNT);
+    cb.writeTimestamp(pipeline_stage, query_pool, stopwatch_id * SW_QUERY_COUNT);
 }
 
-void ExtensionStopwatch::stop_stopwatch(vk::CommandBuffer& cb, vk::PipelineStageFlagBits pipeline_stage) {
-    cb.writeTimestamp(pipeline_stage, query_pool, 1);
+void ExtensionStopwatch::stop_stopwatch(vk::CommandBuffer& cb,
+                                        vk::PipelineStageFlagBits pipeline_stage,
+                                        uint32_t stopwatch_id) {
+    cb.writeTimestamp(pipeline_stage, query_pool, stopwatch_id * SW_QUERY_COUNT + 1);
 }
 
-std::optional<uint32_t> ExtensionStopwatch::get_nanos() {
-    uint64_t timestamps[2];
-    vk::Result result = device.getQueryPoolResults(query_pool, 0, 2, sizeof(timestamps), &timestamps,
-                                                   sizeof(timestamps[0]), vk::QueryResultFlagBits::e64);
-    if (result != vk::Result::eSuccess)
-        return std::nullopt;
+uint32_t ExtensionStopwatch::get_nanos(uint32_t stopwatch_id) {
+    assert(stopwatch_id < number_stopwatches);
+
+    uint64_t timestamps[SW_QUERY_COUNT];
+    check_result(device.getQueryPoolResults(query_pool, stopwatch_id * SW_QUERY_COUNT, SW_QUERY_COUNT,
+                                            sizeof(timestamps), &timestamps, sizeof(timestamps[0]),
+                                            vk::QueryResultFlagBits::e64),
+                 "could not get query results");
 
     uint64_t timediff = timestamps[1] - timestamps[0];
     return timestamp_period * timediff;
 }
-std::optional<double> ExtensionStopwatch::get_millis() {
-    std::optional<uint32_t> nanos = get_nanos();
-    if (nanos.has_value()) {
-        return nanos.value() / (double)1e6;
-    } else {
-        return std::nullopt;
-    }
+double ExtensionStopwatch::get_millis(uint32_t stopwatch_id) {
+    return get_nanos(stopwatch_id) / (double)1e6;
 }
-std::optional<double> ExtensionStopwatch::get_seconds() {
-    std::optional<uint32_t> nanos = get_nanos();
-    if (nanos.has_value()) {
-        return nanos.value() / (double)1e9;
-    } else {
-        return std::nullopt;
-    }
+
+double ExtensionStopwatch::get_seconds(uint32_t stopwatch_id) {
+    return get_nanos(stopwatch_id) / (double)1e9;
 }
 
 } // namespace merian

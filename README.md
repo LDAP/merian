@@ -147,5 +147,6 @@ meson compile -C build
 
 ## ToDO
 
-- Replace lots of manual `destroy()` with shared_ptrs and weak shared_ptrs. Especially in resource management, extensions and pools. (When child objects have pointers to their parent they are destroyed before the parent is destroyed.)
+- Replace lots of manual `destroy()` with shared_ptrs and weak shared_ptrs. Especially in resource management, extensions, descriptorsets and pools. (When child objects have pointers to their parent they are destroyed before the parent is destroyed.) Start the tree at Context, this allows the childen to access the context to destroy itself?
 - Extract Swapchain from ExtensionGLFW
+- AS Builder: Only record commands, dont wait.

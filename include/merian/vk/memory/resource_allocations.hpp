@@ -74,6 +74,7 @@ struct AccelerationStructure {
 
     // -----------------------------------------------------------
 
+    // E.g. needed for accelerationStructureReference in VkAccelerationStructureInstanceKHR
     vk::DeviceAddress get_acceleration_structure_device_address(vk::Device& device) {
         vk::AccelerationStructureDeviceAddressInfoKHR address_info{as};
         return device.getAccelerationStructureAddressKHR(address_info);

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "merian/vk/descriptors/descriptor_set_layout.hpp"
+
 #include <map>
 #include <spdlog/spdlog.h>
 #include <tuple>
@@ -39,9 +41,9 @@ namespace merian {
  * layout (binding = 1) buffer out {float v_out[];};
  *
  * auto builder = DescriptorSetLayoutBuilder()
- *      .add_binding_storage_buffer(0)
- *      .add_binding_storage_buffer(1);
- *      
+ *      .add_binding_storage_buffer()
+ *      .add_binding_storage_buffer();
+ *
  * auto layout = builder.build_layout(context);
  * auto pool = builder.build_pool(context, 2); // 2 -> one set for ping one for pong
  * auto sets = allocate_descriptor_sets(context, pool, layout, 2); -> one for ping one for pong
@@ -93,40 +95,53 @@ class DescriptorSetLayoutBuilder {
 
     // --------------------------------------------------------------------------------------------------------------------
 
-    DescriptorSetLayoutBuilder& add_binding_storage_buffer(uint32_t binding,
-                                    vk::ShaderStageFlags stage_flags = vk::ShaderStageFlagBits::eCompute,
-                                    uint32_t descriptor_count = 1,
-                                    const vk::Sampler* sampler = nullptr) {
-        add_binding(binding, stage_flags, vk::DescriptorType::eStorageBuffer, descriptor_count, sampler);
+    DescriptorSetLayoutBuilder&
+    add_binding_storage_buffer(vk::ShaderStageFlags stage_flags = vk::ShaderStageFlagBits::eCompute,
+                               uint32_t descriptor_count = 1,
+                               const vk::Sampler* sampler = nullptr,
+                               std::optional<uint32_t> binding = std::nullopt) {
+        add_binding(stage_flags, vk::DescriptorType::eStorageBuffer, descriptor_count, sampler, binding);
         return *this;
     }
 
-    DescriptorSetLayoutBuilder& add_binding_sampler(uint32_t binding,
-                             vk::ShaderStageFlags stage_flags,
-                             uint32_t descriptor_count = 1,
-                             const vk::Sampler* sampler = nullptr) {
-        add_binding(binding, stage_flags, vk::DescriptorType::eSampler, descriptor_count, sampler);
+    DescriptorSetLayoutBuilder&
+    add_binding_sampler(vk::ShaderStageFlags stage_flags = vk::ShaderStageFlagBits::eCompute,
+                        uint32_t descriptor_count = 1,
+                        const vk::Sampler* sampler = nullptr,
+                        std::optional<uint32_t> binding = std::nullopt) {
+        add_binding(stage_flags, vk::DescriptorType::eSampler, descriptor_count, sampler, binding);
+        return *this;
+    }
+
+    DescriptorSetLayoutBuilder&
+    add_binding_acceleration_structure(vk::ShaderStageFlags stage_flags = vk::ShaderStageFlagBits::eCompute,
+                                       uint32_t descriptor_count = 1,
+                                       const vk::Sampler* sampler = nullptr,
+                                       std::optional<uint32_t> binding = std::nullopt) {
+        add_binding(stage_flags, vk::DescriptorType::eAccelerationStructureKHR, descriptor_count, sampler, binding);
         return *this;
     }
 
     // --------------------------------------------------------------------------------------------------------------------
 
     /**
-     * @brief      Adds a binding to the descriptor set
+     * @brief      Adds a binding to the descriptor set.
      *
-     * @param[in]  binding              The binding point - this is the binding index that is referenced in the layout
-     * in the shader
+     *
+     * @param[in]  binding              The binding point - this is the binding index that is referenced in the layout.
+     * // if no value is suppied for `binding`, then smallest positive integer without binding is used in the shader
      * @param[in]  descriptor_type_     The descriptor type
      * @param[in]  descriptor_count     The descriptor count
      * @param[in]  stage_flags          The stage slags
      * @param[in]  pImmutableSamplers_  Pointer to a sampler, used for textures
      */
-    DescriptorSetLayoutBuilder& add_binding(uint32_t binding,
-                     vk::ShaderStageFlags stage_flags,
-                     vk::DescriptorType descriptor_type = vk::DescriptorType::eSampler,
-                     uint32_t descriptor_count = 1,
-                     const vk::Sampler* sampler = nullptr) {
-        vk::DescriptorSetLayoutBinding layout_binding{binding, descriptor_type, descriptor_count, stage_flags, sampler};
+    DescriptorSetLayoutBuilder& add_binding(vk::ShaderStageFlags stage_flags,
+                                            vk::DescriptorType descriptor_type = vk::DescriptorType::eSampler,
+                                            uint32_t descriptor_count = 1,
+                                            const vk::Sampler* sampler = nullptr,
+                                            std::optional<uint32_t> binding = std::nullopt) {
+        vk::DescriptorSetLayoutBinding layout_binding{binding.value_or(next_free_binding()), descriptor_type,
+                                                      descriptor_count, stage_flags, sampler};
         add_binding(layout_binding);
         return *this;
     }
@@ -151,9 +166,22 @@ class DescriptorSetLayoutBuilder {
 
     // --------------------------------------------------------------------------------------------------------------------
 
-    vk::DescriptorSetLayout build_layout(vk::Device& device, vk::DescriptorSetLayoutCreateFlags flags = {}) {
+    // Requires that there is a binding from 0 to num_bindings-1.
+    // Return a shared ptr since many descriptor sets may have a reference on this.
+    std::shared_ptr<DescriptorSetLayout> build_layout(vk::Device& device, vk::DescriptorSetLayoutCreateFlags flags = {}) {
         vk::DescriptorSetLayoutCreateInfo info{flags, bindings};
-        return device.createDescriptorSetLayout(info);
+
+        std::vector<vk::DescriptorType> types(bindings.size());
+        for (uint32_t i = 0; i < bindings.size(); i++) {
+            if (!binding_indices.contains(i)) {
+                throw std::runtime_error{
+                    fmt::format("this builder has {} bindings, but binding {} is missing!", bindings.size(), i)};
+            } else {
+                types.push_back(bindings[binding_indices[i]].descriptorType);
+            }
+        }
+
+        return make_shared<DescriptorSetLayout>(device.createDescriptorSetLayout(info), std::move(types));
     }
 
     vk::DescriptorPool build_pool(const vk::Device& device,
@@ -166,9 +194,17 @@ class DescriptorSetLayoutBuilder {
     // --------------------------------------------------------------------------------------------------------------------
 
   private:
-#ifdef DEBUG
+    uint32_t next_free_binding() {
+        for (uint32_t i = 0; i <= bindings.size(); i++) {
+            if (!binding_indices.contains(i)) {
+                return i;
+            }
+        }
+        throw std::runtime_error{"this should not happen"};
+    }
+
+  private:
     std::map<uint32_t, uint32_t> binding_indices;
-#endif
     std::vector<vk::DescriptorSetLayoutBinding> bindings;
 };
 
