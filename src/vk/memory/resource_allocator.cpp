@@ -229,7 +229,7 @@ AccelerationStructure ResourceAllocator::createAccelerationStructure(vk::DeviceS
     return resultAccel;
 }
 
-void ResourceAllocator::finalizeStaging(vk::Fence fence /*= VK_NULL_HANDLE*/) {
+void ResourceAllocator::finalizeStaging(vk::Fence fence) {
     m_staging->finalizeResources(fence);
 }
 
@@ -237,7 +237,7 @@ void ResourceAllocator::releaseStaging() {
     m_staging->releaseResources();
 }
 
-void ResourceAllocator::finalizeAndReleaseStaging(vk::Fence fence /*= VK_NULL_HANDLE*/) {
+void ResourceAllocator::finalizeAndReleaseStaging(vk::Fence fence) {
     m_staging->finalizeResources(fence);
     m_staging->releaseResources();
 }

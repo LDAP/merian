@@ -39,6 +39,10 @@ tol = cmake.subproject('tinyobjloader').dependency('tinyobjloader')
 # Main targets
 # Keep sorted
 src_files = files(
+    'src/ext/stb_image.cpp',
+    'src/ext/stb_image_write.cpp',
+    'src/ext/vma.cpp',
+
     'src/utils/stopwatch.cpp',
     'src/utils/renderdoc.cpp',
     'src/vk/context.cpp',
@@ -52,7 +56,6 @@ src_files = files(
     'src/vk/memory/memory_allocator_vma.cpp',
     'src/vk/memory/resource_allocator.cpp',
     'src/vk/memory/staging_memory_manager.cpp',
-    'src/vk/memory/vma.cpp',
     'src/vk/raytrace/acceleration_structure_builder.cpp',
     'src/vk/sampler/sampler_pool.cpp',
     'src/vk/utils/barriers.cpp',
