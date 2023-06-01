@@ -11,6 +11,7 @@ namespace merian {
 
 class FileLoader {
 
+  public:
     static bool exists(const std::filesystem::path& path,
                        std::filesystem::file_status file_status = std::filesystem::file_status{});
 
@@ -23,6 +24,10 @@ class FileLoader {
     std::optional<std::filesystem::path> find_file(const std::filesystem::path& filename);
 
     std::optional<std::string> find_and_load_file(const std::filesystem::path& filename);
+
+    void add_search_path(std::filesystem::path path);
+
+    bool remove_search_path(std::filesystem::path path);
 
   private:
     std::vector<std::filesystem::path> search_paths;

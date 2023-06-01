@@ -27,6 +27,18 @@ class Context {
             std::string filter_device_name = "");
     ~Context();
 
+    operator vk::Instance&() {
+        return instance;
+    }
+
+    operator vk::PhysicalDevice&() {
+        return physical_device;
+    }
+
+    operator vk::Device&() {
+        return device;
+    }
+
   private: // Vulkan initialization
     void create_instance(std::string application_name, uint32_t application_vk_version);
     void prepare_physical_device(uint32_t filter_vendor_id, uint32_t filter_device_id, std::string filter_device_name);

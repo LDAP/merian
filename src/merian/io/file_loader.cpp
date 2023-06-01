@@ -58,4 +58,20 @@ std::optional<std::string> FileLoader::find_and_load_file(const std::filesystem:
     return load_file(full_path.value());
 }
 
+void FileLoader::add_search_path(std::filesystem::path path) {
+    search_paths.push_back(path);
+}
+
+bool FileLoader::remove_search_path(std::filesystem::path path) {
+    bool found = false;
+    for (std::size_t i = 0; i < search_paths.size(); i++) {
+        if (search_paths[i] == path) {
+            found = true;
+            std::swap(search_paths[i], search_paths[search_paths.size() - 1]);
+            search_paths.pop_back();
+        }
+    }
+    return found;
+}
+
 } // namespace merian

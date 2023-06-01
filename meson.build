@@ -59,6 +59,7 @@ src_files = files(
     'src/merian/vk/memory/staging_memory_manager.cpp',
     'src/merian/vk/raytrace/acceleration_structure_builder.cpp',
     'src/merian/vk/sampler/sampler_pool.cpp',
+    'src/merian/vk/shader/shader_module_loader.cpp',
     'src/merian/vk/utils/barriers.cpp',
 )
 inc_dirs = [

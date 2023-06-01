@@ -1,18 +1,12 @@
 #pragma once
 
 #include "merian/utils/vector_utils.hpp"
+#include "merian/vk/utils/check_result.hpp"
 #include <vulkan/vulkan.hpp>
-
-// Forward def
-class QueueContainer;
 
 namespace merian {
 
 class CommandPool {
-
-  private:
-    // Can submit all cmds as batch
-    friend class QueueContainer;
 
   public:
     CommandPool() = delete;
@@ -25,7 +19,7 @@ class CommandPool {
         pool = device.createCommandPool(info);
     };
 
-    virtual ~CommandPool(){
+    virtual ~CommandPool() {
         reset();
         device.destroyCommandPool(pool);
     };
@@ -35,7 +29,18 @@ class CommandPool {
                         bool begin = true,
                         vk::CommandBufferUsageFlags flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
                         const vk::CommandBufferInheritanceInfo* pInheritanceInfo = nullptr) {
-        return createCommandBuffers(level, 1, begin, flags, pInheritanceInfo)[0];
+        cmds.emplace_back();
+        vk::CommandBuffer& cmd = cmds[cmds.size() - 1];
+
+        vk::CommandBufferAllocateInfo info{pool, level, 1};
+        check_result(device.allocateCommandBuffers(&info, &cmd), "could not allocate command buffer");
+
+        if (begin) {
+            vk::CommandBufferBeginInfo info{flags, pInheritanceInfo};
+            cmd.begin(info);
+        }
+
+        return cmd;
     }
 
     virtual std::vector<vk::CommandBuffer>
@@ -50,8 +55,8 @@ class CommandPool {
         insert_all(cmds, allocated);
 
         if (begin) {
+            vk::CommandBufferBeginInfo info{flags, pInheritanceInfo};
             for (vk::CommandBuffer& cmd : allocated) {
-                vk::CommandBufferBeginInfo info{flags, pInheritanceInfo};
                 cmd.begin(info);
             }
         }
@@ -66,8 +71,19 @@ class CommandPool {
         cmds.clear();
     }
 
-    bool has_cmds() {
+    bool has_command_buffers() {
         return !cmds.empty();
+    }
+
+    // Ends all command buffers
+    void end() {
+        for (vk::CommandBuffer& cmd : cmds) {
+            cmd.end();
+        }
+    }
+
+    const std::vector<vk::CommandBuffer>& get_command_buffers() const {
+        return cmds;
     }
 
   private:

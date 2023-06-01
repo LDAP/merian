@@ -15,6 +15,12 @@ struct Buffer {
 
     // -----------------------------------------------------------
 
+    operator vk::Buffer&() {
+        return buffer;
+    }
+
+    // -----------------------------------------------------------
+
     vk::BufferDeviceAddressInfo get_buffer_device_address_info() {
         return vk::BufferDeviceAddressInfo{buffer};
     }
@@ -28,17 +34,43 @@ struct Buffer {
 struct Image {
     vk::Image image = VK_NULL_HANDLE;
     MemHandle memHandle{nullptr};
+
+    // -----------------------------------------------------------
+
+    operator vk::Image&() {
+        return image;
+    }
 };
 
 struct Texture {
     vk::Image image = VK_NULL_HANDLE;
     MemHandle memHandle{nullptr};
     vk::DescriptorImageInfo descriptor{};
+
+    // -----------------------------------------------------------
+
+    operator vk::Image&() {
+        return image;
+    }
 };
 
 struct AccelerationStructure {
     vk::AccelerationStructureKHR as = VK_NULL_HANDLE;
     Buffer buffer;
+
+    // -----------------------------------------------------------
+
+    operator Buffer&() {
+        return buffer;
+    }
+
+    operator vk::Buffer&() {
+        return buffer;
+    }
+
+    operator vk::AccelerationStructureKHR&() {
+        return as;
+    }
 
     // -----------------------------------------------------------
 
