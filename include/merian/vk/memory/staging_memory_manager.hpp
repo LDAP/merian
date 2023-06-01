@@ -15,6 +15,11 @@ namespace merian {
 /**
   \class merian::StagingMemoryManager
 
+  Resources that are device local and not host visible can only be written to by the device.
+  This class create a second resource - the staging resource (i.e. staging buffer) - with host visibility, then copies
+  the host contents to the stating resource and then to the device local resource (it does not copy directly but records
+  the commands to do so).
+
   merian::StagingMemoryManager class is a utility that manages host visible
   buffers and their allocations in an opaque fashion to assist
   asynchronous transfers between device and host.
@@ -100,9 +105,9 @@ class StagingMemoryManager {
     StagingMemoryManager(StagingMemoryManager const&) = delete;
     StagingMemoryManager& operator=(StagingMemoryManager const&) = delete;
 
-    StagingMemoryManager() {
-    }
-    StagingMemoryManager(MemoryAllocator* memAllocator, vk::DeviceSize stagingBlockSize = NVVK_DEFAULT_STAGING_BLOCKSIZE) {
+    StagingMemoryManager() {}
+    StagingMemoryManager(MemoryAllocator* memAllocator,
+                         vk::DeviceSize stagingBlockSize = NVVK_DEFAULT_STAGING_BLOCKSIZE) {
         init(memAllocator, stagingBlockSize);
     }
 
@@ -125,34 +130,54 @@ class StagingMemoryManager {
 
     // if data != nullptr memcpies to mapping and returns nullptr
     // otherwise returns temporary mapping (valid until "complete" functions)
-    void* cmdToImage(vk::CommandBuffer cmd, vk::Image image, const vk::Offset3D& offset, const vk::Extent3D& extent,
-                     const vk::ImageSubresourceLayers& subresource, vk::DeviceSize size, const void* data,
+    void* cmdToImage(vk::CommandBuffer cmd,
+                     vk::Image image,
+                     const vk::Offset3D& offset,
+                     const vk::Extent3D& extent,
+                     const vk::ImageSubresourceLayers& subresource,
+                     vk::DeviceSize size,
+                     const void* data,
                      vk::ImageLayout layout = vk::ImageLayout::eTransferDstOptimal);
 
     template <class T>
-    T* cmdToImageT(vk::CommandBuffer cmd, vk::Image image, const vk::Offset3D& offset, const vk::Extent3D& extent,
-                   const vk::ImageSubresourceLayers& subresource, vk::DeviceSize size, const void* data,
+    T* cmdToImageT(vk::CommandBuffer cmd,
+                   vk::Image image,
+                   const vk::Offset3D& offset,
+                   const vk::Extent3D& extent,
+                   const vk::ImageSubresourceLayers& subresource,
+                   vk::DeviceSize size,
+                   const void* data,
                    vk::ImageLayout layout = vk::ImageLayout::eTransferDstOptimal) {
         return (T*)cmdToImage(cmd, image, offset, extent, subresource, size, data, layout);
     }
 
     // pointer can be used after cmd execution but only valid until associated resources haven't been released
-    const void* cmdFromImage(vk::CommandBuffer cmd, vk::Image image, const vk::Offset3D& offset, const vk::Extent3D& extent,
-                             const vk::ImageSubresourceLayers& subresource, vk::DeviceSize size,
+    const void* cmdFromImage(vk::CommandBuffer cmd,
+                             vk::Image image,
+                             const vk::Offset3D& offset,
+                             const vk::Extent3D& extent,
+                             const vk::ImageSubresourceLayers& subresource,
+                             vk::DeviceSize size,
                              vk::ImageLayout layout = vk::ImageLayout::eTransferSrcOptimal);
 
     template <class T>
-    const T* cmdFromImageT(vk::CommandBuffer cmd, vk::Image image, const vk::Offset3D& offset, const vk::Extent3D& extent,
-                           const vk::ImageSubresourceLayers& subresource, vk::DeviceSize size,
+    const T* cmdFromImageT(vk::CommandBuffer cmd,
+                           vk::Image image,
+                           const vk::Offset3D& offset,
+                           const vk::Extent3D& extent,
+                           const vk::ImageSubresourceLayers& subresource,
+                           vk::DeviceSize size,
                            vk::ImageLayout layout = vk::ImageLayout::eTransferSrcOptimal) {
         return (const T*)cmdFromImage(cmd, image, offset, extent, subresource, size, layout);
     }
 
     // if data != nullptr memcpies to mapping and returns nullptr
     // otherwise returns temporary mapping (valid until appropriate release)
-    void* cmdToBuffer(vk::CommandBuffer cmd, vk::Buffer buffer, vk::DeviceSize offset, vk::DeviceSize size, const void* data);
+    void*
+    cmdToBuffer(vk::CommandBuffer cmd, vk::Buffer buffer, vk::DeviceSize offset, vk::DeviceSize size, const void* data);
 
-    template <class T> T* cmdToBufferT(vk::CommandBuffer cmd, vk::Buffer buffer, vk::DeviceSize offset, vk::DeviceSize size) {
+    template <class T>
+    T* cmdToBufferT(vk::CommandBuffer cmd, vk::Buffer buffer, vk::DeviceSize offset, vk::DeviceSize size) {
         return (T*)cmdToBuffer(cmd, buffer, offset, size, nullptr);
     }
 
