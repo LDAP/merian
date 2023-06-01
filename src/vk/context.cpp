@@ -226,7 +226,10 @@ void Context::find_queues() {
                 if ((queue_family_props[queue_family_idx_GCT].queueFlags & Flags::eGraphics) &&
                     (queue_family_props[queue_family_idx_GCT].queueFlags & Flags::eCompute) &&
                     (queue_family_props[queue_family_idx_GCT].queueFlags & Flags::eTransfer) &&
-                    remaining_queue_count[queue_family_idx_GCT] > 0) {
+                    remaining_queue_count[queue_family_idx_GCT] > 0 &&
+                    std::all_of(extensions.begin(), extensions.end(), [&](auto ext) {
+                        return ext->accept_graphics_queue(physical_device, queue_family_idx_GCT);
+                    })) {
                     found_GCT = true;
                     remaining_queue_count[queue_family_idx_GCT]--;
                 }
@@ -348,11 +351,13 @@ void Context::create_device_and_queues(uint32_t preferred_number_compute_queues)
 
 void Context::create_command_pools() {
     if (queue_family_idx_GCT) {
-        vk::CommandPoolCreateInfo cpi_graphics({vk::CommandPoolCreateFlagBits::eResetCommandBuffer}, queue_family_idx_GCT);
+        vk::CommandPoolCreateInfo cpi_graphics({vk::CommandPoolCreateFlagBits::eResetCommandBuffer},
+                                               queue_family_idx_GCT);
         cmd_pool_GCT = device.createCommandPool(cpi_graphics);
     }
     if (queue_family_idx_T) {
-        vk::CommandPoolCreateInfo cpi_transfer({vk::CommandPoolCreateFlagBits::eResetCommandBuffer}, queue_family_idx_T);
+        vk::CommandPoolCreateInfo cpi_transfer({vk::CommandPoolCreateFlagBits::eResetCommandBuffer},
+                                               queue_family_idx_T);
         cmd_pool_T = device.createCommandPool(cpi_transfer);
     }
     if (queue_family_idx_C) {
