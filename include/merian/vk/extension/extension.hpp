@@ -43,7 +43,7 @@ class Extension {
     // LIFECYCLE (in order)
 
     /**
-     * Append structs to vkInstanceCreateInfo.
+     * Append structs to vkInstanceCreateInfo to enable features of extensions.
      *
      * If a struct should be appended, set pNext of your struct to the supplied pointer,
      * then return a pointer to your struct.
@@ -65,7 +65,7 @@ class Extension {
         return true;
     }
     /**
-     * Append structs to VkDeviceCreateInfo.
+     * Append structs to VkDeviceCreateInfo to enable features of extensions.
      *
      * If a struct should be appended, set pNext of your struct to the supplied pointer,
      * then return a pointer to your struct.

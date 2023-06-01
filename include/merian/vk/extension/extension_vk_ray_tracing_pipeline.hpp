@@ -4,6 +4,13 @@
 
 namespace merian {
 
+/**
+ * @brief      Adds support for VK_KHR_ray_tracing_pipeline (and additional commonly required extensions).
+ *
+ * Raytracing pipelines are implemented as multiple shaders that generate rays and process intersections (callable
+ * shaders).
+ * This extension requires ExtensionVkAccelerationStructure.
+ */
 class ExtensionVkRayTracingPipeline : public Extension {
   public:
     ExtensionVkRayTracingPipeline() : Extension("ExtensionVkRayTracingPipeline") {
@@ -14,8 +21,7 @@ class ExtensionVkRayTracingPipeline : public Extension {
         return {
             VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME, VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME,
             VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME, // intel doesn't have it pre 2015 (hd 520)
-            VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME,     VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
-            VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
+            VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME,     VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
         };
     }
 
