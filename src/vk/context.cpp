@@ -18,8 +18,6 @@ Context::Context(std::vector<Extension*> desired_extensions,
                  uint32_t filter_device_id,
                  std::string filter_device_name)
     : extensions(desired_extensions) {
-    assert(preffered_number_compute_queues >= 0);
-
     SPDLOG_INFO("This is {} {}. Context initializing...", MERIAN_PROJECT_NAME, MERIAN_VERSION);
 
     // Init dynamic loader
