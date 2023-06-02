@@ -16,7 +16,7 @@ class ExtensionVkRayQuery : public Extension {
         physical_device_ray_query_features.rayQuery = VK_TRUE;
     }
     ~ExtensionVkRayQuery() {}
-    std::vector<const char*> required_device_extension_names() const override {
+    std::vector<const char*> required_device_extension_names(vk::PhysicalDevice) const override {
         return {
             VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME, VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME,
             VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME, // intel doesn't have it pre 2015 (hd 520)
@@ -25,7 +25,7 @@ class ExtensionVkRayQuery : public Extension {
     }
 
     // LIFECYCLE
-    void* on_create_device(void* const p_next) override {
+    void* pnext_device_create_info(void* const p_next) override {
         physical_device_ray_query_features.pNext = p_next;
         return &physical_device_ray_query_features;
     }

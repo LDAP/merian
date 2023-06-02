@@ -3,26 +3,28 @@
 
 namespace merian {
 
-void ExtensionResources::on_context_created(const Context& context) {
+void ExtensionResources::on_context_created(const SharedContext context) {
     SPDLOG_DEBUG("create SamplerPool");
-    _sampler_pool = new SamplerPool(context.device);
+    _sampler_pool = new SamplerPool(context->device);
 
     SPDLOG_DEBUG("create Vulkan Memory Allocator");
     VmaAllocatorCreateInfo allocatorInfo = {};
-    allocatorInfo.physicalDevice = context.physical_device;
-    allocatorInfo.device = context.device;
-    allocatorInfo.instance = context.instance;
-    allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
+    allocatorInfo.physicalDevice = context->pd_container.physical_device;
+    allocatorInfo.device = context->device;
+    allocatorInfo.instance = context->instance;
+    allocatorInfo.flags = supports_device_address ? VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT : 0;
     vmaCreateAllocator(&allocatorInfo, &vma_allocator);
 
     SPDLOG_DEBUG("create VMAMemoryAllocator");
-    _memory_allocator = new VMAMemoryAllocator(context.device, context.physical_device, vma_allocator);
+    _memory_allocator =
+        new VMAMemoryAllocator(context->device, context->pd_container.physical_device, vma_allocator);
 
     SPDLOG_DEBUG("create ResourceAllocator");
-    _resource_allocator = new ResourceAllocator(context.device, context.physical_device, _memory_allocator, *_sampler_pool);
+    _resource_allocator = new ResourceAllocator(context->device, context->pd_container.physical_device,
+                                                _memory_allocator, *_sampler_pool);
 }
 
-void ExtensionResources::on_destroy_context(const Context&) {
+void ExtensionResources::on_destroy_context() {
     SPDLOG_DEBUG("destroy ResourceAllocator");
     _resource_allocator->deinit();
     delete _resource_allocator;

@@ -11,8 +11,9 @@ class ExtensionStopwatch : public Extension {
     ExtensionStopwatch(uint32_t number_stopwatches = 1)
         : Extension("ExtensionStopwatch"), number_stopwatches(number_stopwatches) {}
     ~ExtensionStopwatch() {}
-    void on_context_created(const Context&) override;
-    void on_destroy_context(const Context&) override;
+    void on_context_created(const SharedContext) override;
+    // make sure to release all shared pointers to context!
+    void on_destroy_context() override;
 
   public: // own methods
     /* Resets the query pool and writes the first timestamp */
@@ -32,7 +33,7 @@ class ExtensionStopwatch : public Extension {
     uint32_t number_stopwatches;
     vk::QueryPool query_pool;
     float timestamp_period;
-    vk::Device device = VK_NULL_HANDLE;
+    SharedContext context;
 };
 
 } // namespace merian

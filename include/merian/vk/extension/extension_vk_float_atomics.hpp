@@ -11,12 +11,12 @@ class ExtensionVkFloatAtomics : public Extension {
         atomic_features.shaderImageFloat32AtomicAdd = VK_TRUE;
     }
     ~ExtensionVkFloatAtomics() {}
-    std::vector<const char*> required_device_extension_names() const override {
+    std::vector<const char*> required_device_extension_names(vk::PhysicalDevice) const override {
         return {
             VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME,
         };
     }
-    void* on_create_device(void* const p_next) override {
+    void* pnext_device_create_info(void* const p_next) override {
         atomic_features.pNext = p_next;
         return &atomic_features;
     }

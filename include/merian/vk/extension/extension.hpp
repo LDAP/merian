@@ -35,8 +35,9 @@ class Extension {
     virtual std::vector<const char*> required_instance_layer_names() const {
         return {};
     }
-    /* Extensions that should be enabled device-wide. */
-    virtual std::vector<const char*> required_device_extension_names() const {
+    /* Extensions that should be enabled device-wide. Note that on_physical_device_selected is
+     * called before. */
+    virtual std::vector<const char*> required_device_extension_names(vk::PhysicalDevice) const {
         return {};
     }
 
@@ -49,13 +50,14 @@ class Extension {
      * then return a pointer to your struct.
      * If nothing should be appended, return the supplied pointer.
      */
-    virtual void* on_create_instance(void* const p_next) {
+    virtual void* pnext_instance_create_info(void* const p_next) {
         return p_next;
     }
     virtual void on_instance_created(const vk::Instance&) {}
-    /* Called after the physical device was select and before extensions are checked for compativility and check_support
-     * is called. */
-    virtual void on_physical_device_selected(const vk::PhysicalDevice&) {}
+    /* Called after the physical device was select and before extensions are checked for
+     * compativility and check_support is called.*/
+    virtual void on_physical_device_selected(const Context::PhysicalDeviceContainer&) {
+    }
     /* Custom check for compatibility after the physical device is ready. */
     virtual bool extension_supported(const vk::PhysicalDevice&) {
         return true;
@@ -71,14 +73,17 @@ class Extension {
      * then return a pointer to your struct.
      * If nothing should be appended, return the supplied pointer.
      */
-    virtual void* on_create_device(void* const p_next) {
+    virtual void* pnext_device_create_info(void* const p_next) {
         return p_next;
     }
+    /* Do not change pNext. You can use pnext_device_create_info for that. */
+    virtual void enable_device_features(const Context::FeaturesContainer&,
+                                        Context::FeaturesContainer&) {}
     virtual void on_device_created(const vk::Device&) {}
     /* Called right before context constructor returns. */
-    virtual void on_context_created(const Context&) {}
+    virtual void on_context_created(const SharedContext) {}
     /* Called after device is idle and before context is destroyed. */
-    virtual void on_destroy_context(const Context&) {}
+    virtual void on_destroy_context() {}
     /* Called right before device is destroyed. */
     virtual void on_destroy_device(const vk::Device&) {}
     /* Called before the instance is destroyed or if the extension is determined as unsupported. */

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "merian/utils/vector_utils.hpp"
+#include "merian/vk/context.hpp"
 #include "merian/vk/utils/check_result.hpp"
 #include <vulkan/vulkan.hpp>
 
@@ -11,83 +12,59 @@ class CommandPool {
   public:
     CommandPool() = delete;
 
-    CommandPool(vk::Device& device,
-                uint32_t queue_family_index,
-                vk::CommandPoolCreateFlags create_flags = vk::CommandPoolCreateFlagBits::eTransient)
-        : device(device) {
-        vk::CommandPoolCreateInfo info{create_flags, queue_family_index};
-        pool = device.createCommandPool(info);
-    };
+    CommandPool(
+        const std::shared_ptr<QueueContainer> queue,
+        vk::CommandPoolCreateFlags create_flags = vk::CommandPoolCreateFlagBits::eTransient);
 
-    virtual ~CommandPool() {
-        reset();
-        device.destroyCommandPool(pool);
-    };
+    CommandPool(
+        const SharedContext context,
+        uint32_t queue_family_index,
+        vk::CommandPoolCreateFlags create_flags = vk::CommandPoolCreateFlagBits::eTransient);
+
+    virtual ~CommandPool();
+
+    operator const vk::CommandPool&() const {
+        return pool;
+    }
 
     virtual vk::CommandBuffer
-    createCommandBuffer(vk::CommandBufferLevel level = vk::CommandBufferLevel::ePrimary,
-                        bool begin = true,
-                        vk::CommandBufferUsageFlags flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
-                        const vk::CommandBufferInheritanceInfo* pInheritanceInfo = nullptr) {
-        cmds.emplace_back();
-        vk::CommandBuffer& cmd = cmds[cmds.size() - 1];
+    create(vk::CommandBufferLevel level = vk::CommandBufferLevel::ePrimary,
+           bool begin = false,
+           vk::CommandBufferUsageFlags flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
+           const vk::CommandBufferInheritanceInfo* pInheritanceInfo = nullptr);
 
-        vk::CommandBufferAllocateInfo info{pool, level, 1};
-        check_result(device.allocateCommandBuffers(&info, &cmd), "could not allocate command buffer");
-
-        if (begin) {
-            vk::CommandBufferBeginInfo info{flags, pInheritanceInfo};
-            cmd.begin(info);
-        }
-
-        return cmd;
+    virtual vk::CommandBuffer create_and_begin(
+        vk::CommandBufferLevel level = vk::CommandBufferLevel::ePrimary,
+        vk::CommandBufferUsageFlags flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
+        const vk::CommandBufferInheritanceInfo* pInheritanceInfo = nullptr) {
+        return create(level, true, flags, pInheritanceInfo);
     }
 
-    virtual std::vector<vk::CommandBuffer>
-    createCommandBuffers(vk::CommandBufferLevel level,
-                         uint32_t count,
-                         bool begin = true,
-                         vk::CommandBufferUsageFlags flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
-                         const vk::CommandBufferInheritanceInfo* pInheritanceInfo = nullptr) {
-        vk::CommandBufferAllocateInfo info{pool, level, count};
+    virtual std::vector<vk::CommandBuffer> create_multiple(
+        vk::CommandBufferLevel level,
+        uint32_t count,
+        bool begin = false,
+        vk::CommandBufferUsageFlags flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
+        const vk::CommandBufferInheritanceInfo* pInheritanceInfo = nullptr);
 
-        std::vector<vk::CommandBuffer> allocated = device.allocateCommandBuffers(info);
-        insert_all(cmds, allocated);
-
-        if (begin) {
-            vk::CommandBufferBeginInfo info{flags, pInheritanceInfo};
-            for (vk::CommandBuffer& cmd : allocated) {
-                cmd.begin(info);
-            }
-        }
-
-        return allocated;
+    virtual std::vector<vk::CommandBuffer> create_and_begin_multiple(
+        vk::CommandBufferLevel level,
+        uint32_t count,
+        vk::CommandBufferUsageFlags flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
+        const vk::CommandBufferInheritanceInfo* pInheritanceInfo = nullptr) {
+        return create_multiple(level, count, true, flags, pInheritanceInfo);
     }
 
+    vk::CommandPool& get_pool();
     // Frees command buffers, resets command pool
-    void reset() {
-        device.freeCommandBuffers(pool, cmds);
-        device.resetCommandPool(pool);
-        cmds.clear();
-    }
-
-    bool has_command_buffers() {
-        return !cmds.empty();
-    }
-
+    void reset();
+    bool has_command_buffers();
     // Ends all command buffers
-    void end() {
-        for (vk::CommandBuffer& cmd : cmds) {
-            cmd.end();
-        }
-    }
-
-    const std::vector<vk::CommandBuffer>& get_command_buffers() const {
-        return cmds;
-    }
+    void end();
+    const std::vector<vk::CommandBuffer>& get_command_buffers() const;
 
   private:
-    vk::Device& device;
+    const SharedContext context;
 
   private:
     vk::CommandPool pool = VK_NULL_HANDLE;

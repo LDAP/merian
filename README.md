@@ -53,7 +53,6 @@ Common:
 
 Features:
 - `ExtensionVkFloatAtomics`: Enables float atomics (`VK_EXT_shader_atomic_float`).
-- `ExtensionVkV12`: Enables Vulkan 1.2 features.
 
 Ray tracing:
 - `ExtensionVkRayTracingPipeline`: Enables ray tracing pipeline extensions and provides access to common functions.

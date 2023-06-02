@@ -4,7 +4,8 @@ project(
     version : '0.0.1',
     default_options : [
         'warning_level=3',
-        'cpp_std=c++20'
+        'cpp_std=c++20',
+        'b_ndebug=if-release',
     ]
 )
 
@@ -34,7 +35,8 @@ spdlog = dependency('spdlog', version : ['>=1.10.0'], fallback : ['spdlog', 'spd
 vulkan = dependency('vulkan', version: ['>=1.3.0'])
 glfw = dependency('glfw3', version: ['>=3.3.0'])
 glm = dependency('glm', fallback : ['glm', 'glm_dep'], version: ['>=0.9.9.8'])
-tol = cmake.subproject('tinyobjloader').dependency('tinyobjloader')
+tol_subp = cmake.subproject('tinyobjloader')
+tol = tol_subp.dependency('tinyobjloader')
 
 # Main targets
 # Keep sorted
@@ -46,6 +48,8 @@ src_files = files(
     'src/merian/io/file_loader.cpp',
     'src/merian/utils/stopwatch.cpp',
     'src/merian/utils/renderdoc.cpp',
+    'src/merian/vk/command/command_pool.cpp',
+    'src/merian/vk/command/queue_container.cpp',
     'src/merian/vk/context.cpp',
     'src/merian/vk/extension/extension.cpp',
     'src/merian/vk/extension/extension_resources.cpp',
@@ -64,7 +68,8 @@ src_files = files(
 )
 inc_dirs = [
     'include',
-    cmake.subproject('VulkanMemoryAllocator').include_directories('VulkanMemoryAllocator')
+    cmake.subproject('VulkanMemoryAllocator').include_directories('VulkanMemoryAllocator'),
+    tol_subp.include_directories('tinyobjloader')
 ]
 
 lib = static_library(

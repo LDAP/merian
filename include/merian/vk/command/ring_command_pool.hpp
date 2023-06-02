@@ -21,22 +21,22 @@ class RingCommandPoolCycle : public CommandPool {
           current_index(current_index){};
 
     vk::CommandBuffer
-    createCommandBuffer(vk::CommandBufferLevel level = vk::CommandBufferLevel::ePrimary,
-                        bool begin = true,
+    create(vk::CommandBufferLevel level = vk::CommandBufferLevel::ePrimary,
+                        bool begin = false,
                         vk::CommandBufferUsageFlags flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
                         const vk::CommandBufferInheritanceInfo* pInheritanceInfo = nullptr) override {
         assert(current_index == cycle_index);
-        return CommandPool::createCommandBuffer(level, begin, flags, pInheritanceInfo);
+        return CommandPool::create(level, begin, flags, pInheritanceInfo);
     }
 
     std::vector<vk::CommandBuffer>
-    createCommandBuffers(vk::CommandBufferLevel level,
+    create_multiple(vk::CommandBufferLevel level,
                          uint32_t count,
-                         bool begin = true,
+                         bool begin = false,
                          vk::CommandBufferUsageFlags flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
                          const vk::CommandBufferInheritanceInfo* pInheritanceInfo = nullptr) override {
         assert(current_index == cycle_index);
-        return CommandPool::createCommandBuffers(level, count, begin, flags, pInheritanceInfo);
+        return CommandPool::create_multiple(level, count, begin, flags, pInheritanceInfo);
     }
 
   private:
@@ -88,7 +88,7 @@ template <uint32_t RING_SIZE = 3> class RingCommandPool {
         current_index = cycle % RING_SIZE;
         RingCommandPoolCycle& current_pool = pools[current_index];
 
-        if (current_pool.has_cmds()) {
+        if (current_pool.has_command_buffers()) {
             current_pool.reset();
         }
 

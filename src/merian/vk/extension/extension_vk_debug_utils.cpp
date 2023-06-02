@@ -88,7 +88,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL ExtensionVkDebugUtils::messenger_callback(
     return VK_FALSE;
 }
 
-void* ExtensionVkDebugUtils::on_create_instance(void* p_next) {
+void* ExtensionVkDebugUtils::pnext_instance_create_info(void* p_next) {
     this->create_info.setPNext(p_next);
     return &this->create_info;
 }

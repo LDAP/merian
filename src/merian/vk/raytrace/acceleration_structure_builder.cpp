@@ -17,7 +17,7 @@ vk::AccelerationStructureKHR AccelerationStructureBuilder::getAccelerationStruct
 
 vk::DeviceAddress AccelerationStructureBuilder::getBlasDeviceAddress(uint32_t blasId) {
     assert(size_t(blasId) < vec_blas.size());
-    return vec_blas[blasId].get_acceleration_structure_device_address(device);
+    return vec_blas[blasId].get_acceleration_structure_device_address(*context);
 }
 
 // Build BLAS
@@ -25,7 +25,7 @@ vk::DeviceAddress AccelerationStructureBuilder::getBlasDeviceAddress(uint32_t bl
 void AccelerationStructureBuilder::buildBLAS(const std::vector<BlasInput>& input,
                                              vk::BuildAccelerationStructureFlagsKHR flags) {
     const uint32_t input_size = input.size();
-    CommandPool cmd_pool(device, queue.get_queue_family_index());
+    CommandPool cmd_pool(context, queue.get_queue_family_index());
     vk::DeviceSize asTotalSize = 0;    // Memory size of all allocated BLAS
     uint32_t nbCompactions = 0;        // Nb of BLAS requesting compaction
     vk::DeviceSize maxScratchSize = 0; // Largest scratch size
@@ -54,7 +54,7 @@ void AccelerationStructureBuilder::buildBLAS(const std::vector<BlasInput>& input
         for (std::size_t tt = 0; tt < input[i].asBuildOffsetInfo.size(); tt++)
             maxPrimitiveCounts[tt] = input[i].asBuildOffsetInfo[tt].primitiveCount; // Number of primitives/triangles
 
-        size_info_i = device.getAccelerationStructureBuildSizesKHR(vk::AccelerationStructureBuildTypeKHR::eDevice,
+        size_info_i = context->device.getAccelerationStructureBuildSizesKHR(vk::AccelerationStructureBuildTypeKHR::eDevice,
                                                                    build_info_i, maxPrimitiveCounts);
 
         // Extra info
@@ -65,7 +65,7 @@ void AccelerationStructureBuilder::buildBLAS(const std::vector<BlasInput>& input
 
     // Allocate the scratch buffers holding the temporary data of the acceleration structure builder
     Buffer scratchBuffer = resource_allocator.createScratchBuffer(maxScratchSize);
-    vk::DeviceAddress scratchAddress = scratchBuffer.get_device_address(device);
+    vk::DeviceAddress scratchAddress = scratchBuffer.get_device_address(*context);
 
     // Allocate a query pool for storing the needed size for every BLAS compaction.
     // TODO: Extract compaction completely
@@ -74,7 +74,7 @@ void AccelerationStructureBuilder::buildBLAS(const std::vector<BlasInput>& input
     {
         assert(nbCompactions == input_size); // Don't allow mix of on/off compaction
         vk::QueryPoolCreateInfo qpci{{}, vk::QueryType::eAccelerationStructureCompactedSizeKHR, input_size};
-        queryPool = device.createQueryPool(qpci);
+        queryPool = context->device.createQueryPool(qpci);
     }
 
     // Batching creation/compaction of BLAS to allow staying in restricted amount of memory (when compacting)
@@ -89,13 +89,13 @@ void AccelerationStructureBuilder::buildBLAS(const std::vector<BlasInput>& input
         if (batch_device_size >= batchLimit || idx == input_size - 1) {
 
             // BUILD BATCH
-            vk::CommandBuffer cmdBuf = cmd_pool.createCommandBuffer();
+            vk::CommandBuffer cmdBuf = cmd_pool.create_and_begin();
             cmdCreateBLAS(cmdBuf, batch_indices, build_infos, scratchAddress, queryPool);
             queue.submit_wait(cmdBuf);
 
             // COMPACT BATCH
             if (queryPool.has_value()) { // compact
-                vk::CommandBuffer cmdBuf = cmd_pool.createCommandBuffer();
+                vk::CommandBuffer cmdBuf = cmd_pool.create_and_begin();
                 cmdCompactBLAS(cmdBuf, batch_indices, build_infos, queryPool.value());
                 queue.submit_wait(cmdBuf);
                 // Destroy the non-compacted version
@@ -127,7 +127,7 @@ void AccelerationStructureBuilder::buildBLAS(const std::vector<BlasInput>& input
 
     // Clean up
     if (queryPool.has_value())
-        device.destroyQueryPool(queryPool.value());
+        context->device.destroyQueryPool(queryPool.value());
     resource_allocator.finalizeAndReleaseStaging();
     resource_allocator.destroy(scratchBuffer);
 }
@@ -138,7 +138,7 @@ void AccelerationStructureBuilder::cmdCreateBLAS(vk::CommandBuffer& cmdBuf,
                                                  vk::DeviceAddress scratchAddress,
                                                  std::optional<vk::QueryPool>& queryPool) {
     if (queryPool.has_value()) // For querying the compaction size
-        device.resetQueryPool(queryPool.value(), 0, static_cast<uint32_t>(indices.size()));
+        context->device.resetQueryPool(queryPool.value(), 0, static_cast<uint32_t>(indices.size()));
     uint32_t queryCnt = 0;
 
     for (const auto& idx : indices) {
@@ -180,7 +180,7 @@ void AccelerationStructureBuilder::cmdCompactBLAS(vk::CommandBuffer& cmdBuf,
 
     // Get the compacted size result back
     std::vector<vk::DeviceSize> compactSizes(static_cast<uint32_t>(indices.size()));
-    check_result(device.getQueryPoolResults(queryPool, 0, (uint32_t)compactSizes.size(),
+    check_result(context->device.getQueryPoolResults(queryPool, 0, (uint32_t)compactSizes.size(),
                                             compactSizes.size() * sizeof(vk::DeviceSize), compactSizes.data(),
                                             sizeof(VkDeviceSize), vk::QueryResultFlagBits::eWait),
                  "could not get query pool results");
@@ -230,12 +230,12 @@ void AccelerationStructureBuilder::updateBLAS(uint32_t blasIdx,
     for (std::size_t tt = 0; tt < blas.asBuildOffsetInfo.size(); tt++)
         maxPrimCount[tt] = blas.asBuildOffsetInfo[tt].primitiveCount; // Number of primitives/triangles
 
-    vk::AccelerationStructureBuildSizesInfoKHR sizeInfo = device.getAccelerationStructureBuildSizesKHR(
+    vk::AccelerationStructureBuildSizesInfoKHR sizeInfo = context->device.getAccelerationStructureBuildSizesKHR(
         vk::AccelerationStructureBuildTypeKHR::eDevice, build_infos, maxPrimCount);
 
     // Allocate the scratch buffer and setting the scratch info
     Buffer scratchBuffer = resource_allocator.createScratchBuffer(sizeInfo.buildScratchSize);
-    build_infos.scratchData.deviceAddress = scratchBuffer.get_device_address(device);
+    build_infos.scratchData.deviceAddress = scratchBuffer.get_device_address(*context);
 
     // Need pointer for some reason...
     std::vector<const vk::AccelerationStructureBuildRangeInfoKHR*> pBuildOffset(blas.asBuildOffsetInfo.size());
@@ -243,8 +243,8 @@ void AccelerationStructureBuilder::updateBLAS(uint32_t blasIdx,
         pBuildOffset[i] = &blas.asBuildOffsetInfo[i];
 
     // Update the instance buffer on the device side and build the TLAS
-    CommandPool genCmdBuf(device, queue.get_queue_family_index());
-    vk::CommandBuffer cmdBuf = genCmdBuf.createCommandBuffer();
+    CommandPool genCmdBuf(context, queue.get_queue_family_index());
+    vk::CommandBuffer cmdBuf = genCmdBuf.create_and_begin();
 
     // Update the acceleration structure. Note the VK_TRUE parameter to trigger the update,
     // and the existing BLAS being passed and updated in place
@@ -263,8 +263,8 @@ void AccelerationStructureBuilder::buildTLAS(const std::vector<vk::AccelerationS
     assert(!tlas.as || update); // Cannot call buildTlas twice except to update.
 
     // Command buffer to create the TLAS
-    CommandPool genCmdBuf(device, queue.get_queue_family_index());
-    vk::CommandBuffer cmdBuf = genCmdBuf.createCommandBuffer();
+    CommandPool genCmdBuf(context, queue.get_queue_family_index());
+    vk::CommandBuffer cmdBuf = genCmdBuf.create_and_begin();
 
     // Create a buffer holding the actual instance data (matrices++) for use by the AS builder
     // Buffer of instances containing the matrices and BLAS ids
@@ -273,7 +273,7 @@ void AccelerationStructureBuilder::buildTLAS(const std::vector<vk::AccelerationS
                                         vk::BufferUsageFlagBits::eShaderDeviceAddress |
                                             vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR);
 
-    vk::DeviceAddress instBufferAddr = instancesBuffer.get_device_address(device);
+    vk::DeviceAddress instBufferAddr = instancesBuffer.get_device_address(*context);
 
     // Make sure the instance buffer are copied before triggering the acceleration structure build
     vk::MemoryBarrier barrier{vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eAccelerationStructureWriteKHR};
@@ -311,7 +311,7 @@ void AccelerationStructureBuilder::cmdCreateTLAS(vk::CommandBuffer& cmdBuf,
     vk::AccelerationStructureBuildGeometryInfoKHR build_info{
         vk::AccelerationStructureTypeKHR::eTopLevel, flags, mode, {}, {}, top_as_geometry};
 
-    vk::AccelerationStructureBuildSizesInfoKHR sizeInfo = device.getAccelerationStructureBuildSizesKHR(
+    vk::AccelerationStructureBuildSizesInfoKHR sizeInfo = context->device.getAccelerationStructureBuildSizesKHR(
         vk::AccelerationStructureBuildTypeKHR::eDevice, build_info, countInstance);
 
     // Create TLAS
@@ -322,7 +322,7 @@ void AccelerationStructureBuilder::cmdCreateTLAS(vk::CommandBuffer& cmdBuf,
 
     // Allocate the scratch memory
     scratchBuffer = resource_allocator.createScratchBuffer(sizeInfo.buildScratchSize);
-    vk::DeviceAddress scratchAddress = scratchBuffer.get_device_address(device);
+    vk::DeviceAddress scratchAddress = scratchBuffer.get_device_address(*context);
 
     // Update build information (only now possible after we know size)
     vk::AccelerationStructureKHR src_accel = update ? tlas.as : VK_NULL_HANDLE;

@@ -1,5 +1,6 @@
 #include "merian/vk/extension/extension_vk_glfw.hpp"
 #include "merian/vk/context.hpp"
+#include "merian/vk/command/queue_container.hpp"
 
 #include <spdlog/spdlog.h>
 
@@ -18,7 +19,8 @@ void ExtensionVkGLFW::on_destroy_instance(const vk::Instance& instance) {
     instance.destroySurfaceKHR(surface);
 }
 
-bool ExtensionVkGLFW::accept_graphics_queue(const vk::PhysicalDevice& physical_device, std::size_t queue_family_index) {
+bool ExtensionVkGLFW::accept_graphics_queue(const vk::PhysicalDevice& physical_device,
+                                            std::size_t queue_family_index) {
     if (physical_device.getSurfaceSupportKHR(queue_family_index, surface)) {
         return true;
     }
@@ -41,14 +43,15 @@ bool ExtensionVkGLFW::accept_graphics_queue(const vk::PhysicalDevice& physical_d
             if (present_mode == preferred_vsync_off_mode) {
                 return present_mode;
             }
-            if (present_mode == vk::PresentModeKHR::eImmediate || present_mode == vk::PresentModeKHR::eMailbox) {
+            if (present_mode == vk::PresentModeKHR::eImmediate ||
+                present_mode == vk::PresentModeKHR::eMailbox) {
                 best = present_mode;
             }
         }
     }
 
-    SPDLOG_DEBUG("vsync disabled but mode {} could not be found! Using {}", vk::to_string(preferred_vsync_off_mode),
-                  vk::to_string(best));
+    SPDLOG_DEBUG("vsync disabled but mode {} could not be found! Using {}",
+                 vk::to_string(preferred_vsync_off_mode), vk::to_string(best));
     return best;
 }
 
@@ -69,8 +72,9 @@ vk::SurfaceFormatKHR select_surface_format(std::vector<vk::SurfaceFormatKHR>& av
     return available[0];
 }
 
-void ExtensionVkGLFW::on_physical_device_selected(const vk::PhysicalDevice& physical_device) {
-    this->physical_device = physical_device;
+void ExtensionVkGLFW::on_physical_device_selected(const Context::PhysicalDeviceContainer& pd_container) {
+
+    this->physical_device = pd_container.physical_device;
 
     auto surface_formats = physical_device.getSurfaceFormatsKHR(surface);
     if (surface_formats.size() == 0)
@@ -80,7 +84,7 @@ void ExtensionVkGLFW::on_physical_device_selected(const vk::PhysicalDevice& phys
     present_mode = select_present_mode();
 
     SPDLOG_DEBUG("selected surface format {}, color space {}", vk::to_string(surface_format.format),
-                  vk::to_string(surface_format.colorSpace));
+                 vk::to_string(surface_format.colorSpace));
 }
 
 void ExtensionVkGLFW::on_device_created(const vk::Device& device) {
@@ -100,9 +104,10 @@ vk::Extent2D make_extent2D(vk::SurfaceCapabilitiesKHR capabilities, int width, i
         extent = capabilities.currentExtent;
     } else {
         extent = vk::Extent2D{(uint32_t)width, (uint32_t)height};
-        extent.width = std::clamp(extent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
-        extent.height =
-            std::clamp(extent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
+        extent.width = std::clamp(extent.width, capabilities.minImageExtent.width,
+                                  capabilities.maxImageExtent.width);
+        extent.height = std::clamp(extent.height, capabilities.minImageExtent.height,
+                                   capabilities.maxImageExtent.height);
     }
     return extent;
 }
@@ -253,7 +258,8 @@ void ExtensionVkGLFW::destroy_swapchain() {
     swapchain = VK_NULL_HANDLE;
 }
 
-std::optional<ExtensionVkGLFW::SwapchainAcquireResult> ExtensionVkGLFW::aquire_custom(int width, int height) {
+std::optional<ExtensionVkGLFW::SwapchainAcquireResult> ExtensionVkGLFW::aquire_custom(int width,
+                                                                                      int height) {
     ExtensionVkGLFW::SwapchainAcquireResult aquire_result;
 
     if (width != cur_width || height != cur_height) {
@@ -262,8 +268,8 @@ std::optional<ExtensionVkGLFW::SwapchainAcquireResult> ExtensionVkGLFW::aquire_c
     }
 
     for (int tries = 0; tries < 2; tries++) {
-        vk::Result result =
-            device.acquireNextImageKHR(swapchain, UINT64_MAX, current_read_semaphore(), {}, &current_image_idx);
+        vk::Result result = device.acquireNextImageKHR(
+            swapchain, UINT64_MAX, current_read_semaphore(), {}, &current_image_idx);
 
         if (result == vk::Result::eSuccess) {
             aquire_result.image = current_image();
@@ -274,7 +280,8 @@ std::optional<ExtensionVkGLFW::SwapchainAcquireResult> ExtensionVkGLFW::aquire_c
             aquire_result.extent = extent;
 
             return aquire_result;
-        } else if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR) {
+        } else if (result == vk::Result::eErrorOutOfDateKHR ||
+                   result == vk::Result::eSuboptimalKHR) {
             recreate_swapchain(width, height);
             continue;
         } else {
@@ -308,6 +315,5 @@ void ExtensionVkGLFW::present(QueueContainer& queue) {
 
     queue.present(present_info);
 }
-
 
 } // namespace merian

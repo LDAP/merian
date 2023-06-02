@@ -75,10 +75,10 @@ class AccelerationStructureBuilder {
 
   public:
     AccelerationStructureBuilder(ExtensionVkAccelerationStructure& ext_acceleration_structure,
-                                 vk::Device& device,
+                                 SharedContext context,
                                  ResourceAllocator& resource_allocator,
                                  QueueContainer& queue)
-        : ext_acceleration_structure(ext_acceleration_structure), device(device),
+        : ext_acceleration_structure(ext_acceleration_structure), context(context),
           resource_allocator(resource_allocator), queue(queue) {
 
         if (!ext_acceleration_structure.is_supported()) {
@@ -147,7 +147,7 @@ class AccelerationStructureBuilder {
 
   private:
     ExtensionVkAccelerationStructure& ext_acceleration_structure;
-    vk::Device& device;
+    SharedContext context;
     ResourceAllocator& resource_allocator;
     QueueContainer& queue;
 

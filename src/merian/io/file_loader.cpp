@@ -38,12 +38,12 @@ std::string FileLoader::load_file(const std::filesystem::path& path) {
 // Searches the file in cwd and search paths and returns the full path to the file
 std::optional<std::filesystem::path> FileLoader::find_file(const std::filesystem::path& filename) {
     if (exists(filename)) {
-        return filename;
+        return std::filesystem::weakly_canonical(filename);
     }
     for (const auto& path : search_paths) {
         std::filesystem::path full_path = path / filename;
         if (exists(full_path))
-            return full_path;
+            return std::filesystem::weakly_canonical(full_path);
     }
 
     SPDLOG_WARN("file {} not found in search paths", std::string(filename));
