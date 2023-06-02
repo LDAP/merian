@@ -12,9 +12,14 @@ The Vulkan dynamic dispatch loader must be used.
 
 The default dispatcher is initialized in `Context`.
 
-
-### Context
 The `Context` class initializes and destroys a Vulkan device and holds core objects (PhysicalDevice, Device, Queues, ...).
+
+Create a Context using the `Context::make_context` method. Many functions do not return an object directly, instead they return a shared_ptr.
+This is to ensure that dependent objects (Command Buffer -> Pool -> Device) are destructed in the right order and automatically.
+You should never need to call destroy() manually.
+Keep in mind to keep a reference to the shared pointers to prevent frequent object construction and destruction.
+
+Make sure your program ends with `[INFO] [context.cpp:XX] context destroyed`.
 
 ### Extensions
 The Context can be extended by Extensions. The extensions can hook into the context creation process and enable Vulkan instance/device layers and extensions as well as features. Note: Extension can only be used after `Context` is initialized.
