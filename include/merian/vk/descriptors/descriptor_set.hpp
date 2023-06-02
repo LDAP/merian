@@ -1,3 +1,5 @@
+#pragma once
+
 #include "merian/vk/descriptors/descriptor_pool.hpp"
 #include "merian/vk/descriptors/descriptor_set_layout.hpp"
 

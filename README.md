@@ -1,6 +1,6 @@
 # Merian Vulkan Framework
 
-A framework for quick Vulkan prototyping.
+A Vulkan prototyping framework.
 
 ## Usage
 
@@ -15,9 +15,10 @@ The default dispatcher is initialized in `Context`.
 The `Context` class initializes and destroys a Vulkan device and holds core objects (PhysicalDevice, Device, Queues, ...).
 
 Create a Context using the `Context::make_context(..)` method.
-Most fabric methods do return shared pointer as well and need to be created using a `Fabric::make_fabric(..)` function, since they need a shared pointer to itself to be able to create other objects.
+For common Vulkan objects a wrapper is provided that holds a shared pointer on its parent.
 This is to ensure that dependent objects (Command Buffer -> Pool -> Device) are destructed in the right order automagically.
 You should never need to call destroy(...) manually. Keep in mind to keep a reference to the shared pointers to prevent frequent object construction and destruction. Whenever you create objects by yourself you should consider using `make_shared<Class>(..)`.
+Most fabrics need to be created using a `Fabric::make_fabric(..)` function, since they require a shared pointer to itself to be able to create other objects.
 
 Make sure your program ends with `[INFO] [context.cpp:XX] context destroyed`.
 
@@ -117,8 +118,31 @@ Ray tracing:
 - `Camera`: Helper class to calculate view and projection matrices.
 - `CameraAnimator`: Helper class to smooth camera motion.
 - `CameraController`: Helper class to control a camera with high level commands.
+
 - `Renderdoc`: Helper class to enable start frame capturing for RenderDoc.
 - `FileLoader`: Helper class to find and load files from search paths.
+
+- `Descriptor*`: Create and manage Descriptor Sets, Pools and SetLayouts. Usage:
+    ```c++
+    auto builder = merian::DescriptorSetLayoutBuilder()
+        .add_binding_storage_buffer()           // result
+        .add_binding_acceleration_structure()   // top-level acceleration structure
+        .add_binding_storage_buffer()           // vertex buffer
+        .add_binding_storage_buffer();          // index buffer
+
+    auto desc_layout = builder.build_layout(context);
+    // Shared pointers are used -> allows automatic destruction in the right order.
+    auto desc_pool = std::make_shared<merian::DescriptorPool>(desc_layout);
+    auto desc_set = std::make_shared<merian::DescriptorSet>(desc_pool);
+
+    merian::DescriptorSetUpdate(desc_set)
+        .write_descriptor_buffer(0, result)
+        .write_descriptor_acceleration_structure(1, {as})
+        .write_descriptor_buffer(2, vertex_buffer)
+        .write_descriptor_buffer(3, index_buffer)
+        .update(context);
+    ```
+
 
 ## Building
 
