@@ -33,7 +33,8 @@ void ResourceAllocator::deinit() {
 }
 
 Buffer ResourceAllocator::createBuffer(const vk::BufferCreateInfo& info_,
-                                       const vk::MemoryPropertyFlags memProperties_) {
+                                       const vk::MemoryPropertyFlags memProperties_,
+                                       const vk::DeviceSize alignment) {
     Buffer resultBuffer;
     // Create Buffer (can be overloaded)
     CreateBufferEx(info_, &resultBuffer.buffer);
@@ -46,8 +47,11 @@ Buffer ResourceAllocator::createBuffer(const vk::BufferCreateInfo& info_,
 
     memReqs.pNext = &dedicatedRegs;
     bufferReqs.buffer = resultBuffer.buffer;
-
     m_device.getBufferMemoryRequirements2(&bufferReqs, &memReqs);
+
+    // Scratch Buffer needs extra alignment
+    memReqs.memoryRequirements.alignment =
+        std::max(memReqs.memoryRequirements.alignment, alignment);
 
     // Build up allocation info
     MemAllocateInfo allocInfo(memReqs.memoryRequirements, memProperties_, false);
@@ -73,9 +77,10 @@ Buffer ResourceAllocator::createBuffer(const vk::BufferCreateInfo& info_,
 
 Buffer ResourceAllocator::createBuffer(vk::DeviceSize size_,
                                        vk::BufferUsageFlags usage_,
-                                       const vk::MemoryPropertyFlags memUsage_) {
+                                       const vk::MemoryPropertyFlags memUsage_,
+                                       const vk::DeviceSize alignment) {
     vk::BufferCreateInfo info{{}, size_, vk::BufferUsageFlagBits::eTransferDst | usage_};
-    return createBuffer(info, memUsage_);
+    return createBuffer(info, memUsage_, alignment);
 }
 
 Buffer ResourceAllocator::createBuffer(const vk::CommandBuffer& cmdBuf,
@@ -93,7 +98,18 @@ Buffer ResourceAllocator::createBuffer(const vk::CommandBuffer& cmdBuf,
     return resultBuffer;
 }
 
-Image ResourceAllocator::createImage(const vk::ImageCreateInfo& info_, const vk::MemoryPropertyFlags memUsage_) {
+// You get the alignment from
+// VkPhysicalDeviceAccelerationStructurePropertiesKHR::minAccelerationStructureScratchOffsetAlignment
+Buffer ResourceAllocator::createScratchBuffer(const vk::DeviceSize size,
+                                              const vk::DeviceSize alignment) {
+    return createBuffer(size,
+                        vk::BufferUsageFlagBits::eShaderDeviceAddress |
+                            vk::BufferUsageFlagBits::eStorageBuffer,
+                        vk::MemoryPropertyFlagBits::eDeviceLocal, alignment);
+}
+
+Image ResourceAllocator::createImage(const vk::ImageCreateInfo& info_,
+                                     const vk::MemoryPropertyFlags memUsage_) {
     Image resultImage;
     // Create image
     CreateImageEx(info_, &resultImage.image);
@@ -135,7 +151,8 @@ Image ResourceAllocator::createImage(const vk::CommandBuffer& cmdBuf,
     // Copy the data to staging buffer than to image
     if (data_ != nullptr) {
         // Copy buffer to image
-        vk::ImageSubresourceRange subresourceRange{vk::ImageAspectFlagBits::eColor, 0, info_.mipLevels, 0, 1};
+        vk::ImageSubresourceRange subresourceRange{vk::ImageAspectFlagBits::eColor, 0,
+                                                   info_.mipLevels, 0, 1};
 
         // doing these transitions per copy is not efficient, should do in bulk for many images
         merian::cmdBarrierImageLayout(cmdBuf, resultImage.image, vk::ImageLayout::eUndefined,
@@ -143,13 +160,16 @@ Image ResourceAllocator::createImage(const vk::CommandBuffer& cmdBuf,
 
         vk::Offset3D offset;
         vk::ImageSubresourceLayers subresource{vk::ImageAspectFlagBits::eColor, {}, {}, 1};
-        m_staging->cmdToImage(cmdBuf, resultImage.image, offset, info_.extent, subresource, size_, data_);
+        m_staging->cmdToImage(cmdBuf, resultImage.image, offset, info_.extent, subresource, size_,
+                              data_);
 
         // Setting final image layout
-        merian::cmdBarrierImageLayout(cmdBuf, resultImage.image, vk::ImageLayout::eTransferDstOptimal, layout_);
+        merian::cmdBarrierImageLayout(cmdBuf, resultImage.image,
+                                      vk::ImageLayout::eTransferDstOptimal, layout_);
     } else {
         // Setting final image layout
-        merian::cmdBarrierImageLayout(cmdBuf, resultImage.image, vk::ImageLayout::eUndefined, layout_);
+        merian::cmdBarrierImageLayout(cmdBuf, resultImage.image, vk::ImageLayout::eUndefined,
+                                      layout_);
     }
 
     return resultImage;
@@ -164,7 +184,8 @@ merian::Texture ResourceAllocator::createTexture(const Image& image,
     return resultTexture;
 }
 
-Texture ResourceAllocator::createTexture(const Image& image, const vk::ImageViewCreateInfo& imageViewCreateInfo) {
+Texture ResourceAllocator::createTexture(const Image& image,
+                                         const vk::ImageViewCreateInfo& imageViewCreateInfo) {
     assert(imageViewCreateInfo.image == image.image);
 
     Texture resultTexture;
@@ -195,13 +216,15 @@ Texture ResourceAllocator::createTexture(const vk::CommandBuffer& cmdBuf,
 
     switch (info_.imageType) {
     case vk::ImageType::e1D:
-        viewInfo.viewType = (info_.arrayLayers > 1 ? vk::ImageViewType::e1DArray : vk::ImageViewType::e1D);
+        viewInfo.viewType =
+            (info_.arrayLayers > 1 ? vk::ImageViewType::e1DArray : vk::ImageViewType::e1D);
         break;
     case vk::ImageType::e2D:
         if (isCube) {
             viewInfo.viewType = vk::ImageViewType::eCube;
         } else {
-            viewInfo.viewType = info_.arrayLayers > 1 ? vk::ImageViewType::e2DArray : vk::ImageViewType::e2D;
+            viewInfo.viewType =
+                info_.arrayLayers > 1 ? vk::ImageViewType::e2DArray : vk::ImageViewType::e2D;
         }
         break;
     case vk::ImageType::e3D:
@@ -216,13 +239,17 @@ Texture ResourceAllocator::createTexture(const vk::CommandBuffer& cmdBuf,
     return resultTexture;
 }
 
-AccelerationStructure ResourceAllocator::createAccelerationStructure(vk::DeviceSize size, vk::AccelerationStructureTypeKHR type) {
+AccelerationStructure
+ResourceAllocator::createAccelerationStructure(vk::DeviceSize size,
+                                               vk::AccelerationStructureTypeKHR type) {
     AccelerationStructure resultAccel;
     // Allocating the buffer to hold the acceleration structure
-    resultAccel.buffer = createBuffer(size, vk::BufferUsageFlagBits::eAccelerationStructureStorageKHR |
-                                                vk::BufferUsageFlagBits::eShaderDeviceAddress);
+    resultAccel.buffer =
+        createBuffer(size, vk::BufferUsageFlagBits::eAccelerationStructureStorageKHR |
+                               vk::BufferUsageFlagBits::eShaderDeviceAddress);
     // Setting the buffer
-    vk::AccelerationStructureCreateInfoKHR createInfo{{}, resultAccel.buffer.buffer, {}, size, type};
+    vk::AccelerationStructureCreateInfoKHR createInfo{
+        {}, resultAccel.buffer.buffer, {}, size, type};
     check_result(m_device.createAccelerationStructureKHR(&createInfo, nullptr, &resultAccel.as),
                  "could not create acceleration structure");
 
@@ -313,7 +340,8 @@ void ResourceAllocator::CreateImageEx(const vk::ImageCreateInfo& info_, vk::Imag
     check_result(m_device.createImage(&info_, nullptr, image), "could not create image");
 }
 
-uint32_t ResourceAllocator::getMemoryType(uint32_t typeBits, const vk::MemoryPropertyFlags& properties) {
+uint32_t ResourceAllocator::getMemoryType(uint32_t typeBits,
+                                          const vk::MemoryPropertyFlags& properties) {
     for (uint32_t i = 0; i < m_memoryProperties.memoryTypeCount; i++) {
         if (((typeBits & (1 << i)) > 0) &&
             (m_memoryProperties.memoryTypes[i].propertyFlags & properties) == properties) {

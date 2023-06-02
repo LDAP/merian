@@ -162,6 +162,7 @@ class Context {
 
   private:
     // in make_context
+    std::weak_ptr<Context> weak_self;
 
     // can be nullptr in very rare occasions, you can check that with if (shrd_ptr) {...}
     std::weak_ptr<QueueContainer> queue_GCT;

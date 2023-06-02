@@ -77,7 +77,7 @@ class AccelerationStructureBuilder {
     AccelerationStructureBuilder(ExtensionVkAccelerationStructure& ext_acceleration_structure,
                                  SharedContext context,
                                  ResourceAllocator& resource_allocator,
-                                 QueueContainer& queue)
+                                 std::shared_ptr<QueueContainer>& queue)
         : ext_acceleration_structure(ext_acceleration_structure), context(context),
           resource_allocator(resource_allocator), queue(queue) {
 
@@ -149,7 +149,7 @@ class AccelerationStructureBuilder {
     ExtensionVkAccelerationStructure& ext_acceleration_structure;
     SharedContext context;
     ResourceAllocator& resource_allocator;
-    QueueContainer& queue;
+    std::shared_ptr<QueueContainer> queue;
 
     std::vector<AccelerationStructure> vec_blas; // Bottom-level acceleration structure
     AccelerationStructure tlas;                  // Top-level acceleration structure

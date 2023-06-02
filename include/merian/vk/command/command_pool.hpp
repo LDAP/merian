@@ -60,7 +60,7 @@ class CommandPool {
     void reset();
     bool has_command_buffers();
     // Ends all command buffers
-    void end();
+    void end_all();
     const std::vector<vk::CommandBuffer>& get_command_buffers() const;
 
   private:

@@ -11,12 +11,6 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
 namespace merian {
 
-// Stores a mapping from Context pointer to weak_ptr of the Context.
-// This is to allow Context go the a shared ptr of itself.
-// make_context must update this map on creation and
-// ~Context must remove its entry.
-std::map<Context*, std::weak_ptr<Context>> context_weak_ptrs;
-
 SharedContext Context::make_context(std::vector<Extension*> extensions,
                                     std::string application_name,
                                     uint32_t application_vk_version,
@@ -29,7 +23,7 @@ SharedContext Context::make_context(std::vector<Extension*> extensions,
         extensions, application_name, application_vk_version, preffered_number_compute_queues,
         filter_vendor_id, filter_device_id, filter_device_name));
 
-    context_weak_ptrs[shared_context.get()] = shared_context;
+    shared_context->weak_self = shared_context;
 
     for (auto& ext : extensions) {
         ext->on_context_created(shared_context);
@@ -89,8 +83,6 @@ Context::~Context() {
     instance.destroy();
 
     SPDLOG_INFO("context destroyed");
-
-    context_weak_ptrs.erase(this);
 }
 
 void Context::create_instance(std::string application_name, uint32_t application_vk_version) {
@@ -494,8 +486,8 @@ void Context::destroy_extensions(std::vector<Extension*> extensions) {
 }
 
 std::shared_ptr<Context> Context::get_shared_pointer() {
-    assert(context_weak_ptrs.contains(this));
-    return context_weak_ptrs[this].lock();
+    assert(!weak_self.expired());
+    return weak_self.lock();
 }
 
 std::shared_ptr<QueueContainer> Context::get_queue_GCT() {

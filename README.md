@@ -14,10 +14,10 @@ The default dispatcher is initialized in `Context`.
 
 The `Context` class initializes and destroys a Vulkan device and holds core objects (PhysicalDevice, Device, Queues, ...).
 
-Create a Context using the `Context::make_context` method. Many functions do not return an object directly, instead they return a shared_ptr.
-This is to ensure that dependent objects (Command Buffer -> Pool -> Device) are destructed in the right order and automatically.
-You should never need to call destroy() manually.
-Keep in mind to keep a reference to the shared pointers to prevent frequent object construction and destruction.
+Create a Context using the `Context::make_context(..)` method.
+Most fabric methods do return shared pointer as well and need to be created using a `Fabric::make_fabric(..)` function, since they need a shared pointer to itself to be able to create other objects.
+This is to ensure that dependent objects (Command Buffer -> Pool -> Device) are destructed in the right order automagically.
+You should never need to call destroy(...) manually. Keep in mind to keep a reference to the shared pointers to prevent frequent object construction and destruction. Whenever you create objects by yourself you should consider using `make_shared<Class>(..)`.
 
 Make sure your program ends with `[INFO] [context.cpp:XX] context destroyed`.
 

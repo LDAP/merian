@@ -40,46 +40,51 @@ class ResourceAllocator {
 
     //--------------------------------------------------------------------------------------------------
 
-    // Basic buffer creation
-    Buffer createBuffer(const vk::BufferCreateInfo& info_,
-                        const vk::MemoryPropertyFlags memUsage_ = vk::MemoryPropertyFlagBits::eDeviceLocal);
+    // Basic buffer creation (the maximum of alignment and vk::MemoryRequirements2 is used for
+    // alignment)
+    Buffer
+    createBuffer(const vk::BufferCreateInfo& info_,
+                 const vk::MemoryPropertyFlags memUsage_ = vk::MemoryPropertyFlagBits::eDeviceLocal,
+                 const vk::DeviceSize alignment = 0);
 
     // Simple buffer creation
     // implicitly sets VK_BUFFER_USAGE_TRANSFER_DST_BIT
-    Buffer createBuffer(vk::DeviceSize size_ = 0,
-                        vk::BufferUsageFlags usage_ = vk::BufferUsageFlags(),
-                        const vk::MemoryPropertyFlags memUsage_ = vk::MemoryPropertyFlagBits::eDeviceLocal);
+    Buffer
+    createBuffer(vk::DeviceSize size_ = 0,
+                 vk::BufferUsageFlags usage_ = vk::BufferUsageFlags(),
+                 const vk::MemoryPropertyFlags memUsage_ = vk::MemoryPropertyFlagBits::eDeviceLocal,
+                 const vk::DeviceSize alignment = 0);
 
     // Simple buffer creation with data uploaded through staging manager
     // implicitly sets VK_BUFFER_USAGE_TRANSFER_DST_BIT
-    Buffer createBuffer(const vk::CommandBuffer& cmdBuf,
-                        const vk::DeviceSize& size_,
-                        const void* data_,
-                        vk::BufferUsageFlags usage_,
-                        vk::MemoryPropertyFlags memProps = vk::MemoryPropertyFlagBits::eDeviceLocal);
+    Buffer
+    createBuffer(const vk::CommandBuffer& cmdBuf,
+                 const vk::DeviceSize& size_,
+                 const void* data_,
+                 vk::BufferUsageFlags usage_,
+                 vk::MemoryPropertyFlags memProps = vk::MemoryPropertyFlagBits::eDeviceLocal);
 
     // Simple buffer creation with data uploaded through staging manager
     // implicitly sets VK_BUFFER_USAGE_TRANSFER_DST_BIT
     template <typename T>
-    Buffer createBuffer(const vk::CommandBuffer& cmdBuf,
-                        const std::vector<T>& data_,
-                        vk::BufferUsageFlags usage_,
-                        vk::MemoryPropertyFlags memProps_ = vk::MemoryPropertyFlagBits::eDeviceLocal) {
+    Buffer
+    createBuffer(const vk::CommandBuffer& cmdBuf,
+                 const std::vector<T>& data_,
+                 vk::BufferUsageFlags usage_,
+                 vk::MemoryPropertyFlags memProps_ = vk::MemoryPropertyFlagBits::eDeviceLocal) {
         return createBuffer(cmdBuf, sizeof(T) * data_.size(), data_.data(), usage_, memProps_);
     }
 
     //--------------------------------------------------------------------------------------------------
 
-    Buffer createScratchBuffer(vk::DeviceSize size) {
-        return createBuffer(size,
-                            vk::BufferUsageFlagBits::eShaderDeviceAddress | vk::BufferUsageFlagBits::eStorageBuffer);
-    }
+    Buffer createScratchBuffer(const vk::DeviceSize size, const vk::DeviceSize alignment);
 
     //--------------------------------------------------------------------------------------------------
 
     // Basic image creation
-    Image createImage(const vk::ImageCreateInfo& info_,
-                      const vk::MemoryPropertyFlags memUsage_ = vk::MemoryPropertyFlagBits::eDeviceLocal);
+    Image
+    createImage(const vk::ImageCreateInfo& info_,
+                const vk::MemoryPropertyFlags memUsage_ = vk::MemoryPropertyFlagBits::eDeviceLocal);
 
     // Create an image with data uploaded through staging manager
     Image createImage(const vk::CommandBuffer& cmdBuf,
@@ -88,8 +93,8 @@ class ResourceAllocator {
                       const vk::ImageCreateInfo& info_,
                       const vk::ImageLayout& layout_ = vk::ImageLayout::eShaderReadOnlyOptimal);
 
-    // other variants could exist with a few defaults but we already have makeImage2DViewCreateInfo()
-    // we could always override viewCreateInfo.image
+    // other variants could exist with a few defaults but we already have
+    // makeImage2DViewCreateInfo() we could always override viewCreateInfo.image
     Texture createTexture(const Image& image, const vk::ImageViewCreateInfo& imageViewCreateInfo);
     Texture createTexture(const Image& image,
                           const vk::ImageViewCreateInfo& imageViewCreateInfo,
@@ -108,7 +113,8 @@ class ResourceAllocator {
 
     //--------------------------------------------------------------------------------------------------
 
-    AccelerationStructure createAccelerationStructure(vk::DeviceSize size, vk::AccelerationStructureTypeKHR type);
+    AccelerationStructure createAccelerationStructure(vk::DeviceSize size,
+                                                      vk::AccelerationStructureTypeKHR type);
 
     //--------------------------------------------------------------------------------------------------
 

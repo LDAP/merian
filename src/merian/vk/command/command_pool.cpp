@@ -81,7 +81,7 @@ bool CommandPool::has_command_buffers() {
 }
 
 // Ends all command buffers
-void CommandPool::end() {
+void CommandPool::end_all() {
     for (vk::CommandBuffer& cmd : cmds) {
         cmd.end();
     }
