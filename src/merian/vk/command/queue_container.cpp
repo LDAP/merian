@@ -12,12 +12,12 @@ QueueContainer::QueueContainer(const SharedContext& context,
     : context(context), queue(context->device.getQueue(queue_family_index, queue_index)),
       queue_family_index(queue_family_index) {}
 
-void QueueContainer::submit(const CommandPool& pool,
-                            vk::Fence fence,
+void QueueContainer::submit(const std::shared_ptr<CommandPool>& pool,
+                            const vk::Fence fence,
                             const std::vector<vk::Semaphore>& wait_semaphores,
                             const std::vector<vk::Semaphore>& signal_semaphores,
                             const vk::PipelineStageFlags& wait_dst_stage_mask) {
-    vk::SubmitInfo submit_info{wait_semaphores, wait_dst_stage_mask, pool.get_command_buffers(),
+    vk::SubmitInfo submit_info{wait_semaphores, wait_dst_stage_mask, pool->get_command_buffers(),
                                signal_semaphores};
     submit(submit_info, fence);
 }
@@ -32,8 +32,7 @@ void QueueContainer::submit(const std::vector<vk::CommandBuffer>& command_buffer
     submit(submit_info, fence);
 }
 
-void QueueContainer::submit(const vk::CommandBuffer& command_buffer,
-                            vk::Fence fence) {
+void QueueContainer::submit(const vk::CommandBuffer& command_buffer, vk::Fence fence) {
     vk::SubmitInfo submit_info{
         {}, {}, {}, 1, &command_buffer,
     };
@@ -47,18 +46,17 @@ void QueueContainer::submit(const vk::SubmitInfo& submit_info,
     check_result(queue.submit(submit_count, &submit_info, fence), "queue submit failed");
 }
 
-void QueueContainer::submit(const std::vector<vk::SubmitInfo>& submit_infos,
-                            vk::Fence fence) {
+void QueueContainer::submit(const std::vector<vk::SubmitInfo>& submit_infos, vk::Fence fence) {
     std::lock_guard<std::mutex> lock_guard(mutex);
     queue.submit(submit_infos, fence);
 }
 
-void QueueContainer::submit_wait(const CommandPool& pool,
-                                 vk::Fence fence,
+void QueueContainer::submit_wait(const std::shared_ptr<CommandPool>& pool,
+                                 const vk::Fence fence,
                                  const std::vector<vk::Semaphore>& wait_semaphores,
-                                 const std::vector<vk::Semaphore>& signal_semaphores,
-                                 const vk::PipelineStageFlags& wait_dst_stage_mask) {
-    vk::SubmitInfo submit_info{wait_semaphores, wait_dst_stage_mask, pool.get_command_buffers(),
+                                 const std::vector<vk::PipelineStageFlags>& wait_dst_stage_mask,
+                                 const std::vector<vk::Semaphore>& signal_semaphores) {
+    vk::SubmitInfo submit_info{wait_semaphores, wait_dst_stage_mask, pool->get_command_buffers(),
                                signal_semaphores};
     submit_wait(submit_info, fence);
 }
@@ -75,8 +73,7 @@ void QueueContainer::submit_wait(const std::vector<vk::CommandBuffer>& command_b
 }
 
 // Submits the command buffers then waits using waitIdle(), try to not use the _wait variants
-void QueueContainer::submit_wait(const vk::CommandBuffer& command_buffer,
-                                 vk::Fence fence) {
+void QueueContainer::submit_wait(const vk::CommandBuffer& command_buffer, vk::Fence fence) {
     vk::SubmitInfo submit_info{
         {}, {}, {}, 1, &command_buffer,
     };
@@ -84,8 +81,7 @@ void QueueContainer::submit_wait(const vk::CommandBuffer& command_buffer,
 }
 
 // Submits then waits using waitIdle(), try to not use the _wait variants
-void QueueContainer::submit_wait(const vk::SubmitInfo& submit_info,
-                                 vk::Fence fence) {
+void QueueContainer::submit_wait(const vk::SubmitInfo& submit_info, vk::Fence fence) {
     std::lock_guard<std::mutex> lock_guard(mutex);
     check_result(queue.submit(1, &submit_info, fence), "queue submit failed");
     queue.waitIdle();

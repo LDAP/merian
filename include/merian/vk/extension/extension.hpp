@@ -58,8 +58,19 @@ class Extension {
      * compativility and check_support is called.*/
     virtual void on_physical_device_selected(const Context::PhysicalDeviceContainer&) {
     }
+
+    /* Append a structure to pNext of a getFeatures() call. This can be used to determine extension support.
+     * 
+     * If a struct should be appended, set pNext of your struct to the supplied pointer,
+     * then return a pointer to your struct.
+     * If nothing should be appended, return the supplied pointer.
+     */
+    virtual void* pnext_get_features_2(void* const p_next) {
+        return p_next;
+    }
+
     /* Custom check for compatibility after the physical device is ready. */
-    virtual bool extension_supported(const vk::PhysicalDevice&) {
+    virtual bool extension_supported(const Context::PhysicalDeviceContainer&) {
         return true;
     }
     /* E.g. to dismiss a queue that does not support present-to-surface. */

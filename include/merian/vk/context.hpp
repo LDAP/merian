@@ -16,6 +16,8 @@ class CommandPool;
 using SharedContext = std::shared_ptr<Context>;
 
 /* Initializes the Vulkan instance and device and holds core objects.
+ *  
+ * Common features are automatically enabled.
  *
  * Extensions can extend the functionality and hook into the creation process.
  * Use SharedContext instead of Context directly. This way it is ensured that Context is destroyed

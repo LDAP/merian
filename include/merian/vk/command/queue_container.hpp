@@ -19,8 +19,8 @@ class QueueContainer {
 
     QueueContainer(const SharedContext& context, uint32_t queue_family_index, uint32_t queue_index);
 
-    void submit(const CommandPool& pool,
-                vk::Fence fence = VK_NULL_HANDLE,
+    void submit(const std::shared_ptr<CommandPool>& pool,
+                const vk::Fence fence,
                 const std::vector<vk::Semaphore>& wait_semaphores = {},
                 const std::vector<vk::Semaphore>& signal_semaphores = {},
                 const vk::PipelineStageFlags& wait_dst_stage_mask = {});
@@ -39,11 +39,11 @@ class QueueContainer {
 
     void submit(const std::vector<vk::SubmitInfo>& submit_infos, vk::Fence fence = VK_NULL_HANDLE);
 
-    void submit_wait(const CommandPool& pool,
-                     vk::Fence fence = VK_NULL_HANDLE,
+    void submit_wait(const std::shared_ptr<CommandPool>& pool,
+                     const vk::Fence fence = {},
                      const std::vector<vk::Semaphore>& wait_semaphores = {},
-                     const std::vector<vk::Semaphore>& signal_semaphores = {},
-                     const vk::PipelineStageFlags& wait_dst_stage_mask = {});
+                     const std::vector<vk::PipelineStageFlags>& wait_dst_stage_mask = {},
+                     const std::vector<vk::Semaphore>& signal_semaphores = {});
 
     // Submits the command buffers then waits using waitIdle(), try to not use the _wait variants
     void submit_wait(const std::vector<vk::CommandBuffer>& command_buffers,

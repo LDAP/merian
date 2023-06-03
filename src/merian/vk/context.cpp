@@ -160,8 +160,16 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id,
                 pd_container.physical_device_props.properties.vendorID,
                 pd_container.physical_device_props.properties.deviceID);
 
+    void* extension_features_pnext = nullptr;
+    for (auto& ext : extensions) {
+        extension_features_pnext = ext->pnext_get_features_2(extension_features_pnext);
+    }
+    // ^
+    pd_container.features.physical_device_features_v12.setPNext(extension_features_pnext);
+    // ^
     pd_container.features.physical_device_features.setPNext(
         &pd_container.features.physical_device_features_v12);
+    // ^
     pd_container.physical_device.getFeatures2(&pd_container.features.physical_device_features);
 
     pd_container.physical_device_memory_properties =
@@ -281,6 +289,14 @@ void Context::find_queues() {
                  queue_family_idx_T, queue_family_idx_C);
 }
 
+void enable_common_features(const Context::FeaturesContainer& supported,
+                            Context::FeaturesContainer& enable) {
+    if (supported.physical_device_features_v12.scalarBlockLayout) {
+        SPDLOG_DEBUG("scalarBlockLayout supported. Enabling feature");
+        enable.physical_device_features_v12.scalarBlockLayout = true;
+    }
+}
+
 void Context::create_device_and_queues(uint32_t preferred_number_compute_queues) {
     // PREPARE QUEUES
 
@@ -335,6 +351,7 @@ void Context::create_device_and_queues(uint32_t preferred_number_compute_queues)
     FeaturesContainer enable;
     // TODO: This enables all features which may be overkill
     enable.physical_device_features = pd_container.features.physical_device_features;
+    enable_common_features(pd_container.features, enable);
     for (auto& ext : extensions) {
         ext->enable_device_features(pd_container.features, enable);
     }
@@ -461,7 +478,7 @@ void Context::extensions_self_check_support() {
     SPDLOG_DEBUG("extensions: self-check support...");
     std::vector<Extension*> not_supported;
     for (auto& ext : extensions) {
-        if (!ext->extension_supported(pd_container.physical_device)) {
+        if (!ext->extension_supported(pd_container)) {
             spdlog::warn("extension {} not supported (self-check failed), disabling...", ext->name);
             ext->supported = false;
             not_supported.push_back(ext);
@@ -484,6 +501,10 @@ void Context::destroy_extensions(std::vector<Extension*> extensions) {
         }
     }
 }
+
+///////////////
+// GETTER
+///////////////
 
 std::shared_ptr<Context> Context::get_shared_pointer() {
     assert(!weak_self.expired());

@@ -29,11 +29,13 @@ vk::PipelineStageFlags pipelineStageForLayout(vk::ImageLayout layout) {
     case vk::ImageLayout::eColorAttachmentOptimal:
         return vk::PipelineStageFlagBits::eColorAttachmentOutput;
     case vk::ImageLayout::eDepthStencilAttachmentOptimal:
-        return vk::PipelineStageFlagBits::eAllCommands; // We do this to allow queue other than graphic
-                                                        // return VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+        return vk::PipelineStageFlagBits::
+            eAllCommands; // We do this to allow queue other than graphic
+                          // return VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
     case vk::ImageLayout::eShaderReadOnlyOptimal:
-        return vk::PipelineStageFlagBits::eAllCommands; // We do this to allow queue other than graphic
-                                                        // return VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        return vk::PipelineStageFlagBits::eAllCommands; // We do this to allow queue other than
+                                                        // graphic return
+                                                        // VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
     case vk::ImageLayout::ePreinitialized:
         return vk::PipelineStageFlagBits::eHost;
     case vk::ImageLayout::eUndefined:
@@ -43,36 +45,51 @@ vk::PipelineStageFlags pipelineStageForLayout(vk::ImageLayout layout) {
     }
 }
 
-void cmdBarrierImageLayout(vk::CommandBuffer cmdbuffer, vk::Image image, vk::ImageLayout oldImageLayout,
-                           vk::ImageLayout newImageLayout, const vk::ImageSubresourceRange& subresourceRange) {
+void cmd_barrier_image_layout(vk::CommandBuffer cmd,
+                              vk::Image image,
+                              vk::ImageLayout old_image_layout,
+                              vk::ImageLayout new_image_layout,
+                              const vk::ImageSubresourceRange& subresource_range) {
     // Create an image barrier to change the layout
     vk::ImageMemoryBarrier image_memory_barrier{
-        accessFlagsForImageLayout(oldImageLayout),
-        accessFlagsForImageLayout(newImageLayout),
-        oldImageLayout,
-        newImageLayout,
-        // Fix for a validation issue - should be needed when vk::Image sharing mode is VK_SHARING_MODE_EXCLUSIVE
-        // and the values of srcQueueFamilyIndex and dstQueueFamilyIndex are equal, no ownership transfer is performed,
-        // and the barrier operates as if they were both set to VK_QUEUE_FAMILY_IGNORED.
+        accessFlagsForImageLayout(old_image_layout),
+        accessFlagsForImageLayout(new_image_layout),
+        old_image_layout,
+        new_image_layout,
+        // Fix for a validation issue - should be needed when vk::Image sharing mode is
+        // VK_SHARING_MODE_EXCLUSIVE and the values of srcQueueFamilyIndex and dstQueueFamilyIndex
+        // are equal, no ownership transfer is performed, and the barrier operates as if they were
+        // both set to VK_QUEUE_FAMILY_IGNORED.
         VK_QUEUE_FAMILY_IGNORED,
         VK_QUEUE_FAMILY_IGNORED,
         image,
-        subresourceRange,
+        subresource_range,
     };
 
-    vk::PipelineStageFlags srcStageMask = pipelineStageForLayout(oldImageLayout);
-    vk::PipelineStageFlags destStageMask = pipelineStageForLayout(newImageLayout);
+    vk::PipelineStageFlags srcStageMask = pipelineStageForLayout(old_image_layout);
+    vk::PipelineStageFlags destStageMask = pipelineStageForLayout(new_image_layout);
 
-    cmdbuffer.pipelineBarrier(srcStageMask, destStageMask, {}, 0, nullptr, 0, nullptr, 1, &image_memory_barrier);
+    cmd.pipelineBarrier(srcStageMask, destStageMask, {}, 0, nullptr, 0, nullptr, 1,
+                              &image_memory_barrier);
 }
 
-void cmdBarrierImageLayout(vk::CommandBuffer cmdbuffer, vk::Image image, vk::ImageLayout oldImageLayout,
-                           vk::ImageLayout newImageLayout, vk::ImageAspectFlags aspectMask) {
+void cmd_barrier_image_layout(vk::CommandBuffer cmd,
+                              vk::Image image,
+                              vk::ImageLayout old_image_layout,
+                              vk::ImageLayout new_image_layout,
+                              vk::ImageAspectFlags aspect_mask) {
     vk::ImageSubresourceRange subresourceRange{
-        aspectMask, 0, VK_REMAINING_MIP_LEVELS, 0, VK_REMAINING_ARRAY_LAYERS,
+        aspect_mask, 0, VK_REMAINING_MIP_LEVELS, 0, VK_REMAINING_ARRAY_LAYERS,
     };
 
-    cmdBarrierImageLayout(cmdbuffer, image, oldImageLayout, newImageLayout, subresourceRange);
+    cmd_barrier_image_layout(cmd, image, old_image_layout, new_image_layout, subresourceRange);
+}
+
+// A barrier between compute shader write and host read
+void cmd_barrier_compute_host(const vk::CommandBuffer cmd) {
+    vk::MemoryBarrier barrier{vk::AccessFlagBits::eShaderWrite, vk::AccessFlagBits::eHostRead};
+    cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost,
+                        {}, 1, &barrier, 0, nullptr, 0, nullptr);
 }
 
 } // namespace merian

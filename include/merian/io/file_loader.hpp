@@ -21,13 +21,13 @@ class FileLoader {
     FileLoader(std::vector<std::filesystem::path> search_paths = {"./"}) : search_paths(search_paths) {}
 
     // Searches the file in cwd and search paths and returns the full path to the file
-    std::optional<std::filesystem::path> find_file(const std::filesystem::path& filename);
+    std::optional<std::filesystem::path> find_file(const std::filesystem::path& filename) const;
 
-    std::optional<std::string> find_and_load_file(const std::filesystem::path& filename);
+    std::optional<std::string> find_and_load_file(const std::filesystem::path& filename) const;
 
-    void add_search_path(std::filesystem::path path);
+    void add_search_path(const std::filesystem::path path);
 
-    bool remove_search_path(std::filesystem::path path);
+    bool remove_search_path(const std::filesystem::path path);
 
   private:
     std::vector<std::filesystem::path> search_paths;

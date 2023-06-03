@@ -155,7 +155,7 @@ Image ResourceAllocator::createImage(const vk::CommandBuffer& cmdBuf,
                                                    info_.mipLevels, 0, 1};
 
         // doing these transitions per copy is not efficient, should do in bulk for many images
-        merian::cmdBarrierImageLayout(cmdBuf, resultImage.image, vk::ImageLayout::eUndefined,
+        merian::cmd_barrier_image_layout(cmdBuf, resultImage.image, vk::ImageLayout::eUndefined,
                                       vk::ImageLayout::eTransferDstOptimal, subresourceRange);
 
         vk::Offset3D offset;
@@ -164,11 +164,11 @@ Image ResourceAllocator::createImage(const vk::CommandBuffer& cmdBuf,
                               data_);
 
         // Setting final image layout
-        merian::cmdBarrierImageLayout(cmdBuf, resultImage.image,
+        merian::cmd_barrier_image_layout(cmdBuf, resultImage.image,
                                       vk::ImageLayout::eTransferDstOptimal, layout_);
     } else {
         // Setting final image layout
-        merian::cmdBarrierImageLayout(cmdBuf, resultImage.image, vk::ImageLayout::eUndefined,
+        merian::cmd_barrier_image_layout(cmdBuf, resultImage.image, vk::ImageLayout::eUndefined,
                                       layout_);
     }
 

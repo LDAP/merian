@@ -36,7 +36,7 @@ std::string FileLoader::load_file(const std::filesystem::path& path) {
 }
 
 // Searches the file in cwd and search paths and returns the full path to the file
-std::optional<std::filesystem::path> FileLoader::find_file(const std::filesystem::path& filename) {
+std::optional<std::filesystem::path> FileLoader::find_file(const std::filesystem::path& filename) const {
     if (exists(filename)) {
         return std::filesystem::weakly_canonical(filename);
     }
@@ -50,7 +50,7 @@ std::optional<std::filesystem::path> FileLoader::find_file(const std::filesystem
     return std::nullopt;
 }
 
-std::optional<std::string> FileLoader::find_and_load_file(const std::filesystem::path& filename) {
+std::optional<std::string> FileLoader::find_and_load_file(const std::filesystem::path& filename) const {
     std::optional<std::filesystem::path> full_path = find_file(filename);
     if (!full_path.has_value()) {
         return std::nullopt;
@@ -58,11 +58,11 @@ std::optional<std::string> FileLoader::find_and_load_file(const std::filesystem:
     return load_file(full_path.value());
 }
 
-void FileLoader::add_search_path(std::filesystem::path path) {
+void FileLoader::add_search_path(const std::filesystem::path path) {
     search_paths.push_back(path);
 }
 
-bool FileLoader::remove_search_path(std::filesystem::path path) {
+bool FileLoader::remove_search_path(const std::filesystem::path path) {
     bool found = false;
     for (std::size_t i = 0; i < search_paths.size(); i++) {
         if (search_paths[i] == path) {
