@@ -19,7 +19,7 @@ Create a Context using the `Context::make_context(..)` method.
 For common Vulkan objects a wrapper is provided that holds a shared pointer on its parent.
 This is to ensure that dependent objects (Command Buffer -> Pool -> Device) are destructed in the right order automagically.
 You should never need to call `destroy()` or `free()` manually. Keep in mind to keep a reference to the shared pointers to prevent frequent object construction and destruction. Whenever you create objects by yourself you should consider using `make_shared<Class>(..)` (see below).
-If a `std::bad_weak_ptr` you should have used `make_shared<>(...)` instead of creating the object yourself.
+If a `std::bad_weak_ptr` is thrown you should have used `make_shared<>(...)` instead of creating the object yourself.
 
 Make sure your program ends with `[INFO] [context.cpp:XX] context destroyed`.
 
