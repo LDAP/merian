@@ -1,6 +1,6 @@
-# Merian Vulkan Framework
+# Merian 🎨
 
-A Vulkan prototyping framework.
+~ _A *Vulkan* prototyping framework._ ~
 
 ## Usage
 
@@ -76,20 +76,22 @@ int main() {
 #### Current extensions:
 
 Common:
+
 - `ExtensionVkDebugUtils`: Enables Validation Layers.
 - `ExtensionVkGLFW`: Initializes GLFW and creates window, surface and swapchain.
-
 - `ExtensionResources`: Convenience extension to initialize a `ResourceAllocator`, `MemoryAllocator` and `SamplerPool` using `MemoryAllocatorVMA`.
 - `ExtensionStopwatch`: Convenience extension to create timestamps on a CommandBuffer and retrieve the time.
 
 Features:
+
 - `ExtensionVkFloatAtomics`: Enables float atomics (`VK_EXT_shader_atomic_float`).
+- `ExtensionVkMaintenance4`: Enables maintenance4 extension and feature
 
 Ray tracing:
+
 - `ExtensionVkRayTracingPipeline`: Enables ray tracing pipeline extensions and provides access to common functions.
 - `ExtensionVkRayQuery`: Enables ray query extensions and provides access to common functions.
-- `ExtensionVkAccelerationStructure`: Build and manage ray tracing acceleration structures extensions and provides access to common functions.
-
+- `ExtensionVkAccelerationStructure`: Enables extensions to build ray tracing acceleration structures.
 
 ### Helpers
 
@@ -166,9 +168,9 @@ Ray tracing:
 - `Camera`: Helper class to calculate view and projection matrices.
 - `CameraAnimator`: Helper class to smooth camera motion.
 - `CameraController`: Helper class to control a camera with high level commands.
-
 - `Renderdoc`: Helper class to enable start frame capturing for RenderDoc.
 - `FileLoader`: Helper class to find and load files from search paths.
+
 
 - `Descriptor*`: Create and manage Descriptor Sets, Pools and SetLayouts. Usage:
     ```c++
@@ -237,7 +239,7 @@ meson compile -C build
 
 ## Licenses
 
-- Parts of this code are adapted from https://github.com/nvpro-samples/nvpro_core, which is licensed under [Apache License Version 2.0, January 2004](https://github.com/nvpro-samples/nvpro_core/blob/master/LICENSE). Copyright notice:
+- Parts of this code is adapted from https://github.com/nvpro-samples/nvpro_core, which is licensed under [Apache License Version 2.0, January 2004](https://github.com/nvpro-samples/nvpro_core/blob/master/LICENSE). Copyright notice:
     ```
     Copyright (c) 2019-2021, NVIDIA CORPORATION.  All rights reserved.
     Licensed under the Apache License, Version 2.0 (the "License");
