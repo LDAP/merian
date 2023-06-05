@@ -1,8 +1,10 @@
 #pragma once
 
 #include "merian/utils/vector_utils.hpp"
+#include "merian/vk/context.hpp"
 
 #include <cfloat>
+#include <spdlog/spdlog.h>
 #include <vulkan/vulkan.hpp>
 
 #include <functional>
@@ -37,13 +39,15 @@ namespace merian {
 
 */
 
-class SamplerPool {
+class SamplerPool : public std::enable_shared_from_this<SamplerPool> {
   public:
     SamplerPool(SamplerPool const&) = delete;
     SamplerPool& operator=(SamplerPool const&) = delete;
     SamplerPool() = delete;
 
-    SamplerPool(VkDevice device) : device(device) {}
+    SamplerPool(const SharedContext& context) : context(context) {
+        SPDLOG_DEBUG("create sampler pool ({})", fmt::ptr(this));
+    }
     ~SamplerPool();
 
     /* creates a new sampler or re-uses an existing one with ref-count
@@ -75,7 +79,7 @@ class SamplerPool {
         SamplerState state;
     };
 
-    vk::Device device = nullptr;
+    const SharedContext context;
     uint32_t freeIndex = ~0;
     std::vector<Entry> entries;
 

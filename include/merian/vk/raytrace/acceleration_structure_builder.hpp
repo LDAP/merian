@@ -76,7 +76,7 @@ class AccelerationStructureBuilder {
   public:
     AccelerationStructureBuilder(ExtensionVkAccelerationStructure& ext_acceleration_structure,
                                  SharedContext context,
-                                 ResourceAllocator& resource_allocator,
+                                 std::shared_ptr<ResourceAllocator>& resource_allocator,
                                  std::shared_ptr<QueueContainer>& queue)
         : ext_acceleration_structure(ext_acceleration_structure), context(context),
           resource_allocator(resource_allocator), queue(queue) {
@@ -123,14 +123,14 @@ class AccelerationStructureBuilder {
         vk::AccelerationStructureBuildSizesInfoKHR sizeInfo;
         const vk::AccelerationStructureBuildRangeInfoKHR* rangeInfo;
 
-        AccelerationStructure as;        // result acceleration structure
-        AccelerationStructure cleanupAS; // used for old AS when compacting
+        AccelerationStructureHandle as;        // result acceleration structure
+        AccelerationStructureHandle cleanupAS; // used for old AS when compacting
     };
 
     void cmdCreateTLAS(vk::CommandBuffer& cmdBuf,                    // Command buffer
                        uint32_t countInstance,                       // number of instances
                        vk::DeviceAddress instBufferAddr,             // Buffer address of instances
-                       Buffer& scratchBuffer,                        // Scratch buffer for construction
+                       BufferHandle& scratchBuffer,                        // Scratch buffer for construction
                        vk::BuildAccelerationStructureFlagsKHR flags, // Build creation flag
                        bool update                                   // Update == animation
     );
@@ -148,11 +148,11 @@ class AccelerationStructureBuilder {
   private:
     ExtensionVkAccelerationStructure& ext_acceleration_structure;
     SharedContext context;
-    ResourceAllocator& resource_allocator;
+    std::shared_ptr<ResourceAllocator> resource_allocator;
     std::shared_ptr<QueueContainer> queue;
 
-    std::vector<AccelerationStructure> vec_blas; // Bottom-level acceleration structure
-    AccelerationStructure tlas;                  // Top-level acceleration structure
+    std::vector<AccelerationStructureHandle> vec_blas; // Bottom-level acceleration structure
+    AccelerationStructureHandle tlas;                  // Top-level acceleration structure
 };
 
 } // namespace merian

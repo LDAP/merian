@@ -15,12 +15,37 @@ The default dispatcher is initialized in `Context`.
 The `Context` class initializes and destroys a Vulkan device and holds core objects (PhysicalDevice, Device, Queues, ...).
 
 Create a Context using the `Context::make_context(..)` method.
+
 For common Vulkan objects a wrapper is provided that holds a shared pointer on its parent.
 This is to ensure that dependent objects (Command Buffer -> Pool -> Device) are destructed in the right order automagically.
-You should never need to call destroy(...) manually. Keep in mind to keep a reference to the shared pointers to prevent frequent object construction and destruction. Whenever you create objects by yourself you should consider using `make_shared<Class>(..)`.
-Most fabrics need to be created using a `Fabric::make_fabric(..)` function, since they require a shared pointer to itself to be able to create other objects.
+You should never need to call `destroy()` or `free()` manually. Keep in mind to keep a reference to the shared pointers to prevent frequent object construction and destruction. Whenever you create objects by yourself you should consider using `make_shared<Class>(..)` (see below).
+If a `std::bad_weak_ptr` you should have used `make_shared<>(...)` instead of creating the object yourself.
 
 Make sure your program ends with `[INFO] [context.cpp:XX] context destroyed`.
+
+Example:
+```c++
+int main() {
+    merian::ExtensionVkDebugUtils debugUtils;
+    merian::ExtensionResources resources;
+    merian::ExtensionVkMaintenance4 maintenance4;
+    std::vector<merian::Extension*> extensions = {&debugUtils, &resources, &maintenance4};
+
+    merian::SharedContext context = merian::Context::make_context(extensions, "My beautiful app");
+    auto alloc = resources.resource_allocator();
+
+    const uint32_t width = 800;
+    const uint32_t height = 600;
+
+    merian::BufferHandle result = alloc->createBuffer(
+        width * height * 3 * sizeof(float),
+        vk::BufferUsageFlagBits::eStorageBuffer,
+        merian::HOST_ACCESS_RANDOM
+    );
+
+    // Cleans up automagically (first buffer then resource allocator then memory allocator then ... then context)
+}
+```
 
 ### Extensions
 The Context can be extended by Extensions. The extensions can hook into the context creation process and enable Vulkan instance/device layers and extensions as well as features. Note: Extension can only be used after `Context` is initialized.
@@ -144,6 +169,17 @@ Ray tracing:
     ```
 
 
+### Lifetime of objects
+
+Design decisions:
+
+- Functions that don't impact an object's lifetime (i.e. the object remains valid for the duration of the function) should take a plain reference or pointer, e.g. `int foo(bar& b)`.
+- Functions that consume an object (i.e. are the final users of a given object) should take a `unique_ptr` by value, e.g. `int foo(unique_ptr<bar> b)`. Callers should std::move the value into the function.
+- Functions that extend the lifetime of an object should take a `shared_ptr` by value, e.g. `int foo(shared_ptr<bar> b)`. The usual advice to avoid circular references applies. This does the heavy lifting of destroying objects in the right order.
+- For Vulkan objects with lifetime a wrapper is provided that destroys the Vulkan object in its destructor.
+  These object should derive from `std::enable_shared_from_this`.
+
+
 ## Building
 
 ```bash
@@ -178,3 +214,4 @@ meson compile -C build
 - Replace lots of manual `destroy()` with shared_ptrs and weak shared_ptrs. Especially in resource management, extensions, descriptorsets and pools. (When child objects have pointers to their parent they are destroyed before the parent is destroyed.) Start the tree at Context, this allows the childen to access the context to destroy itself?
 - Extract Swapchain from ExtensionGLFW
 - AS Builder: Only record commands, dont wait.
+- Replace buffer suballocator with VMAVirtualAllocator

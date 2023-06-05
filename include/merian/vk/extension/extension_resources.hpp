@@ -1,9 +1,8 @@
 #pragma once
 
 #include "merian/vk/extension/extension.hpp"
-
+#include "merian/vk/memory/memory_allocator_vma.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
-#include "vk_mem_alloc.h"
 
 namespace merian {
 
@@ -18,7 +17,7 @@ class ExtensionResources : public Extension {
     ~ExtensionResources() {}
 
     void enable_device_features(const Context::FeaturesContainer& supported,
-                                        Context::FeaturesContainer& enable) override {
+                                Context::FeaturesContainer& enable) override {
         if (supported.physical_device_features_v12.bufferDeviceAddress) {
             SPDLOG_DEBUG("bufferDeviceAddress supported. Enabling feature");
             enable.physical_device_features_v12.bufferDeviceAddress = true;
@@ -45,22 +44,55 @@ class ExtensionResources : public Extension {
     void on_context_created(const SharedContext context) override;
     void on_destroy_context() override;
 
-    MemoryAllocator& memory_allocator() {
-        return *_memory_allocator;
+    std::shared_ptr<MemoryAllocator> memory_allocator() {
+        if (_memory_allocator.expired()) {
+            assert(!weak_context.expired());
+            VmaAllocatorCreateFlags flags =
+                supports_device_address ? VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT : 0;
+            auto ptr = VMAMemoryAllocator::make_allocator(weak_context.lock(), flags);
+            _memory_allocator = ptr;
+            return ptr;
+        }
+        return _memory_allocator.lock();
     }
-    ResourceAllocator& resource_allocator() {
-        return *_resource_allocator;
+    std::shared_ptr<ResourceAllocator> resource_allocator() {
+        if (_resource_allocator.expired()) {
+            assert(!weak_context.expired());
+            auto ptr = std::make_shared<ResourceAllocator>(weak_context.lock(), memory_allocator(),
+                                                           staging(), sampler_pool());
+            _resource_allocator = ptr;
+            return ptr;
+        }
+        return _resource_allocator.lock();
     }
-    SamplerPool& sampler_pool() {
-        return *_sampler_pool;
+    std::shared_ptr<SamplerPool> sampler_pool() {
+        if (_sampler_pool.expired()) {
+            assert(!weak_context.expired());
+            auto ptr = std::make_shared<SamplerPool>(weak_context.lock());
+            _sampler_pool = ptr;
+            return ptr;
+        }
+        return _sampler_pool.lock();
+    }
+    std::shared_ptr<StagingMemoryManager> staging() {
+        if (_staging.expired()) {
+            assert(!weak_context.expired());
+            auto ptr =
+                std::make_shared<StagingMemoryManager>(weak_context.lock(), memory_allocator());
+            _staging = ptr;
+            return ptr;
+        }
+        return _staging.lock();
     }
 
   private:
+    std::weak_ptr<Context> weak_context;
     bool supports_device_address = false;
-    VmaAllocator vma_allocator = VK_NULL_HANDLE;
-    MemoryAllocator* _memory_allocator;
-    ResourceAllocator* _resource_allocator;
-    SamplerPool* _sampler_pool;
+
+    std::weak_ptr<MemoryAllocator> _memory_allocator;
+    std::weak_ptr<ResourceAllocator> _resource_allocator;
+    std::weak_ptr<SamplerPool> _sampler_pool;
+    std::weak_ptr<StagingMemoryManager> _staging;
 };
 
 } // namespace merian

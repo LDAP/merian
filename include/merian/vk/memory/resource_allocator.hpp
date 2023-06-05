@@ -9,163 +9,138 @@
 #include <vulkan/vulkan.hpp>
 
 namespace merian {
-class ResourceAllocator {
+class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator> {
   public:
     ResourceAllocator(ResourceAllocator const&) = delete;
     ResourceAllocator& operator=(ResourceAllocator const&) = delete;
     ResourceAllocator() = delete;
 
-    ResourceAllocator(vk::Device device,
-                      vk::PhysicalDevice physicalDevice,
-                      MemoryAllocator* memAllocator,
-                      SamplerPool& m_samplerPool,
-                      vk::DeviceSize stagingBlockSize = NVVK_DEFAULT_STAGING_BLOCKSIZE);
+    ResourceAllocator(const SharedContext& context,
+                      const std::shared_ptr<MemoryAllocator>& memAllocator,
+                      const std::shared_ptr<StagingMemoryManager> staging,
+                      const std::shared_ptr<SamplerPool>& samplerPool);
 
     // All staging buffers must be cleared before
-    virtual ~ResourceAllocator();
+    virtual ~ResourceAllocator() {
+        SPDLOG_DEBUG("destroy ResourceAllocator ({})", fmt::ptr(this));
+    }
 
     //--------------------------------------------------------------------------------------------------
 
-    // Initialization of the allocator
-    void init(vk::Device device,
-              vk::PhysicalDevice physicalDevice,
-              MemoryAllocator* memAlloc,
-              vk::DeviceSize stagingBlockSize = NVVK_DEFAULT_STAGING_BLOCKSIZE);
-
-    void deinit();
-
-    MemoryAllocator* getMemoryAllocator() {
+    std::shared_ptr<MemoryAllocator> getMemoryAllocator() {
         return m_memAlloc;
     }
 
     //--------------------------------------------------------------------------------------------------
 
-    // Basic buffer creation (the maximum of alignment and vk::MemoryRequirements2 is used for
-    // alignment)
-    Buffer
-    createBuffer(const vk::BufferCreateInfo& info_,
-                 const vk::MemoryPropertyFlags memUsage_ = vk::MemoryPropertyFlagBits::eDeviceLocal,
-                 const vk::DeviceSize alignment = 0);
+    // Basic buffer creation
+    BufferHandle createBuffer(const vk::BufferCreateInfo& info_,
+                              const MemoryMappingType mapping_type = NONE,
+                              const std::string& debug_name = {},
+                              const std::optional<vk::DeviceSize> min_alignment = std::nullopt);
 
     // Simple buffer creation
     // implicitly sets VK_BUFFER_USAGE_TRANSFER_DST_BIT
-    Buffer
-    createBuffer(vk::DeviceSize size_ = 0,
-                 vk::BufferUsageFlags usage_ = vk::BufferUsageFlags(),
-                 const vk::MemoryPropertyFlags memUsage_ = vk::MemoryPropertyFlagBits::eDeviceLocal,
-                 const vk::DeviceSize alignment = 0);
+    BufferHandle createBuffer(const vk::DeviceSize size_,
+                              const vk::BufferUsageFlags usage_ = {},
+                              const MemoryMappingType mapping_type = NONE,
+                              const std::string& debug_name = {},
+                              const std::optional<vk::DeviceSize> min_alignment = std::nullopt);
 
     // Simple buffer creation with data uploaded through staging manager
     // implicitly sets VK_BUFFER_USAGE_TRANSFER_DST_BIT
-    Buffer
-    createBuffer(const vk::CommandBuffer& cmdBuf,
-                 const vk::DeviceSize& size_,
-                 const void* data_,
-                 vk::BufferUsageFlags usage_,
-                 vk::MemoryPropertyFlags memProps = vk::MemoryPropertyFlagBits::eDeviceLocal);
+    BufferHandle createBuffer(const vk::CommandBuffer& cmdBuf,
+                              const vk::DeviceSize& size_,
+                              const vk::BufferUsageFlags usage_ = {},
+                              const void* data_ = nullptr,
+                              const MemoryMappingType mapping_type = NONE,
+                              const std::string& debug_name = {},
+                              const std::optional<vk::DeviceSize> min_alignment = std::nullopt);
 
     // Simple buffer creation with data uploaded through staging manager
     // implicitly sets VK_BUFFER_USAGE_TRANSFER_DST_BIT
     template <typename T>
-    Buffer
-    createBuffer(const vk::CommandBuffer& cmdBuf,
-                 const std::vector<T>& data_,
-                 vk::BufferUsageFlags usage_,
-                 vk::MemoryPropertyFlags memProps_ = vk::MemoryPropertyFlagBits::eDeviceLocal) {
-        return createBuffer(cmdBuf, sizeof(T) * data_.size(), data_.data(), usage_, memProps_);
+    BufferHandle createBuffer(const vk::CommandBuffer& cmdBuf,
+                              const std::vector<T>& data_,
+                              const vk::BufferUsageFlags usage_,
+                              const std::string& debug_name = {},
+                              const MemoryMappingType mapping_type = NONE) {
+        return createBuffer(cmdBuf, sizeof(T) * data_.size(), usage_, data_.data(), mapping_type, debug_name);
     }
 
     //--------------------------------------------------------------------------------------------------
 
-    Buffer createScratchBuffer(const vk::DeviceSize size, const vk::DeviceSize alignment);
+    BufferHandle createScratchBuffer(const vk::DeviceSize size,
+                                     const vk::DeviceSize alignment,
+                                     const std::string& debug_name = {});
 
     //--------------------------------------------------------------------------------------------------
 
     // Basic image creation
-    Image
-    createImage(const vk::ImageCreateInfo& info_,
-                const vk::MemoryPropertyFlags memUsage_ = vk::MemoryPropertyFlagBits::eDeviceLocal);
+    ImageHandle createImage(const vk::ImageCreateInfo& info_,
+                            const MemoryMappingType mapping_type = NONE,
+                            const std::string& debug_name = {});
 
     // Create an image with data uploaded through staging manager
-    Image createImage(const vk::CommandBuffer& cmdBuf,
-                      size_t size_,
-                      const void* data_,
-                      const vk::ImageCreateInfo& info_,
-                      const vk::ImageLayout& layout_ = vk::ImageLayout::eShaderReadOnlyOptimal);
+    ImageHandle
+    createImage(const vk::CommandBuffer& cmdBuf,
+                const size_t size_,
+                const void* data_,
+                const vk::ImageCreateInfo& info_,
+                const MemoryMappingType mapping_type = NONE,
+                const vk::ImageLayout& layout_ = vk::ImageLayout::eShaderReadOnlyOptimal,
+                const std::string& debug_name = {});
+
+    //--------------------------------------------------------------------------------------------------
+
+    TextureHandle createTexture(const ImageHandle& image,
+                                const vk::ImageViewCreateInfo& imageViewCreateInfo,
+                                const vk::SamplerCreateInfo& samplerCreateInfo);
 
     // other variants could exist with a few defaults but we already have
     // makeImage2DViewCreateInfo() we could always override viewCreateInfo.image
-    Texture createTexture(const Image& image, const vk::ImageViewCreateInfo& imageViewCreateInfo);
-    Texture createTexture(const Image& image,
-                          const vk::ImageViewCreateInfo& imageViewCreateInfo,
-                          const vk::SamplerCreateInfo& samplerCreateInfo);
+    TextureHandle createTexture(const ImageHandle& image,
+                                const vk::ImageViewCreateInfo& imageViewCreateInfo);
 
     // shortcut that creates the image for the texture
     // - creates the image
     // - creates the texture part by associating image and sampler
-    Texture createTexture(const vk::CommandBuffer& cmdBuf,
-                          size_t size_,
-                          const void* data_,
-                          const vk::ImageCreateInfo& info_,
-                          const vk::SamplerCreateInfo& samplerCreateInfo,
-                          const vk::ImageLayout& layout_ = vk::ImageLayout::eShaderReadOnlyOptimal,
-                          bool isCube = false);
+    TextureHandle
+    createTexture(const vk::CommandBuffer& cmdBuf,
+                  const size_t size_,
+                  const void* data_,
+                  const vk::ImageCreateInfo& info_,
+                  const MemoryMappingType mapping_type,
+                  const vk::SamplerCreateInfo& samplerCreateInfo,
+                  const vk::ImageLayout& layout_ = vk::ImageLayout::eShaderReadOnlyOptimal,
+                  const bool isCube = false,
+                  const std::string& debug_name = {});
 
     //--------------------------------------------------------------------------------------------------
 
-    AccelerationStructure createAccelerationStructure(vk::DeviceSize size,
-                                                      vk::AccelerationStructureTypeKHR type);
+    AccelerationStructureHandle
+    createAccelerationStructure(const vk::DeviceSize size,
+                                const vk::AccelerationStructureTypeKHR type,
+                                const std::string& debug_name = {});
 
     //--------------------------------------------------------------------------------------------------
 
     // implicit staging operations triggered by create are managed here
-    void finalizeStaging(vk::Fence fence = VK_NULL_HANDLE);
-    void finalizeAndReleaseStaging(vk::Fence fence = VK_NULL_HANDLE);
+    void finalizeStaging(const vk::Fence fence = VK_NULL_HANDLE);
+    void finalizeAndReleaseStaging(const vk::Fence fence = VK_NULL_HANDLE);
     void releaseStaging();
 
-    StagingMemoryManager* getStaging();
-    const StagingMemoryManager* getStaging() const;
+    std::shared_ptr<StagingMemoryManager> getStaging();
+    const std::shared_ptr<StagingMemoryManager> getStaging() const;
 
     //--------------------------------------------------------------------------------------------------
-    // Destroy
-    //
-    void destroy(Buffer& b_);
-    void destroy(Image& i_);
-    void destroy(AccelerationStructure& a_);
-    void destroy(Texture& t_);
-
-    //--------------------------------------------------------------------------------------------------
-    // Other
-    //
-    void* map(const Buffer& buffer);
-    void unmap(const Buffer& buffer);
-    void* map(const Image& image);
-    void unmap(const Image& image);
-
-    vk::Device getDevice() const {
-        return m_device;
-    }
-    vk::PhysicalDevice getPhysicalDevice() const {
-        return m_physicalDevice;
-    }
 
   protected:
-    // If necessary, these can be overriden to specialize the allocation, for instance to
-    // enforce allocation of exportable
-    virtual MemHandle AllocateMemory(const MemAllocateInfo& allocateInfo);
-    virtual void CreateBufferEx(const vk::BufferCreateInfo& info_, vk::Buffer* buffer);
-    virtual void CreateImageEx(const vk::ImageCreateInfo& info_, vk::Image* image);
+    const SharedContext context;
+    const std::shared_ptr<MemoryAllocator> m_memAlloc;
+    const std::shared_ptr<StagingMemoryManager> m_staging;
+    const std::shared_ptr<SamplerPool> m_samplerPool;
 
-    //--------------------------------------------------------------------------------------------------
-    // Finding the memory type for memory allocation
-    //
-    uint32_t getMemoryType(uint32_t typeBits, const vk::MemoryPropertyFlags& properties);
-
-    vk::Device m_device{VK_NULL_HANDLE};
-    vk::PhysicalDevice m_physicalDevice{VK_NULL_HANDLE};
-    vk::PhysicalDeviceMemoryProperties m_memoryProperties{};
-    MemoryAllocator* m_memAlloc{nullptr};
-    std::unique_ptr<StagingMemoryManager> m_staging;
-    SamplerPool& m_samplerPool;
 };
+
 } // namespace merian

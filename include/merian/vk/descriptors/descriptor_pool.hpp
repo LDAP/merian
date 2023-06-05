@@ -8,7 +8,7 @@
 
 namespace merian {
 
-class DescriptorPool {
+class DescriptorPool : public std::enable_shared_from_this<DescriptorPool> {
 
   public:
     /**

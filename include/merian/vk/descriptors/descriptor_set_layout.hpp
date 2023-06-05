@@ -7,7 +7,7 @@
 
 namespace merian {
 
-class DescriptorSetLayout {
+class DescriptorSetLayout : public std::enable_shared_from_this<DescriptorSetLayout> {
 
   public:
     DescriptorSetLayout(const SharedContext context,

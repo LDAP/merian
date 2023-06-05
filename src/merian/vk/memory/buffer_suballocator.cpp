@@ -4,13 +4,17 @@ namespace merian {
 
 //////////////////////////////////////////////////////////////////////////
 
-void BufferSubAllocator::init(MemoryAllocator* memAllocator, vk::DeviceSize blockSize,
-                              vk::BufferUsageFlags bufferUsageFlags, vk::MemoryPropertyFlags memPropFlags, bool mapped,
+void BufferSubAllocator::init(MemoryAllocator* memAllocator,
+                              vk::DeviceSize blockSize,
+                              vk::BufferUsageFlags bufferUsageFlags,
+                              vk::MemoryPropertyFlags memPropFlags,
+                              bool mapped,
                               const std::vector<uint32_t>& sharingQueueFamilyIndices) {
     assert(!m_device);
     m_memAllocator = memAllocator;
-    m_device = memAllocator->getDevice();
-    m_blockSize = std::min(blockSize, ((uint64_t(1) << Handle::BLOCKBITS) - 1) * uint64_t(BASE_ALIGNMENT));
+    m_device = memAllocator->get_context()->device;
+    m_blockSize =
+        std::min(blockSize, ((uint64_t(1) << Handle::BLOCKBITS) - 1) * uint64_t(BASE_ALIGNMENT));
     m_bufferUsageFlags = bufferUsageFlags;
     m_memoryPropFlags = memPropFlags;
     m_memoryTypeIndex = ~0;
@@ -94,7 +98,8 @@ BufferSubAllocator::Handle BufferSubAllocator::subAllocate(vk::DeviceSize size, 
     }
 
     Handle sub;
-    if (!sub.setup(blockIndex, isDedicated ? 0 : usedOffset, isDedicated ? size : uint64_t(usedSize), isDedicated)) {
+    if (!sub.setup(blockIndex, isDedicated ? 0 : usedOffset,
+                   isDedicated ? size : uint64_t(usedSize), isDedicated)) {
         return Handle();
     }
 
@@ -124,7 +129,8 @@ void BufferSubAllocator::subFree(Handle sub) {
     }
 }
 
-float BufferSubAllocator::getUtilization(VkDeviceSize& allocatedSize, VkDeviceSize& usedSize) const {
+float BufferSubAllocator::getUtilization(VkDeviceSize& allocatedSize,
+                                         VkDeviceSize& usedSize) const {
     allocatedSize = m_allocatedSize;
     usedSize = m_usedSize;
 
@@ -166,14 +172,13 @@ void BufferSubAllocator::freeBlock(Block& block) {
 
     vkDestroyBuffer(m_device, block.buffer, nullptr);
     if (block.mapping) {
-        m_memAllocator->unmap(block.memory);
+        block.memory->unmap();
     }
-    m_memAllocator->freeMemory(block.memory);
 
     if (!block.isDedicated) {
         block.range.deinit();
     }
-    block.memory = NullMemHandle;
+    block.memory = NullMememoryAllocationHandle;
     block.buffer = VK_NULL_HANDLE;
     block.mapping = nullptr;
     block.isDedicated = false;
@@ -185,8 +190,9 @@ void BufferSubAllocator::freeBlock(Block& block) {
 
 void BufferSubAllocator::allocBlock(Block& block, uint32_t index, vk::DeviceSize size) {
 
-    vk::SharingMode sharingMode =
-        m_sharingQueueFamilyIndices.size() > 1 ? vk::SharingMode::eConcurrent : vk::SharingMode::eExclusive;
+    vk::SharingMode sharingMode = m_sharingQueueFamilyIndices.size() > 1
+                                      ? vk::SharingMode::eConcurrent
+                                      : vk::SharingMode::eExclusive;
     vk::BufferCreateInfo buffer_create_info{
         {}, size, m_bufferUsageFlags, sharingMode, m_sharingQueueFamilyIndices,
     };
@@ -194,16 +200,21 @@ void BufferSubAllocator::allocBlock(Block& block, uint32_t index, vk::DeviceSize
     vk::Buffer buffer = m_device.createBuffer(buffer_create_info, nullptr);
 
     vk::BufferMemoryRequirementsInfo2KHR buffer_requirements{buffer};
-    vk::MemoryRequirements2KHR memory_requirements = m_device.getBufferMemoryRequirements2(buffer_requirements);
+    vk::MemoryRequirements2KHR memory_requirements =
+        m_device.getBufferMemoryRequirements2(buffer_requirements);
 
     if (m_memoryTypeIndex == ~0) {
-        vk::PhysicalDeviceMemoryProperties memoryProperties = m_memAllocator->getPhysicalDevice().getMemoryProperties();
+        vk::PhysicalDeviceMemoryProperties memoryProperties =
+            m_memAllocator->get_context()
+                ->pd_container.physical_device_memory_properties.memoryProperties;
         vk::MemoryPropertyFlags memProps = m_memoryPropFlags;
 
         // Find an available memory type that satisfies the requested properties.
-        for (uint32_t memoryTypeIndex = 0; memoryTypeIndex < memoryProperties.memoryTypeCount; ++memoryTypeIndex) {
+        for (uint32_t memoryTypeIndex = 0; memoryTypeIndex < memoryProperties.memoryTypeCount;
+             ++memoryTypeIndex) {
             if ((memory_requirements.memoryRequirements.memoryTypeBits & (1 << memoryTypeIndex)) &&
-                (memoryProperties.memoryTypes[memoryTypeIndex].propertyFlags & memProps) == memProps) {
+                (memoryProperties.memoryTypes[memoryTypeIndex].propertyFlags & memProps) ==
+                    memProps) {
                 m_memoryTypeIndex = memoryTypeIndex;
                 break;
             }
@@ -215,26 +226,17 @@ void BufferSubAllocator::allocBlock(Block& block, uint32_t index, vk::DeviceSize
         throw std::runtime_error("could not find memoryTypeIndex\n");
     }
 
-    MemAllocateInfo memAllocateInfo(memory_requirements.memoryRequirements, m_memoryPropFlags, false);
+    // TODO: Really only sequential?!
+    MemoryAllocationHandle memory =
+        m_memAllocator->allocate_memory(m_memoryPropFlags, memory_requirements.memoryRequirements,
+                                        "suballocator buffer", HOST_ACCESS_SEQUENTIAL_WRITE);
+    MemoryAllocation::MemoryInfo memInfo = memory->get_memory_info();
 
-    vk::Result result;
-    MemHandle memory = m_memAllocator->allocMemory(memAllocateInfo, &result);
-    if (result != vk::Result::eSuccess) {
-        m_device.destroyBuffer(buffer, nullptr);
-        throw std::runtime_error("could not allocate buffer\n");
-    }
-
-    MemoryAllocator::MemInfo memInfo = m_memAllocator->getMemoryInfo(memory);
-
-    VkBindBufferMemoryInfo bindInfos = {VK_STRUCTURE_TYPE_BIND_BUFFER_MEMORY_INFO};
-    bindInfos.buffer = buffer;
-    bindInfos.memory = memInfo.memory;
-    bindInfos.memoryOffset = memInfo.offset;
-
+    vk::BindBufferMemoryInfo bindInfos{buffer, memInfo.memory, memInfo.offset};
     m_device.bindBufferMemory2({bindInfos});
 
     if (m_mapped) {
-        block.mapping = m_memAllocator->mapT<uint8_t>(memory);
+        block.mapping = memory->map_as<uint8_t>();
     } else {
         block.mapping = nullptr;
     }

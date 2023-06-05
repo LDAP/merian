@@ -1,17 +1,20 @@
 #include "merian/vk/memory/staging_memory_manager.hpp"
+#include <spdlog/spdlog.h>
 
 namespace merian {
 
-void StagingMemoryManager::init(MemoryAllocator* memAllocator, vk::DeviceSize stagingBlockSize /*= 64 * 1024 * 1024*/) {
-    assert(!m_device);
-    m_device = memAllocator->getDevice();
-
-    m_subToDevice.init(memAllocator, stagingBlockSize, vk::BufferUsageFlagBits::eTransferSrc,
-                       vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, true);
-    m_subFromDevice.init(memAllocator, stagingBlockSize, vk::BufferUsageFlagBits::eTransferDst,
-                         vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent |
-                             vk::MemoryPropertyFlagBits::eHostCached,
-                         true);
+StagingMemoryManager::StagingMemoryManager(const SharedContext context,
+                                           const std::shared_ptr<MemoryAllocator> memAllocator,
+                                           const vk::DeviceSize stagingBlockSize)
+    : context(context), memAllocator(memAllocator) {
+    m_subToDevice.init(
+        memAllocator.get(), stagingBlockSize, vk::BufferUsageFlagBits::eTransferSrc,
+        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, true);
+    m_subFromDevice.init(
+        memAllocator.get(), stagingBlockSize, vk::BufferUsageFlagBits::eTransferDst,
+        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent |
+            vk::MemoryPropertyFlagBits::eHostCached,
+        true);
 
     m_freeStagingIndex = INVALID_ID_INDEX;
     m_stagingIndex = newStagingIndex();
@@ -19,26 +22,27 @@ void StagingMemoryManager::init(MemoryAllocator* memAllocator, vk::DeviceSize st
     setFreeUnusedOnRelease(true);
 }
 
-void StagingMemoryManager::deinit() {
-    if (!m_device)
-        return;
-
+StagingMemoryManager::~StagingMemoryManager() {
     free(false);
 
     m_subFromDevice.deinit();
     m_subToDevice.deinit();
 
     m_sets.clear();
-    m_device = VK_NULL_HANDLE;
 }
 
 bool StagingMemoryManager::fitsInAllocated(vk::DeviceSize size, bool toDevice /*= true*/) const {
     return toDevice ? m_subToDevice.fitsInAllocated(size) : m_subFromDevice.fitsInAllocated(size);
 }
 
-void* StagingMemoryManager::cmdToImage(vk::CommandBuffer cmd, vk::Image image, const vk::Offset3D& offset,
-                                       const vk::Extent3D& extent, const vk::ImageSubresourceLayers& subresource,
-                                       vk::DeviceSize size, const void* data, vk::ImageLayout layout) {
+void* StagingMemoryManager::cmdToImage(vk::CommandBuffer cmd,
+                                       vk::Image image,
+                                       const vk::Offset3D& offset,
+                                       const vk::Extent3D& extent,
+                                       const vk::ImageSubresourceLayers& subresource,
+                                       vk::DeviceSize size,
+                                       const void* data,
+                                       vk::ImageLayout layout) {
     if (!image)
         return nullptr;
 
@@ -59,8 +63,11 @@ void* StagingMemoryManager::cmdToImage(vk::CommandBuffer cmd, vk::Image image, c
     return data ? nullptr : mapping;
 }
 
-void* StagingMemoryManager::cmdToBuffer(vk::CommandBuffer cmd, vk::Buffer buffer, vk::DeviceSize offset,
-                                        vk::DeviceSize size, const void* data) {
+void* StagingMemoryManager::cmdToBuffer(vk::CommandBuffer cmd,
+                                        vk::Buffer buffer,
+                                        vk::DeviceSize offset,
+                                        vk::DeviceSize size,
+                                        const void* data) {
     if (!size || !buffer) {
         return nullptr;
     }
@@ -82,7 +89,9 @@ void* StagingMemoryManager::cmdToBuffer(vk::CommandBuffer cmd, vk::Buffer buffer
     return data ? nullptr : (void*)mapping;
 }
 
-const void* StagingMemoryManager::cmdFromBuffer(vk::CommandBuffer cmd, vk::Buffer buffer, vk::DeviceSize offset,
+const void* StagingMemoryManager::cmdFromBuffer(vk::CommandBuffer cmd,
+                                                vk::Buffer buffer,
+                                                vk::DeviceSize offset,
                                                 vk::DeviceSize size) {
     vk::Buffer dstBuffer;
     vk::DeviceSize dstOffset;
@@ -94,9 +103,12 @@ const void* StagingMemoryManager::cmdFromBuffer(vk::CommandBuffer cmd, vk::Buffe
     return mapping;
 }
 
-const void* StagingMemoryManager::cmdFromImage(vk::CommandBuffer cmd, vk::Image image, const vk::Offset3D& offset,
+const void* StagingMemoryManager::cmdFromImage(vk::CommandBuffer cmd,
+                                               vk::Image image,
+                                               const vk::Offset3D& offset,
                                                const vk::Extent3D& extent,
-                                               const vk::ImageSubresourceLayers& subresource, vk::DeviceSize size,
+                                               const vk::ImageSubresourceLayers& subresource,
+                                               vk::DeviceSize size,
                                                vk::ImageLayout layout) {
     vk::Buffer dstBuffer;
     vk::DeviceSize dstOffset;
@@ -109,6 +121,8 @@ const void* StagingMemoryManager::cmdFromImage(vk::CommandBuffer cmd, vk::Image 
 }
 
 void StagingMemoryManager::finalizeResources(vk::Fence fence) {
+    SPDLOG_DEBUG("finalizing resources");
+
     if (m_sets[m_stagingIndex].entries.empty())
         return;
 
@@ -132,11 +146,15 @@ StagingMemoryManager::SetID StagingMemoryManager::finalizeResourceSet() {
     return setID;
 }
 
-void* StagingMemoryManager::getStagingSpace(vk::DeviceSize size, vk::Buffer& buffer, vk::DeviceSize& offset,
+void* StagingMemoryManager::getStagingSpace(vk::DeviceSize size,
+                                            vk::Buffer& buffer,
+                                            vk::DeviceSize& offset,
                                             bool toDevice) {
-    assert(m_sets[m_stagingIndex].index == m_stagingIndex && "illegal index, did you forget finalizeResources");
+    assert(m_sets[m_stagingIndex].index == m_stagingIndex &&
+           "illegal index, did you forget finalizeResources");
 
-    BufferSubAllocator::Handle handle = toDevice ? m_subToDevice.subAllocate(size) : m_subFromDevice.subAllocate(size);
+    BufferSubAllocator::Handle handle =
+        toDevice ? m_subToDevice.subAllocate(size) : m_subFromDevice.subAllocate(size);
     assert(handle);
 
     BufferSubAllocator::Binding info =
@@ -173,9 +191,11 @@ void StagingMemoryManager::releaseResources(uint32_t stagingID) {
 }
 
 void StagingMemoryManager::releaseResources() {
+    SPDLOG_DEBUG("releseing resources");
+
     for (auto& itset : m_sets) {
         if (!itset.entries.empty() && !itset.manualSet &&
-            (!itset.fence || vkGetFenceStatus(m_device, itset.fence) == VK_SUCCESS)) {
+            (!itset.fence || vkGetFenceStatus(context->device, itset.fence) == VK_SUCCESS)) {
             releaseResources(itset.index);
             itset.fence = VK_NULL_HANDLE;
             itset.manualSet = false;
@@ -187,7 +207,8 @@ void StagingMemoryManager::releaseResources() {
     }
 }
 
-float StagingMemoryManager::getUtilization(vk::DeviceSize& allocatedSize, vk::DeviceSize& usedSize) const {
+float StagingMemoryManager::getUtilization(vk::DeviceSize& allocatedSize,
+                                           vk::DeviceSize& usedSize) const {
     vk::DeviceSize aSize = 0;
     vk::DeviceSize uSize = 0;
     m_subFromDevice.getUtilization(aSize, uSize);

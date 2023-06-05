@@ -4,20 +4,16 @@
 namespace merian {
 
 AccelerationStructureBuilder::~AccelerationStructureBuilder() {
-    for (auto& blas : vec_blas) {
-        resource_allocator.destroy(blas);
-    }
-    resource_allocator.destroy(tlas);
     vec_blas.clear();
 }
 
 vk::AccelerationStructureKHR AccelerationStructureBuilder::getAccelerationStructure() const {
-    return tlas.as;
+    return *tlas;
 }
 
 vk::DeviceAddress AccelerationStructureBuilder::getBlasDeviceAddress(uint32_t blasId) {
     assert(size_t(blasId) < vec_blas.size());
-    return vec_blas[blasId].get_acceleration_structure_device_address(*context);
+    return vec_blas[blasId]->get_acceleration_structure_device_address();
 }
 
 // Build BLAS
@@ -68,10 +64,10 @@ void AccelerationStructureBuilder::buildBLAS(const std::vector<BlasInput>& input
     }
 
     // Allocate the scratch buffers holding the temporary data of the acceleration structure builder
-    Buffer scratchBuffer = resource_allocator.createScratchBuffer(
+    BufferHandle scratchBuffer = resource_allocator->createScratchBuffer(
         maxScratchSize, ext_acceleration_structure.acceleration_structure_properties
                             .minAccelerationStructureScratchOffsetAlignment);
-    vk::DeviceAddress scratchAddress = scratchBuffer.get_device_address(*context);
+    vk::DeviceAddress scratchAddress = scratchBuffer->get_device_address();
 
     // Allocate a query pool for storing the needed size for every BLAS compaction.
     // TODO: Extract compaction completely
@@ -139,8 +135,7 @@ void AccelerationStructureBuilder::buildBLAS(const std::vector<BlasInput>& input
     // Clean up
     if (queryPool.has_value())
         context->device.destroyQueryPool(queryPool.value());
-    resource_allocator.finalizeAndReleaseStaging();
-    resource_allocator.destroy(scratchBuffer);
+    resource_allocator->finalizeAndReleaseStaging();
 }
 
 void AccelerationStructureBuilder::cmdCreateBLAS(
@@ -155,12 +150,12 @@ void AccelerationStructureBuilder::cmdCreateBLAS(
 
     for (const auto& idx : indices) {
         // Actual allocation of buffer and acceleration structure.
-        buildAs[idx].as = resource_allocator.createAccelerationStructure(
+        buildAs[idx].as = resource_allocator->createAccelerationStructure(
             buildAs[idx].sizeInfo.accelerationStructureSize,
             vk::AccelerationStructureTypeKHR::eBottomLevel);
 
         // BuildInfo #2 part
-        buildAs[idx].buildInfo.dstAccelerationStructure = buildAs[idx].as.as;
+        buildAs[idx].buildInfo.dstAccelerationStructure = *buildAs[idx].as;
         // All build are using the same scratch buffer
         buildAs[idx].buildInfo.scratchData.deviceAddress = scratchAddress;
 
@@ -207,13 +202,13 @@ void AccelerationStructureBuilder::cmdCompactBLAS(
             compactSizes[queryCtn++]; // new reduced size
 
         // Creating a compact version of the AS
-        buildAs[idx].as = resource_allocator.createAccelerationStructure(
+        buildAs[idx].as = resource_allocator->createAccelerationStructure(
             buildAs[idx].sizeInfo.accelerationStructureSize,
             vk::AccelerationStructureTypeKHR::eBottomLevel);
 
         // Copy the original BLAS to a compact version
         vk::CopyAccelerationStructureInfoKHR copy_info{
-            buildAs[idx].buildInfo.dstAccelerationStructure, buildAs[idx].as.as,
+            buildAs[idx].buildInfo.dstAccelerationStructure, *buildAs[idx].as,
             vk::CopyAccelerationStructureModeKHR::eCompact};
         cmdBuf.copyAccelerationStructureKHR(copy_info);
     }
@@ -222,7 +217,7 @@ void AccelerationStructureBuilder::cmdCompactBLAS(
 void AccelerationStructureBuilder::destroyNonCompactedBLAS(
     std::vector<uint32_t>& indices, std::vector<BuildAccelerationStructureInfo>& buildAs) {
     for (auto& i : indices) {
-        resource_allocator.destroy(buildAs[i].cleanupAS);
+        buildAs[i].cleanupAS = nullptr;
     }
 }
 
@@ -238,8 +233,8 @@ void AccelerationStructureBuilder::updateBLAS(uint32_t blasIdx,
         vk::AccelerationStructureTypeKHR::eBottomLevel,
         flags,
         vk::BuildAccelerationStructureModeKHR::eUpdate,
-        vec_blas[blasIdx].as,
-        vec_blas[blasIdx].as,
+        *vec_blas[blasIdx],
+        *vec_blas[blasIdx],
         blas.asGeometry,
     };
 
@@ -254,10 +249,10 @@ void AccelerationStructureBuilder::updateBLAS(uint32_t blasIdx,
             vk::AccelerationStructureBuildTypeKHR::eDevice, build_infos, maxPrimCount);
 
     // Allocate the scratch buffer and setting the scratch info
-    Buffer scratchBuffer = resource_allocator.createScratchBuffer(
+    BufferHandle scratchBuffer = resource_allocator->createScratchBuffer(
         sizeInfo.buildScratchSize, ext_acceleration_structure.acceleration_structure_properties
                                        .minAccelerationStructureScratchOffsetAlignment);
-    build_infos.scratchData.deviceAddress = scratchBuffer.get_device_address(*context);
+    build_infos.scratchData.deviceAddress = scratchBuffer->get_device_address();
 
     // Need pointer for some reason...
     std::vector<const vk::AccelerationStructureBuildRangeInfoKHR*> pBuildOffset(
@@ -275,8 +270,6 @@ void AccelerationStructureBuilder::updateBLAS(uint32_t blasIdx,
 
     genCmdBuf.end_all();
     queue->submit_wait(cmdBuf);
-
-    resource_allocator.destroy(scratchBuffer);
 }
 
 // BUILD TLAS
@@ -285,7 +278,7 @@ void AccelerationStructureBuilder::buildTLAS(
     const std::vector<vk::AccelerationStructureInstanceKHR>& instances,
     vk::BuildAccelerationStructureFlagsKHR flags,
     bool update) {
-    assert(!tlas.as || update); // Cannot call buildTlas twice except to update.
+    assert(!tlas || update); // Cannot call buildTlas twice except to update.
 
     // Command buffer to create the TLAS
     CommandPool genCmdBuf(context, queue->get_queue_family_index());
@@ -293,12 +286,12 @@ void AccelerationStructureBuilder::buildTLAS(
 
     // Create a buffer holding the actual instance data (matrices++) for use by the AS builder
     // Buffer of instances containing the matrices and BLAS ids
-    Buffer instancesBuffer = resource_allocator.createBuffer(
+    BufferHandle instancesBuffer = resource_allocator->createBuffer(
         cmdBuf, instances,
         vk::BufferUsageFlagBits::eShaderDeviceAddress |
             vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR);
 
-    vk::DeviceAddress instBufferAddr = instancesBuffer.get_device_address(*context);
+    vk::DeviceAddress instBufferAddr = instancesBuffer->get_device_address();
 
     // Make sure the instance buffer are copied before triggering the acceleration structure build
     vk::MemoryBarrier barrier{vk::AccessFlagBits::eTransferWrite,
@@ -308,21 +301,19 @@ void AccelerationStructureBuilder::buildTLAS(
                            &barrier, 0, nullptr, 0, nullptr);
 
     // Creating the TLAS
-    Buffer scratchBuffer;
+    BufferHandle scratchBuffer;
     cmdCreateTLAS(cmdBuf, instances.size(), instBufferAddr, scratchBuffer, flags, update);
 
     // Finalizing and destroying temporary data
     genCmdBuf.end_all();
     queue->submit_wait(cmdBuf); // TODO: Do not use _wait (slow)
-    resource_allocator.finalizeAndReleaseStaging();
-    resource_allocator.destroy(scratchBuffer);
-    resource_allocator.destroy(instancesBuffer);
+    resource_allocator->finalizeAndReleaseStaging();
 }
 
 void AccelerationStructureBuilder::cmdCreateTLAS(vk::CommandBuffer& cmdBuf,
                                                  uint32_t countInstance,
                                                  vk::DeviceAddress instBufferAddr,
-                                                 Buffer& scratchBuffer,
+                                                 BufferHandle& scratchBuffer,
                                                  vk::BuildAccelerationStructureFlagsKHR flags,
                                                  bool update) {
     // Wraps a device pointer to the above uploaded instances.
@@ -346,20 +337,20 @@ void AccelerationStructureBuilder::cmdCreateTLAS(vk::CommandBuffer& cmdBuf,
 
     // Create TLAS
     if (!update) {
-        tlas = resource_allocator.createAccelerationStructure(
+        tlas = resource_allocator->createAccelerationStructure(
             sizeInfo.accelerationStructureSize, vk::AccelerationStructureTypeKHR::eTopLevel);
     }
 
     // Allocate the scratch memory
-    scratchBuffer = resource_allocator.createScratchBuffer(
+    scratchBuffer = resource_allocator->createScratchBuffer(
         sizeInfo.buildScratchSize, ext_acceleration_structure.acceleration_structure_properties
                                        .minAccelerationStructureScratchOffsetAlignment);
-    vk::DeviceAddress scratchAddress = scratchBuffer.get_device_address(*context);
+    vk::DeviceAddress scratchAddress = scratchBuffer->get_device_address();
 
     // Update build information (only now possible after we know size)
-    vk::AccelerationStructureKHR src_accel = update ? tlas.as : VK_NULL_HANDLE;
+    vk::AccelerationStructureKHR src_accel = update ? tlas->get_acceleration_structure() : VK_NULL_HANDLE;
     build_info.srcAccelerationStructure = src_accel;
-    build_info.dstAccelerationStructure = tlas.as;
+    build_info.dstAccelerationStructure = tlas->get_acceleration_structure();
     build_info.scratchData.deviceAddress = scratchAddress;
 
     // Build Offsets info: n instances

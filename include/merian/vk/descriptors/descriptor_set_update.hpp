@@ -1,6 +1,7 @@
 #pragma once
 
 #include "merian/vk/descriptors/descriptor_set.hpp"
+#include "merian/vk/memory/resource_allocations.hpp"
 
 #include <memory>
 #include <vector>
@@ -22,12 +23,24 @@ class DescriptorSetUpdate {
 
     // Bind `buffer` at the binding point `binding` of DescriptorSet `set`.
     // The type is automatically determined from the set using the binding index.
-    DescriptorSetUpdate& write_descriptor_buffer(uint32_t binding,
-                                                 vk::Buffer& buffer,
-                                                 vk::DeviceSize offset = 0,
-                                                 vk::DeviceSize range = VK_WHOLE_SIZE,
-                                                 uint32_t dst_array_element = 0,
-                                                 uint32_t descriptor_count = 1) {
+    DescriptorSetUpdate& write_descriptor_buffer(const uint32_t binding,
+                                                 const BufferHandle& buffer,
+                                                 const vk::DeviceSize offset = 0,
+                                                 const vk::DeviceSize range = VK_WHOLE_SIZE,
+                                                 const uint32_t dst_array_element = 0,
+                                                 const uint32_t descriptor_count = 1) {
+        return write_descriptor_buffer_type(binding, *buffer, set->get_type_for_binding(binding),
+                                            offset, range, dst_array_element, descriptor_count);
+    }
+
+    // Bind `buffer` at the binding point `binding` of DescriptorSet `set`.
+    // The type is automatically determined from the set using the binding index.
+    DescriptorSetUpdate& write_descriptor_buffer(const uint32_t binding,
+                                                 const vk::Buffer& buffer,
+                                                 const vk::DeviceSize offset = 0,
+                                                 const vk::DeviceSize range = VK_WHOLE_SIZE,
+                                                 const uint32_t dst_array_element = 0,
+                                                 const uint32_t descriptor_count = 1) {
         return write_descriptor_buffer_type(binding, buffer, set->get_type_for_binding(binding),
                                             offset, range, dst_array_element, descriptor_count);
     }
@@ -35,13 +48,13 @@ class DescriptorSetUpdate {
     // Bind `buffer` at the binding point `binding` of DescriptorSet `set`.
     // The type is automatically determined from the set using the binding index.
     DescriptorSetUpdate&
-    write_descriptor_buffer_type(uint32_t binding,
-                                 vk::Buffer& buffer,
-                                 vk::DescriptorType type = vk::DescriptorType::eStorageBuffer,
-                                 vk::DeviceSize offset = 0,
-                                 vk::DeviceSize range = VK_WHOLE_SIZE,
-                                 uint32_t dst_array_element = 0,
-                                 uint32_t descriptor_count = 1) {
+    write_descriptor_buffer_type(const uint32_t binding,
+                                 const vk::Buffer& buffer,
+                                 const vk::DescriptorType type = vk::DescriptorType::eStorageBuffer,
+                                 const vk::DeviceSize offset = 0,
+                                 const vk::DeviceSize range = VK_WHOLE_SIZE,
+                                 const uint32_t dst_array_element = 0,
+                                 const uint32_t descriptor_count = 1) {
         write_buffer_infos.emplace_back(
             std::make_unique<vk::DescriptorBufferInfo>(buffer, offset, range));
         vk::WriteDescriptorSet write{*set,
@@ -57,10 +70,10 @@ class DescriptorSetUpdate {
 
     // Bind `acceleration_structure` at the binding point `binding` of DescriptorSet `set`.
     DescriptorSetUpdate& write_descriptor_acceleration_structure(
-        uint32_t binding,
+        const uint32_t binding,
         const std::vector<vk::AccelerationStructureKHR>& acceleration_structures,
-        uint32_t dst_array_element = 0,
-        uint32_t descriptor_count = 1) {
+        const uint32_t dst_array_element = 0,
+        const uint32_t descriptor_count = 1) {
         write_acceleration_structures.emplace_back(
             std::make_unique<vk::WriteDescriptorSetAccelerationStructureKHR>(
                 acceleration_structures));
@@ -77,27 +90,38 @@ class DescriptorSetUpdate {
         return *this;
     }
 
+    // The type is automatically determined from the set using the binding index.
+    DescriptorSetUpdate& write_descriptor_texture(const uint32_t binding,
+                                                  const TextureHandle texture,
+                                                  const uint32_t dst_array_element = 0,
+                                                  const uint32_t descriptor_count = 1) {
+        assert(texture->get_sampler());
+        return write_descriptor_image_type(binding, set->get_type_for_binding(binding), texture->get_sampler(),
+                                           texture->get_view(), texture->get_layout(), dst_array_element,
+                                           descriptor_count);
+    }
+
     // Bind `sampler` at the binding point `binding` of DescriptorSet `set`.
     // The type is automatically determined from the set using the binding index.
-    DescriptorSetUpdate& write_descriptor_image(uint32_t binding,
-                                                vk::Sampler& sampler,
-                                                vk::ImageView& image_view,
-                                                vk::ImageLayout& image_layout,
-                                                uint32_t dst_array_element = 0,
-                                                uint32_t descriptor_count = 1) {
+    DescriptorSetUpdate& write_descriptor_image(const uint32_t binding,
+                                                const vk::Sampler& sampler,
+                                                const vk::ImageView& image_view,
+                                                const vk::ImageLayout& image_layout,
+                                                const uint32_t dst_array_element = 0,
+                                                const uint32_t descriptor_count = 1) {
         return write_descriptor_image_type(binding, set->get_type_for_binding(binding), sampler,
                                            image_view, image_layout, dst_array_element,
                                            descriptor_count);
     }
 
     // Bind `sampler` at the binding point `binding` of DescriptorSet `set`.
-    DescriptorSetUpdate& write_descriptor_image_type(uint32_t binding,
-                                                     vk::DescriptorType type,
-                                                     vk::Sampler& sampler,
-                                                     vk::ImageView& view,
-                                                     vk::ImageLayout& image_layout,
-                                                     uint32_t dst_array_element = 0,
-                                                     uint32_t descriptor_count = 1) {
+    DescriptorSetUpdate& write_descriptor_image_type(const uint32_t binding,
+                                                     const vk::DescriptorType type,
+                                                     const vk::Sampler& sampler,
+                                                     const vk::ImageView& view,
+                                                     const vk::ImageLayout& image_layout,
+                                                     const uint32_t dst_array_element = 0,
+                                                     const uint32_t descriptor_count = 1) {
         write_image_infos.emplace_back(
             std::make_unique<vk::DescriptorImageInfo>(sampler, view, image_layout));
         vk::WriteDescriptorSet write{*set,

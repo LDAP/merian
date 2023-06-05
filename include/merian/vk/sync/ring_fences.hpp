@@ -1,5 +1,6 @@
 #pragma once
 
+#include "merian/vk/context.hpp"
 #include <vulkan/vulkan.hpp>
 
 namespace merian {
@@ -23,17 +24,17 @@ template <uint32_t RING_SIZE = 3> class RingFences {
     RingFences& operator=(RingFences const&) = delete;
     RingFences() = delete;
 
-    RingFences(vk::Device device) {
+    RingFences(const SharedContext& context) : context(context) {
         fences.assign(RING_SIZE, {{}, false});
         for (uint32_t i = 0; i < RING_SIZE; i++) {
             vk::FenceCreateInfo fence_create_info;
-            fences[i].fence = device.createFence(fence_create_info);
+            fences[i].fence = context->device.createFence(fence_create_info);
         }
     }
 
     ~RingFences() {
         for (uint32_t i = 0; i < RING_SIZE; i++) {
-            device.destroyFence(fences[i].fence);
+            context->device.destroyFence(fences[i].fence);
         }
     }
 
@@ -57,7 +58,7 @@ template <uint32_t RING_SIZE = 3> class RingFences {
 
         if (entry.active) {
             // ensure the cycle we will use now has completed
-            check_result(device.waitForFences(1, &entry.fence, VK_TRUE, ~0ULL), "failed waiting for fence");
+            check_result(context->device.waitForFences(1, &entry.fence, VK_TRUE, ~0ULL), "failed waiting for fence");
             reset_fence(entry);
         }
     }
@@ -74,11 +75,11 @@ template <uint32_t RING_SIZE = 3> class RingFences {
   private:
     void reset_fence(Entry& entry) {
         entry.active = false;
-        check_result(device.resetFences(1, &entry.fence), "could not reset fence");
+        check_result(context->device.resetFences(1, &entry.fence), "could not reset fence");
     }
 
     uint32_t current_index = 0;
-    vk::Device device = VK_NULL_HANDLE;
+    const SharedContext context;
     std::vector<Entry> fences;
 };
 

@@ -15,7 +15,7 @@ class ShaderModuleLoader;
  * The object can only be created using the create_module(...) methods. This is to ensure there is
  * only on object and the vk::ShaderModule is destroyed when there are no references left.
  */
-class ShaderModule {
+class ShaderModule : public std::enable_shared_from_this<ShaderModule> {
 
   public:
     ShaderModule() = delete;

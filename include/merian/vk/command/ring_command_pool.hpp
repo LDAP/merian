@@ -12,12 +12,12 @@ class RingCommandPoolCycle : public CommandPool {
   public:
     RingCommandPoolCycle() = delete;
 
-    RingCommandPoolCycle(vk::Device& device,
+    RingCommandPoolCycle(const SharedContext& context,
                          uint32_t queue_family_index,
                          vk::CommandPoolCreateFlags create_flags,
                          uint32_t cycle_index,
                          uint32_t& current_index)
-        : CommandPool(device, queue_family_index, create_flags), cycle_index(cycle_index),
+        : CommandPool(context, queue_family_index, create_flags), cycle_index(cycle_index),
           current_index(current_index){};
 
     vk::CommandBuffer
@@ -60,10 +60,10 @@ template <uint32_t RING_SIZE = 3> class RingCommandPool {
     RingCommandPool(RingCommandPool const&) = delete;
     RingCommandPool& operator=(RingCommandPool const&) = delete;
 
-    RingCommandPool(vk::Device device,
+    RingCommandPool(const SharedContext context,
                     uint32_t queue_family_index,
                     vk::CommandPoolCreateFlags create_flags = vk::CommandPoolCreateFlagBits::eTransient)
-        : device(device), queue_family_index(queue_family_index), create_flags(create_flags) {
+        : context(context), queue_family_index(queue_family_index), create_flags(create_flags) {
 
         for (uint32_t i = 0; i < RING_SIZE; i++) {
             pools.emplace_back(device, queue_family_index, create_flags, i, current_index);
@@ -100,7 +100,7 @@ template <uint32_t RING_SIZE = 3> class RingCommandPool {
     uint32_t queue_family_index;
     vk::CommandPoolCreateFlags create_flags;
 
-    std::vector<RingCommandPoolCycle> pools;
+    std::vector<std::shared_ptr<RingCommandPoolCycle>> pools;
     uint32_t current_index = 0;
 };
 

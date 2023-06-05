@@ -23,7 +23,7 @@ using SharedContext = std::shared_ptr<Context>;
  * Use SharedContext instead of Context directly. This way it is ensured that Context is destroyed
  * last.
  */
-class Context {
+class Context : public std::enable_shared_from_this<Context> {
 
   public:
     struct FeaturesContainer {
@@ -42,10 +42,8 @@ class Context {
     /**
      * @brief      Use this method to create the context.
      *
-     * This is needed since there are circular dependencies between some members and the context.
-     * We aim to simplify resource management by using shared pointers to the parent. Since a shared
-     * pointer can only be created after the object, we first create the context and inject the
-     * objects that depend on SharedContext (CommandPools).
+     * 
+     * Needed for enable_shared_from_this, see https://en.cppreference.com/w/cpp/memory/enable_shared_from_this. 
      */
     static SharedContext
     make_context(std::vector<Extension*> extensions,
@@ -94,7 +92,6 @@ class Context {
     void extensions_check_device_extension_support();
     void extensions_self_check_support();
     void destroy_extensions(std::vector<Extension*> extensions);
-    std::shared_ptr<Context> get_shared_pointer();
 
   public: // Getter
     // can be nullptr in very rare occasions, you can check that with if (shrd_ptr) {...}
@@ -163,9 +160,6 @@ class Context {
     int32_t queue_idx_T = -1;
 
   private:
-    // in make_context
-    std::weak_ptr<Context> weak_self;
-
     // can be nullptr in very rare occasions, you can check that with if (shrd_ptr) {...}
     std::weak_ptr<QueueContainer> queue_GCT;
     // can be nullptr in very rare occasions, you can check that with if (shrd_ptr) {...}

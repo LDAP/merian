@@ -16,9 +16,9 @@ namespace merian {
   \class merian::StagingMemoryManager
 
   Resources that are device local and not host visible can only be written to by the device.
-  This class create a second resource - the staging resource (i.e. staging buffer) - with host visibility, then copies
-  the host contents to the stating resource and then to the device local resource (it does not copy directly but records
-  the commands to do so).
+  This class create a second resource - the staging resource (i.e. staging buffer) - with host
+  visibility, then copies the host contents to the stating resource and then to the device local
+  resource (it does not copy directly but records the commands to do so).
 
   merian::StagingMemoryManager class is a utility that manages host visible
   buffers and their allocations in an opaque fashion to assist
@@ -29,7 +29,8 @@ namespace merian {
   The collection of the transfer resources is represented by merian::StagingID.
 
   The necessary buffer space is sub-allocated and recycled by using one
-  [merian::BufferSubAllocator](#class-merianbuffersuballocator) per transfer direction (to or from device).
+  [merian::BufferSubAllocator](#class-merianbuffersuballocator) per transfer direction (to or from
+  device).
 
   > **WARNING:**
   > - cannot manage a copy > 4 GB
@@ -90,7 +91,7 @@ namespace merian {
   \endcode
 */
 
-class StagingMemoryManager {
+class StagingMemoryManager : public std::enable_shared_from_this<StagingMemoryManager> {
   public:
     static const uint32_t INVALID_ID_INDEX = ~0;
 
@@ -104,19 +105,12 @@ class StagingMemoryManager {
 
     StagingMemoryManager(StagingMemoryManager const&) = delete;
     StagingMemoryManager& operator=(StagingMemoryManager const&) = delete;
+    StagingMemoryManager() = delete;
 
-    StagingMemoryManager() {}
-    StagingMemoryManager(MemoryAllocator* memAllocator,
-                         vk::DeviceSize stagingBlockSize = NVVK_DEFAULT_STAGING_BLOCKSIZE) {
-        init(memAllocator, stagingBlockSize);
-    }
+    StagingMemoryManager(const SharedContext context, const std::shared_ptr<MemoryAllocator> memAllocator,
+                         const vk::DeviceSize stagingBlockSize = NVVK_DEFAULT_STAGING_BLOCKSIZE);
 
-    virtual ~StagingMemoryManager() {
-        deinit();
-    }
-
-    void init(MemoryAllocator* memAllocator, vk::DeviceSize stagingBlockSize = NVVK_DEFAULT_STAGING_BLOCKSIZE);
-    void deinit();
+    virtual ~StagingMemoryManager();
 
     // if true (default) we free the memory completely when released
     // otherwise we would keep blocks for re-use around, unless freeUnused() is called
@@ -151,7 +145,8 @@ class StagingMemoryManager {
         return (T*)cmdToImage(cmd, image, offset, extent, subresource, size, data, layout);
     }
 
-    // pointer can be used after cmd execution but only valid until associated resources haven't been released
+    // pointer can be used after cmd execution but only valid until associated resources haven't
+    // been released
     const void* cmdFromImage(vk::CommandBuffer cmd,
                              vk::Image image,
                              const vk::Offset3D& offset,
@@ -173,19 +168,32 @@ class StagingMemoryManager {
 
     // if data != nullptr memcpies to mapping and returns nullptr
     // otherwise returns temporary mapping (valid until appropriate release)
-    void*
-    cmdToBuffer(vk::CommandBuffer cmd, vk::Buffer buffer, vk::DeviceSize offset, vk::DeviceSize size, const void* data);
+    void* cmdToBuffer(vk::CommandBuffer cmd,
+                      vk::Buffer buffer,
+                      vk::DeviceSize offset,
+                      vk::DeviceSize size,
+                      const void* data);
 
     template <class T>
-    T* cmdToBufferT(vk::CommandBuffer cmd, vk::Buffer buffer, vk::DeviceSize offset, vk::DeviceSize size) {
+    T* cmdToBufferT(vk::CommandBuffer cmd,
+                    vk::Buffer buffer,
+                    vk::DeviceSize offset,
+                    vk::DeviceSize size) {
         return (T*)cmdToBuffer(cmd, buffer, offset, size, nullptr);
     }
 
-    // pointer can be used after cmd execution but only valid until associated resources haven't been released
-    const void* cmdFromBuffer(vk::CommandBuffer cmd, vk::Buffer buffer, vk::DeviceSize offset, vk::DeviceSize size);
+    // pointer can be used after cmd execution but only valid until associated resources haven't
+    // been released
+    const void* cmdFromBuffer(vk::CommandBuffer cmd,
+                              vk::Buffer buffer,
+                              vk::DeviceSize offset,
+                              vk::DeviceSize size);
 
     template <class T>
-    const T* cmdFromBufferT(vk::CommandBuffer cmd, vk::Buffer buffer, vk::DeviceSize offset, vk::DeviceSize size) {
+    const T* cmdFromBufferT(vk::CommandBuffer cmd,
+                            vk::Buffer buffer,
+                            vk::DeviceSize offset,
+                            vk::DeviceSize size) {
         return (const T*)cmdFromBuffer(cmd, buffer, offset, size);
     }
 
@@ -239,7 +247,10 @@ class StagingMemoryManager {
         std::vector<Entry> entries;
     };
 
-    vk::Device m_device = VK_NULL_HANDLE;
+  protected:
+    const SharedContext context;
+    // Buffer sub allocator holds a raw ref, make sure allocator is not destroyed
+    const std::shared_ptr<MemoryAllocator> memAllocator;
 
     BufferSubAllocator m_subToDevice;
     BufferSubAllocator m_subFromDevice;
@@ -251,6 +262,7 @@ class StagingMemoryManager {
     // linked-list to next free staging set
     uint32_t m_freeStagingIndex;
 
+  protected:
     uint32_t setIndexValue(uint32_t& index, uint32_t newValue) {
         uint32_t oldValue = index;
         index = newValue;
@@ -258,11 +270,9 @@ class StagingMemoryManager {
     }
 
     void free(bool unusedOnly);
-
     uint32_t newStagingIndex();
-
-    void* getStagingSpace(vk::DeviceSize size, vk::Buffer& buffer, vk::DeviceSize& offset, bool toDevice);
-
+    void*
+    getStagingSpace(vk::DeviceSize size, vk::Buffer& buffer, vk::DeviceSize& offset, bool toDevice);
     void releaseResources(uint32_t stagingID);
 };
 

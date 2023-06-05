@@ -9,7 +9,7 @@
 
 namespace merian {
 
-class Pipeline {
+class Pipeline : public std::enable_shared_from_this<Pipeline> {
 
   public:
     Pipeline(const SharedContext& context, const std::shared_ptr<PipelineLayout>& pipeline_layout)

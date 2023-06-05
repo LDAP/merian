@@ -13,7 +13,7 @@ namespace merian {
  * All submits are protected using a mutex. When using *_wait the queue is blocked until the queue
  * is idle.
  */
-class QueueContainer {
+class QueueContainer : public std::enable_shared_from_this<QueueContainer> {
   public:
     QueueContainer() = delete;
 

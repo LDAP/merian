@@ -7,7 +7,7 @@
 
 namespace merian {
 
-class CommandPool {
+class CommandPool : public std::enable_shared_from_this<CommandPool> {
 
   public:
     CommandPool() = delete;

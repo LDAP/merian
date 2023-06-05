@@ -25,15 +25,15 @@ namespace merian {
 //////////////////////////////////////////////////////////////////////////
 
 SamplerPool::~SamplerPool() {
-    spdlog::debug("destroy sampler pool");
+    SPDLOG_DEBUG("destroy sampler pool ({})", fmt::ptr(this));
 
     if (!sampler_map.empty()) {
-      spdlog::debug("SamplerPool still contains {} samplers at destruction", sampler_map.size());
+      SPDLOG_WARN("SamplerPool still contains {} samplers at destruction", sampler_map.size());
     }
 
     for (auto it : entries) {
         if (it.sampler) {
-            device.destroySampler(it.sampler);
+            context->device.destroySampler(it.sampler);
         }
     }
 }
@@ -76,7 +76,7 @@ vk::Sampler SamplerPool::acquireSampler(const vk::SamplerCreateInfo& createInfo)
             entries.resize(entries.size() + 1);
         }
 
-        vk::Sampler sampler = device.createSampler(createInfo);
+        vk::Sampler sampler = context->device.createSampler(createInfo);
 
         entries[index].refCount = 1;
         entries[index].sampler = sampler;
@@ -110,7 +110,7 @@ void SamplerPool::releaseSampler(vk::Sampler sampler) {
     entry.refCount--;
 
     if (entry.refCount == 0) {
-        device.destroySampler(sampler);
+        context->device.destroySampler(sampler);
 
         entry.sampler = nullptr;
         entry.nextFreeIndex = freeIndex;
