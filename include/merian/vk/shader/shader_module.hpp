@@ -2,6 +2,7 @@
 
 #include "merian/io/file_loader.hpp"
 #include "merian/vk/context.hpp"
+#include "merian/vk/pipeline/specialization_info.hpp"
 #include <spdlog/spdlog.h>
 #include <vulkan/vulkan.hpp>
 
@@ -16,6 +17,7 @@ class ShaderModuleLoader;
  * only on object and the vk::ShaderModule is destroyed when there are no references left.
  */
 class ShaderModule : public std::enable_shared_from_this<ShaderModule> {
+public:
 
   public:
     ShaderModule() = delete;
@@ -44,7 +46,7 @@ class ShaderModule : public std::enable_shared_from_this<ShaderModule> {
     }
 
   public:
-    operator vk::ShaderModule&() {
+    operator const vk::ShaderModule&() const {
         return shader_module;
     }
 
@@ -58,11 +60,11 @@ class ShaderModule : public std::enable_shared_from_this<ShaderModule> {
 
     vk::PipelineShaderStageCreateInfo get_shader_stage_create_info(
         const vk::ShaderStageFlagBits stage_flags = vk::ShaderStageFlagBits::eCompute,
-        const vk::SpecializationInfo& spec_info = {},
+        const SpecializationInfoHandle specialization_info = MERIAN_SPECIALIZATION_INFO_NONE,
         const char* entry_point = "main",
         const vk::PipelineShaderStageCreateFlags flags = {}) {
         return vk::PipelineShaderStageCreateInfo{flags, stage_flags, shader_module, entry_point,
-                                                 &spec_info};
+                                                 *specialization_info};
     }
 
     void reload() {
@@ -87,5 +89,7 @@ class ShaderModule : public std::enable_shared_from_this<ShaderModule> {
     std::optional<std::string> filename;
     vk::ShaderModule shader_module;
 };
+
+using ShaderModuleHandle = std::shared_ptr<ShaderModule>;
 
 } // namespace merian

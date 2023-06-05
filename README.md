@@ -97,6 +97,29 @@ Ray tracing:
 - `MemoryAllocator`: Interface for memory allocators (called MemoryAllocator in NVPro Core). Memory requirements are described by `MemAllocateInfo` and memory is referenced by `MemHandle`. 
 - `MemoryAllocatorVMA`: A implementation of `MemoryAllocator` using the [Vulkan Memory Allocator](https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator) (VMA).
 - `ResourceAllocator`: Uses a `MemoryAllocator` to create and destroy resources.
+  Example:
+    ```c++
+    auto mem_alloc = VMAMemoryAllocator::make_allocator(context);
+    auto sampler_pool = std::make_shared<SamplerPool>(context);
+    auto staging = std::make_shared<StagingMemoryManager>(context, mem_alloc);
+    auto alloc = std::make_shared<ResourceAllocator>(context, mem_alloc, staging, sampler_pool);
+
+    const uint32_t width = 800;
+    const uint32_t height = 600;
+
+    merian::BufferHandle result = alloc->createBuffer(
+        width * height * 3 * sizeof(float),
+        vk::BufferUsageFlagBits::eStorageBuffer,
+        merian::HOST_ACCESS_RANDOM
+    );
+
+    // Render...
+
+    auto data = result->get_memory()->map();
+    stbi_write_hdr("out.hdr", width, height, 3, reinterpret_cast<float*>(data));
+    result->get_memory()->unmap();
+    ```
+
 - `QueueContainer`: Holds a queue together with its mutex. Provides convenience methods to submit using the mutex.
 - `Ring*`:
     In real-time processing, the CPU typically generates commands 
@@ -168,6 +191,28 @@ Ray tracing:
         .update(context);
     ```
 
+- `Pipeline*` / `SpecicalizationInfo*`
+    ```c++
+    auto shader = std::make_shared<merian::ShaderModule>(context, "raytrace.comp.glsl.spv", loader);
+    auto pipeline_layout = merian::PipelineLayoutBuilder(context)
+                               .add_descriptor_set_layout(desc_layout)
+                               .build_pipeline_layout();
+    auto spec_builder = merian::SpecializationInfoBuilder();
+    spec_builder.add_entry(local_size_x, local_size_y); // contant ids 0 and 1
+    auto spec_info = spec_builder.build();
+    auto pipeline = merian::ComputePipeline(pipeline_layout, shader, spec_info);
+
+    cmd = pool->create_and_begin();
+    pipeline.bind(cmd);
+    pipeline.bind_descriptor_set(cmd, desc_set);
+
+    cmd.dispatch((uint32_t(width) + local_size_x - 1) / local_size_x,
+                 (uint32_t(height) + local_size_y - 1) / local_size_y, 1);
+    merian::cmd_barrier_compute_host(cmd);
+    pool->end_all();
+    queue->submit_wait(pool);
+    pool->reset();
+    ```
 
 ### Lifetime of objects
 
@@ -211,7 +256,6 @@ meson compile -C build
 
 ## ToDO
 
-- Replace lots of manual `destroy()` with shared_ptrs and weak shared_ptrs. Especially in resource management, extensions, descriptorsets and pools. (When child objects have pointers to their parent they are destroyed before the parent is destroyed.) Start the tree at Context, this allows the childen to access the context to destroy itself?
 - Extract Swapchain from ExtensionGLFW
 - AS Builder: Only record commands, dont wait.
 - Replace buffer suballocator with VMAVirtualAllocator
