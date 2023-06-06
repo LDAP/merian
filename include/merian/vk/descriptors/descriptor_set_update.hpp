@@ -12,8 +12,8 @@ namespace merian {
 // Utility class to update desriptors of a DescriptorSet.
 //
 // This can be used to `bind` buffers, images and acceleration structures to DescriptorSets.
-// The binding type is automatically determined using the DescriptorSets and the binding index, you
-// can use the *_type methods if you want to overwrite the type.
+// The binding type is automatically determined using the DescriptorSets and the binding index.
+// However, you can use the *_type methods if you want to overwrite the type.
 class DescriptorSetUpdate {
 
   public:
@@ -96,32 +96,34 @@ class DescriptorSetUpdate {
                                                   const uint32_t dst_array_element = 0,
                                                   const uint32_t descriptor_count = 1) {
         assert(texture->get_sampler());
-        return write_descriptor_image_type(binding, set->get_type_for_binding(binding), texture->get_sampler(),
-                                           texture->get_view(), texture->get_layout(), dst_array_element,
-                                           descriptor_count);
+        return write_descriptor_image_type(
+            binding, set->get_type_for_binding(binding), texture->get_view(), texture->get_layout(),
+            texture->get_sampler(), dst_array_element, descriptor_count);
     }
 
     // Bind `sampler` at the binding point `binding` of DescriptorSet `set`.
     // The type is automatically determined from the set using the binding index.
-    DescriptorSetUpdate& write_descriptor_image(const uint32_t binding,
-                                                const vk::Sampler& sampler,
-                                                const vk::ImageView& image_view,
-                                                const vk::ImageLayout& image_layout,
-                                                const uint32_t dst_array_element = 0,
-                                                const uint32_t descriptor_count = 1) {
-        return write_descriptor_image_type(binding, set->get_type_for_binding(binding), sampler,
-                                           image_view, image_layout, dst_array_element,
+    DescriptorSetUpdate&
+    write_descriptor_image(const uint32_t binding,
+                           const vk::ImageView& image_view,
+                           const vk::ImageLayout& image_layout = vk::ImageLayout::eGeneral,
+                           const vk::Sampler& sampler = {},
+                           const uint32_t dst_array_element = 0,
+                           const uint32_t descriptor_count = 1) {
+        return write_descriptor_image_type(binding, set->get_type_for_binding(binding), image_view,
+                                           image_layout, sampler, dst_array_element,
                                            descriptor_count);
     }
 
     // Bind `sampler` at the binding point `binding` of DescriptorSet `set`.
-    DescriptorSetUpdate& write_descriptor_image_type(const uint32_t binding,
-                                                     const vk::DescriptorType type,
-                                                     const vk::Sampler& sampler,
-                                                     const vk::ImageView& view,
-                                                     const vk::ImageLayout& image_layout,
-                                                     const uint32_t dst_array_element = 0,
-                                                     const uint32_t descriptor_count = 1) {
+    DescriptorSetUpdate&
+    write_descriptor_image_type(const uint32_t binding,
+                                const vk::DescriptorType type,
+                                const vk::ImageView& view,
+                                const vk::ImageLayout& image_layout = vk::ImageLayout::eGeneral,
+                                const vk::Sampler& sampler = {},
+                                const uint32_t dst_array_element = 0,
+                                const uint32_t descriptor_count = 1) {
         write_image_infos.emplace_back(
             std::make_unique<vk::DescriptorImageInfo>(sampler, view, image_layout));
         vk::WriteDescriptorSet write{*set,
@@ -130,6 +132,7 @@ class DescriptorSetUpdate {
                                      descriptor_count,
                                      type,
                                      write_image_infos.back().get()};
+        writes.push_back(write);
 
         return *this;
     }
