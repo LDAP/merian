@@ -71,6 +71,16 @@ class DescriptorSetLayoutBuilder {
     }
 
     DescriptorSetLayoutBuilder&
+    add_binding_storage_image(vk::ShaderStageFlags stage_flags = vk::ShaderStageFlagBits::eCompute,
+                              uint32_t descriptor_count = 1,
+                              const vk::Sampler* sampler = nullptr,
+                              std::optional<uint32_t> binding = std::nullopt) {
+        add_binding(stage_flags, vk::DescriptorType::eStorageImage, descriptor_count, sampler,
+                    binding);
+        return *this;
+    }
+
+    DescriptorSetLayoutBuilder&
     add_binding_sampler(vk::ShaderStageFlags stage_flags = vk::ShaderStageFlagBits::eCompute,
                         uint32_t descriptor_count = 1,
                         const vk::Sampler* sampler = nullptr,

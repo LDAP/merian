@@ -82,6 +82,9 @@ class Image : public std::enable_shared_from_this<Image> {
 
 using ImageHandle = std::shared_ptr<Image>;
 
+/**
+ * @brief      A texture is a image together with a DescriptorImageInfo
+ */
 class Texture : public std::enable_shared_from_this<Texture> {
   public:
     // Creats a Texture objects that automatically destroys `image` when destructed.
@@ -107,6 +110,7 @@ class Texture : public std::enable_shared_from_this<Texture> {
         return image->get_memory();
     }
 
+    // Note: Can be default-initialized
     const vk::Sampler& get_sampler() const {
         return descriptor.sampler;
     }
@@ -115,8 +119,12 @@ class Texture : public std::enable_shared_from_this<Texture> {
         return descriptor.imageLayout;
     }
 
-     const vk::ImageView& get_view() const {
+    const vk::ImageView& get_view() const {
         return descriptor.imageView;
+    }
+
+    const vk::DescriptorImageInfo get_descriptor_info() {
+        return descriptor;
     }
 
     // Attaches a sampler with the vk::DescriptorImageInfo.
