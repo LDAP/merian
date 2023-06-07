@@ -12,6 +12,7 @@ namespace merian {
 /*
  * @brief      Initializes GLFW and makes sure the graphics queue supports present.
  *
+ * This extension needs to create a window and surface to ensure present support on the graphics queue.
  */
 class ExtensionVkGLFW : public Extension {
 
