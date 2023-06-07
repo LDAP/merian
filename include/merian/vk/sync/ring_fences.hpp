@@ -12,7 +12,7 @@ namespace merian {
   A typical frame would start by "wait_and_get_fence()", which waits for the
   requested cycle to be available.
 */
-template <uint32_t RING_SIZE = 3> class RingFences {
+template <uint32_t RING_SIZE = 3> class RingFences : public std::enable_shared_from_this<RingFences<RING_SIZE>> {
   private:
     struct Entry {
         vk::Fence fence;
