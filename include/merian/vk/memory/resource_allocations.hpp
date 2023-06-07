@@ -3,6 +3,7 @@
 // Possible allocations together with their memory handles.
 
 #include "merian/vk/sampler/sampler_pool.hpp"
+#include "merian/vk/utils/subresource_ranges.hpp"
 
 #include <spdlog/spdlog.h>
 #include <vulkan/vulkan.hpp>
@@ -62,6 +63,9 @@ class Buffer : public std::enable_shared_from_this<Buffer> {
     const vk::BufferUsageFlags usage;
 };
 
+class Image;
+using ImageHandle = std::shared_ptr<Image>;
+
 /**
  * @brief      Represents a vk::Image together with its memory and automatic cleanup.
  *
@@ -75,6 +79,7 @@ class Image : public std::enable_shared_from_this<Image> {
     // this is because images are commonly created by memory allocators to optimize memory accesses.
     Image(const vk::Image& image,
           const MemoryAllocationHandle& memory,
+          const vk::Extent3D extent,
           const vk::ImageLayout current_layout = vk::ImageLayout::eUndefined);
 
     ~Image();
@@ -97,6 +102,10 @@ class Image : public std::enable_shared_from_this<Image> {
         return current_layout;
     }
 
+    const vk::Extent3D& get_extent() const {
+        return extent;
+    }
+
     // Use this only if you performed a layout transition without using transition_layout(...)
     // This does not perform a layout transision on itself!
     void _set_current_layout(vk::ImageLayout& new_layout) {
@@ -116,14 +125,32 @@ class Image : public std::enable_shared_from_this<Image> {
                       const uint32_t base_array_layer = 0,
                       const uint32_t array_layer_count = VK_REMAINING_ARRAY_LAYERS);
 
+    // If extent and range are not supplied the whole image is copied.
+    // Layouts are automatically determined from get_current_layout()
+    void cmd_copy_to(
+        const vk::CommandBuffer& cmd,
+        const ImageHandle& dst_picture,
+        const std::optional<vk::Extent3D> extent = std::nullopt,
+        const vk::Offset3D src_offset = {},
+        const vk::Offset3D dst_offset = {},
+        const std::optional<vk::ImageSubresourceLayers> opt_src_subresource = std::nullopt,
+        const std::optional<vk::ImageSubresourceLayers> opt_dst_subresource = std::nullopt) {
+        vk::ImageSubresourceLayers src_subresource = opt_src_subresource.value_or(first_layer());
+        vk::ImageSubresourceLayers dst_subresource = opt_dst_subresource.value_or(first_layer());
+        vk::ImageCopy copy{src_subresource, src_offset, dst_subresource, dst_offset,
+                           extent.value_or(this->extent)};
+
+        cmd.copyImage(image, current_layout, *dst_picture, dst_picture->get_current_layout(),
+                      {copy});
+    }
+
   private:
     const vk::Image image = VK_NULL_HANDLE;
     const MemoryAllocationHandle memory;
+    const vk::Extent3D extent;
 
     vk::ImageLayout current_layout;
 };
-
-using ImageHandle = std::shared_ptr<Image>;
 
 /**
  * @brief      A texture is a image together with a view (and subresource), and an optional sampler.

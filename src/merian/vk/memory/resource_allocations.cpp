@@ -38,8 +38,9 @@ vk::BufferMemoryBarrier Buffer::buffer_barrier(const vk::AccessFlags src_access_
 
 Image::Image(const vk::Image& image,
              const MemoryAllocationHandle& memory,
+             const vk::Extent3D extent,
              const vk::ImageLayout current_layout)
-    : image(image), memory(memory), current_layout(current_layout) {
+    : image(image), memory(memory), extent(extent), current_layout(current_layout) {
     SPDLOG_DEBUG("create image ({})", fmt::ptr(this));
 }
 
