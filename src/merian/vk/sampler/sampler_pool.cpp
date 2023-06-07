@@ -26,19 +26,9 @@ namespace merian {
 
 SamplerPool::~SamplerPool() {
     SPDLOG_DEBUG("destroy sampler pool ({})", fmt::ptr(this));
-
-    if (!sampler_map.empty()) {
-      SPDLOG_WARN("SamplerPool still contains {} samplers at destruction", sampler_map.size());
-    }
-
-    for (auto it : entries) {
-        if (it.sampler) {
-            context->device.destroySampler(it.sampler);
-        }
-    }
 }
 
-vk::Sampler SamplerPool::acquireSampler(const vk::SamplerCreateInfo& createInfo) {
+SamplerHandle SamplerPool::acquireSampler(const vk::SamplerCreateInfo& createInfo) {
     SamplerState state;
     state.createInfo = createInfo;
 
@@ -65,8 +55,6 @@ vk::Sampler SamplerPool::acquireSampler(const vk::SamplerCreateInfo& createInfo)
     auto it = state_map.find(state);
 
     if (it == state_map.end()) {
-        SPDLOG_DEBUG("Create new sampler");
-
         uint32_t index = 0;
         if (freeIndex != (uint32_t) ~0) {
             index = freeIndex;
@@ -76,48 +64,24 @@ vk::Sampler SamplerPool::acquireSampler(const vk::SamplerCreateInfo& createInfo)
             entries.resize(entries.size() + 1);
         }
 
-        vk::Sampler sampler = context->device.createSampler(createInfo);
+        SamplerHandle sampler = std::make_shared<Sampler>(context, createInfo);
 
-        entries[index].refCount = 1;
         entries[index].sampler = sampler;
         entries[index].state = state;
 
         state_map.insert({state, index});
-        sampler_map.insert({sampler, index});
-
         return sampler;
     } else {
-        SPDLOG_TRACE("Reuse existing sampler");
+        Entry& entry = entries[it->second];
+        if (entry.sampler.expired()) {
+            // recreate sampler
+            auto sampler = std::make_shared<Sampler>(context, createInfo);
+            entry.sampler = sampler;
+            return sampler;
 
-        entries[it->second].refCount++;
-        return entries[it->second].sampler;
-    }
-}
-
-void SamplerPool::releaseSampler(vk::Sampler sampler) {
-    auto it = sampler_map.find(sampler);
-
-    if (it == sampler_map.end()) {
-        throw std::runtime_error{"Sampler not found!"};
-    }
-
-    uint32_t index = it->second;
-    Entry& entry = entries[index];
-
-    assert(entry.sampler == sampler);
-    assert(entry.refCount);
-
-    entry.refCount--;
-
-    if (entry.refCount == 0) {
-        context->device.destroySampler(sampler);
-
-        entry.sampler = nullptr;
-        entry.nextFreeIndex = freeIndex;
-        freeIndex = index;
-
-        state_map.erase(entry.state);
-        sampler_map.erase(sampler);
+        } else {
+            return entry.sampler.lock();
+        }
     }
 }
 

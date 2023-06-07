@@ -131,7 +131,8 @@ class MemoryAllocation : public std::enable_shared_from_this<MemoryAllocation> {
 
     // ------------------------------------------------------------------------------------
 
-    // Retrieve detailed information about 'memHandle'
+    // Retrieve detailed information about 'memHandle'. This may not be very efficient.
+    // Try to avoid if possible
     virtual MemoryInfo get_memory_info() const = 0;
 
     const SharedContext& get_context() const {

@@ -2,6 +2,18 @@
 
 ~ _A *Vulkan* prototyping framework._ ~
 
+
+## Building
+
+```bash
+meson setup build
+# or to compile with debug flags
+meson setup build --buildtype=debug
+
+meson compile -C build
+```
+
+
 ## Usage
 
 The Vulkan dynamic dispatch loader must be used.
@@ -225,17 +237,6 @@ Design decisions:
 - Functions that extend the lifetime of an object should take a `shared_ptr` by value, e.g. `int foo(shared_ptr<bar> b)`. The usual advice to avoid circular references applies. This does the heavy lifting of destroying objects in the right order.
 - For Vulkan objects with lifetime a wrapper is provided that destroys the Vulkan object in its destructor.
   These object should derive from `std::enable_shared_from_this`.
-
-
-## Building
-
-```bash
-meson setup build
-# or to compile with debug flags
-meson setup build --buildtype=debug
-
-meson compile -C build
-```
 
 ## Licenses
 

@@ -95,14 +95,12 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
 
     TextureHandle createTexture(const ImageHandle& image,
                                 const vk::ImageViewCreateInfo& imageViewCreateInfo,
-                                const vk::SamplerCreateInfo& samplerCreateInfo,
-                                const vk::ImageLayout& image_layout = vk::ImageLayout::eShaderReadOnlyOptimal);
+                                const vk::SamplerCreateInfo& samplerCreateInfo);
 
     // other variants could exist with a few defaults but we already have
     // makeImage2DViewCreateInfo() we could always override viewCreateInfo.image
     TextureHandle createTexture(const ImageHandle& image,
-                                const vk::ImageViewCreateInfo& imageViewCreateInfo,
-                                const vk::ImageLayout& image_layout = vk::ImageLayout::eShaderReadOnlyOptimal);
+                                const vk::ImageViewCreateInfo& imageViewCreateInfo);
 
     // shortcut that creates the image for the texture
     // - creates the image

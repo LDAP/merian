@@ -98,7 +98,7 @@ class DescriptorSetUpdate {
         // Sampler can be default initialized...
         //assert(texture->get_sampler());
         return write_descriptor_image_type(
-            binding, set->get_type_for_binding(binding), texture->get_view(), texture->get_layout(),
+            binding, set->get_type_for_binding(binding), texture->get_view(), texture->get_current_layout(),
             texture->get_sampler(), dst_array_element, descriptor_count);
     }
 

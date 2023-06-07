@@ -46,18 +46,36 @@ class Buffer : public std::enable_shared_from_this<Buffer> {
 
     vk::DeviceAddress get_device_address();
 
+    // Return a suitable vk::BufferMemoryBarrier. Note that currently no GPU cares and a
+    // global MemoryBarrier can be used in most instances without loosing performance.
+    // This method is especially not very efficient because it has to call get_memory_info on the
+    // memory object.
+    vk::BufferMemoryBarrier
+    buffer_barrier(const vk::AccessFlags src_access_flags,
+                   const vk::AccessFlags dst_access_flags,
+                   uint32_t src_queue_family_index = VK_QUEUE_FAMILY_IGNORED,
+                   uint32_t dst_queue_family_index = VK_QUEUE_FAMILY_IGNORED);
+
   private:
     const vk::Buffer buffer;
     const MemoryAllocationHandle memory;
     const vk::BufferUsageFlags usage;
 };
 
+/**
+ * @brief      Represents a vk::Image together with its memory and automatic cleanup.
+ *
+ * Use the transition() function to perform layout transitions to keep the internal state valid.
+ */
 class Image : public std::enable_shared_from_this<Image> {
   public:
     // Creats a Image objects that automatically destroys Image when destructed.
     // The memory is not freed explicitly to let it free itself.
-    // It is asserted that the memory represented by `memory` is already bound correctly.
-    Image(const vk::Image& image, const MemoryAllocationHandle& memory);
+    // It is asserted that the memory represented by `memory` is already bound correctly,
+    // this is because images are commonly created by memory allocators to optimize memory accesses.
+    Image(const vk::Image& image,
+          const MemoryAllocationHandle& memory,
+          const vk::ImageLayout current_layout = vk::ImageLayout::eUndefined);
 
     ~Image();
 
@@ -75,24 +93,49 @@ class Image : public std::enable_shared_from_this<Image> {
         return memory;
     }
 
+    const vk::ImageLayout& get_current_layout() const {
+        return current_layout;
+    }
+
+    // Use this only if you performed a layout transition without using transition_layout(...)
+    // This does not perform a layout transision on itself!
+    void _set_current_layout(vk::ImageLayout& new_layout) {
+        current_layout = new_layout;
+    }
+
+    // Do not forget submite the barrier, else the internal state does not match the actual state
+    vk::ImageMemoryBarrier
+    transition_layout(const vk::ImageLayout new_layout,
+                      const vk::AccessFlags src_access_flags = {},
+                      const vk::AccessFlags dst_access_flags = {},
+                      const uint32_t src_queue_family_index = VK_QUEUE_FAMILY_IGNORED,
+                      const uint32_t dst_queue_family_index = VK_QUEUE_FAMILY_IGNORED,
+                      const vk::ImageAspectFlags aspect_flags = vk::ImageAspectFlagBits::eColor,
+                      const uint32_t base_mip_level = 0,
+                      const uint32_t mip_level_count = VK_REMAINING_MIP_LEVELS,
+                      const uint32_t base_array_layer = 0,
+                      const uint32_t array_layer_count = VK_REMAINING_ARRAY_LAYERS);
+
   private:
     const vk::Image image = VK_NULL_HANDLE;
     const MemoryAllocationHandle memory;
+
+    vk::ImageLayout current_layout;
 };
 
 using ImageHandle = std::shared_ptr<Image>;
 
 /**
- * @brief      A texture is a image together with a DescriptorImageInfo
+ * @brief      A texture is a image together with a view (and subresource), and an optional sampler.
+ *
+ *  Try to only use the barrier() function to perform layout transitions,
+ *  to keep the internal state valid.
  */
 class Texture : public std::enable_shared_from_this<Texture> {
   public:
-    // Creats a Texture objects that automatically destroys `image` when destructed.
-    // The memory is not freed explicitly to let it free itself.
-    // It is asserted that the memory is already bound correctly.
     Texture(const ImageHandle& image,
-            const vk::DescriptorImageInfo& descriptor,
-            const std::shared_ptr<SamplerPool>& sampler_pool);
+            const vk::ImageViewCreateInfo& view_create_info,
+            const std::optional<SamplerHandle> sampler = std::nullopt);
 
     ~Texture();
 
@@ -110,35 +153,34 @@ class Texture : public std::enable_shared_from_this<Texture> {
         return image->get_memory();
     }
 
-    // Note: Can be default-initialized
-    const vk::Sampler& get_sampler() const {
-        return descriptor.sampler;
+    // Note: Can be default-initialized if no sampler is attached
+    const vk::Sampler get_sampler() const {
+        if (sampler.has_value())
+            return *sampler.value();
+        else
+            return {};
     }
 
-    const vk::ImageLayout& get_layout() const {
-        return descriptor.imageLayout;
+    // Convenience method for get_image()->get_current_layout()
+    const vk::ImageLayout& get_current_layout() const {
+        return image->get_current_layout();
     }
 
     const vk::ImageView& get_view() const {
-        return descriptor.imageView;
+        return view;
     }
 
     const vk::DescriptorImageInfo get_descriptor_info() {
-        return descriptor;
+        return vk::DescriptorImageInfo{get_sampler(), view, image->get_current_layout()};
     }
 
-    // Attaches a sampler with the vk::DescriptorImageInfo.
-    // Releases any previously attached sampler.
-    void attach_sampler(const vk::SamplerCreateInfo& samplerCreateInfo);
-
-    void set_layout(const vk::ImageLayout layout) {
-        descriptor.imageLayout = layout;
-    }
+    void attach_sampler(const std::optional<SamplerHandle> sampler = std::nullopt);
 
   private:
     const ImageHandle image;
-    vk::DescriptorImageInfo descriptor;
-    const std::shared_ptr<SamplerPool> sampler_pool;
+    vk::ImageView view;
+
+    std::optional<SamplerHandle> sampler;
 };
 
 using BufferHandle = std::shared_ptr<Buffer>;

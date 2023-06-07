@@ -101,22 +101,16 @@ ImageHandle ResourceAllocator::createImage(const vk::CommandBuffer& cmdBuf,
 
 TextureHandle ResourceAllocator::createTexture(const ImageHandle& image,
                                                const vk::ImageViewCreateInfo& imageViewCreateInfo,
-                                               const vk::SamplerCreateInfo& samplerCreateInfo,
-                                               const vk::ImageLayout& image_layout) {
-    TextureHandle texture = createTexture(image, imageViewCreateInfo, image_layout);
-    texture->attach_sampler(samplerCreateInfo);
+                                               const vk::SamplerCreateInfo& samplerCreateInfo) {
+    TextureHandle texture = createTexture(image, imageViewCreateInfo);
+    texture->attach_sampler(m_samplerPool->acquireSampler(samplerCreateInfo));
     return texture;
 }
 
-TextureHandle ResourceAllocator::createTexture(
-    const ImageHandle& image,
-    const vk::ImageViewCreateInfo& imageViewCreateInfo,
-    const vk::ImageLayout& image_layout) {
+TextureHandle ResourceAllocator::createTexture(const ImageHandle& image,
+                                               const vk::ImageViewCreateInfo& imageViewCreateInfo) {
     assert(imageViewCreateInfo.image == image->get_image());
-
-    vk::ImageView view = context->device.createImageView(imageViewCreateInfo);
-    TextureHandle texture = std::make_shared<Texture>(
-        image, vk::DescriptorImageInfo{{}, view, image_layout}, m_samplerPool);
+    TextureHandle texture = std::make_shared<Texture>(image, imageViewCreateInfo);
 
     return texture;
 }
@@ -159,7 +153,7 @@ TextureHandle ResourceAllocator::createTexture(const vk::CommandBuffer& cmdBuf,
         assert(0);
     }
 
-    TextureHandle resultTexture = createTexture(image, viewInfo, samplerCreateInfo, layout_);
+    TextureHandle resultTexture = createTexture(image, viewInfo, samplerCreateInfo);
     return resultTexture;
 }
 

@@ -24,10 +24,22 @@ vk::DeviceAddress Buffer::get_device_address() {
     return memory->get_context()->device.getBufferAddress(get_buffer_device_address_info());
 }
 
+vk::BufferMemoryBarrier Buffer::buffer_barrier(const vk::AccessFlags src_access_flags,
+                                               const vk::AccessFlags dst_access_flags,
+                                               uint32_t src_queue_family_index,
+                                               uint32_t dst_queue_family_index) {
+    auto info = memory->get_memory_info();
+    return {
+        src_access_flags, dst_access_flags, src_queue_family_index, dst_queue_family_index, buffer,
+        info.offset,      info.size};
+}
+
 // --------------------------------------------------------------------------
 
-Image::Image(const vk::Image& image, const MemoryAllocationHandle& memory)
-    : image(image), memory(memory) {
+Image::Image(const vk::Image& image,
+             const MemoryAllocationHandle& memory,
+             const vk::ImageLayout current_layout)
+    : image(image), memory(memory), current_layout(current_layout) {
     SPDLOG_DEBUG("create image ({})", fmt::ptr(this));
 }
 
@@ -36,29 +48,51 @@ Image::~Image() {
     memory->get_context()->device.destroyImage(image);
 }
 
+// Do not forget submite the barrier, else the internal state does not match the actual state
+vk::ImageMemoryBarrier Image::transition_layout(const vk::ImageLayout new_layout,
+                                                const vk::AccessFlags src_access_flags,
+                                                const vk::AccessFlags dst_access_flags,
+                                                const uint32_t src_queue_family_index,
+                                                const uint32_t dst_queue_family_index,
+                                                const vk::ImageAspectFlags aspect_flags,
+                                                const uint32_t base_mip_level,
+                                                const uint32_t mip_level_count,
+                                                const uint32_t base_array_layer,
+                                                const uint32_t array_layer_count) {
+
+    vk::ImageMemoryBarrier barrier{
+        src_access_flags,
+        dst_access_flags,
+        current_layout,
+        new_layout,
+        src_queue_family_index,
+        dst_queue_family_index,
+        image,
+        {aspect_flags, base_mip_level, mip_level_count, base_array_layer, array_layer_count},
+    };
+
+    current_layout = new_layout;
+
+    return barrier;
+}
+
 // --------------------------------------------------------------------------
 
 Texture::Texture(const ImageHandle& image,
-                 const vk::DescriptorImageInfo& descriptor,
-                 const std::shared_ptr<SamplerPool>& sampler_pool)
-    : image(image), descriptor(descriptor), sampler_pool(sampler_pool) {
+                 const vk::ImageViewCreateInfo& view_create_info,
+                 const std::optional<SamplerHandle> sampler)
+    : image(image), sampler(sampler) {
     SPDLOG_DEBUG("create texture ({})", fmt::ptr(this));
+    view = image->get_memory()->get_context()->device.createImageView(view_create_info);
 }
 
 Texture::~Texture() {
     SPDLOG_DEBUG("destroy texture ({})", fmt::ptr(this));
-    
-    image->get_memory()->get_context()->device.destroyImageView(descriptor.imageView);
-    if (descriptor.sampler) {
-        sampler_pool->releaseSampler(descriptor.sampler);
-    }
+    image->get_memory()->get_context()->device.destroyImageView(view);
 }
 
-void Texture::attach_sampler(const vk::SamplerCreateInfo& samplerCreateInfo) {
-    if (descriptor.sampler) {
-        sampler_pool->releaseSampler(descriptor.sampler);
-    }
-    descriptor.sampler = sampler_pool->acquireSampler(samplerCreateInfo);
+void Texture::attach_sampler(const std::optional<SamplerHandle> sampler) {
+    this->sampler = sampler;
 }
 
 AccelerationStructure::AccelerationStructure(const vk::AccelerationStructureKHR& as,

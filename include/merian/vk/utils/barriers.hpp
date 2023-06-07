@@ -1,10 +1,12 @@
 #pragma once
 
+#include <unordered_map>
 #include <vulkan/vulkan.hpp>
 
 namespace merian {
 
-inline vk::AccessFlags accessFlagsForImageLayout(vk::ImageLayout layout) {
+// Heuristic to infer access flags from image layout
+inline vk::AccessFlags access_flags_for_image_layout(vk::ImageLayout layout) {
     switch (layout) {
     case vk::ImageLayout::ePreinitialized:
         return vk::AccessFlagBits::eHostWrite;
@@ -23,7 +25,8 @@ inline vk::AccessFlags accessFlagsForImageLayout(vk::ImageLayout layout) {
     }
 }
 
-inline vk::PipelineStageFlags pipelineStageForLayout(vk::ImageLayout layout) {
+// Heuristic to infer pipeline stage from image layout
+inline vk::PipelineStageFlags pipeline_stage_for_image_layout(vk::ImageLayout layout) {
     switch (layout) {
     case vk::ImageLayout::eTransferDstOptimal:
     case vk::ImageLayout::eTransferSrcOptimal:
@@ -31,13 +34,14 @@ inline vk::PipelineStageFlags pipelineStageForLayout(vk::ImageLayout layout) {
     case vk::ImageLayout::eColorAttachmentOptimal:
         return vk::PipelineStageFlagBits::eColorAttachmentOutput;
     case vk::ImageLayout::eDepthStencilAttachmentOptimal:
-        return vk::PipelineStageFlagBits::
-            eAllCommands; // We do this to allow queue other than graphic
-                          // return VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+        // We do this to allow queue other than graphic
+        // return VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+        return vk::PipelineStageFlagBits::eAllCommands;
     case vk::ImageLayout::eShaderReadOnlyOptimal:
-        return vk::PipelineStageFlagBits::eAllCommands; // We do this to allow queue other than
-                                                        // graphic return
-                                                        // VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        // We do this to allow queue other than
+        // graphic return
+        // VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        return vk::PipelineStageFlagBits::eAllCommands;
     case vk::ImageLayout::ePreinitialized:
         return vk::PipelineStageFlagBits::eHost;
     case vk::ImageLayout::eUndefined:
@@ -47,10 +51,13 @@ inline vk::PipelineStageFlags pipelineStageForLayout(vk::ImageLayout layout) {
     }
 }
 
+// Heuristic to infer pipeline stage from access flags
+vk::PipelineStageFlags pipeline_stage_for_access_flags(vk::AccessFlags flags);
+
 vk::ImageMemoryBarrier barrier_image_layout(vk::Image image,
-                              vk::ImageLayout old_image_layout,
-                              vk::ImageLayout new_image_layout,
-                              const vk::ImageSubresourceRange& subresource_range);
+                                            vk::ImageLayout old_image_layout,
+                                            vk::ImageLayout new_image_layout,
+                                            const vk::ImageSubresourceRange& subresource_range);
 
 void cmd_barrier_image_layout(vk::CommandBuffer cmd,
                               vk::Image image,
@@ -59,9 +66,9 @@ void cmd_barrier_image_layout(vk::CommandBuffer cmd,
                               const vk::ImageSubresourceRange& subresource_range);
 
 vk::ImageMemoryBarrier barrier_image_layout(vk::Image image,
-                              vk::ImageLayout old_image_layout,
-                              vk::ImageLayout new_image_layout,
-                              vk::ImageAspectFlags aspect_mask);
+                                            vk::ImageLayout old_image_layout,
+                                            vk::ImageLayout new_image_layout,
+                                            vk::ImageAspectFlags aspect_mask);
 
 void cmd_barrier_image_layout(vk::CommandBuffer cmd,
                               vk::Image image,
