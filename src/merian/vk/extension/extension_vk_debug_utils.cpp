@@ -73,7 +73,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL ExtensionVkDebugUtils::messenger_callback(
             additional_info += "\n";
             additional_info += "\t\t";
             additional_info += "objectHandle = ";
-            additional_info += pCallbackData->pObjects[i].objectHandle;
+            additional_info += std::to_string(pCallbackData->pObjects[i].objectHandle);
             additional_info += "\n";
             if (pCallbackData->pObjects[i].pObjectName) {
                 additional_info += "\t\t";
