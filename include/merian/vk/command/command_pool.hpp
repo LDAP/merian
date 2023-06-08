@@ -71,4 +71,6 @@ class CommandPool : public std::enable_shared_from_this<CommandPool> {
     std::vector<vk::CommandBuffer> cmds;
 };
 
+using CommandPoolHandle = std::shared_ptr<CommandPool>;
+
 } // namespace merian

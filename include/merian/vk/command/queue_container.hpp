@@ -21,15 +21,15 @@ class QueueContainer : public std::enable_shared_from_this<QueueContainer> {
 
     void submit(const std::shared_ptr<CommandPool>& pool,
                 const vk::Fence fence,
-                const std::vector<vk::Semaphore>& wait_semaphores = {},
                 const std::vector<vk::Semaphore>& signal_semaphores = {},
-                const vk::PipelineStageFlags& wait_dst_stage_mask = {});
+                const std::vector<vk::Semaphore>& wait_semaphores = {},
+                const std::vector<vk::PipelineStageFlags>& wait_dst_stage_mask = {});
 
     void submit(const std::vector<vk::CommandBuffer>& command_buffers,
                 vk::Fence fence = VK_NULL_HANDLE,
-                const std::vector<vk::Semaphore>& wait_semaphores = {},
                 const std::vector<vk::Semaphore>& signal_semaphores = {},
-                const vk::PipelineStageFlags& wait_dst_stage_mask = {});
+                const std::vector<vk::Semaphore>& wait_semaphores = {},
+                const std::vector<vk::PipelineStageFlags>& wait_dst_stage_mask = {});
 
     void submit(const vk::CommandBuffer& command_buffer, vk::Fence fence = VK_NULL_HANDLE);
 
@@ -41,15 +41,15 @@ class QueueContainer : public std::enable_shared_from_this<QueueContainer> {
 
     void submit_wait(const std::shared_ptr<CommandPool>& pool,
                      const vk::Fence fence = {},
+                     const std::vector<vk::Semaphore>& signal_semaphores = {},
                      const std::vector<vk::Semaphore>& wait_semaphores = {},
-                     const std::vector<vk::PipelineStageFlags>& wait_dst_stage_mask = {},
-                     const std::vector<vk::Semaphore>& signal_semaphores = {});
+                     const std::vector<vk::PipelineStageFlags>& wait_dst_stage_mask = {});
 
     // Submits the command buffers then waits using waitIdle(), try to not use the _wait variants
     void submit_wait(const std::vector<vk::CommandBuffer>& command_buffers,
                      vk::Fence fence = VK_NULL_HANDLE,
-                     const std::vector<vk::Semaphore>& wait_semaphores = {},
                      const std::vector<vk::Semaphore>& signal_semaphores = {},
+                     const std::vector<vk::Semaphore>& wait_semaphores = {},
                      const vk::PipelineStageFlags& wait_dst_stage_mask = {});
 
     // Submits the command buffers then waits using waitIdle(), try to not use the _wait variants

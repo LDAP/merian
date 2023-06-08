@@ -25,10 +25,11 @@ template <uint32_t RING_SIZE = 3> class RingFences : public std::enable_shared_f
     RingFences() = delete;
 
     RingFences(const SharedContext& context) : context(context) {
-        fences.assign(RING_SIZE, {{}, false});
+        fences.resize(RING_SIZE);
         for (uint32_t i = 0; i < RING_SIZE; i++) {
             vk::FenceCreateInfo fence_create_info;
             fences[i].fence = context->device.createFence(fence_create_info);
+            fences[i].active = false;
         }
     }
 
@@ -61,6 +62,8 @@ template <uint32_t RING_SIZE = 3> class RingFences : public std::enable_shared_f
             check_result(context->device.waitForFences(1, &entry.fence, VK_TRUE, ~0ULL), "failed waiting for fence");
             reset_fence(entry);
         }
+        entry.active = true;
+        return entry.fence;
     }
 
     // query current cycle index

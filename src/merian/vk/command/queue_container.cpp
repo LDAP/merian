@@ -14,9 +14,9 @@ QueueContainer::QueueContainer(const SharedContext& context,
 
 void QueueContainer::submit(const std::shared_ptr<CommandPool>& pool,
                             const vk::Fence fence,
-                            const std::vector<vk::Semaphore>& wait_semaphores,
                             const std::vector<vk::Semaphore>& signal_semaphores,
-                            const vk::PipelineStageFlags& wait_dst_stage_mask) {
+                            const std::vector<vk::Semaphore>& wait_semaphores,
+                            const std::vector<vk::PipelineStageFlags>& wait_dst_stage_mask) {
     vk::SubmitInfo submit_info{wait_semaphores, wait_dst_stage_mask, pool->get_command_buffers(),
                                signal_semaphores};
     submit(submit_info, fence);
@@ -24,9 +24,9 @@ void QueueContainer::submit(const std::shared_ptr<CommandPool>& pool,
 
 void QueueContainer::submit(const std::vector<vk::CommandBuffer>& command_buffers,
                             vk::Fence fence,
-                            const std::vector<vk::Semaphore>& wait_semaphores,
                             const std::vector<vk::Semaphore>& signal_semaphores,
-                            const vk::PipelineStageFlags& wait_dst_stage_mask) {
+                            const std::vector<vk::Semaphore>& wait_semaphores,
+                            const std::vector<vk::PipelineStageFlags>& wait_dst_stage_mask) {
     vk::SubmitInfo submit_info{wait_semaphores, wait_dst_stage_mask, command_buffers,
                                signal_semaphores};
     submit(submit_info, fence);
@@ -53,9 +53,9 @@ void QueueContainer::submit(const std::vector<vk::SubmitInfo>& submit_infos, vk:
 
 void QueueContainer::submit_wait(const std::shared_ptr<CommandPool>& pool,
                                  const vk::Fence fence,
+                                 const std::vector<vk::Semaphore>& signal_semaphores,
                                  const std::vector<vk::Semaphore>& wait_semaphores,
-                                 const std::vector<vk::PipelineStageFlags>& wait_dst_stage_mask,
-                                 const std::vector<vk::Semaphore>& signal_semaphores) {
+                                 const std::vector<vk::PipelineStageFlags>& wait_dst_stage_mask) {
     vk::SubmitInfo submit_info{wait_semaphores, wait_dst_stage_mask, pool->get_command_buffers(),
                                signal_semaphores};
     submit_wait(submit_info, fence);
@@ -64,8 +64,8 @@ void QueueContainer::submit_wait(const std::shared_ptr<CommandPool>& pool,
 // Submits the command buffers then waits using waitIdle(), try to not use the _wait variants
 void QueueContainer::submit_wait(const std::vector<vk::CommandBuffer>& command_buffers,
                                  vk::Fence fence,
-                                 const std::vector<vk::Semaphore>& wait_semaphores,
                                  const std::vector<vk::Semaphore>& signal_semaphores,
+                                 const std::vector<vk::Semaphore>& wait_semaphores,
                                  const vk::PipelineStageFlags& wait_dst_stage_mask) {
     vk::SubmitInfo submit_info{wait_semaphores, wait_dst_stage_mask, command_buffers,
                                signal_semaphores};

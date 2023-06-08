@@ -2,6 +2,7 @@
 
 #include "merian/utils/vector_utils.hpp"
 #include "merian/vk/extension/extension.hpp"
+#include "merian/vk/swapchain/glfw_surface.hpp"
 #include "merian/vk/swapchain/swapchain.hpp"
 
 #include <spdlog/logger.h>
@@ -12,19 +13,26 @@ namespace merian {
 /*
  * @brief      Initializes GLFW and makes sure the graphics queue supports present.
  *
- * This extension needs to create a window and surface to ensure present support on the graphics queue.
+ * This extension needs to create a window and surface to ensure present support on the graphics
+ * queue.
  */
 class ExtensionVkGLFW : public Extension {
+  private:
+    static void glfw_error_callback(int id, const char* desc) {
+        SPDLOG_ERROR("GLFW: {}: {}", id, desc);
+    }
 
   public:
     ExtensionVkGLFW(int width = 1280, int height = 720, const char* title = "")
         : Extension("ExtensionVkGLFW") {
+        glfwSetErrorCallback(glfw_error_callback);
         if (!glfwInit())
             throw std::runtime_error("GLFW initialization failed!");
         if (!glfwVulkanSupported())
             throw std::runtime_error("GLFW reports to have no Vulkan support! Maybe it couldn't "
                                      "find the Vulkan loader!");
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+        // glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
         window = glfwCreateWindow(width, height, title, nullptr, nullptr);
     }
 
@@ -68,8 +76,11 @@ class ExtensionVkGLFW : public Extension {
         assert(!weak_context.expired());
         SharedContext context = weak_context.lock();
 
-        return {std::make_shared<GLFWWindow>(context, window),
-                std::make_shared<Surface>(context, surface)};
+        std::shared_ptr<GLFWWindow> shared_window = std::make_shared<GLFWWindow>(context, window);
+        std::shared_ptr<Surface> shared_surface = std::static_pointer_cast<Surface>(
+            std::make_shared<GLFWSurface>(context, surface, shared_window));
+
+        return {shared_window, shared_surface};
     }
 
   private:

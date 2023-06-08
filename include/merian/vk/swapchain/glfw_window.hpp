@@ -1,3 +1,5 @@
+#pragma once
+
 #include "merian/vk/context.hpp"
 
 #include <GLFW/glfw3.h>

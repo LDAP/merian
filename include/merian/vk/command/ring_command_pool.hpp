@@ -25,8 +25,16 @@ class RingCommandPoolCycle : public CommandPool {
                         bool begin = false,
                         vk::CommandBufferUsageFlags flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
                         const vk::CommandBufferInheritanceInfo* pInheritanceInfo = nullptr) override {
-        assert(current_index == cycle_index);
+        assert(current_index == cycle_index && "do not use pools from an other cycle");
         return CommandPool::create(level, begin, flags, pInheritanceInfo);
+    }
+
+    vk::CommandBuffer create_and_begin(
+        vk::CommandBufferLevel level = vk::CommandBufferLevel::ePrimary,
+        vk::CommandBufferUsageFlags flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
+        const vk::CommandBufferInheritanceInfo* pInheritanceInfo = nullptr) override {
+        assert(current_index == cycle_index && "do not use pools from an other cycle");
+        return CommandPool::create_and_begin(level, flags, pInheritanceInfo);
     }
 
     std::vector<vk::CommandBuffer>
@@ -35,8 +43,16 @@ class RingCommandPoolCycle : public CommandPool {
                          bool begin = false,
                          vk::CommandBufferUsageFlags flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
                          const vk::CommandBufferInheritanceInfo* pInheritanceInfo = nullptr) override {
-        assert(current_index == cycle_index);
+        assert(current_index == cycle_index && "do not use pools from an other cycle");
         return CommandPool::create_multiple(level, count, begin, flags, pInheritanceInfo);
+    }
+
+    std::vector<vk::CommandBuffer> create_and_begin_multiple(
+        vk::CommandBufferLevel level,
+        uint32_t count,
+        vk::CommandBufferUsageFlags flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
+        const vk::CommandBufferInheritanceInfo* pInheritanceInfo = nullptr) override {
+        return CommandPool::create_and_begin_multiple(level, count, flags, pInheritanceInfo);
     }
 
   private:
@@ -60,48 +76,51 @@ template <uint32_t RING_SIZE = 3> class RingCommandPool {
     RingCommandPool(RingCommandPool const&) = delete;
     RingCommandPool& operator=(RingCommandPool const&) = delete;
 
-    RingCommandPool(const SharedContext context,
+    RingCommandPool(const SharedContext& context,
                     uint32_t queue_family_index,
                     vk::CommandPoolCreateFlags create_flags = vk::CommandPoolCreateFlagBits::eTransient)
         : context(context), queue_family_index(queue_family_index), create_flags(create_flags) {
 
         for (uint32_t i = 0; i < RING_SIZE; i++) {
-            pools.emplace_back(device, queue_family_index, create_flags, i, current_index);
+            pools.emplace_back(std::make_shared<RingCommandPoolCycle>(context, queue_family_index, create_flags, i, current_index));
         }
     }
 
     void reset() {
         pools.clear();
         for (uint32_t i = 0; i < RING_SIZE; i++) {
-            pools.emplace_back(device, queue_family_index, create_flags, i, current_index);
+            pools.emplace_back(std::make_shared<RingCommandPoolCycle>(context, queue_family_index, create_flags, i, current_index));
         }
     }
 
     // Like set_cycle(uint32_t cycle) but advances the cycle internally by one
-    CommandPool& set_cycle() {
-        set_cycle(current_index + 1);
+    CommandPoolHandle set_cycle() {
+        return set_cycle(current_index + 1);
     }
 
     // call when cycle has changed, prior creating command buffers. Use for example current_cycle_index() from
     // RingFences. Resets old pools etc and frees command buffers.
-    CommandPool& set_cycle(uint32_t cycle) {
+    CommandPoolHandle set_cycle(uint32_t cycle) {
         current_index = cycle % RING_SIZE;
-        RingCommandPoolCycle& current_pool = pools[current_index];
+        std::shared_ptr<RingCommandPoolCycle>& current_pool = pools[current_index];
 
-        if (current_pool.has_command_buffers()) {
-            current_pool.reset();
+        if (current_pool->has_command_buffers()) {
+            current_pool->reset();
         }
 
         return current_pool;
     }
 
   private:
-    vk::Device device = VK_NULL_HANDLE;
+    const SharedContext context;
     uint32_t queue_family_index;
     vk::CommandPoolCreateFlags create_flags;
 
     std::vector<std::shared_ptr<RingCommandPoolCycle>> pools;
     uint32_t current_index = 0;
 };
+
+template<uint32_t RING_SIZE>
+using RingCommandPoolHandle = std::shared_ptr<RingCommandPool<RING_SIZE>>;
 
 } // namespace merian

@@ -74,7 +74,7 @@ int main() {
         &resources
     };
 
-    merian::Context app(extensions, "My beautiful app");
+    merian::SharedContext context = merian::Context::make_context(extensions, "My beautiful app");
 
     // use extensions...
 }
@@ -154,26 +154,21 @@ Ray tracing:
 
     ```c++
     int main() {
-        //...
+        auto ring_cmd_pool = make_shared<merian::RingCommandPool<>>(context, context->queue_family_idx_GCT);
+        auto ring_fences = make_shared<merian::RingFences<>>(context);
+        auto [window, surface] = extGLFW.get();
+        while (!glfwWindowShouldClose(*window)) {
+            vk::Fence fence = ring_fences->wait_and_get_fence();
+            auto cmd_pool = ring_cmd_pool->set_cycle();
+            auto cmd = cmd_pool->create_and_begin();
 
-        frame++;
+            glfwPollEvents();
 
-        // wait until we can use the new cycle 
-        // (very rare if we use the fence at then end once per-frame)
-        ringFences.setCycleAndWait(frame);
+            // do stuff...
 
-        // update cycle state, allows recycling of old resources
-        auto& cycle = ringPool.setCycle( frame );
-
-        VkCommandBuffer cmd = cycle.createCommandBuffer(...);
-        
-        //... do stuff / submit etc...
-        VkFence fence = ringFences.getFence();
-
-        // use this fence in the submit
-        queue_container.submit(cmd, fence);
-
-        //...
+            cmd_pool->end_all();
+            queue->submit(cmd_pool, fence);
+        }
     }
     ```
 

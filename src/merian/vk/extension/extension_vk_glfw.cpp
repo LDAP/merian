@@ -30,7 +30,8 @@ void ExtensionVkGLFW::on_destroy_instance(const vk::Instance& instance) {
     if (window) {
         instance.destroySurfaceKHR(surface);
         glfwDestroyWindow(window);
-    } 
+    }
+    glfwTerminate();
 }
 
 } // namespace merian
