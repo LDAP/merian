@@ -34,6 +34,7 @@ template <uint32_t RING_SIZE = 3> class RingFences : public std::enable_shared_f
     }
 
     ~RingFences() {
+        context->device.waitIdle();
         for (uint32_t i = 0; i < RING_SIZE; i++) {
             context->device.destroyFence(fences[i].fence);
         }

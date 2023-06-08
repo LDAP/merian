@@ -60,6 +60,8 @@ class QueueContainer : public std::enable_shared_from_this<QueueContainer> {
 
     void present(const vk::PresentInfoKHR& present_info);
 
+    void wait_idle();
+
     const SharedContext& get_context() const {
         return context;
     }
@@ -89,5 +91,7 @@ class QueueContainer : public std::enable_shared_from_this<QueueContainer> {
     const uint32_t queue_family_index;
     std::mutex mutex;
 };
+
+using QueueContainerHandle = std::shared_ptr<QueueContainer>;
 
 } // namespace merian

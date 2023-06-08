@@ -18,6 +18,7 @@ CommandPool::CommandPool(const SharedContext context,
 };
 
 CommandPool::~CommandPool() {
+    context->device.waitIdle();
     SPDLOG_DEBUG("destroy command pool ({})", fmt::ptr(this));
     reset();
     context->device.destroyCommandPool(pool);

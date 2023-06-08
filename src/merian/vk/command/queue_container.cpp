@@ -92,4 +92,9 @@ void QueueContainer::present(const vk::PresentInfoKHR& present_info) {
     check_result(queue.presentKHR(&present_info), "present failed");
 }
 
+void QueueContainer::wait_idle() {
+    std::lock_guard<std::mutex> lock_guard(mutex);
+    queue.waitIdle();
+}
+
 } // namespace merian

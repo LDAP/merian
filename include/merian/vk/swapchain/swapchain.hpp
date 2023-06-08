@@ -22,7 +22,7 @@ struct SwapchainAcquireResult {
     // You MUST signal this semaphore when done writing to the image, and
     // before presenting it. (The system waits for this before presenting).
     vk::Semaphore signal_semaphore;
-    // Swapchain was created or recreated. You may need to cmd_update_barriers().
+    // Swapchain was created or recreated. You need to cmd_update_image_layouts().
     bool did_recreate;
     vk::Extent2D extent;
 };
@@ -38,7 +38,7 @@ struct SwapchainAcquireResult {
  * vk::CommandBuffer cmd = ...
  * if (result.value.did_recreate) {
  *   // after init or resize you have to setup the image layouts
- *   swap.cmd_update_barriers(cmd)
+ *   swap.cmd_update_image_layouts(cmd)
  * }
  *
  * // render to result.imageView directly or own framebuffer then blit into the backbuffer
@@ -79,9 +79,13 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
      * @param[in]  preferred_surface_formats  The preferred surface formats in decreasing priority
      * @param[in]  fallback_format            The fallback format if non of the preferred formats is
      * available
+     * @param[in]  wait_queue                 When recreating the swapchain it must be ensured that
+     * all command buffers that have semaphores are processed. You can supply a queue to wait for.
+     * If no queue is supplied, it is waited using device.waitIdle() (which is slower and not recommeded). 
      */
     Swapchain(const SharedContext& context,
               const SurfaceHandle& surface,
+              const std::optional<QueueContainerHandle> wait_queue = std::nullopt,
               const std::vector<vk::SurfaceFormatKHR>& preferred_surface_formats =
                   {vk::Format::eR8G8B8A8Srgb, vk::Format::eB8G8R8A8Srgb},
               const vk::PresentModeKHR preferred_vsync_off_mode = vk::PresentModeKHR::eMailbox);
@@ -145,7 +149,7 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
         return entries[idx].image;
     }
 
-    void cmd_update_barriers(vk::CommandBuffer cmd) const {
+    void cmd_update_image_layouts(vk::CommandBuffer cmd) const {
         cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
                             vk::PipelineStageFlagBits::eTopOfPipe, {}, {}, nullptr, barriers);
     }
@@ -167,12 +171,14 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
     /* Destroys image views only (for recreate) */
     void destroy_entries();
     [[nodiscard]] vk::PresentModeKHR select_present_mode();
+    void wait_idle();
 
   private:
     const SharedContext context;
     const SurfaceHandle surface;
     const std::vector<vk::SurfaceFormatKHR> preferred_surface_formats;
     const vk::PresentModeKHR preferred_vsync_off_mode;
+    const std::optional<QueueContainerHandle> wait_queue;
 
     vk::SurfaceFormatKHR surface_format;
     bool vsync = false;

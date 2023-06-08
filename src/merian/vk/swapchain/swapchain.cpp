@@ -53,14 +53,23 @@ vk::SurfaceFormatKHR select_surface_format(const std::vector<vk::SurfaceFormatKH
     return available[0];
 }
 
+void Swapchain::wait_idle() {
+    if (wait_queue.has_value()) {
+        wait_queue.value()->wait_idle();
+    } else {
+        context->device.waitIdle();
+    }
+}
+
 // -------------------------------------------------------------------------------------
 
 Swapchain::Swapchain(const SharedContext& context,
                      const SurfaceHandle& surface,
+                     const std::optional<QueueContainerHandle> wait_queue ,
                      const std::vector<vk::SurfaceFormatKHR>& preferred_surface_formats,
                      const vk::PresentModeKHR preferred_vsync_off_mode)
     : context(context), surface(surface), preferred_surface_formats(preferred_surface_formats),
-      preferred_vsync_off_mode(preferred_vsync_off_mode) {
+      preferred_vsync_off_mode(preferred_vsync_off_mode), wait_queue(wait_queue) {
 
     auto surface_formats = context->pd_container.physical_device.getSurfaceFormatsKHR(*surface);
     if (surface_formats.size() == 0)
@@ -212,6 +221,8 @@ vk::Extent2D Swapchain::recreate_swapchain(int width, int height) {
 }
 
 void Swapchain::destroy_entries() {
+    wait_idle();
+    
     SPDLOG_DEBUG("destroy entries");
     for (auto& entry : entries) {
         context->device.destroyImageView(entry.imageView);
