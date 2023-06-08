@@ -160,6 +160,7 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
     /* Sets vsync and recreates the swapchain if necessary (without resize) */
     void set_vsync(bool state) {
         if (state != vsync) {
+            vsync = state;
             present_mode = select_present_mode();
             recreate_swapchain(cur_width, cur_height);
         }

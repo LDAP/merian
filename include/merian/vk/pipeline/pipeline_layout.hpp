@@ -16,7 +16,8 @@ class PipelineLayout : public std::enable_shared_from_this<PipelineLayout> {
         const std::vector<std::shared_ptr<DescriptorSetLayout>>& shared_descriptor_set_layouts,
         const std::vector<vk::PushConstantRange>& ranges = {},
         const vk::PipelineLayoutCreateFlags flags = {})
-        : context(context), shared_descriptor_set_layouts(shared_descriptor_set_layouts) {
+        : context(context), ranges(ranges),
+          shared_descriptor_set_layouts(shared_descriptor_set_layouts) {
         SPDLOG_DEBUG("create PipelineLayout ({})", fmt::ptr(this));
 
         std::vector<vk::DescriptorSetLayout> descriptor_set_layouts(
@@ -37,7 +38,7 @@ class PipelineLayout : public std::enable_shared_from_this<PipelineLayout> {
         return pipeline_layout;
     }
 
-    const vk::PipelineLayout& get_pipeline() {
+    const vk::PipelineLayout& get_pipeline_layout() {
         return pipeline_layout;
     }
 
@@ -45,8 +46,13 @@ class PipelineLayout : public std::enable_shared_from_this<PipelineLayout> {
         return context;
     }
 
+    const vk::PushConstantRange get_push_constant_range(uint32_t id) {
+        return ranges[id];
+    }
+
   private:
     const SharedContext context;
+    const std::vector<vk::PushConstantRange> ranges;
     const std::vector<std::shared_ptr<DescriptorSetLayout>> shared_descriptor_set_layouts;
     vk::PipelineLayout pipeline_layout;
 };

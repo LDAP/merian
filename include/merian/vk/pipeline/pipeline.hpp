@@ -15,7 +15,7 @@ class Pipeline : public std::enable_shared_from_this<Pipeline> {
     Pipeline(const SharedContext& context, const std::shared_ptr<PipelineLayout>& pipeline_layout)
         : context(context), pipeline_layout(pipeline_layout) {}
 
-    virtual ~Pipeline() {};
+    virtual ~Pipeline(){};
 
     // ---------------------------------------------------------------------------
 
@@ -33,10 +33,36 @@ class Pipeline : public std::enable_shared_from_this<Pipeline> {
 
     // ---------------------------------------------------------------------------
 
-    virtual void bind(vk::CommandBuffer& cmd) = 0;
+    virtual void bind(const vk::CommandBuffer& cmd) = 0;
 
-    virtual void bind_descriptor_set(vk::CommandBuffer& cmd,
-                                     std::shared_ptr<DescriptorSet>& descriptor_set) = 0;
+    virtual void bind_descriptor_set(const vk::CommandBuffer& cmd,
+                                     const std::shared_ptr<DescriptorSet>& descriptor_set) = 0;
+
+    template <typename T>
+    void
+    push_constant(const vk::CommandBuffer& cmd, const T& constant, const uint32_t id = 0) {
+        push_constant(cmd, reinterpret_cast<const void*>(&constant), id);
+    }
+
+    template <typename T>
+    void
+    push_constant(const vk::CommandBuffer& cmd, const T* constant, const uint32_t id = 0) {
+        push_constant(cmd, reinterpret_cast<const void*>(constant), id);
+    }
+
+    // The id that was returned by the pipeline layout builder.
+    void push_constant(const vk::CommandBuffer& cmd, const void* values, const uint32_t id = 0) {
+        auto range = pipeline_layout->get_push_constant_range(id);
+        push_constant(cmd, range.stageFlags, range.offset, range.size, values);
+    }
+
+    virtual void push_constant(const vk::CommandBuffer& cmd,
+                               const vk::ShaderStageFlags flags,
+                               const uint32_t offset,
+                               const uint32_t size,
+                               const void* values) {
+        cmd.pushConstants(*pipeline_layout, flags, offset, size, values);
+    }
 
   protected:
     const SharedContext context;

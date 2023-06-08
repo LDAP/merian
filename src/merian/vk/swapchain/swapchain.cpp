@@ -1,5 +1,3 @@
-#pragma once
-
 #include "merian/vk/swapchain/swapchain.hpp"
 #include <spdlog/spdlog.h>
 
@@ -8,6 +6,11 @@ namespace merian {
 // Helper
 // ----------------------------------------------------------------
 
+/*
+ * Fifo is like "vsync on". Immediate is like "vsync off".
+ * Mailbox is a hybrid between the two (gpu doesnt block if running faater than the display, but
+ * screen tearing doesnt happen).
+ */
 [[nodiscard]] vk::PresentModeKHR Swapchain::select_present_mode() {
     auto present_modes = context->pd_container.physical_device.getSurfacePresentModesKHR(*surface);
     if (present_modes.size() == 0)
@@ -65,7 +68,7 @@ void Swapchain::wait_idle() {
 
 Swapchain::Swapchain(const SharedContext& context,
                      const SurfaceHandle& surface,
-                     const std::optional<QueueContainerHandle> wait_queue ,
+                     const std::optional<QueueContainerHandle> wait_queue,
                      const std::vector<vk::SurfaceFormatKHR>& preferred_surface_formats,
                      const vk::PresentModeKHR preferred_vsync_off_mode)
     : context(context), surface(surface), preferred_surface_formats(preferred_surface_formats),
@@ -78,8 +81,9 @@ Swapchain::Swapchain(const SharedContext& context,
     surface_format = select_surface_format(surface_formats, preferred_surface_formats);
     present_mode = select_present_mode();
 
-    SPDLOG_DEBUG("selected surface format {}, color space {}", vk::to_string(surface_format.format),
-                 vk::to_string(surface_format.colorSpace));
+    SPDLOG_DEBUG("selected surface format {}, color space {}, present mode {}",
+                 vk::to_string(surface_format.format), vk::to_string(surface_format.colorSpace),
+                 vk::to_string(present_mode));
 }
 
 Swapchain::~Swapchain() {
@@ -222,7 +226,7 @@ vk::Extent2D Swapchain::recreate_swapchain(int width, int height) {
 
 void Swapchain::destroy_entries() {
     wait_idle();
-    
+
     SPDLOG_DEBUG("destroy entries");
     for (auto& entry : entries) {
         context->device.destroyImageView(entry.imageView);
