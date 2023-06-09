@@ -266,6 +266,5 @@ Design decisions:
 
 ## ToDO
 
-- Extract Swapchain from ExtensionGLFW
 - AS Builder: Only record commands, dont wait.
 - Replace buffer suballocator with VMAVirtualAllocator
