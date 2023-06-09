@@ -1,5 +1,7 @@
 #pragma once
 
+#include "glm/ext/matrix_transform.hpp"
+#include "glm/glm.hpp"
 #include <vulkan/vulkan.hpp>
 
 namespace merian {
@@ -41,12 +43,27 @@ inline std::pair<vk::Offset3D, vk::Offset3D> center(vk::Extent3D extent, vk::Ext
     const int32_t half_depth_diff = (extent.depth - region.depth) / 2;
 
     const vk::Offset3D lower = {half_width_diff, half_height_diff, half_depth_diff};
-    const vk::Offset3D upper = {
-        (int32_t)extent.width - half_width_diff,
-        (int32_t)extent.height - half_height_diff,
-        (int32_t)extent.depth - half_depth_diff
-    };
+    const vk::Offset3D upper = {(int32_t)extent.width - half_width_diff,
+                                (int32_t)extent.height - half_height_diff,
+                                (int32_t)extent.depth - half_depth_diff};
     return std::make_pair(lower, upper);
+}
+
+// Rotate "pos" around "origin". right-left (phi), up-down(theta). 2 * pi equals a full turn.
+inline void
+rotate_around(glm::vec3& pos, const glm::vec3& origin, const glm::vec3& up, const float d_phi, const float d_theta) {
+    const glm::vec3 origin_to_pos(pos - origin);
+    const glm::vec3 normalized_origin_to_pos = glm::normalize(origin_to_pos);
+
+    // left-right, around axis up
+    const glm::mat4 rot_phi = glm::rotate(glm::identity<glm::mat4>(), -d_phi, up);
+
+    // up-down, around axis x
+    const glm::vec3 x = glm::normalize(glm::cross(up, normalized_origin_to_pos));
+    const glm::mat4 rot_theta = glm::rotate(glm::identity<glm::mat4>(), -d_theta, x);
+
+    const glm::vec3 rotated = glm::normalize(rot_theta * rot_phi * glm::vec4(origin_to_pos, 0));
+    pos = origin + rotated * glm::length(origin_to_pos);
 }
 
 } // namespace merian

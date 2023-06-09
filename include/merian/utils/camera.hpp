@@ -2,10 +2,16 @@
 
 #include "glm/ext/matrix_clip_space.hpp"
 #include "glm/ext/matrix_transform.hpp"
+#include "merian/vk/utils/math.hpp"
 #include <glm/glm.hpp>
 
 namespace merian {
 
+/**
+ * @brief      This class describes a camera.
+ * 
+ * The local coordinate system is x: right, y: up, and the camera looks into -z.
+ */
 class Camera {
   private:
     // Checks if current_id != check_id and sets check_id = current_id
@@ -26,8 +32,8 @@ class Camera {
            const float aspect_ratio = 1.f,
            const float near_plane = 0.1f,
            const float far_plane = 1000.f)
-        : eye(eye), center(center), up(up), field_of_view(field_of_view), aspect_ratio(aspect_ratio),
-          near_plane(near_plane), far_plane(far_plane) {
+        : eye(eye), center(center), up(glm::normalize(up)), field_of_view(field_of_view),
+          aspect_ratio(aspect_ratio), near_plane(near_plane), far_plane(far_plane) {
 
         assert(field_of_view < 179.99);
         assert(field_of_view > 0.01);
@@ -64,11 +70,11 @@ class Camera {
 
     // Convenience method that checks if the camera changed
     // and updates the supplied ID to the current ID.
-    bool has_changed_update(uint64_t& check_id) noexcept {
+    bool has_changed_update(uint64_t& check_id) const noexcept {
         return has_changed(get_change_id(), check_id);
     }
 
-    uint64_t get_change_id() noexcept {
+    uint64_t get_change_id() const noexcept {
         return (uint64_t)view_change_id << 32 | (uint64_t)projection_change_id;
     }
 
@@ -77,14 +83,17 @@ class Camera {
     void look_at(const glm::vec3& eye, const glm::vec3& center, const glm::vec3& up) noexcept {
         this->eye = eye;
         this->center = center;
-        this->up = up;
+        this->up = glm::normalize(up);
         view_change_id++;
     }
 
-    void look_at(const glm::vec3& eye, const glm::vec3& center, const glm::vec3& up, const float field_of_view) noexcept {
+    void look_at(const glm::vec3& eye,
+                 const glm::vec3& center,
+                 const glm::vec3& up,
+                 const float field_of_view) noexcept {
         this->eye = eye;
         this->center = center;
-        this->up = up;
+        this->up = glm::normalize(up);
         this->field_of_view = field_of_view;
         view_change_id++;
         projection_change_id++;
@@ -100,8 +109,9 @@ class Camera {
         view_change_id++;
     }
 
+    // this method normalizes up for you
     void set_up(const glm::vec3& up) noexcept {
-        this->up = up;
+        this->up = glm::normalize(up);
         view_change_id++;
     }
 
@@ -173,7 +183,8 @@ class Camera {
 
     // Fitting the camera position and interest to see the bounding box
     // tight: Fit bounding box exactly, not tight: fit bounding sphere
-    void look_at_bounding_box(const glm::vec3& box_min, const glm::vec3& box_max, bool tight = false) {
+    void
+    look_at_bounding_box(const glm::vec3& box_min, const glm::vec3& box_max, bool tight = false) {
         const glm::vec3 bb_half_dimensions = (box_max - box_min) * .5f;
         const glm::vec3 bb_center = box_min + bb_half_dimensions;
 
@@ -201,8 +212,12 @@ class Camera {
                 if (vct.z < 0) // Take only points in front of the center
                 {
                     // Keep the largest offset to see that vertex
-                    offset = std::max(glm::abs(vct.y) / glm::tan(glm::radians(yfov * 0.5f)) + glm::abs(vct.z), offset);
-                    offset = std::max(glm::abs(vct.x) / glm::tan(glm::radians(xfov * 0.5f)) + glm::abs(vct.z), offset);
+                    offset = std::max(glm::abs(vct.y) / glm::tan(glm::radians(yfov * 0.5f)) +
+                                          glm::abs(vct.z),
+                                      offset);
+                    offset = std::max(glm::abs(vct.x) / glm::tan(glm::radians(xfov * 0.5f)) +
+                                          glm::abs(vct.z),
+                                      offset);
                 }
             }
         }
@@ -214,13 +229,70 @@ class Camera {
         look_at(new_eye, bb_center, up);
     }
 
+    // Move your camera left-right (truck), up-down (pedestal) or in-out (dolly) according to
+    // world-space coordinates, while the rotation stays the same. Note: dolly and truck requires a
+    // certain distance to the object, else the looking direction cannot be calculated
+    // Note that a positive dz moves back, because the camera looks to -z!
+    void move(const float dx, const float dup, const float dz) {
+        eye += dup * up;
+        center += dup * up;
+
+        glm::vec3 z = eye - center;
+        if (glm::length(z) < 1e-5)
+            return;
+        z = glm::normalize(z);
+
+        const glm::vec3 x = glm::normalize(glm::cross(up, z));
+        const glm::vec3 in = glm::normalize(glm::cross(x, up));
+
+        const glm::vec3 d = dx * x + dz * in;
+        eye += d;
+        center += d;
+
+        view_change_id++;
+    }
+
+    // Move your camera left-right up-down or in-out (dolly) according to
+    // camera coordinates, while the rotation stays the same.
+    // Note that a positive dz moves back, because the camera looks to -z!
+    void fly(const float dx, const float dy, const float dz) {
+        glm::vec3 z = eye - center;
+        if (glm::length(z) < 1e-5)
+            return;
+        z = glm::normalize(z);
+
+        const glm::vec3 x = glm::normalize(glm::cross(up, z));
+        const glm::vec3 y = glm::normalize(glm::cross(z, x));
+
+        const glm::vec3 d = dx * x + dy * y + dz * z;
+        eye += d;
+        center += d;
+
+        view_change_id++;
+    }
+
+    // Pan and tilt: rotate your camera horizontally (phi) or vertically (theta), while its base is
+    // fixated on a
+    // certain point. 2 * pi equals a full turn.
+    void rotate(const float d_phi, const float d_theta) {
+        rotate_around(center, eye, up, d_phi, d_theta);
+        view_change_id++;
+    }
+
+    // Orbit around the "center" horizontally (phi) or vertically (theta).
+    //  * pi equals a full turn.
+    void orbit(const float d_phi, const float d_theta) {
+        rotate_around(eye, center, up, d_phi, d_theta);
+        view_change_id++;
+    }
+
   private:
     // VIEW
     //-------------------------------------------------
 
     glm::vec3 eye;    // Position of the camera
     glm::vec3 center; // Position where the camera is looking at
-    glm::vec3 up;     // Normalized up vector where the camera is oriented
+    glm::vec3 up;     // Normalized(!) up vector where the camera is oriented
 
     // Increase whenever eye, center or up changes
     uint32_t view_change_id = 0;
