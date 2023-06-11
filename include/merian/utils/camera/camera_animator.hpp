@@ -1,6 +1,6 @@
 #pragma once
 
-#include "merian/utils/camera.hpp"
+#include "merian/utils/camera/camera.hpp"
 #include "merian/utils/interpolation.hpp"
 
 #include <chrono>

@@ -1,4 +1,4 @@
-#include "merian/vk/swapchain/swapchain.hpp"
+#include "merian/vk/window/swapchain.hpp"
 #include <spdlog/spdlog.h>
 
 namespace merian {

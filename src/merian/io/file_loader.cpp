@@ -1,5 +1,5 @@
 #include "merian/io/file_loader.hpp"
-#include "merian/utils/string_utils.hpp"
+#include "merian/utils/string.hpp"
 
 #include <filesystem>
 #include <fstream>

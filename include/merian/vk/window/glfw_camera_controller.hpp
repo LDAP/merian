@@ -1,8 +1,8 @@
 #pragma once
 
 #include "glm/glm.hpp"
-#include "merian/utils/camera_animator.hpp"
-#include "merian/vk/swapchain/glfw_window.hpp"
+#include "merian/utils/camera/camera_animator.hpp"
+#include "merian/vk/window/glfw_window.hpp"
 #include <memory>
 
 namespace merian {

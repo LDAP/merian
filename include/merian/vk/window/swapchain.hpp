@@ -1,7 +1,7 @@
 #pragma once
 
 #include "merian/vk/command/queue_container.hpp"
-#include "merian/vk/swapchain/surface.hpp"
+#include "merian/vk/window/surface.hpp"
 #include "vulkan/vulkan.hpp"
 #include <GLFW/glfw3.h>
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "merian/utils/vector_utils.hpp"
+#include "merian/utils/vector.hpp"
 #include "merian/vk/context.hpp"
 #include "merian/vk/sampler/sampler.hpp"
 

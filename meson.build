@@ -48,8 +48,8 @@ src_files = files(
     'src/ext/vma.cpp',
 
     'src/merian/io/file_loader.cpp',
-    'src/merian/utils/stopwatch.cpp',
     'src/merian/utils/renderdoc.cpp',
+    'src/merian/utils/stopwatch.cpp',
     'src/merian/vk/command/command_pool.cpp',
     'src/merian/vk/command/queue_container.cpp',
     'src/merian/vk/context.cpp',
@@ -61,13 +61,13 @@ src_files = files(
     'src/merian/vk/memory/buffer_suballocator.cpp',
     'src/merian/vk/memory/memory_allocator.cpp',
     'src/merian/vk/memory/memory_allocator_vma.cpp',
-    'src/merian/vk/memory/resource_allocator.cpp',
     'src/merian/vk/memory/resource_allocations.cpp',
+    'src/merian/vk/memory/resource_allocator.cpp',
     'src/merian/vk/memory/staging_memory_manager.cpp',
     'src/merian/vk/raytrace/acceleration_structure_builder.cpp',
     'src/merian/vk/sampler/sampler_pool.cpp',
-    'src/merian/vk/swapchain/swapchain.cpp',
     'src/merian/vk/utils/barriers.cpp',
+    'src/merian/vk/window/swapchain.cpp',
 )
 inc_dirs = [
     'include',

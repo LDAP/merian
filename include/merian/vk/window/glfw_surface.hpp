@@ -1,7 +1,7 @@
 #pragma once
 
-#include "merian/vk/swapchain/glfw_window.hpp"
-#include "merian/vk/swapchain/surface.hpp"
+#include "merian/vk/window/glfw_window.hpp"
+#include "merian/vk/window/surface.hpp"
 
 #include <memory>
 #include <spdlog/spdlog.h>

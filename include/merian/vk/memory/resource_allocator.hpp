@@ -143,4 +143,6 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
 
 };
 
+using ResourceAllocatorHandle = std::shared_ptr<ResourceAllocator>;
+
 } // namespace merian

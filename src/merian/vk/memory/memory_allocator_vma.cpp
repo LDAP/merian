@@ -1,6 +1,6 @@
 #include "merian/vk/memory/memory_allocator_vma.hpp"
 #include "merian/utils/debug.hpp"
-#include "merian/utils/string_utils.hpp"
+#include "merian/utils/string.hpp"
 #include "merian/vk/memory/resource_allocations.hpp"
 #include "merian/vk/utils/check_result.hpp"
 #include <spdlog/spdlog.h>

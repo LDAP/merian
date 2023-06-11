@@ -1,9 +1,9 @@
 #pragma once
 
-#include "merian/utils/vector_utils.hpp"
+#include "merian/utils/vector.hpp"
 #include "merian/vk/extension/extension.hpp"
-#include "merian/vk/swapchain/glfw_surface.hpp"
-#include "merian/vk/swapchain/swapchain.hpp"
+#include "merian/vk/window/glfw_surface.hpp"
+#include "merian/vk/window/swapchain.hpp"
 
 #include <spdlog/logger.h>
 #include <spdlog/spdlog.h>
