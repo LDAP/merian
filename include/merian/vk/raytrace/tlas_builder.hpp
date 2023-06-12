@@ -78,9 +78,6 @@ class TLASBuilder : public ASBuilder {
     }
 
     // Build a TLAS from instances that are stored on the device.
-    //
-    // Note: This method does not insert a synchronization barrier. You must enure proper
-    // synchronization before using the TLAS (you can use the helper cmd_barrier()).
     AccelerationStructureHandle
     queue_build(const uint32_t instance_count,
                 const BufferHandle& instances,
@@ -93,9 +90,6 @@ class TLASBuilder : public ASBuilder {
     }
 
     // Build a TLAS from instances that are stored on the device.
-    //
-    // Note: This method does not insert a synchronization barrier. You must enure proper
-    // synchronization before using the TLAS (you can use the helper cmd_barrier()).
     AccelerationStructureHandle
     queue_build(const uint32_t instance_count,
                 const vk::AccelerationStructureGeometryInstancesDataKHR& instances_data,
@@ -103,9 +97,6 @@ class TLASBuilder : public ASBuilder {
                     vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace);
 
     // Update a TLAS from instances that are stored on the device.
-    //
-    // Note: This method does not insert a synchronization barrier. You must enure proper
-    // synchronization before using the TLAS (you can use the helper cmd_barrier()).
     void queue_update(const uint32_t instance_count,
                       const BufferHandle& instances,
                       const AccelerationStructureHandle src_as,
@@ -121,9 +112,6 @@ class TLASBuilder : public ASBuilder {
     //
     // Consider using queue_rebuild, since the rebuild is fast and updating may hurt raytracing
     // performance.
-    //
-    // Note: This method does not insert a synchronization barrier. You must enure proper
-    // synchronization before using the TLAS (you can use the helper cmd_barrier()).
     void queue_update(const uint32_t instance_count,
                       const vk::AccelerationStructureGeometryInstancesDataKHR& instances_data,
                       const AccelerationStructureHandle src_as,
@@ -134,9 +122,6 @@ class TLASBuilder : public ASBuilder {
     //
     // Consider using queue_rebuild, since the rebuild is fast and updating may hurt raytracing
     // performance.
-    //
-    // Note: This method does not insert a synchronization barrier. You must enure proper
-    // synchronization before using the TLAS (you can use the helper cmd_barrier()).
     void queue_rebuild(const uint32_t instance_count,
                        const BufferHandle& instances,
                        const AccelerationStructureHandle src_as,
@@ -149,14 +134,13 @@ class TLASBuilder : public ASBuilder {
     }
 
     // Rebuild a TLAS from instances that are stored on the device.
-    //
-    // Note: This method does not insert a synchronization barrier. You must enure proper
-    // synchronization before using the TLAS (you can use the helper cmd_barrier()).
     void queue_rebuild(const uint32_t instance_count,
                        const vk::AccelerationStructureGeometryInstancesDataKHR& instances_data,
                        const AccelerationStructureHandle src_as,
                        const vk::BuildAccelerationStructureFlagsKHR flags);
 
+    // Note: This method does not insert a synchronization barrier. You must enure proper
+    // synchronization before using the TLAS (you can use the helper cmd_barrier()).
     void get_cmds(const vk::CommandBuffer cmd);
 
   private:
