@@ -17,6 +17,22 @@ namespace merian {
  * This builder holds a scratch buffer that is large enough for the largest AS.
  * The scratch buffer can be released by calling release(). This class must kept alive until the
  * build has finished.
+ * 
+ * Best practices: (from https://developer.nvidia.com/blog/best-practices-using-nvidia-rtx-ray-tracing/)
+ * 
+ * For TLAS, consider the PREFER_FAST_TRACE flag and perform only rebuilds.
+ * Often, this results in best overall performance.
+ * The rationale is that making the TLAS as high quality as possible regardless of the movement occurring in the
+ * scene is important and doesn’t cost too much.
+ * 
+ * For static BLASes, use the PREFER_FAST_TRACE flag.
+ * For all BLASes that are built only one time, optimizing for best ray-trace performance is an easy choice.
+ *
+ * For dynamic BLASes, choose between using the PREFER_FAST_TRACE or PREFER_FAST_BUILD flags, or neither.
+ * For BLASes that are occasionally rebuilt or updated, the optimal build preference flag depends on many factors.
+ * How much is built? How expensive are the ray traces?
+ * Can the build cost be hidden by executing builds on async compute? To find the optimal solution for a specific case,
+ * I recommend trying out different options.
  */
 class ASBuilder {
 
@@ -48,7 +64,7 @@ class ASBuilder {
     // Ensures the scratch buffer has min size `min_size`.
     // Do not call if a build is running/pending.
     void ensure_scratch_buffer(vk::DeviceSize min_size) {
-        if (current_scratch_buffer_size >= min_size) {
+        if (scratch_buffer && current_scratch_buffer_size >= min_size) {
             return;
         }
         scratch_buffer.reset();

@@ -96,9 +96,11 @@ void Texture::attach_sampler(const std::optional<SamplerHandle> sampler) {
     this->sampler = sampler;
 }
 
-AccelerationStructure::AccelerationStructure(const vk::AccelerationStructureKHR& as,
-                                             const BufferHandle& buffer)
-    : as(as), buffer(buffer) {
+AccelerationStructure::AccelerationStructure(
+    const vk::AccelerationStructureKHR& as,
+    const BufferHandle& buffer,
+    const vk::AccelerationStructureBuildSizesInfoKHR& size_info)
+    : as(as), buffer(buffer), size_info(size_info) {
     SPDLOG_DEBUG("create acceleration structure ({})", fmt::ptr(this));
 }
 

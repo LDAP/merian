@@ -64,8 +64,10 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
                               const std::vector<T>& data_,
                               const vk::BufferUsageFlags usage_,
                               const std::string& debug_name = {},
-                              const MemoryMappingType mapping_type = NONE) {
-        return createBuffer(cmdBuf, sizeof(T) * data_.size(), usage_, data_.data(), mapping_type, debug_name);
+                              const MemoryMappingType mapping_type = NONE,
+                              const std::optional<vk::DeviceSize> min_alignment = std::nullopt) {
+        return createBuffer(cmdBuf, sizeof(T) * data_.size(), usage_, data_.data(), mapping_type,
+                            debug_name, min_alignment);
     }
 
     //--------------------------------------------------------------------------------------------------
@@ -119,8 +121,8 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
     //--------------------------------------------------------------------------------------------------
 
     AccelerationStructureHandle
-    createAccelerationStructure(const vk::DeviceSize size,
-                                const vk::AccelerationStructureTypeKHR type,
+    createAccelerationStructure(const vk::AccelerationStructureTypeKHR type,
+                                const vk::AccelerationStructureBuildSizesInfoKHR& size_info,
                                 const std::string& debug_name = {});
 
     //--------------------------------------------------------------------------------------------------
@@ -140,7 +142,6 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
     const std::shared_ptr<MemoryAllocator> m_memAlloc;
     const std::shared_ptr<StagingMemoryManager> m_staging;
     const std::shared_ptr<SamplerPool> m_samplerPool;
-
 };
 
 using ResourceAllocatorHandle = std::shared_ptr<ResourceAllocator>;

@@ -157,22 +157,23 @@ TextureHandle ResourceAllocator::createTexture(const vk::CommandBuffer& cmdBuf,
     return resultTexture;
 }
 
-AccelerationStructureHandle
-ResourceAllocator::createAccelerationStructure(const vk::DeviceSize size,
-                                               const vk::AccelerationStructureTypeKHR type,
-                                               const std::string& debug_name) {
+AccelerationStructureHandle ResourceAllocator::createAccelerationStructure(
+    const vk::AccelerationStructureTypeKHR type,
+    const vk::AccelerationStructureBuildSizesInfoKHR& size_info,
+    const std::string& debug_name) {
     // Allocating the buffer to hold the acceleration structure
-    BufferHandle buffer = createBuffer(size,
+    BufferHandle buffer = createBuffer(size_info.accelerationStructureSize,
                                        vk::BufferUsageFlagBits::eAccelerationStructureStorageKHR |
                                            vk::BufferUsageFlagBits::eShaderDeviceAddress,
                                        NONE, debug_name);
     vk::AccelerationStructureKHR as;
     // Setting the buffer
-    vk::AccelerationStructureCreateInfoKHR createInfo{{}, *buffer, {}, size, type};
+    vk::AccelerationStructureCreateInfoKHR createInfo{
+        {}, *buffer, {}, size_info.accelerationStructureSize, type};
     check_result(context->device.createAccelerationStructureKHR(&createInfo, nullptr, &as),
                  "could not create acceleration structure");
 
-    return std::make_shared<AccelerationStructure>(as, buffer);
+    return std::make_shared<AccelerationStructure>(as, buffer, size_info);
 }
 
 void ResourceAllocator::finalizeStaging(vk::Fence fence) {

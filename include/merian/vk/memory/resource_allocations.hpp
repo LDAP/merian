@@ -218,7 +218,9 @@ class AccelerationStructure : public std::enable_shared_from_this<AccelerationSt
     // Creats a AccelerationStructure objects that automatically destroys `as` when destructed.
     // The memory is not freed explicitly to let it free itself.
     // It is asserted that the memory is already bound correctly.
-    AccelerationStructure(const vk::AccelerationStructureKHR& as, const BufferHandle& buffer);
+    AccelerationStructure(const vk::AccelerationStructureKHR& as,
+                          const BufferHandle& buffer,
+                          const vk::AccelerationStructureBuildSizesInfoKHR& size_info);
 
     ~AccelerationStructure();
 
@@ -226,6 +228,10 @@ class AccelerationStructure : public std::enable_shared_from_this<AccelerationSt
 
     operator const vk::AccelerationStructureKHR&() const {
         return as;
+    }
+
+    operator const vk::AccelerationStructureKHR*() const {
+        return &as;
     }
 
     const BufferHandle& get_buffer() const {
@@ -236,6 +242,10 @@ class AccelerationStructure : public std::enable_shared_from_this<AccelerationSt
         return as;
     }
 
+    const vk::AccelerationStructureBuildSizesInfoKHR& get_size_info() {
+        return size_info;
+    }
+
     // -----------------------------------------------------------
 
     // E.g. needed for accelerationStructureReference in VkAccelerationStructureInstanceKHR
@@ -244,6 +254,7 @@ class AccelerationStructure : public std::enable_shared_from_this<AccelerationSt
   private:
     const vk::AccelerationStructureKHR as;
     const BufferHandle buffer;
+    const vk::AccelerationStructureBuildSizesInfoKHR size_info;
 };
 
 using AccelerationStructureHandle = std::shared_ptr<AccelerationStructure>;
