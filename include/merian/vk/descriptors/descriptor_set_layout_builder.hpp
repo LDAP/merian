@@ -89,6 +89,16 @@ class DescriptorSetLayoutBuilder {
         return *this;
     }
 
+    DescriptorSetLayoutBuilder& add_binding_combined_sampler(
+        vk::ShaderStageFlags stage_flags = vk::ShaderStageFlagBits::eCompute,
+        uint32_t descriptor_count = 1,
+        const vk::Sampler* sampler = nullptr,
+        std::optional<uint32_t> binding = std::nullopt) {
+        add_binding(stage_flags, vk::DescriptorType::eCombinedImageSampler, descriptor_count,
+                    sampler, binding);
+        return *this;
+    }
+
     DescriptorSetLayoutBuilder& add_binding_acceleration_structure(
         vk::ShaderStageFlags stage_flags = vk::ShaderStageFlagBits::eCompute,
         uint32_t descriptor_count = 1,
