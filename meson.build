@@ -39,6 +39,7 @@ glfw = dependency('glfw3', version: ['>=3.3.0'])
 glm = dependency('glm', fallback : ['glm', 'glm_dep'], version: ['>=0.9.9.8'])
 tol_subp = cmake.subproject('tinyobjloader')
 tol = tol_subp.dependency('tinyobjloader')
+tgltf = cmake.subproject('tinygltf').dependency('tinygltf')
 
 # Main targets
 # Keep sorted
@@ -85,6 +86,7 @@ lib = static_library(
         glfw,
         glm,
         spdlog,
+        tgltf,
         tol,
         vulkan,
     ],
