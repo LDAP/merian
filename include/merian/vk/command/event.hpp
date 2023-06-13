@@ -1,9 +1,10 @@
 #pragma once
 
 #include "merian/vk/context.hpp"
+
 namespace merian {
 
-class Event {
+class Event : public std::enable_shared_from_this<Event> {
 
   public:
     Event() = delete;
