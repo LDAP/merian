@@ -9,7 +9,7 @@ ASCompressor::compact(const SharedContext& context,
                       const CommandPoolHandle& pool,
                       const QueueContainerHandle& queue,
                       const std::vector<AccelerationStructureHandle>& ass,
-                      const EventHandle& wait_event,
+                      const EventHandle& build_wait_event,
                       const vk::AccelerationStructureTypeKHR type) {
     vk::QueryPoolCreateInfo qpci{{},
                                  vk::QueryType::eAccelerationStructureCompactedSizeKHR,
@@ -20,18 +20,14 @@ ASCompressor::compact(const SharedContext& context,
 
     cmd.resetQueryPool(query_pool, 0, static_cast<uint32_t>(ass.size()));
 
-    const vk::MemoryBarrier barrier{vk::AccessFlagBits::eAccelerationStructureReadKHR |
-                                  vk::AccessFlagBits::eAccelerationStructureWriteKHR,
-                              vk::AccessFlagBits::eAccelerationStructureReadKHR |
-                                  vk::AccessFlagBits::eAccelerationStructureWriteKHR};
-
-    cmd.waitEvents(wait_event->get_event(),
-                   vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR,
-                   vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR, barrier, {}, {});
+    // Wait for build to complete
+    const vk::DependencyInfo dep_info{{}, ASCompressor::build_compress_barrier, {}, {}};
+    cmd.setEvent2(build_wait_event->get_event(), dep_info);
 
     // Query compacted size
     std::vector<vk::AccelerationStructureKHR> acc_structures(ass.size());
-    std::transform(ass.begin(), ass.end(), acc_structures.begin(), [&](auto& as) { return as->get_acceleration_structure(); });
+    std::transform(ass.begin(), ass.end(), acc_structures.begin(),
+                   [&](auto& as) { return as->get_acceleration_structure(); });
     cmd.writeAccelerationStructuresPropertiesKHR(
         acc_structures, vk::QueryType::eAccelerationStructureCompactedSizeKHR, query_pool, 0);
     vk::Fence fence = context->device.createFence({});
@@ -66,9 +62,15 @@ ASCompressor::compact(const SharedContext& context,
         cmd.copyAccelerationStructureKHR(copy_info);
     }
 
-    cmd.pipelineBarrier(vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR,
-                        vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR, {}, 1, &barrier,
-                        0, nullptr, 0, nullptr);
+    // Make sure tlas is not build before copy finished
+    vk::MemoryBarrier2 copy_tlas_barrier{vk::PipelineStageFlagBits2::eAccelerationStructureCopyKHR,
+                       vk::AccessFlagBits2::eAccelerationStructureReadKHR |
+                           vk::AccessFlagBits2::eAccelerationStructureWriteKHR,
+                       vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
+                       vk::AccessFlagBits2::eAccelerationStructureReadKHR |
+                           vk::AccessFlagBits2::eAccelerationStructureWriteKHR};
+    vk::DependencyInfo dep_copy_tlas{{}, copy_tlas_barrier};
+    cmd.pipelineBarrier2(dep_copy_tlas);
 
     pool->end_all();
     queue->submit(pool, fence);

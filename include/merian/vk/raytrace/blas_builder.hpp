@@ -119,7 +119,7 @@ class BLASBuilder : public ASBuilder {
 
     // Note that you must execute the command buffer, else the returned acceleration structures are
     // not valid.
-    void get_cmds(const vk::CommandBuffer& cmd, const EventHandle& signal_event = nullptr);
+    void get_cmds(const vk::CommandBuffer& cmd, const EventHandle& compact_signal_event = nullptr);
 
   private:
     // The BLASs that are build when calling build()
