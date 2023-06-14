@@ -46,4 +46,6 @@ class DescriptorSetLayout : public std::enable_shared_from_this<DescriptorSetLay
     vk::DescriptorSetLayout layout;
 };
 
+using DescriptorSetLayoutHandle = std::shared_ptr<DescriptorSetLayout>;
+
 } // namespace merian

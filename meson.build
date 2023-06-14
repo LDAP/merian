@@ -18,7 +18,6 @@ if get_option('buildtype').startswith('debug')
 endif
 
 # Vulkan dynamic loader (VULKAN_HPP_DEFAULT_DISPATCHER initialized in Context)
-add_project_arguments('-DVK_ENABLE_BETA_EXTENSIONS', language : 'cpp')
 add_project_arguments('-DVULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1', language : 'cpp')
 # Vulkan uses [0, 1] for depth instead of [-1, 1] like OpenGL
 add_project_arguments('-DGLM_FORCE_DEPTH_ZERO_TO_ONE', language : 'cpp')

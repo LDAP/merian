@@ -84,4 +84,6 @@ class DescriptorSet : public std::enable_shared_from_this<DescriptorSet> {
     vk::DescriptorSet set;
 };
 
+using DescriptorSetHandle = std::shared_ptr<DescriptorSet>;
+
 } // namespace merian
