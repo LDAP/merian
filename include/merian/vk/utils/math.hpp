@@ -2,6 +2,7 @@
 
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/glm.hpp"
+#include <numeric>
 #include <vulkan/vulkan.hpp>
 
 namespace merian {
@@ -51,8 +52,11 @@ inline std::pair<vk::Offset3D, vk::Offset3D> center(vk::Extent3D extent, vk::Ext
 
 // Rotate "pos" around "origin". right-left (phi), up-down(theta).
 // Keeps the up direction valid.
-inline void
-rotate_around(glm::vec3& pos, const glm::vec3& origin, const glm::vec3& up, const float d_phi, const float d_theta) {
+inline void rotate_around(glm::vec3& pos,
+                          const glm::vec3& origin,
+                          const glm::vec3& up,
+                          const float d_phi,
+                          const float d_theta) {
     const glm::vec3 origin_to_pos(pos - origin);
     const glm::vec3 normalized_origin_to_pos = glm::normalize(origin_to_pos);
 
@@ -62,18 +66,40 @@ rotate_around(glm::vec3& pos, const glm::vec3& origin, const glm::vec3& up, cons
     // up-down, around axis x
     const glm::vec3 x = glm::normalize(glm::cross(up, normalized_origin_to_pos));
     const glm::mat4 rot_theta = glm::rotate(glm::identity<glm::mat4>(), -d_theta, x);
-    
+
     glm::vec3 rotated = rot_theta * glm::vec4(origin_to_pos, 0);
 
     if (glm::dot(x, glm::cross(up, rotated)) <= 0) {
         // only rotate left-right
-        rotated =  glm::normalize(rot_phi * glm::vec4(origin_to_pos, 0));
+        rotated = glm::normalize(rot_phi * glm::vec4(origin_to_pos, 0));
     } else {
         // additionally rotate up-down
         rotated = glm::normalize(rot_phi * glm::vec4(rotated, 0));
     }
-    
+
     pos = origin + rotated * glm::length(origin_to_pos);
+}
+
+// Calculates the lowest common multiple of two numbers
+inline uint32_t lcm(uint32_t a, uint32_t b) {
+    return (a * b) / std::gcd(a, b);
+}
+
+// Calculates the lowest common multiple of numbers
+inline uint32_t lcm(std::vector<uint32_t> numbers) {
+    if (numbers.empty())
+        return 0;
+    if (numbers.size() == 1) {
+        return numbers[0];
+    }
+
+    uint32_t cur = lcm(numbers[0], numbers[1]);
+
+    for (uint32_t i = 2; i < numbers.size(); i++) {
+        cur = lcm(cur, numbers[i]);
+    }
+
+    return cur;
 }
 
 } // namespace merian

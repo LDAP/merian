@@ -3,6 +3,7 @@
 #include "merian/vk/graph/node.hpp"
 #include "merian/vk/graph/node_io.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
+#include "merian/vk/utils/math.hpp"
 
 #include <memory>
 #include <queue>
@@ -16,10 +17,14 @@ class Graph : public std::enable_shared_from_this<Graph> {
   private:
     struct ImageResource {
         ImageHandle image;
+        vk::PipelineStageFlags2 current_stage_flags;
+        vk::AccessFlags2 current_access_flags;
     };
 
     struct BufferResource {
         BufferHandle buffer;
+        vk::PipelineStageFlags2 current_stage_flags;
+        vk::AccessFlags2 current_access_flags;
     };
 
     struct NodeData {
@@ -46,27 +51,28 @@ class Graph : public std::enable_shared_from_this<Graph> {
         std::vector<NodeOutputDescriptorImage> image_outputs_descriptors{};
         std::vector<NodeOutputDescriptorBuffer> buffer_outputs_descriptors{};
 
-        // for each output -> (max_delay + 1) resources
+        // for each output -> (max_delay + 1) resources, accessed in iteration % (max_delay + 1).
         // (on allocate_outputs)
         std::vector<std::vector<ImageResource>> output_images{};
         std::vector<std::vector<BufferResource>> output_buffers{};
 
-        // for each iteration (max_delay + 1) -> For each output -> a list of resources
+        // for each iteration (max_delay + 1) -> For each output -> a list of resources which are
+        // given to the node.
         // (on prepare_resource_sets)
         std::vector<std::vector<ImageHandle>> precomputed_input_images{};
         std::vector<std::vector<BufferHandle>> precomputed_input_buffers{};
         std::vector<std::vector<ImageHandle>> precomputed_output_images{};
         std::vector<std::vector<BufferHandle>> precomputed_output_buffers{};
 
-        // for each iteration (max_delay + 1) -> For each input -> a memory barrier
-        // (on allocate_outputs)
-        std::vector<std::vector<vk::ImageMemoryBarrier2>> input_images_barriers{};
-        // for each iteration (max_delay + 1) -> For each output -> a memory barrier
-        // (on allocate_outputs)
-        std::vector<std::vector<vk::ImageMemoryBarrier2>> output_images_barriers{};
+        // // for each iteration (max_delay + 1) -> For each input -> a memory barrier
+        // // (on allocate_outputs)
+        // std::vector<std::vector<vk::ImageMemoryBarrier2>> input_images_barriers{};
+        // // for each iteration (max_delay + 1) -> For each output -> a memory barrier
+        // // (on allocate_outputs)
+        // std::vector<std::vector<vk::ImageMemoryBarrier2>> output_images_barriers{};
 
-        // one combined memory barrier for all buffers
-        vk::MemoryBarrier2 memory_barrier{};
+        // // one combined memory barrier for all buffers
+        // vk::MemoryBarrier2 memory_barrier{};
     };
 
   public:
@@ -109,8 +115,19 @@ class Graph : public std::enable_shared_from_this<Graph> {
                 fmt::format("The input '{}' on node '{}' is already connected", dst_input,
                             node_data[dst].name)};
         }
-
         node_data[dst].image_input_connections[dst_input] = {src, src_output};
+
+        // make sure the same underlying resource is not accessed twice:
+        for (auto& [n, i] : node_data[src].image_output_connections[src_output]) {
+            if (n == dst && node_data[dst].image_input_descriptors[i].delay ==
+                                node_data[dst].image_input_descriptors[dst_input].delay) {
+                throw std::invalid_argument{fmt::format(
+                    "You are trying to access the same underlying image of node '{}' twice from "
+                    "node '{}' with connections {} -> {}, {} -> {}: ",
+                    node_data[src].name, node_data[dst].name, src_output, i, src_output,
+                    dst_input)};
+            }
+        }
         node_data[src].image_output_connections[src_output].emplace_back(dst, dst_input);
     }
 
@@ -126,8 +143,19 @@ class Graph : public std::enable_shared_from_this<Graph> {
         assert(dst_input < node_data[dst].buffer_input_connections.size());
         // nothing is connected to this input
         assert(!std::get<0>(node_data[dst].buffer_input_connections[dst_input]));
-
         node_data[dst].buffer_input_connections[dst_input] = {src, src_output};
+
+        // make sure the same underlying resource is not accessed twice:
+        for (auto& [n, i] : node_data[src].buffer_output_connections[src_output]) {
+            if (n == dst && node_data[dst].buffer_input_descriptors[i].delay ==
+                                node_data[dst].buffer_input_descriptors[dst_input].delay) {
+                throw std::invalid_argument{fmt::format(
+                    "You are trying to access the same underlying buffer of node '{}' twice from "
+                    "node '{}' with connections {} -> {}, {} -> {}: ",
+                    node_data[src].name, node_data[dst].name, src_output, i, src_output,
+                    dst_input)};
+            }
+        }
         node_data[src].buffer_output_connections[src_output].emplace_back(dst, dst_input);
     }
 
@@ -161,12 +189,12 @@ class Graph : public std::enable_shared_from_this<Graph> {
         allocate_outputs();
         prepare_resource_sets();
 
-        // for (auto& node : flat_topology) {
-        //     NodeData& data = node_data[node];
-        //     // TODO: See cmd_run
-        //     node->cmd_build(cmd, data.input_images, data.input_buffers, data.output_images,
-        //                     data.output_buffers);
-        // }
+        for (auto& node : flat_topology) {
+            NodeData& data = node_data[node];
+            // TODO: See cmd_run
+            node->cmd_build(cmd, data.precomputed_input_images, data.precomputed_input_buffers,
+                            data.precomputed_output_images, data.precomputed_output_buffers);
+        }
 
         graph_built = true;
         current_iteration = 0;
@@ -427,7 +455,8 @@ class Graph : public std::enable_shared_from_this<Graph> {
                         out_desc.create_info.size, usage_flags, NONE,
                         fmt::format("node '{}' buffer, output '{}', copy '{}'", src_data.name,
                                     out_desc.name, j));
-                    src_data.output_buffers[src_out_idx].emplace_back(buffer);
+                    src_data.output_buffers[src_out_idx].emplace_back(
+                        buffer, vk::PipelineStageFlagBits2::eTopOfPipe, vk::AccessFlags2());
                 }
             }
 
@@ -450,7 +479,8 @@ class Graph : public std::enable_shared_from_this<Graph> {
                         create_info, NONE,
                         fmt::format("node '{}' image, output '{}', copy '{}'", src_data.name,
                                     out_desc.name, j));
-                    src_data.output_images[src_out_idx].emplace_back(image);
+                    src_data.output_images[src_out_idx].emplace_back(
+                        image, vk::PipelineStageFlagBits2::eTopOfPipe, vk::AccessFlags2());
                 }
             }
         }
@@ -458,7 +488,71 @@ class Graph : public std::enable_shared_from_this<Graph> {
 
     // Depending on the delay the resources of a node changes on each iteration
     // the "resource sets" for these iterations are prepared here.
-    void prepare_resource_sets() {}
+    void prepare_resource_sets() {
+        for (auto& [dst_node, dst_data] : node_data) {
+            // Find the lowest number of sets needed (lcm)
+            std::vector<uint32_t> num_resources;
+
+            // By checking how many copies of that resource exists in the sources
+            for (auto& [src_node, src_output_idx] : dst_data.image_input_connections) {
+                num_resources.push_back(node_data[src_node].output_images[src_output_idx].size());
+            }
+            for (auto& [src_node, src_output_idx] : dst_data.buffer_input_connections) {
+                num_resources.push_back(node_data[src_node].output_buffers[src_output_idx].size());
+            }
+            // ...and how many output resources the node has
+            for (auto& images : dst_data.output_images) {
+                num_resources.push_back(images.size());
+            }
+            for (auto& buffers : dst_data.output_buffers) {
+                num_resources.push_back(buffers.size());
+            }
+
+            // After this many iterations we can again use the first resource set
+            uint32_t num_sets = lcm(num_resources);
+
+            // Precompute resource sets for each iteration
+            dst_data.precomputed_input_images.resize(num_sets);
+            dst_data.precomputed_input_buffers.resize(num_sets);
+            dst_data.precomputed_output_images.resize(num_sets);
+            dst_data.precomputed_output_buffers.resize(num_sets);
+
+            for (uint32_t set_idx = 0; set_idx < num_sets; set_idx++) {
+                // Precompute inputs
+                for (uint32_t i = 0; i < dst_data.image_input_descriptors.size(); i++) {
+                    auto& [src_node, src_output_idx] = dst_data.image_input_connections[i];
+                    auto& in_desc = dst_data.image_input_descriptors[i];
+                    const uint32_t num_resources =
+                        node_data[src_node].output_images[src_output_idx].size();
+                    const uint32_t resource_idx =
+                        (set_idx + num_resources - in_desc.delay) % num_resources;
+                    const auto& resource =
+                        node_data[src_node].output_images[src_output_idx][resource_idx];
+                    dst_data.precomputed_input_images[set_idx].push_back(resource.image);
+                }
+                for (uint32_t i = 0; i < dst_data.buffer_input_descriptors.size(); i++) {
+                    auto& [src_node, src_output_idx] = dst_data.buffer_input_connections[i];
+                    auto& in_desc = dst_data.buffer_input_descriptors[i];
+                    const uint32_t num_resources =
+                        node_data[src_node].output_buffers[src_output_idx].size();
+                    const uint32_t resource_idx =
+                        (set_idx + num_resources - in_desc.delay) % num_resources;
+                    const auto& resource =
+                        node_data[src_node].output_buffers[src_output_idx][resource_idx];
+                    dst_data.precomputed_input_buffers[set_idx].push_back(resource.buffer);
+                }
+                // Precompute outputs
+                for (auto& images : dst_data.output_images) {
+                    dst_data.precomputed_output_images[set_idx].push_back(
+                        images[set_idx % images.size()].image);
+                }
+                for (auto& buffers : dst_data.output_buffers) {
+                    dst_data.precomputed_output_buffers[set_idx].push_back(
+                        buffers[set_idx % buffers.size()].buffer);
+                }
+            }
+        }
+    }
 };
 
 } // namespace merian
