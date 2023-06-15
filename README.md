@@ -97,7 +97,6 @@ Common:
 Features:
 
 - `ExtensionVkFloatAtomics`: Enables float atomics (`VK_EXT_shader_atomic_float`).
-- `ExtensionVkMaintenance4`: Enables maintenance4 extension and feature
 
 Ray tracing:
 

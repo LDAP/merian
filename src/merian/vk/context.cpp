@@ -163,7 +163,10 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id,
         extension_features_pnext = ext->pnext_get_features_2(extension_features_pnext);
     }
     // ^
-    pd_container.features.physical_device_features_v12.setPNext(extension_features_pnext);
+    pd_container.features.physical_device_features_v13.setPNext(extension_features_pnext);
+    // ^
+    pd_container.features.physical_device_features_v12.setPNext(
+        &pd_container.features.physical_device_features_v13);
     // ^
     pd_container.features.physical_device_features.setPNext(
         &pd_container.features.physical_device_features_v12);
@@ -293,6 +296,14 @@ void enable_common_features(const Context::FeaturesContainer& supported,
         SPDLOG_DEBUG("scalarBlockLayout supported. Enabling feature");
         enable.physical_device_features_v12.scalarBlockLayout = true;
     }
+    if (supported.physical_device_features_v13.synchronization2) {
+        SPDLOG_DEBUG("synchronization2 supported. Enabling feature");
+        enable.physical_device_features_v13.synchronization2 = true;
+    }
+    if (supported.physical_device_features_v13.maintenance4) {
+        SPDLOG_DEBUG("maintenance4 supported. Enabling feature");
+        enable.physical_device_features_v13.maintenance4 = true;
+    }
 }
 
 void Context::create_device_and_queues(uint32_t preferred_number_compute_queues) {
@@ -363,7 +374,9 @@ void Context::create_device_and_queues(uint32_t preferred_number_compute_queues)
             ext->pnext_device_create_info(extensions_device_create_p_next);
     }
     // ^
-    enable.physical_device_features_v12.setPNext(extensions_device_create_p_next);
+    enable.physical_device_features_v13.setPNext(extensions_device_create_p_next);
+    // ^
+    enable.physical_device_features_v12.setPNext(&enable.physical_device_features_v13);
     // ^
     enable.physical_device_features.setPNext(&enable.physical_device_features_v12);
     // ^

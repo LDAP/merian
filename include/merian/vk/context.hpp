@@ -29,6 +29,7 @@ class Context : public std::enable_shared_from_this<Context> {
     struct FeaturesContainer {
         vk::PhysicalDeviceFeatures2 physical_device_features;
         vk::PhysicalDeviceVulkan12Features physical_device_features_v12;
+        vk::PhysicalDeviceVulkan13Features physical_device_features_v13;
     };
 
     struct PhysicalDeviceContainer {
