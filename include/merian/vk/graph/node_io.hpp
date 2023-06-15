@@ -16,7 +16,7 @@ struct NodeInputDescriptor {
                         const uint32_t delay)
         : name(name), access_flags(access_flags), pipeline_stages(pipeline_stages), delay(delay) {}
     std::string name;
-    // The types of access on this input
+    // The types of access on this input, only reads are allowed
     vk::AccessFlags2 access_flags;
     // The pipeline stages that access this input
     vk::PipelineStageFlags2 pipeline_stages;

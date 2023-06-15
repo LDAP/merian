@@ -36,7 +36,8 @@ class Node : public std::enable_shared_from_this<Node> {
 
     // Called when the graph is build or rebuild. You get your inputs and outputs for each set_index
     // (see cmd_process), use these to create your descriptor sets and such. You can also make and
-    // such uploads here. You should only write to images that were declared as 'persistent'.
+    // such uploads here. You should only write to output images that were declared as 'persistent'.
+    // No not access or modify input images.
     virtual void cmd_build(const vk::CommandBuffer& cmd,
                            const std::vector<std::vector<ImageHandle>>& image_inputs,
                            const std::vector<std::vector<BufferHandle>>& buffer_inputs,

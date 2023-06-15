@@ -12,19 +12,69 @@
 
 namespace merian {
 
+/**
+ * @brief      This class describes a general processing graph.
+ *
+ * Nodes can define their required inputs and outputs.
+ * The graph wires up the nodes and allocates the memory for outputs.
+ * Memory may be aliased if 'persistent=false' for an output.
+ * The graph can also buffer resources is delay > 0.
+ *
+ * Note that it is not possible to access the same output twice from the same node
+ * with equal value for delay. Since the graph does also insert memory barriers and
+ * does layout transitions it is not possible to access
+ *
+ * These barriers are automatically inserted:
+ * - For buffers and images: Before they are used as input or output
+ *   for an output the access flags are set to the exact flags of that output
+ *   for an input the access flags are set to the disjunction of all access flags of all inputs that
+ *   use this resource.
+ * - For images: Whenever a layout transition is required
+ *
+ */
 class Graph : public std::enable_shared_from_this<Graph> {
 
   private:
+    // Holds information about images that were allocated by this graph
     struct ImageResource {
         ImageHandle image;
+
+        // for barrier insertions
         vk::PipelineStageFlags2 current_stage_flags;
         vk::AccessFlags2 current_access_flags;
+
+        // to detect if a barrier is needed
+        bool last_used_as_output = false;
+
+        vk::PipelineStageFlags2 output_stage_flags;
+        vk::AccessFlags2 output_access_flags;
+
+        // combined pipeline stage flags of all inputs
+        vk::PipelineStageFlags2 input_stage_flags;
+        // combined access flags of all inputs
+        vk::AccessFlags2 input_access_flags;
     };
 
+    // Holds information about buffers that were allocated by this graph
     struct BufferResource {
         BufferHandle buffer;
+
+        // for barrier insertions
         vk::PipelineStageFlags2 current_stage_flags;
         vk::AccessFlags2 current_access_flags;
+
+        // to detect which src flags are needed
+        // if true: Use the access and pipeline flags from the output
+        // if false: use the input_*_flags
+        bool last_used_as_output = false;
+
+        vk::PipelineStageFlags2 output_stage_flags;
+        vk::AccessFlags2 output_access_flags;
+
+        // combined pipeline stage flags of all inputs
+        vk::PipelineStageFlags2 input_stage_flags;
+        // combined access flags of all inputs
+        vk::AccessFlags2 input_access_flags;
     };
 
     struct NodeData {
@@ -48,15 +98,15 @@ class Graph : public std::enable_shared_from_this<Graph> {
         std::vector<std::vector<std::tuple<NodeHandle, uint32_t>>> buffer_output_connections{};
 
         // Cache outputs (on calculate_outputs)
-        std::vector<NodeOutputDescriptorImage> image_outputs_descriptors{};
-        std::vector<NodeOutputDescriptorBuffer> buffer_outputs_descriptors{};
+        std::vector<NodeOutputDescriptorImage> image_output_descriptors{};
+        std::vector<NodeOutputDescriptorBuffer> buffer_output_descriptors{};
 
         // for each output -> (max_delay + 1) resources, accessed in iteration % (max_delay + 1).
         // (on allocate_outputs)
-        std::vector<std::vector<ImageResource>> output_images{};
-        std::vector<std::vector<BufferResource>> output_buffers{};
+        std::vector<std::vector<std::shared_ptr<ImageResource>>> allocated_image_outputs{};
+        std::vector<std::vector<std::shared_ptr<BufferResource>>> allocated_buffer_outputs{};
 
-        // for each iteration (max_delay + 1) -> For each output -> a list of resources which are
+        // for each iteration -> For each output/input -> a list of resources which are
         // given to the node.
         // (on prepare_resource_sets)
         std::vector<std::vector<ImageHandle>> precomputed_input_images{};
@@ -64,15 +114,16 @@ class Graph : public std::enable_shared_from_this<Graph> {
         std::vector<std::vector<ImageHandle>> precomputed_output_images{};
         std::vector<std::vector<BufferHandle>> precomputed_output_buffers{};
 
-        // // for each iteration (max_delay + 1) -> For each input -> a memory barrier
-        // // (on allocate_outputs)
-        // std::vector<std::vector<vk::ImageMemoryBarrier2>> input_images_barriers{};
-        // // for each iteration (max_delay + 1) -> For each output -> a memory barrier
-        // // (on allocate_outputs)
-        // std::vector<std::vector<vk::ImageMemoryBarrier2>> output_images_barriers{};
-
-        // // one combined memory barrier for all buffers
-        // vk::MemoryBarrier2 memory_barrier{};
+        // as precomputed_input_images but hold a reference to resource
+        // needed for barrier insertion
+        std::vector<std::vector<std::shared_ptr<ImageResource>>>
+            precomputed_input_images_resource{};
+        std::vector<std::vector<std::shared_ptr<BufferResource>>>
+            precomputed_input_buffers_resource{};
+        std::vector<std::vector<std::shared_ptr<ImageResource>>>
+            precomputed_output_images_resource{};
+        std::vector<std::vector<std::shared_ptr<BufferResource>>>
+            precomputed_output_buffers_resource{};
     };
 
   public:
@@ -118,6 +169,7 @@ class Graph : public std::enable_shared_from_this<Graph> {
         node_data[dst].image_input_connections[dst_input] = {src, src_output};
 
         // make sure the same underlying resource is not accessed twice:
+        // only images: Since they need layout transitions
         for (auto& [n, i] : node_data[src].image_output_connections[src_output]) {
             if (n == dst && node_data[dst].image_input_descriptors[i].delay ==
                                 node_data[dst].image_input_descriptors[dst_input].delay) {
@@ -144,18 +196,6 @@ class Graph : public std::enable_shared_from_this<Graph> {
         // nothing is connected to this input
         assert(!std::get<0>(node_data[dst].buffer_input_connections[dst_input]));
         node_data[dst].buffer_input_connections[dst_input] = {src, src_output};
-
-        // make sure the same underlying resource is not accessed twice:
-        for (auto& [n, i] : node_data[src].buffer_output_connections[src_output]) {
-            if (n == dst && node_data[dst].buffer_input_descriptors[i].delay ==
-                                node_data[dst].buffer_input_descriptors[dst_input].delay) {
-                throw std::invalid_argument{fmt::format(
-                    "You are trying to access the same underlying buffer of node '{}' twice from "
-                    "node '{}' with connections {} -> {}, {} -> {}: ",
-                    node_data[src].name, node_data[dst].name, src_output, i, src_output,
-                    dst_input)};
-            }
-        }
         node_data[src].buffer_output_connections[src_output].emplace_back(dst, dst_input);
     }
 
@@ -190,10 +230,7 @@ class Graph : public std::enable_shared_from_this<Graph> {
         prepare_resource_sets();
 
         for (auto& node : flat_topology) {
-            NodeData& data = node_data[node];
-            // TODO: See cmd_run
-            node->cmd_build(cmd, data.precomputed_input_images, data.precomputed_input_buffers,
-                            data.precomputed_output_images, data.precomputed_output_buffers);
+            cmd_build_node(cmd, node);
         }
 
         graph_built = true;
@@ -203,28 +240,9 @@ class Graph : public std::enable_shared_from_this<Graph> {
     void cmd_run(vk::CommandBuffer& cmd) {
         assert(graph_built);
 
-        // for (auto& node : flat_topology) {
-        //     NodeData& data = node_data[node];
-        //     uint32_t set_index = current_iteration % data.input_images.size();
-        //     auto& in_images = data.input_images[set_index];
-        //     auto& in_buffers = data.input_buffers[set_index];
-        //     auto& out_images = data.output_images[set_index];
-        //     auto& out_buffers = data.output_buffers[set_index];
-
-        //     node->cmd_process(cmd, current_iteration, set_index, in_images, in_buffers,
-        //     out_images,
-        //                       out_buffers);
-
-        //     // TODO:
-        //     // - Serialize layers too to determine image transisions and such -> On output might
-        //     be
-        //     // read
-        //     //   by multiple nodes as input, but they want different layouts!
-        //     // - Insert current layout into image barriers!
-        //     // vk::DependencyInfo dep_info{
-        //     //     {}, data.memory_barrier, {}, data.images_barriers[set_index]};
-        //     // cmd.pipelineBarrier2(dep_info);
-        // }
+        for (auto& node : flat_topology) {
+            cmd_run_node(cmd, node);
+        }
 
         current_iteration++;
     }
@@ -243,8 +261,9 @@ class Graph : public std::enable_shared_from_this<Graph> {
     std::vector<NodeHandle> flat_topology;
     std::unordered_map<NodeHandle, uint32_t> topology_index;
 
-    // Contains all nodes, barriers, ... in order to render frames
-    // std::vector<TimelineElement>
+    // required in cmd_barrier_for_node, stored here to prevent memory allocation
+    std::vector<vk::ImageMemoryBarrier2> image_barriers_for_set;
+    std::vector<vk::BufferMemoryBarrier2> buffer_barriers_for_set;
 
   private: // Helpers
     // Makes sure every input is connected
@@ -332,7 +351,7 @@ class Graph : public std::enable_shared_from_this<Graph> {
                 connected_image_outputs.push_back(Node::FEEDBACK_OUTPUT_IMAGE);
             else
                 connected_image_outputs.push_back(
-                    node_data[src_node].image_outputs_descriptors[src_output_idx]);
+                    node_data[src_node].image_output_descriptors[src_output_idx]);
         }
         for (uint32_t i = 0; i < data.buffer_input_descriptors.size(); i++) {
             auto& [src_node, src_output_idx] = data.buffer_input_connections[i];
@@ -341,27 +360,27 @@ class Graph : public std::enable_shared_from_this<Graph> {
                 connected_buffer_outputs.push_back(Node::FEEDBACK_OUTPUT_BUFFER);
             else
                 connected_buffer_outputs.push_back(
-                    node_data[src_node].buffer_outputs_descriptors[src_output_idx]);
+                    node_data[src_node].buffer_output_descriptors[src_output_idx]);
         }
 
         // get outputs from node
-        std::tie(data.image_outputs_descriptors, data.buffer_outputs_descriptors) =
+        std::tie(data.image_output_descriptors, data.buffer_output_descriptors) =
             node->describe_outputs(connected_image_outputs, connected_buffer_outputs);
 
         // validate that the user did not try to connect something from an non existent output,
         // since on connect we did not know the number of output descriptors
-        if (data.image_output_connections.size() > data.image_outputs_descriptors.size()) {
+        if (data.image_output_connections.size() > data.image_output_descriptors.size()) {
             throw std::runtime_error{fmt::format("image output index '{}' is invalid for node '{}'",
                                                  data.image_output_connections.size() - 1,
                                                  data.name)};
         }
-        if (data.buffer_output_connections.size() > data.buffer_outputs_descriptors.size()) {
+        if (data.buffer_output_connections.size() > data.buffer_output_descriptors.size()) {
             throw std::runtime_error{
                 fmt::format("buffer output index '{}' is invalid for node '{}'",
                             data.buffer_output_connections.size() - 1, data.name)};
         }
-        data.image_output_connections.resize(data.image_outputs_descriptors.size());
-        data.buffer_output_connections.resize(data.buffer_outputs_descriptors.size());
+        data.image_output_connections.resize(data.image_output_descriptors.size());
+        data.buffer_output_connections.resize(data.buffer_output_descriptors.size());
 
         // check for all subsequent nodes if we visited all "requirements" and add to queue.
         // also, fail if we see a node again! (in both cases exclude "feedback" edges)
@@ -411,8 +430,8 @@ class Graph : public std::enable_shared_from_this<Graph> {
 #endif
 
         NodeData& src_data = node_data[src];
-        for (uint32_t i = 0; i < src_data.image_outputs_descriptors.size(); i++) {
-            auto& src_out_desc = src_data.image_outputs_descriptors[i];
+        for (uint32_t i = 0; i < src_data.image_output_descriptors.size(); i++) {
+            auto& src_out_desc = src_data.image_output_descriptors[i];
             auto& src_output = src_data.image_output_connections[i];
             for (auto& [dst_node, image_input_idx] : src_output) {
                 NodeData& dst_data = node_data[dst_node];
@@ -421,8 +440,8 @@ class Graph : public std::enable_shared_from_this<Graph> {
                              src_out_desc.name, dst_in_desc.delay, dst_data.name, dst_in_desc.name);
             }
         }
-        for (uint32_t i = 0; i < src_data.buffer_outputs_descriptors.size(); i++) {
-            auto& src_out_desc = src_data.buffer_outputs_descriptors[i];
+        for (uint32_t i = 0; i < src_data.buffer_output_descriptors.size(); i++) {
+            auto& src_out_desc = src_data.buffer_output_descriptors[i];
             auto& src_output = src_data.buffer_output_connections[i];
             for (auto& [dst_node, buffer_input_idx] : src_output) {
                 NodeData& dst_data = node_data[dst_node];
@@ -437,17 +456,21 @@ class Graph : public std::enable_shared_from_this<Graph> {
     void allocate_outputs() {
         for (auto& [src_node, src_data] : node_data) {
             // Buffers
-            src_data.output_buffers.resize(src_data.buffer_outputs_descriptors.size());
-            for (uint32_t src_out_idx = 0; src_out_idx < src_data.buffer_outputs_descriptors.size();
+            src_data.allocated_buffer_outputs.resize(src_data.buffer_output_descriptors.size());
+            for (uint32_t src_out_idx = 0; src_out_idx < src_data.buffer_output_descriptors.size();
                  src_out_idx++) {
-                auto& out_desc = src_data.buffer_outputs_descriptors[src_out_idx];
+                auto& out_desc = src_data.buffer_output_descriptors[src_out_idx];
                 vk::BufferUsageFlags usage_flags = out_desc.create_info.usage;
+                vk::PipelineStageFlags2 input_pipeline_stages;
+                vk::AccessFlags2 input_access_flags;
                 uint32_t max_delay = 0;
                 for (auto& [dst_node, dst_input_idx] :
                      src_data.buffer_output_connections[src_out_idx]) {
                     auto& in_desc = node_data[dst_node].buffer_input_descriptors[dst_input_idx];
                     max_delay = std::max(max_delay, in_desc.delay);
                     usage_flags |= in_desc.usage_flags;
+                    input_pipeline_stages |= in_desc.pipeline_stages;
+                    input_access_flags |= in_desc.access_flags;
                 }
                 // Create max_delay + 1 buffers
                 for (uint32_t j = 0; j < max_delay + 1; j++) {
@@ -455,23 +478,30 @@ class Graph : public std::enable_shared_from_this<Graph> {
                         out_desc.create_info.size, usage_flags, NONE,
                         fmt::format("node '{}' buffer, output '{}', copy '{}'", src_data.name,
                                     out_desc.name, j));
-                    src_data.output_buffers[src_out_idx].emplace_back(
-                        buffer, vk::PipelineStageFlagBits2::eTopOfPipe, vk::AccessFlags2());
+                    src_data.allocated_buffer_outputs[src_out_idx].emplace_back(
+                        std::make_shared<BufferResource>(
+                            buffer, vk::PipelineStageFlagBits2::eTopOfPipe, vk::AccessFlags2(),
+                            false, out_desc.pipeline_stages, out_desc.access_flags,
+                            input_pipeline_stages, input_access_flags));
                 }
             }
 
             // Images
-            src_data.output_images.resize(src_data.image_outputs_descriptors.size());
-            for (uint32_t src_out_idx = 0; src_out_idx < src_data.image_outputs_descriptors.size();
+            src_data.allocated_image_outputs.resize(src_data.image_output_descriptors.size());
+            for (uint32_t src_out_idx = 0; src_out_idx < src_data.image_output_descriptors.size();
                  src_out_idx++) {
-                auto& out_desc = src_data.image_outputs_descriptors[src_out_idx];
+                auto& out_desc = src_data.image_output_descriptors[src_out_idx];
                 vk::ImageCreateInfo create_info = out_desc.create_info;
+                vk::PipelineStageFlags2 input_pipeline_stages;
+                vk::AccessFlags2 input_access_flags;
                 uint32_t max_delay = 0;
                 for (auto& [dst_node, dst_input_idx] :
                      src_data.image_output_connections[src_out_idx]) {
                     auto& in_desc = node_data[dst_node].image_input_descriptors[dst_input_idx];
                     max_delay = std::max(max_delay, in_desc.delay);
                     create_info.usage |= in_desc.usage_flags;
+                    input_pipeline_stages |= in_desc.pipeline_stages;
+                    input_access_flags |= in_desc.access_flags;
                 }
                 // Create max_delay + 1 images
                 for (uint32_t j = 0; j < max_delay + 1; j++) {
@@ -479,8 +509,11 @@ class Graph : public std::enable_shared_from_this<Graph> {
                         create_info, NONE,
                         fmt::format("node '{}' image, output '{}', copy '{}'", src_data.name,
                                     out_desc.name, j));
-                    src_data.output_images[src_out_idx].emplace_back(
-                        image, vk::PipelineStageFlagBits2::eTopOfPipe, vk::AccessFlags2());
+                    src_data.allocated_image_outputs[src_out_idx].emplace_back(
+                        std::make_shared<ImageResource>(
+                            image, vk::PipelineStageFlagBits2::eTopOfPipe, vk::AccessFlags2(),
+                            false, out_desc.pipeline_stages, out_desc.access_flags,
+                            input_pipeline_stages, input_access_flags));
                 }
             }
         }
@@ -495,16 +528,18 @@ class Graph : public std::enable_shared_from_this<Graph> {
 
             // By checking how many copies of that resource exists in the sources
             for (auto& [src_node, src_output_idx] : dst_data.image_input_connections) {
-                num_resources.push_back(node_data[src_node].output_images[src_output_idx].size());
+                num_resources.push_back(
+                    node_data[src_node].allocated_image_outputs[src_output_idx].size());
             }
             for (auto& [src_node, src_output_idx] : dst_data.buffer_input_connections) {
-                num_resources.push_back(node_data[src_node].output_buffers[src_output_idx].size());
+                num_resources.push_back(
+                    node_data[src_node].allocated_buffer_outputs[src_output_idx].size());
             }
             // ...and how many output resources the node has
-            for (auto& images : dst_data.output_images) {
+            for (auto& images : dst_data.allocated_image_outputs) {
                 num_resources.push_back(images.size());
             }
-            for (auto& buffers : dst_data.output_buffers) {
+            for (auto& buffers : dst_data.allocated_buffer_outputs) {
                 num_resources.push_back(buffers.size());
             }
 
@@ -516,6 +551,10 @@ class Graph : public std::enable_shared_from_this<Graph> {
             dst_data.precomputed_input_buffers.resize(num_sets);
             dst_data.precomputed_output_images.resize(num_sets);
             dst_data.precomputed_output_buffers.resize(num_sets);
+            dst_data.precomputed_input_images_resource.resize(num_sets);
+            dst_data.precomputed_input_buffers_resource.resize(num_sets);
+            dst_data.precomputed_output_images_resource.resize(num_sets);
+            dst_data.precomputed_output_buffers_resource.resize(num_sets);
 
             for (uint32_t set_idx = 0; set_idx < num_sets; set_idx++) {
                 // Precompute inputs
@@ -523,35 +562,177 @@ class Graph : public std::enable_shared_from_this<Graph> {
                     auto& [src_node, src_output_idx] = dst_data.image_input_connections[i];
                     auto& in_desc = dst_data.image_input_descriptors[i];
                     const uint32_t num_resources =
-                        node_data[src_node].output_images[src_output_idx].size();
+                        node_data[src_node].allocated_image_outputs[src_output_idx].size();
                     const uint32_t resource_idx =
                         (set_idx + num_resources - in_desc.delay) % num_resources;
                     const auto& resource =
-                        node_data[src_node].output_images[src_output_idx][resource_idx];
-                    dst_data.precomputed_input_images[set_idx].push_back(resource.image);
+                        node_data[src_node].allocated_image_outputs[src_output_idx][resource_idx];
+                    dst_data.precomputed_input_images[set_idx].push_back(resource->image);
+                    dst_data.precomputed_input_images_resource[set_idx].push_back(resource);
                 }
                 for (uint32_t i = 0; i < dst_data.buffer_input_descriptors.size(); i++) {
                     auto& [src_node, src_output_idx] = dst_data.buffer_input_connections[i];
                     auto& in_desc = dst_data.buffer_input_descriptors[i];
                     const uint32_t num_resources =
-                        node_data[src_node].output_buffers[src_output_idx].size();
+                        node_data[src_node].allocated_buffer_outputs[src_output_idx].size();
                     const uint32_t resource_idx =
                         (set_idx + num_resources - in_desc.delay) % num_resources;
                     const auto& resource =
-                        node_data[src_node].output_buffers[src_output_idx][resource_idx];
-                    dst_data.precomputed_input_buffers[set_idx].push_back(resource.buffer);
+                        node_data[src_node].allocated_buffer_outputs[src_output_idx][resource_idx];
+                    dst_data.precomputed_input_buffers[set_idx].push_back(resource->buffer);
+                    dst_data.precomputed_input_buffers_resource[set_idx].push_back(resource);
                 }
                 // Precompute outputs
-                for (auto& images : dst_data.output_images) {
+                for (auto& images : dst_data.allocated_image_outputs) {
                     dst_data.precomputed_output_images[set_idx].push_back(
-                        images[set_idx % images.size()].image);
+                        images[set_idx % images.size()]->image);
+                    dst_data.precomputed_output_images_resource[set_idx].push_back(
+                        images[set_idx % images.size()]);
                 }
-                for (auto& buffers : dst_data.output_buffers) {
+                for (auto& buffers : dst_data.allocated_buffer_outputs) {
                     dst_data.precomputed_output_buffers[set_idx].push_back(
-                        buffers[set_idx % buffers.size()].buffer);
+                        buffers[set_idx % buffers.size()]->buffer);
+                    dst_data.precomputed_output_buffers_resource[set_idx].push_back(
+                        buffers[set_idx % buffers.size()]);
                 }
             }
         }
+    }
+
+    void cmd_build_node(vk::CommandBuffer& cmd, NodeHandle& node) {
+        NodeData& data = node_data[node];
+        for (uint32_t set_idx = 0; set_idx < data.precomputed_input_images.size(); set_idx++) {
+            cmd_barrier_for_node(cmd, data, set_idx);
+        }
+        node->cmd_build(cmd, data.precomputed_input_images, data.precomputed_input_buffers,
+                        data.precomputed_output_images, data.precomputed_output_buffers);
+    }
+
+    // Insert the according barriers for that node
+    void cmd_run_node(vk::CommandBuffer& cmd, NodeHandle& node) {
+        NodeData& data = node_data[node];
+        uint32_t set_idx = current_iteration % data.precomputed_input_images.size();
+
+        cmd_barrier_for_node(cmd, data, set_idx);
+
+        auto& in_images = data.precomputed_input_images[set_idx];
+        auto& in_buffers = data.precomputed_input_buffers[set_idx];
+        auto& out_images = data.precomputed_output_images[set_idx];
+        auto& out_buffers = data.precomputed_output_buffers[set_idx];
+
+        node->cmd_process(cmd, current_iteration, set_idx, in_images, in_buffers, out_images,
+                          out_buffers);
+    }
+
+    // Inserts the necessary barriers for a node and a set index
+    void cmd_barrier_for_node(vk::CommandBuffer& cmd, NodeData& data, uint32_t& set_idx) {
+        image_barriers_for_set.clear();
+        buffer_barriers_for_set.clear();
+
+        auto& in_images_res = data.precomputed_input_images_resource[set_idx];
+        auto& in_buffers_res = data.precomputed_input_buffers_resource[set_idx];
+
+        // in-images
+        for (uint32_t i = 0; i < data.image_input_descriptors.size(); i++) {
+            auto& in_desc = data.image_input_descriptors[i];
+            auto& res = in_images_res[i];
+            if (res->last_used_as_output) {
+                // Need to insert barrier and transition layout
+                vk::ImageMemoryBarrier2 img_bar{res->current_stage_flags,
+                                                res->current_access_flags,
+                                                res->input_stage_flags,
+                                                res->input_access_flags,
+                                                res->image->get_current_layout(),
+                                                in_desc.required_layout,
+                                                VK_QUEUE_FAMILY_IGNORED,
+                                                VK_QUEUE_FAMILY_IGNORED,
+                                                *res->image,
+                                                all_levels_and_layers()};
+                image_barriers_for_set.push_back(img_bar);
+                res->current_stage_flags = res->input_stage_flags;
+                res->current_access_flags = res->input_access_flags;
+                res->last_used_as_output = false;
+            } else {
+                // No barrier required, if no transition required
+                if (in_desc.required_layout != res->image->get_current_layout()) {
+                    vk::ImageMemoryBarrier2 img_bar{res->current_stage_flags,
+                                                    res->current_access_flags,
+                                                    res->current_stage_flags,
+                                                    res->current_access_flags,
+                                                    res->image->get_current_layout(),
+                                                    in_desc.required_layout,
+                                                    VK_QUEUE_FAMILY_IGNORED,
+                                                    VK_QUEUE_FAMILY_IGNORED,
+                                                    *res->image,
+                                                    all_levels_and_layers()};
+                    image_barriers_for_set.push_back(img_bar);
+                }
+            }
+        }
+        // in-buffers
+        for (uint32_t i = 0; i < data.buffer_input_descriptors.size(); i++) {
+            auto& res = in_buffers_res[i];
+            if (res->last_used_as_output) {
+                vk::BufferMemoryBarrier2 buffer_bar{res->current_stage_flags,
+                                                    res->current_access_flags,
+                                                    res->input_stage_flags,
+                                                    res->input_access_flags,
+                                                    VK_QUEUE_FAMILY_IGNORED,
+                                                    VK_QUEUE_FAMILY_IGNORED,
+                                                    *res->buffer,
+                                                    0,
+                                                    VK_WHOLE_SIZE};
+                buffer_barriers_for_set.push_back(buffer_bar);
+                res->current_stage_flags = res->input_stage_flags;
+                res->current_access_flags = res->input_access_flags;
+                res->last_used_as_output = false;
+            } // else nothing to do
+        }
+
+        auto& out_images_res = data.precomputed_output_images_resource[set_idx];
+        auto& out_buffers_res = data.precomputed_output_buffers_resource[set_idx];
+
+        // out-images
+        for (uint32_t i = 0; i < data.image_output_descriptors.size(); i++) {
+            auto& out_desc = data.image_output_descriptors[i];
+            auto& res = out_images_res[i];
+
+            vk::ImageMemoryBarrier2 img_bar{res->current_stage_flags,
+                                            res->current_access_flags,
+                                            res->output_stage_flags,
+                                            res->output_access_flags,
+                                            res->image->get_current_layout(),
+                                            out_desc.required_layout,
+                                            VK_QUEUE_FAMILY_IGNORED,
+                                            VK_QUEUE_FAMILY_IGNORED,
+                                            *res->image,
+                                            all_levels_and_layers()};
+            image_barriers_for_set.push_back(img_bar);
+            res->current_stage_flags = res->output_stage_flags;
+            res->current_access_flags = res->output_access_flags;
+            res->last_used_as_output = true;
+        }
+        // out-buffers
+        for (uint32_t i = 0; i < data.buffer_output_descriptors.size(); i++) {
+            auto& res = out_buffers_res[i];
+
+            vk::BufferMemoryBarrier2 buffer_bar{res->current_stage_flags,
+                                                res->current_access_flags,
+                                                res->output_stage_flags,
+                                                res->output_access_flags,
+                                                VK_QUEUE_FAMILY_IGNORED,
+                                                VK_QUEUE_FAMILY_IGNORED,
+                                                *res->buffer,
+                                                0,
+                                                VK_WHOLE_SIZE};
+            buffer_barriers_for_set.push_back(buffer_bar);
+            res->current_stage_flags = res->output_stage_flags;
+            res->current_access_flags = res->output_access_flags;
+            res->last_used_as_output = true;
+        }
+
+        vk::DependencyInfoKHR dep_info{{}, {}, buffer_barriers_for_set, image_barriers_for_set};
+        cmd.pipelineBarrier2(dep_info);
     }
 };
 
