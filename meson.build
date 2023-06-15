@@ -58,6 +58,7 @@ src_files = files(
     'src/merian/vk/extension/extension_stopwatch.cpp',
     'src/merian/vk/extension/extension_vk_debug_utils.cpp',
     'src/merian/vk/extension/extension_vk_glfw.cpp',
+    'src/merian/vk/graph/graph.cpp',
     'src/merian/vk/memory/buffer_suballocator.cpp',
     'src/merian/vk/memory/memory_allocator.cpp',
     'src/merian/vk/memory/memory_allocator_vma.cpp',
