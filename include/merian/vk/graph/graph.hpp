@@ -154,7 +154,6 @@ class Graph : public std::enable_shared_from_this<Graph> {
 
     // topological order of nodes
     std::vector<NodeHandle> flat_topology;
-    std::unordered_map<NodeHandle, uint32_t> topology_index;
 
     // required in cmd_barrier_for_node, stored here to prevent memory allocation
     std::vector<vk::ImageMemoryBarrier2> image_barriers_for_set;
@@ -190,6 +189,9 @@ class Graph : public std::enable_shared_from_this<Graph> {
 
     // Inserts the necessary barriers for a node and a set index
     void cmd_barrier_for_node(vk::CommandBuffer& cmd, NodeData& data, uint32_t& set_idx);
+
+    // Resets all data, so that the graph can be rebuild
+    void reset_graph();
 };
 
 } // namespace merian

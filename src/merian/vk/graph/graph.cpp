@@ -70,6 +70,11 @@ void Graph::connect_buffer(const NodeHandle& src,
 }
 
 void Graph::cmd_build(vk::CommandBuffer& cmd) {
+    if (graph_built) {
+        context->device.waitIdle();
+        reset_graph();
+    }
+
     if (node_data.empty())
         return;
 
@@ -87,7 +92,6 @@ void Graph::cmd_build(vk::CommandBuffer& cmd) {
         flat_topology[node_index] = queue.front();
         queue.pop();
 
-        topology_index[flat_topology[node_index]] = node_index;
         visited.insert(flat_topology[node_index]);
         calculate_outputs(flat_topology[node_index], visited, queue);
         log_connections(flat_topology[node_index]);
@@ -562,6 +566,28 @@ void Graph::cmd_barrier_for_node(vk::CommandBuffer& cmd, NodeData& data, uint32_
 
     vk::DependencyInfoKHR dep_info{{}, {}, buffer_barriers_for_set, image_barriers_for_set};
     cmd.pipelineBarrier2(dep_info);
+}
+
+void Graph::reset_graph() {
+    this->flat_topology.clear();
+    for (auto& [node, data] : node_data) {
+
+        data.image_output_descriptors.clear();
+        data.buffer_output_descriptors.clear();
+
+        data.allocated_image_outputs.clear();
+        data.allocated_buffer_outputs.clear();
+
+        data.precomputed_input_images.clear();
+        data.precomputed_input_buffers.clear();
+        data.precomputed_output_images.clear();
+        data.precomputed_output_buffers.clear();
+
+        data.precomputed_input_images_resource.clear();
+        data.precomputed_input_buffers_resource.clear();
+        data.precomputed_output_images_resource.clear();
+        data.precomputed_output_buffers_resource.clear();
+    }
 }
 
 } // namespace merian
