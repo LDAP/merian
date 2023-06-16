@@ -86,13 +86,6 @@ template <uint32_t RING_SIZE = 3> class RingCommandPool {
         }
     }
 
-    void reset() {
-        pools.clear();
-        for (uint32_t i = 0; i < RING_SIZE; i++) {
-            pools.emplace_back(std::make_shared<RingCommandPoolCycle>(context, queue_family_index, create_flags, i, current_index));
-        }
-    }
-
     // Like set_cycle(uint32_t cycle) but advances the cycle internally by one
     CommandPoolHandle set_cycle() {
         return set_cycle(current_index + 1);
