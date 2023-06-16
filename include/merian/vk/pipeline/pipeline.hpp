@@ -70,4 +70,6 @@ class Pipeline : public std::enable_shared_from_this<Pipeline> {
     vk::Pipeline pipeline;
 };
 
+using PipelineHandle = std::shared_ptr<Pipeline>;
+
 } // namespace merian

@@ -121,7 +121,11 @@ class Graph : public std::enable_shared_from_this<Graph> {
     };
 
   public:
-    Graph(const SharedContext context, const ResourceAllocatorHandle allocator);
+    // wait_queue: A queue we can wait for when rebuilding the graph (device.waitIdle() is used if
+    // null).
+    Graph(const SharedContext context,
+          const ResourceAllocatorHandle allocator,
+          const std::optional<QueueContainerHandle> wait_queue = std::nullopt);
 
     // Add a node to the graph, returns the index of the node (can be used for connect and such).
     void add_node(const std::string name, const std::shared_ptr<Node>& node);
@@ -138,15 +142,19 @@ class Graph : public std::enable_shared_from_this<Graph> {
                         const uint32_t src_output,
                         const uint32_t dst_input);
 
-    void cmd_build(vk::CommandBuffer& cmd);
+    void request_rebuild() {
+        rebuild_requested = true;
+    }
 
+    // Runs the graph. On the first run or if rebuild is requested the graph is build.
     void cmd_run(vk::CommandBuffer& cmd);
 
   private:
     const SharedContext context;
     const ResourceAllocatorHandle allocator;
+    const std::optional<QueueContainerHandle> wait_queue;
 
-    bool graph_built = false;
+    bool rebuild_requested = true;
     uint64_t current_iteration = 0;
 
     std::unordered_map<std::string, NodeHandle> node_from_name;
@@ -181,6 +189,8 @@ class Graph : public std::enable_shared_from_this<Graph> {
     // Depending on the delay the resources of a node changes on each iteration
     // the "resource sets" for these iterations are prepared here.
     void prepare_resource_sets();
+
+    void cmd_build(vk::CommandBuffer& cmd);
 
     void cmd_build_node(vk::CommandBuffer& cmd, NodeHandle& node);
 

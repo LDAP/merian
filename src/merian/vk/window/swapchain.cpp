@@ -220,7 +220,9 @@ vk::Extent2D Swapchain::recreate_swapchain(int width, int height) {
     cur_height = height;
 
     // clang-format on
-    SPDLOG_DEBUG("created swapchain");
+    SPDLOG_DEBUG("created swapchain {}x{} ({} {} {})", cur_width, cur_height,
+                 vk::to_string(surface_format.format), vk::to_string(surface_format.colorSpace),
+                 vk::to_string(present_mode));
     return extent;
 }
 

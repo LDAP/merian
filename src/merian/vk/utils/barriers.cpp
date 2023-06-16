@@ -87,9 +87,9 @@ void cmd_barrier_image_layout(vk::CommandBuffer cmd,
     vk::ImageMemoryBarrier image_memory_barrier = barrier_image_layout(image, old_image_layout, new_image_layout, subresource_range);
 
     vk::PipelineStageFlags srcStageMask = pipeline_stage_for_image_layout(old_image_layout);
-    vk::PipelineStageFlags destStageMask = pipeline_stage_for_image_layout(new_image_layout);
+    vk::PipelineStageFlags dstStageMask = pipeline_stage_for_image_layout(new_image_layout);
 
-    cmd.pipelineBarrier(srcStageMask, destStageMask, {}, 0, nullptr, 0, nullptr, 1,
+    cmd.pipelineBarrier(srcStageMask, dstStageMask, {}, 0, nullptr, 0, nullptr, 1,
                               &image_memory_barrier);
 }
 

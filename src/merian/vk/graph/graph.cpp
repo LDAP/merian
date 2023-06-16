@@ -2,8 +2,10 @@
 
 namespace merian {
 
-Graph::Graph(const SharedContext context, const ResourceAllocatorHandle allocator)
-    : context(context), allocator(allocator) {}
+Graph::Graph(const SharedContext context,
+             const ResourceAllocatorHandle allocator,
+             const std::optional<QueueContainerHandle> wait_queue)
+    : context(context), allocator(allocator), wait_queue(wait_queue) {}
 
 void Graph::add_node(const std::string name, const std::shared_ptr<Node>& node) {
     if (node_from_name.contains(name)) {
@@ -70,10 +72,14 @@ void Graph::connect_buffer(const NodeHandle& src,
 }
 
 void Graph::cmd_build(vk::CommandBuffer& cmd) {
-    if (graph_built) {
+    // Make sure resources are not in use
+    if (wait_queue.has_value()) {
+        wait_queue.value()->wait_idle();
+    } else {
         context->device.waitIdle();
-        reset_graph();
     }
+
+    reset_graph();
 
     if (node_data.empty())
         return;
@@ -107,12 +113,14 @@ void Graph::cmd_build(vk::CommandBuffer& cmd) {
         cmd_build_node(cmd, node);
     }
 
-    graph_built = true;
     current_iteration = 0;
 }
 
 void Graph::cmd_run(vk::CommandBuffer& cmd) {
-    assert(graph_built);
+    if (rebuild_requested) {
+        cmd_build(cmd);
+        rebuild_requested = false;
+    }
 
     for (auto& node : flat_topology) {
         cmd_run_node(cmd, node);

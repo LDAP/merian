@@ -107,4 +107,6 @@ class DescriptorPool : public std::enable_shared_from_this<DescriptorPool> {
     }
 };
 
+using DescriptorPoolHandle = std::shared_ptr<DescriptorPool>;
+
 } // namespace merian

@@ -46,6 +46,8 @@ inline vk::PipelineStageFlags pipeline_stage_for_image_layout(vk::ImageLayout la
         return vk::PipelineStageFlagBits::eHost;
     case vk::ImageLayout::eUndefined:
         return vk::PipelineStageFlagBits::eTopOfPipe;
+    case vk::ImageLayout::ePresentSrcKHR:
+        return vk::PipelineStageFlagBits::eBottomOfPipe;
     default:
         return vk::PipelineStageFlagBits::eBottomOfPipe;
     }
