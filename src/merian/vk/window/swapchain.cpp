@@ -261,6 +261,8 @@ std::optional<SwapchainAcquireResult> Swapchain::aquire_custom(int width, int he
     if (width != cur_width || height != cur_height) {
         recreate_swapchain(width, height);
         aquire_result.did_recreate = true;
+    } else {
+        aquire_result.did_recreate = false;
     }
 
     for (int tries = 0; tries < 2; tries++) {
