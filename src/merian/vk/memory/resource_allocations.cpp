@@ -50,28 +50,40 @@ Image::~Image() {
 }
 
 // Do not forget submite the barrier, else the internal state does not match the actual state
-vk::ImageMemoryBarrier Image::transition_layout(const vk::ImageLayout new_layout,
-                                                const vk::AccessFlags src_access_flags,
-                                                const vk::AccessFlags dst_access_flags,
-                                                const uint32_t src_queue_family_index,
-                                                const uint32_t dst_queue_family_index,
-                                                const vk::ImageAspectFlags aspect_flags,
-                                                const uint32_t base_mip_level,
-                                                const uint32_t mip_level_count,
-                                                const uint32_t base_array_layer,
-                                                const uint32_t array_layer_count) {
-
+vk::ImageMemoryBarrier Image::barrier(const vk::ImageLayout new_layout,
+                                      const vk::AccessFlags src_access_flags,
+                                      const vk::AccessFlags dst_access_flags,
+                                      const uint32_t src_queue_family_index,
+                                      const uint32_t dst_queue_family_index,
+                                      const vk::ImageSubresourceRange subresource_range,
+                                      const bool transition_from_undefined) {
+    vk::ImageLayout old_layout =
+        transition_from_undefined ? vk::ImageLayout::eUndefined : current_layout;
     vk::ImageMemoryBarrier barrier{
-        src_access_flags,
-        dst_access_flags,
-        current_layout,
-        new_layout,
-        src_queue_family_index,
-        dst_queue_family_index,
-        image,
-        {aspect_flags, base_mip_level, mip_level_count, base_array_layer, array_layer_count},
+        src_access_flags,       dst_access_flags,       old_layout, new_layout,
+        src_queue_family_index, dst_queue_family_index, image,      subresource_range,
     };
+    current_layout = new_layout;
 
+    return barrier;
+}
+
+vk::ImageMemoryBarrier2 Image::barrier2(const vk::ImageLayout new_layout,
+                                        const vk::AccessFlags2 src_access_flags,
+                                        const vk::AccessFlags2 dst_access_flags,
+                                        const vk::PipelineStageFlags2 src_stage_flags,
+                                        const vk::PipelineStageFlags2 dst_stage_flags,
+                                        const uint32_t src_queue_family_index,
+                                        const uint32_t dst_queue_family_index,
+                                        const vk::ImageSubresourceRange subresource_range,
+                                        const bool transition_from_undefined) {
+
+    vk::ImageLayout old_layout =
+        transition_from_undefined ? vk::ImageLayout::eUndefined : current_layout;
+    vk::ImageMemoryBarrier2 barrier{
+        src_stage_flags, src_access_flags, dst_stage_flags,        dst_access_flags,
+        old_layout,      new_layout,       src_queue_family_index, dst_queue_family_index,
+        image,           subresource_range};
     current_layout = new_layout;
 
     return barrier;

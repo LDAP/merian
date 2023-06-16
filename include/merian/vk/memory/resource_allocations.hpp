@@ -69,7 +69,7 @@ using ImageHandle = std::shared_ptr<Image>;
 /**
  * @brief      Represents a vk::Image together with its memory and automatic cleanup.
  *
- * Use the transition() function to perform layout transitions to keep the internal state valid.
+ * Use the barrier() function to perform layout transitions to keep the internal state valid.
  */
 class Image : public std::enable_shared_from_this<Image> {
   public:
@@ -106,24 +106,34 @@ class Image : public std::enable_shared_from_this<Image> {
         return extent;
     }
 
-    // Use this only if you performed a layout transition without using transition_layout(...)
+    // Use this only if you performed a layout transition without using barrier(...)
     // This does not perform a layout transision on itself!
     void _set_current_layout(vk::ImageLayout& new_layout) {
         current_layout = new_layout;
     }
 
     // Do not forget submite the barrier, else the internal state does not match the actual state
+    // You can use transition_from_undefined when you are not interested in keeping the contents,
+    // this can be more performant.
     vk::ImageMemoryBarrier
-    transition_layout(const vk::ImageLayout new_layout,
-                      const vk::AccessFlags src_access_flags = {},
-                      const vk::AccessFlags dst_access_flags = {},
-                      const uint32_t src_queue_family_index = VK_QUEUE_FAMILY_IGNORED,
-                      const uint32_t dst_queue_family_index = VK_QUEUE_FAMILY_IGNORED,
-                      const vk::ImageAspectFlags aspect_flags = vk::ImageAspectFlagBits::eColor,
-                      const uint32_t base_mip_level = 0,
-                      const uint32_t mip_level_count = VK_REMAINING_MIP_LEVELS,
-                      const uint32_t base_array_layer = 0,
-                      const uint32_t array_layer_count = VK_REMAINING_ARRAY_LAYERS);
+    barrier(const vk::ImageLayout new_layout,
+            const vk::AccessFlags src_access_flags = {},
+            const vk::AccessFlags dst_access_flags = {},
+            const uint32_t src_queue_family_index = VK_QUEUE_FAMILY_IGNORED,
+            const uint32_t dst_queue_family_index = VK_QUEUE_FAMILY_IGNORED,
+            const vk::ImageSubresourceRange subresource_range = all_levels_and_layers(),
+            const bool transition_from_undefined = false);
+
+    vk::ImageMemoryBarrier2
+    barrier2(const vk::ImageLayout new_layout,
+            const vk::AccessFlags2 src_access_flags = {},
+            const vk::AccessFlags2 dst_access_flags = {},
+            const vk::PipelineStageFlags2 src_stage_flags = {},
+            const vk::PipelineStageFlags2 dst_stage_flags = {},
+            const uint32_t src_queue_family_index = VK_QUEUE_FAMILY_IGNORED,
+            const uint32_t dst_queue_family_index = VK_QUEUE_FAMILY_IGNORED,
+            const vk::ImageSubresourceRange subresource_range = all_levels_and_layers(),
+            const bool transition_from_undefined = false);
 
     // If extent and range are not supplied the whole image is copied.
     // Layouts are automatically determined from get_current_layout()

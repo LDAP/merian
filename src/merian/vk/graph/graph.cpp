@@ -310,6 +310,11 @@ void Graph::allocate_outputs() {
             for (auto& [dst_node, dst_input_idx] :
                  src_data.buffer_output_connections[src_out_idx]) {
                 auto& in_desc = node_data[dst_node].buffer_input_descriptors[dst_input_idx];
+                if (out_desc.persistent && in_desc.delay > 0) {
+                    throw std::runtime_error{fmt::format(
+                        "persistent outputs cannot be accessed with delay > 0. {}: {} -> {}: {}",
+                        src_data.name, src_out_idx, node_data[dst_node].name, dst_input_idx)};
+                }
                 max_delay = std::max(max_delay, in_desc.delay);
                 usage_flags |= in_desc.usage_flags;
                 input_pipeline_stages |= in_desc.pipeline_stages;
@@ -322,10 +327,9 @@ void Graph::allocate_outputs() {
                                             fmt::format("node '{}' buffer, output '{}', copy '{}'",
                                                         src_data.name, out_desc.name, j));
                 src_data.allocated_buffer_outputs[src_out_idx].emplace_back(
-                    std::make_shared<BufferResource>(
-                        buffer, vk::PipelineStageFlagBits2::eTopOfPipe, vk::AccessFlags2(), false,
-                        out_desc.pipeline_stages, out_desc.access_flags, input_pipeline_stages,
-                        input_access_flags));
+                    std::make_shared<BufferResource>(buffer, vk::PipelineStageFlagBits2::eTopOfPipe,
+                                                     vk::AccessFlags2(), false,
+                                                     input_pipeline_stages, input_access_flags));
             }
         }
 
@@ -340,6 +344,11 @@ void Graph::allocate_outputs() {
             uint32_t max_delay = 0;
             for (auto& [dst_node, dst_input_idx] : src_data.image_output_connections[src_out_idx]) {
                 auto& in_desc = node_data[dst_node].image_input_descriptors[dst_input_idx];
+                if (out_desc.persistent && in_desc.delay > 0) {
+                    throw std::runtime_error{fmt::format(
+                        "persistent outputs cannot be accessed with delay > 0. {}: {} -> {}: {}",
+                        src_data.name, src_out_idx, node_data[dst_node].name, dst_input_idx)};
+                }
                 max_delay = std::max(max_delay, in_desc.delay);
                 create_info.usage |= in_desc.usage_flags;
                 input_pipeline_stages |= in_desc.pipeline_stages;
@@ -354,7 +363,6 @@ void Graph::allocate_outputs() {
                 src_data.allocated_image_outputs[src_out_idx].emplace_back(
                     std::make_shared<ImageResource>(image, vk::PipelineStageFlagBits2::eTopOfPipe,
                                                     vk::AccessFlags2(), false,
-                                                    out_desc.pipeline_stages, out_desc.access_flags,
                                                     input_pipeline_stages, input_access_flags));
             }
         }
@@ -477,11 +485,9 @@ void Graph::cmd_barrier_for_node(vk::CommandBuffer& cmd, NodeData& data, uint32_
         auto& res = in_images_res[i];
         if (res->last_used_as_output) {
             // Need to insert barrier and transition layout
-            vk::ImageMemoryBarrier2 img_bar{
-                res->current_stage_flags, res->current_access_flags,        res->input_stage_flags,
-                res->input_access_flags,  res->image->get_current_layout(), in_desc.required_layout,
-                VK_QUEUE_FAMILY_IGNORED,  VK_QUEUE_FAMILY_IGNORED,          *res->image,
-                all_levels_and_layers()};
+            vk::ImageMemoryBarrier2 img_bar = res->image->barrier2(
+                in_desc.required_layout, res->current_access_flags, res->input_access_flags,
+                res->current_stage_flags, res->input_stage_flags);
             image_barriers_for_set.push_back(img_bar);
             res->current_stage_flags = res->input_stage_flags;
             res->current_access_flags = res->input_access_flags;
@@ -489,16 +495,9 @@ void Graph::cmd_barrier_for_node(vk::CommandBuffer& cmd, NodeData& data, uint32_
         } else {
             // No barrier required, if no transition required
             if (in_desc.required_layout != res->image->get_current_layout()) {
-                vk::ImageMemoryBarrier2 img_bar{res->current_stage_flags,
-                                                res->current_access_flags,
-                                                res->current_stage_flags,
-                                                res->current_access_flags,
-                                                res->image->get_current_layout(),
-                                                in_desc.required_layout,
-                                                VK_QUEUE_FAMILY_IGNORED,
-                                                VK_QUEUE_FAMILY_IGNORED,
-                                                *res->image,
-                                                all_levels_and_layers()};
+                vk::ImageMemoryBarrier2 img_bar = res->image->barrier2(
+                    in_desc.required_layout, res->current_access_flags, res->current_access_flags,
+                    res->current_stage_flags, res->current_stage_flags);
                 image_barriers_for_set.push_back(img_bar);
             }
         }
@@ -530,33 +529,34 @@ void Graph::cmd_barrier_for_node(vk::CommandBuffer& cmd, NodeData& data, uint32_
     for (uint32_t i = 0; i < data.image_output_descriptors.size(); i++) {
         auto& out_desc = data.image_output_descriptors[i];
         auto& res = out_images_res[i];
+        // if not persistent: transition from undefined -> a bit faster
+        vk::ImageMemoryBarrier2 img_bar = res->image->barrier2(
+            out_desc.required_layout, res->current_access_flags, out_desc.access_flags,
+            res->current_stage_flags, out_desc.pipeline_stages, VK_QUEUE_FAMILY_IGNORED,
+            VK_QUEUE_FAMILY_IGNORED, all_levels_and_layers(), !out_desc.persistent);
 
-        vk::ImageMemoryBarrier2 img_bar{
-            res->current_stage_flags, res->current_access_flags,        res->output_stage_flags,
-            res->output_access_flags, res->image->get_current_layout(), out_desc.required_layout,
-            VK_QUEUE_FAMILY_IGNORED,  VK_QUEUE_FAMILY_IGNORED,          *res->image,
-            all_levels_and_layers()};
         image_barriers_for_set.push_back(img_bar);
-        res->current_stage_flags = res->output_stage_flags;
-        res->current_access_flags = res->output_access_flags;
+        res->current_stage_flags = out_desc.pipeline_stages;
+        res->current_access_flags = out_desc.access_flags;
         res->last_used_as_output = true;
     }
     // out-buffers
     for (uint32_t i = 0; i < data.buffer_output_descriptors.size(); i++) {
+        auto& out_desc = data.buffer_output_descriptors[i];
         auto& res = out_buffers_res[i];
 
         vk::BufferMemoryBarrier2 buffer_bar{res->current_stage_flags,
                                             res->current_access_flags,
-                                            res->output_stage_flags,
-                                            res->output_access_flags,
+                                            out_desc.pipeline_stages,
+                                            out_desc.access_flags,
                                             VK_QUEUE_FAMILY_IGNORED,
                                             VK_QUEUE_FAMILY_IGNORED,
                                             *res->buffer,
                                             0,
                                             VK_WHOLE_SIZE};
         buffer_barriers_for_set.push_back(buffer_bar);
-        res->current_stage_flags = res->output_stage_flags;
-        res->current_access_flags = res->output_access_flags;
+        res->current_stage_flags = out_desc.pipeline_stages;
+        res->current_access_flags = out_desc.access_flags;
         res->last_used_as_output = true;
     }
 

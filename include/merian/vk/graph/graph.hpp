@@ -46,9 +46,6 @@ class Graph : public std::enable_shared_from_this<Graph> {
         // to detect if a barrier is needed
         bool last_used_as_output = false;
 
-        vk::PipelineStageFlags2 output_stage_flags;
-        vk::AccessFlags2 output_access_flags;
-
         // combined pipeline stage flags of all inputs
         vk::PipelineStageFlags2 input_stage_flags;
         // combined access flags of all inputs
@@ -67,9 +64,6 @@ class Graph : public std::enable_shared_from_this<Graph> {
         // if true: Use the access and pipeline flags from the output
         // if false: use the input_*_flags
         bool last_used_as_output = false;
-
-        vk::PipelineStageFlags2 output_stage_flags;
-        vk::AccessFlags2 output_access_flags;
 
         // combined pipeline stage flags of all inputs
         vk::PipelineStageFlags2 input_stage_flags;
