@@ -7,7 +7,8 @@ namespace merian {
 
 StopwatchVk::StopwatchVk(const SharedContext context, uint32_t number_stopwatches)
     : context(context), number_stopwatches(number_stopwatches) {
-    vk::QueryPoolCreateInfo createInfo({}, vk::QueryType::eTimestamp, SW_QUERY_COUNT);
+    vk::QueryPoolCreateInfo createInfo({}, vk::QueryType::eTimestamp,
+                                       number_stopwatches * SW_QUERY_COUNT);
     query_pool = context->device.createQueryPool(createInfo);
 
     timestamp_period =
