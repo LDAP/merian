@@ -1,5 +1,6 @@
 #pragma once
 
+#include "glm/ext/vector_float2.hpp"
 #include "merian/io/file_loader.hpp"
 #include "merian/utils/stopwatch.hpp"
 #include "merian/vk/descriptors/descriptor_set_layout_builder.hpp"
@@ -14,8 +15,13 @@
 namespace merian {
 
 class ShadertoyNode : public merian::Node {
+  private:
+    static constexpr uint32_t local_size_x = 16;
+    static constexpr uint32_t local_size_y = 16;
+
   public:
     struct PushConstant {
+        glm::vec2 iResolution{};
         float iTime{};
         float iTimeDelta{};
         float iFrame{};
@@ -114,6 +120,7 @@ class ShadertoyNode : public merian::Node {
             sets.push_back(set);
             textures.push_back(tex);
         }
+        constant.iResolution = glm::vec2(width, height);
     }
 
     virtual void cmd_process(const vk::CommandBuffer& cmd,
@@ -138,9 +145,6 @@ class ShadertoyNode : public merian::Node {
   private:
     const SharedContext context;
     const ResourceAllocatorHandle alloc;
-
-    const uint32_t local_size_x = 16;
-    const uint32_t local_size_y = 8;
 
     uint32_t width;
     uint32_t height;
