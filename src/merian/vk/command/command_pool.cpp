@@ -1,10 +1,10 @@
 #include "merian/vk/command/command_pool.hpp"
-#include "merian/vk/command/queue_container.hpp"
+#include "merian/vk/command/queue.hpp"
 #include <spdlog/spdlog.h>
 
 namespace merian {
 
-CommandPool::CommandPool(const std::shared_ptr<QueueContainer> queue,
+CommandPool::CommandPool(const std::shared_ptr<Queue> queue,
                          vk::CommandPoolCreateFlags create_flags)
     : CommandPool(queue->get_context(), queue->get_queue_family_index(), create_flags) {}
 

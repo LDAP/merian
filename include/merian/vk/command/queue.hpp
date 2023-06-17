@@ -13,11 +13,11 @@ namespace merian {
  * All submits are protected using a mutex. When using *_wait the queue is blocked until the queue
  * is idle.
  */
-class QueueContainer : public std::enable_shared_from_this<QueueContainer> {
+class Queue : public std::enable_shared_from_this<Queue> {
   public:
-    QueueContainer() = delete;
+    Queue() = delete;
 
-    QueueContainer(const SharedContext& context, uint32_t queue_family_index, uint32_t queue_index);
+    Queue(const SharedContext& context, uint32_t queue_family_index, uint32_t queue_index);
 
     void submit(const std::shared_ptr<CommandPool>& pool,
                 const vk::Fence fence,
@@ -92,6 +92,6 @@ class QueueContainer : public std::enable_shared_from_this<QueueContainer> {
     std::mutex mutex;
 };
 
-using QueueContainerHandle = std::shared_ptr<QueueContainer>;
+using QueueHandle = std::shared_ptr<Queue>;
 
 } // namespace merian

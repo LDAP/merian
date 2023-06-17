@@ -138,8 +138,8 @@ class ShadertoyNode : public merian::Node {
         pipe->bind(cmd);
         pipe->bind_descriptor_set(cmd, sets[set_index]);
         pipe->push_constant<PushConstant>(cmd, constant);
-        cmd.dispatch((uint32_t(width) + local_size_x - 1) / local_size_x,
-                     (uint32_t(height) + local_size_y - 1) / local_size_y, 1);
+        cmd.dispatch((width + local_size_x - 1) / local_size_x,
+                     (height + local_size_y - 1) / local_size_y, 1);
     }
 
   private:

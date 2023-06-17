@@ -6,14 +6,11 @@
 
 namespace merian {
 
-class ExtensionStopwatch : public Extension {
+class StopwatchVk {
   public:
-    ExtensionStopwatch(uint32_t number_stopwatches = 1)
-        : Extension("ExtensionStopwatch"), number_stopwatches(number_stopwatches) {}
-    ~ExtensionStopwatch() {}
-    void on_context_created(const SharedContext) override;
-    // make sure to release all shared pointers to context!
-    void on_destroy_context() override;
+    StopwatchVk(const SharedContext context, uint32_t number_stopwatches = 1);
+
+    ~StopwatchVk();
 
   public: // own methods
     /* Resets the query pool and writes the first timestamp */
@@ -30,10 +27,10 @@ class ExtensionStopwatch : public Extension {
     double get_seconds(uint32_t stopwatch_id = 0);
 
   private:
+    const SharedContext context;
     uint32_t number_stopwatches;
     vk::QueryPool query_pool;
     float timestamp_period;
-    SharedContext context;
 };
 
 } // namespace merian

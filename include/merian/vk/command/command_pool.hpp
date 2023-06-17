@@ -13,7 +13,7 @@ class CommandPool : public std::enable_shared_from_this<CommandPool> {
     CommandPool() = delete;
 
     CommandPool(
-        const std::shared_ptr<QueueContainer> queue,
+        const std::shared_ptr<Queue> queue,
         vk::CommandPoolCreateFlags create_flags = vk::CommandPoolCreateFlagBits::eTransient);
 
     CommandPool(

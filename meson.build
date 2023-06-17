@@ -55,7 +55,6 @@ src_files = files(
     'src/merian/vk/context.cpp',
     'src/merian/vk/extension/extension.cpp',
     'src/merian/vk/extension/extension_resources.cpp',
-    'src/merian/vk/extension/extension_stopwatch.cpp',
     'src/merian/vk/extension/extension_vk_debug_utils.cpp',
     'src/merian/vk/extension/extension_vk_glfw.cpp',
     'src/merian/vk/graph/graph.cpp',
@@ -70,6 +69,7 @@ src_files = files(
     'src/merian/vk/raytrace/tlas_builder.cpp',
     'src/merian/vk/sampler/sampler_pool.cpp',
     'src/merian/vk/utils/barriers.cpp',
+    'src/merian/vk/utils/stopwatch_vk.cpp',
     'src/merian/vk/window/swapchain.cpp',
 )
 inc_dirs = [

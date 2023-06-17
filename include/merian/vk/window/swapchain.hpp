@@ -1,6 +1,6 @@
 #pragma once
 
-#include "merian/vk/command/queue_container.hpp"
+#include "merian/vk/command/queue.hpp"
 #include "merian/vk/window/surface.hpp"
 #include "vulkan/vulkan.hpp"
 #include <GLFW/glfw3.h>
@@ -85,7 +85,7 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
      */
     Swapchain(const SharedContext& context,
               const SurfaceHandle& surface,
-              const std::optional<QueueContainerHandle> wait_queue = std::nullopt,
+              const std::optional<QueueHandle> wait_queue = std::nullopt,
               const std::vector<vk::SurfaceFormatKHR>& preferred_surface_formats =
                   {vk::Format::eR8G8B8A8Srgb, vk::Format::eB8G8R8A8Srgb},
               const vk::PresentModeKHR preferred_vsync_off_mode = vk::PresentModeKHR::eMailbox);
@@ -108,7 +108,7 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
 
     vk::Result present(vk::Queue queue);
 
-    void present(QueueContainer& queue);
+    void present(Queue& queue);
 
     /* Semaphore only valid until the next present() */
     vk::Semaphore& current_read_semaphore() {
@@ -179,7 +179,7 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
     const SurfaceHandle surface;
     const std::vector<vk::SurfaceFormatKHR> preferred_surface_formats;
     const vk::PresentModeKHR preferred_vsync_off_mode;
-    const std::optional<QueueContainerHandle> wait_queue;
+    const std::optional<QueueHandle> wait_queue;
 
     vk::SurfaceFormatKHR surface_format;
     bool vsync = false;

@@ -125,7 +125,7 @@ class Graph : public std::enable_shared_from_this<Graph> {
     // null).
     Graph(const SharedContext context,
           const ResourceAllocatorHandle allocator,
-          const std::optional<QueueContainerHandle> wait_queue = std::nullopt);
+          const std::optional<QueueHandle> wait_queue = std::nullopt);
 
     // Add a node to the graph, returns the index of the node (can be used for connect and such).
     void add_node(const std::string name, const std::shared_ptr<Node>& node);
@@ -152,7 +152,7 @@ class Graph : public std::enable_shared_from_this<Graph> {
   private:
     const SharedContext context;
     const ResourceAllocatorHandle allocator;
-    const std::optional<QueueContainerHandle> wait_queue;
+    const std::optional<QueueHandle> wait_queue;
 
     bool rebuild_requested = true;
     uint64_t current_iteration = 0;

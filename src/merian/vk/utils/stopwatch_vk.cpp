@@ -1,13 +1,12 @@
-#include "merian/vk/extension/extension_stopwatch.hpp"
+#include "merian/vk/utils/stopwatch_vk.hpp"
 #include "merian/vk/utils/check_result.hpp"
 
 #define SW_QUERY_COUNT 2
 
 namespace merian {
 
-void ExtensionStopwatch::on_context_created(const SharedContext context) {
-    this->context = context;
-
+StopwatchVk::StopwatchVk(const SharedContext context, uint32_t number_stopwatches)
+    : context(context), number_stopwatches(number_stopwatches) {
     vk::QueryPoolCreateInfo createInfo({}, vk::QueryType::eTimestamp, SW_QUERY_COUNT);
     query_pool = context->device.createQueryPool(createInfo);
 
@@ -15,25 +14,24 @@ void ExtensionStopwatch::on_context_created(const SharedContext context) {
         context->pd_container.physical_device_props.properties.limits.timestampPeriod;
 }
 
-void ExtensionStopwatch::on_destroy_context() {
+StopwatchVk::~StopwatchVk() {
     context->device.destroyQueryPool(query_pool);
-    this->context.reset();
 }
 
-void ExtensionStopwatch::start_stopwatch(vk::CommandBuffer& cb,
-                                         vk::PipelineStageFlagBits pipeline_stage,
-                                         uint32_t stopwatch_id) {
+void StopwatchVk::start_stopwatch(vk::CommandBuffer& cb,
+                                  vk::PipelineStageFlagBits pipeline_stage,
+                                  uint32_t stopwatch_id) {
     cb.resetQueryPool(query_pool, stopwatch_id * SW_QUERY_COUNT, SW_QUERY_COUNT);
     cb.writeTimestamp(pipeline_stage, query_pool, stopwatch_id * SW_QUERY_COUNT);
 }
 
-void ExtensionStopwatch::stop_stopwatch(vk::CommandBuffer& cb,
-                                        vk::PipelineStageFlagBits pipeline_stage,
-                                        uint32_t stopwatch_id) {
+void StopwatchVk::stop_stopwatch(vk::CommandBuffer& cb,
+                                 vk::PipelineStageFlagBits pipeline_stage,
+                                 uint32_t stopwatch_id) {
     cb.writeTimestamp(pipeline_stage, query_pool, stopwatch_id * SW_QUERY_COUNT + 1);
 }
 
-uint32_t ExtensionStopwatch::get_nanos(uint32_t stopwatch_id) {
+uint32_t StopwatchVk::get_nanos(uint32_t stopwatch_id) {
     assert(stopwatch_id < number_stopwatches);
 
     uint64_t timestamps[SW_QUERY_COUNT];
@@ -45,11 +43,11 @@ uint32_t ExtensionStopwatch::get_nanos(uint32_t stopwatch_id) {
     uint64_t timediff = timestamps[1] - timestamps[0];
     return timestamp_period * timediff;
 }
-double ExtensionStopwatch::get_millis(uint32_t stopwatch_id) {
+double StopwatchVk::get_millis(uint32_t stopwatch_id) {
     return get_nanos(stopwatch_id) / (double)1e6;
 }
 
-double ExtensionStopwatch::get_seconds(uint32_t stopwatch_id) {
+double StopwatchVk::get_seconds(uint32_t stopwatch_id) {
     return get_nanos(stopwatch_id) / (double)1e9;
 }
 

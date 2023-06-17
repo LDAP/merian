@@ -10,7 +10,7 @@ namespace merian {
 // cyclic -> forward definition
 class Extension;
 class Context;
-class QueueContainer;
+class Queue;
 class CommandPool;
 
 using SharedContext = std::shared_ptr<Context>;
@@ -97,15 +97,15 @@ class Context : public std::enable_shared_from_this<Context> {
   public: // Getter
     // can be nullptr in very rare occasions, you can check that with if (shrd_ptr) {...}
     // Make sure to keep a reference, else the pool and its buffers are destroyed
-    std::shared_ptr<QueueContainer> get_queue_GCT();
+    std::shared_ptr<Queue> get_queue_GCT();
 
     // can be nullptr in very rare occasions, you can check that with if (shrd_ptr) {...}
     // Make sure to keep a reference, else the pool and its buffers are destroyed
-    std::shared_ptr<QueueContainer> get_queue_T();
+    std::shared_ptr<Queue> get_queue_T();
 
     // can be nullptr in very rare occasions, you can check that with if (shrd_ptr) {...}
     // Make sure to keep a reference, else the pool and its buffers are destroyed
-    std::shared_ptr<QueueContainer> get_queue_C(uint32_t index = 0);
+    std::shared_ptr<Queue> get_queue_C(uint32_t index = 0);
 
     // Convenience command pool for graphics and compute (can be nullptr in very rare occasions)
     // Make sure to keep a reference, else the pool and its buffers are destroyed
@@ -162,11 +162,11 @@ class Context : public std::enable_shared_from_this<Context> {
 
   private:
     // can be nullptr in very rare occasions, you can check that with if (shrd_ptr) {...}
-    std::weak_ptr<QueueContainer> queue_GCT;
+    std::weak_ptr<Queue> queue_GCT;
     // can be nullptr in very rare occasions, you can check that with if (shrd_ptr) {...}
-    std::weak_ptr<QueueContainer> queue_T;
+    std::weak_ptr<Queue> queue_T;
     // resized in create_device_and_queues
-    std::vector<std::weak_ptr<QueueContainer>> queues_C;
+    std::vector<std::weak_ptr<Queue>> queues_C;
 
     // in make_context
 
@@ -181,4 +181,4 @@ class Context : public std::enable_shared_from_this<Context> {
 } // namespace merian
 
 #include "merian/vk/command/command_pool.hpp"
-#include "merian/vk/command/queue_container.hpp"
+#include "merian/vk/command/queue.hpp"

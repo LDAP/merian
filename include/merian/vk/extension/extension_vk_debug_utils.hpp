@@ -48,14 +48,17 @@ class ExtensionVkDebugUtils : public Extension {
 
     // Own methods
     template <typename T> void set_object_name(vk::Device& device, T handle, std::string name) {
-        vk::DebugUtilsObjectNameInfoEXT infoEXT(handle.objectType, uint64_t(static_cast<typename T::CType>(handle)),
-                                                name.c_str());
+        vk::DebugUtilsObjectNameInfoEXT infoEXT(
+            handle.objectType, uint64_t(static_cast<typename T::CType>(handle)), name.c_str());
         device.setDebugUtilsObjectNameEXT(infoEXT);
     }
-    static VKAPI_ATTR VkBool32 VKAPI_CALL messenger_callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-                                                             VkDebugUtilsMessageTypeFlagsEXT messageTypes,
-                                                             VkDebugUtilsMessengerCallbackDataEXT const* pCallbackData,
-                                                             void* pUserData);
+
+  private:
+    static VKAPI_ATTR VkBool32 VKAPI_CALL
+    messenger_callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+                       VkDebugUtilsMessageTypeFlagsEXT messageTypes,
+                       VkDebugUtilsMessengerCallbackDataEXT const* pCallbackData,
+                       void* pUserData);
 
   private:
     std::unordered_set<int32_t> ignore_message_ids;

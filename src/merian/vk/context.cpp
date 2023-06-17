@@ -517,35 +517,35 @@ void Context::destroy_extensions(std::vector<Extension*> extensions) {
 // GETTER
 ///////////////
 
-std::shared_ptr<QueueContainer> Context::get_queue_GCT() {
+std::shared_ptr<Queue> Context::get_queue_GCT() {
     if (!queue_GCT.expired()) {
         return queue_GCT.lock();
     } else {
-        auto queue = std::make_shared<QueueContainer>(shared_from_this(), queue_family_idx_GCT,
+        auto queue = std::make_shared<Queue>(shared_from_this(), queue_family_idx_GCT,
                                                       queue_idx_GCT);
         queue_GCT = queue;
         return queue;
     }
 }
 
-std::shared_ptr<QueueContainer> Context::get_queue_T() {
+std::shared_ptr<Queue> Context::get_queue_T() {
     if (!queue_T.expired()) {
         return queue_T.lock();
     } else {
         auto queue =
-            std::make_shared<QueueContainer>(shared_from_this(), queue_family_idx_T, queue_idx_T);
+            std::make_shared<Queue>(shared_from_this(), queue_family_idx_T, queue_idx_T);
         queue_T = queue;
         return queue;
     }
 }
 
-std::shared_ptr<QueueContainer> Context::get_queue_C(uint32_t index) {
+std::shared_ptr<Queue> Context::get_queue_C(uint32_t index) {
     assert(index < queue_idx_C.size());
 
     if (!queues_C[index].expired()) {
         return queues_C[index].lock();
     } else {
-        auto queue = std::make_shared<QueueContainer>(shared_from_this(), queue_family_idx_C,
+        auto queue = std::make_shared<Queue>(shared_from_this(), queue_family_idx_C,
                                                       queue_idx_C[index]);
         queues_C[index] = queue;
         return queue;

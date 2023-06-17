@@ -30,7 +30,7 @@ public:
     compact(const SharedContext& context,
             const ResourceAllocatorHandle& allocator,
             const CommandPoolHandle& pool,
-            const QueueContainerHandle& queue,
+            const QueueHandle& queue,
             const std::vector<AccelerationStructureHandle>& ass,
             const EventHandle& wait_event,
             const vk::AccelerationStructureTypeKHR type =

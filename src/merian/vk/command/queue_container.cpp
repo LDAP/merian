@@ -6,13 +6,13 @@
 
 namespace merian {
 
-QueueContainer::QueueContainer(const SharedContext& context,
+Queue::Queue(const SharedContext& context,
                                uint32_t queue_family_index,
                                uint32_t queue_index)
     : context(context), queue(context->device.getQueue(queue_family_index, queue_index)),
       queue_family_index(queue_family_index) {}
 
-void QueueContainer::submit(const std::shared_ptr<CommandPool>& pool,
+void Queue::submit(const std::shared_ptr<CommandPool>& pool,
                             const vk::Fence fence,
                             const std::vector<vk::Semaphore>& signal_semaphores,
                             const std::vector<vk::Semaphore>& wait_semaphores,
@@ -22,7 +22,7 @@ void QueueContainer::submit(const std::shared_ptr<CommandPool>& pool,
     submit(submit_info, fence);
 }
 
-void QueueContainer::submit(const std::vector<vk::CommandBuffer>& command_buffers,
+void Queue::submit(const std::vector<vk::CommandBuffer>& command_buffers,
                             vk::Fence fence,
                             const std::vector<vk::Semaphore>& signal_semaphores,
                             const std::vector<vk::Semaphore>& wait_semaphores,
@@ -32,26 +32,26 @@ void QueueContainer::submit(const std::vector<vk::CommandBuffer>& command_buffer
     submit(submit_info, fence);
 }
 
-void QueueContainer::submit(const vk::CommandBuffer& command_buffer, vk::Fence fence) {
+void Queue::submit(const vk::CommandBuffer& command_buffer, vk::Fence fence) {
     vk::SubmitInfo submit_info{
         {}, {}, {}, 1, &command_buffer,
     };
     submit(submit_info, fence);
 }
 
-void QueueContainer::submit(const vk::SubmitInfo& submit_info,
+void Queue::submit(const vk::SubmitInfo& submit_info,
                             vk::Fence fence,
                             uint32_t submit_count) {
     std::lock_guard<std::mutex> lock_guard(mutex);
     check_result(queue.submit(submit_count, &submit_info, fence), "queue submit failed");
 }
 
-void QueueContainer::submit(const std::vector<vk::SubmitInfo>& submit_infos, vk::Fence fence) {
+void Queue::submit(const std::vector<vk::SubmitInfo>& submit_infos, vk::Fence fence) {
     std::lock_guard<std::mutex> lock_guard(mutex);
     queue.submit(submit_infos, fence);
 }
 
-void QueueContainer::submit_wait(const std::shared_ptr<CommandPool>& pool,
+void Queue::submit_wait(const std::shared_ptr<CommandPool>& pool,
                                  const vk::Fence fence,
                                  const std::vector<vk::Semaphore>& signal_semaphores,
                                  const std::vector<vk::Semaphore>& wait_semaphores,
@@ -62,7 +62,7 @@ void QueueContainer::submit_wait(const std::shared_ptr<CommandPool>& pool,
 }
 
 // Submits the command buffers then waits using waitIdle(), try to not use the _wait variants
-void QueueContainer::submit_wait(const std::vector<vk::CommandBuffer>& command_buffers,
+void Queue::submit_wait(const std::vector<vk::CommandBuffer>& command_buffers,
                                  vk::Fence fence,
                                  const std::vector<vk::Semaphore>& signal_semaphores,
                                  const std::vector<vk::Semaphore>& wait_semaphores,
@@ -73,7 +73,7 @@ void QueueContainer::submit_wait(const std::vector<vk::CommandBuffer>& command_b
 }
 
 // Submits the command buffers then waits using waitIdle(), try to not use the _wait variants
-void QueueContainer::submit_wait(const vk::CommandBuffer& command_buffer, vk::Fence fence) {
+void Queue::submit_wait(const vk::CommandBuffer& command_buffer, vk::Fence fence) {
     vk::SubmitInfo submit_info{
         {}, {}, {}, 1, &command_buffer,
     };
@@ -81,18 +81,18 @@ void QueueContainer::submit_wait(const vk::CommandBuffer& command_buffer, vk::Fe
 }
 
 // Submits then waits using waitIdle(), try to not use the _wait variants
-void QueueContainer::submit_wait(const vk::SubmitInfo& submit_info, vk::Fence fence) {
+void Queue::submit_wait(const vk::SubmitInfo& submit_info, vk::Fence fence) {
     std::lock_guard<std::mutex> lock_guard(mutex);
     check_result(queue.submit(1, &submit_info, fence), "queue submit failed");
     queue.waitIdle();
 }
 
-void QueueContainer::present(const vk::PresentInfoKHR& present_info) {
+void Queue::present(const vk::PresentInfoKHR& present_info) {
     std::lock_guard<std::mutex> lock_guard(mutex);
     check_result(queue.presentKHR(&present_info), "present failed");
 }
 
-void QueueContainer::wait_idle() {
+void Queue::wait_idle() {
     std::lock_guard<std::mutex> lock_guard(mutex);
     queue.waitIdle();
 }

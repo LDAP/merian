@@ -68,7 +68,7 @@ void Swapchain::wait_idle() {
 
 Swapchain::Swapchain(const SharedContext& context,
                      const SurfaceHandle& surface,
-                     const std::optional<QueueContainerHandle> wait_queue,
+                     const std::optional<QueueHandle> wait_queue,
                      const std::vector<vk::SurfaceFormatKHR>& preferred_surface_formats,
                      const vk::PresentModeKHR preferred_vsync_off_mode)
     : context(context), surface(surface), preferred_surface_formats(preferred_surface_formats),
@@ -304,7 +304,7 @@ vk::Result Swapchain::present(vk::Queue queue) {
     return queue.presentKHR(present_info);
 }
 
-void Swapchain::present(QueueContainer& queue) {
+void Swapchain::present(Queue& queue) {
     vk::Semaphore& written = current_written_semaphore();
     vk::PresentInfoKHR present_info{
         1,

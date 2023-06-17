@@ -4,7 +4,7 @@ namespace merian {
 
 Graph::Graph(const SharedContext context,
              const ResourceAllocatorHandle allocator,
-             const std::optional<QueueContainerHandle> wait_queue)
+             const std::optional<QueueHandle> wait_queue)
     : context(context), allocator(allocator), wait_queue(wait_queue) {}
 
 void Graph::add_node(const std::string name, const std::shared_ptr<Node>& node) {
