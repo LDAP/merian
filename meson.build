@@ -69,7 +69,7 @@ src_files = files(
     'src/merian/vk/raytrace/tlas_builder.cpp',
     'src/merian/vk/sampler/sampler_pool.cpp',
     'src/merian/vk/utils/barriers.cpp',
-    'src/merian/vk/utils/stopwatch_vk.cpp',
+    'src/merian/vk/utils/profiler.cpp',
     'src/merian/vk/window/swapchain.cpp',
 )
 inc_dirs = [

@@ -4,6 +4,7 @@
 #include "merian/vk/graph/node_io.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/utils/math.hpp"
+#include "merian/vk/utils/profiler.hpp"
 
 #include <memory>
 #include <queue>
@@ -147,7 +148,7 @@ class Graph : public std::enable_shared_from_this<Graph> {
     }
 
     // Runs the graph. On the first run or if rebuild is requested the graph is build.
-    void cmd_run(vk::CommandBuffer& cmd);
+    void cmd_run(vk::CommandBuffer& cmd, const ProfilerHandle profiler = nullptr);
 
   private:
     const SharedContext context;
@@ -190,7 +191,7 @@ class Graph : public std::enable_shared_from_this<Graph> {
     // the "resource sets" for these iterations are prepared here.
     void prepare_resource_sets();
 
-    void cmd_build(vk::CommandBuffer& cmd);
+    void cmd_build(vk::CommandBuffer& cmd, const ProfilerHandle profiler = nullptr);
 
     void cmd_build_node(vk::CommandBuffer& cmd, NodeHandle& node);
 

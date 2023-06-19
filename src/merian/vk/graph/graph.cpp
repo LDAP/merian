@@ -1,4 +1,5 @@
 #include "merian/vk/graph/graph.hpp"
+#include "merian/vk/utils/profiler.hpp"
 
 namespace merian {
 
@@ -71,7 +72,7 @@ void Graph::connect_buffer(const NodeHandle& src,
     node_data[src].buffer_output_connections[src_output].emplace_back(dst, dst_input);
 }
 
-void Graph::cmd_build(vk::CommandBuffer& cmd) {
+void Graph::cmd_build(vk::CommandBuffer& cmd, const ProfilerHandle profiler) {
     // Make sure resources are not in use
     if (wait_queue.has_value()) {
         wait_queue.value()->wait_idle();
@@ -110,19 +111,24 @@ void Graph::cmd_build(vk::CommandBuffer& cmd) {
     prepare_resource_sets();
 
     for (auto& node : flat_topology) {
+        CMD_MERIAN_PROFILE_SCOPE(profiler, cmd, node->name());
         cmd_build_node(cmd, node);
     }
 
     current_iteration = 0;
 }
 
-void Graph::cmd_run(vk::CommandBuffer& cmd) {
+void Graph::cmd_run(vk::CommandBuffer& cmd, const std::shared_ptr<Profiler> profiler) {
+    CMD_MERIAN_PROFILE_SCOPE(profiler, cmd, "Graph: run");
+
     if (rebuild_requested) {
-        cmd_build(cmd);
+        CMD_MERIAN_PROFILE_SCOPE(profiler, cmd, "Graph: build");
+        cmd_build(cmd, profiler);
         rebuild_requested = false;
     }
 
     for (auto& node : flat_topology) {
+        CMD_MERIAN_PROFILE_SCOPE(profiler, cmd, node->name());
         cmd_run_node(cmd, node);
     }
 
