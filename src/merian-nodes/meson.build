@@ -1,8 +1,14 @@
+merian_nodes_src = []
+
+subdir('accumulate')
+subdir('shadertoy')
+
 merian_nodes_lib = static_library(
     'merian-nodes',
-    [],
+    merian_nodes_src,
     dependencies: [
         fmt,
+        glm,
         spdlog,
         vulkan,
     ],

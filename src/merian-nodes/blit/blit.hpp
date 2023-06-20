@@ -26,13 +26,13 @@ template <BlitNodeMode mode> class BlitNode : public Node {
         this->dst_extent = dst_extent;
     }
 
-    virtual std::string name() {
+    virtual std::string name() override {
         return "BlitNode";
     }
 
     virtual std::tuple<std::vector<NodeInputDescriptorImage>,
                        std::vector<NodeInputDescriptorBuffer>>
-    describe_inputs() {
+    describe_inputs() override {
         return {
             {
                 NodeInputDescriptorImage("blit_src", vk::AccessFlagBits2::eTransferRead,
@@ -50,7 +50,7 @@ template <BlitNodeMode mode> class BlitNode : public Node {
                              const std::vector<ImageHandle>& image_inputs,
                              const std::vector<BufferHandle>&,
                              const std::vector<ImageHandle>&,
-                             const std::vector<BufferHandle>&) {
+                             const std::vector<BufferHandle>&) override {
         assert(image_inputs.size() == 1);
         if (!dst_image) {
             return;

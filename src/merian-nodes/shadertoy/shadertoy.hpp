@@ -19,7 +19,7 @@ class ShadertoyNode : public merian::Node {
     static constexpr uint32_t local_size_x = 16;
     static constexpr uint32_t local_size_y = 16;
 
-  public:
+  private:
     struct PushConstant {
         glm::vec2 iResolution{};
         float iTime{};
@@ -33,104 +33,31 @@ class ShadertoyNode : public merian::Node {
                   std::string path,
                   FileLoader loader,
                   uint32_t width = 1920,
-                  uint32_t height = 1080)
-        : context(context), alloc(alloc), width(width), height(height) {
-        auto builder = DescriptorSetLayoutBuilder().add_binding_storage_image(); // result
-        layout = builder.build_layout(context);
-
-        auto shader = std::make_shared<ShaderModule>(context, path, loader);
-        auto pipe_layout = PipelineLayoutBuilder(context)
-                               .add_descriptor_set_layout(layout)
-                               .add_push_constant<PushConstant>(vk::ShaderStageFlagBits::eCompute)
-                               .build_pipeline_layout();
-        auto spec_builder = SpecializationInfoBuilder();
-        spec_builder.add_entry(local_size_x, local_size_y);
-        auto spec_info = spec_builder.build();
-        pipe = std::make_shared<ComputePipeline>(pipe_layout, shader, spec_info);
-
-        sw.reset();
-    }
-
-    void set_resolution(uint32_t width = 1920, uint32_t height = 1080) {
-        if (width != this->width || height != this->height) {
-            this->width = width;
-            this->height = height;
-            requires_rebuild = true;
-        }
-    }
-
-    // Called everytime before the graph is run. Can be used to request a rebuild for example.
-    virtual void pre_process(NodeStatus& status) override {
-        status.request_rebuild = requires_rebuild;
-    }
+                  uint32_t height = 1080);
 
     std::string name() override {
         return "ShadertoyNode";
     }
 
+    void set_resolution(uint32_t width = 1920, uint32_t height = 1080);
+
+    // Called everytime before the graph is run. Can be used to request a rebuild for example.
+    virtual void pre_process(NodeStatus& status) override;
+
     virtual std::tuple<std::vector<merian::NodeInputDescriptorImage>,
                        std::vector<merian::NodeInputDescriptorBuffer>>
-    describe_inputs() override {
-        return {};
-    }
+    describe_inputs() override;
 
     virtual std::tuple<std::vector<merian::NodeOutputDescriptorImage>,
                        std::vector<merian::NodeOutputDescriptorBuffer>>
     describe_outputs(const std::vector<merian::NodeOutputDescriptorImage>&,
-                     const std::vector<merian::NodeOutputDescriptorBuffer>&) override {
-
-        vk::ImageCreateInfo create_image{{},
-                                         vk::ImageType::e2D,
-                                         vk::Format::eR8G8B8A8Unorm,
-                                         {width, height, 1},
-                                         1,
-                                         1,
-                                         vk::SampleCountFlagBits::e1,
-                                         vk::ImageTiling::eOptimal,
-                                         vk::ImageUsageFlagBits::eStorage,
-                                         vk::SharingMode::eExclusive,
-                                         {},
-                                         {},
-                                         vk::ImageLayout::eUndefined};
-        return {
-            {
-                merian::NodeOutputDescriptorImage{"result", vk::AccessFlagBits2::eShaderWrite,
-                                                  vk::PipelineStageFlagBits2::eComputeShader,
-                                                  create_image, vk::ImageLayout::eGeneral, false},
-            },
-            {},
-        };
-    }
+                     const std::vector<merian::NodeOutputDescriptorBuffer>&) override;
 
     virtual void cmd_build(const vk::CommandBuffer&,
                            const std::vector<std::vector<merian::ImageHandle>>&,
                            const std::vector<std::vector<merian::BufferHandle>>&,
                            const std::vector<std::vector<merian::ImageHandle>>& image_outputs,
-                           const std::vector<std::vector<merian::BufferHandle>>&) override {
-        sets.clear();
-        textures.clear();
-
-        uint32_t num_sets = image_outputs.size();
-
-        pool = std::make_shared<merian::DescriptorPool>(layout, num_sets);
-        vk::ImageViewCreateInfo create_image_view{{},
-                                                  VK_NULL_HANDLE,
-                                                  vk::ImageViewType::e2D,
-                                                  vk::Format::eR8G8B8A8Unorm,
-                                                  {},
-                                                  {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}};
-
-        for (uint32_t i = 0; i < num_sets; i++) {
-            auto set = std::make_shared<merian::DescriptorSet>(pool);
-            create_image_view.image = *image_outputs[i][0];
-            auto tex = alloc->createTexture(image_outputs[i][0], create_image_view);
-            DescriptorSetUpdate(set).write_descriptor_texture(0, tex).update(context);
-            sets.push_back(set);
-            textures.push_back(tex);
-        }
-        constant.iResolution = glm::vec2(width, height);
-        requires_rebuild = false;
-    }
+                           const std::vector<std::vector<merian::BufferHandle>>&) override;
 
     virtual void cmd_process(const vk::CommandBuffer& cmd,
                              const uint64_t iteration,
@@ -138,18 +65,7 @@ class ShadertoyNode : public merian::Node {
                              const std::vector<merian::ImageHandle>&,
                              const std::vector<merian::BufferHandle>&,
                              const std::vector<merian::ImageHandle>&,
-                             const std::vector<merian::BufferHandle>&) override {
-        float new_time = sw.seconds();
-        constant.iTimeDelta = new_time - constant.iTime;
-        constant.iTime = new_time;
-        constant.iFrame = iteration;
-
-        pipe->bind(cmd);
-        pipe->bind_descriptor_set(cmd, sets[set_index]);
-        pipe->push_constant<PushConstant>(cmd, constant);
-        cmd.dispatch((width + local_size_x - 1) / local_size_x,
-                     (height + local_size_y - 1) / local_size_y, 1);
-    }
+                             const std::vector<merian::BufferHandle>&) override;
 
   private:
     const SharedContext context;

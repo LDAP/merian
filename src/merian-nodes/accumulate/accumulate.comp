@@ -1,0 +1,20 @@
+#version 460
+#extension GL_EXT_scalar_block_layout : require
+
+layout(local_size_x_id = 0, local_size_y_id = 1) in;
+
+layout(binding = 0, rgba32f) uniform readonly image2D src_image;
+layout(binding = 0, rgba32f) uniform image2D dst_image;
+
+
+void main() {
+    const uvec2 resolution = imageSize(src_image);
+    const ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if((pixel.x >= resolution.x) || (pixel.y >= resolution.y)) {
+        return;
+    }
+
+    vec4 src = imageLoad(src_image, pixel);
+    vec4 dst = imageLoad(dst_image, pixel);
+    imageStore(dst_image, pixel, src + dst);
+}

@@ -17,8 +17,7 @@ class ShaderModuleLoader;
  * only on object and the vk::ShaderModule is destroyed when there are no references left.
  */
 class ShaderModule : public std::enable_shared_from_this<ShaderModule> {
-public:
-
+  public:
   public:
     ShaderModule() = delete;
 
@@ -26,22 +25,25 @@ public:
                  const std::string filename,
                  const std::optional<FileLoader> file_loader = std::nullopt)
         : context(context) {
-        if (file_loader.has_value())
-            this->filename = file_loader.value().find_file(filename).value_or(filename);
-
-        std::string code = FileLoader::load_file(this->filename.value());
+        std::string code =
+            FileLoader::load_file(file_loader.value().find_file(filename).value_or(filename));
         vk::ShaderModuleCreateInfo info{{}, code.size(), (const uint32_t*)code.c_str()};
-        create_module(info);
+        shader_module = context->device.createShaderModule(info);
     }
 
     ShaderModule(const SharedContext& context, const vk::ShaderModuleCreateInfo& info)
-        : context(context), filename(std::nullopt) {
-        create_module(info);
+        : context(context) {
+        shader_module = context->device.createShaderModule(info);
+    }
+
+    ShaderModule(const SharedContext& context, const std::size_t spv_size, const uint32_t spv[])
+        : context(context) {
+        vk::ShaderModuleCreateInfo info{{}, spv_size, spv};
+        shader_module = context->device.createShaderModule(info);
     }
 
     ~ShaderModule() {
-        SPDLOG_DEBUG("destroy shader module from {} ({})", filename.value_or("<unknown>"),
-                     fmt::ptr(this));
+        SPDLOG_DEBUG("destroy shader module ({})", fmt::ptr(this));
         context->device.destroyShaderModule(shader_module);
     }
 
@@ -54,10 +56,6 @@ public:
         return shader_module;
     }
 
-    const std::optional<std::string>& get_filename() const {
-        return filename;
-    }
-
     vk::PipelineShaderStageCreateInfo get_shader_stage_create_info(
         const vk::ShaderStageFlagBits stage_flags = vk::ShaderStageFlagBits::eCompute,
         const SpecializationInfoHandle specialization_info = MERIAN_SPECIALIZATION_INFO_NONE,
@@ -67,26 +65,8 @@ public:
                                                  *specialization_info};
     }
 
-    void reload() {
-        if (!filename.has_value())
-            SPDLOG_WARN("requesting reload of shadermodule without filename");
-        SPDLOG_DEBUG("reloading shader module {}", filename.value());
-        context->device.destroyShaderModule(shader_module);
-        std::string code = FileLoader::load_file(filename.value());
-        vk::ShaderModuleCreateInfo info{{}, code.size(), (const uint32_t*)code.c_str()};
-        shader_module = context->device.createShaderModule(info);
-    }
-
-  private:
-    void create_module(const vk::ShaderModuleCreateInfo info) {
-        SPDLOG_DEBUG("create shader module from {} ({})", filename.value_or("<unknown>"),
-                     fmt::ptr(this));
-        shader_module = context->device.createShaderModule(info);
-    }
-
   private:
     const SharedContext context;
-    std::optional<std::string> filename;
     vk::ShaderModule shader_module;
 };
 
