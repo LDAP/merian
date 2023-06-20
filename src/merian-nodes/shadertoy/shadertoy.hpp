@@ -14,6 +14,7 @@
 
 namespace merian {
 
+// A generator node that pushes the Shadertoy variables as push constant.
 class ShadertoyNode : public merian::Node {
   private:
     static constexpr uint32_t local_size_x = 16;

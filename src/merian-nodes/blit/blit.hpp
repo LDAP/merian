@@ -35,7 +35,7 @@ template <BlitNodeMode mode> class BlitNode : public Node {
     describe_inputs() override {
         return {
             {
-                NodeInputDescriptorImage("blit_src", vk::AccessFlagBits2::eTransferRead,
+                NodeInputDescriptorImage("src", vk::AccessFlagBits2::eTransferRead,
                                          vk::PipelineStageFlagBits2::eTransfer,
                                          vk::ImageLayout::eTransferSrcOptimal,
                                          vk::ImageUsageFlagBits::eTransferSrc),

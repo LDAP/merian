@@ -73,20 +73,24 @@ AccumulateF32ImageNode::describe_outputs(
     return {
         {
             merian::NodeOutputDescriptorImage{
-                "result", vk::AccessFlagBits2::eShaderWrite | vk::AccessFlagBits2::eTransferWrite,
+                "dst", vk::AccessFlagBits2::eShaderWrite | vk::AccessFlagBits2::eTransferWrite,
                 vk::PipelineStageFlagBits2::eComputeShader | vk::PipelineStageFlagBits2::eTransfer,
-                create_image, vk::ImageLayout::eGeneral, false},
+                create_image, vk::ImageLayout::eGeneral, true},
         },
         {},
     };
 }
 
 void AccumulateF32ImageNode::cmd_build(
-    const vk::CommandBuffer&,
+    const vk::CommandBuffer& cmd,
     const std::vector<std::vector<merian::ImageHandle>>& image_inputs,
     const std::vector<std::vector<merian::BufferHandle>>&,
     const std::vector<std::vector<merian::ImageHandle>>& image_outputs,
     const std::vector<std::vector<merian::BufferHandle>>&) {
+
+    // Since this is persistent there should only be exacly one image
+    cmd.clearColorImage(*image_outputs[0][0], vk::ImageLayout::eGeneral, {}, all_levels_and_layers());
+
     sets.clear();
     in_textures.clear();
     out_textures.clear();
