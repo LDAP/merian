@@ -149,6 +149,11 @@ class Graph : public std::enable_shared_from_this<Graph> {
         rebuild_requested = true;
     }
 
+    // Build the graph.
+    // This is automatically called in cmd_run if a rebuild is requested
+    // using request_rebuild() or internally by at least one node.
+    void cmd_build(vk::CommandBuffer& cmd, const ProfilerHandle profiler = nullptr);
+
     // Runs the graph. On the first run or if rebuild is requested the graph is build.
     void cmd_run(vk::CommandBuffer& cmd, const ProfilerHandle profiler = nullptr);
 
@@ -192,8 +197,6 @@ class Graph : public std::enable_shared_from_this<Graph> {
     // Depending on the delay the resources of a node changes on each iteration
     // the "resource sets" for these iterations are prepared here.
     void prepare_resource_sets();
-
-    void cmd_build(vk::CommandBuffer& cmd, const ProfilerHandle profiler = nullptr);
 
     void cmd_build_node(vk::CommandBuffer& cmd, NodeHandle& node);
 
