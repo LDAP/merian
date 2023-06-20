@@ -84,12 +84,9 @@ void ShadertoyNode::cmd_build(const vk::CommandBuffer&,
     uint32_t num_sets = image_outputs.size();
 
     pool = std::make_shared<merian::DescriptorPool>(layout, num_sets);
-    vk::ImageViewCreateInfo create_image_view{{},
-                                              VK_NULL_HANDLE,
-                                              vk::ImageViewType::e2D,
-                                              vk::Format::eR8G8B8A8Unorm,
-                                              {},
-                                              {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}};
+    vk::ImageViewCreateInfo create_image_view{
+        {}, VK_NULL_HANDLE,         vk::ImageViewType::e2D, vk::Format::eR8G8B8A8Unorm,
+        {}, first_level_and_layer()};
 
     for (uint32_t i = 0; i < num_sets; i++) {
         auto set = std::make_shared<merian::DescriptorSet>(pool);
@@ -104,12 +101,12 @@ void ShadertoyNode::cmd_build(const vk::CommandBuffer&,
 }
 
 void ShadertoyNode::cmd_process(const vk::CommandBuffer& cmd,
-                                        const uint64_t iteration,
-                                        const uint32_t set_index,
-                                        const std::vector<merian::ImageHandle>&,
-                                        const std::vector<merian::BufferHandle>&,
-                                        const std::vector<merian::ImageHandle>&,
-                                        const std::vector<merian::BufferHandle>&) {
+                                const uint64_t iteration,
+                                const uint32_t set_index,
+                                const std::vector<merian::ImageHandle>&,
+                                const std::vector<merian::BufferHandle>&,
+                                const std::vector<merian::ImageHandle>&,
+                                const std::vector<merian::BufferHandle>&) {
     float new_time = sw.seconds();
     constant.iTimeDelta = new_time - constant.iTime;
     constant.iTime = new_time;
