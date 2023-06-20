@@ -131,6 +131,6 @@ class ProfileScopeGPU {
 #define MERIAN_PROFILE_SCOPE(profiler, name) merian::ProfileScope merian_profile_scope(profiler, name)
 
 // Profiles CPU and GPU time of this scope
-#define CMD_MERIAN_PROFILE_SCOPE(profiler, cmd, name) merian::ProfileScopeGPU merian_profile_scope(profiler, cmd, name)
+#define MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, name) merian::ProfileScopeGPU merian_profile_scope(profiler, cmd, name)
 
 } // namespace merian

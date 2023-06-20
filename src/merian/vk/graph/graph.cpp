@@ -111,7 +111,7 @@ void Graph::cmd_build(vk::CommandBuffer& cmd, const ProfilerHandle profiler) {
     prepare_resource_sets();
 
     for (auto& node : flat_topology) {
-        CMD_MERIAN_PROFILE_SCOPE(profiler, cmd, node->name());
+        MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, node->name());
         cmd_build_node(cmd, node);
     }
 
@@ -119,7 +119,7 @@ void Graph::cmd_build(vk::CommandBuffer& cmd, const ProfilerHandle profiler) {
 }
 
 void Graph::cmd_run(vk::CommandBuffer& cmd, const std::shared_ptr<Profiler> profiler) {
-    CMD_MERIAN_PROFILE_SCOPE(profiler, cmd, "Graph: run");
+    MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "Graph: run");
 
     {
         MERIAN_PROFILE_SCOPE(profiler, "Graph: pre process");
@@ -133,13 +133,13 @@ void Graph::cmd_run(vk::CommandBuffer& cmd, const std::shared_ptr<Profiler> prof
     }
 
     if (rebuild_requested) {
-        CMD_MERIAN_PROFILE_SCOPE(profiler, cmd, "Graph: build");
+        MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "Graph: build");
         cmd_build(cmd, profiler);
         rebuild_requested = false;
     }
 
     for (auto& node : flat_topology) {
-        CMD_MERIAN_PROFILE_SCOPE(profiler, cmd, node->name());
+        MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, node->name());
         cmd_run_node(cmd, node);
     }
 
