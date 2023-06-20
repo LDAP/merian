@@ -52,8 +52,16 @@ class ShadertoyNode : public merian::Node {
     }
 
     void set_resolution(uint32_t width = 1920, uint32_t height = 1080) {
-        this->width = width;
-        this->height = height;
+        if (width != this->width || height != this->height) {
+            this->width = width;
+            this->height = height;
+            requires_rebuild = true;
+        }
+    }
+
+    // Called everytime before the graph is run. Can be used to request a rebuild for example.
+    virtual void pre_process(NodeStatus& status) override {
+        status.request_rebuild = requires_rebuild;
     }
 
     std::string name() override {
@@ -121,6 +129,7 @@ class ShadertoyNode : public merian::Node {
             textures.push_back(tex);
         }
         constant.iResolution = glm::vec2(width, height);
+        requires_rebuild = false;
     }
 
     virtual void cmd_process(const vk::CommandBuffer& cmd,
@@ -157,6 +166,7 @@ class ShadertoyNode : public merian::Node {
 
     PushConstant constant;
     Stopwatch sw;
+    bool requires_rebuild = true;
 };
 
 } // namespace merian

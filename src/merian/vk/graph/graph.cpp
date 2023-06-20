@@ -121,6 +121,17 @@ void Graph::cmd_build(vk::CommandBuffer& cmd, const ProfilerHandle profiler) {
 void Graph::cmd_run(vk::CommandBuffer& cmd, const std::shared_ptr<Profiler> profiler) {
     CMD_MERIAN_PROFILE_SCOPE(profiler, cmd, "Graph: run");
 
+    {
+        MERIAN_PROFILE_SCOPE(profiler, "Graph: pre process");
+        Node::NodeStatus status;
+        for (auto& node : flat_topology) {
+            MERIAN_PROFILE_SCOPE(profiler, node->name());
+            node->pre_process(status);
+            rebuild_requested |= status.request_rebuild;
+            status = {};
+        }
+    }
+
     if (rebuild_requested) {
         CMD_MERIAN_PROFILE_SCOPE(profiler, cmd, "Graph: build");
         cmd_build(cmd, profiler);

@@ -264,6 +264,5 @@ Design decisions:
 
 
 ## ToDO
-
-- AS Builder: Only record commands, dont wait.
 - Replace buffer suballocator with VMAVirtualAllocator
+- Graph: Allocator: e.g. free memory for "later" nodes?, Parallel cmd recording.

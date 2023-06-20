@@ -44,19 +44,6 @@ template <BlitNodeMode mode> class BlitNode : public Node {
         };
     }
 
-    virtual std::tuple<std::vector<NodeOutputDescriptorImage>,
-                       std::vector<NodeOutputDescriptorBuffer>>
-    describe_outputs(const std::vector<NodeOutputDescriptorImage>&,
-                     const std::vector<NodeOutputDescriptorBuffer>&) {
-        return {};
-    }
-
-    virtual void cmd_build(const vk::CommandBuffer&,
-                           const std::vector<std::vector<ImageHandle>>&,
-                           const std::vector<std::vector<BufferHandle>>&,
-                           const std::vector<std::vector<ImageHandle>>&,
-                           const std::vector<std::vector<BufferHandle>>&) {}
-
     virtual void cmd_process(const vk::CommandBuffer& cmd,
                              const uint64_t,
                              const uint32_t,
