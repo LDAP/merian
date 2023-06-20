@@ -40,13 +40,14 @@ tol_subp = cmake.subproject('tinyobjloader')
 tol = tol_subp.dependency('tinyobjloader')
 tgltf = cmake.subproject('tinygltf').dependency('tinygltf')
 
-# Main targets
-# Keep sorted
-src_files = files(
+ext_src = files(
     'src/ext/stb_image.cpp',
     'src/ext/stb_image_write.cpp',
     'src/ext/vma.cpp',
+)
 
+# Keep sorted
+merian_src = files(
     'src/merian/io/file_loader.cpp',
     'src/merian/utils/renderdoc.cpp',
     'src/merian/utils/stopwatch.cpp',
@@ -80,7 +81,7 @@ inc_dirs = [
 
 lib = static_library(
     'merian',
-    src_files,
+    [ext_src, merian_src],
     dependencies: [
         fmt,
         glfw,
