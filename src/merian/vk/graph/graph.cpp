@@ -123,12 +123,11 @@ void Graph::cmd_run(vk::CommandBuffer& cmd, const std::shared_ptr<Profiler> prof
 
     {
         MERIAN_PROFILE_SCOPE(profiler, "Graph: pre process");
-        Node::NodeStatus status;
-        for (auto& node : flat_topology) {
+        for (auto& [node, data] : node_data) {
             MERIAN_PROFILE_SCOPE(profiler, node->name());
-            node->pre_process(status);
-            rebuild_requested |= status.request_rebuild;
-            status = {};
+            data.status = {};
+            node->pre_process(data.status);
+            rebuild_requested |= data.status.request_rebuild;
         }
     }
 
@@ -139,8 +138,12 @@ void Graph::cmd_run(vk::CommandBuffer& cmd, const std::shared_ptr<Profiler> prof
     }
 
     for (auto& node : flat_topology) {
+        NodeData& data = node_data[node];
+        if (data.status.skip_run) {
+            continue;
+        }
         MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, node->name());
-        cmd_run_node(cmd, node);
+        cmd_run_node(cmd, node, data);
     }
 
     current_iteration++;
@@ -486,8 +489,8 @@ void Graph::cmd_build_node(vk::CommandBuffer& cmd, NodeHandle& node) {
 }
 
 // Insert the according barriers for that node
-void Graph::cmd_run_node(vk::CommandBuffer& cmd, NodeHandle& node) {
-    NodeData& data = node_data[node];
+void Graph::cmd_run_node(vk::CommandBuffer& cmd, NodeHandle& node, NodeData& data) {
+    
     uint32_t set_idx = current_iteration % data.precomputed_input_images.size();
 
     cmd_barrier_for_node(cmd, data, set_idx);

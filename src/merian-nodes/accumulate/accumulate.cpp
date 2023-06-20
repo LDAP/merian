@@ -56,29 +56,11 @@ AccumulateF32ImageNode::describe_outputs(
     assert(connected_image_outputs[0].create_info.arrayLayers == 1);
     assert(connected_image_outputs[0].create_info.format == vk::Format::eR32G32B32A32Sfloat);
 
-    vk::ImageCreateInfo create_image{{},
-                                     vk::ImageType::e2D,
-                                     vk::Format::eR32G32B32A32Sfloat,
-                                     connected_image_outputs[0].create_info.extent,
-                                     1,
-                                     1,
-                                     vk::SampleCountFlagBits::e1,
-                                     vk::ImageTiling::eOptimal,
-                                     vk::ImageUsageFlagBits::eStorage |
-                                         vk::ImageUsageFlagBits::eTransferDst,
-                                     vk::SharingMode::eExclusive,
-                                     {},
-                                     {},
-                                     vk::ImageLayout::eUndefined};
-    return {
-        {
-            merian::NodeOutputDescriptorImage{
-                "dst", vk::AccessFlagBits2::eShaderWrite | vk::AccessFlagBits2::eTransferWrite,
-                vk::PipelineStageFlagBits2::eComputeShader | vk::PipelineStageFlagBits2::eTransfer,
-                create_image, vk::ImageLayout::eGeneral, true},
-        },
-        {},
-    };
+    merian::NodeOutputDescriptorImage out_img = connected_image_outputs[0];
+    out_img.name = "dst";
+    out_img.persistent = true;
+
+    return {{out_img}, {}};
 }
 
 void AccumulateF32ImageNode::cmd_build(
@@ -89,7 +71,8 @@ void AccumulateF32ImageNode::cmd_build(
     const std::vector<std::vector<merian::BufferHandle>>&) {
 
     // Since this is persistent there should only be exacly one image
-    cmd.clearColorImage(*image_outputs[0][0], vk::ImageLayout::eGeneral, {}, all_levels_and_layers());
+    cmd.clearColorImage(*image_outputs[0][0], vk::ImageLayout::eGeneral, {},
+                        all_levels_and_layers());
 
     sets.clear();
     in_textures.clear();

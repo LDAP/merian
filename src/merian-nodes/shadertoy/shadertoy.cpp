@@ -50,25 +50,9 @@ std::tuple<std::vector<merian::NodeOutputDescriptorImage>,
 ShadertoyNode::describe_outputs(const std::vector<merian::NodeOutputDescriptorImage>&,
                                 const std::vector<merian::NodeOutputDescriptorBuffer>&) {
 
-    vk::ImageCreateInfo create_image{{},
-                                     vk::ImageType::e2D,
-                                     vk::Format::eR8G8B8A8Unorm,
-                                     {width, height, 1},
-                                     1,
-                                     1,
-                                     vk::SampleCountFlagBits::e1,
-                                     vk::ImageTiling::eOptimal,
-                                     vk::ImageUsageFlagBits::eStorage,
-                                     vk::SharingMode::eExclusive,
-                                     {},
-                                     {},
-                                     vk::ImageLayout::eUndefined};
     return {
-        {
-            merian::NodeOutputDescriptorImage{"result", vk::AccessFlagBits2::eShaderWrite,
-                                              vk::PipelineStageFlagBits2::eComputeShader,
-                                              create_image, vk::ImageLayout::eGeneral, false},
-        },
+        {merian::NodeOutputDescriptorImage::compute_write("result", vk::Format::eR8G8B8A8Unorm,
+                                                          width, height)},
         {},
     };
 }

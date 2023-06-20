@@ -119,6 +119,8 @@ class Graph : public std::enable_shared_from_this<Graph> {
             precomputed_output_images_resource{};
         std::vector<std::vector<std::shared_ptr<BufferResource>>>
             precomputed_output_buffers_resource{};
+
+        Node::NodeStatus status;
     };
 
   public:
@@ -196,7 +198,7 @@ class Graph : public std::enable_shared_from_this<Graph> {
     void cmd_build_node(vk::CommandBuffer& cmd, NodeHandle& node);
 
     // Insert the according barriers for that node
-    void cmd_run_node(vk::CommandBuffer& cmd, NodeHandle& node);
+    void cmd_run_node(vk::CommandBuffer& cmd, NodeHandle& node, NodeData& data);
 
     // Inserts the necessary barriers for a node and a set index
     void cmd_barrier_for_node(vk::CommandBuffer& cmd, NodeData& data, uint32_t& set_idx);

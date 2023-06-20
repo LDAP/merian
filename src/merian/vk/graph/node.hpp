@@ -13,7 +13,10 @@ class Graph;
 class Node : public std::enable_shared_from_this<Node> {
   public:
     struct NodeStatus {
+        // If this is true the Graph is forced to rebuild before the next run.
         bool request_rebuild{false};
+        // If this is true the Graph is free to not call cmd_process on the next run.
+        bool skip_run{false};
     };
 
     static inline NodeOutputDescriptorImage FEEDBACK_OUTPUT_IMAGE{{}, {}, {}, {}, {}};

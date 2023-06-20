@@ -39,6 +39,25 @@ struct NodeInputDescriptorImage : public NodeInputDescriptor {
 
     vk::ImageLayout required_layout;
     vk::ImageUsageFlags usage_flags;
+
+    static NodeInputDescriptorImage compute_read(std::string& name) {
+        return NodeInputDescriptorImage{
+            name,
+            vk::AccessFlagBits2::eShaderRead,
+            vk::PipelineStageFlagBits2::eComputeShader,
+            vk::ImageLayout::eShaderReadOnlyOptimal,
+            vk::ImageUsageFlagBits::eStorage,
+        };
+    }
+    static NodeInputDescriptorImage transfer_src(std::string& name) {
+        return NodeInputDescriptorImage{
+            name,
+            vk::AccessFlagBits2::eTransferRead,
+            vk::PipelineStageFlagBits2::eTransfer,
+            vk::ImageLayout::eTransferSrcOptimal,
+            vk::ImageUsageFlagBits::eTransferSrc,
+        };
+    }
 };
 
 struct NodeInputDescriptorBuffer : public NodeInputDescriptor {
@@ -52,6 +71,23 @@ struct NodeInputDescriptorBuffer : public NodeInputDescriptor {
           usage_flags(usage_flags) {}
 
     vk::BufferUsageFlags usage_flags;
+
+    static NodeInputDescriptorBuffer compute_read(std::string& name) {
+        return NodeInputDescriptorBuffer{
+            name,
+            vk::AccessFlagBits2::eShaderRead,
+            vk::PipelineStageFlagBits2::eComputeShader,
+            vk::BufferUsageFlagBits::eStorageBuffer,
+        };
+    }
+    static NodeInputDescriptorBuffer transfer_src(std::string& name) {
+        return NodeInputDescriptorBuffer{
+            name,
+            vk::AccessFlagBits2::eTransferRead,
+            vk::PipelineStageFlagBits2::eTransfer,
+            vk::BufferUsageFlagBits::eTransferSrc,
+        };
+    }
 };
 
 class NodeOutputDescriptor {
@@ -86,6 +122,35 @@ class NodeOutputDescriptorImage : public NodeOutputDescriptor {
 
     vk::ImageCreateInfo create_info;
     vk::ImageLayout required_layout;
+
+    static NodeOutputDescriptorImage compute_write(const std::string& name,
+                                                   const vk::Format format,
+                                                   const uint32_t width,
+                                                   const uint32_t height,
+                                                   const bool persistent = false) {
+        const vk::ImageCreateInfo create_info{
+            {},
+            vk::ImageType::e2D,
+            format,
+            {width, height, 1},
+            1,
+            1,
+            vk::SampleCountFlagBits::e1,
+            vk::ImageTiling::eOptimal,
+            vk::ImageUsageFlagBits::eStorage,
+            vk::SharingMode::eExclusive,
+            {},
+            {},
+            vk::ImageLayout::eUndefined,
+        };
+
+        return NodeOutputDescriptorImage{name,
+                                         vk::AccessFlagBits2::eShaderWrite,
+                                         vk::PipelineStageFlagBits2::eComputeShader,
+                                         create_info,
+                                         vk::ImageLayout::eGeneral,
+                                         persistent};
+    }
 };
 
 class NodeOutputDescriptorBuffer : public NodeOutputDescriptor {
