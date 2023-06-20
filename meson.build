@@ -10,6 +10,9 @@ project(
 )
 
 cmake = import('cmake')
+glslc = find_program('glslangValidator')
+
+dir_source_root = meson.project_source_root()
 
 # Debug configuration
 if get_option('buildtype').startswith('debug')
@@ -40,62 +43,19 @@ tol_subp = cmake.subproject('tinyobjloader')
 tol = tol_subp.dependency('tinyobjloader')
 tgltf = cmake.subproject('tinygltf').dependency('tinygltf')
 
-ext_src = files(
-    'src/ext/stb_image.cpp',
-    'src/ext/stb_image_write.cpp',
-    'src/ext/vma.cpp',
-)
-
-# Keep sorted
-merian_src = files(
-    'src/merian/io/file_loader.cpp',
-    'src/merian/utils/renderdoc.cpp',
-    'src/merian/utils/stopwatch.cpp',
-    'src/merian/vk/command/command_pool.cpp',
-    'src/merian/vk/command/queue_container.cpp',
-    'src/merian/vk/context.cpp',
-    'src/merian/vk/extension/extension.cpp',
-    'src/merian/vk/extension/extension_resources.cpp',
-    'src/merian/vk/extension/extension_vk_debug_utils.cpp',
-    'src/merian/vk/extension/extension_vk_glfw.cpp',
-    'src/merian/vk/graph/graph.cpp',
-    'src/merian/vk/memory/buffer_suballocator.cpp',
-    'src/merian/vk/memory/memory_allocator.cpp',
-    'src/merian/vk/memory/memory_allocator_vma.cpp',
-    'src/merian/vk/memory/resource_allocations.cpp',
-    'src/merian/vk/memory/resource_allocator.cpp',
-    'src/merian/vk/memory/staging_memory_manager.cpp',
-    'src/merian/vk/raytrace/as_compressor.cpp',
-    'src/merian/vk/raytrace/blas_builder.cpp',
-    'src/merian/vk/raytrace/tlas_builder.cpp',
-    'src/merian/vk/sampler/sampler_pool.cpp',
-    'src/merian/vk/utils/barriers.cpp',
-    'src/merian/vk/utils/profiler.cpp',
-    'src/merian/vk/window/swapchain.cpp',
-)
 inc_dirs = [
-    'include',
+    include_directories('./src'),
     cmake.subproject('VulkanMemoryAllocator').include_directories('VulkanMemoryAllocator'),
     tol_subp.include_directories('tinyobjloader')
 ]
 
-lib = static_library(
-    'merian',
-    [ext_src, merian_src],
-    dependencies: [
-        fmt,
-        glfw,
-        glm,
-        spdlog,
-        tgltf,
-        tol,
-        vulkan,
-    ],
-    include_directories: inc_dirs,
-    install : true
-)
+subdir('src/ext')
+subdir('src/merian')
+subdir('src/merian-nodes')
+
+# Keep sorted
 
 merian_dep = declare_dependency(
-    link_with : lib,
+    link_with : [ext_lib, merian_lib, merian_nodes_lib],
     include_directories : inc_dirs
 )

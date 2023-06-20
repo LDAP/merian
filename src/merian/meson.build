@@ -1,0 +1,43 @@
+merian_src = files(
+    'io/file_loader.cpp',
+    'utils/renderdoc.cpp',
+    'utils/stopwatch.cpp',
+    'vk/command/command_pool.cpp',
+    'vk/command/queue_container.cpp',
+    'vk/context.cpp',
+    'vk/extension/extension.cpp',
+    'vk/extension/extension_resources.cpp',
+    'vk/extension/extension_vk_debug_utils.cpp',
+    'vk/extension/extension_vk_glfw.cpp',
+    'vk/graph/graph.cpp',
+    'vk/memory/buffer_suballocator.cpp',
+    'vk/memory/memory_allocator.cpp',
+    'vk/memory/memory_allocator_vma.cpp',
+    'vk/memory/resource_allocations.cpp',
+    'vk/memory/resource_allocator.cpp',
+    'vk/memory/staging_memory_manager.cpp',
+    'vk/raytrace/as_compressor.cpp',
+    'vk/raytrace/blas_builder.cpp',
+    'vk/raytrace/tlas_builder.cpp',
+    'vk/sampler/sampler_pool.cpp',
+    'vk/utils/barriers.cpp',
+    'vk/utils/profiler.cpp',
+    'vk/window/swapchain.cpp',
+)
+
+merian_lib = static_library(
+    'merian',
+    [merian_src],
+    dependencies: [
+        fmt,
+        glfw,
+        glm,
+        spdlog,
+        tgltf,
+        tol,
+        vulkan,
+    ],
+    include_directories: inc_dirs,
+    link_with: ext_lib,
+    install : true
+)
