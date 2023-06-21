@@ -145,7 +145,7 @@ class DescriptorSetLayoutBuilder {
     }
 
     DescriptorSetLayoutBuilder& add_binding(vk::DescriptorSetLayoutBinding binding) {
-#ifdef DEBUG
+#ifndef NDEBUG
         if (bindings.contains(binding.binding)) {
             SPDLOG_WARN("builder already contains a binding with binding point {}",
                         binding.binding);

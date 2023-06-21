@@ -119,7 +119,7 @@ void log_allocation(const VmaAllocationInfo& info,
 }
 
 void set_name(VmaAllocator& allocator, VmaAllocation& allocation, const std::string& name) {
-#ifdef DEBUG
+#ifndef NDEBUG
     // set name for VMA leaks finder
     vmaSetAllocationName(allocator, allocation, name.c_str());
 #endif

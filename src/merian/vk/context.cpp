@@ -203,7 +203,7 @@ void Context::find_queues() {
     // GCT family index, T family index, C family index)
     std::vector<std::tuple<bool, bool, bool, uint32_t, uint32_t, uint32_t, uint32_t>> candidates;
 
-#ifdef DEBUG
+#ifndef NDEBUG
     for (std::size_t i = 0; i < queue_family_props.size(); i++) {
         const bool supports_graphics =
             queue_family_props[i].queueFlags & Flags::eGraphics ? true : false;

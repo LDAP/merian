@@ -16,7 +16,6 @@ dir_source_root = meson.project_source_root()
 
 # Debug configuration
 if get_option('buildtype').startswith('debug')
-  add_project_arguments('-DDEBUG', language : 'cpp')
   add_project_arguments('-DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_DEBUG', language : 'cpp')
 endif
 
