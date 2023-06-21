@@ -1,4 +1,3 @@
-shader_include_dir = 'include'
 shaders = [
     'accumulate.comp',      
 ]

@@ -16,6 +16,8 @@ template <BlitNodeMode mode> class BlitNode : public Node {
   public:
     BlitNode() {}
 
+    ~BlitNode() {}
+
     void set_target(vk::Image dst_image,
                     vk::ImageLayout dst_in_layout,
                     vk::ImageLayout dst_out_layout,

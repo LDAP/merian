@@ -103,7 +103,7 @@ TextureHandle ResourceAllocator::createTexture(const ImageHandle& image,
                                                const vk::ImageViewCreateInfo& imageViewCreateInfo,
                                                const vk::SamplerCreateInfo& samplerCreateInfo) {
     TextureHandle texture = createTexture(image, imageViewCreateInfo);
-    texture->attach_sampler(m_samplerPool->acquireSampler(samplerCreateInfo));
+    texture->attach_sampler(m_samplerPool->acquire_sampler(samplerCreateInfo));
     return texture;
 }
 

@@ -80,6 +80,7 @@ class Image : public std::enable_shared_from_this<Image> {
     Image(const vk::Image& image,
           const MemoryAllocationHandle& memory,
           const vk::Extent3D extent,
+          const vk::Format format,
           const vk::ImageLayout current_layout = vk::ImageLayout::eUndefined);
 
     ~Image();
@@ -104,6 +105,10 @@ class Image : public std::enable_shared_from_this<Image> {
 
     const vk::Extent3D& get_extent() const {
         return extent;
+    }
+
+    const vk::Format& get_format() const {
+        return format;
     }
 
     // Use this only if you performed a layout transition without using barrier(...)
@@ -158,6 +163,7 @@ class Image : public std::enable_shared_from_this<Image> {
     const vk::Image image = VK_NULL_HANDLE;
     const MemoryAllocationHandle memory;
     const vk::Extent3D extent;
+    const vk::Format format;
 
     vk::ImageLayout current_layout;
 };

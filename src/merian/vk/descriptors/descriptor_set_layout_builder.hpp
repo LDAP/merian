@@ -63,9 +63,9 @@ class DescriptorSetLayoutBuilder {
     DescriptorSetLayoutBuilder&
     add_binding_storage_buffer(vk::ShaderStageFlags stage_flags = vk::ShaderStageFlagBits::eCompute,
                                uint32_t descriptor_count = 1,
-                               const vk::Sampler* sampler = nullptr,
+                               const vk::Sampler* immutable_sampler = nullptr,
                                std::optional<uint32_t> binding = std::nullopt) {
-        add_binding(stage_flags, vk::DescriptorType::eStorageBuffer, descriptor_count, sampler,
+        add_binding(stage_flags, vk::DescriptorType::eStorageBuffer, descriptor_count, immutable_sampler,
                     binding);
         return *this;
     }
@@ -73,9 +73,9 @@ class DescriptorSetLayoutBuilder {
     DescriptorSetLayoutBuilder&
     add_binding_storage_image(vk::ShaderStageFlags stage_flags = vk::ShaderStageFlagBits::eCompute,
                               uint32_t descriptor_count = 1,
-                              const vk::Sampler* sampler = nullptr,
+                              const vk::Sampler* immutable_sampler = nullptr,
                               std::optional<uint32_t> binding = std::nullopt) {
-        add_binding(stage_flags, vk::DescriptorType::eStorageImage, descriptor_count, sampler,
+        add_binding(stage_flags, vk::DescriptorType::eStorageImage, descriptor_count, immutable_sampler,
                     binding);
         return *this;
     }
@@ -83,29 +83,29 @@ class DescriptorSetLayoutBuilder {
     DescriptorSetLayoutBuilder&
     add_binding_sampler(vk::ShaderStageFlags stage_flags = vk::ShaderStageFlagBits::eCompute,
                         uint32_t descriptor_count = 1,
-                        const vk::Sampler* sampler = nullptr,
+                        const vk::Sampler* immutable_sampler = nullptr,
                         std::optional<uint32_t> binding = std::nullopt) {
-        add_binding(stage_flags, vk::DescriptorType::eSampler, descriptor_count, sampler, binding);
+        add_binding(stage_flags, vk::DescriptorType::eSampler, descriptor_count, immutable_sampler, binding);
         return *this;
     }
 
     DescriptorSetLayoutBuilder& add_binding_combined_sampler(
         vk::ShaderStageFlags stage_flags = vk::ShaderStageFlagBits::eCompute,
         uint32_t descriptor_count = 1,
-        const vk::Sampler* sampler = nullptr,
+        const vk::Sampler* immutable_sampler = nullptr,
         std::optional<uint32_t> binding = std::nullopt) {
         add_binding(stage_flags, vk::DescriptorType::eCombinedImageSampler, descriptor_count,
-                    sampler, binding);
+                    immutable_sampler, binding);
         return *this;
     }
 
     DescriptorSetLayoutBuilder& add_binding_acceleration_structure(
         vk::ShaderStageFlags stage_flags = vk::ShaderStageFlagBits::eCompute,
         uint32_t descriptor_count = 1,
-        const vk::Sampler* sampler = nullptr,
+        const vk::Sampler* immutable_sampler = nullptr,
         std::optional<uint32_t> binding = std::nullopt) {
         add_binding(stage_flags, vk::DescriptorType::eAccelerationStructureKHR, descriptor_count,
-                    sampler, binding);
+                    immutable_sampler, binding);
         return *this;
     }
 
@@ -122,17 +122,17 @@ class DescriptorSetLayoutBuilder {
      * @param[in]  descriptor_type_     The descriptor type
      * @param[in]  descriptor_count     The descriptor count
      * @param[in]  stage_flags          The stage slags
-     * @param[in]  pImmutableSamplers_  Pointer to a sampler, used for textures
+     * @param[in]  pImmutableSamplers_  See vulkan spec
      */
     DescriptorSetLayoutBuilder&
     add_binding(vk::ShaderStageFlags stage_flags,
                 vk::DescriptorType descriptor_type = vk::DescriptorType::eSampler,
                 uint32_t descriptor_count = 1,
-                const vk::Sampler* sampler = nullptr,
+                const vk::Sampler* immutable_sampler = nullptr,
                 std::optional<uint32_t> binding = std::nullopt) {
         vk::DescriptorSetLayoutBinding layout_binding{binding.value_or(next_free_binding()),
                                                       descriptor_type, descriptor_count,
-                                                      stage_flags, sampler};
+                                                      stage_flags, immutable_sampler};
         add_binding(layout_binding);
         return *this;
     }

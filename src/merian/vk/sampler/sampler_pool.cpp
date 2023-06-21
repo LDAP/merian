@@ -28,7 +28,7 @@ SamplerPool::~SamplerPool() {
     SPDLOG_DEBUG("destroy sampler pool ({})", fmt::ptr(this));
 }
 
-SamplerHandle SamplerPool::acquireSampler(const vk::SamplerCreateInfo& createInfo) {
+SamplerHandle SamplerPool::acquire_sampler(const vk::SamplerCreateInfo& createInfo) {
     SamplerState state;
     state.createInfo = createInfo;
 
@@ -55,14 +55,8 @@ SamplerHandle SamplerPool::acquireSampler(const vk::SamplerCreateInfo& createInf
     auto it = state_map.find(state);
 
     if (it == state_map.end()) {
-        uint32_t index = 0;
-        if (freeIndex != (uint32_t) ~0) {
-            index = freeIndex;
-            freeIndex = entries[index].nextFreeIndex;
-        } else {
-            index = (uint32_t)entries.size();
-            entries.resize(entries.size() + 1);
-        }
+        uint32_t index = (uint32_t)entries.size();
+        entries.resize(entries.size() + 1);
 
         SamplerHandle sampler = std::make_shared<Sampler>(context, createInfo);
 
@@ -83,6 +77,46 @@ SamplerHandle SamplerPool::acquireSampler(const vk::SamplerCreateInfo& createInf
             return entry.sampler.lock();
         }
     }
+}
+
+SamplerHandle SamplerPool::linear_mirrored_repeat() {
+    const vk::SamplerCreateInfo info{{},
+                                     vk::Filter::eLinear,
+                                     vk::Filter::eLinear,
+                                     vk::SamplerMipmapMode::eLinear,
+                                     vk::SamplerAddressMode::eMirroredRepeat,
+                                     vk::SamplerAddressMode::eMirroredRepeat,
+                                     vk::SamplerAddressMode::eMirroredRepeat,
+                                     {},
+                                     false,
+                                     16,
+                                     false,
+                                     {},
+                                     0.0f,
+                                     128.0f,
+                                     vk::BorderColor::eIntTransparentBlack,
+                                     false};
+    return acquire_sampler(info);
+}
+
+SamplerHandle SamplerPool::nearest_mirrored_repeat() {
+    const vk::SamplerCreateInfo info{{},
+                                     vk::Filter::eNearest,
+                                     vk::Filter::eNearest,
+                                     vk::SamplerMipmapMode::eNearest,
+                                     vk::SamplerAddressMode::eMirroredRepeat,
+                                     vk::SamplerAddressMode::eMirroredRepeat,
+                                     vk::SamplerAddressMode::eMirroredRepeat,
+                                     {},
+                                     false,
+                                     16,
+                                     false,
+                                     {},
+                                     0.0f,
+                                     128.0f,
+                                     vk::BorderColor::eIntTransparentBlack,
+                                     false};
+    return acquire_sampler(info);
 }
 
 } // namespace merian

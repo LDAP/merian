@@ -22,6 +22,9 @@ class Node : public std::enable_shared_from_this<Node> {
     static inline NodeOutputDescriptorImage FEEDBACK_OUTPUT_IMAGE{{}, {}, {}, {}, {}};
     static inline NodeOutputDescriptorBuffer FEEDBACK_OUTPUT_BUFFER{{}, {}, {}, {}};
 
+  public:
+    virtual ~Node() {}
+
     virtual std::string name() = 0;
 
     // Declare the inputs that you require
@@ -64,6 +67,7 @@ class Node : public std::enable_shared_from_this<Node> {
     // You do not need to insert barriers for node inputs and outputs.
     // Use the descriptor set according to set_index.
     // If you need to perform layout transistions use the barrier() methods of the images.
+    // `iteration` counts the iterations since last build
     virtual void cmd_process([[maybe_unused]] const vk::CommandBuffer& cmd,
                              [[maybe_unused]] const uint64_t iteration,
                              [[maybe_unused]] const uint32_t set_index,

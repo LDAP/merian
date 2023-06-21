@@ -135,13 +135,17 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
     std::shared_ptr<StagingMemoryManager> getStaging();
     const std::shared_ptr<StagingMemoryManager> getStaging() const;
 
+    const SamplerPoolHandle& get_sampler_pool() const {
+        return m_samplerPool;
+    }
+
     //--------------------------------------------------------------------------------------------------
 
   protected:
     const SharedContext context;
     const std::shared_ptr<MemoryAllocator> m_memAlloc;
     const std::shared_ptr<StagingMemoryManager> m_staging;
-    const std::shared_ptr<SamplerPool> m_samplerPool;
+    const SamplerPoolHandle m_samplerPool;
 };
 
 using ResourceAllocatorHandle = std::shared_ptr<ResourceAllocator>;

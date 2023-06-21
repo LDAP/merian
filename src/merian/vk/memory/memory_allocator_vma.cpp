@@ -216,7 +216,7 @@ ImageHandle VMAMemoryAllocator::create_image(const vk::ImageCreateInfo image_cre
         static_pointer_cast<VMAMemoryAllocator>(shared_from_this());
     auto memory =
         std::make_shared<VMAMemoryAllocation>(context, allocator, mapping_type, allocation);
-    auto image_handle = std::make_shared<Image>(image, memory, image_create_info.extent);
+    auto image_handle = std::make_shared<Image>(image, memory, image_create_info.extent, image_create_info.format);
     log_allocation(allocation_info, memory, debug_name);
 
     return image_handle;

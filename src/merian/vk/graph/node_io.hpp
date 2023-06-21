@@ -40,16 +40,16 @@ struct NodeInputDescriptorImage : public NodeInputDescriptor {
     vk::ImageLayout required_layout;
     vk::ImageUsageFlags usage_flags;
 
-    static NodeInputDescriptorImage compute_read(std::string& name) {
+    static NodeInputDescriptorImage compute_read(const std::string& name) {
         return NodeInputDescriptorImage{
             name,
             vk::AccessFlagBits2::eShaderRead,
             vk::PipelineStageFlagBits2::eComputeShader,
             vk::ImageLayout::eShaderReadOnlyOptimal,
-            vk::ImageUsageFlagBits::eStorage,
+            vk::ImageUsageFlagBits::eSampled,
         };
     }
-    static NodeInputDescriptorImage transfer_src(std::string& name) {
+    static NodeInputDescriptorImage transfer_src(const std::string& name) {
         return NodeInputDescriptorImage{
             name,
             vk::AccessFlagBits2::eTransferRead,
@@ -72,7 +72,7 @@ struct NodeInputDescriptorBuffer : public NodeInputDescriptor {
 
     vk::BufferUsageFlags usage_flags;
 
-    static NodeInputDescriptorBuffer compute_read(std::string& name) {
+    static NodeInputDescriptorBuffer compute_read(const std::string& name) {
         return NodeInputDescriptorBuffer{
             name,
             vk::AccessFlagBits2::eShaderRead,
@@ -80,7 +80,7 @@ struct NodeInputDescriptorBuffer : public NodeInputDescriptor {
             vk::BufferUsageFlagBits::eStorageBuffer,
         };
     }
-    static NodeInputDescriptorBuffer transfer_src(std::string& name) {
+    static NodeInputDescriptorBuffer transfer_src(const std::string& name) {
         return NodeInputDescriptorBuffer{
             name,
             vk::AccessFlagBits2::eTransferRead,

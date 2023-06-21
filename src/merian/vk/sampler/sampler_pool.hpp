@@ -34,7 +34,11 @@ class SamplerPool : public std::enable_shared_from_this<SamplerPool> {
     /* creates a new sampler or re-uses an existing one.
      * createInfo may contain VkSamplerReductionModeCreateInfo and VkSamplerYcbcrConversionCreateInfo
      */
-    SamplerHandle acquireSampler(const vk::SamplerCreateInfo& createInfo);
+    SamplerHandle acquire_sampler(const vk::SamplerCreateInfo& createInfo);
+
+    SamplerHandle linear_mirrored_repeat();
+
+    SamplerHandle nearest_mirrored_repeat();
 
   private:
     struct SamplerState {
@@ -58,10 +62,11 @@ class SamplerPool : public std::enable_shared_from_this<SamplerPool> {
     };
 
     const SharedContext context;
-    uint32_t freeIndex = ~0;
 
     std::vector<Entry> entries;
     std::unordered_map<SamplerState, uint32_t, HashAligned32<SamplerState>> state_map;
 };
+
+using SamplerPoolHandle = std::shared_ptr<SamplerPool>;
 
 } // namespace merian
