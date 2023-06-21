@@ -1,6 +1,6 @@
-#ifndef __COMMON_H__
-#define __COMMON_H__
+#ifndef _COMMON_H_
+#define _COMMON_H_
 
 #define M_PI   3.14159265358979323846
 
-#endif // __COMMON_H__
+#endif // _COMMON_H_
