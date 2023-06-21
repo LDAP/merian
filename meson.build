@@ -19,6 +19,10 @@ if get_option('buildtype').startswith('debug')
   add_project_arguments('-DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_DEBUG', language : 'cpp')
 endif
 
+if get_option('performance_profiling')
+  add_project_arguments('-DMERIAN_PROFILER_ENABLE', language : 'cpp')
+endif
+
 # Vulkan dynamic loader (VULKAN_HPP_DEFAULT_DISPATCHER initialized in Context)
 add_project_arguments('-DVULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1', language : 'cpp')
 # Vulkan uses [0, 1] for depth instead of [-1, 1] like OpenGL

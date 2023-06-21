@@ -9,6 +9,14 @@ namespace merian {
 class Profiler;
 using ProfilerHandle = std::shared_ptr<Profiler>;
 
+/**
+ * @brief      A profiler for CPU and GPU code.
+ * 
+ * Prefer to use the MERIAN_PROFILE_* macros which can be enabled and disabled by
+ * defining MERIAN_PROFILER_ENABLE.
+ * 
+ * Remember to export MERIAN_PROFILER_ENABLE if you want to use the profiler.
+ */
 class Profiler {
   private:
     using chrono_clock = std::chrono::high_resolution_clock;
@@ -103,7 +111,10 @@ class ProfileScope {
 class ProfileScopeGPU {
   public:
     // Make sure the command buffers stays valid
-    ProfileScopeGPU(const ProfilerHandle profiler, const vk::CommandBuffer& cmd, const std::string& name) : profiler(profiler), cmd(cmd) {
+    ProfileScopeGPU(const ProfilerHandle profiler,
+                    const vk::CommandBuffer& cmd,
+                    const std::string& name)
+        : profiler(profiler), cmd(cmd) {
         if (!profiler)
             return;
 
@@ -127,10 +138,16 @@ class ProfileScopeGPU {
     uint32_t gpu_section_index;
 };
 
-// Profiles CPU time of this scope
-#define MERIAN_PROFILE_SCOPE(profiler, name) merian::ProfileScope merian_profile_scope(profiler, name)
-
-// Profiles CPU and GPU time of this scope
-#define MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, name) merian::ProfileScopeGPU merian_profile_scope(profiler, cmd, name)
+// clang-format off
+#ifdef MERIAN_PROFILER_ENABLE
+    // Profiles CPU time of this scope
+    #define MERIAN_PROFILE_SCOPE(profiler, name) merian::ProfileScope merian_profile_scope(profiler, name)
+    // Profiles CPU and GPU time of this scope
+    #define MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, name) merian::ProfileScopeGPU merian_profile_scope(profiler, cmd, name)
+#else
+    #define MERIAN_PROFILE_SCOPE(profiler, name) (void)profiler
+    #define MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, name) (void)profiler
+#endif
+// clang-format on
 
 } // namespace merian
