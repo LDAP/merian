@@ -37,7 +37,7 @@ SpecializationInfoHandle VKDTFilmcurv::get_specialization_info() const noexcept 
     return spec_builder.build();
 }
 
-void* VKDTFilmcurv::get_push_constant() {
+const void* VKDTFilmcurv::get_push_constant() {
     return &pc;
 }
 

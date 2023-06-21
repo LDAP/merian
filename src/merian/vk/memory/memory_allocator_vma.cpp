@@ -85,7 +85,16 @@ VMAMemoryAllocator::VMAMemoryAllocator(const SharedContext& context,
         .flags = flags,
         .physicalDevice = context->pd_container.physical_device,
         .device = context->device,
+        .preferredLargeHeapBlockSize = 0,
+        .pAllocationCallbacks = nullptr,
+        .pDeviceMemoryCallbacks = nullptr,
+        .pHeapSizeLimit = nullptr,
+        .pVulkanFunctions = nullptr,
         .instance = context->instance,
+        .vulkanApiVersion = context->vk_api_version,
+#if VMA_EXTERNAL_MEMORY
+        .pTypeExternalMemoryHandleTypes = nullptr
+#endif
     };
     SPDLOG_DEBUG("create VMA allocator ({})", fmt::ptr(this));
     vmaCreateAllocator(&allocatorInfo, &vma_allocator);
@@ -123,9 +132,13 @@ VmaAllocationCreateInfo make_create_info(const VmaMemoryUsage usage,
                                          const bool dedicated,
                                          const float dedicated_priority) {
     VmaAllocationCreateInfo vmaAllocInfo{
+        .flags = {},
         .usage = usage,
         .requiredFlags = static_cast<VkMemoryPropertyFlags>(required_flags),
         .preferredFlags = static_cast<VkMemoryPropertyFlags>(preferred_flags),
+        .memoryTypeBits = 0,
+        .pool = VK_NULL_HANDLE,
+        .pUserData = nullptr,
         .priority = dedicated_priority,
     };
     // clang-format off
@@ -216,7 +229,8 @@ ImageHandle VMAMemoryAllocator::create_image(const vk::ImageCreateInfo image_cre
         static_pointer_cast<VMAMemoryAllocator>(shared_from_this());
     auto memory =
         std::make_shared<VMAMemoryAllocation>(context, allocator, mapping_type, allocation);
-    auto image_handle = std::make_shared<Image>(image, memory, image_create_info.extent, image_create_info.format);
+    auto image_handle =
+        std::make_shared<Image>(image, memory, image_create_info.extent, image_create_info.format);
     log_allocation(allocation_info, memory, debug_name);
 
     return image_handle;

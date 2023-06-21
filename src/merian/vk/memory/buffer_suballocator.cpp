@@ -113,7 +113,7 @@ void BufferSubAllocator::subFree(Handle sub) {
     if (!sub)
         return;
 
-    Block& block = getBlock(sub.blockIndex);
+    Block& block = getBlock(sub.block.blockIndex);
     bool isDedicated = sub.isDedicated();
     if (!isDedicated) {
         block.range.subFree(uint32_t(sub.getOffset()), uint32_t(sub.getSize()));
@@ -188,7 +188,7 @@ void BufferSubAllocator::freeBlock(Block& block) {
     m_freeBlockIndex = setIndexValue(block.index, m_freeBlockIndex);
 }
 
-void BufferSubAllocator::allocBlock(Block& block, uint32_t index, vk::DeviceSize size) {
+void BufferSubAllocator::allocBlock(Block& block, uint32_t, vk::DeviceSize size) {
 
     vk::SharingMode sharingMode = m_sharingQueueFamilyIndices.size() > 1
                                       ? vk::SharingMode::eConcurrent
@@ -203,7 +203,7 @@ void BufferSubAllocator::allocBlock(Block& block, uint32_t index, vk::DeviceSize
     vk::MemoryRequirements2KHR memory_requirements =
         m_device.getBufferMemoryRequirements2(buffer_requirements);
 
-    if (m_memoryTypeIndex == ~0) {
+    if (m_memoryTypeIndex == uint32_t(~0)) {
         vk::PhysicalDeviceMemoryProperties memoryProperties =
             m_memAllocator->get_context()
                 ->pd_container.physical_device_memory_properties.memoryProperties;
@@ -221,7 +221,7 @@ void BufferSubAllocator::allocBlock(Block& block, uint32_t index, vk::DeviceSize
         }
     }
 
-    if (m_memoryTypeIndex == ~0) {
+    if (m_memoryTypeIndex == uint32_t(~0)) {
         m_device.destroyBuffer(buffer);
         throw std::runtime_error("could not find memoryTypeIndex\n");
     }

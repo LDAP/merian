@@ -120,7 +120,7 @@ class Graph : public std::enable_shared_from_this<Graph> {
         std::vector<std::vector<std::shared_ptr<BufferResource>>>
             precomputed_output_buffers_resource{};
 
-        Node::NodeStatus status;
+        Node::NodeStatus status{};
     };
 
   public:

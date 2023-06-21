@@ -19,7 +19,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-
 #pragma once
 
 #include "merian/utils/range_allocator.hpp"
@@ -73,7 +72,8 @@ namespace merian {
 class BufferSubAllocator {
   private:
     static const uint32_t INVALID_ID_INDEX = ~0;
-    static const uint32_t BASE_ALIGNMENT = 16; // could compromise between max block size and typical requests
+    static const uint32_t BASE_ALIGNMENT =
+        16; // could compromise between max block size and typical requests
 
   public:
     class Handle {
@@ -89,41 +89,44 @@ class BufferSubAllocator {
                     (uint64_t((1 << BLOCKBITS)) * uint64_t(BASE_ALIGNMENT)));
         }
 
+        struct Block {
+            uint64_t
+                blockIndex : 11; // 2047 blocks, typical blockSize 64 MB or more, should be enough
+            uint64_t offset : BLOCKBITS;
+            uint64_t size : BLOCKBITS;
+            uint64_t dedicated : 1; // 0 dedicated or not
+        };
+
         union {
-            struct {
-                uint64_t blockIndex : 11; // 2047 blocks, typical blockSize 64 MB or more, should be enough
-                uint64_t offset : BLOCKBITS;
-                uint64_t size : BLOCKBITS;
-                uint64_t dedicated : 1; // 0 dedicated or not
-            };
+            Block block;
             uint64_t raw;
         };
 
         uint64_t getOffset() const {
-            return dedicated == 1 ? 0 : offset * uint64_t(BASE_ALIGNMENT);
+            return block.dedicated == 1 ? 0 : block.offset * uint64_t(BASE_ALIGNMENT);
         }
         uint64_t getSize() const {
-            return dedicated == 1 ? offset + (size << BLOCKBITS) : size * uint64_t(BASE_ALIGNMENT);
+            return block.dedicated == 1 ? block.offset + (block.size << BLOCKBITS) : block.size * uint64_t(BASE_ALIGNMENT);
         }
         uint32_t getBlockIndex() const {
-            return uint32_t(blockIndex);
+            return uint32_t(block.blockIndex);
         }
         bool isDedicated() const {
-            return dedicated == 1;
+            return block.dedicated == 1;
         }
 
         bool setup(uint32_t blockIndex_, uint64_t offset_, uint64_t size_, bool dedicated_) {
             const uint64_t blockBitsMask = ((1ULL << BLOCKBITS) - 1);
             assert((blockIndex_ & ~((1ULL << 11) - 1)) == 0);
-            blockIndex = blockIndex_ & ((1ULL << 11) - 1);
+            block.blockIndex = blockIndex_ & ((1ULL << 11) - 1);
             if (dedicated_) {
-                dedicated = 1;
-                offset = size_ & blockBitsMask;
-                size = (size_ >> BLOCKBITS) & blockBitsMask;
+                block.dedicated = 1;
+                block.offset = size_ & blockBitsMask;
+                block.size = (size_ >> BLOCKBITS) & blockBitsMask;
             } else {
-                dedicated = 0;
-                offset = (offset_ / uint64_t(BASE_ALIGNMENT)) & blockBitsMask;
-                size = (size_ / uint64_t(BASE_ALIGNMENT)) & blockBitsMask;
+                block.dedicated = 0;
+                block.offset = (offset_ / uint64_t(BASE_ALIGNMENT)) & blockBitsMask;
+                block.size = (size_ / uint64_t(BASE_ALIGNMENT)) & blockBitsMask;
             }
 
             return (getBlockIndex() == blockIndex_ && getOffset() == offset_ && getSize() == size_);
@@ -138,8 +141,8 @@ class BufferSubAllocator {
             return raw != ~uint64_t(0);
         }
         bool isEqual(const Handle& other) const {
-            return blockIndex == other.blockIndex && offset == other.offset && dedicated == other.dedicated &&
-                   size == other.size;
+            return block.blockIndex == other.block.blockIndex && block.offset == other.block.offset &&
+                   block.dedicated == other.block.dedicated && block.size == other.block.size;
         }
 
         operator bool() const {
@@ -156,13 +159,15 @@ class BufferSubAllocator {
     BufferSubAllocator& operator=(BufferSubAllocator const&) = delete;
 
     BufferSubAllocator() {}
-    BufferSubAllocator(MemoryAllocator* memAllocator,
-                       vk::DeviceSize blockSize,
-                       vk::BufferUsageFlags bufferUsageFlags,
-                       vk::MemoryPropertyFlags memPropFlags = vk::MemoryPropertyFlagBits::eDeviceLocal,
-                       bool mapped = false,
-                       const std::vector<uint32_t>& sharingQueueFamilyIndices = std::vector<uint32_t>()) {
-        init(memAllocator, blockSize, bufferUsageFlags, memPropFlags, mapped, sharingQueueFamilyIndices);
+    BufferSubAllocator(
+        MemoryAllocator* memAllocator,
+        vk::DeviceSize blockSize,
+        vk::BufferUsageFlags bufferUsageFlags,
+        vk::MemoryPropertyFlags memPropFlags = vk::MemoryPropertyFlagBits::eDeviceLocal,
+        bool mapped = false,
+        const std::vector<uint32_t>& sharingQueueFamilyIndices = std::vector<uint32_t>()) {
+        init(memAllocator, blockSize, bufferUsageFlags, memPropFlags, mapped,
+             sharingQueueFamilyIndices);
     }
 
     ~BufferSubAllocator() {
@@ -206,7 +211,8 @@ class BufferSubAllocator {
     // sub allocation alignment was custom
     Binding getSubBinding(Handle handle, uint32_t alignment) {
         Binding binding;
-        binding.offset = (handle.getOffset() + (uint64_t(alignment) - 1)) & ~(uint64_t(alignment) - 1);
+        binding.offset =
+            (handle.getOffset() + (uint64_t(alignment) - 1)) & ~(uint64_t(alignment) - 1);
         binding.size = handle.getSize() - (binding.offset - handle.getOffset());
         binding.buffer = m_blocks[handle.getBlockIndex()].buffer;
         binding.address = m_blocks[handle.getBlockIndex()].address + binding.offset;

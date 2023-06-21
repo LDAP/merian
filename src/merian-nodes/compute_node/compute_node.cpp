@@ -1,5 +1,3 @@
-#pragma once
-
 #include "compute_node.hpp"
 #include "merian/vk/descriptors/descriptor_set_layout_builder.hpp"
 #include "merian/vk/descriptors/descriptor_set_update.hpp"

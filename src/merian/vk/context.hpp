@@ -129,6 +129,7 @@ class Context : public std::enable_shared_from_this<Context> {
 
   public:
     std::string application_name;
+    uint32_t vk_api_version = VK_API_VERSION_1_3;
     uint32_t application_vk_version;
 
     // in create_instance

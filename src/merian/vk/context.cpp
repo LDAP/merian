@@ -107,7 +107,7 @@ void Context::create_instance(std::string application_name, uint32_t application
         application_vk_version,
         MERIAN_PROJECT_NAME,
         VK_MAKE_VERSION(MERIAN_VERSION_MAJOR, MERIAN_VERSION_MINOR, MERIAN_VERSION_PATCH),
-        VK_API_VERSION_1_3,
+        vk_api_version,
     };
 
     vk::InstanceCreateInfo instance_create_info{
@@ -521,8 +521,8 @@ std::shared_ptr<Queue> Context::get_queue_GCT() {
     if (!queue_GCT.expired()) {
         return queue_GCT.lock();
     } else {
-        auto queue = std::make_shared<Queue>(shared_from_this(), queue_family_idx_GCT,
-                                                      queue_idx_GCT);
+        auto queue =
+            std::make_shared<Queue>(shared_from_this(), queue_family_idx_GCT, queue_idx_GCT);
         queue_GCT = queue;
         return queue;
     }
@@ -532,8 +532,7 @@ std::shared_ptr<Queue> Context::get_queue_T() {
     if (!queue_T.expired()) {
         return queue_T.lock();
     } else {
-        auto queue =
-            std::make_shared<Queue>(shared_from_this(), queue_family_idx_T, queue_idx_T);
+        auto queue = std::make_shared<Queue>(shared_from_this(), queue_family_idx_T, queue_idx_T);
         queue_T = queue;
         return queue;
     }
@@ -545,8 +544,8 @@ std::shared_ptr<Queue> Context::get_queue_C(uint32_t index) {
     if (!queues_C[index].expired()) {
         return queues_C[index].lock();
     } else {
-        auto queue = std::make_shared<Queue>(shared_from_this(), queue_family_idx_C,
-                                                      queue_idx_C[index]);
+        auto queue =
+            std::make_shared<Queue>(shared_from_this(), queue_family_idx_C, queue_idx_C[index]);
         queues_C[index] = queue;
         return queue;
     }
