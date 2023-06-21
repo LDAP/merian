@@ -1,6 +1,7 @@
 merian_nodes_src = []
 
 subdir('accumulate')
+subdir('image')
 subdir('shadertoy')
 
 merian_nodes_lib = static_library(

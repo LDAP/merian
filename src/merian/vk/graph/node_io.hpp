@@ -151,6 +151,35 @@ class NodeOutputDescriptorImage : public NodeOutputDescriptor {
                                          vk::ImageLayout::eGeneral,
                                          persistent};
     }
+
+    static NodeOutputDescriptorImage transfer_write(const std::string& name,
+                                                    const vk::Format format,
+                                                    const uint32_t width,
+                                                    const uint32_t height,
+                                                    const bool persistent = false) {
+        const vk::ImageCreateInfo create_info{
+            {},
+            vk::ImageType::e2D,
+            format,
+            {width, height, 1},
+            1,
+            1,
+            vk::SampleCountFlagBits::e1,
+            vk::ImageTiling::eOptimal,
+            vk::ImageUsageFlagBits::eTransferDst,
+            vk::SharingMode::eExclusive,
+            {},
+            {},
+            vk::ImageLayout::eUndefined,
+        };
+
+        return NodeOutputDescriptorImage{name,
+                                         vk::AccessFlagBits2::eTransferWrite,
+                                         vk::PipelineStageFlagBits2::eTransfer,
+                                         create_info,
+                                         vk::ImageLayout::eTransferDstOptimal,
+                                         persistent};
+    }
 };
 
 class NodeOutputDescriptorBuffer : public NodeOutputDescriptor {
