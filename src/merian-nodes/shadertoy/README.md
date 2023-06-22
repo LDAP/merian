@@ -21,16 +21,23 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     // your shadertoy code goes here
 }
 
-void main()
-{
+vec4 toLinear(vec4 sRGB) {
+    bvec4 cutoff = lessThan(sRGB, vec4(0.04045));
+    vec4 higher = pow((sRGB + vec4(0.055))/vec4(1.055), vec4(2.4));
+    vec4 lower = sRGB/vec4(12.92);
+
+    return mix(higher, lower, cutoff);
+}
+
+void main() {
   const uvec2 pixel = gl_GlobalInvocationID.xy;
-  if((pixel.x >= iResolution.x) || (pixel.y >= iResolution.y))
-  {
+  if((pixel.x >= iResolution.x) || (pixel.y >= iResolution.y)) {
     return;
   }
 
   vec4 frag_color;
-  mainImage(frag_color, pixel);
+  // In OpenGL the y axis is flipped
+  mainImage(frag_color, ivec2(pixel.x, iResolution.y - pixel.y));
   // WebGL or Shadertoy does not do a Linear->sRGB conversion
   // thus the shader must output sRGB. But here the shader is expected to output
   // linear!

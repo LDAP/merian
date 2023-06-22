@@ -4,12 +4,25 @@ namespace merian {
 
 ShadertoyNode::ShadertoyNode(const SharedContext context,
                              const ResourceAllocatorHandle alloc,
-                             std::string path,
+                             const std::string& path,
                              FileLoader loader,
-                             uint32_t width,
-                             uint32_t height)
+                             const uint32_t width,
+                             const uint32_t height)
     : ComputeNode(context, alloc, sizeof(PushConstant)), width(width), height(height) {
     shader = std::make_shared<ShaderModule>(context, path, loader);
+    constant.iResolution = glm::vec2(width, height);
+    sw.reset();
+}
+
+ShadertoyNode::ShadertoyNode(const SharedContext context,
+                             const ResourceAllocatorHandle alloc,
+                             const std::size_t spv_size,
+                             const uint32_t spv[],
+                             const uint32_t width,
+                             const uint32_t height)
+    : ComputeNode(context, alloc, sizeof(PushConstant)), width(width), height(height) {
+    shader = std::make_shared<ShaderModule>(context, spv_size, spv);
+    constant.iResolution = glm::vec2(width, height);
     sw.reset();
 }
 

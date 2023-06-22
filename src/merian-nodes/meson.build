@@ -5,6 +5,7 @@ subdir('accumulate')
 subdir('compute_node')
 subdir('image')
 subdir('shadertoy')
+subdir('shadertoy_spheres')
 subdir('vkdt_filmcurv')
 
 merian_nodes_lib = static_library(
