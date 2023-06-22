@@ -1,4 +1,19 @@
-Reimplementation of https://github.com/hanatos/vkdt/tree/master/src/pipe/modules/filmcurv
+Adjust brightness and contrast.
+
+Inputs:
+
+| Type  | Input ID | Input name | Description     | Delay |
+|-------|----------|------------|-----------------|-------|
+| Image | 0        | in         | input image     | no    |
+
+Outputs:
+
+| Type  | Input ID | Input name | Description         | Format/Resolution        | Persistent |
+|-------|----------|------------|---------------------|--------------------------|------------|
+| Image | 0        | out        | result image        | user defined             | no         |
+
+
+This is a reimplementation of https://github.com/hanatos/vkdt/tree/master/src/pipe/modules/filmcurv
 
 * `light` change the overall brightness of the output. this is the reciprocal lambda parameter of the weibull distribution
 * `contrast` contrast of the output. this is the k parameter of the weibull distribution

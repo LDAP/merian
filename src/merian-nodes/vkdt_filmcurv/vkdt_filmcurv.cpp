@@ -15,7 +15,7 @@ VKDTFilmcurv::VKDTFilmcurv(const SharedContext context,
 
 std::tuple<std::vector<NodeInputDescriptorImage>, std::vector<NodeInputDescriptorBuffer>>
 VKDTFilmcurv::describe_inputs() {
-    return {{NodeInputDescriptorImage::compute_read("src")}, {}};
+    return {{NodeInputDescriptorImage::compute_read("in")}, {}};
 }
 
 std::tuple<std::vector<merian::NodeOutputDescriptorImage>,
@@ -28,7 +28,7 @@ VKDTFilmcurv::describe_outputs(
     width = extent.width;
     height = extent.height;
 
-    return {{NodeOutputDescriptorImage::compute_write("dst", output_format, width, height)}, {}};
+    return {{NodeOutputDescriptorImage::compute_write("out", output_format, width, height)}, {}};
 }
 
 SpecializationInfoHandle VKDTFilmcurv::get_specialization_info() const noexcept {

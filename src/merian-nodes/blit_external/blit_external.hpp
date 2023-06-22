@@ -12,11 +12,14 @@ enum BlitNodeMode {
     STRETCH,
 };
 
-template <BlitNodeMode mode> class BlitNode : public Node {
+/**
+ * Blits an image from the graph to an external user-supplied image.
+ */
+template <BlitNodeMode mode> class BlitExternalNode : public Node {
   public:
-    BlitNode() {}
+    BlitExternalNode() {}
 
-    ~BlitNode() {}
+    ~BlitExternalNode() {}
 
     void set_target(vk::Image dst_image,
                     vk::ImageLayout dst_in_layout,

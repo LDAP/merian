@@ -41,7 +41,7 @@ ShadertoyNode::describe_outputs(const std::vector<merian::NodeOutputDescriptorIm
                                 const std::vector<merian::NodeOutputDescriptorBuffer>&) {
 
     return {
-        {merian::NodeOutputDescriptorImage::compute_write("result", vk::Format::eR8G8B8A8Unorm,
+        {merian::NodeOutputDescriptorImage::compute_write("out", vk::Format::eR8G8B8A8Unorm,
                                                           width, height)},
         {},
     };
