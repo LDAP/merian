@@ -49,13 +49,14 @@ struct NodeInputDescriptorImage : public NodeInputDescriptor {
             vk::ImageUsageFlagBits::eSampled,
         };
     }
-    static NodeInputDescriptorImage transfer_src(const std::string& name) {
+    static NodeInputDescriptorImage transfer_src(const std::string& name, const uint32_t delay = 0) {
         return NodeInputDescriptorImage{
             name,
             vk::AccessFlagBits2::eTransferRead,
             vk::PipelineStageFlagBits2::eTransfer,
             vk::ImageLayout::eTransferSrcOptimal,
             vk::ImageUsageFlagBits::eTransferSrc,
+            delay
         };
     }
 };

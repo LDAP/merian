@@ -1,3 +1,5 @@
+#pragma once
+
 #include "merian-nodes/shadertoy/shadertoy.hpp"
 
 namespace merian {
@@ -8,10 +10,10 @@ namespace merian {
  * @reindernijhoff
  *
  */
-class ShadertoySpheres : public ShadertoyNode {
+class ShadertoySpheresNode : public ShadertoyNode {
 
   public:
-    ShadertoySpheres(const SharedContext context, const ResourceAllocatorHandle allocator);
+    ShadertoySpheresNode(const SharedContext context, const ResourceAllocatorHandle allocator);
 };
 
 } // namespace merian

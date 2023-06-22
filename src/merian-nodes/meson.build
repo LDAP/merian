@@ -1,6 +1,7 @@
 shader_include_dir = dir_source_root + '/src/merian-nodes'
 merian_nodes_src = []
 
+subdir('ab_compare')
 subdir('accumulate')
 subdir('compute_node')
 subdir('image')

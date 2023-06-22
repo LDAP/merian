@@ -6,7 +6,7 @@ static const uint32_t spv[] = {
 #include "spheres.comp.spv.h"
 };
 
-ShadertoySpheres::ShadertoySpheres(const SharedContext context,
+ShadertoySpheresNode::ShadertoySpheresNode(const SharedContext context,
                                    const ResourceAllocatorHandle allocator)
     : ShadertoyNode(context, allocator, sizeof(spv), spv) {}
 

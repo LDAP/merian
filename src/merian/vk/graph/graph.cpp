@@ -29,6 +29,8 @@ void Graph::connect_image(const NodeHandle& src,
                           const NodeHandle& dst,
                           const uint32_t src_output,
                           const uint32_t dst_input) {
+    assert(node_data.contains(src));
+    assert(node_data.contains(dst));
     if (src_output >= node_data[src].image_output_connections.size()) {
         node_data[src].image_output_connections.resize(src_output + 1);
     }
@@ -43,14 +45,16 @@ void Graph::connect_image(const NodeHandle& src,
     }
     node_data[dst].image_input_connections[dst_input] = {src, src_output};
 
-    // make sure the same underlying resource is not accessed twice:
+    // make sure the same underlying resource is not accessed twice with different layouts:
     // only images: Since they need layout transitions
     for (auto& [n, i] : node_data[src].image_output_connections[src_output]) {
         if (n == dst && node_data[dst].image_input_descriptors[i].delay ==
-                            node_data[dst].image_input_descriptors[dst_input].delay) {
+                            node_data[dst].image_input_descriptors[dst_input].delay
+                     && node_data[dst].image_input_descriptors[i].required_layout !=
+                            node_data[dst].image_input_descriptors[dst_input].required_layout) {
             throw std::invalid_argument{fmt::format(
                 "You are trying to access the same underlying image of node '{}' twice from "
-                "node '{}' with connections {} -> {}, {} -> {}: ",
+                "node '{}' with connections {} -> {}, {} -> {} and different layouts",
                 node_data[src].name, node_data[dst].name, src_output, i, src_output, dst_input)};
         }
     }
