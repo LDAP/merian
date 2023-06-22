@@ -121,8 +121,6 @@ const void* StagingMemoryManager::cmdFromImage(vk::CommandBuffer cmd,
 }
 
 void StagingMemoryManager::finalizeResources(vk::Fence fence) {
-    SPDLOG_DEBUG("finalizing resources");
-
     if (m_sets[m_stagingIndex].entries.empty())
         return;
 
@@ -171,6 +169,8 @@ void* StagingMemoryManager::getStagingSpace(vk::DeviceSize size,
 void StagingMemoryManager::releaseResources(uint32_t stagingID) {
     if (stagingID == INVALID_ID_INDEX)
         return;
+
+    SPDLOG_DEBUG("releseing resources for staging id", stagingID);
 
     StagingSet& set = m_sets[stagingID];
     assert(set.index == stagingID);

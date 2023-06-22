@@ -176,19 +176,6 @@ AccelerationStructureHandle ResourceAllocator::createAccelerationStructure(
     return std::make_shared<AccelerationStructure>(as, buffer, size_info);
 }
 
-void ResourceAllocator::finalizeStaging(vk::Fence fence) {
-    m_staging->finalizeResources(fence);
-}
-
-void ResourceAllocator::releaseStaging() {
-    m_staging->releaseResources();
-}
-
-void ResourceAllocator::finalizeAndReleaseStaging(vk::Fence fence) {
-    m_staging->finalizeResources(fence);
-    m_staging->releaseResources();
-}
-
 std::shared_ptr<StagingMemoryManager> ResourceAllocator::getStaging() {
     return m_staging;
 }

@@ -9,6 +9,10 @@
 #include <vulkan/vulkan.hpp>
 
 namespace merian {
+
+// A utility class to create and manage resources.
+//
+// Do not forget to finalize and release the resources from the staging memory manager that this class uses!
 class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator> {
   public:
     ResourceAllocator(ResourceAllocator const&) = delete;
@@ -126,11 +130,6 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
                                 const std::string& debug_name = {});
 
     //--------------------------------------------------------------------------------------------------
-
-    // implicit staging operations triggered by create are managed here
-    void finalizeStaging(const vk::Fence fence = VK_NULL_HANDLE);
-    void finalizeAndReleaseStaging(const vk::Fence fence = VK_NULL_HANDLE);
-    void releaseStaging();
 
     std::shared_ptr<StagingMemoryManager> getStaging();
     const std::shared_ptr<StagingMemoryManager> getStaging() const;
