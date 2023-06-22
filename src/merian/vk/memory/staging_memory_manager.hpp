@@ -9,8 +9,6 @@
 
 namespace merian {
 
-#define NVVK_DEFAULT_STAGING_BLOCKSIZE (vk::DeviceSize(64) * 1024 * 1024)
-
 //////////////////////////////////////////////////////////////////
 /**
   \class merian::StagingMemoryManager
@@ -108,7 +106,7 @@ class StagingMemoryManager : public std::enable_shared_from_this<StagingMemoryMa
     StagingMemoryManager() = delete;
 
     StagingMemoryManager(const SharedContext context, const std::shared_ptr<MemoryAllocator> memAllocator,
-                         const vk::DeviceSize stagingBlockSize = NVVK_DEFAULT_STAGING_BLOCKSIZE);
+                         const vk::DeviceSize stagingBlockSize = (vk::DeviceSize(64) * 1024 * 1024));
 
     virtual ~StagingMemoryManager();
 
