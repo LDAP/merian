@@ -21,7 +21,7 @@ exe = executable(
 ```
 
 Merian is similar to the `vulkan_raii.hpp` layer for `vulkan.hpp`. And most objects follow the RAII principle. In most cases you want to wrap them in smart pointers.
-Merian provides aliases for these types (e.g. ImageHandle for std::shared_ptr<Image>).
+Merian provides aliases for these types (e.g. `merian::ImageHandle` for `std::shared_ptr<merian::Image>`).
 
 The `Context` class initializes and destroys a Vulkan device and holds core objects (PhysicalDevice, Device, Queues, ...).
 
