@@ -9,6 +9,7 @@
 namespace merian {
 
 class Graph;
+class GraphRun;
 
 class Node : public std::enable_shared_from_this<Node> {
   public:
@@ -67,9 +68,9 @@ class Node : public std::enable_shared_from_this<Node> {
     // You do not need to insert barriers for node inputs and outputs.
     // Use the descriptor set according to set_index.
     // If you need to perform layout transistions use the barrier() methods of the images.
-    // `iteration` counts the iterations since last build
+    // `run.get_iteration()` counts the iterations since last build
     virtual void cmd_process([[maybe_unused]] const vk::CommandBuffer& cmd,
-                             [[maybe_unused]] const uint64_t iteration,
+                             [[maybe_unused]] GraphRun& run,
                              [[maybe_unused]] const uint32_t set_index,
                              [[maybe_unused]] const std::vector<ImageHandle>& image_inputs,
                              [[maybe_unused]] const std::vector<BufferHandle>& buffer_inputs,

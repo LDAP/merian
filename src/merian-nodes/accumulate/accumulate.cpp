@@ -112,7 +112,7 @@ void AccumulateF32ImageNode::cmd_build(
 }
 
 void AccumulateF32ImageNode::cmd_process(const vk::CommandBuffer& cmd,
-                                         const uint64_t,
+                                         GraphRun&,
                                          const uint32_t set_index,
                                          const std::vector<merian::ImageHandle>&,
                                          const std::vector<merian::BufferHandle>&,

@@ -13,6 +13,77 @@
 
 namespace merian {
 
+// The result of the graph run.
+// Nodes can insert semaphores that the user must submit together with the
+// graph command buffer.
+class GraphRun {
+    friend class Graph;
+
+  public:
+    void add_wait_semaphore(vk::Semaphore& wait_semaphore,
+                            vk::PipelineStageFlags wait_stage_flags) noexcept {
+        wait_semaphores.push_back(wait_semaphore);
+        wait_stages.push_back(wait_stage_flags);
+    }
+
+    void add_signal_semaphore(vk::Semaphore& signal_semaphore) noexcept {
+        signal_semaphores.push_back(signal_semaphore);
+    }
+
+    void add_submit_callback(std::function<void(const QueueHandle& queue)> callback) noexcept {
+        submit_callbacks.push_back(callback);
+    }
+
+    const uint64_t& get_iteration() const noexcept {
+        return iteration;
+    }
+
+    // Add this to the submit call for the graph command buffer
+    const std::vector<vk::Semaphore>& get_wait_semaphores() const noexcept {
+        return wait_semaphores;
+    }
+
+    // Add this to the submit call for the graph command buffer
+    const std::vector<vk::PipelineStageFlags>& get_wait_stages() const noexcept {
+        return wait_stages;
+    }
+
+    // Add this to the submit call for the graph command buffer
+    const std::vector<vk::Semaphore>& get_signal_semaphore() const noexcept {
+        return signal_semaphores;
+    }
+
+    // You must call every callback after you submited the graph command buffer
+    // Or you use the execute_callbacks function.
+    const std::vector<std::function<void(const QueueHandle& queue)>> get_submit_callbacks() const noexcept {
+        return submit_callbacks;
+    }
+
+    // Call this after you submitted the graph command buffer
+    void execute_callbacks(const QueueHandle& queue) const {
+        for (auto& callback : submit_callbacks) {
+            callback(queue);
+        }
+    }
+
+  private:
+    void reset(const uint32_t iteration) {
+        wait_semaphores.clear();
+        wait_stages.clear();
+        signal_semaphores.clear();
+        submit_callbacks.clear();
+
+        this->iteration = iteration;
+    }
+
+  private:
+    std::vector<vk::Semaphore> wait_semaphores;
+    std::vector<vk::PipelineStageFlags> wait_stages;
+    std::vector<vk::Semaphore> signal_semaphores;
+    std::vector<std::function<void(const QueueHandle& queue)>> submit_callbacks;
+    uint64_t iteration;
+};
+
 /**
  * @brief      This class describes a general processing graph.
  *
@@ -155,7 +226,7 @@ class Graph : public std::enable_shared_from_this<Graph> {
     void cmd_build(vk::CommandBuffer& cmd, const ProfilerHandle profiler = nullptr);
 
     // Runs the graph. On the first run or if rebuild is requested the graph is build.
-    void cmd_run(vk::CommandBuffer& cmd, const ProfilerHandle profiler = nullptr);
+    const GraphRun& cmd_run(vk::CommandBuffer& cmd, const ProfilerHandle profiler = nullptr);
 
   private:
     const SharedContext context;
@@ -174,6 +245,8 @@ class Graph : public std::enable_shared_from_this<Graph> {
     // required in cmd_barrier_for_node, stored here to prevent memory allocation
     std::vector<vk::ImageMemoryBarrier2> image_barriers_for_set;
     std::vector<vk::BufferMemoryBarrier2> buffer_barriers_for_set;
+
+    GraphRun run;
 
   private: // Helpers
     // Makes sure every input is connected

@@ -24,15 +24,14 @@ class AccumulateF32ImageNode : public Node {
     describe_outputs(const std::vector<merian::NodeOutputDescriptorImage>& connected_image_outputs,
                      const std::vector<merian::NodeOutputDescriptorBuffer>&) override;
 
-    void
-    cmd_build(const vk::CommandBuffer&,
-                             const std::vector<std::vector<merian::ImageHandle>>& image_inputs,
-                             const std::vector<std::vector<merian::BufferHandle>>&,
-                             const std::vector<std::vector<merian::ImageHandle>>& image_outputs,
-                             const std::vector<std::vector<merian::BufferHandle>>&) override;
+    void cmd_build(const vk::CommandBuffer&,
+                   const std::vector<std::vector<merian::ImageHandle>>& image_inputs,
+                   const std::vector<std::vector<merian::BufferHandle>>&,
+                   const std::vector<std::vector<merian::ImageHandle>>& image_outputs,
+                   const std::vector<std::vector<merian::BufferHandle>>&) override;
 
     void cmd_process(const vk::CommandBuffer& cmd,
-                     const uint64_t iteration,
+                     GraphRun& run,
                      const uint32_t set_index,
                      const std::vector<merian::ImageHandle>&,
                      const std::vector<merian::BufferHandle>&,

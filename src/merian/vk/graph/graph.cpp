@@ -122,7 +122,7 @@ void Graph::cmd_build(vk::CommandBuffer& cmd, const ProfilerHandle profiler) {
     current_iteration = 0;
 }
 
-void Graph::cmd_run(vk::CommandBuffer& cmd, const std::shared_ptr<Profiler> profiler) {
+const GraphRun& Graph::cmd_run(vk::CommandBuffer& cmd, const std::shared_ptr<Profiler> profiler) {
     MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "Graph: run");
 
     {
@@ -141,6 +141,7 @@ void Graph::cmd_run(vk::CommandBuffer& cmd, const std::shared_ptr<Profiler> prof
         rebuild_requested = false;
     }
 
+    run.reset(current_iteration);
     for (auto& node : flat_topology) {
         NodeData& data = node_data[node];
         if (data.status.skip_run) {
@@ -151,6 +152,8 @@ void Graph::cmd_run(vk::CommandBuffer& cmd, const std::shared_ptr<Profiler> prof
     }
 
     current_iteration++;
+
+    return run;
 }
 
 void Graph::validate_inputs() {
@@ -504,7 +507,7 @@ void Graph::cmd_run_node(vk::CommandBuffer& cmd, NodeHandle& node, NodeData& dat
     auto& out_images = data.precomputed_output_images[set_idx];
     auto& out_buffers = data.precomputed_output_buffers[set_idx];
 
-    node->cmd_process(cmd, current_iteration, set_idx, in_images, in_buffers, out_images,
+    node->cmd_process(cmd, run, set_idx, in_images, in_buffers, out_images,
                       out_buffers);
 }
 

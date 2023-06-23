@@ -88,7 +88,7 @@ void ComputeNode::cmd_build(const vk::CommandBuffer&,
 }
 
 void ComputeNode::cmd_process(const vk::CommandBuffer& cmd,
-                              const uint64_t,
+                              GraphRun&,
                               const uint32_t set_index,
                               const std::vector<ImageHandle>&,
                               const std::vector<BufferHandle>&,

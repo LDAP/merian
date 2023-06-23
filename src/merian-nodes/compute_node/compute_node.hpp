@@ -49,7 +49,7 @@ class ComputeNode : public Node {
               const std::vector<std::vector<merian::BufferHandle>>& buffer_outputs) override final;
 
     void cmd_process(const vk::CommandBuffer& cmd,
-                     const uint64_t iteration,
+                     GraphRun& run,
                      const uint32_t set_index,
                      const std::vector<ImageHandle>& image_inputs,
                      const std::vector<BufferHandle>& buffer_inputs,

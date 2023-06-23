@@ -32,7 +32,7 @@ template <BlitNodeMode mode> class BlitExternalNode : public Node {
     }
 
     virtual std::string name() override {
-        return "BlitNode";
+        return "BlitExternalNode";
     }
 
     virtual std::tuple<std::vector<NodeInputDescriptorImage>,
@@ -47,7 +47,7 @@ template <BlitNodeMode mode> class BlitExternalNode : public Node {
     }
 
     virtual void cmd_process(const vk::CommandBuffer& cmd,
-                             const uint64_t,
+                             GraphRun&,
                              const uint32_t,
                              const std::vector<ImageHandle>& image_inputs,
                              const std::vector<BufferHandle>&,

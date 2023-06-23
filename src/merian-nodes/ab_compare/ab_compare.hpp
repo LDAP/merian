@@ -21,7 +21,7 @@ class ABCompareNode : public Node {
     describe_outputs(const std::vector<NodeOutputDescriptorImage>& connected_image_outputs,
                      const std::vector<NodeOutputDescriptorBuffer>&) override;
     void cmd_process(const vk::CommandBuffer& cmd,
-                     const uint64_t,
+                     GraphRun&,
                      const uint32_t,
                      const std::vector<ImageHandle>& image_inputs,
                      const std::vector<BufferHandle>&,
