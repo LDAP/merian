@@ -45,12 +45,12 @@ graph.connect_image(ab, output, 0, 0);
 auto ring_cmd_pool = make_shared<merian::RingCommandPool<>>(context, context->queue_family_idx_GCT);
 auto ring_fences = make_shared<merian::RingFences<>>(context);
 while (!glfwWindowShouldClose(*window)) {
-    auto frame_data = ring_fences->wait_and_get();
+    auto& frame_data = ring_fences->wait_and_get();
     auto cmd_pool = ring_cmd_pool->set_cycle();
     glfwPollEvents();
 
     auto cmd = cmd_pool->create_and_begin();
-    auto run = graph.cmd_run(cmd);
+    auto& run = graph.cmd_run(cmd);
     cmd_pool->end_all();
 
     queue->submit(cmd_pool, frame_data.fence, run.get_signal_semaphore(),
