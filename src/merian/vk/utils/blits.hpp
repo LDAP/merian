@@ -36,9 +36,9 @@ inline void cmd_blit_fit(const vk::CommandBuffer& cmd,
 
     vk::ImageBlit region{merian::first_layer(), {}, merian::first_layer(), {}};
     region.srcOffsets[1] = extent_to_offset(src_extent);
-    float aspect = src_extent.width / (float)src_extent.height;
+
     std::tie(region.dstOffsets[0], region.dstOffsets[1]) =
-        center(dst_extent, clamp_aspect(aspect, dst_extent));
+        fit(region.srcOffsets[0], region.srcOffsets[1], {}, extent_to_offset(dst_extent));
 
     cmd.blitImage(src_image, src_layout, dst_image, dst_layout, {region}, filter);
 }
@@ -53,10 +53,10 @@ inline void cmd_blit_fill(const vk::CommandBuffer& cmd,
                           const vk::Extent3D& dst_extent,
                           const vk::Filter filter = vk::Filter::eLinear) {
     vk::ImageBlit region{merian::first_layer(), {}, merian::first_layer(), {}};
-    float aspect = dst_extent.width / (float)dst_extent.height;
-    std::tie(region.srcOffsets[0], region.srcOffsets[1]) =
-        center(src_extent, clamp_aspect(aspect, src_extent));
     region.dstOffsets[1] = extent_to_offset(dst_extent);
+
+    std::tie(region.srcOffsets[0], region.srcOffsets[1]) =
+        fit(region.dstOffsets[0], region.dstOffsets[1], {}, extent_to_offset(src_extent));
 
     cmd.blitImage(src_image, src_layout, dst_image, dst_layout, {region}, filter);
 }
