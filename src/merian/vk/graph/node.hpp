@@ -66,9 +66,9 @@ class Node : public std::enable_shared_from_this<Node> {
 
     // This is called once per iteration.
     // You do not need to insert barriers for node inputs and outputs.
-    // Use the descriptor set according to set_index.
+    // Use the descriptor set according to set_index (-1 if there are no sets).
     // If you need to perform layout transistions use the barrier() methods of the images.
-    // `run.get_iteration()` counts the iterations since last build
+    // `run.get_iteration()` counts the iterations since last build.
     virtual void cmd_process([[maybe_unused]] const vk::CommandBuffer& cmd,
                              [[maybe_unused]] GraphRun& run,
                              [[maybe_unused]] const uint32_t set_index,

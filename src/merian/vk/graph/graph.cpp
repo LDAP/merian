@@ -48,10 +48,11 @@ void Graph::connect_image(const NodeHandle& src,
     // make sure the same underlying resource is not accessed twice with different layouts:
     // only images: Since they need layout transitions
     for (auto& [n, i] : node_data[src].image_output_connections[src_output]) {
-        if (n == dst && node_data[dst].image_input_descriptors[i].delay ==
-                            node_data[dst].image_input_descriptors[dst_input].delay
-                     && node_data[dst].image_input_descriptors[i].required_layout !=
-                            node_data[dst].image_input_descriptors[dst_input].required_layout) {
+        if (n == dst &&
+            node_data[dst].image_input_descriptors[i].delay ==
+                node_data[dst].image_input_descriptors[dst_input].delay &&
+            node_data[dst].image_input_descriptors[i].required_layout !=
+                node_data[dst].image_input_descriptors[dst_input].required_layout) {
             throw std::invalid_argument{fmt::format(
                 "You are trying to access the same underlying image of node '{}' twice from "
                 "node '{}' with connections {} -> {}, {} -> {} and different layouts",
@@ -497,18 +498,21 @@ void Graph::cmd_build_node(vk::CommandBuffer& cmd, NodeHandle& node) {
 
 // Insert the according barriers for that node
 void Graph::cmd_run_node(vk::CommandBuffer& cmd, NodeHandle& node, NodeData& data) {
-    
-    uint32_t set_idx = current_iteration % data.precomputed_input_images.size();
 
-    cmd_barrier_for_node(cmd, data, set_idx);
+    if (data.precomputed_input_images.size()) {
+        uint32_t set_idx = current_iteration % data.precomputed_input_images.size();
 
-    auto& in_images = data.precomputed_input_images[set_idx];
-    auto& in_buffers = data.precomputed_input_buffers[set_idx];
-    auto& out_images = data.precomputed_output_images[set_idx];
-    auto& out_buffers = data.precomputed_output_buffers[set_idx];
+        cmd_barrier_for_node(cmd, data, set_idx);
 
-    node->cmd_process(cmd, run, set_idx, in_images, in_buffers, out_images,
-                      out_buffers);
+        auto& in_images = data.precomputed_input_images[set_idx];
+        auto& in_buffers = data.precomputed_input_buffers[set_idx];
+        auto& out_images = data.precomputed_output_images[set_idx];
+        auto& out_buffers = data.precomputed_output_buffers[set_idx];
+
+        node->cmd_process(cmd, run, set_idx, in_images, in_buffers, out_images, out_buffers);
+    } else {
+        node->cmd_process(cmd, run, -1, {}, {}, {}, {});
+    }
 }
 
 void Graph::cmd_barrier_for_node(vk::CommandBuffer& cmd, NodeData& data, uint32_t& set_idx) {
