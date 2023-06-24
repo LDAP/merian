@@ -9,7 +9,7 @@ namespace merian {
  *  RingFences recycles a fixed number of fences, provides information in which cycle
  *  we are currently at, and prevents accidental access to a cycle in-flight.
  *
- *  A typical frame would start by "wait_and_get_fence()", which waits for the
+ *  A typical frame would start by "next_cycle_wait_and_get()", which waits for the
  *  requested cycle to be available.
  *
  *  You can store additional data for every frame.
@@ -55,14 +55,22 @@ class RingFences : public std::enable_shared_from_this<RingFences<RING_SIZE, Use
         }
     }
 
-    // Like wait_and_get(uint32_t cycle) but advances the cycle internally by one
-    RingData& wait_and_get() {
-        return wait_and_get(current_index + 1);
+    // Returns the RingData for the current cycle.
+    // Use next_cycle_wait_and_get once per frame to
+    // advance the data.
+    RingData& get() {
+        return ring_data[current_index].data;
+    }
+
+    // Should be called once per frame.
+    // Like set_cycle_wait_and_get(uint32_t cycle) but advances the cycle internally by one
+    RingData& next_cycle_wait_and_get() {
+        return next_cycle_wait_and_get(current_index + 1);
     }
 
     // ensures the availability of the passed cycle
     // cycle can be absolute (e.g. current frame number)
-    RingData& wait_and_get(uint32_t cycle) {
+    RingData& set_cycle_wait_and_get(uint32_t cycle) {
         current_index = cycle % RING_SIZE;
 
         Entry& entry = ring_data[current_index];
@@ -77,7 +85,7 @@ class RingFences : public std::enable_shared_from_this<RingFences<RING_SIZE, Use
         return entry.data;
     }
 
-    // query current cycle index
+    // query current cycle index [0, RING_SIZE)
     uint32_t current_cycle_index() const {
         return current_index;
     }
