@@ -2,6 +2,13 @@
 
 namespace merian {
 
+ColorOutputNode::ColorOutputNode(const vk::Format format,
+                                 const vk::ClearColorValue color,
+                                 const vk::Extent3D extent)
+    : format(format), color(color), extent(extent) {}
+
+ColorOutputNode::~ColorOutputNode() {}
+
 std::tuple<std::vector<NodeOutputDescriptorImage>, std::vector<NodeOutputDescriptorBuffer>>
 ColorOutputNode::describe_outputs(const std::vector<NodeOutputDescriptorImage>&,
                                   const std::vector<NodeOutputDescriptorBuffer>&) {
