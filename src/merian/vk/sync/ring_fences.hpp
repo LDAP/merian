@@ -34,7 +34,6 @@ class RingFences : public std::enable_shared_from_this<RingFences<RING_SIZE, Use
     RingFences() = delete;
 
     RingFences(const SharedContext& context) : context(context) {
-        ring_data.resize(RING_SIZE);
         for (uint32_t i = 0; i < RING_SIZE; i++) {
             vk::FenceCreateInfo fence_create_info;
             ring_data[i].data.fence = context->device.createFence(fence_create_info);
@@ -102,7 +101,7 @@ class RingFences : public std::enable_shared_from_this<RingFences<RING_SIZE, Use
 
     uint32_t current_index = 0;
     const SharedContext context;
-    std::vector<Entry> ring_data;
+    std::array<Entry, RING_SIZE> ring_data;
 };
 
 } // namespace merian

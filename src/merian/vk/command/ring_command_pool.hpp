@@ -82,7 +82,7 @@ template <uint32_t RING_SIZE = 3> class RingCommandPool {
         : context(context), queue_family_index(queue_family_index), create_flags(create_flags) {
 
         for (uint32_t i = 0; i < RING_SIZE; i++) {
-            pools.emplace_back(std::make_shared<RingCommandPoolCycle>(context, queue_family_index, create_flags, i, current_index));
+            pools[i] = std::make_shared<RingCommandPoolCycle>(context, queue_family_index, create_flags, i, current_index);
         }
     }
 
@@ -109,7 +109,7 @@ template <uint32_t RING_SIZE = 3> class RingCommandPool {
     uint32_t queue_family_index;
     vk::CommandPoolCreateFlags create_flags;
 
-    std::vector<std::shared_ptr<RingCommandPoolCycle>> pools;
+    std::array<std::shared_ptr<RingCommandPoolCycle>, RING_SIZE> pools;
     uint32_t current_index = 0;
 };
 
