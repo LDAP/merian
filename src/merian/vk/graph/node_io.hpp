@@ -126,14 +126,13 @@ class NodeOutputDescriptorImage : public NodeOutputDescriptor {
 
     static NodeOutputDescriptorImage compute_write(const std::string& name,
                                                    const vk::Format format,
-                                                   const uint32_t width,
-                                                   const uint32_t height,
+                                                   const vk::Extent3D extent,
                                                    const bool persistent = false) {
         const vk::ImageCreateInfo create_info{
             {},
             vk::ImageType::e2D,
             format,
-            {width, height, 1},
+            extent,
             1,
             1,
             vk::SampleCountFlagBits::e1,
@@ -153,16 +152,23 @@ class NodeOutputDescriptorImage : public NodeOutputDescriptor {
                                          persistent};
     }
 
+    static NodeOutputDescriptorImage compute_write(const std::string& name,
+                                                   const vk::Format format,
+                                                   const uint32_t width,
+                                                   const uint32_t height,
+                                                   const bool persistent = false) {
+        return compute_write(name, format, {width, height, 1}, persistent);
+    }
+
     static NodeOutputDescriptorImage transfer_write(const std::string& name,
                                                     const vk::Format format,
-                                                    const uint32_t width,
-                                                    const uint32_t height,
+                                                    const vk::Extent3D extent,
                                                     const bool persistent = false) {
         const vk::ImageCreateInfo create_info{
             {},
             vk::ImageType::e2D,
             format,
-            {width, height, 1},
+            extent,
             1,
             1,
             vk::SampleCountFlagBits::e1,
@@ -180,6 +186,14 @@ class NodeOutputDescriptorImage : public NodeOutputDescriptor {
                                          create_info,
                                          vk::ImageLayout::eTransferDstOptimal,
                                          persistent};
+    }
+
+    static NodeOutputDescriptorImage transfer_write(const std::string& name,
+                                                    const vk::Format format,
+                                                    const uint32_t width,
+                                                    const uint32_t height,
+                                                    const bool persistent = false) {
+        return transfer_write(name, format, {width, height, 1}, persistent);
     }
 };
 

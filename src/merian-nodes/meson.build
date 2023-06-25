@@ -3,6 +3,7 @@ merian_nodes_src = []
 
 subdir('ab_compare')
 subdir('accumulate')
+subdir('color_output')
 subdir('compute_node')
 subdir('image')
 subdir('shadertoy')
