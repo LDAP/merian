@@ -40,13 +40,14 @@ struct NodeInputDescriptorImage : public NodeInputDescriptor {
     vk::ImageLayout required_layout;
     vk::ImageUsageFlags usage_flags;
 
-    static NodeInputDescriptorImage compute_read(const std::string& name) {
+    static NodeInputDescriptorImage compute_read(const std::string& name, const uint32_t delay = 0) {
         return NodeInputDescriptorImage{
             name,
             vk::AccessFlagBits2::eShaderRead,
             vk::PipelineStageFlagBits2::eComputeShader,
             vk::ImageLayout::eShaderReadOnlyOptimal,
             vk::ImageUsageFlagBits::eSampled,
+            delay
         };
     }
     static NodeInputDescriptorImage transfer_src(const std::string& name, const uint32_t delay = 0) {
