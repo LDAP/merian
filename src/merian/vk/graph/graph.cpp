@@ -297,10 +297,12 @@ void Graph::calculate_outputs(NodeHandle& node,
         bool satisfied = true;
         NodeData& candidate_data = node_data[candidate];
         for (auto& [src_node, src_output_idx] : candidate_data.image_input_connections) {
-            satisfied &= visited.contains(src_node);
+            // src was is already processed, or src == candindate -> self loop with delay > 0.
+            satisfied &= visited.contains(src_node) || src_node == candidate;
         }
         for (auto& [src_node, src_output_idx] : candidate_data.buffer_input_connections) {
-            satisfied &= visited.contains(src_node);
+            // src was is already processed, or src == candindate -> self loop with delay > 0.
+            satisfied &= visited.contains(src_node) || src_node == candidate;
         }
         if (satisfied) {
             queue.push(candidate);
