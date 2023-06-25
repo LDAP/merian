@@ -65,7 +65,7 @@ class RingFences : public std::enable_shared_from_this<RingFences<RING_SIZE, Use
     // Should be called once per frame.
     // Like set_cycle_wait_and_get(uint32_t cycle) but advances the cycle internally by one
     RingData& next_cycle_wait_and_get() {
-        return next_cycle_wait_and_get(current_index + 1);
+        return set_cycle_wait_and_get(current_index + 1);
     }
 
     // ensures the availability of the passed cycle
