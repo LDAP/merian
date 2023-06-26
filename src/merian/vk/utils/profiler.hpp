@@ -11,11 +11,33 @@ using ProfilerHandle = std::shared_ptr<Profiler>;
 
 /**
  * @brief      A profiler for CPU and GPU code.
- * 
+ *
  * Prefer to use the MERIAN_PROFILE_* macros which can be enabled and disabled by
  * defining MERIAN_PROFILER_ENABLE.
- * 
+ *
  * Remember to export MERIAN_PROFILER_ENABLE if you want to use the profiler.
+ *
+ * Intended use is together with RingFence, since
+ * in GPU processing there are often multiple frames-in-flight.
+ * Waiting for the frame to be finished to collect the timestamps would flush the pipeline.
+ * Use a profiler for every frame-in-flight instead, and collect the results after a few iterations.
+ *
+ * while (True) {
+ *     auto& frame_data = ring_fences->next_cycle_wait_and_get();
+ *     // now the timestamps from iteration i - RING_SIZE are ready
+ *
+ *     //get the profiler for the current iteration
+ *     profiler = frame_data.user_data.profiler
+ *     // collects the results of iteration i - RING_SIZE from the gpu
+ *     // and resets the query pool
+ *     profiler.collect();
+ *     // print, display results...
+ *
+ *     profiler.reset(cmd);
+ *     // use profiler...
+ *
+ *     queue.submit(... fence);
+ * }
  */
 class Profiler {
   private:
