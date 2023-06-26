@@ -123,7 +123,7 @@ void Graph::cmd_build(vk::CommandBuffer& cmd, const ProfilerHandle profiler) {
     current_iteration = 0;
 }
 
-const GraphRun& Graph::cmd_run(vk::CommandBuffer& cmd, const std::shared_ptr<Profiler> profiler) {
+const GraphRun& Graph::cmd_run(vk::CommandBuffer& cmd, const ProfilerHandle profiler) {
     MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "Graph: run");
 
     {
@@ -142,7 +142,7 @@ const GraphRun& Graph::cmd_run(vk::CommandBuffer& cmd, const std::shared_ptr<Pro
         rebuild_requested = false;
     }
 
-    run.reset(current_iteration);
+    run.reset(current_iteration, profiler);
     for (auto& node : flat_topology) {
         NodeData& data = node_data[node];
         if (data.status.skip_run) {

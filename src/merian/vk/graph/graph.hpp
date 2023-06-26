@@ -55,7 +55,8 @@ class GraphRun {
 
     // You must call every callback after you submited the graph command buffer
     // Or you use the execute_callbacks function.
-    const std::vector<std::function<void(const QueueHandle& queue)>> get_submit_callbacks() const noexcept {
+    const std::vector<std::function<void(const QueueHandle& queue)>>
+    get_submit_callbacks() const noexcept {
         return submit_callbacks;
     }
 
@@ -66,14 +67,21 @@ class GraphRun {
         }
     }
 
+    // Returns the profiler that is attached to this run.
+    // Can be nullptr.
+    const ProfilerHandle get_profiler() const {
+        return profiler;
+    }
+
   private:
-    void reset(const uint32_t iteration) {
+    void reset(const uint32_t iteration, const ProfilerHandle profiler) {
         wait_semaphores.clear();
         wait_stages.clear();
         signal_semaphores.clear();
         submit_callbacks.clear();
 
         this->iteration = iteration;
+        this->profiler = profiler;
     }
 
   private:
@@ -82,6 +90,7 @@ class GraphRun {
     std::vector<vk::Semaphore> signal_semaphores;
     std::vector<std::function<void(const QueueHandle& queue)>> submit_callbacks;
     uint64_t iteration;
+    ProfilerHandle profiler = nullptr;
 };
 
 /**
