@@ -20,7 +20,7 @@ std::tuple<std::vector<TextureHandle>,
            std::vector<DescriptorSetHandle>,
            DescriptorPoolHandle,
            DescriptorSetLayoutHandle>
-make_descriptor_sets(const SharedContext context,
+make_graph_descriptor_sets(const SharedContext context,
                      const ResourceAllocatorHandle allocator,
                      const std::vector<std::vector<merian::ImageHandle>>& image_inputs,
                      const std::vector<std::vector<merian::BufferHandle>>& buffer_inputs,

@@ -20,7 +20,7 @@ void ComputeNode::cmd_build(const vk::CommandBuffer&,
                             const std::vector<std::vector<merian::ImageHandle>>& image_outputs,
                             const std::vector<std::vector<merian::BufferHandle>>& buffer_outputs) {
 
-    std::tie(textures, sets, pool, layout) = make_descriptor_sets(
+    std::tie(textures, sets, pool, layout) = make_graph_descriptor_sets(
         context, allocator, image_inputs, buffer_inputs, image_outputs, buffer_outputs, layout);
 
     if (!pipe) {
