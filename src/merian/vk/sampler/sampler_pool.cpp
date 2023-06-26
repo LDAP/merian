@@ -1,5 +1,6 @@
 /*
- *
+ * Parts of this code were adapted NVCore which is licensed under:
+ * 
  * Copyright (c) 2020-2021, NVIDIA CORPORATION.  All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
