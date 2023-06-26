@@ -12,7 +12,7 @@ namespace merian {
 //
 //   https://creativecommons.org/publicdomain/zero/1.0/
 
-float half_to_float(uint16_t hi) {
+float half_to_float(uint16_t hi) noexcept {
     typedef union FP32 {
         uint32_t u;
         float f;
@@ -54,7 +54,7 @@ float half_to_float(uint16_t hi) {
 
 // Approximate solution. This is faster but converts some sNaNs to
 // infinity and doesn't round correctly. Handle with care.
-uint16_t float_to_half(float fi) {
+uint16_t float_to_half(float fi) noexcept {
     typedef union FP32 {
         uint32_t u;
         float f;
@@ -137,4 +137,10 @@ static inline __m128i float_to_half_sse(__m128 f)
 #undef CONSTF
 }
 #endif
+
+
+uint32_t pack_uint32(const uint16_t& lower, const uint16_t& upper) noexcept {
+    return lower | (upper << 16);
+}
+
 } // namespace merian
