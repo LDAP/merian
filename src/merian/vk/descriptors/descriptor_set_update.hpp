@@ -91,15 +91,20 @@ class DescriptorSetUpdate {
     }
 
     // The type is automatically determined from the set using the binding index.
-    DescriptorSetUpdate& write_descriptor_texture(const uint32_t binding,
-                                                  const TextureHandle texture,
-                                                  const uint32_t dst_array_element = 0,
-                                                  const uint32_t descriptor_count = 1) {
+    // With access_layout you can overwrite the layout that the image has "when it is accessed using
+    // the descriptor". If std::nullopt the current layout is used.
+    DescriptorSetUpdate&
+    write_descriptor_texture(const uint32_t binding,
+                             const TextureHandle texture,
+                             const uint32_t dst_array_element = 0,
+                             const uint32_t descriptor_count = 1,
+                             const std::optional<vk::ImageLayout> access_layout = std::nullopt) {
         // Sampler can be default initialized...
-        //assert(texture->get_sampler());
+        // assert(texture->get_sampler());
         return write_descriptor_image_type(
-            binding, set->get_type_for_binding(binding), texture->get_view(), texture->get_current_layout(),
-            texture->get_sampler(), dst_array_element, descriptor_count);
+            binding, set->get_type_for_binding(binding), texture->get_view(),
+            access_layout.value_or(texture->get_current_layout()), texture->get_sampler(),
+            dst_array_element, descriptor_count);
     }
 
     // Bind `sampler` at the binding point `binding` of DescriptorSet `set`.
