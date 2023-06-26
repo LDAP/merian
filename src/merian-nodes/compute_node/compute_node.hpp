@@ -65,8 +65,8 @@ class ComputeNode : public Node {
     DescriptorSetLayoutHandle layout;
     DescriptorPoolHandle pool;
     std::vector<DescriptorSetHandle> sets;
-    std::vector<TextureHandle> in_textures;
-    std::vector<TextureHandle> out_textures;
+    // make sure textures stay available
+    std::vector<TextureHandle> textures;
     PipelineHandle pipe;
 };
 

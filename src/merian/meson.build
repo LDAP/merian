@@ -11,6 +11,7 @@ merian_src = files(
     'vk/extension/extension_vk_debug_utils.cpp',
     'vk/extension/extension_vk_glfw.cpp',
     'vk/graph/graph.cpp',
+    'vk/graph/node_utils.cpp',
     'vk/memory/buffer_suballocator.cpp',
     'vk/memory/memory_allocator.cpp',
     'vk/memory/memory_allocator_vma.cpp',
