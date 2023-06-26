@@ -1,6 +1,7 @@
 merian_src = files(
     'io/file_loader.cpp',
     'utils/bitpacking.cpp',
+    'utils/normal_encoding.cpp',
     'utils/renderdoc.cpp',
     'utils/stopwatch.cpp',
     'vk/command/command_pool.cpp',
