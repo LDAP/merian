@@ -64,14 +64,14 @@ struct SwapchainAcquireResult {
 class Swapchain : public std::enable_shared_from_this<Swapchain> {
   private:
     struct Entry {
-        vk::Image image;
-        vk::ImageView imageView;
+        vk::Image image{};
+        vk::ImageView imageView{};
     };
 
     struct SemaphoreGroup {
         // be aware semaphore index may not match active image index!
-        vk::Semaphore read_semaphore;
-        vk::Semaphore written_semaphore;
+        vk::Semaphore read_semaphore{};
+        vk::Semaphore written_semaphore{};
     };
 
   public:

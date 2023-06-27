@@ -42,9 +42,9 @@ class SamplerPool : public std::enable_shared_from_this<SamplerPool> {
 
   private:
     struct SamplerState {
-        vk::SamplerCreateInfo createInfo;
-        vk::SamplerReductionModeCreateInfo reduction;
-        vk::SamplerYcbcrConversionCreateInfo ycbr;
+        vk::SamplerCreateInfo createInfo{};
+        vk::SamplerReductionModeCreateInfo reduction{};
+        vk::SamplerYcbcrConversionCreateInfo ycbr{};
 
         SamplerState() {}
         bool operator==(const SamplerState& other) const = default;
