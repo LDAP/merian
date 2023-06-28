@@ -65,7 +65,8 @@ class BLASBuilder : public ASBuilder {
     struct PendingBLAS {
         // src/dstAccelerationStructures and scratchData.deviceAddress are left empty until build
         vk::AccelerationStructureBuildGeometryInfoKHR build_info;
-        const vk::AccelerationStructureBuildRangeInfoKHR* const* range_info;
+        std::vector<vk::AccelerationStructureGeometryKHR> geometry;
+        std::vector<vk::AccelerationStructureBuildRangeInfoKHR> range_info;
     };
 
   public:
@@ -73,22 +74,11 @@ class BLASBuilder : public ASBuilder {
 
     // Enqueues a BLAS to build for the next get_cmds().
     // Returns the acceleration structure. Note that you must keep the as alive and the structure is
-    // only valid after the next build. You can free the pp_range_info and p_geometry after
-    // get_cmds(). For static BLAS it is recommended to compact them afterwards.
-    AccelerationStructureHandle
-    queue_build(const uint32_t geometry_count,
-                const vk::AccelerationStructureGeometryKHR* p_geometry,
-                const vk::AccelerationStructureBuildRangeInfoKHR* const* pp_range_info,
-                const vk::BuildAccelerationStructureFlagsKHR build_flags =
-                    vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace);
-
-    // Enqueues a BLAS to build for the next get_cmds().
-    // Returns the acceleration structure. Note that you must keep the as alive and the structure is
-    // only valid after the next build. You can free the range_info and geometry after get_cmds()
-    // (do not use initializer lists). For static BLAS it is recommended to compact them afterwards.
+    // only valid after the next build. For static BLAS it is recommended to compact them
+    // afterwards.
     AccelerationStructureHandle
     queue_build(const std::vector<vk::AccelerationStructureGeometryKHR>& geometry,
-                const std::vector<const vk::AccelerationStructureBuildRangeInfoKHR*>& range_info,
+                const std::vector<vk::AccelerationStructureBuildRangeInfoKHR>& range_info,
                 const vk::BuildAccelerationStructureFlagsKHR build_flags =
                     vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace);
 
@@ -99,9 +89,8 @@ class BLASBuilder : public ASBuilder {
     // The geometry_count and build_flags members must have the same value which was specified when
     // `as` was last built. Note: You should call queue_rebuild after many updates or major
     // deformation.
-    void queue_update(const uint32_t geometry_count,
-                      const vk::AccelerationStructureGeometryKHR* p_geometry,
-                      const vk::AccelerationStructureBuildRangeInfoKHR* const* pp_range_info,
+    void queue_update(const std::vector<vk::AccelerationStructureGeometryKHR>& geometry,
+                      const std::vector<vk::AccelerationStructureBuildRangeInfoKHR>& range_info,
                       const AccelerationStructureHandle as,
                       const vk::BuildAccelerationStructureFlagsKHR build_flags);
 
@@ -111,9 +100,8 @@ class BLASBuilder : public ASBuilder {
     // get_cmds().
     // The geometry_count and build_flags members must have the same value which was specified when
     // `as` was last built.
-    void queue_rebuild(const uint32_t geometry_count,
-                       const vk::AccelerationStructureGeometryKHR* p_geometry,
-                       const vk::AccelerationStructureBuildRangeInfoKHR* const* pp_range_info,
+    void queue_rebuild(const std::vector<vk::AccelerationStructureGeometryKHR>& geometry,
+                       const std::vector<vk::AccelerationStructureBuildRangeInfoKHR>& range_info,
                        const AccelerationStructureHandle as,
                        const vk::BuildAccelerationStructureFlagsKHR build_flags);
 

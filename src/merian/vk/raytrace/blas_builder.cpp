@@ -9,11 +9,11 @@ BLASBuilder::BLASBuilder(const SharedContext context, const ResourceAllocatorHan
     : ASBuilder(context, allocator) {}
 
 AccelerationStructureHandle
-BLASBuilder::queue_build(const uint32_t geometry_count,
-                         const vk::AccelerationStructureGeometryKHR* p_geometry,
-                         const vk::AccelerationStructureBuildRangeInfoKHR* const* pp_range_info,
+BLASBuilder::queue_build(const std::vector<vk::AccelerationStructureGeometryKHR>& geometry,
+                         const std::vector<vk::AccelerationStructureBuildRangeInfoKHR>& range_info,
                          const vk::BuildAccelerationStructureFlagsKHR build_flags) {
 
+    const uint32_t geometry_count = geometry.size();
     vk::AccelerationStructureBuildGeometryInfoKHR build_info{
         vk::AccelerationStructureTypeKHR::eBottomLevel,
         build_flags,
@@ -21,12 +21,12 @@ BLASBuilder::queue_build(const uint32_t geometry_count,
         {}, // filled out later, after we know the size
         {}, // filled out later, after we know the size
         geometry_count,
-        p_geometry};
+        geometry.data()};
 
     // Put primitive counts in own vector
     std::vector<uint32_t> primitive_counts(geometry_count);
-    std::transform(pp_range_info, pp_range_info + geometry_count, primitive_counts.begin(),
-                   [&](auto& range) { return range->primitiveCount; });
+    std::transform(range_info.begin(), range_info.end(), primitive_counts.begin(),
+                   [&](auto& range) { return range.primitiveCount; });
 
     vk::AccelerationStructureBuildSizesInfoKHR size_info =
         context->device.getAccelerationStructureBuildSizesKHR(
@@ -36,18 +36,18 @@ BLASBuilder::queue_build(const uint32_t geometry_count,
     AccelerationStructureHandle as = allocator->createAccelerationStructure(
         vk::AccelerationStructureTypeKHR::eBottomLevel, size_info);
     build_info.dstAccelerationStructure = *as;
-    pending.emplace_back(build_info, pp_range_info);
+    pending.emplace_back(build_info, geometry, range_info);
 
     return as;
 }
 
 void BLASBuilder::queue_update(
-    const uint32_t geometry_count,
-    const vk::AccelerationStructureGeometryKHR* p_geometry,
-    const vk::AccelerationStructureBuildRangeInfoKHR* const* pp_range_info,
+    const std::vector<vk::AccelerationStructureGeometryKHR>& geometry,
+    const std::vector<vk::AccelerationStructureBuildRangeInfoKHR>& range_info,
     const AccelerationStructureHandle as,
     const vk::BuildAccelerationStructureFlagsKHR build_flags) {
 
+    const uint32_t geometry_count = geometry.size();
     vk::AccelerationStructureBuildGeometryInfoKHR build_info{
         vk::AccelerationStructureTypeKHR::eBottomLevel,
         build_flags,
@@ -55,19 +55,20 @@ void BLASBuilder::queue_update(
         *as,
         *as,
         geometry_count,
-        p_geometry};
+        geometry.data()};
 
     pending_min_scratch_buffer =
         std::max(pending_min_scratch_buffer, as->get_size_info().updateScratchSize);
-    pending.emplace_back(build_info, pp_range_info);
+    pending.emplace_back(build_info, geometry, range_info);
 }
 
 void BLASBuilder::queue_rebuild(
-    const uint32_t geometry_count,
-    const vk::AccelerationStructureGeometryKHR* p_geometry,
-    const vk::AccelerationStructureBuildRangeInfoKHR* const* pp_range_info,
+    const std::vector<vk::AccelerationStructureGeometryKHR>& geometry,
+    const std::vector<vk::AccelerationStructureBuildRangeInfoKHR>& range_info,
     const AccelerationStructureHandle as,
     const vk::BuildAccelerationStructureFlagsKHR build_flags) {
+
+    const uint32_t geometry_count = geometry.size();
     vk::AccelerationStructureBuildGeometryInfoKHR build_info{
         vk::AccelerationStructureTypeKHR::eBottomLevel,
         build_flags,
@@ -75,22 +76,17 @@ void BLASBuilder::queue_rebuild(
         *as,
         *as,
         geometry_count,
-        p_geometry};
+        geometry.data()};
 
     pending_min_scratch_buffer =
         std::max(pending_min_scratch_buffer, as->get_size_info().buildScratchSize);
-    pending.emplace_back(build_info, pp_range_info);
-}
-
-AccelerationStructureHandle BLASBuilder::queue_build(
-    const std::vector<vk::AccelerationStructureGeometryKHR>& geometry,
-    const std::vector<const vk::AccelerationStructureBuildRangeInfoKHR*>& range_info,
-    const vk::BuildAccelerationStructureFlagsKHR build_flags) {
-
-    return queue_build(geometry.size(), geometry.data(), range_info.data(), build_flags);
+    pending.emplace_back(build_info, geometry, range_info);
 }
 
 void BLASBuilder::get_cmds(const vk::CommandBuffer& cmd, const EventHandle& compact_signal_event) {
+    if (pending.empty())
+        return;
+
     ensure_scratch_buffer(pending_min_scratch_buffer);
     assert(scratch_buffer);
 
@@ -102,9 +98,11 @@ void BLASBuilder::get_cmds(const vk::CommandBuffer& cmd, const EventHandle& comp
                                                 vk::AccessFlagBits::eAccelerationStructureWriteKHR};
     for (uint32_t idx = 0; idx < pending.size(); idx++) {
         pending[idx].build_info.scratchData.deviceAddress = scratch_buffer->get_device_address();
+        pending[idx].build_info.pGeometries = pending[idx].geometry.data();
 
-        cmd.buildAccelerationStructuresKHR(1, &pending[idx].build_info, pending[idx].range_info);
-
+        const vk::AccelerationStructureBuildRangeInfoKHR* p_range_info =
+            pending[idx].range_info.data();
+        cmd.buildAccelerationStructuresKHR(1, &pending[idx].build_info, &p_range_info);
         cmd.pipelineBarrier(vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR,
                             vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR, {}, 1,
                             &scratch_barrier, 0, nullptr, 0, nullptr);
