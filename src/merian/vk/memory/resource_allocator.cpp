@@ -90,6 +90,7 @@ ImageHandle ResourceAllocator::createImage(const vk::CommandBuffer& cmdBuf,
         // Setting final image layout
         merian::cmd_barrier_image_layout(cmdBuf, *resultImage, vk::ImageLayout::eTransferDstOptimal,
                                          layout_);
+        resultImage->_set_current_layout(layout_);
     } else {
         // Setting final image layout
         merian::cmd_barrier_image_layout(cmdBuf, *resultImage, vk::ImageLayout::eUndefined,
