@@ -9,8 +9,9 @@ namespace merian {
 
 Buffer::Buffer(const vk::Buffer& buffer,
                const MemoryAllocationHandle& memory,
-               const vk::BufferUsageFlags& usage)
-    : buffer(buffer), memory(memory), usage(usage) {
+               const vk::BufferUsageFlags& usage,
+               const vk::DeviceSize& size)
+    : buffer(buffer), memory(memory), usage(usage), size(size) {
     SPDLOG_DEBUG("create buffer ({})", fmt::ptr(this));
 }
 
@@ -26,12 +27,35 @@ vk::DeviceAddress Buffer::get_device_address() {
 
 vk::BufferMemoryBarrier Buffer::buffer_barrier(const vk::AccessFlags src_access_flags,
                                                const vk::AccessFlags dst_access_flags,
-                                               uint32_t src_queue_family_index,
-                                               uint32_t dst_queue_family_index) {
-    auto info = memory->get_memory_info();
-    return {
-        src_access_flags, dst_access_flags, src_queue_family_index, dst_queue_family_index, buffer,
-        info.offset,      info.size};
+                                               const vk::DeviceSize size,
+                                               const uint32_t src_queue_family_index,
+                                               const uint32_t dst_queue_family_index) {
+    return {src_access_flags,
+            dst_access_flags,
+            src_queue_family_index,
+            dst_queue_family_index,
+            buffer,
+            0,
+            size};
+}
+
+vk::BufferMemoryBarrier2 Buffer::buffer_barrier2(const vk::PipelineStageFlags2 src_stage_flags,
+                                                 const vk::PipelineStageFlags2 dst_stage_flags,
+                                                 const vk::AccessFlags2 src_access_flags,
+                                                 const vk::AccessFlags2 dst_access_flags,
+                                                 const vk::DeviceSize size,
+                                                 const uint32_t src_queue_family_index,
+                                                 const uint32_t dst_queue_family_index) {
+    return {src_stage_flags,
+            src_access_flags,
+            dst_stage_flags,
+            dst_access_flags,
+            src_queue_family_index,
+            dst_queue_family_index,
+            buffer,
+            0,
+            size,
+            nullptr};
 }
 
 // --------------------------------------------------------------------------

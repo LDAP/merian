@@ -21,22 +21,27 @@ class Buffer : public std::enable_shared_from_this<Buffer> {
     // It is asserted that the memory represented by `memory` is already bound to `buffer`.
     Buffer(const vk::Buffer& buffer,
            const MemoryAllocationHandle& memory,
-           const vk::BufferUsageFlags& usage);
+           const vk::BufferUsageFlags& usage,
+           const vk::DeviceSize& size);
 
     ~Buffer();
 
     // -----------------------------------------------------------
 
-    operator const vk::Buffer&() const {
+    operator const vk::Buffer&() const noexcept {
         return buffer;
     }
 
-    const vk::Buffer& get_buffer() const {
+    const vk::Buffer& get_buffer() const noexcept {
         return buffer;
     }
 
-    const MemoryAllocationHandle& get_memory() const {
+    const MemoryAllocationHandle& get_memory() const noexcept {
         return memory;
+    }
+
+    vk::DeviceSize get_size() const noexcept {
+        return size;
     }
 
     // -----------------------------------------------------------
@@ -47,20 +52,28 @@ class Buffer : public std::enable_shared_from_this<Buffer> {
 
     vk::DeviceAddress get_device_address();
 
-    // Return a suitable vk::BufferMemoryBarrier. Note that currently no GPU cares and a
-    // global MemoryBarrier can be used in most instances without loosing performance.
-    // This method is especially not very efficient because it has to call get_memory_info on the
-    // memory object.
+    // Return a suitable vk::BufferMemoryBarrier.
     vk::BufferMemoryBarrier
     buffer_barrier(const vk::AccessFlags src_access_flags,
                    const vk::AccessFlags dst_access_flags,
-                   uint32_t src_queue_family_index = VK_QUEUE_FAMILY_IGNORED,
-                   uint32_t dst_queue_family_index = VK_QUEUE_FAMILY_IGNORED);
+                   const vk::DeviceSize size = VK_WHOLE_SIZE,
+                   const uint32_t src_queue_family_index = VK_QUEUE_FAMILY_IGNORED,
+                   const uint32_t dst_queue_family_index = VK_QUEUE_FAMILY_IGNORED);
+
+    vk::BufferMemoryBarrier2
+    buffer_barrier2(const vk::PipelineStageFlags2 src_stage_flags,
+                    const vk::PipelineStageFlags2 dst_stage_flags,
+                    const vk::AccessFlags2 src_access_flags,
+                    const vk::AccessFlags2 dst_access_flags,
+                    const vk::DeviceSize size = VK_WHOLE_SIZE,
+                    const uint32_t src_queue_family_index = VK_QUEUE_FAMILY_IGNORED,
+                    const uint32_t dst_queue_family_index = VK_QUEUE_FAMILY_IGNORED);
 
   private:
     const vk::Buffer buffer;
     const MemoryAllocationHandle memory;
     const vk::BufferUsageFlags usage;
+    const vk::DeviceSize size;
 };
 
 class Image;
@@ -76,7 +89,8 @@ class Image : public std::enable_shared_from_this<Image> {
     // Creats a Image objects that automatically destroys Image when destructed.
     // The memory is not freed explicitly to let it free itself.
     // It is asserted that the memory represented by `memory` is already bound correctly,
-    // this is because images are commonly created by memory allocators to optimize memory accesses.
+    // this is because images are commonly created by memory allocators to optimize memory
+    // accesses.
     Image(const vk::Image& image,
           const MemoryAllocationHandle& memory,
           const vk::Extent3D extent,
@@ -113,13 +127,13 @@ class Image : public std::enable_shared_from_this<Image> {
 
     // Use this only if you performed a layout transition without using barrier(...)
     // This does not perform a layout transision on itself!
-    void _set_current_layout(vk::ImageLayout& new_layout) {
+    void _set_current_layout(const vk::ImageLayout& new_layout) {
         current_layout = new_layout;
     }
 
-    // Do not forget submite the barrier, else the internal state does not match the actual state
-    // You can use transition_from_undefined when you are not interested in keeping the contents,
-    // this can be more performant.
+    // Do not forget submite the barrier, else the internal state does not match the actual
+    // state You can use transition_from_undefined when you are not interested in keeping the
+    // contents, this can be more performant.
     vk::ImageMemoryBarrier
     barrier(const vk::ImageLayout new_layout,
             const vk::AccessFlags src_access_flags = {},
@@ -131,14 +145,14 @@ class Image : public std::enable_shared_from_this<Image> {
 
     vk::ImageMemoryBarrier2
     barrier2(const vk::ImageLayout new_layout,
-            const vk::AccessFlags2 src_access_flags = {},
-            const vk::AccessFlags2 dst_access_flags = {},
-            const vk::PipelineStageFlags2 src_stage_flags = {},
-            const vk::PipelineStageFlags2 dst_stage_flags = {},
-            const uint32_t src_queue_family_index = VK_QUEUE_FAMILY_IGNORED,
-            const uint32_t dst_queue_family_index = VK_QUEUE_FAMILY_IGNORED,
-            const vk::ImageSubresourceRange subresource_range = all_levels_and_layers(),
-            const bool transition_from_undefined = false);
+             const vk::AccessFlags2 src_access_flags = {},
+             const vk::AccessFlags2 dst_access_flags = {},
+             const vk::PipelineStageFlags2 src_stage_flags = {},
+             const vk::PipelineStageFlags2 dst_stage_flags = {},
+             const uint32_t src_queue_family_index = VK_QUEUE_FAMILY_IGNORED,
+             const uint32_t dst_queue_family_index = VK_QUEUE_FAMILY_IGNORED,
+             const vk::ImageSubresourceRange subresource_range = all_levels_and_layers(),
+             const bool transition_from_undefined = false);
 
     // If extent and range are not supplied the whole image is copied.
     // Layouts are automatically determined from get_current_layout()
@@ -169,7 +183,8 @@ class Image : public std::enable_shared_from_this<Image> {
 };
 
 /**
- * @brief      A texture is a image together with a view (and subresource), and an optional sampler.
+ * @brief      A texture is a image together with a view (and subresource), and an optional
+ * sampler.
  *
  *  Try to only use the barrier() function to perform layout transitions,
  *  to keep the internal state valid.
