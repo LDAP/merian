@@ -300,10 +300,40 @@ void enable_common_features(const Context::FeaturesContainer& supported,
         SPDLOG_DEBUG("shaderFloat16 supported. Enabling feature");
         enable.physical_device_features_v12.shaderFloat16 = true;
     }
+    if (supported.physical_device_features_v12.uniformAndStorageBuffer8BitAccess) {
+        SPDLOG_DEBUG("uniformAndStorageBuffer8BitAccess supported. Enabling feature");
+        enable.physical_device_features_v12.uniformAndStorageBuffer8BitAccess = true;
+    }
+    if (supported.physical_device_features_v12.bufferDeviceAddress) {
+        SPDLOG_DEBUG("bufferDeviceAddress supported. Enabling feature");
+        enable.physical_device_features_v12.bufferDeviceAddress = true;
+    }
+
+    if (supported.physical_device_features_v12.runtimeDescriptorArray) {
+        SPDLOG_DEBUG("runtimeDescriptorArray supported. Enabling feature");
+        enable.physical_device_features_v12.runtimeDescriptorArray = true;
+    }
+    if (supported.physical_device_features_v12.descriptorIndexing) {
+        SPDLOG_DEBUG("descriptorIndexing supported. Enabling feature");
+        enable.physical_device_features_v12.descriptorIndexing = true;
+    }
     if (supported.physical_device_features_v12.shaderSampledImageArrayNonUniformIndexing) {
         SPDLOG_DEBUG("shaderSampledImageArrayNonUniformIndexing supported. Enabling feature");
         enable.physical_device_features_v12.shaderSampledImageArrayNonUniformIndexing = true;
     }
+    if (supported.physical_device_features_v12.shaderStorageImageArrayNonUniformIndexing) {
+        SPDLOG_DEBUG("shaderStorageImageArrayNonUniformIndexing supported. Enabling feature");
+        enable.physical_device_features_v12.shaderStorageImageArrayNonUniformIndexing = true;
+    }
+    if (supported.physical_device_features_v12.shaderStorageBufferArrayNonUniformIndexing) {
+        SPDLOG_DEBUG("shaderStorageBufferArrayNonUniformIndexing supported. Enabling feature");
+        enable.physical_device_features_v12.shaderStorageBufferArrayNonUniformIndexing = true;
+    }
+    if (supported.physical_device_features_v12.shaderUniformBufferArrayNonUniformIndexing) {
+        SPDLOG_DEBUG("shaderUniformBufferArrayNonUniformIndexing supported. Enabling feature");
+        enable.physical_device_features_v12.shaderUniformBufferArrayNonUniformIndexing = true;
+    }
+
     if (supported.physical_device_features_v13.synchronization2) {
         SPDLOG_DEBUG("synchronization2 supported. Enabling feature");
         enable.physical_device_features_v13.synchronization2 = true;
