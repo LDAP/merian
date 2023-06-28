@@ -33,32 +33,35 @@ struct NodeInputDescriptorImage : public NodeInputDescriptor {
                              const vk::PipelineStageFlags2 pipeline_stages,
                              const vk::ImageLayout required_layout,
                              const vk::ImageUsageFlags usage_flags,
-                             const uint32_t delay = 0)
+                             const uint32_t delay = 0,
+                             const std::optional<SamplerHandle> sampler = std::nullopt)
         : NodeInputDescriptor(name, access_flags, pipeline_stages, delay),
-          required_layout(required_layout), usage_flags(usage_flags) {}
+          required_layout(required_layout), usage_flags(usage_flags), sampler(sampler) {}
 
     vk::ImageLayout required_layout;
     vk::ImageUsageFlags usage_flags;
+    std::optional<SamplerHandle> sampler;
 
-    static NodeInputDescriptorImage compute_read(const std::string& name, const uint32_t delay = 0) {
-        return NodeInputDescriptorImage{
-            name,
-            vk::AccessFlagBits2::eShaderRead,
-            vk::PipelineStageFlagBits2::eComputeShader,
-            vk::ImageLayout::eShaderReadOnlyOptimal,
-            vk::ImageUsageFlagBits::eSampled,
-            delay
-        };
+    static NodeInputDescriptorImage
+    compute_read(const std::string& name,
+                 const uint32_t delay = 0,
+                 const std::optional<SamplerHandle> sampler = std::nullopt) {
+        return NodeInputDescriptorImage{name,
+                                        vk::AccessFlagBits2::eShaderRead,
+                                        vk::PipelineStageFlagBits2::eComputeShader,
+                                        vk::ImageLayout::eShaderReadOnlyOptimal,
+                                        vk::ImageUsageFlagBits::eSampled,
+                                        delay,
+                                        sampler};
     }
-    static NodeInputDescriptorImage transfer_src(const std::string& name, const uint32_t delay = 0) {
-        return NodeInputDescriptorImage{
-            name,
-            vk::AccessFlagBits2::eTransferRead,
-            vk::PipelineStageFlagBits2::eTransfer,
-            vk::ImageLayout::eTransferSrcOptimal,
-            vk::ImageUsageFlagBits::eTransferSrc,
-            delay
-        };
+    static NodeInputDescriptorImage transfer_src(const std::string& name,
+                                                 const uint32_t delay = 0) {
+        return NodeInputDescriptorImage{name,
+                                        vk::AccessFlagBits2::eTransferRead,
+                                        vk::PipelineStageFlagBits2::eTransfer,
+                                        vk::ImageLayout::eTransferSrcOptimal,
+                                        vk::ImageUsageFlagBits::eTransferSrc,
+                                        delay};
     }
 };
 
