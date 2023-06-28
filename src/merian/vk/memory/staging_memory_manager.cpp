@@ -170,7 +170,7 @@ void StagingMemoryManager::releaseResources(uint32_t stagingID) {
     if (stagingID == INVALID_ID_INDEX)
         return;
 
-    SPDLOG_DEBUG("releseing resources for staging id", stagingID);
+    SPDLOG_TRACE("releseing resources for staging id", stagingID);
 
     StagingSet& set = m_sets[stagingID];
     assert(set.index == stagingID);

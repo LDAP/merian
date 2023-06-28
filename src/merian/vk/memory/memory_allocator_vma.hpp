@@ -26,7 +26,7 @@ class VMAMemoryAllocation : public MemoryAllocation {
                         const VmaAllocation allocation)
         : MemoryAllocation(context), allocator(allocator), mapping_type(mapping_type),
           m_allocation(allocation) {
-        SPDLOG_DEBUG("create VMA allocation ({})", fmt::ptr(this));
+        SPDLOG_TRACE("create VMA allocation ({})", fmt::ptr(this));
     }
 
     // Unmaps and frees the memory when called

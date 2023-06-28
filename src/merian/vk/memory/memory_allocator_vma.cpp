@@ -10,7 +10,7 @@ namespace merian {
 // ALLOCATION
 
 VMAMemoryAllocation::~VMAMemoryAllocation() {
-    SPDLOG_DEBUG("destroy VMA allocation ({})", fmt::ptr(this));
+    SPDLOG_TRACE("destroy VMA allocation ({})", fmt::ptr(this));
     if (is_mapped) {
         unmap();
     }
@@ -21,7 +21,7 @@ VMAMemoryAllocation::~VMAMemoryAllocation() {
 
 void VMAMemoryAllocation::free() {
     if (m_allocation) {
-        SPDLOG_DEBUG("freeing memory ({})", fmt::ptr(this));
+        SPDLOG_TRACE("freeing memory ({})", fmt::ptr(this));
         vmaFreeMemory(allocator->vma_allocator, m_allocation);
         m_allocation = nullptr;
     } else {
@@ -107,14 +107,14 @@ VMAMemoryAllocator::~VMAMemoryAllocator() {
 
 // ----------------------------------------------------------------------------------------------
 
-void log_allocation(const VmaAllocationInfo& info,
-                    const MemoryAllocationHandle memory,
-                    const std::string& name) {
+void log_allocation([[maybe_unused]]const VmaAllocationInfo& info,
+                    [[maybe_unused]]const MemoryAllocationHandle memory,
+                    [[maybe_unused]]const std::string& name) {
     if (!name.empty())
-        SPDLOG_DEBUG("allocated {} of memory at offset {} ({}, {})", format_size(info.size),
+        SPDLOG_TRACE("allocated {} of memory at offset {} ({}, {})", format_size(info.size),
                      format_size(info.offset), fmt::ptr(memory.get()), name);
     else
-        SPDLOG_DEBUG("allocated {} of memory at offset {} ({})", format_size(info.size),
+        SPDLOG_TRACE("allocated {} of memory at offset {} ({})", format_size(info.size),
                      format_size(info.offset), fmt::ptr(memory.get()));
 }
 

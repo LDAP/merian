@@ -12,11 +12,11 @@ Buffer::Buffer(const vk::Buffer& buffer,
                const vk::BufferUsageFlags& usage,
                const vk::DeviceSize& size)
     : buffer(buffer), memory(memory), usage(usage), size(size) {
-    SPDLOG_DEBUG("create buffer ({})", fmt::ptr(this));
+    SPDLOG_TRACE("create buffer ({})", fmt::ptr(this));
 }
 
 Buffer::~Buffer() {
-    SPDLOG_DEBUG("destroy buffer ({})", fmt::ptr(this));
+    SPDLOG_TRACE("destroy buffer ({})", fmt::ptr(this));
     memory->get_context()->device.destroyBuffer(buffer);
 }
 
@@ -66,11 +66,11 @@ Image::Image(const vk::Image& image,
              const vk::Format format,
              const vk::ImageLayout current_layout)
     : image(image), memory(memory), extent(extent), format(format), current_layout(current_layout) {
-    SPDLOG_DEBUG("create image ({})", fmt::ptr(this));
+    SPDLOG_TRACE("create image ({})", fmt::ptr(this));
 }
 
 Image::~Image() {
-    SPDLOG_DEBUG("destroy image ({})", fmt::ptr(this));
+    SPDLOG_TRACE("destroy image ({})", fmt::ptr(this));
     memory->get_context()->device.destroyImage(image);
 }
 
@@ -120,12 +120,12 @@ Texture::Texture(const ImageHandle& image,
                  const vk::ImageViewCreateInfo& view_create_info,
                  const std::optional<SamplerHandle> sampler)
     : image(image), sampler(sampler) {
-    SPDLOG_DEBUG("create texture ({})", fmt::ptr(this));
+    SPDLOG_TRACE("create texture ({})", fmt::ptr(this));
     view = image->get_memory()->get_context()->device.createImageView(view_create_info);
 }
 
 Texture::~Texture() {
-    SPDLOG_DEBUG("destroy texture ({})", fmt::ptr(this));
+    SPDLOG_TRACE("destroy texture ({})", fmt::ptr(this));
     image->get_memory()->get_context()->device.destroyImageView(view);
 }
 
@@ -138,11 +138,11 @@ AccelerationStructure::AccelerationStructure(
     const BufferHandle& buffer,
     const vk::AccelerationStructureBuildSizesInfoKHR& size_info)
     : as(as), buffer(buffer), size_info(size_info) {
-    SPDLOG_DEBUG("create acceleration structure ({})", fmt::ptr(this));
+    SPDLOG_TRACE("create acceleration structure ({})", fmt::ptr(this));
 }
 
 AccelerationStructure::~AccelerationStructure() {
-    SPDLOG_DEBUG("destroy acceleration structure ({})", fmt::ptr(this));
+    SPDLOG_TRACE("destroy acceleration structure ({})", fmt::ptr(this));
     buffer->get_memory()->get_context()->device.destroyAccelerationStructureKHR(as);
 }
 
