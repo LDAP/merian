@@ -63,7 +63,13 @@ make_graph_descriptor_sets(const SharedContext context,
             create_image_view.image = *image_input;
             create_image_view.format = image_input->get_format();
             in_tex = allocator->createTexture(image_input, create_image_view);
-            in_tex->attach_sampler(allocator->get_sampler_pool()->linear_mirrored_repeat());
+
+            vk::FormatProperties props = context->pd_container.physical_device.getFormatProperties(create_image_view.format);
+            if (props.optimalTilingFeatures & vk::FormatFeatureFlagBits::eSampledImageFilterLinear) {
+                in_tex->attach_sampler(allocator->get_sampler_pool()->linear_mirrored_repeat());
+            } else {
+                in_tex->attach_sampler(allocator->get_sampler_pool()->nearest_mirrored_repeat());
+            }
             textures.push_back(in_tex);
 
             update.write_descriptor_texture(u_i++, in_tex, 0, 1,
