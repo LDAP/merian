@@ -296,6 +296,10 @@ void enable_common_features(const Context::FeaturesContainer& supported,
         SPDLOG_DEBUG("scalarBlockLayout supported. Enabling feature");
         enable.physical_device_features_v12.scalarBlockLayout = true;
     }
+    if (supported.physical_device_features_v12.shaderFloat16) {
+        SPDLOG_DEBUG("shaderFloat16 supported. Enabling feature");
+        enable.physical_device_features_v12.shaderFloat16 = true;
+    }
     if (supported.physical_device_features_v12.shaderSampledImageArrayNonUniformIndexing) {
         SPDLOG_DEBUG("shaderSampledImageArrayNonUniformIndexing supported. Enabling feature");
         enable.physical_device_features_v12.shaderSampledImageArrayNonUniformIndexing = true;
