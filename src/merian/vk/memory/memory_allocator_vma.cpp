@@ -192,11 +192,14 @@ BufferHandle VMAMemoryAllocator::create_buffer(const vk::BufferCreateInfo buffer
     VmaAllocation allocation;
     VmaAllocationInfo allocation_info;
     if (min_alignment.has_value()) {
-        vmaCreateBufferWithAlignment(vma_allocator, &c_buffer_create_info, &allocation_create_info,
-                                     min_alignment.value(), &buffer, &allocation, &allocation_info);
+        check_result(vmaCreateBufferWithAlignment(vma_allocator, &c_buffer_create_info,
+                                                  &allocation_create_info, min_alignment.value(),
+                                                  &buffer, &allocation, &allocation_info),
+                     "could not allocate memory for buffer. size == 0?");
     } else {
-        vmaCreateBuffer(vma_allocator, &c_buffer_create_info, &allocation_create_info, &buffer,
-                        &allocation, &allocation_info);
+        check_result(vmaCreateBuffer(vma_allocator, &c_buffer_create_info, &allocation_create_info,
+                                     &buffer, &allocation, &allocation_info),
+                     "could not allocate memory for buffer. size == 0?");
     }
     if (!debug_name.empty())
         set_name(vma_allocator, allocation, debug_name);
@@ -205,7 +208,8 @@ BufferHandle VMAMemoryAllocator::create_buffer(const vk::BufferCreateInfo buffer
         static_pointer_cast<VMAMemoryAllocator>(shared_from_this());
     auto memory =
         std::make_shared<VMAMemoryAllocation>(context, allocator, mapping_type, allocation);
-    auto buffer_handle = std::make_shared<Buffer>(buffer, memory, buffer_create_info.usage);
+    auto buffer_handle =
+        std::make_shared<Buffer>(buffer, memory, buffer_create_info.usage, buffer_create_info.size);
     log_allocation(allocation_info, memory, debug_name);
 
     return buffer_handle;
@@ -221,8 +225,9 @@ ImageHandle VMAMemoryAllocator::create_image(const vk::ImageCreateInfo image_cre
     VkImage image;
     VmaAllocation allocation;
     VmaAllocationInfo allocation_info;
-    vmaCreateImage(vma_allocator, &c_image_create_info, &allocation_create_info, &image,
-                   &allocation, &allocation_info);
+    check_result(vmaCreateImage(vma_allocator, &c_image_create_info, &allocation_create_info,
+                                &image, &allocation, &allocation_info),
+                 "could not allocate memory for image");
     if (!debug_name.empty())
         set_name(vma_allocator, allocation, debug_name);
     const std::shared_ptr<VMAMemoryAllocator> allocator =
