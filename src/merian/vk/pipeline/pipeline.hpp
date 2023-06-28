@@ -36,17 +36,16 @@ class Pipeline : public std::enable_shared_from_this<Pipeline> {
     virtual void bind(const vk::CommandBuffer& cmd) = 0;
 
     virtual void bind_descriptor_set(const vk::CommandBuffer& cmd,
-                                     const std::shared_ptr<DescriptorSet>& descriptor_set) = 0;
+                                     const std::shared_ptr<DescriptorSet>& descriptor_set,
+                                     const uint32_t first_set = 0) = 0;
 
     template <typename T>
-    void
-    push_constant(const vk::CommandBuffer& cmd, const T& constant, const uint32_t id = 0) {
+    void push_constant(const vk::CommandBuffer& cmd, const T& constant, const uint32_t id = 0) {
         push_constant(cmd, reinterpret_cast<const void*>(&constant), id);
     }
 
     template <typename T>
-    void
-    push_constant(const vk::CommandBuffer& cmd, const T* constant, const uint32_t id = 0) {
+    void push_constant(const vk::CommandBuffer& cmd, const T* constant, const uint32_t id = 0) {
         push_constant(cmd, reinterpret_cast<const void*>(constant), id);
     }
 

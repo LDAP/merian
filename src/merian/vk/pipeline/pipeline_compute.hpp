@@ -47,8 +47,9 @@ class ComputePipeline : public Pipeline {
     }
 
     void bind_descriptor_set(const vk::CommandBuffer& cmd,
-                             const std::shared_ptr<DescriptorSet>& descriptor_set) override {
-        cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute, *pipeline_layout, 0, 1,
+                             const std::shared_ptr<DescriptorSet>& descriptor_set,
+                             const uint32_t first_set = 0) override {
+        cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute, *pipeline_layout, first_set, 1,
                                &descriptor_set->get_set(), 0, nullptr);
     };
 
