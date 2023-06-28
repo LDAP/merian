@@ -71,12 +71,12 @@ class DescriptorSetUpdate {
     // Bind `acceleration_structure` at the binding point `binding` of DescriptorSet `set`.
     DescriptorSetUpdate& write_descriptor_acceleration_structure(
         const uint32_t binding,
-        const std::vector<vk::AccelerationStructureKHR>& acceleration_structures,
+        const vk::AccelerationStructureKHR& acceleration_structure,
         const uint32_t dst_array_element = 0,
         const uint32_t descriptor_count = 1) {
         write_acceleration_structures.emplace_back(
             std::make_unique<vk::WriteDescriptorSetAccelerationStructureKHR>(
-                acceleration_structures));
+                1, &acceleration_structure));
         vk::WriteDescriptorSet write{*set,
                                      binding,
                                      dst_array_element,
