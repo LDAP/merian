@@ -168,8 +168,11 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id,
     pd_container.features.physical_device_features_v12.setPNext(
         &pd_container.features.physical_device_features_v13);
     // ^
-    pd_container.features.physical_device_features.setPNext(
+    pd_container.features.physical_device_features_v11.setPNext(
         &pd_container.features.physical_device_features_v12);
+    // ^
+    pd_container.features.physical_device_features.setPNext(
+        &pd_container.features.physical_device_features_v11);
     // ^
     pd_container.physical_device.getFeatures2(&pd_container.features.physical_device_features);
 
@@ -292,6 +295,11 @@ void Context::find_queues() {
 
 void enable_common_features(const Context::FeaturesContainer& supported,
                             Context::FeaturesContainer& enable) {
+    if (supported.physical_device_features_v11.storageBuffer16BitAccess) {
+        SPDLOG_DEBUG("storageBuffer16BitAccess supported. Enabling feature");
+        enable.physical_device_features_v11.storageBuffer16BitAccess = true;
+    }
+
     if (supported.physical_device_features_v12.scalarBlockLayout) {
         SPDLOG_DEBUG("scalarBlockLayout supported. Enabling feature");
         enable.physical_device_features_v12.scalarBlockLayout = true;
@@ -416,7 +424,9 @@ void Context::create_device_and_queues(uint32_t preferred_number_compute_queues)
     // ^
     enable.physical_device_features_v12.setPNext(&enable.physical_device_features_v13);
     // ^
-    enable.physical_device_features.setPNext(&enable.physical_device_features_v12);
+    enable.physical_device_features_v11.setPNext(&enable.physical_device_features_v12);
+    // ^
+    enable.physical_device_features.setPNext(&enable.physical_device_features_v11);
     // ^
     vk::DeviceCreateInfo device_create_info{{},
                                             queue_create_infos,
