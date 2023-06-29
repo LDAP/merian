@@ -1,5 +1,8 @@
 #include "common/common.glsl"
 
+#ifndef _VON_MISES_FISHER_H_
+#define _VON_MISES_FISHER_H_
+
 // numerically robust von Mises Fisher lobe
 float vmf_eval(float kappa, float dotmu)
 {
@@ -20,3 +23,5 @@ float vmf_get_kappa(float x)
   return max(1e-5, (168.479*x*x + 16.4585*x - 2.39942)/
       (-1.12718*x*x+29.1433*x+1.0));
 }
+
+#endif
