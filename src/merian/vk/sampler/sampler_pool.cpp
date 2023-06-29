@@ -120,4 +120,24 @@ SamplerHandle SamplerPool::nearest_mirrored_repeat() {
     return acquire_sampler(info);
 }
 
+SamplerHandle SamplerPool::nearest_repeat() {
+    const vk::SamplerCreateInfo info{{},
+                                     vk::Filter::eNearest,
+                                     vk::Filter::eNearest,
+                                     vk::SamplerMipmapMode::eNearest,
+                                     vk::SamplerAddressMode::eRepeat,
+                                     vk::SamplerAddressMode::eRepeat,
+                                     vk::SamplerAddressMode::eRepeat,
+                                     {},
+                                     false,
+                                     16,
+                                     false,
+                                     {},
+                                     0.0f,
+                                     128.0f,
+                                     vk::BorderColor::eIntTransparentBlack,
+                                     false};
+    return acquire_sampler(info);
+}
+
 } // namespace merian

@@ -40,6 +40,8 @@ class SamplerPool : public std::enable_shared_from_this<SamplerPool> {
 
     SamplerHandle nearest_mirrored_repeat();
 
+    SamplerHandle nearest_repeat();
+
   private:
     struct SamplerState {
         vk::SamplerCreateInfo createInfo{};
