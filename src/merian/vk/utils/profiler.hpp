@@ -39,7 +39,7 @@ using ProfilerHandle = std::shared_ptr<Profiler>;
  *     queue.submit(... fence);
  * }
  */
-class Profiler {
+class Profiler : public std::enable_shared_from_this<Profiler> {
   private:
     using chrono_clock = std::chrono::high_resolution_clock;
 
@@ -60,11 +60,6 @@ class Profiler {
     };
 
   public:
-    static ProfilerHandle make(const SharedContext context, const uint32_t num_gpu_timers = 1028) {
-        return std::shared_ptr<Profiler>(new Profiler(context, num_gpu_timers));
-    }
-
-  private:
     // The timestamps for GPU profiling must be preallocated, therefore you can only caputure
     // num_gpu_timers many timers.
     Profiler(const SharedContext context, const uint32_t num_gpu_timers = 1028);
