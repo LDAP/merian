@@ -120,6 +120,27 @@ SamplerHandle SamplerPool::nearest_mirrored_repeat() {
     return acquire_sampler(info);
 }
 
+SamplerHandle SamplerPool::linear_repeat() {
+    const vk::SamplerCreateInfo info{{},
+                                     vk::Filter::eLinear,
+                                     vk::Filter::eLinear,
+                                     vk::SamplerMipmapMode::eLinear,
+                                     vk::SamplerAddressMode::eRepeat,
+                                     vk::SamplerAddressMode::eRepeat,
+                                     vk::SamplerAddressMode::eRepeat,
+                                     {},
+                                     false,
+                                     16,
+                                     false,
+                                     {},
+                                     0.0f,
+                                     128.0f,
+                                     vk::BorderColor::eIntTransparentBlack,
+                                     false};
+    return acquire_sampler(info);
+}
+
+
 SamplerHandle SamplerPool::nearest_repeat() {
     const vk::SamplerCreateInfo info{{},
                                      vk::Filter::eNearest,
