@@ -4,3 +4,9 @@ option(
     value: false,
     description: 'Enables profiling within the merian library'
 )
+
+option('loglevel',
+    type : 'combo',
+    choices : ['auto', 'info', 'debug', 'trace'],
+    value : 'auto'
+)

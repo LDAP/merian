@@ -14,9 +14,12 @@ glslc = find_program('glslangValidator')
 
 dir_source_root = meson.project_source_root()
 
-# Debug configuration
-if get_option('buildtype').startswith('debug')
-  add_project_arguments('-DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_DEBUG', language : 'cpp')
+if get_option('loglevel') == 'auto'
+    if get_option('buildtype').startswith('debug')
+        add_project_arguments('-DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_DEBUG', language : 'cpp')
+    endif
+else
+    add_project_arguments('-DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_' + get_option('loglevel').to_upper(), language : 'cpp')
 endif
 
 if get_option('performance_profiling')
