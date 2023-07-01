@@ -127,7 +127,7 @@ const GraphRun& Graph::cmd_run(vk::CommandBuffer& cmd, const ProfilerHandle prof
     MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "Graph: run");
 
     {
-        MERIAN_PROFILE_SCOPE(profiler, "Graph: pre process");
+        MERIAN_PROFILE_SCOPE(profiler, "Graph: preprocess nodes");
         for (auto& [node, data] : node_data) {
             MERIAN_PROFILE_SCOPE(profiler, node->name());
             data.status = {};
@@ -143,13 +143,16 @@ const GraphRun& Graph::cmd_run(vk::CommandBuffer& cmd, const ProfilerHandle prof
     }
 
     run.reset(current_iteration, profiler);
-    for (auto& node : flat_topology) {
-        NodeData& data = node_data[node];
-        if (data.status.skip_run) {
-            continue;
+    {
+        MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "Graph: run nodes");
+        for (auto& node : flat_topology) {
+            NodeData& data = node_data[node];
+            if (data.status.skip_run) {
+                continue;
+            }
+            MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, node->name());
+            cmd_run_node(cmd, node, data);
         }
-        MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, node->name());
-        cmd_run_node(cmd, node, data);
     }
 
     current_iteration++;

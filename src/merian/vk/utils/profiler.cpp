@@ -12,8 +12,8 @@ Profiler::Profiler(const SharedContext context, const uint32_t num_gpu_timers)
                                        num_gpu_timers * SW_QUERY_COUNT);
     query_pool = context->device.createQueryPool(createInfo);
     pending_gpu_timestamps.reserve(num_gpu_timers * SW_QUERY_COUNT);
-    gpu_sections.resize(num_gpu_timers);
-    cpu_sections.resize(1024);
+    gpu_sections.reserve(num_gpu_timers);
+    cpu_sections.reserve(1024);
 
     timestamp_period =
         context->pd_container.physical_device_props.properties.limits.timestampPeriod;
@@ -24,12 +24,17 @@ Profiler::~Profiler() {
     context->device.destroyQueryPool(query_pool);
 }
 
-void Profiler::cmd_reset(const vk::CommandBuffer& cmd) {
+void Profiler::cmd_reset(const vk::CommandBuffer& cmd, const bool clear) {
     cmd.resetQueryPool(query_pool, 0, num_gpu_timers);
-    cpu_sections.clear();
-    gpu_sections.clear();
     pending_gpu_timestamps.clear();
     reset_was_called = true;
+
+    if (clear) {
+        cpu_sections.clear();
+        gpu_sections.clear();
+        cpu_key_to_section_idx.clear();
+        gpu_key_to_section_idx.clear();
+    }
 }
 
 uint32_t Profiler::cmd_start(const vk::CommandBuffer& cmd,
@@ -38,13 +43,24 @@ uint32_t Profiler::cmd_start(const vk::CommandBuffer& cmd,
     assert(reset_was_called);
     assert(pending_gpu_timestamps.size() < num_gpu_timers);
 
-    GPUSection section;
-    section.name = name;
-    section.start_timestamp_idx = pending_gpu_timestamps.size();
-    cmd.writeTimestamp(pipeline_stage, query_pool, section.start_timestamp_idx);
-    const uint32_t section_index = gpu_sections.size();
-    gpu_sections.push_back(section);
+    std::string key = std::to_string(gpu_current_depth) + "$$" + name;
+    uint32_t section_index;
+    if (gpu_key_to_section_idx.contains(key)) {
+        section_index = gpu_key_to_section_idx[key];
+    } else {
+        section_index = gpu_sections.size();
+        gpu_key_to_section_idx[key] = section_index;
+        gpu_sections.emplace_back();
+        gpu_sections.back().name = name;
+    }
+    gpu_sections[section_index].start = 0;
+    gpu_sections[section_index].end = 0;
+    gpu_sections[section_index].start_timestamp_idx = pending_gpu_timestamps.size();
+    cmd.writeTimestamp(pipeline_stage, query_pool, gpu_sections[section_index].start_timestamp_idx);
     pending_gpu_timestamps.emplace_back(section_index, false);
+
+    gpu_current_depth++;
+
     return section_index;
 }
 
@@ -59,6 +75,8 @@ void Profiler::cmd_end(const vk::CommandBuffer& cmd,
     section.end_timestamp_idx = pending_gpu_timestamps.size();
     cmd.writeTimestamp(pipeline_stage, query_pool, section.end_timestamp_idx);
     pending_gpu_timestamps.emplace_back(start_id, true);
+
+    gpu_current_depth--;
 }
 
 void Profiler::collect(const bool wait) {
@@ -89,7 +107,10 @@ void Profiler::collect(const bool wait) {
             section.start = ts;
         }
         if (section.start && section.end) {
-            section.duration_ns = (section.end - section.start) * timestamp_period;
+            uint64_t duration_ns = (section.end - section.start) * timestamp_period;
+            section.sum_duration_ns += duration_ns;
+            section.sq_sum_duration_ns += (duration_ns * duration_ns);
+            section.num_captures++;
         }
     }
 
@@ -97,13 +118,21 @@ void Profiler::collect(const bool wait) {
 }
 
 uint32_t Profiler::start(const std::string& name) {
-    CPUSection section;
-    section.name = name;
-    section.start = chrono_clock::now();
-    uint32_t section_index = cpu_sections.size();
-    cpu_sections.push_back(section);
+    std::string key = std::to_string(cpu_current_depth) + "$$" + name;
+    uint32_t section_index;
+    if (cpu_key_to_section_idx.contains(key)) {
+        section_index = cpu_key_to_section_idx[key];
+    } else {
+        section_index = cpu_sections.size();
+        cpu_key_to_section_idx[key] = section_index;
+        cpu_sections.emplace_back();
+        cpu_sections.back().name = name;
+    }
 
+    cpu_sections[section_index].start = chrono_clock::now();
+    cpu_current_depth++;
     std::atomic_signal_fence(std::memory_order_seq_cst);
+
     return section_index;
 }
 
@@ -113,8 +142,12 @@ void Profiler::end(const uint32_t start_id) {
 
     CPUSection& section = cpu_sections[start_id];
     section.end = chrono_clock::now();
-    section.duration_ns =
+    uint64_t duration_ns =
         std::chrono::duration_cast<std::chrono::nanoseconds>(section.end - section.start).count();
+    section.sum_duration_ns += duration_ns;
+    section.sq_sum_duration_ns += (duration_ns * duration_ns);
+    section.num_captures++;
+    cpu_current_depth--;
 }
 
 std::string Profiler::get_report() {
@@ -138,8 +171,10 @@ std::string Profiler::get_report() {
         auto& [ts, is_end, section_index] = q.top();
         if (!is_end) {
             CPUSection& section = cpu_sections[section_index];
-            result += fmt::format("{}{}: {} ms\n", indent, section.name,
-                                  section.duration_ns / (double)1e6);
+            double avg = section.sum_duration_ns / (double) section.num_captures;
+            double std = section.sq_sum_duration_ns / (double) section.num_captures - avg * avg;
+            result += fmt::format("{}{}: {:.04f} (± {:.04f}) ms\n", indent, section.name,
+                                  avg / 1e6, std::sqrt(std) / 1e6);
         }
         if (is_end) {
             indent = indent.substr(0, std::max(0, (int)indent.size() - 2));
@@ -165,8 +200,10 @@ std::string Profiler::get_report() {
         auto& [ts, is_end, section_index] = gpu_q.top();
         if (!is_end) {
             GPUSection& section = gpu_sections[section_index];
-            result += fmt::format("{}{}: {} ms\n", indent, section.name,
-                                  section.duration_ns / (double)1e6);
+            double avg = section.sum_duration_ns / (double) section.num_captures;
+            double std = section.sq_sum_duration_ns / (double) section.num_captures - avg * avg;
+            result += fmt::format("{}{}: {:.04f} (± {:.04f}) ms\n", indent, section.name,
+                                  avg / 1e6, std::sqrt(std) / 1e6);
         }
         if (is_end) {
             indent = indent.substr(0, std::max(0, (int)indent.size() - 2));

@@ -44,17 +44,28 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
     using chrono_clock = std::chrono::high_resolution_clock;
 
     struct CPUSection {
+        // needed for sorting/printing
         chrono_clock::time_point start;
         chrono_clock::time_point end;
-        uint64_t duration_ns;
+
+        uint32_t num_captures{0};
+        uint64_t sum_duration_ns{0};
+        uint64_t sq_sum_duration_ns{0};
+
         std::string name;
     };
 
     struct GPUSection {
+        // needed for sorting/printing
         uint64_t start{};
         uint64_t end{};
-        uint64_t duration_ns;
+
+        uint32_t num_captures{0};
+        uint64_t sum_duration_ns{0};
+        uint64_t sq_sum_duration_ns{0};
+
         std::string name;
+
         uint32_t start_timestamp_idx;
         uint32_t end_timestamp_idx;
     };
@@ -67,9 +78,10 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
   public:
     ~Profiler();
 
-    // Resets the profiler, allowing to capture a new profile
-    // this MUST be called before any cmd_*
-    void cmd_reset(const vk::CommandBuffer& cmd);
+    // Resets the profiler, allowing to capture new timestamps on the GPU.
+    // This MUST be called before any cmd_*
+    // If clear is true the averages are reset too.
+    void cmd_reset(const vk::CommandBuffer& cmd, const bool clear = false);
 
     // Start a GPU section
     uint32_t cmd_start(
@@ -99,6 +111,12 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
     uint32_t num_gpu_timers;
     vk::QueryPool query_pool;
     float timestamp_period;
+    uint32_t cpu_current_depth = 0;
+    uint32_t gpu_current_depth = 0;
+
+    // Key: current_depth$$name
+    std::unordered_map<std::string, uint32_t> cpu_key_to_section_idx;
+    std::unordered_map<std::string, uint32_t> gpu_key_to_section_idx;
 
     std::vector<CPUSection> cpu_sections;
 
