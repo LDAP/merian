@@ -33,6 +33,8 @@ namespace merian {
  * How much is built? How expensive are the ray traces?
  * Can the build cost be hidden by executing builds on async compute? To find the optimal solution for a specific case,
  * I recommend trying out different options.
+ * 
+ * Note: You cannot use one builder for multiple frames in flight, because the scratch buffer might be reallocated!
  */
 class ASBuilder {
 

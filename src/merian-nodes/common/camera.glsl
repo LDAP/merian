@@ -11,7 +11,7 @@ vec2 filter_bh_sample(vec2 rand) {
   return res * r;
 }
 
-// Returns a camera ray direction for a pixel.
+// Returns a camera ray direction for a pixel. Expects up and forward to be normalized.
 // The direction is randomized using a blackman harris pixel filter.
 vec3 get_camera_ray_dir(ivec2 pixel, ivec2 resolution, vec3 up, vec3 forward, vec4 rand) {
     vec3 t = -up * float(resolution.y) / float(resolution.x);
