@@ -93,13 +93,14 @@ void TLASBuilder::get_cmds(const vk::CommandBuffer cmd) {
 
         // Since the scratch buffer is reused across builds, we need a barrier to ensure one
         // build is finished before starting the next one.
-        const vk::MemoryBarrier barrier{vk::AccessFlagBits::eAccelerationStructureReadKHR |
-                                            vk::AccessFlagBits::eAccelerationStructureWriteKHR,
-                                        vk::AccessFlagBits::eAccelerationStructureReadKHR |
-                                            vk::AccessFlagBits::eAccelerationStructureWriteKHR};
+        const vk::BufferMemoryBarrier scratch_barrier =
+            scratch_buffer->buffer_barrier(vk::AccessFlagBits::eAccelerationStructureReadKHR |
+                                               vk::AccessFlagBits::eAccelerationStructureWriteKHR,
+                                           vk::AccessFlagBits::eAccelerationStructureReadKHR |
+                                               vk::AccessFlagBits::eAccelerationStructureWriteKHR);
         cmd.pipelineBarrier(vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR,
-                            vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR, {}, 1,
-                            &barrier, 0, nullptr, 0, nullptr);
+                            vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR, {}, {},
+                            scratch_barrier, {});
     }
 
     pending.clear();

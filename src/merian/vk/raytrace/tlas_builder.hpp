@@ -59,11 +59,11 @@ class TLASBuilder : public ASBuilder {
                 vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR,
             {}, NONE, 16);
         // Make sure the upload has finished
-        const vk::MemoryBarrier barrier{vk::AccessFlagBits::eTransferWrite,
-                                        vk::AccessFlagBits::eAccelerationStructureWriteKHR};
+        const vk::BufferMemoryBarrier barrier = buffer->buffer_barrier(
+            vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eAccelerationStructureWriteKHR);
         cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
-                            vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR, {}, 1,
-                            &barrier, 0, nullptr, 0, nullptr);
+                            vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR, {}, {},
+                            barrier, {});
         return buffer;
     }
 

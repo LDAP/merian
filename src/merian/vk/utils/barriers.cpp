@@ -7,19 +7,16 @@ namespace merian {
 vk::PipelineStageFlags pipeline_stage_for_access_flags(vk::AccessFlags flags) {
     using AF = vk::AccessFlagBits;
     using PS = vk::PipelineStageFlagBits;
-    static vk::PipelineStageFlags shaders =
-        PS::eVertexShader | PS::eTessellationControlShader | PS::eTessellationEvaluationShader |
-        PS::eGeometryShader | PS::eFragmentShader | PS::eComputeShader | PS::eRayTracingShaderKHR;
 
     // clang-format off
     static std::unordered_map<vk::AccessFlagBits, vk::PipelineStageFlags> flag_map{
         {AF::eIndirectCommandRead                 , PS::eDrawIndirect}, 
         {AF::eIndexRead                           , PS::eVertexInput}, 
         {AF::eVertexAttributeRead                 , PS::eVertexInput}, 
-        {AF::eUniformRead                         , shaders}, 
+        {AF::eUniformRead                         , all_shaders}, 
         {AF::eInputAttachmentRead                 , PS::eFragmentShader}, 
-        {AF::eShaderRead                          , shaders}, 
-        {AF::eShaderWrite                         , shaders}, 
+        {AF::eShaderRead                          , all_shaders}, 
+        {AF::eShaderWrite                         , all_shaders}, 
         {AF::eColorAttachmentRead                 , PS::eColorAttachmentOutput}, 
         {AF::eColorAttachmentWrite                , PS::eColorAttachmentOutput}, 
         {AF::eDepthStencilAttachmentRead          , PS::eEarlyFragmentTests | PS::eLateFragmentTests}, 
@@ -36,10 +33,10 @@ vk::PipelineStageFlags pipeline_stage_for_access_flags(vk::AccessFlags flags) {
         // {AF::eTransformFeedbackCounterWriteEXT    , }, 
         // {AF::eConditionalRenderingReadEXT         , }, 
         {AF::eColorAttachmentReadNoncoherentEXT   , PS::eColorAttachmentOutput}, 
-        {AF::eAccelerationStructureReadKHR        , PS::eAccelerationStructureBuildNV | shaders}, 
+        {AF::eAccelerationStructureReadKHR        , PS::eAccelerationStructureBuildNV | all_shaders}, 
         {AF::eAccelerationStructureWriteKHR       , PS::eAccelerationStructureBuildKHR}, 
         //{AF::eShadingRateImageReadNV              , }, 
-        {AF::eAccelerationStructureReadNV         , PS::eAccelerationStructureBuildNV | shaders | PS::eRayTracingShaderNV}, 
+        {AF::eAccelerationStructureReadNV         , PS::eAccelerationStructureBuildNV | all_shaders | PS::eRayTracingShaderNV}, 
         {AF::eAccelerationStructureWriteNV        , PS::eAccelerationStructureBuildNV}, 
         // {AF::eFragmentDensityMapReadEXT           , }, 
         // {AF::eFragmentShadingRateAttachmentReadKHR, }, 
@@ -113,13 +110,6 @@ void cmd_barrier_image_layout(vk::CommandBuffer cmd,
     };
 
     cmd_barrier_image_layout(cmd, image, old_image_layout, new_image_layout, subresourceRange);
-}
-
-// A barrier between compute shader write and host read
-void cmd_barrier_compute_host(const vk::CommandBuffer cmd) {
-    vk::MemoryBarrier barrier{vk::AccessFlagBits::eShaderWrite, vk::AccessFlagBits::eHostRead};
-    cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eHost,
-                        {}, 1, &barrier, 0, nullptr, 0, nullptr);
 }
 
 } // namespace merian

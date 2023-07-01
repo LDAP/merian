@@ -5,6 +5,13 @@
 
 namespace merian {
 
+static vk::PipelineStageFlags all_shaders =
+    vk::PipelineStageFlagBits::eVertexShader |
+    vk::PipelineStageFlagBits::eTessellationControlShader |
+    vk::PipelineStageFlagBits::eTessellationEvaluationShader |
+    vk::PipelineStageFlagBits::eGeometryShader | vk::PipelineStageFlagBits::eFragmentShader |
+    vk::PipelineStageFlagBits::eComputeShader | vk::PipelineStageFlagBits::eRayTracingShaderKHR;
+
 // Heuristic to infer access flags from image layout
 inline vk::AccessFlags access_flags_for_image_layout(vk::ImageLayout layout) {
     switch (layout) {
@@ -34,14 +41,9 @@ inline vk::PipelineStageFlags pipeline_stage_for_image_layout(vk::ImageLayout la
     case vk::ImageLayout::eColorAttachmentOptimal:
         return vk::PipelineStageFlagBits::eColorAttachmentOutput;
     case vk::ImageLayout::eDepthStencilAttachmentOptimal:
-        // We do this to allow queue other than graphic
-        // return VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-        return vk::PipelineStageFlagBits::eAllCommands;
+        return all_shaders;
     case vk::ImageLayout::eShaderReadOnlyOptimal:
-        // We do this to allow queue other than
-        // graphic return
-        // VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-        return vk::PipelineStageFlagBits::eAllCommands;
+        return all_shaders;
     case vk::ImageLayout::ePreinitialized:
         return vk::PipelineStageFlagBits::eHost;
     case vk::ImageLayout::eUndefined:
@@ -85,8 +87,5 @@ inline void cmd_barrier_image_layout(vk::CommandBuffer cmd,
     cmd_barrier_image_layout(cmd, image, old_image_layout, new_image_layout,
                              vk::ImageAspectFlagBits::eColor);
 }
-
-// A barrier between compute shader write and host read
-void cmd_barrier_compute_host(const vk::CommandBuffer cmd);
 
 } // namespace merian
