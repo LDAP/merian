@@ -43,13 +43,13 @@ uint32_t Profiler::cmd_start(const vk::CommandBuffer& cmd,
     assert(reset_was_called);
     assert(pending_gpu_timestamps.size() < num_gpu_timers);
 
-    std::string key = std::to_string(gpu_current_depth) + "$$" + name;
+    gpu_current_key += "$$" + name;
     uint32_t section_index;
-    if (gpu_key_to_section_idx.contains(key)) {
-        section_index = gpu_key_to_section_idx[key];
+    if (gpu_key_to_section_idx.contains(gpu_current_key)) {
+        section_index = gpu_key_to_section_idx[gpu_current_key];
     } else {
         section_index = gpu_sections.size();
-        gpu_key_to_section_idx[key] = section_index;
+        gpu_key_to_section_idx[gpu_current_key] = section_index;
         gpu_sections.emplace_back();
         gpu_sections.back().name = name;
     }
@@ -58,8 +58,6 @@ uint32_t Profiler::cmd_start(const vk::CommandBuffer& cmd,
     gpu_sections[section_index].start_timestamp_idx = pending_gpu_timestamps.size();
     cmd.writeTimestamp(pipeline_stage, query_pool, gpu_sections[section_index].start_timestamp_idx);
     pending_gpu_timestamps.emplace_back(section_index, false);
-
-    gpu_current_depth++;
 
     return section_index;
 }
@@ -76,7 +74,7 @@ void Profiler::cmd_end(const vk::CommandBuffer& cmd,
     cmd.writeTimestamp(pipeline_stage, query_pool, section.end_timestamp_idx);
     pending_gpu_timestamps.emplace_back(start_id, true);
 
-    gpu_current_depth--;
+    gpu_current_key.resize(gpu_current_key.size() - 2 - section.name.size());
 }
 
 void Profiler::collect(const bool wait) {
@@ -118,19 +116,18 @@ void Profiler::collect(const bool wait) {
 }
 
 uint32_t Profiler::start(const std::string& name) {
-    std::string key = std::to_string(cpu_current_depth) + "$$" + name;
+    cpu_current_key += "$$" + name;
     uint32_t section_index;
-    if (cpu_key_to_section_idx.contains(key)) {
-        section_index = cpu_key_to_section_idx[key];
+    if (cpu_key_to_section_idx.contains(cpu_current_key)) {
+        section_index = cpu_key_to_section_idx[cpu_current_key];
     } else {
         section_index = cpu_sections.size();
-        cpu_key_to_section_idx[key] = section_index;
+        cpu_key_to_section_idx[cpu_current_key] = section_index;
         cpu_sections.emplace_back();
         cpu_sections.back().name = name;
     }
 
     cpu_sections[section_index].start = chrono_clock::now();
-    cpu_current_depth++;
     std::atomic_signal_fence(std::memory_order_seq_cst);
 
     return section_index;
@@ -147,7 +144,7 @@ void Profiler::end(const uint32_t start_id) {
     section.sum_duration_ns += duration_ns;
     section.sq_sum_duration_ns += (duration_ns * duration_ns);
     section.num_captures++;
-    cpu_current_depth--;
+    cpu_current_key.resize(cpu_current_key.size() - 2 - section.name.size());
 }
 
 std::string Profiler::get_report() {

@@ -111,8 +111,8 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
     uint32_t num_gpu_timers;
     vk::QueryPool query_pool;
     float timestamp_period;
-    uint32_t cpu_current_depth = 0;
-    uint32_t gpu_current_depth = 0;
+    std::string cpu_current_key;
+    std::string gpu_current_key;
 
     // Key: current_depth$$name
     std::unordered_map<std::string, uint32_t> cpu_key_to_section_idx;
