@@ -84,7 +84,7 @@ CommandPool::create_multiple(vk::CommandBufferLevel level,
     return allocated;
 }
 
-vk::CommandPool& CommandPool::get_pool() {
+const vk::CommandPool& CommandPool::get_pool() const {
     return pool;
 }
 

@@ -59,7 +59,8 @@ class CommandPool : public std::enable_shared_from_this<CommandPool> {
         return create_multiple(level, count, true, flags, pInheritanceInfo);
     }
 
-    vk::CommandPool& get_pool();
+    const vk::CommandPool& get_pool() const;
+    
     // Frees all primary command buffers that were allocated from this pool and resets command pool
     // (keeps some primaries in cache)
     void reset();
