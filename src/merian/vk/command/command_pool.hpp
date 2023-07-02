@@ -12,14 +12,18 @@ class CommandPool : public std::enable_shared_from_this<CommandPool> {
   public:
     CommandPool() = delete;
 
-    CommandPool(
-        const std::shared_ptr<Queue> queue,
-        vk::CommandPoolCreateFlags create_flags = vk::CommandPoolCreateFlagBits::eTransient);
+    // Cache size is the number of primary command buffers that are kept on hand to prevent
+    // reallocation.
+    CommandPool(const std::shared_ptr<Queue> queue,
+                vk::CommandPoolCreateFlags create_flags = vk::CommandPoolCreateFlagBits::eTransient,
+                const uint32_t cache_size = 10);
 
-    CommandPool(
-        const SharedContext context,
-        uint32_t queue_family_index,
-        vk::CommandPoolCreateFlags create_flags = vk::CommandPoolCreateFlagBits::eTransient);
+    // Cache size is the number of primary command buffers that are kept on hand to prevent
+    // reallocation.
+    CommandPool(const SharedContext context,
+                uint32_t queue_family_index,
+                vk::CommandPoolCreateFlags create_flags = vk::CommandPoolCreateFlagBits::eTransient,
+                const uint32_t cache_size = 10);
 
     virtual ~CommandPool();
 
@@ -56,11 +60,14 @@ class CommandPool : public std::enable_shared_from_this<CommandPool> {
     }
 
     vk::CommandPool& get_pool();
-    // Frees command buffers, resets command pool
+    // Frees all primary command buffers that were allocated from this pool and resets command pool
+    // (keeps some primaries in cache)
     void reset();
-    bool has_command_buffers();
-    // Ends all command buffers
+
+    // Ends all command primary command buffers buffers
     void end_all();
+
+    // Returns all primary command buffers that were allocated after the last reset()
     const std::vector<vk::CommandBuffer>& get_command_buffers() const;
 
   private:
@@ -68,7 +75,12 @@ class CommandPool : public std::enable_shared_from_this<CommandPool> {
 
   private:
     vk::CommandPool pool = VK_NULL_HANDLE;
-    std::vector<vk::CommandBuffer> cmds;
+
+    std::vector<vk::CommandBuffer> inuse_primary_cmds;
+    // Keep some cmd to prevent reallocation
+    std::vector<vk::CommandBuffer> cache_primary_cmds;
+
+    const uint32_t cache_size;
 };
 
 using CommandPoolHandle = std::shared_ptr<CommandPool>;

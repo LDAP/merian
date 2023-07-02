@@ -84,9 +84,7 @@ template <uint32_t RING_SIZE = 3> class RingCommandPool {
         current_index = cycle % RING_SIZE;
         std::shared_ptr<RingCommandPoolCycle>& current_pool = pools[current_index];
 
-        if (current_pool->has_command_buffers()) {
-            current_pool->reset();
-        }
+        current_pool->reset();
 
         return current_pool;
     }
