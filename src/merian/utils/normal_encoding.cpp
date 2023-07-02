@@ -7,7 +7,7 @@
 namespace merian {
 
 uint32_t encode_normal(float vec[3]) {
-    uint32_t result;
+    uint32_t result = 0;
     int16_t* enc = reinterpret_cast<int16_t*>(&result);
     const float invL1Norm = 1.0f / (fabsf(vec[0]) + fabsf(vec[1]) + fabsf(vec[2]));
     // first find floating point values of octahedral map in [-1,1]:
