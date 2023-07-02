@@ -23,22 +23,6 @@ class ExtensionResources : public Extension {
             enable.physical_device_features_v12.bufferDeviceAddress = true;
             supports_device_address = true;
         }
-        if (supported.physical_device_features_v12.uniformAndStorageBuffer8BitAccess) {
-            SPDLOG_DEBUG("uniformAndStorageBuffer8BitAccess supported. Enabling feature");
-            enable.physical_device_features_v12.uniformAndStorageBuffer8BitAccess = true;
-        }
-        if (supported.physical_device_features_v12.descriptorIndexing) {
-            SPDLOG_DEBUG("descriptorIndexing supported. Enabling feature");
-            enable.physical_device_features_v12.descriptorIndexing = true;
-        }
-        if (supported.physical_device_features_v12.shaderSampledImageArrayNonUniformIndexing) {
-            SPDLOG_DEBUG("shaderSampledImageArrayNonUniformIndexing supported. Enabling feature");
-            enable.physical_device_features_v12.shaderSampledImageArrayNonUniformIndexing = true;
-        }
-        if (supported.physical_device_features_v12.runtimeDescriptorArray) {
-            SPDLOG_DEBUG("runtimeDescriptorArray supported. Enabling feature");
-            enable.physical_device_features_v12.runtimeDescriptorArray = true;
-        }
     }
 
     void on_context_created(const SharedContext context) override;
