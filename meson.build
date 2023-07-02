@@ -40,8 +40,8 @@ add_project_arguments('-DMERIAN_VERSION_PATCH=@0@'.format(version_split[2]), lan
 add_project_arguments('-DMERIAN_PROJECT_NAME="@0@"'.format(meson.project_name()), language : 'cpp')
 
 # Dependencies
-fmt = dependency('fmt', version : ['>=8.1.1'], fallback : ['fmt', 'fmt_dep'])
-spdlog = dependency('spdlog', version : ['>=1.10.0'], fallback : ['spdlog', 'spdlog_dep'], default_options : ['external_fmt=enabled'])
+fmt = dependency('fmt', version : ['>=9.1.0'], fallback : ['fmt', 'fmt_dep'])
+spdlog = dependency('spdlog', version : ['>=1.11.0'], fallback : ['spdlog', 'spdlog_dep'], default_options : ['external_fmt=enabled'])
 vulkan = dependency('vulkan', version: ['>=1.3.0'])
 glfw = dependency('glfw3', version: ['>=3.3.0'])
 glm = dependency('glm', fallback : ['glm', 'glm_dep'], version: ['>=0.9.9.8'])
