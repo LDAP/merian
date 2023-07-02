@@ -27,6 +27,8 @@ GLFWInputController::KeyStatus status_from_glfw(int action) {
     case GLFW_REPEAT:
         status = GLFWInputController::REPEAT;
         break;
+    default:
+        throw std::invalid_argument{"action not supported"};
     }
     return status;
 }
@@ -63,6 +65,8 @@ void glfw_mouseb_cb(GLFWwindow* window, int glfw_button, int action, int glfw_mo
     case GLFW_MOUSE_BUTTON_5:
         button = GLFWInputController::MOUSE5;
         break;
+    default:
+        throw std::invalid_argument{"glfw_button not allowed"};
     }
     c->mbutton_cb(*c, button, status_from_glfw(action), mods_from_glfw(glfw_mods));
 }
