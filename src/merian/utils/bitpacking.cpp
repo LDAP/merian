@@ -3,6 +3,24 @@
 
 namespace merian {
 
+typedef union FP32 {
+    uint32_t u;
+    float f;
+    struct {
+        uint32_t Mantissa : 23;
+        uint32_t Exponent : 8;
+        uint32_t Sign : 1;
+    };
+} FP32;
+typedef union FP16 {
+    uint16_t u;
+    struct {
+        uint16_t Mantissa : 10;
+        uint16_t Exponent : 5;
+        uint16_t Sign : 1;
+    };
+} FP16;
+
 // float->half variants.
 // by Fabian "ryg" Giesen.
 // https://gist.github.com/rygorous/2156668
@@ -13,23 +31,6 @@ namespace merian {
 //   https://creativecommons.org/publicdomain/zero/1.0/
 
 float half_to_float(uint16_t hi) noexcept {
-    typedef union FP32 {
-        uint32_t u;
-        float f;
-        struct {
-            uint32_t Mantissa : 23;
-            uint32_t Exponent : 8;
-            uint32_t Sign : 1;
-        };
-    } FP32;
-    typedef union FP16 {
-        uint16_t u;
-        struct {
-            uint16_t Mantissa : 10;
-            uint16_t Exponent : 5;
-            uint16_t Sign : 1;
-        };
-    } FP16;
     FP16 h = {hi};
     static const FP32 magic = {113 << 23};
     static const uint32_t shifted_exp = 0x7c00 << 13; // exponent mask after shift
@@ -54,24 +55,7 @@ float half_to_float(uint16_t hi) noexcept {
 
 // Approximate solution. This is faster but converts some sNaNs to
 // infinity and doesn't round correctly. Handle with care.
-uint16_t float_to_half(float fi) noexcept {
-    typedef union FP32 {
-        uint32_t u;
-        float f;
-        struct {
-            uint32_t Mantissa : 23;
-            uint32_t Exponent : 8;
-            uint32_t Sign : 1;
-        };
-    } FP32;
-    typedef union FP16 {
-        uint16_t u;
-        struct {
-            uint16_t Mantissa : 10;
-            uint16_t Exponent : 5;
-            uint16_t Sign : 1;
-        };
-    } FP16;
+uint16_t float_to_half_aprox(float fi) noexcept {
     FP32 f = {.f = fi};
     FP32 f32infty = {255 << 23};
     FP32 f16max = {(127 + 16) << 23};
@@ -137,7 +121,6 @@ static inline __m128i float_to_half_sse(__m128 f)
 #undef CONSTF
 }
 #endif
-
 
 uint32_t pack_uint32(const uint16_t& lower, const uint16_t& upper) noexcept {
     return lower | (upper << 16);

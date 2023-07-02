@@ -6,7 +6,7 @@
 
 namespace merian {
 
-uint32_t encode_normal(float vec[3]) {
+uint32_t encode_normal(float vec[3]) noexcept {
     uint32_t result = 0;
     int16_t* enc = reinterpret_cast<int16_t*>(&result);
     const float invL1Norm = 1.0f / (fabsf(vec[0]) + fabsf(vec[1]) + fabsf(vec[2]));
@@ -24,7 +24,7 @@ uint32_t encode_normal(float vec[3]) {
     return result;
 }
 
-uint32_t encode_normal(glm::vec3 vec) {
+uint32_t encode_normal(glm::vec3 vec) noexcept {
     return encode_normal(&vec.x);
 }
 
