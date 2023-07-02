@@ -16,44 +16,31 @@ class RingCommandPoolCycle : public CommandPool {
                          uint32_t queue_family_index,
                          vk::CommandPoolCreateFlags create_flags,
                          uint32_t cycle_index,
-                         uint32_t& current_index)
-        : CommandPool(context, queue_family_index, create_flags), cycle_index(cycle_index),
-          current_index(current_index){};
+                         uint32_t& current_index);
 
     vk::CommandBuffer
     create(vk::CommandBufferLevel level = vk::CommandBufferLevel::ePrimary,
                         bool begin = false,
                         vk::CommandBufferUsageFlags flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
-                        const vk::CommandBufferInheritanceInfo* pInheritanceInfo = nullptr) override {
-        assert(current_index == cycle_index && "do not use pools from an other cycle");
-        return CommandPool::create(level, begin, flags, pInheritanceInfo);
-    }
+                        const vk::CommandBufferInheritanceInfo* pInheritanceInfo = nullptr) override;
 
     vk::CommandBuffer create_and_begin(
         vk::CommandBufferLevel level = vk::CommandBufferLevel::ePrimary,
         vk::CommandBufferUsageFlags flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
-        const vk::CommandBufferInheritanceInfo* pInheritanceInfo = nullptr) override {
-        assert(current_index == cycle_index && "do not use pools from an other cycle");
-        return CommandPool::create_and_begin(level, flags, pInheritanceInfo);
-    }
+        const vk::CommandBufferInheritanceInfo* pInheritanceInfo = nullptr) override;
 
     std::vector<vk::CommandBuffer>
     create_multiple(vk::CommandBufferLevel level,
                          uint32_t count,
                          bool begin = false,
                          vk::CommandBufferUsageFlags flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
-                         const vk::CommandBufferInheritanceInfo* pInheritanceInfo = nullptr) override {
-        assert(current_index == cycle_index && "do not use pools from an other cycle");
-        return CommandPool::create_multiple(level, count, begin, flags, pInheritanceInfo);
-    }
+                         const vk::CommandBufferInheritanceInfo* pInheritanceInfo = nullptr) override;
 
     std::vector<vk::CommandBuffer> create_and_begin_multiple(
         vk::CommandBufferLevel level,
         uint32_t count,
         vk::CommandBufferUsageFlags flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
-        const vk::CommandBufferInheritanceInfo* pInheritanceInfo = nullptr) override {
-        return CommandPool::create_and_begin_multiple(level, count, flags, pInheritanceInfo);
-    }
+        const vk::CommandBufferInheritanceInfo* pInheritanceInfo = nullptr) override;
 
   private:
     uint32_t cycle_index;

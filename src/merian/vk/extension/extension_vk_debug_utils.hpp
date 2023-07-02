@@ -15,14 +15,15 @@ using MESSAGE = vk::DebugUtilsMessageTypeFlagBitsEXT;
 
 class ExtensionVkDebugUtils : public Extension {
   public:
-    ExtensionVkDebugUtils(std::unordered_set<int32_t> ignore_message_ids = {648835635, 767975156})
-        : Extension("ExtensionVkDebugUtils"), ignore_message_ids(ignore_message_ids) {
+    ExtensionVkDebugUtils(bool assert_message = false,
+                          std::unordered_set<int32_t> ignore_message_ids = {648835635, 767975156})
+        : Extension("ExtensionVkDebugUtils"), user_data(ignore_message_ids, assert_message) {
         create_info = {
             {},
             SEVERITY::eWarning | SEVERITY::eError,
             MESSAGE::eGeneral | MESSAGE::ePerformance | MESSAGE::eValidation,
             &ExtensionVkDebugUtils::messenger_callback,
-            &this->ignore_message_ids,
+            &this->user_data,
         };
     }
 
@@ -61,7 +62,13 @@ class ExtensionVkDebugUtils : public Extension {
                        void* pUserData);
 
   private:
-    std::unordered_set<int32_t> ignore_message_ids;
+    struct UserData {
+        std::unordered_set<int32_t> ignore_message_ids;
+        bool assert_message;
+    };
+
+    UserData user_data;
+
     vk::DebugUtilsMessengerCreateInfoEXT create_info;
     vk::DebugUtilsMessengerEXT messenger = VK_NULL_HANDLE;
 };

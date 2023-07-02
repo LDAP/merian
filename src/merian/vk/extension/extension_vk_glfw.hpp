@@ -62,26 +62,7 @@ class ExtensionVkGLFW : public Extension {
 
     // Get the window and surface that was created by this extension.
     // This can be called EXACTLY ONCE!
-    std::tuple<GLFWWindowHandle, SurfaceHandle> get() {
-        if (!window) {
-            std::runtime_error{"ExtensionVkGLFW:get() can only be called exactly once!"};
-        }
-
-        GLFWwindow* window = this->window;
-        vk::SurfaceKHR surface = this->surface;
-
-        this->window = nullptr;
-        this->surface = vk::SurfaceKHR();
-
-        assert(!weak_context.expired());
-        SharedContext context = weak_context.lock();
-
-        std::shared_ptr<GLFWWindow> shared_window = std::make_shared<GLFWWindow>(context, window);
-        std::shared_ptr<Surface> shared_surface = std::static_pointer_cast<Surface>(
-            std::make_shared<GLFWSurface>(context, surface, shared_window));
-
-        return {shared_window, shared_surface};
-    }
+    std::tuple<GLFWWindowHandle, SurfaceHandle> get();
 
   private:
     vk::PhysicalDevice physical_device = VK_NULL_HANDLE;

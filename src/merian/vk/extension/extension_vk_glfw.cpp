@@ -1,6 +1,6 @@
 #include "merian/vk/extension/extension_vk_glfw.hpp"
-#include "merian/vk/context.hpp"
 #include "merian/vk/command/queue.hpp"
+#include "merian/vk/context.hpp"
 
 #include <spdlog/spdlog.h>
 
@@ -14,7 +14,8 @@ void ExtensionVkGLFW::on_instance_created(const vk::Instance& instance) {
     SPDLOG_DEBUG("created surface");
 }
 
-void ExtensionVkGLFW::on_physical_device_selected(const Context::PhysicalDeviceContainer& pd_container) {
+void ExtensionVkGLFW::on_physical_device_selected(
+    const Context::PhysicalDeviceContainer& pd_container) {
     this->physical_device = pd_container.physical_device;
 }
 
@@ -32,6 +33,27 @@ void ExtensionVkGLFW::on_destroy_instance(const vk::Instance& instance) {
         glfwDestroyWindow(window);
     }
     glfwTerminate();
+}
+
+std::tuple<GLFWWindowHandle, SurfaceHandle> ExtensionVkGLFW::get() {
+    if (!window) {
+        std::runtime_error{"ExtensionVkGLFW:get() can only be called exactly once!"};
+    }
+
+    GLFWwindow* window = this->window;
+    vk::SurfaceKHR surface = this->surface;
+
+    this->window = nullptr;
+    this->surface = vk::SurfaceKHR();
+
+    assert(!weak_context.expired());
+    SharedContext context = weak_context.lock();
+
+    std::shared_ptr<GLFWWindow> shared_window = std::make_shared<GLFWWindow>(context, window);
+    std::shared_ptr<Surface> shared_surface = std::static_pointer_cast<Surface>(
+        std::make_shared<GLFWSurface>(context, surface, shared_window));
+
+    return {shared_window, shared_surface};
 }
 
 } // namespace merian

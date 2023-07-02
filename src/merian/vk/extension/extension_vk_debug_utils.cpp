@@ -27,8 +27,8 @@ VKAPI_ATTR VkBool32 VKAPI_CALL ExtensionVkDebugUtils::messenger_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageTypes,
     VkDebugUtilsMessengerCallbackDataEXT const* pCallbackData, void* pUserData) {
 
-    std::unordered_set<int32_t>* ignore_message_ids = static_cast<std::unordered_set<int32_t>*>(pUserData);
-    if (ignore_message_ids->contains(pCallbackData->messageIdNumber)) {
+    UserData* user_data = static_cast<UserData*>(pUserData);
+    if (user_data->ignore_message_ids.contains(pCallbackData->messageIdNumber)) {
         return VK_FALSE;
     }
 
@@ -84,6 +84,8 @@ VKAPI_ATTR VkBool32 VKAPI_CALL ExtensionVkDebugUtils::messenger_callback(
         }
         spdlog::log(severity, additional_info);
     }
+
+    assert(!user_data->assert_message);
 
     return VK_FALSE;
 }
