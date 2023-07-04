@@ -381,13 +381,17 @@ void Context::create_device_and_queues(uint32_t preferred_number_compute_queues)
     }
     queues_C.resize(actual_number_compute_queues);
 
-    float queue_priority = 1.0f;
+    uint32_t max_queue_count = *std::max_element(count_per_family.begin(), count_per_family.end());
+    std::vector<float> queue_priorities(max_queue_count, 1.0f);
+    
     std::vector<vk::DeviceQueueCreateInfo> queue_create_infos;
     for (uint32_t queue_familiy_idx = 0; queue_familiy_idx < queue_family_props.size();
          queue_familiy_idx++) {
         if (count_per_family[queue_familiy_idx] > 0) {
-            queue_create_infos.push_back(
-                {{}, queue_familiy_idx, count_per_family[queue_familiy_idx], &queue_priority});
+            queue_create_infos.push_back({{},
+                                          queue_familiy_idx,
+                                          count_per_family[queue_familiy_idx],
+                                          queue_priorities.data()});
         }
     }
 
