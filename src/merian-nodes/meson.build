@@ -8,6 +8,7 @@ subdir('compute_node')
 subdir('image')
 subdir('shadertoy')
 subdir('shadertoy_spheres')
+subdir('taa')
 subdir('vkdt_filmcurv')
 
 merian_nodes_lib = static_library(
