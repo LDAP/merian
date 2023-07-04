@@ -11,7 +11,7 @@ struct IntersectionInfo {
 };
 
 // The the intersection info for a commited intersection
-void get_intersection_info_commited(rayQueryEXT ray_query, inout IntersectionInfo info) {
+void get_intersection_info_commited(const rayQueryEXT ray_query, inout IntersectionInfo info) {
     info.instance_custom_index = rayQueryGetIntersectionInstanceCustomIndexEXT(ray_query, true);
     info.primitive_index = rayQueryGetIntersectionPrimitiveIndexEXT(ray_query, true);
     info.barycentrics.yz = rayQueryGetIntersectionBarycentricsEXT(ray_query, true);
@@ -20,7 +20,7 @@ void get_intersection_info_commited(rayQueryEXT ray_query, inout IntersectionInf
 }
 
 // The the intersection info for an uncommited intersection
-void get_intersection_info_uncommited(rayQueryEXT ray_query, inout IntersectionInfo info) {
+void get_intersection_info_uncommited(const rayQueryEXT ray_query, inout IntersectionInfo info) {
     info.instance_custom_index = rayQueryGetIntersectionInstanceCustomIndexEXT(ray_query, false);
     info.primitive_index = rayQueryGetIntersectionPrimitiveIndexEXT(ray_query, false);
     info.barycentrics.yz = rayQueryGetIntersectionBarycentricsEXT(ray_query, false);
