@@ -25,3 +25,16 @@ Outputs:
 | Type  | Input ID | Input name | Description         | Format/Resolution        | Persistent |
 |-------|----------|------------|---------------------|--------------------------|------------|
 | Image | 0        | output     | the blended image   | like `current`           | no         |
+
+
+Example
+
+```c++
+auto taa = std::make_shared<merian::TAANode>(context, alloc, MERIAN_NODES_TAA_CLAMP_MIN_MAX);
+
+graph.add_node("taa", taa);
+
+graph.connect_image(taa, taa, 0, 1); // feedback
+graph.connect_image(aliased_image, taa, 1, 0);
+graph.connect_image(aliased_image_mv, taa, 0, 2);
+```
