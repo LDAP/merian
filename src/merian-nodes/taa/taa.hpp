@@ -13,7 +13,7 @@ class TAANode : public ComputeNode {
 
     struct PushConstant {
         // higher value means more temporal reuse
-        float temporal_alpha{.2};
+        float temporal_alpha{.666};
     };
 
   public:

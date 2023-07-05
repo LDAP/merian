@@ -150,13 +150,11 @@ main() {
     }
 
     const vec4 current_color = texelFetch(img_current_frame, pixel, 0);
-    vec4 previous_color = texelFetch(img_previous_frame, pixel, 0);
-    // TODO: Fix
-    //vec4 previous_color = sampleCatmullRom(img_previous_frame, (pixel + motion_vector + .5) / vec2(resolution));
+    vec4 previous_color = sampleCatmullRom(img_previous_frame, (pixel + motion_vector + .5) / vec2(resolution));
 
     // previous texture is never initialized and might contain NaN (prevent poisoning)
-    if(any(isnan(previous_color)))
-        previous_color = vec4(0, 0, 0, 1);
+    if(any(isnan(previous_color)) || any(isinf(previous_color)))
+        previous_color = current_color;
 
     const vec4 merged = merge_frames(current_color, previous_color, params.temporal_alpha, pixel);
     imageStore(img_out, pixel, merged);
