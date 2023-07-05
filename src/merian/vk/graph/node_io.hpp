@@ -33,20 +33,14 @@ struct NodeInputDescriptorImage : public NodeInputDescriptor {
                              const vk::PipelineStageFlags2 pipeline_stages,
                              const vk::ImageLayout required_layout,
                              const vk::ImageUsageFlags usage_flags,
-                             const uint32_t delay = 0,
-                             const std::optional<SamplerHandle> sampler = std::nullopt);
+                             const uint32_t delay = 0);
 
     vk::ImageLayout required_layout;
     vk::ImageUsageFlags usage_flags;
-    std::optional<SamplerHandle> sampler;
 
-    static NodeInputDescriptorImage
-    compute_read(const std::string& name,
-                 const uint32_t delay = 0,
-                 const std::optional<SamplerHandle> sampler = std::nullopt);
+    static NodeInputDescriptorImage compute_read(const std::string& name, const uint32_t delay = 0);
 
-    static NodeInputDescriptorImage transfer_src(const std::string& name,
-                                                 const uint32_t delay = 0);
+    static NodeInputDescriptorImage transfer_src(const std::string& name, const uint32_t delay = 0);
 };
 
 struct NodeInputDescriptorBuffer : public NodeInputDescriptor {

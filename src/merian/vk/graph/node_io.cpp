@@ -13,20 +13,18 @@ NodeInputDescriptorImage::NodeInputDescriptorImage(const std::string& name,
                                                    const vk::PipelineStageFlags2 pipeline_stages,
                                                    const vk::ImageLayout required_layout,
                                                    const vk::ImageUsageFlags usage_flags,
-                                                   const uint32_t delay,
-                                                   const std::optional<SamplerHandle> sampler)
+                                                   const uint32_t delay)
     : NodeInputDescriptor(name, access_flags, pipeline_stages, delay),
-      required_layout(required_layout), usage_flags(usage_flags), sampler(sampler) {}
+      required_layout(required_layout), usage_flags(usage_flags) {}
 
-NodeInputDescriptorImage NodeInputDescriptorImage::compute_read(
-    const std::string& name, const uint32_t delay, const std::optional<SamplerHandle> sampler) {
+NodeInputDescriptorImage NodeInputDescriptorImage::compute_read(const std::string& name,
+                                                                const uint32_t delay) {
     return NodeInputDescriptorImage{name,
                                     vk::AccessFlagBits2::eShaderRead,
                                     vk::PipelineStageFlagBits2::eComputeShader,
                                     vk::ImageLayout::eShaderReadOnlyOptimal,
                                     vk::ImageUsageFlagBits::eSampled,
-                                    delay,
-                                    sampler};
+                                    delay};
 }
 NodeInputDescriptorImage NodeInputDescriptorImage::transfer_src(const std::string& name,
                                                                 const uint32_t delay) {

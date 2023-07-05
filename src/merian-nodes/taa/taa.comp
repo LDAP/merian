@@ -14,7 +14,7 @@ layout(set = 0, binding = 0) uniform sampler2D img_current_frame;
 layout(set = 0, binding = 1) uniform sampler2D img_previous_frame;
 layout(set = 0, binding = 2) uniform sampler2D img_mv; // in pixels
 
-layout(set = 0, binding = 4) uniform writeonly image2D img_out;
+layout(set = 0, binding = 3) uniform writeonly image2D img_out;
 
 layout(push_constant) uniform PushConstant { 
     // higher value means more temporal reuse
@@ -58,7 +58,6 @@ vec4 merge_frames(const vec4 current_color,
                   const float alpha,
                   const ivec2 pixel) {
     switch(CLAMP_METHOD) {
-    default:
     case MERIAN_NODES_TAA_CLAMP_NONE:
         break;
     case MERIAN_NODES_TAA_CLAMP_MIN_MAX:
@@ -76,6 +75,8 @@ vec4 merge_frames(const vec4 current_color,
     case 2:
         // TODO: implement moment-based clamping here
         break;
+    default:
+        return vec4(1, 0, 1, 1);
     }
 
     return mix(current_color, previous_color, alpha);
@@ -86,17 +87,17 @@ vec4 merge_frames(const vec4 current_color,
 //
 // Samples a texture with Catmull-Rom filtering, using 9 texture fetches instead of 16.
 // See http://vec3.ca/bicubic-filtering-in-fewer-taps/ for more details
-vec4 sampleCatmullRom(const sampler2D tex, const vec2 texel_coord)
-{
-    // We're going to sample a a 4x4 grid of texels surrounding the target texel coordinate. We'll do this by rounding
+vec4 sampleCatmullRom(const sampler2D tex, const vec2 uv) {
+    // We're going to sample a a 4x4 grid of texels surrounding the target UV coordinate. We'll do this by rounding
     // down the sample location to get the exact center of our "starting" texel. The starting texel will be at
     // location [1, 1] in the grid, where [0, 0] is the top left corner.
-    ivec2 texSize = textureSize(tex, 0);
-    vec2 texPos1 = floor(texel_coord - 0.5) + 0.5;
+    vec2 texSize = textureSize(tex, 0);
+    vec2 samplePos = uv * texSize;
+    vec2 texPos1 = floor(samplePos - 0.5) + 0.5;
 
     // Compute the fractional offset from our starting texel to our original sample location, which we'll
     // feed into the Catmull-Rom spline function to get our filter weights.
-    vec2 f = texel_coord - texPos1;
+    vec2 f = samplePos - texPos1;
 
     // Compute the Catmull-Rom weights using the fractional offset that we calculated earlier.
     // These equations are pre-expanded based on our knowledge of where the texels will be located,
@@ -148,12 +149,14 @@ main() {
         motion_vector *= -1;
     }
 
-    const vec4 current_color  = texelFetch(img_current_frame, pixel, 0);
-    vec4 previous_color = sampleCatmullRom(img_previous_frame, pixel + motion_vector);
+    const vec4 current_color = texelFetch(img_current_frame, pixel, 0);
+    vec4 previous_color = texelFetch(img_previous_frame, pixel, 0);
+    // TODO: Fix
+    //vec4 previous_color = sampleCatmullRom(img_previous_frame, (pixel + motion_vector + .5) / vec2(resolution));
 
-    // texture is never initialized and might contain NaN (prevent poisoning)
+    // previous texture is never initialized and might contain NaN (prevent poisoning)
     if(any(isnan(previous_color)))
-        previous_color = current_color;
+        previous_color = vec4(0, 0, 0, 1);
 
     const vec4 merged = merge_frames(current_color, previous_color, params.temporal_alpha, pixel);
     imageStore(img_out, pixel, merged);
