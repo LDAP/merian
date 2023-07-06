@@ -1,3 +1,6 @@
+#ifndef _COLORS_DNG_H_
+#define _COLORS_DNG_H_
+
 // apparently this is what the dng spec says should be used to correct colour
 // after application of tone-changing operators (curve). with all the sorting,
 // it's based on hsv and designed to keep hue constant in that space.
@@ -18,3 +21,5 @@ adjust_colour_dng(
   if(flip.x) col1.bg = col1.gb;
   return col1;
 }
+
+#endif

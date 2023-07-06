@@ -1,5 +1,9 @@
 #include "common.glsl"
 
+#ifndef _COLORS_MUNSELL_H_
+#define _COLORS_MUNSELL_H_
+
+
 const int munsell_hdim = 40;
 const int munsell_cdim = 21;
 
@@ -136,3 +140,5 @@ munsell_from_xy(const vec2 xy)
     }
   }
 }
+
+#endif

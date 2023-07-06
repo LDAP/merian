@@ -1,3 +1,7 @@
+#ifndef _COLORS_REC2020_H_
+#define _COLORS_REC2020_H_
+
+
 vec3 rec2020_to_xyY(vec3 rec2020)
 {
   const mat3 rec2020_to_xyz = mat3(
@@ -17,3 +21,5 @@ vec3 xyY_to_rec2020(vec3 xyY)
    -0.25336628,  0.01576855,  0.94210312);
   return xyz_to_rec2020 * xyz;
 }
+
+#endif

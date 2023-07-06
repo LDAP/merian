@@ -1,3 +1,6 @@
+#ifndef _COLORS_DTUCS_H_
+#define _COLORS_DTUCS_H_
+
 /* The following is darktable Uniform Color Space 2022
  * © Aurélien Pierre
  * https://eng.aurelienpierre.com/2022/02/color-saturation-control-for-the-21th-century/
@@ -101,3 +104,5 @@ vec3 dt_UCS_HCB_to_JCH(const vec3 HCB)
 {
   return vec3(HCB.z / (pow(HCB.y, 1.33654221029386) + 1.), HCB.y, HCB.x);
 }
+
+#endif
