@@ -13,6 +13,8 @@ BLASBuilder::queue_build(const std::vector<vk::AccelerationStructureGeometryKHR>
                          const std::vector<vk::AccelerationStructureBuildRangeInfoKHR>& range_info,
                          const vk::BuildAccelerationStructureFlagsKHR build_flags) {
 
+    std::lock_guard<std::mutex> lock(mutex);
+
     const uint32_t geometry_count = geometry.size();
     vk::AccelerationStructureBuildGeometryInfoKHR build_info{
         vk::AccelerationStructureTypeKHR::eBottomLevel,
@@ -47,6 +49,8 @@ void BLASBuilder::queue_update(
     const AccelerationStructureHandle as,
     const vk::BuildAccelerationStructureFlagsKHR build_flags) {
 
+    std::lock_guard<std::mutex> lock(mutex);
+
     const uint32_t geometry_count = geometry.size();
     vk::AccelerationStructureBuildGeometryInfoKHR build_info{
         vk::AccelerationStructureTypeKHR::eBottomLevel,
@@ -68,6 +72,8 @@ void BLASBuilder::queue_rebuild(
     const AccelerationStructureHandle as,
     const vk::BuildAccelerationStructureFlagsKHR build_flags) {
 
+    std::lock_guard<std::mutex> lock(mutex);
+
     const uint32_t geometry_count = geometry.size();
     vk::AccelerationStructureBuildGeometryInfoKHR build_info{
         vk::AccelerationStructureTypeKHR::eBottomLevel,
@@ -86,6 +92,8 @@ void BLASBuilder::queue_rebuild(
 void BLASBuilder::get_cmds(const vk::CommandBuffer& cmd, const EventHandle& compact_signal_event) {
     if (pending.empty())
         return;
+
+    std::lock_guard<std::mutex> lock(mutex);
 
     ensure_scratch_buffer(pending_min_scratch_buffer);
     assert(scratch_buffer);

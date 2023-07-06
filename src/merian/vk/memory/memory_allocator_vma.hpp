@@ -60,6 +60,7 @@ class VMAMemoryAllocation : public MemoryAllocation {
     const std::shared_ptr<VMAMemoryAllocator> allocator;
     const MemoryMappingType mapping_type;
     VmaAllocation m_allocation;
+    mutable std::mutex allocation_mutex;
     bool is_mapped = false;
 };
 

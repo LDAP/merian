@@ -20,6 +20,8 @@ VMAMemoryAllocation::~VMAMemoryAllocation() {
 // ------------------------------------------------------------------------------------
 
 void VMAMemoryAllocation::free() {
+    std::lock_guard<std::mutex> lock(allocation_mutex);
+
     if (m_allocation) {
         SPDLOG_TRACE("freeing memory ({})", fmt::ptr(this));
         vmaFreeMemory(allocator->vma_allocator, m_allocation);
@@ -33,6 +35,7 @@ void VMAMemoryAllocation::free() {
 
 // Maps device memory to system memory.
 void* VMAMemoryAllocation::map() {
+    std::lock_guard<std::mutex> lock(allocation_mutex);
     assert(m_allocation); // freed?
     assert(mapping_type != NONE);
 
@@ -45,6 +48,7 @@ void* VMAMemoryAllocation::map() {
 
 // Unmap memHandle
 void VMAMemoryAllocation::unmap() {
+    std::lock_guard<std::mutex> lock(allocation_mutex);
     assert(m_allocation); // freed?
 
     vmaUnmapMemory(allocator->vma_allocator, m_allocation);
@@ -54,6 +58,8 @@ void VMAMemoryAllocation::unmap() {
 // ------------------------------------------------------------------------------------
 
 VMAMemoryAllocation::MemoryInfo VMAMemoryAllocation::get_memory_info() const {
+    const std::lock_guard<std::mutex> lock(allocation_mutex);
+
     VmaAllocationInfo allocInfo;
     vmaGetAllocationInfo(allocator->vma_allocator, m_allocation, &allocInfo);
     return MemoryInfo{allocInfo.deviceMemory, allocInfo.offset, allocInfo.size, allocInfo.pName};

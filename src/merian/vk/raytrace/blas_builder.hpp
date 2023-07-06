@@ -114,6 +114,7 @@ class BLASBuilder : public ASBuilder {
     std::vector<PendingBLAS> pending;
     // The minimum scratch buffer size that is required to build all pending BLASs.
     vk::DeviceSize pending_min_scratch_buffer = 0;
+    std::mutex mutex;
 };
 
 } // namespace merian
