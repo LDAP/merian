@@ -30,7 +30,7 @@ SamplerPool::~SamplerPool() {
 }
 
 SamplerHandle SamplerPool::acquire_sampler(const vk::SamplerCreateInfo& createInfo) {
-    SamplerState state;
+    SamplerState state{};
     state.createInfo = createInfo;
 
     const Chain* ext = (const Chain*)createInfo.pNext;
@@ -56,26 +56,18 @@ SamplerHandle SamplerPool::acquire_sampler(const vk::SamplerCreateInfo& createIn
     auto it = state_map.find(state);
 
     if (it == state_map.end()) {
-        uint32_t index = (uint32_t)entries.size();
-        entries.resize(entries.size() + 1);
-
         SamplerHandle sampler = std::make_shared<Sampler>(context, createInfo);
-
-        entries[index].sampler = sampler;
-        entries[index].state = state;
-
-        state_map.insert({state, index});
+        state_map[state] = sampler;
         return sampler;
     } else {
-        Entry& entry = entries[it->second];
-        if (entry.sampler.expired()) {
+        if ((*it).second.expired()) {
             // recreate sampler
             auto sampler = std::make_shared<Sampler>(context, createInfo);
-            entry.sampler = sampler;
+            state_map[state] = sampler;
             return sampler;
 
         } else {
-            return entry.sampler.lock();
+            return (*it).second.lock();
         }
     }
 }

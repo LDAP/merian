@@ -52,7 +52,8 @@ class SamplerPool : public std::enable_shared_from_this<SamplerPool> {
         vk::SamplerYcbcrConversionCreateInfo ycbr{};
 
         SamplerState() {}
-        bool operator==(const SamplerState& other) const = default;
+
+        auto operator<=>(const SamplerState&) const = default;
     };
 
     struct Chain {
@@ -60,16 +61,9 @@ class SamplerPool : public std::enable_shared_from_this<SamplerPool> {
         const Chain* pNext;
     };
 
-    struct Entry {
-        std::weak_ptr<Sampler> sampler;
-        uint32_t nextFreeIndex = ~0;
-        SamplerState state;
-    };
-
     const SharedContext context;
-
-    std::vector<Entry> entries;
-    std::unordered_map<SamplerState, uint32_t, HashAligned32<SamplerState>> state_map;
+    
+    std::unordered_map<SamplerState, std::weak_ptr<Sampler>, HashAligned32<SamplerState>> state_map;
 };
 
 using SamplerPoolHandle = std::shared_ptr<SamplerPool>;
