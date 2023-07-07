@@ -42,6 +42,9 @@ class InputController {
     // Clear all callbacks
     virtual void reset() = 0;
 
+    // if active is false, no callbacks are called
+    virtual void set_active(bool active) = 0;
+
     virtual void set_mouse_cursor_callback(MouseCursorEventCallback cb) = 0;
     virtual void set_mouse_button_callback(MouseButtonEventCallback cb) = 0;
     virtual void set_scroll_event_callback(ScrollEventCallback cb) = 0;

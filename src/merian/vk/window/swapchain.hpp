@@ -15,6 +15,10 @@ struct SwapchainAcquireResult {
     vk::ImageView view;
     uint32_t index;
 
+    uint16_t num_images;
+    uint16_t min_images;
+    vk::SurfaceFormatKHR surface_format;
+
     // You MUST wait on this semaphore before writing to the image. ("The
     // system" signals this semaphore when it's done presenting the
     // image and can safely be reused).
@@ -22,7 +26,8 @@ struct SwapchainAcquireResult {
     // You MUST signal this semaphore when done writing to the image, and
     // before presenting it. (The system waits for this before presenting).
     vk::Semaphore signal_semaphore;
-    // Swapchain was created or recreated. You need to cmd_update_image_layouts().
+    // Swapchain was created or recreated.
+    // You can use cmd_update_image_layouts() to update the image layouts to PresentSrc.
     bool did_recreate;
     vk::Extent2D extent;
 };
@@ -81,7 +86,8 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
      * available
      * @param[in]  wait_queue                 When recreating the swapchain it must be ensured that
      * all command buffers that have semaphores are processed. You can supply a queue to wait for.
-     * If no queue is supplied, it is waited using device.waitIdle() (which is slower and not recommeded). 
+     * If no queue is supplied, it is waited using device.waitIdle() (which is slower and not
+     * recommeded).
      */
     Swapchain(const SharedContext& context,
               const SurfaceHandle& surface,
@@ -149,6 +155,10 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
         return entries[idx].image;
     }
 
+    vk::SurfaceFormatKHR get_surface_format() {
+        return surface_format;
+    }
+
     void cmd_update_image_layouts(vk::CommandBuffer cmd) const {
         cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
                             vk::PipelineStageFlagBits::eTopOfPipe, {}, {}, nullptr, barriers);
@@ -180,6 +190,9 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
     const std::vector<vk::SurfaceFormatKHR> preferred_surface_formats;
     const vk::PresentModeKHR preferred_vsync_off_mode;
     const std::optional<QueueHandle> wait_queue;
+
+    uint32_t min_images = 0;
+    uint32_t num_images = 0;
 
     vk::SurfaceFormatKHR surface_format;
     bool vsync = false;

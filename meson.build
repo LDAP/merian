@@ -52,8 +52,9 @@ sdl2 = dependency('sdl2', fallback : ['sdl2', 'sdl2_dep'])
 
 inc_dirs = [
     include_directories('./src'),
+    include_directories('./src/ext/imgui'),
     cmake.subproject('VulkanMemoryAllocator').include_directories('VulkanMemoryAllocator'),
-    tol_subp.include_directories('tinyobjloader')
+    tol_subp.include_directories('tinyobjloader'),
 ]
 
 subdir('src/ext')

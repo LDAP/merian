@@ -120,8 +120,9 @@ vk::Extent2D Swapchain::recreate_swapchain(int width, int height) {
     auto capabilities = context->pd_container.physical_device.getSurfaceCapabilitiesKHR(*surface);
     extent = make_extent2D(capabilities, width, height);
 
-    uint32_t num_images = capabilities.minImageCount + 1; // one extra to own
-    if (capabilities.maxImageCount > 0)                   // 0 means no limit
+    min_images = capabilities.minImageCount;
+    num_images = capabilities.minImageCount + 1; // one extra to own
+    if (capabilities.maxImageCount > 0)          // 0 means no limit
         num_images = std::min(num_images, capabilities.maxImageCount);
 
     vk::SurfaceTransformFlagBitsKHR pre_transform;
@@ -267,6 +268,10 @@ std::optional<SwapchainAcquireResult> Swapchain::aquire_custom(int width, int he
         aquire_result.did_recreate = false;
     }
 
+    aquire_result.min_images = min_images;
+    aquire_result.num_images = num_images;
+    aquire_result.surface_format = surface_format;
+
     for (int tries = 0; tries < 2; tries++) {
         vk::Result result = context->device.acquireNextImageKHR(
             swapchain, UINT64_MAX, current_read_semaphore(), {}, &current_image_idx);
@@ -283,6 +288,7 @@ std::optional<SwapchainAcquireResult> Swapchain::aquire_custom(int width, int he
         } else if (result == vk::Result::eErrorOutOfDateKHR ||
                    result == vk::Result::eSuboptimalKHR) {
             recreate_swapchain(width, height);
+            aquire_result.did_recreate = true;
             continue;
         } else {
             return std::nullopt;

@@ -26,6 +26,8 @@ private:
     // Clear all callbacks
     virtual void reset() override;
 
+    virtual void set_active(bool active) override;
+
     virtual void set_mouse_cursor_callback(MouseCursorEventCallback cb) override;
     virtual void set_mouse_button_callback(MouseButtonEventCallback cb) override;
     virtual void set_scroll_event_callback(ScrollEventCallback cb) override;
@@ -38,6 +40,8 @@ private:
     MouseButtonEventCallback mbutton_cb{nullptr};
     KeyEventCallback key_cb{nullptr};
     ScrollEventCallback scroll_cb{nullptr};
+
+    bool active = true;
 };
 
 } // namespace merian

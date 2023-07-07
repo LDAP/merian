@@ -36,7 +36,7 @@ GLFWInputController::KeyStatus status_from_glfw(int action) {
 void glfw_cursor_cb(GLFWwindow* window, double xpos, double ypos) {
     GLFWInputController* c = window_controller_map[window];
 
-    if (!c->cursor_cb)
+    if (!c->cursor_cb || !c->active)
         return;
 
     c->cursor_cb(*c, xpos, ypos);
@@ -45,7 +45,7 @@ void glfw_cursor_cb(GLFWwindow* window, double xpos, double ypos) {
 void glfw_mouseb_cb(GLFWwindow* window, int glfw_button, int action, int glfw_mods) {
     GLFWInputController* c = window_controller_map[window];
 
-    if (!c->mbutton_cb)
+    if (!c->mbutton_cb || !c->active)
         return;
 
     GLFWInputController::MouseButton button;
@@ -74,7 +74,7 @@ void glfw_mouseb_cb(GLFWwindow* window, int glfw_button, int action, int glfw_mo
 void glfw_key_cb(GLFWwindow* window, int key, int scancode, int action, int glfw_mods) {
     GLFWInputController* c = window_controller_map[window];
 
-    if (!c->key_cb)
+    if (!c->key_cb || !c->active)
         return;
 
     c->key_cb(*c, key, scancode, status_from_glfw(action), mods_from_glfw(glfw_mods));
@@ -83,7 +83,7 @@ void glfw_key_cb(GLFWwindow* window, int key, int scancode, int action, int glfw
 void glfw_scroll_cb(GLFWwindow* window, double xoffset, double yoffset) {
     GLFWInputController* c = window_controller_map[window];
 
-    if (!c->scroll_cb)
+    if (!c->scroll_cb || !c->active)
         return;
 
     c->scroll_cb(*c, xoffset, yoffset);
@@ -132,6 +132,10 @@ void GLFWInputController::reset() {
     mbutton_cb = nullptr;
     key_cb = nullptr;
     scroll_cb = nullptr;
+}
+
+void GLFWInputController::set_active(bool active) {
+    this->active = active;
 }
 
 void GLFWInputController::set_mouse_cursor_callback(MouseCursorEventCallback cb) {

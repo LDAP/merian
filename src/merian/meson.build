@@ -32,6 +32,7 @@ merian_src = files(
     'vk/sampler/sampler_pool.cpp',
     'vk/utils/barriers.cpp',
     'vk/utils/profiler.cpp',
+    'vk/window/glfw_imgui.cpp',
     'vk/window/swapchain.cpp',
 )
 
