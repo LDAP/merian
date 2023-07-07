@@ -1,5 +1,3 @@
-#pragma once
-
 #include "taa.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 
