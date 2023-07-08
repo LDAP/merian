@@ -274,7 +274,7 @@ class Graph : public std::enable_shared_from_this<Graph> {
                            std::unordered_set<NodeHandle>& visited,
                            std::queue<NodeHandle>& queue);
 
-    void log_connections(NodeHandle& src);
+    std::string connections(NodeHandle& src);
 
     // Allocates the outputs for each node
     void allocate_outputs();

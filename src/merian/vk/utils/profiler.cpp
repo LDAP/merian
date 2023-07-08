@@ -215,13 +215,14 @@ std::string Profiler::get_report_str() {
 
 void to_imgui(const std::vector<Profiler::ReportEntry>& entries, const uint32_t level = 0) {
     for (auto& entry : entries) {
-        if (ImGui::TreeNode(fmt::format("{}-{}", level, entry.name).c_str(), "%s",
-                            fmt::format("{}: {:.04f} (± {:.04f}) ms\n", entry.name, entry.duration,
-                                        entry.std_deviation)
-                                .c_str())) {
-            if (!entry.children.empty()) {
-                to_imgui(entry.children, level + 1);
-            }
+        std::string str = fmt::format("{}: {:.04f} (± {:.04f}) ms\n", entry.name, entry.duration,
+                                      entry.std_deviation);
+        if (entry.children.empty()) {
+            // Add 3 spaces to fit with the child item symbol.
+            ImGui::Text("   %s", str.c_str());
+        } else if (ImGui::TreeNode(fmt::format("{}-{}", level, entry.name).c_str(), "%s",
+                                   str.c_str())) {
+            to_imgui(entry.children, level + 1);
             ImGui::TreePop();
         }
     }
@@ -243,7 +244,7 @@ void Profiler::get_report_imgui(const Profiler::Report& report) {
         if (report.cpu_report.empty())
             ImGui::Text("nothing captured");
         else
-            to_imgui(report.gpu_report);
+            to_imgui(report.gpu_report, 1u << 31);
     }
 }
 

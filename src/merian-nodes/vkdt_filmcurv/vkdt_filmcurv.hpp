@@ -11,7 +11,8 @@ class VKDTFilmcurv : public ComputeNode {
     static constexpr uint32_t local_size_x = 16;
     static constexpr uint32_t local_size_y = 16;
 
-    struct PushConstant {
+  public:
+    struct Options {
         float brightness{1.};
         float contrast{1.};
         float bias{0.};
@@ -21,7 +22,8 @@ class VKDTFilmcurv : public ComputeNode {
   public:
     VKDTFilmcurv(const SharedContext context,
                  const ResourceAllocatorHandle allocator,
-                 const vk::Format output_format = vk::Format::eR16G16B16A16Sfloat);
+                 const vk::Format output_format = vk::Format::eR16G16B16A16Sfloat,
+                 const std::optional<Options> options = std::nullopt);
 
     std::string name() override {
         return "VKDT Filmcurv";
@@ -48,7 +50,7 @@ class VKDTFilmcurv : public ComputeNode {
   private:
     const vk::Format output_format;
     uint32_t width, height;
-    PushConstant pc;
+    Options pc;
 };
 
 } // namespace merian

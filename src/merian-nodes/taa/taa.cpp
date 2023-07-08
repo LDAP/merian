@@ -9,10 +9,12 @@ namespace merian {
 
 TAANode::TAANode(const SharedContext context,
                  const ResourceAllocatorHandle allocator,
+                 const float alpha,
                  const int clamp_method,
                  const bool inverse_motion)
     : ComputeNode(context, allocator, sizeof(PushConstant)), inverse_motion(inverse_motion) {
     shader = std::make_shared<ShaderModule>(context, sizeof(spv), spv);
+    pc.temporal_alpha = alpha;
     pc.clamp_method = clamp_method;
 }
 
@@ -73,7 +75,7 @@ void TAANode::get_configuration(Configuration& config) {
     config.config_options("clamp method", pc.clamp_method, clamp_methods);
 
     std::string text;
-    text += fmt::format("inverse motion: ", inverse_motion);
+    text += fmt::format("inverse motion: {}", inverse_motion);
     config.output_text(text);
 }
 

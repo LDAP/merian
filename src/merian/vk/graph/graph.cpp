@@ -106,7 +106,10 @@ void Graph::cmd_build(vk::CommandBuffer& cmd, const ProfilerHandle profiler) {
 
         visited.insert(flat_topology[node_index]);
         calculate_outputs(flat_topology[node_index], visited, queue);
-        log_connections(flat_topology[node_index]);
+
+#ifndef NDEBUG
+        SPDLOG_DEBUG("{}", connections(flat_topology[node_index]));
+#endif
 
         node_index++;
     }
@@ -313,10 +316,8 @@ void Graph::calculate_outputs(NodeHandle& node,
     }
 }
 
-void Graph::log_connections(NodeHandle& src) {
-#ifdef NDEBUG
-    return;
-#endif
+std::string Graph::connections(NodeHandle& src) {
+    std::string result;
 
     NodeData& src_data = node_data[src];
     for (uint32_t i = 0; i < src_data.image_output_descriptors.size(); i++) {
@@ -325,8 +326,9 @@ void Graph::log_connections(NodeHandle& src) {
         for (auto& [dst_node, image_input_idx] : src_output) {
             NodeData& dst_data = node_data[dst_node];
             auto& dst_in_desc = dst_data.image_input_descriptors[image_input_idx];
-            SPDLOG_DEBUG("image connection: {}({}) --{}-> {}({})", src_data.name, src_out_desc.name,
-                         dst_in_desc.delay, dst_data.name, dst_in_desc.name);
+            result +=
+                fmt::format("image: {} ({}) --{}-> {} ({})\n", src_data.name,
+                            src_out_desc.name, dst_in_desc.delay, dst_data.name, dst_in_desc.name);
         }
     }
     for (uint32_t i = 0; i < src_data.buffer_output_descriptors.size(); i++) {
@@ -335,10 +337,13 @@ void Graph::log_connections(NodeHandle& src) {
         for (auto& [dst_node, buffer_input_idx] : src_output) {
             NodeData& dst_data = node_data[dst_node];
             auto& dst_in_desc = dst_data.buffer_input_descriptors[buffer_input_idx];
-            SPDLOG_DEBUG("buffer connection: {}({}) --{}-> {}({})", src_data.name,
-                         src_out_desc.name, dst_in_desc.delay, dst_data.name, dst_in_desc.name);
+            result +=
+                fmt::format("buffer: {} ({}) --{}-> {} ({})\n", src_data.name,
+                            src_out_desc.name, dst_in_desc.delay, dst_data.name, dst_in_desc.name);
         }
     }
+
+    return result;
 }
 
 void Graph::allocate_outputs() {
@@ -640,10 +645,19 @@ void Graph::get_configuration(Configuration& config) {
         config.st_no_space();
         config.output_text(fmt::format("Current iteration {}", current_iteration));
 
-        for (auto& data : node_data) {
-            if (config.st_new_section(
-                    fmt::format("{} ({})", data.second.name, data.second.node->name()))) {
-                data.second.node->get_configuration(config);
+        if (config.st_begin_child("connections", "Connections")) {
+            for (auto& node : flat_topology) {
+                config.output_text(connections(node));
+            }
+            config.st_end_child();
+        }
+
+        for (auto& node : flat_topology) {
+            auto& data = node_data[node];
+            std::string node_label = fmt::format("{} ({})", data.name, data.node->name());
+            if (config.st_begin_child(data.name.c_str(), node_label.c_str())) {
+                data.node->get_configuration(config);
+                config.st_end_child();
             }
         }
     }

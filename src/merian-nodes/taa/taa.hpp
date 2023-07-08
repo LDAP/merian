@@ -13,13 +13,14 @@ class TAANode : public ComputeNode {
 
     struct PushConstant {
         // higher value means more temporal reuse
-        float temporal_alpha{.5};
+        float temporal_alpha;
         int clamp_method;
     };
 
   public:
     TAANode(const SharedContext context,
             const ResourceAllocatorHandle allocator,
+            const float alpha = 0.,
             const int clamp_method = MERIAN_NODES_TAA_CLAMP_MIN_MAX,
             const bool inverse_motion = false);
 

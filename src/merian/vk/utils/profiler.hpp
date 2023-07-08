@@ -127,6 +127,7 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
 
     // renders the report to imgui
     void get_report_imgui(const Profiler::Report& report);
+
     void get_report_imgui();
 
   private:

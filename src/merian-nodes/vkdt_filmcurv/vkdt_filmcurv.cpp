@@ -10,8 +10,13 @@ namespace merian {
 
 VKDTFilmcurv::VKDTFilmcurv(const SharedContext context,
                            const ResourceAllocatorHandle allocator,
-                           const vk::Format output_format)
-    : ComputeNode(context, allocator, sizeof(PushConstant)), output_format(output_format) {}
+                           const vk::Format output_format,
+                           const std::optional<Options> options)
+    : ComputeNode(context, allocator, sizeof(Options)), output_format(output_format) {
+    if (options) {
+        pc = options.value();
+    }
+}
 
 std::tuple<std::vector<NodeInputDescriptorImage>, std::vector<NodeInputDescriptorBuffer>>
 VKDTFilmcurv::describe_inputs() {

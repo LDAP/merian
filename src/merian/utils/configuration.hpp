@@ -30,7 +30,7 @@ class Configuration {
     // Must only be called if begin_child was true
     virtual void st_end_child() = 0;
 
-    // Starts a new configuration section, that ends at the next st_end_child.
+    // Starts a new configuration section.
     // This has no meaning when identifying the configuration option
     // but can structure config when displayed.
     // Retuns true if the section should be examined.
