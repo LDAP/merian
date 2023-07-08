@@ -213,20 +213,37 @@ std::string Profiler::get_report_str() {
     return result;
 }
 
+void to_imgui(const std::vector<Profiler::ReportEntry>& entries, const uint32_t level = 0) {
+    for (auto& entry : entries) {
+        if (ImGui::TreeNode(fmt::format("{}-{}", level, entry.name).c_str(), "%s",
+                            fmt::format("{}: {:.04f} (± {:.04f}) ms\n", entry.name, entry.duration,
+                                        entry.std_deviation)
+                                .c_str())) {
+            if (!entry.children.empty()) {
+                to_imgui(entry.children, level + 1);
+            }
+            ImGui::TreePop();
+        }
+    }
+}
+
 void Profiler::get_report_imgui() {
     get_report_imgui(get_report());
 }
 
 void Profiler::get_report_imgui(const Profiler::Report& report) {
     if (ImGui::CollapsingHeader("Profiler")) {
-        if (ImGui::TreeNode("CPU")) {
-            ImGui::Text("%s", to_string(report.cpu_report).c_str());
-            ImGui::TreePop();
-        }
-        if (ImGui::TreeNode("GPU")) {
-            ImGui::Text("%s", to_string(report.gpu_report).c_str());
-            ImGui::TreePop();
-        }
+        ImGui::SeparatorText("CPU");
+        if (report.cpu_report.empty())
+            ImGui::Text("nothing captured");
+        else
+            to_imgui(report.cpu_report);
+
+        ImGui::SeparatorText("GPU");
+        if (report.cpu_report.empty())
+            ImGui::Text("nothing captured");
+        else
+            to_imgui(report.gpu_report);
     }
 }
 
