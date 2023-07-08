@@ -6,8 +6,11 @@
 
 namespace merian {
 
-GLFWImGui::GLFWImGui(const SharedContext context, const bool no_mouse_cursor_change)
-    : context(context), no_mouse_cursor_change(no_mouse_cursor_change) {}
+GLFWImGui::GLFWImGui(const SharedContext context,
+                     const bool no_mouse_cursor_change,
+                     const vk::ImageLayout initial_layout)
+    : context(context), no_mouse_cursor_change(no_mouse_cursor_change),
+      initial_layout(initial_layout) {}
 
 GLFWImGui::~GLFWImGui() {
     if (imgui_initialized) {
@@ -41,7 +44,7 @@ void GLFWImGui::recreate_render_pass(SwapchainAcquireResult& aquire_result) {
         vk::AttachmentStoreOp::eStore,
         vk::AttachmentLoadOp::eDontCare,
         vk::AttachmentStoreOp::eDontCare,
-        vk::ImageLayout::ePresentSrcKHR,
+        initial_layout,
         vk::ImageLayout::ePresentSrcKHR,
     };
     vk::AttachmentReference color_attachment{

@@ -7,16 +7,21 @@ namespace merian {
 class GLFWImGui {
 
   public:
-    GLFWImGui(const SharedContext context, const bool no_mouse_cursor_change = false);
+    // Set no_mouse_cursor_change to true if GLFWImGui is interfering with your cursor.
+    // `initial_layout` which layout the swapchain image has when calling "new_frame".
+    GLFWImGui(const SharedContext context,
+              const bool no_mouse_cursor_change = false,
+              const vk::ImageLayout initial_layout = vk::ImageLayout::ePresentSrcKHR);
     ~GLFWImGui();
 
     // Start a new ImGui frame
-    vk::Framebuffer new_frame(vk::CommandBuffer& cmd, GLFWwindow* window, SwapchainAcquireResult& aquire_result);
+    vk::Framebuffer
+    new_frame(vk::CommandBuffer& cmd, GLFWwindow* window, SwapchainAcquireResult& aquire_result);
 
     // Render the ImGui to the current swapchain image
     void render(vk::CommandBuffer& cmd);
 
-private:
+  private:
     void upload_imgui_fonts();
     void init_imgui(GLFWwindow* window, SwapchainAcquireResult& aquire_result);
     void recreate_render_pass(SwapchainAcquireResult& aquire_result);
@@ -24,10 +29,11 @@ private:
   private:
     const SharedContext context;
     const bool no_mouse_cursor_change;
+    const vk::ImageLayout initial_layout;
 
-    bool imgui_initialized;
-    vk::DescriptorPool imgui_pool;
-    vk::RenderPass render_pass;
+    bool imgui_initialized = false;
+    vk::DescriptorPool imgui_pool{VK_NULL_HANDLE};
+    vk::RenderPass render_pass{VK_NULL_HANDLE};
     std::vector<vk::Framebuffer> framebuffers;
 };
 

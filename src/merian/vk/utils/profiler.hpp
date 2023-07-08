@@ -3,6 +3,7 @@
 #include "merian/vk/extension/extension.hpp"
 
 #include <optional>
+#include <queue>
 
 namespace merian {
 
@@ -71,6 +72,21 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
     };
 
   public:
+    struct ReportEntry {
+        std::string name;
+        // in ms
+        double duration;
+        // in ms
+        double std_deviation;
+        std::vector<ReportEntry> children;
+    };
+
+    struct Report {
+        std::vector<ReportEntry> cpu_report;
+        std::vector<ReportEntry> gpu_report;
+    };
+
+  public:
     // The timestamps for GPU profiling must be preallocated, therefore you can only caputure
     // num_gpu_timers many timers.
     Profiler(const SharedContext context, const uint32_t num_gpu_timers = 1028);
@@ -104,7 +120,14 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
     // Stop a CPU section
     void end(const uint32_t start_id);
 
-    std::string get_report();
+    Report get_report();
+
+    // returns the report as string
+    std::string get_report_str();
+
+    // renders the report to imgui
+    void get_report_imgui(const Profiler::Report& report);
+    void get_report_imgui();
 
   private:
     const SharedContext context;

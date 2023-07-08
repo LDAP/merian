@@ -1,4 +1,5 @@
 #include "merian/vk/utils/profiler.hpp"
+#include "imgui.h"
 #include "merian/vk/utils/check_result.hpp"
 #include <queue>
 
@@ -105,7 +106,7 @@ void Profiler::collect(const bool wait) {
             section.start = ts;
         }
         if (section.start && section.end) {
-            uint64_t duration_ns = (section.end - section.start) * timestamp_period;
+            const uint64_t duration_ns = (section.end - section.start) * timestamp_period;
             section.sum_duration_ns += duration_ns;
             section.sq_sum_duration_ns += (duration_ns * duration_ns);
             section.num_captures++;
@@ -147,70 +148,110 @@ void Profiler::end(const uint32_t start_id) {
     cpu_current_key.resize(cpu_current_key.size() - 2 - section.name.size());
 }
 
-std::string Profiler::get_report() {
+std::string to_string(const std::vector<Profiler::ReportEntry>& entries,
+                      const std::string indent = "") {
     std::string result = "";
+    for (auto& entry : entries) {
+        result += fmt::format("{}{}: {:.04f} (± {:.04f}) ms\n", indent, entry.name, entry.duration,
+                              entry.std_deviation);
+        result += to_string(entry.children, indent + "  ");
+    }
+    return result;
+}
+
+template <typename TimeMeasure, typename SectionType>
+std::vector<Profiler::ReportEntry>
+make_report(std::vector<SectionType>& sections,
+            std::priority_queue<std::tuple<TimeMeasure, bool, uint32_t>,
+                                std::vector<std::tuple<TimeMeasure, bool, uint32_t>>,
+                                std::greater<std::tuple<TimeMeasure, bool, uint32_t>>>& queue) {
+    std::vector<Profiler::ReportEntry> report;
+    bool last_was_start = false;
+    while (!queue.empty()) {
+        auto& [ts, is_end, section_index] = queue.top();
+        if (!last_was_start && !is_end) {
+            const SectionType& section = sections[section_index];
+            const double avg = section.sum_duration_ns / (double)section.num_captures;
+            const double std =
+                std::sqrt(section.sq_sum_duration_ns / (double)section.num_captures - avg * avg);
+
+            report.emplace_back(section.name, avg / 1e6, std / 1e6,
+                                std::vector<Profiler::ReportEntry>());
+            last_was_start = true;
+            queue.pop();
+            continue;
+        }
+        if (last_was_start && !is_end) {
+            report.back().children = make_report(sections, queue);
+            last_was_start = true;
+            continue;
+        }
+        if (!last_was_start && is_end) {
+            return report;
+        }
+        if (last_was_start && is_end) {
+            queue.pop();
+            last_was_start = false;
+            continue;
+        }
+    }
+    return report;
+}
+
+std::string Profiler::get_report_str() {
+    Profiler::Report report = get_report();
+
+    if (report.cpu_report.empty() && report.gpu_report.empty()) {
+        return "no timestamps captured";
+    }
+
+    std::string result = "";
+    result += "CPU:\n";
+    result += to_string(report.cpu_report);
+    result += "GPU:\n";
+    result += to_string(report.gpu_report);
+    return result;
+}
+
+void Profiler::get_report_imgui() {
+    get_report_imgui(get_report());
+}
+
+void Profiler::get_report_imgui(const Profiler::Report& report) {
+    if (ImGui::CollapsingHeader("Profiler")) {
+        ImGui::SeparatorText("CPU:");
+        ImGui::Text("%s", to_string(report.cpu_report).c_str());
+        ImGui::SeparatorText("GPU:");
+        ImGui::Text("%s", to_string(report.gpu_report).c_str());
+    }
+}
+
+Profiler::Report Profiler::get_report() {
+    Profiler::Report report;
 
     // timestamp, is_end, section index
     std::priority_queue<std::tuple<chrono_clock::time_point, bool, uint32_t>,
                         std::vector<std::tuple<chrono_clock::time_point, bool, uint32_t>>,
                         std::greater<std::tuple<chrono_clock::time_point, bool, uint32_t>>>
-        q;
-
-    result += "CPU:\n\n";
+        cpu_queue;
     for (uint32_t i = 0; i < cpu_sections.size(); i++) {
         CPUSection& section = cpu_sections[i];
-        q.emplace(section.start, false, i);
-        q.emplace(section.end, true, i);
+        cpu_queue.emplace(section.start, false, i);
+        cpu_queue.emplace(section.end, true, i);
     }
-
-    std::string indent = "";
-    while (!q.empty()) {
-        auto& [ts, is_end, section_index] = q.top();
-        if (!is_end) {
-            CPUSection& section = cpu_sections[section_index];
-            double avg = section.sum_duration_ns / (double) section.num_captures;
-            double std = section.sq_sum_duration_ns / (double) section.num_captures - avg * avg;
-            result += fmt::format("{}{}: {:.04f} (± {:.04f}) ms\n", indent, section.name,
-                                  avg / 1e6, std::sqrt(std) / 1e6);
-        }
-        if (is_end) {
-            indent = indent.substr(0, std::max(0, (int)indent.size() - 2));
-        } else {
-            indent += "  ";
-        }
-        q.pop();
-    }
+    report.cpu_report = make_report(cpu_sections, cpu_queue);
 
     std::priority_queue<std::tuple<uint64_t, bool, uint32_t>,
                         std::vector<std::tuple<uint64_t, bool, uint32_t>>,
                         std::greater<std::tuple<uint64_t, bool, uint32_t>>>
-        gpu_q;
-    result += "\n\nGPU:\n\n";
+        gpu_queue;
     for (uint32_t i = 0; i < gpu_sections.size(); i++) {
         GPUSection& section = gpu_sections[i];
-        gpu_q.emplace(section.start, false, i);
-        gpu_q.emplace(section.end, true, i);
+        gpu_queue.emplace(section.start, false, i);
+        gpu_queue.emplace(section.end, true, i);
     }
-
-    indent = "";
-    while (!gpu_q.empty()) {
-        auto& [ts, is_end, section_index] = gpu_q.top();
-        if (!is_end) {
-            GPUSection& section = gpu_sections[section_index];
-            double avg = section.sum_duration_ns / (double) section.num_captures;
-            double std = section.sq_sum_duration_ns / (double) section.num_captures - avg * avg;
-            result += fmt::format("{}{}: {:.04f} (± {:.04f}) ms\n", indent, section.name,
-                                  avg / 1e6, std::sqrt(std) / 1e6);
-        }
-        if (is_end) {
-            indent = indent.substr(0, std::max(0, (int)indent.size() - 2));
-        } else {
-            indent += "  ";
-        }
-        gpu_q.pop();
-    }
-
-    return result;
+    report.gpu_report = make_report(gpu_sections, gpu_queue);
+    return report;
 }
 
 } // namespace merian
