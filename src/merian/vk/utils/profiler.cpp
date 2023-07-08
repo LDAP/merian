@@ -219,10 +219,14 @@ void Profiler::get_report_imgui() {
 
 void Profiler::get_report_imgui(const Profiler::Report& report) {
     if (ImGui::CollapsingHeader("Profiler")) {
-        ImGui::SeparatorText("CPU:");
-        ImGui::Text("%s", to_string(report.cpu_report).c_str());
-        ImGui::SeparatorText("GPU:");
-        ImGui::Text("%s", to_string(report.gpu_report).c_str());
+        if (ImGui::TreeNode("CPU")) {
+            ImGui::Text("%s", to_string(report.cpu_report).c_str());
+            ImGui::TreePop();
+        }
+        if (ImGui::TreeNode("GPU")) {
+            ImGui::Text("%s", to_string(report.gpu_report).c_str());
+            ImGui::TreePop();
+        }
     }
 }
 
