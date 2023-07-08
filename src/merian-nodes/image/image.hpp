@@ -19,7 +19,7 @@ class ImageNode : public Node {
     ~ImageNode();
 
     std::string name() override {
-        return "ImageNode";
+        return "Image";
     }
 
     std::tuple<std::vector<NodeOutputDescriptorImage>, std::vector<NodeOutputDescriptorBuffer>>
@@ -35,12 +35,15 @@ class ImageNode : public Node {
                    const std::vector<std::vector<merian::ImageHandle>>& image_outputs,
                    const std::vector<std::vector<merian::BufferHandle>>&) override;
 
+    void get_configuration(Configuration& config) override;
+
   private:
     const ResourceAllocatorHandle allocator;
 
     vk::Format format;
     unsigned char* image;
     int width, height, channels;
+    std::string filename;
 };
 
 } // namespace merian

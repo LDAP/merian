@@ -1,5 +1,6 @@
 #pragma once
 
+#include "merian/utils/configuration.hpp"
 #include "merian/vk/descriptors/descriptor_set.hpp"
 #include "merian/vk/graph/node_io.hpp"
 #include "vulkan/vulkan.hpp"
@@ -76,6 +77,9 @@ class Node : public std::enable_shared_from_this<Node> {
                              [[maybe_unused]] const std::vector<BufferHandle>& buffer_inputs,
                              [[maybe_unused]] const std::vector<ImageHandle>& image_outputs,
                              [[maybe_unused]] const std::vector<BufferHandle>& buffer_outputs) {}
+
+    // Declare your configuration options.
+    virtual void get_configuration([[maybe_unused]] Configuration& config) {}
 };
 
 using NodeHandle = std::shared_ptr<Node>;

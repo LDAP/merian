@@ -12,8 +12,9 @@ ImageNode::ImageNode(const ResourceAllocatorHandle allocator,
 
     auto file = loader.find_file(path);
     assert(file.has_value());
-    const char* filename = file->c_str();
+    filename = file.value();
 
+    const char* filename = file->c_str();
     image = stbi_load(filename, &width, &height, &channels, 4);
     assert(image);
     SPDLOG_DEBUG("Loaded image from {} ({}x{}, {} channels)", filename, width, height, channels);
@@ -43,6 +44,15 @@ void ImageNode::cmd_build(const vk::CommandBuffer& cmd,
     allocator->getStaging()->cmdToImage(cmd, *image_outputs[0][0], {0, 0, 0},
                                         image_outputs[0][0]->get_extent(), first_layer(),
                                         width * height * 4, image);
+}
+
+void ImageNode::get_configuration(Configuration& config) {
+    std::string text;
+    text += fmt::format("filename: {}\n", filename);
+    text += fmt::format("extent: {}x{}\n", width, height);
+    text += fmt::format("format: {}\n", vk::to_string(format));
+
+    config.output_text(text);
 }
 
 } // namespace merian

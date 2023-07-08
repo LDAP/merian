@@ -634,4 +634,19 @@ void Graph::reset_graph() {
     }
 }
 
+void Graph::get_configuration(Configuration& config) {
+    if (config.st_new_section("Graph")) {
+        rebuild_requested |= config.config_bool("Rebuild");
+        config.st_no_space();
+        config.output_text(fmt::format("Current iteration {}", current_iteration));
+
+        for (auto& data : node_data) {
+            if (config.st_new_section(
+                    fmt::format("{} ({})", data.second.name, data.second.node->name()))) {
+                data.second.node->get_configuration(config);
+            }
+        }
+    }
+}
+
 } // namespace merian

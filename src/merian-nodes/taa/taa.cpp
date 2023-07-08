@@ -11,9 +11,9 @@ TAANode::TAANode(const SharedContext context,
                  const ResourceAllocatorHandle allocator,
                  const int clamp_method,
                  const bool inverse_motion)
-    : ComputeNode(context, allocator, sizeof(PushConstant)), clamp_method(clamp_method),
-      inverse_motion(inverse_motion) {
+    : ComputeNode(context, allocator, sizeof(PushConstant)), inverse_motion(inverse_motion) {
     shader = std::make_shared<ShaderModule>(context, sizeof(spv), spv);
+    pc.clamp_method = clamp_method;
 }
 
 std::tuple<std::vector<NodeInputDescriptorImage>, std::vector<NodeInputDescriptorBuffer>>
@@ -46,7 +46,7 @@ TAANode::describe_outputs(const std::vector<NodeOutputDescriptorImage>& connecte
 
 SpecializationInfoHandle TAANode::get_specialization_info() const noexcept {
     auto spec_builder = SpecializationInfoBuilder();
-    spec_builder.add_entry(local_size_x, local_size_y, clamp_method, int(inverse_motion));
+    spec_builder.add_entry(local_size_x, local_size_y, int(inverse_motion));
     return spec_builder.build();
 }
 
@@ -61,6 +61,20 @@ std::tuple<uint32_t, uint32_t, uint32_t> TAANode::get_group_count() const noexce
 
 ShaderModuleHandle TAANode::get_shader_module() {
     return shader;
+}
+
+void TAANode::get_configuration(Configuration& config) {
+    config.config_percent("alpha", pc.temporal_alpha);
+
+    std::vector<std::string> clamp_methods = {
+        fmt::format("none ({})", MERIAN_NODES_TAA_CLAMP_NONE),
+        fmt::format("min-max ({})", MERIAN_NODES_TAA_CLAMP_MIN_MAX),
+    };
+    config.config_options("clamp method", pc.clamp_method, clamp_methods);
+
+    std::string text;
+    text += fmt::format("inverse motion: ", inverse_motion);
+    config.output_text(text);
 }
 
 } // namespace merian

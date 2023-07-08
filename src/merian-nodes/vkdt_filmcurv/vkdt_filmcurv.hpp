@@ -24,7 +24,7 @@ class VKDTFilmcurv : public ComputeNode {
                  const vk::Format output_format = vk::Format::eR16G16B16A16Sfloat);
 
     std::string name() override {
-        return "VKDTFilmcurv";
+        return "VKDT Filmcurv";
     }
 
     std::tuple<std::vector<NodeInputDescriptorImage>, std::vector<NodeInputDescriptorBuffer>>
@@ -42,6 +42,8 @@ class VKDTFilmcurv : public ComputeNode {
     std::tuple<uint32_t, uint32_t, uint32_t> get_group_count() const noexcept override;
 
     ShaderModuleHandle get_shader_module() override;
+
+    void get_configuration(Configuration& config) override;
 
   private:
     const vk::Format output_format;

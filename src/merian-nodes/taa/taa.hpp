@@ -13,7 +13,8 @@ class TAANode : public ComputeNode {
 
     struct PushConstant {
         // higher value means more temporal reuse
-        float temporal_alpha{.666};
+        float temporal_alpha{.5};
+        int clamp_method;
     };
 
   public:
@@ -42,8 +43,9 @@ class TAANode : public ComputeNode {
 
     ShaderModuleHandle get_shader_module() override;
 
+    void get_configuration(Configuration& config) override;
+
   private:
-    const int clamp_method;
     const bool inverse_motion;
     ShaderModuleHandle shader;
     PushConstant pc;

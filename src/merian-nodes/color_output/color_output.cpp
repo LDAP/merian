@@ -1,10 +1,11 @@
 #include "color_output.hpp"
+#include "merian/utils/glm.hpp"
 
 namespace merian {
 
 ColorOutputNode::ColorOutputNode(const vk::Format format,
-                                 const vk::ClearColorValue color,
-                                 const vk::Extent3D extent)
+                                 const vk::Extent3D extent,
+                                 const vk::ClearColorValue color)
     : format(format), color(color), extent(extent) {}
 
 ColorOutputNode::~ColorOutputNode() {}
@@ -31,6 +32,10 @@ void ColorOutputNode::cmd_build(const vk::CommandBuffer& cmd,
                                 const std::vector<std::vector<merian::BufferHandle>>&) {
     const ImageHandle image = image_outputs[0][0];
     cmd.clearColorImage(*image, image->get_current_layout(), color, all_levels_and_layers());
+}
+
+void ColorOutputNode::get_configuration(Configuration& config) {
+    config.config_color("color", *merian::as_vec4((float*)&color));
 }
 
 } // namespace merian

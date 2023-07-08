@@ -237,6 +237,9 @@ class Graph : public std::enable_shared_from_this<Graph> {
     // Runs the graph. On the first run or if rebuild is requested the graph is build.
     const GraphRun& cmd_run(vk::CommandBuffer& cmd, const ProfilerHandle profiler = nullptr);
 
+    // Collects configuration for the graph and all its nodes.
+    void get_configuration(Configuration& config);
+
   private:
     const SharedContext context;
     const ResourceAllocatorHandle allocator;

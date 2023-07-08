@@ -2,6 +2,7 @@ merian_src = files(
     'io/file_loader.cpp',
     'io/tinyobj.cpp',
     'utils/bitpacking.cpp',
+    'utils/configuration_imgui.cpp',
     'utils/input_controller_glfw.cpp',
     'utils/normal_encoding.cpp',
     'utils/renderdoc.cpp',

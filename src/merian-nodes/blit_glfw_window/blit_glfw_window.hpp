@@ -52,6 +52,16 @@ template <BlitNodeMode mode = FIT> class GLFWWindowNode : public BlitExternalNod
         return aquire;
     }
 
+    void get_configuration(Configuration& config) override {
+        if (aquire) {
+            config.output_text(
+                fmt::format("surface format: {}\ncolor space: {}\nimage count: {}\nextent: {}x{}",
+                            vk::to_string(aquire->surface_format.format),
+                            vk::to_string(aquire->surface_format.colorSpace), aquire->num_images,
+                            aquire->extent.width, aquire->extent.height));
+        }
+    }
+
   private:
     GLFWWindowHandle window;
     SurfaceHandle surface;

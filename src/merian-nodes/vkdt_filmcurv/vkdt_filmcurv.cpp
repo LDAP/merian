@@ -50,4 +50,12 @@ ShaderModuleHandle VKDTFilmcurv::get_shader_module() {
     return std::make_shared<ShaderModule>(context, sizeof(spv), spv);
 }
 
+void VKDTFilmcurv::get_configuration(Configuration& config) {
+    config.config_float("brightness", pc.brightness);
+    config.config_float("contrast", pc.contrast);
+    config.config_float("bias", pc.bias);
+    config.config_options("colormode", pc.colourmode,
+                          {"darktable ucs", "per channel", "munsell", "hsl"});
+}
+
 } // namespace merian
