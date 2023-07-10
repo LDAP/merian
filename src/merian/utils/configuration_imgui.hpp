@@ -25,33 +25,47 @@ class ImGuiConfiguration : public Configuration {
                                   const float scale_min,
                                   const float scale_max) override;
 
-    virtual void config_color(const std::string& id, glm::vec3& color) override;
-    virtual void config_color(const std::string& id, glm::vec4& color) override;
-    virtual void config_vec(const std::string& id, glm::vec3& value) override;
-    virtual void config_vec(const std::string& id, glm::vec4& value) override;
-    virtual void config_angle(const std::string& id, float& angle) override;
-    virtual void config_percent(const std::string& id, float& value) override;
-    virtual void config_float(const std::string& id, float& value) override;
+    virtual void
+    config_color(const std::string& id, glm::vec3& color, const std::string& desc = "") override;
+    virtual void
+    config_color(const std::string& id, glm::vec4& color, const std::string& desc = "") override;
+    virtual void
+    config_vec(const std::string& id, glm::vec3& value, const std::string& desc = "") override;
+    virtual void
+    config_vec(const std::string& id, glm::vec4& value, const std::string& desc = "") override;
+    virtual void
+    config_angle(const std::string& id, float& angle, const std::string& desc = "") override;
+    virtual void
+    config_percent(const std::string& id, float& value, const std::string& desc = "") override;
+    virtual void
+    config_float(const std::string& id, float& value, const std::string& desc = "") override;
     virtual void config_float(const std::string& id,
                               float& value,
                               const float& min = FLT_MIN,
-                              const float& max = FLT_MAX) override;
-    virtual void config_int(const std::string& id, int& value) override;
+                              const float& max = FLT_MAX,
+                              const std::string& desc = "") override;
+    virtual void
+    config_int(const std::string& id, int& value, const std::string& desc = "") override;
     virtual void config_int(const std::string& id,
                             int& value,
                             const int& min = std::numeric_limits<int>::min(),
-                            const int& max = std::numeric_limits<int>::max()) override;
-    virtual void config_float3(const std::string& id, float value[3]) override;
-    virtual void config_bool(const std::string& id, bool& value) override;
-    virtual bool config_bool(const std::string& id) override;
+                            const int& max = std::numeric_limits<int>::max(),
+                            const std::string& desc = "") override;
+    virtual void
+    config_float3(const std::string& id, float value[3], const std::string& desc = "") override;
+    virtual void
+    config_bool(const std::string& id, bool& value, const std::string& desc = "") override;
+    virtual bool config_bool(const std::string& id, const std::string& desc = "") override;
     virtual void config_options(const std::string& id,
                                 int& selected,
                                 const std::vector<std::string>& options,
-                                const OptionsStyle style = OptionsStyle::DONT_CARE) override;
+                                const OptionsStyle style = OptionsStyle::DONT_CARE,
+                                const std::string& desc = "") override;
     virtual bool config_text(const std::string& id,
                              const uint32_t max_len,
                              char* string,
-                             const bool needs_submit = false) override;
+                             const bool needs_submit = false,
+                             const std::string& desc = "") override;
 };
 
 } // namespace merian

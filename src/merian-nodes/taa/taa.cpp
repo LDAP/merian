@@ -66,7 +66,7 @@ ShaderModuleHandle TAANode::get_shader_module() {
 }
 
 void TAANode::get_configuration(Configuration& config) {
-    config.config_percent("alpha", pc.temporal_alpha);
+    config.config_percent("alpha", pc.temporal_alpha, "more means more reuse");
 
     std::vector<std::string> clamp_methods = {
         fmt::format("none ({})", MERIAN_NODES_TAA_CLAMP_NONE),
