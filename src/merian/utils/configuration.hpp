@@ -10,6 +10,8 @@ namespace merian {
 // "Record" configurtation options and information to display.
 // Some implementations will not allowed that parameters called `id` have the same name in the same
 // child.
+// Different recorders can for example display the configuration in a GUI,
+// dump it to a file or load a dump from a file.
 class Configuration {
   public:
     enum class OptionsStyle {

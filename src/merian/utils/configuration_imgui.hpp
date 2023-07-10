@@ -7,7 +7,7 @@
 
 namespace merian {
 
-// "Record" configurtation options and information to display.
+// A configuration recorder to display and set configuration from ImGui.
 class ImGuiConfiguration : public Configuration {
   public:
     virtual ~ImGuiConfiguration() override;
@@ -45,9 +45,9 @@ class ImGuiConfiguration : public Configuration {
     virtual void config_bool(const std::string& id, bool& value) override;
     virtual bool config_bool(const std::string& id) override;
     virtual void config_options(const std::string& id,
-                               int& selected,
-                               const std::vector<std::string>& options,
-                               const OptionsStyle style = OptionsStyle::DONT_CARE) override;
+                                int& selected,
+                                const std::vector<std::string>& options,
+                                const OptionsStyle style = OptionsStyle::DONT_CARE) override;
     virtual bool config_text(const std::string& id,
                              const uint32_t max_len,
                              char* string,
