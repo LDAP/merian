@@ -342,6 +342,10 @@ void enable_common_features(const Context::FeaturesContainer& supported,
         enable.physical_device_features_v12.shaderUniformBufferArrayNonUniformIndexing = true;
     }
 
+    if (supported.physical_device_features_v13.robustImageAccess) {
+        SPDLOG_DEBUG("robustImageAccess supported. Enabling feature");
+        enable.physical_device_features_v13.robustImageAccess = true;
+    }
     if (supported.physical_device_features_v13.synchronization2) {
         SPDLOG_DEBUG("synchronization2 supported. Enabling feature");
         enable.physical_device_features_v13.synchronization2 = true;
