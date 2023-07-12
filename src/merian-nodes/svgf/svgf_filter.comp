@@ -79,6 +79,8 @@ main() {
 
   float sigma_l = 0;
   if (params.filter_variance == 1) {
+    // the reference implementation does that
+    // but it looks better without
     sigma_l = get_sigma_l(filter_in.a, ipos) * params.param_l;
   } else {
     sigma_l = sqrt(filter_in.a) * params.param_l;
