@@ -75,7 +75,9 @@ class GraphRun {
     }
 
   private:
-    void reset(const uint32_t iteration, const ProfilerHandle profiler) {
+    void reset(const uint32_t iteration,
+               const ProfilerHandle profiler,
+               const std::shared_ptr<ExtensionVkDebugUtils> debug_utils) {
         wait_semaphores.clear();
         wait_stages.clear();
         signal_semaphores.clear();
@@ -83,6 +85,7 @@ class GraphRun {
 
         this->iteration = iteration;
         this->profiler = profiler;
+        this->debug_utils = debug_utils;
     }
 
   private:
@@ -92,6 +95,7 @@ class GraphRun {
     std::vector<std::function<void(const QueueHandle& queue)>> submit_callbacks;
     uint64_t iteration;
     ProfilerHandle profiler = nullptr;
+    std::shared_ptr<ExtensionVkDebugUtils> debug_utils = nullptr;
 };
 
 /**
@@ -210,7 +214,7 @@ class Graph : public std::enable_shared_from_this<Graph> {
     Graph(const SharedContext context,
           const ResourceAllocatorHandle allocator,
           const std::optional<QueueHandle> wait_queue = std::nullopt,
-          const std::optional<std::shared_ptr<Extension>> debug_utils = nullptr);
+          const std::shared_ptr<ExtensionVkDebugUtils> debug_utils = nullptr);
 
     // Add a node to the graph, returns the index of the node (can be used for connect and such).
     void add_node(const std::string name, const std::shared_ptr<Node>& node);
@@ -246,6 +250,7 @@ class Graph : public std::enable_shared_from_this<Graph> {
     const SharedContext context;
     const ResourceAllocatorHandle allocator;
     const std::optional<QueueHandle> wait_queue;
+    const std::shared_ptr<ExtensionVkDebugUtils> debug_utils;
 
     bool rebuild_requested = true;
     uint64_t current_iteration = 0;

@@ -6,8 +6,8 @@ namespace merian {
 Graph::Graph(const SharedContext context,
              const ResourceAllocatorHandle allocator,
              const std::optional<QueueHandle> wait_queue,
-             const std::optional<std::shared_ptr<Extension>> debug_utils)
-    : context(context), allocator(allocator), wait_queue(wait_queue) {}
+             const std::shared_ptr<ExtensionVkDebugUtils> debug_utils)
+    : context(context), allocator(allocator), wait_queue(wait_queue), debug_utils(debug_utils) {}
 
 void Graph::add_node(const std::string name, const std::shared_ptr<Node>& node) {
     if (node_from_name.contains(name)) {
@@ -146,7 +146,7 @@ const GraphRun& Graph::cmd_run(vk::CommandBuffer& cmd, const ProfilerHandle prof
         rebuild_requested = false;
     }
 
-    run.reset(current_iteration, profiler);
+    run.reset(current_iteration, profiler, debug_utils);
     {
         MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "Graph: run nodes");
         for (auto& node : flat_topology) {
@@ -154,8 +154,14 @@ const GraphRun& Graph::cmd_run(vk::CommandBuffer& cmd, const ProfilerHandle prof
             if (data.status.skip_run) {
                 continue;
             }
+            if (debug_utils)
+                debug_utils->cmd_begin_label(cmd, node->name());
+
             MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, node->name());
             cmd_run_node(cmd, node, data);
+
+            if (debug_utils)
+                debug_utils->cmd_end_label(cmd);
         }
     }
 
