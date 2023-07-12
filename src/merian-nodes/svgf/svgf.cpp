@@ -225,6 +225,9 @@ void SVGFNode::get_configuration(Configuration& config) {
     config.config_float("depth sens", filter_pc.param_z, "more means more blur");
     config.config_float("normals sens", filter_pc.param_n, "less means more blur");
     config.config_float("brightness sens", filter_pc.param_l, "more means more blur");
+    bool filter_variance = filter_pc.filter_variance;
+    config.config_bool("filter variance", filter_variance, "Filter variance with a 3x3 gaussian");
+    filter_pc.filter_variance = filter_variance;
 
     config.st_separate("TAA");
     config.config_float(

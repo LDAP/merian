@@ -12,6 +12,7 @@ layout(push_constant, std140) uniform push_t {
     float param_z;
     float param_n;
     float param_l;
+    int filter_variance;
 } params;
 
 float get_sigma_l(float center, ivec2 ipos) {
@@ -21,7 +22,7 @@ float get_sigma_l(float center, ivec2 ipos) {
     { 1.0 / 16.0, 1.0 / 8.0, 1.0 / 16.0 }
   };
 
-  float sum = center * gaussian_kernel[0][0];
+  float sum = center * gaussian_kernel[1][1];
   const int r = 1;
   for(int yy = -r; yy <= r; yy++) {
     for(int xx = -r; xx <= r; xx++) {
@@ -52,7 +53,7 @@ void tap(const ivec2 p,
   const float p_z         = p_gbuf.a;
   const float p_l         = yuv_luminance(p_irr_var.rgb); 
 
-  const float w_l = abs(p_l - c_l) / (sigma_l + 1e-10); 
+  const float w_l = abs(p_l - c_l) / (sigma_l + 1e-10);
   // This is different to the paper version which uses
   // 3.0 * abs(z_p - z_center.x) / (z_center.y * length(vec2(offset) * step_size) + 1e-2); 
   const float w_z = (200 * abs(p_z - c_z) / max(p_z, c_z)) / (params.param_z); 
@@ -76,7 +77,12 @@ main() {
   const vec4 filter_in = texelFetch(img_filter_in, ipos, 0);
   const float c_l = yuv_luminance(filter_in.rgb);
 
-  const float sigma_l = get_sigma_l(filter_in.a, ipos) * params.param_l;
+  float sigma_l = 0;
+  if (params.filter_variance == 1) {
+    sigma_l = get_sigma_l(filter_in.a, ipos) * params.param_l;
+  } else {
+    sigma_l = sqrt(filter_in.a) * params.param_l;
+  }
 
   vec3 filter_irr = filter_in.rgb;
   float filter_var = filter_in.a;
