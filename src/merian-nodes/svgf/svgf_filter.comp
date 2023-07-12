@@ -26,9 +26,9 @@ float get_sigma_l(float center, ivec2 ipos) {
   for(int yy = -r; yy <= r; yy++) {
     for(int xx = -r; xx <= r; xx++) {
       if(xx != 0 || yy != 0) {
-        ivec2 p = ipos + ivec2(xx, yy);
-        float v = texelFetch(img_filter_in, p, 0).a;
-        float w = gaussian_kernel[xx + 1][yy + 1];
+        const ivec2 p = ipos + ivec2(xx, yy);
+        const float v = texelFetch(img_filter_in, p, 0).a;
+        const float w = gaussian_kernel[xx + 1][yy + 1];
         sum += v * w;
       }
     }
