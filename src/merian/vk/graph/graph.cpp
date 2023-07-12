@@ -5,7 +5,8 @@ namespace merian {
 
 Graph::Graph(const SharedContext context,
              const ResourceAllocatorHandle allocator,
-             const std::optional<QueueHandle> wait_queue)
+             const std::optional<QueueHandle> wait_queue,
+             const std::optional<std::shared_ptr<Extension>> debug_utils)
     : context(context), allocator(allocator), wait_queue(wait_queue) {}
 
 void Graph::add_node(const std::string name, const std::shared_ptr<Node>& node) {
@@ -327,8 +328,8 @@ std::string Graph::connections(NodeHandle& src) {
             NodeData& dst_data = node_data[dst_node];
             auto& dst_in_desc = dst_data.image_input_descriptors[image_input_idx];
             result +=
-                fmt::format("image: {} ({}) --{}-> {} ({})\n", src_data.name,
-                            src_out_desc.name, dst_in_desc.delay, dst_data.name, dst_in_desc.name);
+                fmt::format("image: {} ({}) --{}-> {} ({})\n", src_data.name, src_out_desc.name,
+                            dst_in_desc.delay, dst_data.name, dst_in_desc.name);
         }
     }
     for (uint32_t i = 0; i < src_data.buffer_output_descriptors.size(); i++) {
@@ -338,8 +339,8 @@ std::string Graph::connections(NodeHandle& src) {
             NodeData& dst_data = node_data[dst_node];
             auto& dst_in_desc = dst_data.buffer_input_descriptors[buffer_input_idx];
             result +=
-                fmt::format("buffer: {} ({}) --{}-> {} ({})\n", src_data.name,
-                            src_out_desc.name, dst_in_desc.delay, dst_data.name, dst_in_desc.name);
+                fmt::format("buffer: {} ({}) --{}-> {} ({})\n", src_data.name, src_out_desc.name,
+                            dst_in_desc.delay, dst_data.name, dst_in_desc.name);
         }
     }
 

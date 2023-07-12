@@ -11,7 +11,7 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
 namespace merian {
 
-SharedContext Context::make_context(std::vector<Extension*> extensions,
+SharedContext Context::make_context(std::vector<std::shared_ptr<Extension>> extensions,
                                     std::string application_name,
                                     uint32_t application_vk_version,
                                     uint32_t preffered_number_compute_queues,
@@ -30,7 +30,7 @@ SharedContext Context::make_context(std::vector<Extension*> extensions,
     return shared_context;
 }
 
-Context::Context(std::vector<Extension*> desired_extensions,
+Context::Context(std::vector<std::shared_ptr<Extension>> desired_extensions,
                  std::string application_name,
                  uint32_t application_vk_version,
                  uint32_t preffered_number_compute_queues,
@@ -387,7 +387,7 @@ void Context::create_device_and_queues(uint32_t preferred_number_compute_queues)
 
     uint32_t max_queue_count = *std::max_element(count_per_family.begin(), count_per_family.end());
     std::vector<float> queue_priorities(max_queue_count, 1.0f);
-    
+
     std::vector<vk::DeviceQueueCreateInfo> queue_create_infos;
     for (uint32_t queue_familiy_idx = 0; queue_familiy_idx < queue_family_props.size();
          queue_familiy_idx++) {
@@ -458,7 +458,7 @@ void Context::create_device_and_queues(uint32_t preferred_number_compute_queues)
 
 void Context::extensions_check_instance_layer_support() {
     SPDLOG_DEBUG("extensions: checking instance layer support...");
-    std::vector<Extension*> not_supported;
+    std::vector<std::shared_ptr<Extension>> not_supported;
     std::vector<vk::LayerProperties> layer_props = vk::enumerateInstanceLayerProperties();
 
     for (auto& ext : extensions) {
@@ -486,7 +486,7 @@ void Context::extensions_check_instance_layer_support() {
 
 void Context::extensions_check_instance_extension_support() {
     SPDLOG_DEBUG("extensions: checking instance extension support...");
-    std::vector<Extension*> not_supported;
+    std::vector<std::shared_ptr<Extension>> not_supported;
     std::vector<vk::ExtensionProperties> extension_props =
         vk::enumerateInstanceExtensionProperties();
 
@@ -515,7 +515,7 @@ void Context::extensions_check_instance_extension_support() {
 
 void Context::extensions_check_device_extension_support() {
     SPDLOG_DEBUG("extensions: checking device extension support...");
-    std::vector<Extension*> not_supported;
+    std::vector<std::shared_ptr<Extension>> not_supported;
 
     for (auto& ext : extensions) {
         std::vector<const char*> device_extensions =
@@ -543,7 +543,7 @@ void Context::extensions_check_device_extension_support() {
 
 void Context::extensions_self_check_support() {
     SPDLOG_DEBUG("extensions: self-check support...");
-    std::vector<Extension*> not_supported;
+    std::vector<std::shared_ptr<Extension>> not_supported;
     for (auto& ext : extensions) {
         if (!ext->extension_supported(pd_container)) {
             spdlog::warn("extension {} not supported (self-check failed), disabling...", ext->name);
@@ -554,7 +554,7 @@ void Context::extensions_self_check_support() {
     destroy_extensions(not_supported);
 }
 
-void Context::destroy_extensions(std::vector<Extension*> extensions) {
+void Context::destroy_extensions(std::vector<std::shared_ptr<Extension>> extensions) {
     for (auto& ext : extensions) {
         SPDLOG_DEBUG("remove extension {} from context", ext->name);
         ext->on_destroy_instance(this->instance);

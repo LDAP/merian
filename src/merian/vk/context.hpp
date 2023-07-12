@@ -16,7 +16,7 @@ class CommandPool;
 using SharedContext = std::shared_ptr<Context>;
 
 /* Initializes the Vulkan instance and device and holds core objects.
- *  
+ *
  * Common features are automatically enabled.
  *
  * Extensions can extend the functionality and hook into the creation process.
@@ -44,11 +44,12 @@ class Context : public std::enable_shared_from_this<Context> {
     /**
      * @brief      Use this method to create the context.
      *
-     * 
-     * Needed for enable_shared_from_this, see https://en.cppreference.com/w/cpp/memory/enable_shared_from_this. 
+     *
+     * Needed for enable_shared_from_this, see
+     * https://en.cppreference.com/w/cpp/memory/enable_shared_from_this.
      */
     static SharedContext
-    make_context(std::vector<Extension*> extensions,
+    make_context(std::vector<std::shared_ptr<Extension>> extensions,
                  std::string application_name = "",
                  uint32_t application_vk_version = VK_MAKE_VERSION(1, 0, 0),
                  uint32_t preffered_number_compute_queues = 1, // Additionally to the GCT queue
@@ -57,7 +58,7 @@ class Context : public std::enable_shared_from_this<Context> {
                  std::string filter_device_name = "");
 
   private:
-    Context(std::vector<Extension*> extensions,
+    Context(std::vector<std::shared_ptr<Extension>> extensions,
             std::string application_name,
             uint32_t application_vk_version,
             uint32_t preffered_number_compute_queues,
@@ -93,7 +94,7 @@ class Context : public std::enable_shared_from_this<Context> {
     void extensions_check_instance_extension_support();
     void extensions_check_device_extension_support();
     void extensions_self_check_support();
-    void destroy_extensions(std::vector<Extension*> extensions);
+    void destroy_extensions(std::vector<std::shared_ptr<Extension>> extensions);
 
   public: // Getter
     // can be nullptr in very rare occasions, you can check that with if (shrd_ptr) {...}
@@ -121,7 +122,7 @@ class Context : public std::enable_shared_from_this<Context> {
     std::shared_ptr<CommandPool> get_cmd_pool_C();
 
   private:
-    std::vector<Extension*> extensions;
+    std::vector<std::shared_ptr<Extension>> extensions;
 
     // in create_instance
 

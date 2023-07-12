@@ -54,6 +54,15 @@ class ExtensionVkDebugUtils : public Extension {
         device.setDebugUtilsObjectNameEXT(infoEXT);
     }
 
+    void cmd_begin_label(vk::CommandBuffer& cmd, std::string& name) {
+        vk::DebugUtilsLabelEXT label{name.c_str()};
+        cmd.beginDebugUtilsLabelEXT(label);
+    }
+
+    void cmd_end_label(vk::CommandBuffer& cmd) {
+        cmd.endDebugUtilsLabelEXT();
+    }
+
   private:
     static VKAPI_ATTR VkBool32 VKAPI_CALL
     messenger_callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,

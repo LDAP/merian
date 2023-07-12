@@ -1,5 +1,6 @@
 #pragma once
 
+#include "merian/vk/extension/extension_vk_debug_utils.hpp"
 #include "merian/vk/graph/node.hpp"
 #include "merian/vk/graph/node_io.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
@@ -208,7 +209,8 @@ class Graph : public std::enable_shared_from_this<Graph> {
     // null).
     Graph(const SharedContext context,
           const ResourceAllocatorHandle allocator,
-          const std::optional<QueueHandle> wait_queue = std::nullopt);
+          const std::optional<QueueHandle> wait_queue = std::nullopt,
+          const std::optional<std::shared_ptr<Extension>> debug_utils = nullptr);
 
     // Add a node to the graph, returns the index of the node (can be used for connect and such).
     void add_node(const std::string name, const std::shared_ptr<Node>& node);
