@@ -25,6 +25,15 @@ void ColorOutputNode::pre_process(NodeStatus& status) {
     status.skip_run = needs_run;
 }
 
+void ColorOutputNode::cmd_build(const vk::CommandBuffer& cmd,
+                                const std::vector<std::vector<ImageHandle>>&,
+                                const std::vector<std::vector<BufferHandle>>&,
+                                const std::vector<std::vector<ImageHandle>>& image_outputs,
+                                const std::vector<std::vector<BufferHandle>>&) {
+    cmd.clearColorImage(*image_outputs[0][0], image_outputs[0][0]->get_current_layout(), color,
+                        all_levels_and_layers());
+}
+
 void ColorOutputNode::cmd_process(const vk::CommandBuffer& cmd,
                                   GraphRun&,
                                   const uint32_t,

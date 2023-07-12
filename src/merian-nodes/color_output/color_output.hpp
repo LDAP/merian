@@ -21,6 +21,12 @@ class ColorOutputNode : public Node {
     describe_outputs(const std::vector<NodeOutputDescriptorImage>& connected_image_outputs,
                      const std::vector<NodeOutputDescriptorBuffer>&) override;
 
+    void cmd_build(const vk::CommandBuffer& cmd,
+                   const std::vector<std::vector<ImageHandle>>& image_inputs,
+                   const std::vector<std::vector<BufferHandle>>& buffer_inputs,
+                   const std::vector<std::vector<ImageHandle>>& image_outputs,
+                   const std::vector<std::vector<BufferHandle>>& buffer_outputs) override;
+
     void cmd_process(const vk::CommandBuffer& cmd,
                      GraphRun& run,
                      const uint32_t set_index,
