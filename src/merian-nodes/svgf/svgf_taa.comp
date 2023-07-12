@@ -1,0 +1,67 @@
+#version 460
+#extension GL_GOOGLE_include_directive    : enable
+#extension GL_EXT_nonuniform_qualifier    : enable
+
+#include "svgf_graph_layout.glsl"
+
+layout(set = 1, binding = 0) uniform sampler2D img_filter_result;
+layout(set = 1, binding = 1) uniform sampler2D img_filter_in;  // (unused)
+
+layout(push_constant, std140) uniform params_t { 
+    float blend_alpha;
+    float rejection_threshold;
+    int show_variance;
+} params;
+
+void
+main()
+{
+  const ivec2 ipos = ivec2(gl_GlobalInvocationID);
+  if (any(greaterThanEqual(ipos, imageSize(img_out)))) return;
+
+  const vec2 mv = texelFetch(img_mv, ipos, 0).rg;
+  const vec4 filter_result = texelFetch(img_filter_result, ipos, 0);
+
+  if (params.show_variance == 1) {
+    imageStore(img_out, ipos, vec4(filter_result.a / 256));
+    return;
+  }
+
+  const vec3 irr = filter_result.rgb;
+  vec3 prev_irr = texelFetch(img_prev_out, ivec2(ipos + mv), 0).rgb;
+
+  if (any(isnan(prev_irr)) || any(isinf(prev_irr))) {
+    prev_irr = irr;
+  }
+
+  const mat3 M = mat3( // linear rec709 to linear rec2020
+      0.62750375, 0.06910828, 0.01639406,
+      0.32927542, 0.91951916, 0.08801125,
+      0.04330266, 0.0113596 , 0.89538035);
+
+  // taa with box clamping
+  vec3 m1 = vec3(0.0f);
+  vec3 m2 = vec3(0.0f);
+  const int r = 1;
+  for (int yy=-r;yy<=r;yy++)
+    for(int xx=-r;xx<=r;xx++) {
+      const vec3 a = texelFetch(img_albedo, ipos + ivec2(xx, yy), 0).rgb;
+      const vec3 irr = texelFetch(img_filter_result, ipos + ivec2(xx, yy), 0).rgb;
+      const vec3 b = (a * irr);
+      m1 += b;
+      m2 += b * b;
+    }
+  m1 /= (2.0 * r + 1) * (2.0 * r + 1);
+  m2 /= (2.0 * r + 1) * (2.0 * r + 1);
+
+  const vec3 sigma = sqrt(max(vec3(0), m2 - m1 * m1));
+  const float thresh = params.rejection_threshold;
+  prev_irr = clamp(prev_irr, max(vec3(0), m1 - thresh * sigma), m1 + thresh * sigma);
+
+  const vec3 albedo = texelFetch(img_albedo, ipos, 0).rgb; // multiply albedo
+  const vec3 beauty = irr * albedo;
+  const vec3 blended = mix(beauty, prev_irr, params.blend_alpha);
+
+  imageStore(img_out, ipos, vec4(blended, 1));
+}
+

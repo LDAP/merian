@@ -8,9 +8,9 @@ Inputs:
 
 Outputs:
 
-| Type  | Input ID | Input name | Description         | Format/Resolution        | Persistent |
-|-------|----------|------------|---------------------|--------------------------|------------|
-| Image | 0        | out        | result image        | user defined             | no         |
+| Type  | Output ID | Output name | Description         | Format/Resolution        | Persistent |
+|-------|-----------|-------------|---------------------|--------------------------|------------|
+| Image | 0         | out         | result image        | user defined             | no         |
 
 
 This is a reimplementation of https://github.com/hanatos/vkdt/tree/master/src/pipe/modules/filmcurv

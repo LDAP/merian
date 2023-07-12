@@ -98,6 +98,11 @@ class NodeOutputDescriptorImage : public NodeOutputDescriptor {
                                                    const uint32_t height,
                                                    const bool persistent = false);
 
+    static NodeOutputDescriptorImage compute_read_write(const std::string& name,
+                                                        const vk::Format format,
+                                                        const vk::Extent3D extent,
+                                                        const bool persistent = false);
+
     static NodeOutputDescriptorImage transfer_write(const std::string& name,
                                                     const vk::Format format,
                                                     const vk::Extent3D extent,

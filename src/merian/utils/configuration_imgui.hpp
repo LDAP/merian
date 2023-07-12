@@ -37,8 +37,10 @@ class ImGuiConfiguration : public Configuration {
     config_angle(const std::string& id, float& angle, const std::string& desc = "") override;
     virtual void
     config_percent(const std::string& id, float& value, const std::string& desc = "") override;
-    virtual void
-    config_float(const std::string& id, float& value, const std::string& desc = "") override;
+    virtual void config_float(const std::string& id,
+                              float& value,
+                              const std::string& desc = "",
+                              const float sensitivity = 1.0f) override;
     virtual void config_float(const std::string& id,
                               float& value,
                               const float& min = FLT_MIN,

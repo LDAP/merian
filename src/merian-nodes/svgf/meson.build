@@ -1,8 +1,12 @@
 shaders = [
-    'accumulate.comp',
+    'svgf_filter.comp',
+    'svgf_taa.comp',
+    'svgf_variance_estimate.comp',
 ]
 included_files = files(
+    shader_include_dir + '/common/normal_encode.glsl',
     shader_include_dir + '/common/colors_yuv.glsl',
+    'svgf_graph_layout.glsl'
 )
 foreach s : shaders
   merian_nodes_src += custom_target(
@@ -15,4 +19,4 @@ foreach s : shaders
   )
 endforeach
 
-merian_nodes_src += files('accumulate.cpp')
+merian_nodes_src += files('svgf.cpp')

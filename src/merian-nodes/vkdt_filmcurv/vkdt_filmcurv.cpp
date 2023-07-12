@@ -56,9 +56,9 @@ ShaderModuleHandle VKDTFilmcurv::get_shader_module() {
 }
 
 void VKDTFilmcurv::get_configuration(Configuration& config) {
-    config.config_float("brightness", pc.brightness);
-    config.config_float("contrast", pc.contrast);
-    config.config_float("bias", pc.bias);
+    config.config_float("brightness", pc.brightness, "", .01);
+    config.config_float("contrast", pc.contrast, "", .01);
+    config.config_float("bias", pc.bias, "", .01);
     config.config_options("colormode", pc.colourmode,
                           {"darktable ucs", "per channel", "munsell", "hsl"});
 }

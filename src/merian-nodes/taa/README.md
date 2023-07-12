@@ -9,7 +9,7 @@ Parameters:
 
 | Name             | Type               | Description                                                         |
 |------------------|--------------------|---------------------------------------------------------------------|
-| `temporal_alpha` | float \[0, 1\]     | controls the blend with the previous frame. Higher means more reuse |
+| `alpha`          | float \[0, 1\]     | controls the blend with the previous frame. Higher means more reuse |
 
 
 Inputs:
@@ -22,9 +22,9 @@ Inputs:
 
 Outputs:
 
-| Type  | Input ID | Input name | Description         | Format/Resolution        | Persistent |
-|-------|----------|------------|---------------------|--------------------------|------------|
-| Image | 0        | output     | the blended image   | like `current`           | no         |
+| Type  | Output ID | Output name | Description         | Format/Resolution        | Persistent |
+|-------|-----------|-------------|---------------------|--------------------------|------------|
+| Image | 0         | output      | the blended image   | like `current`           | no         |
 
 
 Example

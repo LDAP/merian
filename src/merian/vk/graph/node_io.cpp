@@ -110,6 +110,36 @@ NodeOutputDescriptorImage NodeOutputDescriptorImage::compute_write(const std::st
     return compute_write(name, format, {width, height, 1}, persistent);
 }
 
+NodeOutputDescriptorImage NodeOutputDescriptorImage::compute_read_write(const std::string& name,
+                                                                        const vk::Format format,
+                                                                        const vk::Extent3D extent,
+                                                                        const bool persistent) {
+    const vk::ImageCreateInfo create_info{
+        {},
+        vk::ImageType::e2D,
+        format,
+        extent,
+        1,
+        1,
+        vk::SampleCountFlagBits::e1,
+        vk::ImageTiling::eOptimal,
+        vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled,
+        vk::SharingMode::eExclusive,
+        {},
+        {},
+        vk::ImageLayout::eUndefined,
+    };
+
+    return NodeOutputDescriptorImage{
+        name,
+        vk::AccessFlagBits2::eShaderWrite | vk::AccessFlagBits2::eShaderRead,
+        vk::PipelineStageFlagBits2::eComputeShader,
+        create_info,
+        vk::ImageLayout::eGeneral,
+        persistent,
+    };
+}
+
 NodeOutputDescriptorImage NodeOutputDescriptorImage::transfer_write(const std::string& name,
                                                                     const vk::Format format,
                                                                     const vk::Extent3D extent,

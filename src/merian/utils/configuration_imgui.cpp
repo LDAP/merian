@@ -81,8 +81,9 @@ void ImGuiConfiguration::config_percent(const std::string& id,
 }
 void ImGuiConfiguration::config_float(const std::string& id,
                                       float& value,
-                                      const std::string& desc) {
-    ImGui::DragFloat(id.c_str(), &value);
+                                      const std::string& desc,
+                                      const float sensitivity) {
+    ImGui::DragFloat(id.c_str(), &value, sensitivity);
     tooltip(desc);
 }
 void ImGuiConfiguration::config_float(const std::string& id,

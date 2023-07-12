@@ -1,56 +1,52 @@
 #pragma once
 
-#include "merian/vk/graph/node.hpp"
+#include "merian-nodes/compute_node/compute_node.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
 
 namespace merian {
 
-// An accumulate node for vk::Format::eR32G32B32A32Sfloat images
-class AccumulateF32ImageNode : public Node {
+class AccumulateNode : public ComputeNode {
 
   private:
     static constexpr uint32_t local_size_x = 16;
     static constexpr uint32_t local_size_y = 16;
 
+    struct AccumulatePushConstant {
+        float accum_alpha_color = 0.9;
+        float accum_alpha_moments = 0.9;
+        int histlen_max = 64;
+    };
+
   public:
-    AccumulateF32ImageNode(const SharedContext context, const ResourceAllocatorHandle alloc);
+    AccumulateNode(const SharedContext context, const ResourceAllocatorHandle alloc);
+
+    ~AccumulateNode();
+
+    std::string name() override;
 
     std::tuple<std::vector<NodeInputDescriptorImage>, std::vector<NodeInputDescriptorBuffer>>
     describe_inputs() override;
 
-    std::tuple<std::vector<merian::NodeOutputDescriptorImage>,
-               std::vector<merian::NodeOutputDescriptorBuffer>>
-    describe_outputs(const std::vector<merian::NodeOutputDescriptorImage>& connected_image_outputs,
-                     const std::vector<merian::NodeOutputDescriptorBuffer>&) override;
+    std::tuple<std::vector<NodeOutputDescriptorImage>, std::vector<NodeOutputDescriptorBuffer>>
+    describe_outputs(
+        const std::vector<NodeOutputDescriptorImage>& connected_image_outputs,
+        const std::vector<NodeOutputDescriptorBuffer>& connected_buffer_outputs) override;
 
-    void cmd_build(const vk::CommandBuffer&,
-                   const std::vector<std::vector<merian::ImageHandle>>& image_inputs,
-                   const std::vector<std::vector<merian::BufferHandle>>&,
-                   const std::vector<std::vector<merian::ImageHandle>>& image_outputs,
-                   const std::vector<std::vector<merian::BufferHandle>>&) override;
+    SpecializationInfoHandle get_specialization_info() const noexcept override;
 
-    void cmd_process(const vk::CommandBuffer& cmd,
-                     GraphRun& run,
-                     const uint32_t set_index,
-                     const std::vector<merian::ImageHandle>&,
-                     const std::vector<merian::BufferHandle>&,
-                     const std::vector<merian::ImageHandle>&,
-                     const std::vector<merian::BufferHandle>&) override;
+    const void* get_push_constant() override;
+
+    std::tuple<uint32_t, uint32_t, uint32_t> get_group_count() const noexcept override;
+
+    ShaderModuleHandle get_shader_module() override;
+
+    void get_configuration(Configuration& config) override;
 
   private:
-    const SharedContext context;
-    const ResourceAllocatorHandle alloc;
-
-    DescriptorSetLayoutHandle layout;
-    DescriptorPoolHandle pool;
-    std::vector<DescriptorSetHandle> sets;
-    std::vector<TextureHandle> in_textures;
-    std::vector<TextureHandle> out_textures;
-    PipelineHandle pipe;
-
-    uint32_t group_count_x;
-    uint32_t group_count_y;
+    vk::Extent3D extent;
+    AccumulatePushConstant pc;
+    ShaderModuleHandle shader;
 };
 
 } // namespace merian

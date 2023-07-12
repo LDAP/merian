@@ -1,20 +1,98 @@
 #version 460
-#extension GL_EXT_scalar_block_layout : require
+#extension GL_GOOGLE_include_directive    : enable
+#extension GL_EXT_nonuniform_qualifier    : enable
 
-layout(local_size_x_id = 0, local_size_y_id = 1) in;
-
-layout(binding = 0, rgba32f) uniform readonly image2D src_image;
-layout(binding = 0, rgba32f) uniform image2D dst_image;
+layout(local_size_x_id = 0, local_size_y_id = 1, local_size_z = 1) in;
 
 
-void main() {
-    const uvec2 resolution = imageSize(src_image);
-    const ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
-    if((pixel.x >= resolution.x) || (pixel.y >= resolution.y)) {
-        return;
+layout(set = 0, binding = 0) uniform sampler2D img_prev_accum;
+layout(set = 0, binding = 1) uniform sampler2D img_prev_moments;
+
+layout(set = 0, binding = 2) uniform sampler2D img_irr;
+layout(set = 0, binding = 3) uniform sampler2D img_gbuf;
+layout(set = 0, binding = 4) uniform sampler2D img_prev_gbuf;
+
+layout(set = 0, binding = 5) uniform sampler2D img_mv;
+
+
+layout(set = 0, binding = 6) uniform writeonly image2D img_accum;
+layout(set = 0, binding = 7) uniform writeonly image2D img_moments;
+
+
+#include "common/colors_yuv.glsl"
+
+layout(push_constant, std140) uniform params_t { 
+    float accum_alpha_color;
+    float accum_alpha_moments;
+    int histlen_max;
+} params;
+
+void
+main() {
+  ivec2 ipos = ivec2(gl_GlobalInvocationID);
+  if(any(greaterThanEqual(ipos, imageSize(img_accum)))) return;
+
+  const vec3 curr_irr = texelFetch(img_irr, ipos, 0).rgb;
+  const vec4 curr_normal_z = texelFetch(img_gbuf, ipos, 0);
+  const vec3 curr_normal = curr_normal_z.rgb;
+  const float curr_z = curr_normal_z.a;
+  const float curr_l = yuv_luminance(curr_irr);
+  const vec2 curr_moments = vec2(curr_l, curr_l * curr_l);
+
+  const vec2 mv = texelFetch(img_mv, ipos, 0).rg;
+  const vec2 prev_pos = ivec2(ipos + mv);
+  const ivec2 prev_ipos = ivec2(prev_pos);
+  const vec2 w = fract(prev_pos);
+
+  // Bilinear interpolation of previous data
+  vec4 prev_irr   = vec4(0);
+  vec2 prev_moments = vec2(0);
+  float sum_w       = 0.0;
+  float histlen     = 0.0;
+  for(int yy = 0; yy <= 1; yy++) {
+    for(int xx = 0; xx <= 1; xx++) {
+
+      const ivec2 tc = prev_ipos + ivec2(xx, yy);
+      if(any(greaterThanEqual(tc, textureSize(img_prev_accum, 0)))
+         || any(lessThan(tc, ivec2(0)))) continue;
+
+      const vec4 prev_normal_z = texelFetch(img_prev_gbuf, tc, 0);
+      const vec3 prev_normal = prev_normal_z.rgb;
+      const float prev_z = prev_normal_z.a;
+
+      // Bilinear interpolation weight
+      float w = (xx == 0 ? (1.0 - w.x) : w.x) * (yy == 0 ? (1.0 - w.y) : w.y);
+      // Similar normals
+      w *= smoothstep(0.8, 1.0, dot(curr_normal, prev_normal));
+      // Similar depth
+      w *= 1.0 - smoothstep(0.0, 0.02 * max(curr_z, prev_z), abs(curr_z - prev_z));
+
+      prev_irr   += texelFetch(img_prev_accum, tc, 0) * w;
+      const vec4 prev_moments_histlen = texelFetch(img_prev_moments, tc, 0);
+      prev_moments += prev_moments_histlen.rg * w;
+      histlen      += prev_moments_histlen.b  * w;
+      sum_w        += w;
     }
+  }
 
-    vec4 src = imageLoad(src_image, pixel);
-    vec4 dst = imageLoad(dst_image, pixel);
-    imageStore(dst_image, pixel, src + dst);
+  vec4 accum = vec4(curr_irr, 0);
+  vec4 moments = vec4(curr_moments, 1.0, 0); // histlen in b
+
+  if (sum_w > 0.01) {
+    // make sure the prev values are reliable
+    prev_irr /= sum_w;
+    prev_moments /= sum_w;
+    histlen /= sum_w;
+
+    const float alpha_color   = max(1.0 - params.accum_alpha_color,   1.0 / (histlen + 1.0));
+    const float alpha_moments = max(1.0 - params.accum_alpha_moments, 1.0 / (histlen + 1.0));
+
+    accum.rgb = mix(prev_irr.rgb, curr_irr, alpha_color);
+    moments.rg = mix(prev_moments, curr_moments, alpha_moments);
+    moments.b = min(params.histlen_max, histlen + 1.0);
+  }
+
+  imageStore(img_accum, ipos, accum);
+  imageStore(img_moments, ipos, moments);
 }
+

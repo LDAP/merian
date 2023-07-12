@@ -8,6 +8,7 @@ subdir('compute_node')
 subdir('image')
 subdir('shadertoy')
 subdir('shadertoy_spheres')
+subdir('svgf')
 subdir('taa')
 subdir('vkdt_filmcurv')
 

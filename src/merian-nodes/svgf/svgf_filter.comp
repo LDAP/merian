@@ -1,0 +1,122 @@
+#version 460
+#extension GL_GOOGLE_include_directive    : enable
+
+#include "svgf_graph_layout.glsl"
+#include "common/colors_yuv.glsl"
+
+layout(set = 1, binding = 0) uniform sampler2D img_filter_in;
+layout(set = 1, binding = 1) uniform writeonly image2D img_filter_out;
+
+layout(push_constant, std140) uniform push_t {
+    int gap;
+    float param_z;
+    float param_n;
+    float param_l;
+} params;
+
+float get_sigma_l(float center, ivec2 ipos) {
+  const float gaussian_kernel[3][3] = {
+    { 1.0 / 16.0, 1.0 / 8.0, 1.0 / 16.0 },
+    { 1.0 / 8.0,  1.0 / 4.0, 1.0 / 8.0  },
+    { 1.0 / 16.0, 1.0 / 8.0, 1.0 / 16.0 }
+  };
+
+  float sum = center * gaussian_kernel[0][0];
+  const int r = 1;
+  for(int yy = -r; yy <= r; yy++) {
+    for(int xx = -r; xx <= r; xx++) {
+      if(xx != 0 || yy != 0) {
+        ivec2 p = ipos + ivec2(xx, yy);
+        float v = texelFetch(img_filter_in, p, 0).a;
+        float w = gaussian_kernel[xx + 1][yy + 1];
+        sum += v * w;
+      }
+    }
+  }
+
+  return sqrt(max(sum, 0.0));
+}
+
+void tap(const ivec2 p,
+         const float kernel_weight,
+         const float sigma_l,
+         const float c_l,
+         const vec3 c_n,
+         const float c_z,
+         inout vec3 filter_irr,
+         inout float filter_var,
+         inout float filter_w) {
+  const vec4  p_irr_var   = texelFetch(img_filter_in,  p, 0); 
+  const vec4  p_gbuf      = texelFetch(img_gbuf, p, 0); 
+  const vec3  p_n         = p_gbuf.rgb;
+  const float p_z         = p_gbuf.a;
+  const float p_l         = yuv_luminance(p_irr_var.rgb); 
+
+  const float w_l = abs(p_l - c_l) / (sigma_l + 1e-10); 
+  // This is different to the paper version which uses
+  // 3.0 * abs(z_p - z_center.x) / (z_center.y * length(vec2(offset) * step_size) + 1e-2); 
+  const float w_z = (200 * abs(p_z - c_z) / max(p_z, c_z)) / (params.param_z); 
+  const float w_n = pow(max(0, dot(p_n, c_n)), params.param_n); 
+
+  const float w = exp(-w_l * w_l - w_z) * w_n * kernel_weight; 
+
+  filter_irr += p_irr_var.rgb * w; 
+  filter_var += p_irr_var.a * w * w; 
+  filter_w   += w; 
+}
+
+void
+main() {
+  const ivec2 ipos = ivec2(gl_GlobalInvocationID);
+  if (any(greaterThanEqual(ipos, imageSize(img_filter_out)))) return;
+
+  const vec4 gbuf = texelFetch(img_gbuf, ipos, 0);
+  const vec3 c_n = gbuf.rgb;
+  const float c_z = gbuf.a;
+  const vec4 filter_in = texelFetch(img_filter_in, ipos, 0);
+  const float c_l = yuv_luminance(filter_in.rgb);
+
+  const float sigma_l = get_sigma_l(filter_in.a, ipos) * params.param_l;
+
+  vec3 filter_irr = filter_in.rgb;
+  float filter_var = filter_in.a;
+  float filter_w = 1.0;
+
+  if (c_z > 0) {
+    tap(ivec2( 1,  0) * params.gap + ipos, 2.0 / 3.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
+    tap(ivec2( 0,  1) * params.gap + ipos, 2.0 / 3.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
+    tap(ivec2(-1,  0) * params.gap + ipos, 2.0 / 3.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
+    tap(ivec2( 0, -1) * params.gap + ipos, 2.0 / 3.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
+
+    tap(ivec2( 2,  0) * params.gap + ipos, 1.0 / 6.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
+    tap(ivec2( 0,  2) * params.gap + ipos, 1.0 / 6.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
+    tap(ivec2(-2,  0) * params.gap + ipos, 1.0 / 6.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
+    tap(ivec2( 0, -2) * params.gap + ipos, 1.0 / 6.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
+
+    tap(ivec2( 1,  1) * params.gap + ipos, 4.0 / 9.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
+    tap(ivec2(-1,  1) * params.gap + ipos, 4.0 / 9.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
+    tap(ivec2(-1, -1) * params.gap + ipos, 4.0 / 9.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
+    tap(ivec2( 1, -1) * params.gap + ipos, 4.0 / 9.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
+
+    tap(ivec2( 1,  2) * params.gap + ipos, 1.0 / 9.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
+    tap(ivec2(-1,  2) * params.gap + ipos, 1.0 / 9.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
+    tap(ivec2(-1, -2) * params.gap + ipos, 1.0 / 9.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
+    tap(ivec2( 1, -2) * params.gap + ipos, 1.0 / 9.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
+
+    tap(ivec2( 2,  1) * params.gap + ipos, 1.0 / 9.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
+    tap(ivec2(-2,  1) * params.gap + ipos, 1.0 / 9.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
+    tap(ivec2(-2, -1) * params.gap + ipos, 1.0 / 9.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
+    tap(ivec2( 2, -1) * params.gap + ipos, 1.0 / 9.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
+
+    tap(ivec2( 2,  2) * params.gap + ipos, 1.0 / 36.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
+    tap(ivec2(-2,  2) * params.gap + ipos, 1.0 / 36.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
+    tap(ivec2(-2, -2) * params.gap + ipos, 1.0 / 36.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
+    tap(ivec2( 2, -2) * params.gap + ipos, 1.0 / 36.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
+
+    filter_irr /= filter_w;
+    filter_var /= (filter_w * filter_w);
+  }
+
+  imageStore(img_filter_out, ipos, vec4(filter_irr, filter_var));
+}
+

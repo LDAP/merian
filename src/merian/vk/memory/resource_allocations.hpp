@@ -53,14 +53,14 @@ class Buffer : public std::enable_shared_from_this<Buffer> {
     vk::DeviceAddress get_device_address();
 
     // Return a suitable vk::BufferMemoryBarrier.
-    vk::BufferMemoryBarrier
+    [[nodiscard]] vk::BufferMemoryBarrier
     buffer_barrier(const vk::AccessFlags src_access_flags,
                    const vk::AccessFlags dst_access_flags,
                    const vk::DeviceSize size = VK_WHOLE_SIZE,
                    const uint32_t src_queue_family_index = VK_QUEUE_FAMILY_IGNORED,
                    const uint32_t dst_queue_family_index = VK_QUEUE_FAMILY_IGNORED);
 
-    vk::BufferMemoryBarrier2
+    [[nodiscard]] vk::BufferMemoryBarrier2
     buffer_barrier2(const vk::PipelineStageFlags2 src_stage_flags,
                     const vk::PipelineStageFlags2 dst_stage_flags,
                     const vk::AccessFlags2 src_access_flags,
@@ -134,7 +134,7 @@ class Image : public std::enable_shared_from_this<Image> {
     // Do not forget submite the barrier, else the internal state does not match the actual
     // state You can use transition_from_undefined when you are not interested in keeping the
     // contents, this can be more performant.
-    vk::ImageMemoryBarrier
+    [[nodiscard]] vk::ImageMemoryBarrier
     barrier(const vk::ImageLayout new_layout,
             const vk::AccessFlags src_access_flags = {},
             const vk::AccessFlags dst_access_flags = {},
@@ -143,7 +143,7 @@ class Image : public std::enable_shared_from_this<Image> {
             const vk::ImageSubresourceRange subresource_range = all_levels_and_layers(),
             const bool transition_from_undefined = false);
 
-    vk::ImageMemoryBarrier2
+    [[nodiscard]] vk::ImageMemoryBarrier2
     barrier2(const vk::ImageLayout new_layout,
              const vk::AccessFlags2 src_access_flags = {},
              const vk::AccessFlags2 dst_access_flags = {},
@@ -203,8 +203,8 @@ class Texture : public std::enable_shared_from_this<Texture> {
         return *image;
     }
 
-    const vk::Image& get_image() const {
-        return *image;
+    const ImageHandle& get_image() const {
+        return image;
     }
 
     const MemoryAllocationHandle& get_memory() const {

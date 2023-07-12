@@ -27,6 +27,6 @@ Inputs:
 
 Outputs:
 
-| Type  | Input ID | Input name | Description         | Format/Resolution                    | Persistent |
-|-------|----------|------------|---------------------|--------------------------------------|------------|
-| Image | 0        | result     | split screen image  | user defined or twice as wide as `a` | no         |
+| Type  | Output ID | Output name | Description         | Format/Resolution                    | Persistent |
+|-------|-----------|-------------|---------------------|--------------------------------------|------------|
+| Image | 0         | result      | split screen image  | user defined or twice as wide as `a` | no         |

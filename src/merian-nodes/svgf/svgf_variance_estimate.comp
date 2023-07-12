@@ -1,0 +1,72 @@
+#version 460
+#extension GL_GOOGLE_include_directive    : enable
+
+#include "svgf_graph_layout.glsl"
+
+/*
+ * Reads the accumulated irradiance and the moments, estimates the variance,
+ * and prepares the filter input `img_filter_in`.
+ */
+
+layout(set = 1, binding = 0) uniform sampler2D unused; // needed to match the filter layout
+layout(set = 1, binding = 1) uniform writeonly image2D img_filter_in;
+
+layout(push_constant, std140) uniform push_t {
+    int fresh_threshold;
+    float fresh_variance_boost;
+} params;
+
+
+void
+main()
+{
+  const ivec2 ipos = ivec2(gl_GlobalInvocationID);
+  if (any(greaterThanEqual(ipos, imageSize(img_filter_in)))) return;
+
+  const vec4 normal_z = texelFetch(img_gbuf, ipos, 0);
+  const vec3 normal = normal_z.rgb;
+  const float z = normal_z.a;
+  vec3 irr = texelFetch(img_irr, ipos, 0).rgb;
+
+  const vec4 moments_histlen = texelFetch(img_moments, ipos, 0);
+  const vec2 moments = moments_histlen.rg;
+  const float histlen = moments_histlen.b;
+
+  float variance = 0.;
+  if (histlen < params.fresh_threshold) {
+    // spatial and temporal variance and color
+    float sum_w = 1.0;
+    vec2 m = moments;
+
+    const int r = histlen > 1 ? 2 : 3;
+    for(int yy = -r; yy <= r; yy++) {
+      for(int xx = -r; xx <= r; xx++) {
+        if(xx != 0 || yy != 0) { // added already
+          ivec2 p = ipos + ivec2(xx, yy);
+
+          const vec4 neigh_normal_z = texelFetch(img_gbuf, p, 0);
+          const float neigh_z = neigh_normal_z.w;
+
+          float w = 1.0;
+          // Weight neighbors with similar normals
+          w *= smoothstep(0.8, 1.0, dot(normal, neigh_normal_z.rgb));
+          // Weight neighbors with similar depth
+          w *= 1.0 - smoothstep(0.0, 0.02 * max(z, neigh_z), abs(z - neigh_z));
+
+          sum_w += w;
+          m += texelFetch(img_moments, p, 0).rg * w;
+          irr += texelFetch(img_irr, p, 0).rgb * w;
+        }
+      }
+    }
+    m /= sum_w;
+    irr /= sum_w;
+    variance = max(0.0, m.y - m.x * m.x) * (1.0 + params.fresh_variance_boost * (1.0 - histlen / params.fresh_threshold));
+  } else {
+    // temporal variance
+    variance = max(0.0, moments.y - moments.x * moments.x);
+  }
+
+  imageStore(img_filter_in, ipos, vec4(irr, variance));
+}
+

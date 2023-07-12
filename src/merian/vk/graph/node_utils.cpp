@@ -10,7 +10,8 @@ namespace merian {
 // Creates descriptor sets with from the cmd_build inputs.
 // An appropriate layout is created if optional_layout is null.
 // The graph resources are bound in order input images, input buffers, output images,
-// output buffers.
+// output buffers. The textures contain the images in the same order.
+// 
 // Input images are bound as sampler2d, output images as image2d.
 //
 // The descriptors for images are created with layout eShaderReadOnly and eGeneral for inputs and

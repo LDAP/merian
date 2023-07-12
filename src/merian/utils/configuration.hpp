@@ -70,8 +70,10 @@ class Configuration {
     virtual void
     config_percent(const std::string& id, float& value, const std::string& desc = "") = 0;
 
-    virtual void
-    config_float(const std::string& id, float& value, const std::string& desc = "") = 0;
+    virtual void config_float(const std::string& id,
+                              float& value,
+                              const std::string& desc = "",
+                              const float sensitivity = 1.0f) = 0;
     virtual void config_float(const std::string& id,
                               float& value,
                               const float& min,
