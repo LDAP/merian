@@ -15,6 +15,13 @@ layout(push_constant, std140) uniform push_t {
     int filter_variance;
 } params;
 
+vec3 filter_irr;
+float filter_var;
+float filter_w;
+vec3 c_n;
+float c_z;
+float c_l;
+
 float get_sigma_l(float center, ivec2 ipos) {
   const float gaussian_kernel[3][3] = {
     { 1.0 / 16.0, 1.0 / 8.0, 1.0 / 16.0 },
@@ -40,13 +47,7 @@ float get_sigma_l(float center, ivec2 ipos) {
 
 void tap(const ivec2 p,
          const float kernel_weight,
-         const float sigma_l,
-         const float c_l,
-         const vec3 c_n,
-         const float c_z,
-         inout vec3 filter_irr,
-         inout float filter_var,
-         inout float filter_w) {
+         const float sigma_l) {
   const vec4  p_irr_var   = texelFetch(img_filter_in,  p, 0); 
   const vec4  p_gbuf      = texelFetch(img_gbuf, p, 0); 
   const vec3  p_n         = p_gbuf.rgb;
@@ -72,10 +73,10 @@ main() {
   if (any(greaterThanEqual(ipos, imageSize(img_filter_out)))) return;
 
   const vec4 gbuf = texelFetch(img_gbuf, ipos, 0);
-  const vec3 c_n = gbuf.rgb;
-  const float c_z = gbuf.a;
+  c_n = gbuf.rgb;
+  c_z = gbuf.a;
   const vec4 filter_in = texelFetch(img_filter_in, ipos, 0);
-  const float c_l = yuv_luminance(filter_in.rgb);
+  c_l = yuv_luminance(filter_in.rgb);
 
   float sigma_l = 0;
   if (params.filter_variance == 1) {
@@ -86,40 +87,40 @@ main() {
     sigma_l = sqrt(filter_in.a) * params.param_l;
   }
 
-  vec3 filter_irr = filter_in.rgb;
-  float filter_var = filter_in.a;
-  float filter_w = 1.0;
+  filter_irr = filter_in.rgb;
+  filter_var = filter_in.a;
+  filter_w = 1.0;
 
   if (c_z > 0) {
-    tap(ivec2( 1,  0) * params.gap + ipos, 2.0 / 3.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
-    tap(ivec2( 0,  1) * params.gap + ipos, 2.0 / 3.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
-    tap(ivec2(-1,  0) * params.gap + ipos, 2.0 / 3.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
-    tap(ivec2( 0, -1) * params.gap + ipos, 2.0 / 3.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
+    tap(ivec2( 1,  0) * params.gap + ipos, 2.0 / 3.0, sigma_l);
+    tap(ivec2( 0,  1) * params.gap + ipos, 2.0 / 3.0, sigma_l);
+    tap(ivec2(-1,  0) * params.gap + ipos, 2.0 / 3.0, sigma_l);
+    tap(ivec2( 0, -1) * params.gap + ipos, 2.0 / 3.0, sigma_l);
 
-    tap(ivec2( 2,  0) * params.gap + ipos, 1.0 / 6.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
-    tap(ivec2( 0,  2) * params.gap + ipos, 1.0 / 6.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
-    tap(ivec2(-2,  0) * params.gap + ipos, 1.0 / 6.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
-    tap(ivec2( 0, -2) * params.gap + ipos, 1.0 / 6.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
+    tap(ivec2( 2,  0) * params.gap + ipos, 1.0 / 6.0, sigma_l);
+    tap(ivec2( 0,  2) * params.gap + ipos, 1.0 / 6.0, sigma_l);
+    tap(ivec2(-2,  0) * params.gap + ipos, 1.0 / 6.0, sigma_l);
+    tap(ivec2( 0, -2) * params.gap + ipos, 1.0 / 6.0, sigma_l);
 
-    tap(ivec2( 1,  1) * params.gap + ipos, 4.0 / 9.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
-    tap(ivec2(-1,  1) * params.gap + ipos, 4.0 / 9.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
-    tap(ivec2(-1, -1) * params.gap + ipos, 4.0 / 9.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
-    tap(ivec2( 1, -1) * params.gap + ipos, 4.0 / 9.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
+    tap(ivec2( 1,  1) * params.gap + ipos, 4.0 / 9.0, sigma_l);
+    tap(ivec2(-1,  1) * params.gap + ipos, 4.0 / 9.0, sigma_l);
+    tap(ivec2(-1, -1) * params.gap + ipos, 4.0 / 9.0, sigma_l);
+    tap(ivec2( 1, -1) * params.gap + ipos, 4.0 / 9.0, sigma_l);
 
-    tap(ivec2( 1,  2) * params.gap + ipos, 1.0 / 9.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
-    tap(ivec2(-1,  2) * params.gap + ipos, 1.0 / 9.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
-    tap(ivec2(-1, -2) * params.gap + ipos, 1.0 / 9.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
-    tap(ivec2( 1, -2) * params.gap + ipos, 1.0 / 9.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
+    tap(ivec2( 1,  2) * params.gap + ipos, 1.0 / 9.0, sigma_l);
+    tap(ivec2(-1,  2) * params.gap + ipos, 1.0 / 9.0, sigma_l);
+    tap(ivec2(-1, -2) * params.gap + ipos, 1.0 / 9.0, sigma_l);
+    tap(ivec2( 1, -2) * params.gap + ipos, 1.0 / 9.0, sigma_l);
 
-    tap(ivec2( 2,  1) * params.gap + ipos, 1.0 / 9.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
-    tap(ivec2(-2,  1) * params.gap + ipos, 1.0 / 9.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
-    tap(ivec2(-2, -1) * params.gap + ipos, 1.0 / 9.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
-    tap(ivec2( 2, -1) * params.gap + ipos, 1.0 / 9.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
+    tap(ivec2( 2,  1) * params.gap + ipos, 1.0 / 9.0, sigma_l);
+    tap(ivec2(-2,  1) * params.gap + ipos, 1.0 / 9.0, sigma_l);
+    tap(ivec2(-2, -1) * params.gap + ipos, 1.0 / 9.0, sigma_l);
+    tap(ivec2( 2, -1) * params.gap + ipos, 1.0 / 9.0, sigma_l);
 
-    tap(ivec2( 2,  2) * params.gap + ipos, 1.0 / 36.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
-    tap(ivec2(-2,  2) * params.gap + ipos, 1.0 / 36.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
-    tap(ivec2(-2, -2) * params.gap + ipos, 1.0 / 36.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
-    tap(ivec2( 2, -2) * params.gap + ipos, 1.0 / 36.0, sigma_l, c_l, c_n, c_z, filter_irr, filter_var, filter_w);
+    tap(ivec2( 2,  2) * params.gap + ipos, 1.0 / 36.0, sigma_l);
+    tap(ivec2(-2,  2) * params.gap + ipos, 1.0 / 36.0, sigma_l);
+    tap(ivec2(-2, -2) * params.gap + ipos, 1.0 / 36.0, sigma_l);
+    tap(ivec2( 2, -2) * params.gap + ipos, 1.0 / 36.0, sigma_l);
 
     filter_irr /= filter_w;
     filter_var /= (filter_w * filter_w);
