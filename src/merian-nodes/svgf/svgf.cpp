@@ -146,8 +146,8 @@ void SVGFNode::cmd_process(const vk::CommandBuffer& cmd,
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "estimate variance");
         // prepare image to write to
         auto bar = ping_pong_res[0].ping_pong->get_image()->barrier(
-                                                                    vk::ImageLayout::eGeneral, {}, vk::AccessFlagBits::eShaderWrite, VK_QUEUE_FAMILY_IGNORED,
-                                                                    VK_QUEUE_FAMILY_IGNORED, all_levels_and_layers(), true);
+            vk::ImageLayout::eGeneral, {}, vk::AccessFlagBits::eShaderWrite,
+            VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, all_levels_and_layers(), true);
         cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
                             vk::PipelineStageFlagBits::eComputeShader, {}, {}, {}, bar);
 
@@ -160,9 +160,9 @@ void SVGFNode::cmd_process(const vk::CommandBuffer& cmd,
 
         // make sure writes are visible
         bar = ping_pong_res[0].ping_pong->get_image()->barrier(
-                                                               vk::ImageLayout::eShaderReadOnlyOptimal, vk::AccessFlagBits::eShaderWrite,
-                                                               vk::AccessFlagBits::eShaderRead, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
-                                                               all_levels_and_layers());
+            vk::ImageLayout::eShaderReadOnlyOptimal, vk::AccessFlagBits::eShaderWrite,
+            vk::AccessFlagBits::eShaderRead, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
+            all_levels_and_layers());
         cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
                             vk::PipelineStageFlagBits::eComputeShader, {}, {}, {}, bar);
     }
@@ -207,17 +207,18 @@ void SVGFNode::cmd_process(const vk::CommandBuffer& cmd,
         taa->push_constant(cmd, taa_pc);
         cmd.dispatch(group_size_x, group_size_y, 1);
     }
-    
 }
 
 void SVGFNode::get_configuration(Configuration& config) {
     config.st_separate("Variance estimate");
-    config.config_int(
-        "fresh threshold", variance_estimate_pc.fresh_threshold,
-        "Shorter histories are considered fresh. For those the variance is computed spatially.");
-    config.config_float(
-        "fresh boost", variance_estimate_pc.fresh_variance_boost,
-        "Boost the variance of 'fresh' histories.");
+    config.config_int("spatial threshold", variance_estimate_pc.spatial_threshold, 0, 32,
+                      "Compute the variance spatially for shorter histories.");
+    config.config_float("spatial boost", variance_estimate_pc.spatial_variance_boost,
+                        "Boost the variance of spatial variance estimates.");
+    config.config_angle("normal threshold", variance_estimate_pc.normal_reject_rad,
+                        "Reject points with normals farther apart", 0, 90);
+    config.config_percent("depth threshold", variance_estimate_pc.depth_reject_percent,
+                          "Reject points with depths farther apart (relative to the max)");
 
     config.st_separate("Filter");
     config.config_int("SVGF iterations", svgf_iterations, 0, 10,

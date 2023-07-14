@@ -16,6 +16,8 @@ class AccumulateNode : public ComputeNode {
         float accum_alpha_color = 0.9;
         float accum_alpha_moments = 0.9;
         int histlen_max = 64;
+        float normal_reject_rad = 0.8;
+        float depth_reject_percent = 0.05;
     };
 
   public:

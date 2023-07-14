@@ -12,8 +12,10 @@ layout(set = 1, binding = 0) uniform sampler2D unused; // needed to match the fi
 layout(set = 1, binding = 1) uniform writeonly image2D img_filter_in;
 
 layout(push_constant, std140) uniform push_t {
-    int fresh_threshold;
-    float fresh_variance_boost;
+    int spatial_threshold;
+    float spatial_variance_boost;
+    float normal_reject_rad;
+    float depth_reject_percent;
 } params;
 
 
@@ -33,7 +35,7 @@ main()
   const float histlen = moments_histlen.b;
 
   float variance = 0.;
-  if (histlen < params.fresh_threshold) {
+  if (histlen < params.spatial_threshold) {
     // spatial and temporal variance and color
     float sum_w = 1.0;
     vec2 m = moments;
@@ -49,9 +51,9 @@ main()
 
           float w = 1.0;
           // Weight neighbors with similar normals
-          w *= smoothstep(0.8, 1.0, dot(normal, neigh_normal_z.rgb));
+          w *= smoothstep(params.normal_reject_rad, 1.0, dot(normal, neigh_normal_z.rgb));
           // Weight neighbors with similar depth
-          w *= 1.0 - smoothstep(0.0, 0.02 * max(z, neigh_z), abs(z - neigh_z));
+          w *= 1.0 - smoothstep(0.0, params.depth_reject_percent * max(z, neigh_z), abs(z - neigh_z));
 
           sum_w += w;
           m += texelFetch(img_moments, p, 0).rg * w;
@@ -61,7 +63,7 @@ main()
     }
     m /= sum_w;
     irr /= sum_w;
-    variance = max(0.0, m.y - m.x * m.x) * (1.0 + params.fresh_variance_boost * (1.0 - histlen / params.fresh_threshold));
+    variance = max(0.0, m.y - m.x * m.x) * (1.0 + params.spatial_variance_boost * (1.0 - histlen / params.spatial_threshold));
   } else {
     // temporal variance
     variance = max(0.0, moments.y - moments.x * moments.x);

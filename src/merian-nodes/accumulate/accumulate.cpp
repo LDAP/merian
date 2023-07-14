@@ -84,6 +84,10 @@ void AccumulateNode::get_configuration(Configuration& config) {
                         "Blend factor for the moments and previous moments. More means more reuse");
     config.config_int("history length max", pc.histlen_max,
                       "Clamps the history length counter to this value");
+    config.config_angle("normal threshold", pc.normal_reject_rad,
+                        "Reject points with normals farther apart", 0, 90);
+    config.config_percent("depth threshold", pc.depth_reject_percent,
+                          "Reject points with depths farther apart (relative to the max)");
 }
 
 } // namespace merian

@@ -25,6 +25,8 @@ layout(push_constant, std140) uniform params_t {
     float accum_alpha_color;
     float accum_alpha_moments;
     int histlen_max;
+    float normal_reject_rad;
+    float depth_reject_percent;
 } params;
 
 void
@@ -40,10 +42,10 @@ main() {
   const vec2 curr_moments = vec2(curr_l, curr_l * curr_l);
 
   const vec2 mv = texelFetch(img_mv, ipos, 0).rg;
-  const vec2 prev_pos = ivec2(ipos + mv);
-  const ivec2 prev_ipos = ivec2(prev_pos);
+  const vec2 prev_pos = ipos + mv;
+  const ivec2 prev_ipos = ivec2(floor(prev_pos));
   const vec2 w = fract(prev_pos);
-
+  
   // Bilinear interpolation of previous data
   vec4 prev_irr   = vec4(0);
   vec2 prev_moments = vec2(0);
@@ -65,7 +67,7 @@ main() {
       // Similar normals
       w *= smoothstep(0.8, 1.0, dot(curr_normal, prev_normal));
       // Similar depth
-      w *= 1.0 - smoothstep(0.0, 0.02 * max(curr_z, prev_z), abs(curr_z - prev_z));
+      w *= 1.0 - smoothstep(0.0, 0.05 * max(curr_z, prev_z), abs(curr_z - prev_z));
 
       prev_irr   += texelFetch(img_prev_accum, tc, 0) * w;
       const vec4 prev_moments_histlen = texelFetch(img_prev_moments, tc, 0);

@@ -33,8 +33,11 @@ class ImGuiConfiguration : public Configuration {
     config_vec(const std::string& id, glm::vec3& value, const std::string& desc = "") override;
     virtual void
     config_vec(const std::string& id, glm::vec4& value, const std::string& desc = "") override;
-    virtual void
-    config_angle(const std::string& id, float& angle, const std::string& desc = "") override;
+    virtual void config_angle(const std::string& id,
+                              float& angle,
+                              const std::string& desc = "",
+                              const float min = -360,
+                              const float max = 360) override;
     virtual void
     config_percent(const std::string& id, float& value, const std::string& desc = "") override;
     virtual void config_float(const std::string& id,

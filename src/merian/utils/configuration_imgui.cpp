@@ -69,8 +69,10 @@ void ImGuiConfiguration::config_vec(const std::string& id,
 }
 void ImGuiConfiguration::config_angle(const std::string& id,
                                       float& angle,
-                                      const std::string& desc) {
-    ImGui::SliderAngle(id.c_str(), &angle);
+                                      const std::string& desc,
+                                      const float min,
+                                      const float max) {
+    ImGui::SliderAngle(id.c_str(), &angle, min, max);
     tooltip(desc);
 }
 void ImGuiConfiguration::config_percent(const std::string& id,
