@@ -9,7 +9,7 @@ Inputs:
 | Image | 0        | prev_accum   | feedback last `accum`                                       | 1     |
 | Image | 1        | prev_moments | feedback last `moments`                                     | 1     |
 |       |
-| Image | 2        | irr          | irradiance input                                            | no    |
+| Image | 2        | irr          | irradiance input (irradiance in `rgb`, sample count in `a`) | no    |
 | Image | 3        | gbuf         | GBuffer (normal in rgb, linear depth in a)                  | no    |
 | Image | 4        | prev_gbuf    | previous GBuffer                                            | 1     |
 |       |
@@ -19,5 +19,5 @@ Outputs:
 
 | Type  | Output ID | Output name | Description                                                 | Format/Resolution        | Persistent |
 |-------|-----------|-------------|-------------------------------------------------------------|--------------------------|------------|
-| Image | 0         | accum       | exp average of irradiance in `rgb`                          | rgba32f                  | no         |
-| Image | 1         | moments     | exp average of moments in `rg`, history length in `b`       | rgba32f                  | no         |
+| Image | 0         | accum       | exp average of irradiance in `rgb`, history length in `a`   | rgba32f                  | no         |
+| Image | 1         | moments     | exp average of moments in `rg`                              | rgba32f                  | no         |

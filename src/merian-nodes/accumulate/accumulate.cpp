@@ -77,18 +77,13 @@ ShaderModuleHandle AccumulateNode::get_shader_module() {
 }
 
 void AccumulateNode::get_configuration(Configuration& config) {
-    config.config_float(
-        "alpha color", pc.accum_alpha_color, 0, 1,
-        "Blend factor for the irradiance and previous irradiance. More means more reuse");
-    config.config_float("alpha moments", pc.accum_alpha_moments, 0, 1,
-                        "Blend factor for the moments and previous moments. More means more reuse");
-    config.config_int("history length max", pc.histlen_max,
-                      "Clamps the history length counter to this value");
+    config.config_float("alpha", pc.accum_alpha, 0, 1,
+                        "Blend factor with the previous information. More means more reuse");
     config.config_angle("normal threshold", pc.normal_reject_rad,
                         "Reject points with normals farther apart", 0, 90);
     config.config_percent("depth threshold", pc.depth_reject_percent,
                           "Reject points with depths farther apart (relative to the max)");
-    config.config_options("filter mode", pc.filter_mode, {"nearest",  "linear"});
+    config.config_options("filter mode", pc.filter_mode, {"nearest", "linear"});
 }
 
 } // namespace merian

@@ -211,7 +211,7 @@ void SVGFNode::cmd_process(const vk::CommandBuffer& cmd,
 
 void SVGFNode::get_configuration(Configuration& config) {
     config.st_separate("Variance estimate");
-    config.config_int("spatial threshold", variance_estimate_pc.spatial_threshold, 0, 32,
+    config.config_int("spatial threshold", variance_estimate_pc.spatial_threshold, 0, 120,
                       "Compute the variance spatially for shorter histories.");
     config.config_float("spatial boost", variance_estimate_pc.spatial_variance_boost,
                         "Boost the variance of spatial variance estimates.");

@@ -13,7 +13,7 @@ class SVGFNode : public Node {
     static constexpr uint32_t local_size_y = 16;
 
     struct VarianceEstimatePushConstant {
-        int spatial_threshold = 0;
+        int spatial_threshold = 16;
         float spatial_variance_boost = 2.0;
         float normal_reject_rad = 0.8;
         float depth_reject_percent = 0.05;
@@ -87,7 +87,7 @@ class SVGFNode : public Node {
     uint32_t group_size_x;
     uint32_t group_size_y;
 
-    int svgf_iterations = 4;
+    int svgf_iterations = 6;
 
     std::vector<TextureHandle> graph_textures;
     std::vector<DescriptorSetHandle> graph_sets;

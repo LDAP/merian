@@ -28,19 +28,17 @@ main()
   const vec4 normal_z = texelFetch(img_gbuf, ipos, 0);
   const vec3 normal = normal_z.rgb;
   const float z = normal_z.a;
-  vec3 irr = texelFetch(img_irr, ipos, 0).rgb;
+  vec4 irr_histlen = texelFetch(img_irr, ipos, 0);
 
-  const vec4 moments_histlen = texelFetch(img_moments, ipos, 0);
-  const vec2 moments = moments_histlen.rg;
-  const float histlen = moments_histlen.b;
+  const vec2 moments = texelFetch(img_moments, ipos, 0).rg;
 
   float variance = 0.;
-  if (histlen < params.spatial_threshold) {
+  if (irr_histlen.a < params.spatial_threshold) {
     // spatial and temporal variance and color
     float sum_w = 1.0;
     vec2 m = moments;
 
-    const int r = histlen > 1 ? 2 : 3;
+    const int r = irr_histlen.a < params.spatial_threshold / 2 ? 2 : 1;
     for(int yy = -r; yy <= r; yy++) {
       for(int xx = -r; xx <= r; xx++) {
         if(xx != 0 || yy != 0) { // added already
@@ -54,21 +52,23 @@ main()
           w *= smoothstep(params.normal_reject_rad, 1.0, dot(normal, neigh_normal_z.rgb));
           // Weight neighbors with similar depth
           w *= 1.0 - smoothstep(0.0, params.depth_reject_percent * max(z, neigh_z), abs(z - neigh_z));
+          // Weight lower with increasing history
+          //w *= 1.0 - irr_histlen.a / params.spatial_threshold;
 
-          sum_w += w;
-          m += texelFetch(img_moments, p, 0).rg * w;
-          irr += texelFetch(img_irr, p, 0).rgb * w;
+          sum_w           += w;
+          irr_histlen.rgb += w * texelFetch(img_irr, p, 0).rgb;
+          m               += w * texelFetch(img_moments, p, 0).rg;
         }
       }
     }
-    m /= sum_w;
-    irr /= sum_w;
-    variance = max(0.0, m.y - m.x * m.x) * (1.0 + params.spatial_variance_boost * (1.0 - histlen / params.spatial_threshold));
+    irr_histlen.rgb /= sum_w;
+    m               /= sum_w;
+    variance = max(0.0, m.y - m.x * m.x) * (1. + params.spatial_variance_boost * (1.0 - irr_histlen.a / params.spatial_threshold));
   } else {
     // temporal variance
     variance = max(0.0, moments.y - moments.x * moments.x);
   }
 
-  imageStore(img_filter_in, ipos, vec4(irr, variance));
+  imageStore(img_filter_in, ipos, vec4(irr_histlen.rgb, variance));
 }
 

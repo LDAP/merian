@@ -13,8 +13,8 @@ Inputs:
 |-------|----------|--------------|-------------------------------------------------------------|-------|
 | Image | 0        | prev_out     | feedback last `out`                                         | 1     |
 |       |
-| Image | 1        | irr          | (accumulated) noisy irradiance                              | no    |
-| Image | 2        | moments      | first and second moment in `rg`, history length in `b`      | no    |
+| Image | 1        | irr          | (accumulated) noisy irradiance, history length in `a`       | no    |
+| Image | 2        | moments      | first and second moment in `rg`                             | no    |
 |       |
 | Image | 3        | gbuf         | GBuffer (normal in rgb, linear depth in a)                  | no    |
 | Image | 4        | prev_gbuf    | previous GBuffer                                            | 1     |
