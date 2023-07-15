@@ -27,6 +27,7 @@ layout(push_constant, std140) uniform params_t {
     int histlen_max;
     float normal_reject_rad;
     float depth_reject_percent;
+    int filter_mode;
 } params;
 
 void
@@ -43,37 +44,60 @@ main() {
 
   const vec2 mv = texelFetch(img_mv, ipos, 0).rg;
   const vec2 prev_pos = ipos + mv;
-  const ivec2 prev_ipos = ivec2(floor(prev_pos));
-  const vec2 w = fract(prev_pos);
-  
-  // Bilinear interpolation of previous data
-  vec4 prev_irr   = vec4(0);
+
+  vec4 prev_irr     = vec4(0);
   vec2 prev_moments = vec2(0);
   float sum_w       = 0.0;
   float histlen     = 0.0;
-  for(int yy = 0; yy <= 1; yy++) {
-    for(int xx = 0; xx <= 1; xx++) {
 
-      const ivec2 tc = prev_ipos + ivec2(xx, yy);
-      if(any(greaterThanEqual(tc, textureSize(img_prev_accum, 0)))
-         || any(lessThan(tc, ivec2(0)))) continue;
+  if (params.filter_mode == 0) {
+    const ivec2 prev_ipos = ivec2(round(prev_pos));
 
-      const vec4 prev_normal_z = texelFetch(img_prev_gbuf, tc, 0);
-      const vec3 prev_normal = prev_normal_z.rgb;
-      const float prev_z = prev_normal_z.a;
+    const vec4 prev_normal_z = texelFetch(img_prev_gbuf, prev_ipos, 0);
+    const vec3 prev_normal = prev_normal_z.rgb;
+    const float prev_z = prev_normal_z.a;
+    const vec4 prev_moments_histlen = texelFetch(img_prev_moments, prev_ipos, 0);
 
-      // Bilinear interpolation weight
-      float w = (xx == 0 ? (1.0 - w.x) : w.x) * (yy == 0 ? (1.0 - w.y) : w.y);
-      // Similar normals
-      w *= smoothstep(0.8, 1.0, dot(curr_normal, prev_normal));
-      // Similar depth
-      w *= 1.0 - smoothstep(0.0, 0.05 * max(curr_z, prev_z), abs(curr_z - prev_z));
+    float w = 1.0;
+    // Similar normals
+    w *= smoothstep(0.8, 1.0, dot(curr_normal, prev_normal));
+    // Similar depth
+    w *= 1.0 - smoothstep(0.0, 0.05 * max(curr_z, prev_z), abs(curr_z - prev_z));
 
-      prev_irr   += texelFetch(img_prev_accum, tc, 0) * w;
-      const vec4 prev_moments_histlen = texelFetch(img_prev_moments, tc, 0);
-      prev_moments += prev_moments_histlen.rg * w;
-      histlen      += prev_moments_histlen.b  * w;
-      sum_w        += w;
+    prev_irr     = w * texelFetch(img_prev_accum, prev_ipos, 0);
+    prev_moments = w * prev_moments_histlen.rg;
+    histlen      = w * prev_moments_histlen.b;
+    sum_w        = w;
+
+  } else if (params.filter_mode == 1) {
+    const ivec2 prev_ipos = ivec2(floor(prev_pos));
+    const vec2 inter_w = fract(prev_pos);
+
+    // Bilinear interpolation of previous data
+    for(int yy = 0; yy <= 1; yy++) {
+      for(int xx = 0; xx <= 1; xx++) {
+
+        const ivec2 tc = prev_ipos + ivec2(xx, yy);
+        if(any(greaterThanEqual(tc, textureSize(img_prev_accum, 0)))
+           || any(lessThan(tc, ivec2(0)))) continue;
+
+        const vec4 prev_normal_z = texelFetch(img_prev_gbuf, tc, 0);
+        const vec3 prev_normal = prev_normal_z.rgb;
+        const float prev_z = prev_normal_z.a;
+
+        // Bilinear interpolation weight
+        float w = (xx == 0 ? (1.0 - inter_w.x) : inter_w.x) * (yy == 0 ? (1.0 - inter_w.y) : inter_w.y);
+        // Similar normals
+        w *= smoothstep(0.8, 1.0, dot(curr_normal, prev_normal));
+        // Similar depth
+        w *= 1.0 - smoothstep(0.0, 0.05 * max(curr_z, prev_z), abs(curr_z - prev_z));
+
+        const vec4 prev_moments_histlen = texelFetch(img_prev_moments, tc, 0);
+        prev_irr     += w * texelFetch(img_prev_accum, tc, 0);
+        prev_moments += w * prev_moments_histlen.rg;
+        histlen      += w * prev_moments_histlen.b;
+        sum_w        += w;
+      }
     }
   }
 

@@ -88,6 +88,7 @@ void AccumulateNode::get_configuration(Configuration& config) {
                         "Reject points with normals farther apart", 0, 90);
     config.config_percent("depth threshold", pc.depth_reject_percent,
                           "Reject points with depths farther apart (relative to the max)");
+    config.config_options("filter mode", pc.filter_mode, {"nearest",  "linear"});
 }
 
 } // namespace merian

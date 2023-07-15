@@ -18,6 +18,7 @@ class AccumulateNode : public ComputeNode {
         int histlen_max = 64;
         float normal_reject_rad = 0.8;
         float depth_reject_percent = 0.05;
+        int filter_mode = 1;
     };
 
   public:

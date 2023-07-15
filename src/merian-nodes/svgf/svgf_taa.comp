@@ -28,7 +28,7 @@ main()
   }
 
   const vec3 irr = filter_result.rgb;
-  vec3 prev_irr = texelFetch(img_prev_out, ivec2(ipos + mv), 0).rgb;
+  vec3 prev_irr = texelFetch(img_prev_out, ivec2(round(ipos + mv)), 0).rgb;
 
   if (any(isnan(prev_irr)) || any(isinf(prev_irr))) {
     prev_irr = irr;
