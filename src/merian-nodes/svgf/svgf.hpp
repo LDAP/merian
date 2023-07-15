@@ -24,7 +24,7 @@ class SVGFNode : public Node {
         float param_z = 10;  // parameter for depth      = 1   larger blurs more 
         float param_n = 64;  // parameter for normals    = 128 smaller blurs more
         float param_l = 8;   // parameter for brightness = 4   larger blurs more
-        int filter_variance = 0;
+        int filter_variance = 1;
     };
 
     struct TAAPushConstant {
