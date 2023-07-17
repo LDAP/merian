@@ -79,6 +79,11 @@ ShaderModuleHandle AccumulateNode::get_shader_module() {
 void AccumulateNode::get_configuration(Configuration& config) {
     config.config_float("alpha", pc.accum_alpha, 0, 1,
                         "Blend factor with the previous information. More means more reuse");
+    config.config_float("max history", pc.accum_max_hist,
+                        "artificially limit the history counter. This can be a good alternative to "
+                        "reducing the blend alpha");
+    config.st_no_space();
+    pc.accum_max_hist = config.config_bool("inf") ? INFINITY : pc.accum_max_hist;
     config.config_angle("normal threshold", pc.normal_reject_rad,
                         "Reject points with normals farther apart", 0, 90);
     config.config_percent("depth threshold", pc.depth_reject_percent,

@@ -23,6 +23,7 @@ layout(set = 0, binding = 7) uniform writeonly image2D img_moments;
 
 layout(push_constant, std140) uniform params_t { 
     float accum_alpha;
+    float accum_max_hist;
     float normal_reject_rad;
     float depth_reject_percent;
     int filter_mode;
@@ -106,9 +107,8 @@ main() {
     const float alpha_corrected = params.accum_alpha * prev_irr_histlen.a / (prev_irr_histlen.a + curr_irr_samples.a);
 
     accum.rgb = mix(curr_irr_samples.rgb, prev_irr_histlen.rgb,                    alpha_corrected);
-    moments =   mix(curr_moments,         prev_moments,                            alpha_corrected);
-    // maybe there is a better way to do this
-    accum.a =   mix(curr_irr_samples.a,   prev_irr_histlen.a + curr_irr_samples.a, params.accum_alpha);
+    moments   = mix(curr_moments,         prev_moments,                            alpha_corrected);
+    accum.a = min(prev_irr_histlen.a + curr_irr_samples.a, params.accum_max_hist);
   }
 
   imageStore(img_accum, ipos, accum);
