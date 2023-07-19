@@ -71,12 +71,6 @@ ivec3 grid_idx_interpolate(const vec3 pos, const float cell_width, const float r
 
     // (1, 1, 1)
     return lower;
-
-    // TODO: Is there a faster way to do this?
-
-    // Maybe faster but more variance:
-    // - select a random vertex
-    // - weight with the barycentric coordinate
 }
 
 #define GRID_PRIME_1 2654435761

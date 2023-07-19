@@ -9,12 +9,14 @@ vec3 bsdf_diffuse_sample(const vec3 n, const vec2 random) {
     return make_frame(n) * sample_cos(random);
 }
 
+// solid angle
 float bsdf_diffuse_pdf() {
-    return 1.0 / M_PI;
+    return INV_PI;
 }
 
-float bsdf_diffuse_eval() {
-    return 1.0 / M_PI;
+// solid angle
+vec3 bsdf_diffuse_eval(const vec3 albedo) {
+    return albedo * INV_PI;
 }
 
 #endif

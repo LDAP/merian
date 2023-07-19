@@ -13,11 +13,11 @@ class AccumulateNode : public ComputeNode {
     static constexpr uint32_t local_size_y = 16;
 
     struct AccumulatePushConstant {
-        float accum_alpha = 1.0;
+        float accum_alpha = 0.0;
         float accum_max_hist = INFINITY;
         float normal_reject_rad = 0.8;
         float depth_reject_percent = 0.05;
-        int filter_mode = 1;
+        int filter_mode = 0;
     };
 
   public:

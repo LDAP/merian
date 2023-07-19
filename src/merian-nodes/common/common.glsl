@@ -2,5 +2,6 @@
 #define _COMMON_H_
 
 #define M_PI   3.14159265358979323846
+#define INV_PI 0.3183098861837907
 
 #endif // _COMMON_H_

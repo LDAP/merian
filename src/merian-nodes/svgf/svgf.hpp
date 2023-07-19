@@ -13,8 +13,8 @@ class SVGFNode : public Node {
     static constexpr uint32_t local_size_y = 16;
 
     struct VarianceEstimatePushConstant {
-        int spatial_threshold = 16;
-        float spatial_variance_boost = 2.0;
+        int spatial_threshold = 0;
+        float spatial_variance_boost = 0.0;
         float normal_reject_rad = 0.8;
         float depth_reject_percent = 0.05;
     };
@@ -24,7 +24,7 @@ class SVGFNode : public Node {
         float param_z = 10;  // parameter for depth      = 1   larger blurs more 
         float param_n = 64;  // parameter for normals    = 128 smaller blurs more
         float param_l = 8;   // parameter for brightness = 4   larger blurs more
-        int filter_variance = 1;
+        int filter_variance = 0;
     };
 
     struct TAAPushConstant {
@@ -87,7 +87,7 @@ class SVGFNode : public Node {
     uint32_t group_size_x;
     uint32_t group_size_y;
 
-    int svgf_iterations = 6;
+    int svgf_iterations = 0;
 
     std::vector<TextureHandle> graph_textures;
     std::vector<DescriptorSetHandle> graph_sets;

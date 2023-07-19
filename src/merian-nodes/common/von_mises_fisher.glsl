@@ -5,7 +5,7 @@
 #define _VON_MISES_FISHER_H_
 
 // numerically robust von Mises Fisher lobe
-float vmf_eval(const float kappa, const float dotmu) {
+float vmf_pdf(const float kappa, const float dotmu) {
     if (kappa < 1e-4) return 1.0 / (4.0 * M_PI);
     return kappa / (2.0 * M_PI * (1.0 - exp(-2.0 * kappa))) * exp(kappa * (dotmu - 1.0));
 }
@@ -18,14 +18,14 @@ vec3 vmf_sample(const float kappa, const vec2 random) {
 }
 
 // Sample "around" z.
-vec3 vmf_sample(const float kappa, const vec3 z, const vec2 random) {
+vec3 vmf_sample(const vec3 z, const float kappa, const vec2 random) {
     return make_frame(z) * vmf_sample(kappa, random);
 }
 
 // compute concentration parameter for given maximum density x
-float vmf_get_kappa(const float x) {
-    if (x > 0.795) return 2.0 * M_PI * x;
-    return max(1e-5, (168.479 * x * x + 16.4585 * x - 2.39942) / (-1.12718 * x * x + 29.1433 * x + 1.0));
+float vmf_get_kappa(const float pdf) {
+    if (pdf > 0.795) return 2.0 * M_PI * pdf;
+    return max(1e-5, (168.479 * pdf * pdf + 16.4585 * pdf - 2.39942) / (-1.12718 * pdf * pdf + 29.1433 * pdf + 1.0));
 }
 
 #endif
