@@ -31,7 +31,7 @@ layout(push_constant, std140) uniform params_t {
 
 void
 main() {
-  ivec2 ipos = ivec2(gl_GlobalInvocationID);
+  const ivec2 ipos = ivec2(gl_GlobalInvocationID);
   if(any(greaterThanEqual(ipos, imageSize(img_accum)))) return;
 
   const vec4 curr_irr_samples = texelFetch(img_irr, ipos, 0);

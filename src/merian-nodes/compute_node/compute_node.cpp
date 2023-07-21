@@ -23,15 +23,16 @@ void ComputeNode::cmd_build(const vk::CommandBuffer&,
     std::tie(textures, sets, pool, layout) = make_graph_descriptor_sets(
         context, allocator, image_inputs, buffer_inputs, image_outputs, buffer_outputs, layout);
 
-    if (!pipe) {
+    if (!pipe_layout) {
         auto pipe_builder = PipelineLayoutBuilder(context);
         if (push_constant_size.has_value()) {
             pipe_builder.add_push_constant(push_constant_size.value());
         }
-        auto pipe_layout = pipe_builder.add_descriptor_set_layout(layout).build_pipeline_layout();
-        pipe = std::make_shared<ComputePipeline>(pipe_layout, get_shader_module(),
-                                                 get_specialization_info());
+        pipe_layout = pipe_builder.add_descriptor_set_layout(layout).build_pipeline_layout();
     }
+
+    pipe = std::make_shared<ComputePipeline>(pipe_layout, get_shader_module(),
+                                             get_specialization_info());
 }
 
 void ComputeNode::cmd_process(const vk::CommandBuffer& cmd,

@@ -10,6 +10,7 @@ subdir('shadertoy')
 subdir('shadertoy_spheres')
 subdir('svgf')
 subdir('taa')
+subdir('tonemap')
 subdir('vkdt_filmcurv')
 
 merian_nodes_lib = static_library(

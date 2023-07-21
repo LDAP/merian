@@ -12,6 +12,8 @@ namespace merian {
 // A general purpose compute node.
 // The graph resources are bound in set 0 and order input images, input buffers, output images,
 // output buffers. Input images are bound as sampler2d, output images as image2d.
+// 
+// A rebuild regenerates the pipeline, this allows an update to spec constants.
 class ComputeNode : public Node {
 
   public:
@@ -68,6 +70,7 @@ class ComputeNode : public Node {
     // make sure textures stay available
     std::vector<TextureHandle> textures;
     PipelineHandle pipe;
+    PipelineLayoutHandle pipe_layout;
 };
 
 } // namespace merian

@@ -57,4 +57,6 @@ class PipelineLayout : public std::enable_shared_from_this<PipelineLayout> {
     vk::PipelineLayout pipeline_layout;
 };
 
+using PipelineLayoutHandle = std::shared_ptr<PipelineLayout>;
+
 } // namespace merian

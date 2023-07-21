@@ -28,7 +28,7 @@ class SVGFNode : public Node {
     };
 
     struct TAAPushConstant {
-        float blend_alpha = 0.9;
+        float blend_alpha = 0.0;
         float rejection_threshold = 1.0;
         int show_variance_estimate = 0;
     };
