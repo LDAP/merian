@@ -120,10 +120,9 @@ vk::Extent2D Swapchain::recreate_swapchain(int width, int height) {
     auto capabilities = context->pd_container.physical_device.getSurfaceCapabilitiesKHR(*surface);
     extent = make_extent2D(capabilities, width, height);
 
-    min_images = capabilities.minImageCount;
-    num_images = capabilities.minImageCount + 1; // one extra to own
+    min_images = capabilities.minImageCount + 1; // one extra to own
     if (capabilities.maxImageCount > 0)          // 0 means no limit
-        num_images = std::min(num_images, capabilities.maxImageCount);
+        min_images = std::min(min_images, capabilities.maxImageCount);
 
     vk::SurfaceTransformFlagBitsKHR pre_transform;
     if (capabilities.supportedTransforms & vk::SurfaceTransformFlagBitsKHR::eIdentity) {
@@ -136,7 +135,7 @@ vk::Extent2D Swapchain::recreate_swapchain(int width, int height) {
     vk::SwapchainCreateInfoKHR createInfo(
                                           vk::SwapchainCreateFlagBitsKHR(),
                                           *surface,
-                                          num_images,
+                                          min_images,
                                           surface_format.format,
                                           surface_format.colorSpace,
                                           extent,
@@ -161,6 +160,7 @@ vk::Extent2D Swapchain::recreate_swapchain(int width, int height) {
     }
 
     std::vector<vk::Image> swapchain_images = context->device.getSwapchainImagesKHR(swapchain);
+    num_images = swapchain_images.size();
     entries.resize(swapchain_images.size());
     semaphore_groups.resize(swapchain_images.size());
     barriers.resize(swapchain_images.size());
