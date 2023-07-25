@@ -659,8 +659,7 @@ void Graph::get_configuration(Configuration& config) {
             config.st_end_child();
         }
 
-        for (auto& node : flat_topology) {
-            auto& data = node_data[node];
+        for (auto& [node, data] : node_data) {
             std::string node_label = fmt::format("{} ({})", data.name, data.node->name());
             if (config.st_begin_child(data.name.c_str(), node_label.c_str())) {
                 data.node->get_configuration(config);

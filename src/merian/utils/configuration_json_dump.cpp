@@ -1,16 +1,23 @@
 #include "configuration_json_dump.hpp"
 #include "merian/utils/glm.hpp"
 
+#include <cmath>
 #include <fstream>
 
 using json = nlohmann::json;
 
 namespace merian {
 
+json encode_float(float f) {
+    if (std::isinf(f) || std::isnan(f))
+        return std::to_string(f);
+    else return f;
+}
+
 json dump_vec3(glm::vec3& v) {
     json j;
     for (int i = 0; i < 3; i++) {
-        j.push_back(v[i]);
+        j.push_back(encode_float(v[i]));
     }
     return j;
 }
@@ -18,7 +25,7 @@ json dump_vec3(glm::vec3& v) {
 json dump_vec4(glm::vec4& v) {
     json j;
     for (int i = 0; i < 4; i++) {
-        j.push_back(v[i]);
+        j.push_back(encode_float(v[i]));
     }
     return j;
 }
@@ -74,22 +81,22 @@ void JSONDumpConfiguration::config_vec(const std::string& id,
 }
 void JSONDumpConfiguration::config_angle(
     const std::string& id, float& angle, const std::string&, const float, const float) {
-    o.back()[id] = angle;
+    o.back()[id] = encode_float(angle);
 }
 void JSONDumpConfiguration::config_percent(const std::string& id,
                                            float& value,
                                            const std::string&) {
-    o.back()[id] = value;
+    o.back()[id] = encode_float(value);
 }
 void JSONDumpConfiguration::config_float(const std::string& id,
                                          float& value,
                                          const std::string&,
                                          const float) {
-    o.back()[id] = value;
+    o.back()[id] = encode_float(value);
 }
 void JSONDumpConfiguration::config_float(
     const std::string& id, float& value, const float&, const float&, const std::string&) {
-    o.back()[id] = value;
+    o.back()[id] = encode_float(value);
 }
 void JSONDumpConfiguration::config_int(const std::string& id, int& value, const std::string&) {
     o.back()[id] = value;
@@ -103,9 +110,7 @@ void JSONDumpConfiguration::config_float3(const std::string& id,
                                           const std::string&) {
     o.back()[id] = dump_vec3(*merian::as_vec3(value));
 }
-void JSONDumpConfiguration::config_bool(const std::string& id,
-                                        bool& value,
-                                        const std::string&) {
+void JSONDumpConfiguration::config_bool(const std::string& id, bool& value, const std::string&) {
     o.back()[id] = value;
 }
 bool JSONDumpConfiguration::config_bool(const std::string&, const std::string&) {
@@ -118,11 +123,8 @@ void JSONDumpConfiguration::config_options(const std::string& id,
                                            const std::string&) {
     o.back()[id] = options[selected];
 }
-bool JSONDumpConfiguration::config_text(const std::string&,
-                                        const uint32_t,
-                                        char*,
-                                        const bool,
-                                        const std::string&) {
+bool JSONDumpConfiguration::config_text(
+    const std::string&, const uint32_t, char*, const bool, const std::string&) {
     return false;
 }
 
