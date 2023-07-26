@@ -1,11 +1,11 @@
 #include "accumulate.hpp"
 #include "merian/vk/descriptors/descriptor_set_layout_builder.hpp"
 #include "merian/vk/descriptors/descriptor_set_update.hpp"
+#include "merian/vk/graph/graph.hpp"
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 #include "merian/vk/shader/shader_module.hpp"
-#include "merian/vk/graph/graph.hpp"
 
 static const uint32_t spv[] = {
 #include "accumulate.comp.spv.h"
@@ -13,8 +13,10 @@ static const uint32_t spv[] = {
 
 namespace merian {
 
-AccumulateNode::AccumulateNode(const SharedContext context, const ResourceAllocatorHandle allocator)
-    : ComputeNode(context, allocator, sizeof(AccumulatePushConstant)) {
+AccumulateNode::AccumulateNode(const SharedContext context,
+                               const ResourceAllocatorHandle allocator,
+                               const vk::Format format)
+    : ComputeNode(context, allocator, sizeof(AccumulatePushConstant)), format(format) {
     shader = std::make_shared<ShaderModule>(context, sizeof(spv), spv);
 }
 
@@ -50,8 +52,8 @@ AccumulateNode::describe_outputs(
     // clang-format off
     return {
         {
-            NodeOutputDescriptorImage::compute_read_write("accum", vk::Format::eR32G32B32A32Sfloat, extent),
-            NodeOutputDescriptorImage::compute_read_write("moments", vk::Format::eR32G32B32A32Sfloat, extent),
+            NodeOutputDescriptorImage::compute_read_write("accum", format, extent),
+            NodeOutputDescriptorImage::compute_read_write("moments", format, extent),
         },
         {},
     };

@@ -22,7 +22,9 @@ class AccumulateNode : public ComputeNode {
     };
 
   public:
-    AccumulateNode(const SharedContext context, const ResourceAllocatorHandle alloc);
+    AccumulateNode(const SharedContext context,
+                   const ResourceAllocatorHandle alloc,
+                   const vk::Format format = vk::Format::eR32G32B32A32Sfloat);
 
     ~AccumulateNode();
 
@@ -47,6 +49,7 @@ class AccumulateNode : public ComputeNode {
     void get_configuration(Configuration& config) override;
 
   private:
+    const vk::Format format;
     vk::Extent3D extent;
     AccumulatePushConstant pc;
     ShaderModuleHandle shader;
