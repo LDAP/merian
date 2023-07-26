@@ -1,3 +1,5 @@
+#include "common/cubemap.glsl"
+
 #ifndef _GRID_H_
 #define _GRID_H_
 
@@ -82,6 +84,13 @@ ivec3 grid_idx_interpolate(const vec3 pos, const float cell_width, const float r
 uint hash_grid(const ivec3 index, const uint modulus) {
     return ((index.x ^ (index.y * GRID_PRIME_1) ^ (index.z * GRID_PRIME_2)) % modulus + modulus) % modulus;
 }
+
+// like hash_grid but with simple normal biasing
+uint hash_grid_normal(const ivec3 index, const vec3 normal, const uint modulus) {
+    const int cube = cubemap_side(normal);
+    return ((index.x ^ (index.y * GRID_PRIME_1) ^ (index.z * GRID_PRIME_2) ^ (9351217 * cube + 13 * cube)) % modulus + modulus) % modulus;
+}
+
 
 // Like hash_grid but modulus must be a power of two
 uint hash_grid_2(const ivec3 index, const uint modulus_power_of_two) {
