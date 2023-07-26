@@ -51,7 +51,7 @@ SpecializationInfoHandle TonemapNode::get_specialization_info() const noexcept {
     return spec_builder.build();
 }
 
-const void* TonemapNode::get_push_constant() {
+const void* TonemapNode::get_push_constant([[maybe_unused]] GraphRun& run) {
     return &pc;
 }
 

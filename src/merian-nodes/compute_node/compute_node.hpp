@@ -12,7 +12,7 @@ namespace merian {
 // A general purpose compute node.
 // The graph resources are bound in set 0 and order input images, input buffers, output images,
 // output buffers. Input images are bound as sampler2d, output images as image2d.
-// 
+//
 // A rebuild regenerates the pipeline, this allows an update to spec constants.
 class ComputeNode : public Node {
 
@@ -31,7 +31,7 @@ class ComputeNode : public Node {
 
     // Return a pointer to your push constant if push_constant_size is not std::nullop
     // Called in every run
-    virtual const void* get_push_constant() {
+    virtual const void* get_push_constant([[maybe_unused]] GraphRun& run) {
         throw std::runtime_error{
             "get_push_constant must be overwritten when push_constant_size is not std::nullopt"};
     }

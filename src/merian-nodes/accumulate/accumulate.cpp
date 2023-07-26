@@ -5,6 +5,7 @@
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 #include "merian/vk/shader/shader_module.hpp"
+#include "merian/vk/graph/graph.hpp"
 
 static const uint32_t spv[] = {
 #include "accumulate.comp.spv.h"
@@ -63,7 +64,8 @@ SpecializationInfoHandle AccumulateNode::get_specialization_info() const noexcep
     return spec_builder.build();
 }
 
-const void* AccumulateNode::get_push_constant() {
+const void* AccumulateNode::get_push_constant([[maybe_unused]] GraphRun& run) {
+    pc.iteration = run.get_iteration();
     return &pc;
 }
 

@@ -18,6 +18,7 @@ class AccumulateNode : public ComputeNode {
         float normal_reject_rad = 0.8;
         float depth_reject_percent = 0.05;
         int filter_mode = 0;
+        uint iteration;
     };
 
   public:
@@ -37,7 +38,7 @@ class AccumulateNode : public ComputeNode {
 
     SpecializationInfoHandle get_specialization_info() const noexcept override;
 
-    const void* get_push_constant() override;
+    const void* get_push_constant([[maybe_unused]] GraphRun& run) override;
 
     std::tuple<uint32_t, uint32_t, uint32_t> get_group_count() const noexcept override;
 

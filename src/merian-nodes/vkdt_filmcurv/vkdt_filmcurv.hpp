@@ -39,7 +39,7 @@ class VKDTFilmcurv : public ComputeNode {
 
     SpecializationInfoHandle get_specialization_info() const noexcept override;
 
-    const void* get_push_constant() override;
+    const void* get_push_constant([[maybe_unused]] GraphRun& run) override;
 
     std::tuple<uint32_t, uint32_t, uint32_t> get_group_count() const noexcept override;
 

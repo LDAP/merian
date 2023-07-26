@@ -58,7 +58,7 @@ class ShadertoyNode : public ComputeNode {
 
     SpecializationInfoHandle get_specialization_info() const noexcept override final;
 
-    const void* get_push_constant() override final;
+    const void* get_push_constant([[maybe_unused]] GraphRun& run) override final;
 
     std::tuple<uint32_t, uint32_t, uint32_t> get_group_count() const noexcept override final;
 

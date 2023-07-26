@@ -27,6 +27,7 @@ layout(push_constant, std140) uniform params_t {
     float normal_reject_rad;
     float depth_reject_percent;
     int filter_mode;
+    uint iteration;
 } params;
 
 void
@@ -48,7 +49,9 @@ main() {
   vec2 prev_moments     = vec2(0);
   float sum_w           = 0.0;
 
-  if (params.filter_mode == 0) {
+  if (params.iteration == 0) {
+    // Make sure sum_w is 0. That means no previous information is used.
+  } else if (params.filter_mode == 0) {
     const ivec2 prev_ipos = ivec2(round(prev_pos));
     const vec4 prev_normal_z = texelFetch(img_prev_gbuf, prev_ipos, 0);
     const vec3 prev_normal = prev_normal_z.rgb;
@@ -56,9 +59,9 @@ main() {
 
     float w = 1.0;
     // Similar normals
-    w *= smoothstep(0.8, 1.0, dot(curr_normal, prev_normal));
+    w *= smoothstep(params.normal_reject_rad, 1.0, dot(curr_normal, prev_normal));
     // Similar depth
-    w *= 1.0 - smoothstep(0.0, 0.05 * max(curr_z, prev_z), abs(curr_z - prev_z));
+    w *= 1.0 - smoothstep(0.0, params.depth_reject_percent * max(curr_z, prev_z), abs(curr_z - prev_z));
 
     prev_irr_histlen = w * texelFetch(img_prev_accum, prev_ipos, 0);
     prev_moments     = w * texelFetch(img_prev_moments, prev_ipos, 0).rg;

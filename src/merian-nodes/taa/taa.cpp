@@ -52,7 +52,7 @@ SpecializationInfoHandle TAANode::get_specialization_info() const noexcept {
     return spec_builder.build();
 }
 
-const void* TAANode::get_push_constant() {
+const void* TAANode::get_push_constant([[maybe_unused]] GraphRun& run) {
     return &pc;
 }
 

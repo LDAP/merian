@@ -36,7 +36,7 @@ void ComputeNode::cmd_build(const vk::CommandBuffer&,
 }
 
 void ComputeNode::cmd_process(const vk::CommandBuffer& cmd,
-                              GraphRun&,
+                              GraphRun& run,
                               const uint32_t set_index,
                               const std::vector<ImageHandle>&,
                               const std::vector<BufferHandle>&,
@@ -45,7 +45,7 @@ void ComputeNode::cmd_process(const vk::CommandBuffer& cmd,
     pipe->bind(cmd);
     pipe->bind_descriptor_set(cmd, sets[set_index]);
     if (push_constant_size.has_value())
-        pipe->push_constant(cmd, get_push_constant());
+        pipe->push_constant(cmd, get_push_constant(run));
     auto [x, y, z] = get_group_count();
     cmd.dispatch(x, y, z);
 }

@@ -58,7 +58,7 @@ SpecializationInfoHandle ShadertoyNode::get_specialization_info() const noexcept
     return spec_builder.build();
 }
 
-const void* ShadertoyNode::get_push_constant() {
+const void* ShadertoyNode::get_push_constant([[maybe_unused]] GraphRun& run) {
     float new_time = sw.seconds();
     constant.iTimeDelta = new_time - constant.iTime;
     constant.iTime = new_time;
