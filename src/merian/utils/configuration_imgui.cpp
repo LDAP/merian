@@ -133,7 +133,14 @@ void ImGuiConfiguration::config_options(const std::string& id,
         }
         break;
     case OptionsStyle::COMBO:
-        ImGui::Combo(id.c_str(), &selected, fmt::format("{}", fmt::join(options, "\0")).c_str());
+        ImGui::Combo(
+            id.c_str(), &selected,
+            [](void* data, int n, const char** out_str) {
+                const std::vector<std::string>* options = reinterpret_cast<std::vector<std::string>*>(data);
+                *out_str = (*options)[n].c_str();
+                return true;
+            },
+            (void*)(&options), options.size());
         tooltip(desc);
         break;
     case OptionsStyle::DONT_CARE:
