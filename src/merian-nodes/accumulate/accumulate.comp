@@ -27,7 +27,7 @@ layout(push_constant, std140) uniform params_t {
     float normal_reject_rad;
     float depth_reject_percent;
     int filter_mode;
-    uint iteration;
+    uint clear;
 } params;
 
 void
@@ -49,7 +49,7 @@ main() {
   vec2 prev_moments     = vec2(0);
   float sum_w           = 0.0;
 
-  if (params.iteration == 0) {
+  if (params.clear == 1) {
     // Make sure sum_w is 0. That means no previous information is used.
   } else if (params.filter_mode == 0) {
     const ivec2 prev_ipos = ivec2(round(prev_pos));

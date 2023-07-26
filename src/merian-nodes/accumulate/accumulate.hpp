@@ -18,7 +18,7 @@ class AccumulateNode : public ComputeNode {
         float normal_reject_rad = 0.8;
         float depth_reject_percent = 0.05;
         int filter_mode = 0;
-        uint iteration;
+        uint clear = 0;
     };
 
   public:
@@ -50,6 +50,7 @@ class AccumulateNode : public ComputeNode {
     vk::Extent3D extent;
     AccumulatePushConstant pc;
     ShaderModuleHandle shader;
+    bool clear = false;
 };
 
 } // namespace merian

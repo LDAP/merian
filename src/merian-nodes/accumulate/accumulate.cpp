@@ -65,7 +65,8 @@ SpecializationInfoHandle AccumulateNode::get_specialization_info() const noexcep
 }
 
 const void* AccumulateNode::get_push_constant([[maybe_unused]] GraphRun& run) {
-    pc.iteration = run.get_iteration();
+    pc.clear = run.get_iteration() == 0 || clear;
+    clear = false;
     return &pc;
 }
 
@@ -91,6 +92,7 @@ void AccumulateNode::get_configuration(Configuration& config) {
     config.config_percent("depth threshold", pc.depth_reject_percent,
                           "Reject points with depths farther apart (relative to the max)");
     config.config_options("filter mode", pc.filter_mode, {"nearest", "linear"});
+    clear = config.config_bool("clear");
 }
 
 } // namespace merian
