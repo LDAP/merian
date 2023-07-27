@@ -107,7 +107,7 @@ main() {
 
     // With params == 1, this would be a regular average.
     // The params can be used to allow to adapt to new lighting conditions
-    const float alpha_corrected = params.accum_alpha * prev_irr_histlen.a / (prev_irr_histlen.a + curr_irr_samples.a);
+    const float alpha_corrected = min(params.accum_alpha, prev_irr_histlen.a / (prev_irr_histlen.a + curr_irr_samples.a));
 
     accum.rgb = mix(curr_irr_samples.rgb, prev_irr_histlen.rgb,                    alpha_corrected);
     moments   = mix(curr_moments,         prev_moments,                            alpha_corrected);
