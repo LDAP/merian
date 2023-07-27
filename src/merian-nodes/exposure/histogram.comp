@@ -6,6 +6,7 @@
 
 const uint hist_size = gl_WorkGroupSize.x * gl_WorkGroupSize.y;
 shared uint[hist_size] local_hist;
+shared uint count;
 
 uint get_bin(const vec3 color) {
     float l = XYZ_luminance(color);
@@ -22,14 +23,39 @@ void main() {
     const ivec2 ipos = ivec2(gl_GlobalInvocationID);
 
     local_hist[gl_LocalInvocationIndex] = 0;
+    if (gl_LocalInvocationIndex == 0)
+        count = 0;
     barrier();
 
     if (all(lessThan(ipos, imageSize(img_out)))) {
-        const vec3 color = texelFetch(img_src, ipos, 0).rgb;
-        const uint bin = get_bin(color);
-        atomicAdd(local_hist[bin], 1);
+
+        bool mask;
+        if (params.metering == 0) {
+            mask = true;
+        } else if (params.metering == 1) {
+            // Dirty but works :D
+            mask = true;
+            mask = mask && (ipos.x % max(uint(smoothstep(0, imageSize(img_out).r / 2, distance(imageSize(img_out) / 2, ipos)) * 13), 1)) == 0;
+            mask = mask && (ipos.y % max(uint(smoothstep(0, imageSize(img_out).r / 2, distance(imageSize(img_out) / 2, ipos)) * 7), 1)) == 0;
+        } else if (params.metering == 2) {
+            mask = distance(imageSize(img_out) / 2, ipos) / min(imageSize(img_out).r, imageSize(img_out).g) < .33;
+        } else {
+            // should never happen
+            mask = false;
+        }
+
+        if (mask) {
+            const vec3 color = texelFetch(img_src, ipos, 0).rgb;
+            const uint bin = get_bin(color);
+            atomicAdd(local_hist[bin], 1);
+            atomicAdd(count, 1);
+        }
     }
     barrier();
 
     atomicAdd(histogram[gl_LocalInvocationIndex], local_hist[gl_LocalInvocationIndex]);
+    // Number of pixel that are represented in the histogram
+    if (gl_LocalInvocationIndex == 0) {
+        atomicAdd(histogram[hist_size], count);
+    }
 }

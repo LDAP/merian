@@ -33,6 +33,7 @@ class ExposureNode : public Node {
         int reset = 0;
         float min_log_histogram = -10.0;
         float max_log_histogram = 8.0;
+        int metering = 0;
     };
 
   public:

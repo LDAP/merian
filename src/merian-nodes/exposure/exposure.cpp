@@ -61,8 +61,9 @@ ExposureNode::describe_outputs(
                 vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderRead |
                     vk::AccessFlagBits2::eTransferWrite,
                 vk::PipelineStageFlagBits2::eComputeShader | vk::PipelineStageFlagBits2::eTransfer,
-                vk::BufferCreateInfo({}, local_size_x * local_size_y * sizeof(uint32_t),
-                                     vk::BufferUsageFlagBits::eStorageBuffer)),
+                vk::BufferCreateInfo(
+                    {}, local_size_x * local_size_y * sizeof(uint32_t) + sizeof(uint32_t),
+                    vk::BufferUsageFlagBits::eStorageBuffer)),
             NodeOutputDescriptorBuffer(
                 "avg_luminance",
                 vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderRead,
@@ -157,6 +158,8 @@ void ExposureNode::get_configuration(Configuration& config) {
     config.config_float("max log luminance", pc.max_log_histogram);
     config.config_float("speed up", pc.speed_up);
     config.config_float("speed down", pc.speed_down);
+    config.config_options("metering", pc.metering, {"uniform", "center-weighted", "center"},
+                          Configuration::OptionsStyle::COMBO);
 
     config.st_separate("Manual");
     config.config_float("ISO", pc.iso, "Sensor sensitivity/gain (ISO)");

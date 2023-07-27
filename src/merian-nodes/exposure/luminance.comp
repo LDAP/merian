@@ -6,6 +6,7 @@
 
 const uint hist_size = gl_WorkGroupSize.x * gl_WorkGroupSize.y;
 shared uint[hist_size] local_hist;
+shared uint count;
 
 void main() {
     float max_luminance;
@@ -15,6 +16,8 @@ void main() {
     } else {
         const uint local_bin = histogram[gl_LocalInvocationIndex];
         local_hist[gl_LocalInvocationIndex] = local_bin * gl_LocalInvocationIndex;
+        if (gl_LocalInvocationIndex == 0)
+            count = histogram[hist_size];
         barrier();
 
         for (uint split = (hist_size >> 1); split > 0; split >>= 1) {
@@ -26,7 +29,7 @@ void main() {
 
         if (gl_LocalInvocationIndex == 0) {
             const uvec2 image_size = textureSize(img_src, 0).rg;
-            const float num_bright_pixels = max(image_size.x * image_size.y - float(local_bin), 1.0);
+            const float num_bright_pixels = max(count - float(local_bin), 1.0);
             const float average_bin = (local_hist[0] / num_bright_pixels) - 1.0;
             const float average_l = exp2(((average_bin / float(hist_size - 2.)) * params.max_log_histogram) + params.min_log_histogram);
 
