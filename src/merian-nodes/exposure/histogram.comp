@@ -1,0 +1,35 @@
+#version 460
+#extension GL_GOOGLE_include_directive    : enable
+
+#include "layout.glsl"
+#include "common/colors_xyz.glsl"
+
+const uint hist_size = gl_WorkGroupSize.x * gl_WorkGroupSize.y;
+shared uint[hist_size] local_hist;
+
+uint get_bin(const vec3 color) {
+    float l = XYZ_luminance(color);
+    if (l < pow(2, params.min_log_histogram)) {
+        return 0;
+    }
+
+    const float normalized = (log2(l) - params.min_log_histogram) / params.max_log_histogram;
+    const uint bin = uint(normalized * (hist_size - 2) + 1);
+    return clamp(bin, 0, hist_size - 1);
+}
+
+void main() {
+    const ivec2 ipos = ivec2(gl_GlobalInvocationID);
+
+    local_hist[gl_LocalInvocationIndex] = 0;
+    barrier();
+
+    if (all(lessThan(ipos, imageSize(img_out)))) {
+        const vec3 color = texelFetch(img_src, ipos, 0).rgb;
+        const uint bin = get_bin(color);
+        atomicAdd(local_hist[bin], 1);
+    }
+    barrier();
+
+    atomicAdd(histogram[gl_LocalInvocationIndex], local_hist[gl_LocalInvocationIndex]);
+}

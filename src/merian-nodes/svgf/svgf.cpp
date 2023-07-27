@@ -130,8 +130,8 @@ void SVGFNode::cmd_build([[maybe_unused]] const vk::CommandBuffer& cmd,
         taa = std::make_shared<ComputePipeline>(taa_pipe_layout, taa_module, spec);
     }
 
-    group_size_x = (irr_create_info.extent.width + local_size_x - 1) / local_size_x;
-    group_size_y = (irr_create_info.extent.height + local_size_y - 1) / local_size_y;
+    group_count_x = (irr_create_info.extent.width + local_size_x - 1) / local_size_x;
+    group_count_y = (irr_create_info.extent.height + local_size_y - 1) / local_size_y;
 }
 
 void SVGFNode::cmd_process(const vk::CommandBuffer& cmd,
@@ -156,7 +156,7 @@ void SVGFNode::cmd_process(const vk::CommandBuffer& cmd,
         variance_estimate->bind_descriptor_set(cmd, graph_sets[set_index], 0);
         variance_estimate->bind_descriptor_set(cmd, ping_pong_res[1].set, 1);
         variance_estimate->push_constant(cmd, variance_estimate_pc);
-        cmd.dispatch(group_size_x, group_size_y, 1);
+        cmd.dispatch(group_count_x, group_count_y, 1);
 
         // make sure writes are visible
         bar = ping_pong_res[0].ping_pong->get_image()->barrier(
@@ -186,7 +186,7 @@ void SVGFNode::cmd_process(const vk::CommandBuffer& cmd,
         filter->bind_descriptor_set(cmd, read_set, 1);
         filter_pc.gap = 1 << i;
         filter->push_constant(cmd, filter_pc);
-        cmd.dispatch(group_size_x, group_size_y, 1);
+        cmd.dispatch(group_count_x, group_count_y, 1);
 
         bar = write_res.ping_pong->get_image()->barrier(
             vk::ImageLayout::eShaderReadOnlyOptimal, vk::AccessFlagBits::eShaderWrite,
@@ -205,7 +205,7 @@ void SVGFNode::cmd_process(const vk::CommandBuffer& cmd,
         taa->bind_descriptor_set(cmd, graph_sets[set_index], 0);
         taa->bind_descriptor_set(cmd, read_set, 1);
         taa->push_constant(cmd, taa_pc);
-        cmd.dispatch(group_size_x, group_size_y, 1);
+        cmd.dispatch(group_count_x, group_count_y, 1);
     }
 }
 

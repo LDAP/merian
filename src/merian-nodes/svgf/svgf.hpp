@@ -84,8 +84,8 @@ class SVGFNode : public Node {
     PipelineHandle filter;
     PipelineHandle taa;
 
-    uint32_t group_size_x;
-    uint32_t group_size_y;
+    uint32_t group_count_x;
+    uint32_t group_count_y;
 
     int svgf_iterations = 0;
 

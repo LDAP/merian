@@ -49,4 +49,27 @@ vec2 get_camera_pixel(const vec3 ray_dir, const vec2 resolution,
   return (uv.rg / uv.b + 1.) * resolution / 2.;
 }
 
+// Computes Exposure Value (EV) which is defined at ISO 100 from typical camera settings.
+float ev_100(const float aperature, const float shutter_time, const float iso) {
+  return log2((aperature * aperature * 100) / (shutter_time * iso));
+}
+
+// Computes Exposure Value (EV) which is defined at ISO 100 from average luminance.
+// K is the reflected-light meter calibration constant.
+float ev_100_from_average(const float avg_luminance, const float iso, const float K) {
+  return log2(avg_luminance * iso / K);
+}
+
+// The maximum luminance without clipped or bloomed camera output (Saturation Based Sensitivity).
+// q is the lens and vignetting attenuation (typical 0.65).
+float ev_100_to_max_luminance(const float ev100, float iso, float q) {
+  return 78.0 / (iso * q) * pow(2, ev100);
+}
+
+// This is what is multiplied to the color / luminance values to exposure.
+float max_luminance_to_exposure(const float max_luminance) {
+  // The maximum luminance without clipped or bloomed camera output (Saturation Based Sensitivity).
+  return 1. / max_luminance;
+}
+
 #endif

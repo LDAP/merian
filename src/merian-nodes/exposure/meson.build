@@ -1,7 +1,10 @@
 shaders = [
-    'histogam.comp',      
+    'exposure.comp',
+    'histogram.comp',
+    'luminance.comp',
 ]
 included_files = files(
+    'layout.glsl'
 )
 foreach s : shaders
   merian_nodes_src += custom_target(
@@ -14,4 +17,4 @@ foreach s : shaders
   )
 endforeach
 
-# merian_nodes_src += files('taa.cpp')
+merian_nodes_src += files('exposure.cpp')
