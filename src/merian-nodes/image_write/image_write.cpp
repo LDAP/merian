@@ -82,6 +82,8 @@ void ImageWriteNode::cmd_process([[maybe_unused]] const vk::CommandBuffer& cmd,
             std::string filename =
                 fmt::format("{}_{:06}", this->base_filename, this->image_index++);
 
+            std::filesystem::create_directories(std::filesystem::absolute(filename).parent_path());
+
             switch (this->format) {
             case FORMAT_PNG: {
                 stbi_write_png(fmt::format("{}.png", filename).c_str(), image->get_extent().width,
