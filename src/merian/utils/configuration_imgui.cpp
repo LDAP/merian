@@ -34,7 +34,7 @@ void ImGuiConfiguration::st_no_space() {
 }
 
 void ImGuiConfiguration::output_text(const std::string& text) {
-    ImGui::Text("%s", text.c_str());
+    ImGui::TextWrapped("%s", text.c_str());
 }
 void ImGuiConfiguration::output_plot_line(const std::string& label,
                                           const std::vector<float>& samples,
