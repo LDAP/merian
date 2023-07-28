@@ -38,6 +38,7 @@ class ImageWriteNode : public Node {
     const ResourceAllocatorHandle allocator;
 
     std::string base_filename;
+    std::vector<char> buf;
 
     uint64_t frame = 0;
     uint32_t image_index = 0;

@@ -13,7 +13,10 @@ namespace merian {
 ImageWriteNode::ImageWriteNode(const SharedContext context,
                                const ResourceAllocatorHandle allocator,
                                const std::string& base_filename = "image")
-    : context(context), allocator(allocator), base_filename(base_filename) {}
+    : context(context), allocator(allocator), base_filename(base_filename), buf(256) {
+        assert(base_filename.size() < buf.size());
+        std::copy(base_filename.begin(), base_filename.end(), buf.begin());
+    }
 
 ImageWriteNode::~ImageWriteNode() {}
 
@@ -39,6 +42,10 @@ void ImageWriteNode::cmd_process([[maybe_unused]] const vk::CommandBuffer& cmd,
                                  [[maybe_unused]] const std::vector<BufferHandle>& buffer_inputs,
                                  [[maybe_unused]] const std::vector<ImageHandle>& image_outputs,
                                  [[maybe_unused]] const std::vector<BufferHandle>& buffer_outputs) {
+    if (base_filename.empty()) {
+        return;
+    }
+
     if (record_next || (record && frame % record_every == 0)) {
 
         vk::Format format = this->format == FORMAT_HDR ? vk::Format::eR32G32B32A32Sfloat
@@ -115,11 +122,10 @@ void ImageWriteNode::get_configuration([[maybe_unused]] Configuration& config) {
     config.st_separate("General");
     config.config_options("format", format, {"PNG", "JPG", "HDR"},
                           Configuration::OptionsStyle::COMBO);
-    std::vector<char> buf(256);
     if (config.config_text("filename", buf.size(), buf.data())) {
         base_filename = buf.data();
     }
-    config.output_text(fmt::format("abs path: {}", std::filesystem::absolute(base_filename).string()));
+    config.output_text(fmt::format("abs path: {}", base_filename.empty() ? "<invalid>" : std::filesystem::absolute(base_filename).string()));
 
     config.st_separate("Single");
     record_next = config.config_bool("trigger");

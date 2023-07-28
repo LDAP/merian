@@ -124,7 +124,10 @@ void JSONDumpConfiguration::config_options(const std::string& id,
     o.back()[id] = options[selected];
 }
 bool JSONDumpConfiguration::config_text(
-    const std::string&, const uint32_t, char*, const bool, const std::string&) {
+    const std::string& id, const uint32_t, char* buf, const bool needs_submit, const std::string&) {
+    if (!needs_submit) {
+        o.back()[id] = buf;
+    }
     return false;
 }
 
