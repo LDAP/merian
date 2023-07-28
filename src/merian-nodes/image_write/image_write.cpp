@@ -2,6 +2,7 @@
 #include "ext/stb_image_write.h"
 #include "merian/vk/graph/graph.hpp"
 #include "merian/vk/utils/blits.hpp"
+#include <filesystem>
 
 namespace merian {
 
@@ -11,7 +12,7 @@ namespace merian {
 
 ImageWriteNode::ImageWriteNode(const SharedContext context,
                                const ResourceAllocatorHandle allocator,
-                               const std::string& base_filename)
+                               const std::string& base_filename = "image")
     : context(context), allocator(allocator), base_filename(base_filename) {}
 
 ImageWriteNode::~ImageWriteNode() {}
@@ -41,7 +42,7 @@ void ImageWriteNode::cmd_process([[maybe_unused]] const vk::CommandBuffer& cmd,
     if (record_next || (record && frame % record_every == 0)) {
 
         vk::Format format = this->format == FORMAT_HDR ? vk::Format::eR32G32B32A32Sfloat
-                                                        : vk::Format::eR8G8B8A8Srgb;
+                                                       : vk::Format::eR8G8B8A8Srgb;
         vk::ImageCreateInfo info{
             {},
             vk::ImageType::e2D,
@@ -110,7 +111,13 @@ void ImageWriteNode::cmd_process([[maybe_unused]] const vk::CommandBuffer& cmd,
 
 void ImageWriteNode::get_configuration([[maybe_unused]] Configuration& config) {
     config.st_separate("General");
-    config.config_options("format", format, {"PNG", "JPG", "HDR"}, Configuration::OptionsStyle::COMBO);
+    config.config_options("format", format, {"PNG", "JPG", "HDR"},
+                          Configuration::OptionsStyle::COMBO);
+    std::vector<char> buf(256);
+    if (config.config_text("filename", buf.size(), buf.data())) {
+        base_filename = buf.data();
+    }
+    config.output_text(fmt::format("abs path: {}", std::filesystem::absolute(base_filename).string()));
 
     config.st_separate("Single");
     record_next = config.config_bool("trigger");

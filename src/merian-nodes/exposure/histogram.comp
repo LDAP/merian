@@ -35,10 +35,10 @@ void main() {
         } else if (params.metering == 1) {
             // Dirty but works :D
             mask = true;
-            mask = mask && (ipos.x % max(uint(smoothstep(0, imageSize(img_out).r / 2, distance(imageSize(img_out) / 2, ipos)) * 13), 1)) == 0;
-            mask = mask && (ipos.y % max(uint(smoothstep(0, imageSize(img_out).r / 2, distance(imageSize(img_out) / 2, ipos)) * 7), 1)) == 0;
+            mask = mask && (ipos.x % max(uint(smoothstep(.1 * imageSize(img_out).r / 2, imageSize(img_out).r / 2, distance(imageSize(img_out) / 2, ipos)) * 13), 1)) == 0;
+            mask = mask && (ipos.y % max(uint(smoothstep(.1 * imageSize(img_out).r / 2, imageSize(img_out).r / 2, distance(imageSize(img_out) / 2, ipos)) * 7), 1)) == 0;
         } else if (params.metering == 2) {
-            mask = distance(imageSize(img_out) / 2, ipos) / min(imageSize(img_out).r, imageSize(img_out).g) < .33;
+            mask = distance(imageSize(img_out) / 2, ipos) / min(imageSize(img_out).r, imageSize(img_out).g) < .5;
         } else {
             // should never happen
             mask = false;

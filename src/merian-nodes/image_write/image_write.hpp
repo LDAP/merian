@@ -37,7 +37,7 @@ class ImageWriteNode : public Node {
     const SharedContext context;
     const ResourceAllocatorHandle allocator;
 
-    const std::string base_filename;
+    std::string base_filename;
 
     uint64_t frame = 0;
     uint32_t image_index = 0;
