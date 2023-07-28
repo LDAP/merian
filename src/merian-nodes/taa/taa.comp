@@ -73,7 +73,20 @@ vec4 merge_frames(const vec4 current_color,
         previous_color = clamp(previous_color, neigh_clamp_min_color, neigh_clamp_max_color);
         break;
     case 2:
-        // TODO: implement moment-based clamping here
+        vec4 m1 = vec4(0.0f);
+        vec4 m2 = vec4(0.0f);
+        const int r = 1;
+        for (int yy=-r; yy<=r; yy++)
+            for(int xx=-r; xx<=r; xx++) {
+                const vec4 b = texelFetchClamp(pixel + ivec2(xx, yy), img_current_frame);
+                m1 += b;
+                m2 += b * b;
+            }
+        m1 /= (2.0 * r + 1) * (2.0 * r + 1);
+        m2 /= (2.0 * r + 1) * (2.0 * r + 1);
+        const vec4 sigma = sqrt(max(vec4(0), m2 - m1 * m1));
+        const float thresh = 1.0;//params.rejection_threshold;
+        previous_color = clamp(previous_color, max(vec4(0), m1 - thresh * sigma), m1 + thresh * sigma);
         break;
     default:
         return vec4(1, 0, 1, 1);

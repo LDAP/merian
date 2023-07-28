@@ -71,6 +71,7 @@ void TAANode::get_configuration(Configuration& config) {
     std::vector<std::string> clamp_methods = {
         fmt::format("none ({})", MERIAN_NODES_TAA_CLAMP_NONE),
         fmt::format("min-max ({})", MERIAN_NODES_TAA_CLAMP_MIN_MAX),
+        fmt::format("moments ({})", MERIAN_NODES_TAA_CLAMP_MOMENTS),
     };
     config.config_options("clamp method", pc.clamp_method, clamp_methods);
 
