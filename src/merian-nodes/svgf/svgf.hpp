@@ -33,6 +33,7 @@ class SVGFNode : public Node {
         int show_variance_estimate = 0;
         int filter_prev = 0;
         int clamping = 0;
+        int mv_sampling = 0;
     };
 
   public:

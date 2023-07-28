@@ -234,7 +234,8 @@ void SVGFNode::get_configuration(Configuration& config) {
     config.config_float(
         "TAA alpha", taa_pc.blend_alpha, 0, 1,
         "Blend factor for the final image and the previous image. More means more reuse.");
-    config.config_options("filter", taa_pc.filter_prev, {"none", "catmull rom"});
+    config.config_options("mv sampling", taa_pc.mv_sampling, {"center", "magnitude dilation"});
+    config.config_options("filter", taa_pc.filter_prev, {"none", "catmull rom"}); 
     config.config_options("clamping", taa_pc.clamping, {"min-max", "moments"});
     if (taa_pc.clamping == 1)
         config.config_float(

@@ -14,6 +14,7 @@ layout(push_constant, std140) uniform params_t {
     int show_variance;
     int filter_prev;
     int clamping;
+    int mv_sampling;
 } params;
 
 void
@@ -22,7 +23,12 @@ main()
   const ivec2 ipos = ivec2(gl_GlobalInvocationID);
   if (any(greaterThanEqual(ipos, imageSize(img_out)))) return;
 
-  const vec2 mv = texelFetch(img_mv, ipos, 0).rg;
+  vec2 mv = vec2(0);
+  if (params.mv_sampling == 0)
+    mv = texelFetch(img_mv, ipos, 0).rg;
+  else if (params.mv_sampling == 1)
+    mv = sample_motion_vector(img_mv, ipos, 1);
+
   const vec4 filter_result = texelFetch(img_filter_result, ipos, 0);
 
   if (params.show_variance == 1) {

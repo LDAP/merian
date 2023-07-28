@@ -56,4 +56,36 @@ vec4 catmull_rom(const sampler2D tex, const vec2 uv) {
     return result;
 }
 
+// texel_coord in pixels
+vec4 texelFetchClamp(const ivec2 texel_coord, sampler2D texture) {
+    const ivec2 coord = clamp(texel_coord, ivec2(0), textureSize(texture, 0) - ivec2(1));
+    return texelFetch(texture, coord, 0);
+}
+
+// Find longest motion vector inside a window, return motion vector in texture space (i.e. [0,1]^2)!
+// 
+// Reason:
+// When reprojecting the current pixel, we need to realize that the velocity texture, unlike the history color buffer, is aliased.
+// If we’re not careful we could be reintroducing edge aliasing indirectly. To better account for the edges, a typical solution is to dilate the aliased information.
+// We’ll use velocity as an example but you can do this with depth and stencil. There are a couple of ways I know of doing it:
+// 
+// - (here:) Magnitude Dilation: take the velocity with the largest magnitude in a neighborhood
+// - (also possible:) Depth Dilation: take the velocity that corresponds to the pixel with the nearest depth in a neighborhood
+vec2 sample_motion_vector(const sampler2D img, const ivec2 center_pixel, const int radius) {
+    // find longest motion vector, transform into texture space
+    // access pixes position of the current fragment with ivec2(gl_FragCoord.xy)
+    
+    vec2 longest = vec2(0., 0.);
+    for (int j = -radius; j <= radius; ++j) {
+        for (int i = -radius; i <= radius; ++i) {
+            const vec2 mv = texelFetchClamp(center_pixel + ivec2(j, i), img).rg;
+            if (length(mv) > length(longest)) {
+                longest = mv;
+            }
+        }
+    }
+
+    return longest;
+}
+
 #endif
