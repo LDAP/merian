@@ -31,6 +31,8 @@ class SVGFNode : public Node {
         float blend_alpha = 0.0;
         float rejection_threshold = 1.0;
         int show_variance_estimate = 0;
+        int filter_prev = 0;
+        int clamping = 0;
     };
 
   public:

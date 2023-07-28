@@ -3,6 +3,7 @@
 #extension GL_EXT_nonuniform_qualifier    : enable
 
 #include "svgf_graph_layout.glsl"
+#include "common/sampler.glsl"
 
 layout(set = 1, binding = 0) uniform sampler2D img_filter_result;
 layout(set = 1, binding = 1) uniform sampler2D img_filter_in;  // (unused)
@@ -11,6 +12,8 @@ layout(push_constant, std140) uniform params_t {
     float blend_alpha;
     float rejection_threshold;
     int show_variance;
+    int filter_prev;
+    int clamping;
 } params;
 
 void
@@ -28,10 +31,18 @@ main()
   }
 
   const vec3 irr = filter_result.rgb;
-  vec3 prev_irr = texelFetch(img_prev_out, ivec2(round(ipos + mv)), 0).rgb;
+  const vec3 albedo = texelFetch(img_albedo, ipos, 0).rgb; // multiply albedo
 
-  if (any(isnan(prev_irr)) || any(isinf(prev_irr))) {
-    prev_irr = irr;
+
+  vec3 prev_out = vec3(0);
+  if (params.filter_prev == 0) {
+    prev_out = texelFetch(img_prev_out, ivec2(round(ipos + mv)), 0).rgb;
+  } else if (params.filter_prev == 1) {
+    prev_out = catmull_rom(img_prev_out, (ipos + mv + 0.5) / vec2(imageSize(img_out))).rgb;
+  }
+
+  if (any(isnan(prev_out)) || any(isinf(prev_out))) {
+    prev_out = irr * albedo;
   }
 
   const mat3 M = mat3( // linear rec709 to linear rec2020
@@ -39,28 +50,43 @@ main()
       0.32927542, 0.91951916, 0.08801125,
       0.04330266, 0.0113596 , 0.89538035);
 
-  // taa with box clamping
-  vec3 m1 = vec3(0.0f);
-  vec3 m2 = vec3(0.0f);
-  const int r = 1;
-  for (int yy=-r;yy<=r;yy++)
-    for(int xx=-r;xx<=r;xx++) {
-      const vec3 a = texelFetch(img_albedo, ipos + ivec2(xx, yy), 0).rgb;
-      const vec3 irr = texelFetch(img_filter_result, ipos + ivec2(xx, yy), 0).rgb;
-      const vec3 b = (a * irr);
-      m1 += b;
-      m2 += b * b;
+  if (params.clamping == 0) {
+    // min max clamping
+    vec3 neigh_clamp_min_color = vec3(1. / 0.);
+    vec3 neigh_clamp_max_color = vec3(-1. / 0.);
+    for (int j = -1; j <= 1; ++j) {
+      for (int i = -1; i <= 1; ++i) {
+        const vec3 a = texelFetch(img_albedo, ipos + ivec2(i, j), 0).rgb;
+        const vec3 irr = texelFetch(img_filter_result, ipos + ivec2(i, j), 0).rgb;
+        const vec3 color = (a * irr);
+        neigh_clamp_min_color = min(neigh_clamp_min_color, color);
+        neigh_clamp_max_color = max(neigh_clamp_max_color, color);
+      }
     }
-  m1 /= (2.0 * r + 1) * (2.0 * r + 1);
-  m2 /= (2.0 * r + 1) * (2.0 * r + 1);
+    prev_out = clamp(prev_out, neigh_clamp_min_color, neigh_clamp_max_color);
+  } else if (params.clamping == 1) {
+    // moments clamping
+    vec3 m1 = vec3(0.0f);
+    vec3 m2 = vec3(0.0f);
+    const int r = 1;
+    for (int yy=-r;yy<=r;yy++)
+      for(int xx=-r;xx<=r;xx++) {
+        const vec3 a = texelFetch(img_albedo, ipos + ivec2(xx, yy), 0).rgb;
+        const vec3 irr = texelFetch(img_filter_result, ipos + ivec2(xx, yy), 0).rgb;
+        const vec3 b = (a * irr);
+        m1 += b;
+        m2 += b * b;
+      }
+    m1 /= (2.0 * r + 1) * (2.0 * r + 1);
+    m2 /= (2.0 * r + 1) * (2.0 * r + 1);
 
-  const vec3 sigma = sqrt(max(vec3(0), m2 - m1 * m1));
-  const float thresh = params.rejection_threshold;
-  prev_irr = clamp(prev_irr, max(vec3(0), m1 - thresh * sigma), m1 + thresh * sigma);
+    const vec3 sigma = sqrt(max(vec3(0), m2 - m1 * m1));
+    const float thresh = params.rejection_threshold;
+    prev_out = clamp(prev_out, max(vec3(0), m1 - thresh * sigma), m1 + thresh * sigma);
+  }
 
-  const vec3 albedo = texelFetch(img_albedo, ipos, 0).rgb; // multiply albedo
   const vec3 beauty = irr * albedo;
-  const vec3 blended = mix(beauty, prev_irr, params.blend_alpha);
+  const vec3 blended = mix(beauty, prev_out, params.blend_alpha);
 
   imageStore(img_out, ipos, vec4(blended, 1));
 }

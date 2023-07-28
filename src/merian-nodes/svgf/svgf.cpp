@@ -234,9 +234,12 @@ void SVGFNode::get_configuration(Configuration& config) {
     config.config_float(
         "TAA alpha", taa_pc.blend_alpha, 0, 1,
         "Blend factor for the final image and the previous image. More means more reuse.");
-    config.config_float(
-        "TAA rejection threshold", taa_pc.rejection_threshold,
-        "TAA rejection threshold for the previous frame, in units of standard deviation", 0.01);
+    config.config_options("filter", taa_pc.filter_prev, {"none", "catmull rom"});
+    config.config_options("clamping", taa_pc.clamping, {"min-max", "moments"});
+    if (taa_pc.clamping == 1)
+        config.config_float(
+            "TAA rejection threshold", taa_pc.rejection_threshold,
+            "TAA rejection threshold for the previous frame, in units of standard deviation", 0.01);
     bool show_variance = taa_pc.show_variance_estimate;
     config.config_bool("show variance estimate", show_variance);
     taa_pc.show_variance_estimate = show_variance;
