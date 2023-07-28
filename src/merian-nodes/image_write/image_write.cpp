@@ -112,6 +112,7 @@ void ImageWriteNode::cmd_process([[maybe_unused]] const vk::CommandBuffer& cmd,
             image->get_memory()->unmap();
         });
 
+        run.request_rebuild();
         record_next = false;
     }
 
@@ -122,6 +123,7 @@ void ImageWriteNode::get_configuration([[maybe_unused]] Configuration& config) {
     config.st_separate("General");
     config.config_options("format", format, {"PNG", "JPG", "HDR"},
                           Configuration::OptionsStyle::COMBO);
+    config.config_bool("force rebuild", force_rebuild, "Forces a graph rebuild after every image");
     if (config.config_text("filename", buf.size(), buf.data())) {
         base_filename = buf.data();
     }
@@ -134,6 +136,7 @@ void ImageWriteNode::get_configuration([[maybe_unused]] Configuration& config) {
     config.config_bool("record", record);
     config.st_no_space();
     config.config_int("every", record_every, "Record only every i-th image");
+    record_every = std::max(record_every, 1);
 }
 
 } // namespace merian

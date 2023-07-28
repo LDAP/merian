@@ -35,6 +35,10 @@ class GraphRun {
         submit_callbacks.push_back(callback);
     }
 
+    void request_rebuild() {
+        rebuild_requested = true;
+    }
+
     const uint64_t& get_iteration() const noexcept {
         return iteration;
     }
@@ -86,6 +90,7 @@ class GraphRun {
         this->iteration = iteration;
         this->profiler = profiler;
         this->debug_utils = debug_utils;
+        this->rebuild_requested = false;
     }
 
   private:
@@ -96,6 +101,7 @@ class GraphRun {
     uint64_t iteration;
     ProfilerHandle profiler = nullptr;
     std::shared_ptr<ExtensionVkDebugUtils> debug_utils = nullptr;
+    bool rebuild_requested = false;
 };
 
 /**

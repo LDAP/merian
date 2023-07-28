@@ -165,6 +165,7 @@ const GraphRun& Graph::cmd_run(vk::CommandBuffer& cmd, const ProfilerHandle prof
         }
     }
 
+    rebuild_requested = run.rebuild_requested;
     current_iteration++;
 
     return run;
