@@ -137,7 +137,7 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id,
     for (std::size_t i = 0; i < devices.size(); i++) {
         vk::PhysicalDeviceProperties2 props = devices[i].getProperties2();
         SPDLOG_INFO("found physical device {}, vendor id: {}, device id: {}",
-                    props.properties.deviceName, props.properties.vendorID,
+                    props.properties.deviceName.data(), props.properties.vendorID,
                     props.properties.deviceID);
         if ((filter_vendor_id == (uint32_t)-1 || filter_vendor_id == props.properties.vendorID) &&
             (filter_device_id == (uint32_t)-1 || filter_device_id == props.properties.deviceID) &&
@@ -154,7 +154,7 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id,
     pd_container.physical_device = devices[selected];
     pd_container.physical_device_props = pd_container.physical_device.getProperties();
     SPDLOG_INFO("selected physical device {}, vendor id: {}, device id: {}",
-                pd_container.physical_device_props.properties.deviceName,
+                pd_container.physical_device_props.properties.deviceName.data(),
                 pd_container.physical_device_props.properties.vendorID,
                 pd_container.physical_device_props.properties.deviceID);
 
