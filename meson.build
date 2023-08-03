@@ -43,8 +43,13 @@ add_project_arguments('-DMERIAN_PROJECT_NAME="@0@"'.format(meson.project_name())
 # Dependencies
 fmt = dependency('fmt', version : ['>=9.1.0'], fallback : ['fmt', 'fmt_dep'])
 spdlog = dependency('spdlog', version : ['>=1.11.0'], fallback : ['spdlog', 'spdlog_dep'], default_options : ['external_fmt=enabled'])
-# For some reason vulkan is not found on windows but it works without the dependency
-vulkan = dependency('vulkan', version: ['>=1.3.0'], required : build_machine.system() != 'windows')
+vulkan = dependency('vulkan', version: ['>=1.3.0'], required: false)
+if not vulkan.found()
+    # version specifier is broken for vulkan https://github.com/mesonbuild/meson/issues/12072
+    vulkan = dependency('vulkan')
+else
+    
+endif
 glfw = dependency('glfw3', version: ['>=3.3.0'], fallback : ['glfw', 'glfw_dep'], default_options : ['install=true'])
 glm = dependency('glm', fallback : ['glm', 'glm_dep'], version: ['>=0.9.9.8'])
 tol_subp = cmake.subproject('tinyobjloader')
@@ -62,8 +67,6 @@ inc_dirs = [
 subdir('src/ext')
 subdir('src/merian')
 subdir('src/merian-nodes')
-
-# Keep sorted
 
 merian_dep = declare_dependency(
     link_with : [ext_lib, merian_lib, merian_nodes_lib],
