@@ -112,7 +112,8 @@ void ImageWriteNode::cmd_process([[maybe_unused]] const vk::CommandBuffer& cmd,
             image->get_memory()->unmap();
         });
 
-        run.request_rebuild();
+        if (force_rebuild)
+            run.request_rebuild();
         record_next = false;
     }
 
