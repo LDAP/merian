@@ -65,5 +65,6 @@ subdir('src/merian-nodes')
 
 merian_dep = declare_dependency(
     link_with : [ext_lib, merian_lib, merian_nodes_lib],
-    include_directories : inc_dirs
+    include_directories : inc_dirs,
+    dependencies : [glfw, glm, vulkan, fmt, spdlog]
 )
