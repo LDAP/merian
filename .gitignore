@@ -4,4 +4,4 @@
 
 /subprojects/*
 !/subprojects/*.wrap
-!/subprojects/projectfiles
+!/subprojects/packagefiles
