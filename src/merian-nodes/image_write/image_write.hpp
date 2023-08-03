@@ -43,7 +43,7 @@ class ImageWriteNode : public Node {
     uint64_t frame = 0;
     uint32_t image_index = 0;
 
-    int format;
+    int format = 0;
     int record_every = 1;
     bool record = false;
     bool record_next = false;

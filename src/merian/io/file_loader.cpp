@@ -20,7 +20,7 @@ bool FileLoader::exists(const std::filesystem::path& path, std::filesystem::file
 
 std::string FileLoader::load_file(const std::filesystem::path& path) {
     if (!exists(path)) {
-        throw std::runtime_error{fmt::format("failed to load {} (does not exist)", std::string(path))};
+        throw std::runtime_error{fmt::format("failed to load {} (does not exist)", path.string())};
     }
 
     // Open the stream to 'lock' the file.
@@ -30,7 +30,7 @@ std::string FileLoader::load_file(const std::filesystem::path& path) {
     std::string result(size, '\0');
     f.read(result.data(), size);
 
-    SPDLOG_DEBUG("load {} of data from {}", format_size(size), std::string(path));
+    SPDLOG_DEBUG("load {} of data from {}", format_size(size), path.string());
 
     return result;
 }
@@ -46,7 +46,7 @@ std::optional<std::filesystem::path> FileLoader::find_file(const std::filesystem
             return std::filesystem::weakly_canonical(full_path);
     }
 
-    SPDLOG_WARN("file {} not found in search paths", std::string(filename));
+    SPDLOG_WARN("file {} not found in search paths", filename.string());
     return std::nullopt;
 }
 

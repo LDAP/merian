@@ -14,7 +14,7 @@ template <BlitNodeMode mode = FIT> class GLFWWindowNode : public BlitExternalNod
                    const SurfaceHandle surface,
                    const std::optional<QueueHandle> wait_queue = std::nullopt)
         : window(window), surface(surface) {
-        swapchain = make_shared<merian::Swapchain>(context, surface, wait_queue);
+        swapchain = std::make_shared<merian::Swapchain>(context, surface, wait_queue);
     }
 
     virtual std::string name() override {

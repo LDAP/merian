@@ -55,7 +55,7 @@ void GLFWImGui::recreate_render_pass(SwapchainAcquireResult& aquire_result) {
         {}, vk::PipelineBindPoint::eGraphics, 0, nullptr, 1, &color_attachment,
     };
     vk::SubpassDependency dependency = {
-        vk::SubpassExternal,
+        VK_SUBPASS_EXTERNAL,
         0,
         vk::PipelineStageFlagBits::eColorAttachmentOutput,
         vk::PipelineStageFlagBits::eColorAttachmentOutput,

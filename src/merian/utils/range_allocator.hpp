@@ -21,6 +21,12 @@
 
 #pragma once
 
+#ifdef _MSC_VER
+#  include <intrin.h>
+#  define __builtin_popcount __popcnt
+#endif
+
+
 #include "merian/utils/alignment.hpp"
 
 #include <algorithm>

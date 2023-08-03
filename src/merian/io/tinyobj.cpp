@@ -13,7 +13,7 @@ tinyobj::ObjReader read_obj(std::string filename, std::optional<FileLoader> load
         if (!opt_path) {
             throw std::runtime_error{"file not found using loader"};
         }
-        full_path = loader.value().find_file(filename).value();
+        full_path = loader.value().find_file(filename).value().string();
     } else {
         full_path = filename;
     }

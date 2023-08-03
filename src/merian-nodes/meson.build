@@ -23,6 +23,7 @@ merian_nodes_lib = static_library(
         glm,
         spdlog,
         vulkan,
+        glfw,
     ],
     include_directories: inc_dirs,
     link_with: merian_lib,

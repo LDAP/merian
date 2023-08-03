@@ -1,3 +1,7 @@
 /build
 **/.cache
 *.sublime-workspace
+
+/subprojects/*
+!/subprojects/*.wrap
+!/subprojects/projectfiles

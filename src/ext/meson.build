@@ -16,7 +16,8 @@ ext_lib = static_library(
     'merian-ext',
     [ext_src],
     dependencies: [
-        vulkan
+        vulkan,
+        glfw
     ],
     include_directories: [inc_dirs],
     install : true

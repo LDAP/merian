@@ -12,12 +12,11 @@ ImageNode::ImageNode(const ResourceAllocatorHandle allocator,
 
     auto file = loader.find_file(path);
     assert(file.has_value());
-    filename = file.value();
+    filename = file.value().string();
 
-    const char* filename = file->c_str();
-    image = stbi_load(filename, &width, &height, &channels, 4);
+    image = stbi_load(file->string().c_str(), &width, &height, &channels, 4);
     assert(image);
-    SPDLOG_DEBUG("Loaded image from {} ({}x{}, {} channels)", filename, width, height, channels);
+    SPDLOG_DEBUG("Loaded image from {} ({}x{}, {} channels)", file->string(), width, height, channels);
 
     format = linear ? vk::Format::eR8G8B8A8Unorm : vk::Format::eR8G8B8A8Srgb;
 }
