@@ -27,8 +27,8 @@ class ExposureNode : public Node {
 
         // Auto exposure
         float K = 12.5;
-        float speed_up = 1.1;
-        float speed_down = 1.1;
+        float speed_up = 2.1;
+        float speed_down = 2.1;
         float timediff = 0;
         int reset = 0;
         float min_log_histogram = -10.0;
