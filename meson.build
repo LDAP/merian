@@ -9,6 +9,7 @@ project(
     ]
 )
 
+ccx = meson.get_compiler('cpp')
 cmake = import('cmake')
 glslc = find_program('glslangValidator')
 
@@ -42,10 +43,8 @@ add_project_arguments('-DMERIAN_PROJECT_NAME="@0@"'.format(meson.project_name())
 # Dependencies
 fmt = dependency('fmt', version : ['>=9.1.0'], fallback : ['fmt', 'fmt_dep'])
 spdlog = dependency('spdlog', version : ['>=1.11.0'], fallback : ['spdlog', 'spdlog_dep'], default_options : ['external_fmt=enabled'])
-vulkan = dependency('vulkan', version: ['>=1.3.0'], required : false)
-if not vulkan.found()
-    vulkan = dependency('vulkan-headers', version : ['>=1.3.0'], fallback : ['vulkan-headers', 'vulkan_headers_dep'])
-endif
+# For some reason vulkan is not found on windows but it works without the dependency
+vulkan = dependency('vulkan', version: ['>=1.3.0'], required : build_machine.system() != 'windows')
 glfw = dependency('glfw3', version: ['>=3.3.0'], fallback : ['glfw', 'glfw_dep'], default_options : ['install=true'])
 glm = dependency('glm', fallback : ['glm', 'glm_dep'], version: ['>=0.9.9.8'])
 tol_subp = cmake.subproject('tinyobjloader')
