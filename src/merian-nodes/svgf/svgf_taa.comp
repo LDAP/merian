@@ -51,11 +51,6 @@ main()
     prev_out = irr * albedo;
   }
 
-  const mat3 M = mat3( // linear rec709 to linear rec2020
-      0.62750375, 0.06910828, 0.01639406,
-      0.32927542, 0.91951916, 0.08801125,
-      0.04330266, 0.0113596 , 0.89538035);
-
   if (params.clamping == 0) {
     // min max clamping
     vec3 neigh_clamp_min_color = vec3(1. / 0.);
