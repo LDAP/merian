@@ -75,34 +75,37 @@ ivec3 grid_idx_interpolate(const vec3 pos, const float cell_width, const float r
     return lower;
 }
 
-#define GRID_PRIME_1 2654435761
-#define GRID_PRIME_2 805459861
+// Müller et al. uses 1 for X
+// but we observed artifacts when doing so
+#define GRID_PRIME_X 44761931
+#define GRID_PRIME_Y 2654435761
+#define GRID_PRIME_Z 805459861
 
 // Hashes the grid index, for x nothing is multiplied for better cache coherence.
 // See Müller et al. (2022): Instant Neural Graphics Primitives with a Multiresolution Hash Encoding
 // and Lehmer (1951): Instant Neural Graphics Primitives with a Multiresolution Hash Encoding.
 uint hash_grid(const ivec3 index, const uint modulus) {
-    return ((index.x ^ (index.y * GRID_PRIME_1) ^ (index.z * GRID_PRIME_2)) % modulus + modulus) % modulus;
+    return (((index.x * GRID_PRIME_X) ^ (index.y * GRID_PRIME_Y) ^ (index.z * GRID_PRIME_Z)) % modulus + modulus) % modulus;
 }
 
 // like hash_grid but with simple normal biasing
 uint hash_grid_normal(const ivec3 index, const vec3 normal, const uint modulus) {
     const int cube = cubemap_side(normal);
-    return ((index.x ^ (index.y * GRID_PRIME_1) ^ (index.z * GRID_PRIME_2) ^ (9351217 * cube + 13 * cube)) % modulus + modulus) % modulus;
+    return (((index.x * GRID_PRIME_X) ^ (index.y * GRID_PRIME_Y) ^ (index.z * GRID_PRIME_Z) ^ (9351217 * cube + 13 * cube)) % modulus + modulus) % modulus;
 }
 
 uint hash_grid_normal_level(const ivec3 index, const vec3 normal, const uint level, const uint modulus) {
     const int cube = cubemap_side(normal);
-    return ((index.x ^ (index.y * GRID_PRIME_1) ^ (index.z * GRID_PRIME_2) ^ (9351217 * cube + 13 * cube) ^ (723850877 * level + 231961 * level)) % modulus + modulus) % modulus;
+    return (((index.x * GRID_PRIME_X) ^ (index.y * GRID_PRIME_Y) ^ (index.z * GRID_PRIME_Z) ^ (9351217 * cube + 13 * cube) ^ (723850877 * level + 231961 * level)) % modulus + modulus) % modulus;
 }
 
 uint hash_grid_level(const ivec3 index, const uint level, const uint modulus) {
-    return ((index.x ^ (index.y * GRID_PRIME_1) ^ (index.z * GRID_PRIME_2) ^ (723850877 * level + 231961 * level)) % modulus + modulus) % modulus;
+    return (((index.x * GRID_PRIME_X) ^ (index.y * GRID_PRIME_Y) ^ (index.z * GRID_PRIME_Z) ^ (723850877 * level + 231961 * level)) % modulus + modulus) % modulus;
 }
 
 // Like hash_grid but modulus must be a power of two
 uint hash_grid_2(const ivec3 index, const uint modulus_power_of_two) {
-    return (index.x ^ (index.y * GRID_PRIME_1) ^ (index.z * GRID_PRIME_2)) & (modulus_power_of_two - 1);
+    return ((index.x * GRID_PRIME_X) ^ (index.y * GRID_PRIME_Y) ^ (index.z * GRID_PRIME_Z)) & (modulus_power_of_two - 1);
 }
 
 // Level in [0, max_level]. Higher levels have greater width.
