@@ -46,7 +46,9 @@ void ImageWriteNode::cmd_process([[maybe_unused]] const vk::CommandBuffer& cmd,
         return;
     }
 
-    if (record_next || (record && frame % record_every == 0)) {
+    if (record_next
+        || (record_run_enable && record_run == (int)run.get_iteration())
+        || (record_every_enable && frame % record_every == 0)) {
 
         vk::Format format = this->format == FORMAT_HDR ? vk::Format::eR32G32B32A32Sfloat
                                                        : vk::Format::eR8G8B8A8Srgb;
@@ -134,10 +136,19 @@ void ImageWriteNode::get_configuration([[maybe_unused]] Configuration& config) {
     record_next = config.config_bool("trigger");
 
     config.st_separate("Multiple");
-    config.config_bool("record", record);
+    config.config_bool("record graph run", record_run_enable);
     config.st_no_space();
-    config.config_int("every", record_every, "Record only every i-th image");
+    config.config_int("iteration", record_run, "Save the result of the specified run.");
+    record_run = std::max(record_run, 0);
+
+    bool old_record_every_enable = record_every_enable;
+    config.config_bool("record every", record_every_enable);
+    config.st_no_space();
+    config.config_int("frame", record_every, "Capture every i-th frame.");
     record_every = std::max(record_every, 1);
+    if (old_record_every_enable != record_every_enable) {
+        frame = 1;
+    }
 }
 
 } // namespace merian

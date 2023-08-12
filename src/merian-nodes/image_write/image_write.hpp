@@ -44,8 +44,13 @@ class ImageWriteNode : public Node {
     uint32_t image_index = 0;
 
     int format = 0;
+    
+    bool record_run_enable = false;
+    int record_run = 0;
+
+    bool record_every_enable = false;
     int record_every = 1;
-    bool record = false;
+
     bool record_next = false;
     bool force_rebuild = false;
 };
