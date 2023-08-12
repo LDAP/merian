@@ -51,28 +51,26 @@ inline std::pair<vk::Offset3D, vk::Offset3D> center(const vk::Extent3D& extent,
     return std::make_pair(lower, upper);
 }
 
-// Fits src into dst and returns the new dst offsets.
+// Fits src into dst and returns the new dst offsets, assumes both images to have extent 1 in z direction.
 inline std::pair<vk::Offset3D, vk::Offset3D> fit(const vk::Offset3D& src_lower,
                                                  const vk::Offset3D& src_upper,
                                                  const vk::Offset3D& dst_lower,
                                                  const vk::Offset3D& dst_upper) noexcept {
     const int32_t src_dx = src_upper.x - src_lower.x;
     const int32_t src_dy = src_upper.y - src_lower.y;
-    const int32_t src_dz = src_upper.z - src_lower.z;
 
     const int32_t dst_dx = dst_upper.x - dst_lower.x;
     const int32_t dst_dy = dst_upper.y - dst_lower.y;
-    const int32_t dst_dz = dst_upper.z - dst_lower.z;
 
-    assert(src_dx > 0); assert(src_dy > 0); assert(src_dz > 0);
-    assert(dst_dx > 0); assert(dst_dy > 0); assert(dst_dz > 0);
+    assert(src_dx > 0);
+    assert(src_dy > 0);
+    assert(dst_dx > 0);
+    assert(dst_dy > 0);
 
-    const float scale =
-        std::min(std::min(dst_dx / (float)src_dx, dst_dy / (float)src_dy), dst_dz / (float)src_dz);
+    const float scale = std::min(dst_dx / (float)src_dx, dst_dy / (float)src_dy);
     const auto [ctr_lower, ctr_upper] =
-        center(vk::Extent3D(dst_dx, dst_dy, dst_dz),
-               vk::Extent3D(std::round(src_dx * scale), std::round(src_dy * scale),
-                            std::round(src_dz * scale)));
+        center(vk::Extent3D(dst_dx, dst_dy, 1),
+               vk::Extent3D(std::round(src_dx * scale), std::round(src_dy * scale), 1));
 
     return std::make_pair(add(dst_lower, ctr_lower), add(dst_lower, ctr_upper));
 }
