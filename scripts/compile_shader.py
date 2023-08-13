@@ -56,6 +56,8 @@ def main():
 
     if args.header:
         result = """\
+#pragma once
+
 #include "stdint.h"
 
 #if __cplusplus
