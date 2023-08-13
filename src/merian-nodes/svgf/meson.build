@@ -22,7 +22,7 @@ foreach s : shaders
     s + '.spv.c',
     input: s,
     output: s + '.spv.c',
-    command: spv_compile_script + ['--optimize', '@INPUT@', '@OUTPUT@'] + glslc_args,
+    command: spv_compile_script + ['@INPUT@', '@OUTPUT@'] + glslc_args,
     depend_files: included_files
   )
 endforeach
