@@ -1,6 +1,6 @@
 shader_include_dir = dir_source_root + '/src/merian-nodes'
 merian_nodes_src = []
-spv_compile_script = [python, dir_source_root + '/scripts/compile_shader.py']
+spv_compile_script = [dir_source_root + '/scripts/compile_shader.py']
 glslc_args = ['-I' + shader_include_dir,'--target-env', 'vulkan1.3']
 
 subdir('ab_compare')
