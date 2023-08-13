@@ -19,24 +19,11 @@ from pathlib import Path
 
 
 def to_int_array(b_array: bytes):
+    # This must be true for SPIR-V by spec.
+    assert(len(b_array) % 4 == 0)
     result = []
-
-    sum = 0
-    i = 0
-    for b in b_array:
-        sum += b << (8 * i)
-        i += 1
-
-        if i == 4:
-            result.append(sum)
-            i = 0
-            sum = 0
-
-    if i > 0:
-        result.append(sum)
-        i = 0
-        sum = 0
-
+    for i in range(0, len(b_array), 4):
+        result.append(int.from_bytes(b_array[i: i + 4], byteorder="little"))
     return result
 
 
