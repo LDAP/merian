@@ -9,9 +9,12 @@ project(
     ]
 )
 
-ccx = meson.get_compiler('cpp')
+pymod = import('python')
 cmake = import('cmake')
+
+ccx = meson.get_compiler('cpp')
 glslc = find_program('glslangValidator')
+python = pymod.find_installation('python3')
 
 dir_source_root = meson.project_source_root()
 
