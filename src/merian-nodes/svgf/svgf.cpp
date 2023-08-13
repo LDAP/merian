@@ -7,26 +7,18 @@
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 
-static const uint32_t variance_estimate_spv[] = {
-#include "svgf_variance_estimate.comp.spv.h"
-};
-
-static const uint32_t filter_spv[] = {
 #include "svgf_filter.comp.spv.h"
-};
-
-static const uint32_t taa_spv[] = {
 #include "svgf_taa.comp.spv.h"
-};
+#include "svgf_variance_estimate.comp.spv.h"
 
 namespace merian {
 
 SVGFNode::SVGFNode(const SharedContext context, const ResourceAllocatorHandle allocator)
     : context(context), allocator(allocator) {
     variance_estimate_module = std::make_shared<ShaderModule>(
-        context, sizeof(variance_estimate_spv), variance_estimate_spv);
-    filter_module = std::make_shared<ShaderModule>(context, sizeof(filter_spv), filter_spv);
-    taa_module = std::make_shared<ShaderModule>(context, sizeof(taa_spv), taa_spv);
+        context, merian_svgf_variance_estimate_comp_spv_size(), merian_svgf_variance_estimate_comp_spv());
+    filter_module = std::make_shared<ShaderModule>(context, merian_svgf_filter_comp_spv_size(), merian_svgf_filter_comp_spv());
+    taa_module = std::make_shared<ShaderModule>(context, merian_svgf_taa_comp_spv_size(), merian_svgf_taa_comp_spv());
 }
 
 SVGFNode::~SVGFNode() {}
@@ -235,7 +227,7 @@ void SVGFNode::get_configuration(Configuration& config) {
         "TAA alpha", taa_pc.blend_alpha, 0, 1,
         "Blend factor for the final image and the previous image. More means more reuse.");
     config.config_options("mv sampling", taa_pc.mv_sampling, {"center", "magnitude dilation"});
-    config.config_options("filter", taa_pc.filter_prev, {"none", "catmull rom"}); 
+    config.config_options("filter", taa_pc.filter_prev, {"none", "catmull rom"});
     config.config_options("clamping", taa_pc.clamping, {"min-max", "moments"});
     if (taa_pc.clamping == 1)
         config.config_float(
