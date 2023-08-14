@@ -126,4 +126,13 @@ float cell_width_for_level_linear(const float level, const float max_level, cons
     return mix(min_width, max_width, level / max_level);
 }
 
+#define GRID_PRIME_X_2 74763401
+#define GRID_PRIME_Y_2 2254437599
+#define GRID_PRIME_Z_2 508460413
+
+// Second hash function for collision detection
+uint hash_level(const ivec3 index, const uint level) {
+    return (index.x * GRID_PRIME_X_2) ^ (index.y * GRID_PRIME_Y_2) ^ (index.z * GRID_PRIME_Z_2) ^ (9351217 * level + 13 * level);
+}
+
 #endif
