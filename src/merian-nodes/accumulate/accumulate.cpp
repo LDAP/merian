@@ -89,8 +89,10 @@ void AccumulateNode::get_configuration(Configuration& config) {
                         "reducing the blend alpha");
     config.st_no_space();
     pc.accum_max_hist = config.config_bool("inf") ? INFINITY : pc.accum_max_hist;
-    config.config_angle("normal threshold", pc.normal_reject_rad,
-                        "Reject points with normals farther apart", 0, 90);
+    float angle = glm::acos(pc.normal_reject_cos);
+    config.config_angle("normal threshold", angle, "Reject points with normals farther apart", 0,
+                        90);
+    pc.normal_reject_cos = glm::cos(angle);
     config.config_percent("depth threshold", pc.depth_reject_percent,
                           "Reject points with depths farther apart (relative to the max)");
     config.config_options("filter mode", pc.filter_mode, {"nearest", "linear"});

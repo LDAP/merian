@@ -25,7 +25,7 @@ layout(set = 0, binding = 7) uniform writeonly image2D img_moments;
 layout(push_constant, std140) uniform params_t { 
     float accum_alpha;
     float accum_max_hist;
-    float normal_reject_rad;
+    float normal_reject_cos;
     float depth_reject_percent;
     int filter_mode;
     uint clear;
@@ -59,7 +59,7 @@ main() {
 
     float w = 1.0;
     // Similar normals
-    w *= smoothstep(params.normal_reject_rad, 1.0, dot(curr_normal, prev_normal));
+    w *= smoothstep(params.normal_reject_cos, 1.0, dot(curr_normal, prev_normal));
     // Similar depth
     w *= 1.0 - smoothstep(0.0, params.depth_reject_percent * max(curr_z, prev_z), abs(curr_z - prev_z));
 
@@ -86,7 +86,7 @@ main() {
         // Bilinear interpolation weight
         float w = (xx == 0 ? (1.0 - inter_w.x) : inter_w.x) * (yy == 0 ? (1.0 - inter_w.y) : inter_w.y);
         // Similar normals
-        w *= smoothstep(params.normal_reject_rad, 1.0, dot(curr_normal, prev_normal));
+        w *= smoothstep(params.normal_reject_cos, 1.0, dot(curr_normal, prev_normal));
         // Similar depth
         w *= 1.0 - smoothstep(0.0, params.depth_reject_percent * max(curr_z, prev_z), abs(curr_z - prev_z));
 

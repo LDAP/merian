@@ -15,10 +15,13 @@ namespace merian {
 
 SVGFNode::SVGFNode(const SharedContext context, const ResourceAllocatorHandle allocator)
     : context(context), allocator(allocator) {
-    variance_estimate_module = std::make_shared<ShaderModule>(
-        context, merian_svgf_variance_estimate_comp_spv_size(), merian_svgf_variance_estimate_comp_spv());
-    filter_module = std::make_shared<ShaderModule>(context, merian_svgf_filter_comp_spv_size(), merian_svgf_filter_comp_spv());
-    taa_module = std::make_shared<ShaderModule>(context, merian_svgf_taa_comp_spv_size(), merian_svgf_taa_comp_spv());
+    variance_estimate_module =
+        std::make_shared<ShaderModule>(context, merian_svgf_variance_estimate_comp_spv_size(),
+                                       merian_svgf_variance_estimate_comp_spv());
+    filter_module = std::make_shared<ShaderModule>(context, merian_svgf_filter_comp_spv_size(),
+                                                   merian_svgf_filter_comp_spv());
+    taa_module = std::make_shared<ShaderModule>(context, merian_svgf_taa_comp_spv_size(),
+                                                merian_svgf_taa_comp_spv());
 }
 
 SVGFNode::~SVGFNode() {}
@@ -207,17 +210,20 @@ void SVGFNode::get_configuration(Configuration& config) {
                       "Compute the variance spatially for shorter histories.");
     config.config_float("spatial boost", variance_estimate_pc.spatial_variance_boost,
                         "Boost the variance of spatial variance estimates.");
-    config.config_angle("normal threshold", variance_estimate_pc.normal_reject_rad,
-                        "Reject points with normals farther apart", 0, 90);
+    float angle = glm::acos(variance_estimate_pc.normal_reject_cos);
+    config.config_angle("normal threshold", angle, "Reject points with farther apart", 0, 90);
+    variance_estimate_pc.normal_reject_cos = glm::cos(angle);
     config.config_percent("depth threshold", variance_estimate_pc.depth_reject_percent,
                           "Reject points with depths farther apart (relative to the max)");
 
     config.st_separate("Filter");
     config.config_int("SVGF iterations", svgf_iterations, 0, 10,
                       "0 disables SVGF completely (TAA-only mode)");
-    config.config_float("depth sens", filter_pc.param_z, "more means more blur");
-    config.config_float("normals sens", filter_pc.param_n, "less means more blur");
-    config.config_float("brightness sens", filter_pc.param_l, "more means more blur");
+    config.config_float("filter depth", filter_pc.param_z, "more means more blur");
+    angle = glm::acos(filter_pc.param_n);
+    config.config_angle("filter normals", angle, "Reject with normals farther apart", 0, 179);
+    filter_pc.param_n = glm::cos(angle);
+    config.config_float("filter luminance", filter_pc.param_l, "more means more blur");
     bool filter_variance = filter_pc.filter_variance;
     config.config_bool("filter variance", filter_variance, "Filter variance with a 3x3 gaussian");
     filter_pc.filter_variance = filter_variance;

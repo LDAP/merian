@@ -15,7 +15,7 @@ class AccumulateNode : public ComputeNode {
     struct AccumulatePushConstant {
         float accum_alpha = 0.0;
         float accum_max_hist = INFINITY;
-        float normal_reject_rad = 0.8;
+        float normal_reject_cos = 0.8;
         float depth_reject_percent = 0.05;
         int filter_mode = 0;
         uint32_t clear = 0;

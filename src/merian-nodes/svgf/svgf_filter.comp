@@ -60,7 +60,8 @@ void tap(const ivec2 p,
   // This is different to the paper version which uses
   // 3.0 * abs(z_p - z_center.x) / (z_center.y * length(vec2(offset) * step_size) + 1e-2); 
   const float w_z = (200 * abs(p_z - c_z) / max(p_z, c_z)) / (params.param_z); 
-  const float w_n = pow(max(0, dot(p_n, c_n)), params.param_n); 
+  // was: pow(max(0, dot(p_n, c_n)), params.param_n); 
+  const float w_n = smoothstep(params.param_n, 1.0, dot(p_n, c_n));
 
   const float w = exp(-w_l * w_l - w_z) * w_n * kernel_weight; 
 

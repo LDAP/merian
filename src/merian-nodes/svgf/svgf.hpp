@@ -15,14 +15,14 @@ class SVGFNode : public Node {
     struct VarianceEstimatePushConstant {
         int spatial_threshold = 0;
         float spatial_variance_boost = 0.0;
-        float normal_reject_rad = 0.8;
+        float normal_reject_cos = 0.8;
         float depth_reject_percent = 0.05;
     };
 
     struct FilterPushConstant {
         int gap;
         float param_z = 10;  // parameter for depth      = 1   larger blurs more 
-        float param_n = 64;  // parameter for normals    = 128 smaller blurs more
+        float param_n = .8;  // parameter for normals    cos(alpha) for lower threshold
         float param_l = 8;   // parameter for brightness = 4   larger blurs more
         int filter_variance = 0;
     };
