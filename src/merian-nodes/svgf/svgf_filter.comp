@@ -1,5 +1,6 @@
 #version 460
 #extension GL_GOOGLE_include_directive    : enable
+#extension GL_EXT_control_flow_attributes : enable
 
 #include "svgf_graph_layout.glsl"
 #include "common/colors_yuv.glsl"
@@ -92,35 +93,17 @@ main() {
   filter_w = 1.0;
 
   if (c_z > 0) {
-    tap(ivec2( 1,  0) * params.gap + ipos, 2.0 / 3.0, sigma_l);
-    tap(ivec2( 0,  1) * params.gap + ipos, 2.0 / 3.0, sigma_l);
-    tap(ivec2(-1,  0) * params.gap + ipos, 2.0 / 3.0, sigma_l);
-    tap(ivec2( 0, -1) * params.gap + ipos, 2.0 / 3.0, sigma_l);
-
-    tap(ivec2( 2,  0) * params.gap + ipos, 1.0 / 6.0, sigma_l);
-    tap(ivec2( 0,  2) * params.gap + ipos, 1.0 / 6.0, sigma_l);
-    tap(ivec2(-2,  0) * params.gap + ipos, 1.0 / 6.0, sigma_l);
-    tap(ivec2( 0, -2) * params.gap + ipos, 1.0 / 6.0, sigma_l);
-
-    tap(ivec2( 1,  1) * params.gap + ipos, 4.0 / 9.0, sigma_l);
-    tap(ivec2(-1,  1) * params.gap + ipos, 4.0 / 9.0, sigma_l);
-    tap(ivec2(-1, -1) * params.gap + ipos, 4.0 / 9.0, sigma_l);
-    tap(ivec2( 1, -1) * params.gap + ipos, 4.0 / 9.0, sigma_l);
-
-    tap(ivec2( 1,  2) * params.gap + ipos, 1.0 / 9.0, sigma_l);
-    tap(ivec2(-1,  2) * params.gap + ipos, 1.0 / 9.0, sigma_l);
-    tap(ivec2(-1, -2) * params.gap + ipos, 1.0 / 9.0, sigma_l);
-    tap(ivec2( 1, -2) * params.gap + ipos, 1.0 / 9.0, sigma_l);
-
-    tap(ivec2( 2,  1) * params.gap + ipos, 1.0 / 9.0, sigma_l);
-    tap(ivec2(-2,  1) * params.gap + ipos, 1.0 / 9.0, sigma_l);
-    tap(ivec2(-2, -1) * params.gap + ipos, 1.0 / 9.0, sigma_l);
-    tap(ivec2( 2, -1) * params.gap + ipos, 1.0 / 9.0, sigma_l);
-
-    tap(ivec2( 2,  2) * params.gap + ipos, 1.0 / 36.0, sigma_l);
-    tap(ivec2(-2,  2) * params.gap + ipos, 1.0 / 36.0, sigma_l);
-    tap(ivec2(-2, -2) * params.gap + ipos, 1.0 / 36.0, sigma_l);
-    tap(ivec2( 2, -2) * params.gap + ipos, 1.0 / 36.0, sigma_l);
+    float kernel[] = {1., 2. / 3., 1. / 6.};
+    [[unroll]]
+    for (int j = -2; j <= 2; j++) {
+      [[unroll]]
+      for (int i = -2; i <= 2; i++) {
+        if (i != 0 || j != 0) {
+          const float weight = kernel[abs(i)] * kernel[abs(j)];
+          tap(ivec2(i,  j) * params.gap + ipos, weight, sigma_l);
+        }
+      }
+    }
 
     filter_irr /= filter_w;
     filter_var /= (filter_w * filter_w);
