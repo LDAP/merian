@@ -20,6 +20,7 @@ layout(set = 0, binding = 7) uniform writeonly image2D img_moments;
 
 
 #include "common/colors_yuv.glsl"
+#include "common/normal_encode.glsl"
 
 layout(push_constant, std140) uniform params_t { 
     float accum_alpha;
@@ -37,10 +38,9 @@ main() {
 
   const vec4 curr_irr_samples = texelFetch(img_irr, ipos, 0);
   const vec4 curr_normal_z = texelFetch(img_gbuf, ipos, 0);
-  const vec3 curr_normal = curr_normal_z.rgb;
-  const float curr_z = curr_normal_z.a;
-  const float curr_l = yuv_luminance(curr_irr_samples.rgb);
-  const vec2 curr_moments = vec2(curr_l, curr_l * curr_l);
+  const vec3 curr_normal = geo_decode_normal_float(curr_normal_z.r);
+  const float curr_z = curr_normal_z.g;
+  const vec2 curr_moments = curr_normal_z.ba;
 
   const vec2 mv = texelFetch(img_mv, ipos, 0).rg;
   const vec2 prev_pos = ipos + mv;
@@ -53,9 +53,9 @@ main() {
     // Make sure sum_w is 0. That means no previous information is used.
   } else if (params.filter_mode == 0) {
     const ivec2 prev_ipos = ivec2(round(prev_pos));
-    const vec4 prev_normal_z = texelFetch(img_prev_gbuf, prev_ipos, 0);
-    const vec3 prev_normal = prev_normal_z.rgb;
-    const float prev_z = prev_normal_z.a;
+    const vec2 prev_gbuf = texelFetch(img_prev_gbuf, prev_ipos, 0).rg;
+    const vec3 prev_normal = geo_decode_normal_float(prev_gbuf.r);
+    const float prev_z = prev_gbuf.g;
 
     float w = 1.0;
     // Similar normals
@@ -80,8 +80,8 @@ main() {
           continue;
 
         const vec4 prev_normal_z = texelFetch(img_prev_gbuf, tc, 0);
-        const vec3 prev_normal = prev_normal_z.rgb;
-        const float prev_z = prev_normal_z.a;
+        const vec3 prev_normal = geo_decode_normal_float(prev_normal_z.r);
+        const float prev_z = prev_normal_z.g;
 
         // Bilinear interpolation weight
         float w = (xx == 0 ? (1.0 - inter_w.x) : inter_w.x) * (yy == 0 ? (1.0 - inter_w.y) : inter_w.y);

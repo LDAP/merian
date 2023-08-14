@@ -10,7 +10,7 @@ Inputs:
 | Image | 1        | prev_moments | feedback last `moments`                                     | 1     |
 |       |
 | Image | 2        | irr          | irradiance input (irradiance in `rgb`, sample count in `a`) | no    |
-| Image | 3        | gbuf         | GBuffer (normal in rgb, linear depth in a)                  | no    |
+| Image | 3        | gbuf         | GBuffer (enc normal in r, linear depth in g, monents in ba) | no    |
 | Image | 4        | prev_gbuf    | previous GBuffer                                            | 1     |
 |       |
 | Image | 5        | mv           | motion vectors in `r` and `g` channel                       | no    |

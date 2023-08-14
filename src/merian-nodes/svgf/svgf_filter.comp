@@ -4,6 +4,7 @@
 
 #include "svgf_graph_layout.glsl"
 #include "common/colors_yuv.glsl"
+#include "common/normal_encode.glsl"
 
 layout(set = 1, binding = 0) uniform sampler2D img_filter_in;
 layout(set = 1, binding = 1) uniform writeonly image2D img_filter_out;
@@ -50,9 +51,9 @@ void tap(const ivec2 p,
          const float kernel_weight,
          const float sigma_l) {
   const vec4  p_irr_var   = texelFetch(img_filter_in,  p, 0); 
-  const vec4  p_gbuf      = texelFetch(img_gbuf, p, 0); 
-  const vec3  p_n         = p_gbuf.rgb;
-  const float p_z         = p_gbuf.a;
+  const vec2  p_gbuf      = texelFetch(img_gbuf, p, 0).rg; 
+  const vec3  p_n         = geo_decode_normal_float(p_gbuf.r);
+  const float p_z         = p_gbuf.g;
   const float p_l         = yuv_luminance(p_irr_var.rgb); 
 
   const float w_l = abs(p_l - c_l) / (sigma_l + 1e-10);
@@ -74,8 +75,8 @@ main() {
   if (any(greaterThanEqual(ipos, imageSize(img_filter_out)))) return;
 
   const vec4 gbuf = texelFetch(img_gbuf, ipos, 0);
-  c_n = gbuf.rgb;
-  c_z = gbuf.a;
+  c_n = geo_decode_normal_float(gbuf.r);
+  c_z = gbuf.g;
   const vec4 filter_in = texelFetch(img_filter_in, ipos, 0);
   c_l = yuv_luminance(filter_in.rgb);
 

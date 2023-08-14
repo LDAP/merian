@@ -16,7 +16,7 @@ Inputs:
 | Image | 1        | irr          | (accumulated) noisy irradiance, history length in `a`       | no    |
 | Image | 2        | moments      | first and second moment in `rg`                             | no    |
 |       |
-| Image | 3        | gbuf         | GBuffer (normal in rgb, linear depth in a)                  | no    |
+| Image | 3        | gbuf         | GBuffer (enc normal in r, linear depth in g, monents in ba) | no    |
 | Image | 4        | prev_gbuf    | previous GBuffer                                            | 1     |
 |       |
 | Image | 5        | albedo       | the demodulated albedo                                      | no    |

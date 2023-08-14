@@ -29,4 +29,14 @@ uint geo_encode_normal(const vec3 n)
   return packSnorm2x16(enc);
 }
 
+vec3 geo_decode_normal_float(const float enc) {
+  return geo_decode_normal(floatBitsToUint(enc));
+}
+
+float geo_encode_normal_float(const vec3 n) {
+  return uintBitsToFloat(geo_encode_normal(n));
+}
+
+
+
 #endif
