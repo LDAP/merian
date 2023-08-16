@@ -23,7 +23,7 @@ vec2 pixel_offset_halton(const uint frame) {
     vec2(7.0 /  8.0, 5.0 / 9.0),
     vec2(1.0 / 16.0, 8.0 / 9.0)
   };
-  return halton_sequence[frame & 7];
+  return halton_sequence[frame & 7] - .5;
 }
 
 // expects up, forward to be normalized
