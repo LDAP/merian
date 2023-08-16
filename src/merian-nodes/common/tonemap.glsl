@@ -66,21 +66,37 @@ vec3 tonemap_aces_approx(const vec3 rgb) {
 }
 
 // Lottes 2016, "Advanced Techniques and Optimization of HDR Color Pipelines" (AMD)
-vec3 tonemap_lottes(const vec3 rgb, const float contrast, const float shoulder, const float _hdrMax, const float _midIn, const float _midOut) {
-  const vec3 a = vec3(contrast);
-  const vec3 d = vec3(shoulder);
-  const vec3 hdrMax = vec3(_hdrMax);
-  const vec3 midIn = vec3(_midIn);
-  const vec3 midOut = vec3(_midOut);
+// https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK/blob/d7531ae47d8b36a5d4025663e731a47a38be882f/framework/cauldron/framework/inc/shaders/tonemapping/tonemappers.hlsl#L21
+vec3 tonemap_lottes(const vec3 rgb, const float contrast, const float shoulder, const float hdrMax, const float midIn, const float midOut) {
+    const float b = -((-pow(midIn, contrast) + (midOut*(pow(hdrMax, contrast*shoulder)*pow(midIn, contrast) -
+            pow(hdrMax, contrast)*pow(midIn, contrast*shoulder)*midOut)) /
+            (pow(hdrMax, contrast*shoulder)*midOut - pow(midIn, contrast*shoulder)*midOut)) /
+            (pow(midIn, contrast*shoulder)*midOut));
+    const float c = (pow(hdrMax, contrast*shoulder)*pow(midIn, contrast) - pow(hdrMax, contrast)*pow(midIn, contrast*shoulder)*midOut) /
+           (pow(hdrMax, contrast*shoulder)*midOut - pow(midIn, contrast*shoulder)*midOut);
 
-  const vec3 b =
-    (-pow(midIn, a) + pow(hdrMax, a) * midOut) /
-    ((pow(hdrMax, a * d) - pow(midIn, a * d)) * midOut);
-  const vec3 c =
-    (pow(hdrMax, a * d) * pow(midIn, a) - pow(hdrMax, a) * pow(midIn, a * d) * midOut) /
-    ((pow(hdrMax, a * d) - pow(midIn, a * d)) * midOut);
+    #define EPS 1e-7f
+    float peak = max(rgb.r, max(rgb.g, rgb.b));
 
-  return pow(rgb, a) / (pow(rgb, a * d) * b + c);
+    peak = max(EPS, peak);
+
+    vec3 ratio = rgb / peak;
+    const float z = pow(peak, contrast);
+    peak = z / (pow(z, shoulder) * b + c);
+
+    const float crosstalk = 4.0; // controls amount of channel crosstalk
+    const float saturation = contrast; // full tonal range saturation control
+    const float crossSaturation = contrast * 16.0; 
+
+    float white = 1.0;
+
+    ratio = pow(abs(ratio), vec3(saturation / crossSaturation));
+    ratio = mix(ratio, vec3(white), pow(peak, crosstalk));
+    ratio = pow(abs(ratio), vec3(crossSaturation));
+
+    #undef EPS
+
+    return peak * ratio;
 }
 
 #endif

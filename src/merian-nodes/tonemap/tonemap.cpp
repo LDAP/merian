@@ -95,11 +95,11 @@ void TonemapNode::get_configuration(Configuration& config, bool& needs_rebuild) 
 
     if (tonemap == TONEMAP_LOTTES) {
         if (old_tonemap != TONEMAP_LOTTES) {
-            pc.param1 = 1.6;
-            pc.param2 = 0.997;
-            pc.param3 = 8.0;
+            pc.param1 = 1.0;
+            pc.param2 = 1.0;
+            pc.param3 = 16.0;
             pc.param4 = 0.18;
-            pc.param5 = 0.267;
+            pc.param5 = 0.18;
         }
         config.config_float("contrast", pc.param1, "See Lottes talk", 0.01);
         config.config_float("shoulder", pc.param2, "See Lottes talk", 0.01);
