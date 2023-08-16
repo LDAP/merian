@@ -79,7 +79,7 @@ main() {
         if(any(greaterThanEqual(tc, textureSize(img_prev_accum, 0))) || any(lessThan(tc, ivec2(0))))
           continue;
 
-        const vec4 prev_normal_z = texelFetch(img_prev_gbuf, tc, 0);
+        const vec2 prev_normal_z = texelFetch(img_prev_gbuf, tc, 0).rg;
         const vec3 prev_normal = geo_decode_normal_float(prev_normal_z.r);
         const float prev_z = prev_normal_z.g;
 
