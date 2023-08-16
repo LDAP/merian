@@ -55,7 +55,7 @@ ShaderModuleHandle VKDTFilmcurv::get_shader_module() {
     return std::make_shared<ShaderModule>(context, sizeof(spv), spv);
 }
 
-void VKDTFilmcurv::get_configuration(Configuration& config) {
+void VKDTFilmcurv::get_configuration(Configuration& config, bool&) {
     config.config_float("brightness", pc.brightness, "", .01);
     config.config_float("contrast", pc.contrast, "", .01);
     config.config_float("bias", pc.bias, "", .01);

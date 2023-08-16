@@ -122,7 +122,7 @@ void ImageWriteNode::cmd_process([[maybe_unused]] const vk::CommandBuffer& cmd,
     frame++;
 }
 
-void ImageWriteNode::get_configuration([[maybe_unused]] Configuration& config) {
+void ImageWriteNode::get_configuration([[maybe_unused]] Configuration& config, bool&) {
     config.st_separate("General");
     config.config_options("format", format, {"PNG", "JPG", "HDR"},
                           Configuration::OptionsStyle::COMBO);

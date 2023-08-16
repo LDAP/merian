@@ -37,7 +37,7 @@ class ColorOutputNode : public Node {
 
     void pre_process(NodeStatus& status) override;
 
-    void get_configuration(Configuration& config) override;
+    void get_configuration(Configuration& config, bool& needs_rebuild) override;
 
   private:
     const vk::Format format;

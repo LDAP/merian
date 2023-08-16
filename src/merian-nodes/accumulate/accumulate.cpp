@@ -62,7 +62,7 @@ AccumulateNode::describe_outputs(
 
 SpecializationInfoHandle AccumulateNode::get_specialization_info() const noexcept {
     auto spec_builder = SpecializationInfoBuilder();
-    spec_builder.add_entry(local_size_x, local_size_y);
+    spec_builder.add_entry(local_size_x, local_size_y, filter_mode);
     return spec_builder.build();
 }
 
@@ -81,7 +81,7 @@ ShaderModuleHandle AccumulateNode::get_shader_module() {
     return shader;
 }
 
-void AccumulateNode::get_configuration(Configuration& config) {
+void AccumulateNode::get_configuration(Configuration& config, bool& needs_rebuild) {
     config.config_float("alpha", pc.accum_alpha, 0, 1,
                         "Blend factor with the previous information. More means more reuse");
     config.config_float("max history", pc.accum_max_hist,
@@ -95,7 +95,10 @@ void AccumulateNode::get_configuration(Configuration& config) {
     pc.normal_reject_cos = glm::cos(angle);
     config.config_percent("depth threshold", pc.depth_reject_percent,
                           "Reject points with depths farther apart (relative to the max)");
-    config.config_options("filter mode", pc.filter_mode, {"nearest", "linear"});
+    int old_filter_mode = filter_mode;
+    config.config_options("filter mode", filter_mode, {"nearest", "linear"});
+    needs_rebuild |= old_filter_mode != filter_mode;
+
     clear = config.config_bool("clear");
 }
 

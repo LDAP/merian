@@ -46,7 +46,7 @@ void ColorOutputNode::cmd_process(const vk::CommandBuffer& cmd,
     needs_run = false;
 }
 
-void ColorOutputNode::get_configuration(Configuration& config) {
+void ColorOutputNode::get_configuration(Configuration& config, bool&) {
     const vk::ClearColorValue old_color = color;
     config.config_color("color", *merian::as_vec4((float*)&color));
     needs_run = old_color.float32 != color.float32;

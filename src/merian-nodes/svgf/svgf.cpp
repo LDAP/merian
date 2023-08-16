@@ -98,7 +98,7 @@ void SVGFNode::cmd_build([[maybe_unused]] const vk::CommandBuffer& cmd,
             .update(context);
     }
 
-    if (!taa) {
+    {
         auto variance_estimate_pipe_layout = PipelineLayoutBuilder(context)
                                                  .add_descriptor_set_layout(graph_layout)
                                                  .add_descriptor_set_layout(ping_pong_layout)
@@ -115,14 +115,32 @@ void SVGFNode::cmd_build([[maybe_unused]] const vk::CommandBuffer& cmd,
                                    .add_push_constant<TAAPushConstant>()
                                    .build_pipeline_layout();
 
-        auto spec_builder = SpecializationInfoBuilder();
-        spec_builder.add_entry(local_size_x, local_size_y);
-        SpecializationInfoHandle spec = spec_builder.build();
-
-        variance_estimate = std::make_shared<ComputePipeline>(variance_estimate_pipe_layout,
-                                                              variance_estimate_module, spec);
-        filter = std::make_shared<ComputePipeline>(filter_pipe_layout, filter_module, spec);
-        taa = std::make_shared<ComputePipeline>(taa_pipe_layout, taa_module, spec);
+        {
+            auto spec_builder = SpecializationInfoBuilder();
+            spec_builder.add_entry(local_size_x, local_size_y);
+            SpecializationInfoHandle variance_estimate_spec = spec_builder.build();
+            variance_estimate = std::make_shared<ComputePipeline>(
+                variance_estimate_pipe_layout, variance_estimate_module, variance_estimate_spec);
+        }
+        {
+            filters.clear();
+            filters.resize(svgf_iterations);
+            for (int i = 0; i < svgf_iterations; i++) {
+                auto spec_builder = SpecializationInfoBuilder();
+                int gap = 1 << i;
+                spec_builder.add_entry(local_size_x, local_size_y, gap, filter_variance);
+                SpecializationInfoHandle taa_spec = spec_builder.build();
+                filters[i] =
+                    std::make_shared<ComputePipeline>(filter_pipe_layout, filter_module, taa_spec);
+            }
+        }
+        {
+            auto spec_builder = SpecializationInfoBuilder();
+            spec_builder.add_entry(local_size_x, local_size_y, taa_show_variance_estimate,
+                                   taa_filter_prev, taa_clamping, taa_mv_sampling);
+            SpecializationInfoHandle taa_spec = spec_builder.build();
+            taa = std::make_shared<ComputePipeline>(taa_pipe_layout, taa_module, taa_spec);
+        }
     }
 
     group_count_x = (irr_create_info.extent.width + local_size_x - 1) / local_size_x;
@@ -176,11 +194,10 @@ void SVGFNode::cmd_process(const vk::CommandBuffer& cmd,
                             vk::PipelineStageFlagBits::eComputeShader, {}, {}, {}, bar);
 
         // run filter
-        filter->bind(cmd);
-        filter->bind_descriptor_set(cmd, graph_sets[set_index], 0);
-        filter->bind_descriptor_set(cmd, read_set, 1);
-        filter_pc.gap = 1 << i;
-        filter->push_constant(cmd, filter_pc);
+        filters[i]->bind(cmd);
+        filters[i]->bind_descriptor_set(cmd, graph_sets[set_index], 0);
+        filters[i]->bind_descriptor_set(cmd, read_set, 1);
+        filters[i]->push_constant(cmd, filter_pc);
         cmd.dispatch(group_count_x, group_count_y, 1);
 
         bar = write_res.ping_pong->get_image()->barrier(
@@ -204,7 +221,7 @@ void SVGFNode::cmd_process(const vk::CommandBuffer& cmd,
     }
 }
 
-void SVGFNode::get_configuration(Configuration& config) {
+void SVGFNode::get_configuration(Configuration& config, bool& needs_rebuild) {
     config.st_separate("Variance estimate");
     config.config_int("spatial threshold", variance_estimate_pc.spatial_threshold, 0, 120,
                       "Compute the variance spatially for shorter histories.");
@@ -217,31 +234,41 @@ void SVGFNode::get_configuration(Configuration& config) {
                           "Reject points with depths farther apart (relative to the max)");
 
     config.st_separate("Filter");
+    const int old_svgf_iterations = svgf_iterations;
     config.config_int("SVGF iterations", svgf_iterations, 0, 10,
                       "0 disables SVGF completely (TAA-only mode)");
+    needs_rebuild |= old_svgf_iterations != svgf_iterations;
     config.config_float("filter depth", filter_pc.param_z, "more means more blur");
     angle = glm::acos(filter_pc.param_n);
     config.config_angle("filter normals", angle, "Reject with normals farther apart", 0, 179);
     filter_pc.param_n = glm::cos(angle);
     config.config_float("filter luminance", filter_pc.param_l, "more means more blur");
-    bool filter_variance = filter_pc.filter_variance;
+    int old_filter_variance = filter_variance;
     config.config_bool("filter variance", filter_variance, "Filter variance with a 3x3 gaussian");
-    filter_pc.filter_variance = filter_variance;
+    needs_rebuild |= old_filter_variance != filter_variance;
 
     config.st_separate("TAA");
     config.config_float(
         "TAA alpha", taa_pc.blend_alpha, 0, 1,
         "Blend factor for the final image and the previous image. More means more reuse.");
-    config.config_options("mv sampling", taa_pc.mv_sampling, {"center", "magnitude dilation"});
-    config.config_options("filter", taa_pc.filter_prev, {"none", "catmull rom"});
-    config.config_options("clamping", taa_pc.clamping, {"min-max", "moments"});
-    if (taa_pc.clamping == 1)
+
+    const int old_taa_show_variance_estimate = taa_show_variance_estimate;
+    const int old_taa_filter_prev = taa_filter_prev;
+    const int old_taa_clamping = taa_clamping;
+    const int old_taa_mv_sampling = taa_mv_sampling;
+    config.config_options("mv sampling", taa_mv_sampling, {"center", "magnitude dilation"});
+    config.config_options("filter", taa_filter_prev, {"none", "catmull rom"});
+    config.config_options("clamping", taa_clamping, {"min-max", "moments"});
+    if (taa_clamping == 1)
         config.config_float(
             "TAA rejection threshold", taa_pc.rejection_threshold,
             "TAA rejection threshold for the previous frame, in units of standard deviation", 0.01);
-    bool show_variance = taa_pc.show_variance_estimate;
-    config.config_bool("show variance estimate", show_variance);
-    taa_pc.show_variance_estimate = show_variance;
+    config.config_bool("show variance estimate", taa_show_variance_estimate);
+
+    needs_rebuild |= old_taa_show_variance_estimate != taa_show_variance_estimate;
+    needs_rebuild |= old_taa_filter_prev != taa_filter_prev;
+    needs_rebuild |= old_taa_clamping != taa_clamping;
+    needs_rebuild |= old_taa_mv_sampling != taa_mv_sampling;
 }
 
 } // namespace merian

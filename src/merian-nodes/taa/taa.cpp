@@ -65,7 +65,7 @@ ShaderModuleHandle TAANode::get_shader_module() {
     return shader;
 }
 
-void TAANode::get_configuration(Configuration& config) {
+void TAANode::get_configuration(Configuration& config, bool&) {
     config.config_percent("alpha", pc.temporal_alpha, "more means more reuse");
 
     std::vector<std::string> clamp_methods = {

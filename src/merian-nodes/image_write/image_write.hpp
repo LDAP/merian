@@ -31,7 +31,7 @@ class ImageWriteNode : public Node {
                 [[maybe_unused]] const std::vector<ImageHandle>& image_outputs,
                 [[maybe_unused]] const std::vector<BufferHandle>& buffer_outputs) override;
 
-    virtual void get_configuration([[maybe_unused]] Configuration& config) override;
+    virtual void get_configuration([[maybe_unused]] Configuration& config, bool& needs_rebuild) override;
 
   private:
     const SharedContext context;

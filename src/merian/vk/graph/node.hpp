@@ -79,7 +79,7 @@ class Node : public std::enable_shared_from_this<Node> {
                              [[maybe_unused]] const std::vector<BufferHandle>& buffer_outputs) {}
 
     // Declare your configuration options.
-    virtual void get_configuration([[maybe_unused]] Configuration& config) {}
+    virtual void get_configuration([[maybe_unused]]Configuration& config, [[maybe_unused]] bool& needs_rebuild) {}
 };
 
 using NodeHandle = std::shared_ptr<Node>;

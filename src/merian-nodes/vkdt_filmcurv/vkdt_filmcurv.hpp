@@ -45,7 +45,7 @@ class VKDTFilmcurv : public ComputeNode {
 
     ShaderModuleHandle get_shader_module() override;
 
-    void get_configuration(Configuration& config) override;
+    void get_configuration(Configuration& config, bool& needs_rebuild) override;
 
   private:
     const vk::Format output_format;

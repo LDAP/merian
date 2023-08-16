@@ -44,7 +44,7 @@ class TAANode : public ComputeNode {
 
     ShaderModuleHandle get_shader_module() override;
 
-    void get_configuration(Configuration& config) override;
+    void get_configuration(Configuration& config, bool& needs_rebuild) override;
 
   private:
     const bool inverse_motion;

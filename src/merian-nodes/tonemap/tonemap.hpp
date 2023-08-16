@@ -43,9 +43,7 @@ class TonemapNode : public ComputeNode {
 
     ShaderModuleHandle get_shader_module() override;
 
-    void pre_process(NodeStatus& status) override;
-
-    void get_configuration(Configuration& config) override;
+    void get_configuration(Configuration& config, bool& needs_rebuild) override;
 
   private:
     const std::optional<vk::Format> output_format;
@@ -53,7 +51,6 @@ class TonemapNode : public ComputeNode {
     PushConstant pc;
     ShaderModuleHandle shader;
     int tonemap = 0;
-    bool needs_rebuild = false;
 };
 
 } // namespace merian

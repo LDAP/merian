@@ -45,7 +45,7 @@ void ImageNode::cmd_build(const vk::CommandBuffer& cmd,
                                         width * height * 4, image);
 }
 
-void ImageNode::get_configuration(Configuration& config) {
+void ImageNode::get_configuration(Configuration& config, bool&) {
     std::string text;
     text += fmt::format("filename: {}\n", filename);
     text += fmt::format("extent: {}x{}\n", width, height);

@@ -145,7 +145,7 @@ void ExposureNode::cmd_process(const vk::CommandBuffer& cmd,
     cmd.dispatch(group_count_x, group_count_y, 1);
 }
 
-void ExposureNode::get_configuration(Configuration& config) {
+void ExposureNode::get_configuration(Configuration& config, bool&) {
     config.st_separate("General");
     bool autoexposure = pc.automatic;
     config.config_bool("autoexposure", autoexposure);

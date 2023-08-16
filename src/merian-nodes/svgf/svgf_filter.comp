@@ -9,12 +9,13 @@
 layout(set = 1, binding = 0) uniform sampler2D img_filter_in;
 layout(set = 1, binding = 1) uniform writeonly image2D img_filter_out;
 
+layout (constant_id = 2) const int GAP = 1;
+layout (constant_id = 3) const int FILTER_VARIANCE = 0;
+
 layout(push_constant, std140) uniform push_t {
-    int gap;
     float param_z;
     float param_n;
     float param_l;
-    int filter_variance;
 } params;
 
 vec3 filter_irr;
@@ -82,7 +83,7 @@ main() {
   c_l = yuv_luminance(filter_in.rgb);
 
   float sigma_l = 0;
-  if (params.filter_variance == 1) {
+  if (FILTER_VARIANCE == 1) {
     // the reference implementation does that
     // but it looks better without
     sigma_l = get_sigma_l(filter_in.a, ipos) * params.param_l;
@@ -95,14 +96,14 @@ main() {
   filter_w = 1.0;
 
   if (c_z > 0) {
-    float kernel[] = {1., 2. / 3., 1. / 6.};
+    const float kernel[] = {1., 2. / 3., 1. / 6.};
     [[unroll]]
     for (int j = -2; j <= 2; j++) {
       [[unroll]]
       for (int i = -2; i <= 2; i++) {
         if (i != 0 || j != 0) {
           const float weight = kernel[abs(i)] * kernel[abs(j)];
-          tap(ivec2(i,  j) * params.gap + ipos, weight, sigma_l);
+          tap(ivec2(i,  j) * GAP + ipos, weight, sigma_l);
         }
       }
     }

@@ -35,7 +35,7 @@ class ImageNode : public Node {
                    const std::vector<std::vector<merian::ImageHandle>>& image_outputs,
                    const std::vector<std::vector<merian::BufferHandle>>&) override;
 
-    void get_configuration(Configuration& config) override;
+    void get_configuration(Configuration& config, bool& needs_rebuild) override;
 
   private:
     const ResourceAllocatorHandle allocator;

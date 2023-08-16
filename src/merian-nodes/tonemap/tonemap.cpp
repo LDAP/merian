@@ -64,12 +64,7 @@ ShaderModuleHandle TonemapNode::get_shader_module() {
     return shader;
 }
 
-void TonemapNode::pre_process(NodeStatus& status) {
-    status.request_rebuild = needs_rebuild;
-    needs_rebuild = false;
-}
-
-void TonemapNode::get_configuration(Configuration& config) {
+void TonemapNode::get_configuration(Configuration& config, bool& needs_rebuild) {
     const int old_tonemap = tonemap;
     config.config_options("tonemap", tonemap,
                           {

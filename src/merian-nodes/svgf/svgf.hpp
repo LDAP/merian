@@ -20,20 +20,14 @@ class SVGFNode : public Node {
     };
 
     struct FilterPushConstant {
-        int gap;
         float param_z = 10;  // parameter for depth      = 1   larger blurs more 
         float param_n = .8;  // parameter for normals    cos(alpha) for lower threshold
         float param_l = 8;   // parameter for brightness = 4   larger blurs more
-        int filter_variance = 0;
     };
 
     struct TAAPushConstant {
         float blend_alpha = 0.0;
         float rejection_threshold = 1.0;
-        int show_variance_estimate = 0;
-        int filter_prev = 0;
-        int clamping = 0;
-        int mv_sampling = 0;
     };
 
   public:
@@ -67,7 +61,7 @@ class SVGFNode : public Node {
                      const std::vector<ImageHandle>& image_outputs,
                      const std::vector<BufferHandle>& buffer_outputs) override;
 
-    void get_configuration(Configuration& config) override;
+    void get_configuration(Configuration& config, bool& needs_rebuild) override;
 
   private:
     const SharedContext context;
@@ -84,7 +78,7 @@ class SVGFNode : public Node {
     vk::ImageCreateInfo irr_create_info;
 
     PipelineHandle variance_estimate;
-    PipelineHandle filter;
+    std::vector<PipelineHandle> filters;
     PipelineHandle taa;
 
     uint32_t group_count_x;
@@ -105,6 +99,13 @@ class SVGFNode : public Node {
         DescriptorSetHandle set;
     };
     std::array<EAWRes, 2> ping_pong_res; // Ping pong sets
+
+    int filter_variance;
+
+    int taa_show_variance_estimate = 0;
+    int taa_filter_prev = 0;
+    int taa_clamping = 0;
+    int taa_mv_sampling = 0;
 };
 
 } // namespace merian

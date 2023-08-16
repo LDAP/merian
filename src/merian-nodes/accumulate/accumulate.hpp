@@ -17,7 +17,6 @@ class AccumulateNode : public ComputeNode {
         float accum_max_hist = INFINITY;
         float normal_reject_cos = 0.8;
         float depth_reject_percent = 0.05;
-        int filter_mode = 0;
         uint32_t clear = 0;
     };
 
@@ -46,7 +45,7 @@ class AccumulateNode : public ComputeNode {
 
     ShaderModuleHandle get_shader_module() override;
 
-    void get_configuration(Configuration& config) override;
+    void get_configuration(Configuration& config, bool& needs_rebuild) override;
 
   private:
     const vk::Format format;
@@ -54,6 +53,7 @@ class AccumulateNode : public ComputeNode {
     AccumulatePushConstant pc;
     ShaderModuleHandle shader;
     bool clear = false;
+    int filter_mode = 0;
 };
 
 } // namespace merian

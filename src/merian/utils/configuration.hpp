@@ -92,6 +92,13 @@ class Configuration {
     config_float3(const std::string& id, float value[3], const std::string& desc = "") = 0;
     // Holds the supplied `value` if not changed by the configuration.
     // Converts to a checkbox in a GUI context.
+    virtual void config_bool(const std::string& id, int& value, const std::string& desc = "") {
+        bool bool_value = value;
+        config_bool(id, bool_value, desc);
+        value = bool_value;
+    }
+    // Holds the supplied `value` if not changed by the configuration.
+    // Converts to a checkbox in a GUI context.
     virtual void config_bool(const std::string& id, bool& value, const std::string& desc = "") = 0;
     // If set by the configuration returns true only once `one-shot`.
     // Converts to a button in a GUI context.
