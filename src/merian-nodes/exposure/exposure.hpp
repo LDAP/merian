@@ -34,6 +34,8 @@ class ExposureNode : public Node {
         float min_log_histogram = -10.0;
         float max_log_histogram = 8.0;
         int metering = 0;
+        float min_exposure = 0;
+        float max_exposure = 1e9;
     };
 
   public:

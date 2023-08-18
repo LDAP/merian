@@ -29,5 +29,7 @@ layout(push_constant) uniform PushStruct {
     float min_log_histogram;
     float max_log_histogram;
     int metering;
+    float min_exposure;
+    float max_exposure;
 
 } params;
