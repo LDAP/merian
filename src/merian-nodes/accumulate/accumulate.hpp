@@ -54,6 +54,7 @@ class AccumulateNode : public ComputeNode {
     ShaderModuleHandle shader;
     bool clear = false;
     int filter_mode = 0;
+    int extended_search = 1;
 };
 
 } // namespace merian

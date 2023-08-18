@@ -62,7 +62,7 @@ AccumulateNode::describe_outputs(
 
 SpecializationInfoHandle AccumulateNode::get_specialization_info() const noexcept {
     auto spec_builder = SpecializationInfoBuilder();
-    spec_builder.add_entry(local_size_x, local_size_y, filter_mode);
+    spec_builder.add_entry(local_size_x, local_size_y, filter_mode, extended_search);
     return spec_builder.build();
 }
 
@@ -98,6 +98,12 @@ void AccumulateNode::get_configuration(Configuration& config, bool& needs_rebuil
     int old_filter_mode = filter_mode;
     config.config_options("filter mode", filter_mode, {"nearest", "linear"});
     needs_rebuild |= old_filter_mode != filter_mode;
+
+    int old_extended_search = extended_search;
+    config.config_bool("extended search", extended_search,
+                       "search in a 3x3 radius for valid information if nothing was found. Helps "
+                       "with artifacts at edges");
+    needs_rebuild |= old_extended_search != extended_search;
 
     clear = config.config_bool("clear");
 }
