@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstdint>
 #include <fmt/format.h>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -29,6 +30,19 @@ namespace merian {
     if (prefix.size() > value.size())
         return false;
     return std::equal(prefix.begin(), prefix.end(), value.begin());
+}
+
+inline void split(const std::string& value,
+                  const std::string& delim,
+                  const std::function<void(const std::string&)> function) {
+    std::size_t last = 0;
+    std::size_t pos = 0;
+    while ((pos = value.find(delim, last)) != std::string::npos) {
+        function(value.substr(last, pos - last));
+        last = pos + delim.size();
+    }
+    if (last < value.size())
+        function(value.substr(last));
 }
 
 } // namespace merian
