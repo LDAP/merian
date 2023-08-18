@@ -128,7 +128,8 @@ void SVGFNode::cmd_build([[maybe_unused]] const vk::CommandBuffer& cmd,
             for (int i = 0; i < svgf_iterations; i++) {
                 auto spec_builder = SpecializationInfoBuilder();
                 int gap = 1 << i;
-                spec_builder.add_entry(local_size_x, local_size_y, gap, filter_variance);
+                spec_builder.add_entry(local_size_x, local_size_y, gap, filter_variance,
+                                       filter_type);
                 SpecializationInfoHandle taa_spec = spec_builder.build();
                 filters[i] =
                     std::make_shared<ComputePipeline>(filter_pipe_layout, filter_module, taa_spec);
@@ -243,6 +244,10 @@ void SVGFNode::get_configuration(Configuration& config, bool& needs_rebuild) {
     config.config_angle("filter normals", angle, "Reject with normals farther apart", 0, 179);
     filter_pc.param_n = glm::cos(angle);
     config.config_float("filter luminance", filter_pc.param_l, "more means more blur");
+    int old_filter_type = filter_type;
+    config.config_options("filter type", filter_type, {"atrous", "box"},
+                          Configuration::OptionsStyle::COMBO);
+    needs_rebuild |= old_filter_type != filter_type;
     int old_filter_variance = filter_variance;
     config.config_bool("filter variance", filter_variance, "Filter variance with a 3x3 gaussian");
     needs_rebuild |= old_filter_variance != filter_variance;
@@ -256,9 +261,12 @@ void SVGFNode::get_configuration(Configuration& config, bool& needs_rebuild) {
     const int old_taa_filter_prev = taa_filter_prev;
     const int old_taa_clamping = taa_clamping;
     const int old_taa_mv_sampling = taa_mv_sampling;
-    config.config_options("mv sampling", taa_mv_sampling, {"center", "magnitude dilation"});
-    config.config_options("filter", taa_filter_prev, {"none", "catmull rom"});
-    config.config_options("clamping", taa_clamping, {"min-max", "moments"});
+    config.config_options("mv sampling", taa_mv_sampling, {"center", "magnitude dilation"},
+                          Configuration::OptionsStyle::COMBO);
+    config.config_options("filter", taa_filter_prev, {"none", "catmull rom"},
+                          Configuration::OptionsStyle::COMBO);
+    config.config_options("clamping", taa_clamping, {"min-max", "moments"},
+                          Configuration::OptionsStyle::COMBO);
     if (taa_clamping == 1)
         config.config_float(
             "TAA rejection threshold", taa_pc.rejection_threshold,

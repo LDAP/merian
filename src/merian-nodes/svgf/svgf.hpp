@@ -100,7 +100,8 @@ class SVGFNode : public Node {
     };
     std::array<EAWRes, 2> ping_pong_res; // Ping pong sets
 
-    int filter_variance;
+    int filter_variance = 0;
+    int filter_type = 0;
 
     int taa_show_variance_estimate = 0;
     int taa_filter_prev = 0;

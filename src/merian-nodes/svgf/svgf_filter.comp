@@ -11,6 +11,7 @@ layout(set = 1, binding = 1) uniform writeonly image2D img_filter_out;
 
 layout (constant_id = 2) const int GAP = 1;
 layout (constant_id = 3) const int FILTER_VARIANCE = 0;
+layout (constant_id = 4) const int FILTER_TYPE = 0;
 
 layout(push_constant, std140) uniform push_t {
     float param_z;
@@ -24,6 +25,7 @@ float filter_w;
 vec3 c_n;
 float c_z;
 float c_l;
+float sigma_l;
 
 float get_sigma_l(float center, ivec2 ipos) {
   const float gaussian_kernel[3][3] = {
@@ -49,8 +51,7 @@ float get_sigma_l(float center, ivec2 ipos) {
 }
 
 void tap(const ivec2 p,
-         const float kernel_weight,
-         const float sigma_l) {
+         const float kernel_weight) {
   const vec4  p_irr_var   = texelFetch(img_filter_in,  p, 0); 
   const vec2  p_gbuf      = texelFetch(img_gbuf, p, 0).rg; 
   const vec3  p_n         = geo_decode_normal_float(p_gbuf.r);
@@ -82,7 +83,6 @@ main() {
   const vec4 filter_in = texelFetch(img_filter_in, ipos, 0);
   c_l = yuv_luminance(filter_in.rgb);
 
-  float sigma_l = 0;
   if (FILTER_VARIANCE == 1) {
     // the reference implementation does that
     // but it looks better without
@@ -96,20 +96,40 @@ main() {
   filter_w = 1.0;
 
   if (c_z > 0) {
-    const float kernel[] = {1., 2. / 3., 1. / 6.};
-    [[unroll]]
-    for (int j = -2; j <= 2; j++) {
-      [[unroll]]
-      for (int i = -2; i <= 2; i++) {
-        if (i != 0 || j != 0) {
-          const float weight = kernel[abs(i)] * kernel[abs(j)];
-          tap(ivec2(i,  j) * GAP + ipos, weight, sigma_l);
+
+    switch (FILTER_TYPE) {
+      case 0: {
+        const float kernel[] = {1., 2. / 3., 1. / 6.};
+        [[unroll]]
+        for (int j = -2; j <= 2; j++) {
+          [[unroll]]
+          for (int i = -2; i <= 2; i++) {
+            if (i != 0 || j != 0) {
+              const float weight = kernel[abs(i)] * kernel[abs(j)];
+              tap(ivec2(i,  j) * GAP + ipos, weight);
+            }
+          }
         }
+        break;
+      }
+
+      case 1: {
+        const int r = 1;
+        [[unroll]]
+        for (int yy = -r; yy <= r; yy++) {
+          [[unroll]]
+          for (int xx = -r; xx <= r; xx++) {
+            if (xx != 0 || yy != 0) {
+              tap(ivec2(xx, yy) * GAP + ipos, 1.0);
+            }
+          }
+        }
+        break;
       }
     }
 
     filter_irr /= filter_w;
-    filter_var /= (filter_w * filter_w);
+    filter_var /= filter_w * filter_w;
   }
 
   imageStore(img_filter_out, ipos, vec4(filter_irr, filter_var));
