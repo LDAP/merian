@@ -41,8 +41,7 @@ inline void split(const std::string& value,
         function(value.substr(last, pos - last));
         last = pos + delim.size();
     }
-    if (last < value.size())
-        function(value.substr(last));
+    function(value.substr(last));
 }
 
 } // namespace merian
