@@ -72,6 +72,11 @@ class ImGuiConfiguration : public Configuration {
                              char* string,
                              const bool needs_submit = false,
                              const std::string& desc = "") override;
+    virtual bool config_text_multiline(const std::string& id,
+                                       const uint32_t max_len,
+                                       char* string,
+                                       const bool needs_submit = false,
+                                       const std::string& desc = "") override;
 };
 
 } // namespace merian

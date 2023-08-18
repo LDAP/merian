@@ -136,7 +136,8 @@ void ImGuiConfiguration::config_options(const std::string& id,
         ImGui::Combo(
             id.c_str(), &selected,
             [](void* data, int n, const char** out_str) {
-                const std::vector<std::string>* options = reinterpret_cast<std::vector<std::string>*>(data);
+                const std::vector<std::string>* options =
+                    reinterpret_cast<std::vector<std::string>*>(data);
                 *out_str = (*options)[n].c_str();
                 return true;
             },
@@ -164,6 +165,18 @@ bool ImGuiConfiguration::config_text(const std::string& id,
 
     bool submit_change = ImGui::InputText(id.c_str(), string, max_len,
                                           needs_submit ? ImGuiInputTextFlags_EnterReturnsTrue : 0);
+    tooltip(desc);
+    return submit_change;
+}
+
+bool ImGuiConfiguration::config_text_multiline(const std::string& id,
+                                               const uint32_t max_len,
+                                               char* string,
+                                               const bool needs_submit,
+                                               const std::string& desc) {
+    bool submit_change =
+        ImGui::InputTextMultiline(id.c_str(), string, max_len, ImVec2(0, 0),
+                                  needs_submit ? ImGuiInputTextFlags_EnterReturnsTrue : 0);
     tooltip(desc);
     return submit_change;
 }

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "merian/utils/configuration.hpp"
 #include "ext/json.hpp"
+#include "merian/utils/configuration.hpp"
 
 #include <string>
 #include <vector>
@@ -72,12 +72,16 @@ class JSONDumpConfiguration : public Configuration {
                              char* string,
                              const bool needs_submit = false,
                              const std::string& desc = "") override;
+    virtual bool config_text_multiline(const std::string& id,
+                                       const uint32_t max_len,
+                                       char* string,
+                                       const bool needs_submit = false,
+                                       const std::string& desc = "") override;
 
   private:
     const std::string filename;
     std::string object_name;
     std::vector<nlohmann::json> o;
-
 };
 
 } // namespace merian

@@ -116,6 +116,11 @@ class Configuration {
                                            char* string,
                                            const bool needs_submit = false,
                                            const std::string& desc = "") = 0;
+    [[nodiscard]] virtual bool config_text_multiline(const std::string& id,
+                                                     const uint32_t max_len,
+                                                     char* string,
+                                                     const bool needs_submit = false,
+                                                     const std::string& desc = "") = 0;
 };
 
 } // namespace merian

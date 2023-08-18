@@ -11,7 +11,8 @@ namespace merian {
 json encode_float(float f) {
     if (std::isinf(f) || std::isnan(f))
         return std::to_string(f);
-    else return f;
+    else
+        return f;
 }
 
 json dump_vec3(glm::vec3& v) {
@@ -128,6 +129,11 @@ bool JSONDumpConfiguration::config_text(
     if (!needs_submit) {
         o.back()[id] = buf;
     }
+    return false;
+}
+bool JSONDumpConfiguration::config_text_multiline(
+    const std::string& id, const uint32_t, char* buf, const bool, const std::string&) {
+    o.back()[id] = buf;
     return false;
 }
 
