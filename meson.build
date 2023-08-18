@@ -43,7 +43,7 @@ add_project_arguments('-DMERIAN_PROJECT_NAME="@0@"'.format(meson.project_name())
 
 # Dependencies
 fmt = dependency('fmt', version : ['>=9.1.0'], fallback : ['fmt', 'fmt_dep'])
-spdlog = dependency('spdlog', version : ['>=1.11.0'], fallback : ['spdlog', 'spdlog_dep'], default_options : ['external_fmt=enabled'])
+spdlog = dependency('spdlog', version : ['>=1.12.0'], fallback : ['spdlog', 'spdlog_dep'], default_options : ['external_fmt=enabled'])
 vulkan = dependency('vulkan', version: ['>=1.3.0'], required: false)
 if not vulkan.found()
     # version specifier is broken for vulkan https://github.com/mesonbuild/meson/issues/12072
