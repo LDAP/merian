@@ -53,6 +53,9 @@ class ImageWriteNode : public Node {
 
     bool record_next = false;
     bool force_rebuild = false;
+    bool rebuild_after_record = false;
+
+    int it_power = 1;
 };
 
 } // namespace merian

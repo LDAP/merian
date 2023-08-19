@@ -14,9 +14,9 @@ ImageWriteNode::ImageWriteNode(const SharedContext context,
                                const ResourceAllocatorHandle allocator,
                                const std::string& base_filename = "image")
     : context(context), allocator(allocator), base_filename(base_filename), buf(256) {
-        assert(base_filename.size() < buf.size());
-        std::copy(base_filename.begin(), base_filename.end(), buf.begin());
-    }
+    assert(base_filename.size() < buf.size());
+    std::copy(base_filename.begin(), base_filename.end(), buf.begin());
+}
 
 ImageWriteNode::~ImageWriteNode() {}
 
@@ -46,9 +46,8 @@ void ImageWriteNode::cmd_process([[maybe_unused]] const vk::CommandBuffer& cmd,
         return;
     }
 
-    if (record_next
-        || (record_run_enable && record_run == (int)run.get_iteration())
-        || (record_every_enable && frame % record_every == 0)) {
+    if (record_next || (record_run_enable && record_run == (int)run.get_iteration()) ||
+        (record_every_enable && frame % record_every == 0)) {
 
         vk::Format format = this->format == FORMAT_HDR ? vk::Format::eR32G32B32A32Sfloat
                                                        : vk::Format::eR8G8B8A8Srgb;
@@ -84,12 +83,13 @@ void ImageWriteNode::cmd_process([[maybe_unused]] const vk::CommandBuffer& cmd,
             image->barrier(vk::ImageLayout::eGeneral, vk::AccessFlagBits::eTransferWrite,
                            vk::AccessFlagBits::eHostRead));
 
-        run.add_submit_callback([this, image](const QueueHandle& queue) {
+        int run_it = run.get_iteration();
+        int image_index = this->image_index++;
+        run.add_submit_callback([this, image, run_it, image_index](const QueueHandle& queue) {
             queue->wait_idle();
             void* mem = image->get_memory()->map();
 
-            std::string filename =
-                fmt::format("{}_{:06}", this->base_filename, this->image_index++);
+            std::string filename = fmt::format("{}_{:06}_{:06}", this->base_filename, run_it, image_index);
 
             std::filesystem::create_directories(std::filesystem::absolute(filename).parent_path());
 
@@ -117,28 +117,40 @@ void ImageWriteNode::cmd_process([[maybe_unused]] const vk::CommandBuffer& cmd,
         if (force_rebuild)
             run.request_rebuild();
         record_next = false;
+
+        record_run *= record_run_enable ? it_power : 1;
+        record_every *= record_every_enable ? it_power : 1;
     }
 
     frame++;
 }
 
-void ImageWriteNode::get_configuration([[maybe_unused]] Configuration& config, bool&) {
+void ImageWriteNode::get_configuration([[maybe_unused]] Configuration& config,
+                                       bool& needs_rebuild) {
     config.st_separate("General");
     config.config_options("format", format, {"PNG", "JPG", "HDR"},
                           Configuration::OptionsStyle::COMBO);
     config.config_bool("force rebuild", force_rebuild, "Forces a graph rebuild after every image");
+    config.config_bool("rebuild after record", rebuild_after_record,
+                       "Rebuilds when recording starts");
     if (config.config_text("filename", buf.size(), buf.data())) {
         base_filename = buf.data();
     }
-    config.output_text(fmt::format("abs path: {}", base_filename.empty() ? "<invalid>" : std::filesystem::absolute(base_filename).string()));
+    config.output_text(fmt::format(
+        "abs path: {}",
+        base_filename.empty() ? "<invalid>" : std::filesystem::absolute(base_filename).string()));
 
     config.st_separate("Single");
     record_next = config.config_bool("trigger");
 
     config.st_separate("Multiple");
+    bool old_record_run_enable = record_run_enable;
     config.config_bool("record graph run", record_run_enable);
+    if (record_run_enable && !old_record_run_enable) {
+        needs_rebuild |= rebuild_after_record;
+    }
     config.st_no_space();
-    config.config_int("iteration", record_run, "Save the result of the specified run.");
+    config.config_int("run", record_run, "Save the result of the specified run.");
     record_run = std::max(record_run, 0);
 
     bool old_record_every_enable = record_every_enable;
@@ -146,9 +158,13 @@ void ImageWriteNode::get_configuration([[maybe_unused]] Configuration& config, b
     config.st_no_space();
     config.config_int("frame", record_every, "Capture every i-th frame.");
     record_every = std::max(record_every, 1);
-    if (old_record_every_enable != record_every_enable) {
-        frame = 1;
+    if (record_every_enable && !old_record_every_enable) {
+        frame = 0;
+        needs_rebuild |= rebuild_after_record;
     }
+
+    config.config_int("iteration power", it_power,
+                      "Multiplies the iteration specifier with this value after every image");
 }
 
 } // namespace merian
