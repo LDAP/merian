@@ -151,6 +151,12 @@ void ExposureNode::get_configuration(Configuration& config, bool&) {
     config.config_bool("autoexposure", autoexposure);
     pc.automatic = autoexposure;
     config.config_float("q", pc.q, "Lens and vignetting attenuation", 0.01);
+    config.config_float("min exposure", pc.min_exposure);
+    pc.min_exposure = std::max(pc.min_exposure, 0.f);
+    pc.max_exposure = std::max(pc.max_exposure, pc.min_exposure);
+    config.config_float("max exposure", pc.max_exposure);
+    pc.max_exposure = std::max(pc.max_exposure, 0.f);
+    pc.min_exposure = std::min(pc.min_exposure, pc.max_exposure);
 
     config.st_separate("Auto");
     config.config_float("K", pc.K, "Reflected-light meter calibration constant");
@@ -158,12 +164,6 @@ void ExposureNode::get_configuration(Configuration& config, bool&) {
     config.config_float("max log luminance", pc.max_log_histogram);
     config.config_float("speed up", pc.speed_up);
     config.config_float("speed down", pc.speed_down);
-    config.config_float("min exposure", pc.min_exposure);
-    pc.min_exposure = std::max(pc.min_exposure, 0.f);
-    pc.max_exposure = std::max(pc.max_exposure, pc.min_exposure);
-    config.config_float("max exposure", pc.max_exposure);
-    pc.max_exposure = std::max(pc.max_exposure, 0.f);
-    pc.min_exposure = std::min(pc.min_exposure, pc.max_exposure);
     config.config_options("metering", pc.metering, {"uniform", "center-weighted", "center"},
                           Configuration::OptionsStyle::COMBO);
 
