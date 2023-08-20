@@ -28,27 +28,27 @@ vec2 pixel_offset_halton(const uint frame) {
 
 // expects up, forward to be normalized
 vec3 get_camera_ray_dir(const vec2 pixel, const vec2 resolution,
-                        const vec3 up, const vec3 forward, const float fov_rad) {
-  const vec3 uv = vec3(2. * pixel / resolution - 1., 1.);
+                        const vec3 up, const vec3 forward, const float fov_tan_alpha_half) {
+  const vec3 uv = vec3((2. * pixel + 1.) / resolution - 1., 1.);
   const mat3x3 m = mat3x3(
     cross(forward, up),                // right
     -up * resolution.y / resolution.x, // up (normalized for aspect)
-    forward / tan(fov_rad / 2.)
+    forward / fov_tan_alpha_half
   );
   return normalize(m * uv);
 }
 
 // expects up, forward to be normalized
 vec2 get_camera_pixel(const vec3 ray_dir, const vec2 resolution,
-                      const vec3 up, const vec3 forward, const float fov_rad) {
+                      const vec3 up, const vec3 forward, const float fov_tan_alpha_half) {
   const mat3x3 m = mat3x3(
     cross(forward, up),                 // right
     -up * resolution.y / resolution.x,  // up (normalized for aspect)
-    forward / tan(fov_rad / 2.)
+    forward / fov_tan_alpha_half
   );
   vec3 uv = inverse(m) * ray_dir;
   uv.rg /= uv.b;
-  return (uv.rg + 1.) * resolution / 2.;
+  return ((uv.rg + 1.) * resolution - 1) / 2.;
 }
 
 // Computes Exposure Value (EV) which is defined at ISO 100 from typical camera settings.
