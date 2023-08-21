@@ -4,6 +4,8 @@
 #ifndef _VON_MISES_FISHER_H_
 #define _VON_MISES_FISHER_H_
 
+// Based on Wenzel Jakob, Numerically stable sampling of the von Mises Fisher distribution on S2 (and other tricks)
+
 // numerically robust von Mises Fisher lobe
 float vmf_pdf(const float kappa, const float dotmu) {
     if (kappa < 1e-4) return 1.0 / (4.0 * M_PI);
