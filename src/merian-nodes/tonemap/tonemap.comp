@@ -31,6 +31,7 @@ void main() {
         break;
     case TONEMAP_CLAMP:
         rgb_out = tonemap_clamp(rgb_in.rgb);
+        break;
     case TONEMAP_UNCHARTED_2:
         rgb_out = tonemap_uncharted2(rgb_in.rgb, params.param1, params.param2);
         break;
