@@ -132,7 +132,9 @@ main() {
   vec4 accum = curr_irr_samples; // samples/histlen in a
   vec2 moments = curr_moments;
 
-  if (sum_w > 0.01) {
+  if (sum_w > 0.01
+      && !any(isnan(prev_irr_histlen)) && !any(isinf(prev_irr_histlen))
+      && !any(isnan(prev_moments)) && !any(isinf(prev_moments))) {
     // make sure the prev values are reliable
     prev_irr_histlen /= sum_w;
     prev_moments     /= sum_w;
