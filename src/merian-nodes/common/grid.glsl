@@ -131,7 +131,12 @@ float cell_width_for_level_linear(const float level, const float max_level, cons
 #define GRID_PRIME_Z_2 508460413
 
 // Second hash function for collision detection
-uint hash_level(const ivec3 index, const uint level) {
+uint hash2_grid(const ivec3 index) {
+    return (index.x * GRID_PRIME_X_2) ^ (index.y * GRID_PRIME_Y_2) ^ (index.z * GRID_PRIME_Z_2);
+}
+
+// Second hash function for collision detection
+uint hash2_grid_level(const ivec3 index, const uint level) {
     return (index.x * GRID_PRIME_X_2) ^ (index.y * GRID_PRIME_Y_2) ^ (index.z * GRID_PRIME_Z_2) ^ (9351217 * level + 13 * level);
 }
 
