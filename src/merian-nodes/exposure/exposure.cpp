@@ -58,7 +58,7 @@ ExposureNode::describe_outputs(
         {
             NodeOutputDescriptorBuffer(
                 "histogram",
-                vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderRead |
+                vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite |
                     vk::AccessFlagBits2::eTransferWrite,
                 vk::PipelineStageFlagBits2::eComputeShader | vk::PipelineStageFlagBits2::eTransfer,
                 vk::BufferCreateInfo(
@@ -66,7 +66,7 @@ ExposureNode::describe_outputs(
                     vk::BufferUsageFlagBits::eStorageBuffer)),
             NodeOutputDescriptorBuffer(
                 "avg_luminance",
-                vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderRead,
+                vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
                 vk::PipelineStageFlagBits2::eComputeShader,
                 vk::BufferCreateInfo({}, sizeof(float), vk::BufferUsageFlagBits::eStorageBuffer),
                 true),
