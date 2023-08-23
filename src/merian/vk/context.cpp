@@ -152,11 +152,14 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id,
                         filter_vendor_id, filter_device_id));
     }
     pd_container.physical_device = devices[selected];
-    pd_container.physical_device_props = pd_container.physical_device.getProperties();
+
+    pd_container.physical_device_properties.pNext = &pd_container.physical_device_subgroup_properties;
+    // ^
+    pd_container.physical_device.getProperties2(&pd_container.physical_device_properties);
     SPDLOG_INFO("selected physical device {}, vendor id: {}, device id: {}",
-                pd_container.physical_device_props.properties.deviceName.data(),
-                pd_container.physical_device_props.properties.vendorID,
-                pd_container.physical_device_props.properties.deviceID);
+                pd_container.physical_device_properties.properties.deviceName.data(),
+                pd_container.physical_device_properties.properties.vendorID,
+                pd_container.physical_device_properties.properties.deviceID);
 
     void* extension_features_pnext = nullptr;
     for (auto& ext : extensions) {

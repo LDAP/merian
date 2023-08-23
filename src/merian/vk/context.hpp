@@ -35,8 +35,9 @@ class Context : public std::enable_shared_from_this<Context> {
 
     struct PhysicalDeviceContainer {
         vk::PhysicalDevice physical_device;
-        vk::PhysicalDeviceProperties2 physical_device_props;
+        vk::PhysicalDeviceProperties2 physical_device_properties;
         vk::PhysicalDeviceMemoryProperties2 physical_device_memory_properties;
+        vk::PhysicalDeviceSubgroupProperties physical_device_subgroup_properties;
         std::vector<vk::ExtensionProperties> physical_device_extension_properties;
         FeaturesContainer features;
     };

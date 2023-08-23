@@ -17,7 +17,7 @@ Profiler::Profiler(const SharedContext context, const uint32_t num_gpu_timers)
     cpu_sections.reserve(1024);
 
     timestamp_period =
-        context->pd_container.physical_device_props.properties.limits.timestampPeriod;
+        context->pd_container.physical_device_properties.properties.limits.timestampPeriod;
 }
 
 Profiler::~Profiler() {
