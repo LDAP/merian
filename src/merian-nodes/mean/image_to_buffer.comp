@@ -1,0 +1,38 @@
+#version 460
+#extension GL_GOOGLE_include_directive          : enable
+#extension GL_KHR_shader_subgroup_arithmetic    : enable
+
+#include "layout.glsl"
+
+shared vec4 subgroup_sums[gl_WorkGroupSize.x * gl_WorkGroupSize.y / SUBGROUP_SIZE + 1];
+
+void main() {
+    const ivec2 ipos = ivec2(gl_GlobalInvocationID);
+
+    vec4 v;
+    if (any(greaterThanEqual(ipos, textureSize(img_src, 0)))) {
+        v = vec4(0);
+    } else {
+        v = texelFetch(img_src, ipos, 0);
+    }
+
+    v.x = subgroupAdd(v.x);
+    v.y = subgroupAdd(v.y);
+    v.z = subgroupAdd(v.z);
+    v.w = subgroupAdd(v.w);
+
+    if (subgroupElect()) {
+        subgroup_sums[gl_SubgroupID] = v;
+    }
+
+    barrier();
+
+    if (gl_LocalInvocationIndex == 0) {
+        vec4 sum = vec4(0);
+        for (int i = 0; i < gl_NumSubgroups; i++) {
+            sum += subgroup_sums[i];
+        }
+
+        result[gl_WorkGroupID.x * gl_WorkGroupSize.y + gl_WorkGroupID.y];
+    }
+}
