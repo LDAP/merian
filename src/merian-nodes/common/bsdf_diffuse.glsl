@@ -10,8 +10,8 @@ vec3 bsdf_diffuse_sample(const vec3 n, const vec2 random) {
 }
 
 // solid angle
-float bsdf_diffuse_pdf() {
-    return INV_PI;
+float bsdf_diffuse_pdf(const float wodotn) {
+    return INV_PI * wodotn;
 }
 
 // solid angle
