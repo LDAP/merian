@@ -40,7 +40,7 @@ class SpecializationInfo {
   public:
     ~SpecializationInfo() {
         if (data)
-            free(data);
+            delete[](data);
     }
 
   public:
