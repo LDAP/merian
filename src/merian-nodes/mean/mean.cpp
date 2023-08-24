@@ -70,19 +70,19 @@ void MeanNode::cmd_build([[maybe_unused]] const vk::CommandBuffer& cmd,
                                .add_descriptor_set_layout(graph_layout)
                                .add_push_constant<PushConstant>()
                                .build_pipeline_layout();
-        auto spec_builder = SpecializationInfoBuilder();
-        spec_builder.add_entry(
+        auto image_to_buffer_spec_builder = SpecializationInfoBuilder();
+        image_to_buffer_spec_builder.add_entry(
             local_size_x, local_size_y,
             context->pd_container.physical_device_subgroup_properties.subgroupSize);
-        SpecializationInfoHandle spec = spec_builder.build();
+        SpecializationInfoHandle spec = image_to_buffer_spec_builder.build();
         image_to_buffer =
             std::make_shared<ComputePipeline>(pipe_layout, image_to_buffer_shader, spec);
 
-        spec_builder = SpecializationInfoBuilder();
-        spec_builder.add_entry(
+        auto reduce_buffer_spec_builder = SpecializationInfoBuilder();
+        reduce_buffer_spec_builder.add_entry(
             local_size_x * local_size_y, 1,
             context->pd_container.physical_device_subgroup_properties.subgroupSize);
-        spec = spec_builder.build();
+        spec = reduce_buffer_spec_builder.build();
         reduce_buffer = std::make_shared<ComputePipeline>(pipe_layout, reduce_buffer_shader, spec);
     }
 }
