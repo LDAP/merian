@@ -33,7 +33,7 @@ void main() {
             sum += subgroup_sums[i];
         }
 
-        result[index] = params.count <= gl_WorkGroupSize.x ? sum / float(params.divisor) : sum;
+        result[index] = sum;
     }
 
 }

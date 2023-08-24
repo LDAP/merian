@@ -99,26 +99,31 @@ void MeanNode::cmd_process(const vk::CommandBuffer& cmd,
     const auto group_count_y =
         (image_inputs[0]->get_extent().height + local_size_y - 1) / local_size_y;
 
-    image_to_buffer->bind(cmd);
-    image_to_buffer->bind_descriptor_set(cmd, graph_sets[set_index]);
-    image_to_buffer->push_constant(cmd, pc);
-    cmd.dispatch(group_count_x, group_count_y, 1);
+    pc.divisor = image_inputs[0]->get_extent().width * image_inputs[0]->get_extent().height;
+
+    {
+        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "image to buffer");
+        image_to_buffer->bind(cmd);
+        image_to_buffer->bind_descriptor_set(cmd, graph_sets[set_index]);
+        image_to_buffer->push_constant(cmd, pc);
+        cmd.dispatch(group_count_x, group_count_y, 1);
+    }
 
     pc.size = group_count_x * group_count_y;
-    pc.divisor = image_inputs[0]->get_extent().width * image_inputs[0]->get_extent().height;
     pc.offset = 1;
     pc.count = group_count_x * group_count_y;
 
     while (pc.count > 1) {
+        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, fmt::format("reduce {} elements", pc.count));
         auto bar = buffer_outputs[0]->buffer_barrier(
             vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite,
             vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite);
         cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
                             vk::PipelineStageFlagBits::eComputeShader, {}, {}, bar, {});
 
-        image_to_buffer->bind(cmd);
-        image_to_buffer->bind_descriptor_set(cmd, graph_sets[set_index]);
-        image_to_buffer->push_constant(cmd, pc);
+        reduce_buffer->bind(cmd);
+        reduce_buffer->bind_descriptor_set(cmd, graph_sets[set_index]);
+        reduce_buffer->push_constant(cmd, pc);
         cmd.dispatch((pc.count + workgroup_size - 1) / workgroup_size, 1, 1);
 
         pc.count = (pc.count + workgroup_size - 1) / workgroup_size;

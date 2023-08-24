@@ -13,7 +13,7 @@ void main() {
     if (any(greaterThanEqual(ipos, textureSize(img_src, 0)))) {
         v = vec4(0);
     } else {
-        v = texelFetch(img_src, ipos, 0);
+        v = texelFetch(img_src, ipos, 0) / params.divisor;
     }
 
     v.x = subgroupAdd(v.x);
@@ -33,6 +33,6 @@ void main() {
             sum += subgroup_sums[i];
         }
 
-        result[gl_WorkGroupID.x * gl_WorkGroupSize.y + gl_WorkGroupID.y];
+        result[gl_WorkGroupID.y + gl_NumWorkGroups.y * gl_WorkGroupID.x] = sum;
     }
 }
