@@ -31,6 +31,7 @@ class PipelineLayoutBuilder {
 
     PipelineLayoutBuilder&
     add_descriptor_set_layout(const std::shared_ptr<DescriptorSetLayout>& layout) {
+        assert(layout);
         shared_descriptor_set_layouts.push_back(layout);
         return *this;
     }
