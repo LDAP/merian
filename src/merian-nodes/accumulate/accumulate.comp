@@ -11,17 +11,17 @@ layout(set = 0, binding = 0) uniform sampler2D img_prev_accum;
 layout(set = 0, binding = 1) uniform sampler2D img_prev_moments;
 
 layout(set = 0, binding = 2) uniform sampler2D img_irr;
-layout(set = 0, binding = 3) uniform sampler2D img_gbuf;
-layout(set = 0, binding = 4) uniform sampler2D img_prev_gbuf;
+layout(set = 0, binding = 3) uniform usampler2D img_gbuf;
+layout(set = 0, binding = 4) uniform usampler2D img_prev_gbuf;
 
 layout(set = 0, binding = 5) uniform sampler2D img_mv;
+layout(set = 0, binding = 6) uniform sampler2D img_moments;
 
 
-layout(set = 0, binding = 6) uniform writeonly image2D img_accum;
-layout(set = 0, binding = 7) uniform writeonly image2D img_moments;
+layout(set = 0, binding = 7) uniform writeonly image2D img_accum;
+layout(set = 0, binding = 8) uniform writeonly image2D img_moments_accum;
 
 
-#include "common/colors_yuv.glsl"
 #include "common/normal_encode.glsl"
 #include "common/reprojection.glsl"
 
@@ -38,11 +38,11 @@ main() {
   const ivec2 ipos = ivec2(gl_GlobalInvocationID);
   if(any(greaterThanEqual(ipos, imageSize(img_accum)))) return;
 
-  const vec4 curr_irr_samples = texelFetch(img_irr, ipos, 0);
-  const vec4 curr_normal_z = texelFetch(img_gbuf, ipos, 0);
-  const vec3 curr_normal = geo_decode_normal_float(curr_normal_z.r);
-  const float curr_z = curr_normal_z.g;
-  const vec2 curr_moments = curr_normal_z.ba;
+  const vec3 curr_irr = texelFetch(img_irr, ipos, 0).rgb;
+  const uvec2 curr_normal_z = texelFetch(img_gbuf, ipos, 0).rg;
+  const vec3 curr_normal = geo_decode_normal(curr_normal_z.r);
+  const float curr_z = uintBitsToFloat(curr_normal_z.g);
+  const vec2 curr_moments = texelFetch(img_moments, ipos, 0).rg;
 
   const vec2 mv = texelFetch(img_mv, ipos, 0).rg;
   const vec2 prev_pos = ipos + mv;
@@ -52,16 +52,16 @@ main() {
   float sum_w           = 0.0;
 
   if (params.clear == 1) {
-    imageStore(img_accum, ipos, curr_irr_samples);
-    imageStore(img_moments, ipos, vec4(curr_moments,  0, 0));
+    imageStore(img_accum, ipos, vec4(curr_irr, 1));
+    imageStore(img_moments_accum, ipos, vec4(curr_moments,  0, 0));
     return;
   }
 
   if (FILTER_MODE == 0) {
     const ivec2 prev_ipos = ivec2(round(prev_pos));
-    const vec2 prev_gbuf = texelFetch(img_prev_gbuf, prev_ipos, 0).rg;
-    const vec3 prev_normal = geo_decode_normal_float(prev_gbuf.r);
-    const float prev_z = prev_gbuf.g;
+    const uvec2 prev_gbuf = texelFetch(img_prev_gbuf, prev_ipos, 0).rg;
+    const vec3 prev_normal = geo_decode_normal(prev_gbuf.r);
+    const float prev_z = uintBitsToFloat(prev_gbuf.g);
 
     const float w = reprojection_weight(curr_normal, prev_normal, params.normal_reject_cos,
                           curr_z, prev_z, params.z_reject_percent);
@@ -83,9 +83,9 @@ main() {
         if(any(greaterThanEqual(tc, textureSize(img_prev_accum, 0))) || any(lessThan(tc, ivec2(0))))
           continue;
 
-        const vec2 prev_normal_z = texelFetch(img_prev_gbuf, tc, 0).rg;
-        const vec3 prev_normal = geo_decode_normal_float(prev_normal_z.r);
-        const float prev_z = prev_normal_z.g;
+        const uvec2 prev_normal_z = texelFetch(img_prev_gbuf, tc, 0).rg;
+        const vec3 prev_normal = geo_decode_normal(prev_normal_z.r);
+        const float prev_z = uintBitsToFloat(prev_normal_z.g);
 
         // Bilinear interpolation weight
         const float w = (xx == 0 ? (1.0 - inter_w.x) : inter_w.x) * (yy == 0 ? (1.0 - inter_w.y) : inter_w.y)
@@ -115,9 +115,9 @@ main() {
         if(any(greaterThanEqual(tc, textureSize(img_prev_accum, 0))) || any(lessThan(tc, ivec2(0))))
           continue;
 
-        const vec2 prev_normal_z = texelFetch(img_prev_gbuf, tc, 0).rg;
-        const vec3 prev_normal = geo_decode_normal_float(prev_normal_z.r);
-        const float prev_z = prev_normal_z.g;
+        const uvec2 prev_normal_z = texelFetch(img_prev_gbuf, tc, 0).rg;
+        const vec3 prev_normal = geo_decode_normal(prev_normal_z.r);
+        const float prev_z = uintBitsToFloat(prev_normal_z.g);
 
         const float w = reprojection_weight(curr_normal, prev_normal, params.normal_reject_cos,
                           curr_z, prev_z, params.z_reject_percent);
@@ -129,8 +129,9 @@ main() {
     }
   }
 
-  vec4 accum = curr_irr_samples; // samples/histlen in a
+  vec3 accum = curr_irr;
   vec2 moments = curr_moments;
+  float num_samples = 1;
 
   if (sum_w > 0.01
       && !any(isnan(prev_irr_histlen)) && !any(isinf(prev_irr_histlen))
@@ -139,16 +140,14 @@ main() {
     prev_irr_histlen /= sum_w;
     prev_moments     /= sum_w;
 
-    // With params == 1, this would be a regular average.
-    // The params can be used to allow to adapt to new lighting conditions
-    const float alpha_corrected = min(params.accum_alpha, prev_irr_histlen.a / (prev_irr_histlen.a + curr_irr_samples.a));
+    num_samples = min(prev_irr_histlen.a + 1, params.accum_max_hist);
+    const float alpha = min(params.accum_alpha, 1. / num_samples);
 
-    accum.rgb = mix(curr_irr_samples.rgb, prev_irr_histlen.rgb,                    alpha_corrected);
-    moments   = mix(curr_moments,         prev_moments,                            alpha_corrected);
-    accum.a = min(prev_irr_histlen.a + curr_irr_samples.a, params.accum_max_hist);
+    accum   = mix(curr_irr.rgb, prev_irr_histlen.rgb, alpha);
+    moments = mix(curr_moments,         prev_moments, alpha);
   }
 
-  imageStore(img_accum, ipos, accum);
-  imageStore(img_moments, ipos, vec4(moments,  0, 0));
+  imageStore(img_accum, ipos, vec4(accum, num_samples));
+  imageStore(img_moments_accum, ipos, vec4(moments,  0, 0));
 }
 

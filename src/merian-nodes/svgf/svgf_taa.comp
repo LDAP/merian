@@ -4,6 +4,7 @@
 
 #include "svgf_graph_layout.glsl"
 #include "common/sampler.glsl"
+#include "common/normal_encode.glsl"
 
 layout(set = 1, binding = 0) uniform sampler2D img_filter_result;
 layout(set = 1, binding = 1) uniform sampler2D img_filter_in;  // (unused)

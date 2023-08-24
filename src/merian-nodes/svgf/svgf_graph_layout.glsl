@@ -6,8 +6,8 @@ layout(set = 0, binding = 0) uniform sampler2D img_prev_out;
 layout(set = 0, binding = 1) uniform sampler2D img_irr;
 layout(set = 0, binding = 2) uniform sampler2D img_moments;
 
-layout(set = 0, binding = 3) uniform sampler2D img_gbuf;
-layout(set = 0, binding = 4) uniform sampler2D img_prev_gbuf;
+layout(set = 0, binding = 3) uniform usampler2D img_gbuf;
+layout(set = 0, binding = 4) uniform usampler2D img_prev_gbuf;
 
 layout(set = 0, binding = 5) uniform sampler2D img_albedo;
 layout(set = 0, binding = 6) uniform sampler2D img_mv;

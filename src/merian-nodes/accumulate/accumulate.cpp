@@ -38,6 +38,7 @@ AccumulateNode::describe_inputs() {
             NodeInputDescriptorImage::compute_read("prev_gbuf", 1),
 
             NodeInputDescriptorImage::compute_read("mv"),
+            NodeInputDescriptorImage::compute_read("moments_in"),
         },
         {},
     };
@@ -53,7 +54,7 @@ AccumulateNode::describe_outputs(
     return {
         {
             NodeOutputDescriptorImage::compute_read_write("accum", format, extent),
-            NodeOutputDescriptorImage::compute_read_write("moments", format, extent),
+            NodeOutputDescriptorImage::compute_read_write("moments_accum", vk::Format::eR32G32Sfloat, extent),
         },
         {},
     };
