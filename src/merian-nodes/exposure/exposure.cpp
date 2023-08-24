@@ -126,6 +126,12 @@ void ExposureNode::cmd_process(const vk::CommandBuffer& cmd,
         histogram->bind_descriptor_set(cmd, graph_sets[set_index]);
         histogram->push_constant(cmd, pc);
         cmd.dispatch(group_count_x, group_count_y, 1);
+
+        bar = buffer_outputs[0]->buffer_barrier(vk::AccessFlagBits::eShaderRead |
+                                                    vk::AccessFlagBits::eShaderWrite,
+                                                vk::AccessFlagBits::eShaderRead);
+        cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
+                            vk::PipelineStageFlagBits::eComputeShader, {}, {}, bar, {});
     }
 
     luminance->bind(cmd);
