@@ -17,7 +17,11 @@ namespace merian {
 class SpecializationInfoBuilder {
 
   public:
-    SpecializationInfoBuilder() {
+
+    SpecializationInfoBuilder(const SpecializationInfoBuilder&) = delete;
+    SpecializationInfoBuilder(const SpecializationInfoBuilder&&) = delete;
+
+    explicit SpecializationInfoBuilder() {
         data = new char[MERIAN_INITIAL_SPEC_CONSTANT_ALLOC_SIZE];
         alloc_size = MERIAN_INITIAL_SPEC_CONSTANT_ALLOC_SIZE;
     }
