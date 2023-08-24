@@ -141,7 +141,7 @@ main() {
     prev_moments     /= sum_w;
 
     num_samples = min(prev_irr_histlen.a + 1, params.accum_max_hist);
-    const float alpha = min(params.accum_alpha, 1. / num_samples);
+    const float alpha = min(params.accum_alpha, 1. - 1. / num_samples);
 
     accum   = mix(curr_irr.rgb, prev_irr_histlen.rgb, alpha);
     moments = mix(curr_moments,         prev_moments, alpha);
