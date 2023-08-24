@@ -43,13 +43,11 @@ NodeInputDescriptorBuffer::NodeInputDescriptorBuffer(const std::string& name,
                                                      const uint32_t delay)
     : NodeInputDescriptor(name, access_flags, pipeline_stages, delay), usage_flags(usage_flags) {}
 
-NodeInputDescriptorBuffer NodeInputDescriptorBuffer::compute_read(const std::string& name) {
-    return NodeInputDescriptorBuffer{
-        name,
-        vk::AccessFlagBits2::eShaderRead,
-        vk::PipelineStageFlagBits2::eComputeShader,
-        vk::BufferUsageFlagBits::eStorageBuffer,
-    };
+NodeInputDescriptorBuffer NodeInputDescriptorBuffer::compute_read(const std::string& name,
+                                                                  const uint32_t delay) {
+    return NodeInputDescriptorBuffer{name, vk::AccessFlagBits2::eShaderRead,
+                                     vk::PipelineStageFlagBits2::eComputeShader,
+                                     vk::BufferUsageFlagBits::eStorageBuffer, delay};
 }
 
 NodeInputDescriptorBuffer NodeInputDescriptorBuffer::transfer_src(const std::string& name) {

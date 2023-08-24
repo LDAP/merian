@@ -38,10 +38,10 @@ void Graph::connect_image(const NodeHandle& src,
     // dst_input is valid
     if (dst_input >= node_data[dst].image_input_connections.size()) {
         throw std::invalid_argument{
-            fmt::format("There is no input '{}' on node '{}'", dst_input, node_data[dst].name)};
+            fmt::format("There is no image input '{}' on node '{}'", dst_input, node_data[dst].name)};
     }
     if (std::get<0>(node_data[dst].image_input_connections[dst_input])) {
-        throw std::invalid_argument{fmt::format("The input '{}' on node '{}' is already connected",
+        throw std::invalid_argument{fmt::format("The image input '{}' on node '{}' is already connected",
                                                 dst_input, node_data[dst].name)};
     }
     node_data[dst].image_input_connections[dst_input] = {src, src_output};
@@ -67,13 +67,19 @@ void Graph::connect_buffer(const NodeHandle& src,
                            const NodeHandle& dst,
                            const uint32_t src_output,
                            const uint32_t dst_input) {
+    assert(node_data.contains(src));
+    assert(node_data.contains(dst));
     if (src_output >= node_data[src].buffer_output_connections.size()) {
         node_data[src].buffer_output_connections.resize(src_output + 1);
     }
-    // dst_input is valid
-    assert(dst_input < node_data[dst].buffer_input_connections.size());
-    // nothing is connected to this input
-    assert(!std::get<0>(node_data[dst].buffer_input_connections[dst_input]));
+    if (dst_input >= node_data[dst].buffer_input_connections.size()) {
+        throw std::invalid_argument{
+            fmt::format("There is no buffer input '{}' on node '{}'", dst_input, node_data[dst].name)};
+    }
+    if (std::get<0>(node_data[dst].buffer_input_connections[dst_input])) {
+        throw std::invalid_argument{fmt::format("The buffer input '{}' on node '{}' is already connected",
+                                                dst_input, node_data[dst].name)};
+    }
     node_data[dst].buffer_input_connections[dst_input] = {src, src_output};
     node_data[src].buffer_output_connections[src_output].emplace_back(dst, dst_input);
 }
@@ -114,13 +120,17 @@ void Graph::cmd_build(vk::CommandBuffer& cmd, const ProfilerHandle profiler) {
 
         node_index++;
     }
-    // For some reason a node was not appended to the queue
-    assert(node_index == node_data.size());
+
+    if (node_index != node_data.size()) {
+        throw std::runtime_error{"Undelayed graph (only edges with delay = 0) is not acyclic!"};
+    }
+
     allocate_outputs();
     prepare_resource_sets();
 
     for (auto& node : flat_topology) {
         MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, node->name());
+        SPDLOG_DEBUG("cmd_build node: {}", node->name());
         cmd_build_node(cmd, node);
     }
 
@@ -268,7 +278,8 @@ void Graph::calculate_outputs(NodeHandle& node,
         node->describe_outputs(connected_image_outputs, connected_buffer_outputs);
 
     // validate that the user did not try to connect something from an non existent output,
-    // since on connect we did not know the number of output descriptors
+    // since on connect we did not know the number of output descriptors.
+    // We resize the array in connect_* thus checking the size is enough.
     if (data.image_output_connections.size() > data.image_output_descriptors.size()) {
         throw std::runtime_error{fmt::format("image output index '{}' is invalid for node '{}'",
                                              data.image_output_connections.size() - 1, data.name)};
@@ -310,17 +321,22 @@ void Graph::calculate_outputs(NodeHandle& node,
         }
         bool satisfied = true;
         NodeData& candidate_data = node_data[candidate];
-        for (auto& [src_node, src_output_idx] : candidate_data.image_input_connections) {
-            // src was is already processed, or src == candindate -> self loop with delay > 0.
-            satisfied &= visited.contains(src_node) || src_node == candidate;
+        for (uint32_t i = 0; i < candidate_data.image_input_descriptors.size(); i++) {
+            auto& [src_node, src_output_idx] = candidate_data.image_input_connections[i];
+            auto& in_desc = candidate_data.image_input_descriptors[i];
+            // src was is already processed, or loop with delay > 0.
+            satisfied &= visited.contains(src_node) || in_desc.delay > 0;
         }
-        for (auto& [src_node, src_output_idx] : candidate_data.buffer_input_connections) {
+        for (uint32_t i = 0; i < candidate_data.buffer_input_descriptors.size(); i++) {
+            auto& [src_node, src_output_idx] = candidate_data.buffer_input_connections[i];
+            auto& in_desc = candidate_data.buffer_input_descriptors[i];
             // src was is already processed, or src == candindate -> self loop with delay > 0.
-            satisfied &= visited.contains(src_node) || src_node == candidate;
+            satisfied &= visited.contains(src_node) || in_desc.delay > 0;
         }
         if (satisfied) {
             queue.push(candidate);
         }
+
     }
 }
 

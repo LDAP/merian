@@ -53,7 +53,8 @@ struct NodeInputDescriptorBuffer : public NodeInputDescriptor {
 
     vk::BufferUsageFlags usage_flags;
 
-    static NodeInputDescriptorBuffer compute_read(const std::string& name);
+    static NodeInputDescriptorBuffer compute_read(const std::string& name,
+                                                  const uint32_t delay = 0);
 
     static NodeInputDescriptorBuffer transfer_src(const std::string& name);
 };
