@@ -37,12 +37,13 @@ void Graph::connect_image(const NodeHandle& src,
     }
     // dst_input is valid
     if (dst_input >= node_data[dst].image_input_connections.size()) {
-        throw std::invalid_argument{
-            fmt::format("There is no image input '{}' on node '{}'", dst_input, node_data[dst].name)};
+        throw std::invalid_argument{fmt::format("There is no image input '{}' on node '{}'",
+                                                dst_input, node_data[dst].name)};
     }
     if (std::get<0>(node_data[dst].image_input_connections[dst_input])) {
-        throw std::invalid_argument{fmt::format("The image input '{}' on node '{}' is already connected",
-                                                dst_input, node_data[dst].name)};
+        throw std::invalid_argument{
+            fmt::format("The image input '{}' on node '{}' is already connected", dst_input,
+                        node_data[dst].name)};
     }
     node_data[dst].image_input_connections[dst_input] = {src, src_output};
 
@@ -73,12 +74,13 @@ void Graph::connect_buffer(const NodeHandle& src,
         node_data[src].buffer_output_connections.resize(src_output + 1);
     }
     if (dst_input >= node_data[dst].buffer_input_connections.size()) {
-        throw std::invalid_argument{
-            fmt::format("There is no buffer input '{}' on node '{}'", dst_input, node_data[dst].name)};
+        throw std::invalid_argument{fmt::format("There is no buffer input '{}' on node '{}'",
+                                                dst_input, node_data[dst].name)};
     }
     if (std::get<0>(node_data[dst].buffer_input_connections[dst_input])) {
-        throw std::invalid_argument{fmt::format("The buffer input '{}' on node '{}' is already connected",
-                                                dst_input, node_data[dst].name)};
+        throw std::invalid_argument{
+            fmt::format("The buffer input '{}' on node '{}' is already connected", dst_input,
+                        node_data[dst].name)};
     }
     node_data[dst].buffer_input_connections[dst_input] = {src, src_output};
     node_data[src].buffer_output_connections[src_output].emplace_back(dst, dst_input);
@@ -336,7 +338,6 @@ void Graph::calculate_outputs(NodeHandle& node,
         if (satisfied) {
             queue.push(candidate);
         }
-
     }
 }
 
