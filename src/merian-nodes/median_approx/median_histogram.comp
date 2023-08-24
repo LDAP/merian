@@ -1,0 +1,45 @@
+#version 460
+#extension GL_GOOGLE_include_directive    : enable
+
+#include "layout.glsl"
+
+const uint hist_size = gl_WorkGroupSize.x * gl_WorkGroupSize.y;
+shared uint[hist_size] local_hist;
+
+uint get_bin(const float value) {
+    if (value < params.min) {
+        return 0;
+    }
+
+    const float normalized = (value - params.min) / params.max;
+    const uint bin = uint(normalized * (hist_size - 2) + 1);
+
+    return clamp(bin, 0, hist_size - 1);
+}
+
+void main() {
+    const ivec2 ipos = ivec2(gl_GlobalInvocationID);
+
+    local_hist[gl_LocalInvocationIndex] = 0;
+    barrier();
+
+    if (all(lessThan(ipos, textureSize(img_src, 0)))) {
+
+        float value;
+        if (COMPONENT == 0) {
+            value = texelFetch(img_src, ipos, 0).r;
+        } else if (COMPONENT == 1) {
+            value = texelFetch(img_src, ipos, 0).g;
+        } else if (COMPONENT == 2) {
+            value = texelFetch(img_src, ipos, 0).b;
+        } else {
+            value = texelFetch(img_src, ipos, 0).a;
+        }
+     
+        const uint bin = get_bin(value);
+        atomicAdd(local_hist[bin], 1);
+    }
+    barrier();
+
+    atomicAdd(histogram[gl_LocalInvocationIndex], local_hist[gl_LocalInvocationIndex]);
+}
