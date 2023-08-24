@@ -26,7 +26,7 @@ Outputs:
 
 | Type  | Output ID | Output name | Description                                                 | Format/Resolution        | Persistent |
 |-------|-----------|-------------|-------------------------------------------------------------|--------------------------|------------|
-| Image | 0         | out         | the final image                                             | same as `irr`            | no         |
+| Image | 0         | out         | the final image (containing remaining variance in a)        | same as `irr`            | no         |
 
 
 ```

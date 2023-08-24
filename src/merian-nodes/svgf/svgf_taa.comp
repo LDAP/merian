@@ -90,6 +90,6 @@ main()
   const vec3 beauty = irr * albedo;
   const vec3 blended = mix(beauty, prev_out, params.blend_alpha);
 
-  imageStore(img_out, ipos, vec4(blended, 1));
+  imageStore(img_out, ipos, vec4(blended, filter_result.a));
 }
 
