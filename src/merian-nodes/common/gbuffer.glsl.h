@@ -14,9 +14,7 @@ struct GBuffer {
     float linear_z;
 };
 
-CPP_INLINE uint gbuffer_index(const ivec2 ipos, const ivec2 resolution) {
-    return ipos.x + resolution.x * ipos.y;
-}
+#define gbuffer_index(ipos, resolution) (ipos.x + resolution.x * ipos.y)
 
 #ifdef __cplusplus
 }
