@@ -9,18 +9,18 @@ Follows the implementation of:
 
 Inputs:
 
-| Type  | Input ID | Input name   | Description                                                 | Delay |
-|-------|----------|--------------|-------------------------------------------------------------|-------|
-| Image | 0        | prev_out     | feedback last `out`                                         | 1     |
-|       |
-| Image | 1        | irr          | (accumulated) noisy irradiance, history length in `a`       | no    |
-| Image | 2        | moments      | first and second moment in `rg`                             | no    |
-|       |
-| Image | 3        | gbuf         | GBuffer (enc normal in r, linear depth in g, monents in ba) | no    |
-| Image | 4        | prev_gbuf    | previous GBuffer                                            | 1     |
-|       |
-| Image | 5        | albedo       | the demodulated albedo                                      | no    |
-| Image | 6        | mv           | motion vectors in `r` and `g` channel                       | no    |
+| Type   | Input ID | Input name   | Description                                                 | Delay |
+|--------|----------|--------------|-------------------------------------------------------------|-------|
+| Image  | 0        | prev_out     | feedback last `out`                                         | 1     |
+|        |
+| Image  | 1        | irr          | (accumulated) noisy irradiance, history length in `a`       | no    |
+| Image  | 2        | moments      | first and second moment in `rg`                             | no    |
+|        |
+| Image  | 3        | albedo       | the demodulated albedo                                      | no    |
+| Image  | 4        | mv           | motion vectors in `r` and `g` channel                       | no    |
+|        |
+| Buffer | 0        | gbuffer      | GBuffer (see `gbuffer.glsl.h`)                              | no    |
+| Buffer | 1        | prev_gbuffer | previous GBuffer                                            | 1     |
 
 Outputs:
 

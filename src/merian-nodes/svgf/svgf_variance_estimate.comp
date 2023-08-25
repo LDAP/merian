@@ -26,9 +26,8 @@ main()
   const ivec2 ipos = ivec2(gl_GlobalInvocationID);
   if (any(greaterThanEqual(ipos, imageSize(img_filter_in)))) return;
 
-  const uvec2 normal_z = texelFetch(img_gbuf, ipos, 0).rg;
-  const vec3 normal = geo_decode_normal(normal_z.r);
-  const float z = uintBitsToFloat(normal_z.g);
+  const GBuffer gbuf = gbuffer[gbuffer_index(ipos, imageSize(img_filter_in))];
+  const vec3 normal = geo_decode_normal(gbuf.enc_normal);
   vec4 irr_histlen = texelFetch(img_irr, ipos, 0);
 
   const vec2 moments = texelFetch(img_moments, ipos, 0).rg;
@@ -45,15 +44,14 @@ main()
         if(xx != 0 || yy != 0) { // added already
           ivec2 p = ipos + ivec2(xx, yy);
 
-          const uvec2 neigh_normal_z = texelFetch(img_gbuf, p, 0).rg;
-          const vec3 neigh_normal = geo_decode_normal(neigh_normal_z.r);
-          const float neigh_z = uintBitsToFloat(neigh_normal_z.g);
+          const GBuffer neigh_gbuf = gbuffer[gbuffer_index(p, imageSize(img_filter_in))];
+          const vec3 neigh_normal = geo_decode_normal(neigh_gbuf.enc_normal);
 
           float w = 1.0;
           // Weight neighbors with similar normals
           w *= smoothstep(params.normal_reject_rad, 1.0, dot(normal, neigh_normal));
           // Weight neighbors with similar depth
-          w *= 1.0 - smoothstep(0.0, params.depth_reject_percent * max(z, neigh_z), abs(z - neigh_z));
+          w *= 1.0 - smoothstep(0.0, params.depth_reject_percent * max(gbuf.linear_z, neigh_gbuf.linear_z), abs(gbuf.linear_z - neigh_gbuf.linear_z));
           // Weight lower with increasing history
           //w *= 1.0 - irr_histlen.a / params.spatial_threshold;
 

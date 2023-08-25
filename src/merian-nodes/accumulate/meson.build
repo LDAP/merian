@@ -12,7 +12,7 @@ foreach s : shaders
     input: s,
     output: s + '.spv.h',
     # -x save binary output as text-based 32-bit hexadecimal numbers, allows #include as header
-    command: [glslc, '-V', '-I' + shader_include_dir, '--target-env', 'vulkan1.3', '-x', '-o', '@OUTPUT@', '@INPUT@'],
+    command: [glslc, '-V', '-I' + dir_source_root + '/src', '-I' + shader_include_dir, '--target-env', 'vulkan1.3', '-x', '-o', '@OUTPUT@', '@INPUT@'],
     depend_files: included_files
   )
 endforeach

@@ -2,6 +2,9 @@
 #extension GL_GOOGLE_include_directive    : enable
 #extension GL_EXT_nonuniform_qualifier    : enable
 #extension GL_EXT_control_flow_attributes : enable
+#extension GL_EXT_scalar_block_layout     : require
+
+#include "common/gbuffer.glsl.h"
 
 layout(local_size_x_id = 0, local_size_y_id = 1, local_size_z = 1) in;
 layout (constant_id = 2) const int FILTER_MODE = 1;
@@ -9,14 +12,16 @@ layout (constant_id = 3) const int EXTENDED_SEARCH = 1;
 
 layout(set = 0, binding = 0) uniform sampler2D img_prev_accum;
 layout(set = 0, binding = 1) uniform sampler2D img_prev_moments;
-
 layout(set = 0, binding = 2) uniform sampler2D img_irr;
-layout(set = 0, binding = 3) uniform usampler2D img_gbuf;
-layout(set = 0, binding = 4) uniform usampler2D img_prev_gbuf;
+layout(set = 0, binding = 3) uniform sampler2D img_mv;
+layout(set = 0, binding = 4) uniform sampler2D img_moments;
 
-layout(set = 0, binding = 5) uniform sampler2D img_mv;
-layout(set = 0, binding = 6) uniform sampler2D img_moments;
-
+layout(set = 0, binding = 5, scalar) buffer buf_gbuf {
+    GBuffer gbuffer[];
+};
+layout(set = 0, binding = 6, scalar) buffer buf_prev_gbuf {
+    GBuffer prev_gbuffer[];
+};
 
 layout(set = 0, binding = 7) uniform writeonly image2D img_accum;
 layout(set = 0, binding = 8) uniform writeonly image2D img_moments_accum;
@@ -39,12 +44,11 @@ main() {
   if(any(greaterThanEqual(ipos, imageSize(img_accum)))) return;
 
   const vec3 curr_irr = texelFetch(img_irr, ipos, 0).rgb;
-  const uvec2 curr_normal_z = texelFetch(img_gbuf, ipos, 0).rg;
-  const vec3 curr_normal = geo_decode_normal(curr_normal_z.r);
-  const float curr_z = uintBitsToFloat(curr_normal_z.g);
-  const vec2 curr_moments = texelFetch(img_moments, ipos, 0).rg;
-
+  const GBuffer gbuf = gbuffer[gbuffer_index(ipos, imageSize(img_accum))];
   const vec2 mv = texelFetch(img_mv, ipos, 0).rg;
+
+  const vec3 curr_normal = geo_decode_normal(gbuf.enc_normal);
+  const vec2 curr_moments = texelFetch(img_moments, ipos, 0).rg;
   const vec2 prev_pos = ipos + mv;
 
   vec4 prev_irr_histlen = vec4(0);
@@ -59,12 +63,11 @@ main() {
 
   if (FILTER_MODE == 0) {
     const ivec2 prev_ipos = ivec2(round(prev_pos));
-    const uvec2 prev_gbuf = texelFetch(img_prev_gbuf, prev_ipos, 0).rg;
-    const vec3 prev_normal = geo_decode_normal(prev_gbuf.r);
-    const float prev_z = uintBitsToFloat(prev_gbuf.g);
+    const GBuffer prev_gbuf = prev_gbuffer[gbuffer_index(prev_ipos, imageSize(img_accum))];
+    const vec3 prev_normal = geo_decode_normal(prev_gbuf.enc_normal);
 
     const float w = reprojection_weight(curr_normal, prev_normal, params.normal_reject_cos,
-                          curr_z, prev_z, params.z_reject_percent);
+                          gbuf.linear_z, prev_gbuf.linear_z, params.z_reject_percent);
 
     prev_irr_histlen = w * texelFetch(img_prev_accum, prev_ipos, 0);
     prev_moments     = w * texelFetch(img_prev_moments, prev_ipos, 0).rg;
@@ -83,14 +86,13 @@ main() {
         if(any(greaterThanEqual(tc, textureSize(img_prev_accum, 0))) || any(lessThan(tc, ivec2(0))))
           continue;
 
-        const uvec2 prev_normal_z = texelFetch(img_prev_gbuf, tc, 0).rg;
-        const vec3 prev_normal = geo_decode_normal(prev_normal_z.r);
-        const float prev_z = uintBitsToFloat(prev_normal_z.g);
+        const GBuffer prev_gbuf = prev_gbuffer[gbuffer_index(tc, imageSize(img_accum))];
+        const vec3 prev_normal = geo_decode_normal(prev_gbuf.enc_normal);
 
         // Bilinear interpolation weight
         const float w = (xx == 0 ? (1.0 - inter_w.x) : inter_w.x) * (yy == 0 ? (1.0 - inter_w.y) : inter_w.y)
                   * reprojection_weight(curr_normal, prev_normal, params.normal_reject_cos,
-                          curr_z, prev_z, params.z_reject_percent);
+                          gbuf.linear_z, prev_gbuf.linear_z, params.z_reject_percent);
 
         prev_irr_histlen        += w * texelFetch(img_prev_accum, tc, 0);
         prev_moments            += w * texelFetch(img_prev_moments, tc, 0).rg;
@@ -115,12 +117,10 @@ main() {
         if(any(greaterThanEqual(tc, textureSize(img_prev_accum, 0))) || any(lessThan(tc, ivec2(0))))
           continue;
 
-        const uvec2 prev_normal_z = texelFetch(img_prev_gbuf, tc, 0).rg;
-        const vec3 prev_normal = geo_decode_normal(prev_normal_z.r);
-        const float prev_z = uintBitsToFloat(prev_normal_z.g);
-
+        const GBuffer prev_gbuf = prev_gbuffer[gbuffer_index(tc, imageSize(img_accum))];
+        const vec3 prev_normal = geo_decode_normal(prev_gbuf.enc_normal);
         const float w = reprojection_weight(curr_normal, prev_normal, params.normal_reject_cos,
-                          curr_z, prev_z, params.z_reject_percent);
+                          gbuf.linear_z, prev_gbuf.linear_z, params.z_reject_percent);
 
         prev_irr_histlen        += w * texelFetch(img_prev_accum, tc, 0);
         prev_moments            += w * texelFetch(img_prev_moments, tc, 0).rg;

@@ -34,13 +34,14 @@ AccumulateNode::describe_inputs() {
             NodeInputDescriptorImage::compute_read("prev_moments", 1),
 
             NodeInputDescriptorImage::compute_read("irr"),
-            NodeInputDescriptorImage::compute_read("gbuf"),
-            NodeInputDescriptorImage::compute_read("prev_gbuf", 1),
 
             NodeInputDescriptorImage::compute_read("mv"),
             NodeInputDescriptorImage::compute_read("moments_in"),
         },
-        {},
+        {
+            NodeInputDescriptorBuffer::compute_read("gbuf"),
+            NodeInputDescriptorBuffer::compute_read("prev_gbuf", 1),
+        },
     };
 }
 

@@ -35,13 +35,13 @@ SVGFNode::describe_inputs() {
             NodeInputDescriptorImage::compute_read("irr"),
             NodeInputDescriptorImage::compute_read("moments"),
 
-            NodeInputDescriptorImage::compute_read("gbuf"),
-            NodeInputDescriptorImage::compute_read("prev_gbuf", 1),
-
             NodeInputDescriptorImage::compute_read("albedo"),
             NodeInputDescriptorImage::compute_read("mv"),
         },
-        {},
+        {
+            NodeInputDescriptorBuffer::compute_read("gbuffer"),
+            NodeInputDescriptorBuffer::compute_read("prev_gbuffer", 1),
+        },
     };
 }
 

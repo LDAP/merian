@@ -53,15 +53,14 @@ float get_sigma_l(float center, ivec2 ipos) {
 void tap(const ivec2 p,
          const float kernel_weight) {
   const vec4  p_irr_var   = texelFetch(img_filter_in,  p, 0); 
-  const vec2  p_gbuf      = texelFetch(img_gbuf, p, 0).rg; 
-  const vec3  p_n         = geo_decode_normal_float(p_gbuf.r);
-  const float p_z         = p_gbuf.g;
-  const float p_l         = yuv_luminance(p_irr_var.rgb); 
+  const GBuffer  p_gbuf      = gbuffer[gbuffer_index(p, imageSize(img_filter_out))]; 
+  const vec3  p_n         = geo_decode_normal_float(p_gbuf.enc_normal);
+  const float p_l         = yuv_luminance(p_irr_var.rgb);
 
   const float w_l = abs(p_l - c_l) / (sigma_l + 1e-10);
   // This is different to the paper version which uses
   // 3.0 * abs(z_p - z_center.x) / (z_center.y * length(vec2(offset) * step_size) + 1e-2); 
-  const float w_z = (200 * abs(p_z - c_z) / max(p_z, c_z)) / (params.param_z); 
+  const float w_z = (200 * abs(p_gbuf.linear_z - c_z) / max(p_gbuf.linear_z, c_z)) / (params.param_z); 
   // was: pow(max(0, dot(p_n, c_n)), params.param_n); 
   const float w_n = smoothstep(params.param_n, 1.0, dot(p_n, c_n));
 
@@ -77,9 +76,9 @@ main() {
   const ivec2 ipos = ivec2(gl_GlobalInvocationID);
   if (any(greaterThanEqual(ipos, imageSize(img_filter_out)))) return;
 
-  const vec4 gbuf = texelFetch(img_gbuf, ipos, 0);
-  c_n = geo_decode_normal_float(gbuf.r);
-  c_z = gbuf.g;
+  const GBuffer gbuf = gbuffer[gbuffer_index(ipos, imageSize(img_filter_out))];
+  c_n = geo_decode_normal_float(gbuf.enc_normal);
+  c_z = gbuf.linear_z;
   const vec4 filter_in = texelFetch(img_filter_in, ipos, 0);
   c_l = yuv_luminance(filter_in.rgb);
 
