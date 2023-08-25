@@ -13,6 +13,8 @@ using ivec3 = glm::ivec3;
 using vec4 = glm::vec4;
 using float16_t = uint16_t;
 using uint = uint32_t;
+using f16vec4 = float16_t[4];
+using f16vec3 = float16_t[3];
 
 
 #define CPP_INLINE inline

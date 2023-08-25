@@ -137,8 +137,8 @@ void SVGFNode::cmd_build([[maybe_unused]] const vk::CommandBuffer& cmd,
         }
         {
             auto spec_builder = SpecializationInfoBuilder();
-            spec_builder.add_entry(local_size_x, local_size_y, taa_show_variance_estimate,
-                                   taa_filter_prev, taa_clamping, taa_mv_sampling);
+            spec_builder.add_entry(local_size_x, local_size_y, taa_debug, taa_filter_prev,
+                                   taa_clamping, taa_mv_sampling);
             SpecializationInfoHandle taa_spec = spec_builder.build();
             taa = std::make_shared<ComputePipeline>(taa_pipe_layout, taa_module, taa_spec);
         }
@@ -257,7 +257,7 @@ void SVGFNode::get_configuration(Configuration& config, bool& needs_rebuild) {
         "TAA alpha", taa_pc.blend_alpha, 0, 1,
         "Blend factor for the final image and the previous image. More means more reuse.");
 
-    const int old_taa_show_variance_estimate = taa_show_variance_estimate;
+    const int old_taa_debug = taa_debug;
     const int old_taa_filter_prev = taa_filter_prev;
     const int old_taa_clamping = taa_clamping;
     const int old_taa_mv_sampling = taa_mv_sampling;
@@ -271,9 +271,9 @@ void SVGFNode::get_configuration(Configuration& config, bool& needs_rebuild) {
         config.config_float(
             "TAA rejection threshold", taa_pc.rejection_threshold,
             "TAA rejection threshold for the previous frame, in units of standard deviation", 0.01);
-    config.config_bool("show variance estimate", taa_show_variance_estimate);
+    config.config_options("debug", taa_debug, {"none", "variance", "normal", "depth", "albedo"});
 
-    needs_rebuild |= old_taa_show_variance_estimate != taa_show_variance_estimate;
+    needs_rebuild |= old_taa_debug != taa_debug;
     needs_rebuild |= old_taa_filter_prev != taa_filter_prev;
     needs_rebuild |= old_taa_clamping != taa_clamping;
     needs_rebuild |= old_taa_mv_sampling != taa_mv_sampling;

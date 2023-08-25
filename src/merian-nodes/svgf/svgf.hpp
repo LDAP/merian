@@ -103,7 +103,7 @@ class SVGFNode : public Node {
     int filter_variance = 0;
     int filter_type = 0;
 
-    int taa_show_variance_estimate = 0;
+    int taa_debug = 0;
     int taa_filter_prev = 0;
     int taa_clamping = 0;
     int taa_mv_sampling = 0;
