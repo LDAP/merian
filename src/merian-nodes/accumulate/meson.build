@@ -5,6 +5,7 @@ included_files = files(
     shader_include_dir + '/common/colors_yuv.glsl',
     shader_include_dir + '/common/reprojection.glsl',
     shader_include_dir + '/common/normal_encode.glsl',
+    shader_include_dir + '/common/gbuffer.glsl.h',
 )
 foreach s : shaders
   merian_nodes_src += custom_target(
