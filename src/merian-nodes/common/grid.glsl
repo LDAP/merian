@@ -90,12 +90,12 @@ uint hash_grid(const ivec3 index, const uint modulus) {
 
 // like hash_grid but with simple normal biasing
 uint hash_grid_normal(const ivec3 index, const vec3 normal, const uint modulus) {
-    const int cube = cubemap_side(normal);
+    const uint cube = cubemap_side(normal);
     return (((index.x * GRID_PRIME_X) ^ (index.y * GRID_PRIME_Y) ^ (index.z * GRID_PRIME_Z) ^ (9351217 * cube + 13 * cube)) % modulus + modulus) % modulus;
 }
 
 uint hash_grid_normal_level(const ivec3 index, const vec3 normal, const uint level, const uint modulus) {
-    const int cube = cubemap_side(normal);
+    const uint cube = cubemap_side(normal);
     return (((index.x * GRID_PRIME_X) ^ (index.y * GRID_PRIME_Y) ^ (index.z * GRID_PRIME_Z) ^ (9351217 * cube + 13 * cube) ^ (723850877 * level + 231961 * level)) % modulus + modulus) % modulus;
 }
 
