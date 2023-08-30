@@ -30,17 +30,17 @@ template <BlitNodeMode mode = FIT> class GLFWWindowNode : public BlitExternalNod
                              const std::vector<BufferHandle>& buffer_outputs) override {
 
         aquire = swapchain->aquire_auto_resize(*window);
-        assert(aquire.has_value());
+        if (aquire) {
+            BlitExternalNode<mode>::set_target(aquire->image, vk::ImageLayout::eUndefined,
+                                               vk::ImageLayout::ePresentSrcKHR,
+                                               vk::Extent3D(aquire->extent, 1));
+            BlitExternalNode<mode>::cmd_process(cmd, run, set_idx, image_inputs, buffer_inputs,
+                                                image_outputs, buffer_outputs);
 
-        BlitExternalNode<mode>::set_target(aquire->image, vk::ImageLayout::eUndefined,
-                                           vk::ImageLayout::ePresentSrcKHR,
-                                           vk::Extent3D(aquire->extent, 1));
-        BlitExternalNode<mode>::cmd_process(cmd, run, set_idx, image_inputs, buffer_inputs,
-                                            image_outputs, buffer_outputs);
-
-        run.add_wait_semaphore(aquire->wait_semaphore, vk::PipelineStageFlagBits::eTransfer);
-        run.add_signal_semaphore(aquire->signal_semaphore);
-        run.add_submit_callback([&](const QueueHandle& queue) { swapchain->present(*queue); });
+            run.add_wait_semaphore(aquire->wait_semaphore, vk::PipelineStageFlagBits::eTransfer);
+            run.add_signal_semaphore(aquire->signal_semaphore);
+            run.add_submit_callback([&](const QueueHandle& queue) { swapchain->present(*queue); });
+        }
     }
 
     SwapchainHandle get_swapchain() {
@@ -53,6 +53,25 @@ template <BlitNodeMode mode = FIT> class GLFWWindowNode : public BlitExternalNod
     }
 
     void get_configuration(Configuration& config, [[maybe_unused]] bool& needs_rebuild) override {
+
+        GLFWmonitor* monitor = glfwGetWindowMonitor(*window);
+        int fullscreen = monitor != NULL;
+        const int old_fullscreen = fullscreen;
+        config.config_options("mode", fullscreen, {"windowed", "fullscreen"});
+        if (fullscreen != old_fullscreen) {
+            if (fullscreen) {
+                glfwGetWindowPos(*window, &windowed_pos_size[0], &windowed_pos_size[1]);
+                glfwGetWindowSize(*window, &windowed_pos_size[2], &windowed_pos_size[3]);
+                monitor = glfwGetPrimaryMonitor();
+                const GLFWvidmode* vidmode = glfwGetVideoMode(monitor);
+                glfwSetWindowMonitor(*window, monitor, 0, 0, vidmode->width, vidmode->height,
+                                     vidmode->refreshRate);
+            } else {
+                glfwSetWindowMonitor(*window, NULL, windowed_pos_size[0], windowed_pos_size[1],
+                                     windowed_pos_size[2], windowed_pos_size[3], GLFW_DONT_CARE);
+            }
+        }
+
         if (aquire) {
             config.output_text(
                 fmt::format("surface format: {}\ncolor space: {}\nimage count: {}\nextent: {}x{}",
@@ -67,6 +86,8 @@ template <BlitNodeMode mode = FIT> class GLFWWindowNode : public BlitExternalNod
     SurfaceHandle surface;
     SwapchainHandle swapchain;
     std::optional<SwapchainAcquireResult> aquire;
+
+    std::array<int, 4> windowed_pos_size;
 };
 
 } // namespace merian
