@@ -89,7 +89,10 @@ void Queue::submit_wait(const vk::SubmitInfo& submit_info, vk::Fence fence) {
 
 void Queue::present(const vk::PresentInfoKHR& present_info) {
     std::lock_guard<std::mutex> lock_guard(mutex);
-    check_result(queue.presentKHR(&present_info), "present failed");
+    vk::Result result = queue.presentKHR(&present_info);
+    if (result == vk::Result::eSuccess || result == vk::Result::eSuboptimalKHR)
+        return;
+    check_result(result, "present failed");
 }
 
 void Queue::wait_idle() {

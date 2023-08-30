@@ -261,6 +261,10 @@ void Swapchain::destroy_swapchain() {
 std::optional<SwapchainAcquireResult> Swapchain::aquire_custom(int width, int height) {
     SwapchainAcquireResult aquire_result;
 
+    if (width == 0 || height == 0) {
+        return std::nullopt;
+    }
+
     if (width != cur_width || height != cur_height) {
         recreate_swapchain(width, height);
         aquire_result.did_recreate = true;
