@@ -125,7 +125,6 @@ class GraphRun {
  *
  */
 class Graph : public std::enable_shared_from_this<Graph> {
-
   private:
     // Holds information about images that were allocated by this graph
     struct ImageResource {

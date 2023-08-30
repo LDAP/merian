@@ -41,13 +41,13 @@ ShadertoyNode::describe_outputs(const std::vector<merian::NodeOutputDescriptorIm
                                 const std::vector<merian::NodeOutputDescriptorBuffer>&) {
 
     return {
-        {merian::NodeOutputDescriptorImage::compute_write("out", vk::Format::eR8G8B8A8Unorm,
-                                                          width, height)},
+        {merian::NodeOutputDescriptorImage::compute_write("out", vk::Format::eR8G8B8A8Unorm, width,
+                                                          height)},
         {},
     };
 }
 
-void ShadertoyNode::pre_process(NodeStatus& status) {
+void ShadertoyNode::pre_process([[maybe_unused]] const uint64_t& iteration, NodeStatus& status) {
     status.request_rebuild = requires_rebuild;
     requires_rebuild = false;
 }

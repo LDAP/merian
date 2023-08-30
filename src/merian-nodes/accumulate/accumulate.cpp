@@ -110,4 +110,8 @@ void AccumulateNode::get_configuration(Configuration& config, bool& needs_rebuil
     clear = config.config_bool("clear");
 }
 
+void AccumulateNode::request_clear() {
+    clear = true;
+}
+
 } // namespace merian

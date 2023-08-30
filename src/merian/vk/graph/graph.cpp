@@ -142,21 +142,24 @@ void Graph::cmd_build(vk::CommandBuffer& cmd, const ProfilerHandle profiler) {
 const GraphRun& Graph::cmd_run(vk::CommandBuffer& cmd, const ProfilerHandle profiler) {
     MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "Graph: run");
 
-    {
-        MERIAN_PROFILE_SCOPE(profiler, "Graph: preprocess nodes");
-        for (auto& [node, data] : node_data) {
-            MERIAN_PROFILE_SCOPE(profiler, node->name());
-            data.status = {};
-            node->pre_process(data.status);
-            rebuild_requested |= data.status.request_rebuild;
+    do {
+        if (rebuild_requested) {
+            MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "Graph: build");
+            cmd_build(cmd, profiler);
+            rebuild_requested = false;
         }
-    }
 
-    if (rebuild_requested) {
-        MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "Graph: build");
-        cmd_build(cmd, profiler);
-        rebuild_requested = false;
-    }
+        {
+            MERIAN_PROFILE_SCOPE(profiler, "Graph: preprocess nodes");
+            for (auto& [node, data] : node_data) {
+                MERIAN_PROFILE_SCOPE(profiler, node->name());
+                data.status = {};
+                node->pre_process(current_iteration, data.status);
+                rebuild_requested |= data.status.request_rebuild;
+            }
+        }
+    } while (rebuild_requested);
+
 
     run.reset(current_iteration, profiler, debug_utils);
     {

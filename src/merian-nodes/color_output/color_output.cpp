@@ -21,7 +21,7 @@ ColorOutputNode::describe_outputs(const std::vector<NodeOutputDescriptorImage>&,
     };
 }
 
-void ColorOutputNode::pre_process(NodeStatus& status) {
+void ColorOutputNode::pre_process([[maybe_unused]] const uint64_t& iteration, NodeStatus& status) {
     status.skip_run = needs_run;
 }
 

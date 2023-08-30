@@ -22,6 +22,9 @@ class ImageWriteNode : public Node {
                        std::vector<NodeInputDescriptorBuffer>>
     describe_inputs() override;
 
+    virtual void pre_process([[maybe_unused]] const uint64_t& iteration,
+                             [[maybe_unused]] NodeStatus& status) override;
+
     virtual void
     cmd_process([[maybe_unused]] const vk::CommandBuffer& cmd,
                 [[maybe_unused]] GraphRun& run,
@@ -31,31 +34,35 @@ class ImageWriteNode : public Node {
                 [[maybe_unused]] const std::vector<ImageHandle>& image_outputs,
                 [[maybe_unused]] const std::vector<BufferHandle>& buffer_outputs) override;
 
-    virtual void get_configuration([[maybe_unused]] Configuration& config, bool& needs_rebuild) override;
+    virtual void get_configuration([[maybe_unused]] Configuration& config,
+                                   bool& needs_rebuild) override;
+
+    void set_on_record_callback(const std::function<void()> callback);
 
   private:
     const SharedContext context;
     const ResourceAllocatorHandle allocator;
 
+    std::function<void()> on_record_callback;
+
     std::string base_filename;
     std::vector<char> buf;
 
-    uint64_t frame = 0;
+    int64_t iteration = 0;
     uint32_t image_index = 0;
 
     int format = 0;
-    
-    bool record_run_enable = false;
-    int record_run = 0;
 
-    bool record_every_enable = false;
-    int record_every = 1;
+    bool record_enable = false;
+    int record_iteration = 0;
+    int trigger_run = 0;
 
     bool record_next = false;
-    bool force_rebuild = false;
-    bool rebuild_after_record = false;
+    bool rebuild_after_capture = false;
+    bool rebuild_on_record = false;
 
     int it_power = 1;
+    int it_offset = 0;
 };
 
 } // namespace merian

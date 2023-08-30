@@ -35,7 +35,7 @@ class ColorOutputNode : public Node {
                      const std::vector<ImageHandle>& image_outputs,
                      const std::vector<BufferHandle>& buffer_outputs) override;
 
-    void pre_process(NodeStatus& status) override;
+    void pre_process([[maybe_unused]] const uint64_t& iteration, NodeStatus& status) override;
 
     void get_configuration(Configuration& config, bool& needs_rebuild) override;
 

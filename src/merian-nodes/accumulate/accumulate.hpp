@@ -47,6 +47,9 @@ class AccumulateNode : public ComputeNode {
 
     void get_configuration(Configuration& config, bool& needs_rebuild) override;
 
+    // Clears the accumulation buffer at the next iteration.
+    void request_clear();
+
   private:
     const vk::Format format;
     vk::Extent3D extent;

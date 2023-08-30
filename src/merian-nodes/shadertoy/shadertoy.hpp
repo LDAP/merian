@@ -49,10 +49,10 @@ class ShadertoyNode : public ComputeNode {
 
     void set_resolution(uint32_t width, uint32_t height);
 
-    void pre_process(NodeStatus& status) override final;
+    void pre_process([[maybe_unused]] const uint64_t& iteration, NodeStatus& status) override final;
 
     std::tuple<std::vector<merian::NodeOutputDescriptorImage>,
-                       std::vector<merian::NodeOutputDescriptorBuffer>>
+               std::vector<merian::NodeOutputDescriptorBuffer>>
     describe_outputs(const std::vector<merian::NodeOutputDescriptorImage>&,
                      const std::vector<merian::NodeOutputDescriptorBuffer>&) override final;
 

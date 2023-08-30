@@ -27,7 +27,7 @@ class ImageNode : public Node {
         const std::vector<NodeOutputDescriptorImage>& connected_image_outputs,
         const std::vector<NodeOutputDescriptorBuffer>& connected_buffer_outputs) override;
 
-    void pre_process(NodeStatus& status) override;
+    void pre_process([[maybe_unused]] const uint64_t& iteration, NodeStatus& status) override;
 
     void cmd_build(const vk::CommandBuffer& cmd,
                    const std::vector<std::vector<merian::ImageHandle>>&,

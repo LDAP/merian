@@ -16,7 +16,8 @@ ImageNode::ImageNode(const ResourceAllocatorHandle allocator,
 
     image = stbi_load(file->string().c_str(), &width, &height, &channels, 4);
     assert(image);
-    SPDLOG_DEBUG("Loaded image from {} ({}x{}, {} channels)", file->string(), width, height, channels);
+    SPDLOG_DEBUG("Loaded image from {} ({}x{}, {} channels)", file->string(), width, height,
+                 channels);
 
     format = linear ? vk::Format::eR8G8B8A8Unorm : vk::Format::eR8G8B8A8Srgb;
 }
@@ -31,7 +32,7 @@ ImageNode::describe_outputs(const std::vector<NodeOutputDescriptorImage>&,
     return {{NodeOutputDescriptorImage::transfer_write("output", format, width, height, true)}, {}};
 }
 
-void ImageNode::pre_process(NodeStatus& status) {
+void ImageNode::pre_process([[maybe_unused]] const uint64_t& iteration, NodeStatus& status) {
     status.skip_run = true;
 }
 

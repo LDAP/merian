@@ -50,8 +50,11 @@ class Node : public std::enable_shared_from_this<Node> {
         return {};
     }
 
-    // Called everytime before the graph is run. Can be used to request a rebuild for example.
-    virtual void pre_process([[maybe_unused]] NodeStatus& status) {}
+    // Called everytime before the graph is run.
+    // If rebuild is requested here the graph must rebuild itself before calling cmd_process.
+    // Note, that this method is necessarily called again after the rebuild.
+    virtual void pre_process([[maybe_unused]] const uint64_t& iteration,
+                             [[maybe_unused]] NodeStatus& status) {}
 
     // Called when the graph is build or rebuild. You get your inputs and outputs for each set_index
     // (see cmd_process), use these to create your descriptor sets and such. You can also make and
@@ -79,7 +82,8 @@ class Node : public std::enable_shared_from_this<Node> {
                              [[maybe_unused]] const std::vector<BufferHandle>& buffer_outputs) {}
 
     // Declare your configuration options.
-    virtual void get_configuration([[maybe_unused]]Configuration& config, [[maybe_unused]] bool& needs_rebuild) {}
+    virtual void get_configuration([[maybe_unused]] Configuration& config,
+                                   [[maybe_unused]] bool& needs_rebuild) {}
 };
 
 using NodeHandle = std::shared_ptr<Node>;
