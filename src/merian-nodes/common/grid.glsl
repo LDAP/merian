@@ -94,7 +94,7 @@ uint hash_grid_normal(const uvec3 index, const vec3 normal, const uint modulus) 
 
 uint hash_grid_normal_level(const uvec3 index, const vec3 normal, const uint level, const uint modulus) {
     const uint cube = cubemap_side(normal);
-    return ((index.x * GRID_PRIME_X) ^ (index.y * GRID_PRIME_Y) ^ (index.z * GRID_PRIME_Z) ^ (9351217 * cube + 13 * cube) ^ (723850877 * level + 231961 * level)) % modulus;
+    return ((index.x * GRID_PRIME_X) ^ (index.y * GRID_PRIME_Y) ^ (index.z * GRID_PRIME_Z) ^ (pack32(u16vec2(cube, level)) * 723850877)) % modulus;
 }
 
 uint hash_grid_level(const uvec3 index, const uint level, const uint modulus) {
