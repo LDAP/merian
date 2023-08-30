@@ -75,15 +75,13 @@ ivec3 grid_idx_interpolate(const vec3 pos, const float cell_width, const float r
     return lower;
 }
 
-// Müller et al. uses 1 for X
-// but we observed artifacts when doing so
+// See Müller et al. (2022): Instant Neural Graphics Primitives with a Multiresolution Hash Encoding
+// Müller et al. uses 1 for X but we observed artifacts when doing so
 #define GRID_PRIME_X 44761931
 #define GRID_PRIME_Y 2654435761
 #define GRID_PRIME_Z 805459861
 
 // Hashes the grid index, for x nothing is multiplied for better cache coherence.
-// See Müller et al. (2022): Instant Neural Graphics Primitives with a Multiresolution Hash Encoding
-// and Lehmer (1951): Instant Neural Graphics Primitives with a Multiresolution Hash Encoding.
 uint hash_grid(const uvec3 index, const uint modulus) {
     return ((index.x * GRID_PRIME_X) ^ (index.y * GRID_PRIME_Y) ^ (index.z * GRID_PRIME_Z)) % modulus;
 }
