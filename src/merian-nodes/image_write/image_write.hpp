@@ -55,7 +55,7 @@ class ImageWriteNode : public Node {
 
     bool record_enable = false;
     int record_iteration = 0;
-    int trigger_run = 0;
+    int trigger_run = -1;
 
     bool record_next = false;
     bool rebuild_after_capture = false;
