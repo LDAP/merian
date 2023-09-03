@@ -13,8 +13,8 @@ class BloomNode : public Node {
     static constexpr uint32_t local_size_y = 16;
 
     struct PushConstant {
-        float threshold = 1.0;
-        float strength = 1.0;
+        float threshold = 10.0;
+        float strength = 0.001;
     };
 
   public:
