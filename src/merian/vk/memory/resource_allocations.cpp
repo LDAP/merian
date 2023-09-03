@@ -74,7 +74,7 @@ Image::~Image() {
     memory->get_context()->device.destroyImage(image);
 }
 
-// Do not forget submite the barrier, else the internal state does not match the actual state
+// Do not forget submit the barrier, else the internal state does not match the actual state
 vk::ImageMemoryBarrier Image::barrier(const vk::ImageLayout new_layout,
                                       const vk::AccessFlags src_access_flags,
                                       const vk::AccessFlags dst_access_flags,

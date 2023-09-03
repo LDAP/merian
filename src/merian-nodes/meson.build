@@ -5,6 +5,7 @@ glslc_args = ['-I' + dir_source_root + '/src', '-I' + shader_include_dir,'--targ
 
 subdir('ab_compare')
 subdir('accumulate')
+subdir('bloom')
 subdir('color_output')
 subdir('compute_node')
 subdir('exposure')

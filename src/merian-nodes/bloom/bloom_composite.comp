@@ -1,0 +1,33 @@
+#version 460
+#extension GL_GOOGLE_include_directive    : enable
+
+#include "layout.glsl"
+
+void main() {
+  const ivec2 ipos = ivec2(gl_GlobalInvocationID);
+  if (any(greaterThanEqual(ipos, imageSize(img_out)))) return;
+
+  const float weights[5] = {0.227027, 0.1945946, 0.1216216, 0.054054, 0.016216};
+  vec3 bloom = imageLoad(img_interm, ipos).rgb * weights[0];
+
+  // blur horizontally (vertical pass in composite)
+  for(int i = 1; i < 5; ++i) {
+    bloom += imageLoad(img_interm, clamp(ipos + ivec2(0, i), ivec2(0), textureSize(img_src, 0) - 1)).rgb * weights[i];
+    bloom += imageLoad(img_interm, clamp(ipos - ivec2(0, i), ivec2(0), textureSize(img_src, 0) - 1)).rgb * weights[i];
+  }
+
+  switch (MODE) {
+    case 0: {
+      imageStore(img_out, ipos, vec4(texelFetch(img_src, ipos, 0).rgb + pc.strength * bloom, 1));
+      break;
+    }
+    case 1: {
+      imageStore(img_out, ipos, vec4(pc.strength * bloom, 1));
+      break;
+    }
+    case 2: {
+      imageStore(img_out, ipos, vec4(texelFetch(img_src, ipos, 0).rgb, 1));
+      break;
+    }
+  }
+}
