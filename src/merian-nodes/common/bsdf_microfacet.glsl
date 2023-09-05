@@ -5,8 +5,8 @@
  * microfacet model by jonathan:
  */
 
-#ifndef _BSDF_ROUGH_DIFFUSE_H_
-#define _BSDF_ROUGH_DIFFUSE_H_
+#ifndef _BSDF_MICROFACET_H_
+#define _BSDF_MICROFACET_H_
 
 //-----------------------------------------------------------------
 
@@ -29,18 +29,18 @@ float Lambda(const float cosTheta, const float sigmaSq) {
 
 //-----------------------------------------------------------------
 
-vec3 bsdf_rough_diffuse_sample(const vec3 wi, const vec3 du, const vec3 dv, const vec3 n, const vec2 random) {
-    // this is just regular diffuse sampling
+vec3 bsdf_microfacet_sample(const vec3 wi, const vec3 du, const vec3 dv, const vec3 n, const vec2 random) {
+    // this is just regular diffuse sampling for now
     return mat3(du, dv, n) * sample_cos(random);
 }
 
-float bsdf_rough_diffuse_pdf(const vec3 wi, const vec3 n, const vec3 wo) {
-    // this is just regular diffuse pdf
-    return 1.0 / M_PI;
+float bsdf_microfacet_pdf(const vec3 wi, const vec3 n, const vec3 wo) {
+    // this is just regular diffuse pdf for now
+    return INV_PI;
 }
 
 // -wi, du, dv, n, wo in world space
-float bsdf_rough_diffuse_eval(const vec3 minus_wi, const vec3 du, const vec3 dv, const vec3 n, const vec3 wo, const vec2 sigmaSq) {
+float bsdf_microfacet_eval(const vec3 minus_wi, const vec3 du, const vec3 dv, const vec3 n, const vec3 wo, const vec2 sigmaSq) {
   const vec3 H = normalize(wo + minus_wi);
   const float zetax = dot(H, du) / dot(H, n);
   const float zetay = dot(H, dv) / dot(H, n);
@@ -62,12 +62,13 @@ float bsdf_rough_diffuse_eval(const vec3 minus_wi, const vec3 du, const vec3 dv,
   const float cosL2 = 1.0 / (1.0 + tanL * tanL);
   const float sigmaL2 = sigmaSq.x * cosL2 + sigmaSq.y * (1.0 - cosL2);
 
+  // Schlick's approximation
   const float fresnel = 0.02 + 0.98 * pow(1.0 - dot(minus_wi, H), 5.0);
 
   zL = max(zL, 0.01);
   zV = max(zV, 0.01);
 
-  return mix(1.0/M_PI, p / ((1.0 + Lambda(zL, sigmaL2) + Lambda(zV, sigmaV2)) * zV * zH2 * zH2 * 4.0), fresnel);
+  return mix(INV_PI, p / ((1.0 + Lambda(zL, sigmaL2) + Lambda(zV, sigmaV2)) * zV * zH2 * zH2 * 4.0), fresnel);
 }
 
 #endif
