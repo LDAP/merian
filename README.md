@@ -2,6 +2,9 @@
 
 ~ _A *Vulkan 1.3* prototyping framework._ ~
 
+## Examples
+
+- [Merian-Quake-RT](https://github.com/LDAP/merian-quake-rt): A path-tracer for the original Quake game.
 
 ## Usage
 
