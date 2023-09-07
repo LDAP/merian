@@ -85,7 +85,9 @@ void ImGuiConfiguration::config_float(const std::string& id,
                                       float& value,
                                       const std::string& desc,
                                       const float sensitivity) {
-    ImGui::DragFloat(id.c_str(), &value, sensitivity);
+    ImGui::DragFloat(
+        id.c_str(), &value, sensitivity, 0.0f, 0.0f,
+        fmt::format("%.{}f", std::max(0, (int)std::ceil(-std::log10(sensitivity)))).c_str());
     tooltip(desc);
 }
 void ImGuiConfiguration::config_float(const std::string& id,
