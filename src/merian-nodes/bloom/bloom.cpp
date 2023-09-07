@@ -103,7 +103,7 @@ void BloomNode::cmd_process(const vk::CommandBuffer& cmd,
 void BloomNode::get_configuration(Configuration& config, bool& needs_rebuild) {
     config.config_float("brightness threshold", pc.threshold,
                         "Only areas brighter than that are affected", .1);
-    config.config_float("strengh", pc.strength, "Controls the strength of the effect", .01);
+    config.config_float("strengh", pc.strength, "Controls the strength of the effect", .0001);
 
     config.st_separate("Debug");
     int32_t old_mode = mode;
