@@ -22,4 +22,8 @@ vec3 sample_cos(const vec2 random) {
     return vec3(su * cos(2.0 * M_PI * random.y), su * sin(2.0 * M_PI * random.y), sqrt(1.0 - random.x));
 }
 
+#define sample_t_homogeneous_medium(mu_t, random) (-log(1. - random) / mu_t)
+
+#define sample_t_homogeneous_medium_pdf(mu_t, t) (mu_t * exp(-mu_t * t))
+
 #endif
