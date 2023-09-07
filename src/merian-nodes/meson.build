@@ -3,6 +3,7 @@ merian_nodes_src = []
 spv_compile_script = [dir_source_root + '/scripts/compile_shader.py']
 glslc_args = ['-I' + dir_source_root + '/src', '-I' + shader_include_dir,'--target-env', 'vulkan1.3']
 
+subdir('add')
 subdir('ab_compare')
 subdir('accumulate')
 subdir('bloom')
