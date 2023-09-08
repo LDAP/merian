@@ -35,7 +35,8 @@ ImageWriteNode::describe_inputs() {
     };
 }
 
-void ImageWriteNode::pre_process([[maybe_unused]] const uint64_t& iteration, [[maybe_unused]] NodeStatus& status) {
+void ImageWriteNode::pre_process([[maybe_unused]] const uint64_t& iteration,
+                                 [[maybe_unused]] NodeStatus& status) {
     if (!record_enable && ((int64_t)iteration == trigger_run)) {
         record_enable = true;
         status.request_rebuild |= rebuild_on_record;
@@ -140,9 +141,9 @@ void ImageWriteNode::get_configuration([[maybe_unused]] Configuration& config,
     config.st_separate("General");
     config.config_options("format", format, {"PNG", "JPG", "HDR"},
                           Configuration::OptionsStyle::COMBO);
-    config.config_bool("rebuild after capture", rebuild_after_capture, "Forces a graph rebuild after every capture");
-    config.config_bool("rebuild on record", rebuild_on_record,
-                       "Rebuilds when recording starts");
+    config.config_bool("rebuild after capture", rebuild_after_capture,
+                       "Forces a graph rebuild after every capture");
+    config.config_bool("rebuild on record", rebuild_on_record, "Rebuilds when recording starts");
     if (config.config_text("filename", buf.size(), buf.data())) {
         base_filename = buf.data();
     }
@@ -154,7 +155,8 @@ void ImageWriteNode::get_configuration([[maybe_unused]] Configuration& config,
     record_next = config.config_bool("trigger");
 
     config.st_separate("Multiple");
-    config.output_text(fmt::format("current iteration: {}", record_enable ? fmt::to_string(iteration) : "stopped"));
+    config.output_text(fmt::format("current iteration: {}",
+                                   record_enable ? fmt::to_string(iteration) : "stopped"));
 
     bool old_record_enable = record_enable;
     config.config_bool("enable", record_enable);
@@ -164,7 +166,9 @@ void ImageWriteNode::get_configuration([[maybe_unused]] Configuration& config,
         if (on_record_callback)
             on_record_callback();
     }
-    config.config_int("run trigger", trigger_run, "The specified run starts recording");
+    config.config_int("run trigger", trigger_run,
+                      "The specified run starts recording and resets the iteration and calls the "
+                      "configured callback and forces a rebuild if enabled.");
 
     config.st_separate();
 
@@ -175,7 +179,8 @@ void ImageWriteNode::get_configuration([[maybe_unused]] Configuration& config,
     config.config_int("iteration power", it_power,
                       "Multiplies the iteration specifier with this value after every capture");
     config.config_int("iteration offset", it_offset,
-                      "Adds this value to the iteration specifier after every capture. (After applying the power).");
+                      "Adds this value to the iteration specifier after every capture. (After "
+                      "applying the power).");
 }
 
 void ImageWriteNode::set_on_record_callback(const std::function<void()> callback) {
