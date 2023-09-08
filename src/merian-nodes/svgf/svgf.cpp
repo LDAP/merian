@@ -243,7 +243,7 @@ void SVGFNode::get_configuration(Configuration& config, bool& needs_rebuild) {
     angle = glm::acos(filter_pc.param_n);
     config.config_angle("filter normals", angle, "Reject with normals farther apart", 0, 180);
     filter_pc.param_n = glm::cos(angle);
-    config.config_float("filter luminance", filter_pc.param_l, "more means more blur");
+    config.config_float("filter luminance", filter_pc.param_l, "more means more blur", 0.1);
     int old_filter_type = filter_type;
     config.config_options("filter type", filter_type, {"atrous", "box"},
                           Configuration::OptionsStyle::COMBO);
