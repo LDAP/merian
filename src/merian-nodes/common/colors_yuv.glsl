@@ -1,10 +1,9 @@
 #ifndef _COLORS_YUV_H_
 #define _COLORS_YUV_H_
 
-float yuv_luminance(const vec3 rgb) {
-    // = rgb_to_yuv(rgb).r
-    return dot(rgb, vec3(0.299, 0.587, 0.114));
-}
+#define yuv_luminance(rgb) dot(rgb, vec3(0.299, 0.587, 0.114))
+
+#define yuv_luminance_f16(rgb) dot(rgb, f16vec3(0.299hf, 0.587hf, 0.114hf))
 
 vec3 rgb_to_yuv(const vec3 rgb) {
     const mat3 M = mat3(0.299, -0.14713,  0.615,

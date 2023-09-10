@@ -64,7 +64,7 @@ float ev_100_from_average(const float avg_luminance, const float iso, const floa
 
 // The maximum luminance without clipped or bloomed camera output (Saturation Based Sensitivity).
 // q is the lens and vignetting attenuation (typical 0.65).
-float ev_100_to_max_luminance(const float ev100, float iso, float q) {
+float ev_100_to_max_luminance(const float ev100, const float iso, const float q) {
   return 78.0 / (iso * q) * pow(2, ev100);
 }
 

@@ -10,7 +10,7 @@
 
 //-----------------------------------------------------------------
 
-float erfc(float x) {
+float erfc(const float x) {
   return 2.0 * exp(-x * x) / (2.319 * x + sqrt(4.0 + 1.52 * x * x));
 }
 

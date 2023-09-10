@@ -5,18 +5,12 @@
 #define _BSDF_DIFFUSE_H_
 
 // n must be normalized
-vec3 bsdf_diffuse_sample(const vec3 n, const vec2 random) {
-    return make_frame(n) * sample_cos(random);
-}
+#define bsdf_diffuse_sample(n, random) (make_frame(n) * sample_cos(random))
 
 // solid angle
-float bsdf_diffuse_pdf(const float wodotn) {
-    return INV_PI * wodotn;
-}
+#define bsdf_diffuse_pdf(wodotn) (INV_PI * wodotn)
 
 // solid angle
-vec3 bsdf_diffuse_eval(const vec3 albedo) {
-    return albedo * INV_PI;
-}
+#define bsdf_diffuse_eval(albedo) (INV_PI * albedo)
 
 #endif
