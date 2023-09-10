@@ -39,26 +39,26 @@ float bsdf_microfacet_pdf(const vec3 wi, const vec3 n, const vec3 wo) {
     return INV_PI;
 }
 
-// -wi, du, dv, n, wo in world space
-float bsdf_microfacet_eval(const vec3 minus_wi, const vec3 du, const vec3 dv, const vec3 n, const vec3 wo, const vec2 sigmaSq) {
+// -wi, frame_mat=(du, dv, n), wo in world space
+float bsdf_microfacet_eval(const vec3 minus_wi, const mat3x3 frame_mat, const vec3 wo, const vec2 sigmaSq) {
   const vec3 H = normalize(wo + minus_wi);
-  const float zetax = dot(H, du) / dot(H, n);
-  const float zetay = dot(H, dv) / dot(H, n);
+  const float zetax = dot(H, frame_mat[0]) / dot(H, frame_mat[2]);
+  const float zetay = dot(H, frame_mat[1]) / dot(H, frame_mat[2]);
 
-  float zL = dot(wo, n); // cos of source zenith angle
-  float zV = dot(minus_wi, n); // cos of receiver zenith angle
-  const float zH = dot(H, n); // cos of facet normal zenith angle
+  float zL = dot(wo, frame_mat[2]); // cos of source zenith angle
+  float zV = dot(minus_wi, frame_mat[2]); // cos of receiver zenith angle
+  const float zH = dot(H, frame_mat[2]); // cos of facet normal zenith angle
   if (zL < 0 || zV < 0 || zH < 0) return 0.0;
   const float zH2 = zH * zH;
 
   const float p = exp(-0.5 * (zetax * zetax / sigmaSq.x + zetay * zetay / sigmaSq.y))
     / (2.0 * M_PI * sqrt(sigmaSq.x * sigmaSq.y));
 
-  const float tanV = atan(dot(minus_wi, dv), dot(minus_wi, du));
+  const float tanV = atan(dot(minus_wi, frame_mat[1]), dot(minus_wi, frame_mat[0]));
   const float cosV2 = 1.0 / (1.0 + tanV * tanV);
   const float sigmaV2 = sigmaSq.x * cosV2 + sigmaSq.y * (1.0 - cosV2);
 
-  const float tanL = atan(dot(wo, dv), dot(wo, du));
+  const float tanL = atan(dot(wo, frame_mat[1]), dot(wo, frame_mat[0]));
   const float cosL2 = 1.0 / (1.0 + tanL * tanL);
   const float sigmaL2 = sigmaSq.x * cosL2 + sigmaSq.y * (1.0 - cosL2);
 
