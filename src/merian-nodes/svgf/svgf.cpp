@@ -129,7 +129,7 @@ void SVGFNode::cmd_build([[maybe_unused]] const vk::CommandBuffer& cmd,
                 auto spec_builder = SpecializationInfoBuilder();
                 int gap = 1 << i;
                 spec_builder.add_entry(local_size_x, local_size_y, gap, filter_variance,
-                                       filter_type);
+                                       filter_type, i);
                 SpecializationInfoHandle taa_spec = spec_builder.build();
                 filters[i] =
                     std::make_shared<ComputePipeline>(filter_pipe_layout, filter_module, taa_spec);
@@ -245,7 +245,7 @@ void SVGFNode::get_configuration(Configuration& config, bool& needs_rebuild) {
     filter_pc.param_n = glm::cos(angle);
     config.config_float("filter luminance", filter_pc.param_l, "more means more blur", 0.1);
     int old_filter_type = filter_type;
-    config.config_options("filter type", filter_type, {"atrous", "box"},
+    config.config_options("filter type", filter_type, {"atrous", "box", "subsampled"},
                           Configuration::OptionsStyle::COMBO);
     needs_rebuild |= old_filter_type != filter_type;
     int old_filter_variance = filter_variance;
@@ -271,7 +271,7 @@ void SVGFNode::get_configuration(Configuration& config, bool& needs_rebuild) {
         config.config_float(
             "TAA rejection threshold", taa_pc.rejection_threshold,
             "TAA rejection threshold for the previous frame, in units of standard deviation", 0.01);
-    config.config_options("debug", taa_debug, {"none", "variance", "normal", "depth", "albedo"});
+    config.config_options("debug", taa_debug, {"none", "variance", "normal", "depth", "albedo", "grad z"});
 
     needs_rebuild |= old_taa_debug != taa_debug;
     needs_rebuild |= old_taa_filter_prev != taa_filter_prev;

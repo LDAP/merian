@@ -12,6 +12,8 @@ namespace merian {
 struct GBuffer {
     uint32_t enc_normal;
     float linear_z;
+    // dlinear_z / dipos in depth / pixel
+    vec2 grad_z;
 };
 
 #define gbuffer_index(ipos, resolution) (ipos.x + resolution.x * ipos.y)
