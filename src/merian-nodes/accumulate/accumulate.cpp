@@ -103,7 +103,8 @@ void AccumulateNode::get_configuration(Configuration& config, bool& needs_rebuil
 
     int old_extended_search = extended_search;
     config.config_bool("extended search", extended_search,
-                       "search in a 3x3 radius for valid information if nothing was found. Helps "
+                       "search in a 3x3 radius with weakened rejection thresholds for valid "
+                       "information if nothing was found. Helps "
                        "with artifacts at edges");
     needs_rebuild |= old_extended_search != extended_search;
 
