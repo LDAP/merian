@@ -26,15 +26,15 @@ class ExposureNode : public Node {
         float aperature = 16.0;
 
         // Auto exposure
-        float K = 12.5;
-        float speed_up = 2.1;
-        float speed_down = 2.1;
+        float K = 8.0;
+        float speed_up = 3.0;
+        float speed_down = 5.0;
         float timediff = 0;
         int reset = 0;
-        float min_log_histogram = -10.0;
-        float max_log_histogram = 8.0;
-        int metering = 0;
-        float min_exposure = 0;
+        float min_log_histogram = -15.0;
+        float max_log_histogram = 11.0;
+        int metering = 1;
+        float min_exposure = 1;
         float max_exposure = 1e9;
     };
 
