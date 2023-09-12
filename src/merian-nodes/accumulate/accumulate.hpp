@@ -16,7 +16,7 @@ class AccumulateNode : public ComputeNode {
         float accum_alpha = 0.0;
         float accum_max_hist = INFINITY;
         float normal_reject_cos = 0.8;
-        float depth_reject_percent = 0.05;
+        float depth_reject_percent = 0.02;
         uint32_t clear = 0;
     };
 

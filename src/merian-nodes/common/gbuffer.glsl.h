@@ -10,10 +10,14 @@ namespace merian {
 #endif
 
 struct GBuffer {
+    // encoded normal of pixel
     uint32_t enc_normal;
+    // linear distance from camera to pixel
     float linear_z;
     // dlinear_z / dipos in depth / pixel
     vec2 grad_z;
+    // camera velocity in ray direction
+    float vel_z;
 };
 
 #define gbuffer_index(ipos, resolution) (ipos.x + resolution.x * ipos.y)
