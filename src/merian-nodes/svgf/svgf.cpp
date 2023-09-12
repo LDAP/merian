@@ -229,10 +229,10 @@ void SVGFNode::get_configuration(Configuration& config, bool& needs_rebuild) {
     config.config_float("spatial boost", variance_estimate_pc.spatial_variance_boost,
                         "Boost the variance of spatial variance estimates.");
     float angle = glm::acos(variance_estimate_pc.normal_reject_cos);
-    config.config_angle("normal threshold", angle, "Reject points with farther apart", 0, 90);
+    config.config_angle("normal reject", angle, "Reject points with farther apart", 0, 90);
     variance_estimate_pc.normal_reject_cos = glm::cos(angle);
-    config.config_percent("depth threshold", variance_estimate_pc.depth_reject_percent,
-                          "Reject points with depths farther apart (relative to the max)");
+    config.config_float("depth accept", variance_estimate_pc.depth_accept,
+                          "More means more reuse");
 
     config.st_separate("Filter");
     const int old_svgf_iterations = svgf_iterations;

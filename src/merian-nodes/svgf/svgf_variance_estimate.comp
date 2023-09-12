@@ -16,7 +16,7 @@ layout(push_constant, std140) uniform push_t {
     int spatial_threshold;
     float spatial_variance_boost;
     float normal_reject_rad;
-    float depth_reject_percent;
+    float depth_accept;
 } params;
 
 
@@ -42,7 +42,7 @@ main()
     for(int yy = -r; yy <= r; yy++) {
       for(int xx = -r; xx <= r; xx++) {
         if(xx != 0 || yy != 0) { // added already
-          ivec2 p = ipos + ivec2(xx, yy);
+          const ivec2 p = ipos + ivec2(xx, yy);
 
           const GBuffer neigh_gbuf = gbuffer[gbuffer_index(p, imageSize(img_filter_in))];
           const vec3 neigh_normal = geo_decode_normal(neigh_gbuf.enc_normal);
@@ -51,7 +51,8 @@ main()
           // Weight neighbors with similar normals
           w *= smoothstep(params.normal_reject_rad, 1.0, dot(normal, neigh_normal));
           // Weight neighbors with similar depth
-          w *= 1.0 - smoothstep(0.0, params.depth_reject_percent * max(gbuf.linear_z, neigh_gbuf.linear_z), abs(gbuf.linear_z - neigh_gbuf.linear_z));
+          // w *= 1.0 - smoothstep(0.0, params.depth_reject_percent * max(gbuf.linear_z, neigh_gbuf.linear_z), abs(gbuf.linear_z - neigh_gbuf.linear_z));
+          w *= exp(-10 * abs(gbuf.linear_z + dot(gbuf.grad_z, vec2(xx, yy)) - neigh_gbuf.linear_z) / params.depth_accept);
           // Weight lower with increasing history
           //w *= 1.0 - irr_histlen.a / params.spatial_threshold;
 
