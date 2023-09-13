@@ -52,6 +52,7 @@ main() {
   const vec2 curr_moments = texelFetch(img_moments, ipos, 0).rg;
   vec2 prev_pos = ipos + mv;
 
+  bool used_border = false;
   if (REUSE_BORDER == 1) {
     // Attemp to reuse information at the image border.
     // This results in minor smearing but looks a lot better than
@@ -63,6 +64,7 @@ main() {
       float tmin = min(prev_pos.x / mv.x, (prev_pos.x - bmax.x) / mv.x);
       tmin = max(tmin, min(prev_pos.y / mv.y, (prev_pos.y - bmax.y) / mv.y));
       prev_pos = prev_pos - mv * tmin;
+      used_border = true;
     }
   }
 
@@ -154,6 +156,10 @@ main() {
     // make sure the prev values are reliable
     prev_irr_histlen /= sum_w;
     prev_moments     /= sum_w;
+
+    // reset history for faster adaption to real irradiance values
+    if (used_border)
+      prev_irr_histlen.a = 1.;
 
     num_samples = min(prev_irr_histlen.a + 1, params.accum_max_hist);
     const float alpha = min(params.accum_alpha, 1. - 1. / num_samples);
