@@ -58,6 +58,7 @@ class AccumulateNode : public ComputeNode {
     bool clear = false;
     int filter_mode = 0;
     int extended_search = 1;
+    int reuse_border = 0;
 };
 
 } // namespace merian

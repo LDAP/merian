@@ -64,7 +64,7 @@ AccumulateNode::describe_outputs(
 
 SpecializationInfoHandle AccumulateNode::get_specialization_info() const noexcept {
     auto spec_builder = SpecializationInfoBuilder();
-    spec_builder.add_entry(local_size_x, local_size_y, filter_mode, extended_search);
+    spec_builder.add_entry(local_size_x, local_size_y, filter_mode, extended_search, reuse_border);
     return spec_builder.build();
 }
 
@@ -102,11 +102,15 @@ void AccumulateNode::get_configuration(Configuration& config, bool& needs_rebuil
     needs_rebuild |= old_filter_mode != filter_mode;
 
     int old_extended_search = extended_search;
+    int old_reuse_border = reuse_border;
     config.config_bool("extended search", extended_search,
                        "search in a 3x3 radius with weakened rejection thresholds for valid "
                        "information if nothing was found. Helps "
                        "with artifacts at edges");
-    needs_rebuild |= old_extended_search != extended_search;
+    config.config_bool("reuse border", reuse_border,
+                       "Reuse border information (if valid) for pixel where the motion vector "
+                       "points outside of the image. Can lead to smearing.");
+    needs_rebuild |= old_extended_search != extended_search || old_reuse_border != reuse_border;
 
     clear = config.config_bool("clear");
 }
