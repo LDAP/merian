@@ -1,4 +1,5 @@
 #include "common/common.glsl"
+#include "common/random.glsl"
 
 #ifndef _SAMPLING_H_
 #define _SAMPLING_H_
@@ -22,8 +23,35 @@ vec3 sample_cos(const vec2 random) {
     return vec3(su * cos(TWO_PI * random.y), su * sin(TWO_PI * random.y), sqrt(1.0 - random.x));
 }
 
-#define sample_t_homogeneous_medium(mu_t, random) (-log(1. - random) / mu_t)
+// returns two pseudorandom normal distributed values.
+vec2 sample_normal_box_muller(const float mean, const float sigma, const vec2 random) {
+   // use 1.0 - random.x to ensure > eps
+   return sigma * sqrt(-2.0 * log(1.0 - random.x)) * vec2(cos(TWO_PI * random.y), sin(TWO_PI * random.y)) + mean;
+}
 
-#define sample_t_homogeneous_medium_pdf(mu_t, t) (mu_t * exp(-mu_t * t))
+// init spare with NaN
+float sample_normal_marsaglia(const float mean, const float sigma, inout uint rng_state, inout float spare) {
+   if (!isnan(spare)) {
+      const float res = spare * sigma + mean;
+      spare = 0.0 / 0.0;
+      return res;
+   } else {
+      vec2 u;
+      float s;
+      int i = 0;
+      do {
+         u = XorShift32Vec2(rng_state) * 2.0 - 1.0;
+         s = u.x * u.x + u.y * u.y;
+      } while ((s >= 1.0 || s == 0.0) && i++ < 10);
+      s = sqrt(-2.0 * log(s) / s);
+      spare = u.y * s;
+      return u.x * s * sigma + mean;
+   }
+}
+
+float sample_normal_pdf(const float mean, const float sigma, const float x) {
+   const float z = (x - mean) / sigma;
+   return INV_SQRT_TWO_PI * exp(-0.5 * z * z) / sigma;
+}
 
 #endif
