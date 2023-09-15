@@ -15,6 +15,14 @@ ivec3 grid_idx_upper(const vec3 pos, const float cell_width) {
     return ivec3(ceil(pos / cell_width));
 }
 
+ivec2 grid_idx_lower(const vec2 pos, const float cell_width) {
+    return ivec2(floor(pos / cell_width));
+}
+
+ivec2 grid_idx_upper(const vec2 pos, const float cell_width) {
+    return ivec2(ceil(pos / cell_width));
+}
+
 // Determines the grid cell of pos and returns the closest vertex indices.
 // The vertex pos then is index * cell_width.
 ivec3 grid_idx_closest(const vec3 pos, const float cell_width) {
@@ -72,6 +80,35 @@ ivec3 grid_idx_interpolate(const vec3 pos, const float cell_width, const float r
         return vtx * lower + (1 - vtx) * upper;
 
     // (1, 1, 1)
+    return lower;
+}
+
+// Same as above for a 2d grid
+ivec2 grid_idx_interpolate(const vec2 pos, const float cell_width, const float random) {
+    const ivec2 lower = grid_idx_lower(pos, cell_width);
+    const ivec2 upper = grid_idx_upper(pos, cell_width);
+    const vec2 grid_pos = fract(pos / cell_width);
+
+    float bary_sum = 0;
+
+    // (0, 0)
+    bary_sum += grid_pos.x * grid_pos.y;
+    if (random <= bary_sum)
+        return upper;
+
+    ivec2 vtx = ivec2(0, 1);
+    vec2 dist = abs(grid_pos - vtx);
+    bary_sum += dist.x * dist.y;
+    if (random <= bary_sum)
+        return vtx * lower + (1 - vtx) * upper;
+
+    vtx = ivec2(1, 0);
+    dist = abs(grid_pos - vtx);
+    bary_sum += dist.x * dist.y;
+    if (random <= bary_sum)
+        return vtx * lower + (1 - vtx) * upper;
+
+    // (1, 1)
     return lower;
 }
 
