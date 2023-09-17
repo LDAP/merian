@@ -9,9 +9,11 @@ class GLFWImGui {
   public:
     // Set no_mouse_cursor_change to true if GLFWImGui is interfering with your cursor.
     // `initial_layout` which layout the swapchain image has when calling "new_frame".
+    // initialize_context == true: constructor and destructor initialize and destroy the ImGui context.
     GLFWImGui(const SharedContext context,
               const bool no_mouse_cursor_change = false,
-              const vk::ImageLayout initial_layout = vk::ImageLayout::ePresentSrcKHR);
+              const vk::ImageLayout initial_layout = vk::ImageLayout::ePresentSrcKHR,
+              const bool initialize_context = true);
     ~GLFWImGui();
 
     // Start a new ImGui frame
@@ -30,6 +32,7 @@ class GLFWImGui {
     const SharedContext context;
     const bool no_mouse_cursor_change;
     const vk::ImageLayout initial_layout;
+    const bool initialize_context;
 
     bool imgui_initialized = false;
     vk::DescriptorPool imgui_pool{VK_NULL_HANDLE};

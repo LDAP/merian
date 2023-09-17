@@ -8,11 +8,13 @@ namespace merian {
 
 GLFWImGui::GLFWImGui(const SharedContext context,
                      const bool no_mouse_cursor_change,
-                     const vk::ImageLayout initial_layout)
+                     const vk::ImageLayout initial_layout,
+                     const bool initialize_context)
     : context(context), no_mouse_cursor_change(no_mouse_cursor_change),
-      initial_layout(initial_layout) {
+      initial_layout(initial_layout), initialize_context(initialize_context) {
+    if (initialize_context)
         ImGui::CreateContext();
-    }
+}
 
 GLFWImGui::~GLFWImGui() {
     if (imgui_initialized) {
@@ -20,7 +22,8 @@ GLFWImGui::~GLFWImGui() {
 
         ImGui_ImplVulkan_Shutdown();
         ImGui_ImplGlfw_Shutdown();
-        ImGui::DestroyContext();
+        if (initialize_context)
+            ImGui::DestroyContext();
 
         context->device.destroyDescriptorPool(imgui_pool);
     }
