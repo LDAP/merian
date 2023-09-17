@@ -28,47 +28,42 @@ main()
 
   const GBuffer gbuf = gbuffer[gbuffer_index(ipos, imageSize(img_filter_in))];
   const vec3 normal = geo_decode_normal(gbuf.enc_normal);
+
   vec4 irr_histlen = texelFetch(img_irr, ipos, 0);
+  vec2 moments = texelFetch(img_moments, ipos, 0).rg;
+  float sum_w = 1.0;
 
-  const vec2 moments = texelFetch(img_moments, ipos, 0).rg;
+  const int r = irr_histlen.a < params.spatial_threshold ? (irr_histlen.a < params.spatial_threshold / 2 ? 2 : 1) : 0;
+  for(int yy = -r; yy <= r; yy++) {
+    for(int xx = -r; xx <= r; xx++) {
+      if(xx != 0 || yy != 0) { // added already
+        const ivec2 p = ipos + ivec2(xx, yy);
 
-  float variance = 0.;
-  if (irr_histlen.a < params.spatial_threshold) {
-    // spatial and temporal variance and color
-    float sum_w = 1.0;
-    vec2 m = moments;
+        const GBuffer neigh_gbuf = gbuffer[gbuffer_index(p, imageSize(img_filter_in))];
+        const vec3 neigh_normal = geo_decode_normal(neigh_gbuf.enc_normal);
 
-    const int r = irr_histlen.a < params.spatial_threshold / 2 ? 2 : 1;
-    for(int yy = -r; yy <= r; yy++) {
-      for(int xx = -r; xx <= r; xx++) {
-        if(xx != 0 || yy != 0) { // added already
-          const ivec2 p = ipos + ivec2(xx, yy);
+        float w = 1.0;
+        // Weight neighbors with similar normals
+        w *= smoothstep(params.normal_reject_rad, 1.0, dot(normal, neigh_normal));
+        // Weight neighbors with similar depth
+        // w *= 1.0 - smoothstep(0.0, params.depth_reject_percent * max(gbuf.linear_z, neigh_gbuf.linear_z), abs(gbuf.linear_z - neigh_gbuf.linear_z));
+        w *= exp(-10 * abs(gbuf.linear_z + dot(gbuf.grad_z, vec2(xx, yy)) - neigh_gbuf.linear_z) / params.depth_accept);
+        // Weight lower with increasing history
+        //w *= 1.0 - irr_histlen.a / params.spatial_threshold;
 
-          const GBuffer neigh_gbuf = gbuffer[gbuffer_index(p, imageSize(img_filter_in))];
-          const vec3 neigh_normal = geo_decode_normal(neigh_gbuf.enc_normal);
-
-          float w = 1.0;
-          // Weight neighbors with similar normals
-          w *= smoothstep(params.normal_reject_rad, 1.0, dot(normal, neigh_normal));
-          // Weight neighbors with similar depth
-          // w *= 1.0 - smoothstep(0.0, params.depth_reject_percent * max(gbuf.linear_z, neigh_gbuf.linear_z), abs(gbuf.linear_z - neigh_gbuf.linear_z));
-          w *= exp(-10 * abs(gbuf.linear_z + dot(gbuf.grad_z, vec2(xx, yy)) - neigh_gbuf.linear_z) / params.depth_accept);
-          // Weight lower with increasing history
-          //w *= 1.0 - irr_histlen.a / params.spatial_threshold;
-
-          sum_w           += w;
-          irr_histlen.rgb += w * texelFetch(img_irr, p, 0).rgb;
-          m               += w * texelFetch(img_moments, p, 0).rg;
-        }
+        sum_w           += w;
+        irr_histlen.rgb += w * texelFetch(img_irr, p, 0).rgb;
+        moments         += w * texelFetch(img_moments, p, 0).rg;
       }
     }
-    irr_histlen.rgb /= sum_w;
-    m               /= sum_w;
-    variance = max(0.0, m.y - m.x * m.x) * (1. + params.spatial_variance_boost * (1.0 - irr_histlen.a / params.spatial_threshold));
-  } else {
-    // temporal variance
-    variance = max(0.0, moments.y - moments.x * moments.x);
   }
+
+  irr_histlen.rgb /= sum_w;
+  moments         /= sum_w;
+
+  float variance = max(0.0, moments.y - moments.x * moments.x);
+  if (irr_histlen.a < params.spatial_threshold)
+    variance *= (1. + params.spatial_variance_boost * (1.0 - irr_histlen.a / params.spatial_threshold));
 
   imageStore(img_filter_in, ipos, vec4(irr_histlen.rgb, variance));
 }
