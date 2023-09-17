@@ -48,6 +48,8 @@ class InputController {
     virtual void set_mouse_cursor_callback(MouseCursorEventCallback cb) = 0;
     virtual void set_mouse_button_callback(MouseButtonEventCallback cb) = 0;
     virtual void set_scroll_event_callback(ScrollEventCallback cb) = 0;
+
+    // Note: the supplied key codes are implementation dependent.
     virtual void set_key_event_callback(KeyEventCallback cb) = 0;
 };
 
