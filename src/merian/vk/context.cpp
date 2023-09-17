@@ -344,6 +344,10 @@ void enable_common_features(const Context::FeaturesContainer& supported,
         SPDLOG_DEBUG("shaderUniformBufferArrayNonUniformIndexing supported. Enabling feature");
         enable.physical_device_features_v12.shaderUniformBufferArrayNonUniformIndexing = true;
     }
+    if (supported.physical_device_features_v12.shaderInt8) {
+        SPDLOG_DEBUG("shaderInt8 supported. Enabling feature");
+        enable.physical_device_features_v12.shaderInt8 = true;
+    }
 
     if (supported.physical_device_features_v13.robustImageAccess) {
         SPDLOG_DEBUG("robustImageAccess supported. Enabling feature");
