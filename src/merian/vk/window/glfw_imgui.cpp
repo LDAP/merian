@@ -10,7 +10,9 @@ GLFWImGui::GLFWImGui(const SharedContext context,
                      const bool no_mouse_cursor_change,
                      const vk::ImageLayout initial_layout)
     : context(context), no_mouse_cursor_change(no_mouse_cursor_change),
-      initial_layout(initial_layout) {}
+      initial_layout(initial_layout) {
+        ImGui::CreateContext();
+    }
 
 GLFWImGui::~GLFWImGui() {
     if (imgui_initialized) {
@@ -82,7 +84,6 @@ void GLFWImGui::upload_imgui_fonts() {
 void GLFWImGui::init_imgui(GLFWwindow* window, SwapchainAcquireResult& aquire_result) {
     assert(render_pass);
 
-    ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
