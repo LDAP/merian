@@ -4,16 +4,24 @@
 
 namespace merian {
 
-class GLFWImGui {
+static const std::vector<vk::DescriptorPoolSize> MERIAN_GLFW_IMGUI_DEFAULT_POOL_SIZES = {
+    // enough to fit a few fonts
+    {vk::DescriptorType::eCombinedImageSampler, 8},
+};
 
+class GLFWImGui {
   public:
     // Set no_mouse_cursor_change to true if GLFWImGui is interfering with your cursor.
     // `initial_layout` which layout the swapchain image has when calling "new_frame".
-    // initialize_context == true: constructor and destructor initialize and destroy the ImGui context.
+    // initialize_context == true: constructor and destructor initialize and destroy the ImGui
+    // context.
+    // Adapt pool sizes to your needs (eg to fit all fonts).
     GLFWImGui(const SharedContext context,
               const bool no_mouse_cursor_change = false,
               const vk::ImageLayout initial_layout = vk::ImageLayout::ePresentSrcKHR,
-              const bool initialize_context = true);
+              const bool initialize_context = true,
+              const std::vector<vk::DescriptorPoolSize> pool_sizes =
+                  MERIAN_GLFW_IMGUI_DEFAULT_POOL_SIZES);
     ~GLFWImGui();
 
     // Start a new ImGui frame
@@ -33,6 +41,7 @@ class GLFWImGui {
     const bool no_mouse_cursor_change;
     const vk::ImageLayout initial_layout;
     const bool initialize_context;
+    const std::vector<vk::DescriptorPoolSize> pool_sizes;
 
     bool imgui_initialized = false;
     vk::DescriptorPool imgui_pool{VK_NULL_HANDLE};

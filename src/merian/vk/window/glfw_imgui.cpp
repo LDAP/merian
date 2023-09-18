@@ -9,9 +9,11 @@ namespace merian {
 GLFWImGui::GLFWImGui(const SharedContext context,
                      const bool no_mouse_cursor_change,
                      const vk::ImageLayout initial_layout,
-                     const bool initialize_context)
+                     const bool initialize_context,
+                     const std::vector<vk::DescriptorPoolSize> pool_sizes)
     : context(context), no_mouse_cursor_change(no_mouse_cursor_change),
-      initial_layout(initial_layout), initialize_context(initialize_context) {
+      initial_layout(initial_layout), initialize_context(initialize_context),
+      pool_sizes(pool_sizes) {
     if (initialize_context)
         ImGui::CreateContext();
 }
@@ -106,8 +108,8 @@ void GLFWImGui::init_imgui(GLFWwindow* window, SwapchainAcquireResult& aquire_re
         {vk::DescriptorType::eStorageBufferDynamic, 1000},
         {vk::DescriptorType::eInputAttachment, 1000}};
 
-    vk::DescriptorPoolCreateInfo pool_info{vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
-                                           1000 * (uint32_t)pool_sizes.size(), pool_sizes};
+    vk::DescriptorPoolCreateInfo pool_info{vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet, 1,
+                                           pool_sizes};
 
     imgui_pool = context->device.createDescriptorPool(pool_info);
 
