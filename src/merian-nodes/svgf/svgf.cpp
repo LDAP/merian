@@ -276,7 +276,7 @@ void SVGFNode::get_configuration(Configuration& config, bool& needs_rebuild) {
             "TAA rejection threshold", taa_pc.rejection_threshold,
             "TAA rejection threshold for the previous frame, in units of standard deviation", 0.01);
     config.config_options("debug", taa_debug,
-                          {"none", "variance", "normal", "depth", "albedo", "grad z"});
+                          {"none", "irradiance", "variance", "normal", "depth", "albedo", "grad z"});
 
     needs_rebuild |= old_taa_debug != taa_debug;
     needs_rebuild |= old_taa_filter_prev != taa_filter_prev;

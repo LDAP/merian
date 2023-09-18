@@ -34,25 +34,29 @@ main()
   const vec4 filter_result = texelFetch(img_filter_result, ipos, 0);
 
   if (DEBUG == 1) {
-    imageStore(img_out, ipos, vec4(filter_result.a / 256));
+    imageStore(img_out, ipos, vec4(filter_result.rgb, 1));
     return;
   }
   if (DEBUG == 2) {
+    imageStore(img_out, ipos, vec4(filter_result.a / 256));
+    return;
+  }
+  if (DEBUG == 3) {
     const GBuffer gbuf = gbuffer[gbuffer_index(ipos, imageSize(img_out))];
     const vec3 normal = geo_decode_normal(gbuf.enc_normal);
     imageStore(img_out, ipos, vec4(normal, 1));
     return;
   }
-  if (DEBUG == 3) {
+  if (DEBUG == 4) {
     const GBuffer gbuf = gbuffer[gbuffer_index(ipos, imageSize(img_out))];
     imageStore(img_out, ipos, vec4(gbuf.linear_z / 1000));
     return;
   }
-  if (DEBUG == 4) {
+  if (DEBUG == 5) {
     imageStore(img_out, ipos, texelFetch(img_albedo, ipos, 0));
     return;
   }
-  if (DEBUG == 5) {
+  if (DEBUG == 6) {
     const GBuffer gbuf = gbuffer[gbuffer_index(ipos, imageSize(img_out))];
     imageStore(img_out, ipos, vec4(gbuf.grad_z, 0, 0));
     return;
