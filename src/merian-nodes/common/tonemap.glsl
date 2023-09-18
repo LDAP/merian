@@ -1,5 +1,6 @@
 #include "common/colors_yuv.glsl"
 #include "common/colors_srgb.glsl"
+#include "common/common.glsl"
 
 #ifndef _TONEMAP_H_
 #define _TONEMAP_H_
@@ -11,7 +12,7 @@ vec3 tonemap_clamp(const vec3 rgb) {
 vec3 tonemap_reinhard(const vec3 rgb, const float white) {
     float l = yuv_luminance(rgb);
     float l_new = (l * (1.0f + (l / (white * white)))) / (1.0f + l);
-    return rgb * l_new / l;
+    return rgb * l_new * SAFE_RECIPROCAL(l);
 }
 
 vec3 _tonemap_uncharted2(const vec3 x) {

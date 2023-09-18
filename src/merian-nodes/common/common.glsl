@@ -6,4 +6,7 @@
 #define INV_PI 0.3183098861837907
 #define INV_SQRT_TWO_PI 0.15915494309189535
 
+// returns 1/x if x > 0 else 1.
+#define SAFE_RECIPROCAL(x) (x > 0. ? 1. / x : 1.0)
+
 #endif // _COMMON_H_
