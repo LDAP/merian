@@ -233,6 +233,7 @@ void SVGFNode::get_configuration(Configuration& config, bool& needs_rebuild) {
                       "Compute the variance spatially for shorter histories.");
     config.config_float("spatial boost", variance_estimate_pc.spatial_variance_boost,
                         "Boost the variance of spatial variance estimates.");
+    config.config_int("spatial max radius", variance_estimate_pc.spatial_max_radius, 1, 8);
     float angle = glm::acos(variance_estimate_pc.normal_reject_cos);
     config.config_angle("normal reject", angle, "Reject points with farther apart", 0, 90);
     variance_estimate_pc.normal_reject_cos = glm::cos(angle);
@@ -275,8 +276,9 @@ void SVGFNode::get_configuration(Configuration& config, bool& needs_rebuild) {
         config.config_float(
             "TAA rejection threshold", taa_pc.rejection_threshold,
             "TAA rejection threshold for the previous frame, in units of standard deviation", 0.01);
-    config.config_options("debug", taa_debug,
-                          {"none", "irradiance", "variance", "normal", "depth", "albedo", "grad z"});
+    config.config_options(
+        "debug", taa_debug,
+        {"none", "irradiance", "variance", "normal", "depth", "albedo", "grad z"});
 
     needs_rebuild |= old_taa_debug != taa_debug;
     needs_rebuild |= old_taa_filter_prev != taa_filter_prev;

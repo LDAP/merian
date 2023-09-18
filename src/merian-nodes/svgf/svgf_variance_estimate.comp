@@ -17,6 +17,7 @@ layout(push_constant, std140) uniform push_t {
     float spatial_variance_boost;
     float normal_reject_rad;
     float depth_accept;
+    int spatial_max_radius;
 } params;
 
 
@@ -33,7 +34,7 @@ main()
   vec2 moments = texelFetch(img_moments, ipos, 0).rg;
   float sum_w = 1.0;
 
-  const int r = irr_histlen.a < params.spatial_threshold ? (irr_histlen.a < params.spatial_threshold / 2 ? 2 : 1) : 0;
+  const int r = irr_histlen.a < params.spatial_threshold ? int(round(mix(params.spatial_max_radius, 0, irr_histlen.a / params.spatial_threshold))) : 0;
   for(int yy = -r; yy <= r; yy++) {
     for(int xx = -r; xx <= r; xx++) {
       if(xx != 0 || yy != 0) { // added already

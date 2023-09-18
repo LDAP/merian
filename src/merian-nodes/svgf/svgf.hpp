@@ -17,6 +17,7 @@ class SVGFNode : public Node {
         float spatial_variance_boost = 0.0;
         float normal_reject_cos = 0.8;
         float depth_accept = 10; // larger reuses more
+        int spatial_max_radius = 2;
     };
 
     struct FilterPushConstant {
