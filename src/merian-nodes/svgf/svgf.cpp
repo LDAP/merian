@@ -13,8 +13,10 @@
 
 namespace merian {
 
-SVGFNode::SVGFNode(const SharedContext context, const ResourceAllocatorHandle allocator)
-    : context(context), allocator(allocator) {
+SVGFNode::SVGFNode(const SharedContext context,
+                   const ResourceAllocatorHandle allocator,
+                   const std::optional<vk::Format> output_format)
+    : context(context), allocator(allocator), output_format(output_format) {
     variance_estimate_module =
         std::make_shared<ShaderModule>(context, merian_svgf_variance_estimate_comp_spv_size(),
                                        merian_svgf_variance_estimate_comp_spv());
@@ -50,6 +52,9 @@ SVGFNode::describe_outputs(const std::vector<NodeOutputDescriptorImage>& connect
                            const std::vector<NodeOutputDescriptorBuffer>&) {
     // clang-format off
     irr_create_info = connected_image_outputs[1].create_info;
+    if (output_format)
+        irr_create_info.format = output_format.value();
+
     return {
         {
             NodeOutputDescriptorImage::compute_write("out", irr_create_info.format, irr_create_info.extent),
@@ -231,8 +236,7 @@ void SVGFNode::get_configuration(Configuration& config, bool& needs_rebuild) {
     float angle = glm::acos(variance_estimate_pc.normal_reject_cos);
     config.config_angle("normal reject", angle, "Reject points with farther apart", 0, 90);
     variance_estimate_pc.normal_reject_cos = glm::cos(angle);
-    config.config_float("depth accept", variance_estimate_pc.depth_accept,
-                          "More means more reuse");
+    config.config_float("depth accept", variance_estimate_pc.depth_accept, "More means more reuse");
 
     config.st_separate("Filter");
     const int old_svgf_iterations = svgf_iterations;
@@ -271,7 +275,8 @@ void SVGFNode::get_configuration(Configuration& config, bool& needs_rebuild) {
         config.config_float(
             "TAA rejection threshold", taa_pc.rejection_threshold,
             "TAA rejection threshold for the previous frame, in units of standard deviation", 0.01);
-    config.config_options("debug", taa_debug, {"none", "variance", "normal", "depth", "albedo", "grad z"});
+    config.config_options("debug", taa_debug,
+                          {"none", "variance", "normal", "depth", "albedo", "grad z"});
 
     needs_rebuild |= old_taa_debug != taa_debug;
     needs_rebuild |= old_taa_filter_prev != taa_filter_prev;

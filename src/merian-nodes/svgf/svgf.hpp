@@ -1,7 +1,7 @@
 #pragma once
 
-#include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/graph/node.hpp"
+#include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
 #include "merian/vk/shader/shader_module.hpp"
 
@@ -16,13 +16,13 @@ class SVGFNode : public Node {
         int spatial_threshold = 0;
         float spatial_variance_boost = 0.0;
         float normal_reject_cos = 0.8;
-        float depth_accept = 10;    // larger reuses more
+        float depth_accept = 10; // larger reuses more
     };
 
     struct FilterPushConstant {
-        float param_z = 10;  // parameter for depth      = 1   larger blurs more 
-        float param_n = .8;  // parameter for normals    cos(alpha) for lower threshold
-        float param_l = 8;   // parameter for brightness = 4   larger blurs more
+        float param_z = 10; // parameter for depth      = 1   larger blurs more
+        float param_n = .8; // parameter for normals    cos(alpha) for lower threshold
+        float param_l = 8;  // parameter for brightness = 4   larger blurs more
     };
 
     struct TAAPushConstant {
@@ -31,7 +31,9 @@ class SVGFNode : public Node {
     };
 
   public:
-    SVGFNode(const SharedContext context, const ResourceAllocatorHandle allocator);
+    SVGFNode(const SharedContext context,
+             const ResourceAllocatorHandle allocator,
+             const std::optional<vk::Format> output_format = std::nullopt);
 
     ~SVGFNode();
 
@@ -66,6 +68,7 @@ class SVGFNode : public Node {
   private:
     const SharedContext context;
     const ResourceAllocatorHandle allocator;
+    const std::optional<vk::Format> output_format;
 
     ShaderModuleHandle variance_estimate_module;
     ShaderModuleHandle filter_module;
