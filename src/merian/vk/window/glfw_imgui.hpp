@@ -1,6 +1,8 @@
 #pragma once
 
+#include "merian/vk/window/imgui_context.hpp"
 #include "merian/vk/window/swapchain.hpp"
+#include "imgui.h"
 
 namespace merian {
 
@@ -16,10 +18,11 @@ class GLFWImGui {
     // initialize_context == true: constructor and destructor initialize and destroy the ImGui
     // context.
     // Adapt pool sizes to your needs (eg to fit all fonts).
-    GLFWImGui(const SharedContext context,
+    // Make sure to add all fonts before calling new_frame
+    GLFWImGui(const SharedContext& context,
+              const ImGuiContextWrapperHandle& ctx,
               const bool no_mouse_cursor_change = false,
               const vk::ImageLayout initial_layout = vk::ImageLayout::ePresentSrcKHR,
-              const bool initialize_context = true,
               const std::vector<vk::DescriptorPoolSize> pool_sizes =
                   MERIAN_GLFW_IMGUI_DEFAULT_POOL_SIZES);
     ~GLFWImGui();
@@ -38,9 +41,10 @@ class GLFWImGui {
 
   private:
     const SharedContext context;
+    const ImGuiContextWrapperHandle ctx;
+
     const bool no_mouse_cursor_change;
     const vk::ImageLayout initial_layout;
-    const bool initialize_context;
     const std::vector<vk::DescriptorPoolSize> pool_sizes;
 
     bool imgui_initialized = false;

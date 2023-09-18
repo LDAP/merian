@@ -6,26 +6,23 @@
 
 namespace merian {
 
-GLFWImGui::GLFWImGui(const SharedContext context,
+GLFWImGui::GLFWImGui(const SharedContext& context,
+                     const ImGuiContextWrapperHandle& ctx,
                      const bool no_mouse_cursor_change,
                      const vk::ImageLayout initial_layout,
-                     const bool initialize_context,
                      const std::vector<vk::DescriptorPoolSize> pool_sizes)
-    : context(context), no_mouse_cursor_change(no_mouse_cursor_change),
-      initial_layout(initial_layout), initialize_context(initialize_context),
-      pool_sizes(pool_sizes) {
-    if (initialize_context)
-        ImGui::CreateContext();
-}
+    : context(context), ctx(ctx), no_mouse_cursor_change(no_mouse_cursor_change),
+      initial_layout(initial_layout), pool_sizes(pool_sizes) {}
 
 GLFWImGui::~GLFWImGui() {
+    ImGuiContext* current_context = ImGui::GetCurrentContext();
+    ImGui::SetCurrentContext(ctx->get());
+
     if (imgui_initialized) {
         context->device.waitIdle();
 
         ImGui_ImplVulkan_Shutdown();
         ImGui_ImplGlfw_Shutdown();
-        if (initialize_context)
-            ImGui::DestroyContext();
 
         context->device.destroyDescriptorPool(imgui_pool);
     }
@@ -36,6 +33,8 @@ GLFWImGui::~GLFWImGui() {
     if (render_pass) {
         context->device.destroyRenderPass(render_pass);
     }
+
+    ImGui::SetCurrentContext(current_context);
 }
 
 void GLFWImGui::recreate_render_pass(SwapchainAcquireResult& aquire_result) {
@@ -140,6 +139,9 @@ void GLFWImGui::init_imgui(GLFWwindow* window, SwapchainAcquireResult& aquire_re
 vk::Framebuffer GLFWImGui::new_frame(vk::CommandBuffer& cmd,
                                      GLFWwindow* window,
                                      SwapchainAcquireResult& aquire_result) {
+    ImGuiContext* current_context = ImGui::GetCurrentContext();
+    ImGui::SetCurrentContext(ctx->get());
+
     if (aquire_result.did_recreate) {
         for (auto& framebuffer : framebuffers) {
             if (framebuffer)
@@ -175,14 +177,20 @@ vk::Framebuffer GLFWImGui::new_frame(vk::CommandBuffer& cmd,
         render_pass, framebuffer, {{}, aquire_result.extent}, 0, nullptr};
     cmd.beginRenderPass(rp_info, vk::SubpassContents::eInline);
 
+    ImGui::SetCurrentContext(current_context);
     return framebuffer;
 }
 
 // Render the ImGui to the current swapchain image
 void GLFWImGui::render(vk::CommandBuffer& cmd) {
+    ImGuiContext* current_context = ImGui::GetCurrentContext();
+    ImGui::SetCurrentContext(ctx->get());
+
     ImGui::Render();
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
     cmd.endRenderPass();
+
+    ImGui::SetCurrentContext(current_context);
 }
 
 } // namespace merian
