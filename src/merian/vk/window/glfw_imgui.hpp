@@ -11,6 +11,7 @@ static const std::vector<vk::DescriptorPoolSize> MERIAN_GLFW_IMGUI_DEFAULT_POOL_
     {vk::DescriptorType::eCombinedImageSampler, 8},
 };
 
+// GLFW-Vulkan backend for ImGui.
 class GLFWImGui {
   public:
     // Set no_mouse_cursor_change to true if GLFWImGui is interfering with your cursor.
