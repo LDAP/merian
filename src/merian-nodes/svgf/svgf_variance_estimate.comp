@@ -3,6 +3,7 @@
 
 #include "svgf_graph_layout.glsl"
 #include "common/normal_encode.glsl"
+#include "common/colors_yuv.glsl"
 
 /*
  * Reads the accumulated irradiance and the moments, estimates the variance,
@@ -13,13 +14,11 @@ layout(set = 1, binding = 0) uniform sampler2D unused; // needed to match the fi
 layout(set = 1, binding = 1) uniform writeonly image2D img_filter_in;
 
 layout(push_constant, std140) uniform push_t {
-    int spatial_threshold;
-    float spatial_variance_boost;
     float normal_reject_rad;
     float depth_accept;
-    int spatial_max_radius;
+    float spatial_falloff;
+    float spatial_bias;
 } params;
-
 
 void
 main()
@@ -30,11 +29,16 @@ main()
   const GBuffer gbuf = gbuffer[gbuffer_index(ipos, imageSize(img_filter_in))];
   const vec3 normal = geo_decode_normal(gbuf.enc_normal);
 
-  vec4 irr_histlen = texelFetch(img_irr, ipos, 0);
-  vec2 moments = texelFetch(img_moments, ipos, 0).rg;
+  const vec4 center_irr_histlen = texelFetch(img_irr, ipos, 0);
+  vec4 irr_histlen = center_irr_histlen;
+  const vec2 center_moments = texelFetch(img_moments, ipos, 0).rg;
+  vec2 moments = center_moments;
   float sum_w = 1.0;
 
-  const int r = irr_histlen.a < params.spatial_threshold ? int(round(mix(params.spatial_max_radius, 0, irr_histlen.a / params.spatial_threshold))) : 0;
+  // spatial filtering when variance is 0 leads to unnecessary filtering of surfaces which variance is really 0
+  // however it prevents black trails.
+  const int r = 2;
+
   for(int yy = -r; yy <= r; yy++) {
     for(int xx = -r; xx <= r; xx++) {
       if(xx != 0 || yy != 0) { // added already
@@ -63,8 +67,11 @@ main()
   moments         /= sum_w;
 
   float variance = max(0.0, moments.y - moments.x * moments.x);
-  if (irr_histlen.a < params.spatial_threshold)
-    variance *= (1. + params.spatial_variance_boost * (1.0 - irr_histlen.a / params.spatial_threshold));
+  const float center_variance = max(0.0, center_moments.y - center_moments.x * center_moments.x);
+  const float alpha = clamp(params.spatial_bias / pow(irr_histlen.a, params.spatial_falloff), 0, 1);
+  variance = mix(center_variance, variance, alpha);
+  irr_histlen.rgb = mix(center_irr_histlen.rgb, irr_histlen.rgb, alpha);
+
 
   imageStore(img_filter_in, ipos, vec4(irr_histlen.rgb, variance));
 }

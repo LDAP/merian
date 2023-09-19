@@ -122,7 +122,7 @@ void SVGFNode::cmd_build([[maybe_unused]] const vk::CommandBuffer& cmd,
 
         {
             auto spec_builder = SpecializationInfoBuilder();
-            spec_builder.add_entry(local_size_x, local_size_y);
+            spec_builder.add_entry(variance_estimate_local_size_x, variance_estimate_local_size_y);
             SpecializationInfoHandle variance_estimate_spec = spec_builder.build();
             variance_estimate = std::make_shared<ComputePipeline>(
                 variance_estimate_pipe_layout, variance_estimate_module, variance_estimate_spec);
@@ -175,7 +175,13 @@ void SVGFNode::cmd_process(const vk::CommandBuffer& cmd,
         variance_estimate->bind_descriptor_set(cmd, graph_sets[set_index], 0);
         variance_estimate->bind_descriptor_set(cmd, ping_pong_res[1].set, 1);
         variance_estimate->push_constant(cmd, variance_estimate_pc);
-        cmd.dispatch(group_count_x, group_count_y, 1);
+        const uint32_t variance_estimate_group_count_x =
+            (irr_create_info.extent.width + variance_estimate_local_size_x - 1) /
+            variance_estimate_local_size_x;
+        const uint32_t variance_estimate_group_count_y =
+            (irr_create_info.extent.width + variance_estimate_local_size_y - 1) /
+            variance_estimate_local_size_y;
+        cmd.dispatch(variance_estimate_group_count_x, variance_estimate_group_count_y, 1);
 
         // make sure writes are visible
         bar = ping_pong_res[0].ping_pong->get_image()->barrier(
@@ -229,15 +235,16 @@ void SVGFNode::cmd_process(const vk::CommandBuffer& cmd,
 
 void SVGFNode::get_configuration(Configuration& config, bool& needs_rebuild) {
     config.st_separate("Variance estimate");
-    config.config_int("spatial threshold", variance_estimate_pc.spatial_threshold, 0, 120,
-                      "Compute the variance spatially for shorter histories.");
-    config.config_float("spatial boost", variance_estimate_pc.spatial_variance_boost,
-                        "Boost the variance of spatial variance estimates.");
-    config.config_int("spatial max radius", variance_estimate_pc.spatial_max_radius, 1, 8);
+    config.config_float("spatial falloff", variance_estimate_pc.spatial_falloff,
+                        "higher means only use spatial with very low history", 0.01);
+    config.config_float("spatial bias", variance_estimate_pc.spatial_bias,
+                        "higher means use spatial information longer before using the falloff",
+                        0.1);
     float angle = glm::acos(variance_estimate_pc.normal_reject_cos);
     config.config_angle("normal reject", angle, "Reject points with farther apart", 0, 90);
     variance_estimate_pc.normal_reject_cos = glm::cos(angle);
     config.config_float("depth accept", variance_estimate_pc.depth_accept, "More means more reuse");
+
 
     config.st_separate("Filter");
     const int old_svgf_iterations = svgf_iterations;

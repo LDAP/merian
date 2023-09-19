@@ -12,12 +12,14 @@ class SVGFNode : public Node {
     static constexpr uint32_t local_size_x = 32;
     static constexpr uint32_t local_size_y = 32;
 
+    static constexpr uint32_t variance_estimate_local_size_x = 16;
+    static constexpr uint32_t variance_estimate_local_size_y = 16;
+
     struct VarianceEstimatePushConstant {
-        int spatial_threshold = 0;
-        float spatial_variance_boost = 0.0;
         float normal_reject_cos = 0.8;
         float depth_accept = 10; // larger reuses more
-        int spatial_max_radius = 2;
+        float spatial_falloff = 3.0;
+        float spatial_bias = 8.0;
     };
 
     struct FilterPushConstant {
