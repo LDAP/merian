@@ -127,13 +127,13 @@ void Context::create_instance(std::string application_name, uint32_t application
 void Context::prepare_physical_device(uint32_t filter_vendor_id,
                                       uint32_t filter_device_id,
                                       std::string filter_device_name) {
-    std::vector<vk::PhysicalDevice> devices = instance.enumeratePhysicalDevices();
+    const std::vector<vk::PhysicalDevice> devices = instance.enumeratePhysicalDevices();
     if (devices.empty()) {
         throw std::runtime_error("No vulkan device found!");
     }
 
     // TODO: Sort by score (e.g. prefer dedicated GPU, check supported extensions)
-    long selected = -1;
+    std::vector<std::tuple<vk::PhysicalDevice, vk::PhysicalDeviceProperties2>> matches;
     for (std::size_t i = 0; i < devices.size(); i++) {
         vk::PhysicalDeviceProperties2 props = devices[i].getProperties2();
         SPDLOG_INFO("found physical device {}, vendor id: {}, device id: {}",
@@ -142,18 +142,40 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id,
         if ((filter_vendor_id == (uint32_t)-1 || filter_vendor_id == props.properties.vendorID) &&
             (filter_device_id == (uint32_t)-1 || filter_device_id == props.properties.deviceID) &&
             (filter_device_name == "" || filter_device_name == props.properties.deviceName)) {
-            selected = i;
+            matches.emplace_back(devices[i], props);
         }
     }
 
-    if (selected == -1) {
+    if (matches.empty()) {
         throw std::runtime_error(
             fmt::format("no vulkan device found with vendor id: {}, device id: {}! (-1 means any)",
                         filter_vendor_id, filter_device_id));
     }
-    pd_container.physical_device = devices[selected];
+    std::sort(matches.begin(), matches.end(),
+              [](std::tuple<vk::PhysicalDevice, vk::PhysicalDeviceProperties2>& a,
+                 std::tuple<vk::PhysicalDevice, vk::PhysicalDeviceProperties2>& b) {
+                  const vk::PhysicalDeviceProperties& props_a = std::get<1>(a).properties;
+                  const vk::PhysicalDeviceProperties& props_b = std::get<1>(b).properties;
+                  if (props_a.deviceType != props_b.deviceType) {
+                      if (props_a.deviceType == vk::PhysicalDeviceType::eDiscreteGpu)
+                          return false;
+                      if (props_b.deviceType == vk::PhysicalDeviceType::eDiscreteGpu)
+                          return true;
+                      if (props_a.deviceType == vk::PhysicalDeviceType::eIntegratedGpu)
+                          return false;
+                      if (props_b.deviceType == vk::PhysicalDeviceType::eIntegratedGpu)
+                          return true;
+                  }
+                  return std::get<0>(a).enumerateDeviceExtensionProperties().size() <
+                         std::get<0>(b).enumerateDeviceExtensionProperties().size();
 
-    pd_container.physical_device_properties.pNext = &pd_container.physical_device_subgroup_properties;
+                  return false;
+              });
+
+    pd_container.physical_device = std::get<0>(matches.back());
+
+    pd_container.physical_device_properties.pNext =
+        &pd_container.physical_device_subgroup_properties;
     // ^
     pd_container.physical_device.getProperties2(&pd_container.physical_device_properties);
     SPDLOG_INFO("selected physical device {}, vendor id: {}, device id: {}",
