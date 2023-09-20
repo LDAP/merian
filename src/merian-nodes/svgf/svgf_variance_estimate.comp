@@ -109,6 +109,8 @@ void main() {
   vec2 moments = center_moments;
   float sum_w = 1.0;
 
+  const float kernel[] = {1., 2. / 3., 1. / 6.};
+
   // spatial filtering when variance is 0 leads to unnecessary filtering of surfaces which variance is really 0
   // however it prevents black trails.
   [[unroll]]
@@ -124,6 +126,8 @@ void main() {
         // Weight neighbors with similar depth
         // w *= 1.0 - smoothstep(0.0, params.depth_reject_percent * max(gbuf.linear_z, neigh_gbuf.linear_z), abs(gbuf.linear_z - neigh_gbuf.linear_z));
         w *= exp(-10 * abs(center_linear_z + dot(center_grad_z, vec2(xx, yy)) - shared_z[SHARED_INDEX(p.x, p.y)]) / params.depth_accept);
+        // smoothing kernel
+        w *= kernel[abs(xx)] * kernel[abs(yy)];
         // Weight lower with increasing history
         //w *= 1.0 - irr_histlen.a / params.spatial_threshold;
 
