@@ -1,5 +1,6 @@
 #version 460
 #extension GL_GOOGLE_include_directive    : enable
+#extension GL_EXT_control_flow_attributes : enable
 
 #include "svgf_graph_layout.glsl"
 #include "common/normal_encode.glsl"
@@ -20,45 +21,115 @@ layout(push_constant, std140) uniform push_t {
     float spatial_bias;
 } params;
 
-void
-main()
-{
+#define SPATIAL_RADIUS 2
+#define TILE_SIZE_X (gl_WorkGroupSize.x + 2 * SPATIAL_RADIUS)
+#define TILE_SIZE_Y (gl_WorkGroupSize.y + 2 * SPATIAL_RADIUS)
+#define SHARED_SIZE (TILE_SIZE_X * TILE_SIZE_Y)
+
+shared vec2 shared_moments[SHARED_SIZE];
+shared vec4 shared_irr[SHARED_SIZE];
+shared vec3 shared_normal[SHARED_SIZE];
+shared float shared_z[SHARED_SIZE];
+
+#define SHARED_INDEX(X, Y) ((Y) * TILE_SIZE_X + X)
+
+void main() {
   const ivec2 ipos = ivec2(gl_GlobalInvocationID);
-  if (any(greaterThanEqual(ipos, imageSize(img_filter_in)))) return;
+  const ivec2 lid = ivec2(gl_LocalInvocationID.xy);
+  const ivec2 shared_index = lid + SPATIAL_RADIUS;
 
-  const GBuffer gbuf = gbuffer[gbuffer_index(ipos, imageSize(img_filter_in))];
-  const vec3 normal = geo_decode_normal(gbuf.enc_normal);
+  // Load all necessary information into shared memory
 
-  const vec4 center_irr_histlen = texelFetch(img_irr, ipos, 0);
+  // center pixel
+  vec2 center_grad_z;
+  {
+    const GBuffer gbuf = gbuffer[gbuffer_index(ipos, imageSize(img_filter_in))];
+
+    shared_moments[SHARED_INDEX(shared_index.x, shared_index.y)]  = texelFetch(img_moments, ipos, 0).rg;
+    shared_irr[SHARED_INDEX(shared_index.x, shared_index.y)]      = texelFetch(img_irr, ipos, 0);
+    shared_normal[SHARED_INDEX(shared_index.x, shared_index.y)]   = geo_decode_normal(gbuf.enc_normal);
+    shared_z[SHARED_INDEX(shared_index.x, shared_index.y)]        = gbuf.linear_z;
+    center_grad_z                                                 = gbuf.grad_z;
+  }
+  // halo - use creative index calculation to load whole halo at once
+  // requires 4 * SPATIAL_RADIUS * gl_WorkGroupSize.x/y + 4 * 4 * 4 < gl_WorkGroupSize.x * gl_WorkGroupSize.y
+  {
+    //  TTTTTTTT 
+    //    ---- 
+    //  L |  | R
+    //    ----
+    //  BBBBBBBB
+
+    int idx = int(gl_LocalInvocationIndex);
+
+    uvec2 halo_index;
+    if (idx < SPATIAL_RADIUS * TILE_SIZE_X) {
+      // T
+      halo_index = uvec2(idx % TILE_SIZE_X, idx / TILE_SIZE_X);
+    }
+    idx -= int(SPATIAL_RADIUS * TILE_SIZE_X);
+
+    if (idx >= 0 && idx < SPATIAL_RADIUS * gl_WorkGroupSize.y) {
+      // L
+      halo_index = uvec2(idx / gl_WorkGroupSize.y, SPATIAL_RADIUS + idx % gl_WorkGroupSize.y);
+    }
+    idx -= int(SPATIAL_RADIUS * gl_WorkGroupSize.y);
+
+    if (idx >= 0 && idx < SPATIAL_RADIUS * gl_WorkGroupSize.y) {
+      // R
+      halo_index = uvec2(SPATIAL_RADIUS + gl_WorkGroupSize.x + idx / gl_WorkGroupSize.y, SPATIAL_RADIUS + idx % gl_WorkGroupSize.y);
+    }
+    idx -= int(SPATIAL_RADIUS * gl_WorkGroupSize.y);
+
+    if (idx >= 0 && idx < SPATIAL_RADIUS * TILE_SIZE_X) {
+      // B
+      halo_index = uvec2(idx % TILE_SIZE_X, SPATIAL_RADIUS + gl_WorkGroupSize.y + idx / TILE_SIZE_X);
+    }
+
+    const ivec2 global_index = ivec2(ipos - lid + halo_index - SPATIAL_RADIUS);
+    const GBuffer gbuf = gbuffer[gbuffer_index(global_index, imageSize(img_filter_in))];
+
+    shared_moments[SHARED_INDEX(halo_index.x, halo_index.y)] = texelFetch(img_moments, global_index, 0).rg;
+    shared_irr[SHARED_INDEX(halo_index.x, halo_index.y)]     = texelFetch(img_irr, global_index, 0);
+    shared_normal[SHARED_INDEX(halo_index.x, halo_index.y)]  = geo_decode_normal(gbuf.enc_normal);
+    shared_z[SHARED_INDEX(halo_index.x, halo_index.y)]       = gbuf.linear_z;
+  }
+
+  barrier();
+
+  if (any(greaterThanEqual(ipos, imageSize(img_filter_in))))
+    return;
+
+  #define center_irr_histlen shared_irr[SHARED_INDEX(shared_index.x, shared_index.y)]
+  #define center_moments shared_moments[SHARED_INDEX(shared_index.x, shared_index.y)]
+  #define center_normal shared_normal[SHARED_INDEX(shared_index.x, shared_index.y)]
+  #define center_linear_z shared_z[SHARED_INDEX(shared_index.x, shared_index.y)]
+
   vec4 irr_histlen = center_irr_histlen;
-  const vec2 center_moments = texelFetch(img_moments, ipos, 0).rg;
   vec2 moments = center_moments;
   float sum_w = 1.0;
 
   // spatial filtering when variance is 0 leads to unnecessary filtering of surfaces which variance is really 0
   // however it prevents black trails.
-  const int r = 2;
-
-  for(int yy = -r; yy <= r; yy++) {
-    for(int xx = -r; xx <= r; xx++) {
+  [[unroll]]
+  for(int yy = -SPATIAL_RADIUS; yy <= SPATIAL_RADIUS; yy++) {
+    [[unroll]]
+    for(int xx = -SPATIAL_RADIUS; xx <= SPATIAL_RADIUS; xx++) {
       if(xx != 0 || yy != 0) { // added already
-        const ivec2 p = ipos + ivec2(xx, yy);
-
-        const GBuffer neigh_gbuf = gbuffer[gbuffer_index(p, imageSize(img_filter_in))];
-        const vec3 neigh_normal = geo_decode_normal(neigh_gbuf.enc_normal);
+        const ivec2 p = shared_index + ivec2(xx, yy);
 
         float w = 1.0;
         // Weight neighbors with similar normals
-        w *= smoothstep(params.normal_reject_rad, 1.0, dot(normal, neigh_normal));
+        w *= smoothstep(params.normal_reject_rad, 1.0, dot(center_normal, shared_normal[SHARED_INDEX(p.x, p.y)]));
         // Weight neighbors with similar depth
         // w *= 1.0 - smoothstep(0.0, params.depth_reject_percent * max(gbuf.linear_z, neigh_gbuf.linear_z), abs(gbuf.linear_z - neigh_gbuf.linear_z));
-        w *= exp(-10 * abs(gbuf.linear_z + dot(gbuf.grad_z, vec2(xx, yy)) - neigh_gbuf.linear_z) / params.depth_accept);
+        w *= exp(-10 * abs(center_linear_z + dot(center_grad_z, vec2(xx, yy)) - shared_z[SHARED_INDEX(p.x, p.y)]) / params.depth_accept);
         // Weight lower with increasing history
         //w *= 1.0 - irr_histlen.a / params.spatial_threshold;
 
         sum_w           += w;
-        irr_histlen.rgb += w * texelFetch(img_irr, p, 0).rgb;
-        moments         += w * texelFetch(img_moments, p, 0).rg;
+        irr_histlen.rgb += w * shared_irr[SHARED_INDEX(p.x, p.y)].rgb;
+        moments         += w * shared_moments[SHARED_INDEX(p.x, p.y)].rg;
       }
     }
   }
@@ -71,7 +142,6 @@ main()
   const float alpha = clamp(params.spatial_bias / pow(irr_histlen.a, params.spatial_falloff), 0, 1);
   variance = mix(center_variance, variance, alpha);
   irr_histlen.rgb = mix(center_irr_histlen.rgb, irr_histlen.rgb, alpha);
-
 
   imageStore(img_filter_in, ipos, vec4(irr_histlen.rgb, variance));
 }
