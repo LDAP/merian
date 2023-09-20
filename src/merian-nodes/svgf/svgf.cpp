@@ -1,4 +1,5 @@
 #include "svgf.hpp"
+#include "config.h"
 #include "merian/vk/descriptors/descriptor_set_layout_builder.hpp"
 #include "merian/vk/descriptors/descriptor_set_update.hpp"
 #include "merian/vk/graph/graph.hpp"
@@ -13,10 +14,27 @@
 
 namespace merian {
 
+uint32_t get_ve_local_size(const SharedContext& context) {
+    if ((32 + 2 * VE_SPATIAL_RADIUS) * (32 + 2 * VE_SPATIAL_RADIUS) * VE_SHARED_MEMORY_PER_PIXEL <=
+        context->pd_container.physical_device_properties.properties.limits
+            .maxComputeSharedMemorySize) {
+        return 32;
+    } else if ((16 + 2 * VE_SPATIAL_RADIUS) * (16 + 2 * VE_SPATIAL_RADIUS) *
+                   VE_SHARED_MEMORY_PER_PIXEL <=
+               context->pd_container.physical_device_properties.properties.limits
+                   .maxComputeSharedMemorySize) {
+        return 16;
+    } else {
+        return 8;
+    }
+}
+
 SVGFNode::SVGFNode(const SharedContext context,
                    const ResourceAllocatorHandle allocator,
                    const std::optional<vk::Format> output_format)
-    : context(context), allocator(allocator), output_format(output_format) {
+    : context(context), allocator(allocator), output_format(output_format),
+      variance_estimate_local_size_x(get_ve_local_size(context)),
+      variance_estimate_local_size_y(get_ve_local_size(context)) {
     variance_estimate_module =
         std::make_shared<ShaderModule>(context, merian_svgf_variance_estimate_comp_spv_size(),
                                        merian_svgf_variance_estimate_comp_spv());
@@ -244,7 +262,6 @@ void SVGFNode::get_configuration(Configuration& config, bool& needs_rebuild) {
     config.config_angle("normal reject", angle, "Reject points with farther apart", 0, 90);
     variance_estimate_pc.normal_reject_cos = glm::cos(angle);
     config.config_float("depth accept", variance_estimate_pc.depth_accept, "More means more reuse");
-
 
     config.st_separate("Filter");
     const int old_svgf_iterations = svgf_iterations;

@@ -7,7 +7,8 @@ included_files = files(
     shader_include_dir + '/common/normal_encode.glsl',
     shader_include_dir + '/common/colors_yuv.glsl',
     shader_include_dir + '/common/gbuffer.glsl.h',
-    'svgf_graph_layout.glsl'
+    'svgf_graph_layout.glsl',
+    'config.h'
 )
 
 foreach s : shaders

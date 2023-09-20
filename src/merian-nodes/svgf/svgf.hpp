@@ -9,12 +9,6 @@ namespace merian {
 
 class SVGFNode : public Node {
   private:
-    static constexpr uint32_t local_size_x = 32;
-    static constexpr uint32_t local_size_y = 32;
-
-    static constexpr uint32_t variance_estimate_local_size_x = 16;
-    static constexpr uint32_t variance_estimate_local_size_y = 16;
-
     struct VarianceEstimatePushConstant {
         float normal_reject_cos = 0.8;
         float depth_accept = 10; // larger reuses more
@@ -72,6 +66,12 @@ class SVGFNode : public Node {
     const SharedContext context;
     const ResourceAllocatorHandle allocator;
     const std::optional<vk::Format> output_format;
+
+    // depends on available shared memory
+    const uint32_t variance_estimate_local_size_x;
+    const uint32_t variance_estimate_local_size_y;
+    static constexpr uint32_t local_size_x = 32;
+    static constexpr uint32_t local_size_y = 32;
 
     ShaderModuleHandle variance_estimate_module;
     ShaderModuleHandle filter_module;
