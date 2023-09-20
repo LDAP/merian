@@ -64,7 +64,7 @@ AccumulateNode::describe_outputs(
 
 SpecializationInfoHandle AccumulateNode::get_specialization_info() const noexcept {
     auto spec_builder = SpecializationInfoBuilder();
-    spec_builder.add_entry(local_size_x, local_size_y, filter_mode, extended_search, reuse_border);
+    spec_builder.add_entry(local_size_x, local_size_y, filter_mode, extended_search, reuse_border, firefly_clamp);
     return spec_builder.build();
 }
 
@@ -84,13 +84,16 @@ ShaderModuleHandle AccumulateNode::get_shader_module() {
 }
 
 void AccumulateNode::get_configuration(Configuration& config, bool& needs_rebuild) {
+    config.st_separate("History");
     config.config_float("alpha", pc.accum_alpha, 0, 1,
                         "Blend factor with the previous information. More means more reuse");
     config.config_float("max history", pc.accum_max_hist,
                         "artificially limit the history counter. This can be a good alternative to "
                         "reducing the blend alpha");
     config.st_no_space();
-    pc.accum_max_hist = config.config_bool("inf") ? INFINITY : pc.accum_max_hist;
+    pc.accum_max_hist = config.config_bool("inf history") ? INFINITY : pc.accum_max_hist;
+
+    config.st_separate("Reproject");
     float angle = glm::acos(pc.normal_reject_cos);
     config.config_angle("normal threshold", angle, "Reject points with normals farther apart", 0,
                         180);
@@ -112,7 +115,15 @@ void AccumulateNode::get_configuration(Configuration& config, bool& needs_rebuil
                        "points outside of the image. Can lead to smearing.");
     needs_rebuild |= old_extended_search != extended_search || old_reuse_border != reuse_border;
 
+
+    config.st_separate("Other");
     clear = config.config_bool("clear");
+    const float old_firefly_clamp = firefly_clamp;
+    config.config_float("firefly clamp", firefly_clamp, "DANGER: Introduces bias", 0.1);
+    config.st_no_space();
+    if (config.config_bool("inf clamp"))
+        firefly_clamp = INFINITY;
+    needs_rebuild |= old_firefly_clamp != firefly_clamp;
 }
 
 void AccumulateNode::request_clear() {

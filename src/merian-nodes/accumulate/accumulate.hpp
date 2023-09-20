@@ -59,6 +59,7 @@ class AccumulateNode : public ComputeNode {
     int filter_mode = 0;
     int extended_search = 1;
     int reuse_border = 0;
+    float firefly_clamp = INFINITY;
 };
 
 } // namespace merian
