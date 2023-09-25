@@ -273,6 +273,8 @@ void SVGFNode::get_configuration(Configuration& config, bool& needs_rebuild) {
     config.config_angle("filter normals", angle, "Reject with normals farther apart", 0, 180);
     filter_pc.param_n = glm::cos(angle);
     config.config_float("filter luminance", filter_pc.param_l, "more means more blur", 0.1);
+    config.config_float("z-bias normals", filter_pc.z_bias_normals, "z-dependent rejection: increase to reject more. Disable with <= 0.");
+    config.config_float("z-bias depth", filter_pc.z_bias_depth, "z-dependent rejection: increase to reject more. Disable with <= 0.");
     int old_filter_type = filter_type;
     config.config_options("filter type", filter_type, {"atrous", "box", "subsampled"},
                           Configuration::OptionsStyle::COMBO);

@@ -19,6 +19,8 @@ layout(push_constant, std140) uniform push_t {
     float param_z;
     float param_n;
     float param_l;
+    float z_bias_normals;
+    float z_bias_depth;
 } params;
 
 ivec2 ipos;
@@ -29,6 +31,9 @@ GBuffer c_gbuf;
 vec3 c_n;
 float c_l;
 float sigma_l;
+
+float z_bias_depth_mix;
+float z_bias_normals_mix;
 
 float get_sigma_l(float center, ivec2 ipos) {
   const float gaussian_kernel[3][3] = {
@@ -62,14 +67,14 @@ void tap(const ivec2 offset,
 
   const float w_l = abs(p_l - c_l) / (sigma_l + 1e-10);
   
-  // This is different to the paper version which uses
-  const float w_z = 10 * abs(c_gbuf.linear_z + dot(c_gbuf.grad_z, offset) - p_gbuf.linear_z) / params.param_z;
-  //const float w_z = (200 * abs(p_gbuf.linear_z - c_gbuf.linear_z) / max(p_gbuf.linear_z, c_gbuf.linear_z)) / (params.param_z); 
-  
-  // was: pow(max(0, dot(p_n, c_n)), params.param_n); 
-  const float w_n = smoothstep(params.param_n, 1.0, dot(p_n, c_n));
+  float w_z = exp(-10 * abs(c_gbuf.linear_z + dot(c_gbuf.grad_z, offset) - p_gbuf.linear_z) / params.param_z);
+  w_z = mix(w_z, 1.0, z_bias_depth_mix);
 
-  const float w = exp(-w_l * w_l - w_z) * w_n * kernel_weight; 
+  // was: pow(max(0, dot(p_n, c_n)), params.param_n); 
+  float w_n = smoothstep(params.param_n, 1.0, dot(p_n, c_n));
+  w_n = mix(w_n, 1.0, z_bias_normals_mix);
+
+  const float w = exp(-w_l * w_l) * w_z * w_n * kernel_weight; 
 
   filter_irr += p_irr_var.rgb * w; 
   filter_var += p_irr_var.a * w * w; 
@@ -85,6 +90,18 @@ main() {
   c_n = geo_decode_normal(c_gbuf.enc_normal);
   const vec4 filter_in = texelFetch(img_filter_in, ipos, 0);
   c_l = yuv_luminance(filter_in.rgb);
+
+  if (params.z_bias_normals > 0)
+    z_bias_normals_mix = smoothstep(0, params.z_bias_normals, c_gbuf.linear_z);
+  else
+    z_bias_normals_mix = 0;
+
+  if (params.z_bias_depth > 0)
+    z_bias_depth_mix = smoothstep(0, params.z_bias_depth, c_gbuf.linear_z);
+  else
+    z_bias_depth_mix = 0;
+
+
 
   if (FILTER_VARIANCE == 1) {
     // the reference implementation does that

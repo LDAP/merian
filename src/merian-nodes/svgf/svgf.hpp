@@ -20,6 +20,8 @@ class SVGFNode : public Node {
         float param_z = 10; // parameter for depth      = 1   larger blurs more
         float param_n = .8; // parameter for normals    cos(alpha) for lower threshold
         float param_l = 8;  // parameter for brightness = 4   larger blurs more
+        float z_bias_normals = -1.0;
+        float z_bias_depth = -1.0;
     };
 
     struct TAAPushConstant {
