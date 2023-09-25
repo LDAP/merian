@@ -61,6 +61,10 @@ main()
     imageStore(img_out, ipos, vec4(gbuf.grad_z, 0, 0));
     return;
   }
+  if (DEBUG == 7) {
+    imageStore(img_out, ipos, vec4(any(isnan(filter_result.rgb)), any(isinf(filter_result.rgb)), 0, 0));
+    return;
+  }
 
 
   const vec3 irr = filter_result.rgb;
