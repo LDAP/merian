@@ -25,7 +25,7 @@ uint32_t get_ve_local_size(const SharedContext& context) {
                    .maxComputeSharedMemorySize) {
         return 16;
     } else {
-        return 8;
+        throw std::runtime_error{"SVGF: Not enough shared memory for spatial variance estimate."};
     }
 }
 
