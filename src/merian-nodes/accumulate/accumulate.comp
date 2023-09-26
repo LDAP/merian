@@ -77,7 +77,7 @@ main() {
   vec2 prev_moments     = vec2(0);
   float sum_w           = 0.0;
 
-  if (params.clear == 1) {
+  if (params.clear == 1 || params.accum_alpha == 0) {
     imageStore(img_accum, ipos, vec4(curr_irr, 1));
     imageStore(img_moments_accum, ipos, vec4(curr_moments,  0, 0));
     return;
