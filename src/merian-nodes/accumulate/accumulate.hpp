@@ -18,6 +18,7 @@ class AccumulateNode : public ComputeNode {
         float normal_reject_cos = 0.8;
         float depth_reject_percent = 0.02;
         uint32_t clear = 0;
+        float subgroup_maxmin_factor = 1.0;
     };
 
   public:

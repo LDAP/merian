@@ -3,6 +3,7 @@
 #extension GL_EXT_nonuniform_qualifier    : enable
 #extension GL_EXT_control_flow_attributes : enable
 #extension GL_EXT_scalar_block_layout     : require
+#extension GL_KHR_shader_subgroup_arithmetic : require
 
 #include "common/gbuffer.glsl.h"
 
@@ -39,6 +40,7 @@ layout(push_constant, std140) uniform params_t {
     float normal_reject_cos;
     float z_reject_percent;
     uint clear;
+    float subgroup_maxmin_factor;
 } params;
 
 void
@@ -165,7 +167,18 @@ main() {
       prev_irr_histlen.a = 1.;
 
     num_samples = min(prev_irr_histlen.a + 1, params.accum_max_hist);
-    const float alpha = min(params.accum_alpha, 1. - 1. / num_samples);
+    float alpha = min(params.accum_alpha, 1. - 1. / num_samples);
+
+    if (params.subgroup_maxmin_factor < 1) {
+      const float prev_l = yuv_luminance(prev_irr_histlen.rgb);
+      const float l = yuv_luminance(curr_irr);
+
+      const float max_l = subgroupMax(l);
+      const float min_l = subgroupMin(l);
+      if (prev_l > max_l || prev_l < min_l)
+
+      alpha *= params.subgroup_maxmin_factor;
+    }
 
     accum   = mix(curr_irr.rgb, prev_irr_histlen.rgb, alpha);
     moments = mix(curr_moments,         prev_moments, alpha);

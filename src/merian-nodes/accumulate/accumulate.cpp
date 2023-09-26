@@ -64,7 +64,8 @@ AccumulateNode::describe_outputs(
 
 SpecializationInfoHandle AccumulateNode::get_specialization_info() const noexcept {
     auto spec_builder = SpecializationInfoBuilder();
-    spec_builder.add_entry(local_size_x, local_size_y, filter_mode, extended_search, reuse_border, firefly_clamp);
+    spec_builder.add_entry(local_size_x, local_size_y, filter_mode, extended_search, reuse_border,
+                           firefly_clamp);
     return spec_builder.build();
 }
 
@@ -115,7 +116,6 @@ void AccumulateNode::get_configuration(Configuration& config, bool& needs_rebuil
                        "points outside of the image. Can lead to smearing.");
     needs_rebuild |= old_extended_search != extended_search || old_reuse_border != reuse_border;
 
-
     config.st_separate("Other");
     clear = config.config_bool("clear");
     const float old_firefly_clamp = firefly_clamp;
@@ -124,6 +124,10 @@ void AccumulateNode::get_configuration(Configuration& config, bool& needs_rebuil
     if (config.config_bool("inf clamp"))
         firefly_clamp = INFINITY;
     needs_rebuild |= old_firefly_clamp != firefly_clamp;
+    config.config_percent(
+        "subgroup maxmin adaption", pc.subgroup_maxmin_factor,
+        "Reduces alpha by this factor if the history irradiance is larger than the subgroup "
+        "max or smaller than the subgroup min.");
 }
 
 void AccumulateNode::request_clear() {
