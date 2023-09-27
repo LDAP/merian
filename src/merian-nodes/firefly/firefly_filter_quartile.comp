@@ -1,0 +1,56 @@
+#version 460
+#extension GL_GOOGLE_include_directive    : enable
+
+#include "graph_layout.glsl"
+
+#include "common/colors_yuv.glsl"
+
+layout(set = 1, binding = 0) uniform writeonly image2D img_quartiles;
+
+layout(push_constant, std140) uniform params_t { 
+    float percentile_lower;
+    float percentile_upper;
+} pc;
+
+#define WORKGROUP_SIZE (gl_WorkGroupSize.x * gl_WorkGroupSize.y)
+#define LOCAL_INDEX gl_LocalInvocationIndex
+shared float sort[WORKGROUP_SIZE];
+
+void main() {
+  const ivec2 pixel = min(ivec2(gl_GlobalInvocationID), textureSize(img_moments, 0));
+
+  // Sort luminance using odd even sort
+  sort[LOCAL_INDEX] = texelFetch(img_moments, pixel, 0).r;
+  barrier();
+
+  if (LOCAL_INDEX < WORKGROUP_SIZE - 1) {
+    for (int i = 0; i < WORKGROUP_SIZE / 2; i++) {
+      if (LOCAL_INDEX % 2 == 0) {
+        if (sort[LOCAL_INDEX] > sort[LOCAL_INDEX + 1]) {
+          const float tmp = sort[LOCAL_INDEX];
+          sort[LOCAL_INDEX] = sort[LOCAL_INDEX + 1];
+          sort[LOCAL_INDEX + 1] = tmp;
+        }
+      }
+      barrier();
+
+      if (LOCAL_INDEX % 2 == 1) {
+        if (sort[LOCAL_INDEX] > sort[LOCAL_INDEX + 1]) {
+          const float tmp = sort[LOCAL_INDEX];
+          sort[LOCAL_INDEX] = sort[LOCAL_INDEX + 1];
+          sort[LOCAL_INDEX + 1] = tmp;
+        }
+      }
+      barrier();
+    }
+  }
+
+
+  if (LOCAL_INDEX == 0) {
+    const float min = sort[0];
+    const float q_lower = sort[uint(clamp(round(pc.percentile_lower * WORKGROUP_SIZE), 0, WORKGROUP_SIZE - 1))];
+    const float q_upper = sort[uint(clamp(round(pc.percentile_upper * WORKGROUP_SIZE), 0, WORKGROUP_SIZE - 1))];
+    const float max = sort[WORKGROUP_SIZE - 1];
+    imageStore(img_quartiles, ivec2(gl_WorkGroupID.xy), vec4(min, q_lower, q_upper, max));
+  }
+}
