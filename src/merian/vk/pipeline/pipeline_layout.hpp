@@ -47,6 +47,7 @@ class PipelineLayout : public std::enable_shared_from_this<PipelineLayout> {
     }
 
     const vk::PushConstantRange get_push_constant_range(uint32_t id) {
+        assert(id < ranges.size() && "No such push constant. Did you declare a push constant?");
         return ranges[id];
     }
 
