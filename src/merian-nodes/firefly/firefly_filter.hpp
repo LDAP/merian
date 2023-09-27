@@ -60,8 +60,8 @@ class FireflyFilterNode : public Node {
 
     static constexpr uint32_t quartile_local_size_x = 8;
     static constexpr uint32_t quartile_local_size_y = 8;
-    static constexpr uint32_t filter_local_size_x = 32;
-    static constexpr uint32_t filter_local_size_y = 32;
+    static constexpr uint32_t filter_local_size_x = 16;
+    static constexpr uint32_t filter_local_size_y = 16;
 
     vk::ImageCreateInfo irr_create_info;
 
