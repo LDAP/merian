@@ -151,14 +151,14 @@ void FireflyFilterNode::cmd_process(
         quartile->bind_descriptor_set(cmd, quartile_set, 1);
         quartile->push_constant(cmd, quartile_pc);
         cmd.dispatch(quartile_group_count_x, quartile_group_count_y, 1);
+    }
 
-        bar = quartile_texture->get_image()->barrier(
+    auto bar = quartile_texture->get_image()->barrier(
             vk::ImageLayout::eShaderReadOnlyOptimal, vk::AccessFlagBits::eShaderWrite,
             vk::AccessFlagBits::eShaderRead, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
             all_levels_and_layers());
-        cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
-                            vk::PipelineStageFlagBits::eComputeShader, {}, {}, {}, bar);
-    }
+    cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
+                        vk::PipelineStageFlagBits::eComputeShader, {}, {}, {}, bar);
 
     {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "filter");
