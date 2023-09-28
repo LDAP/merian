@@ -1,6 +1,6 @@
 #include "sdl_audio_device.hpp"
 
-#include "SDL2/SDL.h"
+#include "SDL.h"
 #include <spdlog/spdlog.h>
 #include <stdexcept>
 
