@@ -140,7 +140,7 @@ void SVGFNode::cmd_build([[maybe_unused]] const vk::CommandBuffer& cmd,
 
         {
             auto spec_builder = SpecializationInfoBuilder();
-            spec_builder.add_entry(variance_estimate_local_size_x, variance_estimate_local_size_y);
+            spec_builder.add_entry(variance_estimate_local_size_x, variance_estimate_local_size_y, svgf_iterations);
             SpecializationInfoHandle variance_estimate_spec = spec_builder.build();
             variance_estimate = std::make_shared<ComputePipeline>(
                 variance_estimate_pipe_layout, variance_estimate_module, variance_estimate_spec);

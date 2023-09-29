@@ -12,6 +12,8 @@
  * and prepares the filter input `img_filter_in`.
  */
 
+layout (constant_id = 2) const int SVGF_ITERATIONS = 0;
+
 layout(set = 1, binding = 0) uniform sampler2D unused; // needed to match the filter layout
 layout(set = 1, binding = 1) uniform writeonly image2D img_filter_in;
 
@@ -36,6 +38,13 @@ shared float shared_z[SHARED_SIZE];
 
 void main() {
   const ivec2 ipos = ivec2(gl_GlobalInvocationID);
+
+  if (SVGF_ITERATIONS == 0) {
+    if (all(lessThan(ipos, imageSize(img_filter_in))))
+      imageStore(img_filter_in, ipos, vec4(texelFetch(img_irr, ipos, 0).rgb, 0));
+    return;
+  }
+
   const ivec2 lid = ivec2(gl_LocalInvocationID.xy);
   const ivec2 shared_index = lid + VE_SPATIAL_RADIUS;
 
