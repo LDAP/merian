@@ -10,11 +10,11 @@ namespace merian {
 class AccumulateNode : public Node {
   private:
     struct QuartilePushConstant {
-      float firefly_percentile_lower = 0.25;
-      float firefly_percentile_upper = 0.90;
+        float firefly_percentile_lower = 0.25;
+        float firefly_percentile_upper = 0.90;
 
-      float adaptive_alpha_percentile_lower = 0.05;
-      float adaptive_alpha_percentile_upper = 0.95;
+        float adaptive_alpha_percentile_lower = 0.05;
+        float adaptive_alpha_percentile_upper = 0.95;
     };
 
     struct FilterPushConstant {
@@ -23,20 +23,21 @@ class AccumulateNode : public Node {
         float firefly_ipr_factor = 50;
 
         float firefly_hard_clamp = INFINITY;
-    
+
         float accum_alpha = 0.0;
         float accum_max_hist = INFINITY;
         float normal_reject_cos = 0.8;
         float depth_reject_percent = 0.02;
         int32_t clear = 0;
-        
+
         float adaptive_alpha_reduction = 0.0;
         float adaptive_alpha_ipr_factor = 1.5;
     };
 
   public:
     AccumulateNode(const SharedContext context,
-             const ResourceAllocatorHandle allocator);
+                   const ResourceAllocatorHandle allocator,
+                   const std::optional<vk::Format> format = vk::Format::eR32G32B32A32Sfloat);
 
     ~AccumulateNode();
 
@@ -74,6 +75,7 @@ class AccumulateNode : public Node {
   private:
     const SharedContext context;
     const ResourceAllocatorHandle allocator;
+    const std::optional<vk::Format> format;
 
     static constexpr uint32_t percentile_local_size_x = 8;
     static constexpr uint32_t percentile_local_size_y = 8;

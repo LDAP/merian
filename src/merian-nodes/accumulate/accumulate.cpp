@@ -12,8 +12,10 @@
 
 namespace merian {
 
-AccumulateNode::AccumulateNode(const SharedContext context, const ResourceAllocatorHandle allocator)
-    : context(context), allocator(allocator) {
+AccumulateNode::AccumulateNode(const SharedContext context,
+                               const ResourceAllocatorHandle allocator,
+                               const std::optional<vk::Format> format)
+    : context(context), allocator(allocator), format(format) {
     percentile_module =
         std::make_shared<ShaderModule>(context, merian_calculate_percentiles_comp_spv_size(),
                                        merian_calculate_percentiles_comp_spv());
@@ -52,8 +54,8 @@ AccumulateNode::describe_outputs(
 
     return {
         {
-            NodeOutputDescriptorImage::compute_write("out_irr", irr_create_info.format,
-                                                     irr_create_info.extent),
+            NodeOutputDescriptorImage::compute_write(
+                "out_irr", format.value_or(irr_create_info.format), irr_create_info.extent),
             NodeOutputDescriptorImage::compute_write("out_moments", moments_create_info.format,
                                                      moments_create_info.extent),
         },
@@ -232,14 +234,16 @@ void AccumulateNode::get_configuration(Configuration& config, bool& needs_rebuil
         accumulate_pc.firefly_hard_clamp = INFINITY;
 
     config.st_separate("Adaptive alpha reduction");
-    config.config_percent(
-        "adaptivity", accumulate_pc.adaptive_alpha_reduction,
-        "(1. - adaptivity) is the smallest factor that alpha is multipied with");
-    config.config_float("adaptivity IPR factor", accumulate_pc.adaptive_alpha_ipr_factor,
-                        "Inter-percentile range for adaptive reduction. Increase to soften reduction.", 0.1);
+    config.config_percent("adaptivity", accumulate_pc.adaptive_alpha_reduction,
+                          "(1. - adaptivity) is the smallest factor that alpha is multipied with");
+    config.config_float(
+        "adaptivity IPR factor", accumulate_pc.adaptive_alpha_ipr_factor,
+        "Inter-percentile range for adaptive reduction. Increase to soften reduction.", 0.1);
     config.st_separate();
-    config.config_percent("adaptivity percentile lower", percentile_pc.adaptive_alpha_percentile_lower);
-    config.config_percent("adaptivity percentile upper", percentile_pc.adaptive_alpha_percentile_upper);
+    config.config_percent("adaptivity percentile lower",
+                          percentile_pc.adaptive_alpha_percentile_lower);
+    config.config_percent("adaptivity percentile upper",
+                          percentile_pc.adaptive_alpha_percentile_upper);
 }
 
 void AccumulateNode::request_clear() {
