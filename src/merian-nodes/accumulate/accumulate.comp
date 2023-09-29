@@ -1,75 +1,173 @@
 #version 460
 #extension GL_GOOGLE_include_directive    : enable
-#extension GL_EXT_nonuniform_qualifier    : enable
-#extension GL_EXT_control_flow_attributes : enable
-#extension GL_EXT_scalar_block_layout     : require
-#extension GL_KHR_shader_subgroup_arithmetic : require
+#extension GL_EXT_control_flow_attributes : require
 
-#include "common/gbuffer.glsl.h"
+#include "graph_layout.glsl"
+#include "common/interpolate.glsl"
 
-layout(local_size_x_id = 0, local_size_y_id = 1, local_size_z = 1) in;
-layout (constant_id = 2) const int FILTER_MODE = 1;
-layout (constant_id = 3) const int EXTENDED_SEARCH = 1;
-layout (constant_id = 4) const int REUSE_BORDER = 0;
-layout (constant_id = 5) const float FIREFLY_CLAMP = 1. / 0.;
+#define FILTER_MODE_NEAREST 0
+#define FILTER_MODE_BILINEAR 1
 
-layout(set = 0, binding = 0) uniform sampler2D img_prev_accum;
-layout(set = 0, binding = 1) uniform sampler2D img_prev_moments;
-layout(set = 0, binding = 2) uniform sampler2D img_irr;
-layout(set = 0, binding = 3) uniform sampler2D img_mv;
-layout(set = 0, binding = 4) uniform sampler2D img_moments;
+layout(constant_id = 2) const uint WG_ROUNDED_IRR_SIZE_X = 1;
+layout(constant_id = 3) const uint WG_ROUNDED_IRR_SIZE_Y = 1;
 
-layout(set = 0, binding = 5, scalar) buffer buf_gbuf {
-    GBuffer gbuffer[];
-};
-layout(set = 0, binding = 6, scalar) buffer buf_prev_gbuf {
-    GBuffer prev_gbuffer[];
-};
+layout (constant_id = 4) const int FILTER_MODE = FILTER_MODE_NEAREST;
+layout (constant_id = 5) const int EXTENDED_SEARCH = 1;
+layout (constant_id = 6) const int REUSE_BORDER = 0;
 
-layout(set = 0, binding = 7) uniform writeonly image2D img_accum;
-layout(set = 0, binding = 8) uniform writeonly image2D img_moments_accum;
+layout(set = 1, binding = 0) uniform sampler2D img_quartiles;
 
+layout(push_constant, std140) uniform pc_t { 
+    int firefly_filter_enable;
+    float firefly_bias;
+    float firefly_ipr_factor;
+    float firefly_hard_clamp;
+
+    float accum_alpha;
+    float accum_max_hist;
+    float normal_reject_cos;
+    float z_reject_percent;
+    int clear;
+
+    float adaptive_alpha_reduction;
+    float adaptive_alpha_ipr_factor;
+} pc;
 
 #include "common/normal_encode.glsl"
 #include "common/reprojection.glsl"
 #include "common/colors_yuv.glsl"
 
-layout(push_constant, std140) uniform params_t { 
-    float accum_alpha;
-    float accum_max_hist;
-    float normal_reject_cos;
-    float z_reject_percent;
-    uint clear;
-    float subgroup_maxmin_factor;
-} params;
+void get_prev_nearest(const vec2 prev_pos,
+                      const GBuffer gbuf,
+                      const vec3 normal,
+                      inout vec4 prev_irr_histlen,
+                      inout vec2 prev_moments,
+                      inout float sum_w) {
+  const ivec2 prev_ipos = ivec2(round(prev_pos));
+  const GBuffer prev_gbuf = prev_gbuffer[gbuffer_index(prev_ipos, imageSize(img_accum))];
+  const vec3 prev_normal = geo_decode_normal(prev_gbuf.enc_normal);
+  const float w = reprojection_weight(normal, prev_normal, pc.normal_reject_cos,
+                        gbuf.linear_z, gbuf.vel_z, prev_gbuf.linear_z, pc.z_reject_percent);
 
-void
-main() {
+  prev_irr_histlen = w * texelFetch(img_prev_accum, prev_ipos, 0);
+  prev_moments     = w * texelFetch(img_prev_moments, prev_ipos, 0).rg;
+  sum_w            = w;
+}
+
+void get_prev_bilinear(const vec2 prev_pos,
+                       const GBuffer gbuf,
+                       const vec3 normal,
+                       inout vec4 prev_irr_histlen,
+                       inout vec2 prev_moments,
+                       inout float sum_w) {
+  const ivec2 prev_ipos = ivec2(floor(prev_pos));
+  // bilinear interpolation weight
+  const vec2 inter_w = fract(prev_pos);
+
+  [[unroll]]
+  for(int yy = 0; yy <= 1; yy++) {
+    [[unroll]]
+    for(int xx = 0; xx <= 1; xx++) {
+      const ivec2 tc = prev_ipos + ivec2(xx, yy);
+      if(any(greaterThanEqual(tc, textureSize(img_prev_accum, 0))) || any(lessThan(tc, ivec2(0))))
+        continue;
+
+      const GBuffer prev_gbuf = prev_gbuffer[gbuffer_index(tc, imageSize(img_accum))];
+      const vec3 prev_normal = geo_decode_normal(prev_gbuf.enc_normal);
+
+      // Bilinear interpolation weight
+      const float w = (xx == 0 ? (1.0 - inter_w.x) : inter_w.x) * (yy == 0 ? (1.0 - inter_w.y) : inter_w.y)
+                * reprojection_weight(normal, prev_normal, pc.normal_reject_cos,
+                        gbuf.linear_z, gbuf.vel_z, prev_gbuf.linear_z, pc.z_reject_percent);
+
+      prev_irr_histlen        += w * texelFetch(img_prev_accum, tc, 0);
+      prev_moments            += w * texelFetch(img_prev_moments, tc, 0).rg;
+      sum_w                   += w;
+    }
+  }
+}
+
+void get_prev_extended_search(const vec2 prev_pos,
+                              const GBuffer gbuf,
+                              const vec3 normal,
+                              inout vec4 prev_irr_histlen,
+                              inout vec2 prev_moments,
+                              inout float sum_w) {
+  const ivec2 prev_ipos = ivec2(round(prev_pos));
+
+  [[unroll]]
+  for(int yy = -1; yy <= 1; yy++) {
+    [[unroll]]
+    for(int xx = -1; xx <= 1; xx++) {
+      const ivec2 tc = prev_ipos + ivec2(xx, yy);
+      if(any(greaterThanEqual(tc, textureSize(img_prev_accum, 0))) || any(lessThan(tc, ivec2(0))))
+        continue;
+
+      const GBuffer prev_gbuf = prev_gbuffer[gbuffer_index(tc, imageSize(img_accum))];
+      const vec3 prev_normal = geo_decode_normal(prev_gbuf.enc_normal);
+      const float w = reprojection_weight(normal, prev_normal, pc.normal_reject_cos * 0.8,
+                        gbuf.linear_z, gbuf.vel_z, ivec2(xx, yy), gbuf.grad_z, prev_gbuf.linear_z, pc.z_reject_percent * 2.);
+
+      prev_irr_histlen        += w * texelFetch(img_prev_accum, tc, 0);
+      prev_moments            += w * texelFetch(img_prev_moments, tc, 0).rg;
+      sum_w                   += w;
+    }
+  }
+}
+
+
+void main() {
   const ivec2 ipos = ivec2(gl_GlobalInvocationID);
-  if(any(greaterThanEqual(ipos, imageSize(img_accum)))) return;
+  if (any(greaterThanEqual(ipos, imageSize(img_accum)))) return;
 
-  const vec3 curr_irr = min(texelFetch(img_irr, ipos, 0).rgb, vec3(FIREFLY_CLAMP));
+  vec3 irr = texelFetch(img_irr, ipos, 0).rgb;
+  vec2 moments = texelFetch(img_moments, ipos, 0).rg;
+  vec4 percentiles;
+
+  if (pc.firefly_filter_enable != 0 || pc.adaptive_alpha_reduction > 0.0) {
+    const uvec2 rounded_size = uvec2(WG_ROUNDED_IRR_SIZE_X, WG_ROUNDED_IRR_SIZE_Y);
+    percentiles = texture(img_quartiles, (vec2(ipos) + 0.5) / rounded_size);
+  }
+  
+  // FIREFLY CLAMPING/SUPPRESSION
+  {
+    float max_l = pc.firefly_hard_clamp;
+    if (pc.firefly_filter_enable != 0) {
+      max_l = min(max_l, pc.firefly_bias + percentiles.y + pc.firefly_ipr_factor * (percentiles.y - percentiles.x));
+    }
+
+    if (moments.x > max_l /* = yuv_luminance(irr)*/) {
+      const float factor = max_l / moments.x;
+      irr *= factor;
+      moments *= vec2(factor, factor * factor);
+    }
+  }
+
+  if (pc.clear == 1 || pc.accum_alpha == 0) {
+    imageStore(img_accum, ipos, vec4(irr, 1));
+    imageStore(img_moments_accum, ipos, vec4(moments,  0, 0));
+    return;
+  }
 
   const GBuffer gbuf = gbuffer[gbuffer_index(ipos, imageSize(img_accum))];
   const vec2 mv = texelFetch(img_mv, ipos, 0).rg;
+  const vec3 normal = geo_decode_normal(gbuf.enc_normal);
 
-  const vec3 curr_normal = geo_decode_normal(gbuf.enc_normal);
-  const vec2 curr_moments = texelFetch(img_moments, ipos, 0).rg;
-  vec2 prev_pos = ipos + mv;
-
-  bool used_border = false;
+  // REPROJECTION
+  vec2 prev_pos = ipos + mv;;
+  float max_history = pc.accum_max_hist;
   if (REUSE_BORDER == 1) {
     // Attemp to reuse information at the image border.
     // This results in minor smearing but looks a lot better than
     // noise / SVGF blotches.
-    
     const vec2 bmax = imageSize(img_accum) - 1;
     if (any(greaterThan(prev_pos, bmax)) || any(lessThan(prev_pos, vec2(0)))) {
       // Intersect motion vector with image:
       float tmin = min(prev_pos.x / mv.x, (prev_pos.x - bmax.x) / mv.x);
       tmin = max(tmin, min(prev_pos.y / mv.y, (prev_pos.y - bmax.y) / mv.y));
       prev_pos = prev_pos - mv * tmin;
-      used_border = true;
+      // reset history to converge faster
+      max_history = 2.0;
     }
   }
 
@@ -77,114 +175,63 @@ main() {
   vec2 prev_moments     = vec2(0);
   float sum_w           = 0.0;
 
-  if (params.clear == 1 || params.accum_alpha == 0) {
-    imageStore(img_accum, ipos, vec4(curr_irr, 1));
-    imageStore(img_moments_accum, ipos, vec4(curr_moments,  0, 0));
-    return;
-  }
+  // ACCUMULATE
+  if (FILTER_MODE == FILTER_MODE_NEAREST)
+    get_prev_nearest(prev_pos,
+                     gbuf,
+                     normal,
+                     prev_irr_histlen,
+                     prev_moments,
+                     sum_w);
+  else if (FILTER_MODE == FILTER_MODE_BILINEAR)
+    get_prev_bilinear(prev_pos,
+                      gbuf,
+                      normal,
+                      prev_irr_histlen,
+                      prev_moments,
+                      sum_w);
 
-  if (FILTER_MODE == 0) {
-    const ivec2 prev_ipos = ivec2(round(prev_pos));
-    const GBuffer prev_gbuf = prev_gbuffer[gbuffer_index(prev_ipos, imageSize(img_accum))];
-    const vec3 prev_normal = geo_decode_normal(prev_gbuf.enc_normal);
+  if (EXTENDED_SEARCH == 1) {
+      if (sum_w <= 0.01) {
+      // only if data is not already reliable
+      prev_irr_histlen = vec4(0);
+      prev_moments     = vec2(0);
+      sum_w            = 0.0;
 
-    const float w = reprojection_weight(curr_normal, prev_normal, params.normal_reject_cos,
-                          gbuf.linear_z, gbuf.vel_z, prev_gbuf.linear_z, params.z_reject_percent);
-
-    prev_irr_histlen = w * texelFetch(img_prev_accum, prev_ipos, 0);
-    prev_moments     = w * texelFetch(img_prev_moments, prev_ipos, 0).rg;
-    sum_w            = w;
-
-  } else if (FILTER_MODE == 1) {
-    const ivec2 prev_ipos = ivec2(floor(prev_pos));
-    const vec2 inter_w = fract(prev_pos); // bilinear interpolation weight
-
-    // Bilinear interpolation of previous data
-    [[unroll]]
-    for(int yy = 0; yy <= 1; yy++) {
-      [[unroll]]
-      for(int xx = 0; xx <= 1; xx++) {
-        const ivec2 tc = prev_ipos + ivec2(xx, yy);
-        if(any(greaterThanEqual(tc, textureSize(img_prev_accum, 0))) || any(lessThan(tc, ivec2(0))))
-          continue;
-
-        const GBuffer prev_gbuf = prev_gbuffer[gbuffer_index(tc, imageSize(img_accum))];
-        const vec3 prev_normal = geo_decode_normal(prev_gbuf.enc_normal);
-
-        // Bilinear interpolation weight
-        const float w = (xx == 0 ? (1.0 - inter_w.x) : inter_w.x) * (yy == 0 ? (1.0 - inter_w.y) : inter_w.y)
-                  * reprojection_weight(curr_normal, prev_normal, params.normal_reject_cos,
-                          gbuf.linear_z, gbuf.vel_z, prev_gbuf.linear_z, params.z_reject_percent);
-
-        prev_irr_histlen        += w * texelFetch(img_prev_accum, tc, 0);
-        prev_moments            += w * texelFetch(img_prev_moments, tc, 0).rg;
-        sum_w                   += w;
-      }
+      get_prev_extended_search(prev_pos,
+                               gbuf,
+                               normal,
+                               prev_irr_histlen,
+                               prev_moments,
+                               sum_w);
     }
   }
 
-  if (EXTENDED_SEARCH == 1)
-  if (sum_w <= 0.01) {
-    prev_irr_histlen = vec4(0);
-    prev_moments     = vec2(0);
-    sum_w            = 0.0;
-
-    const ivec2 prev_ipos = ivec2(round(prev_pos));
-
-    [[unroll]]
-    for(int yy = -1; yy <= 1; yy++) {
-      [[unroll]]
-      for(int xx = -1; xx <= 1; xx++) {
-        const ivec2 tc = prev_ipos + ivec2(xx, yy);
-        if(any(greaterThanEqual(tc, textureSize(img_prev_accum, 0))) || any(lessThan(tc, ivec2(0))))
-          continue;
-
-        const GBuffer prev_gbuf = prev_gbuffer[gbuffer_index(tc, imageSize(img_accum))];
-        const vec3 prev_normal = geo_decode_normal(prev_gbuf.enc_normal);
-        const float w = reprojection_weight(curr_normal, prev_normal, params.normal_reject_cos * 0.8,
-                          gbuf.linear_z, gbuf.vel_z, ivec2(xx, yy), gbuf.grad_z, prev_gbuf.linear_z, params.z_reject_percent * 2.);
-
-        prev_irr_histlen        += w * texelFetch(img_prev_accum, tc, 0);
-        prev_moments            += w * texelFetch(img_prev_moments, tc, 0).rg;
-        sum_w                   += w;
-      }
-    }
-  }
-
-  vec3 accum = curr_irr;
-  vec2 moments = curr_moments;
-  float num_samples = 1;
-
-  if (sum_w > 0.001
-      && !any(isnan(prev_irr_histlen)) && !any(isinf(prev_irr_histlen))
-      && !any(isnan(prev_moments)) && !any(isinf(prev_moments))) {
-    // make sure the prev values are reliable
+  if (sum_w > 0.001 // make sure the prev values are reliable
+      && !any(isnan(prev_irr_histlen))
+      && !any(isinf(prev_irr_histlen))
+      && !any(isnan(prev_moments))
+      && !any(isinf(prev_moments))) {
     prev_irr_histlen /= sum_w;
     prev_moments     /= sum_w;
 
-    // reset history for faster adaption to real irradiance values
-    if (used_border)
-      prev_irr_histlen.a = 1.;
+    prev_irr_histlen.a = min(prev_irr_histlen.a + 1, max_history);
+    float alpha = min(pc.accum_alpha, 1. - 1. / prev_irr_histlen.a);
 
-    num_samples = min(prev_irr_histlen.a + 1, params.accum_max_hist);
-    float alpha = min(params.accum_alpha, 1. - 1. / num_samples);
+    if (pc.adaptive_alpha_reduction > 0.0) {
+      const float ipr = pc.adaptive_alpha_ipr_factor * (percentiles.w - percentiles.z);
+      alpha *= (1.0 - pc.adaptive_alpha_reduction * linearstep(percentiles.w, percentiles.w + ipr, prev_moments.x));
+      alpha *= (1.0 - pc.adaptive_alpha_reduction * (1.0 - linearstep(percentiles.z - ipr, percentiles.z, prev_moments.x)));
 
-    if (params.subgroup_maxmin_factor < 1) {
-      const float prev_l = yuv_luminance(prev_irr_histlen.rgb);
-      const float l = yuv_luminance(curr_irr);
-
-      const float max_l = subgroupMax(l);
-      const float min_l = subgroupMin(l);
-      if (prev_l > max_l || prev_l < min_l)
-
-      alpha *= params.subgroup_maxmin_factor;
+      // update history length to match reduced alpha:
+      // prev_irr_histlen.a = 1.0 / (1.0 - alpha + 1e-9);
     }
 
-    accum   = mix(curr_irr.rgb, prev_irr_histlen.rgb, alpha);
-    moments = mix(curr_moments,         prev_moments, alpha);
+    irr     = mix(irr, prev_irr_histlen.rgb, alpha);
+    moments = mix(moments,         prev_moments, alpha);
   }
 
-  imageStore(img_accum, ipos, vec4(accum, num_samples));
-  imageStore(img_moments_accum, ipos, vec4(moments,  0, 0));
-}
 
+  imageStore(img_accum, ipos, vec4(irr, prev_irr_histlen.a));
+  imageStore(img_moments_accum, ipos, vec4(moments, 0, 0));
+} 

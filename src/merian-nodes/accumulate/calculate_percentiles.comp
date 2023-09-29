@@ -8,8 +8,11 @@
 layout(set = 1, binding = 0) uniform writeonly image2D img_quartiles;
 
 layout(push_constant, std140) uniform params_t { 
-    float percentile_lower;
-    float percentile_upper;
+    float firefly_percentile_lower;
+    float firefly_percentile_upper;
+
+    float adaptive_alpha_percentile_lower;
+    float adaptive_alpha_percentile_upper;
 } pc;
 
 #define WORKGROUP_SIZE (gl_WorkGroupSize.x * gl_WorkGroupSize.y)
@@ -47,10 +50,10 @@ void main() {
 
 
   if (LOCAL_INDEX == 0) {
-    const float min = sort[0];
-    const float q_lower = sort[uint(clamp(round(pc.percentile_lower * WORKGROUP_SIZE), 0, WORKGROUP_SIZE - 1))];
-    const float q_upper = sort[uint(clamp(round(pc.percentile_upper * WORKGROUP_SIZE), 0, WORKGROUP_SIZE - 1))];
-    const float max = sort[WORKGROUP_SIZE - 1];
-    imageStore(img_quartiles, ivec2(gl_WorkGroupID.xy), vec4(min, q_lower, q_upper, max));
+    const float firefly_lower = sort[uint(clamp(round(pc.firefly_percentile_lower * WORKGROUP_SIZE), 0, WORKGROUP_SIZE - 1))];
+    const float firefly_upper = sort[uint(clamp(round(pc.firefly_percentile_upper * WORKGROUP_SIZE), 0, WORKGROUP_SIZE - 1))];
+    const float adaptive_alpha_lower = sort[uint(clamp(round(pc.adaptive_alpha_percentile_lower * WORKGROUP_SIZE), 0, WORKGROUP_SIZE - 1))];
+    const float adaptive_alpha_upper = sort[uint(clamp(round(pc.adaptive_alpha_percentile_upper * WORKGROUP_SIZE), 0, WORKGROUP_SIZE - 1))];
+    imageStore(img_quartiles, ivec2(gl_WorkGroupID.xy), vec4(firefly_lower, firefly_upper, adaptive_alpha_lower, adaptive_alpha_upper));
   }
 }
