@@ -15,12 +15,10 @@
 namespace merian {
 
 uint32_t get_ve_local_size(const SharedContext& context) {
-    if ((32 + 2 * VE_SPATIAL_RADIUS) * (32 + 2 * VE_SPATIAL_RADIUS) * VE_SHARED_MEMORY_PER_PIXEL <=
-        context->pd_container.physical_device_properties.properties.limits
-            .maxComputeSharedMemorySize) {
+    if (32 * 32 * VE_SHARED_MEMORY_PER_PIXEL <= context->pd_container.physical_device_properties
+                                                    .properties.limits.maxComputeSharedMemorySize) {
         return 32;
-    } else if ((16 + 2 * VE_SPATIAL_RADIUS) * (16 + 2 * VE_SPATIAL_RADIUS) *
-                   VE_SHARED_MEMORY_PER_PIXEL <=
+    } else if (16 * 16 * VE_SHARED_MEMORY_PER_PIXEL <=
                context->pd_container.physical_device_properties.properties.limits
                    .maxComputeSharedMemorySize) {
         return 16;
@@ -140,7 +138,8 @@ void SVGFNode::cmd_build([[maybe_unused]] const vk::CommandBuffer& cmd,
 
         {
             auto spec_builder = SpecializationInfoBuilder();
-            spec_builder.add_entry(variance_estimate_local_size_x, variance_estimate_local_size_y, svgf_iterations);
+            spec_builder.add_entry(variance_estimate_local_size_x, variance_estimate_local_size_y,
+                                   svgf_iterations);
             SpecializationInfoHandle variance_estimate_spec = spec_builder.build();
             variance_estimate = std::make_shared<ComputePipeline>(
                 variance_estimate_pipe_layout, variance_estimate_module, variance_estimate_spec);
@@ -193,12 +192,15 @@ void SVGFNode::cmd_process(const vk::CommandBuffer& cmd,
         variance_estimate->bind_descriptor_set(cmd, graph_sets[set_index], 0);
         variance_estimate->bind_descriptor_set(cmd, ping_pong_res[1].set, 1);
         variance_estimate->push_constant(cmd, variance_estimate_pc);
+        // run more workgroups to prevent special cases in shader
         const uint32_t variance_estimate_group_count_x =
-            (irr_create_info.extent.width + variance_estimate_local_size_x - 1) /
-            variance_estimate_local_size_x;
+            (irr_create_info.extent.width +
+             (variance_estimate_local_size_x - VE_SPATIAL_RADIUS * 2) - 1) /
+            (variance_estimate_local_size_x - VE_SPATIAL_RADIUS * 2);
         const uint32_t variance_estimate_group_count_y =
-            (irr_create_info.extent.width + variance_estimate_local_size_y - 1) /
-            variance_estimate_local_size_y;
+            (irr_create_info.extent.width +
+             (variance_estimate_local_size_y - VE_SPATIAL_RADIUS * 2) - 1) /
+            (variance_estimate_local_size_y - VE_SPATIAL_RADIUS * 2);
         cmd.dispatch(variance_estimate_group_count_x, variance_estimate_group_count_y, 1);
 
         // make sure writes are visible
@@ -273,8 +275,10 @@ void SVGFNode::get_configuration(Configuration& config, bool& needs_rebuild) {
     config.config_angle("filter normals", angle, "Reject with normals farther apart", 0, 180);
     filter_pc.param_n = glm::cos(angle);
     config.config_float("filter luminance", filter_pc.param_l, "more means more blur", 0.1);
-    config.config_float("z-bias normals", filter_pc.z_bias_normals, "z-dependent rejection: increase to reject more. Disable with <= 0.");
-    config.config_float("z-bias depth", filter_pc.z_bias_depth, "z-dependent rejection: increase to reject more. Disable with <= 0.");
+    config.config_float("z-bias normals", filter_pc.z_bias_normals,
+                        "z-dependent rejection: increase to reject more. Disable with <= 0.");
+    config.config_float("z-bias depth", filter_pc.z_bias_depth,
+                        "z-dependent rejection: increase to reject more. Disable with <= 0.");
     int old_filter_type = filter_type;
     config.config_options("filter type", filter_type, {"atrous", "box", "subsampled"},
                           Configuration::OptionsStyle::COMBO);
@@ -302,9 +306,9 @@ void SVGFNode::get_configuration(Configuration& config, bool& needs_rebuild) {
         config.config_float(
             "TAA rejection threshold", taa_pc.rejection_threshold,
             "TAA rejection threshold for the previous frame, in units of standard deviation", 0.01);
-    config.config_options(
-        "debug", taa_debug,
-        {"none", "irradiance", "variance", "normal", "depth", "albedo", "grad z", "irradiance nan/inf"});
+    config.config_options("debug", taa_debug,
+                          {"none", "irradiance", "variance", "normal", "depth", "albedo", "grad z",
+                           "irradiance nan/inf"});
 
     needs_rebuild |= old_taa_debug != taa_debug;
     needs_rebuild |= old_taa_filter_prev != taa_filter_prev;
