@@ -38,8 +38,8 @@ layout(push_constant, std140) uniform pc_t {
 #include "common/colors_yuv.glsl"
 
 void get_prev_nearest(const vec2 prev_pos,
-                      float linear_z,
-                      float vel_z,
+                      const float linear_z,
+                      const float vel_z,
                       const vec3 normal,
                       inout vec4 prev_irr_histlen,
                       inout vec2 prev_moments,
@@ -56,8 +56,8 @@ void get_prev_nearest(const vec2 prev_pos,
 }
 
 void get_prev_bilinear(const vec2 prev_pos,
-                       float linear_z,
-                       float vel_z,
+                       const float linear_z,
+                       const float vel_z,
                        const vec3 normal,
                        inout vec4 prev_irr_histlen,
                        inout vec2 prev_moments,
@@ -90,9 +90,9 @@ void get_prev_bilinear(const vec2 prev_pos,
 }
 
 void get_prev_extended_search(const vec2 prev_pos,
-                              float linear_z,
-                              float vel_z,
-                              vec2 grad_z,
+                              const float linear_z,
+                              const float vel_z,
+                              const vec2 grad_z,
                               const vec3 normal,
                               inout vec4 prev_irr_histlen,
                               inout vec2 prev_moments,
