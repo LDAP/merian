@@ -45,6 +45,9 @@ void get_prev_nearest(const vec2 prev_pos,
                       inout vec2 prev_moments,
                       inout float sum_w) {
   const ivec2 prev_ipos = ivec2(round(prev_pos));
+  if(any(greaterThanEqual(prev_ipos, textureSize(img_prev_accum, 0))) || any(lessThan(prev_ipos, ivec2(0))))
+    return;
+
   const GBuffer prev_gbuf = prev_gbuffer[gbuffer_index(prev_ipos, imageSize(img_accum))];
   const vec3 prev_normal = geo_decode_normal(prev_gbuf.enc_normal);
   const float w = reprojection_weight(normal, prev_normal, pc.normal_reject_cos,
@@ -140,7 +143,7 @@ void main() {
       max_l = min(max_l, pc.firefly_bias + percentiles.y + pc.firefly_ipr_factor * (percentiles.y - percentiles.x));
     }
 
-    if (moments.x > max_l /* = yuv_luminance(irr)*/) {
+    if (moments.x /* = yuv_luminance(irr)*/ > max_l) {
       const float factor = max_l / moments.x;
       irr *= factor;
       moments *= vec2(factor, factor * factor);
@@ -218,7 +221,7 @@ void main() {
     }
   }
 
-  if (sum_w > 0.001 // make sure the prev values are reliable
+  if (sum_w > 0.001 // make sure the prev values are somewhat reliable
       && !any(isnan(prev_irr_histlen))
       && !any(isinf(prev_irr_histlen))
       && !any(isnan(prev_moments))
