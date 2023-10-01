@@ -179,23 +179,21 @@ void main() {
 
   // ACCUMULATE
   {
-    const vec3 normal = geo_decode_normal(gbuffer[gbuffer_index(ipos, imageSize(img_accum))].enc_normal);
-    const float linear_z = gbuffer[gbuffer_index(ipos, imageSize(img_accum))].linear_z;
-    const float vel_z = gbuffer[gbuffer_index(ipos, imageSize(img_accum))].vel_z;
-    const vec2 grad_z = gbuffer[gbuffer_index(ipos, imageSize(img_accum))].grad_z;
+    const GBuffer gbuf = gbuffer[gbuffer_index(ipos, imageSize(img_accum))];
+    const vec3 normal = geo_decode_normal(gbuf.enc_normal);
 
     if (FILTER_MODE == FILTER_MODE_NEAREST)
       get_prev_nearest(prev_pos,
-                       linear_z,
-                       vel_z,
+                       gbuf.linear_z,
+                       gbuf.vel_z,
                        normal,
                        prev_irr_histlen,
                        prev_moments,
                        sum_w);
     else if (FILTER_MODE == FILTER_MODE_BILINEAR)
       get_prev_bilinear(prev_pos,
-                        linear_z,
-                        vel_z,
+                        gbuf.linear_z,
+                        gbuf.vel_z,
                         normal,
                         prev_irr_histlen,
                         prev_moments,
@@ -209,9 +207,9 @@ void main() {
         sum_w            = 0.0;
 
         get_prev_extended_search(prev_pos,
-                                 linear_z,
-                                 vel_z,
-                                 grad_z,
+                                 gbuf.linear_z,
+                                 gbuf.vel_z,
+                                 gbuf.grad_z,
                                  normal,
                                  prev_irr_histlen,
                                  prev_moments,
