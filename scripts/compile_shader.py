@@ -1,4 +1,4 @@
-#!/bin/env python
+#!/bin/env python3
 
 """
 Compiles a GLSL shader "filename.ext" and
