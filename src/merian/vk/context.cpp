@@ -38,7 +38,14 @@ Context::Context(std::vector<std::shared_ptr<Extension>> desired_extensions,
                  uint32_t filter_device_id,
                  std::string filter_device_name)
     : extensions(desired_extensions) {
-    SPDLOG_INFO("This is {} {}. Context initializing...", MERIAN_PROJECT_NAME, MERIAN_VERSION);
+    SPDLOG_INFO("\n\n\
+__  __ ___ ___ ___   _   _  _ \n\
+|  \\/  | __| _ \\_ _| /_\\ | \\| |\n\
+| |\\/| | _||   /| | / _ \\| .` |\n\
+|_|  |_|___|_|_\\___/_/ \\_\\_|\\_|\n\n\
+Version: {}\n\n",
+                MERIAN_VERSION);
+    SPDLOG_INFO("context initializing...");
 
     // Init dynamic loader
     static vk::DynamicLoader dl;
@@ -57,7 +64,7 @@ Context::Context(std::vector<std::shared_ptr<Extension>> desired_extensions,
     find_queues();
     create_device_and_queues(preffered_number_compute_queues);
 
-    SPDLOG_INFO("Context ready.");
+    SPDLOG_INFO("context ready.");
 }
 
 Context::~Context() {
