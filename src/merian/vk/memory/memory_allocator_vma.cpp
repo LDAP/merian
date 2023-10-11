@@ -113,9 +113,9 @@ VMAMemoryAllocator::~VMAMemoryAllocator() {
 
 // ----------------------------------------------------------------------------------------------
 
-void log_allocation([[maybe_unused]]const VmaAllocationInfo& info,
-                    [[maybe_unused]]const MemoryAllocationHandle memory,
-                    [[maybe_unused]]const std::string& name) {
+void log_allocation([[maybe_unused]] const VmaAllocationInfo& info,
+                    [[maybe_unused]] const MemoryAllocationHandle memory,
+                    [[maybe_unused]] const std::string& name) {
     if (!name.empty())
         SPDLOG_TRACE("allocated {} of memory at offset {} ({}, {})", format_size(info.size),
                      format_size(info.offset), fmt::ptr(memory.get()), name);
@@ -124,7 +124,9 @@ void log_allocation([[maybe_unused]]const VmaAllocationInfo& info,
                      format_size(info.offset), fmt::ptr(memory.get()));
 }
 
-void set_name(VmaAllocator& allocator, VmaAllocation& allocation, const std::string& name) {
+void set_name([[maybe_unused]] VmaAllocator& allocator,
+              [[maybe_unused]] VmaAllocation& allocation,
+              [[maybe_unused]] const std::string& name) {
 #ifndef NDEBUG
     // set name for VMA leaks finder
     vmaSetAllocationName(allocator, allocation, name.c_str());

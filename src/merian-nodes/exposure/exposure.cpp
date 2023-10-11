@@ -74,7 +74,7 @@ ExposureNode::describe_outputs(
     };
 }
 
-void ExposureNode::cmd_build(const vk::CommandBuffer& cmd,
+void ExposureNode::cmd_build(const vk::CommandBuffer&,
                              const std::vector<std::vector<ImageHandle>>& image_inputs,
                              const std::vector<std::vector<BufferHandle>>& buffer_inputs,
                              const std::vector<std::vector<ImageHandle>>& image_outputs,
@@ -101,8 +101,8 @@ void ExposureNode::cmd_build(const vk::CommandBuffer& cmd,
 void ExposureNode::cmd_process(const vk::CommandBuffer& cmd,
                                GraphRun& run,
                                const uint32_t set_index,
-                               const std::vector<ImageHandle>& image_inputs,
-                               const std::vector<BufferHandle>& buffer_inputs,
+                               const std::vector<ImageHandle>&,
+                               const std::vector<BufferHandle>&,
                                const std::vector<ImageHandle>& image_outputs,
                                const std::vector<BufferHandle>& buffer_outputs) {
     const auto group_count_x =

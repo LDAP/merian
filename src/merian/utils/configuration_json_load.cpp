@@ -150,8 +150,11 @@ void JSONLoadConfiguration::config_options(const std::string& id,
         }
     }
 }
-bool JSONLoadConfiguration::config_text(
-    const std::string& id, const uint32_t max_len, char* string, const bool, const std::string&) {
+bool JSONLoadConfiguration::config_text(const std::string& id,
+                                        [[maybe_unused]] const uint32_t max_len,
+                                        char* string,
+                                        const bool,
+                                        const std::string&) {
 
     if (o.back().contains(id)) {
         std::string s = o.back()[id].template get<std::string>();
@@ -162,8 +165,11 @@ bool JSONLoadConfiguration::config_text(
 
     return false;
 }
-bool JSONLoadConfiguration::config_text_multiline(
-    const std::string& id, const uint32_t max_len, char* string, const bool, const std::string&) {
+bool JSONLoadConfiguration::config_text_multiline(const std::string& id,
+                                                  [[maybe_unused]] const uint32_t max_len,
+                                                  char* string,
+                                                  const bool,
+                                                  const std::string&) {
 
     if (o.back().contains(id)) {
         std::string s = o.back()[id].template get<std::string>();

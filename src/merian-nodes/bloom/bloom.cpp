@@ -50,7 +50,7 @@ BloomNode::describe_outputs(const std::vector<NodeOutputDescriptorImage>& connec
     };
 }
 
-void BloomNode::cmd_build(const vk::CommandBuffer& cmd,
+void BloomNode::cmd_build([[maybe_unused]]  const vk::CommandBuffer& cmd,
                           const std::vector<std::vector<ImageHandle>>& image_inputs,
                           const std::vector<std::vector<BufferHandle>>& buffer_inputs,
                           const std::vector<std::vector<ImageHandle>>& image_outputs,
@@ -68,16 +68,16 @@ void BloomNode::cmd_build(const vk::CommandBuffer& cmd,
     SpecializationInfoHandle spec = spec_builder.build();
 
     separate = std::make_shared<ComputePipeline>(pipe_layout, separate_module, spec);
-    composite = std::make_shared<ComputePipeline>(pipe_layout, composite_module, spec);  
+    composite = std::make_shared<ComputePipeline>(pipe_layout, composite_module, spec);
 }
 
 void BloomNode::cmd_process(const vk::CommandBuffer& cmd,
-                            GraphRun& run,
+                             [[maybe_unused]] GraphRun& run,
                             const uint32_t set_index,
-                            const std::vector<ImageHandle>& image_inputs,
-                            const std::vector<BufferHandle>& buffer_inputs,
+                            [[maybe_unused]]  const std::vector<ImageHandle>& image_inputs,
+                            [[maybe_unused]]  const std::vector<BufferHandle>& buffer_inputs,
                             const std::vector<ImageHandle>& image_outputs,
-                            const std::vector<BufferHandle>& buffer_outputs) {
+                            [[maybe_unused]]  const std::vector<BufferHandle>& buffer_outputs) {
     const auto group_count_x =
         (image_outputs[0]->get_extent().width + local_size_x - 1) / local_size_x;
     const auto group_count_y =
