@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 
 namespace merian {
 
@@ -52,5 +53,7 @@ class InputController {
     // Note: the supplied key codes are implementation dependent.
     virtual void set_key_event_callback(KeyEventCallback cb) = 0;
 };
+
+using InputControllerHandle = std::shared_ptr<merian::InputController>;
 
 } // namespace merian

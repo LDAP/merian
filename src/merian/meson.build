@@ -5,6 +5,7 @@ merian_src = files(
     'utils/configuration_imgui.cpp',
     'utils/configuration_json_dump.cpp',
     'utils/configuration_json_load.cpp',
+    'utils/input_controller_dummy.cpp',
     'utils/input_controller_glfw.cpp',
     'utils/normal_encoding.cpp',
     'utils/renderdoc.cpp',
