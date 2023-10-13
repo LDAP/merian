@@ -106,6 +106,15 @@ void JSONDumpConfiguration::config_int(
     const std::string& id, int& value, const int&, const int&, const std::string&) {
     o.back()[id] = value;
 }
+void JSONDumpConfiguration::config_uint(const std::string& id,
+                                        uint32_t& value,
+                                        const std::string&) {
+    o.back()[id] = value;
+}
+void JSONDumpConfiguration::config_uint(
+    const std::string& id, uint32_t& value, const uint32_t&, const uint32_t&, const std::string&) {
+    o.back()[id] = value;
+}
 void JSONDumpConfiguration::config_float3(const std::string& id,
                                           float value[3],
                                           const std::string&) {

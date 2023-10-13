@@ -58,6 +58,13 @@ class JSONLoadConfiguration : public Configuration {
                             const int& max = std::numeric_limits<int>::max(),
                             const std::string& desc = "") override;
     virtual void
+    config_uint(const std::string& id, uint32_t& value, const std::string& desc = "") override;
+    virtual void config_uint(const std::string& id,
+                             uint32_t& value,
+                             const uint32_t& min = std::numeric_limits<uint32_t>::min(),
+                             const uint32_t& max = std::numeric_limits<uint32_t>::max(),
+                             const std::string& desc = "") override;
+    virtual void
     config_float3(const std::string& id, float value[3], const std::string& desc = "") override;
     virtual void
     config_bool(const std::string& id, bool& value, const std::string& desc = "") override;

@@ -131,6 +131,6 @@ void MeanNode::cmd_process(const vk::CommandBuffer& cmd,
     }
 }
 
-void MeanNode::get_configuration(Configuration& config, bool&) {}
+void MeanNode::get_configuration(Configuration&, bool&) {}
 
 } // namespace merian

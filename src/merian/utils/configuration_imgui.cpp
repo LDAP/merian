@@ -107,6 +107,20 @@ void ImGuiConfiguration::config_int(
     ImGui::SliderInt(id.c_str(), &value, min, max);
     tooltip(desc);
 }
+void ImGuiConfiguration::config_uint(const std::string& id,
+                                     uint32_t& value,
+                                     const std::string& desc) {
+    ImGui::DragScalar(id.c_str(), ImGuiDataType_U32, &value);
+    tooltip(desc);
+}
+void ImGuiConfiguration::config_uint(const std::string& id,
+                                     uint32_t& value,
+                                     const uint32_t& min,
+                                     const uint32_t& max,
+                                     const std::string& desc) {
+    ImGui::SliderScalar(id.c_str(), ImGuiDataType_U32, &value, &min, &max);
+    tooltip(desc);
+}
 void ImGuiConfiguration::config_float3(const std::string& id,
                                        float value[3],
                                        const std::string& desc) {

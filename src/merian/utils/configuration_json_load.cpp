@@ -122,6 +122,17 @@ void JSONLoadConfiguration::config_int(
     if (o.back().contains(id))
         value = o.back()[id].template get<int>();
 }
+void JSONLoadConfiguration::config_uint(const std::string& id,
+                                        uint32_t& value,
+                                        const std::string&) {
+    if (o.back().contains(id))
+        value = o.back()[id].template get<uint32_t>();
+}
+void JSONLoadConfiguration::config_uint(
+    const std::string& id, uint32_t& value, const uint32_t&, const uint32_t&, const std::string&) {
+    if (o.back().contains(id))
+        value = o.back()[id].template get<uint32_t>();
+}
 void JSONLoadConfiguration::config_float3(const std::string& id,
                                           float value[3],
                                           const std::string&) {

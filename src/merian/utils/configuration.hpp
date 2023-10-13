@@ -89,6 +89,13 @@ class Configuration {
                             const int& max = std::numeric_limits<int>::max(),
                             const std::string& desc = "") = 0;
     virtual void
+    config_uint(const std::string& id, uint32_t& value, const std::string& desc = "") = 0;
+    virtual void config_uint(const std::string& id,
+                             uint32_t& value,
+                             const uint32_t& min = std::numeric_limits<uint32_t>::min(),
+                             const uint32_t& max = std::numeric_limits<uint32_t>::max(),
+                             const std::string& desc = "") = 0;
+    virtual void
     config_float3(const std::string& id, float value[3], const std::string& desc = "") = 0;
     // Holds the supplied `value` if not changed by the configuration.
     // Converts to a checkbox in a GUI context.
