@@ -41,8 +41,8 @@ void ImageWriteNode::pre_process([[maybe_unused]] const uint64_t& iteration,
         record_enable = true;
         status.request_rebuild |= rebuild_on_record;
         this->iteration = 0;
-        if (on_record_callback)
-            on_record_callback();
+        if (callback_on_record && callback)
+            callback();
     }
 };
 
@@ -94,13 +94,14 @@ void ImageWriteNode::cmd_process([[maybe_unused]] const vk::CommandBuffer& cmd,
                            vk::AccessFlagBits::eHostRead));
 
         int it = iteration;
+        int run_it = run.get_iteration();
         int image_index = this->image_index++;
-        run.add_submit_callback([this, image, it, image_index](const QueueHandle& queue) {
+        run.add_submit_callback([this, image, it, image_index, run_it](const QueueHandle& queue) {
             queue->wait_idle();
             void* mem = image->get_memory()->map();
 
             std::string filename =
-                fmt::format("{}_{:06}_{:06}", this->base_filename, it, image_index);
+                fmt::format("{}_{:06}_{:06}_{:06}", this->base_filename, it, image_index, run_it);
 
             std::filesystem::create_directories(std::filesystem::absolute(filename).parent_path());
 
@@ -127,6 +128,8 @@ void ImageWriteNode::cmd_process([[maybe_unused]] const vk::CommandBuffer& cmd,
 
         if (rebuild_after_capture)
             run.request_rebuild();
+        if (callback_after_capture && callback)
+            callback();
         record_next = false;
 
         record_iteration *= record_enable ? it_power : 1;
@@ -142,8 +145,12 @@ void ImageWriteNode::get_configuration([[maybe_unused]] Configuration& config,
     config.config_options("format", format, {"PNG", "JPG", "HDR"},
                           Configuration::OptionsStyle::COMBO);
     config.config_bool("rebuild after capture", rebuild_after_capture,
-                       "Forces a graph rebuild after every capture");
+                       "forces a graph rebuild after every capture");
     config.config_bool("rebuild on record", rebuild_on_record, "Rebuilds when recording starts");
+    config.config_bool("callback after capture", callback_after_capture,
+                       "calls the on_record callback after every capture");
+    config.config_bool("callback on record", callback_on_record,
+                       "calls the callback when the recording starts");
     if (config.config_text("filename", buf.size(), buf.data())) {
         base_filename = buf.data();
     }
@@ -163,8 +170,8 @@ void ImageWriteNode::get_configuration([[maybe_unused]] Configuration& config,
     if (record_enable && !old_record_enable) {
         needs_rebuild |= rebuild_on_record;
         iteration = 0;
-        if (on_record_callback)
-            on_record_callback();
+        if (callback)
+            callback();
     }
     config.config_int("run trigger", trigger_run,
                       "The specified run starts recording and resets the iteration and calls the "
@@ -183,8 +190,8 @@ void ImageWriteNode::get_configuration([[maybe_unused]] Configuration& config,
                       "applying the power).");
 }
 
-void ImageWriteNode::set_on_record_callback(const std::function<void()> callback) {
-    on_record_callback = callback;
+void ImageWriteNode::set_callback(const std::function<void()> callback) {
+    this->callback = callback;
 }
 
 } // namespace merian

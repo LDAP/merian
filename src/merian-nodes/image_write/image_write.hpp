@@ -37,13 +37,14 @@ class ImageWriteNode : public Node {
     virtual void get_configuration([[maybe_unused]] Configuration& config,
                                    bool& needs_rebuild) override;
 
-    void set_on_record_callback(const std::function<void()> callback);
+    // Set a callback that can be called on capture or record.
+    void set_callback(const std::function<void()> callback);
 
   private:
     const SharedContext context;
     const ResourceAllocatorHandle allocator;
 
-    std::function<void()> on_record_callback;
+    std::function<void()> callback;
 
     std::string base_filename;
     std::vector<char> buf;
@@ -60,6 +61,8 @@ class ImageWriteNode : public Node {
     bool record_next = false;
     bool rebuild_after_capture = false;
     bool rebuild_on_record = false;
+    bool callback_after_capture = false;
+    bool callback_on_record = false;
 
     int it_power = 1;
     int it_offset = 0;
