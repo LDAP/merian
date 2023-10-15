@@ -102,26 +102,31 @@ void ImageWriteNode::cmd_process([[maybe_unused]] const vk::CommandBuffer& cmd,
 
             std::string filename =
                 fmt::format("{}_{:06}_{:06}_{:06}", this->base_filename, it, image_index, run_it);
-
-            std::filesystem::create_directories(std::filesystem::absolute(filename).parent_path());
+            char* tmp_filename = std::tmpnam(NULL);
 
             switch (this->format) {
             case FORMAT_PNG: {
-                stbi_write_png(fmt::format("{}.png", filename).c_str(), image->get_extent().width,
-                               image->get_extent().height, 4, mem, image->get_extent().width * 4);
+                filename += ".png";
+                stbi_write_png(tmp_filename, image->get_extent().width, image->get_extent().height,
+                               4, mem, image->get_extent().width * 4);
                 break;
             }
             case FORMAT_JPG: {
-                stbi_write_jpg(fmt::format("{}.jpg", filename).c_str(), image->get_extent().width,
-                               image->get_extent().height, 4, mem, 100);
+                filename += ".jpg";
+                stbi_write_jpg(tmp_filename, image->get_extent().width, image->get_extent().height,
+                               4, mem, 100);
                 break;
             }
             case FORMAT_HDR: {
-                stbi_write_hdr(fmt::format("{}.hdr", filename).c_str(), image->get_extent().width,
-                               image->get_extent().height, 4, static_cast<float*>(mem));
+                filename += ".hdr";
+                stbi_write_hdr(tmp_filename, image->get_extent().width, image->get_extent().height,
+                               4, static_cast<float*>(mem));
                 break;
             }
             }
+
+            std::filesystem::create_directories(std::filesystem::absolute(filename).parent_path());
+            std::filesystem::rename(tmp_filename, filename);
 
             image->get_memory()->unmap();
         });
