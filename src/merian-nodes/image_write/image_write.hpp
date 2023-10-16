@@ -40,6 +40,8 @@ class ImageWriteNode : public Node {
     // Set a callback that can be called on capture or record.
     void set_callback(const std::function<void()> callback);
 
+    void record();
+
   private:
     const SharedContext context;
     const ResourceAllocatorHandle allocator;
@@ -66,6 +68,8 @@ class ImageWriteNode : public Node {
 
     int it_power = 1;
     int it_offset = 0;
+
+    bool needs_rebuild = false;
 };
 
 } // namespace merian

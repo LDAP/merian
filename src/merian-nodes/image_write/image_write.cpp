@@ -35,15 +35,21 @@ ImageWriteNode::describe_inputs() {
     };
 }
 
-void ImageWriteNode::pre_process([[maybe_unused]] const uint64_t& iteration,
+void ImageWriteNode::record() {
+    record_enable = true;
+    needs_rebuild |= rebuild_on_record;
+    this->iteration = 1;
+    if (callback_on_record && callback)
+        callback();
+}
+
+void ImageWriteNode::pre_process([[maybe_unused]] const uint64_t& run_iteration,
                                  [[maybe_unused]] NodeStatus& status) {
-    if (!record_enable && ((int64_t)iteration == trigger_run)) {
-        record_enable = true;
-        status.request_rebuild |= rebuild_on_record;
-        this->iteration = 0;
-        if (callback_on_record && callback)
-            callback();
+    if (!record_enable && ((int64_t)run_iteration == trigger_run)) {
+        record();
     }
+    status.request_rebuild = needs_rebuild;
+    needs_rebuild = false;
 };
 
 void ImageWriteNode::cmd_process([[maybe_unused]] const vk::CommandBuffer& cmd,
@@ -126,7 +132,12 @@ void ImageWriteNode::cmd_process([[maybe_unused]] const vk::CommandBuffer& cmd,
             }
 
             std::filesystem::create_directories(std::filesystem::absolute(filename).parent_path());
-            std::filesystem::rename(tmp_filename, filename);
+            try {
+                std::filesystem::rename(tmp_filename, filename);
+            } catch (std::filesystem::filesystem_error const&) {
+                SPDLOG_WARN("rename failed! Falling back to copy...");
+                std::filesystem::copy(tmp_filename, filename);
+            }
 
             image->get_memory()->unmap();
         });
@@ -144,8 +155,7 @@ void ImageWriteNode::cmd_process([[maybe_unused]] const vk::CommandBuffer& cmd,
     iteration++;
 }
 
-void ImageWriteNode::get_configuration([[maybe_unused]] Configuration& config,
-                                       bool& needs_rebuild) {
+void ImageWriteNode::get_configuration([[maybe_unused]] Configuration& config, bool&) {
     config.st_separate("General");
     config.config_options("format", format, {"PNG", "JPG", "HDR"},
                           Configuration::OptionsStyle::COMBO);
@@ -169,23 +179,19 @@ void ImageWriteNode::get_configuration([[maybe_unused]] Configuration& config,
     config.st_separate("Multiple");
     config.output_text(fmt::format("current iteration: {}",
                                    record_enable ? fmt::to_string(iteration) : "stopped"));
-
-    bool old_record_enable = record_enable;
+    const bool old_record_enable = record_enable;
     config.config_bool("enable", record_enable);
-    if (record_enable && !old_record_enable) {
-        needs_rebuild |= rebuild_on_record;
-        iteration = 0;
-        if (callback)
-            callback();
-    }
+    if (record_enable && old_record_enable != record_enable)
+        record();
     config.config_int("run trigger", trigger_run,
                       "The specified run starts recording and resets the iteration and calls the "
                       "configured callback and forces a rebuild if enabled.");
 
     config.st_separate();
 
-    config.config_int("iteration", record_iteration,
-                      "Save the result of of the the specified iteration");
+    config.config_int(
+        "iteration", record_iteration,
+        "Save the result of of the the specified iteration. Iterations are 1-indexed.");
     record_iteration = std::max(record_iteration, 0);
 
     config.config_int("iteration power", it_power,
@@ -193,6 +199,7 @@ void ImageWriteNode::get_configuration([[maybe_unused]] Configuration& config,
     config.config_int("iteration offset", it_offset,
                       "Adds this value to the iteration specifier after every capture. (After "
                       "applying the power).");
+    config.output_text("note: Iterations are 1-indexed");
 }
 
 void ImageWriteNode::set_callback(const std::function<void()> callback) {
