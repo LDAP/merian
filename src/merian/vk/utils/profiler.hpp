@@ -89,7 +89,7 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
   public:
     // The timestamps for GPU profiling must be preallocated, therefore you can only caputure
     // num_gpu_timers many timers.
-    Profiler(const SharedContext context, const uint32_t num_gpu_timers = 1028);
+    Profiler(const SharedContext context, const QueueHandle queue, const uint32_t num_gpu_timers = 1028);
 
   public:
     ~Profiler();
@@ -135,6 +135,7 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
     uint32_t num_gpu_timers;
     vk::QueryPool query_pool;
     float timestamp_period;
+    uint64_t bitmask;
     std::string cpu_current_key;
     std::string gpu_current_key;
 

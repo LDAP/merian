@@ -7,7 +7,7 @@
 
 namespace merian {
 
-Profiler::Profiler(const SharedContext context, const uint32_t num_gpu_timers)
+Profiler::Profiler(const SharedContext context, const QueueHandle queue, const uint32_t num_gpu_timers)
     : context(context), num_gpu_timers(num_gpu_timers) {
     vk::QueryPoolCreateInfo createInfo({}, vk::QueryType::eTimestamp,
                                        num_gpu_timers * SW_QUERY_COUNT);
@@ -15,6 +15,14 @@ Profiler::Profiler(const SharedContext context, const uint32_t num_gpu_timers)
     pending_gpu_timestamps.reserve(num_gpu_timers * SW_QUERY_COUNT);
     gpu_sections.reserve(num_gpu_timers);
     cpu_sections.reserve(1024);
+
+    const uint64_t valid_bits = context->pd_container.physical_device.getQueueFamilyProperties()[queue->get_queue_family_index()].timestampValidBits;
+    if (valid_bits < 64) {
+        bitmask = (((uint64_t)1) << (valid_bits + 1)) - 1;
+    } else {
+        bitmask = (uint64_t)-1;
+    }
+    SPDLOG_DEBUG("using queue with valid bits: {}, mask: {}", valid_bits, bitmask);
 
     timestamp_period =
         context->pd_container.physical_device_properties.properties.limits.timestampPeriod;
@@ -98,7 +106,7 @@ void Profiler::collect(const bool wait) {
 
     for (uint32_t i = 0; i < pending_gpu_timestamps.size(); i++) {
         auto& [gpu_sec_idx, is_end] = pending_gpu_timestamps[i];
-        uint64_t ts = timestamps[i];
+        uint64_t ts = timestamps[i] & bitmask;
         GPUSection& section = gpu_sections[gpu_sec_idx];
         if (is_end) {
             section.end = ts;
