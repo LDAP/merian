@@ -5,6 +5,8 @@
 #include "merian/vk/pipeline/pipeline.hpp"
 #include "merian/vk/shader/shader_module.hpp"
 
+#include <optional>
+
 namespace merian {
 
 class AccumulateNode : public Node {

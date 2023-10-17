@@ -6,13 +6,15 @@
 #include "merian/vk/sampler/sampler_pool.hpp"
 
 #include <memory>
+#include <optional>
 #include <vulkan/vulkan.hpp>
 
 namespace merian {
 
 // A utility class to create and manage resources.
 //
-// Do not forget to finalize and release the resources from the staging memory manager that this class uses!
+// Do not forget to finalize and release the resources from the staging memory manager that this
+// class uses!
 class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator> {
   public:
     ResourceAllocator(ResourceAllocator const&) = delete;

@@ -3,6 +3,7 @@
 #include "merian/vk/memory/memory_allocator.hpp"
 
 #include <cstdio>
+#include <optional>
 #include <spdlog/spdlog.h>
 #include <vk_mem_alloc.h>
 

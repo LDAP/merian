@@ -7,6 +7,8 @@
 #include "merian/vk/pipeline/specialization_info.hpp"
 #include "merian/vk/shader/shader_module.hpp"
 
+#include <optional>
+
 namespace merian {
 
 // A general purpose compute node.

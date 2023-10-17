@@ -8,6 +8,8 @@
 #include <spdlog/spdlog.h>
 #include <vulkan/vulkan.hpp>
 
+#include <optional>
+
 namespace merian {
 
 // Forward def

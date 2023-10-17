@@ -3,6 +3,7 @@
 #include "merian/vk/descriptors/descriptor_set_layout.hpp"
 
 #include <map>
+#include <optional>
 #include <spdlog/spdlog.h>
 #include <tuple>
 #include <vector>
@@ -65,8 +66,8 @@ class DescriptorSetLayoutBuilder {
                                uint32_t descriptor_count = 1,
                                const vk::Sampler* immutable_sampler = nullptr,
                                std::optional<uint32_t> binding = std::nullopt) {
-        add_binding(stage_flags, vk::DescriptorType::eStorageBuffer, descriptor_count, immutable_sampler,
-                    binding);
+        add_binding(stage_flags, vk::DescriptorType::eStorageBuffer, descriptor_count,
+                    immutable_sampler, binding);
         return *this;
     }
 
@@ -75,8 +76,8 @@ class DescriptorSetLayoutBuilder {
                               uint32_t descriptor_count = 1,
                               const vk::Sampler* immutable_sampler = nullptr,
                               std::optional<uint32_t> binding = std::nullopt) {
-        add_binding(stage_flags, vk::DescriptorType::eStorageImage, descriptor_count, immutable_sampler,
-                    binding);
+        add_binding(stage_flags, vk::DescriptorType::eStorageImage, descriptor_count,
+                    immutable_sampler, binding);
         return *this;
     }
 
@@ -85,7 +86,8 @@ class DescriptorSetLayoutBuilder {
                         uint32_t descriptor_count = 1,
                         const vk::Sampler* immutable_sampler = nullptr,
                         std::optional<uint32_t> binding = std::nullopt) {
-        add_binding(stage_flags, vk::DescriptorType::eSampler, descriptor_count, immutable_sampler, binding);
+        add_binding(stage_flags, vk::DescriptorType::eSampler, descriptor_count, immutable_sampler,
+                    binding);
         return *this;
     }
 
@@ -159,8 +161,8 @@ class DescriptorSetLayoutBuilder {
 
     // Requires that there is a binding from 0 to num_bindings-1.
     // Return a shared ptr since many descriptor sets may have a reference on this.
-    DescriptorSetLayoutHandle
-    build_layout(const SharedContext& context, const vk::DescriptorSetLayoutCreateFlags flags = {}) {
+    DescriptorSetLayoutHandle build_layout(const SharedContext& context,
+                                           const vk::DescriptorSetLayoutCreateFlags flags = {}) {
 
         std::vector<vk::DescriptorSetLayoutBinding> sorted_bindings(bindings.size());
 

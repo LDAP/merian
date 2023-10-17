@@ -8,6 +8,7 @@
 #include "merian/vk/utils/profiler.hpp"
 
 #include <memory>
+#include <optional>
 #include <queue>
 #include <unordered_set>
 #include <variant>

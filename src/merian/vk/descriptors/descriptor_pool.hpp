@@ -4,6 +4,7 @@
 #include "merian/vk/descriptors/descriptor_set_layout.hpp"
 
 #include <map>
+#include <optional>
 #include <vulkan/vulkan.hpp>
 
 namespace merian {
@@ -12,8 +13,9 @@ class DescriptorPool : public std::enable_shared_from_this<DescriptorPool> {
 
   public:
     /**
-     * @brief      Creates a DescriptorPool that has enough descriptors to allocate set_count DescriptorSet of the layout "layout".
-     * 
+     * @brief      Creates a DescriptorPool that has enough descriptors to allocate set_count
+     * DescriptorSet of the layout "layout".
+     *
      * By default the max_sets parameter is set to set_count
      */
     DescriptorPool(std::shared_ptr<DescriptorSetLayout>& layout,
@@ -54,7 +56,8 @@ class DescriptorPool : public std::enable_shared_from_this<DescriptorPool> {
     // // Returns all descriptor sets to the pool
     // void reset() {
     //     // Problem: DescriptorSets try to call free in their destuctor
-    //     // Solution: Keep a weak reference of every set and notify the sets when they are destroyed
+    //     // Solution: Keep a weak reference of every set and notify the sets when they are
+    //     destroyed
     // }
 
   private:

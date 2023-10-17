@@ -3,6 +3,8 @@
 #include "merian/vk/graph/node.hpp"
 #include "merian/vk/utils/blits.hpp"
 
+#include <optional>
+
 namespace merian {
 
 class ABCompareNode : public Node {

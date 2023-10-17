@@ -4,6 +4,7 @@
 #include "merian/utils/interpolation.hpp"
 
 #include <chrono>
+#include <optional>
 
 namespace merian {
 

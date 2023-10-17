@@ -6,6 +6,7 @@
 #include <memory>
 #include <vulkan/vulkan.hpp>
 
+#include <optional>
 #include <string>
 
 namespace merian {
