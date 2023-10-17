@@ -243,9 +243,14 @@ void main() {
 
     irr     = mix(irr, prev_irr_histlen.rgb, alpha);
     moments = mix(moments,         prev_moments, alpha);
+
+    imageStore(img_accum, ipos, vec4(irr, prev_irr_histlen.a));
+    imageStore(img_moments_accum, ipos, vec4(moments, 0, 0));
+  } else {
+    imageStore(img_accum, ipos, vec4(irr, 1));
+    imageStore(img_moments_accum, ipos, vec4(moments, 0, 0));
   }
 
 
-  imageStore(img_accum, ipos, vec4(irr, prev_irr_histlen.a));
-  imageStore(img_moments_accum, ipos, vec4(moments, 0, 0));
+  
 } 
