@@ -7,25 +7,30 @@
 namespace merian {
 
 static uint32_t audio_devices = 0;
+static bool sdl_is_initialized = false;
 
-static void initialize_sdl() {
-    static bool is_initialized = false;
-    if (is_initialized)
-        return;
+static bool initialize_sdl() {
+    if (sdl_is_initialized) {
+        return true;
+    }
 
     SPDLOG_DEBUG("initialize SDL");
     if (SDL_Init(SDL_INIT_AUDIO) < 0) {
-        throw std::runtime_error{SDL_GetError()};
+        return false;
     }
 
-    audio_devices++;
-    is_initialized = true;
+    sdl_is_initialized = true;
+    return true;
 }
 
 static void uninitialize_sdl() {
-    if (--audio_devices == 0) {
+    if (!sdl_is_initialized)
+        return;
+
+    if (audio_devices == 0) {
         SPDLOG_DEBUG("shutdown SDL");
         SDL_Quit();
+        sdl_is_initialized = false;
     }
 }
 
@@ -52,8 +57,14 @@ SDLAudioDevice::SDLAudioDevice(AudioFormat format,
                                int samplerate,
                                unsigned char channels)
     : callback(callback) {
+    
+    audio_devices++;
 
-    initialize_sdl();
+    if (!initialize_sdl()) {
+        SPDLOG_WARN("{}, disabling audio", SDL_GetError());
+        audio_device_id = 0;
+        return;
+    }
 
     SDL_AudioSpec wanted_spec{samplerate, sdl_format(format), channels, 0, buffersize, 0,
                               0,          sdl_callback,       &this->callback};
@@ -61,21 +72,28 @@ SDLAudioDevice::SDLAudioDevice(AudioFormat format,
     audio_device_id = SDL_OpenAudioDevice(NULL, 0, &wanted_spec, &audio_spec, 0);
 
     if (!audio_device_id) {
-        throw std::runtime_error{SDL_GetError()};
+        SPDLOG_WARN("{}, disabling audio", SDL_GetError());
     }
 }
 
 SDLAudioDevice::~SDLAudioDevice() {
-    SDL_CloseAudioDevice(audio_device_id);
+    audio_devices--;
+
+    if (audio_device_id) {
+        SDL_CloseAudioDevice(audio_device_id);
+    }
+
     uninitialize_sdl();
 }
 
 void SDLAudioDevice::unpause_audio() {
-    SDL_PauseAudioDevice(audio_device_id, 0);
+    if (audio_device_id)
+        SDL_PauseAudioDevice(audio_device_id, 0);
 }
 
 void SDLAudioDevice::pause_audio() {
-    SDL_PauseAudioDevice(audio_device_id, 1);
+    if (audio_device_id)
+        SDL_PauseAudioDevice(audio_device_id, 1);
 }
 
 
