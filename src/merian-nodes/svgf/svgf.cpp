@@ -198,7 +198,7 @@ void SVGFNode::cmd_process(const vk::CommandBuffer& cmd,
              (variance_estimate_local_size_x - VE_SPATIAL_RADIUS * 2) - 1) /
             (variance_estimate_local_size_x - VE_SPATIAL_RADIUS * 2);
         const uint32_t variance_estimate_group_count_y =
-            (irr_create_info.extent.width +
+            (irr_create_info.extent.height +
              (variance_estimate_local_size_y - VE_SPATIAL_RADIUS * 2) - 1) /
             (variance_estimate_local_size_y - VE_SPATIAL_RADIUS * 2);
         cmd.dispatch(variance_estimate_group_count_x, variance_estimate_group_count_y, 1);
