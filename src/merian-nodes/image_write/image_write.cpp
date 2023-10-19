@@ -67,7 +67,37 @@ void ImageWriteNode::cmd_process([[maybe_unused]] const vk::CommandBuffer& cmd,
 
         vk::Format format = this->format == FORMAT_HDR ? vk::Format::eR32G32B32A32Sfloat
                                                        : vk::Format::eR8G8B8A8Srgb;
-        vk::ImageCreateInfo info{
+
+        vk::ImageCreateInfo size_compatible_info{
+            {},
+            vk::ImageType::e2D,
+            format,
+            image_inputs[0]->get_extent(),
+            1,
+            1,
+            vk::SampleCountFlagBits::e1,
+            vk::ImageTiling::eOptimal,
+            vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc,
+            vk::SharingMode::eExclusive,
+            {},
+            {},
+            vk::ImageLayout::eUndefined,
+        };
+        ImageHandle image =
+            allocator->createImage(size_compatible_info, MemoryMappingType::HOST_ACCESS_RANDOM);
+        cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
+                            vk::PipelineStageFlagBits::eTransfer, {}, {}, {},
+                            image->barrier(vk::ImageLayout::eTransferDstOptimal, {},
+                                           vk::AccessFlagBits::eTransferWrite));
+        cmd_blit_stretch(cmd, *image_inputs[0], image_inputs[0]->get_current_layout(),
+                         image_inputs[0]->get_extent(), *image,
+                         vk::ImageLayout::eTransferDstOptimal, image_inputs[0]->get_extent());
+        cmd.pipelineBarrier(
+            vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer, {}, {}, {},
+            image->barrier(vk::ImageLayout::eTransferSrcOptimal, vk::AccessFlagBits::eTransferWrite,
+                           vk::AccessFlagBits::eTransferRead));
+
+        vk::ImageCreateInfo linear_info{
             {},
             vk::ImageType::e2D,
             format,
@@ -82,29 +112,27 @@ void ImageWriteNode::cmd_process([[maybe_unused]] const vk::CommandBuffer& cmd,
             {},
             vk::ImageLayout::eUndefined,
         };
-
-        ImageHandle image = allocator->createImage(info, MemoryMappingType::HOST_ACCESS_RANDOM);
-
+        ImageHandle linear_image =
+            allocator->createImage(linear_info, MemoryMappingType::HOST_ACCESS_RANDOM);
         cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
                             vk::PipelineStageFlagBits::eTransfer, {}, {}, {},
-                            image->barrier(vk::ImageLayout::eTransferDstOptimal, {},
-                                           vk::AccessFlagBits::eTransferWrite));
-
-        cmd_blit_stretch(cmd, *image_inputs[0], image_inputs[0]->get_current_layout(),
-                         image_inputs[0]->get_extent(), *image,
-                         vk::ImageLayout::eTransferDstOptimal, image_inputs[0]->get_extent());
-
+                            linear_image->barrier(vk::ImageLayout::eTransferDstOptimal, {},
+                                                  vk::AccessFlagBits::eTransferWrite));
+        cmd.copyImage(*image, image->get_current_layout(), *linear_image,
+                      linear_image->get_current_layout(),
+                      vk::ImageCopy(first_layer(), {}, first_layer(), {}, image->get_extent()));
         cmd.pipelineBarrier(
             vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost, {}, {}, {},
-            image->barrier(vk::ImageLayout::eGeneral, vk::AccessFlagBits::eTransferWrite,
-                           vk::AccessFlagBits::eHostRead));
+            linear_image->barrier(vk::ImageLayout::eGeneral, vk::AccessFlagBits::eTransferWrite,
+                                  vk::AccessFlagBits::eHostRead));
 
         int it = iteration;
         int run_it = run.get_iteration();
         int image_index = this->image_index++;
-        run.add_submit_callback([this, image, it, image_index, run_it](const QueueHandle& queue) {
+        run.add_submit_callback([this, image, linear_image, it, image_index,
+                                 run_it](const QueueHandle& queue) {
             queue->wait_idle();
-            void* mem = image->get_memory()->map();
+            void* mem = linear_image->get_memory()->map();
 
             std::string filename =
                 fmt::format("{}_{:06}_{:06}_{:06}", this->base_filename, it, image_index, run_it);
@@ -113,20 +141,21 @@ void ImageWriteNode::cmd_process([[maybe_unused]] const vk::CommandBuffer& cmd,
             switch (this->format) {
             case FORMAT_PNG: {
                 filename += ".png";
-                stbi_write_png(tmp_filename, image->get_extent().width, image->get_extent().height,
-                               4, mem, image->get_extent().width * 4);
+                stbi_write_png(tmp_filename, linear_image->get_extent().width,
+                               linear_image->get_extent().height, 4, mem,
+                               linear_image->get_extent().width * 4);
                 break;
             }
             case FORMAT_JPG: {
                 filename += ".jpg";
-                stbi_write_jpg(tmp_filename, image->get_extent().width, image->get_extent().height,
-                               4, mem, 100);
+                stbi_write_jpg(tmp_filename, linear_image->get_extent().width,
+                               linear_image->get_extent().height, 4, mem, 100);
                 break;
             }
             case FORMAT_HDR: {
                 filename += ".hdr";
-                stbi_write_hdr(tmp_filename, image->get_extent().width, image->get_extent().height,
-                               4, static_cast<float*>(mem));
+                stbi_write_hdr(tmp_filename, linear_image->get_extent().width,
+                               linear_image->get_extent().height, 4, static_cast<float*>(mem));
                 break;
             }
             }
@@ -139,7 +168,7 @@ void ImageWriteNode::cmd_process([[maybe_unused]] const vk::CommandBuffer& cmd,
                 std::filesystem::copy(tmp_filename, filename);
             }
 
-            image->get_memory()->unmap();
+            linear_image->get_memory()->unmap();
         });
 
         if (rebuild_after_capture)
