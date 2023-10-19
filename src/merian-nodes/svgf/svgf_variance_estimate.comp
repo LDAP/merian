@@ -36,9 +36,10 @@ shared float shared_z[SHARED_SIZE];
 
 #define IS_ON_TILE (all(greaterThanEqual(gl_LocalInvocationID.xy, ivec2(VE_SPATIAL_RADIUS))) && all(lessThan(gl_LocalInvocationID.xy, gl_WorkGroupSize.xy - VE_SPATIAL_RADIUS)))
 #define TILE_ID (ivec2(gl_LocalInvocationID.xy) - VE_SPATIAL_RADIUS)
+#define TILE_SIZE (gl_WorkGroupSize.xy - 2 * VE_SPATIAL_RADIUS)
 
 void main() {
-  const ivec2 ipos = ivec2(gl_WorkGroupID.xy * (gl_WorkGroupSize.xy - 2 * VE_SPATIAL_RADIUS)) + TILE_ID;
+  const ivec2 ipos = ivec2(gl_WorkGroupID.xy * TILE_SIZE) + TILE_ID;
   const uint shared_idx = SHARED_INDEX(gl_LocalInvocationID.x, gl_LocalInvocationID.y);
 
   if (SVGF_ITERATIONS == 0) {
