@@ -83,8 +83,7 @@ void ImageWriteNode::cmd_process([[maybe_unused]] const vk::CommandBuffer& cmd,
             {},
             vk::ImageLayout::eUndefined,
         };
-        ImageHandle image =
-            allocator->createImage(size_compatible_info, MemoryMappingType::HOST_ACCESS_RANDOM);
+        ImageHandle image = allocator->createImage(size_compatible_info);
         cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
                             vk::PipelineStageFlagBits::eTransfer, {}, {}, {},
                             image->barrier(vk::ImageLayout::eTransferDstOptimal, {},
