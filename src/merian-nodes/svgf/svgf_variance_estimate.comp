@@ -34,14 +34,15 @@ shared float shared_z[SHARED_SIZE];
 
 #define SHARED_INDEX(X, Y) ((Y) * gl_WorkGroupSize.x + X)
 
+#define IS_ON_TILE (all(greaterThanEqual(gl_LocalInvocationID.xy, ivec2(VE_SPATIAL_RADIUS))) && all(lessThan(gl_LocalInvocationID.xy, gl_WorkGroupSize.xy - VE_SPATIAL_RADIUS)))
+#define TILE_ID (ivec2(gl_LocalInvocationID.xy) - VE_SPATIAL_RADIUS)
+
 void main() {
-  const ivec2 lid = ivec2(gl_LocalInvocationID.xy) - VE_SPATIAL_RADIUS;
-  const ivec2 ipos = ivec2(gl_WorkGroupID.xy * (gl_WorkGroupSize.xy - VE_SPATIAL_RADIUS)) + lid;
+  const ivec2 ipos = ivec2(gl_WorkGroupID.xy * (gl_WorkGroupSize.xy - 2 * VE_SPATIAL_RADIUS)) + TILE_ID;
   const uint shared_idx = SHARED_INDEX(gl_LocalInvocationID.x, gl_LocalInvocationID.y);
 
   if (SVGF_ITERATIONS == 0) {
-    if (all(lessThan(ipos, imageSize(img_filter_in)))
-        && all(greaterThanEqual(lid, ivec2(0))) && all(lessThan(lid, gl_WorkGroupSize.xy - VE_SPATIAL_RADIUS)))
+    if (all(lessThan(ipos, imageSize(img_filter_in))) && IS_ON_TILE)
       imageStore(img_filter_in, ipos, vec4(texelFetch(img_irr, ipos, 0).rgb, 0));
     return;
   }
@@ -56,12 +57,11 @@ void main() {
     shared_irr[shared_idx]      = texelFetch(img_irr, ipos, 0);
     shared_normal[shared_idx]   = geo_decode_normal(gbuf.enc_normal);
     shared_z[shared_idx]        = gbuf.linear_z;
-    center_grad_z                                                                 = gbuf.grad_z;
+    center_grad_z               = gbuf.grad_z;
   }
   barrier();
 
-  if (any(greaterThanEqual(ipos, imageSize(img_filter_in)))
-      || any(lessThan(lid, ivec2(0))) || any(greaterThanEqual(lid, gl_WorkGroupSize.xy - VE_SPATIAL_RADIUS)))
+  if (any(greaterThanEqual(ipos, imageSize(img_filter_in))) || !IS_ON_TILE)
     return;
 
   #define center_irr_histlen shared_irr[shared_idx]
