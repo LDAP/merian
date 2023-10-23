@@ -217,9 +217,9 @@ void AccumulateNode::get_configuration(Configuration& config, bool& needs_rebuil
     needs_rebuild |= old_extended_search != extended_search || old_reuse_border != reuse_border;
 
     config.st_separate("Firefly Suppression");
-    config.config_bool("enable", accumulate_pc.firefly_filter_enable);
+    config.config_bool("firefly filter enable", accumulate_pc.firefly_filter_enable);
 
-    config.config_float("bias", accumulate_pc.firefly_bias,
+    config.config_float("firefly filter bias", accumulate_pc.firefly_bias,
                         "Adds this value to the maximum allowed luminance.", 0.1);
     config.config_float("IPR factor", accumulate_pc.firefly_ipr_factor,
                         "Inter-percentile range factor. Increase to allow higher outliers.");
