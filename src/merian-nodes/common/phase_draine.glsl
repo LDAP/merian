@@ -67,4 +67,10 @@ float phase_draine_sample(const float xi, const float g, const float a)
     return (1 + g2 - pow(-0.5 * sqrt(T5) + sqrt(6 * (1 + g2) - (8 * T3) / (a * (-1 + g2) * sqrt(T5)) - T6) / 2., 2)) / (2. * g);
 }
 
+vec3 phase_draine_sample(const vec2 xi, const vec3 wi, const float g, const float a) {
+    const float deflection_cos = phase_draine_sample(xi.x, g, a);
+    const float z2 = sqrt(1.0 - deflection_cos * deflection_cos);
+    return make_frame(wi) * vec3(z2 * cos(TWO_PI * xi.y), z2 * sin(TWO_PI * xi.y), deflection_cos);
+}
+
 #endif
