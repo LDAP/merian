@@ -18,7 +18,7 @@ layout(set = 1, binding = 0) uniform sampler2D unused; // needed to match the fi
 layout(set = 1, binding = 1) uniform writeonly image2D img_filter_in;
 
 layout(push_constant, std140) uniform push_t {
-    float normal_reject_rad;
+    float normal_reject_cos;
     float depth_accept;
     float spatial_falloff;
     float spatial_bias;
@@ -87,7 +87,7 @@ void main() {
 
         float w = 1.0;
         // Weight neighbors with similar normals
-        w *= smoothstep(params.normal_reject_rad, 1.0, dot(center_normal, shared_normal[SHARED_INDEX(p.x, p.y)]));
+        w *= smoothstep(params.normal_reject_cos, 1.0, dot(center_normal, shared_normal[SHARED_INDEX(p.x, p.y)]));
         // Weight neighbors with similar depth
         // w *= 1.0 - smoothstep(0.0, params.depth_reject_percent * max(gbuf.linear_z, neigh_gbuf.linear_z), abs(gbuf.linear_z - neigh_gbuf.linear_z));
         w *= exp(-10 * abs(center_linear_z + dot(center_grad_z, vec2(xx, yy)) - shared_z[SHARED_INDEX(p.x, p.y)]) / params.depth_accept);

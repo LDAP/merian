@@ -261,7 +261,7 @@ void SVGFNode::get_configuration(Configuration& config, bool& needs_rebuild) {
                         "higher means use spatial information longer before using the falloff",
                         0.1);
     float angle = glm::acos(variance_estimate_pc.normal_reject_cos);
-    config.config_angle("normal reject", angle, "Reject points with farther apart", 0, 90);
+    config.config_angle("normal reject", angle, "Reject points with farther apart", 0, 180);
     variance_estimate_pc.normal_reject_cos = glm::cos(angle);
     config.config_float("depth accept", variance_estimate_pc.depth_accept, "More means more reuse");
 
