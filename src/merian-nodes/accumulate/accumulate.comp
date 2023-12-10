@@ -166,7 +166,7 @@ void main() {
     // This results in minor smearing but looks a lot better than
     // noise / SVGF blotches.
     const vec2 bmax = imageSize(img_accum) - 1;
-    if (any(greaterThan(prev_pos, bmax)) || any(lessThan(prev_pos, vec2(0)))) {
+    if (any(greaterThan(round(prev_pos), bmax)) || any(lessThan(round(prev_pos), vec2(0)))) {
       // Intersect motion vector with image:
       float tmin = min(prev_pos.x / mv.x, (prev_pos.x - bmax.x) / mv.x);
       tmin = max(tmin, min(prev_pos.y / mv.y, (prev_pos.y - bmax.y) / mv.y));
