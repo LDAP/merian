@@ -47,7 +47,7 @@ void main() {
         rgb_out = tonemap_aces(rgb_in.rgb);
         break;
     case TONEMAP_ACES_APPROX:
-        rgb_out = tonemap_aces_approx(rgb_in.rgb);
+        rgb_out = tonemap_aces_approx(rgb_in.rgb, params.param1, params.param2, params.param3, params.param4, params.param5);
         break;
     case TONEMAP_LOTTES:
         rgb_out = tonemap_lottes(rgb_in.rgb, params.param1, params.param2, params.param3, params.param4, params.param5);

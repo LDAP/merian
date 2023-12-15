@@ -101,6 +101,22 @@ void TonemapNode::get_configuration(Configuration& config, bool& needs_rebuild) 
         config.config_float("midOut", pc.param5, "See Lottes talk", 0.001);
     }
 
+    if (tonemap == TONEMAP_ACES_APPROX) {
+        if (old_tonemap != TONEMAP_ACES_APPROX) {
+            pc.param1 = 2.51;
+            pc.param2 = 0.03;
+            pc.param3 = 2.43;
+            pc.param4 = 0.59;
+            pc.param5 = 0.14;
+        }
+
+        config.config_float("a", pc.param1, "", 0.01);
+        config.config_float("b", pc.param2, "", 0.01);
+        config.config_float("c", pc.param3, "", 0.01);
+        config.config_float("d", pc.param4, "", 0.01);
+        config.config_float("e", pc.param5, "", 0.01);
+    }
+
     config.st_separate();
     int32_t old_clamp_output = clamp_output;
     config.config_bool("clamp output", clamp_output, "clamps the output (before computing the alpha channel)");
