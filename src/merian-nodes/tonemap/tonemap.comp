@@ -7,6 +7,8 @@
 layout(local_size_x_id = 0, local_size_y_id = 1, local_size_z = 1) in;
 layout (constant_id = 2) const int tonemap = 0;
 layout (constant_id = 3) const int alpha_mode = 0;
+layout (constant_id = 4) const int clamp_output = 1;
+
 
 layout(set = 0, binding = 0) uniform sampler2D img_src;
 layout(set = 0, binding = 1) uniform writeonly image2D img_output;
@@ -52,6 +54,9 @@ void main() {
         break;
     }
 
+    if (clamp_output != 0)
+        rgb_out = clamp(rgb_out, 0, 1);
+
     switch(alpha_mode) {
         case ALPHA_MODE_PASSTHROUGH:
             imageStore(img_output, ipos, vec4(rgb_out, rgb_in.a));
@@ -61,9 +66,6 @@ void main() {
             break;
         case ALPHA_MODE_PERCEPTUAL_LUMINANCE:
             imageStore(img_output, ipos, vec4(rgb_out, pow(yuv_luminance(rgb_out), 1. / params.perceptual_exp)));
-            break;
-        case ALPHA_MODE_PERCEPTUAL_LUMINANCE_CLAMPED:
-            imageStore(img_output, ipos, vec4(rgb_out, clamp(pow(yuv_luminance(rgb_out), 1. / params.perceptual_exp), 0, 1)));
             break;
     }
 }

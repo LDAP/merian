@@ -47,7 +47,7 @@ TonemapNode::describe_outputs(const std::vector<NodeOutputDescriptorImage>& conn
 
 SpecializationInfoHandle TonemapNode::get_specialization_info() const noexcept {
     auto spec_builder = SpecializationInfoBuilder();
-    spec_builder.add_entry(local_size_x, local_size_y, tonemap, alpha_mode);
+    spec_builder.add_entry(local_size_x, local_size_y, tonemap, alpha_mode, clamp_output);
     return spec_builder.build();
 }
 
@@ -102,18 +102,21 @@ void TonemapNode::get_configuration(Configuration& config, bool& needs_rebuild) 
     }
 
     config.st_separate();
+    int32_t old_clamp_output = clamp_output;
+    config.config_bool("clamp output", clamp_output, "clamps the output (before computing the alpha channel)");
+    needs_rebuild |= old_clamp_output != clamp_output;
+
+    config.st_separate();
     int32_t old_alpha_mode = alpha_mode;
     config.config_options("alpha mode", alpha_mode,
                           {
                               "Passthrough",
                               "Luminance",
                               "Perceptual luminance",
-                              "Perceptual luminance (Clamped)",
                           },
                           Configuration::OptionsStyle::DONT_CARE,
                           "Decides what is written in the alpha channel.");
-    if (alpha_mode == ALPHA_MODE_PERCEPTUAL_LUMINANCE ||
-        alpha_mode == ALPHA_MODE_PERCEPTUAL_LUMINANCE_CLAMPED) {
+    if (alpha_mode == ALPHA_MODE_PERCEPTUAL_LUMINANCE) {
         config.config_float(
             "perceptual exponent", pc.perceptual_exponent,
             "Adjust the exponent that is used to convert the luminance to perceptual space.", 0.1);

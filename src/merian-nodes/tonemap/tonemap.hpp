@@ -54,6 +54,7 @@ class TonemapNode : public ComputeNode {
     ShaderModuleHandle shader;
     int32_t tonemap = 0;
     int32_t alpha_mode = 0;
+    int32_t clamp_output = 1;
 };
 
 } // namespace merian
