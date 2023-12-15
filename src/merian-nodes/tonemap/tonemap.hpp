@@ -16,6 +16,8 @@ class TonemapNode : public ComputeNode {
         float param3 = 1.0;
         float param4 = 1.0;
         float param5 = 1.0;
+
+        float perceptual_exponent = 2.2;
     };
 
   public:
@@ -50,7 +52,8 @@ class TonemapNode : public ComputeNode {
     vk::Extent3D extent;
     PushConstant pc;
     ShaderModuleHandle shader;
-    int tonemap = 0;
+    int32_t tonemap = 0;
+    int32_t alpha_mode = 0;
 };
 
 } // namespace merian

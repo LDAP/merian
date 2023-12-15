@@ -47,7 +47,7 @@ TonemapNode::describe_outputs(const std::vector<NodeOutputDescriptorImage>& conn
 
 SpecializationInfoHandle TonemapNode::get_specialization_info() const noexcept {
     auto spec_builder = SpecializationInfoBuilder();
-    spec_builder.add_entry(local_size_x, local_size_y, tonemap);
+    spec_builder.add_entry(local_size_x, local_size_y, tonemap, alpha_mode);
     return spec_builder.build();
 }
 
@@ -66,16 +66,9 @@ ShaderModuleHandle TonemapNode::get_shader_module() {
 
 void TonemapNode::get_configuration(Configuration& config, bool& needs_rebuild) {
     const int old_tonemap = tonemap;
-    config.config_options("tonemap", tonemap,
-                          {
-                              "None",
-                              "Clamp",
-                              "Uncharted 2",
-                              "Reinhard Extended",
-                              "Aces",
-                              "Aces-Approx",
-                              "Lottes"
-                          });
+    config.config_options(
+        "tonemap", tonemap,
+        {"None", "Clamp", "Uncharted 2", "Reinhard Extended", "Aces", "Aces-Approx", "Lottes"});
     needs_rebuild |= old_tonemap != tonemap;
 
     if (tonemap == TONEMAP_REINHARD_EXTENDED) {
@@ -107,6 +100,26 @@ void TonemapNode::get_configuration(Configuration& config, bool& needs_rebuild) 
         config.config_float("midIn", pc.param4, "See Lottes talk", 0.001);
         config.config_float("midOut", pc.param5, "See Lottes talk", 0.001);
     }
+
+    config.st_separate();
+    int32_t old_alpha_mode = alpha_mode;
+    config.config_options("alpha mode", alpha_mode,
+                          {
+                              "Passthrough",
+                              "Luminance",
+                              "Perceptual luminance",
+                              "Perceptual luminance (Clamped)",
+                          },
+                          Configuration::OptionsStyle::DONT_CARE,
+                          "Decides what is written in the alpha channel.");
+    if (alpha_mode == ALPHA_MODE_PERCEPTUAL_LUMINANCE ||
+        alpha_mode == ALPHA_MODE_PERCEPTUAL_LUMINANCE_CLAMPED) {
+        config.config_float(
+            "perceptual exponent", pc.perceptual_exponent,
+            "Adjust the exponent that is used to convert the luminance to perceptual space.", 0.1);
+    }
+
+    needs_rebuild |= old_alpha_mode != alpha_mode;
 }
 
 } // namespace merian
