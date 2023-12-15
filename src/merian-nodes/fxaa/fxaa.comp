@@ -1,0 +1,33 @@
+#version 460
+#extension GL_GOOGLE_include_directive    : enable
+
+layout(local_size_x_id = 0, local_size_y_id = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D img_src;
+layout(set = 0, binding = 1) uniform writeonly image2D img_output;
+
+#define FXAA_PC 1
+#define FXAA_GLSL_130 1
+#define FXAA_QUALITY__PRESET 23
+
+#include "fxaa.h"
+
+layout(push_constant) uniform params_t { 
+    int enable;
+} params;
+
+void main() {
+    const ivec2 ipos = ivec2(gl_GlobalInvocationID);
+    if (any(greaterThanEqual(ipos, imageSize(img_output)))) return;
+
+    const vec2 size = imageSize(img_output);
+    const vec2 pos = (vec2(ipos) + 0.5) / size;
+
+    vec4 output_color;
+    if (params.enable != 0)
+        output_color = FxaaPixelShader(pos, vec4(0), img_src, img_src, img_src, 1. / size, vec4(0), vec4(0), vec4(0), 0.5, 0.166, 0.0833, 8.0, 0.125, 0.05, vec4(0));
+    else
+        output_color = texelFetch(img_src, ipos, 0);
+
+    imageStore(img_output, ipos, output_color);
+}
