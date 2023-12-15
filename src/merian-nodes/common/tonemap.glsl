@@ -54,19 +54,17 @@ vec3 tonemap_aces(const vec3 rgb) {
     return clamp(OUT * col, 0., 1.);
 }
 
-vec3 tonemap_aces_approx(const vec3 rgb, float a, float b, float c, float d, float e) {
-    const vec3 col = (rgb*(a*rgb+b))/(rgb*(c*rgb+d)+e);
-    return clamp(col, 0., 1.);
-}
-
-vec3 tonemap_aces_approx(const vec3 rgb) {
+/* 
+Default parameters:
     const float a = 2.51f;
     const float b = 0.03f;
     const float c = 2.43f;
     const float d = 0.59f;
     const float e = 0.14f;
-
-    return tonemap_aces_approx(rgb, a, b, c, d, e);
+*/
+vec3 tonemap_aces_approx(const vec3 rgb, const float a, const float b, const float c, const float d, const float e) {
+    const vec3 col = (rgb*(a*rgb+b))/(rgb*(c*rgb+d)+e);
+    return clamp(col, 0., 1.);
 }
 
 // Lottes 2016, "Advanced Techniques and Optimization of HDR Color Pipelines" (AMD)
