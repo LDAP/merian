@@ -6,9 +6,9 @@ Calculates accumulated irradiance and the first two moments.
   Calculates percentiles within 8x8 clusters,
   then clamps the luminance by `upper_percentile + user_factor * (upper_percentile - lower_percentile)`
 
-- Includes simple but effective "adaptive alpha reduction".
+- Includes a simple but effective "adaptive alpha reduction".
   For history values that are larger than `upper_percentile` or lower than `lower_percentile` alpha can be reduced dynamically.
-  This helphs agains smearing, ghosting and fireflies in the history.
+  This helps against smearing, ghosting and fireflies in the history.
 
 Inputs:
 
