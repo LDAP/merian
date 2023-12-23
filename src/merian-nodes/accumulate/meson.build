@@ -5,6 +5,7 @@ shaders = [
 included_files = files(
     shader_include_dir + '/common/colors_yuv.glsl',
     shader_include_dir + '/common/interpolate.glsl',
+    shader_include_dir + '/common/gbuffer.glsl.h',
     'graph_layout.glsl',
 )
 
