@@ -165,6 +165,7 @@ void ImageWriteNode::cmd_process([[maybe_unused]] const vk::CommandBuffer& cmd,
             } catch (std::filesystem::filesystem_error const&) {
                 SPDLOG_WARN("rename failed! Falling back to copy...");
                 std::filesystem::copy(tmp_filename, filename);
+                std::filesystem::remove(tmp_filename);
             }
 
             linear_image->get_memory()->unmap();
