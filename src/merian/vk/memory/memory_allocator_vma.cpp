@@ -89,7 +89,7 @@ VMAMemoryAllocator::VMAMemoryAllocator(const SharedContext& context,
     : MemoryAllocator(context) {
     VmaAllocatorCreateInfo allocatorInfo = {
         .flags = flags,
-        .physicalDevice = context->pd_container.physical_device,
+        .physicalDevice = context->physical_device.physical_device,
         .device = context->device,
         .preferredLargeHeapBlockSize = 0,
         .pAllocationCallbacks = nullptr,

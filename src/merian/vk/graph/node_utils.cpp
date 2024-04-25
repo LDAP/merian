@@ -65,7 +65,7 @@ make_graph_descriptor_sets(const SharedContext context,
             create_image_view.format = image_input->get_format();
             in_tex = allocator->createTexture(image_input, create_image_view);
 
-            vk::FormatProperties props = context->pd_container.physical_device.getFormatProperties(create_image_view.format);
+            vk::FormatProperties props = context->physical_device.physical_device.getFormatProperties(create_image_view.format);
             if (props.optimalTilingFeatures & vk::FormatFeatureFlagBits::eSampledImageFilterLinear) {
                 in_tex->attach_sampler(allocator->get_sampler_pool()->linear_mirrored_repeat());
             } else {

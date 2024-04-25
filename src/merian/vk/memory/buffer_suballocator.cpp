@@ -206,7 +206,7 @@ void BufferSubAllocator::allocBlock(Block& block, uint32_t, vk::DeviceSize size)
     if (m_memoryTypeIndex == uint32_t(~0)) {
         vk::PhysicalDeviceMemoryProperties memoryProperties =
             m_memAllocator->get_context()
-                ->pd_container.physical_device_memory_properties.memoryProperties;
+                ->physical_device.physical_device_memory_properties.memoryProperties;
         vk::MemoryPropertyFlags memProps = m_memoryPropFlags;
 
         // Find an available memory type that satisfies the requested properties.

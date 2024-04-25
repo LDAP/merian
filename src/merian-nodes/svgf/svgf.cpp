@@ -15,11 +15,11 @@
 namespace merian {
 
 uint32_t get_ve_local_size(const SharedContext& context) {
-    if (32 * 32 * VE_SHARED_MEMORY_PER_PIXEL <= context->pd_container.physical_device_properties
+    if (32 * 32 * VE_SHARED_MEMORY_PER_PIXEL <= context->physical_device.physical_device_properties
                                                     .properties.limits.maxComputeSharedMemorySize) {
         return 32;
     } else if (16 * 16 * VE_SHARED_MEMORY_PER_PIXEL <=
-               context->pd_container.physical_device_properties.properties.limits
+               context->physical_device.physical_device_properties.properties.limits
                    .maxComputeSharedMemorySize) {
         return 16;
     } else {

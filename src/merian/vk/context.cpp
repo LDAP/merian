@@ -179,43 +179,44 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id,
                   return false;
               });
 
-    pd_container.physical_device = std::get<0>(matches.back());
+    physical_device.physical_device = std::get<0>(matches.back());
 
-    pd_container.physical_device_properties.pNext =
-        &pd_container.physical_device_subgroup_properties;
+    physical_device.physical_device_properties.pNext =
+        &physical_device.physical_device_subgroup_properties;
     // ^
-    pd_container.physical_device.getProperties2(&pd_container.physical_device_properties);
+    physical_device.physical_device.getProperties2(&physical_device.physical_device_properties);
     SPDLOG_INFO("selected physical device {}, vendor id: {}, device id: {}",
-                pd_container.physical_device_properties.properties.deviceName.data(),
-                pd_container.physical_device_properties.properties.vendorID,
-                pd_container.physical_device_properties.properties.deviceID);
+                physical_device.physical_device_properties.properties.deviceName.data(),
+                physical_device.physical_device_properties.properties.vendorID,
+                physical_device.physical_device_properties.properties.deviceID);
 
     void* extension_features_pnext = nullptr;
     for (auto& ext : extensions) {
         extension_features_pnext = ext->pnext_get_features_2(extension_features_pnext);
     }
     // ^
-    pd_container.features.physical_device_features_v13.setPNext(extension_features_pnext);
+    physical_device.features.physical_device_features_v13.setPNext(extension_features_pnext);
     // ^
-    pd_container.features.physical_device_features_v12.setPNext(
-        &pd_container.features.physical_device_features_v13);
+    physical_device.features.physical_device_features_v12.setPNext(
+        &physical_device.features.physical_device_features_v13);
     // ^
-    pd_container.features.physical_device_features_v11.setPNext(
-        &pd_container.features.physical_device_features_v12);
+    physical_device.features.physical_device_features_v11.setPNext(
+        &physical_device.features.physical_device_features_v12);
     // ^
-    pd_container.features.physical_device_features.setPNext(
-        &pd_container.features.physical_device_features_v11);
+    physical_device.features.physical_device_features.setPNext(
+        &physical_device.features.physical_device_features_v11);
     // ^
-    pd_container.physical_device.getFeatures2(&pd_container.features.physical_device_features);
+    physical_device.physical_device.getFeatures2(
+        &physical_device.features.physical_device_features);
 
-    pd_container.physical_device_memory_properties =
-        pd_container.physical_device.getMemoryProperties2();
+    physical_device.physical_device_memory_properties =
+        physical_device.physical_device.getMemoryProperties2();
 
-    pd_container.physical_device_extension_properties =
-        pd_container.physical_device.enumerateDeviceExtensionProperties();
+    physical_device.physical_device_extension_properties =
+        physical_device.physical_device.enumerateDeviceExtensionProperties();
 
     for (auto& ext : extensions) {
-        ext->on_physical_device_selected(pd_container);
+        ext->on_physical_device_selected(physical_device);
     }
 
     extensions_check_device_extension_support();
@@ -224,7 +225,7 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id,
 
 void Context::find_queues() {
     std::vector<vk::QueueFamilyProperties> queue_family_props =
-        pd_container.physical_device.getQueueFamilyProperties();
+        physical_device.physical_device.getQueueFamilyProperties();
 
     if (queue_family_props.empty()) {
         throw std::runtime_error{"no queue families available!"};
@@ -276,7 +277,7 @@ void Context::find_queues() {
                     (queue_family_props[queue_family_idx_GCT].queueFlags & Flags::eTransfer) &&
                     remaining_queue_count[queue_family_idx_GCT] > 0 &&
                     std::all_of(extensions.begin(), extensions.end(), [&](auto ext) {
-                        return ext->accept_graphics_queue(pd_container.physical_device,
+                        return ext->accept_graphics_queue(physical_device.physical_device,
                                                           queue_family_idx_GCT);
                     })) {
                     found_GCT = true;
@@ -396,7 +397,7 @@ void Context::create_device_and_queues(uint32_t preferred_number_compute_queues)
     // PREPARE QUEUES
 
     std::vector<vk::QueueFamilyProperties> queue_family_props =
-        pd_container.physical_device.getQueueFamilyProperties();
+        physical_device.physical_device.getQueueFamilyProperties();
     std::vector<uint32_t> count_per_family(queue_family_props.size());
     uint32_t actual_number_compute_queues = 0;
 
@@ -440,7 +441,7 @@ void Context::create_device_and_queues(uint32_t preferred_number_compute_queues)
     std::vector<const char*> required_device_extensions;
     for (auto& ext : extensions) {
         insert_all(required_device_extensions,
-                   ext->required_device_extension_names(pd_container.physical_device));
+                   ext->required_device_extension_names(physical_device.physical_device));
     }
     remove_duplicates(required_device_extensions);
     SPDLOG_DEBUG("enabling device extensions: [{}]", fmt::join(required_device_extensions, ", "));
@@ -449,10 +450,10 @@ void Context::create_device_and_queues(uint32_t preferred_number_compute_queues)
 
     FeaturesContainer enable;
     // TODO: This enables all features which may be overkill
-    enable.physical_device_features = pd_container.features.physical_device_features;
-    enable_common_features(pd_container.features, enable);
+    enable.physical_device_features = physical_device.features.physical_device_features;
+    enable_common_features(physical_device.features, enable);
     for (auto& ext : extensions) {
-        ext->enable_device_features(pd_container.features, enable);
+        ext->enable_device_features(physical_device.features, enable);
     }
 
     // Setup p_next for extensions
@@ -479,7 +480,7 @@ void Context::create_device_and_queues(uint32_t preferred_number_compute_queues)
                                             nullptr,
                                             &enable.physical_device_features};
 
-    device = pd_container.physical_device.createDevice(device_create_info);
+    device = physical_device.physical_device.createDevice(device_create_info);
     SPDLOG_DEBUG("device created and queues created");
 
     VULKAN_HPP_DEFAULT_DISPATCHER.init(device);
@@ -555,11 +556,11 @@ void Context::extensions_check_device_extension_support() {
 
     for (auto& ext : extensions) {
         std::vector<const char*> device_extensions =
-            ext->required_device_extension_names(pd_container.physical_device);
+            ext->required_device_extension_names(physical_device.physical_device);
         bool all_extensions_found = true;
         for (auto& layer : device_extensions) {
             bool extension_found = false;
-            for (auto& extension_prop : pd_container.physical_device_extension_properties) {
+            for (auto& extension_prop : physical_device.physical_device_extension_properties) {
                 if (!strcmp(extension_prop.extensionName, layer)) {
                     extension_found = true;
                     break;

@@ -12,7 +12,7 @@ namespace merian {
  * screen tearing doesnt happen).
  */
 [[nodiscard]] vk::PresentModeKHR Swapchain::select_present_mode() {
-    auto present_modes = context->pd_container.physical_device.getSurfacePresentModesKHR(*surface);
+    auto present_modes = context->physical_device.physical_device.getSurfacePresentModesKHR(*surface);
     if (present_modes.size() == 0)
         throw std::runtime_error("Surface doesn't support any present modes!");
 
@@ -74,7 +74,7 @@ Swapchain::Swapchain(const SharedContext& context,
     : context(context), surface(surface), preferred_surface_formats(preferred_surface_formats),
       preferred_vsync_off_mode(preferred_vsync_off_mode), wait_queue(wait_queue) {
 
-    auto surface_formats = context->pd_container.physical_device.getSurfaceFormatsKHR(*surface);
+    auto surface_formats = context->physical_device.physical_device.getSurfaceFormatsKHR(*surface);
     if (surface_formats.size() == 0)
         throw std::runtime_error("Surface doesn't support any surface formats!");
 
@@ -117,7 +117,7 @@ vk::Extent2D Swapchain::recreate_swapchain(int width, int height) {
         old_swapchain = VK_NULL_HANDLE;
     }
 
-    auto capabilities = context->pd_container.physical_device.getSurfaceCapabilitiesKHR(*surface);
+    auto capabilities = context->physical_device.physical_device.getSurfaceCapabilitiesKHR(*surface);
     extent = make_extent2D(capabilities, width, height);
 
     min_images = capabilities.minImageCount + 1; // one extra to own

@@ -46,7 +46,7 @@ class ASBuilder {
         vk::PhysicalDeviceAccelerationStructurePropertiesKHR acceleration_structure_properties;
         vk::PhysicalDeviceProperties2KHR props2;
         props2.pNext = &acceleration_structure_properties;
-        context->pd_container.physical_device.getProperties2(&props2);
+        context->physical_device.physical_device.getProperties2(&props2);
         scratch_buffer_min_alignment =
             acceleration_structure_properties.minAccelerationStructureScratchOffsetAlignment;
     }

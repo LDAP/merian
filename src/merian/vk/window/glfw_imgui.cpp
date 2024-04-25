@@ -115,7 +115,7 @@ void GLFWImGui::init_imgui(GLFWwindow* window, SwapchainAcquireResult& aquire_re
     ImGui_ImplGlfw_InitForVulkan(window, true);
     ImGui_ImplVulkan_InitInfo init_info = {};
     init_info.Instance = context->instance;
-    init_info.PhysicalDevice = context->pd_container.physical_device;
+    init_info.PhysicalDevice = context->physical_device.physical_device;
     init_info.Device = context->device;
     init_info.QueueFamily = context->queue_family_idx_GCT;
     init_info.Queue = context->get_queue_GCT()->get_queue();

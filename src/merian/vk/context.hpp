@@ -1,6 +1,5 @@
 #pragma once
 
-#include <mutex>
 #include <spdlog/logger.h>
 
 #include <vulkan/vulkan.hpp>
@@ -27,6 +26,22 @@ class Context : public std::enable_shared_from_this<Context> {
 
   public:
     struct FeaturesContainer {
+        operator const vk::PhysicalDeviceFeatures2&() const {
+          return physical_device_features;
+        }
+
+        operator vk::PhysicalDeviceFeatures2&() {
+          return physical_device_features;
+        }
+
+        operator const vk::PhysicalDeviceFeatures&() const {
+          return physical_device_features.features;
+        }
+
+        operator vk::PhysicalDeviceFeatures&() {
+          return physical_device_features.features;
+        }
+
         vk::PhysicalDeviceFeatures2 physical_device_features;
         vk::PhysicalDeviceVulkan11Features physical_device_features_v11;
         vk::PhysicalDeviceVulkan12Features physical_device_features_v12;
@@ -34,6 +49,14 @@ class Context : public std::enable_shared_from_this<Context> {
     };
 
     struct PhysicalDeviceContainer {
+        operator const vk::PhysicalDevice&() const {
+          return physical_device;
+        }
+
+        operator vk::PhysicalDevice&() {
+          return physical_device;
+        }
+
         vk::PhysicalDevice physical_device;
         vk::PhysicalDeviceProperties2 physical_device_properties;
         vk::PhysicalDeviceMemoryProperties2 physical_device_memory_properties;
@@ -75,7 +98,7 @@ class Context : public std::enable_shared_from_this<Context> {
     }
 
     operator vk::PhysicalDevice&() {
-        return pd_container.physical_device;
+        return physical_device;
     }
 
     operator vk::Device&() {
@@ -142,7 +165,7 @@ class Context : public std::enable_shared_from_this<Context> {
     // in prepare_physical_device
 
     // the vk::PhysicalDevice for this Context
-    PhysicalDeviceContainer pd_container;
+    PhysicalDeviceContainer physical_device;
 
     // in find_queues. Indexes are -1 if no suitable queue was found!
 
