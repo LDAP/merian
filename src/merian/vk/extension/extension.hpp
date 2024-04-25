@@ -56,11 +56,11 @@ class Extension {
     virtual void on_instance_created(const vk::Instance&) {}
     /* Called after the physical device was select and before extensions are checked for
      * compativility and check_support is called.*/
-    virtual void on_physical_device_selected(const Context::PhysicalDeviceContainer&) {
-    }
+    virtual void on_physical_device_selected(const Context::PhysicalDeviceContainer&) {}
 
-    /* Append a structure to pNext of a getFeatures() call. This can be used to determine extension support.
-     * 
+    /* Append a structure to pNext of a getFeatures() call. This can be used to determine extension
+     * support.
+     *
      * If a struct should be appended, set pNext of your struct to the supplied pointer,
      * then return a pointer to your struct.
      * If nothing should be appended, return the supplied pointer.
@@ -69,7 +69,9 @@ class Extension {
         return p_next;
     }
 
-    /* Custom check for compatibility after the physical device is ready. */
+    /* Custom check for compatibility after the physical device is ready.
+     * If this method returns false, it is guaranteed that on_unsupported is called.
+     */
     virtual bool extension_supported(const Context::PhysicalDeviceContainer&) {
         return true;
     }
@@ -99,20 +101,14 @@ class Extension {
     virtual void on_destroy_device(const vk::Device&) {}
     /* Called before the instance is destroyed or if the extension is determined as unsupported. */
     virtual void on_destroy_instance(const vk::Instance&) {}
-
-    // OTHER
-
-    /* Only valid after context initialization */
-    virtual bool is_supported() final {
-        return supported;
+    // Called by context if extension was determined as unsupported. The extension might not receive
+    // further callbacks.
+    virtual void on_unsupported([[maybe_unused]] const std::string reason) {
+        spdlog::warn("extension {} not supported ({})", name, reason);
     }
 
   public:
     const std::string name;
-
-  private:
-    // written by Context
-    bool supported = true;
 };
 
 } // namespace merian

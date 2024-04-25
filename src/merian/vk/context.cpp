@@ -512,10 +512,8 @@ void Context::extensions_check_instance_layer_support() {
             all_layers_found &= layer_found;
         }
         if (!all_layers_found) {
-            spdlog::warn("extension {} not supported (instance layer missing), disabling...",
-                         ext->name);
             not_supported.push_back(ext);
-            ext->supported = false;
+            ext->on_unsupported("instance layer missing");
         }
     }
     destroy_extensions(not_supported);
@@ -541,10 +539,8 @@ void Context::extensions_check_instance_extension_support() {
             all_extensions_found &= extension_found;
         }
         if (!all_extensions_found) {
-            spdlog::warn("extension {} not supported (instance extension missing), disabling...",
-                         ext->name);
             not_supported.push_back(ext);
-            ext->supported = false;
+            ext->on_unsupported("instance extension missing");
         }
     }
     destroy_extensions(not_supported);
@@ -569,10 +565,8 @@ void Context::extensions_check_device_extension_support() {
             all_extensions_found &= extension_found;
         }
         if (!all_extensions_found) {
-            spdlog::warn("extension {} not supported (device extension missing), disabling...",
-                         ext->name);
             not_supported.push_back(ext);
-            ext->supported = false;
+            ext->on_unsupported("device extension missing");
         }
     }
     destroy_extensions(not_supported);
@@ -582,9 +576,8 @@ void Context::extensions_self_check_support() {
     SPDLOG_DEBUG("extensions: self-check support...");
     std::vector<std::shared_ptr<Extension>> not_supported;
     for (auto& ext : extensions) {
-        if (!ext->extension_supported(pd_container)) {
-            spdlog::warn("extension {} not supported (self-check failed), disabling...", ext->name);
-            ext->supported = false;
+        if (!ext->extension_supported(physical_device)) {
+            ext->on_unsupported("self-check failed");
             not_supported.push_back(ext);
         }
     }
