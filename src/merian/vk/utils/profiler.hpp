@@ -103,13 +103,13 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
     uint32_t cmd_start(
         const vk::CommandBuffer& cmd,
         const std::string name,
-        const vk::PipelineStageFlagBits pipeline_stage = vk::PipelineStageFlagBits::eAllCommands);
+        const vk::PipelineStageFlagBits pipeline_stage = vk::PipelineStageFlagBits::eTopOfPipe);
 
     // Stop a GPU section
     void cmd_end(
         const vk::CommandBuffer& cmd,
         const uint32_t start_id,
-        const vk::PipelineStageFlagBits pipeline_stage = vk::PipelineStageFlagBits::eAllCommands);
+        const vk::PipelineStageFlagBits pipeline_stage = vk::PipelineStageFlagBits::eBottomOfPipe);
 
     // Collects the results from the GPU.
     void collect(const bool wait = false);
