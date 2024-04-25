@@ -10,12 +10,14 @@ namespace merian {
 #define FORMAT_JPG 1
 #define FORMAT_HDR 2
 
-ImageWriteNode::ImageWriteNode(const SharedContext context,
-                               const ResourceAllocatorHandle allocator,
-                               const std::string& base_filename = "image")
-    : context(context), allocator(allocator), base_filename(base_filename), buf(256) {
-    assert(base_filename.size() < buf.size());
-    std::copy(base_filename.begin(), base_filename.end(), buf.begin());
+ImageWriteNode::ImageWriteNode(
+    const SharedContext context,
+    const ResourceAllocatorHandle allocator,
+    const std::string& filename_format =
+        "image_{record_iteration:06}_{image_index:06}_{run_iteration:06}")
+    : context(context), allocator(allocator), filename_format(filename_format), buf(1024) {
+    assert(filename_format.size() < buf.size());
+    std::copy(filename_format.begin(), filename_format.end(), buf.begin());
 }
 
 ImageWriteNode::~ImageWriteNode() {}
@@ -59,7 +61,7 @@ void ImageWriteNode::cmd_process([[maybe_unused]] const vk::CommandBuffer& cmd,
                                  [[maybe_unused]] const std::vector<BufferHandle>& buffer_inputs,
                                  [[maybe_unused]] const std::vector<ImageHandle>& image_outputs,
                                  [[maybe_unused]] const std::vector<BufferHandle>& buffer_outputs) {
-    if (base_filename.empty()) {
+    if (filename_format.empty()) {
         return;
     }
 
@@ -128,43 +130,47 @@ void ImageWriteNode::cmd_process([[maybe_unused]] const vk::CommandBuffer& cmd,
         int it = iteration;
         int run_it = run.get_iteration();
         int image_index = this->image_index++;
+        std::string filename_format = this->filename_format;
         run.add_submit_callback([this, image, linear_image, it, image_index,
-                                 run_it](const QueueHandle& queue) {
+                                 run_it, filename_format](const QueueHandle& queue) {
             queue->wait_idle();
             void* mem = linear_image->get_memory()->map();
 
-            std::string filename =
-                fmt::format("{}_{:06}_{:06}_{:06}", this->base_filename, it, image_index, run_it);
-            char* tmp_filename = std::tmpnam(NULL);
+            std::filesystem::path path = std::filesystem::absolute(
+                fmt::format(fmt::runtime(filename_format), fmt::arg("record_iteration", it),
+                            fmt::arg("image_index", image_index), fmt::arg("run_iteration", run_it),
+                            fmt::arg("width", linear_image->get_extent().width),
+                            fmt::arg("height", linear_image->get_extent().height)));
+            std::filesystem::create_directories(path.parent_path());
+            const std::string tmp_filename = path.parent_path() / (".interm_" + path.filename().string());
 
             switch (this->format) {
             case FORMAT_PNG: {
-                filename += ".png";
-                stbi_write_png(tmp_filename, linear_image->get_extent().width,
+                path += ".png";
+                stbi_write_png(tmp_filename.c_str(), linear_image->get_extent().width,
                                linear_image->get_extent().height, 4, mem,
                                linear_image->get_extent().width * 4);
                 break;
             }
             case FORMAT_JPG: {
-                filename += ".jpg";
-                stbi_write_jpg(tmp_filename, linear_image->get_extent().width,
+                path += ".jpg";
+                stbi_write_jpg(tmp_filename.c_str(), linear_image->get_extent().width,
                                linear_image->get_extent().height, 4, mem, 100);
                 break;
             }
             case FORMAT_HDR: {
-                filename += ".hdr";
-                stbi_write_hdr(tmp_filename, linear_image->get_extent().width,
+                path += ".hdr";
+                stbi_write_hdr(tmp_filename.c_str(), linear_image->get_extent().width,
                                linear_image->get_extent().height, 4, static_cast<float*>(mem));
                 break;
             }
             }
 
-            std::filesystem::create_directories(std::filesystem::absolute(filename).parent_path());
             try {
-                std::filesystem::rename(tmp_filename, filename);
+                std::filesystem::rename(tmp_filename, path);
             } catch (std::filesystem::filesystem_error const&) {
                 SPDLOG_WARN("rename failed! Falling back to copy...");
-                std::filesystem::copy(tmp_filename, filename);
+                std::filesystem::copy(tmp_filename, path);
                 std::filesystem::remove(tmp_filename);
             }
 
@@ -195,12 +201,15 @@ void ImageWriteNode::get_configuration([[maybe_unused]] Configuration& config, b
                        "calls the on_record callback after every capture");
     config.config_bool("callback on record", callback_on_record,
                        "calls the callback when the recording starts");
-    if (config.config_text("filename", buf.size(), buf.data())) {
-        base_filename = buf.data();
+    if (config.config_text("filename", buf.size(), buf.data(), false,
+                           "Provide a format string for the path. Supported variables are: "
+                           "record_iteration, run_iteration, image_index, width, height")) {
+        filename_format = buf.data();
     }
-    config.output_text(fmt::format(
-        "abs path: {}",
-        base_filename.empty() ? "<invalid>" : std::filesystem::absolute(base_filename).string()));
+    config.output_text(
+        fmt::format("abs path: {}", filename_format.empty()
+                                        ? "<invalid>"
+                                        : std::filesystem::absolute(filename_format).string()));
 
     config.st_separate("Single");
     record_next = config.config_bool("trigger");

@@ -48,7 +48,7 @@ class ImageWriteNode : public Node {
 
     std::function<void()> callback;
 
-    std::string base_filename;
+    std::string filename_format;
     std::vector<char> buf;
 
     int64_t iteration = 0;
