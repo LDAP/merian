@@ -1,7 +1,6 @@
 #pragma once
 
 #include "merian/vk/command/command_pool.hpp"
-#include "merian/vk/utils/check_result.hpp"
 
 #include <mutex>
 #include <vulkan/vulkan.hpp>
@@ -68,6 +67,10 @@ class Queue : public std::enable_shared_from_this<Queue> {
 
     uint32_t get_queue_family_index() const {
         return queue_family_index;
+    }
+
+    const vk::QueueFamilyProperties get_queue_family_properties() const {
+        return context->physical_device.physical_device.getQueueFamilyProperties()[queue_family_index];
     }
 
     operator uint32_t() const {

@@ -57,6 +57,10 @@ class Context : public std::enable_shared_from_this<Context> {
           return physical_device;
         }
 
+        const vk::PhysicalDeviceLimits& get_physical_device_limits() const {
+          return physical_device_properties.properties.limits;
+        }
+
         vk::PhysicalDevice physical_device;
         vk::PhysicalDeviceProperties2 physical_device_properties;
         vk::PhysicalDeviceMemoryProperties2 physical_device_memory_properties;

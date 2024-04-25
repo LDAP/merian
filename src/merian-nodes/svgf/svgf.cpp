@@ -15,12 +15,11 @@
 namespace merian {
 
 uint32_t get_ve_local_size(const SharedContext& context) {
-    if (32 * 32 * VE_SHARED_MEMORY_PER_PIXEL <= context->physical_device.physical_device_properties
-                                                    .properties.limits.maxComputeSharedMemorySize) {
+    if (32 * 32 * VE_SHARED_MEMORY_PER_PIXEL <=
+        context->physical_device.get_physical_device_limits().maxComputeSharedMemorySize) {
         return 32;
     } else if (16 * 16 * VE_SHARED_MEMORY_PER_PIXEL <=
-               context->physical_device.physical_device_properties.properties.limits
-                   .maxComputeSharedMemorySize) {
+               context->physical_device.get_physical_device_limits().maxComputeSharedMemorySize) {
         return 16;
     } else {
         throw std::runtime_error{"SVGF: Not enough shared memory for spatial variance estimate."};

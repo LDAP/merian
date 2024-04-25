@@ -16,16 +16,16 @@ Profiler::Profiler(const SharedContext context, const QueueHandle queue, const u
     gpu_sections.reserve(num_gpu_timers);
     cpu_sections.reserve(1024);
 
-    const uint64_t valid_bits = context->physical_device.physical_device.getQueueFamilyProperties()[queue->get_queue_family_index()].timestampValidBits;
+    const uint64_t valid_bits = queue->get_queue_family_properties().timestampValidBits;
     if (valid_bits < 64) {
         bitmask = (((uint64_t)1) << (valid_bits + 1)) - 1;
     } else {
         bitmask = (uint64_t)-1;
     }
-    SPDLOG_DEBUG("using queue with valid bits: {}, mask: {}", valid_bits, bitmask);
-
     timestamp_period =
-        context->physical_device.physical_device_properties.properties.limits.timestampPeriod;
+        context->physical_device.get_physical_device_limits().timestampPeriod;
+
+    SPDLOG_DEBUG("using queue with valid bits: {}, mask: {}", valid_bits, bitmask);
 }
 
 Profiler::~Profiler() {
