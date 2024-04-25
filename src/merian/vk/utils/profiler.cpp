@@ -7,25 +7,27 @@
 
 namespace merian {
 
-Profiler::Profiler(const SharedContext context, const QueueHandle queue, const uint32_t num_gpu_timers)
+Profiler::Profiler(const SharedContext context,
+                   const QueueHandle queue,
+                   const uint32_t num_gpu_timers)
     : context(context), num_gpu_timers(num_gpu_timers) {
+
+    // No special handling necessary. According to the spec "Bits outside the valid range are
+    // guaranteed to be zeros."
+    const uint64_t valid_bits = queue->get_queue_family_properties().timestampValidBits;
+    timestamp_period = context->physical_device.get_physical_device_limits().timestampPeriod;
+    SPDLOG_DEBUG("using queue with valid bits: {}. Timestamp period {}", valid_bits,
+                 timestamp_period);
+    if (!timestamp_period || !valid_bits) {
+        throw std::runtime_error{"device does not support timestamp queries!"};
+    }
+
     vk::QueryPoolCreateInfo createInfo({}, vk::QueryType::eTimestamp,
                                        num_gpu_timers * SW_QUERY_COUNT);
     query_pool = context->device.createQueryPool(createInfo);
     pending_gpu_timestamps.reserve(num_gpu_timers * SW_QUERY_COUNT);
     gpu_sections.reserve(num_gpu_timers);
     cpu_sections.reserve(1024);
-
-    const uint64_t valid_bits = queue->get_queue_family_properties().timestampValidBits;
-    if (valid_bits < 64) {
-        bitmask = (((uint64_t)1) << (valid_bits + 1)) - 1;
-    } else {
-        bitmask = (uint64_t)-1;
-    }
-    timestamp_period =
-        context->physical_device.get_physical_device_limits().timestampPeriod;
-
-    SPDLOG_DEBUG("using queue with valid bits: {}, mask: {}", valid_bits, bitmask);
 }
 
 Profiler::~Profiler() {
@@ -106,12 +108,11 @@ void Profiler::collect(const bool wait) {
 
     for (uint32_t i = 0; i < pending_gpu_timestamps.size(); i++) {
         auto& [gpu_sec_idx, is_end] = pending_gpu_timestamps[i];
-        uint64_t ts = timestamps[i] & bitmask;
         GPUSection& section = gpu_sections[gpu_sec_idx];
         if (is_end) {
-            section.end = ts;
+            section.end = timestamps[i];
         } else {
-            section.start = ts;
+            section.start = timestamps[i];
         }
         if (section.start && section.end) {
             const uint64_t duration_ns = (section.end - section.start) * timestamp_period;
