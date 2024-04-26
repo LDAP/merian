@@ -39,6 +39,13 @@ using ProfilerHandle = std::shared_ptr<Profiler>;
  *
  *     queue.submit(... fence);
  * }
+ *
+ * Does not support overlapping sub-regions. Use two profilers in that case.
+ * Example:
+ * |--------------|
+ * |-------|
+ *     |-------|
+ *
  */
 class Profiler : public std::enable_shared_from_this<Profiler> {
   private:
@@ -49,26 +56,27 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
         chrono_clock::time_point start;
         chrono_clock::time_point end;
 
+        std::size_t parent_index;
+        std::unordered_map<std::string, uint32_t> children;
+
         uint32_t num_captures{0};
         uint64_t sum_duration_ns{0};
         uint64_t sq_sum_duration_ns{0};
-
-        std::string name;
     };
 
     struct GPUSection {
-        // needed for sorting/printing
-        uint64_t start{};
-        uint64_t end{};
+        // the query index for start. end has index + 1.
+        // set to -1 if not in the command buffer
+        uint32_t timestamp_idx{(uint32_t)-1};
+        // for sorting
+        uint64_t start;
+
+        std::size_t parent_index;
+        std::unordered_map<std::string, uint32_t> children;
 
         uint32_t num_captures{0};
         uint64_t sum_duration_ns{0};
         uint64_t sq_sum_duration_ns{0};
-
-        std::string name;
-
-        uint32_t start_timestamp_idx;
-        uint32_t end_timestamp_idx;
     };
 
   public:
@@ -103,7 +111,7 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
     void cmd_reset(const vk::CommandBuffer& cmd, const bool clear = false);
 
     // Start a GPU section
-    uint32_t cmd_start(
+    void cmd_start(
         const vk::CommandBuffer& cmd,
         const std::string name,
         const vk::PipelineStageFlagBits pipeline_stage = vk::PipelineStageFlagBits::eTopOfPipe);
@@ -111,17 +119,16 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
     // Stop a GPU section
     void cmd_end(
         const vk::CommandBuffer& cmd,
-        const uint32_t start_id,
         const vk::PipelineStageFlagBits pipeline_stage = vk::PipelineStageFlagBits::eBottomOfPipe);
 
     // Collects the results from the GPU.
     void collect(const bool wait = false);
 
     // Start a CPU section
-    uint32_t start(const std::string& name);
+    void start(const std::string& name);
 
     // Stop a CPU section
-    void end(const uint32_t start_id);
+    void end();
 
     Report get_report();
 
@@ -135,21 +142,19 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
 
   private:
     const SharedContext context;
-    uint32_t num_gpu_timers;
+    const uint32_t num_gpu_timers;
+    const float timestamp_period;
     vk::QueryPool query_pool;
-    float timestamp_period;
-    std::string cpu_current_key;
-    std::string gpu_current_key;
 
-    // Key: current_depth$$name
-    std::unordered_map<std::string, uint32_t> cpu_key_to_section_idx;
-    std::unordered_map<std::string, uint32_t> gpu_key_to_section_idx;
+    uint32_t current_cpu_section = 0;
+    uint32_t current_gpu_section = 0;
 
+    // 0 is root node
     std::vector<CPUSection> cpu_sections;
-
     std::vector<GPUSection> gpu_sections;
-    // gpu section index, is_end
-    std::vector<std::tuple<std::size_t, bool>> pending_gpu_timestamps;
+
+    // sections that have timestamps in the command buffer
+    std::vector<uint32_t> pending_gpu_sections;
     bool reset_was_called = false;
 };
 
@@ -157,17 +162,16 @@ class ProfileScope {
   public:
     ProfileScope(const ProfilerHandle profiler, const std::string& name) : profiler(profiler) {
         if (profiler)
-            section_index = profiler->start(name);
+            profiler->start(name);
     }
 
     ~ProfileScope() {
         if (profiler)
-            profiler->end(section_index);
+            profiler->end();
     }
 
   private:
     ProfilerHandle profiler;
-    uint32_t section_index;
 };
 
 class ProfileScopeGPU {
@@ -180,24 +184,21 @@ class ProfileScopeGPU {
         if (!profiler)
             return;
 
-        cpu_section_index = profiler->start(name);
-        gpu_section_index = profiler->cmd_start(cmd, name);
+        profiler->start(name);
+        profiler->cmd_start(cmd, name);
     }
 
     ~ProfileScopeGPU() {
         if (!profiler)
             return;
 
-        profiler->end(cpu_section_index);
-        profiler->cmd_end(cmd, gpu_section_index);
+        profiler->end();
+        profiler->cmd_end(cmd);
     }
 
   private:
     ProfilerHandle profiler;
     vk::CommandBuffer cmd;
-
-    uint32_t cpu_section_index;
-    uint32_t gpu_section_index;
 };
 
 // clang-format off

@@ -1,7 +1,6 @@
 #include "merian/vk/utils/profiler.hpp"
 #include "imgui.h"
 #include "merian/vk/utils/check_result.hpp"
-#include <queue>
 
 #define SW_QUERY_COUNT 2
 
@@ -10,28 +9,30 @@ namespace merian {
 Profiler::Profiler(const SharedContext context,
                    const QueueHandle queue,
                    const uint32_t num_gpu_timers)
-    : context(context), num_gpu_timers(num_gpu_timers) {
+    : context(context), num_gpu_timers(num_gpu_timers),
+      timestamp_period(context->physical_device.get_physical_device_limits().timestampPeriod) {
 
     // No special handling necessary. According to the spec "Bits outside the valid range are
     // guaranteed to be zeros."
     const uint64_t valid_bits = queue->get_queue_family_properties().timestampValidBits;
-    timestamp_period = context->physical_device.get_physical_device_limits().timestampPeriod;
-    SPDLOG_DEBUG("using queue with valid bits: {}. Timestamp period {}", valid_bits,
-                 timestamp_period);
     if (!timestamp_period || !valid_bits) {
         throw std::runtime_error{"device does not support timestamp queries!"};
     }
+    SPDLOG_DEBUG("using queue with valid bits: {}. Timestamp period {}", valid_bits,
+                 timestamp_period);
 
     vk::QueryPoolCreateInfo createInfo({}, vk::QueryType::eTimestamp,
                                        num_gpu_timers * SW_QUERY_COUNT);
     query_pool = context->device.createQueryPool(createInfo);
-    pending_gpu_timestamps.reserve(num_gpu_timers * SW_QUERY_COUNT);
+    pending_gpu_sections.reserve(num_gpu_timers * SW_QUERY_COUNT);
+    cpu_sections.assign(1, {});
+    gpu_sections.assign(1, {});
     gpu_sections.reserve(num_gpu_timers);
     cpu_sections.reserve(1024);
 
-    #ifndef MERIAN_PROFILER_ENABLE
-        SPDLOG_DEBUG("MERIAN_PROFILER_ENABLE not defined. MERIAN_PROFILE_* macros are disabled.");
-    #endif
+#ifndef MERIAN_PROFILER_ENABLE
+    SPDLOG_DEBUG("MERIAN_PROFILER_ENABLE not defined. MERIAN_PROFILE_* macros are disabled.");
+#endif
 }
 
 Profiler::~Profiler() {
@@ -41,124 +42,116 @@ Profiler::~Profiler() {
 
 void Profiler::cmd_reset(const vk::CommandBuffer& cmd, const bool clear) {
     cmd.resetQueryPool(query_pool, 0, num_gpu_timers);
-    pending_gpu_timestamps.clear();
+    pending_gpu_sections.clear();
     reset_was_called = true;
 
+    assert(clear || (current_gpu_section == 0 && current_cpu_section == 0 &&
+                     "it seams that there is a *end missing?"));
     if (clear) {
-        cpu_sections.clear();
-        gpu_sections.clear();
-        cpu_key_to_section_idx.clear();
-        gpu_key_to_section_idx.clear();
+        // keep only root
+        cpu_sections.assign(1, {});
+        gpu_sections.assign(1, {});
+        current_gpu_section = 0;
+        current_cpu_section = 0;
     }
 }
 
-uint32_t Profiler::cmd_start(const vk::CommandBuffer& cmd,
-                             const std::string name,
-                             const vk::PipelineStageFlagBits pipeline_stage) {
+void Profiler::cmd_start(const vk::CommandBuffer& cmd,
+                         const std::string name,
+                         const vk::PipelineStageFlagBits pipeline_stage) {
     assert(reset_was_called);
-    assert(pending_gpu_timestamps.size() < num_gpu_timers);
+    assert(pending_gpu_sections.size() * SW_QUERY_COUNT < num_gpu_timers);
 
-    gpu_current_key += "$$" + name;
-    uint32_t section_index;
-    if (gpu_key_to_section_idx.contains(gpu_current_key)) {
-        section_index = gpu_key_to_section_idx[gpu_current_key];
+    GPUSection& parent_section = gpu_sections[current_gpu_section];
+    if (parent_section.children.contains(name)) {
+        current_gpu_section = parent_section.children[name];
     } else {
-        section_index = gpu_sections.size();
-        gpu_key_to_section_idx[gpu_current_key] = section_index;
         gpu_sections.emplace_back();
-        gpu_sections.back().name = name;
+        gpu_sections.back().parent_index = current_gpu_section;
+        current_gpu_section = gpu_sections.size() - 1;
+        parent_section.children[name] = current_gpu_section;
     }
-    gpu_sections[section_index].start = 0;
-    gpu_sections[section_index].end = 0;
-    gpu_sections[section_index].start_timestamp_idx = pending_gpu_timestamps.size();
-    cmd.writeTimestamp(pipeline_stage, query_pool, gpu_sections[section_index].start_timestamp_idx);
-    pending_gpu_timestamps.emplace_back(section_index, false);
+    GPUSection& current_section = gpu_sections[current_gpu_section];
+    assert(current_section.timestamp_idx == (uint32_t)-1);
+    current_section.timestamp_idx = pending_gpu_sections.size() * SW_QUERY_COUNT;
 
-    return section_index;
+    cmd.writeTimestamp(pipeline_stage, query_pool, current_section.timestamp_idx);
+    pending_gpu_sections.emplace_back(current_gpu_section);
 }
 
 void Profiler::cmd_end(const vk::CommandBuffer& cmd,
-                       const uint32_t start_id,
                        const vk::PipelineStageFlagBits pipeline_stage) {
+    assert(current_gpu_section != 0 && "missing cmd_start?");
     assert(reset_was_called);
-    assert(start_id < gpu_sections.size());
-    assert(pending_gpu_timestamps.size() < num_gpu_timers);
+    assert(pending_gpu_sections.size() * SW_QUERY_COUNT < num_gpu_timers);
 
-    GPUSection& section = gpu_sections[start_id];
-    section.end_timestamp_idx = pending_gpu_timestamps.size();
-    cmd.writeTimestamp(pipeline_stage, query_pool, section.end_timestamp_idx);
-    pending_gpu_timestamps.emplace_back(start_id, true);
+    GPUSection& section = gpu_sections[current_gpu_section];
+    assert(section.timestamp_idx != (uint32_t)-1);
+    cmd.writeTimestamp(pipeline_stage, query_pool, section.timestamp_idx + 1);
 
-    gpu_current_key.resize(gpu_current_key.size() - 2 - section.name.size());
+    current_gpu_section = section.parent_index;
 }
 
 void Profiler::collect(const bool wait) {
-    if (pending_gpu_timestamps.empty())
+    if (pending_gpu_sections.empty())
         return;
 
     assert(reset_was_called);
+    assert(current_gpu_section == 0 && "cmd_end missing?");
 
     vk::QueryResultFlags flags = vk::QueryResultFlagBits::e64;
     if (wait) {
         flags |= vk::QueryResultFlagBits::eWait;
     }
 
-    std::vector<uint64_t> timestamps(pending_gpu_timestamps.size());
-    check_result(
-        context->device.getQueryPoolResults(query_pool, 0, pending_gpu_timestamps.size(),
-                                            sizeof(uint64_t) * pending_gpu_timestamps.size(),
-                                            timestamps.data(), sizeof(uint64_t), flags),
-        "could not get query results");
-
-    for (uint32_t i = 0; i < pending_gpu_timestamps.size(); i++) {
-        auto& [gpu_sec_idx, is_end] = pending_gpu_timestamps[i];
-        GPUSection& section = gpu_sections[gpu_sec_idx];
-        if (is_end) {
-            section.end = timestamps[i];
-        } else {
-            section.start = timestamps[i];
-        }
-        if (section.start && section.end) {
-            const uint64_t duration_ns = (section.end - section.start) * timestamp_period;
-            section.sum_duration_ns += duration_ns;
-            section.sq_sum_duration_ns += (duration_ns * duration_ns);
-            section.num_captures++;
-        }
+    std::vector<uint64_t> timestamps(pending_gpu_sections.size() * SW_QUERY_COUNT);
+    check_result(context->device.getQueryPoolResults(query_pool, 0, timestamps.size(),
+                                                     sizeof(uint64_t) * timestamps.size(),
+                                                     timestamps.data(), sizeof(uint64_t), flags),
+                 "could not get query results");
+    for (auto section_index : pending_gpu_sections) {
+        GPUSection& section = gpu_sections[section_index];
+        section.start = timestamps[section.timestamp_idx];
+        const uint64_t duration_ns =
+            (timestamps[section.timestamp_idx + 1] - timestamps[section.timestamp_idx]) *
+            timestamp_period;
+        section.timestamp_idx = (uint32_t)-1;
+        section.sum_duration_ns += duration_ns;
+        section.sq_sum_duration_ns += (duration_ns * duration_ns);
+        section.num_captures++;
     }
 
     reset_was_called = false;
 }
 
-uint32_t Profiler::start(const std::string& name) {
-    cpu_current_key += "$$" + name;
-    uint32_t section_index;
-    if (cpu_key_to_section_idx.contains(cpu_current_key)) {
-        section_index = cpu_key_to_section_idx[cpu_current_key];
+void Profiler::start(const std::string& name) {
+    CPUSection& parent_section = cpu_sections[current_cpu_section];
+    if (parent_section.children.contains(name)) {
+        current_cpu_section = parent_section.children[name];
     } else {
-        section_index = cpu_sections.size();
-        cpu_key_to_section_idx[cpu_current_key] = section_index;
         cpu_sections.emplace_back();
-        cpu_sections.back().name = name;
+        cpu_sections.back().parent_index = current_cpu_section;
+        current_cpu_section = cpu_sections.size() - 1;
+        parent_section.children[name] = current_cpu_section;
     }
 
-    cpu_sections[section_index].start = chrono_clock::now();
+    cpu_sections[current_cpu_section].start = chrono_clock::now();
     std::atomic_signal_fence(std::memory_order_seq_cst);
-
-    return section_index;
 }
 
-void Profiler::end(const uint32_t start_id) {
-    assert(start_id < cpu_sections.size());
+void Profiler::end() {
+    assert(current_cpu_section != 0 && "missing start?");
     std::atomic_signal_fence(std::memory_order_seq_cst);
 
-    CPUSection& section = cpu_sections[start_id];
+    CPUSection& section = cpu_sections[current_cpu_section];
     section.end = chrono_clock::now();
     uint64_t duration_ns =
         std::chrono::duration_cast<std::chrono::nanoseconds>(section.end - section.start).count();
     section.sum_duration_ns += duration_ns;
     section.sq_sum_duration_ns += (duration_ns * duration_ns);
     section.num_captures++;
-    cpu_current_key.resize(cpu_current_key.size() - 2 - section.name.size());
+
+    current_cpu_section = section.parent_index;
 }
 
 std::string to_string(const std::vector<Profiler::ReportEntry>& entries,
@@ -173,40 +166,22 @@ std::string to_string(const std::vector<Profiler::ReportEntry>& entries,
 }
 
 template <typename TimeMeasure, typename SectionType>
-std::vector<Profiler::ReportEntry>
-make_report(std::vector<SectionType>& sections,
-            std::priority_queue<std::tuple<TimeMeasure, bool, uint32_t>,
-                                std::vector<std::tuple<TimeMeasure, bool, uint32_t>>,
-                                std::greater<std::tuple<TimeMeasure, bool, uint32_t>>>& queue) {
+std::vector<Profiler::ReportEntry> make_report(SectionType& section,
+                                               std::vector<SectionType>& sections) {
     std::vector<Profiler::ReportEntry> report;
-    bool last_was_start = false;
-    while (!queue.empty()) {
-        auto& [ts, is_end, section_index] = queue.top();
-        if (!last_was_start && !is_end) {
-            const SectionType& section = sections[section_index];
-            const double avg = section.sum_duration_ns / (double)section.num_captures;
-            const double std =
-                std::sqrt(section.sq_sum_duration_ns / (double)section.num_captures - avg * avg);
+    std::vector<std::pair<TimeMeasure, std::string>> children;
+    for (auto& child : section.children) {
+        children.emplace_back(sections[child.second].start, child.first);
+    }
+    std::sort(children.begin(), children.end());
+    for (auto& child : children) {
+        SectionType& subsection = sections[section.children[child.second]];
+        const double avg = subsection.sum_duration_ns / (double)subsection.num_captures;
+        const double std =
+            std::sqrt(subsection.sq_sum_duration_ns / (double)subsection.num_captures - avg * avg);
 
-            report.emplace_back(section.name, avg / 1e6, std / 1e6,
-                                std::vector<Profiler::ReportEntry>());
-            last_was_start = true;
-            queue.pop();
-            continue;
-        }
-        if (last_was_start && !is_end) {
-            report.back().children = make_report(sections, queue);
-            last_was_start = true;
-            continue;
-        }
-        if (!last_was_start && is_end) {
-            return report;
-        }
-        if (last_was_start && is_end) {
-            queue.pop();
-            last_was_start = false;
-            continue;
-        }
+        report.emplace_back(child.second, avg / 1e6, std / 1e6,
+                            make_report<TimeMeasure>(subsection, sections));
     }
     return report;
 }
@@ -263,29 +238,8 @@ void Profiler::get_report_imgui(const Profiler::Report& report) {
 
 Profiler::Report Profiler::get_report() {
     Profiler::Report report;
-
-    // timestamp, is_end, section index
-    std::priority_queue<std::tuple<chrono_clock::time_point, bool, uint32_t>,
-                        std::vector<std::tuple<chrono_clock::time_point, bool, uint32_t>>,
-                        std::greater<std::tuple<chrono_clock::time_point, bool, uint32_t>>>
-        cpu_queue;
-    for (uint32_t i = 0; i < cpu_sections.size(); i++) {
-        CPUSection& section = cpu_sections[i];
-        cpu_queue.emplace(section.start, false, i);
-        cpu_queue.emplace(section.end, true, i);
-    }
-    report.cpu_report = make_report(cpu_sections, cpu_queue);
-
-    std::priority_queue<std::tuple<uint64_t, bool, uint32_t>,
-                        std::vector<std::tuple<uint64_t, bool, uint32_t>>,
-                        std::greater<std::tuple<uint64_t, bool, uint32_t>>>
-        gpu_queue;
-    for (uint32_t i = 0; i < gpu_sections.size(); i++) {
-        GPUSection& section = gpu_sections[i];
-        gpu_queue.emplace(section.start, false, i);
-        gpu_queue.emplace(section.end, true, i);
-    }
-    report.gpu_report = make_report(gpu_sections, gpu_queue);
+    report.cpu_report = make_report<chrono_clock::time_point>(cpu_sections.front(), cpu_sections);
+    report.gpu_report = make_report<uint64_t>(gpu_sections.front(), gpu_sections);
     return report;
 }
 
