@@ -15,6 +15,7 @@ template <BlitNodeMode mode = FIT> class GLFWWindowNode : public BlitExternalNod
                    const std::optional<QueueHandle> wait_queue = std::nullopt)
         : window(window), surface(surface) {
         swapchain = std::make_shared<merian::Swapchain>(context, surface, wait_queue);
+        vsync = swapchain->vsync_enabled();
     }
 
     virtual std::string name() override {
@@ -29,6 +30,7 @@ template <BlitNodeMode mode = FIT> class GLFWWindowNode : public BlitExternalNod
                              const std::vector<ImageHandle>& image_outputs,
                              const std::vector<BufferHandle>& buffer_outputs) override {
 
+        swapchain->set_vsync(vsync);
         aquire = swapchain->aquire_auto_resize(*window);
         if (aquire) {
             BlitExternalNode<mode>::set_target(aquire->image, vk::ImageLayout::eUndefined,
@@ -72,12 +74,19 @@ template <BlitNodeMode mode = FIT> class GLFWWindowNode : public BlitExternalNod
             }
         }
 
+        // Perform the change in cmd_process, since recreating the swapchain here may interfere with
+        // other accesses to the swapchain images.
+        vsync = swapchain->vsync_enabled();
+        config.config_bool("vsync", vsync, "Enables or disables vsync on the swapchain.");
+
         if (aquire) {
-            config.output_text(
-                fmt::format("surface format: {}\ncolor space: {}\nimage count: {}\nextent: {}x{}",
-                            vk::to_string(aquire->surface_format.format),
-                            vk::to_string(aquire->surface_format.colorSpace), aquire->num_images,
-                            aquire->extent.width, aquire->extent.height));
+            config.output_text(fmt::format("surface format: {}\ncolor space: {}\nimage count: "
+                                           "{}\nextent: {}x{}\npresent mode: {}",
+                                           vk::to_string(aquire->surface_format.format),
+                                           vk::to_string(aquire->surface_format.colorSpace),
+                                           aquire->num_images, aquire->extent.width,
+                                           aquire->extent.height,
+                                           vk::to_string(swapchain->get_present_mode())));
         }
     }
 
@@ -88,6 +97,7 @@ template <BlitNodeMode mode = FIT> class GLFWWindowNode : public BlitExternalNod
     std::optional<SwapchainAcquireResult> aquire;
 
     std::array<int, 4> windowed_pos_size;
+    bool vsync;
 };
 
 } // namespace merian
