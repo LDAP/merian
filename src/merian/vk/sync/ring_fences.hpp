@@ -14,7 +14,7 @@ namespace merian {
  *
  *  You can store additional data for every frame.
  */
-template <uint32_t RING_SIZE = 3, typename UserDataType = uint32_t>
+template <uint32_t RING_SIZE = 2, typename UserDataType = uint32_t>
 class RingFences : public std::enable_shared_from_this<RingFences<RING_SIZE, UserDataType>> {
   public:
     struct RingData {
