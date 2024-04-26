@@ -42,6 +42,8 @@ template <BlitNodeMode mode = FIT> class GLFWWindowNode : public BlitExternalNod
             run.add_wait_semaphore(aquire->wait_semaphore, vk::PipelineStageFlagBits::eTransfer);
             run.add_signal_semaphore(aquire->signal_semaphore);
             run.add_submit_callback([&](const QueueHandle& queue) { swapchain->present(*queue); });
+            if (request_rebuild_on_recreate && aquire->did_recreate)
+                run.request_rebuild();
         }
     }
 
@@ -78,6 +80,8 @@ template <BlitNodeMode mode = FIT> class GLFWWindowNode : public BlitExternalNod
         // other accesses to the swapchain images.
         vsync = swapchain->vsync_enabled();
         config.config_bool("vsync", vsync, "Enables or disables vsync on the swapchain.");
+        config.config_bool("rebuild on recreate", request_rebuild_on_recreate,
+                           "requests a graph rebuild if the swapchain was recreated.");
 
         if (aquire) {
             config.output_text(fmt::format("surface format: {}\ncolor space: {}\nimage count: "
@@ -98,6 +102,7 @@ template <BlitNodeMode mode = FIT> class GLFWWindowNode : public BlitExternalNod
 
     std::array<int, 4> windowed_pos_size;
     bool vsync;
+    bool request_rebuild_on_recreate = false;
 };
 
 } // namespace merian
