@@ -28,6 +28,10 @@ Profiler::Profiler(const SharedContext context,
     pending_gpu_timestamps.reserve(num_gpu_timers * SW_QUERY_COUNT);
     gpu_sections.reserve(num_gpu_timers);
     cpu_sections.reserve(1024);
+
+    #ifndef MERIAN_PROFILER_ENABLE
+        SPDLOG_DEBUG("MERIAN_PROFILER_ENABLE not defined. MERIAN_PROFILE_* macros are disabled."):
+    #endif
 }
 
 Profiler::~Profiler() {
