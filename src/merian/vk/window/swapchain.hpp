@@ -169,11 +169,17 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
 
     /* Sets vsync and recreates the swapchain if necessary (without resize) */
     void set_vsync(bool state) {
-        if (state != vsync) {
-            vsync = state;
-            present_mode = select_present_mode();
-            recreate_swapchain(cur_width, cur_height);
+        if (state != vsync_enabled()) {
+            present_mode = select_present_mode(state);
         }
+    }
+
+    bool vsync_enabled() const {
+        return cur_present_mode == vk::PresentModeKHR::eFifo;
+    }
+
+    vk::PresentModeKHR get_present_mode() {
+        return cur_present_mode;
     }
 
   private:
@@ -181,7 +187,7 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
     void destroy_swapchain();
     /* Destroys image views only (for recreate) */
     void destroy_entries();
-    [[nodiscard]] vk::PresentModeKHR select_present_mode();
+    [[nodiscard]] vk::PresentModeKHR select_present_mode(const bool vsync);
     void wait_idle();
 
   private:
@@ -195,7 +201,6 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
     uint32_t num_images = 0;
 
     vk::SurfaceFormatKHR surface_format;
-    bool vsync = false;
     std::vector<Entry> entries;
     // updated in aquire_custom
     uint32_t current_image_idx;
@@ -208,7 +213,9 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
     // Only valid after the first acquire!
     vk::Extent2D extent;
 
+    // swapchain is recreated if this does not match cur_present_mode
     vk::PresentModeKHR present_mode;
+    vk::PresentModeKHR cur_present_mode;
     // You should never access the swapchain directly
     vk::SwapchainKHR swapchain = VK_NULL_HANDLE;
 };

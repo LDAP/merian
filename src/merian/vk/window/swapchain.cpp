@@ -11,8 +11,9 @@ namespace merian {
  * Mailbox is a hybrid between the two (gpu doesnt block if running faater than the display, but
  * screen tearing doesnt happen).
  */
-[[nodiscard]] vk::PresentModeKHR Swapchain::select_present_mode() {
-    auto present_modes = context->physical_device.physical_device.getSurfacePresentModesKHR(*surface);
+[[nodiscard]] vk::PresentModeKHR Swapchain::select_present_mode(const bool vsync) {
+    auto present_modes =
+        context->physical_device.physical_device.getSurfacePresentModesKHR(*surface);
     if (present_modes.size() == 0)
         throw std::runtime_error("Surface doesn't support any present modes!");
 
@@ -79,7 +80,7 @@ Swapchain::Swapchain(const SharedContext& context,
         throw std::runtime_error("Surface doesn't support any surface formats!");
 
     surface_format = select_surface_format(surface_formats, preferred_surface_formats);
-    present_mode = select_present_mode();
+    present_mode = select_present_mode(false);
 
     SPDLOG_DEBUG("selected surface format {}, color space {}, present mode {}",
                  vk::to_string(surface_format.format), vk::to_string(surface_format.colorSpace),
@@ -117,7 +118,8 @@ vk::Extent2D Swapchain::recreate_swapchain(int width, int height) {
         old_swapchain = VK_NULL_HANDLE;
     }
 
-    auto capabilities = context->physical_device.physical_device.getSurfaceCapabilitiesKHR(*surface);
+    auto capabilities =
+        context->physical_device.physical_device.getSurfaceCapabilitiesKHR(*surface);
     extent = make_extent2D(capabilities, width, height);
 
     min_images = capabilities.minImageCount + 1; // one extra to own
@@ -219,11 +221,12 @@ vk::Extent2D Swapchain::recreate_swapchain(int width, int height) {
 
     cur_width = width;
     cur_height = height;
+    cur_present_mode = present_mode;
 
     // clang-format on
     SPDLOG_DEBUG("created swapchain {}x{} ({} {} {})", cur_width, cur_height,
                  vk::to_string(surface_format.format), vk::to_string(surface_format.colorSpace),
-                 vk::to_string(present_mode));
+                 vk::to_string(cur_present_mode));
     return extent;
 }
 
@@ -265,7 +268,7 @@ std::optional<SwapchainAcquireResult> Swapchain::aquire_custom(int width, int he
         return std::nullopt;
     }
 
-    if (width != cur_width || height != cur_height) {
+    if (width != cur_width || height != cur_height || present_mode != cur_present_mode) {
         recreate_swapchain(width, height);
         aquire_result.did_recreate = true;
     } else {
