@@ -234,20 +234,16 @@ std::queue<NodeHandle> Graph::start_nodes() {
             queue.push(node);
             continue;
         }
-        uint32_t num_non_delayed = 0;
-        for (auto& desc : node_data.image_input_descriptors) {
-            if (desc.delay == 0)
-                num_non_delayed++;
-        }
-        for (auto& desc : node_data.buffer_input_descriptors) {
-            if (desc.delay == 0)
-                num_non_delayed++;
-        }
 
-        if (num_non_delayed == 0)
+        if (std::all_of(node_data.image_input_descriptors.begin(),
+                        node_data.image_input_descriptors.end(),
+                        [](NodeInputDescriptorImage& desc) { return desc.delay > 0; }) &&
+            std::all_of(node_data.buffer_input_descriptors.begin(),
+                        node_data.buffer_input_descriptors.end(),
+                        [](NodeInputDescriptorBuffer& desc) { return desc.delay > 0; })) {
             queue.push(node);
+        }
     }
-
     return queue;
 }
 
