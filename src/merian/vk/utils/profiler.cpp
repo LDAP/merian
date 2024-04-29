@@ -61,7 +61,6 @@ void Profiler::cmd_start(const vk::CommandBuffer& cmd,
                          const vk::PipelineStageFlagBits pipeline_stage) {
     assert(reset_was_called);
     assert(pending_gpu_sections.size() * SW_QUERY_COUNT < num_gpu_timers);
-
     GPUSection& parent_section = gpu_sections[current_gpu_section];
     if (parent_section.children.contains(name)) {
         current_gpu_section = parent_section.children[name];
@@ -72,7 +71,7 @@ void Profiler::cmd_start(const vk::CommandBuffer& cmd,
         parent_section.children[name] = current_gpu_section;
     }
     GPUSection& current_section = gpu_sections[current_gpu_section];
-    assert(current_section.timestamp_idx == (uint32_t)-1);
+    assert(current_section.timestamp_idx == (uint32_t)-1 && "two sections with the same name?");
     current_section.timestamp_idx = pending_gpu_sections.size() * SW_QUERY_COUNT;
 
     cmd.writeTimestamp(pipeline_stage, query_pool, current_section.timestamp_idx);
