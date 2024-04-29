@@ -7,8 +7,8 @@
 
 namespace merian {
 
-class Profiler;
-using ProfilerHandle = std::shared_ptr<Profiler>;
+class ProfileScope;
+class ProfileScopeGPU;
 
 /**
  * @brief      A profiler for CPU and GPU code.
@@ -50,6 +50,8 @@ using ProfilerHandle = std::shared_ptr<Profiler>;
 class Profiler : public std::enable_shared_from_this<Profiler> {
   private:
     using chrono_clock = std::chrono::high_resolution_clock;
+    friend ProfileScope;
+    friend ProfileScopeGPU;
 
     struct CPUSection {
         // needed for sorting/printing
@@ -95,7 +97,7 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
     };
 
   public:
-    // The timestamps for GPU profiling must be preallocated, therefore you can only caputure
+    // The timestamps for GPU profiling must be preallocated, therefore you can only capture
     // num_gpu_timers many timers. Throws runtime error if the device or queue does not support
     // timestamp queries.
     Profiler(const SharedContext context,
@@ -157,21 +159,35 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
     std::vector<uint32_t> pending_gpu_sections;
     bool reset_was_called = false;
 };
+using ProfilerHandle = std::shared_ptr<Profiler>;
 
 class ProfileScope {
   public:
     ProfileScope(const ProfilerHandle profiler, const std::string& name) : profiler(profiler) {
         if (profiler)
             profiler->start(name);
+#ifndef NDEBUG
+        section_index = profiler->current_cpu_section;
+#endif
     }
 
     ~ProfileScope() {
-        if (profiler)
-            profiler->end();
+        if (!profiler)
+            return;
+
+#ifndef NDEBUG
+        assert(section_index == profiler->current_cpu_section && "overlapping profiling sections?");
+#endif
+
+        profiler->end();
     }
 
   private:
     ProfilerHandle profiler;
+#ifndef NDEBUG
+    // Detect overlapping regions
+    uint32_t section_index;
+#endif
 };
 
 class ProfileScopeGPU {
@@ -186,11 +202,23 @@ class ProfileScopeGPU {
 
         profiler->start(name);
         profiler->cmd_start(cmd, name);
+
+#ifndef NDEBUG
+        cpu_section_index = profiler->current_cpu_section;
+        gpu_section_index = profiler->current_gpu_section;
+#endif
     }
 
     ~ProfileScopeGPU() {
         if (!profiler)
             return;
+
+#ifndef NDEBUG
+        assert(cpu_section_index == profiler->current_cpu_section &&
+               "overlapping profiling sections?");
+        assert(gpu_section_index == profiler->current_gpu_section &&
+               "overlapping profiling sections?");
+#endif
 
         profiler->end();
         profiler->cmd_end(cmd);
@@ -199,6 +227,11 @@ class ProfileScopeGPU {
   private:
     ProfilerHandle profiler;
     vk::CommandBuffer cmd;
+#ifndef NDEBUG
+    // Detect overlapping regions
+    uint32_t cpu_section_index;
+    uint32_t gpu_section_index;
+#endif
 };
 
 // clang-format off
