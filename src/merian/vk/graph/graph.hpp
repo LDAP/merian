@@ -219,8 +219,7 @@ class Graph : public std::enable_shared_from_this<Graph> {
     // null).
     Graph(const SharedContext context,
           const ResourceAllocatorHandle allocator,
-          const std::optional<QueueHandle> wait_queue = std::nullopt,
-          const std::shared_ptr<ExtensionVkDebugUtils> debug_utils = nullptr);
+          const std::optional<QueueHandle> wait_queue = std::nullopt);
 
     // Add a node to the graph, returns the index of the node (can be used for connect and such).
     void add_node(const std::string name, const std::shared_ptr<Node>& node);

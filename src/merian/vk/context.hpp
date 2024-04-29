@@ -149,6 +149,16 @@ class Context : public std::enable_shared_from_this<Context> {
     // Make sure to keep a reference, else the pool and its buffers are destroyed
     std::shared_ptr<CommandPool> get_cmd_pool_C();
 
+    template <class Extension> std::shared_ptr<Extension> get_extension() {
+        for (auto& ext : extensions) {
+            if (std::shared_ptr<Extension> casted_extension =
+                    dynamic_pointer_cast<Extension>(ext)) {
+                return casted_extension;
+            }
+        }
+        return nullptr;
+    }
+
   private:
     std::vector<std::shared_ptr<Extension>> extensions;
 
