@@ -1,17 +1,16 @@
 #pragma once
 
+#include "merian/utils/hash.hpp"
 #include "merian/vk/extension/extension_vk_debug_utils.hpp"
 #include "merian/vk/graph/node.hpp"
 #include "merian/vk/graph/node_io.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
-#include "merian/vk/utils/math.hpp"
 #include "merian/vk/utils/profiler.hpp"
 
 #include <memory>
 #include <optional>
 #include <queue>
 #include <unordered_set>
-#include <variant>
 
 namespace merian {
 
@@ -163,27 +162,52 @@ class Graph : public std::enable_shared_from_this<Graph> {
         vk::AccessFlags2 input_access_flags;
     };
 
+    struct NodeConnection {
+        const NodeHandle dst;
+        const std::string src_output;
+        const std::string dst_input;
+
+        bool operator==(const NodeConnection&) const = default;
+
+        struct Hash {
+            size_t operator()(const NodeConnection& c) const noexcept {
+                std::size_t h = 0;
+                hash_combine(h, c.dst, c.src_output, c.dst_input);
+                return h;
+            }
+        };
+    };
+
     struct NodeData {
         NodeHandle node;
 
-        // A name for this node from the user. This is not node->name().
+        // A unique name for this node from the user. This is not node->name().
+        // (on add)
         std::string name;
 
-        // Cache inputs (on add)
+        // Cache inputs (node->describe_inputs())
+        // (on add)
         std::vector<NodeInputDescriptorImage> image_input_descriptors{};
         std::vector<NodeInputDescriptorBuffer> buffer_input_descriptors{};
 
+        // Set by the user using the public connect_* methods.
+        // This information is used by connect_nodes to build the graph
+        std::unordered_set<NodeConnection, NodeConnection::Hash> image_connections{};
+        std::unordered_set<NodeConnection, NodeConnection::Hash> buffer_connections{};
+
         // For each input -> (Node, OutputIndex), e.g. to make sure every input is connected.
-        // (resize on add, insert on connect)
+        // always has the size of the number of input descriptors.
+        // (resized on add, filled on connect_nodes, reassigned with empty entries in reset)
         std::vector<std::tuple<NodeHandle, uint32_t>> image_input_connections{};
         std::vector<std::tuple<NodeHandle, uint32_t>> buffer_input_connections{};
 
         // For each output -> a list of inputs of (Node, InputIndex)
-        // on connect
+        // (on connect_nodes)
         std::vector<std::vector<std::tuple<NodeHandle, uint32_t>>> image_output_connections{};
         std::vector<std::vector<std::tuple<NodeHandle, uint32_t>>> buffer_output_connections{};
 
-        // Cache outputs (on calculate_outputs)
+        // Cache outputs
+        // (on compute_node_output_descriptors)
         std::vector<NodeOutputDescriptorImage> image_output_descriptors{};
         std::vector<NodeOutputDescriptorBuffer> buffer_output_descriptors{};
 
@@ -211,7 +235,59 @@ class Graph : public std::enable_shared_from_this<Graph> {
         std::vector<std::vector<std::shared_ptr<BufferResource>>>
             precomputed_output_buffers_resource{};
 
+        // Keep here to prevent memory allocation
         Node::NodeStatus status{};
+
+        uint32_t get_image_input_by_name(const std::string& name) {
+            auto it =
+                std::find_if(image_input_descriptors.begin(), image_input_descriptors.end(),
+                             [&](NodeInputDescriptorImage& desc) { return desc.name == name; });
+
+            if (it == image_input_descriptors.end())
+                throw std::runtime_error{fmt::format("there is no image input '{}' on node {} ({})",
+                                                     name, this->name, this->node->name())};
+
+            return it - image_input_descriptors.begin();
+        }
+
+        uint32_t get_buffer_input_by_name(const std::string& name) {
+            auto it =
+                std::find_if(buffer_input_descriptors.begin(), buffer_input_descriptors.end(),
+                             [&](NodeInputDescriptorBuffer& desc) { return desc.name == name; });
+
+            if (it == buffer_input_descriptors.end())
+                throw std::runtime_error{
+                    fmt::format("there is no buffer input '{}' on node {} ({})", name, this->name,
+                                this->node->name())};
+
+            return it - buffer_input_descriptors.begin();
+        }
+
+        uint32_t get_image_output_by_name(const std::string& name) {
+            auto it =
+                std::find_if(image_output_descriptors.begin(), image_output_descriptors.end(),
+                             [&](NodeOutputDescriptorImage& desc) { return desc.name == name; });
+
+            if (it == image_output_descriptors.end())
+                throw std::runtime_error{
+                    fmt::format("there is no image output '{}' on node {} ({})", name, this->name,
+                                this->node->name())};
+
+            return it - image_output_descriptors.begin();
+        }
+
+        uint32_t get_buffer_output_by_name(const std::string& name) {
+            auto it =
+                std::find_if(buffer_output_descriptors.begin(), buffer_output_descriptors.end(),
+                             [&](NodeOutputDescriptorBuffer& desc) { return desc.name == name; });
+
+            if (it == buffer_output_descriptors.end())
+                throw std::runtime_error{
+                    fmt::format("there is no buffer output '{}' on node {} ({})", name, this->name,
+                                this->node->name())};
+
+            return it - buffer_output_descriptors.begin();
+        }
     };
 
   public:
@@ -222,19 +298,19 @@ class Graph : public std::enable_shared_from_this<Graph> {
           const std::optional<QueueHandle> wait_queue = std::nullopt);
 
     // Add a node to the graph, returns the index of the node (can be used for connect and such).
-    void add_node(const std::string name, const std::shared_ptr<Node>& node);
+    void add_node(const std::string& name, const std::shared_ptr<Node>& node);
 
     // Note: The connection is validated when the graph is build
     void connect_image(const NodeHandle& src,
                        const NodeHandle& dst,
-                       const uint32_t src_output,
-                       const uint32_t dst_input);
+                       const std::string& src_output,
+                       const std::string& dst_input);
 
     // Note: The connection is validated when the graph is build
     void connect_buffer(const NodeHandle& src,
                         const NodeHandle& dst,
-                        const uint32_t src_output,
-                        const uint32_t dst_input);
+                        const std::string& src_output,
+                        const std::string& dst_input);
 
     void request_rebuild() {
         rebuild_requested = true;
@@ -274,18 +350,36 @@ class Graph : public std::enable_shared_from_this<Graph> {
     GraphRun run;
 
   private: // Helpers
-    // Makes sure every input is connected
-    void validate_inputs();
+    // Note: The connection is validated when the graph is build
+    void connect_image(const NodeHandle& src,
+                       const NodeHandle& dst,
+                       const uint32_t src_output,
+                       const uint32_t dst_input);
+
+    // Note: The connection is validated when the graph is build
+    void connect_buffer(const NodeHandle& src,
+                        const NodeHandle& dst,
+                        const uint32_t src_output,
+                        const uint32_t dst_input);
+
+    // Throws if the graph is not fully connected.
+    // Returns a topological order of the nodes.
+    std::vector<NodeHandle> connect_nodes();
 
     // nodes without inputs or with delayed inputs only
     std::queue<NodeHandle> start_nodes();
 
-    // For each node input find the corresponding output descriptors (image_outputs_descriptors,
-    // buffer_outputs_descriptors). Inserts subsequent nodes to the queue if all inputs are
-    // satisfied.
-    void calculate_outputs(NodeHandle& node,
-                           std::unordered_set<NodeHandle>& visited,
-                           std::queue<NodeHandle>& queue);
+    // Visites nodes in topological order as far as they are connected or a cycle is detected.
+    // Returns the number of visited nodes.
+    // Throws if the undelayed graph is not acyclic (feedback edges must have a delay of at
+    // least 1).
+    uint32_t topological_visit(const std::function<void(NodeHandle&, NodeData&)> visitor);
+
+    // Calls node->describe_outputs with the appropriate parameters and populates the data object.
+    // Requires that all inputs are connected.
+    void compute_node_output_descriptors(NodeHandle& node, NodeData& data);
+
+    void print_error_missing_inputs();
 
     std::string connections(NodeHandle& src);
 

@@ -1,5 +1,6 @@
 #include "merian/vk/graph/graph.hpp"
 #include "merian/vk/utils/profiler.hpp"
+#include "vk/utils/math.hpp"
 
 namespace merian {
 
@@ -9,7 +10,7 @@ Graph::Graph(const SharedContext context,
     : context(context), allocator(allocator), wait_queue(wait_queue),
       debug_utils(context->get_extension<ExtensionVkDebugUtils>()) {}
 
-void Graph::add_node(const std::string name, const std::shared_ptr<Node>& node) {
+void Graph::add_node(const std::string& name, const std::shared_ptr<Node>& node) {
     if (node_from_name.contains(name)) {
         throw std::invalid_argument{
             fmt::format("graph already contains a node with name '{}'", name)};
@@ -22,71 +23,210 @@ void Graph::add_node(const std::string name, const std::shared_ptr<Node>& node) 
     auto [image_inputs, buffer_inputs] = node->describe_inputs();
     node_from_name[name] = node;
     node_data[node] = {node, name, image_inputs, buffer_inputs};
-    node_data[node].image_input_connections.resize(image_inputs.size());
-    node_data[node].buffer_input_connections.resize(buffer_inputs.size());
+    node_data[node].image_input_connections.assign(image_inputs.size(), {});
+    node_data[node].buffer_input_connections.assign(buffer_inputs.size(), {});
 }
 
 void Graph::connect_image(const NodeHandle& src,
                           const NodeHandle& dst,
-                          const uint32_t src_output,
-                          const uint32_t dst_input) {
+                          const std::string& src_output,
+                          const std::string& dst_input) {
     assert(node_data.contains(src));
     assert(node_data.contains(dst));
-    if (src_output >= node_data[src].image_output_connections.size()) {
-        node_data[src].image_output_connections.resize(src_output + 1);
-    }
-    // dst_input is valid
-    if (dst_input >= node_data[dst].image_input_connections.size()) {
-        throw std::invalid_argument{fmt::format("There is no image input '{}' on node '{}'",
-                                                dst_input, node_data[dst].name)};
-    }
-    if (std::get<0>(node_data[dst].image_input_connections[dst_input])) {
-        throw std::invalid_argument{
-            fmt::format("The image input '{}' on node '{}' is already connected", dst_input,
-                        node_data[dst].name)};
-    }
-    node_data[dst].image_input_connections[dst_input] = {src, src_output};
 
-    // make sure the same underlying resource is not accessed twice with different layouts:
-    // only images: Since they need layout transitions
-    for (auto& [n, i] : node_data[src].image_output_connections[src_output]) {
-        if (n == dst &&
-            node_data[dst].image_input_descriptors[i].delay ==
-                node_data[dst].image_input_descriptors[dst_input].delay &&
-            node_data[dst].image_input_descriptors[i].required_layout !=
-                node_data[dst].image_input_descriptors[dst_input].required_layout) {
-            throw std::invalid_argument{fmt::format(
-                "You are trying to access the same underlying image of node '{}' twice from "
-                "node '{}' with connections {} -> {}, {} -> {} and different layouts",
-                node_data[src].name, node_data[dst].name, src_output, i, src_output, dst_input)};
-        }
-    }
-    node_data[src].image_output_connections[src_output].emplace_back(dst, dst_input);
+    node_data[src].image_connections.insert({dst, src_output, dst_input});
 }
 
 void Graph::connect_buffer(const NodeHandle& src,
                            const NodeHandle& dst,
-                           const uint32_t src_output,
-                           const uint32_t dst_input) {
+                           const std::string& src_output,
+                           const std::string& dst_input) {
     assert(node_data.contains(src));
     assert(node_data.contains(dst));
-    if (src_output >= node_data[src].buffer_output_connections.size()) {
-        node_data[src].buffer_output_connections.resize(src_output + 1);
+
+    node_data[src].buffer_connections.insert({dst, src_output, dst_input});
+}
+
+std::vector<NodeHandle> Graph::connect_nodes() {
+    // combine connect_*, validate_inputs and calculate_outputs
+
+    std::vector<NodeHandle> topological_order;
+    topological_order.reserve(node_data.size());
+
+    topological_visit([&](NodeHandle& node, NodeData& data) {
+        topological_order.emplace_back(node);
+
+        // All inputs are connected, i.e. *_input_connections and *_input_descriptors are valid.
+        // That means we can compute the nodes' outputs and fill in inputs
+        // of the following nodes.
+
+        // 1. Get node output descriptors
+        compute_node_output_descriptors(node, data);
+
+        // 2. Resize the output arrays accordingly
+        data.image_output_connections.resize(data.image_output_descriptors.size());
+        data.buffer_output_connections.resize(data.buffer_output_descriptors.size());
+
+        // 3. Connect outputs to the inputs of dst nodes (fill in their *_input_connections and
+        // current *_output_connections).
+        for (const NodeConnection& connection : data.image_connections) {
+            NodeData& dst_data = node_data[connection.dst];
+            const uint32_t src_output_index = data.get_image_output_by_name(connection.src_output);
+            const uint32_t dst_input_index = dst_data.get_image_input_by_name(connection.dst_input);
+
+            if (std::get<0>(dst_data.image_input_connections[dst_input_index])) {
+                throw std::invalid_argument{
+                    fmt::format("The image input '{}' on node '{}' is already connected",
+                                connection.dst_input, dst_data.name)};
+            }
+            if (node == connection.dst &&
+                dst_data.image_input_descriptors[dst_input_index].delay == 0) {
+                throw std::runtime_error{fmt::format(
+                    "node '{}'' is connected to itself {} -> {} with delay 0, maybe you want "
+                    "to use a persistent output?",
+                    dst_data.name, connection.src_output, connection.dst_input)};
+            }
+            dst_data.image_input_connections[dst_input_index] = {node, src_output_index};
+            data.image_output_connections[src_output_index].emplace_back(connection.dst,
+                                                                         dst_input_index);
+
+            // make sure the same underlying resource is not accessed with different layouts
+            // from a single node downstream (we can only provide a single layout for cmd_run of the
+            // node).
+            for (auto& [n, i] : data.image_output_connections[src_output_index]) {
+                if (n == connection.dst &&
+                    dst_data.image_input_descriptors[i].delay ==
+                        dst_data.image_input_descriptors[dst_input_index].delay &&
+                    dst_data.image_input_descriptors[i].required_layout !=
+                        dst_data.image_input_descriptors[dst_input_index].required_layout) {
+                    throw std::invalid_argument{fmt::format(
+                        "You are trying to access the same underlying image of node '{}' twice "
+                        "from "
+                        "node '{}' with connections {} -> {}, {} -> {} and different layouts",
+                        data.name, dst_data.name, src_output_index, i, src_output_index,
+                        dst_input_index)};
+                }
+            }
+        }
+        for (const NodeConnection& connection : data.buffer_connections) {
+            NodeData& dst_data = node_data[connection.dst];
+            const uint32_t src_output_index = data.get_buffer_output_by_name(connection.src_output);
+            const uint32_t dst_input_index =
+                dst_data.get_buffer_input_by_name(connection.dst_input);
+
+            if (std::get<0>(dst_data.buffer_input_connections[dst_input_index])) {
+                throw std::invalid_argument{
+                    fmt::format("The buffer input '{}' on node '{}' is already connected",
+                                connection.dst_input, dst_data.name)};
+            }
+            if (node == connection.dst &&
+                dst_data.buffer_input_descriptors[dst_input_index].delay == 0) {
+                throw std::runtime_error{fmt::format(
+                    "node '{}'' is connected to itself {} -> {} with delay 0, maybe you want "
+                    "to use a persistent output?",
+                    dst_data.name, connection.src_output, connection.dst_input)};
+            }
+            dst_data.buffer_input_connections[dst_input_index] = {node, src_output_index};
+            data.buffer_output_connections[src_output_index].emplace_back(connection.dst,
+                                                                          dst_input_index);
+        }
+    });
+
+    return topological_order;
+}
+
+uint32_t Graph::topological_visit(const std::function<void(NodeHandle&, NodeData&)> visitor) {
+    std::unordered_set<NodeHandle> visited;
+    std::queue<NodeHandle> queue = start_nodes();
+
+    uint32_t visited_nodes = 0;
+    while (!queue.empty()) {
+        NodeData& data = node_data[queue.front()];
+
+        visitor(queue.front(), data);
+        visited.insert(queue.front());
+
+        // check for all subsequent nodes if we visited all "requirements" and add to queue.
+        // also, fail if we see a node again! (in both cases exclude "feedback" edges)
+
+        // find all subsequent nodes that are connected over a edge with delay = 0.
+        std::unordered_set<NodeHandle> candidates;
+        for (auto& output : data.image_output_connections) {
+            for (auto& [dst_node, image_input_idx] : output) {
+                if (node_data[dst_node].image_input_descriptors[image_input_idx].delay == 0) {
+                    candidates.insert(dst_node);
+                }
+            }
+        }
+        for (auto& output : data.buffer_output_connections) {
+            for (auto& [dst_node, buffer_input_idx] : output) {
+                if (node_data[dst_node].buffer_input_descriptors[buffer_input_idx].delay == 0) {
+                    candidates.insert(dst_node);
+                }
+            }
+        }
+
+        // add to queue if all "inputs" were visited
+        for (const NodeHandle& candidate : candidates) {
+            if (visited.contains(candidate)) {
+                // Back-edges with delay > 1 are allowed!
+                throw std::runtime_error{
+                    fmt::format("undelayed (edges with delay = 0) graph is not acyclic! {} -> {}",
+                                data.name, node_data[candidate].name)};
+            }
+            bool satisfied = true;
+            NodeData& candidate_data = node_data[candidate];
+            for (uint32_t i = 0; i < candidate_data.image_input_descriptors.size(); i++) {
+                auto& [src_node, src_output_idx] = candidate_data.image_input_connections[i];
+                auto& in_desc = candidate_data.image_input_descriptors[i];
+                // src was is already processed, or loop with delay > 0.
+                satisfied &= visited.contains(src_node) || in_desc.delay > 0;
+            }
+            for (uint32_t i = 0; i < candidate_data.buffer_input_descriptors.size(); i++) {
+                auto& [src_node, src_output_idx] = candidate_data.buffer_input_connections[i];
+                auto& in_desc = candidate_data.buffer_input_descriptors[i];
+                // src was is already processed, or src == candindate -> self loop with delay > 0.
+                satisfied &= visited.contains(src_node) || in_desc.delay > 0;
+            }
+            if (satisfied) {
+                queue.push(candidate);
+            }
+        }
+        queue.pop();
+        visited_nodes++;
     }
-    if (dst_input >= node_data[dst].buffer_input_connections.size()) {
-        throw std::invalid_argument{fmt::format("There is no buffer input '{}' on node '{}'",
-                                                dst_input, node_data[dst].name)};
+
+    return visited_nodes;
+}
+
+void Graph::print_error_missing_inputs() {
+    for (auto& [dst_node, dst_data] : node_data) {
+        // Images
+        for (uint32_t i = 0; i < dst_data.image_input_descriptors.size(); i++) {
+            auto& [src_node, src_connection_idx] = dst_data.image_input_connections[i];
+            auto& in_desc = dst_data.image_input_descriptors[i];
+            if (src_node == nullptr) {
+                SPDLOG_ERROR(fmt::format("image input '{}' ({}) of node '{}' was not connected!",
+                                         in_desc.name, i, dst_data.name));
+            }
+        }
+        // Buffers
+        for (uint32_t i = 0; i < dst_data.buffer_input_descriptors.size(); i++) {
+            auto& [src_node, src_connection_idx] = dst_data.buffer_input_connections[i];
+            auto& in_desc = dst_data.buffer_input_descriptors[i];
+            if (src_node == nullptr) {
+                SPDLOG_ERROR(fmt::format("buffer input {} ({}) of node {} was not connected!",
+                                         in_desc.name, i, dst_data.name));
+            }
+        }
     }
-    if (std::get<0>(node_data[dst].buffer_input_connections[dst_input])) {
-        throw std::invalid_argument{
-            fmt::format("The buffer input '{}' on node '{}' is already connected", dst_input,
-                        node_data[dst].name)};
-    }
-    node_data[dst].buffer_input_connections[dst_input] = {src, src_output};
-    node_data[src].buffer_output_connections[src_output].emplace_back(dst, dst_input);
 }
 
 void Graph::cmd_build(vk::CommandBuffer& cmd, const ProfilerHandle profiler) {
+    // no nodes -> no build necessary
+    if (node_data.empty())
+        return;
+
     // Make sure resources are not in use
     if (wait_queue.has_value()) {
         wait_queue.value()->wait_idle();
@@ -96,38 +236,21 @@ void Graph::cmd_build(vk::CommandBuffer& cmd, const ProfilerHandle profiler) {
 
     reset_graph();
 
-    if (node_data.empty())
-        return;
-
-    validate_inputs();
-
-    // Visit nodes in topological order
-    // to calculate outputs, barriers and such.
-    // Feedback edges must have a delay of at least 1.
-    flat_topology.resize(node_data.size());
-    std::unordered_set<NodeHandle> visited;
-    std::queue<NodeHandle> queue = start_nodes();
-
-    uint32_t node_index = 0;
-    while (!queue.empty()) {
-        flat_topology[node_index] = queue.front();
-        queue.pop();
-
-        visited.insert(flat_topology[node_index]);
-        calculate_outputs(flat_topology[node_index], visited, queue);
+    flat_topology = connect_nodes();
+    if (flat_topology.size() != node_data.size()) {
+        SPDLOG_ERROR("Graph not fully connected.");
+        print_error_missing_inputs();
+        throw std::runtime_error{"Graph not fully connected."};
+    }
 
 #ifndef NDEBUG
-        SPDLOG_DEBUG("{}", connections(flat_topology[node_index]));
+    for (auto& node : flat_topology) {
+        SPDLOG_DEBUG("{}", connections(node));
+    }
 #endif
 
-        node_index++;
-    }
-
-    if (node_index != node_data.size()) {
-        throw std::runtime_error{"Undelayed graph (only edges with delay = 0) is not acyclic!"};
-    }
-
     allocate_outputs();
+
     prepare_resource_sets();
 
     for (auto& node : flat_topology) {
@@ -187,43 +310,6 @@ const GraphRun& Graph::cmd_run(vk::CommandBuffer& cmd, const ProfilerHandle prof
     return run;
 }
 
-void Graph::validate_inputs() {
-    for (auto& [dst_node, dst_data] : node_data) {
-        // Images
-        for (uint32_t i = 0; i < dst_data.image_input_descriptors.size(); i++) {
-            auto& [src_node, src_connection_idx] = dst_data.image_input_connections[i];
-            auto& in_desc = dst_data.image_input_descriptors[i];
-            if (src_node == nullptr) {
-                throw std::runtime_error{
-                    fmt::format("image input '{}' ({}) of node '{}' was not connected!",
-                                in_desc.name, i, dst_data.name)};
-            }
-            if (src_node == dst_node && in_desc.delay == 0) {
-                throw std::runtime_error{
-                    fmt::format("node '{}'' is connected to itself with delay 0, maybe you want "
-                                "to use a persistent output?",
-                                dst_data.name)};
-            }
-        }
-        // Buffers
-        for (uint32_t i = 0; i < dst_data.buffer_input_descriptors.size(); i++) {
-            auto& [src_node, src_connection_idx] = dst_data.buffer_input_connections[i];
-            auto& in_desc = dst_data.buffer_input_descriptors[i];
-            if (src_node == nullptr) {
-                throw std::runtime_error{
-                    fmt::format("buffer input {} ({}) of node {} was not connected!", in_desc.name,
-                                i, dst_data.name)};
-            }
-            if (src_node == dst_node && in_desc.delay == 0) {
-                throw std::runtime_error{
-                    fmt::format("node {} is connected to itself with delay 0, maybe you want "
-                                "to use a persistent output?",
-                                dst_data.name)};
-            }
-        }
-    }
-}
-
 std::queue<NodeHandle> Graph::start_nodes() {
     std::queue<NodeHandle> queue;
 
@@ -247,11 +333,7 @@ std::queue<NodeHandle> Graph::start_nodes() {
     return queue;
 }
 
-void Graph::calculate_outputs(NodeHandle& node,
-                              std::unordered_set<NodeHandle>& visited,
-                              std::queue<NodeHandle>& queue) {
-    NodeData& data = node_data[node];
-
+void Graph::compute_node_output_descriptors(NodeHandle& node, NodeData& data) {
     std::vector<NodeOutputDescriptorImage> connected_image_outputs;
     std::vector<NodeOutputDescriptorBuffer> connected_buffer_outputs;
 
@@ -278,67 +360,6 @@ void Graph::calculate_outputs(NodeHandle& node,
     // get outputs from node
     std::tie(data.image_output_descriptors, data.buffer_output_descriptors) =
         node->describe_outputs(connected_image_outputs, connected_buffer_outputs);
-
-    // validate that the user did not try to connect something from an non existent output,
-    // since on connect we did not know the number of output descriptors.
-    // We resize the array in connect_* thus checking the size is enough.
-    if (data.image_output_connections.size() > data.image_output_descriptors.size()) {
-        throw std::runtime_error{fmt::format("image output index '{}' is invalid for node '{}'",
-                                             data.image_output_connections.size() - 1, data.name)};
-    }
-    if (data.buffer_output_connections.size() > data.buffer_output_descriptors.size()) {
-        throw std::runtime_error{fmt::format("buffer output index '{}' is invalid for node '{}'",
-                                             data.buffer_output_connections.size() - 1, data.name)};
-    }
-    data.image_output_connections.resize(data.image_output_descriptors.size());
-    data.buffer_output_connections.resize(data.buffer_output_descriptors.size());
-
-    // check for all subsequent nodes if we visited all "requirements" and add to queue.
-    // also, fail if we see a node again! (in both cases exclude "feedback" edges)
-
-    // find all subsequent nodes that are connected over a edge with delay = 0.
-    std::unordered_set<NodeHandle> candidates;
-    for (auto& output : data.image_output_connections) {
-        for (auto& [dst_node, image_input_idx] : output) {
-            if (node_data[dst_node].image_input_descriptors[image_input_idx].delay == 0) {
-                candidates.insert(dst_node);
-            }
-        }
-    }
-    for (auto& output : data.buffer_output_connections) {
-        for (auto& [dst_node, buffer_input_idx] : output) {
-            if (node_data[dst_node].buffer_input_descriptors[buffer_input_idx].delay == 0) {
-                candidates.insert(dst_node);
-            }
-        }
-    }
-
-    // add to queue if all "inputs" were visited
-    for (const NodeHandle& candidate : candidates) {
-        if (visited.contains(candidate)) {
-            // Back-edges with delay > 1 are allowed!
-            throw std::runtime_error{
-                fmt::format("undelayed (edges with delay = 0) graph is not acyclic! {} -> {}",
-                            data.name, node_data[candidate].name)};
-        }
-        bool satisfied = true;
-        NodeData& candidate_data = node_data[candidate];
-        for (uint32_t i = 0; i < candidate_data.image_input_descriptors.size(); i++) {
-            auto& [src_node, src_output_idx] = candidate_data.image_input_connections[i];
-            auto& in_desc = candidate_data.image_input_descriptors[i];
-            // src was is already processed, or loop with delay > 0.
-            satisfied &= visited.contains(src_node) || in_desc.delay > 0;
-        }
-        for (uint32_t i = 0; i < candidate_data.buffer_input_descriptors.size(); i++) {
-            auto& [src_node, src_output_idx] = candidate_data.buffer_input_connections[i];
-            auto& in_desc = candidate_data.buffer_input_descriptors[i];
-            // src was is already processed, or src == candindate -> self loop with delay > 0.
-            satisfied &= visited.contains(src_node) || in_desc.delay > 0;
-        }
-        if (satisfied) {
-            queue.push(candidate);
-        }
-    }
 }
 
 std::string Graph::connections(NodeHandle& src) {
@@ -387,7 +408,8 @@ void Graph::allocate_outputs() {
                 auto& in_desc = node_data[dst_node].buffer_input_descriptors[dst_input_idx];
                 if (out_desc.persistent && in_desc.delay > 0) {
                     throw std::runtime_error{fmt::format(
-                        "persistent outputs cannot be accessed with delay > 0. {}: {} -> {}: {}",
+                        "persistent outputs cannot be accessed with delay > 0. {}: {} -> {}: "
+                        "{}",
                         src_data.name, src_out_idx, node_data[dst_node].name, dst_input_idx)};
                 }
                 max_delay = std::max(max_delay, in_desc.delay);
@@ -421,7 +443,8 @@ void Graph::allocate_outputs() {
                 auto& in_desc = node_data[dst_node].image_input_descriptors[dst_input_idx];
                 if (out_desc.persistent && in_desc.delay > 0) {
                     throw std::runtime_error{fmt::format(
-                        "persistent outputs cannot be accessed with delay > 0. {}: {} -> {}: {}",
+                        "persistent outputs cannot be accessed with delay > 0. {}: {} -> {}: "
+                        "{}",
                         src_data.name, src_out_idx, node_data[dst_node].name, dst_input_idx)};
                 }
                 max_delay = std::max(max_delay, in_desc.delay);
@@ -646,6 +669,8 @@ void Graph::reset_graph() {
     this->flat_topology.clear();
     for (auto& [node, data] : node_data) {
 
+        data.image_input_connections.assign(data.image_input_descriptors.size(), {});
+        data.buffer_input_connections.assign(data.buffer_input_descriptors.size(), {});
         data.image_output_descriptors.clear();
         data.buffer_output_descriptors.clear();
 
