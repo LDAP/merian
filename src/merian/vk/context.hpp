@@ -27,19 +27,19 @@ class Context : public std::enable_shared_from_this<Context> {
   public:
     struct FeaturesContainer {
         operator const vk::PhysicalDeviceFeatures2&() const {
-          return physical_device_features;
+            return physical_device_features;
         }
 
         operator vk::PhysicalDeviceFeatures2&() {
-          return physical_device_features;
+            return physical_device_features;
         }
 
         operator const vk::PhysicalDeviceFeatures&() const {
-          return physical_device_features.features;
+            return physical_device_features.features;
         }
 
         operator vk::PhysicalDeviceFeatures&() {
-          return physical_device_features.features;
+            return physical_device_features.features;
         }
 
         vk::PhysicalDeviceFeatures2 physical_device_features;
@@ -50,15 +50,15 @@ class Context : public std::enable_shared_from_this<Context> {
 
     struct PhysicalDeviceContainer {
         operator const vk::PhysicalDevice&() const {
-          return physical_device;
+            return physical_device;
         }
 
         operator vk::PhysicalDevice&() {
-          return physical_device;
+            return physical_device;
         }
 
         const vk::PhysicalDeviceLimits& get_physical_device_limits() const {
-          return physical_device_properties.properties.limits;
+            return physical_device_properties.properties.limits;
         }
 
         vk::PhysicalDevice physical_device;
