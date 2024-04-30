@@ -137,7 +137,6 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id,
         throw std::runtime_error("No vulkan device found!");
     }
 
-    // TODO: Sort by score (e.g. prefer dedicated GPU, check supported extensions)
     std::vector<std::tuple<vk::PhysicalDevice, vk::PhysicalDeviceProperties2>> matches;
     for (std::size_t i = 0; i < devices.size(); i++) {
         vk::PhysicalDeviceProperties2 props = devices[i].getProperties2();
