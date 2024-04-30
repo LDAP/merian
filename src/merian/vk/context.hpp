@@ -159,6 +159,10 @@ class Context : public std::enable_shared_from_this<Context> {
         return nullptr;
     }
 
+    bool device_extension_enabled(const std::string& name);
+
+    bool instance_extension_enabled(const std::string& name);
+
   private:
     std::vector<std::shared_ptr<Extension>> extensions;
 
@@ -192,6 +196,7 @@ class Context : public std::enable_shared_from_this<Context> {
 
     // in create_device_and_queues
 
+    std::vector<const char*> device_extensions;
     // the vk::Device for this Context
     vk::Device device;
     // The queue indices (not family!) used for the graphics queue

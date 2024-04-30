@@ -2,8 +2,6 @@
 #include "merian/utils/vector.hpp"
 #include "merian/vk/extension/extension.hpp"
 
-#include <GLFW/glfw3.h>
-#include <map>
 #include <spdlog/spdlog.h>
 #include <tuple>
 
@@ -437,14 +435,12 @@ void Context::create_device_and_queues(uint32_t preferred_number_compute_queues)
     }
 
     // DEVICE EXTENSIONS
-
-    std::vector<const char*> required_device_extensions;
     for (auto& ext : extensions) {
-        insert_all(required_device_extensions,
+        insert_all(device_extensions,
                    ext->required_device_extension_names(physical_device.physical_device));
     }
-    remove_duplicates(required_device_extensions);
-    SPDLOG_DEBUG("enabling device extensions: [{}]", fmt::join(required_device_extensions, ", "));
+    remove_duplicates(device_extensions);
+    SPDLOG_DEBUG("enabling device extensions: [{}]", fmt::join(device_extensions, ", "));
 
     // FEATURES
 
@@ -476,7 +472,7 @@ void Context::create_device_and_queues(uint32_t preferred_number_compute_queues)
     vk::DeviceCreateInfo device_create_info{{},
                                             queue_create_infos,
                                             instance_layer_names,
-                                            required_device_extensions,
+                                            device_extensions,
                                             nullptr,
                                             &enable.physical_device_features};
 
@@ -665,6 +661,16 @@ std::shared_ptr<CommandPool> Context::get_cmd_pool_C() {
         cmd_pool_C = cmd;
         return cmd;
     }
+}
+
+bool Context::device_extension_enabled(const std::string& name) {
+    return std::find_if(device_extensions.begin(), device_extensions.end(),
+                        [&](const char* s) { return name == s; }) != device_extensions.end();
+}
+
+bool Context::instance_extension_enabled(const std::string& name) {
+    return std::find_if(instance_extension_names.begin(), instance_extension_names.end(),
+                        [&](const char* s) { return name == s; }) != instance_extension_names.end();
 }
 
 } // namespace merian
