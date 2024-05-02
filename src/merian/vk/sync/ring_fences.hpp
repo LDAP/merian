@@ -10,11 +10,11 @@ namespace merian {
  *  we are currently at, and prevents accidental access to a cycle in-flight.
  *
  *  A typical frame would start by "next_cycle_wait_and_get()", which waits for the
- *  requested cycle to be available.
+ *  requested cycle to be available (i.e. the GPU has finished executing).
  *
  *  You can store additional data for every frame.
  */
-template <uint32_t RING_SIZE = 2, typename UserDataType = uint32_t>
+template <uint32_t RING_SIZE = 2, typename UserDataType = void*>
 class RingFences : public std::enable_shared_from_this<RingFences<RING_SIZE, UserDataType>> {
   public:
     struct RingData {
