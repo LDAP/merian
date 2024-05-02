@@ -400,6 +400,9 @@ class Graph : public std::enable_shared_from_this<Graph> {
 
     // Resets all data, so that the graph can be rebuild
     void reset_graph();
+
+    void get_configuration_io_for_node(Configuration& config,
+                                    NodeData& data);
 };
 
 } // namespace merian

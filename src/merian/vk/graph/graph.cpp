@@ -671,8 +671,11 @@ void Graph::reset_graph() {
 
         data.image_input_connections.assign(data.image_input_descriptors.size(), {});
         data.buffer_input_connections.assign(data.buffer_input_descriptors.size(), {});
+
         data.image_output_descriptors.clear();
         data.buffer_output_descriptors.clear();
+        data.image_output_connections.clear();
+        data.buffer_output_connections.clear();
 
         data.allocated_image_outputs.clear();
         data.allocated_buffer_outputs.clear();
@@ -689,18 +692,85 @@ void Graph::reset_graph() {
     }
 }
 
+void Graph::get_configuration_io_for_node(Configuration& config, NodeData& data) {
+    if ((!data.image_output_descriptors.empty() || !data.buffer_output_descriptors.empty()) &&
+        config.st_begin_child("outputs", "Outputs")) {
+        for (uint32_t i = 0; i < data.image_output_descriptors.size(); i++) {
+            auto& out_desc = data.image_output_descriptors[i];
+            if (config.st_begin_child("image_output-" + out_desc.name,
+                                      fmt::format("{} (image)", out_desc.name))) {
+                for (auto& out : data.image_output_connections[i]) {
+                    NodeData& input_data = node_data[std::get<0>(out)];
+                    const std::string id =
+                        fmt::format("image_input-{}-{}", input_data.name,
+                                    input_data.image_input_descriptors[std::get<1>(out)].name);
+                    const std::string label = fmt::format(
+                        "{}, of {} ({})", input_data.image_input_descriptors[std::get<1>(out)].name,
+                        input_data.name, input_data.node->name());
+                    if (config.st_begin_child(id, label)) {
+                        config.st_end_child();
+                    }
+                }
+                config.st_end_child();
+            }
+        }
+        for (uint32_t i = 0; i < data.buffer_output_descriptors.size(); i++) {
+            auto& out_desc = data.buffer_output_descriptors[i];
+            if (config.st_begin_child("buffer_output-" + out_desc.name,
+                                      fmt::format("{} (buffer)", out_desc.name))) {
+                for (auto& out : data.buffer_output_connections[i]) {
+                    NodeData& input_data = node_data[std::get<0>(out)];
+                    const std::string id =
+                        fmt::format("buffer_input-{}-{}", input_data.name,
+                                    input_data.buffer_input_descriptors[std::get<1>(out)].name);
+                    const std::string label =
+                        fmt::format("{}, of {} ({})",
+                                    input_data.buffer_input_descriptors[std::get<1>(out)].name,
+                                    input_data.name, input_data.node->name());
+                    if (config.st_begin_child(id, label)) {
+                        config.st_end_child();
+                    }
+                }
+                config.st_end_child();
+            }
+        }
+        config.st_end_child();
+    }
+    if ((!data.image_input_descriptors.empty() || !data.buffer_input_descriptors.empty()) &&
+        config.st_begin_child("inputs", "Inputs")) {
+        for (uint32_t i = 0; i < data.image_input_descriptors.size(); i++) {
+            auto& in_desc = data.image_input_descriptors[i];
+            uint32_t src_out_index = std::get<1>(data.image_input_connections[i]);
+            auto& out_node_data = node_data[std::get<0>(data.image_input_connections[i])];
+            if (config.st_begin_child(
+                    "image_input-" + in_desc.name,
+                    fmt::format("{} <-image- {}, from {} ({})", in_desc.name,
+                                out_node_data.image_output_descriptors[src_out_index].name,
+                                out_node_data.name, out_node_data.node->name()))) {
+                config.st_end_child();
+            }
+        }
+        for (uint32_t i = 0; i < data.buffer_input_descriptors.size(); i++) {
+            auto& in_desc = data.buffer_input_descriptors[i];
+            uint32_t src_out_index = std::get<1>(data.buffer_input_connections[i]);
+            auto& out_node_data = node_data[std::get<0>(data.buffer_input_connections[i])];
+            if (config.st_begin_child(
+                    "buffer_input-" + in_desc.name,
+                    fmt::format("{} <-buffer- {}, from {} ({})", in_desc.name,
+                                out_node_data.buffer_output_descriptors[src_out_index].name,
+                                out_node_data.name, out_node_data.node->name()))) {
+                config.st_end_child();
+            }
+        }
+        config.st_end_child();
+    }
+}
+
 void Graph::get_configuration(Configuration& config) {
     if (config.st_new_section("Graph")) {
         rebuild_requested |= config.config_bool("Rebuild");
         config.st_no_space();
         config.output_text(fmt::format("Current iteration {}", current_iteration));
-
-        if (config.st_begin_child("connections", "Connections")) {
-            for (auto& node : flat_topology) {
-                config.output_text(connections(node));
-            }
-            config.st_end_child();
-        }
 
         for (auto& [node, data] : node_data) {
             std::string node_label = fmt::format("{} ({})", data.name, data.node->name());
@@ -708,6 +778,8 @@ void Graph::get_configuration(Configuration& config) {
                 bool needs_rebuild = false;
                 data.node->get_configuration(config, needs_rebuild);
                 rebuild_requested |= needs_rebuild;
+                config.st_separate();
+                get_configuration_io_for_node(config, data);
                 config.st_end_child();
             }
         }
