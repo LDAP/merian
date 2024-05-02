@@ -694,7 +694,7 @@ void Graph::reset_graph() {
 
 void Graph::get_configuration_io_for_node(Configuration& config, NodeData& data) {
     if ((!data.image_output_descriptors.empty() || !data.buffer_output_descriptors.empty()) &&
-        config.st_begin_child("outputs", "Outputs")) {
+        config.st_begin_child("graph_outputs", "Outputs")) {
         for (uint32_t i = 0; i < data.image_output_descriptors.size(); i++) {
             auto& out_desc = data.image_output_descriptors[i];
             if (config.st_begin_child("image_output-" + out_desc.name,
@@ -737,7 +737,7 @@ void Graph::get_configuration_io_for_node(Configuration& config, NodeData& data)
         config.st_end_child();
     }
     if ((!data.image_input_descriptors.empty() || !data.buffer_input_descriptors.empty()) &&
-        config.st_begin_child("inputs", "Inputs")) {
+        config.st_begin_child("graph_inputs", "Inputs")) {
         for (uint32_t i = 0; i < data.image_input_descriptors.size(); i++) {
             auto& in_desc = data.image_input_descriptors[i];
             uint32_t src_out_index = std::get<1>(data.image_input_connections[i]);
