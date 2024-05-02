@@ -85,7 +85,9 @@ void GLFWImGui::upload_imgui_fonts() {
     ImGui_ImplVulkan_DestroyFontUploadObjects();
 }
 
-void GLFWImGui::init_imgui(GLFWwindow* window, SwapchainAcquireResult& aquire_result) {
+void GLFWImGui::init_imgui(GLFWwindow* window,
+                           SwapchainAcquireResult& aquire_result,
+                           QueueHandle& queue) {
     assert(render_pass);
 
     ImGuiIO& io = ImGui::GetIO();
@@ -117,8 +119,8 @@ void GLFWImGui::init_imgui(GLFWwindow* window, SwapchainAcquireResult& aquire_re
     init_info.Instance = context->instance;
     init_info.PhysicalDevice = context->physical_device.physical_device;
     init_info.Device = context->device;
-    init_info.QueueFamily = context->queue_family_idx_GCT;
-    init_info.Queue = context->get_queue_GCT()->get_queue();
+    init_info.QueueFamily = queue->get_queue_family_index();
+    init_info.Queue = queue->get_queue();
     init_info.PipelineCache = VK_NULL_HANDLE;
     init_info.DescriptorPool = imgui_pool;
     init_info.Subpass = 0;
@@ -136,7 +138,8 @@ void GLFWImGui::init_imgui(GLFWwindow* window, SwapchainAcquireResult& aquire_re
 }
 
 // Start a new ImGui frame and renderpass. Returns the framebuffer.
-vk::Framebuffer GLFWImGui::new_frame(vk::CommandBuffer& cmd,
+vk::Framebuffer GLFWImGui::new_frame(QueueHandle& queue,
+                                     vk::CommandBuffer& cmd,
                                      GLFWwindow* window,
                                      SwapchainAcquireResult& aquire_result) {
     ImGuiContext* current_context = ImGui::GetCurrentContext();
@@ -152,7 +155,7 @@ vk::Framebuffer GLFWImGui::new_frame(vk::CommandBuffer& cmd,
     }
 
     if (!imgui_initialized) {
-        init_imgui(window, aquire_result);
+        init_imgui(window, aquire_result, queue);
     }
 
     ImGui_ImplVulkan_NewFrame();

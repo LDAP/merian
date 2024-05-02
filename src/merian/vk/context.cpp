@@ -9,13 +9,13 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
 namespace merian {
 
-SharedContext Context::make_context(std::vector<std::shared_ptr<Extension>> extensions,
-                                    std::string application_name,
+SharedContext Context::make_context(const std::vector<std::shared_ptr<Extension>>& extensions,
+                                    const std::string& application_name,
                                     uint32_t application_vk_version,
                                     uint32_t preffered_number_compute_queues,
                                     uint32_t filter_vendor_id,
                                     uint32_t filter_device_id,
-                                    std::string filter_device_name) {
+                                    const std::string& filter_device_name) {
 
     auto shared_context = std::shared_ptr<Context>(new Context(
         extensions, application_name, application_vk_version, preffered_number_compute_queues,
@@ -28,13 +28,13 @@ SharedContext Context::make_context(std::vector<std::shared_ptr<Extension>> exte
     return shared_context;
 }
 
-Context::Context(std::vector<std::shared_ptr<Extension>> desired_extensions,
-                 std::string application_name,
+Context::Context(const std::vector<std::shared_ptr<Extension>>& desired_extensions,
+                 const std::string& application_name,
                  uint32_t application_vk_version,
                  uint32_t preffered_number_compute_queues,
                  uint32_t filter_vendor_id,
                  uint32_t filter_device_id,
-                 std::string filter_device_name)
+                 const std::string& filter_device_name)
     : extensions(desired_extensions) {
     SPDLOG_INFO("\n\n\
 __  __ ___ ___ ___   _   _  _ \n\
@@ -88,7 +88,8 @@ Context::~Context() {
     SPDLOG_INFO("context destroyed");
 }
 
-void Context::create_instance(std::string application_name, uint32_t application_vk_version) {
+void Context::create_instance(const std::string& application_name,
+                              uint32_t application_vk_version) {
     extensions_check_instance_layer_support();
     extensions_check_instance_extension_support();
 
@@ -598,9 +599,15 @@ void Context::destroy_extensions(std::vector<std::shared_ptr<Extension>> extensi
 // GETTER
 ///////////////
 
+uint32_t Context::get_number_compute_queues() const noexcept {
+    return queues_C.size();
+}
+
 std::shared_ptr<Queue> Context::get_queue_GCT() {
     if (!queue_GCT.expired()) {
         return queue_GCT.lock();
+    } else if (queue_family_idx_GCT < 0) {
+        return nullptr;
     } else {
         auto queue =
             std::make_shared<Queue>(shared_from_this(), queue_family_idx_GCT, queue_idx_GCT);
@@ -609,7 +616,13 @@ std::shared_ptr<Queue> Context::get_queue_GCT() {
     }
 }
 
-std::shared_ptr<Queue> Context::get_queue_T() {
+std::shared_ptr<Queue> Context::get_queue_T(const bool fallback) {
+    if (queue_family_idx_T < 0) {
+        if (fallback)
+            return get_queue_GCT();
+        else
+            return nullptr;
+    }
     if (!queue_T.expired()) {
         return queue_T.lock();
     } else {
@@ -619,16 +632,33 @@ std::shared_ptr<Queue> Context::get_queue_T() {
     }
 }
 
-std::shared_ptr<Queue> Context::get_queue_C(uint32_t index) {
-    assert(index < queue_idx_C.size());
+std::shared_ptr<Queue> Context::get_queue_C(uint32_t index, const bool fallback) {
+    assert(fallback || index < queues_C.size());
 
-    if (!queues_C[index].expired()) {
-        return queues_C[index].lock();
+    if (index < queues_C.size()) {
+        if (!queues_C[index].expired()) {
+            return queues_C[index].lock();
+        } else {
+            auto queue =
+                std::make_shared<Queue>(shared_from_this(), queue_family_idx_C, queue_idx_C[index]);
+            queues_C[index] = queue;
+            return queue;
+        }
+    } else if (!fallback) {
+        // early out, fallback is not allowed
+        return nullptr;
+    } else if (!queues_C.empty()) {
+        auto unused_queue = std::find_if(queues_C.begin(), queues_C.end(),
+                                         [](auto& queue) { return queue.expired(); });
+        if (unused_queue == queues_C.end()) {
+            // there is no unused queue, use first
+            return get_queue_C(0);
+        } else {
+            return get_queue_C(unused_queue - queues_C.begin());
+        }
     } else {
-        auto queue =
-            std::make_shared<Queue>(shared_from_this(), queue_family_idx_C, queue_idx_C[index]);
-        queues_C[index] = queue;
-        return queue;
+        // there are no extra compute queues, maybe at least a graphics queue with compute support
+        return get_queue_GCT();
     }
 }
 

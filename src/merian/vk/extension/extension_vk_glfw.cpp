@@ -1,5 +1,4 @@
 #include "merian/vk/extension/extension_vk_glfw.hpp"
-#include "merian/vk/command/queue.hpp"
 #include "merian/vk/context.hpp"
 
 #include <spdlog/spdlog.h>
@@ -21,10 +20,7 @@ void ExtensionVkGLFW::on_physical_device_selected(
 
 bool ExtensionVkGLFW::accept_graphics_queue(const vk::PhysicalDevice& physical_device,
                                             std::size_t queue_family_index) {
-    if (physical_device.getSurfaceSupportKHR(queue_family_index, surface)) {
-        return true;
-    }
-    return false;
+    return physical_device.getSurfaceSupportKHR(queue_family_index, surface);
 }
 
 void ExtensionVkGLFW::on_destroy_instance(const vk::Instance& instance) {

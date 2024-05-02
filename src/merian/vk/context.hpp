@@ -77,22 +77,22 @@ class Context : public std::enable_shared_from_this<Context> {
      * https://en.cppreference.com/w/cpp/memory/enable_shared_from_this.
      */
     static SharedContext
-    make_context(std::vector<std::shared_ptr<Extension>> extensions,
-                 std::string application_name = "",
+    make_context(const std::vector<std::shared_ptr<Extension>>& extensions,
+                 const std::string& application_name = "",
                  uint32_t application_vk_version = VK_MAKE_VERSION(1, 0, 0),
                  uint32_t preffered_number_compute_queues = 1, // Additionally to the GCT queue
                  uint32_t filter_vendor_id = -1,
                  uint32_t filter_device_id = -1,
-                 std::string filter_device_name = "");
+                 const std::string& filter_device_name = "");
 
   private:
-    Context(std::vector<std::shared_ptr<Extension>> extensions,
-            std::string application_name,
+    Context(const std::vector<std::shared_ptr<Extension>>& extensions,
+            const std::string& application_name,
             uint32_t application_vk_version,
             uint32_t preffered_number_compute_queues,
             uint32_t filter_vendor_id,
             uint32_t filter_device_id,
-            std::string filter_device_name);
+            const std::string& filter_device_name);
 
   public:
     ~Context();
@@ -110,7 +110,7 @@ class Context : public std::enable_shared_from_this<Context> {
     }
 
   private: // Vulkan initialization
-    void create_instance(std::string application_name, uint32_t application_vk_version);
+    void create_instance(const std::string& application_name, uint32_t application_vk_version);
     void prepare_physical_device(uint32_t filter_vendor_id,
                                  uint32_t filter_device_id,
                                  std::string filter_device_name);
@@ -125,17 +125,26 @@ class Context : public std::enable_shared_from_this<Context> {
     void destroy_extensions(std::vector<std::shared_ptr<Extension>> extensions);
 
   public: // Getter
-    // can be nullptr in very rare occasions, you can check that with if (shrd_ptr) {...}
+    // The actual number of compute queues (< preffered_number_compute_queues). 
+    uint32_t get_number_compute_queues()  const noexcept;
+
+    // A queue guaranteed to support graphics+compute+transfer.
+    // Can be nullptr if unavailable, you can check that with if (shrd_ptr) {...}
     // Make sure to keep a reference, else the pool and its buffers are destroyed
     std::shared_ptr<Queue> get_queue_GCT();
 
-    // can be nullptr in very rare occasions, you can check that with if (shrd_ptr) {...}
-    // Make sure to keep a reference, else the pool and its buffers are destroyed
-    std::shared_ptr<Queue> get_queue_T();
+    // A queue guaranteed to support transfer.
+    // Can be nullptr if unavailable, you can check that with if (shrd_ptr) {...}
+    // Make sure to keep a reference, else the pool and its buffers are destroyed.
+    // Might fall back to the GCT queue if fallback is true.
+    std::shared_ptr<Queue> get_queue_T(const bool fallback = false);
 
-    // can be nullptr in very rare occasions, you can check that with if (shrd_ptr) {...}
-    // Make sure to keep a reference, else the pool and its buffers are destroyed
-    std::shared_ptr<Queue> get_queue_C(uint32_t index = 0);
+    // A queue guaranteed to support compute.
+    // Can be nullptr if unavailable, you can check that with if (shrd_ptr) {...}
+    // Make sure to keep a reference, else the pool and its buffers are destroyed.
+    // Might fall back to a different compute queue or the GCT queue, if fallback is true.
+    // In this case index may be invalid, else it must be < get_number_compute_queues() and or nullptr is returned.
+    std::shared_ptr<Queue> get_queue_C(uint32_t index = 0, const bool fallback = false);
 
     // Convenience command pool for graphics and compute (can be nullptr in very rare occasions)
     // Make sure to keep a reference, else the pool and its buffers are destroyed
@@ -185,20 +194,22 @@ class Context : public std::enable_shared_from_this<Context> {
     // the vk::PhysicalDevice for this Context
     PhysicalDeviceContainer physical_device;
 
-    // in find_queues. Indexes are -1 if no suitable queue was found!
-
-    // A queue family index guaranteed to support graphics+compute+graphics
-    int32_t queue_family_idx_GCT = -1;
-    // A queue family index guaranteed to support compute
-    int32_t queue_family_idx_C = -1;
-    // A queue family index guaranteed to support transfer
-    int32_t queue_family_idx_T = -1;
-
     // in create_device_and_queues
 
     std::vector<const char*> device_extensions;
     // the vk::Device for this Context
     vk::Device device;
+
+  private:
+    // in find_queues. Indexes are -1 if no suitable queue was found!
+
+    // A queue family index guaranteed to support graphics+compute+transfer (or -1)
+    int32_t queue_family_idx_GCT = -1;
+    // A queue family index guaranteed to support compute (or -1)
+    int32_t queue_family_idx_C = -1;
+    // A queue family index guaranteed to support transfer (or -1)
+    int32_t queue_family_idx_T = -1;
+
     // The queue indices (not family!) used for the graphics queue
     int32_t queue_idx_GCT = -1;
     // The queue indices (not family!) used for the compute queue
@@ -206,7 +217,6 @@ class Context : public std::enable_shared_from_this<Context> {
     // The queue indices (not family!) used for the transfer queue
     int32_t queue_idx_T = -1;
 
-  private:
     // can be nullptr in very rare occasions, you can check that with if (shrd_ptr) {...}
     std::weak_ptr<Queue> queue_GCT;
     // can be nullptr in very rare occasions, you can check that with if (shrd_ptr) {...}

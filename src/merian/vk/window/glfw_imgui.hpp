@@ -1,8 +1,8 @@
 #pragma once
 
+#include "imgui.h"
 #include "merian/vk/window/imgui_context.hpp"
 #include "merian/vk/window/swapchain.hpp"
-#include "imgui.h"
 
 namespace merian {
 
@@ -29,15 +29,17 @@ class GLFWImGui {
     ~GLFWImGui();
 
     // Start a new ImGui frame
-    vk::Framebuffer
-    new_frame(vk::CommandBuffer& cmd, GLFWwindow* window, SwapchainAcquireResult& aquire_result);
+    vk::Framebuffer new_frame(QueueHandle& queue,
+                              vk::CommandBuffer& cmd,
+                              GLFWwindow* window,
+                              SwapchainAcquireResult& aquire_result);
 
     // Render the ImGui to the current swapchain image
     void render(vk::CommandBuffer& cmd);
 
   private:
     void upload_imgui_fonts();
-    void init_imgui(GLFWwindow* window, SwapchainAcquireResult& aquire_result);
+    void init_imgui(GLFWwindow* window, SwapchainAcquireResult& aquire_result, QueueHandle& queue);
     void recreate_render_pass(SwapchainAcquireResult& aquire_result);
 
   private:

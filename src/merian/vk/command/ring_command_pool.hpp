@@ -20,21 +20,21 @@ class RingCommandPoolCycle : public CommandPool {
 
     vk::CommandBuffer
     create(vk::CommandBufferLevel level = vk::CommandBufferLevel::ePrimary,
-                        bool begin = false,
-                        vk::CommandBufferUsageFlags flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
-                        const vk::CommandBufferInheritanceInfo* pInheritanceInfo = nullptr) override;
+           bool begin = false,
+           vk::CommandBufferUsageFlags flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
+           const vk::CommandBufferInheritanceInfo* pInheritanceInfo = nullptr) override;
 
     vk::CommandBuffer create_and_begin(
         vk::CommandBufferLevel level = vk::CommandBufferLevel::ePrimary,
         vk::CommandBufferUsageFlags flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
         const vk::CommandBufferInheritanceInfo* pInheritanceInfo = nullptr) override;
 
-    std::vector<vk::CommandBuffer>
-    create_multiple(vk::CommandBufferLevel level,
-                         uint32_t count,
-                         bool begin = false,
-                         vk::CommandBufferUsageFlags flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
-                         const vk::CommandBufferInheritanceInfo* pInheritanceInfo = nullptr) override;
+    std::vector<vk::CommandBuffer> create_multiple(
+        vk::CommandBufferLevel level,
+        uint32_t count,
+        bool begin = false,
+        vk::CommandBufferUsageFlags flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
+        const vk::CommandBufferInheritanceInfo* pInheritanceInfo = nullptr) override;
 
     std::vector<vk::CommandBuffer> create_and_begin_multiple(
         vk::CommandBufferLevel level,
@@ -63,13 +63,15 @@ template <uint32_t RING_SIZE = 3> class RingCommandPool {
     RingCommandPool(RingCommandPool const&) = delete;
     RingCommandPool& operator=(RingCommandPool const&) = delete;
 
-    RingCommandPool(const SharedContext& context,
-                    uint32_t queue_family_index,
-                    vk::CommandPoolCreateFlags create_flags = vk::CommandPoolCreateFlagBits::eTransient)
-        : context(context), queue_family_index(queue_family_index), create_flags(create_flags) {
-
+    RingCommandPool(
+        const SharedContext& context,
+        const QueueHandle queue,
+        vk::CommandPoolCreateFlags create_flags = vk::CommandPoolCreateFlagBits::eTransient)
+        : context(context), create_flags(create_flags) {
+        const uint32_t queue_family_index = queue->get_queue_family_index();
         for (uint32_t i = 0; i < RING_SIZE; i++) {
-            pools[i] = std::make_shared<RingCommandPoolCycle>(context, queue_family_index, create_flags, i, current_index);
+            pools[i] = std::make_shared<RingCommandPoolCycle>(context, queue_family_index,
+                                                              create_flags, i, current_index);
         }
     }
 
@@ -78,8 +80,8 @@ template <uint32_t RING_SIZE = 3> class RingCommandPool {
         return set_cycle(current_index + 1);
     }
 
-    // call when cycle has changed, prior creating command buffers. Use for example current_cycle_index() from
-    // RingFences. Resets old pools etc and frees command buffers.
+    // call when cycle has changed, prior creating command buffers. Use for example
+    // current_cycle_index() from RingFences. Resets old pools etc and frees command buffers.
     CommandPoolHandle set_cycle(uint32_t cycle) {
         current_index = cycle % RING_SIZE;
         std::shared_ptr<RingCommandPoolCycle>& current_pool = pools[current_index];
@@ -91,14 +93,13 @@ template <uint32_t RING_SIZE = 3> class RingCommandPool {
 
   private:
     const SharedContext context;
-    uint32_t queue_family_index;
     vk::CommandPoolCreateFlags create_flags;
 
     std::array<std::shared_ptr<RingCommandPoolCycle>, RING_SIZE> pools;
     uint32_t current_index = 0;
 };
 
-template<uint32_t RING_SIZE>
+template <uint32_t RING_SIZE>
 using RingCommandPoolHandle = std::shared_ptr<RingCommandPool<RING_SIZE>>;
 
 } // namespace merian
