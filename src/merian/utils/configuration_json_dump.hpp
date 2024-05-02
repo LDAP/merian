@@ -86,9 +86,13 @@ class JSONDumpConfiguration : public Configuration {
                                        const std::string& desc = "") override;
 
   private:
+    nlohmann::json& current() {
+        return o.back().second;
+    }
+
+  private:
     const std::string filename;
-    std::string object_name;
-    std::vector<nlohmann::json> o;
+    std::vector<std::pair<std::string, nlohmann::json>> o;
 };
 
 } // namespace merian

@@ -33,18 +33,21 @@ json dump_vec4(glm::vec4& v) {
 
 JSONDumpConfiguration::JSONDumpConfiguration(const std::string& filename)
     : filename(filename), o(1) {}
+
 JSONDumpConfiguration::~JSONDumpConfiguration() {
+    assert(o.size() == 1 && "Missing st_end_child?");
+
     std::ofstream file(filename);
-    file << std::setw(4) << o[0] << std::endl;
+    file << std::setw(4) << current() << std::endl;
 }
 
 bool JSONDumpConfiguration::st_begin_child(const std::string& id, const std::string&) {
-    object_name = id;
-    o.emplace_back();
+    o.emplace_back(id, nlohmann::json());
     return true;
 }
 void JSONDumpConfiguration::st_end_child() {
-    o[o.size() - 2][object_name] = o[o.size() - 1];
+    if (!current().empty())
+        o[o.size() - 2].second[o.back().first] = current();
     o.pop_back();
 }
 
@@ -63,65 +66,65 @@ void JSONDumpConfiguration::output_plot_line(const std::string&,
 void JSONDumpConfiguration::config_color(const std::string& id,
                                          glm::vec3& color,
                                          const std::string&) {
-    o.back()[id] = dump_vec3(color);
+    current()[id] = dump_vec3(color);
 }
 void JSONDumpConfiguration::config_color(const std::string& id,
                                          glm::vec4& color,
                                          const std::string&) {
-    o.back()[id] = dump_vec4(color);
+    current()[id] = dump_vec4(color);
 }
 void JSONDumpConfiguration::config_vec(const std::string& id,
                                        glm::vec3& value,
                                        const std::string&) {
-    o.back()[id] = dump_vec3(value);
+    current()[id] = dump_vec3(value);
 }
 void JSONDumpConfiguration::config_vec(const std::string& id,
                                        glm::vec4& value,
                                        const std::string&) {
-    o.back()[id] = dump_vec4(value);
+    current()[id] = dump_vec4(value);
 }
 void JSONDumpConfiguration::config_angle(
     const std::string& id, float& angle, const std::string&, const float, const float) {
-    o.back()[id] = encode_float(angle);
+    current()[id] = encode_float(angle);
 }
 void JSONDumpConfiguration::config_percent(const std::string& id,
                                            float& value,
                                            const std::string&) {
-    o.back()[id] = encode_float(value);
+    current()[id] = encode_float(value);
 }
 void JSONDumpConfiguration::config_float(const std::string& id,
                                          float& value,
                                          const std::string&,
                                          const float) {
-    o.back()[id] = encode_float(value);
+    current()[id] = encode_float(value);
 }
 void JSONDumpConfiguration::config_float(
     const std::string& id, float& value, const float&, const float&, const std::string&) {
-    o.back()[id] = encode_float(value);
+    current()[id] = encode_float(value);
 }
 void JSONDumpConfiguration::config_int(const std::string& id, int& value, const std::string&) {
-    o.back()[id] = value;
+    current()[id] = value;
 }
 void JSONDumpConfiguration::config_int(
     const std::string& id, int& value, const int&, const int&, const std::string&) {
-    o.back()[id] = value;
+    current()[id] = value;
 }
 void JSONDumpConfiguration::config_uint(const std::string& id,
                                         uint32_t& value,
                                         const std::string&) {
-    o.back()[id] = value;
+    current()[id] = value;
 }
 void JSONDumpConfiguration::config_uint(
     const std::string& id, uint32_t& value, const uint32_t&, const uint32_t&, const std::string&) {
-    o.back()[id] = value;
+    current()[id] = value;
 }
 void JSONDumpConfiguration::config_float3(const std::string& id,
                                           float value[3],
                                           const std::string&) {
-    o.back()[id] = dump_vec3(*merian::as_vec3(value));
+    current()[id] = dump_vec3(*merian::as_vec3(value));
 }
 void JSONDumpConfiguration::config_bool(const std::string& id, bool& value, const std::string&) {
-    o.back()[id] = value;
+    current()[id] = value;
 }
 bool JSONDumpConfiguration::config_bool(const std::string&, const std::string&) {
     return false;
@@ -131,18 +134,18 @@ void JSONDumpConfiguration::config_options(const std::string& id,
                                            const std::vector<std::string>& options,
                                            const OptionsStyle,
                                            const std::string&) {
-    o.back()[id] = options[selected];
+    current()[id] = options[selected];
 }
 bool JSONDumpConfiguration::config_text(
     const std::string& id, const uint32_t, char* buf, const bool needs_submit, const std::string&) {
     if (!needs_submit) {
-        o.back()[id] = buf;
+        current()[id] = buf;
     }
     return false;
 }
 bool JSONDumpConfiguration::config_text_multiline(
     const std::string& id, const uint32_t, char* buf, const bool, const std::string&) {
-    o.back()[id] = buf;
+    current()[id] = buf;
     return false;
 }
 
