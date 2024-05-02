@@ -21,6 +21,8 @@ class GraphRun {
     friend class Graph;
 
   public:
+    GraphRun(const std::shared_ptr<ExtensionVkDebugUtils> debug_utils) : debug_utils(debug_utils) {}
+
     void add_wait_semaphore(vk::Semaphore& wait_semaphore,
                             vk::PipelineStageFlags wait_stage_flags) noexcept {
         wait_semaphores.push_back(wait_semaphore);
@@ -79,9 +81,7 @@ class GraphRun {
     }
 
   private:
-    void reset(const uint32_t iteration,
-               const ProfilerHandle profiler,
-               const std::shared_ptr<ExtensionVkDebugUtils> debug_utils) {
+    void reset(const uint32_t iteration, const ProfilerHandle profiler) {
         wait_semaphores.clear();
         wait_stages.clear();
         signal_semaphores.clear();
@@ -89,7 +89,6 @@ class GraphRun {
 
         this->iteration = iteration;
         this->profiler = profiler;
-        this->debug_utils = debug_utils;
         this->rebuild_requested = false;
     }
 
@@ -333,6 +332,7 @@ class Graph : public std::enable_shared_from_this<Graph> {
     const ResourceAllocatorHandle allocator;
     const std::optional<QueueHandle> wait_queue;
     const std::shared_ptr<ExtensionVkDebugUtils> debug_utils;
+    GraphRun run;
 
     bool rebuild_requested = true;
     uint64_t current_iteration = 0;
@@ -346,8 +346,6 @@ class Graph : public std::enable_shared_from_this<Graph> {
     // required in cmd_barrier_for_node, stored here to prevent memory allocation
     std::vector<vk::ImageMemoryBarrier2> image_barriers_for_set;
     std::vector<vk::BufferMemoryBarrier2> buffer_barriers_for_set;
-
-    GraphRun run;
 
   private: // Helpers
     // Note: The connection is validated when the graph is build
@@ -401,8 +399,7 @@ class Graph : public std::enable_shared_from_this<Graph> {
     // Resets all data, so that the graph can be rebuild
     void reset_graph();
 
-    void get_configuration_io_for_node(Configuration& config,
-                                    NodeData& data);
+    void get_configuration_io_for_node(Configuration& config, NodeData& data);
 };
 
 } // namespace merian

@@ -8,7 +8,7 @@ Graph::Graph(const SharedContext context,
              const ResourceAllocatorHandle allocator,
              const std::optional<QueueHandle> wait_queue)
     : context(context), allocator(allocator), wait_queue(wait_queue),
-      debug_utils(context->get_extension<ExtensionVkDebugUtils>()) {}
+      debug_utils(context->get_extension<ExtensionVkDebugUtils>()), run(debug_utils) {}
 
 void Graph::add_node(const std::string& name, const std::shared_ptr<Node>& node) {
     if (node_from_name.contains(name)) {
@@ -284,7 +284,7 @@ const GraphRun& Graph::cmd_run(vk::CommandBuffer& cmd, const ProfilerHandle prof
         }
     } while (rebuild_requested);
 
-    run.reset(current_iteration, profiler, debug_utils);
+    run.reset(current_iteration, profiler);
     {
         MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "Graph: run nodes");
         for (auto& node : flat_topology) {
