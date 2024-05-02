@@ -138,6 +138,20 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id,
         throw std::runtime_error("No vulkan device found!");
     }
 
+    // Check environment variables
+    if (const char* env_vendor_id = std::getenv("MERIAN_DEFAULT_FILTER_VENDOR_ID");
+        filter_vendor_id == (uint32_t)-1 && env_vendor_id) {
+        filter_vendor_id = std::strtoul(env_vendor_id, nullptr, 10);
+    }
+    if (const char* env_device_id = std::getenv("MERIAN_DEFAULT_FILTER_DEVICE_ID");
+        filter_device_id == (uint32_t)-1 && env_device_id) {
+        filter_device_id = std::strtoul(env_device_id, nullptr, 10);
+    }
+    if (const char* env_device_name = std::getenv("MERIAN_DEFAULT_FILTER_DEVICE_NAME");
+        filter_device_name.empty() && env_device_name) {
+        filter_device_name = env_device_name;
+    }
+
     std::vector<std::tuple<vk::PhysicalDevice, vk::PhysicalDeviceProperties2>> matches;
     for (std::size_t i = 0; i < devices.size(); i++) {
         vk::PhysicalDeviceProperties2 props = devices[i].getProperties2();
@@ -152,9 +166,11 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id,
     }
 
     if (matches.empty()) {
-        throw std::runtime_error(
-            fmt::format("no vulkan device found with vendor id: {}, device id: {}! (-1 means any)",
-                        filter_vendor_id, filter_device_id));
+        throw std::runtime_error(fmt::format(
+            "no vulkan device found with vendor id: {}, device id: {}, device name: {}.",
+            filter_vendor_id == (uint32_t)-1 ? "any" : std::to_string(filter_vendor_id),
+            filter_device_id == (uint32_t)-1 ? "any" : std::to_string(filter_device_id),
+            filter_device_name.empty() ? "any" : filter_device_name));
     }
     std::sort(matches.begin(), matches.end(),
               [](std::tuple<vk::PhysicalDevice, vk::PhysicalDeviceProperties2>& a,
