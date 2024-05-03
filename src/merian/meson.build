@@ -37,6 +37,7 @@ merian_src = files(
     'vk/utils/barriers.cpp',
     'vk/utils/profiler.cpp',
     'vk/window/glfw_imgui.cpp',
+    'vk/window/glfw_window.cpp',
     'vk/window/swapchain.cpp',
 )
 

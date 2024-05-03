@@ -1,10 +1,9 @@
 #pragma once
 
-#include "merian/utils/vector.hpp"
 #include "merian/vk/extension/extension.hpp"
-#include "merian/vk/window/glfw_surface.hpp"
-#include "merian/vk/window/swapchain.hpp"
+#include "merian/vk/window/glfw_window.hpp"
 
+#include <GLFW/glfw3.h>
 #include <spdlog/logger.h>
 #include <spdlog/spdlog.h>
 
@@ -19,7 +18,9 @@ namespace merian {
 class ExtensionVkGLFW : public Extension {
   private:
     static void glfw_error_callback(int id, const char* desc) {
-        SPDLOG_ERROR("GLFW: {}: {}", id, desc);
+        std::string error = fmt::format("GLFW: {}: {}", id, desc);
+        SPDLOG_ERROR(error);
+        throw std::runtime_error(error);
     }
 
   public:
@@ -54,7 +55,6 @@ class ExtensionVkGLFW : public Extension {
 
     void on_instance_created(const vk::Instance&) override;
     bool accept_graphics_queue(const vk::PhysicalDevice&, std::size_t) override;
-    void on_physical_device_selected(const Context::PhysicalDeviceContainer& pd_container) override;
     void on_context_created(const SharedContext context) override {
         weak_context = context;
     }
@@ -65,7 +65,6 @@ class ExtensionVkGLFW : public Extension {
     std::tuple<GLFWWindowHandle, SurfaceHandle> get();
 
   private:
-    vk::PhysicalDevice physical_device = VK_NULL_HANDLE;
     std::weak_ptr<Context> weak_context;
 
     GLFWwindow* window;

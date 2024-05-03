@@ -9,6 +9,7 @@
 namespace merian {
 
 class GLFWWindow : public Window {
+    friend class ExtensionVkGLFW;
 
   public:
     // Manage the supplied window. The window is destroyed when this object is destroyed.
@@ -20,9 +21,9 @@ class GLFWWindow : public Window {
                int height = 720,
                const char* title = "")
         : context(context) {
-        // glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
         SPDLOG_DEBUG("create window ({})", fmt::ptr(this));
+        glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         window = glfwCreateWindow(width, height, title, nullptr, nullptr);
     }
 
@@ -31,22 +32,16 @@ class GLFWWindow : public Window {
         glfwDestroyWindow(window);
     }
 
-    operator GLFWwindow*() const {
-        return window;
-    }
+    operator GLFWwindow*() const;
 
-    GLFWwindow* get_window() const {
-        return window;
-    }
+    GLFWwindow* get_window() const;
 
-    vk::Extent2D framebuffer_extent() override {
-        int width, height;
-        glfwGetFramebufferSize(window, &width, &height);
-        return vk::Extent2D{static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
-    }
+    SurfaceHandle get_surface() override;
+
+    vk::Extent2D framebuffer_extent() override;
 
   private:
-    const SharedContext context;
+    SharedContext context;
     GLFWwindow* window;
 };
 

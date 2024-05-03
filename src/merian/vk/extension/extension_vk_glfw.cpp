@@ -1,5 +1,6 @@
 #include "merian/vk/extension/extension_vk_glfw.hpp"
 #include "merian/vk/context.hpp"
+#include "merian/vk/window/glfw_surface.hpp"
 
 #include <spdlog/spdlog.h>
 
@@ -11,11 +12,6 @@ void ExtensionVkGLFW::on_instance_created(const vk::Instance& instance) {
         throw std::runtime_error("Surface creation failed!");
     surface = vk::SurfaceKHR(psurf);
     SPDLOG_DEBUG("created surface");
-}
-
-void ExtensionVkGLFW::on_physical_device_selected(
-    const Context::PhysicalDeviceContainer& pd_container) {
-    this->physical_device = pd_container.physical_device;
 }
 
 bool ExtensionVkGLFW::accept_graphics_queue(const vk::PhysicalDevice& physical_device,
@@ -46,8 +42,7 @@ std::tuple<GLFWWindowHandle, SurfaceHandle> ExtensionVkGLFW::get() {
     SharedContext context = weak_context.lock();
 
     std::shared_ptr<GLFWWindow> shared_window = std::make_shared<GLFWWindow>(context, window);
-    std::shared_ptr<Surface> shared_surface = std::static_pointer_cast<Surface>(
-        std::make_shared<GLFWSurface>(context, surface, shared_window));
+    std::shared_ptr<Surface> shared_surface = std::shared_ptr<Surface>(new GLFWSurface(context, surface, shared_window));
 
     return {shared_window, shared_surface};
 }

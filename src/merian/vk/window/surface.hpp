@@ -1,9 +1,6 @@
 #pragma once
 
-#include "merian/vk/window/glfw_window.hpp"
-
 #include "merian/vk/context.hpp"
-#include <GLFW/glfw3.h>
 
 #include <memory>
 #include <spdlog/spdlog.h>
