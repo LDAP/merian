@@ -323,6 +323,7 @@ void Swapchain::present(const QueueHandle& queue,
         return;
     }
     if (result == vk::Result::eErrorOutOfDateKHR) {
+        SPDLOG_DEBUG("got eErrorOutOfDateKHR when trying to present");
         vk::Extent2D extent = framebuffer_extent();
         recreate_swapchain(extent.width, extent.height);
         return;
