@@ -21,7 +21,8 @@ class GraphRun {
     friend class Graph;
 
   public:
-    GraphRun(const std::shared_ptr<ExtensionVkDebugUtils> debug_utils) : debug_utils(debug_utils) {}
+    GraphRun(const Graph& graph, const std::shared_ptr<ExtensionVkDebugUtils> debug_utils)
+        : graph(graph), debug_utils(debug_utils) {}
 
     void add_wait_semaphore(vk::Semaphore& wait_semaphore,
                             vk::PipelineStageFlags wait_stage_flags) noexcept {
@@ -41,9 +42,11 @@ class GraphRun {
         rebuild_requested = true;
     }
 
-    const uint64_t& get_iteration() const noexcept {
-        return iteration;
-    }
+    // increases with each run, resets at rebuild
+    const uint64_t& get_iteration() const noexcept;
+
+    // changes after every rebuild
+    const uint64_t& get_graph_version_identifier() const noexcept;
 
     // Add this to the submit call for the graph command buffer
     const std::vector<vk::Semaphore>& get_wait_semaphores() const noexcept {
@@ -81,26 +84,26 @@ class GraphRun {
     }
 
   private:
-    void reset(const uint32_t iteration, const ProfilerHandle profiler) {
+    void reset(const ProfilerHandle profiler) {
         wait_semaphores.clear();
         wait_stages.clear();
         signal_semaphores.clear();
         submit_callbacks.clear();
 
-        this->iteration = iteration;
         this->profiler = profiler;
         this->rebuild_requested = false;
     }
 
   private:
+    const Graph& graph;
     std::vector<vk::Semaphore> wait_semaphores;
     std::vector<vk::PipelineStageFlags> wait_stages;
     std::vector<vk::Semaphore> signal_semaphores;
     std::vector<std::function<void(const QueueHandle& queue)>> submit_callbacks;
-    uint64_t iteration;
     ProfilerHandle profiler = nullptr;
     std::shared_ptr<ExtensionVkDebugUtils> debug_utils = nullptr;
     bool rebuild_requested = false;
+    uint64_t graph_version_identifier = 0;
 };
 
 /**
@@ -124,6 +127,8 @@ class GraphRun {
  *
  */
 class Graph : public std::enable_shared_from_this<Graph> {
+    friend GraphRun;
+
   private:
     // Holds information about images that were allocated by this graph
     struct ImageResource {
@@ -336,6 +341,8 @@ class Graph : public std::enable_shared_from_this<Graph> {
 
     bool rebuild_requested = true;
     uint64_t current_iteration = 0;
+    // changes at each rebuild
+    uint64_t graph_version_identifier = 0;
 
     std::unordered_map<std::string, NodeHandle> node_from_name;
     std::unordered_map<NodeHandle, NodeData> node_data;
