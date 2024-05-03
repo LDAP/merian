@@ -1,4 +1,5 @@
 #include "shadertoy.hpp"
+#include "merian/vk/pipeline/specialization_info_builder.hpp"
 
 namespace merian {
 
