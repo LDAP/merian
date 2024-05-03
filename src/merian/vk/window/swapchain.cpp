@@ -276,12 +276,6 @@ Swapchain::acquire(const std::function<vk::Extent2D()>& framebuffer_extent) {
         recreate_swapchain(extent.width, extent.height);
     }
 
-    aquire_result.did_recreate = recreated;
-    recreated = false;
-    aquire_result.min_images = min_images;
-    aquire_result.num_images = num_images;
-    aquire_result.surface_format = surface_format;
-
     for (uint32_t tries = 0; tries < ERROR_RETRIES; tries++) {
         vk::Result result = context->device.acquireNextImageKHR(
             swapchain, UINT64_MAX, current_read_semaphore(), {}, &current_image_idx);
@@ -293,13 +287,17 @@ Swapchain::acquire(const std::function<vk::Extent2D()>& framebuffer_extent) {
             aquire_result.wait_semaphore = current_read_semaphore();
             aquire_result.signal_semaphore = current_written_semaphore();
             aquire_result.extent = extent;
+            aquire_result.min_images = min_images;
+            aquire_result.num_images = num_images;
+            aquire_result.surface_format = surface_format;
+            aquire_result.did_recreate = recreated;
+            recreated = false;
 
             return aquire_result;
         } else if (result == vk::Result::eErrorOutOfDateKHR ||
                    result == vk::Result::eSuboptimalKHR) {
             extent = framebuffer_extent();
             recreate_swapchain(extent.width, extent.height);
-            aquire_result.did_recreate = true;
             continue;
         } else {
             return std::nullopt;
