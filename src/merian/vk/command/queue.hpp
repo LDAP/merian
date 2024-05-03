@@ -57,7 +57,7 @@ class Queue : public std::enable_shared_from_this<Queue> {
     // Submits then waits using waitIdle(), try to not use the _wait variants
     void submit_wait(const vk::SubmitInfo& submit_info, vk::Fence fence = VK_NULL_HANDLE);
 
-    void present(const vk::PresentInfoKHR& present_info);
+    vk::Result present(const vk::PresentInfoKHR& present_info);
 
     void wait_idle();
 

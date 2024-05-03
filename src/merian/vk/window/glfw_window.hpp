@@ -1,16 +1,16 @@
 #pragma once
 
 #include "merian/vk/context.hpp"
+#include "merian/vk/window/window.hpp"
 
 #include <GLFW/glfw3.h>
 #include <spdlog/spdlog.h>
 
 namespace merian {
 
-class GLFWWindow : public std::enable_shared_from_this<GLFWWindow> {
+class GLFWWindow : public Window {
 
   public:
-
     // Manage the supplied window. The window is destroyed when this object is destroyed.
     GLFWWindow(const SharedContext& context, GLFWwindow* window)
         : context(context), window(window) {}
@@ -37,6 +37,12 @@ class GLFWWindow : public std::enable_shared_from_this<GLFWWindow> {
 
     GLFWwindow* get_window() const {
         return window;
+    }
+
+    vk::Extent2D framebuffer_extent() override {
+        int width, height;
+        glfwGetFramebufferSize(window, &width, &height);
+        return vk::Extent2D{static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
     }
 
   private:

@@ -222,6 +222,7 @@ vk::Extent2D Swapchain::recreate_swapchain(int width, int height) {
     cur_width = width;
     cur_height = height;
     cur_present_mode = present_mode;
+    recreated = true;
 
     // clang-format on
     SPDLOG_DEBUG("created swapchain {}x{} ({} {} {})", cur_width, cur_height,
@@ -261,25 +262,27 @@ void Swapchain::destroy_swapchain() {
     swapchain = VK_NULL_HANDLE;
 }
 
-std::optional<SwapchainAcquireResult> Swapchain::aquire_custom(int width, int height) {
+std::optional<SwapchainAcquireResult>
+Swapchain::acquire(const std::function<vk::Extent2D()>& framebuffer_extent) {
     SwapchainAcquireResult aquire_result;
+    vk::Extent2D extent = framebuffer_extent();
 
-    if (width == 0 || height == 0) {
+    if (extent.width == 0 || extent.height == 0) {
         return std::nullopt;
     }
 
-    if (width != cur_width || height != cur_height || present_mode != cur_present_mode) {
-        recreate_swapchain(width, height);
-        aquire_result.did_recreate = true;
-    } else {
-        aquire_result.did_recreate = false;
+    if (extent.width != cur_width || extent.height != cur_height ||
+        present_mode != cur_present_mode) {
+        recreate_swapchain(extent.width, extent.height);
     }
 
+    aquire_result.did_recreate = recreated;
+    recreated = false;
     aquire_result.min_images = min_images;
     aquire_result.num_images = num_images;
     aquire_result.surface_format = surface_format;
 
-    for (int tries = 0; tries < 2; tries++) {
+    for (uint32_t tries = 0; tries < ERROR_RETRIES; tries++) {
         vk::Result result = context->device.acquireNextImageKHR(
             swapchain, UINT64_MAX, current_read_semaphore(), {}, &current_image_idx);
 
@@ -294,7 +297,8 @@ std::optional<SwapchainAcquireResult> Swapchain::aquire_custom(int width, int he
             return aquire_result;
         } else if (result == vk::Result::eErrorOutOfDateKHR ||
                    result == vk::Result::eSuboptimalKHR) {
-            recreate_swapchain(width, height);
+            extent = framebuffer_extent();
+            recreate_swapchain(extent.width, extent.height);
             aquire_result.did_recreate = true;
             continue;
         } else {
@@ -305,28 +309,25 @@ std::optional<SwapchainAcquireResult> Swapchain::aquire_custom(int width, int he
     return std::nullopt;
 }
 
-vk::Result Swapchain::present(vk::Queue queue) {
+void Swapchain::present(const QueueHandle& queue,
+                        const std::function<vk::Extent2D()>& framebuffer_extent) {
     vk::Semaphore& written = current_written_semaphore();
     vk::PresentInfoKHR present_info{
         1,
         &written, // wait until the user is done writing to the image
         1,        &swapchain, &current_image_idx,
     };
-    current_semaphore_idx++;
-
-    return queue.presentKHR(present_info);
-}
-
-void Swapchain::present(Queue& queue) {
-    vk::Semaphore& written = current_written_semaphore();
-    vk::PresentInfoKHR present_info{
-        1,
-        &written, // wait until the user is done writing to the image
-        1,        &swapchain, &current_image_idx,
-    };
-    current_semaphore_idx++;
-
-    queue.present(present_info);
+    vk::Result result = queue->present(present_info);
+    if (result == vk::Result::eSuccess || result == vk::Result::eSuboptimalKHR) {
+        current_semaphore_idx++;
+        return;
+    }
+    if (result == vk::Result::eErrorOutOfDateKHR) {
+        vk::Extent2D extent = framebuffer_extent();
+        recreate_swapchain(extent.width, extent.height);
+        return;
+    }
+    check_result(result, "present failed");
 }
 
 } // namespace merian

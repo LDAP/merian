@@ -29,7 +29,7 @@ template <BlitNodeMode mode = FIT> class GLFWWindowNode : public BlitExternalNod
                              const NodeIO& io) override {
 
         swapchain->set_vsync(vsync);
-        aquire = swapchain->aquire_auto_resize(*window);
+        aquire = swapchain->acquire(window);
         if (aquire) {
             BlitExternalNode<mode>::set_target(aquire->image, vk::ImageLayout::eUndefined,
                                                vk::ImageLayout::ePresentSrcKHR,
@@ -38,7 +38,7 @@ template <BlitNodeMode mode = FIT> class GLFWWindowNode : public BlitExternalNod
 
             run.add_wait_semaphore(aquire->wait_semaphore, vk::PipelineStageFlagBits::eTransfer);
             run.add_signal_semaphore(aquire->signal_semaphore);
-            run.add_submit_callback([&](const QueueHandle& queue) { swapchain->present(*queue); });
+            run.add_submit_callback([&](const QueueHandle& queue) { swapchain->present(queue, window); });
             if (request_rebuild_on_recreate && aquire->did_recreate)
                 run.request_rebuild();
         }

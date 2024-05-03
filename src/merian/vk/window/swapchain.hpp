@@ -2,6 +2,7 @@
 
 #include "merian/vk/command/queue.hpp"
 #include "merian/vk/window/surface.hpp"
+#include "merian/vk/window/window.hpp"
 #include "vulkan/vulkan.hpp"
 #include <GLFW/glfw3.h>
 
@@ -79,6 +80,9 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
         vk::Semaphore written_semaphore{};
     };
 
+    // Number of retries if aquire or present failes with Suboptimal/OutOfDate.
+    static constexpr uint32_t ERROR_RETRIES = 2;
+
   public:
     /**
      * @param[in]  preferred_surface_formats  The preferred surface formats in decreasing priority
@@ -98,23 +102,20 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
 
     ~Swapchain();
 
-    /* Never recreates the swapchain */
-    std::optional<SwapchainAcquireResult> aquire() {
-        return aquire_custom(cur_width, cur_height);
-    }
-
     /* Recreates the swapchain if necessary according to window frame buffer size */
-    std::optional<SwapchainAcquireResult> aquire_auto_resize(GLFWwindow* window) {
-        int width, height;
-        glfwGetFramebufferSize(window, &width, &height);
-        return aquire_custom(width, height);
+    std::optional<SwapchainAcquireResult> acquire(const WindowHandle& window) {
+        return acquire([&]() { return window->framebuffer_extent(); });
     }
+
     /* Recreates the swapchain if necessary */
-    std::optional<SwapchainAcquireResult> aquire_custom(int width, int height);
+    std::optional<SwapchainAcquireResult>
+    acquire(const std::function<vk::Extent2D()>& framebuffer_extent);
 
-    vk::Result present(vk::Queue queue);
+    void present(const QueueHandle& queue, const WindowHandle& window) {
+        present(queue, [&]() { return window->framebuffer_extent(); });
+    }
 
-    void present(Queue& queue);
+    void present(const QueueHandle& queue, const std::function<vk::Extent2D()>& framebuffer_extent);
 
     /* Semaphore only valid until the next present() */
     vk::Semaphore& current_read_semaphore() {
@@ -208,8 +209,8 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
     std::vector<SemaphoreGroup> semaphore_groups;
     uint32_t current_semaphore_idx;
     std::vector<vk::ImageMemoryBarrier> barriers;
-    int cur_width = 0;
-    int cur_height = 0;
+    uint32_t cur_width = 0;
+    uint32_t cur_height = 0;
     // Only valid after the first acquire!
     vk::Extent2D extent;
 
@@ -218,6 +219,7 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
     vk::PresentModeKHR cur_present_mode;
     // You should never access the swapchain directly
     vk::SwapchainKHR swapchain = VK_NULL_HANDLE;
+    bool recreated = true;
 };
 
 using SwapchainHandle = std::shared_ptr<Swapchain>;
