@@ -54,13 +54,11 @@ void ImageWriteNode::pre_process([[maybe_unused]] const uint64_t& run_iteration,
     needs_rebuild = false;
 };
 
-void ImageWriteNode::cmd_process([[maybe_unused]] const vk::CommandBuffer& cmd,
-                                 [[maybe_unused]] GraphRun& run,
+void ImageWriteNode::cmd_process(const vk::CommandBuffer& cmd,
+                                 GraphRun& run,
+                                 [[maybe_unused]] const std::shared_ptr<FrameData>& frame_data,
                                  [[maybe_unused]] const uint32_t set_index,
-                                 [[maybe_unused]] const std::vector<ImageHandle>& image_inputs,
-                                 [[maybe_unused]] const std::vector<BufferHandle>& buffer_inputs,
-                                 [[maybe_unused]] const std::vector<ImageHandle>& image_outputs,
-                                 [[maybe_unused]] const std::vector<BufferHandle>& buffer_outputs) {
+                                 const NodeIO& io) {
     if (filename_format.empty()) {
         return;
     }
@@ -74,7 +72,7 @@ void ImageWriteNode::cmd_process([[maybe_unused]] const vk::CommandBuffer& cmd,
             {},
             vk::ImageType::e2D,
             format,
-            image_inputs[0]->get_extent(),
+            io.image_inputs[0]->get_extent(),
             1,
             1,
             vk::SampleCountFlagBits::e1,
@@ -90,9 +88,9 @@ void ImageWriteNode::cmd_process([[maybe_unused]] const vk::CommandBuffer& cmd,
                             vk::PipelineStageFlagBits::eTransfer, {}, {}, {},
                             image->barrier(vk::ImageLayout::eTransferDstOptimal, {},
                                            vk::AccessFlagBits::eTransferWrite));
-        cmd_blit_stretch(cmd, *image_inputs[0], image_inputs[0]->get_current_layout(),
-                         image_inputs[0]->get_extent(), *image,
-                         vk::ImageLayout::eTransferDstOptimal, image_inputs[0]->get_extent());
+        cmd_blit_stretch(cmd, *io.image_inputs[0], io.image_inputs[0]->get_current_layout(),
+                         io.image_inputs[0]->get_extent(), *image,
+                         vk::ImageLayout::eTransferDstOptimal, io.image_inputs[0]->get_extent());
         cmd.pipelineBarrier(
             vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer, {}, {}, {},
             image->barrier(vk::ImageLayout::eTransferSrcOptimal, vk::AccessFlagBits::eTransferWrite,
@@ -102,7 +100,7 @@ void ImageWriteNode::cmd_process([[maybe_unused]] const vk::CommandBuffer& cmd,
             {},
             vk::ImageType::e2D,
             format,
-            image_inputs[0]->get_extent(),
+            io.image_inputs[0]->get_extent(),
             1,
             1,
             vk::SampleCountFlagBits::e1,
@@ -131,8 +129,8 @@ void ImageWriteNode::cmd_process([[maybe_unused]] const vk::CommandBuffer& cmd,
         int run_it = run.get_iteration();
         int image_index = this->image_index++;
         std::string filename_format = this->filename_format;
-        run.add_submit_callback([this, image, linear_image, it, image_index,
-                                 run_it, filename_format](const QueueHandle& queue) {
+        run.add_submit_callback([this, image, linear_image, it, image_index, run_it,
+                                 filename_format](const QueueHandle& queue) {
             queue->wait_idle();
             void* mem = linear_image->get_memory()->map();
 
@@ -142,7 +140,8 @@ void ImageWriteNode::cmd_process([[maybe_unused]] const vk::CommandBuffer& cmd,
                             fmt::arg("width", linear_image->get_extent().width),
                             fmt::arg("height", linear_image->get_extent().height)));
             std::filesystem::create_directories(path.parent_path());
-            const std::string tmp_filename = path.parent_path() / (".interm_" + path.filename().string());
+            const std::string tmp_filename =
+                path.parent_path() / (".interm_" + path.filename().string());
 
             switch (this->format) {
             case FORMAT_PNG: {

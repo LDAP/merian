@@ -10,7 +10,6 @@ namespace merian {
 
 class ExposureNode : public Node {
   private:
-
     // Histogram uses local_size_x * local_size_y bins;
     static constexpr uint32_t local_size_x = 16;
     static constexpr uint32_t local_size_y = 16;
@@ -55,19 +54,13 @@ class ExposureNode : public Node {
         const std::vector<NodeOutputDescriptorImage>& connected_image_outputs,
         const std::vector<NodeOutputDescriptorBuffer>& connected_buffer_outputs) override;
 
-    virtual void cmd_build(const vk::CommandBuffer& cmd,
-                           const std::vector<std::vector<ImageHandle>>& image_inputs,
-                           const std::vector<std::vector<BufferHandle>>& buffer_inputs,
-                           const std::vector<std::vector<ImageHandle>>& image_outputs,
-                           const std::vector<std::vector<BufferHandle>>& buffer_outputs) override;
+    virtual void cmd_build(const vk::CommandBuffer& cmd, const std::vector<NodeIO>& ios) override;
 
     virtual void cmd_process(const vk::CommandBuffer& cmd,
                              GraphRun& run,
+                             const std::shared_ptr<FrameData>& frame_data,
                              const uint32_t set_index,
-                             const std::vector<ImageHandle>& image_inputs,
-                             const std::vector<BufferHandle>& buffer_inputs,
-                             const std::vector<ImageHandle>& image_outputs,
-                             const std::vector<BufferHandle>& buffer_outputs) override;
+                             const NodeIO& io) override;
 
     virtual void get_configuration(Configuration& config, bool& needs_rebuild) override;
 

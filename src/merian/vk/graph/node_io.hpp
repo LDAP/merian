@@ -2,12 +2,15 @@
 
 #include "merian/vk/memory/resource_allocations.hpp"
 
-#include "vulkan/vulkan.hpp"
-
-#include <functional>
-#include <memory>
-
 namespace merian {
+
+struct NodeIO {
+    std::vector<ImageHandle> image_inputs;
+    std::vector<BufferHandle> buffer_inputs;
+    std::vector<ImageHandle> image_outputs;
+    std::vector<BufferHandle> buffer_outputs;
+};
+
 struct NodeInputDescriptor {
   public:
     NodeInputDescriptor(const std::string& name,

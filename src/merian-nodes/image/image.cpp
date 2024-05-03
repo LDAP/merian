@@ -36,13 +36,9 @@ void ImageNode::pre_process([[maybe_unused]] const uint64_t& iteration, NodeStat
     status.skip_run = true;
 }
 
-void ImageNode::cmd_build(const vk::CommandBuffer& cmd,
-                          const std::vector<std::vector<merian::ImageHandle>>&,
-                          const std::vector<std::vector<merian::BufferHandle>>&,
-                          const std::vector<std::vector<merian::ImageHandle>>& image_outputs,
-                          const std::vector<std::vector<merian::BufferHandle>>&) {
-    allocator->getStaging()->cmdToImage(cmd, *image_outputs[0][0], {0, 0, 0},
-                                        image_outputs[0][0]->get_extent(), first_layer(),
+void ImageNode::cmd_build(const vk::CommandBuffer& cmd, const std::vector<NodeIO>& ios) {
+    allocator->getStaging()->cmdToImage(cmd, *ios[0].image_outputs[0], {0, 0, 0},
+                                        ios[0].image_outputs[0]->get_extent(), first_layer(),
                                         width * height * 4, image);
 }
 

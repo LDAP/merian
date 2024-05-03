@@ -50,14 +50,10 @@ BloomNode::describe_outputs(const std::vector<NodeOutputDescriptorImage>& connec
     };
 }
 
-void BloomNode::cmd_build([[maybe_unused]]  const vk::CommandBuffer& cmd,
-                          const std::vector<std::vector<ImageHandle>>& image_inputs,
-                          const std::vector<std::vector<BufferHandle>>& buffer_inputs,
-                          const std::vector<std::vector<ImageHandle>>& image_outputs,
-                          const std::vector<std::vector<BufferHandle>>& buffer_outputs) {
+void BloomNode::cmd_build([[maybe_unused]] const vk::CommandBuffer& cmd,
+                          const std::vector<NodeIO>& ios) {
     std::tie(graph_textures, graph_sets, graph_pool, graph_layout) =
-        make_graph_descriptor_sets(context, allocator, image_inputs, buffer_inputs, image_outputs,
-                                   buffer_outputs, graph_layout);
+        make_graph_descriptor_sets(context, allocator, ios, graph_layout);
 
     auto pipe_layout = PipelineLayoutBuilder(context)
                            .add_descriptor_set_layout(graph_layout)
@@ -72,16 +68,14 @@ void BloomNode::cmd_build([[maybe_unused]]  const vk::CommandBuffer& cmd,
 }
 
 void BloomNode::cmd_process(const vk::CommandBuffer& cmd,
-                             [[maybe_unused]] GraphRun& run,
+                            [[maybe_unused]] GraphRun& run,
+                            [[maybe_unused]] const std::shared_ptr<FrameData>& frame_data,
                             const uint32_t set_index,
-                            [[maybe_unused]]  const std::vector<ImageHandle>& image_inputs,
-                            [[maybe_unused]]  const std::vector<BufferHandle>& buffer_inputs,
-                            const std::vector<ImageHandle>& image_outputs,
-                            [[maybe_unused]]  const std::vector<BufferHandle>& buffer_outputs) {
+                            const NodeIO& io) {
     const auto group_count_x =
-        (image_outputs[0]->get_extent().width + local_size_x - 1) / local_size_x;
+        (io.image_outputs[0]->get_extent().width + local_size_x - 1) / local_size_x;
     const auto group_count_y =
-        (image_outputs[0]->get_extent().height + local_size_y - 1) / local_size_y;
+        (io.image_outputs[0]->get_extent().height + local_size_y - 1) / local_size_y;
 
     separate->bind(cmd);
     separate->bind_descriptor_set(cmd, graph_sets[set_index]);
@@ -89,8 +83,8 @@ void BloomNode::cmd_process(const vk::CommandBuffer& cmd,
     cmd.dispatch(group_count_x, group_count_y, 1);
 
     auto bar =
-        image_outputs[1]->barrier(vk::ImageLayout::eGeneral, vk::AccessFlagBits::eShaderWrite,
-                                  vk::AccessFlagBits::eShaderRead);
+        io.image_outputs[1]->barrier(vk::ImageLayout::eGeneral, vk::AccessFlagBits::eShaderWrite,
+                                     vk::AccessFlagBits::eShaderRead);
     cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
                         vk::PipelineStageFlagBits::eComputeShader, {}, {}, {}, bar);
 

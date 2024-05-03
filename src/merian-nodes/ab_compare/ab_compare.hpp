@@ -36,12 +36,10 @@ class ABSplitNode : public ABCompareNode {
                      const std::vector<NodeOutputDescriptorBuffer>&) override;
 
     void cmd_process(const vk::CommandBuffer& cmd,
-                     GraphRun&,
-                     const uint32_t,
-                     const std::vector<ImageHandle>& image_inputs,
-                     const std::vector<BufferHandle>&,
-                     const std::vector<ImageHandle>& image_outputs,
-                     const std::vector<BufferHandle>&) override;
+                     GraphRun& run,
+                     const std::shared_ptr<FrameData>& frame_data,
+                     const uint32_t set_index,
+                     const NodeIO& io) override;
 };
 
 class ABSideBySideNode : public ABCompareNode {
@@ -57,12 +55,10 @@ class ABSideBySideNode : public ABCompareNode {
                      const std::vector<NodeOutputDescriptorBuffer>&) override;
 
     void cmd_process(const vk::CommandBuffer& cmd,
-                     GraphRun&,
-                     const uint32_t,
-                     const std::vector<ImageHandle>& image_inputs,
-                     const std::vector<BufferHandle>&,
-                     const std::vector<ImageHandle>& image_outputs,
-                     const std::vector<BufferHandle>&) override;
+                     GraphRun& run,
+                     const std::shared_ptr<FrameData>& frame_data,
+                     const uint32_t set_index,
+                     const NodeIO& io) override;
 };
 
 } // namespace merian

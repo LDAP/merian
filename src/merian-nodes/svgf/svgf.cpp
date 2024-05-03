@@ -80,13 +80,9 @@ SVGFNode::describe_outputs(const std::vector<NodeOutputDescriptorImage>& connect
 }
 
 void SVGFNode::cmd_build([[maybe_unused]] const vk::CommandBuffer& cmd,
-                         const std::vector<std::vector<ImageHandle>>& image_inputs,
-                         const std::vector<std::vector<BufferHandle>>& buffer_inputs,
-                         const std::vector<std::vector<ImageHandle>>& image_outputs,
-                         const std::vector<std::vector<BufferHandle>>& buffer_outputs) {
+                         const std::vector<NodeIO>& ios) {
     std::tie(graph_textures, graph_sets, graph_pool, graph_layout) =
-        make_graph_descriptor_sets(context, allocator, image_inputs, buffer_inputs, image_outputs,
-                                   buffer_outputs, graph_layout);
+        make_graph_descriptor_sets(context, allocator, ios, graph_layout);
     if (!ping_pong_layout) {
         ping_pong_layout = DescriptorSetLayoutBuilder()
                                .add_binding_combined_sampler()
@@ -170,12 +166,10 @@ void SVGFNode::cmd_build([[maybe_unused]] const vk::CommandBuffer& cmd,
 }
 
 void SVGFNode::cmd_process(const vk::CommandBuffer& cmd,
-                           [[maybe_unused]] GraphRun& run,
+                           GraphRun& run,
+                           [[maybe_unused]] const std::shared_ptr<FrameData>& frame_data,
                            const uint32_t set_index,
-                           [[maybe_unused]] const std::vector<ImageHandle>& image_inputs,
-                           [[maybe_unused]] const std::vector<BufferHandle>& buffer_inputs,
-                           [[maybe_unused]] const std::vector<ImageHandle>& image_outputs,
-                           [[maybe_unused]] const std::vector<BufferHandle>& buffer_outputs) {
+                           [[maybe_unused]] const NodeIO& io) {
     // PREPARE (VARIANCE ESTIMATE)
     {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "estimate variance");

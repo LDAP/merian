@@ -57,13 +57,9 @@ MeanNode::describe_outputs(const std::vector<NodeOutputDescriptorImage>& connect
 }
 
 void MeanNode::cmd_build([[maybe_unused]] const vk::CommandBuffer& cmd,
-                         const std::vector<std::vector<ImageHandle>>& image_inputs,
-                         const std::vector<std::vector<BufferHandle>>& buffer_inputs,
-                         const std::vector<std::vector<ImageHandle>>& image_outputs,
-                         const std::vector<std::vector<BufferHandle>>& buffer_outputs) {
+                         const std::vector<NodeIO>& ios) {
     std::tie(graph_textures, graph_sets, graph_pool, graph_layout) =
-        make_graph_descriptor_sets(context, allocator, image_inputs, buffer_inputs, image_outputs,
-                                   buffer_outputs, graph_layout);
+        make_graph_descriptor_sets(context, allocator, ios, graph_layout);
 
     if (!image_to_buffer) {
         auto pipe_layout = PipelineLayoutBuilder(context)
@@ -88,18 +84,16 @@ void MeanNode::cmd_build([[maybe_unused]] const vk::CommandBuffer& cmd,
 }
 
 void MeanNode::cmd_process(const vk::CommandBuffer& cmd,
-                           [[maybe_unused]] GraphRun& run,
+                           GraphRun& run,
+                           const std::shared_ptr<FrameData>& frame_data,
                            const uint32_t set_index,
-                           const std::vector<ImageHandle>& image_inputs,
-                           [[maybe_unused]] const std::vector<BufferHandle>& buffer_inputs,
-                           [[maybe_unused]] const std::vector<ImageHandle>& image_outputs,
-                           const std::vector<BufferHandle>& buffer_outputs) {
+                           const NodeIO& io) {
     const auto group_count_x =
-        (image_inputs[0]->get_extent().width + local_size_x - 1) / local_size_x;
+        (io.image_inputs[0]->get_extent().width + local_size_x - 1) / local_size_x;
     const auto group_count_y =
-        (image_inputs[0]->get_extent().height + local_size_y - 1) / local_size_y;
+        (io.image_inputs[0]->get_extent().height + local_size_y - 1) / local_size_y;
 
-    pc.divisor = image_inputs[0]->get_extent().width * image_inputs[0]->get_extent().height;
+    pc.divisor = io.image_inputs[0]->get_extent().width * io.image_inputs[0]->get_extent().height;
 
     {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "image to buffer");
@@ -114,8 +108,9 @@ void MeanNode::cmd_process(const vk::CommandBuffer& cmd,
     pc.count = group_count_x * group_count_y;
 
     while (pc.count > 1) {
-        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, fmt::format("reduce {} elements", pc.count));
-        auto bar = buffer_outputs[0]->buffer_barrier(
+        MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd,
+                                 fmt::format("reduce {} elements", pc.count));
+        auto bar = io.buffer_outputs[0]->buffer_barrier(
             vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite,
             vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite);
         cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,

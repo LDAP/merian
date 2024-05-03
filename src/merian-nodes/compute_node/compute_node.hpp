@@ -45,20 +45,13 @@ class ComputeNode : public Node {
     // Called at the first build
     virtual ShaderModuleHandle get_shader_module() = 0;
 
-    void
-    cmd_build(const vk::CommandBuffer&,
-              const std::vector<std::vector<merian::ImageHandle>>& image_inputs,
-              const std::vector<std::vector<merian::BufferHandle>>& buffer_inputs,
-              const std::vector<std::vector<merian::ImageHandle>>& image_outputs,
-              const std::vector<std::vector<merian::BufferHandle>>& buffer_outputs) override final;
+    void cmd_build(const vk::CommandBuffer&, const std::vector<NodeIO>& ios) override final;
 
     void cmd_process(const vk::CommandBuffer& cmd,
                      GraphRun& run,
+                     const std::shared_ptr<FrameData>& frame_data,
                      const uint32_t set_index,
-                     const std::vector<ImageHandle>& image_inputs,
-                     const std::vector<BufferHandle>& buffer_inputs,
-                     const std::vector<ImageHandle>& image_outputs,
-                     const std::vector<BufferHandle>& buffer_outputs) override final;
+                     const NodeIO& io) override final;
 
   protected:
     const SharedContext context;

@@ -25,14 +25,11 @@ class ImageWriteNode : public Node {
     virtual void pre_process([[maybe_unused]] const uint64_t& iteration,
                              [[maybe_unused]] NodeStatus& status) override;
 
-    virtual void
-    cmd_process([[maybe_unused]] const vk::CommandBuffer& cmd,
-                [[maybe_unused]] GraphRun& run,
-                [[maybe_unused]] const uint32_t set_index,
-                [[maybe_unused]] const std::vector<ImageHandle>& image_inputs,
-                [[maybe_unused]] const std::vector<BufferHandle>& buffer_inputs,
-                [[maybe_unused]] const std::vector<ImageHandle>& image_outputs,
-                [[maybe_unused]] const std::vector<BufferHandle>& buffer_outputs) override;
+    virtual void cmd_process(const vk::CommandBuffer& cmd,
+                             GraphRun& run,
+                             const std::shared_ptr<FrameData>& frame_data,
+                             const uint32_t set_index,
+                             const NodeIO& io) override;
 
     virtual void get_configuration([[maybe_unused]] Configuration& config,
                                    bool& needs_rebuild) override;

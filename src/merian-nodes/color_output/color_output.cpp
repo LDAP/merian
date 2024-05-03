@@ -25,23 +25,17 @@ void ColorOutputNode::pre_process([[maybe_unused]] const uint64_t& iteration, No
     status.skip_run = needs_run;
 }
 
-void ColorOutputNode::cmd_build(const vk::CommandBuffer& cmd,
-                                const std::vector<std::vector<ImageHandle>>&,
-                                const std::vector<std::vector<BufferHandle>>&,
-                                const std::vector<std::vector<ImageHandle>>& image_outputs,
-                                const std::vector<std::vector<BufferHandle>>&) {
-    cmd.clearColorImage(*image_outputs[0][0], image_outputs[0][0]->get_current_layout(), color,
-                        all_levels_and_layers());
+void ColorOutputNode::cmd_build(const vk::CommandBuffer& cmd, const std::vector<NodeIO>& ios) {
+    cmd.clearColorImage(*ios[0].image_outputs[0], ios[0].image_outputs[0]->get_current_layout(),
+                        color, all_levels_and_layers());
 }
 
 void ColorOutputNode::cmd_process(const vk::CommandBuffer& cmd,
-                                  GraphRun&,
-                                  const uint32_t,
-                                  const std::vector<ImageHandle>&,
-                                  const std::vector<BufferHandle>&,
-                                  const std::vector<ImageHandle>& image_outputs,
-                                  const std::vector<BufferHandle>&) {
-    cmd.clearColorImage(*image_outputs[0], image_outputs[0]->get_current_layout(), color,
+                                  [[maybe_unused]] GraphRun& run,
+                                  [[maybe_unused]] const std::shared_ptr<FrameData>& frame_data,
+                                  [[maybe_unused]] const uint32_t set_index,
+                                  const NodeIO& io) {
+    cmd.clearColorImage(*io.image_outputs[0], io.image_outputs[0]->get_current_layout(), color,
                         all_levels_and_layers());
     needs_run = false;
 }

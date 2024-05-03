@@ -30,9 +30,8 @@ std::string ABSplitNode::name() {
 }
 
 std::tuple<std::vector<NodeOutputDescriptorImage>, std::vector<NodeOutputDescriptorBuffer>>
-ABSplitNode::describe_outputs(
-    const std::vector<NodeOutputDescriptorImage>& connected_image_outputs,
-    const std::vector<NodeOutputDescriptorBuffer>&) {
+ABSplitNode::describe_outputs(const std::vector<NodeOutputDescriptorImage>& connected_image_outputs,
+                              const std::vector<NodeOutputDescriptorBuffer>&) {
 
     vk::Format format = output_format.has_value() ? output_format.value()
                                                   : connected_image_outputs[0].create_info.format;
@@ -49,15 +48,13 @@ ABSplitNode::describe_outputs(
 }
 
 void ABSplitNode::cmd_process(const vk::CommandBuffer& cmd,
-                              GraphRun&,
-                              const uint32_t,
-                              const std::vector<ImageHandle>& image_inputs,
-                              const std::vector<BufferHandle>&,
-                              const std::vector<ImageHandle>& image_outputs,
-                              const std::vector<BufferHandle>&) {
-    const ImageHandle& a = image_inputs[0];
-    const ImageHandle& b = image_inputs[1];
-    const ImageHandle& result = image_outputs[0];
+                              [[maybe_unused]] GraphRun& run,
+                              [[maybe_unused]] const std::shared_ptr<FrameData>& frame_data,
+                              [[maybe_unused]] const uint32_t set_index,
+                              const NodeIO& io) {
+    const ImageHandle& a = io.image_inputs[0];
+    const ImageHandle& b = io.image_inputs[1];
+    const ImageHandle& result = io.image_outputs[0];
 
     cmd_blit_fit(cmd, *b, vk::ImageLayout::eTransferSrcOptimal, b->get_extent(), *result,
                  vk::ImageLayout::eTransferDstOptimal, result->get_extent());
@@ -107,19 +104,17 @@ ABSideBySideNode::describe_outputs(
 }
 
 void ABSideBySideNode::cmd_process(const vk::CommandBuffer& cmd,
-                                   GraphRun&,
-                                   const uint32_t,
-                                   const std::vector<ImageHandle>& image_inputs,
-                                   const std::vector<BufferHandle>&,
-                                   const std::vector<ImageHandle>& image_outputs,
-                                   const std::vector<BufferHandle>&) {
-    const ImageHandle& a = image_inputs[0];
-    const ImageHandle& b = image_inputs[1];
-    const ImageHandle& result = image_outputs[0];
+                                   [[maybe_unused]] GraphRun& run,
+                                   [[maybe_unused]] const std::shared_ptr<FrameData>& frame_data,
+                                   [[maybe_unused]] const uint32_t set_index,
+                                   const NodeIO& io) {
+    const ImageHandle& a = io.image_inputs[0];
+    const ImageHandle& b = io.image_inputs[1];
+    const ImageHandle& result = io.image_outputs[0];
 
     vk::Extent3D half_result_extent = result->get_extent();
     half_result_extent.width /= 2;
-    
+
     cmd_blit_fit(cmd, *a, vk::ImageLayout::eTransferSrcOptimal, a->get_extent(), *result,
                  vk::ImageLayout::eTransferDstOptimal, half_result_extent, {}, true);
 

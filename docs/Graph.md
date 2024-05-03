@@ -18,8 +18,12 @@ Persistent outputs are not persistent between graph builds.
 
 ### Rules
 
-- Nodes can access the same resource (same output with same delay) with the same layout only (we do not duplicate the resource for you).
+- The user must add the run's signal and wait semaphores as well as the wait stages to the queue submit. (see `queue->submit` below).
+- The user must call `run.execute_callbacks(queue)` after calling submit.
+- The user must provide unique GraphFrameData objects for each frame-in-flight (see `cmd_run`).
 
+Other:
+- Nodes can access the same resource (same output with same delay) with the same layout only (we do not duplicate the resource for you).
 
 ### Example:
 
@@ -43,14 +47,14 @@ graph.connect_image(ab, output, 0, 0);
 // However many nodes need frequent rebuilds, for example when the Window resolution changes.
 
 auto ring_cmd_pool = make_shared<merian::RingCommandPool<>>(context, context->queue_family_idx_GCT);
-auto ring_fences = make_shared<merian::RingFences<>>(context);
+auto ring_fences = make_shared<merian::RingFences<2, merian::GraphFrameData>>(context);
 while (!glfwWindowShouldClose(*window)) {
     auto& frame_data = ring_fences->wait_and_get();
     auto cmd_pool = ring_cmd_pool->set_cycle();
     glfwPollEvents();
 
     auto cmd = cmd_pool->create_and_begin();
-    auto& run = graph.cmd_run(cmd);
+    auto& run = graph.cmd_run(cmd, frame_data.user_data);
     cmd_pool->end_all();
 
     queue->submit(cmd_pool, frame_data.fence, run.get_signal_semaphore(),

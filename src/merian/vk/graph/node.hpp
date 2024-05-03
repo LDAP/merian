@@ -1,9 +1,7 @@
 #pragma once
 
 #include "merian/utils/configuration.hpp"
-#include "merian/vk/descriptors/descriptor_set.hpp"
 #include "merian/vk/graph/node_io.hpp"
-#include "vulkan/vulkan.hpp"
 
 #include <memory>
 
@@ -19,7 +17,12 @@ class Node : public std::enable_shared_from_this<Node> {
         bool request_rebuild{false};
         // If this is true the Graph is free to not call cmd_process on the next run.
         bool skip_run{false};
+        // By default FrameData is reset when the graph rebuilds.
+        // If set to true, the FrameData is persisted
+        bool persist_frame_data{false};
     };
+
+    struct FrameData {};
 
     static inline NodeOutputDescriptorImage FEEDBACK_OUTPUT_IMAGE{{}, {}, {}, {}, {}};
     static inline NodeOutputDescriptorBuffer FEEDBACK_OUTPUT_BUFFER{{}, {}, {}, {}};
@@ -28,6 +31,13 @@ class Node : public std::enable_shared_from_this<Node> {
     virtual ~Node() {}
 
     virtual std::string name() = 0;
+
+    // A factory for the frame data (data has to exist once per frame-in-flight) for this node.
+    // It is quaranteed that cmd_run gets a shared_ptr to frame data that was generated using this
+    // method, meaning it can be safely casted.
+    virtual std::shared_ptr<FrameData> create_frame_data() {
+        return {};
+    }
 
     // Declare the inputs that you require
     virtual std::tuple<std::vector<NodeInputDescriptorImage>,
@@ -61,12 +71,8 @@ class Node : public std::enable_shared_from_this<Node> {
     // such uploads here. You should only write to output images that were declared as 'persistent',
     // these are also the same in each set.
     // No not access or modify input images.
-    virtual void
-    cmd_build([[maybe_unused]] const vk::CommandBuffer& cmd,
-              [[maybe_unused]] const std::vector<std::vector<ImageHandle>>& image_inputs,
-              [[maybe_unused]] const std::vector<std::vector<BufferHandle>>& buffer_inputs,
-              [[maybe_unused]] const std::vector<std::vector<ImageHandle>>& image_outputs,
-              [[maybe_unused]] const std::vector<std::vector<BufferHandle>>& buffer_outputs) {}
+    virtual void cmd_build([[maybe_unused]] const vk::CommandBuffer& cmd,
+                           [[maybe_unused]] const std::vector<NodeIO>& ios) {}
 
     // This is called once per iteration.
     // You do not need to insert barriers for node inputs and outputs.
@@ -75,11 +81,9 @@ class Node : public std::enable_shared_from_this<Node> {
     // `run.get_iteration()` counts the iterations since last build.
     virtual void cmd_process([[maybe_unused]] const vk::CommandBuffer& cmd,
                              [[maybe_unused]] GraphRun& run,
+                             [[maybe_unused]] const std::shared_ptr<FrameData>& frame_data,
                              [[maybe_unused]] const uint32_t set_index,
-                             [[maybe_unused]] const std::vector<ImageHandle>& image_inputs,
-                             [[maybe_unused]] const std::vector<BufferHandle>& buffer_inputs,
-                             [[maybe_unused]] const std::vector<ImageHandle>& image_outputs,
-                             [[maybe_unused]] const std::vector<BufferHandle>& buffer_outputs) {}
+                             [[maybe_unused]] const NodeIO& io) {}
 
     // Declare your configuration options.
     virtual void get_configuration([[maybe_unused]] Configuration& config,

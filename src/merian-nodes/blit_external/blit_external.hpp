@@ -49,18 +49,16 @@ template <BlitNodeMode mode> class BlitExternalNode : public Node {
     }
 
     virtual void cmd_process(const vk::CommandBuffer& cmd,
-                             GraphRun&,
-                             const uint32_t,
-                             const std::vector<ImageHandle>& image_inputs,
-                             const std::vector<BufferHandle>&,
-                             const std::vector<ImageHandle>&,
-                             const std::vector<BufferHandle>&) override {
-        assert(image_inputs.size() == 1);
+                             [[maybe_unused]] GraphRun& run,
+                             [[maybe_unused]] const std::shared_ptr<FrameData>& frame_data,
+                             [[maybe_unused]] const uint32_t set_index,
+                             const NodeIO& io) override {
+        assert(io.image_inputs.size() == 1);
         if (!dst_image) {
             return;
         }
 
-        auto& src_image = image_inputs[0];
+        auto& src_image = io.image_inputs[0];
 
         if (dst_in_layout != vk::ImageLayout::eTransferDstOptimal)
             cmd_barrier_image_layout(cmd, dst_image, dst_in_layout,

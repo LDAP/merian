@@ -29,11 +29,7 @@ class ImageNode : public Node {
 
     void pre_process([[maybe_unused]] const uint64_t& iteration, NodeStatus& status) override;
 
-    void cmd_build(const vk::CommandBuffer& cmd,
-                   const std::vector<std::vector<merian::ImageHandle>>&,
-                   const std::vector<std::vector<merian::BufferHandle>>&,
-                   const std::vector<std::vector<merian::ImageHandle>>& image_outputs,
-                   const std::vector<std::vector<merian::BufferHandle>>&) override;
+    void cmd_build(const vk::CommandBuffer& cmd, const std::vector<NodeIO>& ios) override;
 
     void get_configuration(Configuration& config, bool& needs_rebuild) override;
 

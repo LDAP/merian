@@ -272,7 +272,9 @@ void Graph::cmd_build(vk::CommandBuffer& cmd, const ProfilerHandle profiler) {
     graph_version_identifier++;
 }
 
-const GraphRun& Graph::cmd_run(vk::CommandBuffer& cmd, const ProfilerHandle profiler) {
+const GraphRun& Graph::cmd_run(vk::CommandBuffer& cmd,
+                               GraphFrameData& graph_frame_data,
+                               const ProfilerHandle profiler) {
     MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "Graph: run");
 
     do {
@@ -306,13 +308,14 @@ const GraphRun& Graph::cmd_run(vk::CommandBuffer& cmd, const ProfilerHandle prof
 
             MERIAN_PROFILE_SCOPE_GPU(profiler, cmd,
                                      fmt::format("{} ({})", data.name, node->name()));
-            cmd_run_node(cmd, node, data);
+            cmd_run_node(cmd, node, data, graph_frame_data);
 
             if (debug_utils)
                 debug_utils->cmd_end_label(cmd);
         }
     }
 
+    graph_frame_data.graph_version_identifier = graph_version_identifier;
     rebuild_requested = run.rebuild_requested;
     current_iteration++;
 
@@ -502,10 +505,10 @@ void Graph::prepare_resource_sets() {
         uint32_t num_sets = lcm(num_resources);
 
         // Precompute resource sets for each iteration
-        dst_data.precomputed_input_images.resize(num_sets);
-        dst_data.precomputed_input_buffers.resize(num_sets);
-        dst_data.precomputed_output_images.resize(num_sets);
-        dst_data.precomputed_output_buffers.resize(num_sets);
+        dst_data.precomputed_io.resize(num_sets);
+        dst_data.precomputed_io.resize(num_sets);
+        dst_data.precomputed_io.resize(num_sets);
+        dst_data.precomputed_io.resize(num_sets);
         dst_data.precomputed_input_images_resource.resize(num_sets);
         dst_data.precomputed_input_buffers_resource.resize(num_sets);
         dst_data.precomputed_output_images_resource.resize(num_sets);
@@ -522,7 +525,7 @@ void Graph::prepare_resource_sets() {
                     (set_idx + num_resources - in_desc.delay) % num_resources;
                 const auto& resource =
                     node_data[src_node].allocated_image_outputs[src_output_idx][resource_idx];
-                dst_data.precomputed_input_images[set_idx].push_back(resource->image);
+                dst_data.precomputed_io[set_idx].image_inputs.push_back(resource->image);
                 dst_data.precomputed_input_images_resource[set_idx].push_back(resource);
             }
             for (uint32_t i = 0; i < dst_data.buffer_input_descriptors.size(); i++) {
@@ -534,18 +537,18 @@ void Graph::prepare_resource_sets() {
                     (set_idx + num_resources - in_desc.delay) % num_resources;
                 const auto& resource =
                     node_data[src_node].allocated_buffer_outputs[src_output_idx][resource_idx];
-                dst_data.precomputed_input_buffers[set_idx].push_back(resource->buffer);
+                dst_data.precomputed_io[set_idx].buffer_inputs.push_back(resource->buffer);
                 dst_data.precomputed_input_buffers_resource[set_idx].push_back(resource);
             }
             // Precompute outputs
             for (auto& images : dst_data.allocated_image_outputs) {
-                dst_data.precomputed_output_images[set_idx].push_back(
+                dst_data.precomputed_io[set_idx].image_outputs.push_back(
                     images[set_idx % images.size()]->image);
                 dst_data.precomputed_output_images_resource[set_idx].push_back(
                     images[set_idx % images.size()]);
             }
             for (auto& buffers : dst_data.allocated_buffer_outputs) {
-                dst_data.precomputed_output_buffers[set_idx].push_back(
+                dst_data.precomputed_io[set_idx].buffer_outputs.push_back(
                     buffers[set_idx % buffers.size()]->buffer);
                 dst_data.precomputed_output_buffers_resource[set_idx].push_back(
                     buffers[set_idx % buffers.size()]);
@@ -556,33 +559,36 @@ void Graph::prepare_resource_sets() {
 
 void Graph::cmd_build_node(vk::CommandBuffer& cmd, NodeHandle& node) {
     NodeData& data = node_data[node];
-    for (uint32_t set_idx = 0; set_idx < data.precomputed_input_images.size(); set_idx++) {
+    for (uint32_t set_idx = 0; set_idx < data.precomputed_io.size(); set_idx++) {
         cmd_barrier_for_node(cmd, data, set_idx);
     }
-    node->cmd_build(cmd, data.precomputed_input_images, data.precomputed_input_buffers,
-                    data.precomputed_output_images, data.precomputed_output_buffers);
+    node->cmd_build(cmd, data.precomputed_io);
 }
 
 // Insert the according barriers for that node
-void Graph::cmd_run_node(vk::CommandBuffer& cmd, NodeHandle& node, NodeData& data) {
+void Graph::cmd_run_node(vk::CommandBuffer& cmd,
+                         NodeHandle& node,
+                         NodeData& data,
+                         GraphFrameData& graph_frame_data) {
+    if (!graph_frame_data.frame_data.contains(node)) {
+        graph_frame_data.frame_data[node] = node->create_frame_data();
+        SPDLOG_DEBUG("create frame data for node {}", data.name);
+    } else if (graph_frame_data.graph_version_identifier != graph_version_identifier &&
+               !data.status.persist_frame_data) {
+        graph_frame_data.frame_data[node] = node->create_frame_data();
+        SPDLOG_DEBUG("recreate frame data for node {}", data.name);
+    }
 
-    if (data.precomputed_input_images.size()) {
-        uint32_t set_idx = current_iteration % data.precomputed_input_images.size();
-
+    if (data.precomputed_io.size()) {
+        const uint32_t set_idx = current_iteration % data.precomputed_io.size();
         cmd_barrier_for_node(cmd, data, set_idx);
-
-        auto& in_images = data.precomputed_input_images[set_idx];
-        auto& in_buffers = data.precomputed_input_buffers[set_idx];
-        auto& out_images = data.precomputed_output_images[set_idx];
-        auto& out_buffers = data.precomputed_output_buffers[set_idx];
-
-        node->cmd_process(cmd, run, set_idx, in_images, in_buffers, out_images, out_buffers);
+        node->cmd_process(cmd, run, graph_frame_data.frame_data[node], set_idx, data.precomputed_io[set_idx]);
     } else {
-        node->cmd_process(cmd, run, -1, {}, {}, {}, {});
+        node->cmd_process(cmd, run, graph_frame_data.frame_data[node], -1, {});
     }
 }
 
-void Graph::cmd_barrier_for_node(vk::CommandBuffer& cmd, NodeData& data, uint32_t& set_idx) {
+void Graph::cmd_barrier_for_node(vk::CommandBuffer& cmd, NodeData& data, const uint32_t& set_idx) {
     image_barriers_for_set.clear();
     buffer_barriers_for_set.clear();
 
@@ -689,10 +695,7 @@ void Graph::reset_graph() {
         data.allocated_image_outputs.clear();
         data.allocated_buffer_outputs.clear();
 
-        data.precomputed_input_images.clear();
-        data.precomputed_input_buffers.clear();
-        data.precomputed_output_images.clear();
-        data.precomputed_output_buffers.clear();
+        data.precomputed_io.clear();
 
         data.precomputed_input_images_resource.clear();
         data.precomputed_input_buffers_resource.clear();

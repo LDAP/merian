@@ -14,14 +14,10 @@ ComputeNode::ComputeNode(const SharedContext context,
                          const std::optional<uint32_t> push_constant_size)
     : context(context), allocator(allocator), push_constant_size(push_constant_size) {}
 
-void ComputeNode::cmd_build(const vk::CommandBuffer&,
-                            const std::vector<std::vector<merian::ImageHandle>>& image_inputs,
-                            const std::vector<std::vector<merian::BufferHandle>>& buffer_inputs,
-                            const std::vector<std::vector<merian::ImageHandle>>& image_outputs,
-                            const std::vector<std::vector<merian::BufferHandle>>& buffer_outputs) {
+void ComputeNode::cmd_build(const vk::CommandBuffer&, const std::vector<NodeIO>& ios) {
 
-    std::tie(textures, sets, pool, layout) = make_graph_descriptor_sets(
-        context, allocator, image_inputs, buffer_inputs, image_outputs, buffer_outputs, layout);
+    std::tie(textures, sets, pool, layout) =
+        make_graph_descriptor_sets(context, allocator, ios, layout);
 
     if (!pipe_layout) {
         auto pipe_builder = PipelineLayoutBuilder(context);
@@ -37,11 +33,9 @@ void ComputeNode::cmd_build(const vk::CommandBuffer&,
 
 void ComputeNode::cmd_process(const vk::CommandBuffer& cmd,
                               GraphRun& run,
+                              [[maybe_unused]] const std::shared_ptr<FrameData>& frame_data,
                               const uint32_t set_index,
-                              const std::vector<ImageHandle>&,
-                              const std::vector<BufferHandle>&,
-                              const std::vector<ImageHandle>&,
-                              const std::vector<BufferHandle>&) {
+                              [[maybe_unused]] const NodeIO& io) {
     pipe->bind(cmd);
     pipe->bind_descriptor_set(cmd, sets[set_index]);
     if (push_constant_size.has_value())

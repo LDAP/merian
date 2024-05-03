@@ -74,14 +74,9 @@ ExposureNode::describe_outputs(
     };
 }
 
-void ExposureNode::cmd_build(const vk::CommandBuffer&,
-                             const std::vector<std::vector<ImageHandle>>& image_inputs,
-                             const std::vector<std::vector<BufferHandle>>& buffer_inputs,
-                             const std::vector<std::vector<ImageHandle>>& image_outputs,
-                             const std::vector<std::vector<BufferHandle>>& buffer_outputs) {
+void ExposureNode::cmd_build(const vk::CommandBuffer&, const std::vector<NodeIO>& ios) {
     std::tie(graph_textures, graph_sets, graph_pool, graph_layout) =
-        make_graph_descriptor_sets(context, allocator, image_inputs, buffer_inputs, image_outputs,
-                                   buffer_outputs, graph_layout);
+        make_graph_descriptor_sets(context, allocator, ios, graph_layout);
 
     if (!exposure) {
         auto pipe_layout = PipelineLayoutBuilder(context)
@@ -100,25 +95,23 @@ void ExposureNode::cmd_build(const vk::CommandBuffer&,
 
 void ExposureNode::cmd_process(const vk::CommandBuffer& cmd,
                                GraphRun& run,
+                               [[maybe_unused]] const std::shared_ptr<FrameData>& frame_data,
                                const uint32_t set_index,
-                               const std::vector<ImageHandle>&,
-                               const std::vector<BufferHandle>&,
-                               const std::vector<ImageHandle>& image_outputs,
-                               const std::vector<BufferHandle>& buffer_outputs) {
+                               const NodeIO& io) {
     const auto group_count_x =
-        (image_outputs[0]->get_extent().width + local_size_x - 1) / local_size_x;
+        (io.image_outputs[0]->get_extent().width + local_size_x - 1) / local_size_x;
     const auto group_count_y =
-        (image_outputs[0]->get_extent().height + local_size_y - 1) / local_size_y;
+        (io.image_outputs[0]->get_extent().height + local_size_y - 1) / local_size_y;
 
     if (pc.automatic) {
         pc.reset = run.get_iteration() == 0;
         pc.timediff = sw.seconds();
         sw.reset();
 
-        cmd.fillBuffer(*buffer_outputs[0], 0, VK_WHOLE_SIZE, 0);
-        auto bar = buffer_outputs[0]->buffer_barrier(vk::AccessFlagBits::eTransferWrite,
-                                                     vk::AccessFlagBits::eShaderRead |
-                                                         vk::AccessFlagBits::eShaderWrite);
+        cmd.fillBuffer(*io.buffer_outputs[0], 0, VK_WHOLE_SIZE, 0);
+        auto bar = io.buffer_outputs[0]->buffer_barrier(vk::AccessFlagBits::eTransferWrite,
+                                                        vk::AccessFlagBits::eShaderRead |
+                                                            vk::AccessFlagBits::eShaderWrite);
         cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
                             vk::PipelineStageFlagBits::eComputeShader, {}, {}, bar, {});
 
@@ -127,9 +120,9 @@ void ExposureNode::cmd_process(const vk::CommandBuffer& cmd,
         histogram->push_constant(cmd, pc);
         cmd.dispatch(group_count_x, group_count_y, 1);
 
-        bar = buffer_outputs[0]->buffer_barrier(vk::AccessFlagBits::eShaderRead |
-                                                    vk::AccessFlagBits::eShaderWrite,
-                                                vk::AccessFlagBits::eShaderRead);
+        bar = io.buffer_outputs[0]->buffer_barrier(vk::AccessFlagBits::eShaderRead |
+                                                       vk::AccessFlagBits::eShaderWrite,
+                                                   vk::AccessFlagBits::eShaderRead);
         cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
                             vk::PipelineStageFlagBits::eComputeShader, {}, {}, bar, {});
     }
@@ -139,9 +132,9 @@ void ExposureNode::cmd_process(const vk::CommandBuffer& cmd,
     luminance->push_constant(cmd, pc);
     cmd.dispatch(1, 1, 1);
 
-    auto bar = buffer_outputs[1]->buffer_barrier(vk::AccessFlagBits::eShaderRead |
-                                                     vk::AccessFlagBits::eShaderWrite,
-                                                 vk::AccessFlagBits::eShaderRead);
+    auto bar = io.buffer_outputs[1]->buffer_barrier(vk::AccessFlagBits::eShaderRead |
+                                                        vk::AccessFlagBits::eShaderWrite,
+                                                    vk::AccessFlagBits::eShaderRead);
     cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
                         vk::PipelineStageFlagBits::eComputeShader, {}, {}, bar, {});
 

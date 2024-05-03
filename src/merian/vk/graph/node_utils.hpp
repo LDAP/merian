@@ -1,6 +1,7 @@
 #pragma once
 
 #include "merian/vk/descriptors/descriptor_set.hpp"
+#include "merian/vk/graph/node_io.hpp"
 #include "merian/vk/memory/resource_allocations.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 
@@ -21,10 +22,7 @@ namespace merian {
                          DescriptorSetLayoutHandle>
 make_graph_descriptor_sets(const SharedContext context,
                            const ResourceAllocatorHandle allocator,
-                           const std::vector<std::vector<merian::ImageHandle>>& image_inputs,
-                           const std::vector<std::vector<merian::BufferHandle>>& buffer_inputs,
-                           const std::vector<std::vector<merian::ImageHandle>>& image_outputs,
-                           const std::vector<std::vector<merian::BufferHandle>>& buffer_outputs,
+                           const std::vector<NodeIO>& ios,
                            const DescriptorSetLayoutHandle optional_layout);
 
 } // namespace merian

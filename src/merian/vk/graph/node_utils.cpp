@@ -11,7 +11,7 @@ namespace merian {
 // An appropriate layout is created if optional_layout is null.
 // The graph resources are bound in order input images, input buffers, output images,
 // output buffers. The textures contain the images in the same order.
-// 
+//
 // Input images are bound as sampler2d, output images as image2d.
 //
 // The descriptors for images are created with layout eShaderReadOnly and eGeneral for inputs and
@@ -22,51 +22,51 @@ namespace merian {
                          DescriptorSetLayoutHandle>
 make_graph_descriptor_sets(const SharedContext context,
                            const ResourceAllocatorHandle allocator,
-                           const std::vector<std::vector<merian::ImageHandle>>& image_inputs,
-                           const std::vector<std::vector<merian::BufferHandle>>& buffer_inputs,
-                           const std::vector<std::vector<merian::ImageHandle>>& image_outputs,
-                           const std::vector<std::vector<merian::BufferHandle>>& buffer_outputs,
+                           const std::vector<NodeIO>& ios,
                            const DescriptorSetLayoutHandle optional_layout) {
     DescriptorSetLayoutHandle layout;
     if (optional_layout) {
         layout = optional_layout;
     } else {
         auto builder = DescriptorSetLayoutBuilder();
-        for (uint32_t i = 0; i < image_inputs[0].size(); i++)
+        for (uint32_t i = 0; i < ios[0].image_inputs.size(); i++)
             builder.add_binding_combined_sampler();
-        for (uint32_t i = 0; i < buffer_inputs[0].size(); i++)
+        for (uint32_t i = 0; i < ios[0].buffer_inputs.size(); i++)
             builder.add_binding_storage_buffer();
 
-        for (uint32_t i = 0; i < image_outputs[0].size(); i++)
+        for (uint32_t i = 0; i < ios[0].image_outputs.size(); i++)
             builder.add_binding_storage_image();
-        for (uint32_t i = 0; i < buffer_outputs[0].size(); i++)
+        for (uint32_t i = 0; i < ios[0].buffer_outputs.size(); i++)
             builder.add_binding_storage_buffer();
         layout = builder.build_layout(context);
     }
 
     std::vector<DescriptorSetHandle> sets;
     std::vector<TextureHandle> textures;
-    uint32_t num_sets = image_outputs.size();
+    uint32_t num_sets = ios.size();
     DescriptorPoolHandle pool = std::make_shared<merian::DescriptorPool>(layout, num_sets);
 
     vk::ImageViewCreateInfo create_image_view{
         {}, VK_NULL_HANDLE, vk::ImageViewType::e2D, {}, {}, first_level_and_layer()};
 
     TextureHandle out_tex, in_tex;
-    for (uint32_t i = 0; i < num_sets; i++) {
+    for (auto& io : ios) {
         auto set = std::make_shared<merian::DescriptorSet>(pool);
         sets.push_back(set);
         auto update = DescriptorSetUpdate(set);
         uint32_t u_i = 0;
 
         // in
-        for (auto& image_input : image_inputs[i]) {
+        for (auto& image_input : io.image_inputs) {
             create_image_view.image = *image_input;
             create_image_view.format = image_input->get_format();
             in_tex = allocator->createTexture(image_input, create_image_view);
 
-            vk::FormatProperties props = context->physical_device.physical_device.getFormatProperties(create_image_view.format);
-            if (props.optimalTilingFeatures & vk::FormatFeatureFlagBits::eSampledImageFilterLinear) {
+            vk::FormatProperties props =
+                context->physical_device.physical_device.getFormatProperties(
+                    create_image_view.format);
+            if (props.optimalTilingFeatures &
+                vk::FormatFeatureFlagBits::eSampledImageFilterLinear) {
                 in_tex->attach_sampler(allocator->get_sampler_pool()->linear_mirrored_repeat());
             } else {
                 in_tex->attach_sampler(allocator->get_sampler_pool()->nearest_mirrored_repeat());
@@ -76,12 +76,12 @@ make_graph_descriptor_sets(const SharedContext context,
             update.write_descriptor_texture(u_i++, in_tex, 0, 1,
                                             vk::ImageLayout::eShaderReadOnlyOptimal);
         }
-        for (auto& buffer_input : buffer_inputs[i]) {
+        for (auto& buffer_input : io.buffer_inputs) {
             update.write_descriptor_buffer(u_i++, buffer_input);
         }
 
         // out
-        for (auto& image_output : image_outputs[i]) {
+        for (auto& image_output : io.image_outputs) {
             create_image_view.image = *image_output;
             create_image_view.format = image_output->get_format();
             out_tex = allocator->createTexture(image_output, create_image_view);
@@ -89,7 +89,7 @@ make_graph_descriptor_sets(const SharedContext context,
 
             update.write_descriptor_texture(u_i++, out_tex, 0, 1, vk::ImageLayout::eGeneral);
         }
-        for (auto& buffer_output : buffer_outputs[i]) {
+        for (auto& buffer_output : io.buffer_outputs) {
             update.write_descriptor_buffer(u_i++, buffer_output);
         }
         update.update(context);

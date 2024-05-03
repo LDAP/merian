@@ -58,13 +58,9 @@ MedianApproxNode::describe_outputs(const std::vector<NodeOutputDescriptorImage>&
 }
 
 void MedianApproxNode::cmd_build([[maybe_unused]] const vk::CommandBuffer& cmd,
-                                 const std::vector<std::vector<ImageHandle>>& image_inputs,
-                                 const std::vector<std::vector<BufferHandle>>& buffer_inputs,
-                                 const std::vector<std::vector<ImageHandle>>& image_outputs,
-                                 const std::vector<std::vector<BufferHandle>>& buffer_outputs) {
+                                 const std::vector<NodeIO>& ios) {
     std::tie(graph_textures, graph_sets, graph_pool, graph_layout) =
-        make_graph_descriptor_sets(context, allocator, image_inputs, buffer_inputs, image_outputs,
-                                   buffer_outputs, graph_layout);
+        make_graph_descriptor_sets(context, allocator, ios, graph_layout);
 
     if (!pipe_reduce) {
         auto pipe_layout = PipelineLayoutBuilder(context)
@@ -82,20 +78,18 @@ void MedianApproxNode::cmd_build([[maybe_unused]] const vk::CommandBuffer& cmd,
 
 void MedianApproxNode::cmd_process(const vk::CommandBuffer& cmd,
                                    [[maybe_unused]] GraphRun& run,
+                                   [[maybe_unused]] const std::shared_ptr<FrameData>& frame_data,
                                    const uint32_t set_index,
-                                   const std::vector<ImageHandle>& image_inputs,
-                                   [[maybe_unused]] const std::vector<BufferHandle>& buffer_inputs,
-                                   [[maybe_unused]] const std::vector<ImageHandle>& image_outputs,
-                                   const std::vector<BufferHandle>& buffer_outputs) {
+                                   const NodeIO& io) {
     const auto group_count_x =
-        (image_inputs[0]->get_extent().width + local_size_x - 1) / local_size_x;
+        (io.image_inputs[0]->get_extent().width + local_size_x - 1) / local_size_x;
     const auto group_count_y =
-        (image_inputs[0]->get_extent().height + local_size_y - 1) / local_size_y;
+        (io.image_inputs[0]->get_extent().height + local_size_y - 1) / local_size_y;
 
-    cmd.fillBuffer(*buffer_outputs[1], 0, VK_WHOLE_SIZE, 0);
-    auto bar = buffer_outputs[1]->buffer_barrier(vk::AccessFlagBits::eTransferWrite,
-                                                 vk::AccessFlagBits::eShaderRead |
-                                                     vk::AccessFlagBits::eShaderWrite);
+    cmd.fillBuffer(*io.buffer_outputs[1], 0, VK_WHOLE_SIZE, 0);
+    auto bar = io.buffer_outputs[1]->buffer_barrier(vk::AccessFlagBits::eTransferWrite,
+                                                    vk::AccessFlagBits::eShaderRead |
+                                                        vk::AccessFlagBits::eShaderWrite);
     cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
                         vk::PipelineStageFlagBits::eComputeShader, {}, {}, bar, {});
 
@@ -104,9 +98,9 @@ void MedianApproxNode::cmd_process(const vk::CommandBuffer& cmd,
     pipe_histogram->push_constant(cmd, pc);
     cmd.dispatch(group_count_x, group_count_y, 1);
 
-    bar = buffer_outputs[1]->buffer_barrier(vk::AccessFlagBits::eShaderRead |
-                                                vk::AccessFlagBits::eShaderWrite,
-                                            vk::AccessFlagBits::eShaderRead);
+    bar = io.buffer_outputs[1]->buffer_barrier(vk::AccessFlagBits::eShaderRead |
+                                                   vk::AccessFlagBits::eShaderWrite,
+                                               vk::AccessFlagBits::eShaderRead);
     cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
                         vk::PipelineStageFlagBits::eComputeShader, {}, {}, bar, {});
 

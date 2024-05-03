@@ -24,11 +24,9 @@ template <BlitNodeMode mode = FIT> class GLFWWindowNode : public BlitExternalNod
 
     virtual void cmd_process(const vk::CommandBuffer& cmd,
                              GraphRun& run,
-                             const uint32_t set_idx,
-                             const std::vector<ImageHandle>& image_inputs,
-                             const std::vector<BufferHandle>& buffer_inputs,
-                             const std::vector<ImageHandle>& image_outputs,
-                             const std::vector<BufferHandle>& buffer_outputs) override {
+                             [[maybe_unused]] const std::shared_ptr<Node::FrameData>& frame_data,
+                             const uint32_t set_index,
+                             const NodeIO& io) override {
 
         swapchain->set_vsync(vsync);
         aquire = swapchain->aquire_auto_resize(*window);
@@ -36,8 +34,7 @@ template <BlitNodeMode mode = FIT> class GLFWWindowNode : public BlitExternalNod
             BlitExternalNode<mode>::set_target(aquire->image, vk::ImageLayout::eUndefined,
                                                vk::ImageLayout::ePresentSrcKHR,
                                                vk::Extent3D(aquire->extent, 1));
-            BlitExternalNode<mode>::cmd_process(cmd, run, set_idx, image_inputs, buffer_inputs,
-                                                image_outputs, buffer_outputs);
+            BlitExternalNode<mode>::cmd_process(cmd, run, frame_data, set_index, io);
 
             run.add_wait_semaphore(aquire->wait_semaphore, vk::PipelineStageFlagBits::eTransfer);
             run.add_signal_semaphore(aquire->signal_semaphore);

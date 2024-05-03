@@ -64,13 +64,9 @@ AccumulateNode::describe_outputs(
 }
 
 void AccumulateNode::cmd_build([[maybe_unused]] const vk::CommandBuffer& cmd,
-                               const std::vector<std::vector<ImageHandle>>& image_inputs,
-                               const std::vector<std::vector<BufferHandle>>& buffer_inputs,
-                               const std::vector<std::vector<ImageHandle>>& image_outputs,
-                               const std::vector<std::vector<BufferHandle>>& buffer_outputs) {
+                               const std::vector<NodeIO>& ios) {
     std::tie(graph_textures, graph_sets, graph_pool, graph_layout) =
-        make_graph_descriptor_sets(context, allocator, image_inputs, buffer_inputs, image_outputs,
-                                   buffer_outputs, graph_layout);
+        make_graph_descriptor_sets(context, allocator, ios, graph_layout);
 
     if (!percentile_desc_layout) {
         percentile_desc_layout =
@@ -141,12 +137,10 @@ void AccumulateNode::cmd_build([[maybe_unused]] const vk::CommandBuffer& cmd,
 }
 
 void AccumulateNode::cmd_process(const vk::CommandBuffer& cmd,
-                                 [[maybe_unused]] GraphRun& run,
+                                 GraphRun& run,
+                                 [[maybe_unused]] const std::shared_ptr<FrameData>& frame_data,
                                  const uint32_t set_index,
-                                 [[maybe_unused]] const std::vector<ImageHandle>& image_inputs,
-                                 [[maybe_unused]] const std::vector<BufferHandle>& buffer_inputs,
-                                 [[maybe_unused]] const std::vector<ImageHandle>& image_outputs,
-                                 [[maybe_unused]] const std::vector<BufferHandle>& buffer_outputs) {
+                                 [[maybe_unused]] const NodeIO& io) {
 
     if (accumulate_pc.firefly_filter_enable || accumulate_pc.adaptive_alpha_reduction > 0.0f) {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "compute percentiles");

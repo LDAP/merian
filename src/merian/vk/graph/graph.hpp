@@ -14,6 +14,14 @@
 
 namespace merian {
 
+// A unique object for each frame-in-flight.
+class GraphFrameData {
+    friend class Graph;
+
+    uint64_t graph_version_identifier{0};
+    std::unordered_map<NodeHandle, std::shared_ptr<Node::FrameData>> frame_data{};
+};
+
 // The result of the graph run.
 // Nodes can insert semaphores that the user must submit together with the
 // graph command buffer.
@@ -223,10 +231,7 @@ class Graph : public std::enable_shared_from_this<Graph> {
         // for each iteration -> For each output/input -> a list of resources which are
         // given to the node.
         // (on prepare_resource_sets)
-        std::vector<std::vector<ImageHandle>> precomputed_input_images{};
-        std::vector<std::vector<BufferHandle>> precomputed_input_buffers{};
-        std::vector<std::vector<ImageHandle>> precomputed_output_images{};
-        std::vector<std::vector<BufferHandle>> precomputed_output_buffers{};
+        std::vector<NodeIO> precomputed_io{};
 
         // as precomputed_input_images but hold a reference to resource
         // needed for barrier insertion
@@ -325,8 +330,11 @@ class Graph : public std::enable_shared_from_this<Graph> {
     // using request_rebuild() or internally by at least one node.
     void cmd_build(vk::CommandBuffer& cmd, const ProfilerHandle profiler = nullptr);
 
-    // Runs the graph. On the first run or if rebuild is requested the graph is build.
+    // Runs the graph. On the first run, or if a rebuild is requested, the graph is automatically
+    // built. frame_data must be unique for each frame-in-flight, reuse existing frame_data for best
+    // performance since data might be reused.
     [[nodiscard]] const GraphRun& cmd_run(vk::CommandBuffer& cmd,
+                                          GraphFrameData& graph_frame_data,
                                           const ProfilerHandle profiler = nullptr);
 
     // Collects configuration for the graph and all its nodes.
@@ -355,18 +363,6 @@ class Graph : public std::enable_shared_from_this<Graph> {
     std::vector<vk::BufferMemoryBarrier2> buffer_barriers_for_set;
 
   private: // Helpers
-    // Note: The connection is validated when the graph is build
-    void connect_image(const NodeHandle& src,
-                       const NodeHandle& dst,
-                       const uint32_t src_output,
-                       const uint32_t dst_input);
-
-    // Note: The connection is validated when the graph is build
-    void connect_buffer(const NodeHandle& src,
-                        const NodeHandle& dst,
-                        const uint32_t src_output,
-                        const uint32_t dst_input);
-
     // Throws if the graph is not fully connected.
     // Returns a topological order of the nodes.
     std::vector<NodeHandle> connect_nodes();
@@ -398,10 +394,13 @@ class Graph : public std::enable_shared_from_this<Graph> {
     void cmd_build_node(vk::CommandBuffer& cmd, NodeHandle& node);
 
     // Insert the according barriers for that node
-    void cmd_run_node(vk::CommandBuffer& cmd, NodeHandle& node, NodeData& data);
+    void cmd_run_node(vk::CommandBuffer& cmd,
+                      NodeHandle& node,
+                      NodeData& data,
+                      GraphFrameData& graph_frame_data);
 
     // Inserts the necessary barriers for a node and a set index
-    void cmd_barrier_for_node(vk::CommandBuffer& cmd, NodeData& data, uint32_t& set_idx);
+    void cmd_barrier_for_node(vk::CommandBuffer& cmd, NodeData& data, const uint32_t& set_idx);
 
     // Resets all data, so that the graph can be rebuild
     void reset_graph();
