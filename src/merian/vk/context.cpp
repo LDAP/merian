@@ -291,7 +291,7 @@ void Context::find_queues() {
                     (queue_family_props[queue_family_idx_GCT].queueFlags & Flags::eTransfer) &&
                     remaining_queue_count[queue_family_idx_GCT] > 0 &&
                     std::all_of(extensions.begin(), extensions.end(), [&](auto ext) {
-                        return ext->accept_graphics_queue(physical_device.physical_device,
+                        return ext->accept_graphics_queue(instance, physical_device.physical_device,
                                                           queue_family_idx_GCT);
                     })) {
                     found_GCT = true;

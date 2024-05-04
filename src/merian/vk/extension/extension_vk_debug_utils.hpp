@@ -4,8 +4,6 @@
 #include "merian/vk/extension/extension.hpp"
 
 #include <vulkan/vulkan.hpp>
-
-#include <iostream>
 #include <unordered_set>
 
 namespace merian {

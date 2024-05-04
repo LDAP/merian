@@ -1,50 +1,45 @@
 #include "merian/vk/extension/extension_vk_glfw.hpp"
-#include "merian/vk/context.hpp"
-#include "merian/vk/window/glfw_surface.hpp"
 
 #include <spdlog/spdlog.h>
 
 namespace merian {
 
-void ExtensionVkGLFW::on_instance_created(const vk::Instance& instance) {
-    auto psurf = VkSurfaceKHR(surface);
-    if (glfwCreateWindowSurface(instance, window, NULL, &psurf))
-        throw std::runtime_error("Surface creation failed!");
-    surface = vk::SurfaceKHR(psurf);
-    SPDLOG_DEBUG("created surface");
+ExtensionVkGLFW::ExtensionVkGLFW() : Extension("ExtensionVkGLFW") {
+    glfwSetErrorCallback(glfw_error_callback);
+
+    SPDLOG_DEBUG("Initialize GLFW");
+    if (!glfwInit())
+        throw std::runtime_error("GLFW initialization failed!");
+    if (!glfwVulkanSupported())
+        throw std::runtime_error("GLFW reports to have no Vulkan support! Maybe it couldn't "
+                                 "find the Vulkan loader!");
 }
 
-bool ExtensionVkGLFW::accept_graphics_queue(const vk::PhysicalDevice& physical_device,
-                                            std::size_t queue_family_index) {
-    return physical_device.getSurfaceSupportKHR(queue_family_index, surface);
-}
-
-void ExtensionVkGLFW::on_destroy_instance(const vk::Instance& instance) {
-    if (window) {
-        instance.destroySurfaceKHR(surface);
-        glfwDestroyWindow(window);
-    }
+ExtensionVkGLFW::~ExtensionVkGLFW() {
+    SPDLOG_DEBUG("Terminate GLFW");
     glfwTerminate();
 }
 
-std::tuple<GLFWWindowHandle, SurfaceHandle> ExtensionVkGLFW::get() {
-    if (!window) {
-        std::runtime_error{"ExtensionVkGLFW:get() can only be called exactly once!"};
-    }
+std::vector<const char*> ExtensionVkGLFW::required_instance_extension_names() const {
+    std::vector<const char*> required_extensions;
+    uint32_t count;
+    const char** extensions = glfwGetRequiredInstanceExtensions(&count);
+    required_extensions.insert(required_extensions.end(), extensions, extensions + count);
+    return required_extensions;
+}
 
-    GLFWwindow* window = this->window;
-    vk::SurfaceKHR surface = this->surface;
+std::vector<const char*>
+ExtensionVkGLFW::required_device_extension_names(vk::PhysicalDevice) const {
+    return {
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+    };
+}
 
-    this->window = nullptr;
-    this->surface = vk::SurfaceKHR();
-
-    assert(!weak_context.expired());
-    SharedContext context = weak_context.lock();
-
-    std::shared_ptr<GLFWWindow> shared_window = std::make_shared<GLFWWindow>(context, window);
-    std::shared_ptr<Surface> shared_surface = std::shared_ptr<Surface>(new GLFWSurface(context, surface, shared_window));
-
-    return {shared_window, shared_surface};
+bool ExtensionVkGLFW::accept_graphics_queue(const vk::Instance& instance,
+                                            const vk::PhysicalDevice& physical_device,
+                                            std::size_t queue_family_index) {
+    return glfwGetPhysicalDevicePresentationSupport(instance, physical_device,
+                                                    queue_family_index) == GLFW_TRUE;
 }
 
 } // namespace merian

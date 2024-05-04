@@ -76,7 +76,9 @@ class Extension {
         return true;
     }
     /* E.g. to dismiss a queue that does not support present-to-surface. */
-    virtual bool accept_graphics_queue(const vk::PhysicalDevice&, std::size_t) {
+    virtual bool accept_graphics_queue([[maybe_unused]] const vk::Instance& instance,
+                                       [[maybe_unused]] const vk::PhysicalDevice& physical_device,
+                                       [[maybe_unused]] std::size_t queue_family_index) {
         return true;
     }
     /**
