@@ -1,6 +1,5 @@
 #pragma once
 
-#include "imgui.h"
 #include "merian/vk/window/imgui_context.hpp"
 #include "merian/vk/window/swapchain.hpp"
 
