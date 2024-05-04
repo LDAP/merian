@@ -1,16 +1,13 @@
 #pragma once
 
-#include "merian/utils/vector.hpp"
 #include "merian/vk/context.hpp"
 #include "merian/vk/sampler/sampler.hpp"
+#include "merian/utils/hash.hpp"
 
-#include <cfloat>
 #include <spdlog/spdlog.h>
 #include <vulkan/vulkan.hpp>
 
-#include <functional>
 #include <unordered_map>
-#include <vector>
 
 namespace merian {
 
