@@ -38,7 +38,6 @@ class GLFWImGui {
     void render(vk::CommandBuffer& cmd);
 
   private:
-    void upload_imgui_fonts();
     void init_imgui(GLFWwindow* window, SwapchainAcquireResult& aquire_result, QueueHandle& queue);
     void recreate_render_pass(SwapchainAcquireResult& aquire_result);
 

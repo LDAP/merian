@@ -21,6 +21,7 @@ GLFWImGui::~GLFWImGui() {
     if (imgui_initialized) {
         context->device.waitIdle();
 
+        ImGui_ImplVulkan_DestroyFontsTexture();
         ImGui_ImplVulkan_Shutdown();
         ImGui_ImplGlfw_Shutdown();
 
@@ -75,16 +76,6 @@ void GLFWImGui::recreate_render_pass(SwapchainAcquireResult& aquire_result) {
     render_pass = context->device.createRenderPass(info);
 }
 
-void GLFWImGui::upload_imgui_fonts() {
-    CommandPool pool(context->get_queue_GCT());
-
-    auto cmd = pool.create_and_begin();
-    ImGui_ImplVulkan_CreateFontsTexture(cmd);
-    pool.end_all();
-    context->get_queue_GCT()->submit_wait(cmd);
-    ImGui_ImplVulkan_DestroyFontUploadObjects();
-}
-
 void GLFWImGui::init_imgui(GLFWwindow* window,
                            SwapchainAcquireResult& aquire_result,
                            QueueHandle& queue) {
@@ -129,10 +120,11 @@ void GLFWImGui::init_imgui(GLFWwindow* window,
     init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
     init_info.Allocator = VK_NULL_HANDLE;
     init_info.CheckVkResultFn = nullptr;
+    init_info.RenderPass = render_pass;
 
-    ImGui_ImplVulkan_Init(&init_info, render_pass);
+    ImGui_ImplVulkan_Init(&init_info);
 
-    upload_imgui_fonts();
+    ImGui_ImplVulkan_CreateFontsTexture();
 
     imgui_initialized = true;
 }
