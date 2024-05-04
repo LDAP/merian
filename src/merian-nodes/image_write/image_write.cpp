@@ -141,7 +141,7 @@ void ImageWriteNode::cmd_process(const vk::CommandBuffer& cmd,
                             fmt::arg("height", linear_image->get_extent().height)));
             std::filesystem::create_directories(path.parent_path());
             const std::string tmp_filename =
-                path.parent_path() / (".interm_" + path.filename().string());
+                (path.parent_path() / (".interm_" + path.filename().string())).string();
 
             switch (this->format) {
             case FORMAT_PNG: {
