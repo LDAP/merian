@@ -23,6 +23,7 @@ GLFWImGui::~GLFWImGui() {
 
         ImGui_ImplVulkan_DestroyFontsTexture();
         ImGui_ImplVulkan_Shutdown();
+        ImGui_ImplGlfw_RestoreCallbacks(window);
         ImGui_ImplGlfw_Shutdown();
 
         context->device.destroyDescriptorPool(imgui_pool);
@@ -113,6 +114,7 @@ void GLFWImGui::init_imgui(GLFWwindow* window,
 
     ImGui_ImplVulkan_CreateFontsTexture();
 
+    this->window = window;
     imgui_initialized = true;
 }
 

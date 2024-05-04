@@ -49,6 +49,7 @@ class GLFWImGui {
     const std::vector<vk::DescriptorPoolSize> pool_sizes;
 
     bool imgui_initialized = false;
+    GLFWwindow* window; // only valid if initialized
     vk::DescriptorPool imgui_pool{VK_NULL_HANDLE};
     vk::RenderPass render_pass{VK_NULL_HANDLE};
     std::vector<vk::Framebuffer> framebuffers;
