@@ -85,7 +85,7 @@ void MeanNode::cmd_build([[maybe_unused]] const vk::CommandBuffer& cmd,
 
 void MeanNode::cmd_process(const vk::CommandBuffer& cmd,
                            GraphRun& run,
-                           const std::shared_ptr<FrameData>& frame_data,
+                           [[maybe_unused]] const std::shared_ptr<FrameData>& frame_data,
                            const uint32_t set_index,
                            const NodeIO& io) {
     const auto group_count_x =
