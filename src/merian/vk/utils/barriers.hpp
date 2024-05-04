@@ -1,6 +1,5 @@
 #pragma once
 
-#include <unordered_map>
 #include <vulkan/vulkan.hpp>
 
 namespace merian {
@@ -10,7 +9,7 @@ static vk::PipelineStageFlags all_shaders =
     vk::PipelineStageFlagBits::eTessellationControlShader |
     vk::PipelineStageFlagBits::eTessellationEvaluationShader |
     vk::PipelineStageFlagBits::eGeometryShader | vk::PipelineStageFlagBits::eFragmentShader |
-    vk::PipelineStageFlagBits::eComputeShader | vk::PipelineStageFlagBits::eRayTracingShaderKHR;
+    vk::PipelineStageFlagBits::eComputeShader;
 
 // Heuristic to infer access flags from image layout
 inline vk::AccessFlags access_flags_for_image_layout(vk::ImageLayout layout) {
@@ -32,7 +31,10 @@ inline vk::AccessFlags access_flags_for_image_layout(vk::ImageLayout layout) {
     }
 }
 
-// Heuristic to infer pipeline stage from image layout
+// Heuristic to infer pipeline stage from image layout.
+// This is very conservative (i.e. attemps to include all stages that may access a layout).
+// However, no extensions are taken into account. For example,
+// vk::PipelineStageFlagBits::eRayTracingShaderKHR might never be included!
 inline vk::PipelineStageFlags pipeline_stage_for_image_layout(vk::ImageLayout layout) {
     switch (layout) {
     case vk::ImageLayout::eTransferDstOptimal:
@@ -58,28 +60,43 @@ inline vk::PipelineStageFlags pipeline_stage_for_image_layout(vk::ImageLayout la
 // Heuristic to infer pipeline stage from access flags
 vk::PipelineStageFlags pipeline_stage_for_access_flags(vk::AccessFlags flags);
 
+// This is very conservative (i.e. attemps to include all stages that may access a layout).
+// However, no extensions are taken into account. For example,
+// vk::PipelineStageFlagBits::eRayTracingShaderKHR might never be included!
 vk::ImageMemoryBarrier barrier_image_layout(vk::Image image,
                                             vk::ImageLayout old_image_layout,
                                             vk::ImageLayout new_image_layout,
                                             const vk::ImageSubresourceRange& subresource_range);
 
+// This is very conservative (i.e. attemps to include all stages that may access a layout).
+// However, no extensions are taken into account. For example,
+// vk::PipelineStageFlagBits::eRayTracingShaderKHR might never be included!
 void cmd_barrier_image_layout(vk::CommandBuffer cmd,
                               vk::Image image,
                               vk::ImageLayout old_image_layout,
                               vk::ImageLayout new_image_layout,
                               const vk::ImageSubresourceRange& subresource_range);
 
+// This is very conservative (i.e. attemps to include all stages that may access a layout).
+// However, no extensions are taken into account. For example,
+// vk::PipelineStageFlagBits::eRayTracingShaderKHR might never be included!
 vk::ImageMemoryBarrier barrier_image_layout(vk::Image image,
                                             vk::ImageLayout old_image_layout,
                                             vk::ImageLayout new_image_layout,
                                             vk::ImageAspectFlags aspect_mask);
 
+// This is very conservative (i.e. attemps to include all stages that may access a layout).
+// However, no extensions are taken into account. For example,
+// vk::PipelineStageFlagBits::eRayTracingShaderKHR might never be included!
 void cmd_barrier_image_layout(vk::CommandBuffer cmd,
                               vk::Image image,
                               vk::ImageLayout old_image_layout,
                               vk::ImageLayout new_image_layout,
                               vk::ImageAspectFlags aspect_mask);
 
+// This is very conservative (i.e. attemps to include all stages that may access a layout).
+// However, no extensions are taken into account. For example,
+// vk::PipelineStageFlagBits::eRayTracingShaderKHR might never be included!
 inline void cmd_barrier_image_layout(vk::CommandBuffer cmd,
                                      vk::Image image,
                                      vk::ImageLayout old_image_layout,

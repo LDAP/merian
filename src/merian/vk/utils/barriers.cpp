@@ -1,6 +1,8 @@
 #include "merian/vk/utils/barriers.hpp"
-
+#include "vk/utils/subresource_ranges.hpp"
 #include <vulkan/vulkan.hpp>
+
+#include <unordered_map>
 
 namespace merian {
 
@@ -94,10 +96,7 @@ vk::ImageMemoryBarrier barrier_image_layout(vk::Image image,
                               vk::ImageLayout old_image_layout,
                               vk::ImageLayout new_image_layout,
                               vk::ImageAspectFlags aspect_mask) {
-    vk::ImageSubresourceRange subresourceRange{
-        aspect_mask, 0, VK_REMAINING_MIP_LEVELS, 0, VK_REMAINING_ARRAY_LAYERS,
-    };
-    return barrier_image_layout(image, old_image_layout, new_image_layout, subresourceRange);
+    return barrier_image_layout(image, old_image_layout, new_image_layout, all_levels_and_layers(aspect_mask));
 }
 
 void cmd_barrier_image_layout(vk::CommandBuffer cmd,
@@ -105,11 +104,7 @@ void cmd_barrier_image_layout(vk::CommandBuffer cmd,
                               vk::ImageLayout old_image_layout,
                               vk::ImageLayout new_image_layout,
                               vk::ImageAspectFlags aspect_mask) {
-    vk::ImageSubresourceRange subresourceRange{
-        aspect_mask, 0, VK_REMAINING_MIP_LEVELS, 0, VK_REMAINING_ARRAY_LAYERS,
-    };
-
-    cmd_barrier_image_layout(cmd, image, old_image_layout, new_image_layout, subresourceRange);
+    cmd_barrier_image_layout(cmd, image, old_image_layout, new_image_layout, all_levels_and_layers(aspect_mask));
 }
 
 } // namespace merian
