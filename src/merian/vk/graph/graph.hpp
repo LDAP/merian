@@ -362,6 +362,9 @@ class Graph : public std::enable_shared_from_this<Graph> {
     std::vector<vk::ImageMemoryBarrier2> image_barriers_for_set;
     std::vector<vk::BufferMemoryBarrier2> buffer_barriers_for_set;
 
+    double duration_last_run;
+    double duration_last_build;
+
   private: // Helpers
     // Throws if the graph is not fully connected.
     // Returns a topological order of the nodes.

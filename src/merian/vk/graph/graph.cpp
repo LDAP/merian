@@ -1,6 +1,7 @@
 #include "merian/vk/graph/graph.hpp"
+#include "merian/utils/stopwatch.hpp"
+#include "merian/vk/utils/math.hpp"
 #include "merian/vk/utils/profiler.hpp"
-#include "vk/utils/math.hpp"
 
 namespace merian {
 
@@ -231,6 +232,8 @@ void Graph::print_error_missing_inputs() {
 }
 
 void Graph::cmd_build(vk::CommandBuffer& cmd, const ProfilerHandle profiler) {
+    merian::Stopwatch build_duration;
+
     // no nodes -> no build necessary
     if (node_data.empty())
         return;
@@ -270,12 +273,14 @@ void Graph::cmd_build(vk::CommandBuffer& cmd, const ProfilerHandle profiler) {
 
     current_iteration = 0;
     graph_version_identifier++;
+    duration_last_build = build_duration.millis();
 }
 
 const GraphRun& Graph::cmd_run(vk::CommandBuffer& cmd,
                                GraphFrameData& graph_frame_data,
                                const ProfilerHandle profiler) {
     MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "Graph: run");
+    merian::Stopwatch run_duration;
 
     do {
         if (rebuild_requested) {
@@ -318,6 +323,7 @@ const GraphRun& Graph::cmd_run(vk::CommandBuffer& cmd,
     graph_frame_data.graph_version_identifier = graph_version_identifier;
     rebuild_requested = run.rebuild_requested;
     current_iteration++;
+    duration_last_run = run_duration.millis();
 
     return run;
 }
@@ -582,7 +588,8 @@ void Graph::cmd_run_node(vk::CommandBuffer& cmd,
     if (data.precomputed_io.size()) {
         const uint32_t set_idx = current_iteration % data.precomputed_io.size();
         cmd_barrier_for_node(cmd, data, set_idx);
-        node->cmd_process(cmd, run, graph_frame_data.frame_data[node], set_idx, data.precomputed_io[set_idx]);
+        node->cmd_process(cmd, run, graph_frame_data.frame_data[node], set_idx,
+                          data.precomputed_io[set_idx]);
     } else {
         node->cmd_process(cmd, run, graph_frame_data.frame_data[node], -1, {});
     }
@@ -781,8 +788,12 @@ void Graph::get_configuration_io_for_node(Configuration& config, NodeData& data)
 void Graph::get_configuration(Configuration& config) {
     if (config.st_new_section("Graph")) {
         rebuild_requested |= config.config_bool("Rebuild");
-        config.st_no_space();
-        config.output_text(fmt::format("Current iteration {}", current_iteration));
+
+        config.output_text(fmt::format("Current iteration: {}", current_iteration));
+        config.output_text(fmt::format("Last run CPU time: {:.02f} ms", duration_last_run));
+        config.output_text(fmt::format("Last build CPU time: {:.02f} ms", duration_last_build));
+        config.output_text(fmt::format("Number builds: {}", graph_version_identifier));
+        config.st_separate();
 
         for (auto& [node, data] : node_data) {
             std::string node_label = fmt::format("{} ({})", data.name, data.node->name());
