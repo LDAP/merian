@@ -14,15 +14,26 @@ namespace merian {
 ImageWriteNode::ImageWriteNode(const SharedContext context,
                                const ResourceAllocatorHandle allocator,
                                const std::string& filename_format)
-    : context(context), allocator(allocator), filename_format(filename_format), buf(1024) {
+    : context(context), allocator(allocator),
+      max_active_threads(std::thread::hardware_concurrency()), filename_format(filename_format),
+      buf(1024) {
     assert(filename_format.size() < buf.size());
     std::copy(filename_format.begin(), filename_format.end(), buf.begin());
 }
 
-ImageWriteNode::~ImageWriteNode() {}
+ImageWriteNode::~ImageWriteNode() {
+    SPDLOG_DEBUG("wait for threads to finish");
+    std::unique_lock lk(lock_cv_active_threads);
+    cv_active_threads.wait(lk, [&] { return active_threads == 0; });
+    lk.unlock();
+}
 
 std::string ImageWriteNode::name() {
     return "Image Write";
+}
+
+std::shared_ptr<Node::FrameData> ImageWriteNode::create_frame_data() {
+    return std::make_shared<FrameData>();
 }
 
 // Declare the inputs that you require
@@ -53,25 +64,26 @@ void ImageWriteNode::pre_process([[maybe_unused]] const uint64_t& run_iteration,
     needs_rebuild = false;
 };
 
-void ImageWriteNode::cmd_process(const vk::CommandBuffer& cmd,
-                                 GraphRun& run,
-                                 [[maybe_unused]] const std::shared_ptr<FrameData>& frame_data,
-                                 [[maybe_unused]] const uint32_t set_index,
-                                 const NodeIO& io) {
+void ImageWriteNode::cmd_process(
+    const vk::CommandBuffer& cmd,
+    GraphRun& run,
+    [[maybe_unused]] const std::shared_ptr<Node::FrameData>& node_frame_data,
+    [[maybe_unused]] const uint32_t set_index,
+    const NodeIO& io) {
     if (filename_format.empty()) {
         record_enable = false;
         record_next = false;
     }
 
     if (record_next || (record_enable && record_iteration == iteration)) {
-
         const vk::Format format = this->format == FORMAT_HDR ? vk::Format::eR32G32B32A32Sfloat
                                                              : vk::Format::eR8G8B8A8Srgb;
         const vk::FormatProperties format_properties =
             context->physical_device.physical_device.getFormatProperties(format);
+        const std::shared_ptr<FrameData> frame_data =
+            std::static_pointer_cast<FrameData>(node_frame_data);
 
         const ImageHandle src = io.image_inputs[0];
-        std::optional<ImageHandle> intermediate_image;
 
         vk::ImageCreateInfo linear_info{
             {},
@@ -121,44 +133,53 @@ void ImageWriteNode::cmd_process(const vk::CommandBuffer& cmd,
                     {},
                     vk::ImageLayout::eUndefined,
                 };
-                intermediate_image = allocator->createImage(intermediate_info);
+                ImageHandle intermediate_image = allocator->createImage(intermediate_info);
+                frame_data->intermediate_image = intermediate_image;
+
                 cmd.pipelineBarrier(
                     vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eTransfer, {},
                     {}, {},
-                    intermediate_image.value()->barrier(vk::ImageLayout::eTransferDstOptimal, {},
-                                                        vk::AccessFlagBits::eTransferWrite));
+                    intermediate_image->barrier(vk::ImageLayout::eTransferDstOptimal, {},
+                                                vk::AccessFlagBits::eTransferWrite));
                 cmd_blit_stretch(cmd, *src, src->get_current_layout(), src->get_extent(),
-                                 *intermediate_image.value(), vk::ImageLayout::eTransferDstOptimal,
+                                 *intermediate_image, vk::ImageLayout::eTransferDstOptimal,
                                  src->get_extent());
                 cmd.pipelineBarrier(
                     vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer, {},
                     {}, {},
-                    intermediate_image.value()->barrier(vk::ImageLayout::eTransferSrcOptimal,
-                                                        vk::AccessFlagBits::eTransferWrite,
-                                                        vk::AccessFlagBits::eTransferRead));
+                    intermediate_image->barrier(vk::ImageLayout::eTransferSrcOptimal,
+                                                vk::AccessFlagBits::eTransferWrite,
+                                                vk::AccessFlagBits::eTransferRead));
             }
             {
                 MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "copy to linear image");
-                cmd.copyImage(*intermediate_image.value(),
-                              intermediate_image.value()->get_current_layout(), *linear_image,
-                              linear_image->get_current_layout(),
+                cmd.copyImage(*frame_data->intermediate_image.value(),
+                              frame_data->intermediate_image.value()->get_current_layout(),
+                              *linear_image, linear_image->get_current_layout(),
                               vk::ImageCopy(first_layer(), {}, first_layer(), {},
-                                            intermediate_image.value()->get_extent()));
+                                            frame_data->intermediate_image.value()->get_extent()));
             }
         }
-
         cmd.pipelineBarrier(
             vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost, {}, {}, {},
             linear_image->barrier(vk::ImageLayout::eGeneral, vk::AccessFlagBits::eTransferWrite,
                                   vk::AccessFlagBits::eHostRead));
 
+        // wait for a thread to be available
+        std::unique_lock lk(lock_cv_active_threads);
+        cv_active_threads.wait(lk, [&] { return active_threads < max_active_threads; });
+        active_threads++;
+        lk.unlock();
+
+        TimelineSemaphoreHandle image_ready = std::make_shared<TimelineSemaphore>(context, 0);
+        run.add_signal_semaphore(image_ready, 1);
+
         int it = iteration;
         int run_it = run.get_iteration();
         int image_index = this->image_index++;
         std::string filename_format = this->filename_format;
-        run.add_submit_callback([this, intermediate_image, linear_image, it, image_index, run_it,
-                                 filename_format](const QueueHandle& queue) {
-            queue->wait_idle();
+        std::thread([this, image_ready, linear_image, it, image_index, run_it, filename_format]() {
+            image_ready->wait(1);
             void* mem = linear_image->get_memory()->map();
 
             std::filesystem::path path = std::filesystem::absolute(
@@ -201,7 +222,11 @@ void ImageWriteNode::cmd_process(const vk::CommandBuffer& cmd,
             }
 
             linear_image->get_memory()->unmap();
-        });
+            std::unique_lock lk(lock_cv_active_threads);
+            active_threads--;
+            lk.unlock();
+            cv_active_threads.notify_all();
+        }).detach();
 
         if (rebuild_after_capture)
             run.request_rebuild();
@@ -243,6 +268,8 @@ void ImageWriteNode::get_configuration([[maybe_unused]] Configuration& config, b
         fmt::format("abs path: {}", filename_format.empty()
                                         ? "<invalid>"
                                         : std::filesystem::absolute(filename_format).string()));
+    config.config_int("concurrency", max_active_threads,
+                      "Limit the maximum concurrency. Might be necessary with low memory.");
 
     config.st_separate("Single");
     record_next = config.config_bool("trigger");

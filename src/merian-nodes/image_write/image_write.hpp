@@ -7,6 +7,10 @@ namespace merian {
 
 // Writes to images files. Note that a queue idle is used after each iteration.
 class ImageWriteNode : public Node {
+    class FrameData : public Node::FrameData {
+      public:
+        std::optional<ImageHandle> intermediate_image;
+    };
 
   public:
     ImageWriteNode(const SharedContext context,
@@ -18,6 +22,8 @@ class ImageWriteNode : public Node {
 
     virtual std::string name() override;
 
+    virtual std::shared_ptr<Node::FrameData> create_frame_data() override;
+
     // Declare the inputs that you require
     virtual std::tuple<std::vector<NodeInputDescriptorImage>,
                        std::vector<NodeInputDescriptorBuffer>>
@@ -28,7 +34,7 @@ class ImageWriteNode : public Node {
 
     virtual void cmd_process(const vk::CommandBuffer& cmd,
                              GraphRun& run,
-                             const std::shared_ptr<FrameData>& frame_data,
+                             const std::shared_ptr<Node::FrameData>& frame_data,
                              const uint32_t set_index,
                              const NodeIO& io) override;
 
@@ -43,6 +49,13 @@ class ImageWriteNode : public Node {
   private:
     const SharedContext context;
     const ResourceAllocatorHandle allocator;
+
+    // DIY semaphore, since those are added with c++20.
+    int max_active_threads;
+    int active_threads = 0;
+    std::vector<std::thread> threads;
+    std::condition_variable cv_active_threads;
+    std::mutex lock_cv_active_threads;
 
     std::function<void()> callback;
 
