@@ -11,7 +11,8 @@ class ImageWriteNode : public Node {
   public:
     ImageWriteNode(const SharedContext context,
                    const ResourceAllocatorHandle allocator,
-                   const std::string& base_filename);
+                   const std::string& base_filename =
+                       "image_{record_iteration:06}_{image_index:06}_{run_iteration:06}");
 
     virtual ~ImageWriteNode();
 
@@ -65,6 +66,11 @@ class ImageWriteNode : public Node {
 
     int it_power = 1;
     int it_offset = 0;
+
+    int stop_run = -1;
+    int stop_iteration = -1;
+    int exit_run = -1;
+    int exit_iteration = -1;
 
     bool needs_rebuild = false;
 };

@@ -2,6 +2,7 @@
 #include "ext/stb_image_write.h"
 #include "merian/vk/graph/graph.hpp"
 #include "merian/vk/utils/blits.hpp"
+#include <csignal>
 #include <filesystem>
 
 namespace merian {
@@ -10,11 +11,9 @@ namespace merian {
 #define FORMAT_JPG 1
 #define FORMAT_HDR 2
 
-ImageWriteNode::ImageWriteNode(
-    const SharedContext context,
-    const ResourceAllocatorHandle allocator,
-    const std::string& filename_format =
-        "image_{record_iteration:06}_{image_index:06}_{run_iteration:06}")
+ImageWriteNode::ImageWriteNode(const SharedContext context,
+                               const ResourceAllocatorHandle allocator,
+                               const std::string& filename_format)
     : context(context), allocator(allocator), filename_format(filename_format), buf(1024) {
     assert(filename_format.size() < buf.size());
     std::copy(filename_format.begin(), filename_format.end(), buf.begin());
@@ -60,7 +59,8 @@ void ImageWriteNode::cmd_process(const vk::CommandBuffer& cmd,
                                  [[maybe_unused]] const uint32_t set_index,
                                  const NodeIO& io) {
     if (filename_format.empty()) {
-        return;
+        record_enable = false;
+        record_next = false;
     }
 
     if (record_next || (record_enable && record_iteration == iteration)) {
@@ -186,6 +186,13 @@ void ImageWriteNode::cmd_process(const vk::CommandBuffer& cmd,
         record_iteration += record_enable ? it_offset : 0;
     }
 
+    if (stop_run == (int64_t)run.get_iteration() || stop_iteration == iteration) {
+        record_enable = false;
+    }
+    if (exit_run == (int64_t)run.get_iteration() || exit_iteration == iteration) {
+        raise(SIGKILL);
+    }
+
     iteration++;
 }
 
@@ -237,6 +244,17 @@ void ImageWriteNode::get_configuration([[maybe_unused]] Configuration& config, b
                       "Adds this value to the iteration specifier after every capture. (After "
                       "applying the power).");
     config.output_text("note: Iterations are 1-indexed");
+    config.st_separate();
+    config.config_int("stop at run", stop_run,
+                      "Stops recording at the specified run. -1 to disable.");
+    config.config_int("stop at iteration", stop_iteration,
+                      "Stops recording at the specified iteration. -1 to disable.");
+    config.config_int("exit at run", exit_run,
+                      "Raises SIGKILL at the specified run. -1 to disable. Add a signal handler to "
+                      "shut down properly and not corrupt the images.");
+    config.config_int("exit at iteration", exit_iteration,
+                      "Raises SIGKILL at the specified iteration. -1 to disable. Add a signal "
+                      "handler to shut down properly and not corrupt the images.");
 }
 
 void ImageWriteNode::set_callback(const std::function<void()> callback) {
