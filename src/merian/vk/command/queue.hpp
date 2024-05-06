@@ -22,7 +22,9 @@ class Queue : public std::enable_shared_from_this<Queue> {
                 const vk::Fence fence,
                 const std::vector<vk::Semaphore>& signal_semaphores = {},
                 const std::vector<vk::Semaphore>& wait_semaphores = {},
-                const std::vector<vk::PipelineStageFlags>& wait_dst_stage_mask = {});
+                const std::vector<vk::PipelineStageFlags>& wait_dst_stage_mask = {},
+                const std::optional<VkTimelineSemaphoreSubmitInfo> timeline_semaphore_submit_info =
+                    std::nullopt);
 
     void submit(const std::vector<vk::CommandBuffer>& command_buffers,
                 vk::Fence fence = VK_NULL_HANDLE,
@@ -70,7 +72,8 @@ class Queue : public std::enable_shared_from_this<Queue> {
     }
 
     const vk::QueueFamilyProperties get_queue_family_properties() const {
-        return context->physical_device.physical_device.getQueueFamilyProperties()[queue_family_index];
+        return context->physical_device.physical_device
+            .getQueueFamilyProperties()[queue_family_index];
     }
 
     operator uint32_t() const {

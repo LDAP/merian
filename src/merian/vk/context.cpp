@@ -392,6 +392,10 @@ void enable_common_features(const Context::FeaturesContainer& supported,
         SPDLOG_DEBUG("shaderInt8 supported. Enabling feature");
         enable.physical_device_features_v12.shaderInt8 = true;
     }
+    if (supported.physical_device_features_v12.timelineSemaphore) {
+        SPDLOG_DEBUG("timelineSemaphore supported. Enabling feature");
+        enable.physical_device_features_v12.timelineSemaphore = true;
+    }
 
     if (supported.physical_device_features_v13.robustImageAccess) {
         SPDLOG_DEBUG("robustImageAccess supported. Enabling feature");

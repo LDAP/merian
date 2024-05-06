@@ -6,6 +6,8 @@
 #include "merian/vk/graph/node_io.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/utils/profiler.hpp"
+#include <merian/vk/sync/semaphore_binary.hpp>
+#include <merian/vk/sync/semaphore_timeline.hpp>
 
 #include <memory>
 #include <optional>
@@ -32,14 +34,30 @@ class GraphRun {
     GraphRun(const Graph& graph, const std::shared_ptr<ExtensionVkDebugUtils> debug_utils)
         : graph(graph), debug_utils(debug_utils) {}
 
-    void add_wait_semaphore(vk::Semaphore& wait_semaphore,
-                            vk::PipelineStageFlags wait_stage_flags) noexcept {
-        wait_semaphores.push_back(wait_semaphore);
+    void add_wait_semaphore(const BinarySemaphoreHandle& wait_semaphore,
+                            const vk::PipelineStageFlags& wait_stage_flags) noexcept {
+        wait_semaphores.push_back(*wait_semaphore);
         wait_stages.push_back(wait_stage_flags);
+        wait_values.push_back(0);
     }
 
-    void add_signal_semaphore(vk::Semaphore& signal_semaphore) noexcept {
-        signal_semaphores.push_back(signal_semaphore);
+    void add_signal_semaphore(const BinarySemaphoreHandle& signal_semaphore) noexcept {
+        signal_semaphores.push_back(*signal_semaphore);
+        signal_values.push_back(0);
+    }
+
+    void add_wait_semaphore(const TimelineSemaphoreHandle& wait_semaphore,
+                            const vk::PipelineStageFlags& wait_stage_flags,
+                            const uint64_t value) noexcept {
+        wait_semaphores.push_back(*wait_semaphore);
+        wait_stages.push_back(wait_stage_flags);
+        wait_values.push_back(value);
+    }
+
+    void add_signal_semaphore(const TimelineSemaphoreHandle& signal_semaphore,
+                              const uint64_t value) noexcept {
+        signal_semaphores.push_back(*signal_semaphore);
+        signal_values.push_back(value);
     }
 
     void add_submit_callback(std::function<void(const QueueHandle& queue)> callback) noexcept {
@@ -67,8 +85,14 @@ class GraphRun {
     }
 
     // Add this to the submit call for the graph command buffer
-    const std::vector<vk::Semaphore>& get_signal_semaphore() const noexcept {
+    const std::vector<vk::Semaphore>& get_signal_semaphores() const noexcept {
         return signal_semaphores;
+    }
+
+    // Add this to the submit call for the graph command buffer
+    // The retuned pointer is valid until the next call to run.
+    vk::TimelineSemaphoreSubmitInfo get_timeline_semaphore_submit_info() const noexcept {
+        return vk::TimelineSemaphoreSubmitInfo{wait_values, signal_values};
     }
 
     // You must call every callback after you submited the graph command buffer
@@ -95,7 +119,9 @@ class GraphRun {
     void reset(const ProfilerHandle profiler) {
         wait_semaphores.clear();
         wait_stages.clear();
+        wait_values.clear();
         signal_semaphores.clear();
+        signal_values.clear();
         submit_callbacks.clear();
 
         this->profiler = profiler;
@@ -105,8 +131,11 @@ class GraphRun {
   private:
     const Graph& graph;
     std::vector<vk::Semaphore> wait_semaphores;
+    std::vector<uint64_t> wait_values;
     std::vector<vk::PipelineStageFlags> wait_stages;
     std::vector<vk::Semaphore> signal_semaphores;
+    std::vector<uint64_t> signal_values;
+
     std::vector<std::function<void(const QueueHandle& queue)>> submit_callbacks;
     ProfilerHandle profiler = nullptr;
     std::shared_ptr<ExtensionVkDebugUtils> debug_utils = nullptr;

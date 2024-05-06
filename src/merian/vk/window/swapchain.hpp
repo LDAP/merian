@@ -3,6 +3,7 @@
 #include "merian/vk/command/queue.hpp"
 #include "merian/vk/window/surface.hpp"
 #include "merian/vk/window/window.hpp"
+#include "merian/vk/sync/semaphore_binary.hpp"
 #include "vulkan/vulkan.hpp"
 #include <GLFW/glfw3.h>
 
@@ -23,10 +24,10 @@ struct SwapchainAcquireResult {
     // You MUST wait on this semaphore before writing to the image. ("The
     // system" signals this semaphore when it's done presenting the
     // image and can safely be reused).
-    vk::Semaphore wait_semaphore;
+    BinarySemaphoreHandle wait_semaphore;
     // You MUST signal this semaphore when done writing to the image, and
     // before presenting it. (The system waits for this before presenting).
-    vk::Semaphore signal_semaphore;
+    BinarySemaphoreHandle signal_semaphore;
     // Swapchain was created or recreated.
     // You can use cmd_update_image_layouts() to update the image layouts to PresentSrc.
     bool did_recreate;
@@ -76,8 +77,8 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
 
     struct SemaphoreGroup {
         // be aware semaphore index may not match active image index!
-        vk::Semaphore read_semaphore{};
-        vk::Semaphore written_semaphore{};
+        BinarySemaphoreHandle read_semaphore{};
+        BinarySemaphoreHandle written_semaphore{};
     };
 
     // Number of retries if aquire or present failes with Suboptimal/OutOfDate.
@@ -118,12 +119,12 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
     void present(const QueueHandle& queue, const std::function<vk::Extent2D()>& framebuffer_extent);
 
     /* Semaphore only valid until the next present() */
-    vk::Semaphore& current_read_semaphore() {
+    const BinarySemaphoreHandle& current_read_semaphore() const {
         return semaphore_groups[current_semaphore_idx % semaphore_groups.size()].read_semaphore;
     }
 
     /* Semaphore only valid until the next present(). */
-    vk::Semaphore& current_written_semaphore() {
+    const BinarySemaphoreHandle& current_written_semaphore() const {
         return semaphore_groups[current_semaphore_idx % semaphore_groups.size()].written_semaphore;
     }
 

@@ -194,9 +194,8 @@ vk::Extent2D Swapchain::recreate_swapchain(int width, int height) {
         entry.imageView = context->device.createImageView(createInfo);
 
         // Semaphore
-        vk::SemaphoreCreateInfo semaphoreCreateInfo;
-        semaphore_group.read_semaphore = context->device.createSemaphore(semaphoreCreateInfo);
-        semaphore_group.written_semaphore = context->device.createSemaphore(semaphoreCreateInfo);
+        semaphore_group.read_semaphore = std::make_shared<BinarySemaphore>(context);
+        semaphore_group.written_semaphore = std::make_shared<BinarySemaphore>(context);
 
         // Barrier
         vk::ImageSubresourceRange imageSubresourceRange {
@@ -240,13 +239,9 @@ void Swapchain::destroy_entries() {
     }
 
     SPDLOG_DEBUG("destroy semaphores");
-    for (auto& semaphore_group : semaphore_groups) {
-        context->device.destroySemaphore(semaphore_group.read_semaphore);
-        context->device.destroySemaphore(semaphore_group.written_semaphore);
-    }
+    semaphore_groups.resize(0);
 
     entries.resize(0);
-    semaphore_groups.resize(0);
     barriers.resize(0);
 }
 
@@ -278,7 +273,7 @@ Swapchain::acquire(const std::function<vk::Extent2D()>& framebuffer_extent) {
 
     for (uint32_t tries = 0; tries < ERROR_RETRIES; tries++) {
         vk::Result result = context->device.acquireNextImageKHR(
-            swapchain, UINT64_MAX, current_read_semaphore(), {}, &current_image_idx);
+            swapchain, UINT64_MAX, *current_read_semaphore(), {}, &current_image_idx);
 
         if (result == vk::Result::eSuccess) {
             aquire_result.image = current_image();
@@ -309,7 +304,7 @@ Swapchain::acquire(const std::function<vk::Extent2D()>& framebuffer_extent) {
 
 void Swapchain::present(const QueueHandle& queue,
                         const std::function<vk::Extent2D()>& framebuffer_extent) {
-    vk::Semaphore& written = current_written_semaphore();
+    const vk::Semaphore& written = *current_written_semaphore();
     vk::PresentInfoKHR present_info{
         1,
         &written, // wait until the user is done writing to the image
