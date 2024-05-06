@@ -65,42 +65,19 @@ void ImageWriteNode::cmd_process(const vk::CommandBuffer& cmd,
 
     if (record_next || (record_enable && record_iteration == iteration)) {
 
-        vk::Format format = this->format == FORMAT_HDR ? vk::Format::eR32G32B32A32Sfloat
-                                                       : vk::Format::eR8G8B8A8Srgb;
+        const vk::Format format = this->format == FORMAT_HDR ? vk::Format::eR32G32B32A32Sfloat
+                                                             : vk::Format::eR8G8B8A8Srgb;
+        const vk::FormatProperties format_properties =
+            context->physical_device.physical_device.getFormatProperties(format);
 
-        vk::ImageCreateInfo size_compatible_info{
-            {},
-            vk::ImageType::e2D,
-            format,
-            io.image_inputs[0]->get_extent(),
-            1,
-            1,
-            vk::SampleCountFlagBits::e1,
-            vk::ImageTiling::eOptimal,
-            vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc,
-            vk::SharingMode::eExclusive,
-            {},
-            {},
-            vk::ImageLayout::eUndefined,
-        };
-        ImageHandle image = allocator->createImage(size_compatible_info);
-        cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
-                            vk::PipelineStageFlagBits::eTransfer, {}, {}, {},
-                            image->barrier(vk::ImageLayout::eTransferDstOptimal, {},
-                                           vk::AccessFlagBits::eTransferWrite));
-        cmd_blit_stretch(cmd, *io.image_inputs[0], io.image_inputs[0]->get_current_layout(),
-                         io.image_inputs[0]->get_extent(), *image,
-                         vk::ImageLayout::eTransferDstOptimal, io.image_inputs[0]->get_extent());
-        cmd.pipelineBarrier(
-            vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer, {}, {}, {},
-            image->barrier(vk::ImageLayout::eTransferSrcOptimal, vk::AccessFlagBits::eTransferWrite,
-                           vk::AccessFlagBits::eTransferRead));
+        const ImageHandle src = io.image_inputs[0];
+        std::optional<ImageHandle> intermediate_image;
 
         vk::ImageCreateInfo linear_info{
             {},
             vk::ImageType::e2D,
             format,
-            io.image_inputs[0]->get_extent(),
+            src->get_extent(),
             1,
             1,
             vk::SampleCountFlagBits::e1,
@@ -117,9 +94,59 @@ void ImageWriteNode::cmd_process(const vk::CommandBuffer& cmd,
                             vk::PipelineStageFlagBits::eTransfer, {}, {}, {},
                             linear_image->barrier(vk::ImageLayout::eTransferDstOptimal, {},
                                                   vk::AccessFlagBits::eTransferWrite));
-        cmd.copyImage(*image, image->get_current_layout(), *linear_image,
-                      linear_image->get_current_layout(),
-                      vk::ImageCopy(first_layer(), {}, first_layer(), {}, image->get_extent()));
+
+        if (format_properties.linearTilingFeatures & vk::FormatFeatureFlagBits::eBlitDst) {
+            // blit directly onto the linear image
+            MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "blit to linear image");
+            cmd_blit_stretch(cmd, *src, src->get_current_layout(), src->get_extent(), *linear_image,
+                             vk::ImageLayout::eTransferDstOptimal, src->get_extent());
+
+        } else {
+            // cannot blit directly to the linear image with the desired format
+            // therefore blit first onto a optimal tiled image and then copy to linear tiled image.
+            {
+                MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "blit to optimal tiled image");
+                vk::ImageCreateInfo intermediate_info{
+                    {},
+                    vk::ImageType::e2D,
+                    format,
+                    src->get_extent(),
+                    1,
+                    1,
+                    vk::SampleCountFlagBits::e1,
+                    vk::ImageTiling::eOptimal,
+                    vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc,
+                    vk::SharingMode::eExclusive,
+                    {},
+                    {},
+                    vk::ImageLayout::eUndefined,
+                };
+                intermediate_image = allocator->createImage(intermediate_info);
+                cmd.pipelineBarrier(
+                    vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eTransfer, {},
+                    {}, {},
+                    intermediate_image.value()->barrier(vk::ImageLayout::eTransferDstOptimal, {},
+                                                        vk::AccessFlagBits::eTransferWrite));
+                cmd_blit_stretch(cmd, *src, src->get_current_layout(), src->get_extent(),
+                                 *intermediate_image.value(), vk::ImageLayout::eTransferDstOptimal,
+                                 src->get_extent());
+                cmd.pipelineBarrier(
+                    vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer, {},
+                    {}, {},
+                    intermediate_image.value()->barrier(vk::ImageLayout::eTransferSrcOptimal,
+                                                        vk::AccessFlagBits::eTransferWrite,
+                                                        vk::AccessFlagBits::eTransferRead));
+            }
+            {
+                MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "copy to linear image");
+                cmd.copyImage(*intermediate_image.value(),
+                              intermediate_image.value()->get_current_layout(), *linear_image,
+                              linear_image->get_current_layout(),
+                              vk::ImageCopy(first_layer(), {}, first_layer(), {},
+                                            intermediate_image.value()->get_extent()));
+            }
+        }
+
         cmd.pipelineBarrier(
             vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost, {}, {}, {},
             linear_image->barrier(vk::ImageLayout::eGeneral, vk::AccessFlagBits::eTransferWrite,
@@ -129,7 +156,7 @@ void ImageWriteNode::cmd_process(const vk::CommandBuffer& cmd,
         int run_it = run.get_iteration();
         int image_index = this->image_index++;
         std::string filename_format = this->filename_format;
-        run.add_submit_callback([this, image, linear_image, it, image_index, run_it,
+        run.add_submit_callback([this, intermediate_image, linear_image, it, image_index, run_it,
                                  filename_format](const QueueHandle& queue) {
             queue->wait_idle();
             void* mem = linear_image->get_memory()->map();
