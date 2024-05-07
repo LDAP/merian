@@ -13,6 +13,7 @@ merian_src = files(
     'utils/sdl_audio_device.cpp',
     'utils/camera/camera.cpp',
     'utils/camera/camera_animator.cpp',
+    'utils/concurrent/thread_pool.cpp',
     'vk/command/command_pool.cpp',
     'vk/command/queue.cpp',
     'vk/command/ring_command_pool.cpp',

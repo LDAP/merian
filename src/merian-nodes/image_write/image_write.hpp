@@ -5,7 +5,7 @@
 
 namespace merian {
 
-// Writes to images files. Note that a queue idle is used after each iteration.
+// Writes to images files.
 class ImageWriteNode : public Node {
     class FrameData : public Node::FrameData {
       public:
@@ -50,18 +50,17 @@ class ImageWriteNode : public Node {
     const SharedContext context;
     const ResourceAllocatorHandle allocator;
 
-    // DIY semaphore, since those are added with c++20.
-    int max_active_threads;
-    int active_threads = 0;
-    std::vector<std::thread> threads;
-    std::condition_variable cv_active_threads;
-    std::mutex lock_cv_active_threads;
+    uint32_t max_concurrent_tasks = std::thread::hardware_concurrency();
+    uint32_t concurrent_tasks = 0;
+    std::mutex mutex_concurrent;
+    std::condition_variable cv_concurrent;
 
     std::function<void()> callback;
 
     std::string filename_format;
     std::vector<char> buf;
 
+    float scale = 1;
     int64_t iteration = 0;
     uint32_t image_index = 0;
 

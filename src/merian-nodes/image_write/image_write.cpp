@@ -14,19 +14,12 @@ namespace merian {
 ImageWriteNode::ImageWriteNode(const SharedContext context,
                                const ResourceAllocatorHandle allocator,
                                const std::string& filename_format)
-    : context(context), allocator(allocator),
-      max_active_threads(std::thread::hardware_concurrency()), filename_format(filename_format),
-      buf(1024) {
+    : context(context), allocator(allocator), filename_format(filename_format), buf(1024) {
     assert(filename_format.size() < buf.size());
     std::copy(filename_format.begin(), filename_format.end(), buf.begin());
 }
 
-ImageWriteNode::~ImageWriteNode() {
-    SPDLOG_DEBUG("wait for threads to finish");
-    std::unique_lock lk(lock_cv_active_threads);
-    cv_active_threads.wait(lk, [&] { return active_threads == 0; });
-    lk.unlock();
-}
+ImageWriteNode::~ImageWriteNode() {}
 
 std::string ImageWriteNode::name() {
     return "Image Write";
@@ -84,12 +77,13 @@ void ImageWriteNode::cmd_process(
             std::static_pointer_cast<FrameData>(node_frame_data);
 
         const ImageHandle src = io.image_inputs[0];
+        vk::Extent3D scaled = max(multiply(src->get_extent(), scale), {1, 1, 1});
 
         vk::ImageCreateInfo linear_info{
             {},
             vk::ImageType::e2D,
             format,
-            src->get_extent(),
+            scaled,
             1,
             1,
             vk::SampleCountFlagBits::e1,
@@ -111,7 +105,7 @@ void ImageWriteNode::cmd_process(
             // blit directly onto the linear image
             MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "blit to linear image");
             cmd_blit_stretch(cmd, *src, src->get_current_layout(), src->get_extent(), *linear_image,
-                             vk::ImageLayout::eTransferDstOptimal, src->get_extent());
+                             vk::ImageLayout::eTransferDstOptimal, linear_image->get_extent());
 
         } else {
             // cannot blit directly to the linear image with the desired format
@@ -122,7 +116,7 @@ void ImageWriteNode::cmd_process(
                     {},
                     vk::ImageType::e2D,
                     format,
-                    src->get_extent(),
+                    scaled,
                     1,
                     1,
                     vk::SampleCountFlagBits::e1,
@@ -143,7 +137,7 @@ void ImageWriteNode::cmd_process(
                                                 vk::AccessFlagBits::eTransferWrite));
                 cmd_blit_stretch(cmd, *src, src->get_current_layout(), src->get_extent(),
                                  *intermediate_image, vk::ImageLayout::eTransferDstOptimal,
-                                 src->get_extent());
+                                 intermediate_image->get_extent());
                 cmd.pipelineBarrier(
                     vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer, {},
                     {}, {},
@@ -165,68 +159,71 @@ void ImageWriteNode::cmd_process(
             linear_image->barrier(vk::ImageLayout::eGeneral, vk::AccessFlagBits::eTransferWrite,
                                   vk::AccessFlagBits::eHostRead));
 
-        // wait for a thread to be available
-        std::unique_lock lk(lock_cv_active_threads);
-        cv_active_threads.wait(lk, [&] { return active_threads < max_active_threads; });
-        active_threads++;
-        lk.unlock();
-
         TimelineSemaphoreHandle image_ready = std::make_shared<TimelineSemaphore>(context, 0);
         run.add_signal_semaphore(image_ready, 1);
+
+        std::unique_lock lk(mutex_concurrent);
+        cv_concurrent.wait(lk, [&] { return concurrent_tasks < max_concurrent_tasks; });
+        concurrent_tasks++;
+        lk.unlock();
 
         int it = iteration;
         int run_it = run.get_iteration();
         int image_index = this->image_index++;
         std::string filename_format = this->filename_format;
-        std::thread([this, image_ready, linear_image, it, image_index, run_it, filename_format]() {
-            image_ready->wait(1);
-            void* mem = linear_image->get_memory()->map();
+        const std::function<void()> write_task =
+            ([this, image_ready, linear_image, it, image_index, run_it, filename_format]() {
+                image_ready->wait(1);
+                void* mem = linear_image->get_memory()->map();
 
-            std::filesystem::path path = std::filesystem::absolute(
-                fmt::format(fmt::runtime(filename_format), fmt::arg("record_iteration", it),
-                            fmt::arg("image_index", image_index), fmt::arg("run_iteration", run_it),
-                            fmt::arg("width", linear_image->get_extent().width),
-                            fmt::arg("height", linear_image->get_extent().height)));
-            std::filesystem::create_directories(path.parent_path());
-            const std::string tmp_filename =
-                (path.parent_path() / (".interm_" + path.filename().string())).string();
+                std::filesystem::path path = std::filesystem::absolute(fmt::format(
+                    fmt::runtime(filename_format), fmt::arg("record_iteration", it),
+                    fmt::arg("image_index", image_index), fmt::arg("run_iteration", run_it),
+                    fmt::arg("width", linear_image->get_extent().width),
+                    fmt::arg("height", linear_image->get_extent().height)));
+                std::filesystem::create_directories(path.parent_path());
+                const std::string tmp_filename =
+                    (path.parent_path() / (".interm_" + path.filename().string())).string();
 
-            switch (this->format) {
-            case FORMAT_PNG: {
-                path += ".png";
-                stbi_write_png(tmp_filename.c_str(), linear_image->get_extent().width,
-                               linear_image->get_extent().height, 4, mem,
-                               linear_image->get_extent().width * 4);
-                break;
-            }
-            case FORMAT_JPG: {
-                path += ".jpg";
-                stbi_write_jpg(tmp_filename.c_str(), linear_image->get_extent().width,
-                               linear_image->get_extent().height, 4, mem, 100);
-                break;
-            }
-            case FORMAT_HDR: {
-                path += ".hdr";
-                stbi_write_hdr(tmp_filename.c_str(), linear_image->get_extent().width,
-                               linear_image->get_extent().height, 4, static_cast<float*>(mem));
-                break;
-            }
-            }
+                switch (this->format) {
+                case FORMAT_PNG: {
+                    path += ".png";
+                    stbi_write_png(tmp_filename.c_str(), linear_image->get_extent().width,
+                                   linear_image->get_extent().height, 4, mem,
+                                   linear_image->get_extent().width * 4);
+                    break;
+                }
+                case FORMAT_JPG: {
+                    path += ".jpg";
+                    stbi_write_jpg(tmp_filename.c_str(), linear_image->get_extent().width,
+                                   linear_image->get_extent().height, 4, mem, 100);
+                    break;
+                }
+                case FORMAT_HDR: {
+                    path += ".hdr";
+                    stbi_write_hdr(tmp_filename.c_str(), linear_image->get_extent().width,
+                                   linear_image->get_extent().height, 4, static_cast<float*>(mem));
+                    break;
+                }
+                }
 
-            try {
-                std::filesystem::rename(tmp_filename, path);
-            } catch (std::filesystem::filesystem_error const&) {
-                SPDLOG_WARN("rename failed! Falling back to copy...");
-                std::filesystem::copy(tmp_filename, path);
-                std::filesystem::remove(tmp_filename);
-            }
+                try {
+                    std::filesystem::rename(tmp_filename, path);
+                } catch (std::filesystem::filesystem_error const&) {
+                    SPDLOG_WARN("rename failed! Falling back to copy...");
+                    std::filesystem::copy(tmp_filename, path);
+                    std::filesystem::remove(tmp_filename);
+                }
 
-            linear_image->get_memory()->unmap();
-            std::unique_lock lk(lock_cv_active_threads);
-            active_threads--;
-            lk.unlock();
-            cv_active_threads.notify_all();
-        }).detach();
+                linear_image->get_memory()->unmap();
+                std::unique_lock lk(mutex_concurrent);
+                concurrent_tasks--;
+                lk.unlock();
+                cv_concurrent.notify_all();
+                return;
+            });
+
+        context->thread_pool.submit(write_task);
 
         if (rebuild_after_capture)
             run.request_rebuild();
@@ -252,6 +249,9 @@ void ImageWriteNode::get_configuration([[maybe_unused]] Configuration& config, b
     config.st_separate("General");
     config.config_options("format", format, {"PNG", "JPG", "HDR"},
                           Configuration::OptionsStyle::COMBO);
+    config.config_uint("concurrency", max_concurrent_tasks, 1, std::thread::hardware_concurrency(),
+                       "Limit the maximum concurrency. Might be necessary with low memory.");
+    config.config_percent("scale", scale);
     config.config_bool("rebuild after capture", rebuild_after_capture,
                        "forces a graph rebuild after every capture");
     config.config_bool("rebuild on record", rebuild_on_record, "Rebuilds when recording starts");
@@ -268,8 +268,6 @@ void ImageWriteNode::get_configuration([[maybe_unused]] Configuration& config, b
         fmt::format("abs path: {}", filename_format.empty()
                                         ? "<invalid>"
                                         : std::filesystem::absolute(filename_format).string()));
-    config.config_int("concurrency", max_active_threads,
-                      "Limit the maximum concurrency. Might be necessary with low memory.");
 
     config.st_separate("Single");
     record_next = config.config_bool("trigger");

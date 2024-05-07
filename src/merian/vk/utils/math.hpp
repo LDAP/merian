@@ -21,8 +21,23 @@ inline vk::Extent3D offset_to_extent(const vk::Offset3D& offset) noexcept {
     return {(uint32_t)offset.x, (uint32_t)offset.y, (uint32_t)offset.z};
 }
 
+inline vk::Extent2D multiply(const vk::Extent2D& a, const float b) {
+    return {static_cast<uint32_t>(std::round(a.width * b)),
+            static_cast<uint32_t>(std::round(a.height * b))};
+}
+
+inline vk::Extent3D multiply(const vk::Extent3D& a, const float b) {
+    return {static_cast<uint32_t>(std::round(a.width * b)),
+            static_cast<uint32_t>(std::round(a.height * b)),
+            static_cast<uint32_t>(std::round(a.depth * b))};
+}
+
 inline vk::Extent3D min(const vk::Extent3D& a, const vk::Extent3D& b) noexcept {
     return {std::min(a.width, b.width), std::min(a.height, b.height), std::min(a.depth, b.depth)};
+}
+
+inline vk::Extent3D max(const vk::Extent3D& a, const vk::Extent3D& b) noexcept {
+    return {std::max(a.width, b.width), std::max(a.height, b.height), std::max(a.depth, b.depth)};
 }
 
 inline vk::Extent3D add(const vk::Extent3D& a, const vk::Extent3D& b) noexcept {
@@ -51,7 +66,8 @@ inline std::pair<vk::Offset3D, vk::Offset3D> center(const vk::Extent3D& extent,
     return std::make_pair(lower, upper);
 }
 
-// Fits src into dst and returns the new dst offsets, assumes both images to have extent 1 in z direction.
+// Fits src into dst and returns the new dst offsets, assumes both images to have extent 1 in z
+// direction.
 inline std::pair<vk::Offset3D, vk::Offset3D> fit(const vk::Offset3D& src_lower,
                                                  const vk::Offset3D& src_upper,
                                                  const vk::Offset3D& dst_lower,

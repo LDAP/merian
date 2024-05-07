@@ -1,5 +1,6 @@
 #pragma once
 
+#include "merian/utils/concurrent/thread_pool.hpp"
 #include <spdlog/logger.h>
 
 #include <vulkan/vulkan.hpp>
@@ -180,6 +181,10 @@ class Context : public std::enable_shared_from_this<Context> {
     std::vector<const char*> instance_layer_names;
     std::vector<const char*> instance_extension_names;
 
+    // in create_device_and_queues
+
+    std::vector<const char*> device_extensions;
+
   public:
     std::string application_name;
     uint32_t vk_api_version = VK_API_VERSION_1_3;
@@ -196,9 +201,11 @@ class Context : public std::enable_shared_from_this<Context> {
 
     // in create_device_and_queues
 
-    std::vector<const char*> device_extensions;
     // the vk::Device for this Context
     vk::Device device;
+
+    // A shared thread pool with default size.
+    ThreadPool thread_pool;
 
   private:
     // in find_queues. Indexes are -1 if no suitable queue was found!
