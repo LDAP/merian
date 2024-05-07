@@ -45,8 +45,11 @@ void ImageWriteNode::record() {
     record_enable = true;
     needs_rebuild |= rebuild_on_record;
     this->iteration = 1;
+    estimated_frametime_millis = 0;
     last_record_time_millis = -std::numeric_limits<double>::infinity();
+    last_frame_time_millis = 0;
     time_since_record.reset();
+
     if (callback_on_record && callback)
         callback();
 }
@@ -85,24 +88,43 @@ void ImageWriteNode::cmd_process(
     if (stop_after_seconds >= 0 && time_since_record.seconds() >= stop_after_seconds) {
         record_enable = false;
     }
-
-    record_next |= record_enable && (trigger == 0) && record_iteration == iteration;
-
-    if (record_enable && (trigger == 1)) {
-        const double estimated_frametime_millis =
-            time_since_record.millis() - last_record_time_millis;
-        const double optimal_timing = last_record_time_millis + record_frametime_millis;
-        record_next |= (estimated_frametime_millis > record_frametime_millis ||
-                        std::abs(time_since_record.millis() - optimal_timing) <
-                            std::abs(time_since_record.millis() + estimated_frametime_millis -
-                                     optimal_timing));
-        undersampling = estimated_frametime_millis > record_frametime_millis;
-        SPDLOG_WARN("undersampling, video may stutter");
-        last_record_time_millis = time_since_record.millis();
+    if (exit_after_seconds >= 0 && time_since_record.seconds() >= exit_after_seconds) {
+        raise(SIGKILL);
     }
 
+    // RECORD TRIGGER 0: Iteration
+    record_next |= record_enable && (trigger == 0) && record_iteration == iteration;
+
+    // RECORD TRIGGER 1: Frametime
+    const double time_millis = time_since_record.millis();
+    const double optimal_timing = last_record_time_millis + record_frametime_millis;
+    if (record_enable && (trigger == 1) && last_frame_time_millis <= 0) {
+        record_next = true;
+    } else {
+        // estimate how long a frame takes and reduce stutter
+        const double frametime_millis = time_millis - last_frame_time_millis;
+
+        if (estimated_frametime_millis == 0)
+            estimated_frametime_millis = frametime_millis;
+        else
+            estimated_frametime_millis = estimated_frametime_millis * 0.9 + frametime_millis * 0.1;
+
+        // am I this time closer to the optimal point or next frame?
+        if (record_enable && (trigger == 1) &&
+            std::abs(time_millis - optimal_timing) <
+                std::abs(time_millis + estimated_frametime_millis - optimal_timing)) {
+            record_next = true;
+            if ((undersampling = (frametime_millis > record_frametime_millis)))
+                SPDLOG_WARN("undersampling, video may stutter");
+        }
+    }
+
+    last_frame_time_millis = time_millis;
     if (!record_next)
         return;
+    // needs correction else we might take more pictures if the
+    // record framerate is slightly below the actual framerate
+    last_record_time_millis = std::max(time_millis, optimal_timing);
 
     const vk::Format format =
         this->format == FORMAT_HDR ? vk::Format::eR32G32B32A32Sfloat : vk::Format::eR8G8B8A8Srgb;
@@ -308,11 +330,11 @@ void ImageWriteNode::get_configuration([[maybe_unused]] Configuration& config, b
     record_next = config.config_bool("record_next");
 
     config.st_separate("Multiple");
-    config.output_text(
-        fmt::format("current iteration: {}\ncurrent time: {}\nundersampling: {}",
-                    record_enable ? fmt::to_string(iteration) : "stopped",
-                    record_enable ? fmt::format("{:02f}", time_since_record.seconds()) : "stopped",
-                    undersampling));
+    config.output_text(fmt::format(
+        "current iteration: {}\ncurrent time: {}\nundersampling: {}\nestimated frametime: {:.2f}",
+        record_enable ? fmt::to_string(iteration) : "stopped",
+        record_enable ? fmt::format("{:.2f}", time_since_record.seconds()) : "stopped",
+        undersampling, estimated_frametime_millis));
     const bool old_record_enable = record_enable;
     config.config_bool("enable", record_enable);
     if (record_enable && old_record_enable != record_enable)
@@ -357,6 +379,10 @@ void ImageWriteNode::get_configuration([[maybe_unused]] Configuration& config, b
     config.config_int("exit at iteration", exit_iteration,
                       "Raises SIGKILL at the specified iteration. -1 to disable. Add a signal "
                       "handler to shut down properly and not corrupt the images.");
+    config.config_float(
+        "exit after seconds", exit_after_seconds,
+        "Raises SIGKILL after the specified seconds have passed. -1 to disable. Add a signal "
+        "handler to shut down properly and not corrupt the images.");
     config.st_separate();
     config.output_text("Hint: convert to video with ffmpeg -framerate 30 -pattern_type glob -i "
                        "'*.jpg' -level 3.0 -pix_fmt yuv420p out.mp4");

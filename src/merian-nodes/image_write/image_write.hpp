@@ -66,6 +66,8 @@ class ImageWriteNode : public Node {
     uint32_t image_index = 0;
     Stopwatch time_since_record;
     double last_record_time_millis;
+    double last_frame_time_millis;
+    double estimated_frametime_millis = 0;
     bool undersampling = false;
 
     int format = 0;
@@ -92,6 +94,7 @@ class ImageWriteNode : public Node {
     float stop_after_seconds = -1;
     int exit_run = -1;
     int exit_iteration = -1;
+    float exit_after_seconds = -1;
 
     bool needs_rebuild = false;
 };
