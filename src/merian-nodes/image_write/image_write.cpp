@@ -268,6 +268,7 @@ void ImageWriteNode::get_configuration([[maybe_unused]] Configuration& config, b
         fmt::format("abs path: {}", filename_format.empty()
                                         ? "<invalid>"
                                         : std::filesystem::absolute(filename_format).string()));
+    config.output_text("use variables with {:leading_zeros} variables: record_iteration, run_iteration, image_index, width, height");
 
     config.st_separate("Single");
     record_next = config.config_bool("trigger");
