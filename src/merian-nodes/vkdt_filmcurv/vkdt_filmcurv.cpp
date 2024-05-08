@@ -1,5 +1,4 @@
 #include "vkdt_filmcurv.hpp"
-#include "merian/vk/descriptors/descriptor_set_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 
 static const uint32_t spv[] = {

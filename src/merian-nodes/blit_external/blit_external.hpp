@@ -4,8 +4,6 @@
 #include "merian/vk/utils/barriers.hpp"
 #include "merian/vk/utils/blits.hpp"
 
-#include <optional>
-
 namespace merian {
 
 enum BlitNodeMode {

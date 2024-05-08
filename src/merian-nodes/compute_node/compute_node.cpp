@@ -1,11 +1,7 @@
 #include "compute_node.hpp"
-#include "merian/vk/descriptors/descriptor_set_layout_builder.hpp"
-#include "merian/vk/descriptors/descriptor_set_update.hpp"
 #include "merian/vk/graph/node_utils.hpp"
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
-#include "merian/vk/pipeline/specialization_info_builder.hpp"
-#include "merian/vk/shader/shader_module.hpp"
 
 namespace merian {
 

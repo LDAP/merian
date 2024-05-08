@@ -1,4 +1,5 @@
 #include "ab_compare.hpp"
+#include "merian/vk/utils/blits.hpp"
 
 namespace merian {
 
