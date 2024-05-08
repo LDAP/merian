@@ -6,11 +6,16 @@
 #include <csignal>
 #include <filesystem>
 
+#include "fmt/args.h"
+
 namespace merian {
 
 #define FORMAT_PNG 0
 #define FORMAT_JPG 1
 #define FORMAT_HDR 2
+
+static std::unordered_map<uint32_t, std::string> FILE_EXTENSIONS = {
+    {FORMAT_PNG, ".png"}, {FORMAT_JPG, ".jpg"}, {FORMAT_HDR, ".hdr"}};
 
 ImageWriteNode::ImageWriteNode(const SharedContext context,
                                const ResourceAllocatorHandle allocator,
@@ -70,15 +75,12 @@ void ImageWriteNode::cmd_process(
     [[maybe_unused]] const uint32_t set_index,
     const NodeIO& io) {
 
+    //--------- Make sure we always increase the iteration counter
     defer {
         iteration++;
     };
 
-    if (filename_format.empty()) {
-        record_enable = false;
-        record_next = false;
-    }
-
+    //--------- STOP TRIGGER
     if (stop_run == (int64_t)run.get_iteration() || stop_iteration == iteration) {
         record_enable = false;
     }
@@ -92,6 +94,7 @@ void ImageWriteNode::cmd_process(
         raise(SIGKILL);
     }
 
+    //--------- RECORD TRIGGER
     // RECORD TRIGGER 0: Iteration
     record_next |= record_enable && (trigger == 0) && record_iteration == iteration;
 
@@ -120,11 +123,34 @@ void ImageWriteNode::cmd_process(
     }
 
     last_frame_time_millis = time_millis;
+
+    // CHECK PATH
+    const ImageHandle src = io.image_inputs[0];
+    vk::Extent3D scaled = max(multiply(src->get_extent(), scale), {1, 1, 1});
+    fmt::dynamic_format_arg_store<fmt::format_context> arg_store;
+    get_format_args([&](const auto& arg) { arg_store.push_back(arg); }, scaled,
+                    run.get_iteration());
+    std::filesystem::path path;
+    try {
+        if (filename_format.empty()) {
+            throw fmt::format_error{"empty filename"};
+        }
+        path = std::filesystem::absolute(fmt::vformat(this->filename_format, arg_store) +
+                                         FILE_EXTENSIONS[this->format]);
+    } catch (fmt::format_error e) {
+        record_enable = false;
+        record_next = false;
+        SPDLOG_ERROR(e.what());
+        return;
+    }
+
     if (!record_next)
         return;
     // needs correction else we might take more pictures if the
     // record framerate is slightly below the actual framerate
     last_record_time_millis = std::max(time_millis, optimal_timing);
+
+    // RECORD FRAME
 
     const vk::Format format =
         this->format == FORMAT_HDR ? vk::Format::eR32G32B32A32Sfloat : vk::Format::eR8G8B8A8Srgb;
@@ -132,9 +158,6 @@ void ImageWriteNode::cmd_process(
         context->physical_device.physical_device.getFormatProperties(format);
     const std::shared_ptr<FrameData> frame_data =
         std::static_pointer_cast<FrameData>(node_frame_data);
-
-    const ImageHandle src = io.image_inputs[0];
-    vk::Extent3D scaled = max(multiply(src->get_extent(), scale), {1, 1, 1});
 
     vk::ImageCreateInfo linear_info{
         {},
@@ -223,27 +246,6 @@ void ImageWriteNode::cmd_process(
     concurrent_tasks++;
     lk.unlock();
 
-    std::filesystem::path path = std::filesystem::absolute(
-        fmt::format(fmt::runtime(this->filename_format), fmt::arg("record_iteration", iteration),
-                    fmt::arg("image_index", this->image_index++),
-                    fmt::arg("run_iteration", run.get_iteration()),
-                    fmt::arg("time", time_since_record.millis()),
-                    fmt::arg("width", linear_image->get_extent().width),
-                    fmt::arg("height", linear_image->get_extent().height)));
-    switch (this->format) {
-    case FORMAT_PNG: {
-        path += ".png";
-        break;
-    }
-    case FORMAT_JPG: {
-        path += ".jpg";
-        break;
-    }
-    case FORMAT_HDR: {
-        path += ".hdr";
-        break;
-    }
-    }
     std::filesystem::create_directories(path.parent_path());
     const std::string tmp_filename =
         (path.parent_path() / (".interm_" + path.filename().string())).string();
@@ -304,27 +306,27 @@ void ImageWriteNode::get_configuration([[maybe_unused]] Configuration& config, b
     config.st_separate("General");
     config.config_options("format", format, {"PNG", "JPG", "HDR"},
                           Configuration::OptionsStyle::COMBO);
-    config.config_uint("concurrency", max_concurrent_tasks, 1, std::thread::hardware_concurrency(),
-                       "Limit the maximum concurrency. Might be necessary with low memory.");
-    config.config_percent("scale", scale);
     config.config_bool("rebuild after capture", rebuild_after_capture,
                        "forces a graph rebuild after every capture");
-    config.config_bool("rebuild on record", rebuild_on_record, "Rebuilds when recording starts");
-    config.config_bool("callback after capture", callback_after_capture,
-                       "calls the on_record callback after every capture");
-    config.config_bool("callback on record", callback_on_record,
-                       "calls the callback when the recording starts");
     if (config.config_text("filename", buf.size(), buf.data(), false,
                            "Provide a format string for the path. Supported variables are: "
                            "record_iteration, run_iteration, image_index, width, height")) {
         filename_format = buf.data();
     }
+    std::vector<std::string> variables;
+    get_format_args([&](const auto& arg) { variables.push_back(arg.name); }, {1920, 1080, 1}, 1);
+    fmt::dynamic_format_arg_store<fmt::format_context> arg_store;
+    get_format_args([&](const auto& arg) { arg_store.push_back(arg); }, {1920, 1080, 1}, 1);
+
+    std::filesystem::path abs_path;
+    try {
+        abs_path = std::filesystem::absolute(fmt::vformat(filename_format, arg_store)).string();
+    } catch (fmt::format_error e) {
+        abs_path.clear();
+    }
     config.output_text(
-        fmt::format("abs path: {}", filename_format.empty()
-                                        ? "<invalid>"
-                                        : std::filesystem::absolute(filename_format).string()));
-    config.output_text("use variables with {:leading_zeros} variables: record_iteration, "
-                       "run_iteration, image_index, width, height, time");
+        fmt::format("abs path: {}", abs_path.empty() ? "<invalid>" : abs_path.string()));
+    config.output_text(fmt::format("variables: {}", fmt::join(variables, ", ")));
 
     config.st_separate("Single");
     record_next = config.config_bool("record_next");
@@ -339,10 +341,6 @@ void ImageWriteNode::get_configuration([[maybe_unused]] Configuration& config, b
     config.config_bool("enable", record_enable);
     if (record_enable && old_record_enable != record_enable)
         record();
-    config.config_int("enable run", enable_run,
-                      "The specified run starts recording and resets the iteration and calls the "
-                      "configured callback and forces a rebuild if enabled.");
-
     config.st_separate();
 
     config.config_options("trigger", trigger, {"iteration", "frametime"},
@@ -367,25 +365,48 @@ void ImageWriteNode::get_configuration([[maybe_unused]] Configuration& config, b
         record_framerate = 1000 / record_frametime_millis;
     }
     config.st_separate();
-    config.config_int("stop at run", stop_run,
-                      "Stops recording at the specified run. -1 to disable.");
-    config.config_int("stop at iteration", stop_iteration,
-                      "Stops recording at the specified iteration. -1 to disable.");
-    config.config_float("stop after seconds", stop_after_seconds,
-                        "Stops recording after the specified seconds have passed. -1 to dissable.");
-    config.config_int("exit at run", exit_run,
-                      "Raises SIGKILL at the specified run. -1 to disable. Add a signal handler to "
-                      "shut down properly and not corrupt the images.");
-    config.config_int("exit at iteration", exit_iteration,
-                      "Raises SIGKILL at the specified iteration. -1 to disable. Add a signal "
-                      "handler to shut down properly and not corrupt the images.");
-    config.config_float(
-        "exit after seconds", exit_after_seconds,
-        "Raises SIGKILL after the specified seconds have passed. -1 to disable. Add a signal "
-        "handler to shut down properly and not corrupt the images.");
+    if (config.st_begin_child("advanced", "Advanced")) {
+        config.config_uint("concurrency", max_concurrent_tasks, 1,
+                           std::thread::hardware_concurrency(),
+                           "Limit the maximum concurrency. Might be necessary with low memory.");
+        config.config_percent("scale", scale);
+        config.st_separate();
+        config.config_int(
+            "enable run", enable_run,
+            "The specified run starts recording and resets the iteration and calls the "
+            "configured callback and forces a rebuild if enabled.");
+
+        config.config_bool("rebuild on record", rebuild_on_record,
+                           "Rebuilds when recording starts");
+        config.config_bool("callback after capture", callback_after_capture,
+                           "calls the on_record callback after every capture");
+        config.config_bool("callback on record", callback_on_record,
+                           "calls the callback when the recording starts");
+        config.st_separate();
+        config.config_int("stop at run", stop_run,
+                          "Stops recording at the specified run. -1 to disable.");
+        config.config_int("stop at iteration", stop_iteration,
+                          "Stops recording at the specified iteration. -1 to disable.");
+        config.config_float(
+            "stop after seconds", stop_after_seconds,
+            "Stops recording after the specified seconds have passed. -1 to dissable.");
+        config.config_int(
+            "exit at run", exit_run,
+            "Raises SIGKILL at the specified run. -1 to disable. Add a signal handler to "
+            "shut down properly and not corrupt the images.");
+        config.config_int("exit at iteration", exit_iteration,
+                          "Raises SIGKILL at the specified iteration. -1 to disable. Add a signal "
+                          "handler to shut down properly and not corrupt the images.");
+        config.config_float(
+            "exit after seconds", exit_after_seconds,
+            "Raises SIGKILL after the specified seconds have passed. -1 to disable. Add a signal "
+            "handler to shut down properly and not corrupt the images.");
+        config.st_end_child();
+    }
     config.st_separate();
-    config.output_text("Hint: convert to video with ffmpeg -framerate 30 -pattern_type glob -i "
-                       "'*.jpg' -level 3.0 -pix_fmt yuv420p out.mp4");
+    config.output_text(
+        "Hint: convert to video with ffmpeg -framerate <framerate> -pattern_type glob -i "
+        "'*.jpg' -level 3.0 -pix_fmt yuv420p out.mp4");
 }
 
 void ImageWriteNode::set_callback(const std::function<void()> callback) {

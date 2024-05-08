@@ -45,7 +45,22 @@ class ImageWriteNode : public Node {
     // Set a callback that can be called on capture or record.
     void set_callback(const std::function<void()> callback);
 
+    // std::vector
+
     void record();
+
+  private:
+    template <typename T>
+    void
+    get_format_args(const T& consumer, const vk::Extent3D& extent, const uint64_t run_iteration) {
+        consumer(fmt::arg("record_iteration", iteration));
+        consumer(fmt::arg("image_index", this->image_index++));
+        consumer(fmt::arg("run_iteration", run_iteration));
+        consumer(fmt::arg("time", time_since_record.millis()));
+        consumer(fmt::arg("width", extent.width));
+        consumer(fmt::arg("height", extent.height));
+        consumer(fmt::arg("random", random()));
+    }
 
   private:
     const SharedContext context;
