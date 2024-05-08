@@ -265,7 +265,7 @@ void Graph::cmd_build(vk::CommandBuffer& cmd, const ProfilerHandle profiler) {
     prepare_resource_sets();
 
     for (auto& node : flat_topology) {
-        NodeData& data = node_data[node];
+        [[maybe_unused]]NodeData& data = node_data[node];
         MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, fmt::format("{} ({})", data.name, node->name()));
         SPDLOG_DEBUG("cmd_build node: {} ({})", data.name, node->name());
         cmd_build_node(cmd, node);
