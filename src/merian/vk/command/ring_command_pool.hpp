@@ -1,7 +1,6 @@
 #pragma once
 
 #include "merian/vk/command/command_pool.hpp"
-#include "merian/vk/utils/check_result.hpp"
 
 #include <vulkan/vulkan.hpp>
 
@@ -58,7 +57,7 @@ class RingCommandPoolCycle : public CommandPool {
  * You must ensure cycle is available manually, typically by keeping in sync
  * with ring fences.
  */
-template <uint32_t RING_SIZE = 3> class RingCommandPool {
+template <uint32_t RING_SIZE = 2> class RingCommandPool {
   public:
     RingCommandPool(RingCommandPool const&) = delete;
     RingCommandPool& operator=(RingCommandPool const&) = delete;
