@@ -1,7 +1,6 @@
 #pragma once
 
 #include "merian/vk/pipeline/pipeline.hpp"
-#include "merian/vk/pipeline/specialization_info_builder.hpp"
 #include "merian/vk/shader/shader_module.hpp"
 
 namespace merian {
@@ -42,16 +41,9 @@ class ComputePipeline : public Pipeline {
     // Overrides
     // ---------------------------------------------------------------------------
 
-    void bind(const vk::CommandBuffer& cmd) override {
-        cmd.bindPipeline(vk::PipelineBindPoint::eCompute, pipeline);
+    virtual vk::PipelineBindPoint get_pipeline_bind_point() const {
+        return vk::PipelineBindPoint::eCompute;
     }
-
-    void bind_descriptor_set(const vk::CommandBuffer& cmd,
-                             const std::shared_ptr<DescriptorSet>& descriptor_set,
-                             const uint32_t first_set = 0) override {
-        cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute, *pipeline_layout, first_set, 1,
-                               &descriptor_set->get_set(), 0, nullptr);
-    };
 
     // ---------------------------------------------------------------------------
 

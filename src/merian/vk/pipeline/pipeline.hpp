@@ -4,7 +4,6 @@
 #include "merian/vk/descriptors/descriptor_set.hpp"
 #include "merian/vk/pipeline/pipeline_layout.hpp"
 
-#include "vulkan/vulkan.hpp"
 #include <spdlog/spdlog.h>
 
 namespace merian {
@@ -31,13 +30,20 @@ class Pipeline : public std::enable_shared_from_this<Pipeline> {
         return pipeline_layout;
     }
 
+    void bind(const vk::CommandBuffer& cmd) {
+        cmd.bindPipeline(get_pipeline_bind_point(), pipeline);
+    }
+
+    void bind_descriptor_set(const vk::CommandBuffer& cmd,
+                                     const std::shared_ptr<DescriptorSet>& descriptor_set,
+                                     const uint32_t first_set = 0) {
+        cmd.bindDescriptorSets(get_pipeline_bind_point(), *pipeline_layout, first_set, 1,
+                               &descriptor_set->get_set(), 0, nullptr);
+    }
+
     // ---------------------------------------------------------------------------
 
-    virtual void bind(const vk::CommandBuffer& cmd) = 0;
-
-    virtual void bind_descriptor_set(const vk::CommandBuffer& cmd,
-                                     const std::shared_ptr<DescriptorSet>& descriptor_set,
-                                     const uint32_t first_set = 0) = 0;
+    virtual vk::PipelineBindPoint get_pipeline_bind_point() const = 0;
 
     template <typename T>
     void push_constant(const vk::CommandBuffer& cmd, const T& constant, const uint32_t id = 0) {
@@ -67,6 +73,7 @@ class Pipeline : public std::enable_shared_from_this<Pipeline> {
     const SharedContext context;
     const std::shared_ptr<PipelineLayout> pipeline_layout;
     vk::Pipeline pipeline;
+    vk::PipelineBindPoint bind_point;
 };
 
 using PipelineHandle = std::shared_ptr<Pipeline>;
