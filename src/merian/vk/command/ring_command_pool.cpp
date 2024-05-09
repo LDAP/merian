@@ -42,6 +42,7 @@ std::vector<vk::CommandBuffer> RingCommandPoolCycle::create_and_begin_multiple(
     uint32_t count,
     vk::CommandBufferUsageFlags flags,
     const vk::CommandBufferInheritanceInfo* pInheritanceInfo) {
+    assert(current_index == cycle_index && "do not use pools from an other cycle");
     return CommandPool::create_and_begin_multiple(level, count, flags, pInheritanceInfo);
 }
 
