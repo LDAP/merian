@@ -48,6 +48,7 @@ class RingFences : public std::enable_shared_from_this<RingFences<RING_SIZE, Use
         }
     }
 
+    // Resets the fences of the whole RING
     void reset() {
         for (uint32_t i = 0; i < RING_SIZE; i++) {
             reset_fence(ring_data[i]);
@@ -91,6 +92,13 @@ class RingFences : public std::enable_shared_from_this<RingFences<RING_SIZE, Use
 
     uint32_t ring_size() const {
         return RING_SIZE;
+    }
+
+    // Allows access to the user data of the whole ring.
+    // Use with caution and do not change data of in-flight processing.
+    UserDataType& get_ring_data(const uint32_t index) {
+        assert(index < RING_SIZE);
+        return ring_data[index].data.user_data;
     }
 
   private:
