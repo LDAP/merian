@@ -40,6 +40,10 @@ class DescriptorSetLayout : public std::enable_shared_from_this<DescriptorSetLay
         return context;
     }
 
+    vk::DescriptorType get_type_for_binding(uint32_t binding) const {
+        return bindings[binding].descriptorType;
+    }
+
   private:
     const SharedContext context;
     const std::vector<vk::DescriptorSetLayoutBinding> bindings;

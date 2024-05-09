@@ -66,12 +66,12 @@ class DescriptorSet : public std::enable_shared_from_this<DescriptorSet> {
         return *layout.get();
     }
 
-    const vk::DescriptorSet& get_set() const {
+    const vk::DescriptorSet& get_descriptor_set() const {
         return set;
     }
 
-    const DescriptorSetLayout& get_layout() const {
-        return *layout.get();
+    const DescriptorSetLayoutHandle& get_layout() const {
+        return layout;
     }
 
     vk::DescriptorType get_type_for_binding(uint32_t binding) const {
