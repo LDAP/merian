@@ -22,12 +22,6 @@ class RingFences : public std::enable_shared_from_this<RingFences<RING_SIZE, Use
         UserDataType user_data{};
     };
 
-  private:
-    struct Entry {
-        RingData data;
-        bool active;
-    };
-
   public:
     RingFences(RingFences const&) = delete;
     RingFences& operator=(RingFences const&) = delete;
@@ -35,20 +29,20 @@ class RingFences : public std::enable_shared_from_this<RingFences<RING_SIZE, Use
 
     RingFences(const SharedContext& context) : context(context) {
         for (uint32_t i = 0; i < RING_SIZE; i++) {
-            vk::FenceCreateInfo fence_create_info;
-            ring_data[i].data.fence = context->device.createFence(fence_create_info);
-            ring_data[i].active = false;
+            vk::FenceCreateInfo fence_create_info{vk::FenceCreateFlagBits::eSignaled};
+            ring_data[i].fence = context->device.createFence(fence_create_info);
         }
     }
 
     ~RingFences() {
         context->device.waitIdle();
         for (uint32_t i = 0; i < RING_SIZE; i++) {
-            context->device.destroyFence(ring_data[i].data.fence);
+            context->device.destroyFence(ring_data[i].fence);
         }
     }
 
-    // Resets the fences of the whole RING
+    // Resets the fences of the whole ring.
+    // Use with caution.
     void reset() {
         for (uint32_t i = 0; i < RING_SIZE; i++) {
             reset_fence(ring_data[i]);
@@ -59,7 +53,7 @@ class RingFences : public std::enable_shared_from_this<RingFences<RING_SIZE, Use
     // Use next_cycle_wait_and_get once per frame to
     // advance the data.
     RingData& get() {
-        return ring_data[current_index].data;
+        return ring_data[current_index];
     }
 
     // Should be called once per frame.
@@ -72,17 +66,13 @@ class RingFences : public std::enable_shared_from_this<RingFences<RING_SIZE, Use
     // cycle can be absolute (e.g. current frame number)
     RingData& set_cycle_wait_and_get(uint32_t cycle) {
         current_index = cycle % RING_SIZE;
+        RingData& data = ring_data[current_index];
 
-        Entry& entry = ring_data[current_index];
+        check_result(context->device.waitForFences(1, &data.fence, VK_TRUE, ~0ULL),
+                     "failed waiting for fence");
+        reset_fence(data);
 
-        if (entry.active) {
-            // ensure the cycle we will use now has completed
-            check_result(context->device.waitForFences(1, &entry.data.fence, VK_TRUE, ~0ULL),
-                         "failed waiting for fence");
-            reset_fence(entry);
-        }
-        entry.active = true;
-        return entry.data;
+        return data;
     }
 
     // query current cycle index [0, RING_SIZE)
@@ -102,14 +92,13 @@ class RingFences : public std::enable_shared_from_this<RingFences<RING_SIZE, Use
     }
 
   private:
-    void reset_fence(Entry& entry) {
-        entry.active = false;
-        check_result(context->device.resetFences(1, &entry.data.fence), "could not reset fence");
+    void reset_fence(RingData& data) {
+        check_result(context->device.resetFences(1, &data.fence), "could not reset fence");
     }
 
     uint32_t current_index = 0;
     const SharedContext context;
-    std::array<Entry, RING_SIZE> ring_data;
+    std::array<RingData, RING_SIZE> ring_data;
 };
 
 } // namespace merian
