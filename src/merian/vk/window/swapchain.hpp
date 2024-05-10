@@ -147,15 +147,9 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
         return entries.size();
     }
 
-    vk::ImageView image_view(uint32_t idx) const {
-        check_size(entries, idx);
-        return entries[idx].imageView;
-    }
+    vk::ImageView image_view(uint32_t idx) const;
 
-    vk::Image image(uint32_t idx) const {
-        check_size(entries, idx);
-        return entries[idx].image;
-    }
+    vk::Image image(uint32_t idx) const;
 
     vk::SurfaceFormatKHR get_surface_format() {
         return surface_format;

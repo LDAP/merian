@@ -1,4 +1,8 @@
 #include "merian/vk/window/swapchain.hpp"
+
+#include "merian/vk/utils/check_result.hpp"
+#include "merian/utils/vector.hpp"
+
 #include <spdlog/spdlog.h>
 
 namespace merian {
@@ -322,6 +326,16 @@ void Swapchain::present(const QueueHandle& queue,
         return;
     }
     check_result(result, "present failed");
+}
+
+vk::ImageView Swapchain::image_view(uint32_t idx) const {
+    check_size(entries, idx);
+    return entries[idx].imageView;
+}
+
+vk::Image Swapchain::image(uint32_t idx) const {
+    check_size(entries, idx);
+    return entries[idx].image;
 }
 
 } // namespace merian

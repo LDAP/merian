@@ -32,6 +32,7 @@ merian_src = files(
     'vk/raytrace/blas_builder.cpp',
     'vk/raytrace/tlas_builder.cpp',
     'vk/sampler/sampler_pool.cpp',
+    'vk/sync/semaphore_timeline.cpp',
     'vk/utils/barriers.cpp',
     'vk/utils/profiler.cpp',
     'vk/window/glfw_imgui.cpp',

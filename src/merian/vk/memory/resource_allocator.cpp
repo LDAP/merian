@@ -181,7 +181,7 @@ std::shared_ptr<StagingMemoryManager> ResourceAllocator::getStaging() {
     return m_staging;
 }
 
-const std::shared_ptr<StagingMemoryManager> ResourceAllocator::getStaging() const {
+const std::shared_ptr<StagingMemoryManager>& ResourceAllocator::getStaging() const {
     return m_staging;
 }
 

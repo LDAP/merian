@@ -1,8 +1,6 @@
 #pragma once
 
-#include "merian/utils/vector.hpp"
 #include "merian/vk/context.hpp"
-#include "merian/vk/utils/check_result.hpp"
 #include <vulkan/vulkan.hpp>
 
 namespace merian {

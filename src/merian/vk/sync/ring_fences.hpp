@@ -3,6 +3,8 @@
 #include "merian/vk/context.hpp"
 #include <vulkan/vulkan.hpp>
 
+#include "merian/vk/utils/check_result.hpp"
+
 namespace merian {
 
 /**
@@ -88,7 +90,7 @@ class RingFences : public std::enable_shared_from_this<RingFences<RING_SIZE, Use
     // Use with caution and do not change data of in-flight processing.
     UserDataType& get_ring_data(const uint32_t index) {
         assert(index < RING_SIZE);
-        return ring_data[index].data.user_data;
+        return ring_data[index].user_data;
     }
 
   private:

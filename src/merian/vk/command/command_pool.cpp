@@ -1,5 +1,8 @@
 #include "merian/vk/command/command_pool.hpp"
 #include "merian/vk/command/queue.hpp"
+#include "merian/vk/utils/check_result.hpp"
+#include "merian/utils/vector.hpp"
+
 #include <spdlog/spdlog.h>
 
 namespace merian {

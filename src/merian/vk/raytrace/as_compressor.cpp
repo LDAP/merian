@@ -1,5 +1,7 @@
 #include "merian/vk/raytrace/as_compressor.hpp"
 
+#include "merian/vk/utils/check_result.hpp"
+
 namespace merian {
 
 // You must ensure proper synchronization with the build

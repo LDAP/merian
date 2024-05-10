@@ -1,7 +1,6 @@
 #pragma once
 
 #include "merian/vk/extension/extension.hpp"
-#include "merian/vk/memory/memory_allocator_vma.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 
 namespace merian {

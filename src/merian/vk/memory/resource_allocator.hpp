@@ -134,7 +134,8 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
     //--------------------------------------------------------------------------------------------------
 
     std::shared_ptr<StagingMemoryManager> getStaging();
-    const std::shared_ptr<StagingMemoryManager> getStaging() const;
+
+    const std::shared_ptr<StagingMemoryManager>& getStaging() const;
 
     const SamplerPoolHandle& get_sampler_pool() const {
         return m_samplerPool;
