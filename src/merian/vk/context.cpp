@@ -21,8 +21,8 @@ SharedContext Context::make_context(const std::vector<std::shared_ptr<Extension>
         extensions, application_name, application_vk_version, preffered_number_compute_queues,
         filter_vendor_id, filter_device_id, filter_device_name));
 
-    for (auto& ext : extensions) {
-        ext->on_context_created(shared_context);
+    for (auto& ext : shared_context->extensions) {
+        ext.second->on_context_created(shared_context);
     }
 
     return shared_context;
@@ -34,8 +34,7 @@ Context::Context(const std::vector<std::shared_ptr<Extension>>& desired_extensio
                  uint32_t preffered_number_compute_queues,
                  uint32_t filter_vendor_id,
                  uint32_t filter_device_id,
-                 const std::string& filter_device_name)
-    : extensions(desired_extensions) {
+                 const std::string& filter_device_name) {
     SPDLOG_INFO("\n\n\
 __  __ ___ ___ ___   _   _  _ \n\
 |  \\/  | __| _ \\_ _| /_\\ | \\| |\n\
@@ -51,10 +50,15 @@ Version: {}\n\n",
         dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
     VULKAN_HPP_DEFAULT_DISPATCHER.init(vkGetInstanceProcAddr);
 
-    SPDLOG_TRACE("supplied extensions:");
-    for (auto& ext : extensions) {
-        (void)ext;
-        SPDLOG_TRACE("{}", ext->name);
+    SPDLOG_DEBUG("supplied extensions:");
+    for (auto& ext : desired_extensions) {
+        SPDLOG_DEBUG("{}", ext->name);
+        auto& r = *ext.get();
+        if (extensions.contains(typeid(r))) {
+            std::runtime_error{"A extension type can only be added once."};
+        } else {
+            extensions[typeid(r)] = ext;
+        }
     }
 
     create_instance(application_name, application_vk_version);
@@ -70,18 +74,18 @@ Context::~Context() {
 
     SPDLOG_DEBUG("destroy context");
     for (auto& ext : extensions) {
-        ext->on_destroy_context();
+        ext.second->on_destroy_context();
     }
 
     SPDLOG_DEBUG("destroy device");
     for (auto& ext : extensions) {
-        ext->on_destroy_device(device);
+        ext.second->on_destroy_device(device);
     }
     device.destroy();
 
     SPDLOG_DEBUG("destroy instance");
     for (auto& ext : extensions) {
-        ext->on_destroy_instance(instance);
+        ext.second->on_destroy_instance(instance);
     }
     instance.destroy();
 
@@ -94,8 +98,8 @@ void Context::create_instance(const std::string& application_name,
     extensions_check_instance_extension_support();
 
     for (auto& ext : extensions) {
-        insert_all(instance_layer_names, ext->required_instance_layer_names());
-        insert_all(instance_extension_names, ext->required_instance_extension_names());
+        insert_all(instance_layer_names, ext.second->required_instance_layer_names());
+        insert_all(instance_extension_names, ext.second->required_instance_extension_names());
     }
     remove_duplicates(instance_layer_names);
     remove_duplicates(instance_extension_names);
@@ -105,7 +109,7 @@ void Context::create_instance(const std::string& application_name,
 
     void* p_next = nullptr;
     for (auto& ext : extensions) {
-        p_next = ext->pnext_instance_create_info(p_next);
+        p_next = ext.second->pnext_instance_create_info(p_next);
     }
 
     vk::ApplicationInfo application_info{
@@ -126,7 +130,7 @@ void Context::create_instance(const std::string& application_name,
     // Must happen before on_instance_created since it requires dynamic loading
     VULKAN_HPP_DEFAULT_DISPATCHER.init(instance);
     for (auto& ext : extensions) {
-        ext->on_instance_created(instance);
+        ext.second->on_instance_created(instance);
     }
 }
 
@@ -206,7 +210,7 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id,
 
     void* extension_features_pnext = nullptr;
     for (auto& ext : extensions) {
-        extension_features_pnext = ext->pnext_get_features_2(extension_features_pnext);
+        extension_features_pnext = ext.second->pnext_get_features_2(extension_features_pnext);
     }
     // ^
     physical_device.features.physical_device_features_v13.setPNext(extension_features_pnext);
@@ -230,7 +234,7 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id,
         physical_device.physical_device.enumerateDeviceExtensionProperties();
 
     for (auto& ext : extensions) {
-        ext->on_physical_device_selected(physical_device);
+        ext.second->on_physical_device_selected(physical_device);
     }
 
     extensions_check_device_extension_support();
@@ -291,8 +295,8 @@ void Context::find_queues() {
                     (queue_family_props[queue_family_idx_GCT].queueFlags & Flags::eTransfer) &&
                     remaining_queue_count[queue_family_idx_GCT] > 0 &&
                     std::all_of(extensions.begin(), extensions.end(), [&](auto ext) {
-                        return ext->accept_graphics_queue(instance, physical_device.physical_device,
-                                                          queue_family_idx_GCT);
+                        return ext.second->accept_graphics_queue(
+                            instance, physical_device.physical_device, queue_family_idx_GCT);
                     })) {
                     found_GCT = true;
                     remaining_queue_count[queue_family_idx_GCT]--;
@@ -457,7 +461,7 @@ void Context::create_device_and_queues(uint32_t preferred_number_compute_queues)
     // DEVICE EXTENSIONS
     for (auto& ext : extensions) {
         insert_all(device_extensions,
-                   ext->required_device_extension_names(physical_device.physical_device));
+                   ext.second->required_device_extension_names(physical_device.physical_device));
     }
     remove_duplicates(device_extensions);
     SPDLOG_DEBUG("enabling device extensions: [{}]", fmt::join(device_extensions, ", "));
@@ -469,7 +473,7 @@ void Context::create_device_and_queues(uint32_t preferred_number_compute_queues)
     enable.physical_device_features = physical_device.features.physical_device_features;
     enable_common_features(physical_device.features, enable);
     for (auto& ext : extensions) {
-        ext->enable_device_features(physical_device.features, enable);
+        ext.second->enable_device_features(physical_device.features, enable);
     }
 
     // Setup p_next for extensions
@@ -478,7 +482,7 @@ void Context::create_device_and_queues(uint32_t preferred_number_compute_queues)
     void* extensions_device_create_p_next = nullptr;
     for (auto& ext : extensions) {
         extensions_device_create_p_next =
-            ext->pnext_device_create_info(extensions_device_create_p_next);
+            ext.second->pnext_device_create_info(extensions_device_create_p_next);
     }
     // ^
     enable.physical_device_features_v13.setPNext(extensions_device_create_p_next);
@@ -501,7 +505,7 @@ void Context::create_device_and_queues(uint32_t preferred_number_compute_queues)
 
     VULKAN_HPP_DEFAULT_DISPATCHER.init(device);
     for (auto& ext : extensions) {
-        ext->on_device_created(device);
+        ext.second->on_device_created(device);
     }
 }
 
@@ -515,7 +519,7 @@ void Context::extensions_check_instance_layer_support() {
     std::vector<vk::LayerProperties> layer_props = vk::enumerateInstanceLayerProperties();
 
     for (auto& ext : extensions) {
-        std::vector<const char*> layers = ext->required_instance_layer_names();
+        std::vector<const char*> layers = ext.second->required_instance_layer_names();
         bool all_layers_found = true;
         for (auto& layer : layers) {
             bool layer_found = false;
@@ -528,8 +532,8 @@ void Context::extensions_check_instance_layer_support() {
             all_layers_found &= layer_found;
         }
         if (!all_layers_found) {
-            not_supported.push_back(ext);
-            ext->on_unsupported("instance layer missing");
+            not_supported.push_back(ext.second);
+            ext.second->on_unsupported("instance layer missing");
         }
     }
     destroy_extensions(not_supported);
@@ -542,7 +546,8 @@ void Context::extensions_check_instance_extension_support() {
         vk::enumerateInstanceExtensionProperties();
 
     for (auto& ext : extensions) {
-        std::vector<const char*> instance_extensions = ext->required_instance_extension_names();
+        std::vector<const char*> instance_extensions =
+            ext.second->required_instance_extension_names();
         bool all_extensions_found = true;
         for (auto& layer : instance_extensions) {
             bool extension_found = false;
@@ -555,8 +560,8 @@ void Context::extensions_check_instance_extension_support() {
             all_extensions_found &= extension_found;
         }
         if (!all_extensions_found) {
-            not_supported.push_back(ext);
-            ext->on_unsupported("instance extension missing");
+            not_supported.push_back(ext.second);
+            ext.second->on_unsupported("instance extension missing");
         }
     }
     destroy_extensions(not_supported);
@@ -568,7 +573,7 @@ void Context::extensions_check_device_extension_support() {
 
     for (auto& ext : extensions) {
         std::vector<const char*> device_extensions =
-            ext->required_device_extension_names(physical_device.physical_device);
+            ext.second->required_device_extension_names(physical_device.physical_device);
         bool all_extensions_found = true;
         for (auto& layer : device_extensions) {
             bool extension_found = false;
@@ -581,8 +586,8 @@ void Context::extensions_check_device_extension_support() {
             all_extensions_found &= extension_found;
         }
         if (!all_extensions_found) {
-            not_supported.push_back(ext);
-            ext->on_unsupported("device extension missing");
+            not_supported.push_back(ext.second);
+            ext.second->on_unsupported("device extension missing");
         }
     }
     destroy_extensions(not_supported);
@@ -592,9 +597,9 @@ void Context::extensions_self_check_support() {
     SPDLOG_DEBUG("extensions: self-check support...");
     std::vector<std::shared_ptr<Extension>> not_supported;
     for (auto& ext : extensions) {
-        if (!ext->extension_supported(physical_device)) {
-            ext->on_unsupported("self-check failed");
-            not_supported.push_back(ext);
+        if (!ext.second->extension_supported(physical_device)) {
+            ext.second->on_unsupported("self-check failed");
+            not_supported.push_back(ext.second);
         }
     }
     destroy_extensions(not_supported);
@@ -603,15 +608,8 @@ void Context::extensions_self_check_support() {
 void Context::destroy_extensions(std::vector<std::shared_ptr<Extension>> extensions) {
     for (auto& ext : extensions) {
         SPDLOG_DEBUG("remove extension {} from context", ext->name);
-        ext->on_destroy_instance(this->instance);
-
-        for (std::size_t i = 0; this->extensions.size(); i++) {
-            if (this->extensions[i] == ext) {
-                std::swap(this->extensions[i], this->extensions[this->extensions.size() - 1]);
-                this->extensions.pop_back();
-                break;
-            }
-        }
+        auto& r = *ext.get(); // suppress warnings...
+        this->extensions.erase(typeid(r));
     }
 }
 

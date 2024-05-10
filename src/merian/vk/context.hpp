@@ -3,6 +3,7 @@
 #include "merian/utils/concurrent/thread_pool.hpp"
 #include <spdlog/logger.h>
 
+#include <typeindex>
 #include <vulkan/vulkan.hpp>
 
 namespace merian {
@@ -126,8 +127,8 @@ class Context : public std::enable_shared_from_this<Context> {
     void destroy_extensions(std::vector<std::shared_ptr<Extension>> extensions);
 
   public: // Getter
-    // The actual number of compute queues (< preffered_number_compute_queues). 
-    uint32_t get_number_compute_queues()  const noexcept;
+    // The actual number of compute queues (< preffered_number_compute_queues).
+    uint32_t get_number_compute_queues() const noexcept;
 
     // A queue guaranteed to support graphics+compute+transfer.
     // Can be nullptr if unavailable, you can check that with if (shrd_ptr) {...}
@@ -144,7 +145,8 @@ class Context : public std::enable_shared_from_this<Context> {
     // Can be nullptr if unavailable, you can check that with if (shrd_ptr) {...}
     // Make sure to keep a reference, else the pool and its buffers are destroyed.
     // Might fall back to a different compute queue or the GCT queue, if fallback is true.
-    // In this case index may be invalid, else it must be < get_number_compute_queues() and or nullptr is returned.
+    // In this case index may be invalid, else it must be < get_number_compute_queues() and or
+    // nullptr is returned.
     std::shared_ptr<Queue> get_queue_C(uint32_t index = 0, const bool fallback = false);
 
     // Convenience command pool for graphics and compute (can be nullptr in very rare occasions)
@@ -160,13 +162,11 @@ class Context : public std::enable_shared_from_this<Context> {
     std::shared_ptr<CommandPool> get_cmd_pool_C();
 
     template <class Extension> std::shared_ptr<Extension> get_extension() {
-        for (auto& ext : extensions) {
-            if (std::shared_ptr<Extension> casted_extension =
-                    dynamic_pointer_cast<Extension>(ext)) {
-                return casted_extension;
-            }
+        if (extensions.contains(typeid(Extension))) {
+            return std::static_pointer_cast<Extension>(extensions[typeid(Extension)]);
+        } else {
+            return nullptr;
         }
-        return nullptr;
     }
 
     bool device_extension_enabled(const std::string& name);
@@ -174,7 +174,7 @@ class Context : public std::enable_shared_from_this<Context> {
     bool instance_extension_enabled(const std::string& name);
 
   private:
-    std::vector<std::shared_ptr<Extension>> extensions;
+    std::unordered_map<std::type_index, std::shared_ptr<Extension>> extensions;
 
     // in create_instance
 
