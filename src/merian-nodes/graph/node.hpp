@@ -1,95 +1,101 @@
 #pragma once
 
 #include "merian/utils/configuration.hpp"
-#include "merian-nodes/graph/node_io.hpp"
+#include "merian/vk/descriptors/descriptor_set.hpp"
+#include "merian/vk/descriptors/descriptor_set_layout.hpp"
+
+#include "graph_run.hpp"
 
 #include <memory>
 
 namespace merian {
 
-class Graph;
-class GraphRun;
-
 class Node : public std::enable_shared_from_this<Node> {
   public:
-    struct NodeStatus {
-        // If this is true the Graph is forced to rebuild before the next run.
-        bool request_rebuild{false};
-        // If this is true the Graph is free to not call cmd_process on the next run.
-        bool skip_run{false};
-        // By default FrameData is reset when the graph rebuilds.
-        // If set to true, the FrameData is persisted
-        bool persist_frame_data{false};
+    struct InFlightData {};
+
+    struct NodeStatus {};
+
+    using NodeStatusFlags = uint32_t;
+
+    enum NodeStatusFlagBits {
+        // Ensures a rebuild before the next call to process(...)
+        NEEDS_REBUILD = 1,
     };
 
-    struct FrameData {};
-
-    static inline NodeOutputDescriptorImage FEEDBACK_OUTPUT_IMAGE{{}, {}, {}, {}, {}};
-    static inline NodeOutputDescriptorBuffer FEEDBACK_OUTPUT_BUFFER{{}, {}, {}, {}};
-
   public:
+    Node(const std::string& name) : name(name) {}
+
     virtual ~Node() {}
 
-    virtual std::string name() = 0;
+    // Called each time the graph attempts to connect nodes.
+    // If you need to access the resources directly, you need to maintain a copy of the shared_ptr.
+    virtual void describe_inputs() {
+        return;
+    }
 
-    // A factory for the frame data (data has to exist once per frame-in-flight) for this node.
-    // It is quaranteed that cmd_run gets a shared_ptr to frame data that was generated using this
-    // method, meaning it can be safely casted.
-    virtual std::shared_ptr<FrameData> create_frame_data() {
+    // Called each time the graph attempts to connect nodes.
+    // 
+    // If you need to access the resources directly, you need to maintain a copy of the shared_ptr.
+    // You won't have access to delayed inputs here, since the corresponding outputs are created later.
+    virtual void describe_outputs() {
+        return;
+    }
+
+    // Called when the graph is fully connected and all inputs and outputs are defined.
+    // This is a good place to create layouts and pipelines.
+    // This might be called multiple times in the nodes life-cycle (whenever a connection changes).
+    // It can be assumed that at the time of calling processing of all in-flight data has finished,
+    // that means old pipelines and such can be safely destroyed.
+    //
+    // The descriptor set layout is automatically constructed from the inputs and outputs.
+    // It contains all input and output connectors which get_descriptor_info() method does not
+    // return std::nullopt. The order is guaranteed to be all inputs in the order of
+    // describe_inputs() then outputs in the order of describe_outputs().
+    virtual void
+    on_connected([[maybe_unused]] const DescriptorSetLayoutHandle& descriptor_set_layout,
+                 bool& reset_frame_data,
+                 const uint32_t number_sets) {}
+
+    // Called before each run.
+    //
+    // Note that requesting a rebuild is a heavy operation and should only be called if the outputs
+    // change. The graph then has to rebuild itself before calling cmd_process. Note, that this
+    // method is called again after the rebuild until no node requests a rebuild.
+    //
+    // Here you can access the resources for the run or set your own, depending on the descriptor
+    // type. It is guaranteed that the descriptor set in process(...) is accordingly updated. If you
+    // update resources in process(...) the descriptor set will reflect the changes on iteration
+    // later.
+    //
+    // The supplied command buffer is submitted independently of the flags being returned. Depending
+    // on the implementation a separate submit might be used for on_pre_process() and process(),
+    // however synchronization between the two is then explicitly ensured.
+    virtual NodeStatusFlags on_pre_process([[maybe_unused]] GraphRun& run,
+                                           [[maybe_unused]] const vk::CommandBuffer& cmd) {
         return {};
     }
 
-    // Declare the inputs that you require
-    virtual std::tuple<std::vector<NodeInputDescriptorImage>,
-                       std::vector<NodeInputDescriptorBuffer>>
-    describe_inputs() {
-        return {};
-    }
-
-    // Declare your outputs. Based on the output descriptors that were connected to your inputs.
-    // You can check format and such here and fail if they are not compatible.
-    // This may be called with different parameters when the graph is rebuilding.
-    // Note: You do NOT get valid descriptors for delayed images and buffers, since those are
-    // instanciated later, instead you get FEEDBACK_OUTPUT_IMAGE and FEEDBACK_OUTPUT_BUFFER
-    // respectively.
-    virtual std::tuple<std::vector<NodeOutputDescriptorImage>,
-                       std::vector<NodeOutputDescriptorBuffer>>
-    describe_outputs(
-        [[maybe_unused]] const std::vector<NodeOutputDescriptorImage>& connected_image_outputs,
-        [[maybe_unused]] const std::vector<NodeOutputDescriptorBuffer>& connected_buffer_outputs) {
-        return {};
-    }
-
-    // Called everytime before the graph is run.
-    // If rebuild is requested here the graph must rebuild itself before calling cmd_process.
-    // Note, that this method is necessarily called again after the rebuild.
-    virtual void pre_process([[maybe_unused]] const uint64_t& iteration,
-                             [[maybe_unused]] NodeStatus& status) {}
-
-    // Called when the graph is build or rebuild. You get your inputs and outputs for each set_index
-    // (see cmd_process), use these to create your descriptor sets and such. You can also make and
-    // such uploads here. You should only write to output images that were declared as 'persistent',
-    // these are also the same in each set.
-    // No not access or modify input images.
-    virtual void cmd_build([[maybe_unused]] const vk::CommandBuffer& cmd,
-                           [[maybe_unused]] const std::vector<NodeIO>& ios) {}
-
-    // This is called once per iteration.
+    // Do your main processing here.
+    //
     // You do not need to insert barriers for node inputs and outputs.
-    // Use the descriptor set according to set_index (-1 if there are no sets).
-    // If you need to perform layout transistions use the barrier() methods of the images.
-    // `run.get_iteration()` counts the iterations since last build.
-    virtual void cmd_process([[maybe_unused]] const vk::CommandBuffer& cmd,
-                             [[maybe_unused]] GraphRun& run,
-                             [[maybe_unused]] const std::shared_ptr<FrameData>& frame_data,
-                             [[maybe_unused]] const uint32_t set_index,
-                             [[maybe_unused]] const NodeIO& io) {}
+    // If you need to perform layout transitions use the barrier() methods of the images.
+    // You can provide data that that is required for the current run by setting in_flight_data.
+    // The pointer is persisted and supplied again after (graph ring size - 1) runs.
+    virtual void process([[maybe_unused]] GraphRun& run,
+                         [[maybe_unused]] const vk::CommandBuffer& cmd,
+                         [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
+                         [[maybe_unused]] std::shared_ptr<InFlightData>& in_flight_data) {}
 
-    // Declare your configuration options.
+    // Declare your configuration options and output status information.
+    // This method is not called as part of a run, meaning you cannot rely on it being called!
+    //
+    // Set needs_rebuild to true if a rebuild is required after updating the configuration.
+    // This is a heavy operation and should only be done if the outputs change.
     virtual void get_configuration([[maybe_unused]] Configuration& config,
                                    [[maybe_unused]] bool& needs_rebuild) {}
+
+  public:
+    const std::string name;
 };
-
-using NodeHandle = std::shared_ptr<Node>;
-
 } // namespace merian
