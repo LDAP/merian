@@ -6,7 +6,9 @@
 
 #include <cstdint>
 
-namespace merian {
+namespace merian_nodes {
+
+using namespace merian;
 
 // Manages data of a single graph run.
 class GraphRun {
@@ -14,7 +16,7 @@ class GraphRun {
 
   public:
     GraphRun() {}
-    
+
     void add_wait_semaphore(const BinarySemaphoreHandle& wait_semaphore,
                             const vk::PipelineStageFlags& wait_stage_flags) noexcept {
         wait_semaphores.push_back(*wait_semaphore);
@@ -122,4 +124,4 @@ class GraphRun {
     uint64_t graph_version_identifier = 0;
 };
 
-} // namespace merian
+} // namespace merian_nodes

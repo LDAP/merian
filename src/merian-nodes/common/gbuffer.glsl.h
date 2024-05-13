@@ -4,7 +4,7 @@
 #define _GBUFFER_H_
 
 #ifdef __cplusplus
-namespace merian {
+namespace merian_nodes {
 #else
 #extension GL_EXT_shader_explicit_arithmetic_types  : enable
 #endif

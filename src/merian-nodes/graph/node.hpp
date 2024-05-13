@@ -1,26 +1,29 @@
 #pragma once
 
+#include "connector_input.hpp"
+#include "connector_output.hpp"
+#include "graph_run.hpp"
+
 #include "merian/utils/configuration.hpp"
 #include "merian/vk/descriptors/descriptor_set.hpp"
 #include "merian/vk/descriptors/descriptor_set_layout.hpp"
 
-#include "graph_run.hpp"
-
 #include <memory>
 
-namespace merian {
+namespace merian_nodes {
 
 class Node : public std::enable_shared_from_this<Node> {
   public:
     struct InFlightData {};
 
-    struct NodeStatus {};
-
     using NodeStatusFlags = uint32_t;
 
     enum NodeStatusFlagBits {
         // Ensures a rebuild before the next call to process(...)
-        NEEDS_REBUILD = 1,
+        NEEDS_REBUILD = 0b1,
+        // In on_connected: Resets frame data of EVERY frame in flight.
+        // In pre_process: Resets frame data of the next run ONLY.
+        RESET_FRAME_DATA = 0b10,
     };
 
   public:
@@ -29,17 +32,23 @@ class Node : public std::enable_shared_from_this<Node> {
     virtual ~Node() {}
 
     // Called each time the graph attempts to connect nodes.
-    // If you need to access the resources directly, you need to maintain a copy of the shared_ptr.
-    virtual void describe_inputs() {
-        return;
+    // If you need to access the resources directly, you need to maintain a copy of the InputHandle.
+    //
+    // Note that input and output names must be unique.
+    virtual std::vector<InputConnectorHandle> describe_inputs() {
+        return {};
     }
 
     // Called each time the graph attempts to connect nodes.
-    // 
-    // If you need to access the resources directly, you need to maintain a copy of the shared_ptr.
-    // You won't have access to delayed inputs here, since the corresponding outputs are created later.
-    virtual void describe_outputs() {
-        return;
+    //
+    // If you need to access the resources directly, you need to maintain a copy of the
+    // OutputHandle. You won't have access to delayed inputs here, since the corresponding outputs
+    // are created later.
+    //
+    // Note that input and output names must be unique.
+    virtual std::vector<OutputConnectorHandle>
+    describe_outputs([[maybe_unused]] const ConnectorIOMap& output_for_input) {
+        return {};
     }
 
     // Called when the graph is fully connected and all inputs and outputs are defined.
@@ -52,10 +61,10 @@ class Node : public std::enable_shared_from_this<Node> {
     // It contains all input and output connectors which get_descriptor_info() method does not
     // return std::nullopt. The order is guaranteed to be all inputs in the order of
     // describe_inputs() then outputs in the order of describe_outputs().
-    virtual void
-    on_connected([[maybe_unused]] const DescriptorSetLayoutHandle& descriptor_set_layout,
-                 bool& reset_frame_data,
-                 const uint32_t number_sets) {}
+    virtual NodeStatusFlags
+    on_connected([[maybe_unused]] const DescriptorSetLayoutHandle& descriptor_set_layout) {
+        return {};
+    }
 
     // Called before each run.
     //
@@ -71,8 +80,8 @@ class Node : public std::enable_shared_from_this<Node> {
     // The supplied command buffer is submitted independently of the flags being returned. Depending
     // on the implementation a separate submit might be used for on_pre_process() and process(),
     // however synchronization between the two is then explicitly ensured.
-    virtual NodeStatusFlags on_pre_process([[maybe_unused]] GraphRun& run,
-                                           [[maybe_unused]] const vk::CommandBuffer& cmd) {
+    virtual NodeStatusFlags pre_process([[maybe_unused]] GraphRun& run,
+                                        [[maybe_unused]] const vk::CommandBuffer& cmd) {
         return {};
     }
 
@@ -98,4 +107,7 @@ class Node : public std::enable_shared_from_this<Node> {
   public:
     const std::string name;
 };
-} // namespace merian
+
+using NodeHandle = std::shared_ptr<Node>;
+
+} // namespace merian_nodes

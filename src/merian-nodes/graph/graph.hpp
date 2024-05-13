@@ -10,7 +10,9 @@
 
 #include <cstdint>
 
-namespace merian {
+namespace merian_nodes {
+
+using namespace merian;
 
 /**
  * @brief      A Vulkan processing graph.
@@ -70,6 +72,26 @@ template <uint32_t RING_SIZE = 2> class Graph {
         run_if_set(on_post_submit);
     }
 
+    // Callback setter
+  public:
+    // Set a callback that is executed right after the fence for the current iteration is aquired
+    // and before any node is run.
+    void set_on_run_starting(const std::function<void(GraphRun& graph_run)>& on_run_starting) {
+        this->on_run_starting = on_run_starting;
+    }
+
+    // Set a callback that is executed right before the commands for this run are submitted to the
+    // GPU.
+    void set_on_pre_submit(const std::function<void(GraphRun& graph_run)>& on_pre_submit) {
+        this->on_pre_submit = on_pre_submit;
+    }
+
+    // Set a callback that is executed right after the run was submitted to the queue and the run
+    // callbacks were called.
+    void set_on_post_submit(const std::function<void()>& on_post_submit) {
+        this->on_post_submit = on_post_submit;
+    }
+
   private:
     // General stuff
     const SharedContext context;
@@ -85,4 +107,4 @@ template <uint32_t RING_SIZE = 2> class Graph {
     merian::RingFences<RING_SIZE, FrameData> ring_fences;
 };
 
-} // namespace merian
+} // namespace merian_nodes
