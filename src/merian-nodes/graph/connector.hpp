@@ -23,14 +23,20 @@ class Connector : public std::enable_shared_from_this<Connector> {
     }
 
     // Called right after the node with this connector has finished node.pre_process() and before
-    // node.process(). This is the place to insert barriers, if necessary. Also, you can validate
-    // here that the node did use the output correctly (set the resource in pre_process for example)
-    // and throw merian::graph_errors::connector_error if not.
+    // node.process(). This is the place to insert barriers, if necessary. Prefer adding your
+    // barriers to the supplied vectors instead of adding them directlty to the command buffer (for
+    // performance reasons).
+    //
+    // Also, you can validate here that the node did use the output correctly (set the resource in
+    // pre_process for example) and throw merian::graph_errors::connector_error if not.
     //
     // The graph supplies here the resource for the current iteration (depending on delay and such).
-    virtual void on_pre_process([[maybe_unused]] GraphRun& run,
-                                [[maybe_unused]] const vk::CommandBuffer& cmd,
-                                [[maybe_unused]] GraphResourceHandle& resource) {}
+    virtual void
+    on_pre_process([[maybe_unused]] GraphRun& run,
+                   [[maybe_unused]] const vk::CommandBuffer& cmd,
+                   [[maybe_unused]] GraphResourceHandle& resource,
+                   [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
+                   [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {}
 
     // Called right after the node with this connector has finished node.process(). For example, you
     // can validate here that the node did use the output correctly (set the resource for example)

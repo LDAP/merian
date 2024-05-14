@@ -20,7 +20,7 @@ class OutputConnector : public Connector {
     const bool supports_delay;
 };
 
-using OutputConnectorHandle = std::vector<std::shared_ptr<OutputConnector>>;
+using OutputConnectorHandle = std::shared_ptr<OutputConnector>;
 
 /**
  * @brief      The base class for all output connectors.
@@ -34,7 +34,6 @@ template <typename ResourceAccessType = void> class TypedOutputConnector : publi
 };
 
 template <typename ResourceAccessType = void>
-using TypedOutputConnectorHandle =
-    std::vector<std::shared_ptr<TypedOutputConnector<ResourceAccessType>>>;
+using TypedOutputConnectorHandle = std::shared_ptr<TypedOutputConnector<ResourceAccessType>>;
 
 } // namespace merian_nodes

@@ -9,6 +9,15 @@ using namespace merian;
 
 class GraphResource {
   public:
+    using ConnectorStatusFlags = uint32_t;
+
+    enum ConnectorStatusFlagBits {
+        // Signalize that the resource has changed and descriptor set updates are necessary.
+        //  You can assume that after you return this falg the descriptor sets are updated (and
+        //  you can reset needs_descriptor_update).
+        NEEDS_DESCRIPTOR_UPDATE = 0b1,
+    };
+
     virtual ~GraphResource() = 0;
 
     // Allocate your resource. This is called exactly once per graph build. That means, depending
@@ -22,14 +31,12 @@ class GraphResource {
     // made. However, it is guaranteed between calls to connector.on_pre_process and
     // connector.on_post_process with this resource the memory is not in use and syncronization is
     // ensured.
-    virtual void allocate(const ResourceAllocator& allocator,
-                          const ResourceAllocator& aliasing_allocator);
+    virtual void allocate([[maybe_unused]] const ResourceAllocator& allocator,
+                          [[maybe_unused]] const ResourceAllocator& aliasing_allocator) {}
 
-    // Signalize that the resource has changed and descriptor set updates are necessary.
-    // You can assume that after this method returns true the descriptor sets are updated (and you
-    // can reset needs_descriptor_update).
-    virtual bool needs_descriptor_update() const {
-        throw std::runtime_error{"resource is not accessible using a descriptor"};
+    // This is called after connector.on_pre_process() was called on the corresponding output. 
+    virtual ConnectorStatusFlags get_status() const {
+        return {};
     }
 
     // Write the descriptor update to the specified binding (please).

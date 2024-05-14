@@ -21,7 +21,7 @@ class InputConnector : public Connector {
     const uint32_t delay;
 };
 
-using InputConnectorHandle = std::vector<std::shared_ptr<InputConnector>>;
+using InputConnectorHandle = std::shared_ptr<InputConnector>;
 
 /**
  * @brief      The base class for all input connectors.
@@ -38,7 +38,7 @@ class TypedInputConnector : public InputConnector {
 
 template <typename OutputConnectorType, typename ResourceAccessType = void>
 using TypedInputConnectorHandle =
-    std::vector<std::shared_ptr<TypedInputConnector<OutputConnectorType, ResourceAccessType>>>;
+    std::shared_ptr<TypedInputConnector<OutputConnectorType, ResourceAccessType>>;
 
 class ConnectorIOMap {
   public:
@@ -56,5 +56,7 @@ class ConnectorIOMap {
     const std::function<const OutputConnectorHandle&(const InputConnectorHandle&)>&
         output_for_input;
 };
+
+class ConnectorResourceMap {};
 
 } // namespace merian_nodes

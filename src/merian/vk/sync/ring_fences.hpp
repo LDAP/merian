@@ -58,6 +58,13 @@ class RingFences : public std::enable_shared_from_this<RingFences<RING_SIZE, Use
         return ring_data[current_index];
     }
 
+    // Allows access to the user data of the whole ring.
+    // Use with caution and do not change data of in-flight processing.
+    RingData& get(const uint32_t index) {
+        assert(index < RING_SIZE);
+        return ring_data[index];
+    }
+
     // Should be called once per frame.
     // Like set_cycle_wait_and_get(uint32_t cycle) but advances the cycle internally by one
     RingData& next_cycle_wait_and_get() {
@@ -84,13 +91,6 @@ class RingFences : public std::enable_shared_from_this<RingFences<RING_SIZE, Use
 
     uint32_t ring_size() const {
         return RING_SIZE;
-    }
-
-    // Allows access to the user data of the whole ring.
-    // Use with caution and do not change data of in-flight processing.
-    UserDataType& get_ring_data(const uint32_t index) {
-        assert(index < RING_SIZE);
-        return ring_data[index].user_data;
     }
 
   private:

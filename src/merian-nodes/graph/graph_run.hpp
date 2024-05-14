@@ -121,7 +121,6 @@ class GraphRun {
     std::vector<std::function<void(const QueueHandle& queue)>> submit_callbacks;
     ProfilerHandle profiler = nullptr;
     bool rebuild_requested = false;
-    uint64_t graph_version_identifier = 0;
 };
 
 } // namespace merian_nodes

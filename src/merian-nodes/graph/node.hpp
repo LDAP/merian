@@ -23,7 +23,7 @@ class Node : public std::enable_shared_from_this<Node> {
         NEEDS_REBUILD = 0b1,
         // In on_connected: Resets frame data of EVERY frame in flight.
         // In pre_process: Resets frame data of the next run ONLY.
-        RESET_FRAME_DATA = 0b10,
+        RESET_IN_FLIGHT_DATA = 0b10,
     };
 
   public:
@@ -61,8 +61,13 @@ class Node : public std::enable_shared_from_this<Node> {
     // It contains all input and output connectors which get_descriptor_info() method does not
     // return std::nullopt. The order is guaranteed to be all inputs in the order of
     // describe_inputs() then outputs in the order of describe_outputs().
+    //
+    // The supplied command buffer is submitted independently of the flags being returned. Depending
+    // on the implementation a separate submit might be used for on_connected() and process(),
+    // however synchronization between the two is then explicitly ensured.
     virtual NodeStatusFlags
-    on_connected([[maybe_unused]] const DescriptorSetLayoutHandle& descriptor_set_layout) {
+    on_connected([[maybe_unused]] const vk::CommandBuffer& cmd,
+                 [[maybe_unused]] const DescriptorSetLayoutHandle& descriptor_set_layout) {
         return {};
     }
 
@@ -76,12 +81,9 @@ class Node : public std::enable_shared_from_this<Node> {
     // type. It is guaranteed that the descriptor set in process(...) is accordingly updated. If you
     // update resources in process(...) the descriptor set will reflect the changes on iteration
     // later.
-    //
-    // The supplied command buffer is submitted independently of the flags being returned. Depending
-    // on the implementation a separate submit might be used for on_pre_process() and process(),
-    // however synchronization between the two is then explicitly ensured.
-    virtual NodeStatusFlags pre_process([[maybe_unused]] GraphRun& run,
-                                        [[maybe_unused]] const vk::CommandBuffer& cmd) {
+    virtual NodeStatusFlags
+    pre_process([[maybe_unused]] GraphRun& run,
+                [[maybe_unused]] ConnectorResourceMap& resource_for_connector) {
         return {};
     }
 
@@ -94,15 +96,17 @@ class Node : public std::enable_shared_from_this<Node> {
     virtual void process([[maybe_unused]] GraphRun& run,
                          [[maybe_unused]] const vk::CommandBuffer& cmd,
                          [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
+                         [[maybe_unused]] ConnectorResourceMap& resource_for_connector,
                          [[maybe_unused]] std::shared_ptr<InFlightData>& in_flight_data) {}
 
     // Declare your configuration options and output status information.
     // This method is not called as part of a run, meaning you cannot rely on it being called!
     //
-    // Set needs_rebuild to true if a rebuild is required after updating the configuration.
+    // Return NEEDS_REBUILD if a rebuild is required after updating the configuration.
     // This is a heavy operation and should only be done if the outputs change.
-    virtual void get_configuration([[maybe_unused]] Configuration& config,
-                                   [[maybe_unused]] bool& needs_rebuild) {}
+    virtual NodeStatusFlags get_configuration([[maybe_unused]] Configuration& config) {
+        return {};
+    }
 
   public:
     const std::string name;
