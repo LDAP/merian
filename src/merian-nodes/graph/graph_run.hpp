@@ -47,8 +47,8 @@ class GraphRun {
         submit_callbacks.push_back(callback);
     }
 
-    void request_rebuild() {
-        rebuild_requested = true;
+    void request_reconnect() {
+        needs_reconnect = true;
     }
 
     // increases with each run, resets at rebuild
@@ -108,7 +108,7 @@ class GraphRun {
         submit_callbacks.clear();
 
         this->profiler = profiler;
-        this->rebuild_requested = false;
+        this->needs_reconnect = false;
     }
 
   private:
@@ -120,7 +120,7 @@ class GraphRun {
 
     std::vector<std::function<void(const QueueHandle& queue)>> submit_callbacks;
     ProfilerHandle profiler = nullptr;
-    bool rebuild_requested = false;
+    bool needs_reconnect = false;
 };
 
 } // namespace merian_nodes

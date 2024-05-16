@@ -12,7 +12,7 @@ class OutputConnector : public Connector {
         : Connector(name), supports_delay(supports_delay) {}
 
     // Create the resource for this output.
-    // This is called exactly once for every graph build, if supports_delay == false. Otherwise it
+    // This is called exactly once when the graph connects, if supports_delay == false. Otherwise it
     // might be called multiple times.
     virtual GraphResourceHandle create_resource() = 0;
 

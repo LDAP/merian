@@ -52,12 +52,12 @@ class ExtensionVkDebugUtils : public Extension {
         device.setDebugUtilsObjectNameEXT(infoEXT);
     }
 
-    void cmd_begin_label(vk::CommandBuffer& cmd, const std::string& name) {
+    void cmd_begin_label(const vk::CommandBuffer& cmd, const std::string& name) {
         vk::DebugUtilsLabelEXT label{name.c_str()};
         cmd.beginDebugUtilsLabelEXT(label);
     }
 
-    void cmd_end_label(vk::CommandBuffer& cmd) {
+    void cmd_end_label(const vk::CommandBuffer& cmd) {
         cmd.endDebugUtilsLabelEXT();
     }
 

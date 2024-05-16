@@ -4,6 +4,12 @@
 #include <spdlog/logger.h>
 
 #include <typeindex>
+
+// attempt to set the dynamic dispach launcher as early as possible
+#ifndef VULKAN_HPP_DISPATCH_LOADER_DYNAMIC
+#define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
+#endif
+
 #include <vulkan/vulkan.hpp>
 
 namespace merian {

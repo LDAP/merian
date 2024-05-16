@@ -40,10 +40,11 @@ template <typename OutputConnectorType, typename ResourceAccessType = void>
 using TypedInputConnectorHandle =
     std::shared_ptr<TypedInputConnector<OutputConnectorType, ResourceAccessType>>;
 
+// Access the outputs that are connected to your inputs.
 class ConnectorIOMap {
   public:
-    ConnectorIOMap(const std::function<const OutputConnectorHandle&(const InputConnectorHandle&)>&
-                       output_for_input)
+    ConnectorIOMap(
+        const std::function<OutputConnectorHandle(const InputConnectorHandle&)>& output_for_input)
         : output_for_input(output_for_input) {}
 
     template <typename OutputConnectorType>
@@ -53,8 +54,7 @@ class ConnectorIOMap {
     }
 
   private:
-    const std::function<const OutputConnectorHandle&(const InputConnectorHandle&)>&
-        output_for_input;
+    const std::function<OutputConnectorHandle(const InputConnectorHandle&)>& output_for_input;
 };
 
 class ConnectorResourceMap {};

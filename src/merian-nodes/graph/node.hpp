@@ -19,8 +19,8 @@ class Node : public std::enable_shared_from_this<Node> {
     using NodeStatusFlags = uint32_t;
 
     enum NodeStatusFlagBits {
-        // Ensures a rebuild before the next call to process(...)
-        NEEDS_REBUILD = 0b1,
+        // Ensures the graph is reconnected before the next call to process(...)
+        NEEDS_RECONNECT = 0b1,
         // In on_connected: Resets frame data of EVERY frame in flight.
         // In pre_process: Resets frame data of the next run ONLY.
         RESET_IN_FLIGHT_DATA = 0b10,
@@ -53,29 +53,24 @@ class Node : public std::enable_shared_from_this<Node> {
 
     // Called when the graph is fully connected and all inputs and outputs are defined.
     // This is a good place to create layouts and pipelines.
-    // This might be called multiple times in the nodes life-cycle (whenever a connection changes).
-    // It can be assumed that at the time of calling processing of all in-flight data has finished,
-    // that means old pipelines and such can be safely destroyed.
+    // This might be called multiple times in the nodes life-cycle (whenever a connection changes or
+    // other nodes request reconnects). It can be assumed that at the time of calling processing of
+    // all in-flight data has finished, that means old pipelines and such can be safely destroyed.
     //
     // The descriptor set layout is automatically constructed from the inputs and outputs.
-    // It contains all input and output connectors which get_descriptor_info() method does not
+    // It contains all input and output connectors for which get_descriptor_info() method does not
     // return std::nullopt. The order is guaranteed to be all inputs in the order of
     // describe_inputs() then outputs in the order of describe_outputs().
-    //
-    // The supplied command buffer is submitted independently of the flags being returned. Depending
-    // on the implementation a separate submit might be used for on_connected() and process(),
-    // however synchronization between the two is then explicitly ensured.
     virtual NodeStatusFlags
-    on_connected([[maybe_unused]] const vk::CommandBuffer& cmd,
-                 [[maybe_unused]] const DescriptorSetLayoutHandle& descriptor_set_layout) {
+    on_connected([[maybe_unused]] const DescriptorSetLayoutHandle& descriptor_set_layout) {
         return {};
     }
 
     // Called before each run.
     //
-    // Note that requesting a rebuild is a heavy operation and should only be called if the outputs
-    // change. The graph then has to rebuild itself before calling cmd_process. Note, that this
-    // method is called again after the rebuild until no node requests a rebuild.
+    // Note that requesting a reconnect is a heavy operation and should only be called if the
+    // outputs change. The graph then has to reconnect itself before calling cmd_process. Note, that
+    // this method is called again after the reconnect until no node requests a reconnect.
     //
     // Here you can access the resources for the run or set your own, depending on the descriptor
     // type. It is guaranteed that the descriptor set in process(...) is accordingly updated. If you
@@ -83,7 +78,7 @@ class Node : public std::enable_shared_from_this<Node> {
     // later.
     virtual NodeStatusFlags
     pre_process([[maybe_unused]] GraphRun& run,
-                [[maybe_unused]] ConnectorResourceMap& resource_for_connector) {
+                [[maybe_unused]] const ConnectorResourceMap& resource_for_connector) {
         return {};
     }
 
@@ -102,7 +97,7 @@ class Node : public std::enable_shared_from_this<Node> {
     // Declare your configuration options and output status information.
     // This method is not called as part of a run, meaning you cannot rely on it being called!
     //
-    // Return NEEDS_REBUILD if a rebuild is required after updating the configuration.
+    // Return NEEDS_RECONNECT if reconnecting is required after updating the configuration.
     // This is a heavy operation and should only be done if the outputs change.
     virtual NodeStatusFlags get_configuration([[maybe_unused]] Configuration& config) {
         return {};
