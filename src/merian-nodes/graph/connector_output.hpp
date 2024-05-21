@@ -1,7 +1,6 @@
 #pragma once
 
 #include "connector.hpp"
-#include "resource.hpp"
 
 namespace merian_nodes {
 

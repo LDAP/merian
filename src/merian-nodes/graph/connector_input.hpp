@@ -10,12 +10,6 @@ class InputConnector : public Connector {
   public:
     InputConnector(const std::string& name, const uint32_t delay) : Connector(name), delay(delay) {}
 
-    // Return false, if the connector cannot interface with the supplied resource (try dynamic cast
-    // or use merian::test_shared_ptr_types). Can also be used to pre-compute barriers or similar.
-    // This is called for every resource that is created by the output connector (at least in every
-    // build once and multiple times if delay > 0 for one input connector for a resource).
-    virtual bool on_connect_resource([[maybe_unused]] const GraphResourceHandle& resource) = 0;
-
   public:
     // The number of iterations the corresponding resource is accessed later.
     const uint32_t delay;
@@ -43,8 +37,8 @@ using TypedInputConnectorHandle =
 // Access the outputs that are connected to your inputs.
 class ConnectorIOMap {
   public:
-    ConnectorIOMap(
-        const std::function<OutputConnectorHandle(const InputConnectorHandle&)>& output_for_input)
+    ConnectorIOMap(const std::function<OutputConnectorHandle(const InputConnectorHandle&)>&
+                       output_for_input)
         : output_for_input(output_for_input) {}
 
     template <typename OutputConnectorType>
@@ -54,7 +48,8 @@ class ConnectorIOMap {
     }
 
   private:
-    const std::function<OutputConnectorHandle(const InputConnectorHandle&)>& output_for_input;
+    const std::function<OutputConnectorHandle(const InputConnectorHandle&)>&
+        output_for_input;
 };
 
 class ConnectorResourceMap {};

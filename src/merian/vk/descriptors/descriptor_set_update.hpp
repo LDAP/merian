@@ -15,6 +15,10 @@ namespace merian {
 // This can be used to `bind` buffers, images and acceleration structures to DescriptorSets.
 // The binding type is automatically determined using the DescriptorSets and the binding index.
 // However, you can use the *_type methods if you want to overwrite the type.
+//
+// From the spec: The operations described by pDescriptorWrites are performed first, followed by the
+// operations described by pDescriptorCopies. Within each array, the operations are performed in the
+// order they appear in the array.
 class DescriptorSetUpdate {
 
   public:
@@ -148,6 +152,8 @@ class DescriptorSetUpdate {
     void update(SharedContext context) {
         assert(writes.size() == write_buffer_infos.size() + write_image_infos.size() +
                                     write_acceleration_structures.size());
+        if (writes.empty())
+            return;
         context->device.updateDescriptorSets(writes, {});
     }
 

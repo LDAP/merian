@@ -3,11 +3,15 @@
 #include <memory>
 
 #include "graph_run.hpp"
-#include "resource.hpp"
 
 #include <vulkan/vulkan.hpp>
 
 namespace merian_nodes {
+
+class Node;
+using NodeHandle = std::shared_ptr<Node>;
+class GraphResource;
+using GraphResourceHandle = std::shared_ptr<GraphResource>;
 
 class Connector : public std::enable_shared_from_this<Connector> {
   public:
@@ -15,10 +19,9 @@ class Connector : public std::enable_shared_from_this<Connector> {
 
     virtual ~Connector() = 0;
 
-    // If the resource should be available in a shader, return the vk::ShaderStageFlags,
-    // vk::DescriptorType and the descriptor count here.
-    virtual std::optional<std::tuple<vk::ShaderStageFlags, vk::DescriptorType, uint32_t>>
-    get_descriptor_info() const {
+    // If the resource should be available in a shader, return a DescriptorSetLayoutBinding.
+    // Note, that the binding value is ignored!
+    virtual std::optional<vk::DescriptorSetLayoutBinding> get_descriptor_info() const {
         return std::nullopt;
     }
 
@@ -28,15 +31,17 @@ class Connector : public std::enable_shared_from_this<Connector> {
     // performance reasons).
     //
     // Also, you can validate here that the node did use the output correctly (set the resource in
-    // pre_process for example) and throw merian::graph_errors::connector_error if not.
+    // pre_process or do not access the same image with different layouts for example) and throw
+    // merian::graph_errors::connector_error if not.
     //
     // The graph supplies here the resource for the current iteration (depending on delay and such).
-    virtual void
-    on_pre_process([[maybe_unused]] GraphRun& run,
-                   [[maybe_unused]] const vk::CommandBuffer& cmd,
-                   [[maybe_unused]] GraphResourceHandle& resource,
-                   [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
-                   [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {}
+    virtual void on_pre_process(
+        [[maybe_unused]] GraphRun& run,
+        [[maybe_unused]] const vk::CommandBuffer& cmd,
+        [[maybe_unused]] GraphResourceHandle& resource,
+        [[maybe_unused]] NodeHandle& node,
+        [[maybe_unused]] [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
+        [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {}
 
     // Called right after the node with this connector has finished node.process(). For example, you
     // can validate here that the node did use the output correctly (set the resource for example)
@@ -45,7 +50,8 @@ class Connector : public std::enable_shared_from_this<Connector> {
     // The graph supplies here the resource for the current iteration (depending on delay and such).
     virtual void on_post_process([[maybe_unused]] GraphRun& run,
                                  [[maybe_unused]] const vk::CommandBuffer& cmd,
-                                 [[maybe_unused]] GraphResourceHandle& resource) {}
+                                 [[maybe_unused]] GraphResourceHandle& resource,
+                                 [[maybe_unused]] NodeHandle& node) {}
 
   public:
     const std::string name;
