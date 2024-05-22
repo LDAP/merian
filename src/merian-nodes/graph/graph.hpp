@@ -615,13 +615,12 @@ template <uint32_t RING_SIZE = 2> class Graph : public std::enable_shared_from_t
                              "node {} ({})",
                              max_delay + 1, output->name, data.name, node->name);
                 for (uint32_t i = 0; i <= max_delay; i++) {
-                    GraphResourceHandle res = output->create_resource();
+                    GraphResourceHandle res = output->create_resource(context, per_output_info.inputs,
+                                                                      resource_allocator, resource_allocator);
                     res->on_connect_output(output);
                     for (auto& input : per_output_info.inputs) {
                         res->on_connect_input(std::get<1>(input));
                     }
-                    res->allocate(resource_allocator, resource_allocator);
-
                     per_output_info.resources.emplace_back(res);
                 }
             }

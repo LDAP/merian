@@ -1,5 +1,7 @@
 #pragma once
 
+#include "merian/utils/pointer.hpp"
+
 #include "connector_output.hpp"
 
 namespace merian_nodes {
@@ -27,6 +29,8 @@ using InputConnectorHandle = std::shared_ptr<InputConnector>;
 template <typename OutputConnectorType, typename ResourceAccessType = void>
 class TypedInputConnector : public InputConnector {
   public:
+    TypedInputConnector(const std::string& name, const uint32_t delay) : InputConnector(name, delay) {}
+
     virtual ResourceAccessType resource(GraphResourceHandle& resource) = 0;
 };
 
@@ -42,7 +46,7 @@ class ConnectorIOMap {
     template <typename OutputConnectorType, typename ResourceAccessType>
     const std::shared_ptr<OutputConnectorType>&
     operator[](const TypedInputConnectorHandle<OutputConnectorType, ResourceAccessType> input_connector) {
-        return std::static_pointer_cast<OutputConnectorType>(output_for_input(input_connector));
+        return debugable_ptr_cast<OutputConnectorType>(output_for_input(input_connector));
     }
 
   private:
@@ -63,8 +67,9 @@ class ConnectorResourceMap {
         return input_connector->resource(resource_for_input_connector(input_connector));
     }
 
-    template <typename ResourceAccessType>
-    const ResourceAccessType operator[](const TypedOutputConnectorHandle<ResourceAccessType> output_connector) {
+    template <typename ResourceType, typename ResourceAccessType>
+    const ResourceAccessType
+    operator[](const TypedOutputConnectorHandle<ResourceType, ResourceAccessType> output_connector) {
         return output_connector->resource(resource_for_output_connector(output_connector));
     }
 

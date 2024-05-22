@@ -64,7 +64,7 @@ class Connector : public std::enable_shared_from_this<Connector> {
                    [[maybe_unused]] const vk::CommandBuffer& cmd,
                    [[maybe_unused]] GraphResourceHandle& resource,
                    [[maybe_unused]] const NodeHandle& node,
-                   [[maybe_unused]] [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
+                   [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
                    [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {
         return {};
     }
@@ -80,7 +80,7 @@ class Connector : public std::enable_shared_from_this<Connector> {
                     [[maybe_unused]] const vk::CommandBuffer& cmd,
                     [[maybe_unused]] GraphResourceHandle& resource,
                     [[maybe_unused]] const NodeHandle& node,
-                    [[maybe_unused]] [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
+                    [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
                     [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {
         return {};
     }
