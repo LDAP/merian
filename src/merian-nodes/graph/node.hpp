@@ -77,7 +77,7 @@ class Node : public std::enable_shared_from_this<Node> {
     //
     // Here you can access the resources for the run or set your own, depending on the descriptor
     // type. It is guaranteed that the descriptor set in process(...) is accordingly updated. If you
-    // update resources in process(...) the descriptor set will reflect the changes on iteration
+    // update resources in process(...) the descriptor set will reflect the changes one iteration
     // later.
     [[nodiscard]]
     virtual NodeStatusFlags
@@ -86,7 +86,7 @@ class Node : public std::enable_shared_from_this<Node> {
         return {};
     }
 
-    // Do your main processing here.
+    // Do your main GPU processing here.
     //
     // You do not need to insert barriers for node inputs and outputs.
     // If you need to perform layout transitions use the barrier() methods of the images.
@@ -95,7 +95,7 @@ class Node : public std::enable_shared_from_this<Node> {
     virtual void process([[maybe_unused]] GraphRun& run,
                          [[maybe_unused]] const vk::CommandBuffer& cmd,
                          [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
-                         [[maybe_unused]] ConnectorResourceMap& resource_for_connector,
+                         [[maybe_unused]] const ConnectorResourceMap& resource_for_connector,
                          [[maybe_unused]] std::shared_ptr<InFlightData>& in_flight_data) {}
 
     // Declare your configuration options and output status information.

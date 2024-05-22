@@ -129,6 +129,7 @@ struct NodeData {
         std::unique_ptr<DescriptorSetUpdate> update;
     };
     std::vector<PerDescriptorSetInfo> descriptor_sets;
+    std::vector<ConnectorResourceMap> resource_maps;
 };
 } // namespace graph_internal
 
@@ -306,9 +307,10 @@ template <uint32_t RING_SIZE = 2> class Graph : public std::enable_shared_from_t
             {
                 // MERIAN_PROFILE_SCOPE(profiler, "Graph: preprocess nodes");
                 for (auto& node : flat_topology) {
-                    // MERIAN_PROFILE_SCOPE(profiler, fmt::format("{} ({})", data.name,
-                    // node->name()));
-                    Node::NodeStatusFlags flags = node->pre_process(run, ConnectorResourceMap());
+                    // MERIAN_PROFILE_SCOPE(profiler, fmt::format("{} ({})", data.name, node->name()));
+                    NodeData& data = node_data.at(node);
+                    const uint32_t set_idx = iteration % data.descriptor_sets.size();
+                    Node::NodeStatusFlags flags = node->pre_process(run, data.resource_maps[set_idx]);
                     needs_reconnect |= flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT;
                     if (flags & Node::NodeStatusFlagBits::RESET_IN_FLIGHT_DATA) {
                         in_flight_data.in_flight_data.erase(node);
@@ -419,8 +421,7 @@ template <uint32_t RING_SIZE = 2> class Graph : public std::enable_shared_from_t
             // actually run node
             // MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, fmt::format("{} ({})", data.name, node->name()));
             auto& in_flight_data = graph_frame_data.in_flight_data[node];
-            ConnectorResourceMap res_map;
-            node->process(run, cmd, descriptor_set.descriptor_set, res_map, in_flight_data);
+            node->process(run, cmd, descriptor_set.descriptor_set, data.resource_maps[set_idx], in_flight_data);
         }
 
         {
@@ -691,6 +692,15 @@ template <uint32_t RING_SIZE = 2> class Graph : public std::enable_shared_from_t
                     resource.set_indices.emplace_back(set_idx);
                     per_output_info.precomputed_resources.emplace_back(resource.resource, resource_index);
                 }
+
+                // precompute resource maps
+                dst_data.resource_maps.emplace_back(
+                    [&, set_idx](const InputConnectorHandle& connector) {
+                        return std::get<0>(dst_data.input_connections[connector].precomputed_resources[set_idx]);
+                    },
+                    [&, set_idx](const OutputConnectorHandle& connector) {
+                        return std::get<0>(dst_data.output_connections[connector].precomputed_resources[set_idx]);
+                    });
             }
         }
     }
