@@ -2,7 +2,7 @@
 
 #include "merian-nodes/nodes/shadertoy/shadertoy.hpp"
 
-namespace merian {
+namespace merian_nodes {
 
 /* Ported version of https://www.shadertoy.com/view/lsX3DH
  *
@@ -13,7 +13,7 @@ namespace merian {
 class ShadertoySpheresNode : public ShadertoyNode {
 
   public:
-    ShadertoySpheresNode(const SharedContext context, const ResourceAllocatorHandle allocator);
+    ShadertoySpheresNode(const SharedContext context);
 };
 
-} // namespace merian
+} // namespace merian_nodes

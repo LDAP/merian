@@ -120,7 +120,7 @@ void GLFWImGui::init_imgui(GLFWwindow* window,
 
 // Start a new ImGui frame and renderpass. Returns the framebuffer.
 vk::Framebuffer GLFWImGui::new_frame(QueueHandle& queue,
-                                     vk::CommandBuffer& cmd,
+                                     const vk::CommandBuffer& cmd,
                                      GLFWwindow* window,
                                      SwapchainAcquireResult& aquire_result) {
     ImGuiContext* current_context = ImGui::GetCurrentContext();
@@ -166,7 +166,7 @@ vk::Framebuffer GLFWImGui::new_frame(QueueHandle& queue,
 }
 
 // Render the ImGui to the current swapchain image
-void GLFWImGui::render(vk::CommandBuffer& cmd) {
+void GLFWImGui::render(const vk::CommandBuffer& cmd) {
     ImGuiContext* current_context = ImGui::GetCurrentContext();
     ImGui::SetCurrentContext(ctx->get());
 

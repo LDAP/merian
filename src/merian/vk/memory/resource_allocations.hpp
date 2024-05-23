@@ -2,7 +2,7 @@
 
 // Possible allocations together with their memory handles.
 
-#include "merian/vk/sampler/sampler_pool.hpp"
+#include "merian/vk/sampler/sampler.hpp"
 #include "merian/vk/utils/subresource_ranges.hpp"
 
 #include <spdlog/spdlog.h>
@@ -88,15 +88,14 @@ using ImageHandle = std::shared_ptr<Image>;
  */
 class Image : public std::enable_shared_from_this<Image> {
   public:
-    // Creats a Image objects that automatically destroys Image when destructed.
+    // Creates a Image objects that automatically destroys Image when destructed.
     // The memory is not freed explicitly to let it free itself.
     // It is asserted that the memory represented by `memory` is already bound correctly,
     // this is because images are commonly created by memory allocators to optimize memory
     // accesses.
     Image(const vk::Image& image,
           const MemoryAllocationHandle& memory,
-          const vk::Extent3D extent,
-          const vk::Format format,
+          const vk::ImageCreateInfo create_info,
           const vk::ImageLayout current_layout = vk::ImageLayout::eUndefined);
 
     ~Image();
@@ -120,11 +119,15 @@ class Image : public std::enable_shared_from_this<Image> {
     }
 
     const vk::Extent3D& get_extent() const {
-        return extent;
+        return create_info.extent;
     }
 
     const vk::Format& get_format() const {
-        return format;
+        return create_info.format;
+    }
+
+    const vk::ImageTiling& get_tiling() {
+        return create_info.tiling;
     }
 
     // Use this only if you performed a layout transition without using barrier(...)
@@ -158,44 +161,67 @@ class Image : public std::enable_shared_from_this<Image> {
 
     // If extent and range are not supplied the whole image is copied.
     // Layouts are automatically determined from get_current_layout()
-    void cmd_copy_to(
-        const vk::CommandBuffer& cmd,
-        const ImageHandle& dst_picture,
-        const std::optional<vk::Extent3D> extent = std::nullopt,
-        const vk::Offset3D src_offset = {},
-        const vk::Offset3D dst_offset = {},
-        const std::optional<vk::ImageSubresourceLayers> opt_src_subresource = std::nullopt,
-        const std::optional<vk::ImageSubresourceLayers> opt_dst_subresource = std::nullopt) {
+    void cmd_copy_to(const vk::CommandBuffer& cmd,
+                     const ImageHandle& dst_picture,
+                     const std::optional<vk::Extent3D> extent = std::nullopt,
+                     const vk::Offset3D src_offset = {},
+                     const vk::Offset3D dst_offset = {},
+                     const std::optional<vk::ImageSubresourceLayers> opt_src_subresource = std::nullopt,
+                     const std::optional<vk::ImageSubresourceLayers> opt_dst_subresource = std::nullopt) {
         vk::ImageSubresourceLayers src_subresource = opt_src_subresource.value_or(first_layer());
         vk::ImageSubresourceLayers dst_subresource = opt_dst_subresource.value_or(first_layer());
         vk::ImageCopy copy{src_subresource, src_offset, dst_subresource, dst_offset,
-                           extent.value_or(this->extent)};
+                           extent.value_or(this->get_extent())};
 
-        cmd.copyImage(image, current_layout, *dst_picture, dst_picture->get_current_layout(),
-                      {copy});
+        cmd.copyImage(image, current_layout, *dst_picture, dst_picture->get_current_layout(), {copy});
+    }
+
+    // Convenience method to create a view info.
+    // By default all levels and layers are accessed and if array layers > 1 a array view is used.
+    // If the image is 2D and is_cube is true a cube view is returned.
+    vk::ImageViewCreateInfo make_view_create_info(const bool is_cube = false) {
+        vk::ImageViewCreateInfo view_info{
+            {}, get_image(), {}, create_info.format, {}, all_levels_and_layers(),
+        };
+
+        switch (create_info.imageType) {
+        case vk::ImageType::e1D:
+            view_info.viewType = (create_info.arrayLayers > 1 ? vk::ImageViewType::e1DArray : vk::ImageViewType::e1D);
+            break;
+        case vk::ImageType::e2D:
+            if (is_cube) {
+                view_info.viewType = vk::ImageViewType::eCube;
+            } else {
+                view_info.viewType = create_info.arrayLayers > 1 ? vk::ImageViewType::e2DArray : vk::ImageViewType::e2D;
+            }
+            break;
+        case vk::ImageType::e3D:
+            view_info.viewType = vk::ImageViewType::e3D;
+            break;
+        default:
+            assert(0);
+        }
+
+        return view_info;
     }
 
   private:
     const vk::Image image = VK_NULL_HANDLE;
     const MemoryAllocationHandle memory;
-    const vk::Extent3D extent;
-    const vk::Format format;
+    const vk::ImageCreateInfo create_info;
 
     vk::ImageLayout current_layout;
 };
 
 /**
- * @brief      A texture is a image together with a view (and subresource), and an optional
- * sampler.
+ * @brief      A texture is a image together with a view (and subresource) and sampler.
  *
  *  Try to only use the barrier() function to perform layout transitions,
  *  to keep the internal state valid.
  */
 class Texture : public std::enable_shared_from_this<Texture> {
   public:
-    Texture(const ImageHandle& image,
-            const vk::ImageViewCreateInfo& view_create_info,
-            const std::optional<SamplerHandle> sampler = std::nullopt);
+    Texture(const ImageHandle& image, const vk::ImageViewCreateInfo& view_create_info, const SamplerHandle& sampler);
 
     ~Texture();
 
@@ -213,12 +239,8 @@ class Texture : public std::enable_shared_from_this<Texture> {
         return image->get_memory();
     }
 
-    // Note: Can be default-initialized if no sampler is attached
-    const vk::Sampler get_sampler() const {
-        if (sampler.has_value())
-            return *sampler.value();
-        else
-            return {};
+    const SamplerHandle get_sampler() const {
+        return sampler;
     }
 
     // Convenience method for get_image()->get_current_layout()
@@ -231,16 +253,15 @@ class Texture : public std::enable_shared_from_this<Texture> {
     }
 
     const vk::DescriptorImageInfo get_descriptor_info() {
-        return vk::DescriptorImageInfo{get_sampler(), view, image->get_current_layout()};
+        return vk::DescriptorImageInfo{*get_sampler(), view, image->get_current_layout()};
     }
 
-    void attach_sampler(const std::optional<SamplerHandle> sampler = std::nullopt);
+    void set_sampler(const SamplerHandle& sampler);
 
   private:
     const ImageHandle image;
     vk::ImageView view;
-
-    std::optional<SamplerHandle> sampler;
+    SamplerHandle sampler;
 };
 
 using BufferHandle = std::shared_ptr<Buffer>;

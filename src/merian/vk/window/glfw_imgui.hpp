@@ -29,12 +29,12 @@ class GLFWImGui {
 
     // Start a new ImGui frame
     vk::Framebuffer new_frame(QueueHandle& queue,
-                              vk::CommandBuffer& cmd,
+                              const vk::CommandBuffer& cmd,
                               GLFWwindow* window,
                               SwapchainAcquireResult& aquire_result);
 
     // Render the ImGui to the current swapchain image
-    void render(vk::CommandBuffer& cmd);
+    void render(const vk::CommandBuffer& cmd);
 
   private:
     void init_imgui(GLFWwindow* window, SwapchainAcquireResult& aquire_result, QueueHandle& queue);

@@ -1,27 +1,28 @@
 #include "shadertoy.hpp"
+
+#include "merian-nodes/connectors/vk_image_out.hpp"
+
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 
-namespace merian {
+namespace merian_nodes {
 
 ShadertoyNode::ShadertoyNode(const SharedContext context,
-                             const ResourceAllocatorHandle alloc,
                              const std::string& path,
                              FileLoader loader,
                              const uint32_t width,
                              const uint32_t height)
-    : ComputeNode(context, alloc, sizeof(PushConstant)), width(width), height(height) {
+    : ComputeNode(context, "ShadertoyNode", sizeof(PushConstant)), width(width), height(height) {
     shader = std::make_shared<ShaderModule>(context, path, loader);
     constant.iResolution = glm::vec2(width, height);
     sw.reset();
 }
 
 ShadertoyNode::ShadertoyNode(const SharedContext context,
-                             const ResourceAllocatorHandle alloc,
                              const std::size_t spv_size,
                              const uint32_t spv[],
                              const uint32_t width,
                              const uint32_t height)
-    : ComputeNode(context, alloc, sizeof(PushConstant)), width(width), height(height) {
+    : ComputeNode(context, "ShadertoyNode", sizeof(PushConstant)), width(width), height(height) {
     shader = std::make_shared<ShaderModule>(context, spv_size, spv);
     constant.iResolution = glm::vec2(width, height);
     sw.reset();
@@ -36,21 +37,20 @@ void ShadertoyNode::set_resolution(uint32_t width, uint32_t height) {
     }
 }
 
-std::tuple<std::vector<merian::NodeOutputDescriptorImage>,
-           std::vector<merian::NodeOutputDescriptorBuffer>>
-ShadertoyNode::describe_outputs(const std::vector<merian::NodeOutputDescriptorImage>&,
-                                const std::vector<merian::NodeOutputDescriptorBuffer>&) {
-
-    return {
-        {merian::NodeOutputDescriptorImage::compute_write("out", vk::Format::eR8G8B8A8Unorm, width,
-                                                          height)},
-        {},
-    };
+std::vector<OutputConnectorHandle>
+ShadertoyNode::describe_outputs([[maybe_unused]] const ConnectorIOMap& output_for_input) {
+    return {VkImageOut::compute_write("out", vk::Format::eR8G8B8A8Unorm, width, height)};
 }
 
-void ShadertoyNode::pre_process([[maybe_unused]] const uint64_t& iteration, NodeStatus& status) {
-    status.request_rebuild = requires_rebuild;
+ComputeNode::NodeStatusFlags
+ShadertoyNode::pre_process([[maybe_unused]] GraphRun& run,
+                           [[maybe_unused]] const ConnectorResourceMap& resource_for_connector) {
+    NodeStatusFlags flags{};
+    if (requires_rebuild) {
+        flags |= NodeStatusFlagBits::NEEDS_RECONNECT;
+    }
     requires_rebuild = false;
+    return flags;
 }
 
 SpecializationInfoHandle ShadertoyNode::get_specialization_info() const noexcept {
@@ -77,4 +77,4 @@ ShaderModuleHandle ShadertoyNode::get_shader_module() {
     return shader;
 }
 
-} // namespace merian
+} // namespace merian_nodes

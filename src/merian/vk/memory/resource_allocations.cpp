@@ -1,6 +1,5 @@
 #include "merian/vk/memory/resource_allocations.hpp"
 #include "merian/vk/memory/memory_allocator.hpp"
-#include "merian/vk/sampler/sampler_pool.hpp"
 
 #include <spdlog/spdlog.h>
 #include <vulkan/vulkan.hpp>
@@ -30,13 +29,7 @@ vk::BufferMemoryBarrier Buffer::buffer_barrier(const vk::AccessFlags src_access_
                                                const vk::DeviceSize size,
                                                const uint32_t src_queue_family_index,
                                                const uint32_t dst_queue_family_index) {
-    return {src_access_flags,
-            dst_access_flags,
-            src_queue_family_index,
-            dst_queue_family_index,
-            buffer,
-            0,
-            size};
+    return {src_access_flags, dst_access_flags, src_queue_family_index, dst_queue_family_index, buffer, 0, size};
 }
 
 vk::BufferMemoryBarrier2 Buffer::buffer_barrier2(const vk::PipelineStageFlags2 src_stage_flags,
@@ -62,10 +55,9 @@ vk::BufferMemoryBarrier2 Buffer::buffer_barrier2(const vk::PipelineStageFlags2 s
 
 Image::Image(const vk::Image& image,
              const MemoryAllocationHandle& memory,
-             const vk::Extent3D extent,
-             const vk::Format format,
+             const vk::ImageCreateInfo create_info,
              const vk::ImageLayout current_layout)
-    : image(image), memory(memory), extent(extent), format(format), current_layout(current_layout) {
+    : image(image), memory(memory), create_info(create_info), current_layout(current_layout) {
     SPDLOG_TRACE("create image ({})", fmt::ptr(this));
 }
 
@@ -82,8 +74,7 @@ vk::ImageMemoryBarrier Image::barrier(const vk::ImageLayout new_layout,
                                       const uint32_t dst_queue_family_index,
                                       const vk::ImageSubresourceRange subresource_range,
                                       const bool transition_from_undefined) {
-    vk::ImageLayout old_layout =
-        transition_from_undefined ? vk::ImageLayout::eUndefined : current_layout;
+    vk::ImageLayout old_layout = transition_from_undefined ? vk::ImageLayout::eUndefined : current_layout;
     vk::ImageMemoryBarrier barrier{
         src_access_flags,       dst_access_flags,       old_layout, new_layout,
         src_queue_family_index, dst_queue_family_index, image,      subresource_range,
@@ -103,12 +94,10 @@ vk::ImageMemoryBarrier2 Image::barrier2(const vk::ImageLayout new_layout,
                                         const vk::ImageSubresourceRange subresource_range,
                                         const bool transition_from_undefined) {
 
-    vk::ImageLayout old_layout =
-        transition_from_undefined ? vk::ImageLayout::eUndefined : current_layout;
-    vk::ImageMemoryBarrier2 barrier{
-        src_stage_flags, src_access_flags, dst_stage_flags,        dst_access_flags,
-        old_layout,      new_layout,       src_queue_family_index, dst_queue_family_index,
-        image,           subresource_range};
+    vk::ImageLayout old_layout = transition_from_undefined ? vk::ImageLayout::eUndefined : current_layout;
+    vk::ImageMemoryBarrier2 barrier{src_stage_flags, src_access_flags, dst_stage_flags,        dst_access_flags,
+                                    old_layout,      new_layout,       src_queue_family_index, dst_queue_family_index,
+                                    image,           subresource_range};
     current_layout = new_layout;
 
     return barrier;
@@ -118,10 +107,11 @@ vk::ImageMemoryBarrier2 Image::barrier2(const vk::ImageLayout new_layout,
 
 Texture::Texture(const ImageHandle& image,
                  const vk::ImageViewCreateInfo& view_create_info,
-                 const std::optional<SamplerHandle> sampler)
+                 const SamplerHandle& sampler)
     : image(image), sampler(sampler) {
     SPDLOG_TRACE("create texture ({})", fmt::ptr(this));
     view = image->get_memory()->get_context()->device.createImageView(view_create_info);
+    assert(sampler);
 }
 
 Texture::~Texture() {
@@ -129,14 +119,14 @@ Texture::~Texture() {
     image->get_memory()->get_context()->device.destroyImageView(view);
 }
 
-void Texture::attach_sampler(const std::optional<SamplerHandle> sampler) {
+void Texture::set_sampler(const SamplerHandle& sampler) {
+    assert(sampler);
     this->sampler = sampler;
 }
 
-AccelerationStructure::AccelerationStructure(
-    const vk::AccelerationStructureKHR& as,
-    const BufferHandle& buffer,
-    const vk::AccelerationStructureBuildSizesInfoKHR& size_info)
+AccelerationStructure::AccelerationStructure(const vk::AccelerationStructureKHR& as,
+                                             const BufferHandle& buffer,
+                                             const vk::AccelerationStructureBuildSizesInfoKHR& size_info)
     : as(as), buffer(buffer), size_info(size_info) {
     SPDLOG_TRACE("create acceleration structure ({})", fmt::ptr(this));
 }
@@ -148,8 +138,7 @@ AccelerationStructure::~AccelerationStructure() {
 
 vk::DeviceAddress AccelerationStructure::get_acceleration_structure_device_address() {
     vk::AccelerationStructureDeviceAddressInfoKHR address_info{as};
-    return buffer->get_memory()->get_context()->device.getAccelerationStructureAddressKHR(
-        address_info);
+    return buffer->get_memory()->get_context()->device.getAccelerationStructureAddressKHR(address_info);
 }
 
 } // namespace merian

@@ -78,6 +78,8 @@ Swapchain::Swapchain(const SharedContext& context,
                      const vk::PresentModeKHR preferred_vsync_off_mode)
     : context(context), surface(surface), preferred_surface_formats(preferred_surface_formats),
       preferred_vsync_off_mode(preferred_vsync_off_mode), wait_queue(wait_queue) {
+    assert(context);
+    assert(surface);
 
     auto surface_formats = context->physical_device.physical_device.getSurfaceFormatsKHR(*surface);
     if (surface_formats.size() == 0)

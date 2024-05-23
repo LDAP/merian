@@ -96,11 +96,9 @@ class DescriptorSetUpdate {
                                                   const uint32_t dst_array_element = 0,
                                                   const uint32_t descriptor_count = 1,
                                                   const std::optional<vk::ImageLayout> access_layout = std::nullopt) {
-        // Sampler can be default initialized...
-        // assert(texture->get_sampler());
         return write_descriptor_image_type(binding, set->get_type_for_binding(binding), texture->get_view(),
                                            access_layout.value_or(texture->get_current_layout()),
-                                           texture->get_sampler(), dst_array_element, descriptor_count);
+                                           *texture->get_sampler(), dst_array_element, descriptor_count);
     }
 
     // Bind `sampler` at the binding point `binding` of DescriptorSet `set`.

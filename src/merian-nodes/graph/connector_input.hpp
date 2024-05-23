@@ -29,23 +29,26 @@ using InputConnectorHandle = std::shared_ptr<InputConnector>;
 template <typename OutputConnectorType, typename ResourceAccessType = void>
 class TypedInputConnector : public InputConnector {
   public:
-    TypedInputConnector(const std::string& name, const uint32_t delay) : InputConnector(name, delay) {}
+    TypedInputConnector(const std::string& name, const uint32_t delay)
+        : InputConnector(name, delay) {}
 
-    virtual ResourceAccessType resource(GraphResourceHandle& resource) = 0;
+    virtual ResourceAccessType resource(const GraphResourceHandle& resource) = 0;
 };
 
 template <typename OutputConnectorType, typename ResourceAccessType = void>
-using TypedInputConnectorHandle = std::shared_ptr<TypedInputConnector<OutputConnectorType, ResourceAccessType>>;
+using TypedInputConnectorHandle =
+    std::shared_ptr<TypedInputConnector<OutputConnectorType, ResourceAccessType>>;
 
 // Access the outputs that are connected to your inputs.
 class ConnectorIOMap {
   public:
-    ConnectorIOMap(const std::function<OutputConnectorHandle(const InputConnectorHandle&)>& output_for_input)
+    ConnectorIOMap(
+        const std::function<OutputConnectorHandle(const InputConnectorHandle&)>& output_for_input)
         : output_for_input(output_for_input) {}
 
     template <typename OutputConnectorType, typename ResourceAccessType>
-    const std::shared_ptr<OutputConnectorType>&
-    operator[](const TypedInputConnectorHandle<OutputConnectorType, ResourceAccessType> input_connector) {
+    const std::shared_ptr<OutputConnectorType>& operator[](
+        const TypedInputConnectorHandle<OutputConnectorType, ResourceAccessType> input_connector) {
         return debugable_ptr_cast<OutputConnectorType>(output_for_input(input_connector));
     }
 
@@ -55,27 +58,32 @@ class ConnectorIOMap {
 
 class ConnectorResourceMap {
   public:
-    ConnectorResourceMap(
-        const std::function<GraphResourceHandle(const InputConnectorHandle&)>& resource_for_input_connector,
-        const std::function<GraphResourceHandle(const OutputConnectorHandle&)>& resource_for_output_connector)
+    ConnectorResourceMap(const std::function<GraphResourceHandle(const InputConnectorHandle&)>&
+                             resource_for_input_connector,
+                         const std::function<GraphResourceHandle(const OutputConnectorHandle&)>&
+                             resource_for_output_connector)
         : resource_for_input_connector(resource_for_input_connector),
           resource_for_output_connector(resource_for_output_connector) {}
 
     template <typename OutputConnectorType, typename ResourceAccessType>
-    const ResourceAccessType
-    operator[](const TypedInputConnectorHandle<OutputConnectorType, ResourceAccessType> input_connector) {
+    ResourceAccessType
+    get(const TypedInputConnectorHandle<OutputConnectorType, ResourceAccessType>& input_connector)
+        const {
         return input_connector->resource(resource_for_input_connector(input_connector));
     }
 
     template <typename ResourceType, typename ResourceAccessType>
-    const ResourceAccessType
-    operator[](const TypedOutputConnectorHandle<ResourceType, ResourceAccessType> output_connector) {
+    ResourceAccessType
+    get(const TypedOutputConnectorHandle<ResourceType, ResourceAccessType>& output_connector)
+        const {
         return output_connector->resource(resource_for_output_connector(output_connector));
     }
 
   private:
-    const std::function<GraphResourceHandle(const InputConnectorHandle&)> resource_for_input_connector;
-    const std::function<GraphResourceHandle(const OutputConnectorHandle&)> resource_for_output_connector;
+    const std::function<GraphResourceHandle(const InputConnectorHandle&)>
+        resource_for_input_connector;
+    const std::function<GraphResourceHandle(const OutputConnectorHandle&)>
+        resource_for_output_connector;
 };
 
 } // namespace merian_nodes

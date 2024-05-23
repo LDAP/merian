@@ -103,16 +103,23 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
 
     TextureHandle createTexture(const ImageHandle& image,
                                 const vk::ImageViewCreateInfo& imageViewCreateInfo,
+                                const SamplerHandle& sampler);
+
+    TextureHandle createTexture(const ImageHandle& image,
+                                const vk::ImageViewCreateInfo& imageViewCreateInfo,
                                 const vk::SamplerCreateInfo& samplerCreateInfo);
 
-    // other variants could exist with a few defaults but we already have
-    // makeImage2DViewCreateInfo() we could always override viewCreateInfo.image
+    // Create a texture with a linear sampler if the view format supports it.
+    // With a view to the whole subresource (using image->make_view_create_info()).
+    TextureHandle createTexture(const ImageHandle& image);
+
+    // Create a texture with a linear sampler if the view format supports it.
     TextureHandle createTexture(const ImageHandle& image,
                                 const vk::ImageViewCreateInfo& imageViewCreateInfo);
 
     // shortcut that creates the image for the texture
     // - creates the image
-    // - creates the texture part by associating image and sampler
+    // - creates the texture part by associating image view and sampler
     TextureHandle
     createTexture(const vk::CommandBuffer& cmdBuf,
                   const size_t size_,

@@ -1,17 +1,17 @@
 #pragma once
 
-#include "graph/resource.hpp"
+#include "merian-nodes/graph/resource.hpp"
 
 namespace merian_nodes {
 
-class VkTextureResource : public GraphResource {
+class VkImageResource : public GraphResource {
     friend class VkImageIn;
     friend class VkImageOut;
 
   public:
-    VkTextureResource(const TextureHandle& tex,
-                      const vk::PipelineStageFlags2& input_stage_flags,
-                      const vk::AccessFlags2& input_access_flags)
+    VkImageResource(const TextureHandle& tex,
+                    const vk::PipelineStageFlags2& input_stage_flags,
+                    const vk::AccessFlags2& input_access_flags)
         : tex(tex), input_stage_flags(input_stage_flags), input_access_flags(input_access_flags) {}
 
   private:
@@ -30,6 +30,6 @@ class VkTextureResource : public GraphResource {
     const vk::AccessFlags2 input_access_flags;
 };
 
-using VkTextureResourceHandle = std::shared_ptr<VkTextureResource>;
+using VkTextureResourceHandle = std::shared_ptr<VkImageResource>;
 
 } // namespace merian_nodes

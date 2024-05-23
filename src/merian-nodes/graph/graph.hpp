@@ -58,7 +58,10 @@ struct InFlightData {
 
 // Data that is stored for every node that is present in the graph.
 struct NodeData {
-    NodeData(const std::string& name, const uint32_t node_number) : name(name), node_number(node_number) {}
+    static const uint32_t NO_DESCRIPTOR_BINDING = -1u;
+
+    NodeData(const std::string& name, const uint32_t node_number)
+        : name(name), node_number(node_number) {}
 
     // A unique name for this node from the user. This is not node->name().
     // (on add_node)
@@ -83,7 +86,7 @@ struct NodeData {
     struct PerInputInfo {
         NodeHandle node;
         OutputConnectorHandle output;
-        uint32_t descriptor_set_binding{(uint32_t)-1}; // (on prepare_descriptor_sets)
+        uint32_t descriptor_set_binding{NO_DESCRIPTOR_BINDING}; // (on prepare_descriptor_sets)
         // precomputed such that (iteration % precomputed_resources.size()) is the index of the
         // resource that must be used in the iteration. Matches the descriptor_sets array below.
         // (resource handle, resource index the resources array of the corresponing output)
@@ -107,11 +110,12 @@ struct NodeData {
         // (max_delay + 1) resources
         std::vector<PerResourceInfo> resources;
         std::vector<std::tuple<NodeHandle, InputConnectorHandle>> inputs;
-        uint32_t descriptor_set_binding{(uint32_t)-1}; // (on prepare_descriptor_sets)
+        uint32_t descriptor_set_binding{NO_DESCRIPTOR_BINDING}; // (on prepare_descriptor_sets)
         // precomputed such that (iteration % precomputed_resources.size()) is the index of the
         // resource that must be used in the iteration. Matches the descriptor_sets array below.
         // (resource handle, resource index the resources array)
-        std::vector<std::tuple<GraphResourceHandle, uint32_t>> precomputed_resources{}; // (on prepare_descriptor_sets)
+        std::vector<std::tuple<GraphResourceHandle, uint32_t>>
+            precomputed_resources{}; // (on prepare_descriptor_sets)
     };
     std::unordered_map<OutputConnectorHandle, PerOutputInfo> output_connections{};
 
@@ -141,7 +145,8 @@ using namespace graph_internal;
  *
  * @tparam     RING_SIZE  Controls the amount of in-flight processing (frames-in-flight).
  */
-template <uint32_t RING_SIZE = 2> class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
+template <uint32_t RING_SIZE = 2>
+class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
   public:
     Graph(const SharedContext& context, const ResourceAllocatorHandle& resource_allocator)
         : context(context), resource_allocator(resource_allocator), queue(context->get_queue_GCT()),
@@ -153,6 +158,10 @@ template <uint32_t RING_SIZE = 2> class Graph : public std::enable_shared_from_t
         debug_utils = context->get_extension<ExtensionVkDebugUtils>();
     }
 
+    ~Graph() {
+        queue->wait_idle();
+    }
+
     // --- add / remove nodes and connections ---
 
     // Adds a node to the graph.
@@ -160,9 +169,11 @@ template <uint32_t RING_SIZE = 2> class Graph : public std::enable_shared_from_t
     // Throws invalid_argument, if a node with this name already exists, the graph contains the
     // same node under a different name or the name is "Node <number>" which is reserved for
     // internal use.
-    void add_node(const std::shared_ptr<Node>& node, const std::optional<std::string>& name) {
+    void add_node(const std::shared_ptr<Node>& node,
+                  const std::optional<std::string>& name = std::nullopt) {
         if (node_data.contains(node)) {
-            throw std::invalid_argument{fmt::format("graph already contains this node as '{}'", node_data[node].name)};
+            throw std::invalid_argument{
+                fmt::format("graph already contains this node as '{}'", node_data.at(node).name)};
         }
 
         std::string node_name;
@@ -171,11 +182,14 @@ template <uint32_t RING_SIZE = 2> class Graph : public std::enable_shared_from_t
                 throw std::invalid_argument{"node name cannot be empty"};
             }
             if (std::regex_search(name.value(), std::regex("Node \\d+"))) {
-                throw std::invalid_argument{fmt::format("The node name {} is reserved for internal use", name.value())};
+                throw std::invalid_argument{
+                    fmt::format("The node name {} is reserved for internal use", name.value())};
             }
             if (node_for_name.contains(name.value())) {
-                throw std::invalid_argument{fmt::format("graph already contains a node with name '{}'", name.value())};
+                throw std::invalid_argument{
+                    fmt::format("graph already contains a node with name '{}'", name.value())};
             }
+            node_name = name.value();
         }
 
         uint32_t node_number;
@@ -191,7 +205,7 @@ template <uint32_t RING_SIZE = 2> class Graph : public std::enable_shared_from_t
         }
 
         node_for_name[node_name] = node;
-        node_data.emplace(node, node_name, node_number);
+        node_data.try_emplace(node, node_name, node_number);
 
         needs_reconnect = true;
         SPDLOG_DEBUG("added node {} {}", node_number, node_name);
@@ -210,7 +224,7 @@ template <uint32_t RING_SIZE = 2> class Graph : public std::enable_shared_from_t
             throw std::invalid_argument{"graph does not contain the source or destination node"};
         }
 
-        node_data[src].desired_connections.emplace(dst, src_output, dst_input);
+        node_data.at(src).desired_connections.emplace(dst, src_output, dst_input);
         needs_reconnect = true;
     }
 
@@ -285,7 +299,8 @@ template <uint32_t RING_SIZE = 2> class Graph : public std::enable_shared_from_t
         // now we can release the resources from staging space and reset the command pool
         resource_allocator->getStaging()->releaseResourceSet(in_flight_data.staging_set_id);
         // run all queued tasks
-        std::for_each(in_flight_data.tasks.begin(), in_flight_data.tasks.end(), [](auto& task) { task(); });
+        std::for_each(in_flight_data.tasks.begin(), in_flight_data.tasks.end(),
+                      [](auto& task) { task(); });
         in_flight_data.tasks.clear();
         // get and reset command pool and graph run
         const std::shared_ptr<CommandPool>& cmd_pool = in_flight_data.command_pool;
@@ -307,10 +322,12 @@ template <uint32_t RING_SIZE = 2> class Graph : public std::enable_shared_from_t
             {
                 // MERIAN_PROFILE_SCOPE(profiler, "Graph: preprocess nodes");
                 for (auto& node : flat_topology) {
-                    // MERIAN_PROFILE_SCOPE(profiler, fmt::format("{} ({})", data.name, node->name()));
+                    // MERIAN_PROFILE_SCOPE(profiler, fmt::format("{} ({})", data.name,
+                    // node->name()));
                     NodeData& data = node_data.at(node);
                     const uint32_t set_idx = iteration % data.descriptor_sets.size();
-                    Node::NodeStatusFlags flags = node->pre_process(run, data.resource_maps[set_idx]);
+                    Node::NodeStatusFlags flags =
+                        node->pre_process(run, data.resource_maps[set_idx]);
                     needs_reconnect |= flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT;
                     if (flags & Node::NodeStatusFlagBits::RESET_IN_FLIGHT_DATA) {
                         in_flight_data.in_flight_data.erase(node);
@@ -338,8 +355,9 @@ template <uint32_t RING_SIZE = 2> class Graph : public std::enable_shared_from_t
         on_pre_submit(run, cmd);
         cmd_pool->end_all();
         in_flight_data.staging_set_id = resource_allocator->getStaging()->finalizeResourceSet();
-        queue->submit(cmd_pool, iteration_data.fence, run.get_signal_semaphores(), run.get_wait_semaphores(),
-                      run.get_wait_stages(), run.get_timeline_semaphore_submit_info());
+        queue->submit(cmd_pool, iteration_data.fence, run.get_signal_semaphores(),
+                      run.get_wait_semaphores(), run.get_wait_stages(),
+                      run.get_timeline_semaphore_submit_info());
         run.execute_callbacks(queue);
         on_post_submit();
 
@@ -366,7 +384,8 @@ template <uint32_t RING_SIZE = 2> class Graph : public std::enable_shared_from_t
 
     // --- Graph run subtasks ---
 
-    // Calls connector callbacks, checks resource states and records as well as applies descriptor set updates.
+    // Calls connector callbacks, checks resource states and records as well as applies descriptor
+    // set updates.
     void run_node(GraphRun& run,
                   const vk::CommandBuffer& cmd,
                   const NodeHandle& node,
@@ -381,18 +400,19 @@ template <uint32_t RING_SIZE = 2> class Graph : public std::enable_shared_from_t
             // Call connector callbacks (pre_process) and record descriptor set updates
             for (auto& [input, per_input_info] : data.input_connections) {
                 auto& [resource, resource_index] = per_input_info.precomputed_resources[set_idx];
-                const Connector::ConnectorStatusFlags flags =
-                    input->on_pre_process(run, cmd, resource, node, image_barriers, buffer_barriers);
+                const Connector::ConnectorStatusFlags flags = input->on_pre_process(
+                    run, cmd, resource, node, image_barriers, buffer_barriers);
                 if (flags & Connector::ConnectorStatusFlagBits::NEEDS_DESCRIPTOR_UPDATE) {
                     NodeData& src_data = node_data.at(per_input_info.node);
                     record_descriptor_updates(src_data, per_input_info.output,
-                                              src_data.output_connections[per_input_info.output], resource_index);
+                                              src_data.output_connections[per_input_info.output],
+                                              resource_index);
                 }
             }
             for (auto& [output, per_output_info] : data.output_connections) {
                 auto& [resource, resource_index] = per_output_info.precomputed_resources[set_idx];
-                const Connector::ConnectorStatusFlags flags =
-                    output->on_pre_process(run, cmd, resource, node, image_barriers, buffer_barriers);
+                const Connector::ConnectorStatusFlags flags = output->on_pre_process(
+                    run, cmd, resource, node, image_barriers, buffer_barriers);
                 if (flags & Connector::ConnectorStatusFlagBits::NEEDS_DESCRIPTOR_UPDATE) {
                     record_descriptor_updates(data, output, per_output_info, resource_index);
                 }
@@ -410,8 +430,8 @@ template <uint32_t RING_SIZE = 2> class Graph : public std::enable_shared_from_t
         {
             // apply descriptor set updates
             if (!descriptor_set.update->empty()) {
-                SPDLOG_DEBUG("applying {} descriptor set updates for node {}, set {}", descriptor_set.update->count(),
-                             data.name, set_idx);
+                SPDLOG_DEBUG("applying {} descriptor set updates for node {}, set {}",
+                             descriptor_set.update->count(), data.name, set_idx);
                 descriptor_set.update->update(context);
                 descriptor_set.update->next();
             }
@@ -419,27 +439,30 @@ template <uint32_t RING_SIZE = 2> class Graph : public std::enable_shared_from_t
 
         {
             // actually run node
-            // MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, fmt::format("{} ({})", data.name, node->name()));
+            // MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, fmt::format("{} ({})", data.name,
+            // node->name()));
             auto& in_flight_data = graph_frame_data.in_flight_data[node];
-            node->process(run, cmd, descriptor_set.descriptor_set, data.resource_maps[set_idx], in_flight_data);
+            node->process(run, cmd, descriptor_set.descriptor_set, data.resource_maps[set_idx],
+                          in_flight_data);
         }
 
         {
             // Call connector callbacks (post_process) and record descriptor set updates
             for (auto& [input, per_input_info] : data.input_connections) {
                 auto& [resource, resource_index] = per_input_info.precomputed_resources[set_idx];
-                const Connector::ConnectorStatusFlags flags =
-                    input->on_post_process(run, cmd, resource, node, image_barriers, buffer_barriers);
+                const Connector::ConnectorStatusFlags flags = input->on_post_process(
+                    run, cmd, resource, node, image_barriers, buffer_barriers);
                 if (flags & Connector::ConnectorStatusFlagBits::NEEDS_DESCRIPTOR_UPDATE) {
                     NodeData& src_data = node_data.at(per_input_info.node);
                     record_descriptor_updates(src_data, per_input_info.output,
-                                              src_data.output_connections[per_input_info.output], resource_index);
+                                              src_data.output_connections[per_input_info.output],
+                                              resource_index);
                 }
             }
             for (auto& [output, per_output_info] : data.output_connections) {
                 auto& [resource, resource_index] = per_output_info.precomputed_resources[set_idx];
-                const Connector::ConnectorStatusFlags flags =
-                    output->on_post_process(run, cmd, resource, node, image_barriers, buffer_barriers);
+                const Connector::ConnectorStatusFlags flags = output->on_post_process(
+                    run, cmd, resource, node, image_barriers, buffer_barriers);
                 if (flags & Connector::ConnectorStatusFlagBits::NEEDS_DESCRIPTOR_UPDATE) {
                     record_descriptor_updates(data, output, per_output_info, resource_index);
                 }
@@ -458,16 +481,20 @@ template <uint32_t RING_SIZE = 2> class Graph : public std::enable_shared_from_t
                                    const uint32_t resource_index) {
         NodeData::PerResourceInfo& resource_info = per_output_info.resources[resource_index];
 
-        for (auto& set_idx : resource_info.set_indices) {
-            src_output->get_descriptor_update(per_output_info.descriptor_set_binding, resource_info.resource,
-                                              *src_data.descriptor_sets[set_idx].update);
-        }
+        if (per_output_info.descriptor_set_binding != NodeData::NO_DESCRIPTOR_BINDING)
+            for (auto& set_idx : resource_info.set_indices) {
+                src_output->get_descriptor_update(per_output_info.descriptor_set_binding,
+                                                  resource_info.resource,
+                                                  *src_data.descriptor_sets[set_idx].update);
+            }
 
         for (auto& [dst_node, dst_input, set_idx] : resource_info.other_set_indices) {
             NodeData& dst_data = node_data.at(dst_node);
             NodeData::PerInputInfo& per_input_info = dst_data.input_connections[dst_input];
-            dst_input->get_descriptor_update(per_input_info.descriptor_set_binding, resource_info.resource,
-                                             *dst_data.descriptor_sets[set_idx].update);
+            if (per_input_info.descriptor_set_binding != NodeData::NO_DESCRIPTOR_BINDING)
+                dst_input->get_descriptor_update(per_input_info.descriptor_set_binding,
+                                                 resource_info.resource,
+                                                 *dst_data.descriptor_sets[set_idx].update);
         }
     }
 
@@ -504,8 +531,9 @@ template <uint32_t RING_SIZE = 2> class Graph : public std::enable_shared_from_t
             // Cache input connectors in node_data and check that there are no name conflicts.
             for (InputConnectorHandle& input : node->describe_inputs()) {
                 if (node_data.input_connectors.contains(input->name)) {
-                    throw graph_errors::connector_error{fmt::format(
-                        "node {} contains two input connectors with the same name {}", node->name, input->name)};
+                    throw graph_errors::connector_error{
+                        fmt::format("node {} contains two input connectors with the same name {}",
+                                    node->name, input->name)};
                 } else {
                     node_data.input_connectors[input->name] = input;
                 }
@@ -529,7 +557,7 @@ template <uint32_t RING_SIZE = 2> class Graph : public std::enable_shared_from_t
         topological_order.reserve(node_data.size());
 
         topological_visit([&](NodeHandle& node, NodeData& data) {
-            SPDLOG_DEBUG("connecting () {}", data.name, node->name);
+            SPDLOG_DEBUG("connecting {} ({})", data.name, node->name);
 
             topological_order.emplace_back(node);
 
@@ -541,24 +569,28 @@ template <uint32_t RING_SIZE = 2> class Graph : public std::enable_shared_from_t
             std::vector<OutputConnectorHandle> outputs =
                 node->describe_outputs(ConnectorIOMap([&](const InputConnectorHandle& input) {
                     if (input->delay > 0) {
-                        throw std::runtime_error{
-                            fmt::format("Node {} tried to access an output connector that is connected "
-                                        "through a delayed input {} (which is not allowed).",
-                                        node->name, input->name)};
+                        throw std::runtime_error{fmt::format(
+                            "Node {} tried to access an output connector that is connected "
+                            "through a delayed input {} (which is not allowed).",
+                            node->name, input->name)};
                     }
                     if (!data.input_connections.contains(input)) {
-                        throw std::runtime_error{fmt::format("Node {} tried to get an output connector for an input {} "
-                                                             "which was not returned in describe_inputs (which is not "
-                                                             "how this works).",
-                                                             node->name, input->name)};
+                        throw std::runtime_error{
+                            fmt::format("Node {} tried to get an output connector for an input {} "
+                                        "which was not returned in describe_inputs (which is not "
+                                        "how this works).",
+                                        node->name, input->name)};
                     }
                     return data.input_connections.at(input).output;
                 }));
             for (auto& output : outputs) {
                 if (data.output_connectors.contains(output->name)) {
-                    throw graph_errors::connector_error{fmt::format(
-                        "node {} contains two output connectors with the same name {}", node->name, output->name)};
+                    throw graph_errors::connector_error{
+                        fmt::format("node {} contains two output connectors with the same name {}",
+                                    node->name, output->name)};
                 }
+                data.output_connectors.try_emplace(output->name, output);
+                data.output_connections.try_emplace(output);
             }
 
             // 2. Connect outputs to the inputs of destination nodes (fill in their
@@ -566,36 +598,41 @@ template <uint32_t RING_SIZE = 2> class Graph : public std::enable_shared_from_t
             for (const NodeConnection& connection : data.desired_connections) {
                 NodeData& dst_data = node_data.at(connection.dst);
                 if (!data.output_connectors.contains(connection.src_output)) {
-                    throw graph_errors::illegal_connection{fmt::format("node ({}) {} does not have an output {}.",
-                                                                       data.name, node->name, connection.src_output)};
+                    throw graph_errors::illegal_connection{
+                        fmt::format("node ({}) {} does not have an output {}.", data.name,
+                                    node->name, connection.src_output)};
                 }
-                const OutputConnectorHandle src_output = data.output_connectors.at(connection.src_output);
+                const OutputConnectorHandle src_output =
+                    data.output_connectors.at(connection.src_output);
                 if (!dst_data.input_connectors.contains(connection.dst_input)) {
-                    throw graph_errors::illegal_connection{fmt::format("node ({}) {} does not have an input {}.",
-                                                                       data.name, node->name, connection.dst_input)};
+                    throw graph_errors::illegal_connection{
+                        fmt::format("node ({}) {} does not have an input {}.", data.name,
+                                    node->name, connection.dst_input)};
                 }
-                const InputConnectorHandle dst_input = dst_data.input_connectors.at(connection.dst_input);
+                const InputConnectorHandle dst_input =
+                    dst_data.input_connectors.at(connection.dst_input);
 
                 if (dst_data.input_connections.contains(dst_input)) {
                     throw graph_errors::illegal_connection{
-                        fmt::format("the input {} on node ({}) {} is already connected.", connection.dst_input,
-                                    data.name, node->name)};
+                        fmt::format("the input {} on node ({}) {} is already connected.",
+                                    connection.dst_input, data.name, node->name)};
                 }
                 if (node == connection.dst && dst_input->delay == 0) {
                     throw graph_errors::illegal_connection{
-                        fmt::format("node '{}'' is connected to itself {} -> {} with delay 0.", dst_data.name,
-                                    connection.src_output, connection.dst_input)};
+                        fmt::format("node '{}'' is connected to itself {} -> {} with delay 0.",
+                                    dst_data.name, connection.src_output, connection.dst_input)};
                 }
                 if (!src_output->supports_delay && dst_input->delay > 0) {
-                    throw graph_errors::illegal_connection{
-                        fmt::format("input connector {} of node {} ({}) was connected to output "
-                                    "connector {} on node {} ({}) with delay {}, however the output "
-                                    "connector does not support delay.",
-                                    dst_input->name, dst_data.name, connection.dst->name, src_output->name, data.name,
-                                    node->name, dst_input->delay)};
+                    throw graph_errors::illegal_connection{fmt::format(
+                        "input connector {} of node {} ({}) was connected to output "
+                        "connector {} on node {} ({}) with delay {}, however the output "
+                        "connector does not support delay.",
+                        dst_input->name, dst_data.name, connection.dst->name, src_output->name,
+                        data.name, node->name, dst_input->delay)};
                 }
 
-                dst_data.input_connections.emplace(dst_input, NodeData::PerInputInfo{node, src_output});
+                dst_data.input_connections.try_emplace(dst_input,
+                                                       NodeData::PerInputInfo{node, src_output});
                 data.output_connections[src_output].inputs.emplace_back(connection.dst, dst_input);
             }
         });
@@ -615,8 +652,8 @@ template <uint32_t RING_SIZE = 2> class Graph : public std::enable_shared_from_t
                              "node {} ({})",
                              max_delay + 1, output->name, data.name, node->name);
                 for (uint32_t i = 0; i <= max_delay; i++) {
-                    GraphResourceHandle res = output->create_resource(context, per_output_info.inputs,
-                                                                      resource_allocator, resource_allocator);
+                    GraphResourceHandle res = output->create_resource(
+                        per_output_info.inputs, resource_allocator, resource_allocator);
                     res->on_connect_output(output);
                     for (auto& input : per_output_info.inputs) {
                         res->on_connect_input(std::get<1>(input));
@@ -634,7 +671,8 @@ template <uint32_t RING_SIZE = 2> class Graph : public std::enable_shared_from_t
             uint32_t binding_counter = 0;
 
             for (auto& [input, per_input_info] : dst_data.input_connections) {
-                std::optional<vk::DescriptorSetLayoutBinding> desc_info = input->get_descriptor_info();
+                std::optional<vk::DescriptorSetLayoutBinding> desc_info =
+                    input->get_descriptor_info();
                 if (desc_info) {
                     desc_info->setBinding(binding_counter);
                     per_input_info.descriptor_set_binding = binding_counter;
@@ -643,7 +681,20 @@ template <uint32_t RING_SIZE = 2> class Graph : public std::enable_shared_from_t
                     binding_counter++;
                 }
             }
+            for (auto& [output, per_output_info] : dst_data.output_connections) {
+                std::optional<vk::DescriptorSetLayoutBinding> desc_info =
+                    output->get_descriptor_info();
+                if (desc_info) {
+                    desc_info->setBinding(binding_counter);
+                    per_output_info.descriptor_set_binding = binding_counter;
+                    layout_builder.add_binding(desc_info.value());
+
+                    binding_counter++;
+                }
+            }
             dst_data.descriptor_set_layout = layout_builder.build_layout(context);
+            SPDLOG_DEBUG("descriptor set layout for node {} ({}): {}", dst_data.name,
+                         dst_node->name, dst_data.descriptor_set_layout);
 
             // --- FIND NUMBER OF SETS ---
             // the lowest number of descriptor sets needed.
@@ -652,8 +703,9 @@ template <uint32_t RING_SIZE = 2> class Graph : public std::enable_shared_from_t
             num_resources.emplace_back(RING_SIZE);
             // ... number of resources in the corresponding outputs for own inputs
             for (auto& [dst_input, per_input_info] : dst_data.input_connections) {
-                num_resources.push_back(
-                    node_data.at(per_input_info.node).output_connections[per_input_info.output].resources.size());
+                num_resources.push_back(node_data.at(per_input_info.node)
+                                            .output_connections[per_input_info.output]
+                                            .resources.size());
             }
             // ... number of resources in own outputs
             for (auto& [_, per_output_info] : dst_data.output_connections) {
@@ -661,44 +713,54 @@ template <uint32_t RING_SIZE = 2> class Graph : public std::enable_shared_from_t
             }
 
             const uint32_t num_sets = lcm(num_resources);
-            SPDLOG_DEBUG("needing {} descriptor sets for node {} ({})", num_sets, dst_data.name, dst_node->name);
+            SPDLOG_DEBUG("needing {} descriptor sets for node {} ({})", num_sets, dst_data.name,
+                         dst_node->name);
 
             // --- ALLOCATE POOL ---
-            dst_data.descriptor_pool = std::make_shared<DescriptorPool>(dst_data.descriptor_set_layout, num_sets);
+            dst_data.descriptor_pool =
+                std::make_shared<DescriptorPool>(dst_data.descriptor_set_layout, num_sets);
 
             // --- ALLOCATE SETS and PRECOMUTE RESOURCES for each iteration ---
             for (uint32_t set_idx = 0; set_idx < num_sets; set_idx++) {
                 // allocate
-                const DescriptorSetHandle desc_set = std::make_shared<DescriptorSet>(dst_data.descriptor_pool);
+                const DescriptorSetHandle desc_set =
+                    std::make_shared<DescriptorSet>(dst_data.descriptor_pool);
                 dst_data.descriptor_sets.emplace_back();
                 dst_data.descriptor_sets.back().descriptor_set = desc_set;
-                dst_data.descriptor_sets.back().update = std::make_unique<DescriptorSetUpdate>(desc_set);
+                dst_data.descriptor_sets.back().update =
+                    std::make_unique<DescriptorSetUpdate>(desc_set);
 
                 // precompute resources for inputs
                 for (auto& [input, per_input_info] : dst_data.input_connections) {
                     NodeData& src_data = node_data.at(per_input_info.node);
-                    auto& resources = src_data.output_connections.at(per_input_info.output).resources;
+                    auto& resources =
+                        src_data.output_connections.at(per_input_info.output).resources;
                     const uint32_t num_resources = resources.size();
-                    const uint32_t resource_index = (set_idx + num_resources - input->delay) % num_resources;
+                    const uint32_t resource_index =
+                        (set_idx + num_resources - input->delay) % num_resources;
                     auto& resource = resources[resource_index];
                     resource.other_set_indices.emplace_back(dst_node, input, set_idx);
-                    per_input_info.precomputed_resources.emplace_back(resource.resource, resource_index);
+                    per_input_info.precomputed_resources.emplace_back(resource.resource,
+                                                                      resource_index);
                 }
                 // precompute resources for outputs
                 for (auto& [_, per_output_info] : dst_data.output_connections) {
                     const uint32_t resource_index = set_idx % per_output_info.resources.size();
                     auto& resource = per_output_info.resources[resource_index];
                     resource.set_indices.emplace_back(set_idx);
-                    per_output_info.precomputed_resources.emplace_back(resource.resource, resource_index);
+                    per_output_info.precomputed_resources.emplace_back(resource.resource,
+                                                                       resource_index);
                 }
 
                 // precompute resource maps
                 dst_data.resource_maps.emplace_back(
                     [&, set_idx](const InputConnectorHandle& connector) {
-                        return std::get<0>(dst_data.input_connections[connector].precomputed_resources[set_idx]);
+                        return std::get<0>(
+                            dst_data.input_connections[connector].precomputed_resources[set_idx]);
                     },
                     [&, set_idx](const OutputConnectorHandle& connector) {
-                        return std::get<0>(dst_data.output_connections[connector].precomputed_resources[set_idx]);
+                        return std::get<0>(
+                            dst_data.output_connections[connector].precomputed_resources[set_idx]);
                     });
             }
         }
@@ -737,9 +799,9 @@ template <uint32_t RING_SIZE = 2> class Graph : public std::enable_shared_from_t
             for (const NodeHandle& candidate : candidates) {
                 if (visited.contains(candidate)) {
                     // Back-edges with delay > 1 are allowed!
-                    throw graph_errors::illegal_connection{
-                        fmt::format("undelayed (edges with delay = 0) graph is not acyclic! {} -> {}", data.name,
-                                    node_data.at(candidate).name)};
+                    throw graph_errors::illegal_connection{fmt::format(
+                        "undelayed (edges with delay = 0) graph is not acyclic! {} -> {}",
+                        data.name, node_data.at(candidate).name)};
                 }
                 bool satisfied = true;
                 NodeData& candidate_data = node_data.at(candidate);
@@ -748,7 +810,8 @@ template <uint32_t RING_SIZE = 2> class Graph : public std::enable_shared_from_t
                         // all good, delayed inputs must not be connected.
                         continue;
                     }
-                    auto& candidate_input_connection = candidate_data.input_connections.at(candidate_input.second);
+                    auto& candidate_input_connection =
+                        candidate_data.input_connections.at(candidate_input.second);
                     if (!visited.contains(candidate_input_connection.node)) {
                         // src was not processed, cannot add...
                         satisfied = false;
@@ -775,8 +838,8 @@ template <uint32_t RING_SIZE = 2> class Graph : public std::enable_shared_from_t
 
     // Set a callback that is executed right before the commands for this run are submitted to
     // the GPU.
-    void
-    set_on_pre_submit(const std::function<void(GraphRun& graph_run, const vk::CommandBuffer& cmd)>& on_pre_submit) {
+    void set_on_pre_submit(const std::function<void(GraphRun& graph_run,
+                                                    const vk::CommandBuffer& cmd)>& on_pre_submit) {
         this->on_pre_submit = on_pre_submit;
     }
 
@@ -789,7 +852,8 @@ template <uint32_t RING_SIZE = 2> class Graph : public std::enable_shared_from_t
     void set_profiling(const bool enabled) {
         add_task_to_all_iterations_in_flight([&]() {
             if (enabled && !ring_fences.get().user_data.profiler) {
-                ring_fences.get().user_data.profiler = std::make_shared<merian::Profiler>(context, queue);
+                ring_fences.get().user_data.profiler =
+                    std::make_shared<merian::Profiler>(context, queue);
             } else if (!enabled) {
                 ring_fences.get().user_data.profiler = nullptr;
             }

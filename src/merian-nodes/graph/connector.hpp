@@ -22,7 +22,8 @@ class Connector : public std::enable_shared_from_this<Connector> {
         //  You can assume that after you return this falg the descriptor sets are updated (and
         //  you can reset needs_descriptor_update).
         //
-        //  Not only the descriptor set for this connector but every descriptor set that accesses the resource is
+        //  Not only the descriptor set for this connector but every descriptor set that accesses
+        //  the resource is
         //  updated.
         NEEDS_DESCRIPTOR_UPDATE = 0b1,
     };
@@ -30,7 +31,7 @@ class Connector : public std::enable_shared_from_this<Connector> {
   public:
     Connector(const std::string& name) : name(name) {}
 
-    virtual ~Connector() = 0;
+    virtual ~Connector() {};
 
     // If the resource should be available in a shader, return a DescriptorSetLayoutBinding.
     // Note, that the binding value is ignored!

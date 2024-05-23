@@ -13,7 +13,12 @@ inline void cmd_blit_stretch(const vk::CommandBuffer& cmd,
                              const vk::Image& dst_image,
                              const vk::ImageLayout& dst_layout,
                              const vk::Extent3D& dst_extent,
+                             const std::optional<vk::ClearColorValue> clear_color = std::nullopt,
                              const vk::Filter filter = vk::Filter::eLinear) {
+    if (clear_color)
+        cmd.clearColorImage(dst_image, dst_layout, clear_color.value(),
+                            {merian::all_levels_and_layers()});
+
     vk::ImageBlit region{merian::first_layer(), {}, merian::first_layer(), {{}}};
     region.srcOffsets[1] = extent_to_offset(src_extent);
     region.dstOffsets[1] = extent_to_offset(dst_extent);
@@ -28,11 +33,11 @@ inline void cmd_blit_fit(const vk::CommandBuffer& cmd,
                          const vk::Image& dst_image,
                          const vk::ImageLayout& dst_layout,
                          const vk::Extent3D& dst_extent,
-                         const vk::ClearColorValue clear_color = {},
-                         const bool clear = true,
+                         const std::optional<vk::ClearColorValue> clear_color = std::nullopt,
                          const vk::Filter filter = vk::Filter::eLinear) {
-    if (clear)
-        cmd.clearColorImage(dst_image, dst_layout, clear_color, {merian::all_levels_and_layers()});
+    if (clear_color)
+        cmd.clearColorImage(dst_image, dst_layout, clear_color.value(),
+                            {merian::all_levels_and_layers()});
 
     vk::ImageBlit region{merian::first_layer(), {}, merian::first_layer(), {}};
     region.srcOffsets[1] = extent_to_offset(src_extent);
@@ -51,7 +56,12 @@ inline void cmd_blit_fill(const vk::CommandBuffer& cmd,
                           const vk::Image& dst_image,
                           const vk::ImageLayout& dst_layout,
                           const vk::Extent3D& dst_extent,
+                          const std::optional<vk::ClearColorValue> clear_color = std::nullopt,
                           const vk::Filter filter = vk::Filter::eLinear) {
+    if (clear_color)
+        cmd.clearColorImage(dst_image, dst_layout, clear_color.value(),
+                            {merian::all_levels_and_layers()});
+
     vk::ImageBlit region{merian::first_layer(), {}, merian::first_layer(), {}};
     region.dstOffsets[1] = extent_to_offset(dst_extent);
 
@@ -59,6 +69,40 @@ inline void cmd_blit_fill(const vk::CommandBuffer& cmd,
         fit(region.dstOffsets[0], region.dstOffsets[1], {}, extent_to_offset(src_extent));
 
     cmd.blitImage(src_image, src_layout, dst_image, dst_layout, {region}, filter);
+}
+
+enum BlitMode {
+    FIT,
+    FILL,
+    STRETCH,
+};
+
+inline void cmd_blit(const BlitMode blit_mode,
+                     const vk::CommandBuffer& cmd,
+                     const vk::Image& src_image,
+                     const vk::ImageLayout& src_layout,
+                     const vk::Extent3D& src_extent,
+                     const vk::Image& dst_image,
+                     const vk::ImageLayout& dst_layout,
+                     const vk::Extent3D& dst_extent,
+                     const std::optional<vk::ClearColorValue> clear_color = std::nullopt,
+                     const vk::Filter filter = vk::Filter::eLinear) {
+    switch (blit_mode) {
+    case FIT:
+        cmd_blit_fit(cmd, src_image, src_layout, src_extent, dst_image, dst_layout, dst_extent,
+                     clear_color, filter);
+        break;
+    case FILL:
+        cmd_blit_fill(cmd, src_image, src_layout, src_extent, dst_image, dst_layout, dst_extent,
+                      clear_color, filter);
+        break;
+    case STRETCH:
+        cmd_blit_stretch(cmd, src_image, src_layout, src_extent, dst_image, dst_layout, dst_extent,
+                         clear_color, filter);
+        break;
+    default:
+        throw std::runtime_error{"unknown blit mode"};
+    }
 }
 
 } // namespace merian

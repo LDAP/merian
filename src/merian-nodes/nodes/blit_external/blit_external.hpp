@@ -4,20 +4,14 @@
 #include "merian/vk/utils/barriers.hpp"
 #include "merian/vk/utils/blits.hpp"
 
-namespace merian {
-
-enum BlitNodeMode {
-    FIT,
-    FILL,
-    STRETCH,
-};
+namespace merian_nodes {
 
 /**
  * Blits an image from the graph to an external user-supplied image.
  */
 template <BlitNodeMode mode> class BlitExternalNode : public Node {
   public:
-    BlitExternalNode() {}
+    BlitExternalNode() : Node("BlitExternalNode") {}
 
     ~BlitExternalNode() {}
 
@@ -31,20 +25,7 @@ template <BlitNodeMode mode> class BlitExternalNode : public Node {
         this->dst_extent = dst_extent;
     }
 
-    virtual std::string name() override {
-        return "BlitExternalNode";
-    }
-
-    virtual std::tuple<std::vector<NodeInputDescriptorImage>,
-                       std::vector<NodeInputDescriptorBuffer>>
-    describe_inputs() override {
-        return {
-            {
-                NodeInputDescriptorImage::transfer_src("src"),
-            },
-            {},
-        };
-    }
+    
 
     virtual void cmd_process(const vk::CommandBuffer& cmd,
                              [[maybe_unused]] GraphRun& run,
@@ -55,30 +36,6 @@ template <BlitNodeMode mode> class BlitExternalNode : public Node {
         if (!dst_image) {
             return;
         }
-
-        auto& src_image = io.image_inputs[0];
-
-        if (dst_in_layout != vk::ImageLayout::eTransferDstOptimal)
-            cmd_barrier_image_layout(cmd, dst_image, dst_in_layout,
-                                     vk::ImageLayout::eTransferDstOptimal);
-
-        if constexpr (mode == FIT) {
-            cmd_blit_fit(cmd, *src_image, vk::ImageLayout::eTransferSrcOptimal,
-                         src_image->get_extent(), dst_image, vk::ImageLayout::eTransferDstOptimal,
-                         dst_extent);
-        } else if constexpr (mode == FILL) {
-            cmd_blit_fill(cmd, *src_image, vk::ImageLayout::eTransferSrcOptimal,
-                          src_image->get_extent(), dst_image, vk::ImageLayout::eTransferDstOptimal,
-                          dst_extent);
-        } else if constexpr (mode == STRETCH) {
-            cmd_blit_stretch(cmd, *src_image, vk::ImageLayout::eTransferSrcOptimal,
-                             src_image->get_extent(), dst_image,
-                             vk::ImageLayout::eTransferDstOptimal, dst_extent);
-        }
-
-        if (dst_out_layout != vk::ImageLayout::eTransferDstOptimal)
-            cmd_barrier_image_layout(cmd, dst_image, vk::ImageLayout::eTransferDstOptimal,
-                                     dst_out_layout);
     }
 
   private:

@@ -49,7 +49,19 @@ class DescriptorSetLayout : public std::enable_shared_from_this<DescriptorSetLay
     const std::vector<vk::DescriptorSetLayoutBinding> bindings;
     vk::DescriptorSetLayout layout;
 };
-
 using DescriptorSetLayoutHandle = std::shared_ptr<DescriptorSetLayout>;
+
+inline auto format_as(DescriptorSetLayoutHandle layout) {
+    std::vector<std::string> binding_strs;
+
+    for (auto& binding : layout->get_bindings()) {
+        binding_strs.emplace_back(
+            fmt::format("(binding = {}, count = {}, type = {}, stage flags = {})", binding.binding,
+                        binding.descriptorCount, vk::to_string(binding.descriptorType),
+                        vk::to_string(binding.stageFlags)));
+    }
+
+    return fmt::format("[{}]", fmt::join(binding_strs.begin(), binding_strs.end(), ", "));
+}
 
 } // namespace merian

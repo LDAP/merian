@@ -8,7 +8,7 @@
 
 #include <optional>
 
-namespace merian {
+namespace merian_nodes {
 
 // A general purpose compute node.
 // The graph resources are bound in set 0 and order input images, input buffers, output images,
@@ -19,7 +19,7 @@ class ComputeNode : public Node {
 
   public:
     ComputeNode(const SharedContext context,
-                const ResourceAllocatorHandle allocator,
+                const std::string& name,
                 const std::optional<uint32_t> push_constant_size = std::nullopt);
 
     virtual ~ComputeNode() {}
@@ -44,27 +44,22 @@ class ComputeNode : public Node {
     // Called at the first build
     virtual ShaderModuleHandle get_shader_module() = 0;
 
-    void cmd_build(const vk::CommandBuffer&, const std::vector<NodeIO>& ios) override final;
+    virtual NodeStatusFlags
+    on_connected(const DescriptorSetLayoutHandle& descriptor_set_layout) override final;
 
-    void cmd_process(const vk::CommandBuffer& cmd,
-                     GraphRun& run,
-                     const std::shared_ptr<FrameData>& frame_data,
-                     const uint32_t set_index,
-                     const NodeIO& io) override final;
+    virtual void process(GraphRun& run,
+                         const vk::CommandBuffer& cmd,
+                         const DescriptorSetHandle& descriptor_set,
+                         const ConnectorResourceMap& resource_for_connector,
+                         std::shared_ptr<InFlightData>& in_flight_data) override final;
 
   protected:
     const SharedContext context;
-    const ResourceAllocatorHandle allocator;
     const std::optional<uint32_t> push_constant_size;
 
   private:
-    DescriptorSetLayoutHandle layout;
-    DescriptorPoolHandle pool;
-    std::vector<DescriptorSetHandle> sets;
-    // make sure textures stay available
-    std::vector<TextureHandle> textures;
     PipelineHandle pipe;
     PipelineLayoutHandle pipe_layout;
 };
 
-} // namespace merian
+} // namespace merian_nodes

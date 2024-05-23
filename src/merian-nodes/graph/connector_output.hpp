@@ -25,10 +25,10 @@ class OutputConnector : public Connector {
     // made. However, it is guaranteed between calls to connector.on_pre_process and
     // connector.on_post_process with this resource the memory is not in use and syncronization is
     // ensured.
-    virtual GraphResourceHandle create_resource(const SharedContext& context,
-                                                const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
-                                                const ResourceAllocatorHandle& allocator,
-                                                const ResourceAllocatorHandle& aliasing_allocator) = 0;
+    virtual GraphResourceHandle
+    create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
+                    const ResourceAllocatorHandle& allocator,
+                    const ResourceAllocatorHandle& aliasing_allocator) = 0;
 
   public:
     const bool supports_delay;
@@ -44,9 +44,10 @@ using OutputConnectorHandle = std::shared_ptr<OutputConnector>;
  */
 template <typename ResourceAccessType = void> class TypedOutputConnector : public OutputConnector {
   public:
-    TypedOutputConnector(const std::string& name, const bool supports_delay) : OutputConnector(name, supports_delay) {}
+    TypedOutputConnector(const std::string& name, const bool supports_delay)
+        : OutputConnector(name, supports_delay) {}
 
-    virtual ResourceAccessType resource(GraphResourceHandle& resource) = 0;
+    virtual ResourceAccessType resource(const GraphResourceHandle& resource) = 0;
 };
 
 template <typename ResourceType, typename ResourceAccessType = void>

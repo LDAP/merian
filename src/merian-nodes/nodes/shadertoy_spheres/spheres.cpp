@@ -1,13 +1,12 @@
 #include "spheres.hpp"
 
-namespace merian {
+namespace merian_nodes {
 
 static const uint32_t spv[] = {
 #include "spheres.comp.spv.h"
 };
 
-ShadertoySpheresNode::ShadertoySpheresNode(const SharedContext context,
-                                   const ResourceAllocatorHandle allocator)
-    : ShadertoyNode(context, allocator, sizeof(spv), spv) {}
+ShadertoySpheresNode::ShadertoySpheresNode(const SharedContext context)
+    : ShadertoyNode(context, sizeof(spv), spv) {}
 
-} // namespace merian
+} // namespace merian_nodes
