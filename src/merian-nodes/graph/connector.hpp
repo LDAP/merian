@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "merian/utils/configuration.hpp"
 #include "merian/vk/descriptors/descriptor_set_update.hpp"
 
 #include "graph_run.hpp"
@@ -31,7 +32,7 @@ class Connector : public std::enable_shared_from_this<Connector> {
   public:
     Connector(const std::string& name) : name(name) {}
 
-    virtual ~Connector() {};
+    virtual ~Connector(){};
 
     // If the resource should be available in a shader, return a DescriptorSetLayoutBinding.
     // Note, that the binding value is ignored!
@@ -85,6 +86,9 @@ class Connector : public std::enable_shared_from_this<Connector> {
                     [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {
         return {};
     }
+
+    // Mainly to describe yourself
+    virtual void configuration([[maybe_unused]] Configuration& config) {}
 
   public:
     const std::string name;

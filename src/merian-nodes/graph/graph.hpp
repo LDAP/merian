@@ -153,8 +153,9 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
           ring_fences(context) {
         for (uint32_t i = 0; i < RING_SIZE; i++) {
             ring_fences.get(i).user_data.command_pool = std::make_shared<CommandPool>(queue);
+            ring_fences.get(i).user_data.profiler =
+                std::make_shared<merian::Profiler>(context, queue);
         }
-        set_profiling(true);
         debug_utils = context->get_extension<ExtensionVkDebugUtils>();
     }
 
@@ -241,7 +242,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
     //
     // the configuration allow to inspect the partial connections as well
     void connect() {
-        // MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "Graph: connect");
+        ProfilerHandle profiler = std::make_shared<Profiler>(context, queue, 0);
 
         needs_reconnect = false;
 
@@ -251,37 +252,54 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         }
 
         // Make sure resources are not in use
-        queue->wait_idle();
+        {
+            MERIAN_PROFILE_SCOPE(profiler, "wait idle");
+            queue->wait_idle();
+        }
 
-        reset_connections();
+        {
+            MERIAN_PROFILE_SCOPE(profiler, "reset");
+            reset_connections();
+        }
 
-        flat_topology = connect_nodes();
+        {
+            MERIAN_PROFILE_SCOPE(profiler, "connect nodes");
+            flat_topology = connect_nodes();
+        }
 
         if (flat_topology.size() != node_data.size()) {
             // todo: determine node and input and provide a better error message.
             throw graph_errors::connection_missing{"Graph not fully connected."};
         }
 
-        allocate_resources();
+        {
+            MERIAN_PROFILE_SCOPE(profiler, "allocate resources");
+            allocate_resources();
+        }
 
-        prepare_descriptor_sets();
+        {
+            MERIAN_PROFILE_SCOPE(profiler, "prepare descriptor sets");
+            prepare_descriptor_sets();
+        }
 
-        for (auto& node : flat_topology) {
-            NodeData& data = node_data.at(node);
-            // MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, fmt::format("{} ({})", data.name,
-            // node->name()));
-            SPDLOG_DEBUG("on_connected node: {} ({})", data.name, node->name);
-            Node::NodeStatusFlags flags = node->on_connected(data.descriptor_set_layout);
-            needs_reconnect |= flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT;
-            if (flags & Node::NodeStatusFlagBits::RESET_IN_FLIGHT_DATA) {
-                for (uint32_t i = 0; i < RING_SIZE; i++) {
-                    ring_fences.get(i).user_data.in_flight_data.erase(node);
+        {
+            MERIAN_PROFILE_SCOPE(profiler, "Node::on_connected");
+            for (auto& node : flat_topology) {
+                NodeData& data = node_data.at(node);
+                MERIAN_PROFILE_SCOPE(profiler, fmt::format("{} ({})", data.name, node->name));
+                SPDLOG_DEBUG("on_connected node: {} ({})", data.name, node->name);
+                Node::NodeStatusFlags flags = node->on_connected(data.descriptor_set_layout);
+                needs_reconnect |= flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT;
+                if (flags & Node::NodeStatusFlagBits::RESET_IN_FLIGHT_DATA) {
+                    for (uint32_t i = 0; i < RING_SIZE; i++) {
+                        ring_fences.get(i).user_data.in_flight_data.erase(node);
+                    }
                 }
             }
         }
 
         iteration = 0;
-        // todo: save profiler report for build
+        last_build_report = profiler->get_report();
     }
 
     // Runs one iteration of the graph.
@@ -298,19 +316,16 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
         // now we can release the resources from staging space and reset the command pool
         resource_allocator->getStaging()->releaseResourceSet(in_flight_data.staging_set_id);
-        // run all queued tasks
-        std::for_each(in_flight_data.tasks.begin(), in_flight_data.tasks.end(),
-                      [](auto& task) { task(); });
-        in_flight_data.tasks.clear();
-        // get and reset command pool and graph run
         const std::shared_ptr<CommandPool>& cmd_pool = in_flight_data.command_pool;
-        cmd_pool->reset();
         GraphRun& run = in_flight_data.graph_run;
-        run.reset(nullptr); // todo: profiler
-        on_run_starting(run);
-        const vk::CommandBuffer cmd = cmd_pool->create_and_begin();
+        cmd_pool->reset();
 
-        // MERIAN_PROFILE_SCOPE_GPU(in_flight_data.profiler, cmd, "Graph: run");
+        const vk::CommandBuffer cmd = cmd_pool->create_and_begin();
+        // get profiler and reports
+        const ProfilerHandle& profiler = prepare_profiler_for_run(cmd, in_flight_data);
+
+        run.reset(profiler);
+        on_run_starting(run);
 
         // EXECUTE RUN
         do {
@@ -320,11 +335,10 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             }
             // While preprocessing nodes can signalize that they need to reconnect as well
             {
-                // MERIAN_PROFILE_SCOPE(profiler, "Graph: preprocess nodes");
+                MERIAN_PROFILE_SCOPE(profiler, "Preprocess nodes");
                 for (auto& node : flat_topology) {
-                    // MERIAN_PROFILE_SCOPE(profiler, fmt::format("{} ({})", data.name,
-                    // node->name()));
                     NodeData& data = node_data.at(node);
+                    MERIAN_PROFILE_SCOPE(profiler, fmt::format("{} ({})", data.name, node->name));
                     const uint32_t set_idx = iteration % data.descriptor_sets.size();
                     Node::NodeStatusFlags flags =
                         node->pre_process(run, data.resource_maps[set_idx]);
@@ -337,13 +351,13 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         } while (needs_reconnect);
 
         {
-            // MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "Graph: run nodes");
+            MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "Run nodes");
             for (auto& node : flat_topology) {
                 NodeData& data = node_data.at(node);
                 if (debug_utils)
                     debug_utils->cmd_begin_label(cmd, node->name);
 
-                run_node(run, cmd, node, data, in_flight_data);
+                run_node(run, cmd, node, data, in_flight_data, profiler);
 
                 if (debug_utils)
                     debug_utils->cmd_end_label(cmd);
@@ -361,28 +375,112 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         run.execute_callbacks(queue);
         on_post_submit();
 
-        needs_reconnect = run.needs_reconnect;
+        needs_reconnect |= run.needs_reconnect;
         iteration++;
     }
 
+    void configuration(Configuration& config) {
+        if (config.st_new_section("Graph")) {
+            needs_reconnect |= config.config_bool("Rebuild");
+            config.config_bool("profiling", profiler_enable);
+
+            config.st_separate();
+
+            config.output_text(fmt::format("Current iteration: {}", iteration));
+
+            if (profiler_enable) {
+                config.st_separate("Profiler");
+                config.config_uint("report intervall", profiler_report_intervall_ms,
+                                   "Set the time period for the profiler to update in ms. Meaning, "
+                                   "averages and deviations are calculated over this this period.");
+                if (last_build_report && config.st_begin_child("build", "Last Build")) {
+                    Profiler::get_report_imgui(last_build_report);
+                    config.st_end_child();
+                }
+
+                if (last_run_report && config.st_begin_child("run", "Run")) {
+                    Profiler::get_report_imgui(last_run_report);
+                    config.st_end_child();
+                }
+            }
+
+            config.st_separate("Nodes");
+
+            for (auto& [node, data] : node_data) {
+                std::string node_label = fmt::format("{} ({})", data.name, node->name);
+                if (config.st_begin_child(data.name.c_str(), node_label.c_str())) {
+                    const Node::NodeStatusFlags flags = node->configuration(config);
+                    needs_reconnect |= flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT;
+                    config.st_separate();
+                    io_configuration_for_node(config, data);
+                    config.st_end_child();
+                }
+            }
+        }
+    }
+
   private:
-    // --- Helpers ---
+    void io_configuration_for_node(Configuration& config, NodeData& data) {
+        if (config.st_begin_child("desc_set_layout", "Descriptor Set Layout")) {
+            config.output_text(fmt::format("{}", data.descriptor_set_layout));
+            config.st_end_child();
+        }
+        if (!data.output_connections.empty() && config.st_begin_child("outputs", "Outputs")) {
+            for (auto& [output, per_output_info] : data.output_connections) {
+                if (config.st_begin_child(output->name, output->name)) {
+                    std::vector<std::string> receivers;
+                    for (auto& [node, input] : per_output_info.inputs) {
+                        receivers.emplace_back(fmt::format("({}, {} ({}))", input->name,
+                                                           node_data.at(node).name, node->name));
+                    }
 
-    void add_task_to_current_iteration(const std::function<void()>& task) {
-        ring_fences.get().tasks.push_back(task);
-    }
-
-    void add_task_to_next_iteration(const std::function<void()>& task) {
-        ring_fences.get((ring_fences.current_cycle_index() + 1) % RING_SIZE).tasks.push_back(task);
-    }
-
-    void add_task_to_all_iterations_in_flight(const std::function<void()>& task) {
-        for (uint32_t i = 0; i < RING_SIZE; i++) {
-            ring_fences.get(i).user_data.tasks.push_back(task);
+                    config.output_text(fmt::format(
+                        "descriptor set binding: {}\nresources: {}\nsending to: [{}]",
+                        per_output_info.descriptor_set_binding == NodeData::NO_DESCRIPTOR_BINDING
+                            ? "None"
+                            : std::to_string(per_output_info.descriptor_set_binding),
+                        per_output_info.resources.size(), fmt::join(receivers, ", ")));
+                    config.st_separate();
+                    output->configuration(config);
+                    config.st_end_child();
+                }
+            }
+            config.st_end_child();
+        }
+        if (!data.input_connections.empty() && config.st_begin_child("inputs", "Inputs")) {
+            for (auto& [input, per_input_info] : data.input_connections) {
+                if (config.st_begin_child(input->name, input->name)) {
+                    config.output_text(fmt::format(
+                        "descriptor set binding: {}\nreceiving from: {}, {} ({})",
+                        per_input_info.descriptor_set_binding == NodeData::NO_DESCRIPTOR_BINDING
+                            ? "None"
+                            : std::to_string(per_input_info.descriptor_set_binding),
+                        per_input_info.output->name, node_data.at(per_input_info.node).name,
+                        per_input_info.node->name));
+                    config.st_separate();
+                    input->configuration(config);
+                    config.st_end_child();
+                }
+            }
+            config.st_end_child();
         }
     }
 
     // --- Graph run subtasks ---
+
+    // Creates the profiler if necessary
+    ProfilerHandle prepare_profiler_for_run(const vk::CommandBuffer& cmd,
+                                            InFlightData& in_flight_data) {
+        if (!profiler_enable) {
+            return nullptr;
+        }
+
+        last_run_report =
+            in_flight_data.profiler->collect_reset_get_every(cmd, profiler_report_intervall_ms)
+                .value_or(last_run_report);
+
+        return in_flight_data.profiler;
+    }
 
     // Calls connector callbacks, checks resource states and records as well as applies descriptor
     // set updates.
@@ -390,8 +488,11 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                   const vk::CommandBuffer& cmd,
                   const NodeHandle& node,
                   NodeData& data,
-                  InFlightData& graph_frame_data) {
+                  InFlightData& graph_frame_data,
+                  [[maybe_unused]] const ProfilerHandle& profiler) {
         const uint32_t set_idx = iteration % data.descriptor_sets.size();
+
+        MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, fmt::format("{} ({})", data.name, node->name));
 
         std::vector<vk::ImageMemoryBarrier2> image_barriers;
         std::vector<vk::BufferMemoryBarrier2> buffer_barriers;
@@ -439,8 +540,6 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
         {
             // actually run node
-            // MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, fmt::format("{} ({})", data.name,
-            // node->name()));
             auto& in_flight_data = graph_frame_data.in_flight_data[node];
             node->process(run, cmd, descriptor_set.descriptor_set, data.resource_maps[set_idx],
                           in_flight_data);
@@ -699,8 +798,6 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             // --- FIND NUMBER OF SETS ---
             // the lowest number of descriptor sets needed.
             std::vector<uint32_t> num_resources;
-            // ... RING_SIZE to allow updates while iterations are in-flight
-            num_resources.emplace_back(RING_SIZE);
             // ... number of resources in the corresponding outputs for own inputs
             for (auto& [dst_input, per_input_info] : dst_data.input_connections) {
                 num_resources.push_back(node_data.at(per_input_info.node)
@@ -712,7 +809,12 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 num_resources.push_back(per_output_info.resources.size());
             }
 
-            const uint32_t num_sets = lcm(num_resources);
+            uint32_t num_sets = lcm(num_resources);
+            // make sure it is at least RING_SIZE to allow updates while iterations are in-flight
+            // solve k * num_sets >= RING_SIZE
+            const uint32_t k = (RING_SIZE + num_sets - 1) / num_sets;
+            num_sets *= k;
+
             SPDLOG_DEBUG("needing {} descriptor sets for node {} ({})", num_sets, dst_data.name,
                          dst_node->name);
 
@@ -849,17 +951,6 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         this->on_post_submit = on_post_submit;
     }
 
-    void set_profiling(const bool enabled) {
-        add_task_to_all_iterations_in_flight([&]() {
-            if (enabled && !ring_fences.get().user_data.profiler) {
-                ring_fences.get().user_data.profiler =
-                    std::make_shared<merian::Profiler>(context, queue);
-            } else if (!enabled) {
-                ring_fences.get().user_data.profiler = nullptr;
-            }
-        });
-    }
-
   private:
     // General stuff
     const SharedContext context;
@@ -880,6 +971,11 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
     // State
     bool needs_reconnect = false;
     uint64_t iteration = 0;
+    bool profiler_enable = true;
+    uint32_t profiler_report_intervall_ms = 100;
+
+    Profiler::Report last_build_report;
+    Profiler::Report last_run_report;
 
     // Nodes
     std::unordered_map<std::string, NodeHandle> node_for_name;

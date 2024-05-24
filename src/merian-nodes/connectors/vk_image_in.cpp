@@ -1,5 +1,4 @@
 #include "vk_image_in.hpp"
-#include "merian-nodes/graph/errors.hpp"
 #include "merian-nodes/graph/node.hpp"
 #include "merian-nodes/resources/vk_image_resource.hpp"
 

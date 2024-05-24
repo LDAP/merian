@@ -33,7 +33,7 @@ class GLFWWindowNode : public Node {
         swapchain->set_vsync(vsync);
         acquire = swapchain->acquire(window);
         if (acquire) {
-            const auto& src_image = resource_for_connector.get<VkImageOut, TextureHandle>(image_in);
+            const auto& src_image = resource_for_connector.at(image_in);
 
             const vk::Extent3D extent(acquire->extent, 1);
             cmd_barrier_image_layout(cmd, acquire->image, vk::ImageLayout::eUndefined,
@@ -62,7 +62,7 @@ class GLFWWindowNode : public Node {
         return swapchain;
     }
 
-    NodeStatusFlags get_configuration(Configuration& config) override {
+    NodeStatusFlags configuration(Configuration& config) override {
 
         GLFWmonitor* monitor = glfwGetWindowMonitor(*window);
         int fullscreen = monitor != NULL;

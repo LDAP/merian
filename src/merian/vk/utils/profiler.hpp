@@ -1,5 +1,6 @@
 #pragma once
 
+#include "merian/utils/stopwatch.hpp"
 #include "merian/vk/extension/extension.hpp"
 
 #include <optional>
@@ -94,12 +95,18 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
     struct Report {
         std::vector<ReportEntry> cpu_report;
         std::vector<ReportEntry> gpu_report;
+
+        operator bool() const {
+            return !cpu_report.empty() || !gpu_report.empty();
+        }
     };
 
   public:
     // The timestamps for GPU profiling must be preallocated, therefore you can only capture
     // num_gpu_timers many timers. Throws runtime error if the device or queue does not support
     // timestamp queries.
+    //
+    // Set num_gpu_timers to 0 to disable GPU profiling capabilities.
     Profiler(const SharedContext context,
              const QueueHandle queue,
              const uint32_t num_gpu_timers = 1024);
@@ -134,19 +141,25 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
 
     Report get_report();
 
+    // Convenience method that collects the results then resets the profiler (for GPU profiling).
+    //
+    // Every report_intervall_millis the method returns a profiling report and clears the profiler
+    // when resetting. Meaning, means and std deviation were calculated over the report intervall.
+    std::optional<Report> collect_reset_get_every(const vk::CommandBuffer& cmd,
+                                                  const uint32_t report_intervall_millis = 0);
+
     // returns the report as string
-    std::string get_report_str();
+    static std::string get_report_str(const Profiler::Report& report);
 
     // renders the report to imgui
-    void get_report_imgui(const Profiler::Report& report);
-
-    void get_report_imgui();
+    static void get_report_imgui(const Profiler::Report& report);
 
   private:
     const SharedContext context;
     const uint32_t num_gpu_timers;
     const float timestamp_period;
-    vk::QueryPool query_pool;
+    vk::QueryPool query_pool{nullptr};
+    Stopwatch report_intervall;
 
     uint32_t current_cpu_section = 0;
     uint32_t current_gpu_section = 0;
@@ -164,8 +177,11 @@ using ProfilerHandle = std::shared_ptr<Profiler>;
 class ProfileScope {
   public:
     ProfileScope(const ProfilerHandle profiler, const std::string& name) : profiler(profiler) {
-        if (profiler)
-            profiler->start(name);
+        if (!profiler) {
+            return;
+        }
+
+        profiler->start(name);
 #ifndef NDEBUG
         section_index = profiler->current_cpu_section;
 #endif

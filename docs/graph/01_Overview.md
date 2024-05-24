@@ -1,35 +1,18 @@
 ## Graph
 
-Merian provides a general purpose processing graph as well as some commonly used nodes (as merian-nodes).
-Nodes define their input and outputs, the graph allocates the memory and calls the `cmd_build` and `cmd_process` methods of nodes.
-Before `cmd_process` can issue commands (e.g. rebuild/skip/...) to the graph by implementing the `pre_process` method.
+Merian provides a general purpose processing graph as well as some commonly used nodes.
+Nodes define their input and outputs, the graph allocates the memory and calls the `pre_process` and `process` methods of nodes.
 
 ### Delayed inputs
 
 Nodes can request a delayed view on an input.
 The graph internally creates (delay + 1) resources and cycles them in every iteration.
 
-### Persistent outputs
-
-Nodes can request a persistent output. Persistent outputs are guaranteed to contain the same content between runs.
-Currently, it is not possible to have a delayed view on a persistent output (because the data would have to be copied after each iteration).
-You can accomplish this by using a "copy" node in between.
-Persistent outputs are not persistent between graph builds.
-
-### Rules
-
-- The user must add the run's signal and wait semaphores as well as the wait stages to the queue submit. (see `queue->submit` below).
-- The user must call `run.execute_callbacks(queue)` after calling submit.
-- The user must provide unique GraphFrameData objects for each frame-in-flight (see `cmd_run`).
-
-Other:
-- Nodes can access the same resource (same output with same delay) with the same layout only (we do not duplicate the resource for you).
-
 ### Example:
 
 ```c++
 merian::Graph graph{context, alloc, queue};
-auto output = std::make_shared<merian::GLFWWindowNode<merian::FIT>>(context, window, surface, queue);
+auto output = std::make_shared<merian::GLFWWindowNode>(context, queue);
 auto ab = std::make_shared<merian::ABCompareNode>();
 auto image_node = std::make_shared<merian::ImageNode>(alloc, "/home/lucas/Downloads/image.jpg", loader, false);
 auto spheres = std::make_shared<merian::ShadertoySpheresNode>(context, alloc);
@@ -42,23 +25,8 @@ graph.connect_image(spheres, ab, 0, 0);
 graph.connect_image(image_node, ab, 0, 1);
 graph.connect_image(ab, output, 0, 0);
 
-// Optionally, you can build the graph here, since building is a expensive operation.
-// This makes the first run faster.
-// However many nodes need frequent rebuilds, for example when the Window resolution changes.
-
-auto ring_cmd_pool = make_shared<merian::RingCommandPool<>>(context, context->queue_family_idx_GCT);
-auto ring_fences = make_shared<merian::RingFences<2, merian::GraphFrameData>>(context);
-while (!glfwWindowShouldClose(*window)) {
-    auto& frame_data = ring_fences->wait_and_get();
-    auto cmd_pool = ring_cmd_pool->set_cycle();
+while (!output->get_window()->should_close()) {
     glfwPollEvents();
-
-    auto cmd = cmd_pool->create_and_begin();
-    auto& run = graph.cmd_run(cmd, frame_data.user_data);
-    cmd_pool->end_all();
-
-    queue->submit(cmd_pool, frame_data.fence, run.get_signal_semaphore(),
-                  run.get_wait_semaphores(), run.get_wait_stages());
-    run.execute_callbacks(queue);
+    graph.run();
 }
 ```

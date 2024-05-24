@@ -21,7 +21,7 @@ void ImGuiConfiguration::st_end_child() {
     ImGui::TreePop();
 }
 bool ImGuiConfiguration::st_new_section(const std::string& label) {
-    return ImGui::CollapsingHeader(label.c_str());
+    return ImGui::CollapsingHeader(label.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
 }
 void ImGuiConfiguration::st_separate(const std::string& label) {
     if (label.empty())

@@ -12,6 +12,9 @@ class InputConnector : public Connector {
   public:
     InputConnector(const std::string& name, const uint32_t delay) : Connector(name), delay(delay) {}
 
+    virtual void configuration(Configuration& config) {
+        config.output_text(fmt::format("delay: {}", delay));
+    }
   public:
     // The number of iterations the corresponding resource is accessed later.
     const uint32_t delay;
@@ -29,6 +32,9 @@ using InputConnectorHandle = std::shared_ptr<InputConnector>;
 template <typename OutputConnectorType, typename ResourceAccessType = void>
 class TypedInputConnector : public InputConnector {
   public:
+    using resource_access_type = ResourceAccessType;
+    using output_connector_type = OutputConnectorType;
+
     TypedInputConnector(const std::string& name, const uint32_t delay)
         : InputConnector(name, delay) {}
 
@@ -46,9 +52,14 @@ class ConnectorIOMap {
         const std::function<OutputConnectorHandle(const InputConnectorHandle&)>& output_for_input)
         : output_for_input(output_for_input) {}
 
-    template <typename OutputConnectorType, typename ResourceAccessType>
-    const std::shared_ptr<OutputConnectorType>& operator[](
-        const TypedInputConnectorHandle<OutputConnectorType, ResourceAccessType> input_connector) {
+    template <
+        typename T,
+        typename ResourceAccessType = T::resource_access_type,
+        typename OutputConnectorType = T::output_connector_type,
+        std::enable_if_t<
+            std::is_base_of_v<TypedInputConnector<OutputConnectorType, ResourceAccessType>, T>,
+            bool> = true>
+    const std::shared_ptr<OutputConnectorType>& at(const std::shared_ptr<T>& input_connector) {
         return debugable_ptr_cast<OutputConnectorType>(output_for_input(input_connector));
     }
 
@@ -65,17 +76,22 @@ class ConnectorResourceMap {
         : resource_for_input_connector(resource_for_input_connector),
           resource_for_output_connector(resource_for_output_connector) {}
 
-    template <typename OutputConnectorType, typename ResourceAccessType>
-    ResourceAccessType
-    get(const TypedInputConnectorHandle<OutputConnectorType, ResourceAccessType>& input_connector)
-        const {
+    template <
+        typename T,
+        typename ResourceAccessType = T::resource_access_type,
+        typename OutputConnectorType = T::output_connector_type,
+        std::enable_if_t<
+            std::is_base_of_v<TypedInputConnector<OutputConnectorType, ResourceAccessType>, T>,
+            bool> = true>
+    ResourceAccessType at(const std::shared_ptr<T>& input_connector) const {
         return input_connector->resource(resource_for_input_connector(input_connector));
     }
 
-    template <typename ResourceType, typename ResourceAccessType>
-    ResourceAccessType
-    get(const TypedOutputConnectorHandle<ResourceType, ResourceAccessType>& output_connector)
-        const {
+    template <typename T,
+              typename ResourceAccessType = T::resource_access_type,
+              std::enable_if_t<std::is_base_of_v<TypedOutputConnector<ResourceAccessType>, T>,
+                               bool> = true>
+    ResourceAccessType at(const std::shared_ptr<T>& output_connector) const {
         return output_connector->resource(resource_for_output_connector(output_connector));
     }
 

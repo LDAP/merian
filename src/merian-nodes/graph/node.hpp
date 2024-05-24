@@ -104,7 +104,7 @@ class Node : public std::enable_shared_from_this<Node> {
     // Return NEEDS_RECONNECT if reconnecting is required after updating the configuration.
     // This is a heavy operation and should only be done if the outputs change.
     [[nodiscard]]
-    virtual NodeStatusFlags get_configuration([[maybe_unused]] Configuration& config) {
+    virtual NodeStatusFlags configuration([[maybe_unused]] Configuration& config) {
         return {};
     }
 

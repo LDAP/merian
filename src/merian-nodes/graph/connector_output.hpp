@@ -30,6 +30,10 @@ class OutputConnector : public Connector {
                     const ResourceAllocatorHandle& allocator,
                     const ResourceAllocatorHandle& aliasing_allocator) = 0;
 
+    virtual void configuration(Configuration& config) {
+        config.output_text(fmt::format("supports delay: {}", supports_delay));
+    }
+
   public:
     const bool supports_delay;
 };
@@ -46,6 +50,8 @@ template <typename ResourceAccessType = void> class TypedOutputConnector : publi
   public:
     TypedOutputConnector(const std::string& name, const bool supports_delay)
         : OutputConnector(name, supports_delay) {}
+
+    using resource_access_type = ResourceAccessType;
 
     virtual ResourceAccessType resource(const GraphResourceHandle& resource) = 0;
 };
