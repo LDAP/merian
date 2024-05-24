@@ -8,14 +8,13 @@
 #include "merian/vk/descriptors/descriptor_set.hpp"
 #include "merian/vk/descriptors/descriptor_set_layout.hpp"
 
+#include <any>
 #include <memory>
 
 namespace merian_nodes {
 
 class Node : public std::enable_shared_from_this<Node> {
   public:
-    struct InFlightData {};
-
     using NodeStatusFlags = uint32_t;
 
     enum NodeStatusFlagBits {
@@ -88,15 +87,17 @@ class Node : public std::enable_shared_from_this<Node> {
 
     // Do your main GPU processing here.
     //
-    // You do not need to insert barriers for node inputs and outputs.
-    // If you need to perform layout transitions use the barrier() methods of the images.
+    // You do not need to insert barriers for node inputs and outputs if not stated otherwise in the
+    // connector documentation. If you need to perform layout transitions use the barrier() methods
+    // of the images.
+    //
     // You can provide data that that is required for the current run by setting in_flight_data.
     // The pointer is persisted and supplied again after (graph ring size - 1) runs.
     virtual void process([[maybe_unused]] GraphRun& run,
                          [[maybe_unused]] const vk::CommandBuffer& cmd,
                          [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
                          [[maybe_unused]] const ConnectorResourceMap& resource_for_connector,
-                         [[maybe_unused]] std::shared_ptr<InFlightData>& in_flight_data) {}
+                         [[maybe_unused]] std::any& in_flight_data) {}
 
     // Declare your configuration options and output status information.
     // This method is not called as part of a run, meaning you cannot rely on it being called!

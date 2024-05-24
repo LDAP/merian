@@ -52,10 +52,9 @@ class GraphRun {
     }
 
     // increases with each run, resets at rebuild
-    const uint64_t& get_iteration() const noexcept;
-
-    // changes after every rebuild
-    const uint64_t& get_graph_version_identifier() const noexcept;
+    const uint64_t& get_iteration() const noexcept {
+        return iteration;
+    }
 
     // Add this to the submit call for the graph command buffer
     const std::vector<vk::Semaphore>& get_wait_semaphores() const noexcept {
@@ -99,7 +98,8 @@ class GraphRun {
     }
 
   private:
-    void reset(const ProfilerHandle profiler) {
+    void reset(const uint64_t iteration, const ProfilerHandle profiler) {
+        this->iteration = iteration;
         wait_semaphores.clear();
         wait_stages.clear();
         wait_values.clear();
@@ -119,8 +119,10 @@ class GraphRun {
     std::vector<uint64_t> signal_values;
 
     std::vector<std::function<void(const QueueHandle& queue)>> submit_callbacks;
+
     ProfilerHandle profiler = nullptr;
     bool needs_reconnect = false;
+    uint64_t iteration;
 };
 
 } // namespace merian_nodes

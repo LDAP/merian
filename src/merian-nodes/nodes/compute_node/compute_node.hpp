@@ -1,7 +1,6 @@
 #pragma once
 
 #include "merian-nodes/graph/node.hpp"
-#include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
 #include "merian/vk/pipeline/specialization_info.hpp"
 #include "merian/vk/shader/shader_module.hpp"
@@ -51,7 +50,7 @@ class ComputeNode : public Node {
                          const vk::CommandBuffer& cmd,
                          const DescriptorSetHandle& descriptor_set,
                          const ConnectorResourceMap& resource_for_connector,
-                         std::shared_ptr<InFlightData>& in_flight_data) override final;
+                         std::any& in_flight_data) override final;
 
   protected:
     const SharedContext context;

@@ -1,14 +1,14 @@
 #include "image_write.hpp"
 #include "ext/stb_image_write.h"
+
 #include "merian/utils/defer.hpp"
-#include "merian-nodes/graph/graph.hpp"
 #include "merian/vk/utils/blits.hpp"
 #include <csignal>
 #include <filesystem>
 
 #include "fmt/args.h"
 
-namespace merian {
+namespace merian_nodes {
 
 #define FORMAT_PNG 0
 #define FORMAT_JPG 1
@@ -20,30 +20,16 @@ static std::unordered_map<uint32_t, std::string> FILE_EXTENSIONS = {
 ImageWriteNode::ImageWriteNode(const SharedContext context,
                                const ResourceAllocatorHandle allocator,
                                const std::string& filename_format)
-    : context(context), allocator(allocator), filename_format(filename_format), buf(1024) {
+    : Node("Image Write"), context(context), allocator(allocator), filename_format(filename_format),
+      buf(1024) {
     assert(filename_format.size() < buf.size());
     std::copy(filename_format.begin(), filename_format.end(), buf.begin());
 }
 
 ImageWriteNode::~ImageWriteNode() {}
 
-std::string ImageWriteNode::name() {
-    return "Image Write";
-}
-
-std::shared_ptr<Node::FrameData> ImageWriteNode::create_frame_data() {
-    return std::make_shared<FrameData>();
-}
-
-// Declare the inputs that you require
-std::tuple<std::vector<NodeInputDescriptorImage>, std::vector<NodeInputDescriptorBuffer>>
-ImageWriteNode::describe_inputs() {
-    return {
-        {
-            NodeInputDescriptorImage::transfer_src("src"),
-        },
-        {},
-    };
+std::vector<InputConnectorHandle> ImageWriteNode::describe_inputs() {
+    return {image_in};
 }
 
 void ImageWriteNode::record() {
@@ -59,21 +45,24 @@ void ImageWriteNode::record() {
         callback();
 }
 
-void ImageWriteNode::pre_process([[maybe_unused]] const uint64_t& run_iteration,
-                                 [[maybe_unused]] NodeStatus& status) {
-    if (!record_enable && ((int64_t)run_iteration == enable_run)) {
+ImageWriteNode::NodeStatusFlags
+ImageWriteNode::pre_process(GraphRun& run,
+                            [[maybe_unused]] const ConnectorResourceMap& resource_for_connector) {
+    if (!record_enable && ((int64_t)run.get_iteration() == enable_run)) {
         record();
     }
-    status.request_rebuild = needs_rebuild;
-    needs_rebuild = false;
+    if (needs_rebuild) {
+        needs_rebuild = false;
+        return NodeStatusFlagBits::NEEDS_RECONNECT;
+    }
+    return {};
 };
 
-void ImageWriteNode::cmd_process(
-    const vk::CommandBuffer& cmd,
-    GraphRun& run,
-    [[maybe_unused]] const std::shared_ptr<Node::FrameData>& node_frame_data,
-    [[maybe_unused]] const uint32_t set_index,
-    const NodeIO& io) {
+void ImageWriteNode::process(GraphRun& run,
+                             const vk::CommandBuffer& cmd,
+                             [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
+                             const ConnectorResourceMap& resource_for_connector,
+                             std::any& in_flight_data) {
 
     //--------- Make sure we always increase the iteration counter
     defer {
@@ -125,7 +114,7 @@ void ImageWriteNode::cmd_process(
     last_frame_time_millis = time_millis;
 
     // CHECK PATH
-    const ImageHandle src = io.image_inputs[0];
+    const ImageHandle src = resource_for_connector.at(image_in)->get_image();
     vk::Extent3D scaled = max(multiply(src->get_extent(), scale), {1, 1, 1});
     fmt::dynamic_format_arg_store<fmt::format_context> arg_store;
     get_format_args([&](const auto& arg) { arg_store.push_back(arg); }, scaled,
@@ -137,7 +126,7 @@ void ImageWriteNode::cmd_process(
         }
         path = std::filesystem::absolute(fmt::vformat(this->filename_format, arg_store) +
                                          FILE_EXTENSIONS[this->format]);
-    } catch (fmt::format_error e) {
+    } catch (const fmt::format_error& e) {
         record_enable = false;
         record_next = false;
         SPDLOG_ERROR(e.what());
@@ -156,8 +145,10 @@ void ImageWriteNode::cmd_process(
         this->format == FORMAT_HDR ? vk::Format::eR32G32B32A32Sfloat : vk::Format::eR8G8B8A8Srgb;
     const vk::FormatProperties format_properties =
         context->physical_device.physical_device.getFormatProperties(format);
-    const std::shared_ptr<FrameData> frame_data =
-        std::static_pointer_cast<FrameData>(node_frame_data);
+
+    if (!in_flight_data.has_value())
+        in_flight_data.emplace<FrameData>();
+    FrameData& frame_data = std::any_cast<FrameData&>(in_flight_data);
 
     vk::ImageCreateInfo linear_info{
         {},
@@ -208,7 +199,7 @@ void ImageWriteNode::cmd_process(
                 vk::ImageLayout::eUndefined,
             };
             ImageHandle intermediate_image = allocator->createImage(intermediate_info);
-            frame_data->intermediate_image = intermediate_image;
+            frame_data.intermediate_image = intermediate_image;
 
             cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
                                 vk::PipelineStageFlagBits::eTransfer, {}, {}, {},
@@ -226,11 +217,11 @@ void ImageWriteNode::cmd_process(
         }
         {
             MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "copy to linear image");
-            cmd.copyImage(*frame_data->intermediate_image.value(),
-                          frame_data->intermediate_image.value()->get_current_layout(),
+            cmd.copyImage(*frame_data.intermediate_image.value(),
+                          frame_data.intermediate_image.value()->get_current_layout(),
                           *linear_image, linear_image->get_current_layout(),
                           vk::ImageCopy(first_layer(), {}, first_layer(), {},
-                                        frame_data->intermediate_image.value()->get_extent()));
+                                        frame_data.intermediate_image.value()->get_extent()));
         }
     }
     cmd.pipelineBarrier(
@@ -293,7 +284,7 @@ void ImageWriteNode::cmd_process(
     context->thread_pool.submit(write_task);
 
     if (rebuild_after_capture)
-        run.request_rebuild();
+        run.request_reconnect();
     if (callback_after_capture && callback)
         callback();
     record_next = false;
@@ -302,7 +293,8 @@ void ImageWriteNode::cmd_process(
     record_iteration += record_enable ? it_offset : 0;
 }
 
-void ImageWriteNode::get_configuration([[maybe_unused]] Configuration& config, bool&) {
+ImageWriteNode::NodeStatusFlags
+ImageWriteNode::configuration([[maybe_unused]] Configuration& config) {
     config.st_separate("General");
     config.config_options("format", format, {"PNG", "JPG", "HDR"},
                           Configuration::OptionsStyle::COMBO);
@@ -321,7 +313,7 @@ void ImageWriteNode::get_configuration([[maybe_unused]] Configuration& config, b
     std::filesystem::path abs_path;
     try {
         abs_path = std::filesystem::absolute(fmt::vformat(filename_format, arg_store)).string();
-    } catch (fmt::format_error e) {
+    } catch (const fmt::format_error& e) {
         abs_path.clear();
     }
     config.output_text(
@@ -407,10 +399,11 @@ void ImageWriteNode::get_configuration([[maybe_unused]] Configuration& config, b
     config.output_text(
         "Hint: convert to video with ffmpeg -framerate <framerate> -pattern_type glob -i "
         "'*.jpg' -level 3.0 -pix_fmt yuv420p out.mp4");
+    return {};
 }
 
 void ImageWriteNode::set_callback(const std::function<void()> callback) {
     this->callback = callback;
 }
 
-} // namespace merian
+} // namespace merian_nodes

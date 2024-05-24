@@ -29,7 +29,7 @@ class GLFWWindowNode : public Node {
                          const vk::CommandBuffer& cmd,
                          [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
                          const ConnectorResourceMap& resource_for_connector,
-                         [[maybe_unused]] std::shared_ptr<InFlightData>& in_flight_data) override {
+                         [[maybe_unused]] std::any& in_flight_data) override {
         swapchain->set_vsync(vsync);
         acquire = swapchain->acquire(window);
         if (acquire) {

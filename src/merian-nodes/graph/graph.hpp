@@ -53,7 +53,7 @@ struct InFlightData {
     // Tasks that should be run in the current iteration after acquiring the fence.
     std::vector<std::function<void()>> tasks;
     // For each node: optional in-flight data.
-    std::unordered_map<NodeHandle, std::shared_ptr<Node::InFlightData>> in_flight_data{};
+    std::unordered_map<NodeHandle, std::any> in_flight_data{};
 };
 
 // Data that is stored for every node that is present in the graph.
@@ -160,7 +160,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
     }
 
     ~Graph() {
-        queue->wait_idle();
+        wait();
     }
 
     // --- add / remove nodes and connections ---
@@ -253,8 +253,8 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
         // Make sure resources are not in use
         {
-            MERIAN_PROFILE_SCOPE(profiler, "wait idle");
-            queue->wait_idle();
+            MERIAN_PROFILE_SCOPE(profiler, "wait for in-flight iteraitons");
+            wait();
         }
 
         {
@@ -292,7 +292,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 needs_reconnect |= flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT;
                 if (flags & Node::NodeStatusFlagBits::RESET_IN_FLIGHT_DATA) {
                     for (uint32_t i = 0; i < RING_SIZE; i++) {
-                        ring_fences.get(i).user_data.in_flight_data.erase(node);
+                        ring_fences.get(i).user_data.in_flight_data.at(node).reset();
                     }
                 }
             }
@@ -311,8 +311,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         // PREPARE RUN: wait for fence, release resources, reset cmd pool
 
         // wait for the in-flight processing to finish
-        auto& iteration_data = ring_fences.next_cycle_wait_and_get();
-        InFlightData& in_flight_data = iteration_data.user_data;
+        InFlightData& in_flight_data = ring_fences.next_cycle_wait_get();
 
         // now we can release the resources from staging space and reset the command pool
         resource_allocator->getStaging()->releaseResourceSet(in_flight_data.staging_set_id);
@@ -324,10 +323,10 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         // get profiler and reports
         const ProfilerHandle& profiler = prepare_profiler_for_run(cmd, in_flight_data);
 
-        run.reset(profiler);
+        run.reset(iteration, profiler);
         on_run_starting(run);
 
-        // EXECUTE RUN
+        // CONNECT and PREPROCESS
         do {
             // While connection nodes can signalize that they need to reconnect
             while (needs_reconnect) {
@@ -344,12 +343,13 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                         node->pre_process(run, data.resource_maps[set_idx]);
                     needs_reconnect |= flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT;
                     if (flags & Node::NodeStatusFlagBits::RESET_IN_FLIGHT_DATA) {
-                        in_flight_data.in_flight_data.erase(node);
+                        in_flight_data.in_flight_data[node].reset();
                     }
                 }
             }
         } while (needs_reconnect);
 
+        // RUN
         {
             MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "Run nodes");
             for (auto& node : flat_topology) {
@@ -369,7 +369,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         on_pre_submit(run, cmd);
         cmd_pool->end_all();
         in_flight_data.staging_set_id = resource_allocator->getStaging()->finalizeResourceSet();
-        queue->submit(cmd_pool, iteration_data.fence, run.get_signal_semaphores(),
+        queue->submit(cmd_pool, ring_fences.reset(), run.get_signal_semaphores(),
                       run.get_wait_semaphores(), run.get_wait_stages(),
                       run.get_timeline_semaphore_submit_info());
         run.execute_callbacks(queue);
@@ -377,6 +377,11 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
         needs_reconnect |= run.needs_reconnect;
         iteration++;
+    }
+
+    // waits until all in-flight iterations have finished
+    void wait() {
+        ring_fences.wait_all();
     }
 
     void configuration(Configuration& config) {
