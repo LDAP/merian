@@ -1,6 +1,6 @@
 #pragma once
 
-#include "graph/resource.hpp"
+#include "merian-nodes/graph/resource.hpp"
 
 namespace merian_nodes {
 

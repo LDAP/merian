@@ -29,8 +29,7 @@ ComputeNode::on_connected(const DescriptorSetLayoutHandle& descriptor_set_layout
 void ComputeNode::process(GraphRun& run,
                           const vk::CommandBuffer& cmd,
                           const DescriptorSetHandle& descriptor_set,
-                          [[maybe_unused]] const ConnectorResourceMap& resource_for_connector,
-                          [[maybe_unused]] std::any& in_flight_data) {
+                          [[maybe_unused]] const NodeIO& io) {
     pipe->bind(cmd);
     pipe->bind_descriptor_set(cmd, descriptor_set);
     if (push_constant_size.has_value())

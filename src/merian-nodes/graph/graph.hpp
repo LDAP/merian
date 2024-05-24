@@ -133,7 +133,7 @@ struct NodeData {
         std::unique_ptr<DescriptorSetUpdate> update;
     };
     std::vector<PerDescriptorSetInfo> descriptor_sets;
-    std::vector<ConnectorResourceMap> resource_maps;
+    std::vector<NodeIO> resource_maps;
 };
 } // namespace graph_internal
 
@@ -357,7 +357,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 if (debug_utils)
                     debug_utils->cmd_begin_label(cmd, node->name);
 
-                run_node(run, cmd, node, data, in_flight_data, profiler);
+                run_node(run, cmd, node, data, profiler);
 
                 if (debug_utils)
                     debug_utils->cmd_end_label(cmd);
@@ -493,7 +493,6 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                   const vk::CommandBuffer& cmd,
                   const NodeHandle& node,
                   NodeData& data,
-                  InFlightData& graph_frame_data,
                   [[maybe_unused]] const ProfilerHandle& profiler) {
         const uint32_t set_idx = iteration % data.descriptor_sets.size();
 
@@ -543,12 +542,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             }
         }
 
-        {
-            // actually run node
-            auto& in_flight_data = graph_frame_data.in_flight_data[node];
-            node->process(run, cmd, descriptor_set.descriptor_set, data.resource_maps[set_idx],
-                          in_flight_data);
-        }
+        { node->process(run, cmd, descriptor_set.descriptor_set, data.resource_maps[set_idx]); }
 
         {
             // Call connector callbacks (post_process) and record descriptor set updates
@@ -868,6 +862,9 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                     [&, set_idx](const OutputConnectorHandle& connector) {
                         return std::get<0>(
                             dst_data.output_connections[connector].precomputed_resources[set_idx]);
+                    },
+                    [&, dst_node]() -> std::any& {
+                        return ring_fences.get().user_data.in_flight_data[dst_node];
                     });
             }
         }

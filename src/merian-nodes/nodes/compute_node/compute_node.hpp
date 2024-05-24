@@ -49,8 +49,7 @@ class ComputeNode : public Node {
     virtual void process(GraphRun& run,
                          const vk::CommandBuffer& cmd,
                          const DescriptorSetHandle& descriptor_set,
-                         const ConnectorResourceMap& resource_for_connector,
-                         std::any& in_flight_data) override final;
+                         const NodeIO& io) override final;
 
   protected:
     const SharedContext context;

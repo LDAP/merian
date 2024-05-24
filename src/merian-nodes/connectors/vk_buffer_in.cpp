@@ -1,6 +1,7 @@
 #include "vk_buffer_in.hpp"
 
 #include "merian-nodes/resources/vk_buffer_resource.hpp"
+#include "merian/utils/pointer.hpp"
 
 namespace merian_nodes {
 

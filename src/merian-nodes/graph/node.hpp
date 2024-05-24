@@ -2,13 +2,13 @@
 
 #include "connector_input.hpp"
 #include "connector_output.hpp"
+#include "node_io.hpp"
 #include "graph_run.hpp"
 
 #include "merian/utils/configuration.hpp"
 #include "merian/vk/descriptors/descriptor_set.hpp"
 #include "merian/vk/descriptors/descriptor_set_layout.hpp"
 
-#include <any>
 #include <memory>
 
 namespace merian_nodes {
@@ -81,7 +81,7 @@ class Node : public std::enable_shared_from_this<Node> {
     [[nodiscard]]
     virtual NodeStatusFlags
     pre_process([[maybe_unused]] GraphRun& run,
-                [[maybe_unused]] const ConnectorResourceMap& resource_for_connector) {
+                [[maybe_unused]] const NodeIO& io) {
         return {};
     }
 
@@ -91,13 +91,12 @@ class Node : public std::enable_shared_from_this<Node> {
     // connector documentation. If you need to perform layout transitions use the barrier() methods
     // of the images.
     //
-    // You can provide data that that is required for the current run by setting in_flight_data.
+    // You can provide data that that is required for the current run by setting the io map in_flight_data.
     // The pointer is persisted and supplied again after (graph ring size - 1) runs.
     virtual void process([[maybe_unused]] GraphRun& run,
                          [[maybe_unused]] const vk::CommandBuffer& cmd,
                          [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
-                         [[maybe_unused]] const ConnectorResourceMap& resource_for_connector,
-                         [[maybe_unused]] std::any& in_flight_data) {}
+                         [[maybe_unused]] const NodeIO& io) {}
 
     // Declare your configuration options and output status information.
     // This method is not called as part of a run, meaning you cannot rely on it being called!

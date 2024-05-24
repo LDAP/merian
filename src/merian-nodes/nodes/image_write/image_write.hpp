@@ -25,13 +25,12 @@ class ImageWriteNode : public Node {
     virtual std::vector<InputConnectorHandle> describe_inputs() override;
 
     virtual NodeStatusFlags
-    pre_process(GraphRun& run, const ConnectorResourceMap& resource_for_connector) override;
+    pre_process(GraphRun& run, const NodeIO& io) override;
 
     virtual void process(GraphRun& run,
                          const vk::CommandBuffer& cmd,
                          const DescriptorSetHandle& descriptor_set,
-                         const ConnectorResourceMap& resource_for_connector,
-                         std::any& in_flight_data) override;
+                         const NodeIO& io) override;
 
     virtual NodeStatusFlags configuration(Configuration& config) override;
 

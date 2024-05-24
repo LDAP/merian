@@ -45,9 +45,8 @@ void ImageWriteNode::record() {
         callback();
 }
 
-ImageWriteNode::NodeStatusFlags
-ImageWriteNode::pre_process(GraphRun& run,
-                            [[maybe_unused]] const ConnectorResourceMap& resource_for_connector) {
+ImageWriteNode::NodeStatusFlags ImageWriteNode::pre_process(GraphRun& run,
+                                                            [[maybe_unused]] const NodeIO& io) {
     if (!record_enable && ((int64_t)run.get_iteration() == enable_run)) {
         record();
     }
@@ -61,8 +60,7 @@ ImageWriteNode::pre_process(GraphRun& run,
 void ImageWriteNode::process(GraphRun& run,
                              const vk::CommandBuffer& cmd,
                              [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
-                             const ConnectorResourceMap& resource_for_connector,
-                             std::any& in_flight_data) {
+                             const NodeIO& io) {
 
     //--------- Make sure we always increase the iteration counter
     defer {
@@ -114,7 +112,7 @@ void ImageWriteNode::process(GraphRun& run,
     last_frame_time_millis = time_millis;
 
     // CHECK PATH
-    const ImageHandle src = resource_for_connector.at(image_in)->get_image();
+    const ImageHandle src = io[image_in]->get_image();
     vk::Extent3D scaled = max(multiply(src->get_extent(), scale), {1, 1, 1});
     fmt::dynamic_format_arg_store<fmt::format_context> arg_store;
     get_format_args([&](const auto& arg) { arg_store.push_back(arg); }, scaled,
@@ -146,9 +144,8 @@ void ImageWriteNode::process(GraphRun& run,
     const vk::FormatProperties format_properties =
         context->physical_device.physical_device.getFormatProperties(format);
 
-    if (!in_flight_data.has_value())
-        in_flight_data.emplace<FrameData>();
-    FrameData& frame_data = std::any_cast<FrameData&>(in_flight_data);
+    FrameData& frame_data = io.frame_data<FrameData>();
+    frame_data.intermediate_image.reset();
 
     vk::ImageCreateInfo linear_info{
         {},

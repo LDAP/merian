@@ -28,12 +28,11 @@ class GLFWWindowNode : public Node {
     virtual void process(GraphRun& run,
                          const vk::CommandBuffer& cmd,
                          [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
-                         const ConnectorResourceMap& resource_for_connector,
-                         [[maybe_unused]] std::any& in_flight_data) override {
+                         const NodeIO& io) override {
         swapchain->set_vsync(vsync);
         acquire = swapchain->acquire(window);
         if (acquire) {
-            const auto& src_image = resource_for_connector.at(image_in);
+            const auto& src_image = io[image_in];
 
             const vk::Extent3D extent(acquire->extent, 1);
             cmd_barrier_image_layout(cmd, acquire->image, vk::ImageLayout::eUndefined,

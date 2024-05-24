@@ -44,7 +44,7 @@ ShadertoyNode::describe_outputs([[maybe_unused]] const ConnectorIOMap& output_fo
 
 ComputeNode::NodeStatusFlags
 ShadertoyNode::pre_process([[maybe_unused]] GraphRun& run,
-                           [[maybe_unused]] const ConnectorResourceMap& resource_for_connector) {
+                           [[maybe_unused]] const NodeIO& io) {
     NodeStatusFlags flags{};
     if (requires_rebuild) {
         flags |= NodeStatusFlagBits::NEEDS_RECONNECT;

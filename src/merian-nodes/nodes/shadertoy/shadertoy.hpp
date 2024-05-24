@@ -38,7 +38,7 @@ class ShadertoyNode : public ComputeNode {
     void set_resolution(uint32_t width, uint32_t height);
 
     NodeStatusFlags pre_process(GraphRun& run,
-                                const ConnectorResourceMap& resource_for_connector) override final;
+                                const NodeIO& io) override final;
 
     std::vector<OutputConnectorHandle>
     describe_outputs(const ConnectorIOMap& output_for_input) override final;
