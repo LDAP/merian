@@ -21,7 +21,7 @@ class ConnectorIOMap {
         std::enable_if_t<
             std::is_base_of_v<TypedInputConnector<OutputConnectorType, ResourceAccessType>, T>,
             bool> = true>
-    const std::shared_ptr<OutputConnectorType>& at(const std::shared_ptr<T>& input_connector) {
+    const std::shared_ptr<OutputConnectorType> at(const std::shared_ptr<T>& input_connector) {
         return debugable_ptr_cast<OutputConnectorType>(output_for_input(input_connector));
     }
 
