@@ -2,6 +2,7 @@
 
 #include "merian/utils/stopwatch.hpp"
 #include "merian/vk/extension/extension.hpp"
+#include "merian/vk/utils/query_pool.hpp"
 
 #include <optional>
 #include <queue>
@@ -19,23 +20,16 @@ class ProfileScopeGPU;
  *
  * Remember to export MERIAN_PROFILER_ENABLE if you want to use the profiler.
  *
- * Intended use is together with RingFence, since
- * in GPU processing there are often multiple frames-in-flight.
- * Waiting for the frame to be finished to collect the timestamps would flush the pipeline.
- * Use a profiler for every frame-in-flight instead, and collect the results after a few iterations.
  *
  * while (True) {
  *     auto& frame_data = ring_fences->next_cycle_wait_and_get();
  *     // now the timestamps from iteration i - RING_SIZE are ready
- *
- *     //get the profiler for the current iteration
- *     profiler = frame_data.user_data.profiler
- *     // collects the results of iteration i - RING_SIZE from the gpu
+
+ *     // collects the results of iteration i - RING_SIZE from the GPU
  *     // and resets the query pool
+ *     profiler.set_query_pool(frame_data.query_pool);
  *     profiler.collect();
- *     // print, display results...
  *
- *     profiler.reset(cmd);
  *     // use profiler...
  *
  *     queue.submit(... fence);
@@ -102,31 +96,25 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
     };
 
   public:
-    // The timestamps for GPU profiling must be preallocated, therefore you can only capture
-    // num_gpu_timers many timers. Throws runtime error if the device or queue does not support
-    // timestamp queries.
-    //
-    // Set num_gpu_timers to 0 to disable GPU profiling capabilities.
-    Profiler(const SharedContext context,
-             const QueueHandle queue,
-             const uint32_t num_gpu_timers = 1024);
+    Profiler(const SharedContext& context);
 
-  public:
     ~Profiler();
 
-    // Resets the averages.
+    // Clears the profiler
     void clear();
+
+    void set_query_pool(const QueryPoolHandle<vk::QueryType::eTimestamp>& query_pool);
 
     // Start a GPU section
     void cmd_start(
         const vk::CommandBuffer& cmd,
         const std::string name,
-        const vk::PipelineStageFlagBits pipeline_stage = vk::PipelineStageFlagBits::eTopOfPipe);
+        const vk::PipelineStageFlagBits pipeline_stage = vk::PipelineStageFlagBits::eAllCommands);
 
     // Stop a GPU section
     void cmd_end(
         const vk::CommandBuffer& cmd,
-        const vk::PipelineStageFlagBits pipeline_stage = vk::PipelineStageFlagBits::eBottomOfPipe);
+        const vk::PipelineStageFlagBits pipeline_stage = vk::PipelineStageFlagBits::eAllCommands);
 
     // Collects the results from the GPU.
     void collect(const bool wait = false);
@@ -139,11 +127,17 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
 
     Report get_report();
 
-    // Convenience method that collects the results then resets the profiler (for GPU profiling).
+    // Convenience method that sets the next query pool, collects the results then resets query pool
+    // (for GPU profiling).
     //
     // Every report_intervall_millis the method returns a profiling report and clears the profiler
     // when resetting. Meaning, means and std deviation were calculated over the report intervall.
-    std::optional<Report> collect_get_every(const uint32_t report_intervall_millis = 0);
+    //
+    // Note: The profiler is only reset when the GPU results are actually ready, however, that means
+    // that the may be already multiple results for the CPU (noticeable when report_intervall_millis == 0).
+    std::optional<Report>
+    set_collect_get_every(const QueryPoolHandle<vk::QueryType::eTimestamp>& query_pool,
+                          const uint32_t report_intervall_millis = 0);
 
     // returns the report as string
     static std::string get_report_str(const Profiler::Report& report);
@@ -153,9 +147,10 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
 
   private:
     const SharedContext context;
-    const uint32_t num_gpu_timers;
     const float timestamp_period;
-    vk::QueryPool query_pool{nullptr};
+
+    QueryPoolHandle<vk::QueryType::eTimestamp> query_pool;
+
     Stopwatch report_intervall;
 
     uint32_t current_cpu_section = 0;
@@ -165,8 +160,14 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
     std::vector<CPUSection> cpu_sections;
     std::vector<GPUSection> gpu_sections;
 
-    // sections that have timestamps in the command buffer
-    std::vector<uint32_t> pending_gpu_sections;
+    uint32_t clear_index = 0;
+
+    struct PerQueryPoolInfo {
+        std::vector<uint32_t> pending_gpu_sections;
+        uint32_t clear_index;
+    };
+    std::unordered_map<QueryPoolHandle<vk::QueryType::eTimestamp>, PerQueryPoolInfo>
+        query_pool_infos;
 };
 using ProfilerHandle = std::shared_ptr<Profiler>;
 

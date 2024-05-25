@@ -48,8 +48,8 @@ struct InFlightData {
     merian::StagingMemoryManager::SetID staging_set_id{};
     // The graph run, holds semaphores and such.
     GraphRun graph_run;
-    // The profiler, might be nullptr if profiling is disabeled.
-    merian::ProfilerHandle profiler{};
+    // Query pools for the profiler
+    QueryPoolHandle<vk::QueryType::eTimestamp> profiler_query_pool;
     // Tasks that should be run in the current iteration after acquiring the fence.
     std::vector<std::function<void()>> tasks;
     // For each node: optional in-flight data.
@@ -152,11 +152,13 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         : context(context), resource_allocator(resource_allocator), queue(context->get_queue_GCT()),
           ring_fences(context) {
         for (uint32_t i = 0; i < RING_SIZE; i++) {
-            ring_fences.get(i).user_data.command_pool = std::make_shared<CommandPool>(queue);
-            ring_fences.get(i).user_data.profiler =
-                std::make_shared<merian::Profiler>(context, queue);
+            InFlightData& in_flight_data = ring_fences.get(i).user_data;
+            in_flight_data.command_pool = std::make_shared<CommandPool>(queue);
+            in_flight_data.profiler_query_pool =
+                std::make_shared<merian::QueryPool<vk::QueryType::eTimestamp>>(context, 512, true);
         }
         debug_utils = context->get_extension<ExtensionVkDebugUtils>();
+        run_profiler = std::make_shared<merian::Profiler>(context);
     }
 
     ~Graph() {
@@ -242,7 +244,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
     //
     // the configuration allow to inspect the partial connections as well
     void connect() {
-        ProfilerHandle profiler = std::make_shared<Profiler>(context, queue, 0);
+        ProfilerHandle profiler = std::make_shared<Profiler>(context);
 
         needs_reconnect = false;
 
@@ -479,10 +481,12 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             return nullptr;
         }
 
-        last_run_report = in_flight_data.profiler->collect_get_every(profiler_report_intervall_ms)
+        last_run_report = run_profiler
+                              ->set_collect_get_every(in_flight_data.profiler_query_pool,
+                                                      profiler_report_intervall_ms)
                               .value_or(last_run_report);
 
-        return in_flight_data.profiler;
+        return run_profiler;
     }
 
     // Calls connector callbacks, checks resource states and records as well as applies descriptor
@@ -976,6 +980,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
     Profiler::Report last_build_report;
     Profiler::Report last_run_report;
+    merian::ProfilerHandle run_profiler;
 
     // Nodes
     std::unordered_map<std::string, NodeHandle> node_for_name;
