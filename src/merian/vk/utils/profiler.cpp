@@ -25,6 +25,7 @@ Profiler::Profiler(const SharedContext context,
         vk::QueryPoolCreateInfo createInfo({}, vk::QueryType::eTimestamp,
                                            num_gpu_timers * SW_QUERY_COUNT);
         query_pool = context->device.createQueryPool(createInfo);
+        context->device.resetQueryPool(query_pool, 0, num_gpu_timers * SW_QUERY_COUNT);
     }
     pending_gpu_sections.reserve(num_gpu_timers * SW_QUERY_COUNT);
     cpu_sections.assign(1, {});
@@ -44,28 +45,18 @@ Profiler::~Profiler() {
     }
 }
 
-void Profiler::cmd_reset(const vk::CommandBuffer& cmd, const bool clear) {
-    if (query_pool) {
-        cmd.resetQueryPool(query_pool, 0, num_gpu_timers);
-        pending_gpu_sections.clear();
-        reset_was_called = true;
-    }
-
-    assert(clear || (current_gpu_section == 0 && current_cpu_section == 0 &&
-                     "it seams that there is a *end missing?"));
-    if (clear) {
-        // keep only root
-        cpu_sections.assign(1, {});
-        gpu_sections.assign(1, {});
-        current_gpu_section = 0;
-        current_cpu_section = 0;
-    }
+void Profiler::clear() {
+    pending_gpu_sections.clear();
+    // keep only root
+    cpu_sections.assign(1, {});
+    gpu_sections.assign(1, {});
+    current_gpu_section = 0;
+    current_cpu_section = 0;
 }
 
 void Profiler::cmd_start(const vk::CommandBuffer& cmd,
                          const std::string name,
                          const vk::PipelineStageFlagBits pipeline_stage) {
-    assert(reset_was_called);
     assert(pending_gpu_sections.size() * SW_QUERY_COUNT < num_gpu_timers);
     assert(query_pool && "num_gpu_timers is 0?");
     GPUSection& parent_section = gpu_sections[current_gpu_section];
@@ -78,7 +69,8 @@ void Profiler::cmd_start(const vk::CommandBuffer& cmd,
         parent_section.children[name] = current_gpu_section;
     }
     GPUSection& current_section = gpu_sections[current_gpu_section];
-    assert(current_section.timestamp_idx == (uint32_t)-1 && "two sections with the same name or missing collect()?");
+    assert(current_section.timestamp_idx == (uint32_t)-1 &&
+           "two sections with the same name or missing collect()?");
     current_section.timestamp_idx = pending_gpu_sections.size() * SW_QUERY_COUNT;
 
     cmd.writeTimestamp(pipeline_stage, query_pool, current_section.timestamp_idx);
@@ -89,7 +81,6 @@ void Profiler::cmd_end(const vk::CommandBuffer& cmd,
                        const vk::PipelineStageFlagBits pipeline_stage) {
     assert(query_pool && "num_gpu_timers is 0?");
     assert(current_gpu_section != 0 && "missing cmd_start?");
-    assert(reset_was_called);
     assert(pending_gpu_sections.size() * SW_QUERY_COUNT < num_gpu_timers);
 
     GPUSection& section = gpu_sections[current_gpu_section];
@@ -104,7 +95,6 @@ void Profiler::collect(const bool wait) {
         return;
 
     assert(query_pool && "num_gpu_timers is 0?");
-    assert(reset_was_called);
     assert(current_gpu_section == 0 && "cmd_end missing?");
 
     vk::QueryResultFlags flags = vk::QueryResultFlagBits::e64;
@@ -129,7 +119,8 @@ void Profiler::collect(const bool wait) {
         section.num_captures++;
     }
 
-    reset_was_called = false;
+    context->device.resetQueryPool(query_pool, 0, timestamps.size());
+    pending_gpu_sections.clear();
 }
 
 void Profiler::start(const std::string& name) {
@@ -195,23 +186,17 @@ std::vector<Profiler::ReportEntry> make_report(SectionType& section,
 }
 
 std::optional<Profiler::Report>
-Profiler::collect_reset_get_every(const vk::CommandBuffer& cmd,
-                                  const uint32_t report_intervall_millis) {
-    
+Profiler::collect_get_every(const uint32_t report_intervall_millis) {
+
     collect();
 
     std::optional<Profiler::Report> report;
-    bool clear;
 
     if (report_intervall.millis() >= report_intervall_millis) {
         report = get_report();
-        clear = true;
+        clear();
         report_intervall.reset();
-    } else {
-        clear = false;
     }
-
-    cmd_reset(cmd, clear);
 
     return report;
 }

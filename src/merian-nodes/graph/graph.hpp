@@ -321,7 +321,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
         const vk::CommandBuffer cmd = cmd_pool->create_and_begin();
         // get profiler and reports
-        const ProfilerHandle& profiler = prepare_profiler_for_run(cmd, in_flight_data);
+        const ProfilerHandle& profiler = prepare_profiler_for_run(in_flight_data);
 
         run.reset(iteration, profiler);
         on_run_starting(run);
@@ -474,15 +474,13 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
     // --- Graph run subtasks ---
 
     // Creates the profiler if necessary
-    ProfilerHandle prepare_profiler_for_run(const vk::CommandBuffer& cmd,
-                                            InFlightData& in_flight_data) {
+    ProfilerHandle prepare_profiler_for_run(InFlightData& in_flight_data) {
         if (!profiler_enable) {
             return nullptr;
         }
 
-        last_run_report =
-            in_flight_data.profiler->collect_reset_get_every(cmd, profiler_report_intervall_ms)
-                .value_or(last_run_report);
+        last_run_report = in_flight_data.profiler->collect_get_every(profiler_report_intervall_ms)
+                              .value_or(last_run_report);
 
         return in_flight_data.profiler;
     }

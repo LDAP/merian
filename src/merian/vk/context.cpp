@@ -400,6 +400,10 @@ void enable_common_features(const Context::FeaturesContainer& supported,
         SPDLOG_DEBUG("timelineSemaphore supported. Enabling feature");
         enable.physical_device_features_v12.timelineSemaphore = true;
     }
+    if (supported.physical_device_features_v12.hostQueryReset) {
+        SPDLOG_DEBUG("hostQueryReset supported. Enabling feature");
+        enable.physical_device_features_v12.hostQueryReset = true;
+    }
 
     if (supported.physical_device_features_v13.robustImageAccess) {
         SPDLOG_DEBUG("robustImageAccess supported. Enabling feature");

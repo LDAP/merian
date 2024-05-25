@@ -114,10 +114,8 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
   public:
     ~Profiler();
 
-    // Resets the profiler, allowing to capture new timestamps on the GPU.
-    // This MUST be called before any cmd_*
-    // If clear is true the averages are reset too.
-    void cmd_reset(const vk::CommandBuffer& cmd, const bool clear = false);
+    // Resets the averages.
+    void clear();
 
     // Start a GPU section
     void cmd_start(
@@ -145,8 +143,7 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
     //
     // Every report_intervall_millis the method returns a profiling report and clears the profiler
     // when resetting. Meaning, means and std deviation were calculated over the report intervall.
-    std::optional<Report> collect_reset_get_every(const vk::CommandBuffer& cmd,
-                                                  const uint32_t report_intervall_millis = 0);
+    std::optional<Report> collect_get_every(const uint32_t report_intervall_millis = 0);
 
     // returns the report as string
     static std::string get_report_str(const Profiler::Report& report);
@@ -170,7 +167,6 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
 
     // sections that have timestamps in the command buffer
     std::vector<uint32_t> pending_gpu_sections;
-    bool reset_was_called = false;
 };
 using ProfilerHandle = std::shared_ptr<Profiler>;
 
