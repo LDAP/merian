@@ -398,13 +398,13 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 config.config_uint("report intervall", profiler_report_intervall_ms,
                                    "Set the time period for the profiler to update in ms. Meaning, "
                                    "averages and deviations are calculated over this this period.");
-                if (last_build_report && config.st_begin_child("build", "Last Build")) {
-                    Profiler::get_report_imgui(last_build_report);
+
+                if (last_run_report && config.st_begin_child("run", "Graph Run")) {
+                    Profiler::get_report_imgui(last_run_report);
                     config.st_end_child();
                 }
-
-                if (last_run_report && config.st_begin_child("run", "Run")) {
-                    Profiler::get_report_imgui(last_run_report);
+                if (last_build_report && config.st_begin_child("build", "Last Graph Build")) {
+                    Profiler::get_report_imgui(last_build_report);
                     config.st_end_child();
                 }
             }
