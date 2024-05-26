@@ -74,7 +74,7 @@ class GLFWWindowNode : public Node {
         }
     }
 
-    SwapchainHandle get_swapchain() {
+    const SwapchainHandle& get_swapchain() {
         return swapchain;
     }
 
