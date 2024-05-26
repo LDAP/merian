@@ -122,8 +122,9 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
      *
      * If the framebuffer extent is 0 or the aquire was not successfull, std::nullopt is returned.
      */
-    std::optional<SwapchainAcquireResult> acquire(const WindowHandle& window) {
-        return acquire([&]() { return window->framebuffer_extent(); });
+    std::optional<SwapchainAcquireResult> acquire(const WindowHandle& window,
+                                                  const uint64_t timeout = UINT64_MAX) {
+        return acquire([&]() { return window->framebuffer_extent(); }, timeout);
     }
 
     /* May throw Swapchain::needs_recreate.
@@ -132,7 +133,8 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
      * If the framebuffer extent is 0 or the aquire was not successfull, std::nullopt is returned.
      */
     std::optional<SwapchainAcquireResult>
-    acquire(const std::function<vk::Extent2D()>& framebuffer_extent);
+    acquire(const std::function<vk::Extent2D()>& framebuffer_extent,
+            const uint64_t timeout = UINT64_MAX);
 
     /* May throw Swapchain::needs_recreate.
      * For that you can use the Swapchains copy constructor.

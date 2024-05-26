@@ -35,7 +35,7 @@ class GLFWWindowNode : public Node {
         acquire.reset();
         for (uint32_t tries = 0; !acquire && tries < 2; tries++) {
             try {
-                acquire = swapchain->acquire(window);
+                acquire = swapchain->acquire(window, 1000 * 1000 /* 1s */);
             } catch (const Swapchain::needs_recreate& e) {
                 old_swapchains.emplace_back(swapchain);
                 swapchain = std::make_shared<Swapchain>(swapchain);

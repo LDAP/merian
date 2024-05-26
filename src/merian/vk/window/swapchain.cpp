@@ -257,7 +257,8 @@ void Swapchain::destroy_swapchain() {
 }
 
 std::optional<SwapchainAcquireResult>
-Swapchain::acquire(const std::function<vk::Extent2D()>& framebuffer_extent) {
+Swapchain::acquire(const std::function<vk::Extent2D()>& framebuffer_extent,
+                   const uint64_t timeout) {
     const vk::Extent2D extent = framebuffer_extent();
 
     if (extent.width == 0 || extent.height == 0) {
@@ -276,7 +277,7 @@ Swapchain::acquire(const std::function<vk::Extent2D()>& framebuffer_extent) {
     }
 
     vk::Result result = context->device.acquireNextImageKHR(
-        swapchain, UINT64_MAX, *current_read_semaphore(), {}, &current_image_idx);
+        swapchain, timeout, *current_read_semaphore(), {}, &current_image_idx);
 
     if (result == vk::Result::eSuccess) {
         aquire_result.image = current_image();
