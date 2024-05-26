@@ -1,11 +1,9 @@
 #pragma once
 
 #include "merian/utils/stopwatch.hpp"
-#include "merian/vk/extension/extension.hpp"
 #include "merian/vk/utils/query_pool.hpp"
 
 #include <optional>
-#include <queue>
 
 namespace merian {
 
