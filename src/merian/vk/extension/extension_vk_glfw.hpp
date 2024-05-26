@@ -12,11 +12,18 @@ namespace merian {
  * @brief      Initializes GLFW and makes sure the graphics queue supports present.
  */
 class ExtensionVkGLFW : public Extension {
+  public:
+    struct glfw_error : public std::runtime_error {
+        glfw_error(int id, const char* desc)
+            : std::runtime_error(fmt::format("GLFW: {}: {}", id, desc)), desc(desc), id(id) {}
+
+        const char* desc;
+        const int id;
+    };
+
   private:
     static void glfw_error_callback(int id, const char* desc) {
-        std::string error = fmt::format("GLFW: {}: {}", id, desc);
-        SPDLOG_ERROR(error);
-        throw std::runtime_error(error);
+        throw glfw_error(id, desc);
     }
 
   public:

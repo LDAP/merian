@@ -3,6 +3,7 @@
 #include "merian-nodes/connectors/vk_image_in.hpp"
 #include "merian-nodes/graph/node.hpp"
 
+#include "merian/vk/extension/extension_vk_glfw.hpp"
 #include "merian/vk/utils/barriers.hpp"
 #include "merian/vk/utils/blits.hpp"
 #include "merian/vk/window/glfw_window.hpp"
@@ -10,6 +11,11 @@
 
 namespace merian_nodes {
 
+/*
+ * Outputs to a GLFW window.
+ * This node makes use of the error handling features of ExtensionVkGLFW, meaning, consider using
+ * that to initialize GLFW.
+ */
 class GLFWWindowNode : public Node {
   public:
     GLFWWindowNode(const SharedContext context) : Node("GLFW window") {
@@ -29,6 +35,7 @@ class GLFWWindowNode : public Node {
                          const NodeIO& io) override {
         auto& old_swapchains = io.frame_data<std::vector<SwapchainHandle>>();
         old_swapchains.clear();
+        const auto& src_image = io[image_in];
 
         swapchain->set_vsync(vsync);
 
@@ -43,8 +50,6 @@ class GLFWWindowNode : public Node {
         }
 
         if (acquire) {
-            const auto& src_image = io[image_in];
-
             const vk::Extent3D extent(acquire->extent, 1);
             cmd_barrier_image_layout(cmd, acquire->image, vk::ImageLayout::eUndefined,
                                      vk::ImageLayout::eTransferDstOptimal);
@@ -60,7 +65,7 @@ class GLFWWindowNode : public Node {
 
             run.add_wait_semaphore(acquire->wait_semaphore, vk::PipelineStageFlagBits::eTransfer);
             run.add_signal_semaphore(acquire->signal_semaphore);
-            run.add_submit_callback([&](const QueueHandle& queue) { 
+            run.add_submit_callback([&](const QueueHandle& queue) {
                 try {
                     swapchain->present(queue);
                 } catch (const Swapchain::needs_recreate& e) {
@@ -86,7 +91,14 @@ class GLFWWindowNode : public Node {
         config.config_options("mode", fullscreen, {"windowed", "fullscreen"});
         if (fullscreen != old_fullscreen) {
             if (fullscreen) {
-                glfwGetWindowPos(*window, &windowed_pos_size[0], &windowed_pos_size[1]);
+                try {
+                    glfwGetWindowPos(*window, &windowed_pos_size[0], &windowed_pos_size[1]);
+                } catch (const ExtensionVkGLFW::glfw_error& e) {
+                    if (e.id != GLFW_FEATURE_UNAVAILABLE) {
+                        throw e;
+                    }
+                    windowed_pos_size[0] = windowed_pos_size[1] = 0;
+                }
                 glfwGetWindowSize(*window, &windowed_pos_size[2], &windowed_pos_size[3]);
                 monitor = glfwGetPrimaryMonitor();
                 const GLFWvidmode* vidmode = glfwGetVideoMode(monitor);
