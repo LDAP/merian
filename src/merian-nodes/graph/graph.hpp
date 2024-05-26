@@ -13,7 +13,6 @@
 #include <merian/vk/descriptors/descriptor_set_layout_builder.hpp>
 
 #include <cstdint>
-#include <regex>
 #include <set>
 #include <unordered_map>
 #include <unordered_set>
@@ -60,13 +59,11 @@ struct InFlightData {
 struct NodeData {
     static const uint32_t NO_DESCRIPTOR_BINDING = -1u;
 
-    NodeData(const std::string& name, const uint32_t node_number)
-        : name(name), node_number(node_number) {}
+    NodeData(const std::string& name) : name(name) {}
 
     // A unique name for this node from the user. This is not node->name().
     // (on add_node)
     std::string name;
-    const uint32_t node_number;
 
     // Cache input connectors (node->describe_inputs())
     // (on start_nodes added and checked for name conflicts)
@@ -184,34 +181,23 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             if (name->empty()) {
                 throw std::invalid_argument{"node name cannot be empty"};
             }
-            if (std::regex_search(name.value(), std::regex("Node \\d+"))) {
-                throw std::invalid_argument{
-                    fmt::format("The node name {} is reserved for internal use", name.value())};
-            }
             if (node_for_name.contains(name.value())) {
                 throw std::invalid_argument{
                     fmt::format("graph already contains a node with name '{}'", name.value())};
             }
             node_name = name.value();
-        }
-
-        uint32_t node_number;
-        if (free_node_numbers.empty()) {
-            node_number = this->node_number++;
         } else {
-            auto smallest_it = free_node_numbers.begin();
-            node_number = *smallest_it;
-            free_node_numbers.erase(smallest_it);
-        }
-        if (node_name.empty()) {
-            node_name = fmt::format("Node {}", node_number);
+            uint32_t i = 0;
+            do {
+                node_name = fmt::format("{} {}", node->name, i++);
+            } while (node_for_name.contains(node_name));
         }
 
         node_for_name[node_name] = node;
-        node_data.try_emplace(node, node_name, node_number);
+        node_data.try_emplace(node, node_name);
 
         needs_reconnect = true;
-        SPDLOG_DEBUG("added node {} {}", node_number, node_name);
+        SPDLOG_DEBUG("added node {} ({})", node_name, node->name);
     }
 
     // Adds a connection to the graph.
@@ -988,9 +974,6 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
     // After connect() contains the nodes as far as a connection was possible in topological
     // order
     std::vector<NodeHandle> flat_topology;
-    // for node naming / identification
-    uint32_t node_number = 0;
-    std::set<uint32_t> free_node_numbers;
 };
 
 } // namespace merian_nodes
