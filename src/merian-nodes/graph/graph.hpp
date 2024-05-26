@@ -43,7 +43,7 @@ struct InFlightData {
     // We do not use RingCommandPool here since we might want to add a more custom
     // setup later (multi-threaded, multi-queues,...).
     std::shared_ptr<CommandPool> command_pool;
-    // Statging set, to release staging buffers and images when the copy
+    // Staging set, to release staging buffers and images when the copy
     // to device local memory has finished.
     merian::StagingMemoryManager::SetID staging_set_id{};
     // The graph run, holds semaphores and such.
@@ -80,7 +80,7 @@ struct NodeData {
     // This information is used by connect() to connect the graph
     std::unordered_set<NodeConnection, typename NodeConnection::Hash> desired_connections;
 
-    // --- Actural connections. ---
+    // --- Actual connections. ---
     // for each input the connected node and the corresponding output connector on the other
     // node (on connect)
     struct PerInputInfo {
@@ -89,7 +89,7 @@ struct NodeData {
         uint32_t descriptor_set_binding{NO_DESCRIPTOR_BINDING}; // (on prepare_descriptor_sets)
         // precomputed such that (iteration % precomputed_resources.size()) is the index of the
         // resource that must be used in the iteration. Matches the descriptor_sets array below.
-        // (resource handle, resource index the resources array of the corresponing output)
+        // (resource handle, resource index the resources array of the corresponding output)
         // (on prepare_descriptor_sets)
         std::vector<std::tuple<GraphResourceHandle, uint32_t>> precomputed_resources{};
     };
@@ -99,10 +99,10 @@ struct NodeData {
     struct PerResourceInfo {
         GraphResourceHandle resource;
 
-        // precomputed occurences in descriptor sets (needed to "record" descriptor set updates)
+        // precomputed occurrences in descriptor sets (needed to "record" descriptor set updates)
         // in descriptor sets of the node this output / resource belongs to
         std::vector<uint32_t> set_indices{};
-        // in descriptor sets of other nodes this resource is accessd using inputs
+        // in descriptor sets of other nodes this resource is accessed using inputs
         // (using in node, input connector, set_idx)
         std::vector<std::tuple<NodeHandle, InputConnectorHandle, uint32_t>> other_set_indices{};
     };
@@ -125,7 +125,7 @@ struct NodeData {
 
     DescriptorPoolHandle descriptor_pool;
 
-    // A descriptor set for each cobination of resources that can occur, due to delayed accesses.
+    // A descriptor set for each combination of resources that can occur, due to delayed accesses.
     // Also keep at least RING_SIZE to allow updating descriptor sets while iterations are in
     // flight. Access with iteration % data.descriptor_sets.size() (on prepare descriptor sets)
     struct PerDescriptorSetInfo {
@@ -233,7 +233,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
     // --- connect / run graph ---
 
-    // attemps to connect the graph with the current set of connections
+    // Attempts to connect the graph with the current set of connections
     // May fail with illegal_connection if there is a illegal connection present (a node input does
     // not support the connected output or the graph contains a undelayed cycle). May fail with
     // connection_missing if a node input was not connected. May fail with conenctor_error if two
@@ -255,7 +255,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
         // Make sure resources are not in use
         {
-            MERIAN_PROFILE_SCOPE(profiler, "wait for in-flight iteraitons");
+            MERIAN_PROFILE_SCOPE(profiler, "wait for in-flight iterations");
             wait();
         }
 
@@ -473,7 +473,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         }
     }
 
-    // --- Graph run subtasks ---
+    // --- Graph run sub-tasks ---
 
     // Creates the profiler if necessary
     ProfilerHandle prepare_profiler_for_run(InFlightData& in_flight_data) {
@@ -598,7 +598,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         }
     }
 
-    // --- Graph connect subtasks ---
+    // --- Graph connect sub-tasks ---
 
     // Removes all connections, frees graph resources and resets the precomputed topology.
     // Only keeps desired connections.
@@ -622,7 +622,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
     // Calls the describe_inputs() methods of the nodes and caches the result in the node_data.
     //
-    // Nodes without inputs or with delayed inputs only (ie. nodes that are fully connected).
+    // Nodes without inputs or with delayed inputs only (i.e. nodes that are fully connected).
     // This is used to initialize a topological traversal of the graph to connect the nodes.
     std::queue<NodeHandle> start_nodes() {
         std::queue<NodeHandle> queue;
@@ -937,7 +937,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
     // --- Callback setter ---
 
     // Set a callback that is executed right after the fence for the current iteration is
-    // aquired and before any node is run.
+    // acquired and before any node is run.
     void set_on_run_starting(const std::function<void(GraphRun& graph_run)>& on_run_starting) {
         this->on_run_starting = on_run_starting;
     }
