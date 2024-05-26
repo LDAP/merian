@@ -38,7 +38,7 @@ class GLFWImGui {
 
   private:
     void init_imgui(GLFWwindow* window, SwapchainAcquireResult& aquire_result, QueueHandle& queue);
-    void recreate_render_pass(SwapchainAcquireResult& aquire_result);
+    void create_render_pass(SwapchainAcquireResult& aquire_result);
 
   private:
     const SharedContext context;
@@ -51,7 +51,7 @@ class GLFWImGui {
     bool imgui_initialized = false;
     GLFWwindow* window; // only valid if initialized
     vk::DescriptorPool imgui_pool{VK_NULL_HANDLE};
-    vk::RenderPass render_pass{VK_NULL_HANDLE};
+    vk::RenderPass renderpass{VK_NULL_HANDLE};
     std::vector<vk::Framebuffer> framebuffers;
 };
 

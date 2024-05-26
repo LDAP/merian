@@ -12,12 +12,10 @@ namespace merian_nodes {
 
 class GLFWWindowNode : public Node {
   public:
-    GLFWWindowNode(const SharedContext context,
-                   const std::optional<QueueHandle> wait_queue = std::nullopt)
-        : Node("GLFW window") {
+    GLFWWindowNode(const SharedContext context) : Node("GLFW window") {
         window = std::make_shared<merian::GLFWWindow>(context);
         surface = window->get_surface();
-        swapchain = std::make_shared<merian::Swapchain>(context, surface, wait_queue);
+        swapchain = std::make_shared<merian::Swapchain>(context, surface);
         vsync = swapchain->vsync_enabled();
     }
 
@@ -29,8 +27,21 @@ class GLFWWindowNode : public Node {
                          const vk::CommandBuffer& cmd,
                          [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
                          const NodeIO& io) override {
+        auto& old_swapchains = io.frame_data<std::vector<SwapchainHandle>>();
+        old_swapchains.clear();
+
         swapchain->set_vsync(vsync);
-        acquire = swapchain->acquire(window);
+
+        acquire.reset();
+        for (uint32_t tries = 0; !acquire && tries < 2; tries++) {
+            try {
+                acquire = swapchain->acquire(window);
+            } catch (const Swapchain::needs_recreate& e) {
+                old_swapchains.emplace_back(swapchain);
+                swapchain = std::make_shared<Swapchain>(swapchain);
+            }
+        }
+
         if (acquire) {
             const auto& src_image = io[image_in];
 
@@ -49,8 +60,14 @@ class GLFWWindowNode : public Node {
 
             run.add_wait_semaphore(acquire->wait_semaphore, vk::PipelineStageFlagBits::eTransfer);
             run.add_signal_semaphore(acquire->signal_semaphore);
-            run.add_submit_callback(
-                [&](const QueueHandle& queue) { swapchain->present(queue, window); });
+            run.add_submit_callback([&](const QueueHandle& queue) { 
+                try {
+                    swapchain->present(queue);
+                } catch (const Swapchain::needs_recreate& e) {
+                    // do nothing and hope for the best
+                    return;
+                }
+            });
 
             if (request_rebuild_on_recreate && acquire->did_recreate)
                 run.request_reconnect();

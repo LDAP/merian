@@ -1,15 +1,18 @@
 #pragma once
 
 #include "merian/vk/command/queue.hpp"
+#include "merian/vk/sync/semaphore_binary.hpp"
 #include "merian/vk/window/surface.hpp"
 #include "merian/vk/window/window.hpp"
-#include "merian/vk/sync/semaphore_binary.hpp"
 #include "vulkan/vulkan.hpp"
 #include <GLFW/glfw3.h>
 
 #include <optional>
 
 namespace merian {
+
+class Swapchain;
+using SwapchainHandle = std::shared_ptr<Swapchain>;
 
 struct SwapchainAcquireResult {
     // The image and its view and index in the swap chain.
@@ -31,6 +34,10 @@ struct SwapchainAcquireResult {
     // Swapchain was created or recreated.
     // You can use cmd_update_image_layouts() to update the image layouts to PresentSrc.
     bool did_recreate;
+    // A pointer to the old swapchain if it was not already destroyed.
+    // Can be used to enqueue cleanup functions.
+    std::weak_ptr<Swapchain> old_swapchain;
+
     vk::Extent2D extent;
 };
 
@@ -44,7 +51,7 @@ struct SwapchainAcquireResult {
  *
  * vk::CommandBuffer cmd = ...
  * if (result.value.did_recreate) {
- *   // after init or resize you have to setup the image layouts
+ *   // after init or resize you have can use cmd_update_image_layouts to setup the image layouts
  *   swap.cmd_update_image_layouts(cmd)
  * }
  *
@@ -81,42 +88,56 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
         BinarySemaphoreHandle written_semaphore{};
     };
 
-    // Number of retries if aquire or present failes with Suboptimal/OutOfDate.
-    static constexpr uint32_t ERROR_RETRIES = 2;
-
   public:
+    class needs_recreate : public std::runtime_error {
+      public:
+        needs_recreate(const vk::Result& reason) : needs_recreate(vk::to_string(reason)) {}
+
+        needs_recreate(const std::string& reason) : std::runtime_error(reason) {
+            SPDLOG_DEBUG("needs recreate swapchain because {}", reason);
+        }
+    };
+
     /**
      * @param[in]  preferred_surface_formats  The preferred surface formats in decreasing priority
      * @param[in]  fallback_format            The fallback format if non of the preferred formats is
      * available
-     * @param[in]  wait_queue                 When recreating the swapchain it must be ensured that
-     * all command buffers that have semaphores are processed. You can supply a queue to wait for.
-     * If no queue is supplied, it is waited using device.waitIdle() (which is slower and not
-     * recommeded).
      */
     Swapchain(const SharedContext& context,
               const SurfaceHandle& surface,
-              const std::optional<QueueHandle> wait_queue = std::nullopt,
               const std::vector<vk::SurfaceFormatKHR>& preferred_surface_formats =
                   {vk::Format::eR8G8B8A8Srgb, vk::Format::eB8G8R8A8Srgb},
               const vk::PresentModeKHR preferred_vsync_off_mode = vk::PresentModeKHR::eMailbox);
 
+    // Special constructor that recreates the swapchain.
+    // The old is then not usable anymore but must be kept alive until the old images finished
+    // any in-flight processing (fancy by keeping alive until the current frame finished on the GPU
+    // or just wait_idle on the queue or device).
+    Swapchain(const SwapchainHandle& swapchain);
+
     ~Swapchain();
 
-    /* Recreates the swapchain if necessary according to window frame buffer size */
+    /* May throw Swapchain::needs_recreate if the swapchain needs to adapt to a new to window frame
+     * buffer size For that you can use the Swapchains copy constructor.
+     *
+     * If the framebuffer extent is 0 or the aquire was not successfull, std::nullopt is returned.
+     */
     std::optional<SwapchainAcquireResult> acquire(const WindowHandle& window) {
         return acquire([&]() { return window->framebuffer_extent(); });
     }
 
-    /* Recreates the swapchain if necessary */
+    /* May throw Swapchain::needs_recreate.
+     * For that you can use the Swapchains copy constructor.
+     *
+     * If the framebuffer extent is 0 or the aquire was not successfull, std::nullopt is returned.
+     */
     std::optional<SwapchainAcquireResult>
     acquire(const std::function<vk::Extent2D()>& framebuffer_extent);
 
-    void present(const QueueHandle& queue, const WindowHandle& window) {
-        present(queue, [&]() { return window->framebuffer_extent(); });
-    }
-
-    void present(const QueueHandle& queue, const std::function<vk::Extent2D()>& framebuffer_extent);
+    /* May throw Swapchain::needs_recreate.
+     * For that you can use the Swapchains copy constructor.
+     */
+    void present(const QueueHandle& queue);
 
     /* Semaphore only valid until the next present() */
     const BinarySemaphoreHandle& current_read_semaphore() const {
@@ -161,7 +182,7 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
     }
 
     /* Remember to also transition image layouts */
-    vk::Extent2D recreate_swapchain(int width, int height);
+    vk::Extent2D create_swapchain(int width, int height);
 
     /* Sets vsync and recreates the swapchain if necessary (without resize) */
     void set_vsync(bool state) {
@@ -178,13 +199,18 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
         return cur_present_mode;
     }
 
+    // intened to destroy framebuffers and renderpasses when the swapchain is destroyed.
+    void add_cleanup_function(const std::function<void()>& cleanup_function) {
+        cleanup_functions.emplace_back(cleanup_function);
+    }
+
   private:
     /* Destroys swapchain and image views */
     void destroy_swapchain();
+
     /* Destroys image views only (for recreate) */
     void destroy_entries();
     [[nodiscard]] vk::PresentModeKHR select_present_mode(const bool vsync);
-    void wait_idle();
 
   private:
     const SharedContext context;
@@ -192,6 +218,8 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
     const std::vector<vk::SurfaceFormatKHR> preferred_surface_formats;
     const vk::PresentModeKHR preferred_vsync_off_mode;
     const std::optional<QueueHandle> wait_queue;
+
+    std::vector<std::function<void()>> cleanup_functions;
 
     uint32_t min_images = 0;
     uint32_t num_images = 0;
@@ -209,14 +237,14 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
     // Only valid after the first acquire!
     vk::Extent2D extent;
 
-    // swapchain is recreated if this does not match cur_present_mode
+    // swapchain need recreate if this does not match cur_present_mode
     vk::PresentModeKHR present_mode;
     vk::PresentModeKHR cur_present_mode;
-    // You should never access the swapchain directly
-    vk::SwapchainKHR swapchain = VK_NULL_HANDLE;
-    bool recreated = true;
-};
 
-using SwapchainHandle = std::shared_ptr<Swapchain>;
+    vk::SwapchainKHR swapchain = VK_NULL_HANDLE;
+    std::weak_ptr<Swapchain> old_swapchain;
+
+    bool created = true;
+};
 
 } // namespace merian
