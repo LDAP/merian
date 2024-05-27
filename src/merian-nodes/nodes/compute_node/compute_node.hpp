@@ -24,23 +24,23 @@ class ComputeNode : public Node {
     virtual ~ComputeNode() {}
 
     // Return a SpecializationInfoHandle if you want to add specialization constants
-    // Called at the first build
+    // In every run (rebuilds the pipeline if handle changed.)
     virtual SpecializationInfoHandle get_specialization_info() const noexcept {
         return MERIAN_SPECIALIZATION_INFO_NONE;
     }
 
     // Return a pointer to your push constant if push_constant_size is not std::nullop
-    // Called in every run
+    // In every run (rebuilds the pipeline if handle changed.)
     virtual const void* get_push_constant([[maybe_unused]] GraphRun& run) {
         throw std::runtime_error{
             "get_push_constant must be overwritten when push_constant_size is not std::nullopt"};
     }
 
-    // Return the group count for x,y and z
+    // Return the group count for x, y and z
     // Called in every run
     virtual std::tuple<uint32_t, uint32_t, uint32_t> get_group_count() const noexcept = 0;
 
-    // Called at the first build
+    // In every run (rebuilds the pipeline if handle changed.)
     virtual ShaderModuleHandle get_shader_module() = 0;
 
     virtual NodeStatusFlags
@@ -56,8 +56,11 @@ class ComputeNode : public Node {
     const std::optional<uint32_t> push_constant_size;
 
   private:
+    SpecializationInfoHandle current_spec_info;
+    ShaderModuleHandle current_shader_module;
+
+    DescriptorSetLayoutHandle descriptor_set_layout;
     PipelineHandle pipe;
-    PipelineLayoutHandle pipe_layout;
 };
 
 } // namespace merian_nodes

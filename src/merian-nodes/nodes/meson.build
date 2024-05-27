@@ -1,8 +1,10 @@
-# subdir('add')
+# keep this list sorted
+
 subdir('ab_compare')
-# subdir('accumulate')
-# subdir('bloom')
-# subdir('color_output')
+subdir('accumulate')
+subdir('add')
+subdir('bloom')
+subdir('color_output')
 subdir('compute_node')
 # subdir('exposure')
 # subdir('fxaa')

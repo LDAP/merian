@@ -23,8 +23,8 @@ class ABCompareNode : public Node {
     const std::optional<vk::Format> output_format;
     const std::optional<vk::Extent2D> output_extent;
 
-    const VkImageInHandle img_in_a = VkImageIn::transfer_src("a");
-    const VkImageInHandle img_in_b = VkImageIn::transfer_src("b");
+    const VkImageInHandle con_in_a = VkImageIn::transfer_src("a");
+    const VkImageInHandle con_in_b = VkImageIn::transfer_src("b");
 };
 
 class ABSplitNode : public ABCompareNode {
@@ -42,7 +42,7 @@ class ABSplitNode : public ABCompareNode {
                  const NodeIO& io) override;
 
   private:
-    VkImageOutHandle img_out;
+    VkImageOutHandle con_out;
 };
 
 class ABSideBySideNode : public ABCompareNode {
@@ -60,7 +60,7 @@ class ABSideBySideNode : public ABCompareNode {
                  const NodeIO& io) override;
 
   private:
-    VkImageOutHandle img_out;
+    VkImageOutHandle con_out;
 };
 
 } // namespace merian_nodes

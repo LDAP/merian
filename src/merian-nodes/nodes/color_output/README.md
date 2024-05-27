@@ -3,6 +3,6 @@ The image output is persistent since it will never change and this way the image
 
 Outputs:
 
-| Type  | Output ID | Output name | Description         | Format/Resolution | Persistent |
-|-------|-----------|-------------|---------------------|-------------------|------------|
-| Image | 0         | output      | the loaded image    | user defined      | yes        |
+| Type  | Output name | Description                             | Format/Resolution | Persistent |
+|-------|-------------|-----------------------------------------|-------------------|------------|
+| Image | out         | An image with the user defined color    | user defined      | yes        |

@@ -11,7 +11,7 @@ ABCompareNode::ABCompareNode(const std::string& name,
 ABCompareNode::~ABCompareNode() {}
 
 std::vector<InputConnectorHandle> ABCompareNode::describe_inputs() {
-    return {img_in_a, img_in_b};
+    return {con_in_a, con_in_b};
 }
 
 // --------------------------------------------------------------------------------
@@ -24,23 +24,23 @@ std::vector<OutputConnectorHandle>
 ABSplitNode::describe_outputs(const ConnectorIOMap& output_for_input) {
 
     vk::Format format = output_format.has_value() ? output_format.value()
-                                                  : output_for_input[img_in_a]->create_info.format;
+                                                  : output_for_input[con_in_a]->create_info.format;
     vk::Extent3D extent = output_extent.has_value()
                               ? vk::Extent3D(output_extent.value(), 1)
-                              : output_for_input[img_in_a]->create_info.extent;
+                              : output_for_input[con_in_a]->create_info.extent;
 
-    img_out = VkImageOut::transfer_write("out", format, extent.width, extent.height);
+    con_out = VkImageOut::transfer_write("out", format, extent.width, extent.height);
 
-    return {img_out};
+    return {con_out};
 }
 
 void ABSplitNode::process([[maybe_unused]] GraphRun& run,
                           const vk::CommandBuffer& cmd,
                           [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
                           const NodeIO& io) {
-    const ImageHandle& a = io[img_in_a];
-    const ImageHandle& b = io[img_in_b];
-    const ImageHandle& result = io[img_out];
+    const ImageHandle& a = io[con_in_a];
+    const ImageHandle& b = io[con_in_b];
+    const ImageHandle& result = io[con_out];
 
     cmd_blit_fit(cmd, *b, vk::ImageLayout::eTransferSrcOptimal, b->get_extent(), *result,
                  vk::ImageLayout::eTransferDstOptimal, result->get_extent());
@@ -64,28 +64,28 @@ std::vector<OutputConnectorHandle>
 ABSideBySideNode::describe_outputs(const ConnectorIOMap& output_for_input) {
 
     vk::Format format = output_format.has_value() ? output_format.value()
-                                                  : output_for_input[img_in_a]->create_info.format;
+                                                  : output_for_input[con_in_a]->create_info.format;
 
     vk::Extent3D extent;
     if (output_extent.has_value()) {
         extent = vk::Extent3D(output_extent.value(), 1);
     } else {
-        extent = output_for_input[img_in_a]->create_info.extent;
+        extent = output_for_input[con_in_a]->create_info.extent;
         extent.width *= 2;
     }
 
-    img_out = VkImageOut::transfer_write("out", format, extent.width, extent.height);
+    con_out = VkImageOut::transfer_write("out", format, extent.width, extent.height);
 
-    return {img_out};
+    return {con_out};
 }
 
 void ABSideBySideNode::process([[maybe_unused]] GraphRun& run,
                                [[maybe_unused]] const vk::CommandBuffer& cmd,
                                [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
                                [[maybe_unused]] const NodeIO& io) {
-    const ImageHandle& a = io[img_in_a];
-    const ImageHandle& b = io[img_in_b];
-    const ImageHandle& result = io[img_out];
+    const ImageHandle& a = io[con_in_a];
+    const ImageHandle& b = io[con_in_b];
+    const ImageHandle& result = io[con_out];
 
     vk::Extent3D half_result_extent = result->get_extent();
     half_result_extent.width /= 2;

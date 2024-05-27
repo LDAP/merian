@@ -702,14 +702,14 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 NodeData& dst_data = node_data.at(connection.dst);
                 if (!data.output_connector_for_name.contains(connection.src_output)) {
                     throw graph_errors::illegal_connection{
-                        fmt::format("node ({}) {} does not have an output {}.", data.name,
+                        fmt::format("node {} ({}) does not have an output {}.", data.name,
                                     node->name, connection.src_output)};
                 }
                 const OutputConnectorHandle src_output =
                     data.output_connector_for_name[connection.src_output];
                 if (!dst_data.input_connector_for_name.contains(connection.dst_input)) {
                     throw graph_errors::illegal_connection{
-                        fmt::format("node ({}) {} does not have an input {}.", data.name,
+                        fmt::format("node {} ({}) does not have an input {}.", data.name,
                                     node->name, connection.dst_input)};
                 }
                 const InputConnectorHandle dst_input =

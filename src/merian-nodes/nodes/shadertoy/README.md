@@ -2,9 +2,9 @@ A generator node that pushes the Shadertoy variables as push constant.
 
 Outputs:
 
-| Type  | Output ID | Output name | Description          | Format/Resolution            | Persistent |
-|-------|-----------|-------------|----------------------|------------------------------|------------|
-| Image | 0         | out         | the shadertoy result | `vk::Format::eR8G8B8A8Unorm` | no         |
+| Type  | Output name | Description          | Format/Resolution            | Persistent |
+|-------|-------------|----------------------|------------------------------|------------|
+| Image | out         | the shadertoy result | `vk::Format::eR8G8B8A8Unorm` | no         |
 
 
 Shader code:

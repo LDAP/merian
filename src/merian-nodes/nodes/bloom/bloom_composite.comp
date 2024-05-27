@@ -10,7 +10,7 @@ void main() {
   const float weights[5] = {0.227027, 0.1945946, 0.1216216, 0.054054, 0.016216};
   vec3 bloom = imageLoad(img_interm, ipos).rgb * weights[0];
 
-  // blur horizontally (vertical pass in composite)
+  // blur horizontally (vertical pass in separate)
   for(int i = 1; i < 5; ++i) {
     bloom += imageLoad(img_interm, clamp(ipos + ivec2(0, i), ivec2(0), textureSize(img_src, 0) - 1)).rgb * weights[i];
     bloom += imageLoad(img_interm, clamp(ipos - ivec2(0, i), ivec2(0), textureSize(img_src, 0) - 1)).rgb * weights[i];

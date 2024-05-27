@@ -56,6 +56,7 @@ class ShadertoyNode : public ComputeNode {
     uint32_t height;
 
     ShaderModuleHandle shader;
+    SpecializationInfoHandle spec_info;
 
     PushConstant constant;
     Stopwatch sw;

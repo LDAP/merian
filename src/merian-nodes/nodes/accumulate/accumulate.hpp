@@ -1,5 +1,8 @@
 #pragma once
 
+#include "merian-nodes/connectors/vk_buffer_in.hpp"
+#include "merian-nodes/connectors/vk_image_in.hpp"
+
 #include "merian-nodes/graph/node.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
@@ -7,7 +10,7 @@
 
 #include <optional>
 
-namespace merian {
+namespace merian_nodes {
 
 class AccumulateNode : public Node {
   private:
@@ -43,27 +46,19 @@ class AccumulateNode : public Node {
 
     ~AccumulateNode();
 
-    std::string name() override {
-        return "Accumulate";
-    };
+    std::vector<InputConnectorHandle> describe_inputs() override;
 
-    std::tuple<std::vector<NodeInputDescriptorImage>, std::vector<NodeInputDescriptorBuffer>>
-    describe_inputs() override;
+    std::vector<OutputConnectorHandle>
+    describe_outputs(const ConnectorIOMap& output_for_input) override;
 
-    std::tuple<std::vector<NodeOutputDescriptorImage>, std::vector<NodeOutputDescriptorBuffer>>
-    describe_outputs(
-        const std::vector<NodeOutputDescriptorImage>& connected_image_outputs,
-        const std::vector<NodeOutputDescriptorBuffer>& connected_buffer_outputs) override;
+    NodeStatusFlags on_connected(const DescriptorSetLayoutHandle& descriptor_set_layout) override;
 
-    void cmd_build(const vk::CommandBuffer& cmd, const std::vector<NodeIO>& io) override;
+    void process(GraphRun& run,
+                 const vk::CommandBuffer& cmd,
+                 const DescriptorSetHandle& descriptor_set,
+                 const NodeIO& io) override;
 
-    void cmd_process(const vk::CommandBuffer& cmd,
-                     GraphRun& run,
-                     const std::shared_ptr<FrameData>& frame_data,
-                     const uint32_t set_index,
-                     const NodeIO& io) override;
-
-    void get_configuration(Configuration& config, bool& needs_rebuild) override;
+    NodeStatusFlags configuration([[maybe_unused]] Configuration& config) override;
 
     // Clears the accumulation buffer at the next iteration.
     void request_clear();
@@ -77,6 +72,19 @@ class AccumulateNode : public Node {
     static constexpr uint32_t percentile_local_size_y = 8;
     static constexpr uint32_t filter_local_size_x = 16;
     static constexpr uint32_t filter_local_size_y = 16;
+
+    // Graph IO
+    VkImageInHandle con_prev_accum = VkImageIn::compute_read("prev_accum", 1);
+    VkImageInHandle con_prev_moments = VkImageIn::compute_read("prev_moments", 1);
+    VkImageInHandle con_irr_in = VkImageIn::compute_read("irr");
+    VkImageInHandle con_mv = VkImageIn::compute_read("mv");
+    VkImageInHandle con_moments_in = VkImageIn::compute_read("moments_in");
+
+    VkBufferInHandle con_gbuf = VkBufferIn::compute_read("gbuf");
+    VkBufferInHandle con_prev_gbuf = VkBufferIn::compute_read("prev_gbuf", 1);
+
+    VkImageOutHandle con_irr_out;
+    VkImageOutHandle con_moments_out;
 
     vk::ImageCreateInfo irr_create_info;
 
@@ -96,11 +104,6 @@ class AccumulateNode : public Node {
     PipelineHandle calculate_percentiles;
     PipelineHandle accumulate;
 
-    std::vector<TextureHandle> graph_textures;
-    std::vector<DescriptorSetHandle> graph_sets;
-    DescriptorSetLayoutHandle graph_layout;
-    DescriptorPoolHandle graph_pool;
-
     DescriptorSetLayoutHandle percentile_desc_layout;
     DescriptorPoolHandle percentile_desc_pool;
     DescriptorSetHandle percentile_set;
@@ -114,4 +117,4 @@ class AccumulateNode : public Node {
     int reuse_border = 0;
 };
 
-} // namespace merian
+} // namespace merian_nodes

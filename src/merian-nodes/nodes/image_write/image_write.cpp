@@ -29,7 +29,7 @@ ImageWriteNode::ImageWriteNode(const SharedContext context,
 ImageWriteNode::~ImageWriteNode() {}
 
 std::vector<InputConnectorHandle> ImageWriteNode::describe_inputs() {
-    return {image_in};
+    return {con_src};
 }
 
 void ImageWriteNode::record() {
@@ -112,7 +112,7 @@ void ImageWriteNode::process(GraphRun& run,
     last_frame_time_millis = time_millis;
 
     // CHECK PATH
-    const ImageHandle src = io[image_in];
+    const ImageHandle src = io[con_src];
     vk::Extent3D scaled = max(multiply(src->get_extent(), scale), {1, 1, 1});
     fmt::dynamic_format_arg_store<fmt::format_context> arg_store;
     get_format_args([&](const auto& arg) { arg_store.push_back(arg); }, scaled,

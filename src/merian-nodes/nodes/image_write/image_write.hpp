@@ -15,6 +15,11 @@ class ImageWriteNode : public Node {
     };
 
   public:
+    /**
+     * @brief      Constructs a new instance.
+     *
+     * @param      allocator      The allocator used to create copies of the input to be able to
+     */
     ImageWriteNode(const SharedContext context,
                    const ResourceAllocatorHandle allocator,
                    const std::string& base_filename =
@@ -24,8 +29,7 @@ class ImageWriteNode : public Node {
 
     virtual std::vector<InputConnectorHandle> describe_inputs() override;
 
-    virtual NodeStatusFlags
-    pre_process(GraphRun& run, const NodeIO& io) override;
+    virtual NodeStatusFlags pre_process(GraphRun& run, const NodeIO& io) override;
 
     virtual void process(GraphRun& run,
                          const vk::CommandBuffer& cmd,
@@ -56,7 +60,7 @@ class ImageWriteNode : public Node {
     const SharedContext context;
     const ResourceAllocatorHandle allocator;
 
-    VkImageInHandle image_in = VkImageIn::transfer_src("src");
+    VkImageInHandle con_src = VkImageIn::transfer_src("src");
 
     uint32_t max_concurrent_tasks = std::thread::hardware_concurrency();
     uint32_t concurrent_tasks = 0;

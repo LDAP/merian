@@ -1,11 +1,12 @@
 #pragma once
 
+#include "merian-nodes/connectors/vk_image_in.hpp"
 #include "merian-nodes/graph/node.hpp"
-#include "merian/vk/memory/resource_allocator.hpp"
+
 #include "merian/vk/pipeline/pipeline.hpp"
 #include "merian/vk/shader/shader_module.hpp"
 
-namespace merian {
+namespace merian_nodes {
 
 class BloomNode : public Node {
   private:
@@ -18,42 +19,32 @@ class BloomNode : public Node {
     };
 
   public:
-    BloomNode(const SharedContext context, const ResourceAllocatorHandle allocator);
+    BloomNode(const SharedContext context);
 
     virtual ~BloomNode();
 
-    virtual std::string name() override;
+    std::vector<InputConnectorHandle> describe_inputs() override;
 
-    virtual std::tuple<std::vector<NodeInputDescriptorImage>,
-                       std::vector<NodeInputDescriptorBuffer>>
-    describe_inputs() override;
+    std::vector<OutputConnectorHandle>
+    describe_outputs(const ConnectorIOMap& output_for_input) override;
 
-    virtual std::tuple<std::vector<NodeOutputDescriptorImage>,
-                       std::vector<NodeOutputDescriptorBuffer>>
-    describe_outputs(
-        const std::vector<NodeOutputDescriptorImage>& connected_image_outputs,
-        const std::vector<NodeOutputDescriptorBuffer>& connected_buffer_outputs) override;
+    NodeStatusFlags on_connected(const DescriptorSetLayoutHandle& descriptor_set_layout) override;
 
-    virtual void cmd_build(const vk::CommandBuffer& cmd, const std::vector<NodeIO>& ios) override;
+    void process(GraphRun& run,
+                 const vk::CommandBuffer& cmd,
+                 const DescriptorSetHandle& descriptor_set,
+                 const NodeIO& io) override;
 
-    virtual void cmd_process(const vk::CommandBuffer& cmd,
-                             GraphRun& run,
-                             const std::shared_ptr<FrameData>& frame_data,
-                             const uint32_t set_index,
-                             const NodeIO& io) override;
-
-    virtual void get_configuration(Configuration& config, bool& needs_rebuild) override;
+    NodeStatusFlags configuration(Configuration& config) override;
 
   private:
     const SharedContext context;
-    const ResourceAllocatorHandle allocator;
+
+    VkImageInHandle con_src = VkImageIn::compute_read("src");
+    VkImageOutHandle con_out;
+    VkImageOutHandle con_interm;
 
     PushConstant pc;
-
-    std::vector<TextureHandle> graph_textures;
-    std::vector<DescriptorSetHandle> graph_sets;
-    DescriptorSetLayoutHandle graph_layout;
-    DescriptorPoolHandle graph_pool;
 
     ShaderModuleHandle separate_module;
     ShaderModuleHandle composite_module;
@@ -64,4 +55,4 @@ class BloomNode : public Node {
     int32_t mode = 0;
 };
 
-} // namespace merian
+} // namespace merian_nodes

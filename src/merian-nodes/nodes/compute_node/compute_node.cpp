@@ -12,16 +12,8 @@ ComputeNode::ComputeNode(const SharedContext context,
 
 ComputeNode::NodeStatusFlags
 ComputeNode::on_connected(const DescriptorSetLayoutHandle& descriptor_set_layout) {
-
-    auto pipe_builder = PipelineLayoutBuilder(context);
-    if (push_constant_size.has_value()) {
-        pipe_builder.add_push_constant(push_constant_size.value());
-    }
-    pipe_layout =
-        pipe_builder.add_descriptor_set_layout(descriptor_set_layout).build_pipeline_layout();
-
-    pipe = std::make_shared<ComputePipeline>(pipe_layout, get_shader_module(),
-                                             get_specialization_info());
+    this->descriptor_set_layout = descriptor_set_layout;
+    this->pipe.reset();
 
     return {};
 }
@@ -29,7 +21,29 @@ ComputeNode::on_connected(const DescriptorSetLayoutHandle& descriptor_set_layout
 void ComputeNode::process(GraphRun& run,
                           const vk::CommandBuffer& cmd,
                           const DescriptorSetHandle& descriptor_set,
-                          [[maybe_unused]] const NodeIO& io) {
+                          const NodeIO& io) {
+    PipelineHandle& old_pipeline = io.frame_data<PipelineHandle>();
+    old_pipeline.reset();
+
+    if (!pipe || current_spec_info != get_specialization_info() ||
+        current_shader_module != get_shader_module()) {
+        SPDLOG_DEBUG("(re)create pipeline");
+        old_pipeline = pipe;
+
+        auto pipe_builder = PipelineLayoutBuilder(context);
+        if (push_constant_size.has_value()) {
+            pipe_builder.add_push_constant(push_constant_size.value());
+        }
+
+        PipelineLayoutHandle pipe_layout =
+            pipe_builder.add_descriptor_set_layout(descriptor_set_layout).build_pipeline_layout();
+        pipe = std::make_shared<ComputePipeline>(pipe_layout, get_shader_module(),
+                                                 get_specialization_info());
+
+        current_spec_info = get_specialization_info();
+        current_shader_module = get_shader_module();
+    }
+
     pipe->bind(cmd);
     pipe->bind_descriptor_set(cmd, descriptor_set);
     if (push_constant_size.has_value())

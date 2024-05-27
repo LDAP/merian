@@ -15,6 +15,9 @@ ShadertoyNode::ShadertoyNode(const SharedContext context,
     shader = std::make_shared<ShaderModule>(context, path, loader);
     constant.iResolution = glm::vec2(width, height);
     sw.reset();
+    auto spec_builder = SpecializationInfoBuilder();
+    spec_builder.add_entry(local_size_x, local_size_y);
+    spec_info = spec_builder.build();
 }
 
 ShadertoyNode::ShadertoyNode(const SharedContext context,
@@ -42,9 +45,8 @@ ShadertoyNode::describe_outputs([[maybe_unused]] const ConnectorIOMap& output_fo
     return {VkImageOut::compute_write("out", vk::Format::eR8G8B8A8Unorm, width, height)};
 }
 
-ComputeNode::NodeStatusFlags
-ShadertoyNode::pre_process([[maybe_unused]] GraphRun& run,
-                           [[maybe_unused]] const NodeIO& io) {
+ComputeNode::NodeStatusFlags ShadertoyNode::pre_process([[maybe_unused]] GraphRun& run,
+                                                        [[maybe_unused]] const NodeIO& io) {
     NodeStatusFlags flags{};
     if (requires_rebuild) {
         flags |= NodeStatusFlagBits::NEEDS_RECONNECT;
@@ -54,9 +56,7 @@ ShadertoyNode::pre_process([[maybe_unused]] GraphRun& run,
 }
 
 SpecializationInfoHandle ShadertoyNode::get_specialization_info() const noexcept {
-    auto spec_builder = SpecializationInfoBuilder();
-    spec_builder.add_entry(local_size_x, local_size_y);
-    return spec_builder.build();
+    return spec_info;
 }
 
 const void* ShadertoyNode::get_push_constant([[maybe_unused]] GraphRun& run) {
