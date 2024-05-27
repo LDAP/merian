@@ -87,6 +87,7 @@ using ImageHandle = std::shared_ptr<Image>;
  * Use the barrier() function to perform layout transitions to keep the internal state valid.
  */
 class Image : public std::enable_shared_from_this<Image> {
+
   public:
     // Creates a Image objects that automatically destroys Image when destructed.
     // The memory is not freed explicitly to let it free itself.
@@ -161,19 +162,21 @@ class Image : public std::enable_shared_from_this<Image> {
 
     // If extent and range are not supplied the whole image is copied.
     // Layouts are automatically determined from get_current_layout()
-    void cmd_copy_to(const vk::CommandBuffer& cmd,
-                     const ImageHandle& dst_picture,
-                     const std::optional<vk::Extent3D> extent = std::nullopt,
-                     const vk::Offset3D src_offset = {},
-                     const vk::Offset3D dst_offset = {},
-                     const std::optional<vk::ImageSubresourceLayers> opt_src_subresource = std::nullopt,
-                     const std::optional<vk::ImageSubresourceLayers> opt_dst_subresource = std::nullopt) {
+    void cmd_copy_to(
+        const vk::CommandBuffer& cmd,
+        const ImageHandle& dst_picture,
+        const std::optional<vk::Extent3D> extent = std::nullopt,
+        const vk::Offset3D src_offset = {},
+        const vk::Offset3D dst_offset = {},
+        const std::optional<vk::ImageSubresourceLayers> opt_src_subresource = std::nullopt,
+        const std::optional<vk::ImageSubresourceLayers> opt_dst_subresource = std::nullopt) {
         vk::ImageSubresourceLayers src_subresource = opt_src_subresource.value_or(first_layer());
         vk::ImageSubresourceLayers dst_subresource = opt_dst_subresource.value_or(first_layer());
         vk::ImageCopy copy{src_subresource, src_offset, dst_subresource, dst_offset,
                            extent.value_or(this->get_extent())};
 
-        cmd.copyImage(image, current_layout, *dst_picture, dst_picture->get_current_layout(), {copy});
+        cmd.copyImage(image, current_layout, *dst_picture, dst_picture->get_current_layout(),
+                      {copy});
     }
 
     // Convenience method to create a view info.
@@ -186,13 +189,15 @@ class Image : public std::enable_shared_from_this<Image> {
 
         switch (create_info.imageType) {
         case vk::ImageType::e1D:
-            view_info.viewType = (create_info.arrayLayers > 1 ? vk::ImageViewType::e1DArray : vk::ImageViewType::e1D);
+            view_info.viewType = (create_info.arrayLayers > 1 ? vk::ImageViewType::e1DArray
+                                                              : vk::ImageViewType::e1D);
             break;
         case vk::ImageType::e2D:
             if (is_cube) {
                 view_info.viewType = vk::ImageViewType::eCube;
             } else {
-                view_info.viewType = create_info.arrayLayers > 1 ? vk::ImageViewType::e2DArray : vk::ImageViewType::e2D;
+                view_info.viewType = create_info.arrayLayers > 1 ? vk::ImageViewType::e2DArray
+                                                                 : vk::ImageViewType::e2D;
             }
             break;
         case vk::ImageType::e3D:
@@ -203,6 +208,30 @@ class Image : public std::enable_shared_from_this<Image> {
         }
 
         return view_info;
+    }
+
+    // Test if the image has been created with a usage value containing at least one of the usages
+    // defined in the valid image usage list for image views
+    // (https://www.khronos.org/registry/vulkan/specs/1.3-extensions/html/vkspec.html#VUID-VkImageViewCreateInfo-image-04441)
+    bool valid_for_view() {
+        static const vk::ImageUsageFlags VALID_IMAGE_USAGE_FOR_IMAGE_VIEWS =
+            vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eStorage |
+            vk::ImageUsageFlagBits::eColorAttachment |
+            vk::ImageUsageFlagBits::eDepthStencilAttachment |
+            vk::ImageUsageFlagBits::eTransientAttachment |
+            vk::ImageUsageFlagBits::eInputAttachment |
+            vk::ImageUsageFlagBits::eFragmentShadingRateAttachmentKHR |
+            vk::ImageUsageFlagBits::eFragmentDensityMapEXT |
+            vk::ImageUsageFlagBits::eVideoDecodeDstKHR |
+            vk::ImageUsageFlagBits::eVideoDecodeDpbKHR |
+            vk::ImageUsageFlagBits::eVideoEncodeSrcKHR |
+            vk::ImageUsageFlagBits::eVideoEncodeDpbKHR | vk::ImageUsageFlagBits::eSampleWeightQCOM |
+            vk::ImageUsageFlagBits::eSampleBlockMatchQCOM;
+
+        if (create_info.usage & VALID_IMAGE_USAGE_FOR_IMAGE_VIEWS) {
+            return true;
+        }
+        return false;
     }
 
   private:
@@ -221,7 +250,9 @@ class Image : public std::enable_shared_from_this<Image> {
  */
 class Texture : public std::enable_shared_from_this<Texture> {
   public:
-    Texture(const ImageHandle& image, const vk::ImageViewCreateInfo& view_create_info, const SamplerHandle& sampler);
+    Texture(const ImageHandle& image,
+            const vk::ImageViewCreateInfo& view_create_info,
+            const SamplerHandle& sampler);
 
     ~Texture();
 

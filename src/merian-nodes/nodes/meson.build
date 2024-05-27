@@ -1,5 +1,5 @@
 # subdir('add')
-# subdir('ab_compare')
+subdir('ab_compare')
 # subdir('accumulate')
 # subdir('bloom')
 # subdir('color_output')

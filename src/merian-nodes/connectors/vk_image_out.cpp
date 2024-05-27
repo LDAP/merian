@@ -30,7 +30,9 @@ void VkImageOut::get_descriptor_update(const uint32_t binding,
                                        GraphResourceHandle& resource,
                                        DescriptorSetUpdate& update) {
     // or vk::ImageLayout::eGeneral instead of required?
-    update.write_descriptor_texture(binding, this->resource(resource), 0, 1, required_layout);
+    assert(debugable_ptr_cast<VkImageResource>(resource)->tex && "missing usage flags?");
+    update.write_descriptor_texture(binding, *debugable_ptr_cast<VkImageResource>(resource)->tex, 0,
+                                    1, required_layout);
 }
 
 Connector::ConnectorStatusFlags VkImageOut::on_pre_process(
@@ -47,10 +49,10 @@ Connector::ConnectorStatusFlags VkImageOut::on_pre_process(
         res->needs_descriptor_update = false;
     }
 
-    vk::ImageMemoryBarrier2 img_bar = res->tex->get_image()->barrier2(
-        required_layout, res->current_access_flags, access_flags, res->current_stage_flags,
-        pipeline_stages, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, all_levels_and_layers(),
-        !persistent);
+    vk::ImageMemoryBarrier2 img_bar =
+        res->image->barrier2(required_layout, res->current_access_flags, access_flags,
+                             res->current_stage_flags, pipeline_stages, VK_QUEUE_FAMILY_IGNORED,
+                             VK_QUEUE_FAMILY_IGNORED, all_levels_and_layers(), !persistent);
 
     image_barriers.push_back(img_bar);
     res->current_stage_flags = pipeline_stages;
@@ -74,6 +76,8 @@ GraphResourceHandle
 VkImageOut::create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
                             [[maybe_unused]] const ResourceAllocatorHandle& allocator,
                             const ResourceAllocatorHandle& aliasing_allocator) {
+    const ResourceAllocatorHandle alloc = persistent ? allocator : aliasing_allocator;
+
     vk::ImageCreateInfo create_info = this->create_info;
     vk::PipelineStageFlags2 input_pipeline_stages;
     vk::AccessFlags2 input_access_flags;
@@ -91,7 +95,8 @@ VkImageOut::create_resource(const std::vector<std::tuple<NodeHandle, InputConnec
         input_access_flags |= image_in->access_flags;
 
         if (layouts_per_node.contains(std::make_pair(input_node, input->delay)) &&
-            layouts_per_node.at(std::make_pair(input_node, input->delay)) != required_layout) {
+            layouts_per_node.at(std::make_pair(input_node, input->delay)) !=
+                image_in->required_layout) {
             throw graph_errors::connector_error{
                 fmt::format("node {} has two input descriptors (one is {}) pointing to the "
                             "same underlying resource with different image layouts.",
@@ -102,19 +107,18 @@ VkImageOut::create_resource(const std::vector<std::tuple<NodeHandle, InputConnec
         }
     }
 
-    ResourceAllocatorHandle alloc = persistent ? allocator : aliasing_allocator;
     const ImageHandle image = alloc->createImage(create_info, NONE);
+    auto res = std::make_shared<VkImageResource>(image, input_pipeline_stages, input_access_flags);
 
-    vk::ImageViewCreateInfo create_image_view{
-        {}, *image, vk::ImageViewType::e2D, image->get_format(), {}, first_level_and_layer()};
-    // todo: make sampler configurable per output and input connector
-    const TextureHandle tex = allocator->createTexture(image, create_image_view);
+    if (image->valid_for_view()) {
+        res->tex = allocator->createTexture(image, image->make_view_create_info());
+    }
 
-    return std::make_shared<VkImageResource>(tex, input_pipeline_stages, input_access_flags);
+    return res;
 }
 
-TextureHandle VkImageOut::resource(const GraphResourceHandle& resource) {
-    return debugable_ptr_cast<VkImageResource>(resource)->tex;
+ImageHandle VkImageOut::resource(const GraphResourceHandle& resource) {
+    return debugable_ptr_cast<VkImageResource>(resource)->image;
 }
 
 std::shared_ptr<VkImageOut> VkImageOut::compute_write(const std::string& name,

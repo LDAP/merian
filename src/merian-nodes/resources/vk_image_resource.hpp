@@ -9,13 +9,15 @@ class VkImageResource : public GraphResource {
     friend class VkImageOut;
 
   public:
-    VkImageResource(const TextureHandle& tex,
+    VkImageResource(const ImageHandle& image,
                     const vk::PipelineStageFlags2& input_stage_flags,
                     const vk::AccessFlags2& input_access_flags)
-        : tex(tex), input_stage_flags(input_stage_flags), input_access_flags(input_access_flags) {}
+        : image(image), input_stage_flags(input_stage_flags),
+          input_access_flags(input_access_flags) {}
 
   private:
-    const TextureHandle tex;
+    const ImageHandle image;
+    std::optional<TextureHandle> tex;
 
     // for barrier insertions
     vk::PipelineStageFlags2 current_stage_flags = vk::PipelineStageFlagBits2::eTopOfPipe;

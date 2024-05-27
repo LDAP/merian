@@ -1,25 +1,30 @@
 #pragma once
 
+#include "merian-nodes/connectors/vk_image_in.hpp"
+#include "merian-nodes/connectors/vk_image_out.hpp"
 #include "merian-nodes/graph/node.hpp"
 
 #include <optional>
 
-namespace merian {
+namespace merian_nodes {
 
 class ABCompareNode : public Node {
 
   protected:
-    ABCompareNode(const std::optional<vk::Format> output_format = std::nullopt,
+    ABCompareNode(const std::string& name,
+                  const std::optional<vk::Format> output_format = std::nullopt,
                   const std::optional<vk::Extent2D> output_extent = std::nullopt);
 
     virtual ~ABCompareNode();
 
-    std::tuple<std::vector<NodeInputDescriptorImage>, std::vector<NodeInputDescriptorBuffer>>
-    describe_inputs() override final;
+    std::vector<InputConnectorHandle> describe_inputs() override final;
 
   protected:
     const std::optional<vk::Format> output_format;
     const std::optional<vk::Extent2D> output_extent;
+
+    const VkImageInHandle img_in_a = VkImageIn::transfer_src("a");
+    const VkImageInHandle img_in_b = VkImageIn::transfer_src("b");
 };
 
 class ABSplitNode : public ABCompareNode {
@@ -28,17 +33,16 @@ class ABSplitNode : public ABCompareNode {
     ABSplitNode(const std::optional<vk::Format> output_format = std::nullopt,
                 const std::optional<vk::Extent2D> output_extent = std::nullopt);
 
-    std::string name() override;
+    std::vector<OutputConnectorHandle>
+    describe_outputs(const ConnectorIOMap& output_for_input) override;
 
-    std::tuple<std::vector<NodeOutputDescriptorImage>, std::vector<NodeOutputDescriptorBuffer>>
-    describe_outputs(const std::vector<NodeOutputDescriptorImage>& connected_image_outputs,
-                     const std::vector<NodeOutputDescriptorBuffer>&) override;
+    void process(GraphRun& run,
+                 const vk::CommandBuffer& cmd,
+                 const DescriptorSetHandle& descriptor_set,
+                 const NodeIO& io) override;
 
-    void cmd_process(const vk::CommandBuffer& cmd,
-                     GraphRun& run,
-                     const std::shared_ptr<FrameData>& frame_data,
-                     const uint32_t set_index,
-                     const NodeIO& io) override;
+  private:
+    VkImageOutHandle img_out;
 };
 
 class ABSideBySideNode : public ABCompareNode {
@@ -47,17 +51,16 @@ class ABSideBySideNode : public ABCompareNode {
     ABSideBySideNode(const std::optional<vk::Format> output_format = std::nullopt,
                      const std::optional<vk::Extent2D> output_extent = std::nullopt);
 
-    std::string name() override;
+    std::vector<OutputConnectorHandle>
+    describe_outputs(const ConnectorIOMap& output_for_input) override;
 
-    std::tuple<std::vector<NodeOutputDescriptorImage>, std::vector<NodeOutputDescriptorBuffer>>
-    describe_outputs(const std::vector<NodeOutputDescriptorImage>& connected_image_outputs,
-                     const std::vector<NodeOutputDescriptorBuffer>&) override;
+    void process(GraphRun& run,
+                 const vk::CommandBuffer& cmd,
+                 const DescriptorSetHandle& descriptor_set,
+                 const NodeIO& io) override;
 
-    void cmd_process(const vk::CommandBuffer& cmd,
-                     GraphRun& run,
-                     const std::shared_ptr<FrameData>& frame_data,
-                     const uint32_t set_index,
-                     const NodeIO& io) override;
+  private:
+    VkImageOutHandle img_out;
 };
 
-} // namespace merian
+} // namespace merian_nodes

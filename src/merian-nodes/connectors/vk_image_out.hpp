@@ -10,7 +10,7 @@ using VkImageOutHandle = std::shared_ptr<VkImageOut>;
 
 // Output a Vulkan image that is allocated and managed by the graph.
 // Note that it only supplies a descriptor if stage_flags contains at least one bit.
-class VkImageOut : public TypedOutputConnector<TextureHandle> {
+class VkImageOut : public TypedOutputConnector<ImageHandle> {
   public:
     VkImageOut(const std::string& name,
                const vk::AccessFlags2& access_flags,
@@ -47,7 +47,7 @@ class VkImageOut : public TypedOutputConnector<TextureHandle> {
                     const ResourceAllocatorHandle& allocator,
                     const ResourceAllocatorHandle& aliasing_allocator) override;
 
-    virtual TextureHandle resource(const GraphResourceHandle& resource) override;
+    virtual ImageHandle resource(const GraphResourceHandle& resource) override;
 
   public:
     static VkImageOutHandle compute_write(const std::string& name,
@@ -79,7 +79,7 @@ class VkImageOut : public TypedOutputConnector<TextureHandle> {
                                            const uint32_t depth = 1,
                                            const bool persistent = false);
 
-  private:
+  public:
     const vk::AccessFlags2 access_flags;
     const vk::PipelineStageFlags2 pipeline_stages;
     const vk::ImageLayout required_layout;

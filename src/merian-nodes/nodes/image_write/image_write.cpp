@@ -112,7 +112,7 @@ void ImageWriteNode::process(GraphRun& run,
     last_frame_time_millis = time_millis;
 
     // CHECK PATH
-    const ImageHandle src = io[image_in]->get_image();
+    const ImageHandle src = io[image_in];
     vk::Extent3D scaled = max(multiply(src->get_extent(), scale), {1, 1, 1});
     fmt::dynamic_format_arg_store<fmt::format_context> arg_store;
     get_format_args([&](const auto& arg) { arg_store.push_back(arg); }, scaled,

@@ -55,8 +55,8 @@ class GLFWWindowNode : public Node {
                                      vk::ImageLayout::eTransferDstOptimal);
 
             cmd_blit(mode, cmd, *src_image, vk::ImageLayout::eTransferSrcOptimal,
-                     src_image->get_image()->get_extent(), acquire->image,
-                     vk::ImageLayout::eTransferDstOptimal, extent);
+                     src_image->get_extent(), acquire->image, vk::ImageLayout::eTransferDstOptimal,
+                     extent);
 
             cmd_barrier_image_layout(cmd, acquire->image, vk::ImageLayout::eTransferDstOptimal,
                                      vk::ImageLayout::ePresentSrcKHR);

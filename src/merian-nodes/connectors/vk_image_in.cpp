@@ -28,7 +28,9 @@ void VkImageIn::get_descriptor_update(const uint32_t binding,
                                       GraphResourceHandle& resource,
                                       DescriptorSetUpdate& update) {
     // // or vk::ImageLayout::eShaderReadOnlyOptimal instead of required?
-    update.write_descriptor_texture(binding, this->resource(resource), 0, 1, required_layout);
+    assert(debugable_ptr_cast<VkImageResource>(resource)->tex && "missing usage flags?");
+    update.write_descriptor_texture(binding, *debugable_ptr_cast<VkImageResource>(resource)->tex, 0,
+                                    1, required_layout);
 }
 
 Connector::ConnectorStatusFlags
@@ -41,7 +43,7 @@ VkImageIn::on_pre_process([[maybe_unused]] GraphRun& run,
     auto res = debugable_ptr_cast<VkImageResource>(resource);
 
     if (res->last_used_as_output) {
-        vk::ImageMemoryBarrier2 img_bar = res->tex->get_image()->barrier2(
+        vk::ImageMemoryBarrier2 img_bar = res->image->barrier2(
             required_layout, res->current_access_flags, res->input_access_flags,
             res->current_stage_flags, res->input_stage_flags);
         image_barriers.push_back(img_bar);
@@ -50,8 +52,8 @@ VkImageIn::on_pre_process([[maybe_unused]] GraphRun& run,
         res->last_used_as_output = false;
     } else {
         // No barrier required, if no transition required
-        if (required_layout != res->tex->get_current_layout()) {
-            vk::ImageMemoryBarrier2 img_bar = res->tex->get_image()->barrier2(
+        if (required_layout != res->image->get_current_layout()) {
+            vk::ImageMemoryBarrier2 img_bar = res->image->barrier2(
                 required_layout, res->current_access_flags, res->current_access_flags,
                 res->current_stage_flags, res->current_stage_flags);
             image_barriers.push_back(img_bar);
@@ -61,8 +63,8 @@ VkImageIn::on_pre_process([[maybe_unused]] GraphRun& run,
     return {};
 }
 
-TextureHandle VkImageIn::resource(const GraphResourceHandle& resource) {
-    return debugable_ptr_cast<VkImageResource>(resource)->tex;
+ImageHandle VkImageIn::resource(const GraphResourceHandle& resource) {
+    return debugable_ptr_cast<VkImageResource>(resource)->image;
 }
 
 std::shared_ptr<VkImageIn> VkImageIn::compute_read(const std::string& name, const uint32_t delay) {

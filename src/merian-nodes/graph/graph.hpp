@@ -253,6 +253,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         {
             MERIAN_PROFILE_SCOPE(profiler, "connect nodes");
             flat_topology = connect_nodes();
+            // todo: make sure all delayed inputs are connected too!
         }
 
         if (flat_topology.size() != node_data.size()) {
@@ -899,12 +900,16 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 NodeData& candidate_data = node_data.at(candidate);
                 for (auto& candidate_input : candidate_data.input_connectors) {
                     if (candidate_input.second->delay > 0) {
-                        // all good, delayed inputs must not be connected.
+                        // all good, delayed inputs must not yet be connected.
                         continue;
                     }
-                    auto& candidate_input_connection =
-                        candidate_data.input_connections.at(candidate_input.second);
-                    if (!visited.contains(candidate_input_connection.node)) {
+                    if (!candidate_data.input_connections.contains(candidate_input.second)) {
+                        // skip, maybe another node will connect to this node
+                        satisfied = false;
+                        break;
+                    }
+                    if (!visited.contains(
+                            candidate_data.input_connections.at(candidate_input.second).node)) {
                         // src was not processed, cannot add...
                         satisfied = false;
                         break;
