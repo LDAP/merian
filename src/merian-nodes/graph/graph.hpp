@@ -67,10 +67,12 @@ struct NodeData {
 
     // Cache input connectors (node->describe_inputs())
     // (on start_nodes added and checked for name conflicts)
-    std::unordered_map<std::string, InputConnectorHandle> input_connectors;
+    std::vector<InputConnectorHandle> input_connectors;
+    std::unordered_map<std::string, InputConnectorHandle> input_connector_for_name;
     // Cache output connectors (node->describe_outputs())
     // (on conncet_nodes added and checked for name conflicts)
-    std::unordered_map<std::string, OutputConnectorHandle> output_connectors;
+    std::vector<OutputConnectorHandle> output_connectors;
+    std::unordered_map<std::string, OutputConnectorHandle> output_connector_for_name;
 
     // --- Desired connections. ---
     // Set by the user using the public add_connection method.
@@ -256,9 +258,19 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             // todo: make sure all delayed inputs are connected too!
         }
 
-        if (flat_topology.size() != node_data.size()) {
-            // todo: determine node and input and provide a better error message.
-            throw graph_errors::connection_missing{"Graph not fully connected."};
+        std::vector<std::string> missing_connections;
+        for (auto& [node, data] : node_data) {
+            for (auto& [input_name, input] : data.input_connector_for_name) {
+                if (!data.input_connections.contains(input)) {
+                    missing_connections.emplace_back(
+                        fmt::format("input {} of Node {} ({}) is not connected", input->name,
+                                    data.name, node->name));
+                }
+            }
+        }
+        if (!missing_connections.empty()) {
+            throw graph_errors::connection_missing{fmt::format(
+                "Graph not fully connected.\n{}", fmt::join(missing_connections, ", "))};
         }
 
         {
@@ -598,6 +610,9 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             data.input_connectors.clear();
             data.output_connectors.clear();
 
+            data.input_connector_for_name.clear();
+            data.output_connector_for_name.clear();
+
             data.input_connections.clear();
             data.output_connections.clear();
 
@@ -616,20 +631,21 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
         for (auto& [node, node_data] : node_data) {
             // Cache input connectors in node_data and check that there are no name conflicts.
-            for (InputConnectorHandle& input : node->describe_inputs()) {
-                if (node_data.input_connectors.contains(input->name)) {
+            node_data.input_connectors = node->describe_inputs();
+            for (InputConnectorHandle& input : node_data.input_connectors) {
+                if (node_data.input_connector_for_name.contains(input->name)) {
                     throw graph_errors::connector_error{
                         fmt::format("node {} contains two input connectors with the same name {}",
                                     node->name, input->name)};
                 } else {
-                    node_data.input_connectors[input->name] = input;
+                    node_data.input_connector_for_name[input->name] = input;
                 }
             }
 
             // Find nodes without inputs or with delayed inputs only.
             if (node_data.input_connectors.empty() ||
                 std::all_of(node_data.input_connectors.begin(), node_data.input_connectors.end(),
-                            [](auto& input) { return input.second->delay > 0; })) {
+                            [](auto& input) { return input->delay > 0; })) {
                 queue.push(node);
             }
         }
@@ -653,7 +669,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             // of the following nodes.
 
             // 1. Get node output connectors and check for name conflicts
-            std::vector<OutputConnectorHandle> outputs =
+            data.output_connectors =
                 node->describe_outputs(ConnectorIOMap([&](const InputConnectorHandle& input) {
                     if (input->delay > 0) {
                         throw std::runtime_error{fmt::format(
@@ -670,13 +686,13 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                     }
                     return data.input_connections.at(input).output;
                 }));
-            for (auto& output : outputs) {
-                if (data.output_connectors.contains(output->name)) {
+            for (auto& output : data.output_connectors) {
+                if (data.output_connector_for_name.contains(output->name)) {
                     throw graph_errors::connector_error{
                         fmt::format("node {} contains two output connectors with the same name {}",
                                     node->name, output->name)};
                 }
-                data.output_connectors.try_emplace(output->name, output);
+                data.output_connector_for_name.try_emplace(output->name, output);
                 data.output_connections.try_emplace(output);
             }
 
@@ -684,20 +700,20 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             // input_connections and the current nodes output_connections).
             for (const NodeConnection& connection : data.desired_connections) {
                 NodeData& dst_data = node_data.at(connection.dst);
-                if (!data.output_connectors.contains(connection.src_output)) {
+                if (!data.output_connector_for_name.contains(connection.src_output)) {
                     throw graph_errors::illegal_connection{
                         fmt::format("node ({}) {} does not have an output {}.", data.name,
                                     node->name, connection.src_output)};
                 }
                 const OutputConnectorHandle src_output =
-                    data.output_connectors.at(connection.src_output);
-                if (!dst_data.input_connectors.contains(connection.dst_input)) {
+                    data.output_connector_for_name[connection.src_output];
+                if (!dst_data.input_connector_for_name.contains(connection.dst_input)) {
                     throw graph_errors::illegal_connection{
                         fmt::format("node ({}) {} does not have an input {}.", data.name,
                                     node->name, connection.dst_input)};
                 }
                 const InputConnectorHandle dst_input =
-                    dst_data.input_connectors.at(connection.dst_input);
+                    dst_data.input_connector_for_name[connection.dst_input];
 
                 if (dst_data.input_connections.contains(dst_input)) {
                     throw graph_errors::illegal_connection{
@@ -757,7 +773,8 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             auto layout_builder = DescriptorSetLayoutBuilder();
             uint32_t binding_counter = 0;
 
-            for (auto& [input, per_input_info] : dst_data.input_connections) {
+            for (auto& input : dst_data.input_connectors) {
+                auto& per_input_info = dst_data.input_connections[input];
                 std::optional<vk::DescriptorSetLayoutBinding> desc_info =
                     input->get_descriptor_info();
                 if (desc_info) {
@@ -768,7 +785,8 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                     binding_counter++;
                 }
             }
-            for (auto& [output, per_output_info] : dst_data.output_connections) {
+            for (auto& output : dst_data.output_connectors) {
+                auto& per_output_info = dst_data.output_connections[output];
                 std::optional<vk::DescriptorSetLayoutBinding> desc_info =
                     output->get_descriptor_info();
                 if (desc_info) {
@@ -899,17 +917,17 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 bool satisfied = true;
                 NodeData& candidate_data = node_data.at(candidate);
                 for (auto& candidate_input : candidate_data.input_connectors) {
-                    if (candidate_input.second->delay > 0) {
+                    if (candidate_input->delay > 0) {
                         // all good, delayed inputs must not yet be connected.
                         continue;
                     }
-                    if (!candidate_data.input_connections.contains(candidate_input.second)) {
+                    if (!candidate_data.input_connections.contains(candidate_input)) {
                         // skip, maybe another node will connect to this node
                         satisfied = false;
                         break;
                     }
                     if (!visited.contains(
-                            candidate_data.input_connections.at(candidate_input.second).node)) {
+                            candidate_data.input_connections.at(candidate_input).node)) {
                         // src was not processed, cannot add...
                         satisfied = false;
                         break;
