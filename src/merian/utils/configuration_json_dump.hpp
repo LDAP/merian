@@ -10,7 +10,9 @@ namespace merian {
 
 class JSONDumpConfiguration : public Configuration {
   public:
-    JSONDumpConfiguration(const std::string& filename);
+    // If filename is not nullopt the configuration is dumped in the destructor.
+    JSONDumpConfiguration(const std::optional<std::filesystem::path>& filename = std::nullopt);
+
     virtual ~JSONDumpConfiguration() override;
 
     virtual bool st_begin_child(const std::string& id, const std::string& label = "") override;
@@ -85,13 +87,23 @@ class JSONDumpConfiguration : public Configuration {
                                        const bool needs_submit = false,
                                        const std::string& desc = "") override;
 
+    nlohmann::json get() const {
+        assert(o.size() == 1 && "Missing st_end_child?");
+        return o.back().second;
+    }
+
+    std::string string() const {
+        assert(o.size() == 1 && "Missing st_end_child?");
+        return o.back().second.dump();
+    }
+
   private:
     nlohmann::json& current() {
         return o.back().second;
     }
 
   private:
-    const std::string filename;
+    const std::optional<std::filesystem::path> filename;
     std::vector<std::pair<std::string, nlohmann::json>> o;
 };
 

@@ -10,7 +10,10 @@ namespace merian {
 
 class JSONLoadConfiguration : public Configuration {
   public:
-    JSONLoadConfiguration(const std::string& filename);
+    JSONLoadConfiguration(const std::filesystem::path& filename);
+
+    JSONLoadConfiguration(const std::string& json_string);
+
     virtual ~JSONLoadConfiguration() override;
 
     virtual bool st_begin_child(const std::string& id, const std::string& label = "") override;

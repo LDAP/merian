@@ -31,14 +31,16 @@ json dump_vec4(glm::vec4& v) {
     return j;
 }
 
-JSONDumpConfiguration::JSONDumpConfiguration(const std::string& filename)
+JSONDumpConfiguration::JSONDumpConfiguration(const std::optional<std::filesystem::path>& filename)
     : filename(filename), o(1) {}
 
 JSONDumpConfiguration::~JSONDumpConfiguration() {
     assert(o.size() == 1 && "Missing st_end_child?");
 
-    std::ofstream file(filename);
-    file << std::setw(4) << current() << std::endl;
+    if (filename) {
+        std::ofstream file(filename.value().string());
+        file << std::setw(4) << current() << std::endl;
+    }
 }
 
 bool JSONDumpConfiguration::st_begin_child(const std::string& id, const std::string&) {

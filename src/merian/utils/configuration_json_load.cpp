@@ -33,14 +33,19 @@ glm::vec4 load_vec4(json& j) {
     return v;
 }
 
-JSONLoadConfiguration::JSONLoadConfiguration(const std::string& filename) : o(1) {
+JSONLoadConfiguration::JSONLoadConfiguration(const std::string& json_string) : o(1) {
+    o[0] = json::parse(json_string);
+}
+
+JSONLoadConfiguration::JSONLoadConfiguration(const std::filesystem::path& filename) : o(1) {
     if (std::filesystem::exists(filename)) {
-        std::ifstream i(filename);
+        std::ifstream i(filename.string());
         i >> o[0];
     } else {
         o[0] = json::object();
     }
 }
+
 JSONLoadConfiguration::~JSONLoadConfiguration() {}
 
 bool JSONLoadConfiguration::st_begin_child(const std::string& id, const std::string&) {
