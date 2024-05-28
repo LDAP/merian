@@ -1,16 +1,16 @@
-# Tone mapping
+## Tone mapping
 
 Tone mapping operator for high-dynamic range images.
 
-Inputs:
+### Inputs:
 
-| Type  | Input ID | Input name | Description                                       | Delay |
-|-------|----------|------------|---------------------------------------------------|-------|
-| Image | 0        | src        | the current frame                                 | no    |
+| Type  | Input name | Description                                       | Delay |
+|-------|------------|---------------------------------------------------|-------|
+| Image | src        | the current frame                                 | no    |
 
-Outputs:
+### Outputs:
 
-| Type  | Output ID | Output name | Description         | Format/Resolution          | Persistent |
-|-------|-----------|-------------|---------------------|----------------------------|------------|
-| Image | 0         | output      | tonemapped image    | user-defined or like `src` | no         |
+| Type  | Output name | Description         | Format/Resolution          | Persistent |
+|-------|-------------|---------------------|----------------------------|------------|
+| Image | out         | tonemapped image    | user-defined or like `src` | no         |
 

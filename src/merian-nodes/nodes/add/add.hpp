@@ -5,17 +5,17 @@
 
 namespace merian_nodes {
 
-class AddNode : public ComputeNode {
+class Add : public AbstractCompute {
 
   private:
     static constexpr uint32_t local_size_x = 32;
     static constexpr uint32_t local_size_y = 32;
 
   public:
-    AddNode(const SharedContext context,
+    Add(const SharedContext context,
             const std::optional<vk::Format> output_format = std::nullopt);
 
-    ~AddNode();
+    ~Add();
 
     std::vector<InputConnectorHandle> describe_inputs() override;
 

@@ -3,25 +3,25 @@
 
 namespace merian_nodes {
 
-ABCompareNode::ABCompareNode(const std::string& name,
+AbstractABCompare::AbstractABCompare(const std::string& name,
                              const std::optional<vk::Format> output_format,
                              const std::optional<vk::Extent2D> output_extent)
     : Node(name), output_format(output_format), output_extent(output_extent) {}
 
-ABCompareNode::~ABCompareNode() {}
+AbstractABCompare::~AbstractABCompare() {}
 
-std::vector<InputConnectorHandle> ABCompareNode::describe_inputs() {
+std::vector<InputConnectorHandle> AbstractABCompare::describe_inputs() {
     return {con_in_a, con_in_b};
 }
 
 // --------------------------------------------------------------------------------
 
-ABSplitNode::ABSplitNode(const std::optional<vk::Format> output_format,
+ABSplit::ABSplit(const std::optional<vk::Format> output_format,
                          const std::optional<vk::Extent2D> output_extent)
-    : ABCompareNode("ABSplitNode", output_format, output_extent) {}
+    : AbstractABCompare("ABSplitNode", output_format, output_extent) {}
 
 std::vector<OutputConnectorHandle>
-ABSplitNode::describe_outputs(const ConnectorIOMap& output_for_input) {
+ABSplit::describe_outputs(const ConnectorIOMap& output_for_input) {
 
     vk::Format format = output_format.has_value() ? output_format.value()
                                                   : output_for_input[con_in_a]->create_info.format;
@@ -34,7 +34,7 @@ ABSplitNode::describe_outputs(const ConnectorIOMap& output_for_input) {
     return {con_out};
 }
 
-void ABSplitNode::process([[maybe_unused]] GraphRun& run,
+void ABSplit::process([[maybe_unused]] GraphRun& run,
                           const vk::CommandBuffer& cmd,
                           [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
                           const NodeIO& io) {
@@ -56,12 +56,12 @@ void ABSplitNode::process([[maybe_unused]] GraphRun& run,
 
 // --------------------------------------------------------------------------------
 
-ABSideBySideNode::ABSideBySideNode(const std::optional<vk::Format> output_format,
+ABSideBySide::ABSideBySide(const std::optional<vk::Format> output_format,
                                    const std::optional<vk::Extent2D> output_extent)
-    : ABCompareNode("ABSideBySideNode", output_format, output_extent) {}
+    : AbstractABCompare("ABSideBySideNode", output_format, output_extent) {}
 
 std::vector<OutputConnectorHandle>
-ABSideBySideNode::describe_outputs(const ConnectorIOMap& output_for_input) {
+ABSideBySide::describe_outputs(const ConnectorIOMap& output_for_input) {
 
     vk::Format format = output_format.has_value() ? output_format.value()
                                                   : output_for_input[con_in_a]->create_info.format;
@@ -79,7 +79,7 @@ ABSideBySideNode::describe_outputs(const ConnectorIOMap& output_for_input) {
     return {con_out};
 }
 
-void ABSideBySideNode::process([[maybe_unused]] GraphRun& run,
+void ABSideBySide::process([[maybe_unused]] GraphRun& run,
                                [[maybe_unused]] const vk::CommandBuffer& cmd,
                                [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
                                [[maybe_unused]] const NodeIO& io) {

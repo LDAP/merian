@@ -1,14 +1,16 @@
 #pragma once
 
-#include "merian/utils/stopwatch.hpp"
 #include "merian-nodes/graph/node.hpp"
-#include "merian/vk/memory/resource_allocator.hpp"
+#include "merian-nodes/connectors/vk_image_in.hpp"
+#include "merian-nodes/connectors/vk_buffer_out.hpp"
+
+#include "merian/utils/stopwatch.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
 #include "merian/vk/shader/shader_module.hpp"
 
-namespace merian {
+namespace merian_nodes {
 
-class ExposureNode : public Node {
+class AutoExposure : public Node {
   private:
     // Histogram uses local_size_x * local_size_y bins;
     static constexpr uint32_t local_size_x = 16;
@@ -38,42 +40,34 @@ class ExposureNode : public Node {
     };
 
   public:
-    ExposureNode(const SharedContext context, const ResourceAllocatorHandle allocator);
+    AutoExposure(const SharedContext context);
 
-    virtual ~ExposureNode();
+    virtual ~AutoExposure();
 
-    virtual std::string name() override;
+    std::vector<InputConnectorHandle> describe_inputs() override;
 
-    virtual std::tuple<std::vector<NodeInputDescriptorImage>,
-                       std::vector<NodeInputDescriptorBuffer>>
-    describe_inputs() override;
+    std::vector<OutputConnectorHandle>
+    describe_outputs(const ConnectorIOMap& output_for_input) override;
 
-    virtual std::tuple<std::vector<NodeOutputDescriptorImage>,
-                       std::vector<NodeOutputDescriptorBuffer>>
-    describe_outputs(
-        const std::vector<NodeOutputDescriptorImage>& connected_image_outputs,
-        const std::vector<NodeOutputDescriptorBuffer>& connected_buffer_outputs) override;
+    NodeStatusFlags on_connected(const DescriptorSetLayoutHandle& descriptor_set_layout) override;
 
-    virtual void cmd_build(const vk::CommandBuffer& cmd, const std::vector<NodeIO>& ios) override;
+    void process(GraphRun& run,
+                 const vk::CommandBuffer& cmd,
+                 const DescriptorSetHandle& descriptor_set,
+                 const NodeIO& io) override;
 
-    virtual void cmd_process(const vk::CommandBuffer& cmd,
-                             GraphRun& run,
-                             const std::shared_ptr<FrameData>& frame_data,
-                             const uint32_t set_index,
-                             const NodeIO& io) override;
-
-    virtual void get_configuration(Configuration& config, bool& needs_rebuild) override;
+    NodeStatusFlags configuration(Configuration& config) override;
 
   private:
     const SharedContext context;
-    const ResourceAllocatorHandle allocator;
+
+    VkImageInHandle con_src = VkImageIn::compute_read("src");
+
+    VkImageOutHandle con_out;
+    VkBufferOutHandle con_hist;
+    VkBufferOutHandle con_luminance;
 
     PushConstant pc;
-
-    std::vector<TextureHandle> graph_textures;
-    std::vector<DescriptorSetHandle> graph_sets;
-    DescriptorSetLayoutHandle graph_layout;
-    DescriptorPoolHandle graph_pool;
 
     ShaderModuleHandle histogram_module;
     ShaderModuleHandle luminance_module;
@@ -86,4 +80,4 @@ class ExposureNode : public Node {
     Stopwatch sw;
 };
 
-} // namespace merian
+} // namespace merian_nodes

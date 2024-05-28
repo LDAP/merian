@@ -12,7 +12,7 @@
 
 namespace merian_nodes {
 
-class AccumulateNode : public Node {
+class Accumulate : public Node {
   private:
     struct QuartilePushConstant {
         float firefly_percentile_lower = 0.25;
@@ -40,11 +40,11 @@ class AccumulateNode : public Node {
     };
 
   public:
-    AccumulateNode(const SharedContext context,
+    Accumulate(const SharedContext context,
                    const ResourceAllocatorHandle allocator,
                    const std::optional<vk::Format> format = vk::Format::eR32G32B32A32Sfloat);
 
-    ~AccumulateNode();
+    ~Accumulate();
 
     std::vector<InputConnectorHandle> describe_inputs() override;
 

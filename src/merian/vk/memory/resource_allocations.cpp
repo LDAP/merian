@@ -29,7 +29,13 @@ vk::BufferMemoryBarrier Buffer::buffer_barrier(const vk::AccessFlags src_access_
                                                const vk::DeviceSize size,
                                                const uint32_t src_queue_family_index,
                                                const uint32_t dst_queue_family_index) {
-    return {src_access_flags, dst_access_flags, src_queue_family_index, dst_queue_family_index, buffer, 0, size};
+    return {src_access_flags,
+            dst_access_flags,
+            src_queue_family_index,
+            dst_queue_family_index,
+            buffer,
+            0,
+            size};
 }
 
 vk::BufferMemoryBarrier2 Buffer::buffer_barrier2(const vk::PipelineStageFlags2 src_stage_flags,
@@ -66,6 +72,18 @@ Image::~Image() {
     memory->get_context()->device.destroyImage(image);
 }
 
+vk::FormatFeatureFlags Image::format_features() const {
+    if (get_tiling() == vk::ImageTiling::eOptimal) {
+        return memory->get_context()
+            ->physical_device.physical_device.getFormatProperties(get_format())
+            .optimalTilingFeatures;
+    } else {
+        return memory->get_context()
+            ->physical_device.physical_device.getFormatProperties(get_format())
+            .linearTilingFeatures;
+    }
+}
+
 // Do not forget submit the barrier, else the internal state does not match the actual state
 vk::ImageMemoryBarrier Image::barrier(const vk::ImageLayout new_layout,
                                       const vk::AccessFlags src_access_flags,
@@ -74,7 +92,8 @@ vk::ImageMemoryBarrier Image::barrier(const vk::ImageLayout new_layout,
                                       const uint32_t dst_queue_family_index,
                                       const vk::ImageSubresourceRange subresource_range,
                                       const bool transition_from_undefined) {
-    vk::ImageLayout old_layout = transition_from_undefined ? vk::ImageLayout::eUndefined : current_layout;
+    vk::ImageLayout old_layout =
+        transition_from_undefined ? vk::ImageLayout::eUndefined : current_layout;
     vk::ImageMemoryBarrier barrier{
         src_access_flags,       dst_access_flags,       old_layout, new_layout,
         src_queue_family_index, dst_queue_family_index, image,      subresource_range,
@@ -94,10 +113,12 @@ vk::ImageMemoryBarrier2 Image::barrier2(const vk::ImageLayout new_layout,
                                         const vk::ImageSubresourceRange subresource_range,
                                         const bool transition_from_undefined) {
 
-    vk::ImageLayout old_layout = transition_from_undefined ? vk::ImageLayout::eUndefined : current_layout;
-    vk::ImageMemoryBarrier2 barrier{src_stage_flags, src_access_flags, dst_stage_flags,        dst_access_flags,
-                                    old_layout,      new_layout,       src_queue_family_index, dst_queue_family_index,
-                                    image,           subresource_range};
+    vk::ImageLayout old_layout =
+        transition_from_undefined ? vk::ImageLayout::eUndefined : current_layout;
+    vk::ImageMemoryBarrier2 barrier{
+        src_stage_flags, src_access_flags, dst_stage_flags,        dst_access_flags,
+        old_layout,      new_layout,       src_queue_family_index, dst_queue_family_index,
+        image,           subresource_range};
     current_layout = new_layout;
 
     return barrier;
@@ -124,9 +145,10 @@ void Texture::set_sampler(const SamplerHandle& sampler) {
     this->sampler = sampler;
 }
 
-AccelerationStructure::AccelerationStructure(const vk::AccelerationStructureKHR& as,
-                                             const BufferHandle& buffer,
-                                             const vk::AccelerationStructureBuildSizesInfoKHR& size_info)
+AccelerationStructure::AccelerationStructure(
+    const vk::AccelerationStructureKHR& as,
+    const BufferHandle& buffer,
+    const vk::AccelerationStructureBuildSizesInfoKHR& size_info)
     : as(as), buffer(buffer), size_info(size_info) {
     SPDLOG_TRACE("create acceleration structure ({})", fmt::ptr(this));
 }
@@ -138,7 +160,8 @@ AccelerationStructure::~AccelerationStructure() {
 
 vk::DeviceAddress AccelerationStructure::get_acceleration_structure_device_address() {
     vk::AccelerationStructureDeviceAddressInfoKHR address_info{as};
-    return buffer->get_memory()->get_context()->device.getAccelerationStructureAddressKHR(address_info);
+    return buffer->get_memory()->get_context()->device.getAccelerationStructureAddressKHR(
+        address_info);
 }
 
 } // namespace merian

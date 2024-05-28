@@ -23,8 +23,8 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
 
     ResourceAllocator(const SharedContext& context,
                       const std::shared_ptr<MemoryAllocator>& memAllocator,
-                      const std::shared_ptr<StagingMemoryManager> staging,
-                      const std::shared_ptr<SamplerPool>& samplerPool);
+                      const StagingMemoryManagerHandle staging,
+                      const SamplerPoolHandle& samplerPool);
 
     // All staging buffers must be cleared before
     virtual ~ResourceAllocator() {
@@ -140,9 +140,9 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
 
     //--------------------------------------------------------------------------------------------------
 
-    std::shared_ptr<StagingMemoryManager> getStaging();
+    StagingMemoryManagerHandle getStaging();
 
-    const std::shared_ptr<StagingMemoryManager>& getStaging() const;
+    const StagingMemoryManagerHandle& getStaging() const;
 
     const SamplerPoolHandle& get_sampler_pool() const {
         return m_samplerPool;
@@ -153,7 +153,7 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
   protected:
     const SharedContext context;
     const std::shared_ptr<MemoryAllocator> m_memAlloc;
-    const std::shared_ptr<StagingMemoryManager> m_staging;
+    const StagingMemoryManagerHandle m_staging;
     const SamplerPoolHandle m_samplerPool;
 };
 

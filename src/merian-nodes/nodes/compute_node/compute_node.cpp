@@ -5,20 +5,20 @@
 
 namespace merian_nodes {
 
-ComputeNode::ComputeNode(const SharedContext context,
+AbstractCompute::AbstractCompute(const SharedContext context,
                          const std::string& name,
                          const std::optional<uint32_t> push_constant_size)
     : Node(name), context(context), push_constant_size(push_constant_size) {}
 
-ComputeNode::NodeStatusFlags
-ComputeNode::on_connected(const DescriptorSetLayoutHandle& descriptor_set_layout) {
+AbstractCompute::NodeStatusFlags
+AbstractCompute::on_connected(const DescriptorSetLayoutHandle& descriptor_set_layout) {
     this->descriptor_set_layout = descriptor_set_layout;
     this->pipe.reset();
 
     return {};
 }
 
-void ComputeNode::process(GraphRun& run,
+void AbstractCompute::process(GraphRun& run,
                           const vk::CommandBuffer& cmd,
                           const DescriptorSetHandle& descriptor_set,
                           const NodeIO& io) {

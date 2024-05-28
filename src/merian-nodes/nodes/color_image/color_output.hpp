@@ -5,14 +5,14 @@
 
 namespace merian_nodes {
 
-class ColorOutputNode : public Node {
+class ColorImage : public Node {
 
   public:
-    ColorOutputNode(const vk::Format format,
+    ColorImage(const vk::Format format,
                     const vk::Extent3D extent,
                     const vk::ClearColorValue color = {});
 
-    ~ColorOutputNode();
+    ~ColorImage();
 
     std::vector<OutputConnectorHandle>
     describe_outputs(const ConnectorIOMap& output_for_input) override;

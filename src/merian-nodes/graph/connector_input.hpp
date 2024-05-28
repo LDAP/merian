@@ -2,6 +2,8 @@
 
 #include "connector_output.hpp"
 
+#include "merian/utils/pointer.hpp"
+
 namespace merian_nodes {
 
 // Do not inherit from this class, inherit from TypedInputConnector instead.
@@ -13,6 +15,7 @@ class InputConnector : public Connector {
     virtual void configuration(Configuration& config) {
         config.output_text(fmt::format("delay: {}", delay));
     }
+
   public:
     // The number of iterations the corresponding resource is accessed later.
     const uint32_t delay;
@@ -37,6 +40,10 @@ class TypedInputConnector : public InputConnector {
         : InputConnector(name, delay) {}
 
     virtual ResourceAccessType resource(const GraphResourceHandle& resource) = 0;
+
+    virtual OutputConnectorType output_connector(const OutputConnectorHandle& output) const {
+        return debugable_ptr_cast<typename OutputConnectorType::element_type>(output);
+    }
 };
 
 template <typename OutputConnectorType, typename ResourceAccessType = void>

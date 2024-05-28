@@ -11,7 +11,7 @@ ShadertoyNode::ShadertoyNode(const SharedContext context,
                              FileLoader loader,
                              const uint32_t width,
                              const uint32_t height)
-    : ComputeNode(context, "ShadertoyNode", sizeof(PushConstant)), width(width), height(height) {
+    : AbstractCompute(context, "Shadertoy", sizeof(PushConstant)), width(width), height(height) {
     shader = std::make_shared<ShaderModule>(context, path, loader);
     constant.iResolution = glm::vec2(width, height);
     sw.reset();
@@ -25,7 +25,7 @@ ShadertoyNode::ShadertoyNode(const SharedContext context,
                              const uint32_t spv[],
                              const uint32_t width,
                              const uint32_t height)
-    : ComputeNode(context, "ShadertoyNode", sizeof(PushConstant)), width(width), height(height) {
+    : AbstractCompute(context, "Shadertoy", sizeof(PushConstant)), width(width), height(height) {
     shader = std::make_shared<ShaderModule>(context, spv_size, spv);
     constant.iResolution = glm::vec2(width, height);
     sw.reset();
@@ -45,8 +45,8 @@ ShadertoyNode::describe_outputs([[maybe_unused]] const ConnectorIOMap& output_fo
     return {VkImageOut::compute_write("out", vk::Format::eR8G8B8A8Unorm, width, height)};
 }
 
-ComputeNode::NodeStatusFlags ShadertoyNode::pre_process([[maybe_unused]] GraphRun& run,
-                                                        [[maybe_unused]] const NodeIO& io) {
+AbstractCompute::NodeStatusFlags ShadertoyNode::pre_process([[maybe_unused]] GraphRun& run,
+                                                            [[maybe_unused]] const NodeIO& io) {
     NodeStatusFlags flags{};
     if (requires_rebuild) {
         flags |= NodeStatusFlagBits::NEEDS_RECONNECT;

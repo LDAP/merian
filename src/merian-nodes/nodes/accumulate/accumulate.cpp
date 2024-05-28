@@ -10,7 +10,7 @@
 
 namespace merian_nodes {
 
-AccumulateNode::AccumulateNode(const SharedContext context,
+Accumulate::Accumulate(const SharedContext context,
                                const ResourceAllocatorHandle allocator,
                                const std::optional<vk::Format> format)
     : Node("Accumulate"), context(context), allocator(allocator), format(format) {
@@ -21,9 +21,9 @@ AccumulateNode::AccumulateNode(const SharedContext context,
                                                        merian_accumulate_comp_spv());
 }
 
-AccumulateNode::~AccumulateNode() {}
+Accumulate::~Accumulate() {}
 
-std::vector<InputConnectorHandle> AccumulateNode::describe_inputs() {
+std::vector<InputConnectorHandle> Accumulate::describe_inputs() {
     return {
         con_prev_accum, con_prev_moments, con_irr_in,    con_mv,
         con_moments_in, con_gbuf,         con_prev_gbuf,
@@ -31,7 +31,7 @@ std::vector<InputConnectorHandle> AccumulateNode::describe_inputs() {
 }
 
 std::vector<OutputConnectorHandle>
-AccumulateNode::describe_outputs(const ConnectorIOMap& output_for_input) {
+Accumulate::describe_outputs(const ConnectorIOMap& output_for_input) {
 
     irr_create_info = output_for_input[con_irr_in]->create_info;
     const auto moments_create_info = output_for_input[con_moments_in]->create_info;
@@ -48,8 +48,8 @@ AccumulateNode::describe_outputs(const ConnectorIOMap& output_for_input) {
     };
 }
 
-AccumulateNode::NodeStatusFlags
-AccumulateNode::on_connected(const DescriptorSetLayoutHandle& graph_layout) {
+Accumulate::NodeStatusFlags
+Accumulate::on_connected(const DescriptorSetLayoutHandle& graph_layout) {
     if (!percentile_desc_layout) {
         percentile_desc_layout =
             DescriptorSetLayoutBuilder().add_binding_storage_image().build_layout(context);
@@ -121,7 +121,7 @@ AccumulateNode::on_connected(const DescriptorSetLayoutHandle& graph_layout) {
     return {};
 }
 
-void AccumulateNode::process(GraphRun& run,
+void Accumulate::process(GraphRun& run,
                              const vk::CommandBuffer& cmd,
                              const DescriptorSetHandle& descriptor_set,
                              [[maybe_unused]] const NodeIO& io) {
@@ -161,7 +161,7 @@ void AccumulateNode::process(GraphRun& run,
     }
 }
 
-AccumulateNode::NodeStatusFlags AccumulateNode::configuration(Configuration& config) {
+Accumulate::NodeStatusFlags Accumulate::configuration(Configuration& config) {
     bool needs_rebuild = false;
     config.st_separate("Accumulation");
     config.config_float("alpha", accumulate_pc.accum_alpha, 0, 1,
@@ -227,7 +227,7 @@ AccumulateNode::NodeStatusFlags AccumulateNode::configuration(Configuration& con
     return needs_rebuild ? NodeStatusFlags{NEEDS_RECONNECT} : NodeStatusFlags{};
 }
 
-void AccumulateNode::request_clear() {
+void Accumulate::request_clear() {
     clear = true;
 }
 

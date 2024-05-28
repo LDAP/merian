@@ -6,65 +6,59 @@ static const uint32_t spv[] = {
 #include "tonemap.comp.spv.h"
 };
 
-namespace merian {
+namespace merian_nodes {
 
-TonemapNode::TonemapNode(const SharedContext context,
-                         const ResourceAllocatorHandle allocator,
-                         const std::optional<vk::Format> output_format)
-    : ComputeNode(context, allocator, sizeof(PushConstant)), output_format(output_format) {
+Tonemap::Tonemap(const SharedContext context, const std::optional<vk::Format> output_format)
+    : AbstractCompute(context, "Tonemap", sizeof(PushConstant)), output_format(output_format) {
     shader = std::make_shared<ShaderModule>(context, sizeof(spv), spv);
+    make_spec_info();    
 }
 
-TonemapNode::~TonemapNode() {}
+Tonemap::~Tonemap() {}
 
-std::string TonemapNode::name() {
-    return "Tonemap";
-}
-
-std::tuple<std::vector<NodeInputDescriptorImage>, std::vector<NodeInputDescriptorBuffer>>
-TonemapNode::describe_inputs() {
-    return {
-        {
-            NodeInputDescriptorImage::compute_read("src"),
-        },
-        {},
-    };
-}
-
-std::tuple<std::vector<NodeOutputDescriptorImage>, std::vector<NodeOutputDescriptorBuffer>>
-TonemapNode::describe_outputs(const std::vector<NodeOutputDescriptorImage>& connected_image_outputs,
-                              const std::vector<NodeOutputDescriptorBuffer>&) {
-    extent = connected_image_outputs[0].create_info.extent;
-    vk::Format format = output_format.value_or(connected_image_outputs[0].create_info.format);
-
-    return {
-        {
-            NodeOutputDescriptorImage::compute_write("output", format, extent),
-        },
-        {},
-    };
-}
-
-SpecializationInfoHandle TonemapNode::get_specialization_info() const noexcept {
+void Tonemap::make_spec_info() {
     auto spec_builder = SpecializationInfoBuilder();
     spec_builder.add_entry(local_size_x, local_size_y, tonemap, alpha_mode, clamp_output);
-    return spec_builder.build();
+    spec_info = spec_builder.build();
 }
 
-const void* TonemapNode::get_push_constant([[maybe_unused]] GraphRun& run) {
+
+std::vector<InputConnectorHandle> Tonemap::describe_inputs() {
+    return {
+        con_src,
+    };
+}
+
+std::vector<OutputConnectorHandle>
+Tonemap::describe_outputs([[maybe_unused]] const ConnectorIOMap& output_for_input) {
+    extent = output_for_input[con_src]->create_info.extent;
+    const vk::Format format = output_format.value_or(output_for_input[con_src]->create_info.format);
+
+    return {
+        VkImageOut::compute_write("out", format, extent),
+    };
+}
+
+SpecializationInfoHandle Tonemap::get_specialization_info() const noexcept {
+    return spec_info;
+}
+
+const void* Tonemap::get_push_constant([[maybe_unused]] GraphRun& run) {
     return &pc;
 }
 
-std::tuple<uint32_t, uint32_t, uint32_t> TonemapNode::get_group_count() const noexcept {
+std::tuple<uint32_t, uint32_t, uint32_t> Tonemap::get_group_count() const noexcept {
     return {(extent.width + local_size_x - 1) / local_size_x,
             (extent.height + local_size_y - 1) / local_size_y, 1};
 };
 
-ShaderModuleHandle TonemapNode::get_shader_module() {
+ShaderModuleHandle Tonemap::get_shader_module() {
     return shader;
 }
 
-void TonemapNode::get_configuration(Configuration& config, bool& needs_rebuild) {
+AbstractCompute::NodeStatusFlags Tonemap::configuration(Configuration& config) {
+    bool needs_rebuild = false;
+
     const int old_tonemap = tonemap;
     config.config_options(
         "tonemap", tonemap,
@@ -119,7 +113,8 @@ void TonemapNode::get_configuration(Configuration& config, bool& needs_rebuild) 
 
     config.st_separate();
     int32_t old_clamp_output = clamp_output;
-    config.config_bool("clamp output", clamp_output, "clamps the output (before computing the alpha channel)");
+    config.config_bool("clamp output", clamp_output,
+                       "clamps the output (before computing the alpha channel)");
     needs_rebuild |= old_clamp_output != clamp_output;
 
     config.st_separate();
@@ -139,6 +134,12 @@ void TonemapNode::get_configuration(Configuration& config, bool& needs_rebuild) 
     }
 
     needs_rebuild |= old_alpha_mode != alpha_mode;
+
+    if (needs_rebuild) {
+        make_spec_info();
+    }
+
+    return {};
 }
 
-} // namespace merian
+} // namespace merian_nodes

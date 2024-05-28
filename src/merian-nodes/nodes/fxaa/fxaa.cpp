@@ -1,34 +1,36 @@
 #include "fxaa.hpp"
+
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 
 #include "fxaa.comp.spv.h"
 
-namespace merian {
+namespace merian_nodes {
 
-FXAA::FXAA(const SharedContext context, const ResourceAllocatorHandle allocator)
-    : ComputeNode(context, allocator, sizeof(PushConstant)) {}
-
-std::tuple<std::vector<NodeInputDescriptorImage>, std::vector<NodeInputDescriptorBuffer>>
-FXAA::describe_inputs() {
-    return {{NodeInputDescriptorImage::compute_read("in")}, {}};
+FXAA::FXAA(const SharedContext context) : AbstractCompute(context, "FXAA", sizeof(PushConstant)) {
+    auto spec_builder = SpecializationInfoBuilder();
+    spec_builder.add_entry(local_size_x, local_size_y);
+    spec_info = spec_builder.build();
+    shader = std::make_shared<ShaderModule>(context, merian_fxaa_comp_spv_size(),
+                                            merian_fxaa_comp_spv());
 }
 
-std::tuple<std::vector<merian::NodeOutputDescriptorImage>,
-           std::vector<merian::NodeOutputDescriptorBuffer>>
-FXAA::describe_outputs(
-    const std::vector<merian::NodeOutputDescriptorImage>& connected_image_outputs,
-    const std::vector<merian::NodeOutputDescriptorBuffer>&) {
-    extent = connected_image_outputs[0].create_info.extent;
+std::vector<InputConnectorHandle> FXAA::describe_inputs() {
+    return {
+        con_src,
+    };
+}
 
-    return {{NodeOutputDescriptorImage::compute_write(
-                "out", connected_image_outputs[0].create_info.format, extent)},
-            {}};
+std::vector<OutputConnectorHandle>
+FXAA::describe_outputs([[maybe_unused]] const ConnectorIOMap& output_for_input) {
+    extent = output_for_input[con_src]->create_info.extent;
+
+    return {
+        VkImageOut::compute_write("out", output_for_input[con_src]->create_info.format, extent),
+    };
 }
 
 SpecializationInfoHandle FXAA::get_specialization_info() const noexcept {
-    auto spec_builder = SpecializationInfoBuilder();
-    spec_builder.add_entry(local_size_x, local_size_y);
-    return spec_builder.build();
+    return spec_info;
 }
 
 const void* FXAA::get_push_constant([[maybe_unused]] GraphRun& run) {
@@ -41,12 +43,12 @@ std::tuple<uint32_t, uint32_t, uint32_t> FXAA::get_group_count() const noexcept 
 }
 
 ShaderModuleHandle FXAA::get_shader_module() {
-    return std::make_shared<ShaderModule>(context, merian_fxaa_comp_spv_size(),
-                                          merian_fxaa_comp_spv());
+    return shader;
 }
 
-void FXAA::get_configuration(Configuration& config, bool&) {
+AbstractCompute::NodeStatusFlags FXAA::configuration(Configuration& config) {
     config.config_bool("enable", pc.enable, "");
+    return {};
 }
 
-} // namespace merian
+} // namespace merian_nodes

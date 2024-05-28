@@ -1,10 +1,11 @@
 #pragma once
 
+#include "merian-nodes/connectors/vk_image_in.hpp"
 #include "merian-nodes/nodes/compute_node/compute_node.hpp"
 
-namespace merian {
+namespace merian_nodes {
 
-class TonemapNode : public ComputeNode {
+class Tonemap : public AbstractCompute {
 
   private:
     static constexpr uint32_t local_size_x = 16;
@@ -21,21 +22,15 @@ class TonemapNode : public ComputeNode {
     };
 
   public:
-    TonemapNode(const SharedContext context,
-                const ResourceAllocatorHandle alloc,
+    Tonemap(const SharedContext context,
                 const std::optional<vk::Format> output_format = std::nullopt);
 
-    ~TonemapNode();
+    ~Tonemap();
 
-    std::string name() override;
+    std::vector<InputConnectorHandle> describe_inputs() override;
 
-    std::tuple<std::vector<NodeInputDescriptorImage>, std::vector<NodeInputDescriptorBuffer>>
-    describe_inputs() override;
-
-    std::tuple<std::vector<NodeOutputDescriptorImage>, std::vector<NodeOutputDescriptorBuffer>>
-    describe_outputs(
-        const std::vector<NodeOutputDescriptorImage>& connected_image_outputs,
-        const std::vector<NodeOutputDescriptorBuffer>& connected_buffer_outputs) override;
+    std::vector<OutputConnectorHandle>
+    describe_outputs(const ConnectorIOMap& output_for_input) override;
 
     SpecializationInfoHandle get_specialization_info() const noexcept override;
 
@@ -45,16 +40,23 @@ class TonemapNode : public ComputeNode {
 
     ShaderModuleHandle get_shader_module() override;
 
-    void get_configuration(Configuration& config, bool& needs_rebuild) override;
+    NodeStatusFlags configuration(Configuration& config) override;
 
   private:
+    void make_spec_info();
+
     const std::optional<vk::Format> output_format;
+
+    VkImageInHandle con_src = VkImageIn::compute_read("src");
+
     vk::Extent3D extent;
     PushConstant pc;
     ShaderModuleHandle shader;
+    SpecializationInfoHandle spec_info;
+
     int32_t tonemap = 0;
     int32_t alpha_mode = 0;
     int32_t clamp_output = 1;
 };
 
-} // namespace merian
+} // namespace merian_nodes

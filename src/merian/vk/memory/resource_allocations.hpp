@@ -127,7 +127,7 @@ class Image : public std::enable_shared_from_this<Image> {
         return create_info.format;
     }
 
-    const vk::ImageTiling& get_tiling() {
+    const vk::ImageTiling& get_tiling() const {
         return create_info.tiling;
     }
 
@@ -209,6 +209,8 @@ class Image : public std::enable_shared_from_this<Image> {
 
         return view_info;
     }
+
+    vk::FormatFeatureFlags format_features() const;
 
     // Test if the image has been created with a usage value containing at least one of the usages
     // defined in the valid image usage list for image views

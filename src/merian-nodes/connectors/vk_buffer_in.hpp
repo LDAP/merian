@@ -11,7 +11,7 @@ using VkBufferInHandle = std::shared_ptr<VkBufferIn>;
 
 // Input a Vulkan buffer that is allocated and managed by the graph.
 // Note that it only supplies a descriptor if stage_flags contains at least one bit.
-class VkBufferIn : public TypedInputConnector<VkBufferOut, BufferHandle> {
+class VkBufferIn : public TypedInputConnector<VkBufferOutHandle, BufferHandle> {
     friend class VkBufferOut;
 
   public:

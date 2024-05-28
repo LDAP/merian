@@ -274,4 +274,6 @@ class StagingMemoryManager : public std::enable_shared_from_this<StagingMemoryMa
     void releaseResources(uint32_t stagingID);
 };
 
+using StagingMemoryManagerHandle = std::shared_ptr<StagingMemoryManager>;
+
 } // namespace merian

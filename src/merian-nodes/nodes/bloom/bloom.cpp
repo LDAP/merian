@@ -9,7 +9,7 @@
 
 namespace merian_nodes {
 
-BloomNode::BloomNode(const SharedContext context) : Node("Bloom"), context(context) {
+Bloom::Bloom(const SharedContext context) : Node("Bloom"), context(context) {
 
     separate_module = std::make_shared<ShaderModule>(context, merian_bloom_separate_comp_spv_size(),
                                                      merian_bloom_separate_comp_spv());
@@ -17,14 +17,14 @@ BloomNode::BloomNode(const SharedContext context) : Node("Bloom"), context(conte
         context, merian_bloom_composite_comp_spv_size(), merian_bloom_composite_comp_spv());
 }
 
-BloomNode::~BloomNode() {}
+Bloom::~Bloom() {}
 
-std::vector<InputConnectorHandle> BloomNode::describe_inputs() {
+std::vector<InputConnectorHandle> Bloom::describe_inputs() {
     return {con_src};
 }
 
 std::vector<OutputConnectorHandle>
-BloomNode::describe_outputs(const ConnectorIOMap& output_for_input) {
+Bloom::describe_outputs(const ConnectorIOMap& output_for_input) {
     const vk::Format format = output_for_input[con_src]->create_info.format;
     const vk::Extent3D extent = output_for_input[con_src]->create_info.extent;
 
@@ -37,7 +37,7 @@ BloomNode::describe_outputs(const ConnectorIOMap& output_for_input) {
     };
 }
 
-BloomNode::NodeStatusFlags BloomNode::on_connected(const DescriptorSetLayoutHandle& graph_layout) {
+Bloom::NodeStatusFlags Bloom::on_connected(const DescriptorSetLayoutHandle& graph_layout) {
     auto pipe_layout = PipelineLayoutBuilder(context)
                            .add_descriptor_set_layout(graph_layout)
                            .add_push_constant<PushConstant>()
@@ -52,7 +52,7 @@ BloomNode::NodeStatusFlags BloomNode::on_connected(const DescriptorSetLayoutHand
     return {};
 }
 
-void BloomNode::process([[maybe_unused]] GraphRun& run,
+void Bloom::process([[maybe_unused]] GraphRun& run,
                         const vk::CommandBuffer& cmd,
                         const DescriptorSetHandle& descriptor_set,
                         const NodeIO& io) {
@@ -75,7 +75,7 @@ void BloomNode::process([[maybe_unused]] GraphRun& run,
     cmd.dispatch(group_count_x, group_count_y, 1);
 }
 
-BloomNode::NodeStatusFlags BloomNode::configuration(Configuration& config) {
+Bloom::NodeStatusFlags Bloom::configuration(Configuration& config) {
     config.config_float("brightness threshold", pc.threshold,
                         "Only areas brighter than that are affected", .1);
     config.config_float("strengh", pc.strength, "Controls the strength of the effect", .0001);

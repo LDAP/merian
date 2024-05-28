@@ -1,6 +1,5 @@
 #include "mean.hpp"
-#include "merian-nodes/graph/graph.hpp"
-#include "merian-nodes/graph/node_utils.hpp"
+
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
@@ -8,10 +7,9 @@
 #include "image_to_buffer.comp.spv.h"
 #include "reduce_buffer.comp.spv.h"
 
-namespace merian {
+namespace merian_nodes {
 
-MeanNode::MeanNode(const SharedContext context, const ResourceAllocatorHandle allocator)
-    : context(context), allocator(allocator) {
+MeanToBuffer::MeanToBuffer(const SharedContext context) : Node("Mean"), context(context) {
 
     image_to_buffer_shader = std::make_shared<ShaderModule>(
         context, merian_image_to_buffer_comp_spv_size(), merian_image_to_buffer_comp_spv());
@@ -19,51 +17,34 @@ MeanNode::MeanNode(const SharedContext context, const ResourceAllocatorHandle al
         context, merian_reduce_buffer_comp_spv_size(), merian_reduce_buffer_comp_spv());
 }
 
-MeanNode::~MeanNode() {}
+MeanToBuffer::~MeanToBuffer() {}
 
-std::string MeanNode::name() {
-    return "Mean";
+std::vector<InputConnectorHandle> MeanToBuffer::describe_inputs() {
+    return {con_src};
 }
 
-std::tuple<std::vector<NodeInputDescriptorImage>, std::vector<NodeInputDescriptorBuffer>>
-MeanNode::describe_inputs() {
-    return {
-        {
-            NodeInputDescriptorImage::compute_read("src"),
-        },
-        {},
-    };
-}
-
-std::tuple<std::vector<NodeOutputDescriptorImage>, std::vector<NodeOutputDescriptorBuffer>>
-MeanNode::describe_outputs(const std::vector<NodeOutputDescriptorImage>& connected_image_outputs,
-                           const std::vector<NodeOutputDescriptorBuffer>&) {
-    vk::Extent3D extent = connected_image_outputs[0].create_info.extent;
+std::vector<OutputConnectorHandle>
+MeanToBuffer::describe_outputs(const ConnectorIOMap& output_for_input) {
+    vk::Extent3D extent = output_for_input[con_src]->create_info.extent;
 
     const auto group_count_x = (extent.width + local_size_x - 1) / local_size_x;
     const auto group_count_y = (extent.height + local_size_y - 1) / local_size_y;
     const std::size_t buffer_size = group_count_x * group_count_y;
 
-    return {
-        {},
-        {
-            NodeOutputDescriptorBuffer(
-                "mean", vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
-                vk::PipelineStageFlagBits2::eComputeShader,
-                vk::BufferCreateInfo({}, buffer_size * sizeof(glm::vec4),
-                                     vk::BufferUsageFlagBits::eStorageBuffer)),
-        },
-    };
+    con_mean = std::make_shared<VkBufferOut>(
+        "mean", vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
+        vk::PipelineStageFlagBits2::eComputeShader, vk::ShaderStageFlagBits::eCompute,
+        vk::BufferCreateInfo({}, buffer_size * sizeof(glm::vec4),
+                             vk::BufferUsageFlagBits::eStorageBuffer));
+
+    return {con_mean};
 }
 
-void MeanNode::cmd_build([[maybe_unused]] const vk::CommandBuffer& cmd,
-                         const std::vector<NodeIO>& ios) {
-    std::tie(graph_textures, graph_sets, graph_pool, graph_layout) =
-        make_graph_descriptor_sets(context, allocator, ios, graph_layout);
-
+MeanToBuffer::NodeStatusFlags
+MeanToBuffer::on_connected(const DescriptorSetLayoutHandle& descriptor_set_layout) {
     if (!image_to_buffer) {
         auto pipe_layout = PipelineLayoutBuilder(context)
-                               .add_descriptor_set_layout(graph_layout)
+                               .add_descriptor_set_layout(descriptor_set_layout)
                                .add_push_constant<PushConstant>()
                                .build_pipeline_layout();
         auto image_to_buffer_spec_builder = SpecializationInfoBuilder();
@@ -81,24 +62,23 @@ void MeanNode::cmd_build([[maybe_unused]] const vk::CommandBuffer& cmd,
         spec = reduce_buffer_spec_builder.build();
         reduce_buffer = std::make_shared<ComputePipeline>(pipe_layout, reduce_buffer_shader, spec);
     }
+
+    return {};
 }
 
-void MeanNode::cmd_process(const vk::CommandBuffer& cmd,
-                           GraphRun& run,
-                           [[maybe_unused]] const std::shared_ptr<FrameData>& frame_data,
-                           const uint32_t set_index,
+void MeanToBuffer::process([[maybe_unused]] GraphRun& run,
+                           const vk::CommandBuffer& cmd,
+                           const DescriptorSetHandle& descriptor_set,
                            const NodeIO& io) {
-    const auto group_count_x =
-        (io.image_inputs[0]->get_extent().width + local_size_x - 1) / local_size_x;
-    const auto group_count_y =
-        (io.image_inputs[0]->get_extent().height + local_size_y - 1) / local_size_y;
+    const auto group_count_x = (io[con_src]->get_extent().width + local_size_x - 1) / local_size_x;
+    const auto group_count_y = (io[con_src]->get_extent().height + local_size_y - 1) / local_size_y;
 
-    pc.divisor = io.image_inputs[0]->get_extent().width * io.image_inputs[0]->get_extent().height;
+    pc.divisor = io[con_src]->get_extent().width * io[con_src]->get_extent().height;
 
     {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "image to buffer");
         image_to_buffer->bind(cmd);
-        image_to_buffer->bind_descriptor_set(cmd, graph_sets[set_index]);
+        image_to_buffer->bind_descriptor_set(cmd, descriptor_set);
         image_to_buffer->push_constant(cmd, pc);
         cmd.dispatch(group_count_x, group_count_y, 1);
     }
@@ -110,14 +90,14 @@ void MeanNode::cmd_process(const vk::CommandBuffer& cmd,
     while (pc.count > 1) {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd,
                                  fmt::format("reduce {} elements", pc.count));
-        auto bar = io.buffer_outputs[0]->buffer_barrier(
+        auto bar = io[con_mean]->buffer_barrier(
             vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite,
             vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite);
         cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
                             vk::PipelineStageFlagBits::eComputeShader, {}, {}, bar, {});
 
         reduce_buffer->bind(cmd);
-        reduce_buffer->bind_descriptor_set(cmd, graph_sets[set_index]);
+        reduce_buffer->bind_descriptor_set(cmd, descriptor_set);
         reduce_buffer->push_constant(cmd, pc);
         cmd.dispatch((pc.count + workgroup_size - 1) / workgroup_size, 1, 1);
 
@@ -126,6 +106,4 @@ void MeanNode::cmd_process(const vk::CommandBuffer& cmd,
     }
 }
 
-void MeanNode::get_configuration(Configuration&, bool&) {}
-
-} // namespace merian
+} // namespace merian_nodes

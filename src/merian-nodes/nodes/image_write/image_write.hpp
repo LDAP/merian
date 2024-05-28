@@ -8,7 +8,7 @@
 namespace merian_nodes {
 
 // Writes to images files.
-class ImageWriteNode : public Node {
+class ImageWrite : public Node {
     class FrameData {
       public:
         std::optional<ImageHandle> intermediate_image;
@@ -20,12 +20,12 @@ class ImageWriteNode : public Node {
      *
      * @param      allocator      The allocator used to create copies of the input to be able to
      */
-    ImageWriteNode(const SharedContext context,
+    ImageWrite(const SharedContext context,
                    const ResourceAllocatorHandle allocator,
                    const std::string& base_filename =
                        "image_{record_iteration:06}_{image_index:06}_{run_iteration:06}");
 
-    virtual ~ImageWriteNode();
+    virtual ~ImageWrite();
 
     virtual std::vector<InputConnectorHandle> describe_inputs() override;
 

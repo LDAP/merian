@@ -8,7 +8,7 @@
 
 namespace merian_nodes {
 
-class BloomNode : public Node {
+class Bloom : public Node {
   private:
     static constexpr uint32_t local_size_x = 16;
     static constexpr uint32_t local_size_y = 16;
@@ -19,9 +19,9 @@ class BloomNode : public Node {
     };
 
   public:
-    BloomNode(const SharedContext context);
+    Bloom(const SharedContext context);
 
-    virtual ~BloomNode();
+    virtual ~Bloom();
 
     std::vector<InputConnectorHandle> describe_inputs() override;
 

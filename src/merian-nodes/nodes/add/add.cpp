@@ -5,8 +5,8 @@
 
 namespace merian_nodes {
 
-AddNode::AddNode(const SharedContext context, const std::optional<vk::Format> output_format)
-    : ComputeNode(context, "Add"), output_format(output_format) {
+Add::Add(const SharedContext context, const std::optional<vk::Format> output_format)
+    : AbstractCompute(context, "Add"), output_format(output_format) {
     shader =
         std::make_shared<ShaderModule>(context, merian_add_comp_spv_size(), merian_add_comp_spv());
 
@@ -15,9 +15,9 @@ AddNode::AddNode(const SharedContext context, const std::optional<vk::Format> ou
     spec_info = spec_builder.build();
 }
 
-AddNode::~AddNode() {}
+Add::~Add() {}
 
-std::vector<InputConnectorHandle> AddNode::describe_inputs() {
+std::vector<InputConnectorHandle> Add::describe_inputs() {
     return {
         con_a,
         con_b,
@@ -25,7 +25,7 @@ std::vector<InputConnectorHandle> AddNode::describe_inputs() {
 }
 
 std::vector<OutputConnectorHandle>
-AddNode::describe_outputs(const ConnectorIOMap& output_for_input) {
+Add::describe_outputs(const ConnectorIOMap& output_for_input) {
     extent = output_for_input[con_a]->create_info.extent;
     vk::Format format = output_format.value_or(output_for_input[con_a]->create_info.format);
 
@@ -34,7 +34,7 @@ AddNode::describe_outputs(const ConnectorIOMap& output_for_input) {
     };
 }
 
-SpecializationInfoHandle AddNode::get_specialization_info() const noexcept {
+SpecializationInfoHandle Add::get_specialization_info() const noexcept {
     return spec_info;
 }
 
@@ -42,16 +42,16 @@ SpecializationInfoHandle AddNode::get_specialization_info() const noexcept {
 //     return &pc;
 // }
 
-std::tuple<uint32_t, uint32_t, uint32_t> AddNode::get_group_count() const noexcept {
+std::tuple<uint32_t, uint32_t, uint32_t> Add::get_group_count() const noexcept {
     return {(extent.width + local_size_x - 1) / local_size_x,
             (extent.height + local_size_y - 1) / local_size_y, 1};
 };
 
-ShaderModuleHandle AddNode::get_shader_module() {
+ShaderModuleHandle Add::get_shader_module() {
     return shader;
 }
 
-AddNode::NodeStatusFlags AddNode::configuration(Configuration&) {
+Add::NodeStatusFlags Add::configuration(Configuration&) {
     return {};
 }
 

@@ -8,14 +8,14 @@
 
 namespace merian_nodes {
 
-class ABCompareNode : public Node {
+class AbstractABCompare : public Node {
 
   protected:
-    ABCompareNode(const std::string& name,
+    AbstractABCompare(const std::string& name,
                   const std::optional<vk::Format> output_format = std::nullopt,
                   const std::optional<vk::Extent2D> output_extent = std::nullopt);
 
-    virtual ~ABCompareNode();
+    virtual ~AbstractABCompare();
 
     std::vector<InputConnectorHandle> describe_inputs() override final;
 
@@ -27,10 +27,10 @@ class ABCompareNode : public Node {
     const VkImageInHandle con_in_b = VkImageIn::transfer_src("b");
 };
 
-class ABSplitNode : public ABCompareNode {
+class ABSplit : public AbstractABCompare {
 
   public:
-    ABSplitNode(const std::optional<vk::Format> output_format = std::nullopt,
+    ABSplit(const std::optional<vk::Format> output_format = std::nullopt,
                 const std::optional<vk::Extent2D> output_extent = std::nullopt);
 
     std::vector<OutputConnectorHandle>
@@ -45,10 +45,10 @@ class ABSplitNode : public ABCompareNode {
     VkImageOutHandle con_out;
 };
 
-class ABSideBySideNode : public ABCompareNode {
+class ABSideBySide : public AbstractABCompare {
 
   public:
-    ABSideBySideNode(const std::optional<vk::Format> output_format = std::nullopt,
+    ABSideBySide(const std::optional<vk::Format> output_format = std::nullopt,
                      const std::optional<vk::Extent2D> output_extent = std::nullopt);
 
     std::vector<OutputConnectorHandle>

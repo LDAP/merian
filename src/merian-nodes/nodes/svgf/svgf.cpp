@@ -2,8 +2,7 @@
 #include "config.h"
 #include "merian/vk/descriptors/descriptor_set_layout_builder.hpp"
 #include "merian/vk/descriptors/descriptor_set_update.hpp"
-#include "merian-nodes/graph/graph.hpp"
-#include "merian-nodes/graph/node_utils.hpp"
+
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
@@ -12,7 +11,7 @@
 #include "svgf_taa.comp.spv.h"
 #include "svgf_variance_estimate.comp.spv.h"
 
-namespace merian {
+namespace merian_nodes {
 
 uint32_t get_ve_local_size(const SharedContext& context) {
     if (32 * 32 * VE_SHARED_MEMORY_PER_PIXEL <=
@@ -26,10 +25,10 @@ uint32_t get_ve_local_size(const SharedContext& context) {
     }
 }
 
-SVGFNode::SVGFNode(const SharedContext context,
+SVGF::SVGF(const SharedContext context,
                    const ResourceAllocatorHandle allocator,
                    const std::optional<vk::Format> output_format)
-    : context(context), allocator(allocator), output_format(output_format),
+    : Node("SVGF"), context(context), allocator(allocator), output_format(output_format),
       variance_estimate_local_size_x(get_ve_local_size(context)),
       variance_estimate_local_size_y(get_ve_local_size(context)) {
     variance_estimate_module =
@@ -41,48 +40,28 @@ SVGFNode::SVGFNode(const SharedContext context,
                                                 merian_svgf_taa_comp_spv());
 }
 
-SVGFNode::~SVGFNode() {}
+SVGF::~SVGF() {}
 
-std::tuple<std::vector<NodeInputDescriptorImage>, std::vector<NodeInputDescriptorBuffer>>
-SVGFNode::describe_inputs() {
+std::vector<InputConnectorHandle> SVGF::describe_inputs() {
     return {
-        {
-            NodeInputDescriptorImage::compute_read("prev_out", 1),
-
-            NodeInputDescriptorImage::compute_read("irr"),
-            NodeInputDescriptorImage::compute_read("moments"),
-
-            NodeInputDescriptorImage::compute_read("albedo"),
-            NodeInputDescriptorImage::compute_read("mv"),
-        },
-        {
-            NodeInputDescriptorBuffer::compute_read("gbuffer"),
-            NodeInputDescriptorBuffer::compute_read("prev_gbuffer", 1),
-        },
+        con_prev_out, con_irr, con_moments, con_albedo, con_mv, con_gbuffer, con_prev_gbuffer,
     };
 }
 
-std::tuple<std::vector<NodeOutputDescriptorImage>, std::vector<NodeOutputDescriptorBuffer>>
-SVGFNode::describe_outputs(const std::vector<NodeOutputDescriptorImage>& connected_image_outputs,
-                           const std::vector<NodeOutputDescriptorBuffer>&) {
+std::vector<OutputConnectorHandle>
+SVGF::describe_outputs(const ConnectorIOMap& output_for_input) {
     // clang-format off
-    irr_create_info = connected_image_outputs[1].create_info;
+    irr_create_info = output_for_input[con_irr]->create_info;
     if (output_format)
         irr_create_info.format = output_format.value();
 
     return {
-        {
-            NodeOutputDescriptorImage::compute_write("out", irr_create_info.format, irr_create_info.extent),
-        },
-        {},
+            VkImageOut::compute_write("out", irr_create_info.format, irr_create_info.extent),
     };
     // clang-format on
 }
 
-void SVGFNode::cmd_build([[maybe_unused]] const vk::CommandBuffer& cmd,
-                         const std::vector<NodeIO>& ios) {
-    std::tie(graph_textures, graph_sets, graph_pool, graph_layout) =
-        make_graph_descriptor_sets(context, allocator, ios, graph_layout);
+SVGF::NodeStatusFlags SVGF::on_connected(const DescriptorSetLayoutHandle& graph_layout) {
     if (!ping_pong_layout) {
         ping_pong_layout = DescriptorSetLayoutBuilder()
                                .add_binding_combined_sampler()
@@ -101,9 +80,9 @@ void SVGFNode::cmd_build([[maybe_unused]] const vk::CommandBuffer& cmd,
         vk::ImageViewCreateInfo create_image_view{
             {}, *tmp_irr_image,         vk::ImageViewType::e2D, tmp_irr_image->get_format(),
             {}, first_level_and_layer()};
-        ping_pong_res[i].ping_pong = allocator->createTexture(tmp_irr_image, create_image_view);
-        ping_pong_res[i].ping_pong->attach_sampler(
-            allocator->get_sampler_pool()->linear_mirrored_repeat());
+        ping_pong_res[i].ping_pong =
+            allocator->createTexture(tmp_irr_image, create_image_view,
+                                     allocator->get_sampler_pool()->linear_mirrored_repeat());
     }
     for (int i = 0; i < 2; i++) {
         DescriptorSetUpdate(ping_pong_res[i].set)
@@ -163,13 +142,14 @@ void SVGFNode::cmd_build([[maybe_unused]] const vk::CommandBuffer& cmd,
 
     group_count_x = (irr_create_info.extent.width + local_size_x - 1) / local_size_x;
     group_count_y = (irr_create_info.extent.height + local_size_y - 1) / local_size_y;
+
+    return {};
 }
 
-void SVGFNode::cmd_process(const vk::CommandBuffer& cmd,
-                           GraphRun& run,
-                           [[maybe_unused]] const std::shared_ptr<FrameData>& frame_data,
-                           const uint32_t set_index,
-                           [[maybe_unused]] const NodeIO& io) {
+void SVGF::process([[maybe_unused]] GraphRun& run,
+                       [[maybe_unused]] const vk::CommandBuffer& cmd,
+                       const DescriptorSetHandle& descriptor_set,
+                       [[maybe_unused]] const NodeIO& io) {
     // PREPARE (VARIANCE ESTIMATE)
     {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "estimate variance");
@@ -182,7 +162,7 @@ void SVGFNode::cmd_process(const vk::CommandBuffer& cmd,
 
         // run kernel
         variance_estimate->bind(cmd);
-        variance_estimate->bind_descriptor_set(cmd, graph_sets[set_index], 0);
+        variance_estimate->bind_descriptor_set(cmd, descriptor_set, 0);
         variance_estimate->bind_descriptor_set(cmd, ping_pong_res[1].set, 1);
         variance_estimate->push_constant(cmd, variance_estimate_pc);
         // run more workgroups to prevent special cases in shader
@@ -220,7 +200,7 @@ void SVGFNode::cmd_process(const vk::CommandBuffer& cmd,
 
         // run filter
         filters[i]->bind(cmd);
-        filters[i]->bind_descriptor_set(cmd, graph_sets[set_index], 0);
+        filters[i]->bind_descriptor_set(cmd, descriptor_set, 0);
         filters[i]->bind_descriptor_set(cmd, read_set, 1);
         filters[i]->push_constant(cmd, filter_pc);
         cmd.dispatch(group_count_x, group_count_y, 1);
@@ -239,14 +219,16 @@ void SVGFNode::cmd_process(const vk::CommandBuffer& cmd,
     {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "taa");
         taa->bind(cmd);
-        taa->bind_descriptor_set(cmd, graph_sets[set_index], 0);
+        taa->bind_descriptor_set(cmd, descriptor_set, 0);
         taa->bind_descriptor_set(cmd, read_set, 1);
         taa->push_constant(cmd, taa_pc);
         cmd.dispatch(group_count_x, group_count_y, 1);
     }
 }
 
-void SVGFNode::get_configuration(Configuration& config, bool& needs_rebuild) {
+SVGF::NodeStatusFlags SVGF::configuration(Configuration& config) {
+    bool needs_rebuild = false;
+
     config.st_separate("Variance estimate");
     config.config_float("spatial falloff", variance_estimate_pc.spatial_falloff,
                         "higher means only use spatial with very low history", 0.01);
@@ -307,6 +289,12 @@ void SVGFNode::get_configuration(Configuration& config, bool& needs_rebuild) {
     needs_rebuild |= old_taa_filter_prev != taa_filter_prev;
     needs_rebuild |= old_taa_clamping != taa_clamping;
     needs_rebuild |= old_taa_mv_sampling != taa_mv_sampling;
+
+    if (needs_rebuild) {
+        return NEEDS_RECONNECT;
+    } else {
+        return {};
+    }
 }
 
-} // namespace merian
+} // namespace merian_nodes

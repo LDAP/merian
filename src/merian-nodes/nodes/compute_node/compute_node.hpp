@@ -14,14 +14,14 @@ namespace merian_nodes {
 // output buffers. Input images are bound as sampler2d, output images as image2d.
 //
 // A rebuild regenerates the pipeline, this allows an update to spec constants.
-class ComputeNode : public Node {
+class AbstractCompute : public Node {
 
   public:
-    ComputeNode(const SharedContext context,
+    AbstractCompute(const SharedContext context,
                 const std::string& name,
                 const std::optional<uint32_t> push_constant_size = std::nullopt);
 
-    virtual ~ComputeNode() {}
+    virtual ~AbstractCompute() {}
 
     // Return a SpecializationInfoHandle if you want to add specialization constants
     // In every run (rebuilds the pipeline if handle changed.)

@@ -16,9 +16,9 @@ namespace merian_nodes {
  * This node makes use of the error handling features of ExtensionVkGLFW, meaning, consider using
  * that to initialize GLFW.
  */
-class GLFWWindowNode : public Node {
+class GLFWWindow : public Node {
   public:
-    GLFWWindowNode(const SharedContext context) : Node("GLFW window") {
+    GLFWWindow(const SharedContext context) : Node("GLFW window") {
         window = std::make_shared<merian::GLFWWindow>(context);
         surface = window->get_surface();
         swapchain = std::make_shared<merian::Swapchain>(context, surface);
@@ -54,9 +54,14 @@ class GLFWWindowNode : public Node {
             cmd_barrier_image_layout(cmd, acquire->image, vk::ImageLayout::eUndefined,
                                      vk::ImageLayout::eTransferDstOptimal);
 
+            const vk::Filter filter =
+                src_image->format_features() & vk::FormatFeatureFlagBits::eSampledImageFilterLinear
+                    ? vk::Filter::eLinear
+                    : vk::Filter::eNearest;
+
             cmd_blit(mode, cmd, *src_image, vk::ImageLayout::eTransferSrcOptimal,
                      src_image->get_extent(), acquire->image, vk::ImageLayout::eTransferDstOptimal,
-                     extent);
+                     extent, std::nullopt, filter);
 
             cmd_barrier_image_layout(cmd, acquire->image, vk::ImageLayout::eTransferDstOptimal,
                                      vk::ImageLayout::ePresentSrcKHR);
@@ -84,7 +89,6 @@ class GLFWWindowNode : public Node {
     }
 
     NodeStatusFlags configuration(Configuration& config) override {
-
         GLFWmonitor* monitor = glfwGetWindowMonitor(*window);
         int fullscreen = monitor != NULL;
         const int old_fullscreen = fullscreen;

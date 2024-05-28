@@ -1,15 +1,18 @@
 #pragma once
 
 #include "merian-nodes/graph/node.hpp"
+#include "merian-nodes/connectors/vk_image_in.hpp"
+#include "merian-nodes/connectors/vk_buffer_in.hpp"
+
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
 #include "merian/vk/shader/shader_module.hpp"
 
 #include <optional>
 
-namespace merian {
+namespace merian_nodes {
 
-class SVGFNode : public Node {
+class SVGF : public Node {
   private:
     struct VarianceEstimatePushConstant {
         float normal_reject_cos = 0.8;
@@ -32,33 +35,25 @@ class SVGFNode : public Node {
     };
 
   public:
-    SVGFNode(const SharedContext context,
+    SVGF(const SharedContext context,
              const ResourceAllocatorHandle allocator,
              const std::optional<vk::Format> output_format = std::nullopt);
 
-    ~SVGFNode();
+    ~SVGF();
 
-    std::string name() override {
-        return "SVGF";
-    };
+    std::vector<InputConnectorHandle> describe_inputs() override;
 
-    std::tuple<std::vector<NodeInputDescriptorImage>, std::vector<NodeInputDescriptorBuffer>>
-    describe_inputs() override;
+    std::vector<OutputConnectorHandle>
+    describe_outputs(const ConnectorIOMap& output_for_input) override;
 
-    std::tuple<std::vector<NodeOutputDescriptorImage>, std::vector<NodeOutputDescriptorBuffer>>
-    describe_outputs(
-        const std::vector<NodeOutputDescriptorImage>& connected_image_outputs,
-        const std::vector<NodeOutputDescriptorBuffer>& connected_buffer_outputs) override;
+    NodeStatusFlags on_connected(const DescriptorSetLayoutHandle& descriptor_set_layout) override;
 
-    void cmd_build(const vk::CommandBuffer& cmd, const std::vector<NodeIO>& ios) override;
+    void process(GraphRun& run,
+                 const vk::CommandBuffer& cmd,
+                 const DescriptorSetHandle& descriptor_set,
+                 const NodeIO& io) override;
 
-    void cmd_process(const vk::CommandBuffer& cmd,
-                     GraphRun& run,
-                     const std::shared_ptr<FrameData>& frame_data,
-                     const uint32_t set_index,
-                     const NodeIO& io) override;
-
-    void get_configuration(Configuration& config, bool& needs_rebuild) override;
+    NodeStatusFlags configuration(Configuration& config) override;
 
   private:
     const SharedContext context;
@@ -70,6 +65,14 @@ class SVGFNode : public Node {
     const uint32_t variance_estimate_local_size_y;
     static constexpr uint32_t local_size_x = 32;
     static constexpr uint32_t local_size_y = 32;
+
+    VkImageInHandle con_prev_out = VkImageIn::compute_read("prev_out", 1);
+    VkImageInHandle con_irr = VkImageIn::compute_read("irr");
+    VkImageInHandle con_moments = VkImageIn::compute_read("moments");
+    VkImageInHandle con_albedo = VkImageIn::compute_read("albedo");
+    VkImageInHandle con_mv = VkImageIn::compute_read("mv");
+    VkBufferInHandle con_gbuffer = VkBufferIn::compute_read("gbuffer");
+    VkBufferInHandle con_prev_gbuffer = VkBufferIn::compute_read("prev_gbuffer", 1);
 
     ShaderModuleHandle variance_estimate_module;
     ShaderModuleHandle filter_module;
@@ -90,11 +93,6 @@ class SVGFNode : public Node {
 
     int svgf_iterations = 0;
 
-    std::vector<TextureHandle> graph_textures;
-    std::vector<DescriptorSetHandle> graph_sets;
-    DescriptorSetLayoutHandle graph_layout;
-    DescriptorPoolHandle graph_pool;
-
     DescriptorSetLayoutHandle ping_pong_layout;
     DescriptorPoolHandle filter_pool;
     struct EAWRes {
@@ -113,4 +111,4 @@ class SVGFNode : public Node {
     int taa_mv_sampling = 0;
 };
 
-} // namespace merian
+} // namespace merian_nodes

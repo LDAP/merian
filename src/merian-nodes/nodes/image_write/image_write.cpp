@@ -17,7 +17,7 @@ namespace merian_nodes {
 static std::unordered_map<uint32_t, std::string> FILE_EXTENSIONS = {
     {FORMAT_PNG, ".png"}, {FORMAT_JPG, ".jpg"}, {FORMAT_HDR, ".hdr"}};
 
-ImageWriteNode::ImageWriteNode(const SharedContext context,
+ImageWrite::ImageWrite(const SharedContext context,
                                const ResourceAllocatorHandle allocator,
                                const std::string& filename_format)
     : Node("Image Write"), context(context), allocator(allocator), filename_format(filename_format),
@@ -26,13 +26,13 @@ ImageWriteNode::ImageWriteNode(const SharedContext context,
     std::copy(filename_format.begin(), filename_format.end(), buf.begin());
 }
 
-ImageWriteNode::~ImageWriteNode() {}
+ImageWrite::~ImageWrite() {}
 
-std::vector<InputConnectorHandle> ImageWriteNode::describe_inputs() {
+std::vector<InputConnectorHandle> ImageWrite::describe_inputs() {
     return {con_src};
 }
 
-void ImageWriteNode::record() {
+void ImageWrite::record() {
     record_enable = true;
     needs_rebuild |= rebuild_on_record;
     this->iteration = 1;
@@ -45,7 +45,7 @@ void ImageWriteNode::record() {
         callback();
 }
 
-ImageWriteNode::NodeStatusFlags ImageWriteNode::pre_process(GraphRun& run,
+ImageWrite::NodeStatusFlags ImageWrite::pre_process(GraphRun& run,
                                                             [[maybe_unused]] const NodeIO& io) {
     if (!record_enable && ((int64_t)run.get_iteration() == enable_run)) {
         record();
@@ -57,7 +57,7 @@ ImageWriteNode::NodeStatusFlags ImageWriteNode::pre_process(GraphRun& run,
     return {};
 };
 
-void ImageWriteNode::process(GraphRun& run,
+void ImageWrite::process(GraphRun& run,
                              const vk::CommandBuffer& cmd,
                              [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
                              const NodeIO& io) {
@@ -290,8 +290,8 @@ void ImageWriteNode::process(GraphRun& run,
     record_iteration += record_enable ? it_offset : 0;
 }
 
-ImageWriteNode::NodeStatusFlags
-ImageWriteNode::configuration([[maybe_unused]] Configuration& config) {
+ImageWrite::NodeStatusFlags
+ImageWrite::configuration([[maybe_unused]] Configuration& config) {
     config.st_separate("General");
     config.config_options("format", format, {"PNG", "JPG", "HDR"},
                           Configuration::OptionsStyle::COMBO);
@@ -399,7 +399,7 @@ ImageWriteNode::configuration([[maybe_unused]] Configuration& config) {
     return {};
 }
 
-void ImageWriteNode::set_callback(const std::function<void()> callback) {
+void ImageWrite::set_callback(const std::function<void()> callback) {
     this->callback = callback;
 }
 

@@ -1,15 +1,16 @@
-# Median
+# MedianApproxToBuffer
 
-Calculates an approximation of the median.
+Calculates an approximation of the median and outputs it to a buffer.
 
 Inputs:
 
-| Type  | Input ID | Input name | Description                                       | Delay |
-|-------|----------|------------|---------------------------------------------------|-------|
-| Image | 0        | src        | input                                             | no    |
+| Type  | Input name | Description                                       | Delay |
+|-------|------------|---------------------------------------------------|-------|
+| Image | src        | input                                             | no    |
 
 Outputs:
 
-| Type   | Output ID | Output name | Description             | Format/Resolution          | Persistent |
-|--------|-----------|-------------|-------------------------|----------------------------|------------|
-| Buffer | 0         | mean        | approximation of median | float                      | no         |
+| Type   | Output name | Description             | Format/Resolution          | Persistent |
+|--------|-------------|-------------------------|----------------------------|------------|
+| Buffer | median      | approximation of median | float                      | no         |
+| Buffer | histogram   | luminance histogram     | internal use only          | no         |

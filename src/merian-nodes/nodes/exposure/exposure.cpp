@@ -1,11 +1,10 @@
 #include "exposure.hpp"
-#include "merian-nodes/graph/graph.hpp"
-#include "merian-nodes/graph/node_utils.hpp"
+
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 
-namespace merian {
+namespace merian_nodes {
 
 static const uint32_t histogram_spv[] = {
 #include "histogram.comp.spv.h"
@@ -19,8 +18,7 @@ static const uint32_t exposure_spv[] = {
 #include "exposure.comp.spv.h"
 };
 
-ExposureNode::ExposureNode(const SharedContext context, const ResourceAllocatorHandle allocator)
-    : context(context), allocator(allocator) {
+AutoExposure::AutoExposure(const SharedContext context) : Node("Auto Exposure"), context(context) {
 
     histogram_module =
         std::make_shared<ShaderModule>(context, sizeof(histogram_spv), histogram_spv);
@@ -29,58 +27,40 @@ ExposureNode::ExposureNode(const SharedContext context, const ResourceAllocatorH
     exposure_module = std::make_shared<ShaderModule>(context, sizeof(exposure_spv), exposure_spv);
 }
 
-ExposureNode::~ExposureNode() {}
+AutoExposure::~AutoExposure() {}
 
-std::string ExposureNode::name() {
-    return "Auto Exposure";
+std::vector<InputConnectorHandle> AutoExposure::describe_inputs() {
+    return {con_src};
 }
 
-std::tuple<std::vector<NodeInputDescriptorImage>, std::vector<NodeInputDescriptorBuffer>>
-ExposureNode::describe_inputs() {
-    return {
-        {
-            NodeInputDescriptorImage::compute_read("src"),
-        },
-        {},
-    };
+std::vector<OutputConnectorHandle>
+AutoExposure::describe_outputs(const ConnectorIOMap& output_for_input) {
+    const vk::Format format = output_for_input[con_src]->create_info.format;
+    const vk::Extent3D extent = output_for_input[con_src]->create_info.extent;
+
+    con_out = VkImageOut::compute_write("out", format, extent);
+    con_hist = std::make_shared<VkBufferOut>(
+        "histogram",
+        vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite |
+            vk::AccessFlagBits2::eTransferWrite,
+        vk::PipelineStageFlagBits2::eComputeShader | vk::PipelineStageFlagBits2::eTransfer,
+        vk::ShaderStageFlagBits::eCompute,
+        vk::BufferCreateInfo({}, local_size_x * local_size_y * sizeof(uint32_t) + sizeof(uint32_t),
+                             vk::BufferUsageFlagBits::eStorageBuffer |
+                                 vk::BufferUsageFlagBits::eTransferDst));
+    con_luminance = std::make_shared<VkBufferOut>(
+        "avg_luminance", vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
+        vk::PipelineStageFlagBits2::eComputeShader, vk::ShaderStageFlagBits::eCompute,
+        vk::BufferCreateInfo({}, sizeof(float), vk::BufferUsageFlagBits::eStorageBuffer), true);
+
+    return {con_out, con_hist, con_luminance};
 }
 
-std::tuple<std::vector<NodeOutputDescriptorImage>, std::vector<NodeOutputDescriptorBuffer>>
-ExposureNode::describe_outputs(
-    const std::vector<NodeOutputDescriptorImage>& connected_image_outputs,
-    const std::vector<NodeOutputDescriptorBuffer>&) {
-    vk::Format format = connected_image_outputs[0].create_info.format;
-    vk::Extent3D extent = connected_image_outputs[0].create_info.extent;
-    return {
-        {
-            NodeOutputDescriptorImage::compute_write("output", format, extent),
-        },
-        {
-            NodeOutputDescriptorBuffer(
-                "histogram",
-                vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite |
-                    vk::AccessFlagBits2::eTransferWrite,
-                vk::PipelineStageFlagBits2::eComputeShader | vk::PipelineStageFlagBits2::eTransfer,
-                vk::BufferCreateInfo(
-                    {}, local_size_x * local_size_y * sizeof(uint32_t) + sizeof(uint32_t),
-                    vk::BufferUsageFlagBits::eStorageBuffer)),
-            NodeOutputDescriptorBuffer(
-                "avg_luminance",
-                vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
-                vk::PipelineStageFlagBits2::eComputeShader,
-                vk::BufferCreateInfo({}, sizeof(float), vk::BufferUsageFlagBits::eStorageBuffer),
-                true),
-        },
-    };
-}
-
-void ExposureNode::cmd_build(const vk::CommandBuffer&, const std::vector<NodeIO>& ios) {
-    std::tie(graph_textures, graph_sets, graph_pool, graph_layout) =
-        make_graph_descriptor_sets(context, allocator, ios, graph_layout);
-
+AutoExposure::NodeStatusFlags
+AutoExposure::on_connected(const DescriptorSetLayoutHandle& descriptor_set_layout) {
     if (!exposure) {
         auto pipe_layout = PipelineLayoutBuilder(context)
-                               .add_descriptor_set_layout(graph_layout)
+                               .add_descriptor_set_layout(descriptor_set_layout)
                                .add_push_constant<PushConstant>()
                                .build_pipeline_layout();
         auto spec_builder = SpecializationInfoBuilder();
@@ -91,60 +71,59 @@ void ExposureNode::cmd_build(const vk::CommandBuffer&, const std::vector<NodeIO>
         luminance = std::make_shared<ComputePipeline>(pipe_layout, luminance_module, spec);
         exposure = std::make_shared<ComputePipeline>(pipe_layout, exposure_module, spec);
     }
+
+    return {};
 }
 
-void ExposureNode::cmd_process(const vk::CommandBuffer& cmd,
-                               GraphRun& run,
-                               [[maybe_unused]] const std::shared_ptr<FrameData>& frame_data,
-                               const uint32_t set_index,
-                               const NodeIO& io) {
-    const auto group_count_x =
-        (io.image_outputs[0]->get_extent().width + local_size_x - 1) / local_size_x;
-    const auto group_count_y =
-        (io.image_outputs[0]->get_extent().height + local_size_y - 1) / local_size_y;
+void AutoExposure::process(GraphRun& run,
+                           const vk::CommandBuffer& cmd,
+                           const DescriptorSetHandle& descriptor_set,
+                           const NodeIO& io) {
+    const auto group_count_x = (io[con_out]->get_extent().width + local_size_x - 1) / local_size_x;
+    const auto group_count_y = (io[con_out]->get_extent().height + local_size_y - 1) / local_size_y;
 
     if (pc.automatic) {
         pc.reset = run.get_iteration() == 0;
         pc.timediff = sw.seconds();
         sw.reset();
 
-        cmd.fillBuffer(*io.buffer_outputs[0], 0, VK_WHOLE_SIZE, 0);
-        auto bar = io.buffer_outputs[0]->buffer_barrier(vk::AccessFlagBits::eTransferWrite,
-                                                        vk::AccessFlagBits::eShaderRead |
-                                                            vk::AccessFlagBits::eShaderWrite);
+        cmd.fillBuffer(*io[con_hist], 0, VK_WHOLE_SIZE, 0);
+        auto bar = io[con_hist]->buffer_barrier(vk::AccessFlagBits::eTransferWrite,
+                                                vk::AccessFlagBits::eShaderRead |
+                                                    vk::AccessFlagBits::eShaderWrite);
         cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
                             vk::PipelineStageFlagBits::eComputeShader, {}, {}, bar, {});
 
         histogram->bind(cmd);
-        histogram->bind_descriptor_set(cmd, graph_sets[set_index]);
+        histogram->bind_descriptor_set(cmd, descriptor_set);
         histogram->push_constant(cmd, pc);
         cmd.dispatch(group_count_x, group_count_y, 1);
 
-        bar = io.buffer_outputs[0]->buffer_barrier(vk::AccessFlagBits::eShaderRead |
-                                                       vk::AccessFlagBits::eShaderWrite,
-                                                   vk::AccessFlagBits::eShaderRead);
+        bar = io[con_hist]->buffer_barrier(vk::AccessFlagBits::eShaderRead |
+                                               vk::AccessFlagBits::eShaderWrite,
+                                           vk::AccessFlagBits::eShaderRead);
         cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
                             vk::PipelineStageFlagBits::eComputeShader, {}, {}, bar, {});
     }
 
     luminance->bind(cmd);
-    luminance->bind_descriptor_set(cmd, graph_sets[set_index]);
+    luminance->bind_descriptor_set(cmd, descriptor_set);
     luminance->push_constant(cmd, pc);
     cmd.dispatch(1, 1, 1);
 
-    auto bar = io.buffer_outputs[1]->buffer_barrier(vk::AccessFlagBits::eShaderRead |
-                                                        vk::AccessFlagBits::eShaderWrite,
-                                                    vk::AccessFlagBits::eShaderRead);
+    auto bar = io[con_luminance]->buffer_barrier(vk::AccessFlagBits::eShaderRead |
+                                                     vk::AccessFlagBits::eShaderWrite,
+                                                 vk::AccessFlagBits::eShaderRead);
     cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
                         vk::PipelineStageFlagBits::eComputeShader, {}, {}, bar, {});
 
     exposure->bind(cmd);
-    exposure->bind_descriptor_set(cmd, graph_sets[set_index]);
+    exposure->bind_descriptor_set(cmd, descriptor_set);
     exposure->push_constant(cmd, pc);
     cmd.dispatch(group_count_x, group_count_y, 1);
 }
 
-void ExposureNode::get_configuration(Configuration& config, bool&) {
+AutoExposure::NodeStatusFlags AutoExposure::configuration(Configuration& config) {
     config.st_separate("General");
     bool autoexposure = pc.automatic;
     config.config_bool("autoexposure", autoexposure);
@@ -172,6 +151,8 @@ void ExposureNode::get_configuration(Configuration& config, bool&) {
     config.config_float("shutter time (ms)", shutter_time);
     pc.shutter_time = std::max(0.f, shutter_time / 1000);
     config.config_float("aperature", pc.aperature, "", .01);
+
+    return {};
 }
 
-} // namespace merian
+} // namespace merian_nodes
