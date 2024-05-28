@@ -5,40 +5,41 @@ static const uint32_t spv[] = {
 #include "vkdt_filmcurv.comp.spv.h"
 };
 
-namespace merian {
+namespace merian_nodes {
 
 VKDTFilmcurv::VKDTFilmcurv(const SharedContext context,
-                           const ResourceAllocatorHandle allocator,
-                           const vk::Format output_format,
-                           const std::optional<Options> options)
-    : ComputeNode(context, allocator, sizeof(Options)), output_format(output_format) {
+                           const std::optional<Options> options,
+                           const std::optional<vk::Format> output_format)
+    : AbstractCompute(context, "VKDT Filmcurv", sizeof(Options)), output_format(output_format) {
     if (options) {
         pc = options.value();
     }
+
+    auto spec_builder = SpecializationInfoBuilder();
+    spec_builder.add_entry(local_size_x, local_size_y);
+    spec_info = spec_builder.build();
+
+    shader = std::make_shared<ShaderModule>(context, sizeof(spv), spv);
 }
 
-std::tuple<std::vector<NodeInputDescriptorImage>, std::vector<NodeInputDescriptorBuffer>>
-VKDTFilmcurv::describe_inputs() {
-    return {{NodeInputDescriptorImage::compute_read("in")}, {}};
+std::vector<InputConnectorHandle> VKDTFilmcurv::describe_inputs() {
+    return {
+        con_src,
+    };
 }
 
-std::tuple<std::vector<merian::NodeOutputDescriptorImage>,
-           std::vector<merian::NodeOutputDescriptorBuffer>>
-VKDTFilmcurv::describe_outputs(
-    const std::vector<merian::NodeOutputDescriptorImage>& connected_image_outputs,
-    const std::vector<merian::NodeOutputDescriptorBuffer>&) {
-    const vk::Extent3D& extent = connected_image_outputs[0].create_info.extent;
+std::vector<OutputConnectorHandle>
+VKDTFilmcurv::describe_outputs([[maybe_unused]] const ConnectorIOMap& output_for_input) {
+    extent = output_for_input[con_src]->create_info.extent;
+    const vk::Format format = output_format.value_or(output_for_input[con_src]->create_info.format);
 
-    width = extent.width;
-    height = extent.height;
-
-    return {{NodeOutputDescriptorImage::compute_write("out", output_format, width, height)}, {}};
+    return {
+        VkImageOut::compute_write("out", format, extent),
+    };
 }
 
 SpecializationInfoHandle VKDTFilmcurv::get_specialization_info() const noexcept {
-    auto spec_builder = SpecializationInfoBuilder();
-    spec_builder.add_entry(local_size_x, local_size_y);
-    return spec_builder.build();
+    return spec_info;
 }
 
 const void* VKDTFilmcurv::get_push_constant([[maybe_unused]] GraphRun& run) {
@@ -46,20 +47,22 @@ const void* VKDTFilmcurv::get_push_constant([[maybe_unused]] GraphRun& run) {
 }
 
 std::tuple<uint32_t, uint32_t, uint32_t> VKDTFilmcurv::get_group_count() const noexcept {
-    return {(width + local_size_x - 1) / local_size_x, (height + local_size_y - 1) / local_size_y,
-            1};
+    return {(extent.width + local_size_x - 1) / local_size_x,
+            (extent.height + local_size_y - 1) / local_size_y, 1};
 }
 
 ShaderModuleHandle VKDTFilmcurv::get_shader_module() {
-    return std::make_shared<ShaderModule>(context, sizeof(spv), spv);
+    return shader;
 }
 
-void VKDTFilmcurv::get_configuration(Configuration& config, bool&) {
+AbstractCompute::NodeStatusFlags VKDTFilmcurv::configuration(Configuration& config) {
     config.config_float("brightness", pc.brightness, "", .01);
     config.config_float("contrast", pc.contrast, "", .01);
     config.config_float("bias", pc.bias, "", .01);
     config.config_options("colormode", pc.colourmode,
                           {"darktable ucs", "per channel", "munsell", "hsl"});
+
+    return {};
 }
 
-} // namespace merian
+} // namespace merian_nodes

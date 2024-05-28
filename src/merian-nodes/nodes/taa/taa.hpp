@@ -1,11 +1,12 @@
 #pragma once
 
-#include "merian-nodes/nodes/taa/config.h"
+#include "merian-nodes/connectors/vk_image_in.hpp"
 #include "merian-nodes/nodes/compute_node/compute_node.hpp"
+#include "merian-nodes/nodes/taa/config.h"
 
-namespace merian {
+namespace merian_nodes {
 
-class TAANode : public ComputeNode {
+class TAA : public AbstractCompute {
 
   private:
     static constexpr uint32_t local_size_x = 16;
@@ -18,23 +19,15 @@ class TAANode : public ComputeNode {
     };
 
   public:
-    TAANode(const SharedContext context,
-            const ResourceAllocatorHandle allocator,
-            const float alpha = 0.,
-            const int clamp_method = MERIAN_NODES_TAA_CLAMP_MIN_MAX,
-            const bool inverse_motion = false);
+    TAA(const SharedContext context,
+        const float alpha = 0.,
+        const int clamp_method = MERIAN_NODES_TAA_CLAMP_MIN_MAX,
+        const bool inverse_motion = false);
 
-    std::string name() override {
-        return "Temporal Anti-Aliasing";
-    }
+    std::vector<InputConnectorHandle> describe_inputs() override;
 
-    std::tuple<std::vector<NodeInputDescriptorImage>, std::vector<NodeInputDescriptorBuffer>>
-    describe_inputs() override;
-
-    std::tuple<std::vector<NodeOutputDescriptorImage>, std::vector<NodeOutputDescriptorBuffer>>
-    describe_outputs(
-        const std::vector<NodeOutputDescriptorImage>& connected_image_outputs,
-        const std::vector<NodeOutputDescriptorBuffer>& connected_buffer_outputs) override;
+    std::vector<OutputConnectorHandle>
+    describe_outputs(const ConnectorIOMap& output_for_input) override;
 
     SpecializationInfoHandle get_specialization_info() const noexcept override;
 
@@ -44,14 +37,18 @@ class TAANode : public ComputeNode {
 
     ShaderModuleHandle get_shader_module() override;
 
-    void get_configuration(Configuration& config, bool& needs_rebuild) override;
+    NodeStatusFlags configuration(Configuration& config) override;
 
   private:
     const bool inverse_motion;
     ShaderModuleHandle shader;
+    SpecializationInfoHandle spec_info;
+
+    VkImageInHandle con_src = VkImageIn::compute_read("src");
+
     PushConstant pc;
     uint32_t width{};
     uint32_t height{};
 };
 
-} // namespace merian
+} // namespace merian_nodes

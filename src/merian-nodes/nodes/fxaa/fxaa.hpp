@@ -1,11 +1,11 @@
 #pragma once
 
 #include "merian-nodes/nodes/compute_node/compute_node.hpp"
-#include "merian/vk/memory/resource_allocator.hpp"
+#include "merian-nodes/connectors/vk_image_in.hpp"
 
-namespace merian {
+namespace merian_nodes {
 
-class FXAA : public ComputeNode {
+class FXAA : public AbstractCompute {
 
   private:
     static constexpr uint32_t local_size_x = 16;
@@ -16,34 +16,30 @@ class FXAA : public ComputeNode {
     };
 
   public:
-    FXAA(const SharedContext context,
-         const ResourceAllocatorHandle allocator);
+    FXAA(const SharedContext context);
 
-    std::string name() override {
-        return "FXAA";
-    }
+    std::vector<InputConnectorHandle> describe_inputs() override;
 
-    std::tuple<std::vector<NodeInputDescriptorImage>, std::vector<NodeInputDescriptorBuffer>>
-    describe_inputs() override;
-
-    std::tuple<std::vector<merian::NodeOutputDescriptorImage>,
-               std::vector<merian::NodeOutputDescriptorBuffer>>
-    describe_outputs(const std::vector<merian::NodeOutputDescriptorImage>&,
-                     const std::vector<merian::NodeOutputDescriptorBuffer>&) override;
+    std::vector<OutputConnectorHandle>
+    describe_outputs(const ConnectorIOMap& output_for_input) override;
 
     SpecializationInfoHandle get_specialization_info() const noexcept override;
 
-    const void* get_push_constant([[maybe_unused]] GraphRun& run) override;
+    const void* get_push_constant(GraphRun& run) override;
 
     std::tuple<uint32_t, uint32_t, uint32_t> get_group_count() const noexcept override;
 
     ShaderModuleHandle get_shader_module() override;
 
-    void get_configuration(Configuration& config, bool& needs_rebuild) override;
+    NodeStatusFlags configuration(Configuration& config) override;
 
   private:
     vk::Extent3D extent;
     PushConstant pc;
+    SpecializationInfoHandle spec_info;
+    ShaderModuleHandle shader;
+
+    VkImageInHandle con_src = VkImageIn::compute_read("src");
 };
 
-} // namespace merian
+} // namespace merian_nodes

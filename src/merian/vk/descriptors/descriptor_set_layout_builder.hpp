@@ -183,8 +183,8 @@ class DescriptorSetLayoutBuilder {
                 return i;
             }
         }
-        throw std::runtime_error{
-            "this should not happen"}; // since we check one index more than size()
+        throw std::runtime_error{"this should not happen"};
+        // since we check one index more than size()
     }
 
   private:

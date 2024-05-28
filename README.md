@@ -49,12 +49,11 @@ Note that the Vulkan dynamic dispatch loader must be used. The default dispatche
 
 ```c++
 int main() {
-    merian::ExtensionVkDebugUtils debugUtils;
-    merian::ExtensionResources resources;
-    std::vector<merian::Extension*> extensions = {&debugUtils, &resources};
+    auto debug_utils = std::make_shared<merian::ExtensionVkDebugUtils>(false);
+    auto resources = std::make_shared<merian::ExtensionResources>();
 
-    merian::SharedContext context = merian::Context::make_context(extensions, "My beautiful app");
-    auto alloc = resources.resource_allocator();
+    merian::SharedContext context = merian::Context::make_context({debug_utils, resources}, "merian-shadertoy");
+    auto alloc = resources->resource_allocator();
 
     // allocating, rendering,...
 

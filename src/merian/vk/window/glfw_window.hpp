@@ -30,6 +30,8 @@ class GLFWWindow : public Window {
         glfwDestroyWindow(window);
     }
 
+    bool should_close() const;
+
     operator GLFWwindow*() const;
 
     GLFWwindow* get_window() const;

@@ -4,18 +4,16 @@
 #include "calculate_percentiles.comp.spv.h"
 #include "merian/vk/descriptors/descriptor_set_layout_builder.hpp"
 #include "merian/vk/descriptors/descriptor_set_update.hpp"
-#include "merian-nodes/graph/graph.hpp"
-#include "merian-nodes/graph/node_utils.hpp"
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 
-namespace merian {
+namespace merian_nodes {
 
-AccumulateNode::AccumulateNode(const SharedContext context,
+Accumulate::Accumulate(const SharedContext context,
                                const ResourceAllocatorHandle allocator,
                                const std::optional<vk::Format> format)
-    : context(context), allocator(allocator), format(format) {
+    : Node("Accumulate"), context(context), allocator(allocator), format(format) {
     percentile_module =
         std::make_shared<ShaderModule>(context, merian_calculate_percentiles_comp_spv_size(),
                                        merian_calculate_percentiles_comp_spv());
@@ -23,51 +21,35 @@ AccumulateNode::AccumulateNode(const SharedContext context,
                                                        merian_accumulate_comp_spv());
 }
 
-AccumulateNode::~AccumulateNode() {}
+Accumulate::~Accumulate() {}
 
-std::tuple<std::vector<NodeInputDescriptorImage>, std::vector<NodeInputDescriptorBuffer>>
-AccumulateNode::describe_inputs() {
+std::vector<InputConnectorHandle> Accumulate::describe_inputs() {
     return {
-        {
-            NodeInputDescriptorImage::compute_read("prev_accum", 1),
-            NodeInputDescriptorImage::compute_read("prev_moments", 1),
-
-            NodeInputDescriptorImage::compute_read("irr"),
-
-            NodeInputDescriptorImage::compute_read("mv"),
-            NodeInputDescriptorImage::compute_read("moments_in"),
-        },
-        {
-            NodeInputDescriptorBuffer::compute_read("gbuf"),
-            NodeInputDescriptorBuffer::compute_read("prev_gbuf", 1),
-        },
+        con_prev_accum, con_prev_moments, con_irr_in,    con_mv,
+        con_moments_in, con_gbuf,         con_prev_gbuf,
     };
 }
 
-std::tuple<std::vector<NodeOutputDescriptorImage>, std::vector<NodeOutputDescriptorBuffer>>
-AccumulateNode::describe_outputs(
-    const std::vector<NodeOutputDescriptorImage>& connected_image_outputs,
-    const std::vector<NodeOutputDescriptorBuffer>&) {
+std::vector<OutputConnectorHandle>
+Accumulate::describe_outputs(const ConnectorIOMap& output_for_input) {
 
-    irr_create_info = connected_image_outputs[2].create_info;
-    const auto moments_create_info = connected_image_outputs[4].create_info;
+    irr_create_info = output_for_input[con_irr_in]->create_info;
+    const auto moments_create_info = output_for_input[con_moments_in]->create_info;
+
+    con_irr_out = VkImageOut::compute_write("out_irr", format.value_or(irr_create_info.format),
+                                            irr_create_info.extent);
+    con_moments_out = VkImageOut::compute_write("out_moments", moments_create_info.format,
+                                                moments_create_info.extent);
 
     return {
-        {
-            NodeOutputDescriptorImage::compute_write(
-                "out_irr", format.value_or(irr_create_info.format), irr_create_info.extent),
-            NodeOutputDescriptorImage::compute_write("out_moments", moments_create_info.format,
-                                                     moments_create_info.extent),
-        },
-        {},
+        con_irr_out,
+        con_moments_out,
+
     };
 }
 
-void AccumulateNode::cmd_build([[maybe_unused]] const vk::CommandBuffer& cmd,
-                               const std::vector<NodeIO>& ios) {
-    std::tie(graph_textures, graph_sets, graph_pool, graph_layout) =
-        make_graph_descriptor_sets(context, allocator, ios, graph_layout);
-
+Accumulate::NodeStatusFlags
+Accumulate::on_connected(const DescriptorSetLayoutHandle& graph_layout) {
     if (!percentile_desc_layout) {
         percentile_desc_layout =
             DescriptorSetLayoutBuilder().add_binding_storage_image().build_layout(context);
@@ -97,8 +79,9 @@ void AccumulateNode::cmd_build([[maybe_unused]] const vk::CommandBuffer& cmd,
     vk::ImageViewCreateInfo quartile_image_view_create_info{
         {}, *quartile_image,        vk::ImageViewType::e2D, quartile_image->get_format(),
         {}, first_level_and_layer()};
-    percentile_texture = allocator->createTexture(quartile_image, quartile_image_view_create_info);
-    percentile_texture->attach_sampler(allocator->get_sampler_pool()->linear_mirrored_repeat());
+    percentile_texture =
+        allocator->createTexture(quartile_image, quartile_image_view_create_info,
+                                 allocator->get_sampler_pool()->linear_mirrored_repeat());
 
     DescriptorSetUpdate(percentile_set)
         .write_descriptor_texture(0, percentile_texture, 0, 1, vk::ImageLayout::eGeneral)
@@ -134,13 +117,14 @@ void AccumulateNode::cmd_build([[maybe_unused]] const vk::CommandBuffer& cmd,
     auto filter_spec = filter_spec_builder.build();
     accumulate =
         std::make_shared<ComputePipeline>(filter_pipe_layout, accumulate_module, filter_spec);
+
+    return {};
 }
 
-void AccumulateNode::cmd_process(const vk::CommandBuffer& cmd,
-                                 GraphRun& run,
-                                 [[maybe_unused]] const std::shared_ptr<FrameData>& frame_data,
-                                 const uint32_t set_index,
-                                 [[maybe_unused]] const NodeIO& io) {
+void Accumulate::process(GraphRun& run,
+                             const vk::CommandBuffer& cmd,
+                             const DescriptorSetHandle& descriptor_set,
+                             [[maybe_unused]] const NodeIO& io) {
 
     if (accumulate_pc.firefly_filter_enable || accumulate_pc.adaptive_alpha_reduction > 0.0f) {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "compute percentiles");
@@ -151,7 +135,7 @@ void AccumulateNode::cmd_process(const vk::CommandBuffer& cmd,
                             vk::PipelineStageFlagBits::eComputeShader, {}, {}, {}, bar);
 
         calculate_percentiles->bind(cmd);
-        calculate_percentiles->bind_descriptor_set(cmd, graph_sets[set_index], 0);
+        calculate_percentiles->bind_descriptor_set(cmd, descriptor_set, 0);
         calculate_percentiles->bind_descriptor_set(cmd, percentile_set, 1);
         calculate_percentiles->push_constant(cmd, percentile_pc);
         cmd.dispatch(percentile_group_count_x, percentile_group_count_y, 1);
@@ -170,14 +154,15 @@ void AccumulateNode::cmd_process(const vk::CommandBuffer& cmd,
 
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "accumulate");
         accumulate->bind(cmd);
-        accumulate->bind_descriptor_set(cmd, graph_sets[set_index], 0);
+        accumulate->bind_descriptor_set(cmd, descriptor_set, 0);
         accumulate->bind_descriptor_set(cmd, accumulate_set, 1);
         accumulate->push_constant(cmd, accumulate_pc);
         cmd.dispatch(filter_group_count_x, filter_group_count_y, 1);
     }
 }
 
-void AccumulateNode::get_configuration(Configuration& config, bool& needs_rebuild) {
+Accumulate::NodeStatusFlags Accumulate::configuration(Configuration& config) {
+    bool needs_rebuild = false;
     config.st_separate("Accumulation");
     config.config_float("alpha", accumulate_pc.accum_alpha, 0, 1,
                         "Blend factor with the previous information. More means more reuse");
@@ -238,10 +223,12 @@ void AccumulateNode::get_configuration(Configuration& config, bool& needs_rebuil
                           percentile_pc.adaptive_alpha_percentile_lower);
     config.config_percent("adaptivity percentile upper",
                           percentile_pc.adaptive_alpha_percentile_upper);
+
+    return needs_rebuild ? NodeStatusFlags{NEEDS_RECONNECT} : NodeStatusFlags{};
 }
 
-void AccumulateNode::request_clear() {
+void Accumulate::request_clear() {
     clear = true;
 }
 
-} // namespace merian
+} // namespace merian_nodes

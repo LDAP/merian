@@ -32,18 +32,14 @@ GLFWImGui::~GLFWImGui() {
     for (auto& framebuffer : framebuffers) {
         context->device.destroyFramebuffer(framebuffer);
     }
-    if (render_pass) {
-        context->device.destroyRenderPass(render_pass);
+    if (renderpass) {
+        context->device.destroyRenderPass(renderpass);
     }
 
     ImGui::SetCurrentContext(current_context);
 }
 
-void GLFWImGui::recreate_render_pass(SwapchainAcquireResult& aquire_result) {
-    if (render_pass) {
-        context->device.destroyRenderPass(render_pass);
-    }
-
+void GLFWImGui::create_render_pass(SwapchainAcquireResult& aquire_result) {
     vk::AttachmentDescription attachment_desc{
         {},
         aquire_result.surface_format.format,
@@ -74,13 +70,13 @@ void GLFWImGui::recreate_render_pass(SwapchainAcquireResult& aquire_result) {
         {}, 1, &attachment_desc, 1, &subpass, 1, &dependency,
     };
 
-    render_pass = context->device.createRenderPass(info);
+    renderpass = context->device.createRenderPass(info);
 }
 
 void GLFWImGui::init_imgui(GLFWwindow* window,
                            SwapchainAcquireResult& aquire_result,
                            QueueHandle& queue) {
-    assert(render_pass);
+    assert(renderpass);
 
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
@@ -108,7 +104,7 @@ void GLFWImGui::init_imgui(GLFWwindow* window,
     init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
     init_info.Allocator = VK_NULL_HANDLE;
     init_info.CheckVkResultFn = nullptr;
-    init_info.RenderPass = render_pass;
+    init_info.RenderPass = renderpass;
 
     ImGui_ImplVulkan_Init(&init_info);
 
@@ -120,19 +116,38 @@ void GLFWImGui::init_imgui(GLFWwindow* window,
 
 // Start a new ImGui frame and renderpass. Returns the framebuffer.
 vk::Framebuffer GLFWImGui::new_frame(QueueHandle& queue,
-                                     vk::CommandBuffer& cmd,
+                                     const vk::CommandBuffer& cmd,
                                      GLFWwindow* window,
                                      SwapchainAcquireResult& aquire_result) {
     ImGuiContext* current_context = ImGui::GetCurrentContext();
     ImGui::SetCurrentContext(ctx->get());
 
     if (aquire_result.did_recreate) {
-        for (auto& framebuffer : framebuffers) {
-            if (framebuffer)
-                context->device.destroyFramebuffer(framebuffer);
+        const std::vector<vk::Framebuffer> old_framebuffers = framebuffers;
+        const vk::RenderPass old_renderpass = renderpass;
+        const SharedContext context = this->context;
+
+        const std::function<void()> cleanup = [context, old_framebuffers, old_renderpass]() {
+            SPDLOG_DEBUG("destroy framebuffers and renderpass");
+            for (auto& framebuffer : old_framebuffers) {
+                if (framebuffer)
+                    context->device.destroyFramebuffer(framebuffer);
+            }
+            if (old_renderpass) {
+                context->device.destroyRenderPass(old_renderpass);
+            }
+        };
+
+        if (aquire_result.old_swapchain.expired()) {
+            // cleanup now
+            cleanup();
+        } else {
+            // cleanup when swapchain is destroyed
+            aquire_result.old_swapchain.lock()->add_cleanup_function(cleanup);
         }
+
         framebuffers.assign(aquire_result.num_images, VK_NULL_HANDLE);
-        recreate_render_pass(aquire_result);
+        create_render_pass(aquire_result);
     }
 
     if (!imgui_initialized) {
@@ -146,7 +161,7 @@ vk::Framebuffer GLFWImGui::new_frame(QueueHandle& queue,
     if (!framebuffers[aquire_result.index]) {
         vk::FramebufferCreateInfo fb_create_info = {
             {},
-            render_pass,
+            renderpass,
             1,
             &aquire_result.view,
             aquire_result.extent.width,
@@ -158,7 +173,7 @@ vk::Framebuffer GLFWImGui::new_frame(QueueHandle& queue,
     vk::Framebuffer& framebuffer = framebuffers[aquire_result.index];
 
     vk::RenderPassBeginInfo rp_info = {
-        render_pass, framebuffer, {{}, aquire_result.extent}, 0, nullptr};
+        renderpass, framebuffer, {{}, aquire_result.extent}, 0, nullptr};
     cmd.beginRenderPass(rp_info, vk::SubpassContents::eInline);
 
     ImGui::SetCurrentContext(current_context);
@@ -166,7 +181,7 @@ vk::Framebuffer GLFWImGui::new_frame(QueueHandle& queue,
 }
 
 // Render the ImGui to the current swapchain image
-void GLFWImGui::render(vk::CommandBuffer& cmd) {
+void GLFWImGui::render(const vk::CommandBuffer& cmd) {
     ImGuiContext* current_context = ImGui::GetCurrentContext();
     ImGui::SetCurrentContext(ctx->get());
 

@@ -1,61 +1,46 @@
 #include "ab_compare.hpp"
 #include "merian/vk/utils/blits.hpp"
 
-namespace merian {
+namespace merian_nodes {
 
-ABCompareNode::ABCompareNode(const std::optional<vk::Format> output_format,
+AbstractABCompare::AbstractABCompare(const std::string& name,
+                             const std::optional<vk::Format> output_format,
                              const std::optional<vk::Extent2D> output_extent)
-    : output_format(output_format), output_extent(output_extent) {}
+    : Node(name), output_format(output_format), output_extent(output_extent) {}
 
-ABCompareNode::~ABCompareNode() {}
+AbstractABCompare::~AbstractABCompare() {}
 
-std::tuple<std::vector<NodeInputDescriptorImage>, std::vector<NodeInputDescriptorBuffer>>
-ABCompareNode::describe_inputs() {
-    return {
-        {
-            NodeInputDescriptorImage::transfer_src("a"),
-            NodeInputDescriptorImage::transfer_src("b"),
-        },
-        {},
-    };
+std::vector<InputConnectorHandle> AbstractABCompare::describe_inputs() {
+    return {con_in_a, con_in_b};
 }
 
 // --------------------------------------------------------------------------------
 
-ABSplitNode::ABSplitNode(const std::optional<vk::Format> output_format,
+ABSplit::ABSplit(const std::optional<vk::Format> output_format,
                          const std::optional<vk::Extent2D> output_extent)
-    : ABCompareNode(output_format, output_extent) {}
+    : AbstractABCompare("ABSplitNode", output_format, output_extent) {}
 
-std::string ABSplitNode::name() {
-    return "ABSplitNode";
-}
-
-std::tuple<std::vector<NodeOutputDescriptorImage>, std::vector<NodeOutputDescriptorBuffer>>
-ABSplitNode::describe_outputs(const std::vector<NodeOutputDescriptorImage>& connected_image_outputs,
-                              const std::vector<NodeOutputDescriptorBuffer>&) {
+std::vector<OutputConnectorHandle>
+ABSplit::describe_outputs(const ConnectorIOMap& output_for_input) {
 
     vk::Format format = output_format.has_value() ? output_format.value()
-                                                  : connected_image_outputs[0].create_info.format;
-    vk::Extent3D extent = output_extent.has_value() ? vk::Extent3D(output_extent.value(), 1)
-                                                    : connected_image_outputs[0].create_info.extent;
+                                                  : output_for_input[con_in_a]->create_info.format;
+    vk::Extent3D extent = output_extent.has_value()
+                              ? vk::Extent3D(output_extent.value(), 1)
+                              : output_for_input[con_in_a]->create_info.extent;
 
-    return {
-        {
-            NodeOutputDescriptorImage::transfer_write("result", format, extent.width,
-                                                      extent.height),
-        },
-        {},
-    };
+    con_out = VkImageOut::transfer_write("out", format, extent.width, extent.height);
+
+    return {con_out};
 }
 
-void ABSplitNode::cmd_process(const vk::CommandBuffer& cmd,
-                              [[maybe_unused]] GraphRun& run,
-                              [[maybe_unused]] const std::shared_ptr<FrameData>& frame_data,
-                              [[maybe_unused]] const uint32_t set_index,
-                              const NodeIO& io) {
-    const ImageHandle& a = io.image_inputs[0];
-    const ImageHandle& b = io.image_inputs[1];
-    const ImageHandle& result = io.image_outputs[0];
+void ABSplit::process([[maybe_unused]] GraphRun& run,
+                          const vk::CommandBuffer& cmd,
+                          [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
+                          const NodeIO& io) {
+    const ImageHandle& a = io[con_in_a];
+    const ImageHandle& b = io[con_in_b];
+    const ImageHandle& result = io[con_out];
 
     cmd_blit_fit(cmd, *b, vk::ImageLayout::eTransferSrcOptimal, b->get_extent(), *result,
                  vk::ImageLayout::eTransferDstOptimal, result->get_extent());
@@ -66,58 +51,47 @@ void ABSplitNode::cmd_process(const vk::CommandBuffer& cmd,
     result_extent.width /= 2;
 
     cmd_blit_fit(cmd, *a, vk::ImageLayout::eTransferSrcOptimal, a_extent, *result,
-                 vk::ImageLayout::eTransferDstOptimal, result_extent, {}, false);
+                 vk::ImageLayout::eTransferDstOptimal, result_extent, std::nullopt);
 }
 
 // --------------------------------------------------------------------------------
 
-ABSideBySideNode::ABSideBySideNode(const std::optional<vk::Format> output_format,
+ABSideBySide::ABSideBySide(const std::optional<vk::Format> output_format,
                                    const std::optional<vk::Extent2D> output_extent)
-    : ABCompareNode(output_format, output_extent) {}
+    : AbstractABCompare("ABSideBySideNode", output_format, output_extent) {}
 
-std::string ABSideBySideNode::name() {
-    return "ABSideBySideNode";
-}
-
-std::tuple<std::vector<NodeOutputDescriptorImage>, std::vector<NodeOutputDescriptorBuffer>>
-ABSideBySideNode::describe_outputs(
-    const std::vector<NodeOutputDescriptorImage>& connected_image_outputs,
-    const std::vector<NodeOutputDescriptorBuffer>&) {
+std::vector<OutputConnectorHandle>
+ABSideBySide::describe_outputs(const ConnectorIOMap& output_for_input) {
 
     vk::Format format = output_format.has_value() ? output_format.value()
-                                                  : connected_image_outputs[0].create_info.format;
+                                                  : output_for_input[con_in_a]->create_info.format;
 
     vk::Extent3D extent;
     if (output_extent.has_value()) {
         extent = vk::Extent3D(output_extent.value(), 1);
     } else {
-        extent = connected_image_outputs[0].create_info.extent;
+        extent = output_for_input[con_in_a]->create_info.extent;
         extent.width *= 2;
     }
 
-    return {
-        {
-            NodeOutputDescriptorImage::transfer_write("result", format, extent.width,
-                                                      extent.height),
-        },
-        {},
-    };
+    con_out = VkImageOut::transfer_write("out", format, extent.width, extent.height);
+
+    return {con_out};
 }
 
-void ABSideBySideNode::cmd_process(const vk::CommandBuffer& cmd,
-                                   [[maybe_unused]] GraphRun& run,
-                                   [[maybe_unused]] const std::shared_ptr<FrameData>& frame_data,
-                                   [[maybe_unused]] const uint32_t set_index,
-                                   const NodeIO& io) {
-    const ImageHandle& a = io.image_inputs[0];
-    const ImageHandle& b = io.image_inputs[1];
-    const ImageHandle& result = io.image_outputs[0];
+void ABSideBySide::process([[maybe_unused]] GraphRun& run,
+                               [[maybe_unused]] const vk::CommandBuffer& cmd,
+                               [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
+                               [[maybe_unused]] const NodeIO& io) {
+    const ImageHandle& a = io[con_in_a];
+    const ImageHandle& b = io[con_in_b];
+    const ImageHandle& result = io[con_out];
 
     vk::Extent3D half_result_extent = result->get_extent();
     half_result_extent.width /= 2;
 
     cmd_blit_fit(cmd, *a, vk::ImageLayout::eTransferSrcOptimal, a->get_extent(), *result,
-                 vk::ImageLayout::eTransferDstOptimal, half_result_extent, {}, true);
+                 vk::ImageLayout::eTransferDstOptimal, half_result_extent, vk::ClearColorValue());
 
     // manual blit since we need offset by half result extent...
     vk::ImageBlit region{merian::first_layer(), {}, merian::first_layer(), {}};
@@ -131,4 +105,4 @@ void ABSideBySideNode::cmd_process(const vk::CommandBuffer& cmd,
                   vk::Filter::eLinear);
 }
 
-} // namespace merian
+} // namespace merian_nodes

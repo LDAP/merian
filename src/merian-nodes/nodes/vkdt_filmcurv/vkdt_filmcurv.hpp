@@ -1,11 +1,11 @@
 #pragma once
 
 #include "merian-nodes/nodes/compute_node/compute_node.hpp"
-#include "merian/vk/memory/resource_allocator.hpp"
+#include "merian-nodes/connectors/vk_image_in.hpp"
 
-namespace merian {
+namespace merian_nodes {
 
-class VKDTFilmcurv : public ComputeNode {
+class VKDTFilmcurv : public AbstractCompute {
 
   private:
     static constexpr uint32_t local_size_x = 16;
@@ -21,21 +21,13 @@ class VKDTFilmcurv : public ComputeNode {
 
   public:
     VKDTFilmcurv(const SharedContext context,
-                 const ResourceAllocatorHandle allocator,
-                 const vk::Format output_format = vk::Format::eR16G16B16A16Sfloat,
-                 const std::optional<Options> options = std::nullopt);
+                 const std::optional<Options> options = std::nullopt,
+                 const std::optional<vk::Format> output_format = std::nullopt);
 
-    std::string name() override {
-        return "VKDT Filmcurv";
-    }
+    std::vector<InputConnectorHandle> describe_inputs() override;
 
-    std::tuple<std::vector<NodeInputDescriptorImage>, std::vector<NodeInputDescriptorBuffer>>
-    describe_inputs() override;
-
-    std::tuple<std::vector<merian::NodeOutputDescriptorImage>,
-               std::vector<merian::NodeOutputDescriptorBuffer>>
-    describe_outputs(const std::vector<merian::NodeOutputDescriptorImage>&,
-                     const std::vector<merian::NodeOutputDescriptorBuffer>&) override;
+    std::vector<OutputConnectorHandle>
+    describe_outputs(const ConnectorIOMap& output_for_input) override;
 
     SpecializationInfoHandle get_specialization_info() const noexcept override;
 
@@ -45,11 +37,17 @@ class VKDTFilmcurv : public ComputeNode {
 
     ShaderModuleHandle get_shader_module() override;
 
-    void get_configuration(Configuration& config, bool& needs_rebuild) override;
+    NodeStatusFlags configuration(Configuration& config) override;
 
   private:
-    const vk::Format output_format;
-    uint32_t width, height;
+    const std::optional<vk::Format> output_format;
+
+    VkImageInHandle con_src = VkImageIn::compute_read("src");
+    vk::Extent3D extent;
+
+    ShaderModuleHandle shader;
+    SpecializationInfoHandle spec_info;
+
     Options pc;
 };
 

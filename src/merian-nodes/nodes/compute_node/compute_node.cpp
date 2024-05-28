@@ -1,43 +1,55 @@
 #include "compute_node.hpp"
-#include "merian-nodes/graph/node_utils.hpp"
+
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 
-namespace merian {
+namespace merian_nodes {
 
-ComputeNode::ComputeNode(const SharedContext context,
-                         const ResourceAllocatorHandle allocator,
+AbstractCompute::AbstractCompute(const SharedContext context,
+                         const std::string& name,
                          const std::optional<uint32_t> push_constant_size)
-    : context(context), allocator(allocator), push_constant_size(push_constant_size) {}
+    : Node(name), context(context), push_constant_size(push_constant_size) {}
 
-void ComputeNode::cmd_build(const vk::CommandBuffer&, const std::vector<NodeIO>& ios) {
+AbstractCompute::NodeStatusFlags
+AbstractCompute::on_connected(const DescriptorSetLayoutHandle& descriptor_set_layout) {
+    this->descriptor_set_layout = descriptor_set_layout;
+    this->pipe.reset();
 
-    std::tie(textures, sets, pool, layout) =
-        make_graph_descriptor_sets(context, allocator, ios, layout);
+    return {};
+}
 
-    if (!pipe_layout) {
+void AbstractCompute::process(GraphRun& run,
+                          const vk::CommandBuffer& cmd,
+                          const DescriptorSetHandle& descriptor_set,
+                          const NodeIO& io) {
+    PipelineHandle& old_pipeline = io.frame_data<PipelineHandle>();
+    old_pipeline.reset();
+
+    if (!pipe || current_spec_info != get_specialization_info() ||
+        current_shader_module != get_shader_module()) {
+        SPDLOG_DEBUG("(re)create pipeline");
+        old_pipeline = pipe;
+
         auto pipe_builder = PipelineLayoutBuilder(context);
         if (push_constant_size.has_value()) {
             pipe_builder.add_push_constant(push_constant_size.value());
         }
-        pipe_layout = pipe_builder.add_descriptor_set_layout(layout).build_pipeline_layout();
+
+        PipelineLayoutHandle pipe_layout =
+            pipe_builder.add_descriptor_set_layout(descriptor_set_layout).build_pipeline_layout();
+        pipe = std::make_shared<ComputePipeline>(pipe_layout, get_shader_module(),
+                                                 get_specialization_info());
+
+        current_spec_info = get_specialization_info();
+        current_shader_module = get_shader_module();
     }
 
-    pipe = std::make_shared<ComputePipeline>(pipe_layout, get_shader_module(),
-                                             get_specialization_info());
-}
-
-void ComputeNode::cmd_process(const vk::CommandBuffer& cmd,
-                              GraphRun& run,
-                              [[maybe_unused]] const std::shared_ptr<FrameData>& frame_data,
-                              const uint32_t set_index,
-                              [[maybe_unused]] const NodeIO& io) {
     pipe->bind(cmd);
-    pipe->bind_descriptor_set(cmd, sets[set_index]);
+    pipe->bind_descriptor_set(cmd, descriptor_set);
     if (push_constant_size.has_value())
         pipe->push_constant(cmd, get_push_constant(run));
     auto [x, y, z] = get_group_count();
     cmd.dispatch(x, y, z);
 }
 
-} // namespace merian
+} // namespace merian_nodes

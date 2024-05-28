@@ -1,51 +1,45 @@
 #pragma once
 
-#include "merian/utils/stopwatch.hpp"
+#include "merian-nodes/connectors/vk_image_in.hpp"
 #include "merian-nodes/graph/node.hpp"
+#include "merian/utils/stopwatch.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 
-namespace merian {
+namespace merian_nodes {
 
 // Writes to images files.
-class ImageWriteNode : public Node {
-    class FrameData : public Node::FrameData {
+class ImageWrite : public Node {
+    class FrameData {
       public:
         std::optional<ImageHandle> intermediate_image;
     };
 
   public:
-    ImageWriteNode(const SharedContext context,
+    /**
+     * @brief      Constructs a new instance.
+     *
+     * @param      allocator      The allocator used to create copies of the input to be able to
+     */
+    ImageWrite(const SharedContext context,
                    const ResourceAllocatorHandle allocator,
                    const std::string& base_filename =
                        "image_{record_iteration:06}_{image_index:06}_{run_iteration:06}");
 
-    virtual ~ImageWriteNode();
+    virtual ~ImageWrite();
 
-    virtual std::string name() override;
+    virtual std::vector<InputConnectorHandle> describe_inputs() override;
 
-    virtual std::shared_ptr<Node::FrameData> create_frame_data() override;
+    virtual NodeStatusFlags pre_process(GraphRun& run, const NodeIO& io) override;
 
-    // Declare the inputs that you require
-    virtual std::tuple<std::vector<NodeInputDescriptorImage>,
-                       std::vector<NodeInputDescriptorBuffer>>
-    describe_inputs() override;
+    virtual void process(GraphRun& run,
+                         const vk::CommandBuffer& cmd,
+                         const DescriptorSetHandle& descriptor_set,
+                         const NodeIO& io) override;
 
-    virtual void pre_process([[maybe_unused]] const uint64_t& iteration,
-                             [[maybe_unused]] NodeStatus& status) override;
-
-    virtual void cmd_process(const vk::CommandBuffer& cmd,
-                             GraphRun& run,
-                             const std::shared_ptr<Node::FrameData>& frame_data,
-                             const uint32_t set_index,
-                             const NodeIO& io) override;
-
-    virtual void get_configuration([[maybe_unused]] Configuration& config,
-                                   bool& needs_rebuild) override;
+    virtual NodeStatusFlags configuration(Configuration& config) override;
 
     // Set a callback that can be called on capture or record.
     void set_callback(const std::function<void()> callback);
-
-    // std::vector
 
     void record();
 
@@ -65,6 +59,8 @@ class ImageWriteNode : public Node {
   private:
     const SharedContext context;
     const ResourceAllocatorHandle allocator;
+
+    VkImageInHandle con_src = VkImageIn::transfer_src("src");
 
     uint32_t max_concurrent_tasks = std::thread::hardware_concurrency();
     uint32_t concurrent_tasks = 0;
@@ -114,4 +110,4 @@ class ImageWriteNode : public Node {
     bool needs_rebuild = false;
 };
 
-} // namespace merian
+} // namespace merian_nodes

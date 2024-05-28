@@ -102,18 +102,40 @@ ImageHandle ResourceAllocator::createImage(const vk::CommandBuffer& cmdBuf,
 
 TextureHandle ResourceAllocator::createTexture(const ImageHandle& image,
                                                const vk::ImageViewCreateInfo& imageViewCreateInfo,
-                                               const vk::SamplerCreateInfo& samplerCreateInfo) {
-    TextureHandle texture = createTexture(image, imageViewCreateInfo);
-    texture->attach_sampler(m_samplerPool->acquire_sampler(samplerCreateInfo));
-    return texture;
+                                               const SamplerHandle& sampler) {
+    assert(imageViewCreateInfo.image == image->get_image());
+    return std::make_shared<Texture>(image, imageViewCreateInfo, sampler);
 }
 
 TextureHandle ResourceAllocator::createTexture(const ImageHandle& image,
-                                               const vk::ImageViewCreateInfo& imageViewCreateInfo) {
-    assert(imageViewCreateInfo.image == image->get_image());
-    TextureHandle texture = std::make_shared<Texture>(image, imageViewCreateInfo);
+                                               const vk::ImageViewCreateInfo& imageViewCreateInfo,
+                                               const vk::SamplerCreateInfo& samplerCreateInfo) {
+    const SamplerHandle sampler = m_samplerPool->acquire_sampler(samplerCreateInfo);
+    return createTexture(image, imageViewCreateInfo, sampler);
+}
 
-    return texture;
+TextureHandle ResourceAllocator::createTexture(const ImageHandle& image) {
+    return createTexture(image, image->make_view_create_info());
+}
+
+TextureHandle ResourceAllocator::createTexture(const ImageHandle& image,
+                                               const vk::ImageViewCreateInfo& view_create_info) {
+    const SharedContext& context = image->get_memory()->get_context();
+
+    const vk::FormatProperties props =
+        context->physical_device.physical_device.getFormatProperties(view_create_info.format);
+
+    SamplerHandle sampler;
+    if ((image->get_tiling() == vk::ImageTiling::eOptimal &&
+         (props.optimalTilingFeatures & vk::FormatFeatureFlagBits::eSampledImageFilterLinear)) ||
+        (image->get_tiling() == vk::ImageTiling::eLinear &&
+         (props.linearTilingFeatures & vk::FormatFeatureFlagBits::eSampledImageFilterLinear))) {
+        sampler = get_sampler_pool()->linear_mirrored_repeat();
+    } else {
+        sampler = get_sampler_pool()->nearest_mirrored_repeat();
+    }
+
+    return createTexture(image, view_create_info, sampler);
 }
 
 TextureHandle ResourceAllocator::createTexture(const vk::CommandBuffer& cmdBuf,
@@ -123,39 +145,10 @@ TextureHandle ResourceAllocator::createTexture(const vk::CommandBuffer& cmdBuf,
                                                const MemoryMappingType mapping_type,
                                                const vk::SamplerCreateInfo& samplerCreateInfo,
                                                const vk::ImageLayout& layout_,
-                                               const bool isCube,
+                                               const bool is_cube,
                                                const std::string& debug_name) {
     ImageHandle image = createImage(cmdBuf, size_, data_, info_, mapping_type, layout_, debug_name);
-
-    vk::ImageSubresourceRange subresourceRange{
-        vk::ImageAspectFlagBits::eColor, 0, VK_REMAINING_MIP_LEVELS, 0, VK_REMAINING_ARRAY_LAYERS,
-    };
-    vk::ImageViewCreateInfo viewInfo{
-        {}, *image, {}, info_.format, {}, subresourceRange,
-    };
-
-    switch (info_.imageType) {
-    case vk::ImageType::e1D:
-        viewInfo.viewType =
-            (info_.arrayLayers > 1 ? vk::ImageViewType::e1DArray : vk::ImageViewType::e1D);
-        break;
-    case vk::ImageType::e2D:
-        if (isCube) {
-            viewInfo.viewType = vk::ImageViewType::eCube;
-        } else {
-            viewInfo.viewType =
-                info_.arrayLayers > 1 ? vk::ImageViewType::e2DArray : vk::ImageViewType::e2D;
-        }
-        break;
-    case vk::ImageType::e3D:
-        viewInfo.viewType = vk::ImageViewType::e3D;
-        break;
-    default:
-        assert(0);
-    }
-
-    TextureHandle resultTexture = createTexture(image, viewInfo, samplerCreateInfo);
-    return resultTexture;
+    return createTexture(image, image->make_view_create_info(is_cube), samplerCreateInfo);
 }
 
 AccelerationStructureHandle ResourceAllocator::createAccelerationStructure(

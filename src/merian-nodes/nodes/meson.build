@@ -1,12 +1,14 @@
-subdir('add')
+# keep this list sorted
+
 subdir('ab_compare')
 subdir('accumulate')
+subdir('add')
 subdir('bloom')
-subdir('color_output')
+subdir('color_image')
 subdir('compute_node')
 subdir('exposure')
 subdir('fxaa')
-subdir('image')
+subdir('image_read')
 subdir('image_write')
 subdir('mean')
 subdir('median_approx')

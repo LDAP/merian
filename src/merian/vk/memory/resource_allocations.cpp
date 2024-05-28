@@ -1,6 +1,5 @@
 #include "merian/vk/memory/resource_allocations.hpp"
 #include "merian/vk/memory/memory_allocator.hpp"
-#include "merian/vk/sampler/sampler_pool.hpp"
 
 #include <spdlog/spdlog.h>
 #include <vulkan/vulkan.hpp>
@@ -62,16 +61,27 @@ vk::BufferMemoryBarrier2 Buffer::buffer_barrier2(const vk::PipelineStageFlags2 s
 
 Image::Image(const vk::Image& image,
              const MemoryAllocationHandle& memory,
-             const vk::Extent3D extent,
-             const vk::Format format,
+             const vk::ImageCreateInfo create_info,
              const vk::ImageLayout current_layout)
-    : image(image), memory(memory), extent(extent), format(format), current_layout(current_layout) {
+    : image(image), memory(memory), create_info(create_info), current_layout(current_layout) {
     SPDLOG_TRACE("create image ({})", fmt::ptr(this));
 }
 
 Image::~Image() {
     SPDLOG_TRACE("destroy image ({})", fmt::ptr(this));
     memory->get_context()->device.destroyImage(image);
+}
+
+vk::FormatFeatureFlags Image::format_features() const {
+    if (get_tiling() == vk::ImageTiling::eOptimal) {
+        return memory->get_context()
+            ->physical_device.physical_device.getFormatProperties(get_format())
+            .optimalTilingFeatures;
+    } else {
+        return memory->get_context()
+            ->physical_device.physical_device.getFormatProperties(get_format())
+            .linearTilingFeatures;
+    }
 }
 
 // Do not forget submit the barrier, else the internal state does not match the actual state
@@ -118,10 +128,11 @@ vk::ImageMemoryBarrier2 Image::barrier2(const vk::ImageLayout new_layout,
 
 Texture::Texture(const ImageHandle& image,
                  const vk::ImageViewCreateInfo& view_create_info,
-                 const std::optional<SamplerHandle> sampler)
+                 const SamplerHandle& sampler)
     : image(image), sampler(sampler) {
     SPDLOG_TRACE("create texture ({})", fmt::ptr(this));
     view = image->get_memory()->get_context()->device.createImageView(view_create_info);
+    assert(sampler);
 }
 
 Texture::~Texture() {
@@ -129,7 +140,8 @@ Texture::~Texture() {
     image->get_memory()->get_context()->device.destroyImageView(view);
 }
 
-void Texture::attach_sampler(const std::optional<SamplerHandle> sampler) {
+void Texture::set_sampler(const SamplerHandle& sampler) {
+    assert(sampler);
     this->sampler = sampler;
 }
 
