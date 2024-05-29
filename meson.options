@@ -10,3 +10,10 @@ option('loglevel',
     choices : ['auto', 'info', 'debug', 'trace'],
     value : 'auto'
 )
+
+option(
+    'shaderc',
+    type: 'feature',
+    value: 'auto',
+    description: 'Enable support for shaderc, used for hot reloading'
+)

@@ -1,4 +1,9 @@
-A generator node that pushes the Shadertoy variables as push constant.
+## Shadertoy
+
+A limited reimplementation of Shadertoy.
+The Shadertoy variables as push constant.
+
+**Note: The Shadertoy node requires shaderc.**
 
 Outputs:
 

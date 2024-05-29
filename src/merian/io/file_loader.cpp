@@ -6,11 +6,11 @@
 #include <optional>
 #include <spdlog/spdlog.h>
 #include <string>
-#include <vector>
 
 namespace merian {
 
-bool FileLoader::exists(const std::filesystem::path& path, std::filesystem::file_status file_status) {
+bool FileLoader::exists(const std::filesystem::path& path,
+                        std::filesystem::file_status file_status) {
     if (std::filesystem::status_known(file_status) ? std::filesystem::exists(file_status)
                                                    : std::filesystem::exists(path))
         return true;
@@ -36,12 +36,13 @@ std::string FileLoader::load_file(const std::filesystem::path& path) {
 }
 
 // Searches the file in cwd and search paths and returns the full path to the file
-std::optional<std::filesystem::path> FileLoader::find_file(const std::filesystem::path& filename) const {
+std::optional<std::filesystem::path>
+FileLoader::find_file(const std::filesystem::path& filename) const {
     if (exists(filename)) {
         return std::filesystem::weakly_canonical(filename);
     }
     for (const auto& path : search_paths) {
-        std::filesystem::path full_path = path / filename;
+        const std::filesystem::path full_path = path / filename;
         if (exists(full_path))
             return std::filesystem::weakly_canonical(full_path);
     }
@@ -50,7 +51,17 @@ std::optional<std::filesystem::path> FileLoader::find_file(const std::filesystem
     return std::nullopt;
 }
 
-std::optional<std::string> FileLoader::find_and_load_file(const std::filesystem::path& filename) const {
+std::optional<std::filesystem::path>
+FileLoader::find_file(const std::filesystem::path& filename,
+                      const std::filesystem::path& relative_to_file_or_directory) const {
+    const std::filesystem::path relative_to = std::filesystem::is_directory(filename)
+                                                  ? relative_to_file_or_directory
+                                                  : relative_to_file_or_directory.parent_path();
+    return find_file(relative_to / filename);
+}
+
+std::optional<std::string>
+FileLoader::find_and_load_file(const std::filesystem::path& filename) const {
     std::optional<std::filesystem::path> full_path = find_file(filename);
     if (!full_path.has_value()) {
         return std::nullopt;
@@ -58,20 +69,23 @@ std::optional<std::string> FileLoader::find_and_load_file(const std::filesystem:
     return load_file(full_path.value());
 }
 
+std::optional<std::string>
+FileLoader::find_and_load_file(const std::filesystem::path& filename,
+                               const std::filesystem::path& relative_to_file_or_directory) const {
+    std::optional<std::filesystem::path> full_path =
+        find_file(filename, relative_to_file_or_directory);
+    if (!full_path.has_value()) {
+        return std::nullopt;
+    }
+    return load_file(full_path.value());
+}
+
 void FileLoader::add_search_path(const std::filesystem::path path) {
-    search_paths.push_back(path);
+    search_paths.insert(std::filesystem::weakly_canonical(path));
 }
 
 bool FileLoader::remove_search_path(const std::filesystem::path path) {
-    bool found = false;
-    for (std::size_t i = 0; i < search_paths.size(); i++) {
-        if (search_paths[i] == path) {
-            found = true;
-            std::swap(search_paths[i], search_paths[search_paths.size() - 1]);
-            search_paths.pop_back();
-        }
-    }
-    return found;
+    return search_paths.erase(std::filesystem::weakly_canonical(path)) > 0;
 }
 
 } // namespace merian

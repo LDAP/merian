@@ -60,6 +60,11 @@ tol_subp = cmake.subproject('tinyobjloader')
 tol = tol_subp.dependency('tinyobjloader')
 tgltf = cmake.subproject('tinygltf').dependency('tinygltf')
 sdl2 = dependency('sdl2', fallback : ['sdl2', 'sdl2_dep'])
+shaderc = dependency('shaderc', version: ['>=2023.8.1'], required: get_option('shaderc'))
+
+if shaderc.found()
+    add_project_arguments('-DFOUND_LIBSHADERC', language: 'cpp')
+endif
 
 inc_dirs = [
     include_directories('./src'),

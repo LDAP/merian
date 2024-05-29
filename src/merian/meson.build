@@ -32,6 +32,8 @@ merian_src = files(
     'vk/raytrace/blas_builder.cpp',
     'vk/raytrace/tlas_builder.cpp',
     'vk/sampler/sampler_pool.cpp',
+    'vk/shader/shader_compiler.cpp',
+    'vk/shader/shader_hotreloader.cpp',
     'vk/sync/semaphore_timeline.cpp',
     'vk/utils/barriers.cpp',
     'vk/utils/profiler.cpp',
@@ -39,6 +41,10 @@ merian_src = files(
     'vk/window/glfw_window.cpp',
     'vk/window/swapchain.cpp',
 )
+
+if shaderc.found()
+    merian_src += files('vk/shader/shader_compiler_shaderc.cpp')
+endif
 
 merian_lib = static_library(
     'merian',
@@ -48,6 +54,7 @@ merian_lib = static_library(
         glfw,
         glm,
         sdl2,
+        shaderc,
         spdlog,
         tgltf,
         tol,

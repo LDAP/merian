@@ -1,52 +1,92 @@
 #include "shadertoy.hpp"
 
 #include "merian-nodes/connectors/vk_image_out.hpp"
-
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 
 namespace merian_nodes {
 
-ShadertoyNode::ShadertoyNode(const SharedContext context,
-                             const std::string& path,
-                             FileLoader loader,
-                             const uint32_t width,
-                             const uint32_t height)
-    : AbstractCompute(context, "Shadertoy", sizeof(PushConstant)), width(width), height(height) {
-    shader = std::make_shared<ShaderModule>(context, path, loader);
-    constant.iResolution = glm::vec2(width, height);
+static const char* shadertoy_pre = R"(#version 460
+#extension GL_EXT_scalar_block_layout : require
+
+// Use constants to set local size
+layout(local_size_x_id = 0, local_size_y_id = 1) in;
+
+layout(binding = 0, set = 0, rgba32f) uniform image2D result;
+layout(push_constant) uniform constants {
+    vec2 iResolution;
+    float iTime;
+    float iTimeDelta;
+    float iFrame;
+};
+
+)";
+
+static const char* shadertoy_post = R"(vec4 _merian_shadertoy_toLinear(vec4 sRGB)
+{
+    bvec4 cutoff = lessThan(sRGB, vec4(0.04045));
+    vec4 higher = pow((sRGB + vec4(0.055))/vec4(1.055), vec4(2.4));
+    vec4 lower = sRGB/vec4(12.92);
+
+    return mix(higher, lower, cutoff);
+}
+
+void main()
+{
+  const uvec2 pixel = gl_GlobalInvocationID.xy;
+  if((pixel.x >= iResolution.x) || (pixel.y >= iResolution.y))
+  {
+    return;
+  }
+
+  vec4 frag_color;
+  mainImage(frag_color, pixel);
+  // WebGL or Shadertoy does not do a Linear->sRGB conversion
+  // thus the shader must output sRGB. But here the shader is expected to output
+  // linear!
+  imageStore(result, ivec2(pixel), _merian_shadertoy_toLinear(frag_color));
+}
+
+)";
+
+class ShadertoyInjectCompiler : public ShaderCompiler {
+  public:
+    ShadertoyInjectCompiler(const ShaderCompilerHandle forwarding_compiler)
+        : forwarding_compiler(forwarding_compiler) {}
+
+    ~ShadertoyInjectCompiler() {}
+
+    std::vector<uint32_t> compile_glsl(const std::string& source,
+                                       const std::string& source_name,
+                                       const vk::ShaderStageFlagBits shader_kind) final {
+        SPDLOG_INFO("(re-)compiling {}", source_name);
+        return forwarding_compiler->compile_glsl(shadertoy_pre + source + shadertoy_post,
+                                                 source_name, shader_kind);
+    }
+
+  private:
+    const ShaderCompilerHandle forwarding_compiler;
+};
+
+Shadertoy::Shadertoy(const SharedContext context,
+                     const std::string& path,
+                     const ShaderCompilerHandle& compiler)
+    : AbstractCompute(context, "Shadertoy", sizeof(PushConstant)), shader_path(path),
+      reloader(context, std::make_shared<ShadertoyInjectCompiler>(compiler)) {
+
     sw.reset();
     auto spec_builder = SpecializationInfoBuilder();
     spec_builder.add_entry(local_size_x, local_size_y);
     spec_info = spec_builder.build();
 }
 
-ShadertoyNode::ShadertoyNode(const SharedContext context,
-                             const std::size_t spv_size,
-                             const uint32_t spv[],
-                             const uint32_t width,
-                             const uint32_t height)
-    : AbstractCompute(context, "Shadertoy", sizeof(PushConstant)), width(width), height(height) {
-    shader = std::make_shared<ShaderModule>(context, spv_size, spv);
-    constant.iResolution = glm::vec2(width, height);
-    sw.reset();
-}
-
-void ShadertoyNode::set_resolution(uint32_t width, uint32_t height) {
-    if (width != this->width || height != this->height) {
-        this->width = width;
-        this->height = height;
-        constant.iResolution = glm::vec2(width, height);
-        requires_rebuild = true;
-    }
-}
-
 std::vector<OutputConnectorHandle>
-ShadertoyNode::describe_outputs([[maybe_unused]] const ConnectorIOMap& output_for_input) {
-    return {VkImageOut::compute_write("out", vk::Format::eR8G8B8A8Unorm, width, height)};
+Shadertoy::describe_outputs([[maybe_unused]] const ConnectorIOMap& output_for_input) {
+    constant.iResolution = {extent.width, extent.height};
+    return {VkImageOut::compute_write("out", vk::Format::eR8G8B8A8Unorm, extent)};
 }
 
-AbstractCompute::NodeStatusFlags ShadertoyNode::pre_process([[maybe_unused]] GraphRun& run,
-                                                            [[maybe_unused]] const NodeIO& io) {
+AbstractCompute::NodeStatusFlags Shadertoy::pre_process([[maybe_unused]] GraphRun& run,
+                                                        [[maybe_unused]] const NodeIO& io) {
     NodeStatusFlags flags{};
     if (requires_rebuild) {
         flags |= NodeStatusFlagBits::NEEDS_RECONNECT;
@@ -55,11 +95,11 @@ AbstractCompute::NodeStatusFlags ShadertoyNode::pre_process([[maybe_unused]] Gra
     return flags;
 }
 
-SpecializationInfoHandle ShadertoyNode::get_specialization_info() const noexcept {
+SpecializationInfoHandle Shadertoy::get_specialization_info() const noexcept {
     return spec_info;
 }
 
-const void* ShadertoyNode::get_push_constant([[maybe_unused]] GraphRun& run) {
+const void* Shadertoy::get_push_constant([[maybe_unused]] GraphRun& run) {
     float new_time = sw.seconds();
     constant.iTimeDelta = new_time - constant.iTime;
     constant.iTime = new_time;
@@ -68,13 +108,25 @@ const void* ShadertoyNode::get_push_constant([[maybe_unused]] GraphRun& run) {
     return &constant;
 }
 
-std::tuple<uint32_t, uint32_t, uint32_t> ShadertoyNode::get_group_count() const noexcept {
-    return {(width + local_size_x - 1) / local_size_x, (height + local_size_y - 1) / local_size_y,
-            1};
+std::tuple<uint32_t, uint32_t, uint32_t> Shadertoy::get_group_count() const noexcept {
+    return {(extent.width + local_size_x - 1) / local_size_x,
+            (extent.height + local_size_y - 1) / local_size_y, 1};
 };
 
-ShaderModuleHandle ShadertoyNode::get_shader_module() {
-    return shader;
+ShaderModuleHandle Shadertoy::get_shader_module() {
+    return reloader.get_shader(shader_path, vk::ShaderStageFlagBits::eCompute);
+}
+
+AbstractCompute::NodeStatusFlags Shadertoy::configuration(Configuration& config) {
+    vk::Extent3D old_extent = extent;
+    config.config_uint("width", extent.width, "");
+    config.config_uint("height", extent.height, "");
+
+    if (old_extent != extent) {
+        return NEEDS_RECONNECT;
+    } else {
+        return {};
+    }
 }
 
 } // namespace merian_nodes

@@ -24,11 +24,11 @@ class ShaderModule : public std::enable_shared_from_this<ShaderModule> {
     ShaderModule() = delete;
 
     ShaderModule(const SharedContext& context,
-                 const std::string filename,
-                 const std::optional<FileLoader> file_loader = std::nullopt)
+                 const std::string spv_filename,
+                 const std::optional<FileLoader>& file_loader = std::nullopt)
         : context(context) {
-        std::string code =
-            FileLoader::load_file(file_loader.value().find_file(filename).value_or(filename));
+        std::string code = FileLoader::load_file(
+            file_loader.value().find_file(spv_filename).value_or(spv_filename));
         vk::ShaderModuleCreateInfo info{{}, code.size(), (const uint32_t*)code.c_str()};
         shader_module = context->device.createShaderModule(info);
     }
@@ -43,6 +43,9 @@ class ShaderModule : public std::enable_shared_from_this<ShaderModule> {
         vk::ShaderModuleCreateInfo info{{}, spv_size, spv};
         shader_module = context->device.createShaderModule(info);
     }
+
+    ShaderModule(const SharedContext& context, const std::vector<uint32_t>& spv)
+        : ShaderModule(context, spv.size() * sizeof(uint32_t), spv.data()) {}
 
     ~ShaderModule() {
         SPDLOG_DEBUG("destroy shader module ({})", fmt::ptr(this));
