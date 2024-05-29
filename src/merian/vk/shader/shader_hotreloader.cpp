@@ -18,9 +18,12 @@ HotReloader::get_shader(const std::filesystem::path& path,
         shaders[*canonical].last_write_time = last_write_time;
     } else if (last_write_time > shaders[*canonical].last_write_time) {
         try {
+            // still remember time, so that we do not attempt to recompile the same broken file over
+            // and over again.
+            shaders[*canonical].last_write_time = last_write_time;
+
             shaders[*canonical].shader = std::make_shared<ShaderModule>(
                 context, compiler->compile_glsl(*canonical, shader_kind));
-            shaders[*canonical].last_write_time = last_write_time;
         } catch (const ShaderCompiler::compilation_failed& e) {
             SPDLOG_WARN("compilation failed: {}", e.what());
         }
