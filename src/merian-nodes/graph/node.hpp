@@ -2,8 +2,8 @@
 
 #include "connector_input.hpp"
 #include "connector_output.hpp"
-#include "node_io.hpp"
 #include "graph_run.hpp"
+#include "node_io.hpp"
 
 #include "merian/utils/configuration.hpp"
 #include "merian/vk/descriptors/descriptor_set.hpp"
@@ -79,9 +79,8 @@ class Node : public std::enable_shared_from_this<Node> {
     // update resources in process(...) the descriptor set will reflect the changes one iteration
     // later.
     [[nodiscard]]
-    virtual NodeStatusFlags
-    pre_process([[maybe_unused]] GraphRun& run,
-                [[maybe_unused]] const NodeIO& io) {
+    virtual NodeStatusFlags pre_process([[maybe_unused]] GraphRun& run,
+                                        [[maybe_unused]] const NodeIO& io) {
         return {};
     }
 
@@ -91,8 +90,8 @@ class Node : public std::enable_shared_from_this<Node> {
     // connector documentation. If you need to perform layout transitions use the barrier() methods
     // of the images.
     //
-    // You can provide data that that is required for the current run by setting the io map in_flight_data.
-    // The pointer is persisted and supplied again after (graph ring size - 1) runs.
+    // You can provide data that that is required for the current run by setting the io map
+    // in_flight_data. The pointer is persisted and supplied again after (graph ring size - 1) runs.
     virtual void process([[maybe_unused]] GraphRun& run,
                          [[maybe_unused]] const vk::CommandBuffer& cmd,
                          [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
@@ -103,6 +102,9 @@ class Node : public std::enable_shared_from_this<Node> {
     //
     // Return NEEDS_RECONNECT if reconnecting is required after updating the configuration.
     // This is a heavy operation and should only be done if the outputs change.
+    //
+    // Normally this method is called by the graph configuration(), if you want to call it directly
+    // you need to handle the NodeStatusFlags accordingly.
     [[nodiscard]]
     virtual NodeStatusFlags configuration([[maybe_unused]] Configuration& config) {
         return {};

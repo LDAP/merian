@@ -17,8 +17,7 @@ class HotReloader {
     // If this method is called multiple times the shader is automatically recompiled if the file
     // was changed, otherwise the same ShaderModule is returned.
     //
-    // If the compilation fails, but a old version is cached the old version is returned and a
-    // warning is printed.
+    // If the compilation fails, ShaderCompiler::compilation_failed might be thrown.
     ShaderModuleHandle
     get_shader(const std::filesystem::path& path,
                const std::optional<vk::ShaderStageFlagBits> shader_kind = std::nullopt);
@@ -30,6 +29,7 @@ class HotReloader {
     struct per_path {
         ShaderModuleHandle shader;
         std::filesystem::file_time_type last_write_time;
+        std::optional<ShaderCompiler::compilation_failed> error;
     };
     std::unordered_map<std::filesystem::path, per_path> shaders;
 };

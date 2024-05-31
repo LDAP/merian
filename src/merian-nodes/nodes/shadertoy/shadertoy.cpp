@@ -114,13 +114,27 @@ std::tuple<uint32_t, uint32_t, uint32_t> Shadertoy::get_group_count() const noex
 };
 
 ShaderModuleHandle Shadertoy::get_shader_module() {
-    return reloader.get_shader(shader_path, vk::ShaderStageFlagBits::eCompute);
+    ShaderModuleHandle shader;
+
+    try {
+        shader = reloader.get_shader(shader_path, vk::ShaderStageFlagBits::eCompute);
+        error.reset();
+    } catch (const ShaderCompiler::compilation_failed& e) {
+        error = e;
+    }
+
+    return shader;
 }
 
 AbstractCompute::NodeStatusFlags Shadertoy::configuration(Configuration& config) {
     vk::Extent3D old_extent = extent;
     config.config_uint("width", extent.width, "");
     config.config_uint("height", extent.height, "");
+
+    if (error) {
+        config.st_separate("Compilation failed.");
+        config.output_text(error->what());
+    }
 
     if (old_extent != extent) {
         return NEEDS_RECONNECT;

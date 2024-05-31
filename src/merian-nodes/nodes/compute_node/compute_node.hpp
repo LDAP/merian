@@ -10,16 +10,13 @@
 namespace merian_nodes {
 
 // A general purpose compute node.
-// The graph resources are bound in set 0 and order input images, input buffers, output images,
-// output buffers. Input images are bound as sampler2d, output images as image2d.
-//
-// A rebuild regenerates the pipeline, this allows an update to spec constants.
+// The pipeline is automatically rebuild if ShaderModule or SpecializationInfo pointer change.
 class AbstractCompute : public Node {
 
   public:
     AbstractCompute(const SharedContext context,
-                const std::string& name,
-                const std::optional<uint32_t> push_constant_size = std::nullopt);
+                    const std::string& name,
+                    const std::optional<uint32_t> push_constant_size = std::nullopt);
 
     virtual ~AbstractCompute() {}
 

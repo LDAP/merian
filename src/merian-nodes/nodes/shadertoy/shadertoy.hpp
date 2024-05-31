@@ -53,6 +53,7 @@ class Shadertoy : public AbstractCompute {
 
     ShaderModuleHandle shader;
     SpecializationInfoHandle spec_info;
+    std::optional<ShaderCompiler::compilation_failed> error;
 
     PushConstant constant;
     Stopwatch sw;
