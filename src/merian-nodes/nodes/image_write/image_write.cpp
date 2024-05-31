@@ -3,6 +3,7 @@
 
 #include "merian/utils/defer.hpp"
 #include "merian/vk/utils/blits.hpp"
+
 #include <csignal>
 #include <filesystem>
 
@@ -18,8 +19,8 @@ static std::unordered_map<uint32_t, std::string> FILE_EXTENSIONS = {
     {FORMAT_PNG, ".png"}, {FORMAT_JPG, ".jpg"}, {FORMAT_HDR, ".hdr"}};
 
 ImageWrite::ImageWrite(const SharedContext context,
-                               const ResourceAllocatorHandle allocator,
-                               const std::string& filename_format)
+                       const ResourceAllocatorHandle allocator,
+                       const std::string& filename_format)
     : Node("Image Write"), context(context), allocator(allocator), filename_format(filename_format),
       buf(1024) {
     assert(filename_format.size() < buf.size());
@@ -46,7 +47,7 @@ void ImageWrite::record() {
 }
 
 ImageWrite::NodeStatusFlags ImageWrite::pre_process(GraphRun& run,
-                                                            [[maybe_unused]] const NodeIO& io) {
+                                                    [[maybe_unused]] const NodeIO& io) {
     if (!record_enable && ((int64_t)run.get_iteration() == enable_run)) {
         record();
     }
@@ -58,9 +59,9 @@ ImageWrite::NodeStatusFlags ImageWrite::pre_process(GraphRun& run,
 };
 
 void ImageWrite::process(GraphRun& run,
-                             const vk::CommandBuffer& cmd,
-                             [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
-                             const NodeIO& io) {
+                         const vk::CommandBuffer& cmd,
+                         [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
+                         const NodeIO& io) {
 
     //--------- Make sure we always increase the iteration counter
     defer {
@@ -72,13 +73,13 @@ void ImageWrite::process(GraphRun& run,
         record_enable = false;
     }
     if (exit_run == (int64_t)run.get_iteration() || exit_iteration == iteration) {
-        raise(SIGKILL);
+        raise(SIGTERM);
     }
     if (stop_after_seconds >= 0 && time_since_record.seconds() >= stop_after_seconds) {
         record_enable = false;
     }
     if (exit_after_seconds >= 0 && time_since_record.seconds() >= exit_after_seconds) {
-        raise(SIGKILL);
+        raise(SIGTERM);
     }
 
     //--------- RECORD TRIGGER
@@ -290,8 +291,7 @@ void ImageWrite::process(GraphRun& run,
     record_iteration += record_enable ? it_offset : 0;
 }
 
-ImageWrite::NodeStatusFlags
-ImageWrite::configuration([[maybe_unused]] Configuration& config) {
+ImageWrite::NodeStatusFlags ImageWrite::configuration([[maybe_unused]] Configuration& config) {
     config.st_separate("General");
     config.config_options("format", format, {"PNG", "JPG", "HDR"},
                           Configuration::OptionsStyle::COMBO);
@@ -381,14 +381,14 @@ ImageWrite::configuration([[maybe_unused]] Configuration& config) {
             "Stops recording after the specified seconds have passed. -1 to dissable.");
         config.config_int(
             "exit at run", exit_run,
-            "Raises SIGKILL at the specified run. -1 to disable. Add a signal handler to "
+            "Raises SIGTERM at the specified run. -1 to disable. Add a signal handler to "
             "shut down properly and not corrupt the images.");
         config.config_int("exit at iteration", exit_iteration,
-                          "Raises SIGKILL at the specified iteration. -1 to disable. Add a signal "
+                          "Raises SIGTERM at the specified iteration. -1 to disable. Add a signal "
                           "handler to shut down properly and not corrupt the images.");
         config.config_float(
             "exit after seconds", exit_after_seconds,
-            "Raises SIGKILL after the specified seconds have passed. -1 to disable. Add a signal "
+            "Raises SIGTERM after the specified seconds have passed. -1 to disable. Add a signal "
             "handler to shut down properly and not corrupt the images.");
         config.st_end_child();
     }

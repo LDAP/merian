@@ -226,8 +226,11 @@ class Image : public std::enable_shared_from_this<Image> {
             vk::ImageUsageFlagBits::eFragmentDensityMapEXT |
             vk::ImageUsageFlagBits::eVideoDecodeDstKHR |
             vk::ImageUsageFlagBits::eVideoDecodeDpbKHR |
+#if defined(VK_ENABLE_BETA_EXTENSIONS)
             vk::ImageUsageFlagBits::eVideoEncodeSrcKHR |
-            vk::ImageUsageFlagBits::eVideoEncodeDpbKHR | vk::ImageUsageFlagBits::eSampleWeightQCOM |
+            vk::ImageUsageFlagBits::eVideoEncodeDpbKHR |
+#endif
+            vk::ImageUsageFlagBits::eSampleWeightQCOM |
             vk::ImageUsageFlagBits::eSampleBlockMatchQCOM;
 
         if (create_info.usage & VALID_IMAGE_USAGE_FOR_IMAGE_VIEWS) {

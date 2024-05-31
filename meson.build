@@ -51,10 +51,7 @@ if not vulkan.found()
 else
     
 endif
-glfw = dependency('glfw3', version: ['>=3.4.0'], required: false)
-if not glfw.found()
-    glfw = cmake.subproject('glfw').dependency('glfw')
-endif
+glfw = dependency('glfw3', version: ['>=3.4.0'], fallback: ['glfw', 'glfw_dep'])
 glm = dependency('glm', fallback : ['glm', 'glm_dep'], version: ['>=0.9.9.8'])
 tol_subp = cmake.subproject('tinyobjloader')
 tol = tol_subp.dependency('tinyobjloader')

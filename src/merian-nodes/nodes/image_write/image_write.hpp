@@ -53,7 +53,7 @@ class ImageWrite : public Node {
         consumer(fmt::arg("time", time_since_record.millis()));
         consumer(fmt::arg("width", extent.width));
         consumer(fmt::arg("height", extent.height));
-        consumer(fmt::arg("random", random()));
+        consumer(fmt::arg("random", rand()));
     }
 
   private:
