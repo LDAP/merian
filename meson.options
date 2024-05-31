@@ -17,3 +17,10 @@ option(
     value: 'auto',
     description: 'Enable support for shaderc, used for hot reloading'
 )
+option(
+    'tinygltf',
+    type: 'feature',
+    value: 'auto',
+    description: 'Build with tinygltf support.'
+)
+

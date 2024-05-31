@@ -1,0 +1,10 @@
+[wrap-git]
+directory = tinygltf
+
+url = https://github.com/syoyo/tinygltf
+revision = v2.8.22
+depth = 1
+method = cmake
+
+[provide]
+tinygltf = tinygltf_dep

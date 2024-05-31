@@ -4,9 +4,6 @@
 [submodule "subprojects/tinyobjloader"]
 	path = subprojects/tinyobjloader
 	url = https://github.com/tinyobjloader/tinyobjloader
-[submodule "subprojects/tinygltf"]
-	path = subprojects/tinygltf
-	url = https://github.com/syoyo/tinygltf
 [submodule "src/ext/imgui"]
 	path = src/ext/imgui
 	url = https://github.com/ocornut/imgui
