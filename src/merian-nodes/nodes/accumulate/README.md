@@ -11,7 +11,7 @@ Calculates accumulated irradiance and the first two moments.
   This helps against smearing, ghosting and fireflies in the history.
 
 The implementation of the "firefly filter" and "adaptive alpha reduction" follow
->Lucas Alber. (2024), Markov Chain Path Guiding for Real-Time Global Illumination and Single-Scattering, MSc Thesis, Karlsruhe Institute of Technology.
+> Lucas Alber. (2024), Markov Chain Path Guiding for Real-Time Global Illumination and Single-Scattering, MSc Thesis, Karlsruhe Institute of Technology.
 
 
 Inputs:
@@ -20,12 +20,12 @@ Inputs:
 |------------|--------------|----------------------------------------------------------------------------------------|-------|
 | VkImageIn  | prev_accum   | feedback last `accum`                                                                  | 1     |
 | VkImageIn  | prev_moments | feedback last `moments`                                                                | 1     |
-|                                                                                                                 
+|            |              |                                                                                        |       |
 | VkImageIn  | irr          | irradiance input (irradiance in `rgb`, sample count in `a`)                            | no    |
-|                                                                                                                 
+|            |              |                                                                                        |       |
 | VkImageIn  | mv           | motion vectors in `r` and `g` channel                                                  | no    |
 | VkImageIn  | moments_in   | moments in `r` and `g` channel                                                         | no    |
-|        
+|            |              |                                                                                        |       |
 | VkBufferIn | gbuffer      | GBuffer (see `gbuffer.glsl.h`)                                                         | no    |
 | VkBufferIn | prev_gbuf    | previous GBuffer                                                                       | 1     |
 
