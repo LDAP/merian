@@ -710,8 +710,8 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                     data.output_connector_for_name[connection.src_output];
                 if (!dst_data.input_connector_for_name.contains(connection.dst_input)) {
                     throw graph_errors::illegal_connection{
-                        fmt::format("node {} ({}) does not have an input {}.", data.name,
-                                    node->name, connection.dst_input)};
+                        fmt::format("node {} ({}) does not have an input {}.", dst_data.name,
+                                    connection.dst->name, connection.dst_input)};
                 }
                 const InputConnectorHandle dst_input =
                     dst_data.input_connector_for_name[connection.dst_input];
