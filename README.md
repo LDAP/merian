@@ -120,8 +120,3 @@ Design decisions:
     SPDX-FileCopyrightText: Copyright (c) 2019-2021 NVIDIA CORPORATION
     SPDX-License-Identifier: Apache-2.0
     ```
-
-
-## ToDO
-- Replace buffer suballocator with VMAVirtualAllocator
-- Graph: Allocator: e.g. free memory for "later" nodes?, Parallel cmd recording.
