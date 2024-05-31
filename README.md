@@ -2,18 +2,43 @@
 
 ~ _A *Vulkan 1.3* prototyping framework._ ~
 
+
+Merian is split into two libraries:
+
+ - `merian`: Provides core abstractions and utilities (Vulkan context, memory allocation, configuration, IO, ...).
+ - `merian-nodes`: Implements an extensible Vulkan processing graph.
+
+
 ## Examples
 
-- [Merian-Quake-RT](https://github.com/LDAP/merian-quake-rt): A path-tracer for the original Quake game.
+- [merian-quake](https://github.com/LDAP/merian-quake-rt): A path-tracer for the original Quake game. (coming soon)
+- [merian-shadertoy](https://github.com/LDAP/merian-shadertoy): A limited Vulkan executor for Shadertoys with hot reloading
+- [merian-hdr-viewer](https://github.com/LDAP/merian-hdr-viewer): A simple HDR viewer with various exposure and tone-mapping controls.
 
-## Usage
+## Getting started
+
+```c++
+int main() {
+    auto debug_utils = std::make_shared<merian::ExtensionVkDebugUtils>(false);
+    auto resources = std::make_shared<merian::ExtensionResources>();
+
+    merian::SharedContext context = merian::Context::make_context({debug_utils, resources}, "merian");
+    auto alloc = resources->resource_allocator();
+
+    // allocating, rendering,...
+
+    // merian cleans up everything for you
+}    
+```
+
+## Include Merian into your Project
 
 This library uses the [Meson Build System](https://mesonbuild.com/) and declares a dependency for it:
 
-``` 
+``` py
 # in your meson.build
 
-merian = dependency('merian', fallback: ['merian', 'merian_dep'])
+merian = dependency('merian', version: ['>=1.0.0'], fallback: ['merian', 'merian_dep'])
 exe = executable(
     'my-app',
     dependencies: [
@@ -21,7 +46,29 @@ exe = executable(
     ],
     // ...
 )
+
 ```
+
+If Merian is not installed, either clone Merian into the subprojects folder or add a file `subprojects/merian.wrap` with
+
+```ini
+[wrap-git]
+directory = merian
+
+url = https://github.com/LDAP/merian
+revision = 1.0.0
+depth = 1
+clone-recursive = true
+
+[provide]
+merian = merian_dep
+```
+
+## Documentation
+
+Documentation is in the `docs` subdirectory of this repository.
+
+## Usage
 
 Merian is similar to the `vulkan_raii.hpp` layer for `vulkan.hpp`. And most objects follow the RAII principle. In most cases you want to wrap them in smart pointers.
 Merian provides aliases for these types (e.g. `merian::ImageHandle` for `std::shared_ptr<merian::Image>`).
@@ -33,7 +80,7 @@ Create a Context using the `Context::make_context(..)` method.
 For common Vulkan objects a wrapper is provided that holds a shared pointer on its parent.
 This is to ensure that dependent objects (Command Buffer → Pool → Device) are destructed in the right order automagically.
 You should never need to call `destroy()` or `free()` manually.
-Keep in mind to keep a reference to the shared pointers to prevent frequent object construction and destruction.
+Keep in mind to hold a reference to the shared pointers to prevent frequent object construction and destruction.
 Whenever you create objects by yourself you should consider using `make_shared<Class>(..)`.
 If a `std::bad_weak_ptr` is thrown you should have used `make_shared<>(...)` instead of creating the object directly.
 
@@ -44,26 +91,6 @@ Note that the Vulkan dynamic dispatch loader must be used. The default dispatche
 ```c++
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 ```
-
-## Getting started
-
-```c++
-int main() {
-    auto debug_utils = std::make_shared<merian::ExtensionVkDebugUtils>(false);
-    auto resources = std::make_shared<merian::ExtensionResources>();
-
-    merian::SharedContext context = merian::Context::make_context({debug_utils, resources}, "merian-shadertoy");
-    auto alloc = resources->resource_allocator();
-
-    // allocating, rendering,...
-
-    // merian cleans up everything for you
-}    
-```
-
-## Documentation
-
-Documentation is in the `docs` subdirectory of this repository.
 
 ### Lifetime of objects
 
