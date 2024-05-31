@@ -255,7 +255,6 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         {
             MERIAN_PROFILE_SCOPE(profiler, "connect nodes");
             flat_topology = connect_nodes();
-            // todo: make sure all delayed inputs are connected too!
         }
 
         std::vector<std::string> missing_connections;
@@ -386,41 +385,39 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
     }
 
     void configuration(Configuration& config) {
-        if (config.st_new_section("Graph")) {
-            needs_reconnect |= config.config_bool("Rebuild");
-            config.config_bool("profiling", profiler_enable);
+        needs_reconnect |= config.config_bool("Rebuild");
+        config.config_bool("profiling", profiler_enable);
 
-            config.st_separate();
+        config.st_separate();
 
-            config.output_text(fmt::format("Current iteration: {}", iteration));
+        config.output_text(fmt::format("Current iteration: {}", iteration));
 
-            if (profiler_enable) {
-                config.st_separate("Profiler");
-                config.config_uint("report intervall", profiler_report_intervall_ms,
-                                   "Set the time period for the profiler to update in ms. Meaning, "
-                                   "averages and deviations are calculated over this this period.");
+        if (profiler_enable) {
+            config.st_separate("Profiler");
+            config.config_uint("report intervall", profiler_report_intervall_ms,
+                               "Set the time period for the profiler to update in ms. Meaning, "
+                               "averages and deviations are calculated over this this period.");
 
-                if (last_run_report && config.st_begin_child("run", "Graph Run")) {
-                    Profiler::get_report_imgui(last_run_report);
-                    config.st_end_child();
-                }
-                if (last_build_report && config.st_begin_child("build", "Last Graph Build")) {
-                    Profiler::get_report_imgui(last_build_report);
-                    config.st_end_child();
-                }
+            if (last_run_report && config.st_begin_child("run", "Graph Run")) {
+                Profiler::get_report_imgui(last_run_report);
+                config.st_end_child();
             }
+            if (last_build_report && config.st_begin_child("build", "Last Graph Build")) {
+                Profiler::get_report_imgui(last_build_report);
+                config.st_end_child();
+            }
+        }
 
-            config.st_separate("Nodes");
+        config.st_separate("Nodes");
 
-            for (auto& [node, data] : node_data) {
-                std::string node_label = fmt::format("{} ({})", data.name, node->name);
-                if (config.st_begin_child(data.name.c_str(), node_label.c_str())) {
-                    const Node::NodeStatusFlags flags = node->configuration(config);
-                    needs_reconnect |= flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT;
-                    config.st_separate();
-                    io_configuration_for_node(config, data);
-                    config.st_end_child();
-                }
+        for (auto& [node, data] : node_data) {
+            std::string node_label = fmt::format("{} ({})", data.name, node->name);
+            if (config.st_begin_child(data.name.c_str(), node_label.c_str())) {
+                const Node::NodeStatusFlags flags = node->configuration(config);
+                needs_reconnect |= flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT;
+                config.st_separate();
+                io_configuration_for_node(config, data);
+                config.st_end_child();
             }
         }
     }
