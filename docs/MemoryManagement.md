@@ -21,7 +21,7 @@ Current resources (that can be allocated using a ResourceAllocator):
 
 - `Buffer`
 - `Image`
-- `Texture`: A image together with an image view and an optional sampler
+- `Texture`: A image together with an image view and sampler
 - `AccelerationStructure`: for ray tracing
 
 Note that the destructor of these allocations destroys the underlying Vulkan resource and frees the associated memory.
@@ -30,12 +30,12 @@ Note that the destructor of these allocations destroys the underlying Vulkan res
 
 ```c++
 int main() {
-    merian::ExtensionVkDebugUtils debugUtils;
-    merian::ExtensionResources resources;
-    std::vector<merian::Extension*> extensions = {&debugUtils, &resources};
+    const auto debug_utils = std::make_shared<merian::ExtensionVkDebugUtils>(false);
+    const auto resources = std::make_shared<merian::ExtensionResources>();
+    const std::vector<std::shared_ptr<merian::Extension>> extensions = {resources, debug_utils};
 
-    merian::SharedContext context = merian::Context::make_context(extensions, "My beautiful app");
-    auto alloc = resources.resource_allocator();
+    const merian::SharedContext context = merian::Context::make_context(extensions, "merian");
+    auto alloc = resources->resource_allocator();
 
     const uint32_t width = 800;
     const uint32_t height = 600;
@@ -52,7 +52,7 @@ int main() {
     stbi_write_hdr("out.hdr", width, height, 3, reinterpret_cast<float*>(data));
     result->get_memory()->unmap();
 
-    // Cleans up automagically (first buffer then resource allocator then memory allocator then ... then context)
+    // Cleans up automagically (first buffer then resource allocator then memory allocator then, ..., then context)
 }
 ```
 

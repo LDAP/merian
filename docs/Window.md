@@ -2,8 +2,8 @@
 
 ### GLFW
 
-Merian provides an extension `ExtensionVkGLFW` that initializes GLFW.
-Then a window can be simply constructed.
+Merian provides an extension `ExtensionVkGLFW` that initializes GLFW. With the extension active a window can be simply constructed.
+
 
 ```c++
 
