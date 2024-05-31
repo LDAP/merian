@@ -6,14 +6,15 @@
 Merian is split into two libraries:
 
  - `merian`: Provides core abstractions and utilities (Vulkan context, memory allocation, configuration, IO, ...).
- - `merian-nodes`: Implements an extensible Vulkan processing graph.
-
+ - `merian-nodes`: Implements an extensible Vulkan processing graph. Already implemented nodes can be found [here](https://github.com/LDAP/merian/tree/main/src/merian-nodes/nodes).
 
 ## Examples
 
 - [merian-quake](https://github.com/LDAP/merian-quake-rt): A path-tracer for the original Quake game. (coming soon)
 - [merian-shadertoy](https://github.com/LDAP/merian-shadertoy): A limited Vulkan executor for Shadertoys with hot reloading
 - [merian-hdr-viewer](https://github.com/LDAP/merian-hdr-viewer): A simple HDR viewer with various exposure and tone-mapping controls.
+
+Merian aims for compatibility with Windows, Linux as well as all major GPU vendors.
 
 ## Getting started
 
@@ -67,6 +68,8 @@ merian = merian_dep
 ## Documentation
 
 Documentation is in the `docs` subdirectory of this repository.
+
+Nodes are documented in their [respective subfolder](https://github.com/LDAP/merian/tree/main/src/merian-nodes/nodes).
 
 ## Usage
 
