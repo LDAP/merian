@@ -1,6 +1,10 @@
 #include "merian/vk/utils/profiler.hpp"
 #include "imgui.h"
 
+#ifndef MERIAN_PROFILER_ENABLE
+#include "spdlog/spdlog.h"
+#endif
+
 #define SW_QUERY_COUNT 2
 
 namespace merian {
