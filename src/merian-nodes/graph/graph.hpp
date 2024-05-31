@@ -384,20 +384,24 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         ring_fences.wait_all();
     }
 
+    // Ensures at reconnect at the next run
+    void request_reconnect() {
+        needs_reconnect = true;
+    }
+
     void configuration(Configuration& config) {
         needs_reconnect |= config.config_bool("Rebuild");
-        config.config_bool("profiling", profiler_enable);
-
-        config.st_separate();
 
         config.output_text(fmt::format("Current iteration: {}", iteration));
 
-        if (profiler_enable) {
-            config.st_separate("Profiler");
-            config.config_uint("report intervall", profiler_report_intervall_ms,
-                               "Set the time period for the profiler to update in ms. Meaning, "
-                               "averages and deviations are calculated over this this period.");
+        config.st_separate("Profiler");
+        config.config_bool("profiling", profiler_enable);
+        config.st_no_space();
+        config.config_uint("report intervall", profiler_report_intervall_ms,
+                           "Set the time period for the profiler to update in ms. Meaning, "
+                           "averages and deviations are calculated over this this period.");
 
+        if (profiler_enable) {
             if (last_run_report && config.st_begin_child("run", "Graph Run")) {
                 Profiler::get_report_imgui(last_run_report);
                 config.st_end_child();
