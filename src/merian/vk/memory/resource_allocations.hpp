@@ -54,6 +54,11 @@ class Buffer : public std::enable_shared_from_this<Buffer> {
 
     vk::DeviceAddress get_device_address();
 
+    // Remember to add an buffer barrier to the command buffer.
+    void fill(const vk::CommandBuffer& cmd, const uint32_t data = 0) {
+        cmd.fillBuffer(buffer, 0, VK_WHOLE_SIZE, data);
+    }
+
     // Return a suitable vk::BufferMemoryBarrier.
     [[nodiscard]] vk::BufferMemoryBarrier
     buffer_barrier(const vk::AccessFlags src_access_flags,
