@@ -3,6 +3,7 @@
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_vulkan.h"
 #include "imgui.h"
+#include "merian/vk/utils/subresource_ranges.hpp"
 
 namespace merian {
 
@@ -63,8 +64,8 @@ void GLFWImGui::create_render_pass(SwapchainAcquireResult& aquire_result) {
         0,
         vk::PipelineStageFlagBits::eColorAttachmentOutput,
         vk::PipelineStageFlagBits::eColorAttachmentOutput,
-        {},
         vk::AccessFlagBits::eColorAttachmentWrite,
+        vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite,
     };
     vk::RenderPassCreateInfo info = {
         {}, 1, &attachment_desc, 1, &subpass, 1, &dependency,

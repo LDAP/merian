@@ -28,6 +28,10 @@ public:
         return sampler;
     }
 
+    const vk::Sampler& operator*() {
+        return sampler;
+    }
+
     const vk::Sampler& get_sampler() const {
         return sampler;
     }
@@ -38,5 +42,4 @@ private:
 };
 
 using SamplerHandle = std::shared_ptr<Sampler>;
-
 }

@@ -26,8 +26,8 @@ uint32_t get_ve_local_size(const SharedContext& context) {
 }
 
 SVGF::SVGF(const SharedContext context,
-                   const ResourceAllocatorHandle allocator,
-                   const std::optional<vk::Format> output_format)
+           const ResourceAllocatorHandle allocator,
+           const std::optional<vk::Format> output_format)
     : Node("SVGF"), context(context), allocator(allocator), output_format(output_format),
       variance_estimate_local_size_x(get_ve_local_size(context)),
       variance_estimate_local_size_y(get_ve_local_size(context)) {
@@ -48,8 +48,7 @@ std::vector<InputConnectorHandle> SVGF::describe_inputs() {
     };
 }
 
-std::vector<OutputConnectorHandle>
-SVGF::describe_outputs(const ConnectorIOMap& output_for_input) {
+std::vector<OutputConnectorHandle> SVGF::describe_outputs(const ConnectorIOMap& output_for_input) {
     // clang-format off
     irr_create_info = output_for_input[con_irr]->create_info;
     if (output_format)
@@ -76,7 +75,8 @@ SVGF::NodeStatusFlags SVGF::on_connected(const DescriptorSetLayoutHandle& graph_
         if (!ping_pong_res[i].set)
             ping_pong_res[i].set = std::make_shared<DescriptorSet>(filter_pool);
 
-        ImageHandle tmp_irr_image = allocator->createImage(irr_create_info);
+        ImageHandle tmp_irr_image =
+            allocator->createImage(irr_create_info, NONE, fmt::format("SVGF ping pong: {}", i));
         vk::ImageViewCreateInfo create_image_view{
             {}, *tmp_irr_image,         vk::ImageViewType::e2D, tmp_irr_image->get_format(),
             {}, first_level_and_layer()};
@@ -147,17 +147,18 @@ SVGF::NodeStatusFlags SVGF::on_connected(const DescriptorSetLayoutHandle& graph_
 }
 
 void SVGF::process([[maybe_unused]] GraphRun& run,
-                       [[maybe_unused]] const vk::CommandBuffer& cmd,
-                       const DescriptorSetHandle& descriptor_set,
-                       [[maybe_unused]] const NodeIO& io) {
+                   [[maybe_unused]] const vk::CommandBuffer& cmd,
+                   const DescriptorSetHandle& descriptor_set,
+                   [[maybe_unused]] const NodeIO& io) {
     // PREPARE (VARIANCE ESTIMATE)
     {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "estimate variance");
         // prepare image to write to
         auto bar = ping_pong_res[0].ping_pong->get_image()->barrier(
-            vk::ImageLayout::eGeneral, {}, vk::AccessFlagBits::eShaderWrite,
-            VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, all_levels_and_layers(), true);
-        cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
+            vk::ImageLayout::eGeneral, vk::AccessFlagBits::eShaderRead,
+            vk::AccessFlagBits::eShaderWrite, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
+            all_levels_and_layers(), true);
+        cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
                             vk::PipelineStageFlagBits::eComputeShader, {}, {}, {}, bar);
 
         // run kernel
@@ -193,9 +194,10 @@ void SVGF::process([[maybe_unused]] GraphRun& run,
 
         // prepare image to write to
         auto bar = write_res.ping_pong->get_image()->barrier(
-            vk::ImageLayout::eGeneral, {}, vk::AccessFlagBits::eShaderWrite,
-            VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, all_levels_and_layers(), true);
-        cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
+            vk::ImageLayout::eGeneral, vk::AccessFlagBits::eShaderRead,
+            vk::AccessFlagBits::eShaderWrite, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
+            all_levels_and_layers(), true);
+        cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
                             vk::PipelineStageFlagBits::eComputeShader, {}, {}, {}, bar);
 
         // run filter

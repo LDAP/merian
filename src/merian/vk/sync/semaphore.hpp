@@ -23,6 +23,10 @@ class Semaphore : public std::enable_shared_from_this<Semaphore> {
         return semaphore;
     }
 
+    const vk::Semaphore& operator*() {
+      return semaphore;
+    }
+
   protected:
     const SharedContext context;
     vk::Semaphore semaphore;

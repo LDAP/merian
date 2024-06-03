@@ -80,9 +80,9 @@ ExtensionVkDebugUtils::messenger_callback(VkDebugUtilsMessageSeverityFlagBitsEXT
             additional_info += "\n";
             if (pCallbackData->pObjects[i].pObjectName) {
                 additional_info += "\t\t";
-                additional_info += "objectName   = <";
+                additional_info += "objectName   = ";
                 additional_info += pCallbackData->pObjects[i].pObjectName;
-                additional_info += ">\n";
+                additional_info += "\n";
             }
         }
         spdlog::log(severity, additional_info);

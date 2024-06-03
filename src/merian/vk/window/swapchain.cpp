@@ -302,10 +302,9 @@ Swapchain::acquire(const std::function<vk::Extent2D()>& framebuffer_extent,
 }
 
 void Swapchain::present(const QueueHandle& queue) {
-    const vk::Semaphore& written = *current_written_semaphore();
     vk::PresentInfoKHR present_info{
         1,
-        &written, // wait until the user is done writing to the image
+        &**current_written_semaphore(), // wait until the user is done writing to the image
         1,        &swapchain, &current_image_idx,
     };
     vk::Result result = queue->present(present_info);

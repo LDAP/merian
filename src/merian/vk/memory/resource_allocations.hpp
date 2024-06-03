@@ -246,8 +246,8 @@ class Image : public std::enable_shared_from_this<Image> {
  */
 class Texture : public std::enable_shared_from_this<Texture> {
   public:
-    Texture(const ImageHandle& image,
-            const vk::ImageViewCreateInfo& view_create_info,
+    Texture(const vk::ImageView& view,
+            const ImageHandle& image,
             const SamplerHandle& sampler);
 
     ~Texture();
@@ -294,8 +294,8 @@ class Texture : public std::enable_shared_from_this<Texture> {
     void set_sampler(const SamplerHandle& sampler);
 
   private:
+    const vk::ImageView view;
     const ImageHandle image;
-    vk::ImageView view;
     SamplerHandle sampler;
 };
 

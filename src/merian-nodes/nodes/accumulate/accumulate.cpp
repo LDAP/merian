@@ -11,8 +11,8 @@
 namespace merian_nodes {
 
 Accumulate::Accumulate(const SharedContext context,
-                               const ResourceAllocatorHandle allocator,
-                               const std::optional<vk::Format> format)
+                       const ResourceAllocatorHandle allocator,
+                       const std::optional<vk::Format> format)
     : Node("Accumulate"), context(context), allocator(allocator), format(format) {
     percentile_module =
         std::make_shared<ShaderModule>(context, merian_calculate_percentiles_comp_spv_size(),
@@ -75,7 +75,8 @@ Accumulate::on_connected(const DescriptorSetLayoutHandle& graph_layout) {
     vk::ImageCreateInfo quartile_image_create_info = irr_create_info;
     quartile_image_create_info.usage |= vk::ImageUsageFlagBits::eSampled;
     quartile_image_create_info.setExtent({percentile_group_count_x, percentile_group_count_y, 1});
-    const ImageHandle quartile_image = allocator->createImage(quartile_image_create_info);
+    const ImageHandle quartile_image =
+        allocator->createImage(quartile_image_create_info, NONE, "accum node, quartiles");
     vk::ImageViewCreateInfo quartile_image_view_create_info{
         {}, *quartile_image,        vk::ImageViewType::e2D, quartile_image->get_format(),
         {}, first_level_and_layer()};
@@ -122,16 +123,17 @@ Accumulate::on_connected(const DescriptorSetLayoutHandle& graph_layout) {
 }
 
 void Accumulate::process(GraphRun& run,
-                             const vk::CommandBuffer& cmd,
-                             const DescriptorSetHandle& descriptor_set,
-                             [[maybe_unused]] const NodeIO& io) {
+                         const vk::CommandBuffer& cmd,
+                         const DescriptorSetHandle& descriptor_set,
+                         [[maybe_unused]] const NodeIO& io) {
 
     if (accumulate_pc.firefly_filter_enable || accumulate_pc.adaptive_alpha_reduction > 0.0f) {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "compute percentiles");
         auto bar = percentile_texture->get_image()->barrier(
-            vk::ImageLayout::eGeneral, {}, vk::AccessFlagBits::eShaderWrite,
-            VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, all_levels_and_layers(), true);
-        cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
+            vk::ImageLayout::eGeneral, vk::AccessFlagBits::eShaderRead,
+            vk::AccessFlagBits::eShaderWrite, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
+            all_levels_and_layers(), true);
+        cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
                             vk::PipelineStageFlagBits::eComputeShader, {}, {}, {}, bar);
 
         calculate_percentiles->bind(cmd);

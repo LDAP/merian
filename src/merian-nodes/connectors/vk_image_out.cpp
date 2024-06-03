@@ -107,11 +107,11 @@ VkImageOut::create_resource(const std::vector<std::tuple<NodeHandle, InputConnec
         }
     }
 
-    const ImageHandle image = alloc->createImage(create_info, NONE);
+    const ImageHandle image = alloc->createImage(create_info, NONE, name);
     auto res = std::make_shared<VkImageResource>(image, input_pipeline_stages, input_access_flags);
 
     if (image->valid_for_view()) {
-        res->tex = allocator->createTexture(image, image->make_view_create_info());
+        res->tex = allocator->createTexture(image, image->make_view_create_info(), name);
     }
 
     return res;

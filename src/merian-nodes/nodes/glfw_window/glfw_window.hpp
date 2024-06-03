@@ -50,14 +50,17 @@ class GLFWWindow : public Node {
         }
 
         if (acquire) {
-            const vk::Extent3D extent(acquire->extent, 1);
-            cmd_barrier_image_layout(cmd, acquire->image, vk::ImageLayout::eUndefined,
-                                     vk::ImageLayout::eTransferDstOptimal);
+            const auto bar = barrier_image_layout(acquire->image, vk::ImageLayout::eUndefined,
+                                            vk::ImageLayout::eTransferDstOptimal,
+                                            all_levels_and_layers(vk::ImageAspectFlagBits::eColor));
+            cmd.pipelineBarrier(vk::PipelineStageFlagBits::eBottomOfPipe,
+                                vk::PipelineStageFlagBits::eTransfer, {}, {}, {}, bar);
 
             const vk::Filter filter =
                 src_image->format_features() & vk::FormatFeatureFlagBits::eSampledImageFilterLinear
                     ? vk::Filter::eLinear
                     : vk::Filter::eNearest;
+            const vk::Extent3D extent(acquire->extent, 1);
 
             cmd_blit(mode, cmd, *src_image, vk::ImageLayout::eTransferSrcOptimal,
                      src_image->get_extent(), acquire->image, vk::ImageLayout::eTransferDstOptimal,

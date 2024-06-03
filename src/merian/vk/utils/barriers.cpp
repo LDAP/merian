@@ -6,7 +6,7 @@
 
 namespace merian {
 
-vk::PipelineStageFlags pipeline_stage_for_access_flags(vk::AccessFlags flags) {
+vk::PipelineStageFlags pipeline_stage_for_access_flags(const vk::AccessFlags& flags) {
     using AF = vk::AccessFlagBits;
     using PS = vk::PipelineStageFlagBits;
 
@@ -56,9 +56,9 @@ vk::PipelineStageFlags pipeline_stage_for_access_flags(vk::AccessFlags flags) {
     return result_flags;
 }
 
-vk::ImageMemoryBarrier barrier_image_layout(vk::Image image,
-                              vk::ImageLayout old_image_layout,
-                              vk::ImageLayout new_image_layout,
+vk::ImageMemoryBarrier barrier_image_layout(const vk::Image& image,
+                              const vk::ImageLayout& old_image_layout,
+                              const vk::ImageLayout& new_image_layout,
                               const vk::ImageSubresourceRange& subresource_range) {
     vk::ImageMemoryBarrier image_memory_barrier{
         access_flags_for_image_layout(old_image_layout),
@@ -77,10 +77,10 @@ vk::ImageMemoryBarrier barrier_image_layout(vk::Image image,
     return image_memory_barrier;
 }
 
-void cmd_barrier_image_layout(vk::CommandBuffer cmd,
-                              vk::Image image,
-                              vk::ImageLayout old_image_layout,
-                              vk::ImageLayout new_image_layout,
+void cmd_barrier_image_layout(const vk::CommandBuffer& cmd,
+                              const vk::Image& image,
+                              const vk::ImageLayout& old_image_layout,
+                              const vk::ImageLayout& new_image_layout,
                               const vk::ImageSubresourceRange& subresource_range) {
 
     vk::ImageMemoryBarrier image_memory_barrier = barrier_image_layout(image, old_image_layout, new_image_layout, subresource_range);
@@ -92,18 +92,18 @@ void cmd_barrier_image_layout(vk::CommandBuffer cmd,
                               &image_memory_barrier);
 }
 
-vk::ImageMemoryBarrier barrier_image_layout(vk::Image image,
-                              vk::ImageLayout old_image_layout,
-                              vk::ImageLayout new_image_layout,
-                              vk::ImageAspectFlags aspect_mask) {
+vk::ImageMemoryBarrier barrier_image_layout(const vk::Image& image,
+                              const vk::ImageLayout& old_image_layout,
+                              const vk::ImageLayout& new_image_layout,
+                              const vk::ImageAspectFlags& aspect_mask) {
     return barrier_image_layout(image, old_image_layout, new_image_layout, all_levels_and_layers(aspect_mask));
 }
 
-void cmd_barrier_image_layout(vk::CommandBuffer cmd,
-                              vk::Image image,
-                              vk::ImageLayout old_image_layout,
-                              vk::ImageLayout new_image_layout,
-                              vk::ImageAspectFlags aspect_mask) {
+void cmd_barrier_image_layout(const vk::CommandBuffer& cmd,
+                              const vk::Image& image,
+                              const vk::ImageLayout& old_image_layout,
+                              const vk::ImageLayout& new_image_layout,
+                              const vk::ImageAspectFlags& aspect_mask) {
     cmd_barrier_image_layout(cmd, image, old_image_layout, new_image_layout, all_levels_and_layers(aspect_mask));
 }
 

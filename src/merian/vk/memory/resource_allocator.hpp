@@ -1,5 +1,6 @@
 #pragma once
 
+#include "merian/vk/extension/extension_vk_debug_utils.hpp"
 #include "merian/vk/memory/memory_allocator.hpp"
 #include "merian/vk/memory/resource_allocations.hpp"
 #include "merian/vk/memory/staging_memory_manager.hpp"
@@ -15,6 +16,9 @@ namespace merian {
 //
 // Do not forget to finalize and release the resources from the staging memory manager that this
 // class uses!
+//
+// Debug names are forwarded to the memory allocator. If NDEBUG is not defined the debug are
+// attempted to be set using the debug extension.
 class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator> {
   public:
     ResourceAllocator(ResourceAllocator const&) = delete;
@@ -103,19 +107,22 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
 
     TextureHandle createTexture(const ImageHandle& image,
                                 const vk::ImageViewCreateInfo& imageViewCreateInfo,
-                                const SamplerHandle& sampler);
+                                const SamplerHandle& sampler,
+                                const std::string& debug_name = {});
 
     TextureHandle createTexture(const ImageHandle& image,
                                 const vk::ImageViewCreateInfo& imageViewCreateInfo,
-                                const vk::SamplerCreateInfo& samplerCreateInfo);
+                                const vk::SamplerCreateInfo& samplerCreateInfo,
+                                const std::string& debug_name = {});
 
     // Create a texture with a linear sampler if the view format supports it.
     // With a view to the whole subresource (using image->make_view_create_info()).
-    TextureHandle createTexture(const ImageHandle& image);
+    TextureHandle createTexture(const ImageHandle& image, const std::string& debug_name = {});
 
     // Create a texture with a linear sampler if the view format supports it.
     TextureHandle createTexture(const ImageHandle& image,
-                                const vk::ImageViewCreateInfo& imageViewCreateInfo);
+                                const vk::ImageViewCreateInfo& imageViewCreateInfo,
+                                const std::string& debug_name = {});
 
     // shortcut that creates the image for the texture
     // - creates the image
@@ -155,6 +162,7 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
     const std::shared_ptr<MemoryAllocator> m_memAlloc;
     const StagingMemoryManagerHandle m_staging;
     const SamplerPoolHandle m_samplerPool;
+    const std::shared_ptr<ExtensionVkDebugUtils> debug_utils;
 };
 
 using ResourceAllocatorHandle = std::shared_ptr<ResourceAllocator>;

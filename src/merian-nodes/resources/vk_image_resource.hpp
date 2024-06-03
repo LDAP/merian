@@ -24,7 +24,7 @@ class VkImageResource : public GraphResource {
     vk::AccessFlags2 current_access_flags{};
 
     bool needs_descriptor_update = true;
-    bool last_used_as_output = false;
+    bool last_used_as_output = true;
 
     // combined pipeline stage flags of all inputs
     const vk::PipelineStageFlags2 input_stage_flags;

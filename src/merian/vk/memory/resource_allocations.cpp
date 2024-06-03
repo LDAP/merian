@@ -10,12 +10,10 @@ Buffer::Buffer(const vk::Buffer& buffer,
                const MemoryAllocationHandle& memory,
                const vk::BufferUsageFlags& usage,
                const vk::DeviceSize& size)
-    : buffer(buffer), memory(memory), usage(usage), size(size) {
-    SPDLOG_TRACE("create buffer ({})", fmt::ptr(this));
-}
+    : buffer(buffer), memory(memory), usage(usage), size(size) {}
 
 Buffer::~Buffer() {
-    SPDLOG_TRACE("destroy buffer ({})", fmt::ptr(this));
+    SPDLOG_TRACE("destroy buffer ({})", fmt::ptr(static_cast<VkBuffer>(buffer)));
     memory->get_context()->device.destroyBuffer(buffer);
 }
 
@@ -63,12 +61,10 @@ Image::Image(const vk::Image& image,
              const MemoryAllocationHandle& memory,
              const vk::ImageCreateInfo create_info,
              const vk::ImageLayout current_layout)
-    : image(image), memory(memory), create_info(create_info), current_layout(current_layout) {
-    SPDLOG_TRACE("create image ({})", fmt::ptr(this));
-}
+    : image(image), memory(memory), create_info(create_info), current_layout(current_layout) {}
 
 Image::~Image() {
-    SPDLOG_TRACE("destroy image ({})", fmt::ptr(this));
+    SPDLOG_TRACE("destroy image ({})", fmt::ptr(static_cast<VkImage>(image)));
     memory->get_context()->device.destroyImage(image);
 }
 
@@ -124,19 +120,34 @@ vk::ImageMemoryBarrier2 Image::barrier2(const vk::ImageLayout new_layout,
     return barrier;
 }
 
+bool Image::valid_for_view() {
+    static const vk::ImageUsageFlags VALID_IMAGE_USAGE_FOR_IMAGE_VIEWS =
+        vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eStorage |
+        vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eDepthStencilAttachment |
+        vk::ImageUsageFlagBits::eTransientAttachment | vk::ImageUsageFlagBits::eInputAttachment |
+        vk::ImageUsageFlagBits::eFragmentShadingRateAttachmentKHR |
+        vk::ImageUsageFlagBits::eFragmentDensityMapEXT |
+        vk::ImageUsageFlagBits::eVideoDecodeDstKHR | vk::ImageUsageFlagBits::eVideoDecodeDpbKHR |
+#if defined(VK_ENABLE_BETA_EXTENSIONS)
+        vk::ImageUsageFlagBits::eVideoEncodeSrcKHR | vk::ImageUsageFlagBits::eVideoEncodeDpbKHR |
+#endif
+        vk::ImageUsageFlagBits::eSampleWeightQCOM | vk::ImageUsageFlagBits::eSampleBlockMatchQCOM;
+
+    if (create_info.usage & VALID_IMAGE_USAGE_FOR_IMAGE_VIEWS) {
+        return true;
+    }
+    return false;
+}
+
 // --------------------------------------------------------------------------
 
-Texture::Texture(const ImageHandle& image,
-                 const vk::ImageViewCreateInfo& view_create_info,
-                 const SamplerHandle& sampler)
-    : image(image), sampler(sampler) {
-    SPDLOG_TRACE("create texture ({})", fmt::ptr(this));
-    view = image->get_memory()->get_context()->device.createImageView(view_create_info);
+Texture::Texture(const vk::ImageView& view, const ImageHandle& image, const SamplerHandle& sampler)
+    : view(view), image(image), sampler(sampler) {
     assert(sampler);
 }
 
 Texture::~Texture() {
-    SPDLOG_TRACE("destroy texture ({})", fmt::ptr(this));
+    SPDLOG_TRACE("destroy image view ({})", fmt::ptr(static_cast<VkImageView>(view)));
     image->get_memory()->get_context()->device.destroyImageView(view);
 }
 

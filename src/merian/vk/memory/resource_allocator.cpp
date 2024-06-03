@@ -1,4 +1,5 @@
 #include "merian/vk/memory/resource_allocator.hpp"
+#include "merian/vk/extension/extension_vk_debug_utils.hpp"
 #include "merian/vk/utils/barriers.hpp"
 #include "merian/vk/utils/check_result.hpp"
 #include <spdlog/spdlog.h>
@@ -9,7 +10,8 @@ ResourceAllocator::ResourceAllocator(const SharedContext& context,
                                      const std::shared_ptr<MemoryAllocator>& memAllocator,
                                      const std::shared_ptr<StagingMemoryManager> staging,
                                      const std::shared_ptr<SamplerPool>& samplerPool)
-    : context(context), m_memAlloc(memAllocator), m_staging(staging), m_samplerPool(samplerPool) {
+    : context(context), m_memAlloc(memAllocator), m_staging(staging), m_samplerPool(samplerPool),
+      debug_utils(context->get_extension<ExtensionVkDebugUtils>()) {
     SPDLOG_DEBUG("create ResourceAllocator ({})", fmt::ptr(this));
 }
 
@@ -17,7 +19,17 @@ BufferHandle ResourceAllocator::createBuffer(const vk::BufferCreateInfo& info,
                                              const MemoryMappingType mapping_type,
                                              const std::string& debug_name,
                                              const std::optional<vk::DeviceSize> min_alignment) {
-    return m_memAlloc->create_buffer(info, mapping_type, debug_name, min_alignment);
+    const BufferHandle buffer =
+        m_memAlloc->create_buffer(info, mapping_type, debug_name, min_alignment);
+
+#ifndef NDEBUG
+    if (debug_utils) {
+        debug_utils->set_object_name(context->device, **buffer, debug_name);
+    }
+    SPDLOG_TRACE("created buffer {} ({})", fmt::ptr(static_cast<VkBuffer>(**buffer)), debug_name);
+#endif
+
+    return buffer;
 }
 
 BufferHandle ResourceAllocator::createBuffer(const vk::DeviceSize size_,
@@ -60,7 +72,16 @@ BufferHandle ResourceAllocator::createScratchBuffer(const vk::DeviceSize size,
 ImageHandle ResourceAllocator::createImage(const vk::ImageCreateInfo& info_,
                                            const MemoryMappingType mapping_type,
                                            const std::string& debug_name) {
-    return m_memAlloc->create_image(info_, mapping_type, debug_name);
+    const ImageHandle image = m_memAlloc->create_image(info_, mapping_type, debug_name);
+
+#ifndef NDEBUG
+    if (debug_utils) {
+        debug_utils->set_object_name(context->device, **image, debug_name);
+    }
+    SPDLOG_TRACE("created image {} ({})", fmt::ptr(static_cast<VkImage>(**image)), debug_name);
+#endif
+
+    return image;
 }
 
 ImageHandle ResourceAllocator::createImage(const vk::CommandBuffer& cmdBuf,
@@ -101,25 +122,43 @@ ImageHandle ResourceAllocator::createImage(const vk::CommandBuffer& cmdBuf,
 }
 
 TextureHandle ResourceAllocator::createTexture(const ImageHandle& image,
-                                               const vk::ImageViewCreateInfo& imageViewCreateInfo,
-                                               const SamplerHandle& sampler) {
-    assert(imageViewCreateInfo.image == image->get_image());
-    return std::make_shared<Texture>(image, imageViewCreateInfo, sampler);
+                                               const vk::ImageViewCreateInfo& view_create_info,
+                                               const SamplerHandle& sampler,
+                                               [[maybe_unused]] const std::string& debug_name) {
+    assert(view_create_info.image == image->get_image());
+
+    const vk::ImageView view =
+        image->get_memory()->get_context()->device.createImageView(view_create_info);
+    const TextureHandle tex = std::make_shared<Texture>(view, image, sampler);
+
+#ifndef NDEBUG
+    if (debug_utils) {
+        debug_utils->set_object_name(context->device, view, debug_name);
+    }
+    SPDLOG_TRACE("created image view {} ({}), for image {}",
+                 fmt::ptr(static_cast<VkImageView>(view)), debug_name,
+                 fmt::ptr(static_cast<VkImage>(**image)));
+#endif
+
+    return tex;
 }
 
 TextureHandle ResourceAllocator::createTexture(const ImageHandle& image,
                                                const vk::ImageViewCreateInfo& imageViewCreateInfo,
-                                               const vk::SamplerCreateInfo& samplerCreateInfo) {
+                                               const vk::SamplerCreateInfo& samplerCreateInfo,
+                                               const std::string& debug_name) {
     const SamplerHandle sampler = m_samplerPool->acquire_sampler(samplerCreateInfo);
-    return createTexture(image, imageViewCreateInfo, sampler);
-}
-
-TextureHandle ResourceAllocator::createTexture(const ImageHandle& image) {
-    return createTexture(image, image->make_view_create_info());
+    return createTexture(image, imageViewCreateInfo, sampler, debug_name);
 }
 
 TextureHandle ResourceAllocator::createTexture(const ImageHandle& image,
-                                               const vk::ImageViewCreateInfo& view_create_info) {
+                                               const std::string& debug_name) {
+    return createTexture(image, image->make_view_create_info(), debug_name);
+}
+
+TextureHandle ResourceAllocator::createTexture(const ImageHandle& image,
+                                               const vk::ImageViewCreateInfo& view_create_info,
+                                               const std::string& debug_name) {
     const SharedContext& context = image->get_memory()->get_context();
 
     const vk::FormatProperties props =
@@ -135,7 +174,7 @@ TextureHandle ResourceAllocator::createTexture(const ImageHandle& image,
         sampler = get_sampler_pool()->nearest_mirrored_repeat();
     }
 
-    return createTexture(image, view_create_info, sampler);
+    return createTexture(image, view_create_info, sampler, debug_name);
 }
 
 TextureHandle ResourceAllocator::createTexture(const vk::CommandBuffer& cmdBuf,
@@ -166,6 +205,12 @@ AccelerationStructureHandle ResourceAllocator::createAccelerationStructure(
         {}, *buffer, {}, size_info.accelerationStructureSize, type};
     check_result(context->device.createAccelerationStructureKHR(&createInfo, nullptr, &as),
                  "could not create acceleration structure");
+
+#ifndef NDEBUG
+    if (debug_utils) {
+        debug_utils->set_object_name(context->device, as, debug_name);
+    }
+#endif
 
     return std::make_shared<AccelerationStructure>(as, buffer, size_info);
 }
