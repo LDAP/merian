@@ -403,11 +403,11 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
         if (profiler_enable) {
             if (last_run_report && config.st_begin_child("run", "Graph Run")) {
-                Profiler::get_report_imgui(last_run_report);
+                Profiler::get_report_as_config(config, last_run_report);
                 config.st_end_child();
             }
             if (last_build_report && config.st_begin_child("build", "Last Graph Build")) {
-                Profiler::get_report_imgui(last_build_report);
+                Profiler::get_report_as_config(config, last_build_report);
                 config.st_end_child();
             }
         }

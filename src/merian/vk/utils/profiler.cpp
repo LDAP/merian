@@ -1,5 +1,4 @@
 #include "merian/vk/utils/profiler.hpp"
-#include "imgui.h"
 
 #ifndef MERIAN_PROFILER_ENABLE
 #include "spdlog/spdlog.h"
@@ -220,30 +219,31 @@ std::string Profiler::get_report_str(const Profiler::Report& report) {
     return result;
 }
 
-void to_imgui(const std::vector<Profiler::ReportEntry>& entries, const uint32_t level = 0) {
+void to_config(Configuration& config,
+               const std::vector<Profiler::ReportEntry>& entries,
+               const uint32_t level = 0) {
     for (auto& entry : entries) {
         std::string str = fmt::format("{}: {:.04f} (± {:.04f}) ms\n", entry.name, entry.duration,
                                       entry.std_deviation);
         if (entry.children.empty()) {
             // Add 3 spaces to fit with the child item symbol.
-            ImGui::Text("   %s", str.c_str());
-        } else if (ImGui::TreeNode(fmt::format("{}-{}", level, entry.name).c_str(), "%s",
-                                   str.c_str())) {
-            to_imgui(entry.children, level + 1);
-            ImGui::TreePop();
+            config.output_text(fmt::format("   {}", str.c_str()));
+        } else if (config.st_begin_child(fmt::format("{}-{}", level, entry.name).c_str(), str)) {
+            to_config(config, entry.children, level + 1);
+            config.st_end_child();
         }
     }
 }
 
-void Profiler::get_report_imgui(const Profiler::Report& report) {
+void Profiler::get_report_as_config(Configuration& config, const Profiler::Report& report) {
     if (!report.cpu_report.empty()) {
-        ImGui::SeparatorText("CPU");
-        to_imgui(report.cpu_report);
+        config.st_separate("CPU");
+        to_config(config, report.cpu_report);
     }
 
     if (!report.gpu_report.empty()) {
-        ImGui::SeparatorText("GPU");
-        to_imgui(report.gpu_report, 1u << 31);
+        config.st_separate("GPU");
+        to_config(config, report.gpu_report, 1u << 31);
     }
 }
 

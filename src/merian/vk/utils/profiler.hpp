@@ -2,6 +2,7 @@
 
 #include "merian/utils/stopwatch.hpp"
 #include "merian/vk/utils/query_pool.hpp"
+#include "merian/utils/configuration.hpp"
 
 #include <optional>
 
@@ -141,7 +142,7 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
     static std::string get_report_str(const Profiler::Report& report);
 
     // renders the report to imgui
-    static void get_report_imgui(const Profiler::Report& report);
+    static void get_report_as_config(Configuration& config, const Profiler::Report& report);
 
   private:
     const SharedContext context;
