@@ -38,6 +38,10 @@ class Buffer : public std::enable_shared_from_this<Buffer> {
         return buffer;
     }
 
+    const vk::Buffer& operator*() {
+        return buffer;
+    }
+
     const MemoryAllocationHandle& get_memory() const noexcept {
         return memory;
     }
@@ -113,6 +117,10 @@ class Image : public std::enable_shared_from_this<Image> {
     }
 
     const vk::Image& get_image() const {
+        return image;
+    }
+
+    const vk::Image& operator*() {
         return image;
     }
 
@@ -220,29 +228,7 @@ class Image : public std::enable_shared_from_this<Image> {
     // Test if the image has been created with a usage value containing at least one of the usages
     // defined in the valid image usage list for image views
     // (https://www.khronos.org/registry/vulkan/specs/1.3-extensions/html/vkspec.html#VUID-VkImageViewCreateInfo-image-04441)
-    bool valid_for_view() {
-        static const vk::ImageUsageFlags VALID_IMAGE_USAGE_FOR_IMAGE_VIEWS =
-            vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eStorage |
-            vk::ImageUsageFlagBits::eColorAttachment |
-            vk::ImageUsageFlagBits::eDepthStencilAttachment |
-            vk::ImageUsageFlagBits::eTransientAttachment |
-            vk::ImageUsageFlagBits::eInputAttachment |
-            vk::ImageUsageFlagBits::eFragmentShadingRateAttachmentKHR |
-            vk::ImageUsageFlagBits::eFragmentDensityMapEXT |
-            vk::ImageUsageFlagBits::eVideoDecodeDstKHR |
-            vk::ImageUsageFlagBits::eVideoDecodeDpbKHR |
-#if defined(VK_ENABLE_BETA_EXTENSIONS)
-            vk::ImageUsageFlagBits::eVideoEncodeSrcKHR |
-            vk::ImageUsageFlagBits::eVideoEncodeDpbKHR |
-#endif
-            vk::ImageUsageFlagBits::eSampleWeightQCOM |
-            vk::ImageUsageFlagBits::eSampleBlockMatchQCOM;
-
-        if (create_info.usage & VALID_IMAGE_USAGE_FOR_IMAGE_VIEWS) {
-            return true;
-        }
-        return false;
-    }
+    bool valid_for_view();
 
   private:
     const vk::Image image = VK_NULL_HANDLE;
@@ -270,6 +256,14 @@ class Texture : public std::enable_shared_from_this<Texture> {
 
     operator const vk::Image&() const {
         return *image;
+    }
+
+    operator const vk::ImageView&() const {
+        return view;
+    }
+
+    const vk::ImageView& operator*() {
+        return view;
     }
 
     const ImageHandle& get_image() const {
@@ -327,6 +321,10 @@ class AccelerationStructure : public std::enable_shared_from_this<AccelerationSt
 
     operator const vk::AccelerationStructureKHR*() const {
         return &as;
+    }
+
+    const vk::AccelerationStructureKHR& operator*() {
+        return as;
     }
 
     const BufferHandle& get_buffer() const {
