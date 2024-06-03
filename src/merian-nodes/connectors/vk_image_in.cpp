@@ -60,7 +60,13 @@ VkImageIn::on_pre_process([[maybe_unused]] GraphRun& run,
         }
     }
 
-    return {};
+    Connector::ConnectorStatusFlags flags{};
+    if (res->needs_descriptor_update) {
+        flags |= NEEDS_DESCRIPTOR_UPDATE;
+        res->needs_descriptor_update = false;
+    }
+
+    return flags;
 }
 
 ImageHandle VkImageIn::resource(const GraphResourceHandle& resource) {

@@ -30,7 +30,7 @@ void AbstractCompute::process(GraphRun& run,
 
     if (spec_info && shader &&
         (!pipe || current_spec_info != spec_info || current_shader_module != shader)) {
-        SPDLOG_DEBUG("(re)create pipeline");
+        SPDLOG_DEBUG("(re)create pipeline for {}", name);
         old_pipeline = pipe;
 
         auto pipe_builder = PipelineLayoutBuilder(context);

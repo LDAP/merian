@@ -30,6 +30,24 @@ void VkBufferIn::get_descriptor_update(const uint32_t binding,
     update.write_descriptor_buffer(binding, debugable_ptr_cast<VkBufferResource>(resource)->buffer);
 }
 
+Connector::ConnectorStatusFlags VkBufferIn::on_pre_process(
+    [[maybe_unused]] GraphRun& run,
+    [[maybe_unused]] const vk::CommandBuffer& cmd,
+    GraphResourceHandle& resource,
+    [[maybe_unused]] const NodeHandle& node,
+    [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
+    [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {
+    auto res = debugable_ptr_cast<VkBufferResource>(resource);
+
+    Connector::ConnectorStatusFlags flags{};
+    if (res->needs_descriptor_update) {
+        flags |= NEEDS_DESCRIPTOR_UPDATE;
+        res->needs_descriptor_update = false;
+    }
+
+    return flags;
+}
+
 BufferHandle VkBufferIn::resource(const GraphResourceHandle& resource) {
     return debugable_ptr_cast<VkBufferResource>(resource)->buffer;
 }
