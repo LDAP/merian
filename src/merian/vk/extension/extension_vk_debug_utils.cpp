@@ -22,9 +22,11 @@ spdlog::level::level_enum get_severity(VkDebugUtilsMessageSeverityFlagBitsEXT me
 /*
     This is the function in which errors will go through to be displayed.
 */
-VKAPI_ATTR VkBool32 VKAPI_CALL ExtensionVkDebugUtils::messenger_callback(
-    VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageTypes,
-    VkDebugUtilsMessengerCallbackDataEXT const* pCallbackData, void* pUserData) {
+VKAPI_ATTR VkBool32 VKAPI_CALL
+ExtensionVkDebugUtils::messenger_callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+                                          VkDebugUtilsMessageTypeFlagsEXT messageTypes,
+                                          VkDebugUtilsMessengerCallbackDataEXT const* pCallbackData,
+                                          void* pUserData) {
 
     UserData* user_data = static_cast<UserData*>(pUserData);
     if (user_data->ignore_message_ids.contains(pCallbackData->messageIdNumber)) {
@@ -32,9 +34,10 @@ VKAPI_ATTR VkBool32 VKAPI_CALL ExtensionVkDebugUtils::messenger_callback(
     }
 
     spdlog::level::level_enum severity = get_severity(messageSeverity);
-    std::string msg_type = vk::to_string(static_cast<vk::DebugUtilsMessageTypeFlagsEXT>(messageTypes));
-    spdlog::log(severity, "[{}] [{}] [{}]\n{}", msg_type, pCallbackData->pMessageIdName, pCallbackData->messageIdNumber,
-                pCallbackData->pMessage);
+    std::string msg_type =
+        vk::to_string(static_cast<vk::DebugUtilsMessageTypeFlagsEXT>(messageTypes));
+    spdlog::log(severity, "[{}] [{}] [{}]\n{}", msg_type, pCallbackData->pMessageIdName,
+                pCallbackData->messageIdNumber, pCallbackData->pMessage);
 
     if (0 < pCallbackData->queueLabelCount) {
         std::string additional_info;
@@ -68,7 +71,8 @@ VKAPI_ATTR VkBool32 VKAPI_CALL ExtensionVkDebugUtils::messenger_callback(
             additional_info += "\n";
             additional_info += "\t\t";
             additional_info += "objectType   = ";
-            additional_info += vk::to_string(static_cast<vk::ObjectType>(pCallbackData->pObjects[i].objectType));
+            additional_info +=
+                vk::to_string(static_cast<vk::ObjectType>(pCallbackData->pObjects[i].objectType));
             additional_info += "\n";
             additional_info += "\t\t";
             additional_info += "objectHandle = ";
@@ -84,7 +88,8 @@ VKAPI_ATTR VkBool32 VKAPI_CALL ExtensionVkDebugUtils::messenger_callback(
         spdlog::log(severity, additional_info);
     }
 
-    assert(!user_data->assert_message);
+    assert(!user_data->assert_message ||
+           !(messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT));
 
     return VK_FALSE;
 }
