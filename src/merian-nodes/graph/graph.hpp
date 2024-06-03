@@ -428,7 +428,8 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
   private:
     void io_configuration_for_node(Configuration& config, NodeData& data) {
-        if (config.st_begin_child("desc_set_layout", "Descriptor Set Layout")) {
+        if (data.descriptor_set_layout &&
+            config.st_begin_child("desc_set_layout", "Descriptor Set Layout")) {
             config.output_text(fmt::format("{}", data.descriptor_set_layout));
             config.st_end_child();
         }
