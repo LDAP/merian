@@ -323,15 +323,15 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         // get profiler and reports
         const ProfilerHandle& profiler = prepare_profiler_for_run(in_flight_data);
 
-        run.reset(iteration, profiler);
-        on_run_starting(run);
-
         // CONNECT and PREPROCESS
         do {
             // While connection nodes can signalize that they need to reconnect
             while (needs_reconnect) {
                 connect();
             }
+            
+            run.reset(iteration, profiler);
+
             // While preprocessing nodes can signalize that they need to reconnect as well
             {
                 MERIAN_PROFILE_SCOPE(profiler, "Preprocess nodes");
@@ -352,6 +352,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         // RUN
         {
             MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "Run nodes");
+            on_run_starting(run);
             for (auto& node : flat_topology) {
                 NodeData& data = node_data.at(node);
                 if (debug_utils)
@@ -947,8 +948,8 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
   public:
     // --- Callback setter ---
 
-    // Set a callback that is executed right after the fence for the current iteration is
-    // acquired and before any node is run.
+    // Set a callback that is executed right after nodes are preprocessed and before any node is
+    // run.
     void set_on_run_starting(const std::function<void(GraphRun& graph_run)>& on_run_starting) {
         this->on_run_starting = on_run_starting;
     }
