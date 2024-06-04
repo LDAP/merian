@@ -18,10 +18,10 @@ layout(push_constant) uniform constants {
 } params;
 
 layout(binding = 0) uniform sampler2D img_in;
-layout(binding = 1) uniform writeonly image2D img_out;
+layout(binding = 1) uniform writeonly restrict image2D img_out;
 
 #ifdef WRITE_CURVE
-layout(binding = 2) uniform writeonly image2D img_crv;
+layout(binding = 2) uniform writeonly restrict image2D img_crv;
 #endif
 
 float

@@ -11,7 +11,7 @@ layout (constant_id = 4) const int clamp_output = 1;
 
 
 layout(set = 0, binding = 0) uniform sampler2D img_src;
-layout(set = 0, binding = 1) uniform writeonly image2D img_output;
+layout(set = 0, binding = 1) uniform writeonly restrict image2D img_output;
 
 layout(push_constant) uniform params_t { 
     float param1;

@@ -15,7 +15,7 @@
 layout (constant_id = 2) const int SVGF_ITERATIONS = 0;
 
 layout(set = 1, binding = 0) uniform sampler2D unused; // needed to match the filter layout
-layout(set = 1, binding = 1) uniform writeonly image2D img_filter_in;
+layout(set = 1, binding = 1) uniform writeonly restrict image2D img_filter_in;
 
 layout(push_constant, std140) uniform push_t {
     float normal_reject_cos;

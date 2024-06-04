@@ -9,11 +9,11 @@ layout(set = 0, binding = 2) uniform sampler2D img_moments;
 layout(set = 0, binding = 3) uniform sampler2D img_albedo;
 layout(set = 0, binding = 4) uniform sampler2D img_mv;
 
-layout(set = 0, binding = 5, scalar) buffer buf_gbuf {
+layout(set = 0, binding = 5, scalar) buffer readonly restrict buf_gbuf {
     GBuffer gbuffer[];
 };
-layout(set = 0, binding = 6, scalar) buffer buf_prev_gbuf {
+layout(set = 0, binding = 6, scalar) buffer readonly restrict buf_prev_gbuf {
     GBuffer prev_gbuffer[];
 };
 
-layout(set = 0, binding = 7) uniform writeonly image2D img_out;
+layout(set = 0, binding = 7) uniform writeonly restrict image2D img_out;

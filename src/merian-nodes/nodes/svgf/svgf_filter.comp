@@ -7,7 +7,7 @@
 #include "common/normal_encode.glsl"
 
 layout(set = 1, binding = 0) uniform sampler2D img_filter_in;
-layout(set = 1, binding = 1) uniform writeonly image2D img_filter_out;
+layout(set = 1, binding = 1) uniform writeonly restrict image2D img_filter_out;
 
 layout (constant_id = 2) const int GAP = 1;
 layout (constant_id = 3) const int FILTER_VARIANCE = 0;

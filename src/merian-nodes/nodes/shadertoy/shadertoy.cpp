@@ -11,7 +11,7 @@ static const char* shadertoy_pre = R"(#version 460
 // Use constants to set local size
 layout(local_size_x_id = 0, local_size_y_id = 1) in;
 
-layout(binding = 0, set = 0, rgba32f) uniform image2D result;
+layout(binding = 0, set = 0, rgba32f) uniform restrict image2D result;
 layout(push_constant) uniform constants {
     vec2 iResolution;
     float iTime;

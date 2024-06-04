@@ -5,7 +5,7 @@
 
 #include "common/colors_yuv.glsl"
 
-layout(set = 1, binding = 0) uniform writeonly image2D img_quartiles;
+layout(set = 1, binding = 0) uniform writeonly restrict image2D img_quartiles;
 
 layout(push_constant, std140) uniform params_t { 
     float firefly_percentile_lower;

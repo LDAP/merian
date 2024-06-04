@@ -4,7 +4,7 @@
 layout(local_size_x_id = 0, local_size_y_id = 1, local_size_z = 1) in;
 
 layout(set = 0, binding = 0) uniform sampler2D img_src;
-layout(set = 0, binding = 1) uniform writeonly image2D img_output;
+layout(set = 0, binding = 1) uniform writeonly restrict image2D img_output;
 
 #define FXAA_PC 1
 #define FXAA_GLSL_130 1

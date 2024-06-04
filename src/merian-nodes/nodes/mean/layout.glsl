@@ -7,7 +7,7 @@ layout (constant_id = 2) const int SUBGROUP_SIZE = 0;
 
 layout(set = 0, binding = 0) uniform sampler2D img_src;
 
-layout(set = 0, binding = 1, scalar) buffer buf_result {
+layout(set = 0, binding = 1, scalar) buffer restrict buf_result {
     vec4 result[];
 };
 
