@@ -6,12 +6,12 @@
 namespace merian_nodes {
 
 HDRImageRead::HDRImageRead(const StagingMemoryManagerHandle& staging,
-                           const std::string filename,
+                           const std::filesystem::path& filename,
                            const bool keep_on_host)
     : Node("HDR Image"), staging(staging), keep_on_host(keep_on_host), filename(filename) {
 
     assert(std::filesystem::exists(filename));
-    if (!stbi_info(filename.c_str(), &width, &height, &channels)) {
+    if (!stbi_info(filename.string().c_str(), &width, &height, &channels)) {
         throw std::runtime_error{"format not supported!"};
     }
 
@@ -37,12 +37,12 @@ void HDRImageRead::process([[maybe_unused]] GraphRun& run,
                            const NodeIO& io) {
     if (needs_run) {
         if (!image) {
-            image = stbi_loadf(filename.c_str(), &width, &height, &channels, 4);
+            image = stbi_loadf(filename.string().c_str(), &width, &height, &channels, 4);
             assert(image);
             assert(width == (int)io[con_out]->get_extent().width &&
                    height == (int)io[con_out]->get_extent().height);
 
-            SPDLOG_INFO("Loaded image from {} ({}x{}, {} channels)", filename, width, height,
+            SPDLOG_INFO("Loaded image from {} ({}x{}, {} channels)", filename.string(), width, height,
                          channels);
         }
 
@@ -65,7 +65,7 @@ HDRImageRead::NodeStatusFlags HDRImageRead::configuration(Configuration& config)
         image = nullptr;
     }
 
-    const std::string text = fmt::format("filename: {}\nextent: {}x{}\nhost cached: {}\n", filename,
+    const std::string text = fmt::format("filename: {}\nextent: {}x{}\nhost cached: {}\n", filename.string(),
                                          width, height, image != nullptr);
 
     config.output_text(text);

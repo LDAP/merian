@@ -3,6 +3,8 @@
 #include "merian-nodes/graph/node.hpp"
 #include "merian-nodes/connectors/vk_image_out.hpp"
 
+#include <filesystem>
+
 namespace merian_nodes {
 
 class LDRImageRead : public Node {
@@ -14,7 +16,7 @@ class LDRImageRead : public Node {
     // Set keep_on_host to keep a copy in host memory, otherwise the image is reloaded from disk
     // everytime the graph reconnects.
     LDRImageRead(const StagingMemoryManagerHandle& staging,
-              const std::string path,
+              const std::filesystem::path& path,
               const bool linear = false,
               const bool keep_on_host = false);
 
@@ -42,7 +44,7 @@ class LDRImageRead : public Node {
     bool needs_run = true;
 
     int width, height, channels;
-    std::string filename;
+    std::filesystem::path filename;
 };
 
 } // namespace merian_nodes

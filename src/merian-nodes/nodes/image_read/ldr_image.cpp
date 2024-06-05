@@ -6,13 +6,13 @@
 namespace merian_nodes {
 
 LDRImageRead::LDRImageRead(const StagingMemoryManagerHandle& staging,
-                           const std::string filename,
+                           const std::filesystem::path& filename,
                            const bool linear,
                            const bool keep_on_host)
     : Node("LDR Image"), staging(staging), keep_on_host(keep_on_host), filename(filename) {
 
     assert(std::filesystem::exists(filename));
-    if (!stbi_info(filename.c_str(), &width, &height, &channels)) {
+    if (!stbi_info(filename.string().c_str(), &width, &height, &channels)) {
         throw std::runtime_error{"format not supported!"};
     }
 
@@ -39,12 +39,12 @@ void LDRImageRead::process([[maybe_unused]] GraphRun& run,
                            const NodeIO& io) {
     if (needs_run) {
         if (!image) {
-            image = stbi_load(filename.c_str(), &width, &height, &channels, 4);
+            image = stbi_load(filename.string().c_str(), &width, &height, &channels, 4);
             assert(image);
             assert(width == (int)io[con_out]->get_extent().width &&
                    height == (int)io[con_out]->get_extent().height);
 
-            SPDLOG_INFO("Loaded image from {} ({}x{}, {} channels)", filename, width, height,
+            SPDLOG_INFO("Loaded image from {} ({}x{}, {} channels)", filename.string(), width, height,
                          channels);
         }
 
@@ -72,7 +72,7 @@ LDRImageRead::NodeStatusFlags LDRImageRead::configuration(Configuration& config)
     }
 
     const std::string text =
-        fmt::format("filename: {}\nextent: {}x{}\nformat: {}\nhost cached: {}\n", filename, width,
+        fmt::format("filename: {}\nextent: {}x{}\nformat: {}\nhost cached: {}\n", filename.string(), width,
                     height, vk::to_string(format), image != nullptr);
 
     config.output_text(text);

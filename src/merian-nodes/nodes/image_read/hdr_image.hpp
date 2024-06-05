@@ -3,6 +3,8 @@
 #include "merian-nodes/connectors/vk_image_out.hpp"
 #include "merian-nodes/graph/node.hpp"
 
+#include <filesystem>
+
 namespace merian_nodes {
 
 class HDRImageRead : public Node {
@@ -14,7 +16,7 @@ class HDRImageRead : public Node {
     // Set keep_on_host to keep a copy in host memory, otherwise the image is reloaded from disk
     // everytime the graph reconnects.
     HDRImageRead(const StagingMemoryManagerHandle& staging,
-                 const std::string path,
+                 const std::filesystem::path& path,
                  const bool keep_on_host = false);
 
     ~HDRImageRead();
@@ -40,7 +42,7 @@ class HDRImageRead : public Node {
     bool needs_run = true;
 
     int width, height, channels;
-    std::string filename;
+    std::filesystem::path filename;
 };
 
 } // namespace merian_nodes
