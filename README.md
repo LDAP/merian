@@ -1,6 +1,6 @@
 # Merian 🎨
 
-~ _A *Vulkan 1.3* prototyping framework._ ~
+~ _A *Vulkan 1.3* development framework._ ~
 
 
 Merian is split into two libraries:
