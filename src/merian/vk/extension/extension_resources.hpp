@@ -1,6 +1,7 @@
 #pragma once
 
 #include "merian/vk/extension/extension.hpp"
+#include "merian/vk/memory/memory_allocator_vma.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 
 namespace merian {
@@ -15,6 +16,10 @@ class ExtensionResources : public Extension {
     ExtensionResources() : Extension("ExtensionResources") {}
     ~ExtensionResources() {}
 
+    void on_physical_device_selected(const Context::PhysicalDeviceContainer&) override;
+
+    std::vector<const char*> required_device_extension_names(vk::PhysicalDevice) const override;
+
     void enable_device_features(const Context::FeaturesContainer& supported,
                                 Context::FeaturesContainer& enable) override;
 
@@ -28,7 +33,10 @@ class ExtensionResources : public Extension {
 
   private:
     std::weak_ptr<Context> weak_context;
-    bool supports_device_address = false;
+
+    // Both filled depending on device features and supported extensions.
+    std::vector<const char*> required_extensions;
+    VmaAllocatorCreateFlags flags{};
 
     std::weak_ptr<MemoryAllocator> _memory_allocator;
     std::weak_ptr<ResourceAllocator> _resource_allocator;
