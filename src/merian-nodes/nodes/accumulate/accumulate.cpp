@@ -75,8 +75,8 @@ Accumulate::on_connected(const DescriptorSetLayoutHandle& graph_layout) {
     vk::ImageCreateInfo quartile_image_create_info = irr_create_info;
     quartile_image_create_info.usage |= vk::ImageUsageFlagBits::eSampled;
     quartile_image_create_info.setExtent({percentile_group_count_x, percentile_group_count_y, 1});
-    const ImageHandle quartile_image =
-        allocator->createImage(quartile_image_create_info, NONE, "accum node, quartiles");
+    const ImageHandle quartile_image = allocator->createImage(
+        quartile_image_create_info, MemoryMappingType::NONE, "accum node, quartiles");
     vk::ImageViewCreateInfo quartile_image_view_create_info{
         {}, *quartile_image,        vk::ImageViewType::e2D, quartile_image->get_format(),
         {}, first_level_and_layer()};

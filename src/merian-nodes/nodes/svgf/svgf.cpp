@@ -75,8 +75,8 @@ SVGF::NodeStatusFlags SVGF::on_connected(const DescriptorSetLayoutHandle& graph_
         if (!ping_pong_res[i].set)
             ping_pong_res[i].set = std::make_shared<DescriptorSet>(filter_pool);
 
-        ImageHandle tmp_irr_image =
-            allocator->createImage(irr_create_info, NONE, fmt::format("SVGF ping pong: {}", i));
+        ImageHandle tmp_irr_image = allocator->createImage(irr_create_info, MemoryMappingType::NONE,
+                                                           fmt::format("SVGF ping pong: {}", i));
         vk::ImageViewCreateInfo create_image_view{
             {}, *tmp_irr_image,         vk::ImageViewType::e2D, tmp_irr_image->get_format(),
             {}, first_level_and_layer()};

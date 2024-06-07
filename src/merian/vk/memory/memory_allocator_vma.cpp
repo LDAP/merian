@@ -37,7 +37,7 @@ void VMAMemoryAllocation::free() {
 void* VMAMemoryAllocation::map() {
     std::lock_guard<std::mutex> lock(allocation_mutex);
     assert(m_allocation); // freed?
-    assert(mapping_type != NONE);
+    assert(mapping_type != MemoryMappingType::NONE);
 
     void* ptr;
     check_result(vmaMapMemory(allocator->vma_allocator, m_allocation, &ptr),
@@ -87,19 +87,19 @@ VMAMemoryAllocator::make_allocator(const SharedContext& context,
 VMAMemoryAllocator::VMAMemoryAllocator(const SharedContext& context,
                                        const VmaAllocatorCreateFlags flags)
     : MemoryAllocator(context) {
-    VmaAllocatorCreateInfo allocatorInfo = {
-        .flags = flags,
-        .physicalDevice = context->physical_device.physical_device,
-        .device = context->device,
-        .preferredLargeHeapBlockSize = 0,
-        .pAllocationCallbacks = nullptr,
-        .pDeviceMemoryCallbacks = nullptr,
-        .pHeapSizeLimit = nullptr,
-        .pVulkanFunctions = nullptr,
-        .instance = context->instance,
-        .vulkanApiVersion = context->vk_api_version,
+    VmaAllocatorCreateInfo allocatorInfo = {.flags = flags,
+                                            .physicalDevice =
+                                                context->physical_device.physical_device,
+                                            .device = context->device,
+                                            .preferredLargeHeapBlockSize = 0,
+                                            .pAllocationCallbacks = nullptr,
+                                            .pDeviceMemoryCallbacks = nullptr,
+                                            .pHeapSizeLimit = nullptr,
+                                            .pVulkanFunctions = nullptr,
+                                            .instance = context->instance,
+                                            .vulkanApiVersion = context->vk_api_version,
 #if VMA_EXTERNAL_MEMORY
-        .pTypeExternalMemoryHandleTypes = nullptr
+                                            .pTypeExternalMemoryHandleTypes = nullptr
 #endif
     };
     SPDLOG_DEBUG("create VMA allocator ({})", fmt::ptr(this));
@@ -151,8 +151,8 @@ VmaAllocationCreateInfo make_create_info(const VmaMemoryUsage usage,
     };
     // clang-format off
     vmaAllocInfo.flags |= dedicated ? VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT : 0;
-    vmaAllocInfo.flags |= mapping_type == HOST_ACCESS_RANDOM ? VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT : 0;
-    vmaAllocInfo.flags |= mapping_type == HOST_ACCESS_SEQUENTIAL_WRITE ? VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT : 0;
+    vmaAllocInfo.flags |= mapping_type == MemoryMappingType::HOST_ACCESS_RANDOM ? VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT : 0;
+    vmaAllocInfo.flags |= mapping_type == MemoryMappingType::HOST_ACCESS_SEQUENTIAL_WRITE ? VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT : 0;
     // clang-format on
     return vmaAllocInfo;
 }
@@ -242,8 +242,7 @@ ImageHandle VMAMemoryAllocator::create_image(const vk::ImageCreateInfo image_cre
         static_pointer_cast<VMAMemoryAllocator>(shared_from_this());
     auto memory =
         std::make_shared<VMAMemoryAllocation>(context, allocator, mapping_type, allocation);
-    auto image_handle =
-        std::make_shared<Image>(image, memory, image_create_info);
+    auto image_handle = std::make_shared<Image>(image, memory, image_create_info);
     log_allocation(allocation_info, memory, debug_name);
 
     return image_handle;

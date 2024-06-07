@@ -57,7 +57,7 @@ class TLASBuilder : public ASBuilder {
             cmd, instances,
             vk::BufferUsageFlagBits::eShaderDeviceAddress |
                 vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR,
-            {}, NONE, 16);
+            {}, MemoryMappingType::NONE, 16);
         // Make sure the upload has finished
         const vk::BufferMemoryBarrier barrier = buffer->buffer_barrier(
             vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eAccelerationStructureWriteKHR);

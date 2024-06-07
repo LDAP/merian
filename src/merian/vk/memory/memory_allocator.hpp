@@ -17,7 +17,7 @@ using MemoryAllocationHandle = std::shared_ptr<MemoryAllocation>;
 
 static const MemoryAllocationHandle NullMememoryAllocationHandle = nullptr;
 
-enum MemoryMappingType {
+enum class MemoryMappingType {
     // Memory mapping is not possible. GPU-only resources.
     // Will likely have VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
     NONE,
@@ -58,19 +58,19 @@ class MemoryAllocator : public std::enable_shared_from_this<MemoryAllocator> {
     allocate_memory(const vk::MemoryPropertyFlags required_flags,
                     const vk::MemoryRequirements& requirements,
                     const std::string& debug_name = {},
-                    const MemoryMappingType mapping_type = NONE,
+                    const MemoryMappingType mapping_type = MemoryMappingType::NONE,
                     const vk::MemoryPropertyFlags preferred_flags = {},
                     const bool dedicated = false,
                     const float dedicated_priority = 1.0) = 0;
 
     virtual BufferHandle
     create_buffer(const vk::BufferCreateInfo buffer_create_info,
-                  const MemoryMappingType mapping_type = NONE,
+                  const MemoryMappingType mapping_type = MemoryMappingType::NONE,
                   const std::string& debug_name = {},
                   const std::optional<vk::DeviceSize> min_alignment = std::nullopt) = 0;
 
     virtual ImageHandle create_image(const vk::ImageCreateInfo image_create_info,
-                                     const MemoryMappingType mapping_type = NONE,
+                                     const MemoryMappingType mapping_type = MemoryMappingType::NONE,
                                      const std::string& debug_name = {}) = 0;
 
     // ------------------------------------------------------------------------------------

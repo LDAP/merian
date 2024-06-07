@@ -45,7 +45,7 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
 
     // Basic buffer creation
     BufferHandle createBuffer(const vk::BufferCreateInfo& info_,
-                              const MemoryMappingType mapping_type = NONE,
+                              const MemoryMappingType mapping_type = MemoryMappingType::NONE,
                               const std::string& debug_name = {},
                               const std::optional<vk::DeviceSize> min_alignment = std::nullopt);
 
@@ -53,7 +53,7 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
     // implicitly sets VK_BUFFER_USAGE_TRANSFER_DST_BIT
     BufferHandle createBuffer(const vk::DeviceSize size_,
                               const vk::BufferUsageFlags usage_ = {},
-                              const MemoryMappingType mapping_type = NONE,
+                              const MemoryMappingType mapping_type = MemoryMappingType::NONE,
                               const std::string& debug_name = {},
                               const std::optional<vk::DeviceSize> min_alignment = std::nullopt);
 
@@ -63,7 +63,7 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
                               const vk::DeviceSize& size_,
                               const vk::BufferUsageFlags usage_ = {},
                               const void* data_ = nullptr,
-                              const MemoryMappingType mapping_type = NONE,
+                              const MemoryMappingType mapping_type = MemoryMappingType::NONE,
                               const std::string& debug_name = {},
                               const std::optional<vk::DeviceSize> min_alignment = std::nullopt);
 
@@ -74,7 +74,7 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
                               const std::vector<T>& data_,
                               const vk::BufferUsageFlags usage_,
                               const std::string& debug_name = {},
-                              const MemoryMappingType mapping_type = NONE,
+                              const MemoryMappingType mapping_type = MemoryMappingType::NONE,
                               const std::optional<vk::DeviceSize> min_alignment = std::nullopt) {
         return createBuffer(cmdBuf, sizeof(T) * data_.size(), usage_, data_.data(), mapping_type,
                             debug_name, min_alignment);
@@ -90,7 +90,7 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
 
     // Basic image creation
     ImageHandle createImage(const vk::ImageCreateInfo& info_,
-                            const MemoryMappingType mapping_type = NONE,
+                            const MemoryMappingType mapping_type = MemoryMappingType::NONE,
                             const std::string& debug_name = {});
 
     // Create an image with data uploaded through staging manager
@@ -99,7 +99,7 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
                 const size_t size_,
                 const void* data_,
                 const vk::ImageCreateInfo& info_,
-                const MemoryMappingType mapping_type = NONE,
+                const MemoryMappingType mapping_type = MemoryMappingType::NONE,
                 const vk::ImageLayout& layout_ = vk::ImageLayout::eShaderReadOnlyOptimal,
                 const std::string& debug_name = {});
 

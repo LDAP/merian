@@ -107,7 +107,7 @@ VkImageOut::create_resource(const std::vector<std::tuple<NodeHandle, InputConnec
         }
     }
 
-    const ImageHandle image = alloc->createImage(create_info, NONE, name);
+    const ImageHandle image = alloc->createImage(create_info, MemoryMappingType::NONE, name);
     auto res = std::make_shared<VkImageResource>(image, input_pipeline_stages, input_access_flags);
 
     if (image->valid_for_view()) {

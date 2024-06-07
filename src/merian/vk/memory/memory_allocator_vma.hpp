@@ -88,19 +88,19 @@ class VMAMemoryAllocator : public MemoryAllocator {
     MemoryAllocationHandle allocate_memory(const vk::MemoryPropertyFlags required_flags,
                                            const vk::MemoryRequirements& requirements,
                                            const std::string& debug_name = {},
-                                           const MemoryMappingType mapping_type = NONE,
+                                           const MemoryMappingType mapping_type = MemoryMappingType::NONE,
                                            const vk::MemoryPropertyFlags preferred_flags = {},
                                            const bool dedicated = false,
                                            const float dedicated_priority = 1.0) override;
 
     BufferHandle
     create_buffer(const vk::BufferCreateInfo buffer_create_info,
-                  const MemoryMappingType mapping_type = NONE,
+                  const MemoryMappingType mapping_type = MemoryMappingType::NONE,
                   const std::string& debug_name = {},
                   const std::optional<vk::DeviceSize> min_alignment = std::nullopt) override;
 
     ImageHandle create_image(const vk::ImageCreateInfo image_create_info,
-                             const MemoryMappingType mapping_type = NONE,
+                             const MemoryMappingType mapping_type = MemoryMappingType::NONE,
                              const std::string& debug_name = {}) override;
 
     // ------------------------------------------------------------------------------------

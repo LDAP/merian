@@ -66,7 +66,7 @@ BufferHandle ResourceAllocator::createScratchBuffer(const vk::DeviceSize size,
     return createBuffer(size,
                         vk::BufferUsageFlagBits::eShaderDeviceAddress |
                             vk::BufferUsageFlagBits::eStorageBuffer,
-                        NONE, debug_name, alignment);
+                        MemoryMappingType::NONE, debug_name, alignment);
 }
 
 ImageHandle ResourceAllocator::createImage(const vk::ImageCreateInfo& info_,
@@ -198,7 +198,7 @@ AccelerationStructureHandle ResourceAllocator::createAccelerationStructure(
     BufferHandle buffer = createBuffer(size_info.accelerationStructureSize,
                                        vk::BufferUsageFlagBits::eAccelerationStructureStorageKHR |
                                            vk::BufferUsageFlagBits::eShaderDeviceAddress,
-                                       NONE, debug_name);
+                                       MemoryMappingType::NONE, debug_name);
     vk::AccelerationStructureKHR as;
     // Setting the buffer
     vk::AccelerationStructureCreateInfoKHR createInfo{

@@ -227,9 +227,9 @@ void BufferSubAllocator::allocBlock(Block& block, uint32_t, vk::DeviceSize size)
     }
 
     // TODO: Really only sequential?!
-    MemoryAllocationHandle memory =
-        m_memAllocator->allocate_memory(m_memoryPropFlags, memory_requirements.memoryRequirements,
-                                        "suballocator buffer", HOST_ACCESS_SEQUENTIAL_WRITE);
+    MemoryAllocationHandle memory = m_memAllocator->allocate_memory(
+        m_memoryPropFlags, memory_requirements.memoryRequirements, "suballocator buffer",
+        MemoryMappingType::HOST_ACCESS_SEQUENTIAL_WRITE);
     MemoryAllocation::MemoryInfo memInfo = memory->get_memory_info();
 
     vk::BindBufferMemoryInfo bindInfos{buffer, memInfo.memory, memInfo.offset};
