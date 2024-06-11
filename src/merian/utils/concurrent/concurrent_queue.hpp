@@ -8,13 +8,13 @@ namespace merian {
 
 template <typename T> class ConcurrentQueue {
   public:
-    ConcurrentQueue(const uint64_t max_size = UINT64_MAX) : max_size(max_size) {}
+    ConcurrentQueue() {}
 
     ~ConcurrentQueue() {}
 
     ConcurrentQueue(ConcurrentQueue& other) = delete;
 
-    ConcurrentQueue(ConcurrentQueue&& other) : max_size(other.max_size) {
+    ConcurrentQueue(ConcurrentQueue&& other) {
         std::unique_lock lk_other(other.mutex);
         std::unique_lock lk(mutex);
         q = std::move(other.q);
@@ -30,7 +30,7 @@ template <typename T> class ConcurrentQueue {
         return *this;
     }
 
-    void push(const T&& value) {
+    void push(const T&& value, const uint64_t max_size = UINT64_MAX) {
         std::unique_lock lk(mutex);
         cv_full.wait(lk, [&] { return q.size() < max_size; });
         q.emplace_back(std::move(value));
@@ -38,7 +38,7 @@ template <typename T> class ConcurrentQueue {
         cv_empty.notify_all();
     }
 
-    void push(const T& value) {
+    void push(const T& value, const uint64_t max_size = UINT64_MAX) {
         std::unique_lock lk(mutex);
         cv_full.wait(lk, [&] { return q.size() < max_size; });
         q.push_back(value);
@@ -68,7 +68,6 @@ template <typename T> class ConcurrentQueue {
     }
 
   private:
-    const uint64_t max_size;
     std::vector<T> q;
     std::condition_variable cv_empty;
     std::condition_variable cv_full;
