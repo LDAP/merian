@@ -1,6 +1,6 @@
 #pragma once
 
-#include "merian-nodes/connectors/host_ptr_in.hpp"
+#include "merian-nodes/connectors/ptr_in.hpp"
 #include "merian-nodes/graph/connector_output.hpp"
 #include "merian-nodes/graph/errors.hpp"
 #include "merian-nodes/graph/node.hpp"
@@ -9,14 +9,14 @@
 
 namespace merian_nodes {
 
-template <typename T> class HostPtrOut;
-template <typename T> using HostPtrOutHandle = std::shared_ptr<HostPtrOut<T>>;
+template <typename T> class PtrOut;
+template <typename T> using PtrOutHandle = std::shared_ptr<PtrOut<T>>;
 
 // Transfer information between nodes on the host using shared_ptr.
-template <typename T> class HostPtrOut : public TypedOutputConnector<std::shared_ptr<T>&> {
+template <typename T> class PtrOut : public TypedOutputConnector<std::shared_ptr<T>&> {
 
   public:
-    HostPtrOut(const std::string& name, const bool persistent)
+    PtrOut(const std::string& name, const bool persistent)
         : TypedOutputConnector<std::shared_ptr<T>&>(name, !persistent), persistent(persistent) {}
 
     GraphResourceHandle
@@ -26,19 +26,19 @@ template <typename T> class HostPtrOut : public TypedOutputConnector<std::shared
 
         for (auto& [node, input] : inputs) {
             // check compatibility
-            const auto& casted_in = std::dynamic_pointer_cast<HostPtrIn<T>>(input);
+            const auto& casted_in = std::dynamic_pointer_cast<PtrIn<T>>(input);
             if (!casted_in) {
                 throw graph_errors::connector_error{
-                    fmt::format("HostPtrOut {} cannot output to {} of node {}.", Connector::name,
+                    fmt::format("PtrOut {} cannot output to {} of node {}.", Connector::name,
                                 input->name, node->name)};
             }
         }
 
-        return std::make_shared<HostPtrResource<T>>(persistent ? -1 : (int32_t)inputs.size());
+        return std::make_shared<PtrResource<T>>(persistent ? -1 : (int32_t)inputs.size());
     }
 
     std::shared_ptr<T>& resource(const GraphResourceHandle& resource) override {
-        return debugable_ptr_cast<HostPtrResource<T>>(resource)->ptr;
+        return debugable_ptr_cast<PtrResource<T>>(resource)->ptr;
     }
 
     Connector::ConnectorStatusFlags on_pre_process(
@@ -48,7 +48,7 @@ template <typename T> class HostPtrOut : public TypedOutputConnector<std::shared
         [[maybe_unused]] const NodeHandle& node,
         [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
         [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) override {
-        const auto& res = debugable_ptr_cast<HostPtrResource<T>>(resource);
+        const auto& res = debugable_ptr_cast<PtrResource<T>>(resource);
         if (!persistent) {
             res->ptr.reset();
         }
@@ -63,7 +63,7 @@ template <typename T> class HostPtrOut : public TypedOutputConnector<std::shared
         [[maybe_unused]] const NodeHandle& node,
         [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
         [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) override {
-        const auto& res = debugable_ptr_cast<HostPtrResource<T>>(resource);
+        const auto& res = debugable_ptr_cast<PtrResource<T>>(resource);
         if (!res->ptr) {
             throw graph_errors::connector_error{fmt::format(
                 "Node {} did not set the resource for output {}.", node->name, Connector::name)};
@@ -74,8 +74,8 @@ template <typename T> class HostPtrOut : public TypedOutputConnector<std::shared
     }
 
   public:
-    static HostPtrOutHandle<T> create(const std::string& name, const bool persistent = false) {
-        return std::make_shared<HostPtrOut<T>>(name, persistent);
+    static PtrOutHandle<T> create(const std::string& name, const bool persistent = false) {
+        return std::make_shared<PtrOut<T>>(name, persistent);
     }
 
   private:
