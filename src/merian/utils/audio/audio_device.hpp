@@ -3,12 +3,13 @@
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <memory>
 
 namespace merian {
 
-class SDLAudioDevice {
+class AudioDevice : public std::enable_shared_from_this<AudioDevice> {
   public:
-    // Convention lower 0xFF are bit count.
+    // Convention lower 0xFF are bit count (following what SDL does).
     enum AudioFormat {
         FORMAT_S16_LSB = 0x8010,
         FORMAT_F32_LSB = 0x8020,
@@ -19,45 +20,42 @@ class SDLAudioDevice {
         FORMAT_U16MSB = 0x1010,
         FORMAT_S16MSB = 0x9010,
     };
+
     struct AudioSpec {
-        SDLAudioDevice::AudioFormat format;
+        AudioFormat format;
         uint16_t buffersize;
         int samplerate;
         unsigned char channels;
     };
 
-    SDLAudioDevice(std::function<void(uint8_t* stream, int len)> callback);
+    AudioDevice() {}
 
-    ~SDLAudioDevice();
+    virtual ~AudioDevice() = 0;
 
     // Open a audio device with the desired format specification.
     // This method returns the obtained AudioSpec, if it succeeds.
-    std::optional<SDLAudioDevice::AudioSpec> open_device(const AudioSpec& desired_audio_spec);
+    virtual std::optional<AudioSpec>
+    open_device(const AudioSpec& desired_audio_spec,
+                const std::function<void(uint8_t* stream, int len)>& callback) = 0;
 
-    void close_device();
+    virtual void close_device() = 0;
 
     // returns a audio spec if the device is open
-    std::optional<AudioSpec> get_audio_spec();
+    virtual std::optional<AudioSpec> get_audio_spec() = 0;
 
     // Pauses the audio device from calling the callback, to safely change the data.
     // Locking multiple times is possible, however you must call unlock_device the same number of
     // times!
-    void lock_device();
+    virtual void lock_device() = 0;
 
-    void unlock_device();
+    virtual void unlock_device() = 0;
 
     // Pauses the audio device from calling the callback, e.g. to initialize variables.
     // While paused, silence is written to the audio device, meaning this is not suitable to just
     // change some variables as it will result in dropouts, use lock_device for that.
-    void pause_audio();
+    virtual void pause_audio() = 0;
 
-    void unpause_audio();
-
-  private:
-    unsigned int audio_device_id;
-    std::optional<AudioSpec> audio_spec;
-
-    std::function<void(uint8_t* stream, int len)> callback;
+    virtual void unpause_audio() = 0;
 };
 
 } // namespace merian

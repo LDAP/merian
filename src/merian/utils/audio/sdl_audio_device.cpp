@@ -62,8 +62,7 @@ static void SDLCALL sdl_callback(void* raw_callback, Uint8* stream, int len) {
     (*callback)(stream, len);
 }
 
-SDLAudioDevice::SDLAudioDevice(std::function<void(uint8_t* stream, int len)> callback)
-    : callback(callback) {
+SDLAudioDevice::SDLAudioDevice() : AudioDevice() {
 
     audio_devices++;
 
@@ -83,7 +82,10 @@ SDLAudioDevice::~SDLAudioDevice() {
 }
 
 std::optional<SDLAudioDevice::AudioSpec>
-SDLAudioDevice::open_device(const AudioSpec& desired_audio_spec) {
+SDLAudioDevice::open_device(const AudioSpec& desired_audio_spec,
+                            const std::function<void(uint8_t* stream, int len)>& callback) {
+    this->callback = callback;
+
     SDL_AudioSpec wanted_spec{
         desired_audio_spec.samplerate,
         sdl_format(desired_audio_spec.format),
