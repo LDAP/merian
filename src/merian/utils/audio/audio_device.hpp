@@ -2,8 +2,8 @@
 
 #include <cstdint>
 #include <functional>
-#include <optional>
 #include <memory>
+#include <optional>
 
 namespace merian {
 
@@ -28,15 +28,32 @@ class AudioDevice : public std::enable_shared_from_this<AudioDevice> {
         unsigned char channels;
     };
 
+    using AllowedChangesFlags = uint32_t;
+    enum AllowedChangesFlagBits {
+        SAMPLERATE_CHANGE = 0b1,
+        FORMAT_CHANGE = 0b10,
+        CHANNELS_CHANGE = 0b100,
+        BUFFERSIZE_CHANGE = 0b1000,
+    };
+
     AudioDevice() {}
 
     virtual ~AudioDevice() = 0;
 
     // Open a audio device with the desired format specification.
     // This method returns the obtained AudioSpec, if it succeeds.
+    //
+    // If a callback is supplied it is called whenever the audio device is ready for more samples.
+    // This can be empty if you want to call queue audio manually using queue_audio() (push_mode).
     virtual std::optional<AudioSpec>
     open_device(const AudioSpec& desired_audio_spec,
-                const std::function<void(uint8_t* stream, int len)>& callback) = 0;
+                const std::function<void(uint8_t* stream, int len)>& callback = {},
+                const AllowedChangesFlags& allowed_changes = {}) = 0;
+
+    // Queue more audio to devices which were opened without callback.
+    // Audio is buffered internally and forwarded to the device automatically.
+    // If there is not enough audio, it is filled with silence.
+    virtual void queue_audio(const void* data, uint32_t len) = 0;
 
     virtual void close_device() = 0;
 

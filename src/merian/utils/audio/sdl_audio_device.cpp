@@ -83,8 +83,22 @@ SDLAudioDevice::~SDLAudioDevice() {
 
 std::optional<SDLAudioDevice::AudioSpec>
 SDLAudioDevice::open_device(const AudioSpec& desired_audio_spec,
-                            const std::function<void(uint8_t* stream, int len)>& callback) {
+                            const std::function<void(uint8_t* stream, int len)>& callback,
+                            const AllowedChangesFlags& allowed_changes) {
     this->callback = callback;
+
+    int sdl_allowed_changes = 0;
+    sdl_allowed_changes |= allowed_changes & AllowedChangesFlagBits::CHANNELS_CHANGE
+                               ? SDL_AUDIO_ALLOW_CHANNELS_CHANGE
+                               : 0;
+    sdl_allowed_changes |= allowed_changes & AllowedChangesFlagBits::SAMPLERATE_CHANGE
+                               ? SDL_AUDIO_ALLOW_FREQUENCY_CHANGE
+                               : 0;
+    sdl_allowed_changes |=
+        allowed_changes & AllowedChangesFlagBits::FORMAT_CHANGE ? SDL_AUDIO_ALLOW_FORMAT_CHANGE : 0;
+    sdl_allowed_changes |= allowed_changes & AllowedChangesFlagBits::BUFFERSIZE_CHANGE
+                               ? SDL_AUDIO_ALLOW_SAMPLES_CHANGE
+                               : 0;
 
     SDL_AudioSpec wanted_spec{
         desired_audio_spec.samplerate,
@@ -95,10 +109,10 @@ SDLAudioDevice::open_device(const AudioSpec& desired_audio_spec,
         0,
         0,
         sdl_callback,
-        &this->callback,
+        callback ? &this->callback : nullptr,
     };
     SDL_AudioSpec audio_spec;
-    audio_device_id = SDL_OpenAudioDevice(NULL, 0, &wanted_spec, &audio_spec, 0);
+    audio_device_id = SDL_OpenAudioDevice(NULL, 0, &wanted_spec, &audio_spec, sdl_allowed_changes);
     if (audio_device_id) {
         this->audio_spec = AudioSpec{
             merian_format(audio_spec.format),
@@ -122,6 +136,14 @@ void SDLAudioDevice::close_device() {
 // returns a audio spec if the device is open
 std::optional<SDLAudioDevice::AudioSpec> SDLAudioDevice::get_audio_spec() {
     return audio_spec;
+}
+
+void SDLAudioDevice::queue_audio(const void* data, uint32_t len) {
+    assert(!callback);
+
+    if (audio_device_id) {
+        SDL_QueueAudio(audio_device_id, data, len);
+    }
 }
 
 void SDLAudioDevice::lock_device() {
