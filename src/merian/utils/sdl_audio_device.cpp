@@ -45,19 +45,26 @@ SDL_AudioFormat sdl_format(SDLAudioDevice::AudioFormat format) {
     }
 }
 
+SDLAudioDevice::AudioFormat merian_format(SDL_AudioFormat format) {
+    switch (format) {
+    case AUDIO_F32LSB:
+        return SDLAudioDevice::FORMAT_F32_LSB;
+    case AUDIO_S16LSB:
+        return SDLAudioDevice::FORMAT_S16_LSB;
+    default:
+        throw std::runtime_error{"format unsupported"};
+    }
+}
+
 static void SDLCALL sdl_callback(void* raw_callback, Uint8* stream, int len) {
     std::function<void(uint8_t * stream, int len)>* callback =
         static_cast<std::function<void(uint8_t * stream, int len)>*>(raw_callback);
     (*callback)(stream, len);
 }
 
-SDLAudioDevice::SDLAudioDevice(AudioFormat format,
-                               std::function<void(uint8_t* stream, int len)> callback,
-                               uint16_t buffersize,
-                               int samplerate,
-                               unsigned char channels)
+SDLAudioDevice::SDLAudioDevice(std::function<void(uint8_t* stream, int len)> callback)
     : callback(callback) {
-    
+
     audio_devices++;
 
     if (!initialize_sdl()) {
@@ -65,36 +72,78 @@ SDLAudioDevice::SDLAudioDevice(AudioFormat format,
         audio_device_id = 0;
         return;
     }
-
-    SDL_AudioSpec wanted_spec{samplerate, sdl_format(format), channels, 0, buffersize, 0,
-                              0,          sdl_callback,       &this->callback};
-    SDL_AudioSpec audio_spec;
-    audio_device_id = SDL_OpenAudioDevice(NULL, 0, &wanted_spec, &audio_spec, 0);
-
-    if (!audio_device_id) {
-        SPDLOG_WARN("{}, disabling audio", SDL_GetError());
-    }
 }
 
 SDLAudioDevice::~SDLAudioDevice() {
     audio_devices--;
 
-    if (audio_device_id) {
-        SDL_CloseAudioDevice(audio_device_id);
-    }
+    close_device();
 
     uninitialize_sdl();
 }
 
+std::optional<SDLAudioDevice::AudioSpec>
+SDLAudioDevice::open_device(const AudioSpec& desired_audio_spec) {
+    SDL_AudioSpec wanted_spec{
+        desired_audio_spec.samplerate,
+        sdl_format(desired_audio_spec.format),
+        desired_audio_spec.channels,
+        0,
+        desired_audio_spec.buffersize,
+        0,
+        0,
+        sdl_callback,
+        &this->callback,
+    };
+    SDL_AudioSpec audio_spec;
+    audio_device_id = SDL_OpenAudioDevice(NULL, 0, &wanted_spec, &audio_spec, 0);
+    if (audio_device_id) {
+        this->audio_spec = AudioSpec{
+            merian_format(audio_spec.format),
+            audio_spec.samples,
+            audio_spec.freq,
+            audio_spec.channels,
+        };
+    }
+
+    return this->audio_spec;
+}
+
+void SDLAudioDevice::close_device() {
+    if (audio_device_id) {
+        SDL_CloseAudioDevice(audio_device_id);
+        audio_device_id = 0;
+        audio_spec.reset();
+    }
+}
+
+// returns a audio spec if the device is open
+std::optional<SDLAudioDevice::AudioSpec> SDLAudioDevice::get_audio_spec() {
+    return audio_spec;
+}
+
+void SDLAudioDevice::lock_device() {
+    if (audio_device_id) {
+        SDL_LockAudioDevice(audio_device_id);
+    }
+}
+
+void SDLAudioDevice::unlock_device() {
+    if (audio_device_id) {
+        SDL_UnlockAudioDevice(audio_device_id);
+    }
+}
+
 void SDLAudioDevice::unpause_audio() {
-    if (audio_device_id)
+    if (audio_device_id) {
         SDL_PauseAudioDevice(audio_device_id, 0);
+    }
 }
 
 void SDLAudioDevice::pause_audio() {
-    if (audio_device_id)
+    if (audio_device_id) {
         SDL_PauseAudioDevice(audio_device_id, 1);
+    }
 }
-
 
 } // namespace merian
