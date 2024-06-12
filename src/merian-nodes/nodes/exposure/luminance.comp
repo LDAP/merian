@@ -20,6 +20,7 @@ void main() {
             count = histogram[hist_size];
         barrier();
 
+        // sum all local_hist entries into local_hist[0]
         for (uint split = (hist_size >> 1); split > 0; split >>= 1) {
             if (uint(gl_LocalInvocationIndex) < split) {
               local_hist[gl_LocalInvocationIndex] += local_hist[gl_LocalInvocationIndex + split];

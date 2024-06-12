@@ -1,6 +1,6 @@
 # Autoexposure
 
-Follows the idea from Lagarde et al. *Moving Frostbite to Physically Based Rendering 2.0* (2014).
+Follows the idea from Lagarde et al. *Moving Frostbite to Physically Based Rendering 2.0* (2014) and Alex Tardifs [Adaptive Exposure from Luminance Histograms](https://www.alextardif.com/HistogramLuminance.html).
 
 
 | Type      | Input name | Delay |
