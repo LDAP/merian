@@ -258,18 +258,41 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         }
 
         std::vector<std::string> missing_connections;
+        std::vector<std::string> maybe_missing_connections;
         for (auto& [node, data] : node_data) {
             for (auto& [input_name, input] : data.input_connector_for_name) {
                 if (!data.input_connections.contains(input)) {
-                    missing_connections.emplace_back(
-                        fmt::format("input {} of Node {} ({}) is not connected", input->name,
-                                    data.name, node->name));
+
+                    // there might be a connection queued up but was never processed because of the
+                    // actual fail.
+                    bool found = false;
+                    for (auto& [maybe_src_node, maybe_src_data] : node_data) {
+                        for (auto& maybe_connection : maybe_src_data.desired_connections) {
+                            if (maybe_connection.dst == node &&
+                                maybe_connection.dst_input == input_name) {
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!found) {
+                        missing_connections.emplace_back(
+                            fmt::format("input {} of Node {} ({}) is not connected", input->name,
+                                        data.name, node->name));
+                    } else {
+                        maybe_missing_connections.emplace_back(
+                            fmt::format("input {} of Node {} ({}) could not be connected",
+                                        input->name, data.name, node->name));
+                    }
                 }
             }
         }
         if (!missing_connections.empty()) {
             throw graph_errors::connection_missing{fmt::format(
-                "Graph not fully connected.\n{}", fmt::join(missing_connections, ", "))};
+                "Graph not fully connected.\n\nMissing connections:\n - {}\n\nConsequences:\n - {}",
+                fmt::join(missing_connections, "\n - "),
+                fmt::join(maybe_missing_connections, "\n - "))};
         }
 
         {
@@ -329,7 +352,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             while (needs_reconnect) {
                 connect();
             }
-            
+
             run.reset(iteration, profiler);
 
             // While preprocessing nodes can signalize that they need to reconnect as well
