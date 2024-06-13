@@ -1,5 +1,7 @@
 #pragma once
 
+#include "any_out.hpp"
+
 #include "merian-nodes/graph/connector_input.hpp"
 
 #include <any>
@@ -9,8 +11,6 @@ namespace merian_nodes {
 
 class AnyIn;
 using AnyInHandle = std::shared_ptr<AnyIn>;
-class AnyOut;
-using AnyOutHandle = std::shared_ptr<AnyOut>;
 
 // Receive information from HostAnyOuts.
 class AnyIn : public TypedInputConnector<AnyOutHandle, const std::any&> {
