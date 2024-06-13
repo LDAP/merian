@@ -1,7 +1,7 @@
 #pragma once
 
 #include "merian-nodes/nodes/compute_node/compute_node.hpp"
-#include "merian-nodes/connectors/vk_image_in.hpp"
+#include "merian-nodes/connectors/managed_vk_image_in.hpp"
 
 namespace merian_nodes {
 
@@ -39,7 +39,7 @@ class FXAA : public AbstractCompute {
     SpecializationInfoHandle spec_info;
     ShaderModuleHandle shader;
 
-    VkImageInHandle con_src = VkImageIn::compute_read("src");
+    ManagedVkImageInHandle con_src = ManagedVkImageIn::compute_read("src");
 };
 
 } // namespace merian_nodes

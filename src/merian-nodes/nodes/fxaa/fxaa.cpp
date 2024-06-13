@@ -25,7 +25,7 @@ FXAA::describe_outputs([[maybe_unused]] const ConnectorIOMap& output_for_input) 
     extent = output_for_input[con_src]->create_info.extent;
 
     return {
-        VkImageOut::compute_write("out", output_for_input[con_src]->create_info.format, extent),
+        ManagedVkImageOut::compute_write("out", output_for_input[con_src]->create_info.format, extent),
     };
 }
 

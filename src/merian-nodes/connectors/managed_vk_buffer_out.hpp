@@ -4,14 +4,14 @@
 
 namespace merian_nodes {
 
-class VkBufferOut;
-using VkBufferOutHandle = std::shared_ptr<VkBufferOut>;
+class ManagedVkBufferOut;
+using ManagedVkBufferOutHandle = std::shared_ptr<ManagedVkBufferOut>;
 
 // Output a Vulkan image that is allocated and managed by the graph.
 // Note that it only supplies a descriptor if stage_flags contains at least one bit.
-class VkBufferOut : public TypedOutputConnector<BufferHandle> {
+class ManagedVkBufferOut : public TypedOutputConnector<BufferHandle> {
   public:
-    VkBufferOut(const std::string& name,
+    ManagedVkBufferOut(const std::string& name,
                 const vk::AccessFlags2& access_flags,
                 const vk::PipelineStageFlags2& pipeline_stages,
                 const vk::ShaderStageFlags& stage_flags,
@@ -48,11 +48,11 @@ class VkBufferOut : public TypedOutputConnector<BufferHandle> {
     virtual BufferHandle resource(const GraphResourceHandle& resource) override;
 
   public:
-    static VkBufferOutHandle compute_write(const std::string& name,
+    static ManagedVkBufferOutHandle compute_write(const std::string& name,
                                            const vk::BufferCreateInfo& create_info,
                                            const bool persistent = false);
 
-    static VkBufferOutHandle transfer_write(const std::string& name,
+    static ManagedVkBufferOutHandle transfer_write(const std::string& name,
                                             const vk::BufferCreateInfo& create_info,
                                             const bool persistent = false);
 

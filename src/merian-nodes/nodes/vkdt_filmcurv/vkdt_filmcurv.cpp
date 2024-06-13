@@ -34,7 +34,7 @@ VKDTFilmcurv::describe_outputs([[maybe_unused]] const ConnectorIOMap& output_for
     const vk::Format format = output_format.value_or(output_for_input[con_src]->create_info.format);
 
     return {
-        VkImageOut::compute_write("out", format, extent),
+        ManagedVkImageOut::compute_write("out", format, extent),
     };
 }
 

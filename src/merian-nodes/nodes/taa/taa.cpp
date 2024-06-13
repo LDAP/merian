@@ -26,8 +26,8 @@ TAA::TAA(const SharedContext context,
 std::vector<InputConnectorHandle> TAA::describe_inputs() {
     return {
         con_src,
-        VkImageIn::compute_read("feedback", 1),
-        VkImageIn::compute_read("mv"),
+        ManagedVkImageIn::compute_read("feedback", 1),
+        ManagedVkImageIn::compute_read("mv"),
     };
 }
 
@@ -37,7 +37,7 @@ TAA::describe_outputs([[maybe_unused]] const ConnectorIOMap& output_for_input) {
     height = output_for_input[con_src]->create_info.extent.height;
 
     return {
-        VkImageOut::compute_write("out", output_for_input[con_src]->create_info.format, width,
+        ManagedVkImageOut::compute_write("out", output_for_input[con_src]->create_info.format, width,
                                   height),
     };
 }

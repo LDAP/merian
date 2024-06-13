@@ -1,21 +1,21 @@
 #pragma once
 
-#include "vk_image_out.hpp"
+#include "managed_vk_image_out.hpp"
 
 #include "merian-nodes/graph/connector_input.hpp"
 
 namespace merian_nodes {
 
-class VkImageIn;
-using VkImageInHandle = std::shared_ptr<VkImageIn>;
+class ManagedVkImageIn;
+using ManagedVkImageInHandle = std::shared_ptr<ManagedVkImageIn>;
 
 // Input a Vulkan image that is allocated and managed by the graph.
 // Note that it only supplies a descriptor if stage_flags contains at least one bit.
-class VkImageIn : public TypedInputConnector<VkImageOutHandle, ImageHandle> {
-    friend class VkImageOut;
+class ManagedVkImageIn : public TypedInputConnector<ManagedVkImageOutHandle, ImageHandle> {
+    friend class ManagedVkImageOut;
 
   public:
-    VkImageIn(const std::string& name,
+    ManagedVkImageIn(const std::string& name,
               const vk::AccessFlags2 access_flags,
               const vk::PipelineStageFlags2 pipeline_stages,
               const vk::ImageLayout required_layout,
@@ -40,9 +40,9 @@ class VkImageIn : public TypedInputConnector<VkImageOutHandle, ImageHandle> {
     virtual ImageHandle resource(const GraphResourceHandle& resource) override;
 
   public:
-    static VkImageInHandle compute_read(const std::string& name, const uint32_t delay = 0);
+    static ManagedVkImageInHandle compute_read(const std::string& name, const uint32_t delay = 0);
 
-    static VkImageInHandle transfer_src(const std::string& name, const uint32_t delay = 0);
+    static ManagedVkImageInHandle transfer_src(const std::string& name, const uint32_t delay = 0);
 
   private:
     const vk::AccessFlags2 access_flags;

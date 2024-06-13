@@ -1,6 +1,6 @@
 #pragma once
 
-#include "merian-nodes/connectors/vk_image_out.hpp"
+#include "merian-nodes/connectors/managed_vk_image_out.hpp"
 #include "merian-nodes/graph/node.hpp"
 
 namespace merian_nodes {
@@ -28,7 +28,7 @@ class ColorImage : public Node {
     const vk::ClearColorValue color;
 
     bool needs_run = true;
-    VkImageOutHandle con_out;
+    ManagedVkImageOutHandle con_out;
 };
 
 } // namespace merian_nodes

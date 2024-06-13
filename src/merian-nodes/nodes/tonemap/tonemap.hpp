@@ -1,6 +1,6 @@
 #pragma once
 
-#include "merian-nodes/connectors/vk_image_in.hpp"
+#include "merian-nodes/connectors/managed_vk_image_in.hpp"
 #include "merian-nodes/nodes/compute_node/compute_node.hpp"
 
 namespace merian_nodes {
@@ -47,7 +47,7 @@ class Tonemap : public AbstractCompute {
 
     const std::optional<vk::Format> output_format;
 
-    VkImageInHandle con_src = VkImageIn::compute_read("src");
+    ManagedVkImageInHandle con_src = ManagedVkImageIn::compute_read("src");
 
     vk::Extent3D extent;
     PushConstant pc;

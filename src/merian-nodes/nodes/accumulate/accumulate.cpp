@@ -36,9 +36,9 @@ Accumulate::describe_outputs(const ConnectorIOMap& output_for_input) {
     irr_create_info = output_for_input[con_irr_in]->create_info;
     const auto moments_create_info = output_for_input[con_moments_in]->create_info;
 
-    con_irr_out = VkImageOut::compute_write("out_irr", format.value_or(irr_create_info.format),
+    con_irr_out = ManagedVkImageOut::compute_write("out_irr", format.value_or(irr_create_info.format),
                                             irr_create_info.extent);
-    con_moments_out = VkImageOut::compute_write("out_moments", moments_create_info.format,
+    con_moments_out = ManagedVkImageOut::compute_write("out_moments", moments_create_info.format,
                                                 moments_create_info.extent);
 
     return {

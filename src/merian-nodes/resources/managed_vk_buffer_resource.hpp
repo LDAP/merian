@@ -4,12 +4,12 @@
 
 namespace merian_nodes {
 
-class VkBufferResource : public GraphResource {
-    friend class VkBufferIn;
-    friend class VkBufferOut;
+class ManagedVkBufferResource : public GraphResource {
+    friend class ManagedVkBufferIn;
+    friend class ManagedVkBufferOut;
 
   public:
-    VkBufferResource(const BufferHandle& buffer,
+    ManagedVkBufferResource(const BufferHandle& buffer,
                      const vk::PipelineStageFlags2& input_stage_flags,
                      const vk::AccessFlags2& input_access_flags)
         : buffer(buffer), input_stage_flags(input_stage_flags),
@@ -26,6 +26,6 @@ class VkBufferResource : public GraphResource {
     bool needs_descriptor_update = true;
 };
 
-using VkBufferResourceHandle = std::shared_ptr<VkBufferResource>;
+using VkBufferResourceHandle = std::shared_ptr<ManagedVkBufferResource>;
 
 } // namespace merian_nodes

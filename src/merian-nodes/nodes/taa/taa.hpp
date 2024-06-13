@@ -1,6 +1,6 @@
 #pragma once
 
-#include "merian-nodes/connectors/vk_image_in.hpp"
+#include "merian-nodes/connectors/managed_vk_image_in.hpp"
 #include "merian-nodes/nodes/compute_node/compute_node.hpp"
 #include "merian-nodes/nodes/taa/config.h"
 
@@ -44,7 +44,7 @@ class TAA : public AbstractCompute {
     ShaderModuleHandle shader;
     SpecializationInfoHandle spec_info;
 
-    VkImageInHandle con_src = VkImageIn::compute_read("src");
+    ManagedVkImageInHandle con_src = ManagedVkImageIn::compute_read("src");
 
     PushConstant pc;
     uint32_t width{};

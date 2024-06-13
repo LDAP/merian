@@ -28,8 +28,8 @@ Bloom::describe_outputs(const ConnectorIOMap& output_for_input) {
     const vk::Format format = output_for_input[con_src]->create_info.format;
     const vk::Extent3D extent = output_for_input[con_src]->create_info.extent;
 
-    con_out = VkImageOut::compute_write("out", format, extent);
-    con_interm = VkImageOut::compute_read_write("interm", vk::Format::eR16G16B16A16Sfloat, extent);
+    con_out = ManagedVkImageOut::compute_write("out", format, extent);
+    con_interm = ManagedVkImageOut::compute_read_write("interm", vk::Format::eR16G16B16A16Sfloat, extent);
 
     return {
         con_out,

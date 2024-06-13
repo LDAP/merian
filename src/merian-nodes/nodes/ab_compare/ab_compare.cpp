@@ -29,7 +29,7 @@ ABSplit::describe_outputs(const ConnectorIOMap& output_for_input) {
                               ? vk::Extent3D(output_extent.value(), 1)
                               : output_for_input[con_in_a]->create_info.extent;
 
-    con_out = VkImageOut::transfer_write("out", format, extent.width, extent.height);
+    con_out = ManagedVkImageOut::transfer_write("out", format, extent.width, extent.height);
 
     return {con_out};
 }
@@ -74,7 +74,7 @@ ABSideBySide::describe_outputs(const ConnectorIOMap& output_for_input) {
         extent.width *= 2;
     }
 
-    con_out = VkImageOut::transfer_write("out", format, extent.width, extent.height);
+    con_out = ManagedVkImageOut::transfer_write("out", format, extent.width, extent.height);
 
     return {con_out};
 }

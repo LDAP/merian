@@ -16,7 +16,7 @@ HDRImageRead::HDRImageRead(const StagingMemoryManagerHandle& staging,
     }
 
     con_out =
-        VkImageOut::transfer_write("out", vk::Format::eR32G32B32A32Sfloat, width, height, 1, true);
+        ManagedVkImageOut::transfer_write("out", vk::Format::eR32G32B32A32Sfloat, width, height, 1, true);
 }
 
 HDRImageRead::~HDRImageRead() {

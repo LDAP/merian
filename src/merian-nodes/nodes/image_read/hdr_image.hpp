@@ -1,6 +1,6 @@
 #pragma once
 
-#include "merian-nodes/connectors/vk_image_out.hpp"
+#include "merian-nodes/connectors/managed_vk_image_out.hpp"
 #include "merian-nodes/graph/node.hpp"
 
 #include <filesystem>
@@ -35,7 +35,7 @@ class HDRImageRead : public Node {
     const StagingMemoryManagerHandle staging;
     bool keep_on_host;
 
-    VkImageOutHandle con_out;
+    ManagedVkImageOutHandle con_out;
 
     // can be nullptr when image is unloaded.
     float* image{nullptr};

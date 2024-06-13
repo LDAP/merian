@@ -28,11 +28,11 @@ std::vector<InputConnectorHandle> MedianApproxNode::describe_inputs() {
 std::vector<OutputConnectorHandle>
 MedianApproxNode::describe_outputs([[maybe_unused]] const ConnectorIOMap& output_for_input) {
 
-    con_median = std::make_shared<VkBufferOut>(
+    con_median = std::make_shared<ManagedVkBufferOut>(
         "median", vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
         vk::PipelineStageFlagBits2::eComputeShader, vk::ShaderStageFlagBits::eCompute,
         vk::BufferCreateInfo({}, sizeof(float), vk::BufferUsageFlagBits::eStorageBuffer));
-    con_histogram = std::make_shared<VkBufferOut>(
+    con_histogram = std::make_shared<ManagedVkBufferOut>(
         "histogram", vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
         vk::PipelineStageFlagBits2::eComputeShader, vk::ShaderStageFlagBits::eCompute,
         vk::BufferCreateInfo({}, local_size_x * local_size_y * sizeof(uint32_t),

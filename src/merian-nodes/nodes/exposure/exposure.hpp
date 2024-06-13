@@ -1,8 +1,8 @@
 #pragma once
 
 #include "merian-nodes/graph/node.hpp"
-#include "merian-nodes/connectors/vk_image_in.hpp"
-#include "merian-nodes/connectors/vk_buffer_out.hpp"
+#include "merian-nodes/connectors/managed_vk_image_in.hpp"
+#include "merian-nodes/connectors/managed_vk_buffer_out.hpp"
 
 #include "merian/utils/stopwatch.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
@@ -61,11 +61,11 @@ class AutoExposure : public Node {
   private:
     const SharedContext context;
 
-    VkImageInHandle con_src = VkImageIn::compute_read("src");
+    ManagedVkImageInHandle con_src = ManagedVkImageIn::compute_read("src");
 
-    VkImageOutHandle con_out;
-    VkBufferOutHandle con_hist;
-    VkBufferOutHandle con_luminance;
+    ManagedVkImageOutHandle con_out;
+    ManagedVkBufferOutHandle con_hist;
+    ManagedVkBufferOutHandle con_luminance;
 
     PushConstant pc;
 

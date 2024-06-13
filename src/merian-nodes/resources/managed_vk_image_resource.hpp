@@ -4,12 +4,12 @@
 
 namespace merian_nodes {
 
-class VkImageResource : public GraphResource {
-    friend class VkImageIn;
-    friend class VkImageOut;
+class ManagedVkImageResource : public GraphResource {
+    friend class ManagedVkImageIn;
+    friend class ManagedVkImageOut;
 
   public:
-    VkImageResource(const ImageHandle& image,
+    ManagedVkImageResource(const ImageHandle& image,
                     const vk::PipelineStageFlags2& input_stage_flags,
                     const vk::AccessFlags2& input_access_flags)
         : image(image), input_stage_flags(input_stage_flags),
@@ -32,6 +32,6 @@ class VkImageResource : public GraphResource {
     const vk::AccessFlags2 input_access_flags;
 };
 
-using VkTextureResourceHandle = std::shared_ptr<VkImageResource>;
+using VkTextureResourceHandle = std::shared_ptr<ManagedVkImageResource>;
 
 } // namespace merian_nodes

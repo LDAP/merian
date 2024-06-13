@@ -1,6 +1,6 @@
 #pragma once
 
-#include "merian-nodes/connectors/vk_image_in.hpp"
+#include "merian-nodes/connectors/managed_vk_image_in.hpp"
 #include "merian-nodes/graph/node.hpp"
 
 #include "merian/vk/extension/extension_vk_glfw.hpp"
@@ -165,7 +165,7 @@ class GLFWWindow : public Node {
         on_blit_completed = []([[maybe_unused]] const vk::CommandBuffer& cmd,
                                [[maybe_unused]] SwapchainAcquireResult& acquire_result) {};
 
-    VkImageInHandle image_in = VkImageIn::transfer_src("src");
+    ManagedVkImageInHandle image_in = ManagedVkImageIn::transfer_src("src");
 
     std::array<int, 4> windowed_pos_size;
     bool vsync;

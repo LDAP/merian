@@ -1,12 +1,12 @@
-#include "vk_image_out.hpp"
+#include "managed_vk_image_out.hpp"
 
-#include "merian-nodes/connectors/vk_image_in.hpp"
+#include "merian-nodes/connectors/managed_vk_image_in.hpp"
 #include "merian-nodes/graph/errors.hpp"
 #include "merian-nodes/graph/node.hpp"
 
 namespace merian_nodes {
 
-VkImageOut::VkImageOut(const std::string& name,
+ManagedVkImageOut::ManagedVkImageOut(const std::string& name,
                        const vk::AccessFlags2& access_flags,
                        const vk::PipelineStageFlags2& pipeline_stages,
                        const vk::ImageLayout& required_layout,
@@ -17,7 +17,7 @@ VkImageOut::VkImageOut(const std::string& name,
       pipeline_stages(pipeline_stages), required_layout(required_layout), stage_flags(stage_flags),
       create_info(create_info), persistent(persistent) {}
 
-std::optional<vk::DescriptorSetLayoutBinding> VkImageOut::get_descriptor_info() const {
+std::optional<vk::DescriptorSetLayoutBinding> ManagedVkImageOut::get_descriptor_info() const {
     if (stage_flags) {
         return vk::DescriptorSetLayoutBinding{0, vk::DescriptorType::eStorageImage, 1, stage_flags,
                                               nullptr};
@@ -26,16 +26,16 @@ std::optional<vk::DescriptorSetLayoutBinding> VkImageOut::get_descriptor_info() 
     }
 }
 
-void VkImageOut::get_descriptor_update(const uint32_t binding,
+void ManagedVkImageOut::get_descriptor_update(const uint32_t binding,
                                        GraphResourceHandle& resource,
                                        DescriptorSetUpdate& update) {
     // or vk::ImageLayout::eGeneral instead of required?
-    assert(debugable_ptr_cast<VkImageResource>(resource)->tex && "missing usage flags?");
-    update.write_descriptor_texture(binding, *debugable_ptr_cast<VkImageResource>(resource)->tex, 0,
+    assert(debugable_ptr_cast<ManagedVkImageResource>(resource)->tex && "missing usage flags?");
+    update.write_descriptor_texture(binding, *debugable_ptr_cast<ManagedVkImageResource>(resource)->tex, 0,
                                     1, required_layout);
 }
 
-Connector::ConnectorStatusFlags VkImageOut::on_pre_process(
+Connector::ConnectorStatusFlags ManagedVkImageOut::on_pre_process(
     [[maybe_unused]] GraphRun& run,
     [[maybe_unused]] const vk::CommandBuffer& cmd,
     GraphResourceHandle& resource,
@@ -43,7 +43,7 @@ Connector::ConnectorStatusFlags VkImageOut::on_pre_process(
     std::vector<vk::ImageMemoryBarrier2>& image_barriers,
     [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {
     Connector::ConnectorStatusFlags flags{};
-    const auto& res = debugable_ptr_cast<VkImageResource>(resource);
+    const auto& res = debugable_ptr_cast<ManagedVkImageResource>(resource);
     if (res->needs_descriptor_update) {
         flags |= NEEDS_DESCRIPTOR_UPDATE;
         res->needs_descriptor_update = false;
@@ -61,19 +61,19 @@ Connector::ConnectorStatusFlags VkImageOut::on_pre_process(
     return flags;
 }
 
-Connector::ConnectorStatusFlags VkImageOut::on_post_process(
+Connector::ConnectorStatusFlags ManagedVkImageOut::on_post_process(
     [[maybe_unused]] GraphRun& run,
     [[maybe_unused]] const vk::CommandBuffer& cmd,
     GraphResourceHandle& resource,
     [[maybe_unused]] const NodeHandle& node,
     [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
     [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {
-    debugable_ptr_cast<VkImageResource>(resource)->last_used_as_output = true;
+    debugable_ptr_cast<ManagedVkImageResource>(resource)->last_used_as_output = true;
     return {};
 }
 
 GraphResourceHandle
-VkImageOut::create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
+ManagedVkImageOut::create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
                             [[maybe_unused]] const ResourceAllocatorHandle& allocator,
                             const ResourceAllocatorHandle& aliasing_allocator) {
     const ResourceAllocatorHandle alloc = persistent ? allocator : aliasing_allocator;
@@ -85,7 +85,7 @@ VkImageOut::create_resource(const std::vector<std::tuple<NodeHandle, InputConnec
     std::map<std::pair<NodeHandle, uint32_t>, vk::ImageLayout> layouts_per_node;
 
     for (auto& [input_node, input] : inputs) {
-        const auto& image_in = std::dynamic_pointer_cast<VkImageIn>(input);
+        const auto& image_in = std::dynamic_pointer_cast<ManagedVkImageIn>(input);
         if (!image_in) {
             throw graph_errors::connector_error{
                 fmt::format("VkImageOut {} cannot output to {}.", name, input->name)};
@@ -108,7 +108,7 @@ VkImageOut::create_resource(const std::vector<std::tuple<NodeHandle, InputConnec
     }
 
     const ImageHandle image = alloc->createImage(create_info, MemoryMappingType::NONE, name);
-    auto res = std::make_shared<VkImageResource>(image, input_pipeline_stages, input_access_flags);
+    auto res = std::make_shared<ManagedVkImageResource>(image, input_pipeline_stages, input_access_flags);
 
     if (image->valid_for_view()) {
         res->tex = allocator->createTexture(image, image->make_view_create_info(), name);
@@ -117,11 +117,11 @@ VkImageOut::create_resource(const std::vector<std::tuple<NodeHandle, InputConnec
     return res;
 }
 
-ImageHandle VkImageOut::resource(const GraphResourceHandle& resource) {
-    return debugable_ptr_cast<VkImageResource>(resource)->image;
+ImageHandle ManagedVkImageOut::resource(const GraphResourceHandle& resource) {
+    return debugable_ptr_cast<ManagedVkImageResource>(resource)->image;
 }
 
-std::shared_ptr<VkImageOut> VkImageOut::compute_write(const std::string& name,
+std::shared_ptr<ManagedVkImageOut> ManagedVkImageOut::compute_write(const std::string& name,
                                                       const vk::Format format,
                                                       const vk::Extent3D extent,
                                                       const bool persistent) {
@@ -141,12 +141,12 @@ std::shared_ptr<VkImageOut> VkImageOut::compute_write(const std::string& name,
         vk::ImageLayout::eUndefined,
     };
 
-    return std::make_shared<VkImageOut>(
+    return std::make_shared<ManagedVkImageOut>(
         name, vk::AccessFlagBits2::eShaderWrite, vk::PipelineStageFlagBits2::eComputeShader,
         vk::ImageLayout::eGeneral, vk::ShaderStageFlagBits::eCompute, create_info, persistent);
 }
 
-std::shared_ptr<VkImageOut> VkImageOut::compute_write(const std::string& name,
+std::shared_ptr<ManagedVkImageOut> ManagedVkImageOut::compute_write(const std::string& name,
                                                       const vk::Format format,
                                                       const uint32_t width,
                                                       const uint32_t height,
@@ -155,7 +155,7 @@ std::shared_ptr<VkImageOut> VkImageOut::compute_write(const std::string& name,
     return compute_write(name, format, {width, height, depth}, persistent);
 }
 
-std::shared_ptr<VkImageOut> VkImageOut::compute_read_write(const std::string& name,
+std::shared_ptr<ManagedVkImageOut> ManagedVkImageOut::compute_read_write(const std::string& name,
                                                            const vk::Format format,
                                                            const vk::Extent3D extent,
                                                            const bool persistent) {
@@ -175,13 +175,13 @@ std::shared_ptr<VkImageOut> VkImageOut::compute_read_write(const std::string& na
         vk::ImageLayout::eUndefined,
     };
 
-    return std::make_shared<VkImageOut>(
+    return std::make_shared<ManagedVkImageOut>(
         name, vk::AccessFlagBits2::eShaderWrite | vk::AccessFlagBits2::eShaderRead,
         vk::PipelineStageFlagBits2::eComputeShader, vk::ImageLayout::eGeneral,
         vk::ShaderStageFlagBits::eCompute, create_info, persistent);
 }
 
-std::shared_ptr<VkImageOut> VkImageOut::transfer_write(const std::string& name,
+std::shared_ptr<ManagedVkImageOut> ManagedVkImageOut::transfer_write(const std::string& name,
                                                        const vk::Format format,
                                                        const vk::Extent3D extent,
                                                        const bool persistent) {
@@ -201,12 +201,12 @@ std::shared_ptr<VkImageOut> VkImageOut::transfer_write(const std::string& name,
         vk::ImageLayout::eUndefined,
     };
 
-    return std::make_shared<VkImageOut>(
+    return std::make_shared<ManagedVkImageOut>(
         name, vk::AccessFlagBits2::eTransferWrite, vk::PipelineStageFlagBits2::eAllTransfer,
         vk::ImageLayout::eTransferDstOptimal, vk::ShaderStageFlags(), create_info, persistent);
 }
 
-std::shared_ptr<VkImageOut> VkImageOut::transfer_write(const std::string& name,
+std::shared_ptr<ManagedVkImageOut> ManagedVkImageOut::transfer_write(const std::string& name,
                                                        const vk::Format format,
                                                        const uint32_t width,
                                                        const uint32_t height,

@@ -55,7 +55,7 @@ std::vector<OutputConnectorHandle> SVGF::describe_outputs(const ConnectorIOMap& 
         irr_create_info.format = output_format.value();
 
     return {
-            VkImageOut::compute_write("out", irr_create_info.format, irr_create_info.extent),
+            ManagedVkImageOut::compute_write("out", irr_create_info.format, irr_create_info.extent),
     };
     // clang-format on
 }

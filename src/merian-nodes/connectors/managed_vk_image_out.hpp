@@ -1,18 +1,18 @@
 #pragma once
 
 #include "merian-nodes/graph/connector_output.hpp"
-#include "merian-nodes/resources/vk_image_resource.hpp"
+#include "merian-nodes/resources/managed_vk_image_resource.hpp"
 
 namespace merian_nodes {
 
-class VkImageOut;
-using VkImageOutHandle = std::shared_ptr<VkImageOut>;
+class ManagedVkImageOut;
+using ManagedVkImageOutHandle = std::shared_ptr<ManagedVkImageOut>;
 
 // Output a Vulkan image that is allocated and managed by the graph.
 // Note that it only supplies a descriptor if stage_flags contains at least one bit.
-class VkImageOut : public TypedOutputConnector<ImageHandle> {
+class ManagedVkImageOut : public TypedOutputConnector<ImageHandle> {
   public:
-    VkImageOut(const std::string& name,
+    ManagedVkImageOut(const std::string& name,
                const vk::AccessFlags2& access_flags,
                const vk::PipelineStageFlags2& pipeline_stages,
                const vk::ImageLayout& required_layout,
@@ -50,29 +50,29 @@ class VkImageOut : public TypedOutputConnector<ImageHandle> {
     virtual ImageHandle resource(const GraphResourceHandle& resource) override;
 
   public:
-    static VkImageOutHandle compute_write(const std::string& name,
+    static ManagedVkImageOutHandle compute_write(const std::string& name,
                                           const vk::Format format,
                                           const vk::Extent3D extent,
                                           const bool persistent = false);
 
-    static VkImageOutHandle compute_write(const std::string& name,
+    static ManagedVkImageOutHandle compute_write(const std::string& name,
                                           const vk::Format format,
                                           const uint32_t width,
                                           const uint32_t height,
                                           const uint32_t depth = 1,
                                           const bool persistent = false);
 
-    static VkImageOutHandle compute_read_write(const std::string& name,
+    static ManagedVkImageOutHandle compute_read_write(const std::string& name,
                                                const vk::Format format,
                                                const vk::Extent3D extent,
                                                const bool persistent = false);
 
-    static VkImageOutHandle transfer_write(const std::string& name,
+    static ManagedVkImageOutHandle transfer_write(const std::string& name,
                                            const vk::Format format,
                                            const vk::Extent3D extent,
                                            const bool persistent = false);
 
-    static VkImageOutHandle transfer_write(const std::string& name,
+    static ManagedVkImageOutHandle transfer_write(const std::string& name,
                                            const vk::Format format,
                                            const uint32_t width,
                                            const uint32_t height,

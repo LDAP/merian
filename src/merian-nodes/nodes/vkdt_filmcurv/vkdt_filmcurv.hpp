@@ -1,7 +1,7 @@
 #pragma once
 
 #include "merian-nodes/nodes/compute_node/compute_node.hpp"
-#include "merian-nodes/connectors/vk_image_in.hpp"
+#include "merian-nodes/connectors/managed_vk_image_in.hpp"
 
 namespace merian_nodes {
 
@@ -42,7 +42,7 @@ class VKDTFilmcurv : public AbstractCompute {
   private:
     const std::optional<vk::Format> output_format;
 
-    VkImageInHandle con_src = VkImageIn::compute_read("src");
+    ManagedVkImageInHandle con_src = ManagedVkImageIn::compute_read("src");
     vk::Extent3D extent;
 
     ShaderModuleHandle shader;

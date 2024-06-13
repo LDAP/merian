@@ -1,7 +1,7 @@
 #pragma once
 
 #include "merian-nodes/graph/node.hpp"
-#include "merian-nodes/connectors/vk_image_out.hpp"
+#include "merian-nodes/connectors/managed_vk_image_out.hpp"
 
 #include <filesystem>
 
@@ -36,7 +36,7 @@ class LDRImageRead : public Node {
     const StagingMemoryManagerHandle staging;
     bool keep_on_host;
 
-    VkImageOutHandle con_out;
+    ManagedVkImageOutHandle con_out;
 
     vk::Format format;
     // can be nullptr when image is unloaded.

@@ -1,6 +1,6 @@
 #include "shadertoy.hpp"
 
-#include "merian-nodes/connectors/vk_image_out.hpp"
+#include "merian-nodes/connectors/managed_vk_image_out.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 
 namespace merian_nodes {
@@ -82,7 +82,7 @@ Shadertoy::Shadertoy(const SharedContext context,
 std::vector<OutputConnectorHandle>
 Shadertoy::describe_outputs([[maybe_unused]] const ConnectorIOMap& output_for_input) {
     constant.iResolution = {extent.width, extent.height};
-    return {VkImageOut::compute_write("out", vk::Format::eR8G8B8A8Unorm, extent)};
+    return {ManagedVkImageOut::compute_write("out", vk::Format::eR8G8B8A8Unorm, extent)};
 }
 
 AbstractCompute::NodeStatusFlags Shadertoy::pre_process([[maybe_unused]] GraphRun& run,

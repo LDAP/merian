@@ -31,7 +31,7 @@ MeanToBuffer::describe_outputs(const ConnectorIOMap& output_for_input) {
     const auto group_count_y = (extent.height + local_size_y - 1) / local_size_y;
     const std::size_t buffer_size = group_count_x * group_count_y;
 
-    con_mean = std::make_shared<VkBufferOut>(
+    con_mean = std::make_shared<ManagedVkBufferOut>(
         "mean", vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
         vk::PipelineStageFlagBits2::eComputeShader, vk::ShaderStageFlagBits::eCompute,
         vk::BufferCreateInfo({}, buffer_size * sizeof(glm::vec4),

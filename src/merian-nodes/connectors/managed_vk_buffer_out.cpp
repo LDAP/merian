@@ -1,14 +1,14 @@
-#include "vk_buffer_out.hpp"
+#include "managed_vk_buffer_out.hpp"
 
-#include "merian-nodes/connectors/vk_buffer_in.hpp"
+#include "merian-nodes/connectors/managed_vk_buffer_in.hpp"
 #include "merian-nodes/graph/errors.hpp"
-#include "merian-nodes/resources/vk_buffer_resource.hpp"
+#include "merian-nodes/resources/managed_vk_buffer_resource.hpp"
 
 #include "merian/utils/pointer.hpp"
 
 namespace merian_nodes {
 
-VkBufferOut::VkBufferOut(const std::string& name,
+ManagedVkBufferOut::ManagedVkBufferOut(const std::string& name,
                          const vk::AccessFlags2& access_flags,
                          const vk::PipelineStageFlags2& pipeline_stages,
                          const vk::ShaderStageFlags& stage_flags,
@@ -18,7 +18,7 @@ VkBufferOut::VkBufferOut(const std::string& name,
       pipeline_stages(pipeline_stages), stage_flags(stage_flags), create_info(create_info),
       persistent(persistent) {}
 
-std::optional<vk::DescriptorSetLayoutBinding> VkBufferOut::get_descriptor_info() const {
+std::optional<vk::DescriptorSetLayoutBinding> ManagedVkBufferOut::get_descriptor_info() const {
     if (stage_flags) {
         return vk::DescriptorSetLayoutBinding{
             0, vk::DescriptorType::eStorageBuffer, 1, stage_flags, nullptr,
@@ -28,20 +28,20 @@ std::optional<vk::DescriptorSetLayoutBinding> VkBufferOut::get_descriptor_info()
     }
 }
 
-void VkBufferOut::get_descriptor_update(const uint32_t binding,
+void ManagedVkBufferOut::get_descriptor_update(const uint32_t binding,
                                         GraphResourceHandle& resource,
                                         DescriptorSetUpdate& update) {
-    update.write_descriptor_buffer(binding, debugable_ptr_cast<VkBufferResource>(resource)->buffer);
+    update.write_descriptor_buffer(binding, debugable_ptr_cast<ManagedVkBufferResource>(resource)->buffer);
 }
 
 Connector::ConnectorStatusFlags
-VkBufferOut::on_pre_process([[maybe_unused]] GraphRun& run,
+ManagedVkBufferOut::on_pre_process([[maybe_unused]] GraphRun& run,
                             [[maybe_unused]] const vk::CommandBuffer& cmd,
                             GraphResourceHandle& resource,
                             [[maybe_unused]] const NodeHandle& node,
                             [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
                             std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {
-    const auto& res = debugable_ptr_cast<VkBufferResource>(resource);
+    const auto& res = debugable_ptr_cast<ManagedVkBufferResource>(resource);
 
     vk::BufferMemoryBarrier2 buffer_bar{
         res->input_stage_flags,  res->input_access_flags, pipeline_stages, access_flags,
@@ -60,13 +60,13 @@ VkBufferOut::on_pre_process([[maybe_unused]] GraphRun& run,
 }
 
 Connector::ConnectorStatusFlags
-VkBufferOut::on_post_process([[maybe_unused]] GraphRun& run,
+ManagedVkBufferOut::on_post_process([[maybe_unused]] GraphRun& run,
                              [[maybe_unused]] const vk::CommandBuffer& cmd,
                              GraphResourceHandle& resource,
                              [[maybe_unused]] const NodeHandle& node,
                              [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
                              std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {
-    const auto& res = debugable_ptr_cast<VkBufferResource>(resource);
+    const auto& res = debugable_ptr_cast<ManagedVkBufferResource>(resource);
 
     vk::BufferMemoryBarrier2 buffer_bar{
         pipeline_stages,
@@ -84,7 +84,7 @@ VkBufferOut::on_post_process([[maybe_unused]] GraphRun& run,
     return {};
 }
 
-GraphResourceHandle VkBufferOut::create_resource(
+GraphResourceHandle ManagedVkBufferOut::create_resource(
     const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
     const ResourceAllocatorHandle& allocator,
     const ResourceAllocatorHandle& aliasing_allocator) {
@@ -93,7 +93,7 @@ GraphResourceHandle VkBufferOut::create_resource(
     vk::AccessFlags2 input_access_flags;
 
     for (auto& [input_node, input] : inputs) {
-        const auto& buffer_in = std::dynamic_pointer_cast<VkBufferIn>(input);
+        const auto& buffer_in = std::dynamic_pointer_cast<ManagedVkBufferIn>(input);
         if (!buffer_in) {
             throw graph_errors::connector_error{
                 fmt::format("VkImageOut {} cannot output to {}.", name, input->name)};
@@ -106,26 +106,26 @@ GraphResourceHandle VkBufferOut::create_resource(
     ResourceAllocatorHandle alloc = persistent ? allocator : aliasing_allocator;
     const BufferHandle buffer = alloc->createBuffer(create_info, MemoryMappingType::NONE, name);
 
-    return std::make_shared<VkBufferResource>(buffer, input_pipeline_stages, input_access_flags);
+    return std::make_shared<ManagedVkBufferResource>(buffer, input_pipeline_stages, input_access_flags);
 }
 
-BufferHandle VkBufferOut::resource(const GraphResourceHandle& resource) {
-    return debugable_ptr_cast<VkBufferResource>(resource)->buffer;
+BufferHandle ManagedVkBufferOut::resource(const GraphResourceHandle& resource) {
+    return debugable_ptr_cast<ManagedVkBufferResource>(resource)->buffer;
 }
 
-std::shared_ptr<VkBufferOut> VkBufferOut::compute_write(const std::string& name,
+std::shared_ptr<ManagedVkBufferOut> ManagedVkBufferOut::compute_write(const std::string& name,
                                                         const vk::BufferCreateInfo& create_info,
                                                         const bool persistent) {
-    return std::make_shared<VkBufferOut>(
+    return std::make_shared<ManagedVkBufferOut>(
         name, vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
         vk::PipelineStageFlagBits2::eComputeShader, vk::ShaderStageFlagBits::eCompute, create_info,
         persistent);
 }
 
-std::shared_ptr<VkBufferOut> VkBufferOut::transfer_write(const std::string& name,
+std::shared_ptr<ManagedVkBufferOut> ManagedVkBufferOut::transfer_write(const std::string& name,
                                                          const vk::BufferCreateInfo& create_info,
                                                          const bool persistent) {
-    return std::make_shared<VkBufferOut>(name, vk::AccessFlagBits2::eTransferWrite,
+    return std::make_shared<ManagedVkBufferOut>(name, vk::AccessFlagBits2::eTransferWrite,
                                          vk::PipelineStageFlagBits2::eAllTransfer,
                                          vk::ShaderStageFlags(), create_info, persistent);
 }

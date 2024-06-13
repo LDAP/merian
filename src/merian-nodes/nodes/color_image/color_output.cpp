@@ -8,7 +8,7 @@ ColorImage::ColorImage(const vk::Format format,
                                  const vk::Extent3D extent,
                                  const vk::ClearColorValue color)
     : Node("Color Output"), color(color) {
-    con_out = VkImageOut::transfer_write("out", format, extent, true);
+    con_out = ManagedVkImageOut::transfer_write("out", format, extent, true);
 }
 
 ColorImage::~ColorImage() {}

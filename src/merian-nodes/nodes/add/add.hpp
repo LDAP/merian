@@ -1,6 +1,6 @@
 #pragma once
 
-#include "merian-nodes/connectors/vk_image_in.hpp"
+#include "merian-nodes/connectors/managed_vk_image_in.hpp"
 #include "merian-nodes/nodes/compute_node/compute_node.hpp"
 
 namespace merian_nodes {
@@ -36,8 +36,8 @@ class Add : public AbstractCompute {
     ShaderModuleHandle shader;
     SpecializationInfoHandle spec_info;
 
-    VkImageInHandle con_a = VkImageIn::compute_read("a");
-    VkImageInHandle con_b = VkImageIn::compute_read("b");
+    ManagedVkImageInHandle con_a = ManagedVkImageIn::compute_read("a");
+    ManagedVkImageInHandle con_b = ManagedVkImageIn::compute_read("b");
 };
 
 } // namespace merian_nodes

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "merian-nodes/connectors/vk_image_in.hpp"
+#include "merian-nodes/connectors/managed_vk_image_in.hpp"
 #include "merian-nodes/graph/node.hpp"
 
 #include "merian/vk/pipeline/pipeline.hpp"
@@ -40,9 +40,9 @@ class Bloom : public Node {
   private:
     const SharedContext context;
 
-    VkImageInHandle con_src = VkImageIn::compute_read("src");
-    VkImageOutHandle con_out;
-    VkImageOutHandle con_interm;
+    ManagedVkImageInHandle con_src = ManagedVkImageIn::compute_read("src");
+    ManagedVkImageOutHandle con_out;
+    ManagedVkImageOutHandle con_interm;
 
     PushConstant pc;
 

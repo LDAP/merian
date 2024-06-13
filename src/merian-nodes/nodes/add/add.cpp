@@ -30,7 +30,7 @@ Add::describe_outputs(const ConnectorIOMap& output_for_input) {
     vk::Format format = output_format.value_or(output_for_input[con_a]->create_info.format);
 
     return {
-        VkImageOut::compute_write("out", format, extent),
+        ManagedVkImageOut::compute_write("out", format, extent),
     };
 }
 

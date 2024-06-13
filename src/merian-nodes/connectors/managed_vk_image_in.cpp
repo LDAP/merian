@@ -1,10 +1,10 @@
-#include "vk_image_in.hpp"
+#include "managed_vk_image_in.hpp"
 #include "merian-nodes/graph/node.hpp"
-#include "merian-nodes/resources/vk_image_resource.hpp"
+#include "merian-nodes/resources/managed_vk_image_resource.hpp"
 
 namespace merian_nodes {
 
-VkImageIn::VkImageIn(const std::string& name,
+ManagedVkImageIn::ManagedVkImageIn(const std::string& name,
                      const vk::AccessFlags2 access_flags,
                      const vk::PipelineStageFlags2 pipeline_stages,
                      const vk::ImageLayout required_layout,
@@ -15,7 +15,7 @@ VkImageIn::VkImageIn(const std::string& name,
       pipeline_stages(pipeline_stages), required_layout(required_layout), usage_flags(usage_flags),
       stage_flags(stage_flags) {}
 
-std::optional<vk::DescriptorSetLayoutBinding> VkImageIn::get_descriptor_info() const {
+std::optional<vk::DescriptorSetLayoutBinding> ManagedVkImageIn::get_descriptor_info() const {
     if (stage_flags) {
         return vk::DescriptorSetLayoutBinding{0, vk::DescriptorType::eCombinedImageSampler, 1,
                                               stage_flags, nullptr};
@@ -24,23 +24,23 @@ std::optional<vk::DescriptorSetLayoutBinding> VkImageIn::get_descriptor_info() c
     }
 }
 
-void VkImageIn::get_descriptor_update(const uint32_t binding,
+void ManagedVkImageIn::get_descriptor_update(const uint32_t binding,
                                       GraphResourceHandle& resource,
                                       DescriptorSetUpdate& update) {
     // // or vk::ImageLayout::eShaderReadOnlyOptimal instead of required?
-    assert(debugable_ptr_cast<VkImageResource>(resource)->tex && "missing usage flags?");
-    update.write_descriptor_texture(binding, *debugable_ptr_cast<VkImageResource>(resource)->tex, 0,
+    assert(debugable_ptr_cast<ManagedVkImageResource>(resource)->tex && "missing usage flags?");
+    update.write_descriptor_texture(binding, *debugable_ptr_cast<ManagedVkImageResource>(resource)->tex, 0,
                                     1, required_layout);
 }
 
 Connector::ConnectorStatusFlags
-VkImageIn::on_pre_process([[maybe_unused]] GraphRun& run,
+ManagedVkImageIn::on_pre_process([[maybe_unused]] GraphRun& run,
                           [[maybe_unused]] const vk::CommandBuffer& cmd,
                           GraphResourceHandle& resource,
                           [[maybe_unused]] const NodeHandle& node,
                           std::vector<vk::ImageMemoryBarrier2>& image_barriers,
                           [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {
-    auto res = debugable_ptr_cast<VkImageResource>(resource);
+    auto res = debugable_ptr_cast<ManagedVkImageResource>(resource);
 
     if (res->last_used_as_output) {
         vk::ImageMemoryBarrier2 img_bar = res->image->barrier2(
@@ -69,19 +69,19 @@ VkImageIn::on_pre_process([[maybe_unused]] GraphRun& run,
     return flags;
 }
 
-ImageHandle VkImageIn::resource(const GraphResourceHandle& resource) {
-    return debugable_ptr_cast<VkImageResource>(resource)->image;
+ImageHandle ManagedVkImageIn::resource(const GraphResourceHandle& resource) {
+    return debugable_ptr_cast<ManagedVkImageResource>(resource)->image;
 }
 
-std::shared_ptr<VkImageIn> VkImageIn::compute_read(const std::string& name, const uint32_t delay) {
-    return std::make_shared<VkImageIn>(
+std::shared_ptr<ManagedVkImageIn> ManagedVkImageIn::compute_read(const std::string& name, const uint32_t delay) {
+    return std::make_shared<ManagedVkImageIn>(
         name, vk::AccessFlagBits2::eShaderRead, vk::PipelineStageFlagBits2::eComputeShader,
         vk::ImageLayout::eShaderReadOnlyOptimal, vk::ImageUsageFlagBits::eSampled,
         vk::ShaderStageFlagBits::eCompute, delay);
 }
 
-std::shared_ptr<VkImageIn> VkImageIn::transfer_src(const std::string& name, const uint32_t delay) {
-    return std::make_shared<VkImageIn>(
+std::shared_ptr<ManagedVkImageIn> ManagedVkImageIn::transfer_src(const std::string& name, const uint32_t delay) {
+    return std::make_shared<ManagedVkImageIn>(
         name, vk::AccessFlagBits2::eTransferRead, vk::PipelineStageFlagBits2::eAllTransfer,
         vk::ImageLayout::eTransferSrcOptimal, vk::ImageUsageFlagBits::eTransferSrc,
         vk::ShaderStageFlags(), delay);

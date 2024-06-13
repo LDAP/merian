@@ -27,7 +27,7 @@ LDRImageRead::~LDRImageRead() {
 
 std::vector<OutputConnectorHandle>
 LDRImageRead::describe_outputs([[maybe_unused]] const ConnectorIOMap& output_for_input) {
-    con_out = VkImageOut::transfer_write("out", format, width, height, 1, true);
+    con_out = ManagedVkImageOut::transfer_write("out", format, width, height, 1, true);
 
     needs_run = true;
     return {con_out};

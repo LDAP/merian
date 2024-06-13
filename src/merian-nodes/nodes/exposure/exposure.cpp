@@ -38,8 +38,8 @@ AutoExposure::describe_outputs(const ConnectorIOMap& output_for_input) {
     const vk::Format format = output_for_input[con_src]->create_info.format;
     const vk::Extent3D extent = output_for_input[con_src]->create_info.extent;
 
-    con_out = VkImageOut::compute_write("out", format, extent);
-    con_hist = std::make_shared<VkBufferOut>(
+    con_out = ManagedVkImageOut::compute_write("out", format, extent);
+    con_hist = std::make_shared<ManagedVkBufferOut>(
         "histogram",
         vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite |
             vk::AccessFlagBits2::eTransferWrite,
@@ -48,7 +48,7 @@ AutoExposure::describe_outputs(const ConnectorIOMap& output_for_input) {
         vk::BufferCreateInfo({}, local_size_x * local_size_y * sizeof(uint32_t) + sizeof(uint32_t),
                              vk::BufferUsageFlagBits::eStorageBuffer |
                                  vk::BufferUsageFlagBits::eTransferDst));
-    con_luminance = std::make_shared<VkBufferOut>(
+    con_luminance = std::make_shared<ManagedVkBufferOut>(
         "avg_luminance", vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
         vk::PipelineStageFlagBits2::eComputeShader, vk::ShaderStageFlagBits::eCompute,
         vk::BufferCreateInfo({}, sizeof(float), vk::BufferUsageFlagBits::eStorageBuffer), true);
