@@ -56,7 +56,7 @@ glm = dependency('glm', fallback : ['glm', 'glm_dep'], version: ['>=0.9.9.8'])
 tol_subp = cmake.subproject('tinyobjloader')
 tol = tol_subp.dependency('tinyobjloader')
 tgltf = dependency('tinygltf', required: get_option('tinygltf'), fallback: ['tinygltf', 'tinygltf_dep'])
-sdl2 = dependency('sdl2', fallback : ['sdl2', 'sdl2_dep'])
+sdl2 = dependency('sdl2', fallback : ['sdl2', 'SDL2_static_dep'])
 shaderc = dependency('shaderc', version: ['>=2023.8.1'], required: get_option('shaderc'))
 
 if shaderc.found()
