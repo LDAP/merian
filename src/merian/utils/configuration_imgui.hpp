@@ -21,7 +21,8 @@ class ImGuiConfiguration : public Configuration {
 
     virtual void output_text(const std::string& text) override;
     virtual void output_plot_line(const std::string& label,
-                                  const std::vector<float>& samples,
+                                  const float* samples,
+                                  const uint32_t count,
                                   const float scale_min,
                                   const float scale_max) override;
 

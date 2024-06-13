@@ -37,10 +37,12 @@ void ImGuiConfiguration::output_text(const std::string& text) {
     ImGui::TextWrapped("%s", text.c_str());
 }
 void ImGuiConfiguration::output_plot_line(const std::string& label,
-                                          const std::vector<float>& samples,
+                                          const float* samples,
+                                          const uint32_t count,
                                           const float scale_min,
                                           const float scale_max) {
-    ImGui::PlotLines(label.c_str(), samples.data(), samples.size(), 0, NULL, scale_min, scale_max);
+    ImGui::PlotLines(label.c_str(), samples, count, 0, NULL, scale_min, scale_max,
+                     {0, ImGui::GetFontSize() * 5});
 }
 
 void ImGuiConfiguration::config_color(const std::string& id,

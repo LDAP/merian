@@ -427,7 +427,21 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
         if (profiler_enable) {
             if (last_run_report && config.st_begin_child("run", "Graph Run")) {
-                Profiler::get_report_as_config(config, last_run_report);
+                if (!last_run_report.cpu_report.empty()) {
+                    config.st_separate("CPU");
+                    config.output_plot_line("", cpu_time_history.data() + time_history_current + 1,
+                                            (cpu_time_history.size() / 2) - 1, 0, cpu_max);
+                    config.config_float("cpu max ms", cpu_max, 0, 1000);
+                    Profiler::get_cpu_report_as_config(config, last_run_report);
+                }
+
+                if (!last_run_report.gpu_report.empty()) {
+                    config.st_separate("GPU");
+                    config.output_plot_line("", gpu_time_history.data() + time_history_current + 1,
+                                            (gpu_time_history.size() / 2) - 1, 0, gpu_max);
+                    config.config_float("gpu max ms", gpu_max, 0, 1000);
+                    Profiler::get_gpu_report_as_config(config, last_run_report);
+                }
                 config.st_end_child();
             }
             if (last_build_report && config.st_begin_child("build", "Last Graph Build")) {
@@ -506,10 +520,26 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             return nullptr;
         }
 
-        last_run_report = run_profiler
-                              ->set_collect_get_every(in_flight_data.profiler_query_pool,
-                                                      profiler_report_intervall_ms)
-                              .value_or(last_run_report);
+        auto report = run_profiler->set_collect_get_every(in_flight_data.profiler_query_pool,
+                                                          profiler_report_intervall_ms);
+
+        if (report) {
+            last_run_report = std::move(*report);
+
+            const float cpu_sum = std::transform_reduce(
+                last_run_report.cpu_report.begin(), last_run_report.cpu_report.end(), 0,
+                std::plus<>(), [](auto& report) { return report.duration; });
+            const float gpu_sum = std::transform_reduce(
+                last_run_report.gpu_report.begin(), last_run_report.gpu_report.end(), 0,
+                std::plus<>(), [](auto& report) { return report.duration; });
+
+            const uint32_t half_size = cpu_time_history.size() / 2;
+            cpu_time_history[time_history_current] =
+                cpu_time_history[time_history_current + half_size] = cpu_sum;
+            gpu_time_history[time_history_current] =
+                gpu_time_history[time_history_current + half_size] = gpu_sum;
+            time_history_current = (time_history_current + 1) % half_size;
+        }
 
         return run_profiler;
     }
@@ -1011,10 +1041,16 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
     bool needs_reconnect = false;
     uint64_t iteration = 0;
     bool profiler_enable = true;
-    uint32_t profiler_report_intervall_ms = 100;
+    uint32_t profiler_report_intervall_ms = 50;
 
     Profiler::Report last_build_report;
     Profiler::Report last_run_report;
+    // in ms
+    std::array<float, 256> cpu_time_history;
+    std::array<float, 256> gpu_time_history;
+    float cpu_max = 20, gpu_max = 20;
+    // Always write at cpu_time_history_current and cpu_time_history_current + (size >> 1)
+    uint32_t time_history_current = 0;
     merian::ProfilerHandle run_profiler;
 
     // Nodes

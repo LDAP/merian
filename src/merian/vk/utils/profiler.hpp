@@ -1,8 +1,8 @@
 #pragma once
 
+#include "merian/utils/configuration.hpp"
 #include "merian/utils/stopwatch.hpp"
 #include "merian/vk/utils/query_pool.hpp"
-#include "merian/utils/configuration.hpp"
 
 #include <optional>
 
@@ -133,7 +133,8 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
     // when resetting. Meaning, means and std deviation were calculated over the report intervall.
     //
     // Note: The profiler is only reset when the GPU results are actually ready, however, that means
-    // that the may be already multiple results for the CPU (noticeable when report_intervall_millis == 0).
+    // that the may be already multiple results for the CPU (noticeable when report_intervall_millis
+    // == 0).
     std::optional<Report>
     set_collect_get_every(const QueryPoolHandle<vk::QueryType::eTimestamp>& query_pool,
                           const uint32_t report_intervall_millis = 0);
@@ -141,7 +142,11 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
     // returns the report as string
     static std::string get_report_str(const Profiler::Report& report);
 
-    // renders the report to imgui
+    // outputs the report as config
+    static void get_cpu_report_as_config(Configuration& config, const Profiler::Report& report);
+    static void get_gpu_report_as_config(Configuration& config, const Profiler::Report& report);
+
+    // outputs the report as config
     static void get_report_as_config(Configuration& config, const Profiler::Report& report);
 
   private:

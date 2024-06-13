@@ -60,10 +60,8 @@ void JSONDumpConfiguration::st_separate(const std::string&) {}
 void JSONDumpConfiguration::st_no_space() {}
 
 void JSONDumpConfiguration::output_text(const std::string&) {}
-void JSONDumpConfiguration::output_plot_line(const std::string&,
-                                             const std::vector<float>&,
-                                             const float,
-                                             const float) {}
+void JSONDumpConfiguration::output_plot_line(
+    const std::string&, const float*, const uint32_t, const float, const float) {}
 
 void JSONDumpConfiguration::config_color(const std::string& id,
                                          glm::vec3& color,

@@ -66,10 +66,8 @@ void JSONLoadConfiguration::st_separate(const std::string&) {}
 void JSONLoadConfiguration::st_no_space() {}
 
 void JSONLoadConfiguration::output_text(const std::string&) {}
-void JSONLoadConfiguration::output_plot_line(const std::string&,
-                                             const std::vector<float>&,
-                                             const float,
-                                             const float) {}
+void JSONLoadConfiguration::output_plot_line(
+    const std::string&, const float*, const uint32_t, const float, const float) {}
 
 void JSONLoadConfiguration::config_color(const std::string& id,
                                          glm::vec3& color,

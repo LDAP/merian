@@ -235,15 +235,24 @@ void to_config(Configuration& config,
     }
 }
 
+void Profiler::get_cpu_report_as_config(Configuration& config, const Profiler::Report& report) {
+    to_config(config, report.cpu_report);
+}
+
+void Profiler::get_gpu_report_as_config(Configuration& config, const Profiler::Report& report) {
+    to_config(config, report.gpu_report, 1u << 31);
+}
+
+
 void Profiler::get_report_as_config(Configuration& config, const Profiler::Report& report) {
     if (!report.cpu_report.empty()) {
         config.st_separate("CPU");
-        to_config(config, report.cpu_report);
+        get_cpu_report_as_config(config, report);
     }
 
     if (!report.gpu_report.empty()) {
         config.st_separate("GPU");
-        to_config(config, report.gpu_report, 1u << 31);
+        get_gpu_report_as_config(config, report);
     }
 }
 
