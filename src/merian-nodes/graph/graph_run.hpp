@@ -15,7 +15,7 @@ class GraphRun {
     template <uint32_t> friend class Graph;
 
   public:
-    GraphRun() {}
+    GraphRun(const uint32_t ring_size) : ring_size(ring_size) {}
 
     void add_wait_semaphore(const BinarySemaphoreHandle& wait_semaphore,
                             const vk::PipelineStageFlags& wait_stage_flags) noexcept {
@@ -54,6 +54,17 @@ class GraphRun {
     // increases with each run, resets at rebuild
     const uint64_t& get_iteration() const noexcept {
         return iteration;
+    }
+
+    // returns the current in-flight index i, with 0 <= i < get_ring_size().
+    // It is guaranteed that processing of the last iteration with that index has finished.
+    const uint32_t& get_in_flight_index() const noexcept {
+        return in_flight_index;
+    }
+
+    // returns the number of iterations that might be in flight at a certain time.
+    const uint32_t& get_ring_size() const noexcept {
+        return ring_size;
     }
 
     // Add this to the submit call for the graph command buffer
@@ -98,8 +109,10 @@ class GraphRun {
     }
 
   private:
-    void reset(const uint64_t iteration, const ProfilerHandle profiler) {
+    void
+    reset(const uint64_t iteration, const uint32_t in_flight_index, const ProfilerHandle profiler) {
         this->iteration = iteration;
+        this->in_flight_index = in_flight_index;
         wait_semaphores.clear();
         wait_stages.clear();
         wait_values.clear();
@@ -112,6 +125,8 @@ class GraphRun {
     }
 
   private:
+    const uint32_t ring_size;
+
     std::vector<vk::Semaphore> wait_semaphores;
     std::vector<uint64_t> wait_values;
     std::vector<vk::PipelineStageFlags> wait_stages;
@@ -123,6 +138,7 @@ class GraphRun {
     ProfilerHandle profiler = nullptr;
     bool needs_reconnect = false;
     uint64_t iteration;
+    uint32_t in_flight_index;
 };
 
 } // namespace merian_nodes

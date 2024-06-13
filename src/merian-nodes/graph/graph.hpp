@@ -35,26 +35,6 @@ struct NodeConnection {
     };
 };
 
-// Data that is stored for every iteration in flight.
-// Created for each iteration in flight in Graph::Graph.
-struct InFlightData {
-    // The command pool for the current iteration.
-    // We do not use RingCommandPool here since we might want to add a more custom
-    // setup later (multi-threaded, multi-queues,...).
-    std::shared_ptr<CommandPool> command_pool;
-    // Staging set, to release staging buffers and images when the copy
-    // to device local memory has finished.
-    merian::StagingMemoryManager::SetID staging_set_id{};
-    // The graph run, holds semaphores and such.
-    GraphRun graph_run;
-    // Query pools for the profiler
-    QueryPoolHandle<vk::QueryType::eTimestamp> profiler_query_pool;
-    // Tasks that should be run in the current iteration after acquiring the fence.
-    std::vector<std::function<void()>> tasks;
-    // For each node: optional in-flight data.
-    std::unordered_map<NodeHandle, std::any> in_flight_data{};
-};
-
 // Data that is stored for every node that is present in the graph.
 struct NodeData {
     static const uint32_t NO_DESCRIPTOR_BINDING = -1u;
@@ -146,6 +126,26 @@ using namespace graph_internal;
  */
 template <uint32_t RING_SIZE = 2>
 class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
+    // Data that is stored for every iteration in flight.
+    // Created for each iteration in flight in Graph::Graph.
+    struct InFlightData {
+        // The command pool for the current iteration.
+        // We do not use RingCommandPool here since we might want to add a more custom
+        // setup later (multi-threaded, multi-queues,...).
+        std::shared_ptr<CommandPool> command_pool;
+        // Staging set, to release staging buffers and images when the copy
+        // to device local memory has finished.
+        merian::StagingMemoryManager::SetID staging_set_id{};
+        // The graph run, holds semaphores and such.
+        GraphRun graph_run{RING_SIZE};
+        // Query pools for the profiler
+        QueryPoolHandle<vk::QueryType::eTimestamp> profiler_query_pool;
+        // Tasks that should be run in the current iteration after acquiring the fence.
+        std::vector<std::function<void()>> tasks;
+        // For each node: optional in-flight data.
+        std::unordered_map<NodeHandle, std::any> in_flight_data{};
+    };
+
   public:
     Graph(const SharedContext& context, const ResourceAllocatorHandle& resource_allocator)
         : context(context), resource_allocator(resource_allocator), queue(context->get_queue_GCT()),
@@ -353,7 +353,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 connect();
             }
 
-            run.reset(iteration, profiler);
+            run.reset(iteration, iteration % RING_SIZE, profiler);
 
             // While preprocessing nodes can signalize that they need to reconnect as well
             {
