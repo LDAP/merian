@@ -11,6 +11,13 @@ static vk::PipelineStageFlags all_shaders =
     vk::PipelineStageFlagBits::eGeometryShader | vk::PipelineStageFlagBits::eFragmentShader |
     vk::PipelineStageFlagBits::eComputeShader;
 
+static vk::PipelineStageFlags2 all_shaders2 =
+    vk::PipelineStageFlagBits2::eVertexShader |
+    vk::PipelineStageFlagBits2::eTessellationControlShader |
+    vk::PipelineStageFlagBits2::eTessellationEvaluationShader |
+    vk::PipelineStageFlagBits2::eGeometryShader | vk::PipelineStageFlagBits2::eFragmentShader |
+    vk::PipelineStageFlagBits2::eComputeShader;
+
 // Heuristic to infer access flags from image layout
 inline vk::AccessFlags access_flags_for_image_layout(const vk::ImageLayout& layout) {
     switch (layout) {
@@ -27,7 +34,27 @@ inline vk::AccessFlags access_flags_for_image_layout(const vk::ImageLayout& layo
     case vk::ImageLayout::eShaderReadOnlyOptimal:
         return vk::AccessFlagBits::eShaderRead;
     default:
-        return vk::AccessFlags();
+        return {};
+    }
+}
+
+// Heuristic to infer access flags from image layout
+inline vk::AccessFlags2 access_flags2_for_image_layout(const vk::ImageLayout& layout) {
+    switch (layout) {
+    case vk::ImageLayout::ePreinitialized:
+        return vk::AccessFlagBits2::eHostWrite;
+    case vk::ImageLayout::eTransferDstOptimal:
+        return vk::AccessFlagBits2::eTransferWrite;
+    case vk::ImageLayout::eTransferSrcOptimal:
+        return vk::AccessFlagBits2::eTransferRead;
+    case vk::ImageLayout::eColorAttachmentOptimal:
+        return vk::AccessFlagBits2::eColorAttachmentWrite;
+    case vk::ImageLayout::eDepthStencilAttachmentOptimal:
+        return vk::AccessFlagBits2::eDepthStencilAttachmentWrite;
+    case vk::ImageLayout::eShaderReadOnlyOptimal:
+        return vk::AccessFlagBits2::eShaderRead;
+    default:
+        return {};
     }
 }
 
@@ -54,6 +81,32 @@ inline vk::PipelineStageFlags pipeline_stage_for_image_layout(const vk::ImageLay
         return vk::PipelineStageFlagBits::eBottomOfPipe;
     default:
         return vk::PipelineStageFlagBits::eBottomOfPipe;
+    }
+}
+
+// Heuristic to infer pipeline stage from image layout.
+// This is very conservative (i.e. attemps to include all stages that may access a layout).
+// However, no extensions are taken into account. For example,
+// vk::PipelineStageFlagBits::eRayTracingShaderKHR might never be included!
+inline vk::PipelineStageFlags2 pipeline_stage2_for_image_layout(const vk::ImageLayout& layout) {
+    switch (layout) {
+    case vk::ImageLayout::eTransferDstOptimal:
+    case vk::ImageLayout::eTransferSrcOptimal:
+        return vk::PipelineStageFlagBits2::eTransfer;
+    case vk::ImageLayout::eColorAttachmentOptimal:
+        return vk::PipelineStageFlagBits2::eColorAttachmentOutput;
+    case vk::ImageLayout::eDepthStencilAttachmentOptimal:
+        return all_shaders2;
+    case vk::ImageLayout::eShaderReadOnlyOptimal:
+        return all_shaders2;
+    case vk::ImageLayout::ePreinitialized:
+        return vk::PipelineStageFlagBits2::eHost;
+    case vk::ImageLayout::eUndefined:
+        return vk::PipelineStageFlagBits2::eTopOfPipe;
+    case vk::ImageLayout::ePresentSrcKHR:
+        return vk::PipelineStageFlagBits2::eBottomOfPipe;
+    default:
+        return vk::PipelineStageFlagBits2::eBottomOfPipe;
     }
 }
 

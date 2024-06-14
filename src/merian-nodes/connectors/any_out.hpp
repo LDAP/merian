@@ -23,7 +23,9 @@ class AnyOut : public TypedOutputConnector<std::any&> {
     GraphResourceHandle
     create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
                     [[maybe_unused]] const ResourceAllocatorHandle& allocator,
-                    [[maybe_unused]] const ResourceAllocatorHandle& aliasing_allocator) override {
+                    [[maybe_unused]] const ResourceAllocatorHandle& aliasing_allocator,
+                    [[maybe_unused]] const uint32_t resoruce_index,
+                    [[maybe_unused]] const uint32_t ring_size) override {
 
         for (auto& [node, input] : inputs) {
             // check compatibility

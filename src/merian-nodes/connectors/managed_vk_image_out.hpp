@@ -13,12 +13,12 @@ using ManagedVkImageOutHandle = std::shared_ptr<ManagedVkImageOut>;
 class ManagedVkImageOut : public TypedOutputConnector<ImageHandle> {
   public:
     ManagedVkImageOut(const std::string& name,
-               const vk::AccessFlags2& access_flags,
-               const vk::PipelineStageFlags2& pipeline_stages,
-               const vk::ImageLayout& required_layout,
-               const vk::ShaderStageFlags& stage_flags,
-               const vk::ImageCreateInfo& create_info,
-               const bool persistent = false);
+                      const vk::AccessFlags2& access_flags,
+                      const vk::PipelineStageFlags2& pipeline_stages,
+                      const vk::ImageLayout& required_layout,
+                      const vk::ShaderStageFlags& stage_flags,
+                      const vk::ImageCreateInfo& create_info,
+                      const bool persistent = false);
 
     virtual std::optional<vk::DescriptorSetLayoutBinding> get_descriptor_info() const override;
 
@@ -45,39 +45,41 @@ class ManagedVkImageOut : public TypedOutputConnector<ImageHandle> {
     virtual GraphResourceHandle
     create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
                     const ResourceAllocatorHandle& allocator,
-                    const ResourceAllocatorHandle& aliasing_allocator) override;
+                    const ResourceAllocatorHandle& aliasing_allocator,
+                    const uint32_t resoruce_index,
+                    const uint32_t ring_size) override;
 
     virtual ImageHandle resource(const GraphResourceHandle& resource) override;
 
   public:
     static ManagedVkImageOutHandle compute_write(const std::string& name,
-                                          const vk::Format format,
-                                          const vk::Extent3D extent,
-                                          const bool persistent = false);
+                                                 const vk::Format format,
+                                                 const vk::Extent3D extent,
+                                                 const bool persistent = false);
 
     static ManagedVkImageOutHandle compute_write(const std::string& name,
-                                          const vk::Format format,
-                                          const uint32_t width,
-                                          const uint32_t height,
-                                          const uint32_t depth = 1,
-                                          const bool persistent = false);
+                                                 const vk::Format format,
+                                                 const uint32_t width,
+                                                 const uint32_t height,
+                                                 const uint32_t depth = 1,
+                                                 const bool persistent = false);
 
     static ManagedVkImageOutHandle compute_read_write(const std::string& name,
-                                               const vk::Format format,
-                                               const vk::Extent3D extent,
-                                               const bool persistent = false);
+                                                      const vk::Format format,
+                                                      const vk::Extent3D extent,
+                                                      const bool persistent = false);
 
     static ManagedVkImageOutHandle transfer_write(const std::string& name,
-                                           const vk::Format format,
-                                           const vk::Extent3D extent,
-                                           const bool persistent = false);
+                                                  const vk::Format format,
+                                                  const vk::Extent3D extent,
+                                                  const bool persistent = false);
 
     static ManagedVkImageOutHandle transfer_write(const std::string& name,
-                                           const vk::Format format,
-                                           const uint32_t width,
-                                           const uint32_t height,
-                                           const uint32_t depth = 1,
-                                           const bool persistent = false);
+                                                  const vk::Format format,
+                                                  const uint32_t width,
+                                                  const uint32_t height,
+                                                  const uint32_t depth = 1,
+                                                  const bool persistent = false);
 
   public:
     const vk::AccessFlags2 access_flags;

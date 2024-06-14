@@ -793,6 +793,9 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 dst_data.input_connections.try_emplace(dst_input,
                                                        NodeData::PerInputInfo{node, src_output});
                 data.output_connections[src_output].inputs.emplace_back(connection.dst, dst_input);
+
+                src_output->on_connect_input(dst_input);
+                dst_input->on_connect_output(src_output);
             }
         });
 
@@ -811,12 +814,9 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                              "node {} ({})",
                              max_delay + 1, output->name, data.name, node->name);
                 for (uint32_t i = 0; i <= max_delay; i++) {
-                    GraphResourceHandle res = output->create_resource(
-                        per_output_info.inputs, resource_allocator, resource_allocator);
-                    res->on_connect_output(output);
-                    for (auto& input : per_output_info.inputs) {
-                        res->on_connect_input(std::get<1>(input));
-                    }
+                    GraphResourceHandle res =
+                        output->create_resource(per_output_info.inputs, resource_allocator,
+                                                resource_allocator, i, RING_SIZE);
                     per_output_info.resources.emplace_back(res);
                 }
             }

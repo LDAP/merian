@@ -16,6 +16,11 @@ class InputConnector : public Connector {
         config.output_text(fmt::format("delay: {}", delay));
     }
 
+    // Throw connector_error, if the resource cannot interface with the supplied connector (try
+    // dynamic cast or use merian::test_shared_ptr_types). Can also be used to pre-compute barriers
+    // or similar.
+    virtual void on_connect_output([[maybe_unused]] const OutputConnectorHandle& output) {}
+
   public:
     // The number of iterations the corresponding resource is accessed later.
     const uint32_t delay;

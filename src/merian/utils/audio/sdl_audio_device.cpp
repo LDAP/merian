@@ -120,6 +120,10 @@ SDLAudioDevice::open_device(const AudioSpec& desired_audio_spec,
             audio_spec.freq,
             audio_spec.channels,
         };
+
+        SPDLOG_DEBUG("SDL audio device opened: {} Hz, {} samples, {} channels",
+                     this->audio_spec->samplerate, this->audio_spec->buffersize,
+                     this->audio_spec->channels);
     }
 
     return this->audio_spec;

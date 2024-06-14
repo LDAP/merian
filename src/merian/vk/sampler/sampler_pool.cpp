@@ -1,6 +1,6 @@
 /*
  * Parts of this code were adapted NVCore which is licensed under:
- * 
+ *
  * Copyright (c) 2020-2021, NVIDIA CORPORATION.  All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -72,85 +72,42 @@ SamplerHandle SamplerPool::acquire_sampler(const vk::SamplerCreateInfo& createIn
     }
 }
 
-SamplerHandle SamplerPool::linear_mirrored_repeat() {
-    const vk::SamplerCreateInfo info{{},
-                                     vk::Filter::eLinear,
-                                     vk::Filter::eLinear,
-                                     vk::SamplerMipmapMode::eLinear,
-                                     vk::SamplerAddressMode::eMirroredRepeat,
-                                     vk::SamplerAddressMode::eMirroredRepeat,
-                                     vk::SamplerAddressMode::eMirroredRepeat,
-                                     {},
-                                     false,
-                                     context->physical_device.get_physical_device_limits().maxSamplerAnisotropy,
-                                     false,
-                                     {},
-                                     0.0f,
-                                     128.0f,
-                                     vk::BorderColor::eIntTransparentBlack,
-                                     false};
+SamplerHandle SamplerPool::for_filter_and_address_mode(const vk::Filter filter,
+                                                       const vk::SamplerAddressMode address_mode) {
+    const vk::SamplerCreateInfo info{
+        {},
+        filter,
+        filter,
+        vk::SamplerMipmapMode::eLinear,
+        address_mode,
+        address_mode,
+        address_mode,
+        {},
+        false,
+        context->physical_device.get_physical_device_limits().maxSamplerAnisotropy,
+        false,
+        {},
+        0.0f,
+        128.0f,
+        vk::BorderColor::eIntTransparentBlack,
+        false};
     return acquire_sampler(info);
+}
+
+SamplerHandle SamplerPool::linear_mirrored_repeat() {
+    return for_filter_and_address_mode(vk::Filter::eLinear, vk::SamplerAddressMode::eMirroredRepeat);
 }
 
 SamplerHandle SamplerPool::nearest_mirrored_repeat() {
-    const vk::SamplerCreateInfo info{{},
-                                     vk::Filter::eNearest,
-                                     vk::Filter::eNearest,
-                                     vk::SamplerMipmapMode::eNearest,
-                                     vk::SamplerAddressMode::eMirroredRepeat,
-                                     vk::SamplerAddressMode::eMirroredRepeat,
-                                     vk::SamplerAddressMode::eMirroredRepeat,
-                                     {},
-                                     false,
-                                     context->physical_device.get_physical_device_limits().maxSamplerAnisotropy,
-                                     false,
-                                     {},
-                                     0.0f,
-                                     128.0f,
-                                     vk::BorderColor::eIntTransparentBlack,
-                                     false};
-    return acquire_sampler(info);
+    return for_filter_and_address_mode(vk::Filter::eNearest, vk::SamplerAddressMode::eMirroredRepeat);
 }
 
 SamplerHandle SamplerPool::linear_repeat() {
-    const vk::SamplerCreateInfo info{{},
-                                     vk::Filter::eLinear,
-                                     vk::Filter::eLinear,
-                                     vk::SamplerMipmapMode::eLinear,
-                                     vk::SamplerAddressMode::eRepeat,
-                                     vk::SamplerAddressMode::eRepeat,
-                                     vk::SamplerAddressMode::eRepeat,
-                                     {},
-                                     false,
-                                     context->physical_device.get_physical_device_limits().maxSamplerAnisotropy,
-                                     false,
-                                     {},
-                                     0.0f,
-                                     128.0f,
-                                     vk::BorderColor::eIntTransparentBlack,
-                                     false};
-    return acquire_sampler(info);
+    return for_filter_and_address_mode(vk::Filter::eLinear, vk::SamplerAddressMode::eRepeat);
 }
 
-
 SamplerHandle SamplerPool::nearest_repeat() {
-    const vk::SamplerCreateInfo info{{},
-                                     vk::Filter::eNearest,
-                                     vk::Filter::eNearest,
-                                     vk::SamplerMipmapMode::eNearest,
-                                     vk::SamplerAddressMode::eRepeat,
-                                     vk::SamplerAddressMode::eRepeat,
-                                     vk::SamplerAddressMode::eRepeat,
-                                     {},
-                                     false,
-                                     context->physical_device.get_physical_device_limits().maxSamplerAnisotropy,
-                                     false,
-                                     {},
-                                     0.0f,
-                                     128.0f,
-                                     vk::BorderColor::eIntTransparentBlack,
-                                     false};
-    return acquire_sampler(info);
+    return for_filter_and_address_mode(vk::Filter::eNearest, vk::SamplerAddressMode::eRepeat);
 }
 
 } // namespace merian

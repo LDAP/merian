@@ -12,11 +12,11 @@ using ManagedVkBufferOutHandle = std::shared_ptr<ManagedVkBufferOut>;
 class ManagedVkBufferOut : public TypedOutputConnector<BufferHandle> {
   public:
     ManagedVkBufferOut(const std::string& name,
-                const vk::AccessFlags2& access_flags,
-                const vk::PipelineStageFlags2& pipeline_stages,
-                const vk::ShaderStageFlags& stage_flags,
-                const vk::BufferCreateInfo& create_info,
-                const bool persistent = false);
+                       const vk::AccessFlags2& access_flags,
+                       const vk::PipelineStageFlags2& pipeline_stages,
+                       const vk::ShaderStageFlags& stage_flags,
+                       const vk::BufferCreateInfo& create_info,
+                       const bool persistent = false);
 
     virtual std::optional<vk::DescriptorSetLayoutBinding> get_descriptor_info() const override;
 
@@ -43,18 +43,20 @@ class ManagedVkBufferOut : public TypedOutputConnector<BufferHandle> {
     virtual GraphResourceHandle
     create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
                     const ResourceAllocatorHandle& allocator,
-                    const ResourceAllocatorHandle& aliasing_allocator) override;
+                    const ResourceAllocatorHandle& aliasing_allocator,
+                    const uint32_t resoruce_index,
+                    const uint32_t ring_size) override;
 
     virtual BufferHandle resource(const GraphResourceHandle& resource) override;
 
   public:
     static ManagedVkBufferOutHandle compute_write(const std::string& name,
-                                           const vk::BufferCreateInfo& create_info,
-                                           const bool persistent = false);
+                                                  const vk::BufferCreateInfo& create_info,
+                                                  const bool persistent = false);
 
     static ManagedVkBufferOutHandle transfer_write(const std::string& name,
-                                            const vk::BufferCreateInfo& create_info,
-                                            const bool persistent = false);
+                                                   const vk::BufferCreateInfo& create_info,
+                                                   const bool persistent = false);
 
   private:
     const vk::AccessFlags2 access_flags;

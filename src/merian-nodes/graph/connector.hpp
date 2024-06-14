@@ -14,8 +14,8 @@ using NodeHandle = std::shared_ptr<Node>;
 class GraphResource;
 using GraphResourceHandle = std::shared_ptr<GraphResource>;
 
-// An IO connector for a Node. Connectors should not hold any internal state but instead put it into
-// the resources.
+// An IO connector for a Node. Connectors might be reused and should therefore only contain the
+// minimal necessary state and put everything else into the resoruces.
 class Connector : public std::enable_shared_from_this<Connector> {
   public:
     using ConnectorStatusFlags = uint32_t;

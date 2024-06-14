@@ -1,5 +1,6 @@
 #include "merian/vk/memory/resource_allocations.hpp"
 #include "merian/vk/memory/memory_allocator.hpp"
+#include "merian/vk/utils/barriers.hpp"
 
 #include <spdlog/spdlog.h>
 #include <vulkan/vulkan.hpp>
@@ -80,6 +81,18 @@ vk::FormatFeatureFlags Image::format_features() const {
     }
 }
 
+vk::ImageMemoryBarrier Image::barrier(const vk::ImageLayout new_layout) {
+    return barrier(new_layout, access_flags_for_image_layout(current_layout),
+                   access_flags_for_image_layout(new_layout));
+}
+
+vk::ImageMemoryBarrier2 Image::barrier2(const vk::ImageLayout new_layout) {
+    return barrier2(new_layout, access_flags2_for_image_layout(current_layout),
+                    access_flags2_for_image_layout(new_layout),
+                    pipeline_stage2_for_image_layout(current_layout),
+                    pipeline_stage2_for_image_layout(new_layout));
+}
+
 // Do not forget submit the barrier, else the internal state does not match the actual state
 vk::ImageMemoryBarrier Image::barrier(const vk::ImageLayout new_layout,
                                       const vk::AccessFlags src_access_flags,
@@ -88,9 +101,9 @@ vk::ImageMemoryBarrier Image::barrier(const vk::ImageLayout new_layout,
                                       const uint32_t dst_queue_family_index,
                                       const vk::ImageSubresourceRange subresource_range,
                                       const bool transition_from_undefined) {
-    vk::ImageLayout old_layout =
+    const vk::ImageLayout old_layout =
         transition_from_undefined ? vk::ImageLayout::eUndefined : current_layout;
-    vk::ImageMemoryBarrier barrier{
+    const vk::ImageMemoryBarrier barrier{
         src_access_flags,       dst_access_flags,       old_layout, new_layout,
         src_queue_family_index, dst_queue_family_index, image,      subresource_range,
     };
@@ -109,9 +122,9 @@ vk::ImageMemoryBarrier2 Image::barrier2(const vk::ImageLayout new_layout,
                                         const vk::ImageSubresourceRange subresource_range,
                                         const bool transition_from_undefined) {
 
-    vk::ImageLayout old_layout =
+    const vk::ImageLayout old_layout =
         transition_from_undefined ? vk::ImageLayout::eUndefined : current_layout;
-    vk::ImageMemoryBarrier2 barrier{
+    const vk::ImageMemoryBarrier2 barrier{
         src_stage_flags, src_access_flags, dst_stage_flags,        dst_access_flags,
         old_layout,      new_layout,       src_queue_family_index, dst_queue_family_index,
         image,           subresource_range};

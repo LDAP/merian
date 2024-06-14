@@ -1,8 +1,8 @@
 #pragma once
 
+#include "merian/utils/hash.hpp"
 #include "merian/vk/context.hpp"
 #include "merian/vk/sampler/sampler.hpp"
-#include "merian/utils/hash.hpp"
 
 #include <spdlog/spdlog.h>
 #include <vulkan/vulkan.hpp>
@@ -13,7 +13,7 @@ namespace merian {
 
 /**
  * @brief      This class describes a sampler pool.
- * 
+ *
  * Holds weak references to sampler, to return the same sampler,
  * if an identical configuration is requested.
  */
@@ -29,10 +29,13 @@ class SamplerPool : public std::enable_shared_from_this<SamplerPool> {
     ~SamplerPool();
 
     /* creates a new sampler or re-uses an existing one.
-     * createInfo may contain VkSamplerReductionModeCreateInfo and VkSamplerYcbcrConversionCreateInfo
+     * createInfo may contain VkSamplerReductionModeCreateInfo and
+     * VkSamplerYcbcrConversionCreateInfo
      */
     SamplerHandle acquire_sampler(const vk::SamplerCreateInfo& createInfo);
 
+    SamplerHandle for_filter_and_address_mode(const vk::Filter filter,
+                                              const vk::SamplerAddressMode address_mode);
 
     SamplerHandle linear_mirrored_repeat();
 
@@ -59,7 +62,7 @@ class SamplerPool : public std::enable_shared_from_this<SamplerPool> {
     };
 
     const SharedContext context;
-    
+
     std::unordered_map<SamplerState, std::weak_ptr<Sampler>, HashAligned32<SamplerState>> state_map;
 };
 

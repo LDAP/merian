@@ -89,34 +89,22 @@ ImageHandle ResourceAllocator::createImage(const vk::CommandBuffer& cmdBuf,
                                            const void* data_,
                                            const vk::ImageCreateInfo& info_,
                                            const MemoryMappingType mapping_type,
-                                           const vk::ImageLayout& layout_,
                                            const std::string& debug_name) {
-    ImageHandle resultImage = createImage(info_, mapping_type, debug_name);
+    assert(data_);
 
-    // Copy the data to staging buffer than to image
-    if (data_ != nullptr) {
-        // Copy buffer to image
-        vk::ImageSubresourceRange subresourceRange{vk::ImageAspectFlagBits::eColor, 0,
-                                                   info_.mipLevels, 0, 1};
+    const ImageHandle resultImage = createImage(info_, mapping_type, debug_name);
+    // Copy buffer to image
+    vk::ImageSubresourceRange subresourceRange{vk::ImageAspectFlagBits::eColor, 0, info_.mipLevels,
+                                               0, 1};
 
-        // doing these transitions per copy is not efficient, should do in bulk for many images
-        merian::cmd_barrier_image_layout(cmdBuf, *resultImage, vk::ImageLayout::eUndefined,
-                                         vk::ImageLayout::eTransferDstOptimal, subresourceRange);
+    // doing these transitions per copy is not efficient, should do in bulk for many images
+    cmdBuf.pipelineBarrier(
+        vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eTransfer, {}, {}, {},
+        resultImage->barrier(vk::ImageLayout::eTransferDstOptimal, {},
+                             vk::AccessFlagBits::eTransferWrite, VK_QUEUE_FAMILY_IGNORED,
+                             VK_QUEUE_FAMILY_IGNORED, all_levels_and_layers(), true));
 
-        vk::Offset3D offset;
-        vk::ImageSubresourceLayers subresource{vk::ImageAspectFlagBits::eColor, {}, {}, 1};
-        m_staging->cmdToImage(cmdBuf, *resultImage, offset, info_.extent, subresource, size_,
-                              data_);
-
-        // Setting final image layout
-        merian::cmd_barrier_image_layout(cmdBuf, *resultImage, vk::ImageLayout::eTransferDstOptimal,
-                                         layout_);
-        resultImage->_set_current_layout(layout_);
-    } else {
-        // Setting final image layout
-        merian::cmd_barrier_image_layout(cmdBuf, *resultImage, vk::ImageLayout::eUndefined,
-                                         layout_);
-    }
+    m_staging->cmdToImage(cmdBuf, *resultImage, {}, info_.extent, first_layer(), size_, data_);
 
     return resultImage;
 }
@@ -177,17 +165,36 @@ TextureHandle ResourceAllocator::createTexture(const ImageHandle& image,
     return createTexture(image, view_create_info, sampler, debug_name);
 }
 
-TextureHandle ResourceAllocator::createTexture(const vk::CommandBuffer& cmdBuf,
-                                               const size_t size_,
-                                               const void* data_,
-                                               const vk::ImageCreateInfo& info_,
-                                               const MemoryMappingType mapping_type,
-                                               const vk::SamplerCreateInfo& samplerCreateInfo,
-                                               const vk::ImageLayout& layout_,
-                                               const bool is_cube,
-                                               const std::string& debug_name) {
-    ImageHandle image = createImage(cmdBuf, size_, data_, info_, mapping_type, layout_, debug_name);
-    return createTexture(image, image->make_view_create_info(is_cube), samplerCreateInfo);
+TextureHandle ResourceAllocator::createTextureFromRGB8(const vk::CommandBuffer& cmd,
+                                                       const uint32_t* data,
+                                                       const uint32_t width,
+                                                       const uint32_t height,
+                                                       const vk::Filter filter,
+                                                       const bool isSRGB,
+                                                       const std::string& debug_name) {
+    const vk::ImageCreateInfo tex_image_info{
+        {},
+        vk::ImageType::e2D,
+        isSRGB ? vk::Format::eR8G8B8A8Srgb : vk::Format::eR8G8B8A8Unorm,
+        {width, height, 1},
+        1,
+        1,
+        vk::SampleCountFlagBits::e1,
+        vk::ImageTiling::eOptimal,
+        vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
+        vk::SharingMode::eExclusive,
+        {},
+        {},
+        vk::ImageLayout::eUndefined,
+    };
+    const merian::ImageHandle image =
+        createImage(cmd, width * height * sizeof(uint32_t), data, tex_image_info,
+                    MemoryMappingType::NONE, debug_name);
+
+    merian::SamplerHandle sampler =
+        get_sampler_pool()->for_filter_and_address_mode(filter, vk::SamplerAddressMode::eRepeat);
+
+    return createTexture(image, image->make_view_create_info(), sampler, debug_name);
 }
 
 AccelerationStructureHandle ResourceAllocator::createAccelerationStructure(

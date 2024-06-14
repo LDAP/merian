@@ -94,14 +94,14 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
                             const std::string& debug_name = {});
 
     // Create an image with data uploaded through staging manager
-    ImageHandle
-    createImage(const vk::CommandBuffer& cmdBuf,
-                const size_t size_,
-                const void* data_,
-                const vk::ImageCreateInfo& info_,
-                const MemoryMappingType mapping_type = MemoryMappingType::NONE,
-                const vk::ImageLayout& layout_ = vk::ImageLayout::eShaderReadOnlyOptimal,
-                const std::string& debug_name = {});
+    //
+    // Important: You are responsible to insert a barrier for the upload.
+    ImageHandle createImage(const vk::CommandBuffer& cmdBuf,
+                            const size_t size_,
+                            const void* data_,
+                            const vk::ImageCreateInfo& info_,
+                            const MemoryMappingType mapping_type = MemoryMappingType::NONE,
+                            const std::string& debug_name = {});
 
     //--------------------------------------------------------------------------------------------------
 
@@ -124,19 +124,17 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
                                 const vk::ImageViewCreateInfo& imageViewCreateInfo,
                                 const std::string& debug_name = {});
 
-    // shortcut that creates the image for the texture
-    // - creates the image
-    // - creates the texture part by associating image view and sampler
-    TextureHandle
-    createTexture(const vk::CommandBuffer& cmdBuf,
-                  const size_t size_,
-                  const void* data_,
-                  const vk::ImageCreateInfo& info_,
-                  const MemoryMappingType mapping_type,
-                  const vk::SamplerCreateInfo& samplerCreateInfo,
-                  const vk::ImageLayout& layout_ = vk::ImageLayout::eShaderReadOnlyOptimal,
-                  const bool isCube = false,
-                  const std::string& debug_name = {});
+    // shortcut to create a texture from RGB8 data.
+    // layout: the layout for the image view
+    //
+    // Important: You are responsible to perform the image transition!
+    TextureHandle createTextureFromRGB8(const vk::CommandBuffer& cmd,
+                                        const uint32_t* data,
+                                        const uint32_t width,
+                                        const uint32_t height,
+                                        const vk::Filter filter,
+                                        const bool isSRGB = true,
+                                        const std::string& debug_name = {});
 
     //--------------------------------------------------------------------------------------------------
 

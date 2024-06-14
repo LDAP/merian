@@ -25,10 +25,20 @@ class OutputConnector : public Connector {
     // made. However, it is guaranteed between calls to connector.on_pre_process and
     // connector.on_post_process with this resource the memory is not in use and syncronization is
     // ensured.
+    //
+    // resource_index: 0 <= i <= max_delay
+    // ring_size: Number of iterations in flight
     virtual GraphResourceHandle
     create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
                     const ResourceAllocatorHandle& allocator,
-                    const ResourceAllocatorHandle& aliasing_allocator) = 0;
+                    const ResourceAllocatorHandle& aliasing_allocator,
+                    const uint32_t resoruce_index,
+                    const uint32_t ring_size) = 0;
+
+    // Throw connector_error, if the resource cannot interface with the supplied connector (try
+    // dynamic cast or use merian::test_shared_ptr_types). Can also be used to pre-compute barriers
+    // or similar.
+    virtual void on_connect_input([[maybe_unused]] const InputConnectorHandle& input) {}
 
     virtual void configuration(Configuration& config) {
         config.output_text(fmt::format("supports delay: {}", supports_delay));

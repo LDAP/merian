@@ -7,12 +7,12 @@
 namespace merian_nodes {
 
 ManagedVkImageOut::ManagedVkImageOut(const std::string& name,
-                       const vk::AccessFlags2& access_flags,
-                       const vk::PipelineStageFlags2& pipeline_stages,
-                       const vk::ImageLayout& required_layout,
-                       const vk::ShaderStageFlags& stage_flags,
-                       const vk::ImageCreateInfo& create_info,
-                       const bool persistent)
+                                     const vk::AccessFlags2& access_flags,
+                                     const vk::PipelineStageFlags2& pipeline_stages,
+                                     const vk::ImageLayout& required_layout,
+                                     const vk::ShaderStageFlags& stage_flags,
+                                     const vk::ImageCreateInfo& create_info,
+                                     const bool persistent)
     : TypedOutputConnector(name, !persistent), access_flags(access_flags),
       pipeline_stages(pipeline_stages), required_layout(required_layout), stage_flags(stage_flags),
       create_info(create_info), persistent(persistent) {}
@@ -27,12 +27,12 @@ std::optional<vk::DescriptorSetLayoutBinding> ManagedVkImageOut::get_descriptor_
 }
 
 void ManagedVkImageOut::get_descriptor_update(const uint32_t binding,
-                                       GraphResourceHandle& resource,
-                                       DescriptorSetUpdate& update) {
+                                              GraphResourceHandle& resource,
+                                              DescriptorSetUpdate& update) {
     // or vk::ImageLayout::eGeneral instead of required?
     assert(debugable_ptr_cast<ManagedVkImageResource>(resource)->tex && "missing usage flags?");
-    update.write_descriptor_texture(binding, *debugable_ptr_cast<ManagedVkImageResource>(resource)->tex, 0,
-                                    1, required_layout);
+    update.write_descriptor_texture(
+        binding, *debugable_ptr_cast<ManagedVkImageResource>(resource)->tex, 0, 1, required_layout);
 }
 
 Connector::ConnectorStatusFlags ManagedVkImageOut::on_pre_process(
@@ -72,10 +72,12 @@ Connector::ConnectorStatusFlags ManagedVkImageOut::on_post_process(
     return {};
 }
 
-GraphResourceHandle
-ManagedVkImageOut::create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
-                            [[maybe_unused]] const ResourceAllocatorHandle& allocator,
-                            const ResourceAllocatorHandle& aliasing_allocator) {
+GraphResourceHandle ManagedVkImageOut::create_resource(
+    const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
+    [[maybe_unused]] const ResourceAllocatorHandle& allocator,
+    const ResourceAllocatorHandle& aliasing_allocator,
+    [[maybe_unused]] const uint32_t resoruce_index,
+    [[maybe_unused]] const uint32_t ring_size) {
     const ResourceAllocatorHandle alloc = persistent ? allocator : aliasing_allocator;
 
     vk::ImageCreateInfo create_info = this->create_info;
@@ -108,7 +110,8 @@ ManagedVkImageOut::create_resource(const std::vector<std::tuple<NodeHandle, Inpu
     }
 
     const ImageHandle image = alloc->createImage(create_info, MemoryMappingType::NONE, name);
-    auto res = std::make_shared<ManagedVkImageResource>(image, input_pipeline_stages, input_access_flags);
+    auto res =
+        std::make_shared<ManagedVkImageResource>(image, input_pipeline_stages, input_access_flags);
 
     if (image->valid_for_view()) {
         res->tex = allocator->createTexture(image, image->make_view_create_info(), name);
@@ -122,9 +125,9 @@ ImageHandle ManagedVkImageOut::resource(const GraphResourceHandle& resource) {
 }
 
 std::shared_ptr<ManagedVkImageOut> ManagedVkImageOut::compute_write(const std::string& name,
-                                                      const vk::Format format,
-                                                      const vk::Extent3D extent,
-                                                      const bool persistent) {
+                                                                    const vk::Format format,
+                                                                    const vk::Extent3D extent,
+                                                                    const bool persistent) {
     const vk::ImageCreateInfo create_info{
         {},
         extent.depth == 1 ? vk::ImageType::e2D : vk::ImageType::e3D,
@@ -147,18 +150,18 @@ std::shared_ptr<ManagedVkImageOut> ManagedVkImageOut::compute_write(const std::s
 }
 
 std::shared_ptr<ManagedVkImageOut> ManagedVkImageOut::compute_write(const std::string& name,
-                                                      const vk::Format format,
-                                                      const uint32_t width,
-                                                      const uint32_t height,
-                                                      const uint32_t depth,
-                                                      const bool persistent) {
+                                                                    const vk::Format format,
+                                                                    const uint32_t width,
+                                                                    const uint32_t height,
+                                                                    const uint32_t depth,
+                                                                    const bool persistent) {
     return compute_write(name, format, {width, height, depth}, persistent);
 }
 
 std::shared_ptr<ManagedVkImageOut> ManagedVkImageOut::compute_read_write(const std::string& name,
-                                                           const vk::Format format,
-                                                           const vk::Extent3D extent,
-                                                           const bool persistent) {
+                                                                         const vk::Format format,
+                                                                         const vk::Extent3D extent,
+                                                                         const bool persistent) {
     const vk::ImageCreateInfo create_info{
         {},
         extent.depth == 1 ? vk::ImageType::e2D : vk::ImageType::e3D,
@@ -182,9 +185,9 @@ std::shared_ptr<ManagedVkImageOut> ManagedVkImageOut::compute_read_write(const s
 }
 
 std::shared_ptr<ManagedVkImageOut> ManagedVkImageOut::transfer_write(const std::string& name,
-                                                       const vk::Format format,
-                                                       const vk::Extent3D extent,
-                                                       const bool persistent) {
+                                                                     const vk::Format format,
+                                                                     const vk::Extent3D extent,
+                                                                     const bool persistent) {
     const vk::ImageCreateInfo create_info{
         {},
         extent.depth == 1 ? vk::ImageType::e2D : vk::ImageType::e3D,
@@ -207,11 +210,11 @@ std::shared_ptr<ManagedVkImageOut> ManagedVkImageOut::transfer_write(const std::
 }
 
 std::shared_ptr<ManagedVkImageOut> ManagedVkImageOut::transfer_write(const std::string& name,
-                                                       const vk::Format format,
-                                                       const uint32_t width,
-                                                       const uint32_t height,
-                                                       const uint32_t depth,
-                                                       const bool persistent) {
+                                                                     const vk::Format format,
+                                                                     const uint32_t width,
+                                                                     const uint32_t height,
+                                                                     const uint32_t depth,
+                                                                     const bool persistent) {
     return transfer_write(name, format, {width, height, depth}, persistent);
 }
 

@@ -150,13 +150,19 @@ class Image : public std::enable_shared_from_this<Image> {
         current_layout = new_layout;
     }
 
+    // Guess AccessFlags from old and new layout.
+    [[nodiscard]] vk::ImageMemoryBarrier barrier(const vk::ImageLayout new_layout);
+
+    // Guess AccessFlags2 and PipelineStageFlags2 from old and new layout.
+    [[nodiscard]] vk::ImageMemoryBarrier2 barrier2(const vk::ImageLayout new_layout);
+
     // Do not forget submite the barrier, else the internal state does not match the actual
     // state You can use transition_from_undefined when you are not interested in keeping the
     // contents, this can be more performant.
     [[nodiscard]] vk::ImageMemoryBarrier
     barrier(const vk::ImageLayout new_layout,
-            const vk::AccessFlags src_access_flags = {},
-            const vk::AccessFlags dst_access_flags = {},
+            const vk::AccessFlags src_access_flags,
+            const vk::AccessFlags dst_access_flags,
             const uint32_t src_queue_family_index = VK_QUEUE_FAMILY_IGNORED,
             const uint32_t dst_queue_family_index = VK_QUEUE_FAMILY_IGNORED,
             const vk::ImageSubresourceRange subresource_range = all_levels_and_layers(),
@@ -164,10 +170,10 @@ class Image : public std::enable_shared_from_this<Image> {
 
     [[nodiscard]] vk::ImageMemoryBarrier2
     barrier2(const vk::ImageLayout new_layout,
-             const vk::AccessFlags2 src_access_flags = {},
-             const vk::AccessFlags2 dst_access_flags = {},
-             const vk::PipelineStageFlags2 src_stage_flags = {},
-             const vk::PipelineStageFlags2 dst_stage_flags = {},
+             const vk::AccessFlags2 src_access_flags,
+             const vk::AccessFlags2 dst_access_flags,
+             const vk::PipelineStageFlags2 src_stage_flags,
+             const vk::PipelineStageFlags2 dst_stage_flags,
              const uint32_t src_queue_family_index = VK_QUEUE_FAMILY_IGNORED,
              const uint32_t dst_queue_family_index = VK_QUEUE_FAMILY_IGNORED,
              const vk::ImageSubresourceRange subresource_range = all_levels_and_layers(),
@@ -246,9 +252,7 @@ class Image : public std::enable_shared_from_this<Image> {
  */
 class Texture : public std::enable_shared_from_this<Texture> {
   public:
-    Texture(const vk::ImageView& view,
-            const ImageHandle& image,
-            const SamplerHandle& sampler);
+    Texture(const vk::ImageView& view, const ImageHandle& image, const SamplerHandle& sampler);
 
     ~Texture();
 
