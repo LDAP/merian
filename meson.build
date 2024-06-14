@@ -56,7 +56,17 @@ glm = dependency('glm', fallback : ['glm', 'glm_dep'], version: ['>=0.9.9.8'])
 tol_subp = cmake.subproject('tinyobjloader')
 tol = tol_subp.dependency('tinyobjloader')
 tgltf = dependency('tinygltf', required: get_option('tinygltf'), fallback: ['tinygltf', 'tinygltf_dep'])
-sdl2 = dependency('sdl2', fallback : ['sdl2', 'sdl2_dep'])
+sdl2 = dependency('sdl2', required: false)
+if not sdl2.found()
+    # Workaround because SDL2 ships Vulkan which conflicts
+    # This is basically the same declare_dependency they have without "deps"
+    sdl2_subp = subproject('sdl2')
+    sdl2 = declare_dependency(
+        link_with : sdl2_subp.get_variable('sdl2'),
+        include_directories : sdl2_subp.get_variable('core_inc'),
+        compile_args : sdl2_subp.get_variable('c_args')
+    )
+endif
 shaderc = dependency('shaderc', version: ['>=2023.8.1'], required: get_option('shaderc'))
 
 if shaderc.found()
