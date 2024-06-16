@@ -67,6 +67,10 @@ class GraphRun {
         return ring_size;
     }
 
+    const CommandPoolHandle get_cmd_pool() noexcept {
+        return cmd_pool;
+    }
+
     // Add this to the submit call for the graph command buffer
     const std::vector<vk::Semaphore>& get_wait_semaphores() const noexcept {
         return wait_semaphores;
@@ -109,10 +113,13 @@ class GraphRun {
     }
 
   private:
-    void
-    reset(const uint64_t iteration, const uint32_t in_flight_index, const ProfilerHandle profiler) {
+    void reset(const uint64_t iteration,
+               const uint32_t in_flight_index,
+               const ProfilerHandle profiler,
+               const CommandPoolHandle& cmd_pool) {
         this->iteration = iteration;
         this->in_flight_index = in_flight_index;
+        this->cmd_pool = cmd_pool;
         wait_semaphores.clear();
         wait_stages.clear();
         wait_values.clear();
@@ -136,6 +143,7 @@ class GraphRun {
     std::vector<std::function<void(const QueueHandle& queue)>> submit_callbacks;
 
     ProfilerHandle profiler = nullptr;
+    CommandPoolHandle cmd_pool = nullptr;
     bool needs_reconnect = false;
     uint64_t iteration;
     uint32_t in_flight_index;

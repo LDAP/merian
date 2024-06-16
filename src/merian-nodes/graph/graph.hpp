@@ -353,7 +353,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 connect();
             }
 
-            run.reset(iteration, iteration % RING_SIZE, profiler);
+            run.reset(iteration, iteration % RING_SIZE, profiler, cmd_pool);
 
             // While preprocessing nodes can signalize that they need to reconnect as well
             {
