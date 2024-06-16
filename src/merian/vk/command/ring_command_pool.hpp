@@ -12,38 +12,38 @@ class RingCommandPoolCycle : public CommandPool {
     RingCommandPoolCycle() = delete;
 
     RingCommandPoolCycle(const SharedContext& context,
-                         uint32_t queue_family_index,
-                         vk::CommandPoolCreateFlags create_flags,
-                         uint32_t cycle_index,
-                         uint32_t& current_index);
+                         const uint32_t queue_family_index,
+                         const vk::CommandPoolCreateFlags create_flags,
+                         const uint32_t cycle_index,
+                         const uint32_t& current_index);
 
     vk::CommandBuffer
-    create(vk::CommandBufferLevel level = vk::CommandBufferLevel::ePrimary,
-           bool begin = false,
-           vk::CommandBufferUsageFlags flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
+    create(const vk::CommandBufferLevel level = vk::CommandBufferLevel::ePrimary,
+           const bool begin = false,
+           const vk::CommandBufferUsageFlags flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
            const vk::CommandBufferInheritanceInfo* pInheritanceInfo = nullptr) override;
 
     vk::CommandBuffer create_and_begin(
-        vk::CommandBufferLevel level = vk::CommandBufferLevel::ePrimary,
-        vk::CommandBufferUsageFlags flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
+        const vk::CommandBufferLevel level = vk::CommandBufferLevel::ePrimary,
+        const vk::CommandBufferUsageFlags flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
         const vk::CommandBufferInheritanceInfo* pInheritanceInfo = nullptr) override;
 
     std::vector<vk::CommandBuffer> create_multiple(
-        vk::CommandBufferLevel level,
-        uint32_t count,
-        bool begin = false,
-        vk::CommandBufferUsageFlags flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
+        const vk::CommandBufferLevel level,
+        const uint32_t count,
+        const bool begin = false,
+        const vk::CommandBufferUsageFlags flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
         const vk::CommandBufferInheritanceInfo* pInheritanceInfo = nullptr) override;
 
     std::vector<vk::CommandBuffer> create_and_begin_multiple(
-        vk::CommandBufferLevel level,
-        uint32_t count,
-        vk::CommandBufferUsageFlags flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
+        const vk::CommandBufferLevel level,
+        const uint32_t count,
+        const vk::CommandBufferUsageFlags flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
         const vk::CommandBufferInheritanceInfo* pInheritanceInfo = nullptr) override;
 
   private:
-    uint32_t cycle_index;
-    uint32_t& current_index;
+    const uint32_t cycle_index;
+    const uint32_t& current_index;
 };
 
 /**

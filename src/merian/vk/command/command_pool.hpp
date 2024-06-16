@@ -12,16 +12,16 @@ class CommandPool : public std::enable_shared_from_this<CommandPool> {
 
     // Cache size is the number of primary command buffers that are kept on hand to prevent
     // reallocation.
-    CommandPool(const std::shared_ptr<Queue> queue,
-                vk::CommandPoolCreateFlags create_flags = vk::CommandPoolCreateFlagBits::eTransient,
-                const uint32_t cache_size = 10);
+    CommandPool(
+        const std::shared_ptr<Queue> queue,
+        const vk::CommandPoolCreateFlags create_flags = vk::CommandPoolCreateFlagBits::eTransient);
 
     // Cache size is the number of primary command buffers that are kept on hand to prevent
     // reallocation.
-    CommandPool(const SharedContext context,
-                uint32_t queue_family_index,
-                vk::CommandPoolCreateFlags create_flags = vk::CommandPoolCreateFlagBits::eTransient,
-                const uint32_t cache_size = 10);
+    CommandPool(
+        const SharedContext context,
+        const uint32_t queue_family_index,
+        const vk::CommandPoolCreateFlags create_flags = vk::CommandPoolCreateFlagBits::eTransient);
 
     virtual ~CommandPool();
 
@@ -30,35 +30,37 @@ class CommandPool : public std::enable_shared_from_this<CommandPool> {
     }
 
     virtual vk::CommandBuffer
-    create(vk::CommandBufferLevel level = vk::CommandBufferLevel::ePrimary,
-           bool begin = false,
-           vk::CommandBufferUsageFlags flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
+    create(const vk::CommandBufferLevel level = vk::CommandBufferLevel::ePrimary,
+           const bool begin = false,
+           const vk::CommandBufferUsageFlags flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
            const vk::CommandBufferInheritanceInfo* pInheritanceInfo = nullptr);
 
     virtual vk::CommandBuffer create_and_begin(
-        vk::CommandBufferLevel level = vk::CommandBufferLevel::ePrimary,
-        vk::CommandBufferUsageFlags flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
+        const vk::CommandBufferLevel level = vk::CommandBufferLevel::ePrimary,
+        const vk::CommandBufferUsageFlags flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
         const vk::CommandBufferInheritanceInfo* pInheritanceInfo = nullptr) {
         return create(level, true, flags, pInheritanceInfo);
     }
 
     virtual std::vector<vk::CommandBuffer> create_multiple(
-        vk::CommandBufferLevel level,
-        uint32_t count,
-        bool begin = false,
-        vk::CommandBufferUsageFlags flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
+        const vk::CommandBufferLevel level,
+        const uint32_t count,
+        const bool begin = false,
+        const vk::CommandBufferUsageFlags flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
         const vk::CommandBufferInheritanceInfo* pInheritanceInfo = nullptr);
 
     virtual std::vector<vk::CommandBuffer> create_and_begin_multiple(
-        vk::CommandBufferLevel level,
-        uint32_t count,
-        vk::CommandBufferUsageFlags flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
+        const vk::CommandBufferLevel level,
+        const uint32_t count,
+        const vk::CommandBufferUsageFlags flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
         const vk::CommandBufferInheritanceInfo* pInheritanceInfo = nullptr) {
         return create_multiple(level, count, true, flags, pInheritanceInfo);
     }
 
+    uint32_t get_queue_family_index() const noexcept;
+
     const vk::CommandPool& get_pool() const;
-    
+
     // Frees all primary command buffers that were allocated from this pool and resets command pool
     // (keeps some primaries in cache)
     void reset();
@@ -71,15 +73,20 @@ class CommandPool : public std::enable_shared_from_this<CommandPool> {
 
   private:
     const SharedContext context;
-
-  private:
+    const uint32_t queue_family_index;
     vk::CommandPool pool = VK_NULL_HANDLE;
 
+    // Estimate the necessary amount of command buffers and keep them cached
+    uint32_t last_used_primary_count;
+    uint32_t last_used_secondary_count;
+
+    // Keep all cmds for resetting / freeing
     std::vector<vk::CommandBuffer> inuse_primary_cmds;
+    std::vector<vk::CommandBuffer> inuse_secondary_cmds;
+
     // Keep some cmd to prevent reallocation
     std::vector<vk::CommandBuffer> cache_primary_cmds;
-
-    const uint32_t cache_size;
+    std::vector<vk::CommandBuffer> cache_secondary_cmds;
 };
 
 using CommandPoolHandle = std::shared_ptr<CommandPool>;
