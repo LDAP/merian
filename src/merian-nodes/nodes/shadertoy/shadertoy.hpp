@@ -43,7 +43,7 @@ class Shadertoy : public AbstractCompute {
 
     ShaderModuleHandle get_shader_module() override;
 
-    NodeStatusFlags configuration(Configuration& config) override;
+    NodeStatusFlags properties(Properties& config) override;
 
   private:
     const std::string shader_path;

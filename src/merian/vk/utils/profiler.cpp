@@ -219,7 +219,7 @@ std::string Profiler::get_report_str(const Profiler::Report& report) {
     return result;
 }
 
-void to_config(Configuration& config,
+void to_config(Properties& config,
                const std::vector<Profiler::ReportEntry>& entries,
                const uint32_t level = 0) {
     for (auto& entry : entries) {
@@ -235,16 +235,16 @@ void to_config(Configuration& config,
     }
 }
 
-void Profiler::get_cpu_report_as_config(Configuration& config, const Profiler::Report& report) {
+void Profiler::get_cpu_report_as_config(Properties& config, const Profiler::Report& report) {
     to_config(config, report.cpu_report);
 }
 
-void Profiler::get_gpu_report_as_config(Configuration& config, const Profiler::Report& report) {
+void Profiler::get_gpu_report_as_config(Properties& config, const Profiler::Report& report) {
     to_config(config, report.gpu_report, 1u << 31);
 }
 
 
-void Profiler::get_report_as_config(Configuration& config, const Profiler::Report& report) {
+void Profiler::get_report_as_config(Properties& config, const Profiler::Report& report) {
     if (!report.cpu_report.empty()) {
         config.st_separate("CPU");
         get_cpu_report_as_config(config, report);

@@ -58,7 +58,7 @@ void HDRImageRead::process([[maybe_unused]] GraphRun& run,
     }
 }
 
-HDRImageRead::NodeStatusFlags HDRImageRead::configuration(Configuration& config) {
+HDRImageRead::NodeStatusFlags HDRImageRead::properties(Properties& config) {
     config.config_bool("keep in host memory", keep_on_host, "");
     if (!keep_on_host && image) {
         stbi_image_free(image);

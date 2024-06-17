@@ -56,7 +56,7 @@ ShaderModuleHandle Tonemap::get_shader_module() {
     return shader;
 }
 
-AbstractCompute::NodeStatusFlags Tonemap::configuration(Configuration& config) {
+AbstractCompute::NodeStatusFlags Tonemap::properties(Properties& config) {
     bool needs_rebuild = false;
 
     const int old_tonemap = tonemap;
@@ -125,7 +125,7 @@ AbstractCompute::NodeStatusFlags Tonemap::configuration(Configuration& config) {
                               "Luminance",
                               "Perceptual luminance",
                           },
-                          Configuration::OptionsStyle::DONT_CARE,
+                          Properties::OptionsStyle::DONT_CARE,
                           "Decides what is written in the alpha channel.");
     if (alpha_mode == ALPHA_MODE_PERCEPTUAL_LUMINANCE) {
         config.config_float(

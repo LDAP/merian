@@ -5,7 +5,7 @@
 #include "graph_run.hpp"
 #include "node_io.hpp"
 
-#include "merian/utils/configuration.hpp"
+#include "merian/utils/properties.hpp"
 #include "merian/vk/descriptors/descriptor_set.hpp"
 #include "merian/vk/descriptors/descriptor_set_layout.hpp"
 
@@ -106,7 +106,7 @@ class Node : public std::enable_shared_from_this<Node> {
     // Normally this method is called by the graph configuration(), if you want to call it directly
     // you need to handle the NodeStatusFlags accordingly.
     [[nodiscard]]
-    virtual NodeStatusFlags configuration([[maybe_unused]] Configuration& config) {
+    virtual NodeStatusFlags properties([[maybe_unused]] Properties& config) {
         return {};
     }
 

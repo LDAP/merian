@@ -40,7 +40,7 @@ class Tonemap : public AbstractCompute {
 
     ShaderModuleHandle get_shader_module() override;
 
-    NodeStatusFlags configuration(Configuration& config) override;
+    NodeStatusFlags properties(Properties& config) override;
 
   private:
     void make_spec_info();

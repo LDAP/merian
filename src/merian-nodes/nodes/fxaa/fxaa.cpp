@@ -46,7 +46,7 @@ ShaderModuleHandle FXAA::get_shader_module() {
     return shader;
 }
 
-AbstractCompute::NodeStatusFlags FXAA::configuration(Configuration& config) {
+AbstractCompute::NodeStatusFlags FXAA::properties(Properties& config) {
     config.config_bool("enable", pc.enable, "");
     return {};
 }

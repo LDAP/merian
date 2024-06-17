@@ -163,7 +163,7 @@ void Accumulate::process(GraphRun& run,
     }
 }
 
-Accumulate::NodeStatusFlags Accumulate::configuration(Configuration& config) {
+Accumulate::NodeStatusFlags Accumulate::properties(Properties& config) {
     bool needs_rebuild = false;
     config.st_separate("Accumulation");
     config.config_float("alpha", accumulate_pc.accum_alpha, 0, 1,

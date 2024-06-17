@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "merian/utils/configuration.hpp"
+#include "merian/utils/properties.hpp"
 #include "merian/vk/descriptors/descriptor_set_update.hpp"
 
 #include "graph_run.hpp"
@@ -90,7 +90,7 @@ class Connector : public std::enable_shared_from_this<Connector> {
     }
 
     // Mainly to describe yourself
-    virtual void configuration([[maybe_unused]] Configuration& config) {}
+    virtual void properties([[maybe_unused]] Properties& config) {}
 
   public:
     const std::string name;

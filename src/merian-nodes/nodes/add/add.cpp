@@ -51,7 +51,7 @@ ShaderModuleHandle Add::get_shader_module() {
     return shader;
 }
 
-Add::NodeStatusFlags Add::configuration(Configuration&) {
+Add::NodeStatusFlags Add::properties(Properties&) {
     return {};
 }
 

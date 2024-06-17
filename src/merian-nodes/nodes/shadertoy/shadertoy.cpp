@@ -126,7 +126,7 @@ ShaderModuleHandle Shadertoy::get_shader_module() {
     return shader;
 }
 
-AbstractCompute::NodeStatusFlags Shadertoy::configuration(Configuration& config) {
+AbstractCompute::NodeStatusFlags Shadertoy::properties(Properties& config) {
     vk::Extent3D old_extent = extent;
     config.config_uint("width", extent.width, "");
     config.config_uint("height", extent.height, "");

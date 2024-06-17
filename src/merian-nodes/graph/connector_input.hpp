@@ -12,7 +12,7 @@ class InputConnector : public Connector {
   public:
     InputConnector(const std::string& name, const uint32_t delay) : Connector(name), delay(delay) {}
 
-    virtual void configuration(Configuration& config) {
+    virtual void properties(Properties& config) {
         config.output_text(fmt::format("delay: {}", delay));
     }
 

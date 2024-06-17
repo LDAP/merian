@@ -228,7 +228,7 @@ void SVGF::process([[maybe_unused]] GraphRun& run,
     }
 }
 
-SVGF::NodeStatusFlags SVGF::configuration(Configuration& config) {
+SVGF::NodeStatusFlags SVGF::properties(Properties& config) {
     bool needs_rebuild = false;
 
     config.st_separate("Variance estimate");
@@ -258,7 +258,7 @@ SVGF::NodeStatusFlags SVGF::configuration(Configuration& config) {
                         "z-dependent rejection: increase to reject more. Disable with <= 0.");
     int old_filter_type = filter_type;
     config.config_options("filter type", filter_type, {"atrous", "box", "subsampled"},
-                          Configuration::OptionsStyle::COMBO);
+                          Properties::OptionsStyle::COMBO);
     needs_rebuild |= old_filter_type != filter_type;
     int old_filter_variance = filter_variance;
     config.config_bool("filter variance", filter_variance, "Filter variance with a 3x3 gaussian");
@@ -274,11 +274,11 @@ SVGF::NodeStatusFlags SVGF::configuration(Configuration& config) {
     const int old_taa_clamping = taa_clamping;
     const int old_taa_mv_sampling = taa_mv_sampling;
     config.config_options("mv sampling", taa_mv_sampling, {"center", "magnitude dilation"},
-                          Configuration::OptionsStyle::COMBO);
+                          Properties::OptionsStyle::COMBO);
     config.config_options("filter", taa_filter_prev, {"none", "catmull rom"},
-                          Configuration::OptionsStyle::COMBO);
+                          Properties::OptionsStyle::COMBO);
     config.config_options("clamping", taa_clamping, {"min-max", "moments"},
-                          Configuration::OptionsStyle::COMBO);
+                          Properties::OptionsStyle::COMBO);
     if (taa_clamping == 1)
         config.config_float(
             "TAA rejection threshold", taa_pc.rejection_threshold,

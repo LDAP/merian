@@ -37,7 +37,7 @@ class VKDTFilmcurv : public AbstractCompute {
 
     ShaderModuleHandle get_shader_module() override;
 
-    NodeStatusFlags configuration(Configuration& config) override;
+    NodeStatusFlags properties(Properties& config) override;
 
   private:
     const std::optional<vk::Format> output_format;

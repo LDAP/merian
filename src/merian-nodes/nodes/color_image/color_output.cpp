@@ -31,7 +31,7 @@ void ColorImage::process([[maybe_unused]] GraphRun& run,
     }
 }
 
-ColorImage::NodeStatusFlags ColorImage::configuration(Configuration& config) {
+ColorImage::NodeStatusFlags ColorImage::properties(Properties& config) {
     const vk::ClearColorValue old_color = color;
     config.config_color("color", *merian::as_vec4((float*)&color));
     needs_run = old_color.float32 != color.float32;

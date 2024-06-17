@@ -53,7 +53,7 @@ class SVGF : public Node {
                  const DescriptorSetHandle& descriptor_set,
                  const NodeIO& io) override;
 
-    NodeStatusFlags configuration(Configuration& config) override;
+    NodeStatusFlags properties(Properties& config) override;
 
   private:
     const SharedContext context;

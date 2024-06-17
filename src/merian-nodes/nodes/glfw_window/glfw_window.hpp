@@ -91,7 +91,7 @@ class GLFWWindow : public Node {
         return swapchain;
     }
 
-    NodeStatusFlags configuration(Configuration& config) override {
+    NodeStatusFlags properties(Properties& config) override {
         GLFWmonitor* monitor = glfwGetWindowMonitor(*window);
         int fullscreen = monitor != NULL;
         const int old_fullscreen = fullscreen;
@@ -119,7 +119,7 @@ class GLFWWindow : public Node {
 
         int int_mode = mode;
         config.config_options("blit mode", int_mode, {"FIT", "FILL", "STRETCH"},
-                              Configuration::OptionsStyle::LIST_BOX);
+                              Properties::OptionsStyle::LIST_BOX);
         mode = (BlitMode)int_mode;
 
         // Perform the change in cmd_process, since recreating the swapchain here may interfere

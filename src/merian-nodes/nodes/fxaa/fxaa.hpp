@@ -1,7 +1,7 @@
 #pragma once
 
-#include "merian-nodes/nodes/compute_node/compute_node.hpp"
 #include "merian-nodes/connectors/managed_vk_image_in.hpp"
+#include "merian-nodes/nodes/compute_node/compute_node.hpp"
 
 namespace merian_nodes {
 
@@ -31,7 +31,7 @@ class FXAA : public AbstractCompute {
 
     ShaderModuleHandle get_shader_module() override;
 
-    NodeStatusFlags configuration(Configuration& config) override;
+    NodeStatusFlags properties(Properties& config) override;
 
   private:
     vk::Extent3D extent;

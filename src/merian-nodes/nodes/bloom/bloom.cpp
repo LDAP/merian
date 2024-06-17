@@ -75,7 +75,7 @@ void Bloom::process([[maybe_unused]] GraphRun& run,
     cmd.dispatch(group_count_x, group_count_y, 1);
 }
 
-Bloom::NodeStatusFlags Bloom::configuration(Configuration& config) {
+Bloom::NodeStatusFlags Bloom::properties(Properties& config) {
     config.config_float("brightness threshold", pc.threshold,
                         "Only areas brighter than that are affected", .1);
     config.config_float("strengh", pc.strength, "Controls the strength of the effect", .0001);

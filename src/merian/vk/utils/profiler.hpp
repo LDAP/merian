@@ -1,6 +1,6 @@
 #pragma once
 
-#include "merian/utils/configuration.hpp"
+#include "merian/utils/properties.hpp"
 #include "merian/utils/stopwatch.hpp"
 #include "merian/vk/utils/query_pool.hpp"
 
@@ -143,11 +143,11 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
     static std::string get_report_str(const Profiler::Report& report);
 
     // outputs the report as config
-    static void get_cpu_report_as_config(Configuration& config, const Profiler::Report& report);
-    static void get_gpu_report_as_config(Configuration& config, const Profiler::Report& report);
+    static void get_cpu_report_as_config(Properties& config, const Profiler::Report& report);
+    static void get_gpu_report_as_config(Properties& config, const Profiler::Report& report);
 
     // outputs the report as config
-    static void get_report_as_config(Configuration& config, const Profiler::Report& report);
+    static void get_report_as_config(Properties& config, const Profiler::Report& report);
 
   private:
     const SharedContext context;

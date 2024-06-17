@@ -1,20 +1,16 @@
 #pragma once
 
-#include "ext/json.hpp"
-#include "merian/utils/configuration.hpp"
+#include "properties.hpp"
 
 #include <string>
 #include <vector>
 
 namespace merian {
 
-class JSONLoadConfiguration : public Configuration {
+// A configuration recorder to display and set configuration from ImGui.
+class ImGuiProperties : public Properties {
   public:
-    JSONLoadConfiguration(const std::filesystem::path& filename);
-
-    JSONLoadConfiguration(const std::string& json_string);
-
-    virtual ~JSONLoadConfiguration() override;
+    virtual ~ImGuiProperties() override;
 
     virtual bool st_begin_child(const std::string& id, const std::string& label = "") override;
     virtual void st_end_child() override;
@@ -72,6 +68,7 @@ class JSONLoadConfiguration : public Configuration {
     config_float3(const std::string& id, float value[3], const std::string& desc = "") override;
     virtual void
     config_bool(const std::string& id, bool& value, const std::string& desc = "") override;
+    // For buttons
     virtual bool config_bool(const std::string& id, const std::string& desc = "") override;
     virtual void config_options(const std::string& id,
                                 int& selected,
@@ -88,10 +85,6 @@ class JSONLoadConfiguration : public Configuration {
                                        char* string,
                                        const bool needs_submit = false,
                                        const std::string& desc = "") override;
-
-  private:
-    std::string object_name;
-    std::vector<nlohmann::json> o;
 };
 
 } // namespace merian

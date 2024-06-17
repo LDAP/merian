@@ -413,59 +413,59 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         needs_reconnect = true;
     }
 
-    void configuration(Configuration& config) {
-        needs_reconnect |= config.config_bool("Rebuild");
+    void properties(Properties& props) {
+        needs_reconnect |= props.config_bool("Rebuild");
 
-        config.output_text(fmt::format("Current iteration: {}", iteration));
+        props.output_text(fmt::format("Current iteration: {}", iteration));
 
-        config.st_separate("Profiler");
-        config.config_bool("profiling", profiler_enable);
-        config.st_no_space();
-        config.config_uint("report intervall", profiler_report_intervall_ms,
-                           "Set the time period for the profiler to update in ms. Meaning, "
-                           "averages and deviations are calculated over this this period.");
+        props.st_separate("Profiler");
+        props.config_bool("profiling", profiler_enable);
+        props.st_no_space();
+        props.config_uint("report intervall", profiler_report_intervall_ms,
+                          "Set the time period for the profiler to update in ms. Meaning, "
+                          "averages and deviations are calculated over this this period.");
 
         if (profiler_enable) {
-            if (last_run_report && config.st_begin_child("run", "Graph Run")) {
+            if (last_run_report && props.st_begin_child("run", "Graph Run")) {
                 if (!last_run_report.cpu_report.empty()) {
-                    config.st_separate("CPU");
-                    config.output_plot_line("", cpu_time_history.data() + time_history_current + 1,
-                                            (cpu_time_history.size() / 2) - 1, 0, cpu_max);
-                    config.config_float("cpu max ms", cpu_max, 0, 1000);
-                    Profiler::get_cpu_report_as_config(config, last_run_report);
+                    props.st_separate("CPU");
+                    props.output_plot_line("", cpu_time_history.data() + time_history_current + 1,
+                                           (cpu_time_history.size() / 2) - 1, 0, cpu_max);
+                    props.config_float("cpu max ms", cpu_max, 0, 1000);
+                    Profiler::get_cpu_report_as_config(props, last_run_report);
                 }
 
                 if (!last_run_report.gpu_report.empty()) {
-                    config.st_separate("GPU");
-                    config.output_plot_line("", gpu_time_history.data() + time_history_current + 1,
-                                            (gpu_time_history.size() / 2) - 1, 0, gpu_max);
-                    config.config_float("gpu max ms", gpu_max, 0, 1000);
-                    Profiler::get_gpu_report_as_config(config, last_run_report);
+                    props.st_separate("GPU");
+                    props.output_plot_line("", gpu_time_history.data() + time_history_current + 1,
+                                           (gpu_time_history.size() / 2) - 1, 0, gpu_max);
+                    props.config_float("gpu max ms", gpu_max, 0, 1000);
+                    Profiler::get_gpu_report_as_config(props, last_run_report);
                 }
-                config.st_end_child();
+                props.st_end_child();
             }
-            if (last_build_report && config.st_begin_child("build", "Last Graph Build")) {
-                Profiler::get_report_as_config(config, last_build_report);
-                config.st_end_child();
+            if (last_build_report && props.st_begin_child("build", "Last Graph Build")) {
+                Profiler::get_report_as_config(props, last_build_report);
+                props.st_end_child();
             }
         }
 
-        config.st_separate("Nodes");
+        props.st_separate("Nodes");
 
         for (auto& [node, data] : node_data) {
             std::string node_label = fmt::format("{} ({})", data.name, node->name);
-            if (config.st_begin_child(data.name.c_str(), node_label.c_str())) {
-                const Node::NodeStatusFlags flags = node->configuration(config);
+            if (props.st_begin_child(data.name.c_str(), node_label.c_str())) {
+                const Node::NodeStatusFlags flags = node->properties(props);
                 needs_reconnect |= flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT;
-                config.st_separate();
-                io_configuration_for_node(config, data);
-                config.st_end_child();
+                props.st_separate();
+                io_props_for_node(props, data);
+                props.st_end_child();
             }
         }
     }
 
   private:
-    void io_configuration_for_node(Configuration& config, NodeData& data) {
+    void io_props_for_node(Properties& config, NodeData& data) {
         if (data.descriptor_set_layout &&
             config.st_begin_child("desc_set_layout", "Descriptor Set Layout")) {
             config.output_text(fmt::format("{}", data.descriptor_set_layout));
@@ -487,7 +487,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                             : std::to_string(per_output_info.descriptor_set_binding),
                         per_output_info.resources.size(), fmt::join(receivers, ", ")));
                     config.st_separate();
-                    output->configuration(config);
+                    output->properties(config);
                     config.st_end_child();
                 }
             }
@@ -504,7 +504,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                         per_input_info.output->name, node_data.at(per_input_info.node).name,
                         per_input_info.node->name));
                     config.st_separate();
-                    input->configuration(config);
+                    input->properties(config);
                     config.st_end_child();
                 }
             }

@@ -89,7 +89,7 @@ void MedianApproxNode::process([[maybe_unused]] GraphRun& run,
     cmd.dispatch(1, 1, 1);
 }
 
-MedianApproxNode::NodeStatusFlags MedianApproxNode::configuration(Configuration& config) {
+MedianApproxNode::NodeStatusFlags MedianApproxNode::properties(Properties& config) {
     config.config_float("min", pc.min);
     config.config_float("max", pc.max);
 

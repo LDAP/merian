@@ -12,7 +12,7 @@ namespace merian {
 // child.
 // Different recorders can for example display the configuration in a GUI,
 // dump it to a file or load a dump from a file.
-class Configuration {
+class Properties {
   public:
     enum class OptionsStyle {
         DONT_CARE,
@@ -21,7 +21,7 @@ class Configuration {
         LIST_BOX,
     };
 
-    virtual ~Configuration(){};
+    virtual ~Properties(){};
 
     // Structure
 

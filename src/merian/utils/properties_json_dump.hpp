@@ -1,19 +1,19 @@
 #pragma once
 
 #include "ext/json.hpp"
-#include "merian/utils/configuration.hpp"
+#include "properties.hpp"
 
 #include <string>
 #include <vector>
 
 namespace merian {
 
-class JSONDumpConfiguration : public Configuration {
+class JSONDumpProperties : public Properties {
   public:
     // If filename is not nullopt the configuration is dumped in the destructor.
-    JSONDumpConfiguration(const std::optional<std::filesystem::path>& filename = std::nullopt);
+    JSONDumpProperties(const std::optional<std::filesystem::path>& filename = std::nullopt);
 
-    virtual ~JSONDumpConfiguration() override;
+    virtual ~JSONDumpProperties() override;
 
     virtual bool st_begin_child(const std::string& id, const std::string& label = "") override;
     virtual void st_end_child() override;

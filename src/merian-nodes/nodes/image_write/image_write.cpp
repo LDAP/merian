@@ -291,10 +291,10 @@ void ImageWrite::process(GraphRun& run,
     record_iteration += record_enable ? it_offset : 0;
 }
 
-ImageWrite::NodeStatusFlags ImageWrite::configuration([[maybe_unused]] Configuration& config) {
+ImageWrite::NodeStatusFlags ImageWrite::properties([[maybe_unused]] Properties& config) {
     config.st_separate("General");
     config.config_options("format", format, {"PNG", "JPG", "HDR"},
-                          Configuration::OptionsStyle::COMBO);
+                          Properties::OptionsStyle::COMBO);
     config.config_bool("rebuild after capture", rebuild_after_capture,
                        "forces a graph rebuild after every capture");
     if (config.config_text("filename", buf.size(), buf.data(), false,
@@ -333,7 +333,7 @@ ImageWrite::NodeStatusFlags ImageWrite::configuration([[maybe_unused]] Configura
     config.st_separate();
 
     config.config_options("trigger", trigger, {"iteration", "frametime"},
-                          Configuration::OptionsStyle::COMBO);
+                          Properties::OptionsStyle::COMBO);
     if (trigger == 0) {
         config.config_int(
             "iteration", record_iteration,

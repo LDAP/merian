@@ -58,7 +58,7 @@ class Accumulate : public Node {
                  const DescriptorSetHandle& descriptor_set,
                  const NodeIO& io) override;
 
-    NodeStatusFlags configuration([[maybe_unused]] Configuration& config) override;
+    NodeStatusFlags properties([[maybe_unused]] Properties& config) override;
 
     // Clears the accumulation buffer at the next iteration.
     void request_clear();

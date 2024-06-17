@@ -123,7 +123,7 @@ void AutoExposure::process(GraphRun& run,
     cmd.dispatch(group_count_x, group_count_y, 1);
 }
 
-AutoExposure::NodeStatusFlags AutoExposure::configuration(Configuration& config) {
+AutoExposure::NodeStatusFlags AutoExposure::properties(Properties& config) {
     config.st_separate("General");
     bool autoexposure = pc.automatic;
     config.config_bool("autoexposure", autoexposure);
@@ -143,7 +143,7 @@ AutoExposure::NodeStatusFlags AutoExposure::configuration(Configuration& config)
     config.config_float("speed up", pc.speed_up);
     config.config_float("speed down", pc.speed_down);
     config.config_options("metering", pc.metering, {"uniform", "center-weighted", "center"},
-                          Configuration::OptionsStyle::COMBO);
+                          Properties::OptionsStyle::COMBO);
 
     config.st_separate("Manual");
     config.config_float("ISO", pc.iso, "Sensor sensitivity/gain (ISO)");

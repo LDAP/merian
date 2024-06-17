@@ -36,7 +36,7 @@ class ImageWrite : public Node {
                          const DescriptorSetHandle& descriptor_set,
                          const NodeIO& io) override;
 
-    virtual NodeStatusFlags configuration(Configuration& config) override;
+    virtual NodeStatusFlags properties(Properties& config) override;
 
     // Set a callback that can be called on capture or record.
     void set_callback(const std::function<void()> callback);

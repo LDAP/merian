@@ -55,7 +55,7 @@ ShaderModuleHandle VKDTFilmcurv::get_shader_module() {
     return shader;
 }
 
-AbstractCompute::NodeStatusFlags VKDTFilmcurv::configuration(Configuration& config) {
+AbstractCompute::NodeStatusFlags VKDTFilmcurv::properties(Properties& config) {
     config.config_float("brightness", pc.brightness, "", .01);
     config.config_float("contrast", pc.contrast, "", .01);
     config.config_float("bias", pc.bias, "", .01);

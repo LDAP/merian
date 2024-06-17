@@ -59,7 +59,7 @@ ShaderModuleHandle TAA::get_shader_module() {
     return shader;
 }
 
-AbstractCompute::NodeStatusFlags TAA::configuration(Configuration& config) {
+AbstractCompute::NodeStatusFlags TAA::properties(Properties& config) {
     config.config_percent("alpha", pc.temporal_alpha, "more means more reuse");
 
     std::vector<std::string> clamp_methods = {

@@ -40,7 +40,7 @@ class OutputConnector : public Connector {
     // or similar.
     virtual void on_connect_input([[maybe_unused]] const InputConnectorHandle& input) {}
 
-    virtual void configuration(Configuration& config) {
+    virtual void properties(Properties& config) {
         config.output_text(fmt::format("supports delay: {}", supports_delay));
     }
 

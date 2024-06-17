@@ -60,7 +60,7 @@ void LDRImageRead::process([[maybe_unused]] GraphRun& run,
     }
 }
 
-LDRImageRead::NodeStatusFlags LDRImageRead::configuration(Configuration& config) {
+LDRImageRead::NodeStatusFlags LDRImageRead::properties(Properties& config) {
     const vk::Format old_format = format;
     bool linear = format == vk::Format::eR8G8B8A8Unorm;
     config.config_bool("linear", linear);
