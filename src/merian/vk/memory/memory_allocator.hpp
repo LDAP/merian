@@ -1,5 +1,6 @@
 #pragma once
 
+#include "merian/utils/string.hpp"
 #include "merian/vk/context.hpp"
 #include "merian/vk/memory/resource_allocations.hpp"
 
@@ -84,6 +85,26 @@ class MemoryAllocator : public std::enable_shared_from_this<MemoryAllocator> {
     const SharedContext context;
 };
 
+struct MemoryAllocationInfo {
+    MemoryAllocationInfo(const vk::DeviceMemory memory,
+                         const vk::DeviceSize offset,
+                         const vk::DeviceSize size,
+                         const char* name)
+        : memory(memory), offset(offset), size(size), name(name) {}
+
+    const vk::DeviceMemory memory;
+    const vk::DeviceSize offset;
+    const vk::DeviceSize size;
+    const char* name;
+};
+
+inline std::string format_as(const MemoryAllocationInfo& alloc_info) {
+    return fmt::format("DeviceMemory: {}\nOffset: {}\nSize: {}\nName: {}",
+                       fmt::ptr(static_cast<VkDeviceMemory>(alloc_info.memory)),
+                       format_size(alloc_info.offset), format_size(alloc_info.size),
+                       alloc_info.name ? alloc_info.name : "<unknown>");
+}
+
 /* MemoryAllocation represents a memory allocation or sub-allocation from the
  * generic merian::MemoryAllocator interface. Ideally use `merian::NullMememoryAllocationHandle` for
  * setting to 'NULL'.
@@ -92,20 +113,6 @@ class MemoryAllocator : public std::enable_shared_from_this<MemoryAllocator> {
  * with their own data.
  */
 class MemoryAllocation : public std::enable_shared_from_this<MemoryAllocation> {
-  public:
-    struct MemoryInfo {
-        MemoryInfo(const vk::DeviceMemory memory,
-                   const vk::DeviceSize offset,
-                   const vk::DeviceSize size,
-                   const char* name)
-            : memory(memory), offset(offset), size(size), name(name) {}
-
-        const vk::DeviceMemory memory;
-        const vk::DeviceSize offset;
-        const vk::DeviceSize size;
-        const char* name;
-    };
-
   public:
     MemoryAllocation(const SharedContext& context) : context(context) {}
 
@@ -134,10 +141,14 @@ class MemoryAllocation : public std::enable_shared_from_this<MemoryAllocation> {
 
     // Retrieve detailed information about 'memHandle'. This may not be very efficient.
     // Try to avoid if possible
-    virtual MemoryInfo get_memory_info() const = 0;
+    virtual MemoryAllocationInfo get_memory_info() const = 0;
 
     const SharedContext& get_context() const {
         return context;
+    }
+
+    virtual void properties(Properties& props) {
+        props.output_text(fmt::format("{}", get_memory_info()));
     }
 
   protected:

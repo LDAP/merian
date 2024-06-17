@@ -2,6 +2,7 @@
 
 // Possible allocations together with their memory handles.
 
+#include "merian/utils/properties.hpp"
 #include "merian/vk/sampler/sampler.hpp"
 #include "merian/vk/utils/subresource_ranges.hpp"
 
@@ -80,6 +81,10 @@ class Buffer : public std::enable_shared_from_this<Buffer> {
                     const uint32_t src_queue_family_index = VK_QUEUE_FAMILY_IGNORED,
                     const uint32_t dst_queue_family_index = VK_QUEUE_FAMILY_IGNORED);
 
+    // -----------------------------------------------------------
+
+    void properties(Properties& props);
+
   private:
     const vk::Buffer buffer;
     const MemoryAllocationHandle memory;
@@ -142,6 +147,10 @@ class Image : public std::enable_shared_from_this<Image> {
 
     const vk::ImageTiling& get_tiling() const {
         return create_info.tiling;
+    }
+
+    const vk::ImageUsageFlags& get_usage_flags() const {
+        return create_info.usage;
     }
 
     // Use this only if you performed a layout transition without using barrier(...)
@@ -236,6 +245,10 @@ class Image : public std::enable_shared_from_this<Image> {
     // (https://www.khronos.org/registry/vulkan/specs/1.3-extensions/html/vkspec.html#VUID-VkImageViewCreateInfo-image-04441)
     bool valid_for_view();
 
+    // -----------------------------------------------------------
+
+    void properties(Properties& props);
+
   private:
     const vk::Image image = VK_NULL_HANDLE;
     const MemoryAllocationHandle memory;
@@ -297,6 +310,10 @@ class Texture : public std::enable_shared_from_this<Texture> {
 
     void set_sampler(const SamplerHandle& sampler);
 
+    // -----------------------------------------------------------
+
+    void properties(Properties& props);
+
   private:
     const vk::ImageView view;
     const ImageHandle image;
@@ -347,6 +364,10 @@ class AccelerationStructure : public std::enable_shared_from_this<AccelerationSt
 
     // E.g. needed for accelerationStructureReference in VkAccelerationStructureInstanceKHR
     vk::DeviceAddress get_acceleration_structure_device_address();
+
+    // -----------------------------------------------------------
+
+    void properties(Properties& props);
 
   private:
     const vk::AccelerationStructureKHR as;

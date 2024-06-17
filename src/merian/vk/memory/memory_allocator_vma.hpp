@@ -49,13 +49,15 @@ class VMAMemoryAllocation : public MemoryAllocation {
 
     // Retrieve detailed information about 'memHandle'
     // You should not call this to often
-    MemoryInfo get_memory_info() const override;
+    MemoryAllocationInfo get_memory_info() const override;
 
     // ------------------------------------------------------------------------------------
 
     VmaAllocation getAllocation() const {
         return m_allocation;
     }
+
+    void properties(Properties& props) override;
 
   private:
     const std::shared_ptr<VMAMemoryAllocator> allocator;

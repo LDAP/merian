@@ -1,4 +1,5 @@
 #include "merian/vk/memory/resource_allocations.hpp"
+#include "merian/utils/string.hpp"
 #include "merian/vk/memory/memory_allocator.hpp"
 #include "merian/vk/utils/barriers.hpp"
 
@@ -54,6 +55,16 @@ vk::BufferMemoryBarrier2 Buffer::buffer_barrier2(const vk::PipelineStageFlags2 s
             0,
             size,
             nullptr};
+}
+
+void Buffer::properties(Properties& props) {
+    props.output_text(fmt::format("Handle: {}\nSize: {}\nUsage: {}",
+                                  fmt::ptr(static_cast<VkBuffer>(buffer)), format_size(size),
+                                  vk::to_string(usage)));
+    if (props.st_begin_child("memory_info", "Memory")) {
+        get_memory()->properties(props);
+        props.st_end_child();
+    }
 }
 
 // --------------------------------------------------------------------------
@@ -152,6 +163,18 @@ bool Image::valid_for_view() {
     return false;
 }
 
+void Image::properties(Properties& props) {
+    props.output_text(fmt::format(
+        "Handle: {}\nExtent: {} x {} x {}\nUsage: {}\nTiling: {}\nFormat: {}\nCurrent Layout: {}",
+        fmt::ptr(static_cast<VkImage>(image)), get_extent().width, get_extent().height,
+        get_extent().depth, vk::to_string(get_usage_flags()), vk::to_string(get_tiling()),
+        vk::to_string(get_format()), vk::to_string(get_current_layout())));
+    if (props.st_begin_child("memory_info", "Memory")) {
+        get_memory()->properties(props);
+        props.st_end_child();
+    }
+}
+
 // --------------------------------------------------------------------------
 
 Texture::Texture(const vk::ImageView& view, const ImageHandle& image, const SamplerHandle& sampler)
@@ -168,6 +191,15 @@ void Texture::set_sampler(const SamplerHandle& sampler) {
     assert(sampler);
     this->sampler = sampler;
 }
+
+void Texture::properties(Properties& props) {
+    if (props.st_begin_child("image_info", "Image")) {
+        image->properties(props);
+        props.st_end_child();
+    }
+}
+
+// --------------------------------------------------------------------------
 
 AccelerationStructure::AccelerationStructure(
     const vk::AccelerationStructureKHR& as,
@@ -186,6 +218,13 @@ vk::DeviceAddress AccelerationStructure::get_acceleration_structure_device_addre
     vk::AccelerationStructureDeviceAddressInfoKHR address_info{as};
     return buffer->get_memory()->get_context()->device.getAccelerationStructureAddressKHR(
         address_info);
+}
+
+void AccelerationStructure::properties(Properties& props) {
+    if (props.st_begin_child("buffer_info", "Buffer")) {
+        buffer->properties(props);
+        props.st_end_child();
+    }
 }
 
 } // namespace merian

@@ -17,12 +17,14 @@ ResourceAllocator::ResourceAllocator(const SharedContext& context,
     const uint32_t missing_rgba = merian::uint32_from_rgba(1, 0, 1, 1);
     const std::vector<uint32_t> data = {missing_rgba, missing_rgba, missing_rgba, missing_rgba};
     context->get_queue_GCT()->submit_wait([&](const vk::CommandBuffer& cmd) {
-        dummy_texture = createTextureFromRGB8(cmd, data.data(), 2, 2, vk::Filter::eLinear);
+        dummy_texture = createTextureFromRGB8(cmd, data.data(), 2, 2, vk::Filter::eLinear, true,
+                                              "ResourceAllocator::dummy_texture");
         const auto img_transition =
             dummy_texture->get_image()->barrier2(vk::ImageLayout::eShaderReadOnlyOptimal);
         cmd.pipelineBarrier2(vk::DependencyInfo{{}, {}, {}, img_transition});
         dummy_buffer = createBuffer(cmd, data.size() * sizeof(uint32_t),
-                                    vk::BufferUsageFlagBits::eStorageBuffer, data.data());
+                                    vk::BufferUsageFlagBits::eStorageBuffer, data.data(),
+                                    MemoryMappingType::NONE, "ResourceAllocator::dummy_buffer");
     });
 
     SPDLOG_DEBUG("Uploaded dummy texture and buffer");

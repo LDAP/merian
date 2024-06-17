@@ -1,6 +1,4 @@
 #include "merian/vk/memory/memory_allocator_vma.hpp"
-#include "merian/utils/debug.hpp"
-#include "merian/utils/string.hpp"
 #include "merian/vk/memory/resource_allocations.hpp"
 #include "merian/vk/utils/check_result.hpp"
 #include <spdlog/spdlog.h>
@@ -57,13 +55,19 @@ void VMAMemoryAllocation::unmap() {
 
 // ------------------------------------------------------------------------------------
 
-VMAMemoryAllocation::MemoryInfo VMAMemoryAllocation::get_memory_info() const {
+MemoryAllocationInfo VMAMemoryAllocation::get_memory_info() const {
     const std::lock_guard<std::mutex> lock(allocation_mutex);
 
     VmaAllocationInfo allocInfo;
     vmaGetAllocationInfo(allocator->vma_allocator, m_allocation, &allocInfo);
-    return MemoryInfo{allocInfo.deviceMemory, allocInfo.offset, allocInfo.size, allocInfo.pName};
+    return MemoryAllocationInfo{allocInfo.deviceMemory, allocInfo.offset, allocInfo.size,
+                                allocInfo.pName};
 };
+
+void VMAMemoryAllocation::properties(Properties& props) {
+    MemoryAllocation::properties(props);
+    props.output_text(fmt::format("Mapped: {}", is_mapped));
+}
 
 //--------------------------------------------------------------------------------------------------
 //--------------------------------------------------------------------------------------------------
