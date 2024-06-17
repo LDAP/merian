@@ -87,10 +87,15 @@ void AutoExposure::process(GraphRun& run,
         pc.timediff = sw.seconds();
         sw.reset();
 
-        cmd.fillBuffer(*io[con_hist], 0, VK_WHOLE_SIZE, 0);
-        auto bar = io[con_hist]->buffer_barrier(vk::AccessFlagBits::eTransferWrite,
-                                                vk::AccessFlagBits::eShaderRead |
-                                                    vk::AccessFlagBits::eShaderWrite);
+        auto bar = io[con_hist]->buffer_barrier(vk::AccessFlagBits::eShaderRead |
+                                                    vk::AccessFlagBits::eShaderWrite,
+                                                vk::AccessFlagBits::eTransferWrite);
+        cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
+                            vk::PipelineStageFlagBits::eTransfer, {}, {}, bar, {});
+        io[con_hist]->fill(cmd);
+        bar = io[con_hist]->buffer_barrier(vk::AccessFlagBits::eTransferWrite,
+                                           vk::AccessFlagBits::eShaderRead |
+                                               vk::AccessFlagBits::eShaderWrite);
         cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
                             vk::PipelineStageFlagBits::eComputeShader, {}, {}, bar, {});
 
