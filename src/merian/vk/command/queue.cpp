@@ -32,17 +32,17 @@ void Queue::submit(
 }
 
 void Queue::submit(const std::vector<vk::CommandBuffer>& command_buffers,
-                   vk::Fence fence,
+                   const vk::Fence fence,
                    const std::vector<vk::Semaphore>& signal_semaphores,
                    const std::vector<vk::Semaphore>& wait_semaphores,
                    const std::vector<vk::PipelineStageFlags>& wait_dst_stage_mask) {
-    vk::SubmitInfo submit_info{wait_semaphores, wait_dst_stage_mask, command_buffers,
-                               signal_semaphores};
+    const vk::SubmitInfo submit_info{wait_semaphores, wait_dst_stage_mask, command_buffers,
+                                     signal_semaphores};
     submit(submit_info, fence);
 }
 
 void Queue::submit(const vk::CommandBuffer& command_buffer, vk::Fence fence) {
-    vk::SubmitInfo submit_info{
+    const vk::SubmitInfo submit_info{
         {}, {}, {}, 1, &command_buffer,
     };
     submit(submit_info, fence);
@@ -63,35 +63,51 @@ void Queue::submit_wait(const std::shared_ptr<CommandPool>& pool,
                         const std::vector<vk::Semaphore>& signal_semaphores,
                         const std::vector<vk::Semaphore>& wait_semaphores,
                         const std::vector<vk::PipelineStageFlags>& wait_dst_stage_mask) {
-    vk::SubmitInfo submit_info{wait_semaphores, wait_dst_stage_mask, pool->get_command_buffers(),
-                               signal_semaphores};
+    const vk::SubmitInfo submit_info{wait_semaphores, wait_dst_stage_mask,
+                                     pool->get_command_buffers(), signal_semaphores};
     submit_wait(submit_info, fence);
 }
 
-// Submits the command buffers then waits using waitIdle(), try to not use the _wait variants
 void Queue::submit_wait(const std::vector<vk::CommandBuffer>& command_buffers,
                         vk::Fence fence,
                         const std::vector<vk::Semaphore>& signal_semaphores,
                         const std::vector<vk::Semaphore>& wait_semaphores,
                         const vk::PipelineStageFlags& wait_dst_stage_mask) {
-    vk::SubmitInfo submit_info{wait_semaphores, wait_dst_stage_mask, command_buffers,
-                               signal_semaphores};
-    submit(submit_info, fence);
+    const vk::SubmitInfo submit_info{wait_semaphores, wait_dst_stage_mask, command_buffers,
+                                     signal_semaphores};
+    submit_wait(submit_info, fence);
 }
 
-// Submits the command buffers then waits using waitIdle(), try to not use the _wait variants
-void Queue::submit_wait(const vk::CommandBuffer& command_buffer, vk::Fence fence) {
-    vk::SubmitInfo submit_info{
+void Queue::submit_wait(const vk::CommandBuffer& command_buffer, const vk::Fence fence) {
+    const vk::SubmitInfo submit_info{
         {}, {}, {}, 1, &command_buffer,
     };
     submit_wait(submit_info, fence);
 }
 
-// Submits then waits using waitIdle(), try to not use the _wait variants
-void Queue::submit_wait(const vk::SubmitInfo& submit_info, vk::Fence fence) {
-    std::lock_guard<std::mutex> lock_guard(mutex);
-    check_result(queue.submit(1, &submit_info, fence), "queue submit failed");
-    queue.waitIdle();
+void Queue::submit_wait(const vk::SubmitInfo& submit_info, const vk::Fence fence) {
+    submit(submit_info, fence);
+    if (fence) {
+        check_result(context->device.waitForFences(fence, VK_TRUE, ~0ULL),
+                     "failed waiting for fence");
+    } else {
+        wait_idle();
+    }
+}
+
+void Queue::submit_wait(const CommandPoolHandle& cmd_pool,
+                        const std::function<void(const vk::CommandBuffer& cmd)>& cmd_function) {
+    const vk::CommandBuffer cmd = cmd_pool->create_and_begin();
+    cmd_function(cmd);
+    cmd.end();
+    const vk::Fence fence = context->device.createFence({});
+    submit_wait(cmd, fence);
+    context->device.destroyFence(fence);
+}
+
+void Queue::submit_wait(const std::function<void(const vk::CommandBuffer& cmd)>& cmd_function) {
+    const CommandPoolHandle cmd_pool = std::make_shared<CommandPool>(shared_from_this());
+    submit_wait(cmd_pool, cmd_function);
 }
 
 vk::Result Queue::present(const vk::PresentInfoKHR& present_info) {

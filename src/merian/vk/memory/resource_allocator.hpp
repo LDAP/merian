@@ -80,6 +80,10 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
                             debug_name, min_alignment);
     }
 
+    // Returns a dummy buffer containing exactly 4 entries of the "missing texture" color
+    // (1,0,1,1).
+    const BufferHandle& get_dummy_buffer() const;
+
     //--------------------------------------------------------------------------------------------------
 
     BufferHandle createScratchBuffer(const vk::DeviceSize size,
@@ -136,6 +140,9 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
                                         const bool isSRGB = true,
                                         const std::string& debug_name = {});
 
+    // Returns a dummy 4x4 texture with the "missing texture" color (1,0,1,1).
+    const TextureHandle& get_dummy_texture() const;
+
     //--------------------------------------------------------------------------------------------------
 
     AccelerationStructureHandle
@@ -161,6 +168,9 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
     const StagingMemoryManagerHandle m_staging;
     const SamplerPoolHandle m_samplerPool;
     const std::shared_ptr<ExtensionVkDebugUtils> debug_utils;
+
+    TextureHandle dummy_texture;
+    BufferHandle dummy_buffer;
 };
 
 using ResourceAllocatorHandle = std::shared_ptr<ResourceAllocator>;

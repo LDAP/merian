@@ -1,6 +1,6 @@
 #include "merian/vk/memory/resource_allocator.hpp"
+#include "merian/utils/colors.hpp"
 #include "merian/vk/extension/extension_vk_debug_utils.hpp"
-#include "merian/vk/utils/barriers.hpp"
 #include "merian/vk/utils/check_result.hpp"
 #include <spdlog/spdlog.h>
 
@@ -13,6 +13,19 @@ ResourceAllocator::ResourceAllocator(const SharedContext& context,
     : context(context), m_memAlloc(memAllocator), m_staging(staging), m_samplerPool(samplerPool),
       debug_utils(context->get_extension<ExtensionVkDebugUtils>()) {
     SPDLOG_DEBUG("create ResourceAllocator ({})", fmt::ptr(this));
+
+    const uint32_t missing_rgba = merian::uint32_from_rgba(1, 0, 1, 1);
+    const std::vector<uint32_t> data = {missing_rgba, missing_rgba, missing_rgba, missing_rgba};
+    context->get_queue_GCT()->submit_wait([&](const vk::CommandBuffer& cmd) {
+        dummy_texture = createTextureFromRGB8(cmd, data.data(), 2, 2, vk::Filter::eLinear);
+        const auto img_transition =
+            dummy_texture->get_image()->barrier2(vk::ImageLayout::eShaderReadOnlyOptimal);
+        cmd.pipelineBarrier2(vk::DependencyInfo{{}, {}, {}, img_transition});
+        dummy_buffer = createBuffer(cmd, data.size() * sizeof(uint32_t),
+                                    vk::BufferUsageFlagBits::eStorageBuffer, data.data());
+    });
+
+    SPDLOG_DEBUG("Uploaded dummy texture and buffer");
 }
 
 BufferHandle ResourceAllocator::createBuffer(const vk::BufferCreateInfo& info,
@@ -56,6 +69,10 @@ BufferHandle ResourceAllocator::createBuffer(const vk::CommandBuffer& cmdBuf,
     }
 
     return resultBuffer;
+}
+
+const BufferHandle& ResourceAllocator::get_dummy_buffer() const {
+    return dummy_buffer;
 }
 
 // You get the alignment from
@@ -195,6 +212,10 @@ TextureHandle ResourceAllocator::createTextureFromRGB8(const vk::CommandBuffer& 
         get_sampler_pool()->for_filter_and_address_mode(filter, vk::SamplerAddressMode::eRepeat);
 
     return createTexture(image, image->make_view_create_info(), sampler, debug_name);
+}
+
+const TextureHandle& ResourceAllocator::get_dummy_texture() const {
+    return dummy_texture;
 }
 
 AccelerationStructureHandle ResourceAllocator::createAccelerationStructure(

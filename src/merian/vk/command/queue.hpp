@@ -2,10 +2,16 @@
 
 #include "merian/vk/command/command_pool.hpp"
 
-#include <mutex>
 #include <vulkan/vulkan.hpp>
 
+#include <mutex>
+
 namespace merian {
+
+class Queue;
+using QueueHandle = std::shared_ptr<Queue>;
+class CommandPool;
+using CommandPoolHandle = std::shared_ptr<CommandPool>;
 
 /* A container that holds a queue together with a mutex and provides utility functions.
  *
@@ -19,7 +25,7 @@ class Queue : public std::enable_shared_from_this<Queue> {
     Queue(const SharedContext& context, uint32_t queue_family_index, uint32_t queue_index);
 
     void submit(const std::shared_ptr<CommandPool>& pool,
-                const vk::Fence fence,
+                const vk::Fence fence = VK_NULL_HANDLE,
                 const std::vector<vk::Semaphore>& signal_semaphores = {},
                 const std::vector<vk::Semaphore>& wait_semaphores = {},
                 const std::vector<vk::PipelineStageFlags>& wait_dst_stage_mask = {},
@@ -27,7 +33,7 @@ class Queue : public std::enable_shared_from_this<Queue> {
                     std::nullopt);
 
     void submit(const std::vector<vk::CommandBuffer>& command_buffers,
-                vk::Fence fence = VK_NULL_HANDLE,
+                const vk::Fence fence = VK_NULL_HANDLE,
                 const std::vector<vk::Semaphore>& signal_semaphores = {},
                 const std::vector<vk::Semaphore>& wait_semaphores = {},
                 const std::vector<vk::PipelineStageFlags>& wait_dst_stage_mask = {});
@@ -40,24 +46,43 @@ class Queue : public std::enable_shared_from_this<Queue> {
 
     void submit(const std::vector<vk::SubmitInfo>& submit_infos, vk::Fence fence = VK_NULL_HANDLE);
 
+    // Submits all command buffers of the pool, then waits using the fence or wait_idle().
     void submit_wait(const std::shared_ptr<CommandPool>& pool,
                      const vk::Fence fence = {},
                      const std::vector<vk::Semaphore>& signal_semaphores = {},
                      const std::vector<vk::Semaphore>& wait_semaphores = {},
                      const std::vector<vk::PipelineStageFlags>& wait_dst_stage_mask = {});
 
-    // Submits the command buffers then waits using waitIdle(), try to not use the _wait variants
+    // Submits the command buffers, then waits using the fence or wait_idle(). Try to not use the
+    // _wait variants.
     void submit_wait(const std::vector<vk::CommandBuffer>& command_buffers,
                      vk::Fence fence = VK_NULL_HANDLE,
                      const std::vector<vk::Semaphore>& signal_semaphores = {},
                      const std::vector<vk::Semaphore>& wait_semaphores = {},
                      const vk::PipelineStageFlags& wait_dst_stage_mask = {});
 
-    // Submits the command buffers then waits using waitIdle(), try to not use the _wait variants
-    void submit_wait(const vk::CommandBuffer& command_buffer, vk::Fence fence = VK_NULL_HANDLE);
+    // Submits the command buffer, then waits using the fence or wait_idle(). Try to not use the
+    // _wait variants.
+    void submit_wait(const vk::CommandBuffer& command_buffer,
+                     const vk::Fence fence = VK_NULL_HANDLE);
 
-    // Submits then waits using waitIdle(), try to not use the _wait variants
-    void submit_wait(const vk::SubmitInfo& submit_info, vk::Fence fence = VK_NULL_HANDLE);
+    // Submits, then waits using the fence or wait_idle(). Try to not use the _wait variants.
+    void submit_wait(const vk::SubmitInfo& submit_info, const vk::Fence fence = VK_NULL_HANDLE);
+
+    // Utility function that
+    // - Creates a command buffer
+    // - Records commands using the supplied cmd_function
+    // - Submits the command buffer
+    // - Waits for the execution to finish
+    void submit_wait(const CommandPoolHandle& cmd_pool,
+                     const std::function<void(const vk::CommandBuffer& cmd)>& cmd_function);
+
+    // Utility function that
+    // - Creates a command pool and command buffer
+    // - Records commands using the supplied cmd_function
+    // - Submits the command buffer
+    // - Waits for the execution to finish
+    void submit_wait(const std::function<void(const vk::CommandBuffer& cmd)>& cmd_function);
 
     vk::Result present(const vk::PresentInfoKHR& present_info);
 
@@ -97,7 +122,5 @@ class Queue : public std::enable_shared_from_this<Queue> {
     const uint32_t queue_family_index;
     std::mutex mutex;
 };
-
-using QueueHandle = std::shared_ptr<Queue>;
 
 } // namespace merian
