@@ -10,9 +10,8 @@ namespace merian {
 
 Buffer::Buffer(const vk::Buffer& buffer,
                const MemoryAllocationHandle& memory,
-               const vk::BufferUsageFlags& usage,
-               const vk::DeviceSize& size)
-    : buffer(buffer), memory(memory), usage(usage), size(size) {}
+               const vk::BufferCreateInfo& create_info)
+    : buffer(buffer), memory(memory), create_info(create_info) {}
 
 Buffer::~Buffer() {
     SPDLOG_TRACE("destroy buffer ({})", fmt::ptr(static_cast<VkBuffer>(buffer)));
@@ -20,7 +19,7 @@ Buffer::~Buffer() {
 }
 
 vk::DeviceAddress Buffer::get_device_address() {
-    assert(usage | vk::BufferUsageFlagBits::eShaderDeviceAddress);
+    assert(create_info.usage | vk::BufferUsageFlagBits::eShaderDeviceAddress);
     return memory->get_context()->device.getBufferAddress(get_buffer_device_address_info());
 }
 
@@ -57,10 +56,14 @@ vk::BufferMemoryBarrier2 Buffer::buffer_barrier2(const vk::PipelineStageFlags2 s
             nullptr};
 }
 
+BufferHandle Buffer::create_aliasing_buffer() {
+    return get_memory()->create_aliasing_buffer(create_info);
+}
+
 void Buffer::properties(Properties& props) {
     props.output_text(fmt::format("Handle: {}\nSize: {}\nUsage: {}",
-                                  fmt::ptr(static_cast<VkBuffer>(buffer)), format_size(size),
-                                  vk::to_string(usage)));
+                                  fmt::ptr(static_cast<VkBuffer>(buffer)),
+                                  format_size(create_info.size), vk::to_string(create_info.usage)));
     if (props.st_begin_child("memory_info", "Memory")) {
         get_memory()->properties(props);
         props.st_end_child();
@@ -161,6 +164,10 @@ bool Image::valid_for_view() {
         return true;
     }
     return false;
+}
+
+ImageHandle Image::create_aliasing_image() {
+    return get_memory()->create_aliasing_image(create_info);
 }
 
 void Image::properties(Properties& props) {

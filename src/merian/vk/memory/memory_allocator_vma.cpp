@@ -55,6 +55,35 @@ void VMAMemoryAllocation::unmap() {
 
 // ------------------------------------------------------------------------------------
 
+ImageHandle
+VMAMemoryAllocation::create_aliasing_image(const vk::ImageCreateInfo& image_create_info) {
+    std::lock_guard<std::mutex> lock(allocation_mutex);
+    assert(m_allocation); // freed?
+
+    vk::Image image;
+    vmaCreateAliasingImage(allocator->vma_allocator, m_allocation,
+                           reinterpret_cast<const VkImageCreateInfo*>(&image_create_info),
+                           reinterpret_cast<VkImage*>(&image));
+
+    return std::make_shared<Image>(image, shared_from_this(), image_create_info,
+                                   image_create_info.initialLayout);
+}
+
+BufferHandle
+VMAMemoryAllocation::create_aliasing_buffer(const vk::BufferCreateInfo& buffer_create_info) {
+    std::lock_guard<std::mutex> lock(allocation_mutex);
+    assert(m_allocation); // freed?
+
+    vk::Buffer buffer;
+    vmaCreateAliasingBuffer(allocator->vma_allocator, m_allocation,
+                            reinterpret_cast<const VkBufferCreateInfo*>(&buffer_create_info),
+                            reinterpret_cast<VkBuffer*>(&buffer));
+
+    return std::make_shared<Buffer>(buffer, shared_from_this(), buffer_create_info);
+}
+
+// ------------------------------------------------------------------------------------
+
 MemoryAllocationInfo VMAMemoryAllocation::get_memory_info() const {
     const std::lock_guard<std::mutex> lock(allocation_mutex);
 
@@ -220,8 +249,7 @@ BufferHandle VMAMemoryAllocator::create_buffer(const vk::BufferCreateInfo buffer
         static_pointer_cast<VMAMemoryAllocator>(shared_from_this());
     auto memory =
         std::make_shared<VMAMemoryAllocation>(context, allocator, mapping_type, allocation);
-    auto buffer_handle =
-        std::make_shared<Buffer>(buffer, memory, buffer_create_info.usage, buffer_create_info.size);
+    auto buffer_handle = std::make_shared<Buffer>(buffer, memory, buffer_create_info);
     log_allocation(allocation_info, memory, debug_name);
 
     return buffer_handle;

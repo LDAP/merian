@@ -16,6 +16,8 @@ namespace merian {
 // Forward def
 class MemoryAllocation;
 using MemoryAllocationHandle = std::shared_ptr<MemoryAllocation>;
+class Buffer;
+using BufferHandle = std::shared_ptr<Buffer>;
 
 class Buffer : public std::enable_shared_from_this<Buffer> {
   public:
@@ -24,8 +26,7 @@ class Buffer : public std::enable_shared_from_this<Buffer> {
     // It is asserted that the memory represented by `memory` is already bound to `buffer`.
     Buffer(const vk::Buffer& buffer,
            const MemoryAllocationHandle& memory,
-           const vk::BufferUsageFlags& usage,
-           const vk::DeviceSize& size);
+           const vk::BufferCreateInfo& create_info);
 
     ~Buffer();
 
@@ -48,7 +49,7 @@ class Buffer : public std::enable_shared_from_this<Buffer> {
     }
 
     vk::DeviceSize get_size() const noexcept {
-        return size;
+        return create_info.size;
     }
 
     // -----------------------------------------------------------
@@ -63,6 +64,8 @@ class Buffer : public std::enable_shared_from_this<Buffer> {
     void fill(const vk::CommandBuffer& cmd, const uint32_t data = 0) {
         cmd.fillBuffer(buffer, 0, VK_WHOLE_SIZE, data);
     }
+
+    BufferHandle create_aliasing_buffer();
 
     // Return a suitable vk::BufferMemoryBarrier.
     [[nodiscard]] vk::BufferMemoryBarrier
@@ -88,8 +91,7 @@ class Buffer : public std::enable_shared_from_this<Buffer> {
   private:
     const vk::Buffer buffer;
     const MemoryAllocationHandle memory;
-    const vk::BufferUsageFlags usage;
-    const vk::DeviceSize size;
+    const vk::BufferCreateInfo create_info;
 };
 
 class Image;
@@ -245,6 +247,8 @@ class Image : public std::enable_shared_from_this<Image> {
     // (https://www.khronos.org/registry/vulkan/specs/1.3-extensions/html/vkspec.html#VUID-VkImageViewCreateInfo-image-04441)
     bool valid_for_view();
 
+    ImageHandle create_aliasing_image();
+
     // -----------------------------------------------------------
 
     void properties(Properties& props);
@@ -320,7 +324,6 @@ class Texture : public std::enable_shared_from_this<Texture> {
     SamplerHandle sampler;
 };
 
-using BufferHandle = std::shared_ptr<Buffer>;
 using TextureHandle = std::shared_ptr<Texture>;
 
 class AccelerationStructure : public std::enable_shared_from_this<AccelerationStructure> {

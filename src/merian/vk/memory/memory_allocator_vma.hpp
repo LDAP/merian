@@ -52,6 +52,12 @@ class VMAMemoryAllocation : public MemoryAllocation {
     MemoryAllocationInfo get_memory_info() const override;
 
     // ------------------------------------------------------------------------------------
+    
+    ImageHandle create_aliasing_image(const vk::ImageCreateInfo& image_create_info) override;
+
+    BufferHandle create_aliasing_buffer(const vk::BufferCreateInfo& buffer_create_info) override;
+
+    // ------------------------------------------------------------------------------------
 
     VmaAllocation getAllocation() const {
         return m_allocation;

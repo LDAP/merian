@@ -139,6 +139,14 @@ class MemoryAllocation : public std::enable_shared_from_this<MemoryAllocation> {
 
     // ------------------------------------------------------------------------------------
 
+    // Creates an image that points to this memory
+    virtual ImageHandle create_aliasing_image(const vk::ImageCreateInfo& image_create_info) = 0;
+
+    // Creates a buffer that points to this memory
+    virtual BufferHandle create_aliasing_buffer(const vk::BufferCreateInfo& buffer_create_info) = 0;
+
+    // ------------------------------------------------------------------------------------
+
     // Retrieve detailed information about 'memHandle'. This may not be very efficient.
     // Try to avoid if possible
     virtual MemoryAllocationInfo get_memory_info() const = 0;
