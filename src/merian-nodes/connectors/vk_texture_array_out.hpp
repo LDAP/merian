@@ -59,6 +59,8 @@ class TextureArrayOut : public TypedOutputConnector<TextureArrayResource&> {
                     std::vector<vk::ImageMemoryBarrier2>& image_barriers,
                     std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) override;
 
+    uint32_t array_size() const;
+
   public:
     static TextureArrayOutHandle create(const std::string& name, const uint32_t array_size);
 

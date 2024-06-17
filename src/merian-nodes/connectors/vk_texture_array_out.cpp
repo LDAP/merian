@@ -100,4 +100,8 @@ TextureArrayOutHandle TextureArrayOut::create(const std::string& name, const uin
     return std::make_shared<TextureArrayOut>(name, array_size);
 }
 
+uint32_t TextureArrayOut::array_size() const {
+    return textures.size();
+}
+
 } // namespace merian_nodes
