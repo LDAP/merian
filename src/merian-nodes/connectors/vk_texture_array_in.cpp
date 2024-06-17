@@ -35,7 +35,7 @@ void TextureArrayIn::on_connect_output(const OutputConnectorHandle& output) {
         throw graph_errors::connector_error{
             fmt::format("TextureArrayIn {} cannot recive from {}.", name, output->name)};
     }
-    array_size = casted_output->array_size;
+    array_size = casted_output->textures.size();
 }
 
 TextureArrayInHandle

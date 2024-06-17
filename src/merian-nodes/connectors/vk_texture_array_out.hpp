@@ -10,6 +10,9 @@ using TextureArrayOutHandle = std::shared_ptr<TextureArrayOut>;
 
 // Output an array of textures to use in a shader.
 //
+// Note that this connector does also persist the textures accross graph rebuilds and it does
+// inititalize all slots with an dummy texture (ResourceAllocator::get_dummy_texture()).
+//
 // When you set the texture the layout is automatically converted to eShaderReadOnlyOptimal after
 // Node::process was called.
 //
@@ -60,7 +63,7 @@ class TextureArrayOut : public TypedOutputConnector<TextureArrayResource&> {
     static TextureArrayOutHandle create(const std::string& name, const uint32_t array_size);
 
   private:
-    const uint32_t array_size;
+    std::vector<merian::TextureHandle> textures;
     const std::optional<vk::ShaderStageFlags> stage_flags;
 };
 

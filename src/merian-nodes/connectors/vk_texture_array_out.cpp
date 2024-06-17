@@ -1,6 +1,5 @@
 #include "vk_texture_array_out.hpp"
 #include "graph/node.hpp"
-#include "merian-nodes/graph/errors.hpp"
 #include "merian/utils/pointer.hpp"
 
 namespace merian_nodes {
@@ -8,18 +7,19 @@ namespace merian_nodes {
 TextureArrayOut::TextureArrayOut(const std::string& name,
                                  const uint32_t array_size,
                                  const std::optional<vk::ShaderStageFlags>& stage_flags)
-    : TypedOutputConnector(name, false), array_size(array_size), stage_flags(stage_flags) {}
+    : TypedOutputConnector(name, false), textures(array_size), stage_flags(stage_flags) {}
 
 std::optional<vk::DescriptorSetLayoutBinding> TextureArrayOut::get_descriptor_info() const {
     if (stage_flags)
         return vk::DescriptorSetLayoutBinding{0, vk::DescriptorType::eCombinedImageSampler,
-                                              array_size, *stage_flags, nullptr};
+                                              static_cast<uint32_t>(textures.size()), *stage_flags,
+                                              nullptr};
     return std::nullopt;
 }
 
-void TextureArrayOut::get_descriptor_update([[maybe_unused]] const uint32_t binding,
-                                            [[maybe_unused]] GraphResourceHandle& resource,
-                                            [[maybe_unused]] DescriptorSetUpdate& update) {
+void TextureArrayOut::get_descriptor_update(const uint32_t binding,
+                                            GraphResourceHandle& resource,
+                                            DescriptorSetUpdate& update) {
     const auto& res = debugable_ptr_cast<TextureArrayResource>(resource);
     for (auto& pending_update : res->pending_updates) {
         update.write_descriptor_texture(binding, res->textures[pending_update], pending_update, 1,
@@ -34,7 +34,16 @@ GraphResourceHandle TextureArrayOut::create_resource(
     [[maybe_unused]] const uint32_t resoruce_index,
     const uint32_t ring_size) {
 
-    return std::make_shared<TextureArrayResource>(array_size, ring_size);
+    auto res = std::make_shared<TextureArrayResource>(textures, ring_size);
+
+    for (uint32_t i = 0; i < textures.size(); i++) {
+        if (!textures[i]) {
+            textures[i] = allocator->get_dummy_texture();
+        }
+        res->current_updates.push_back(i);
+    }
+
+    return res;
 }
 
 TextureArrayResource& TextureArrayOut::resource(const GraphResourceHandle& resource) {
@@ -76,15 +85,11 @@ Connector::ConnectorStatusFlags TextureArrayOut::on_post_process(
         flags |= NEEDS_DESCRIPTOR_UPDATE;
     }
 
-    for (uint32_t i = 0; i < array_size; i++) {
-        if (!res->textures[i]) {
-            throw graph_errors::connector_error{fmt::format(
-                "array index {} if connector {} in node {} was not set.", i, name, node->name)};
-        }
-        res->in_flight_textures[run.get_in_flight_index()][i] = res->textures[i];
-        if (res->textures[i]->get_current_layout() != vk::ImageLayout::eShaderReadOnlyOptimal) {
+    for (uint32_t i = 0; i < textures.size(); i++) {
+        res->in_flight_textures[run.get_in_flight_index()][i] = textures[i];
+        if (textures[i]->get_current_layout() != vk::ImageLayout::eShaderReadOnlyOptimal) {
             image_barriers.emplace_back(
-                res->textures[i]->get_image()->barrier2(vk::ImageLayout::eShaderReadOnlyOptimal));
+                textures[i]->get_image()->barrier2(vk::ImageLayout::eShaderReadOnlyOptimal));
         }
     }
 

@@ -11,9 +11,9 @@ class TextureArrayResource : public GraphResource {
     friend class TextureArrayIn;
 
   public:
-    TextureArrayResource(const uint32_t array_size, const uint32_t ring_size)
-        : textures(array_size) {
-        in_flight_textures.assign(ring_size, std::vector<merian::TextureHandle>(array_size));
+    TextureArrayResource(std::vector<merian::TextureHandle>& textures, const uint32_t ring_size)
+        : textures(textures) {
+        in_flight_textures.assign(ring_size, std::vector<merian::TextureHandle>(textures.size()));
     }
 
     void set(const uint32_t index, const merian::TextureHandle& tex) {
@@ -31,7 +31,7 @@ class TextureArrayResource : public GraphResource {
     // then flushed to here to wait for the graph to apply descriptor updates.
     std::vector<uint32_t> pending_updates;
 
-    std::vector<merian::TextureHandle> textures;
+    std::vector<merian::TextureHandle>& textures;
     // on_post_process copy here to keep alive
     std::vector<std::vector<merian::TextureHandle>> in_flight_textures;
 };
