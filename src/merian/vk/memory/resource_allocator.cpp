@@ -17,7 +17,7 @@ ResourceAllocator::ResourceAllocator(const SharedContext& context,
     const uint32_t missing_rgba = merian::uint32_from_rgba(1, 0, 1, 1);
     const std::vector<uint32_t> data = {missing_rgba, missing_rgba, missing_rgba, missing_rgba};
     context->get_queue_GCT()->submit_wait([&](const vk::CommandBuffer& cmd) {
-        dummy_texture = createTextureFromRGB8(cmd, data.data(), 2, 2, vk::Filter::eLinear, true,
+        dummy_texture = createTextureFromRGBA8(cmd, data.data(), 2, 2, vk::Filter::eLinear, true,
                                               "ResourceAllocator::dummy_texture");
         const auto img_transition =
             dummy_texture->get_image()->barrier2(vk::ImageLayout::eShaderReadOnlyOptimal);
@@ -184,7 +184,7 @@ TextureHandle ResourceAllocator::createTexture(const ImageHandle& image,
     return createTexture(image, view_create_info, sampler, debug_name);
 }
 
-TextureHandle ResourceAllocator::createTextureFromRGB8(const vk::CommandBuffer& cmd,
+TextureHandle ResourceAllocator::createTextureFromRGBA8(const vk::CommandBuffer& cmd,
                                                        const uint32_t* data,
                                                        const uint32_t width,
                                                        const uint32_t height,

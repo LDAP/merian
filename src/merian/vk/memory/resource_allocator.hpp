@@ -132,7 +132,7 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
     // layout: the layout for the image view
     //
     // Important: You are responsible to perform the image transition!
-    TextureHandle createTextureFromRGB8(const vk::CommandBuffer& cmd,
+    TextureHandle createTextureFromRGBA8(const vk::CommandBuffer& cmd,
                                         const uint32_t* data,
                                         const uint32_t width,
                                         const uint32_t height,
