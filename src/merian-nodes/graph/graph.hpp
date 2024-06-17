@@ -480,14 +480,24 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                                                            node_data.at(node).name, node->name));
                     }
 
+                    const uint32_t set_idx = iteration % data.descriptor_sets.size();
+                    auto& [cur_resouruce, cur_resource_index] =
+                        per_output_info.precomputed_resources[set_idx];
+
                     config.output_text(fmt::format(
-                        "descriptor set binding: {}\nresources: {}\nsending to: [{}]",
+                        "Descriptor set binding: {}\n# Resources: {:02}\nResource index: "
+                        "{:02}\nSending to: [{}]",
                         per_output_info.descriptor_set_binding == NodeData::NO_DESCRIPTOR_BINDING
                             ? "None"
                             : std::to_string(per_output_info.descriptor_set_binding),
-                        per_output_info.resources.size(), fmt::join(receivers, ", ")));
-                    config.st_separate();
+                        per_output_info.resources.size(), cur_resource_index,
+                        fmt::join(receivers, ", ")));
+
+                    config.st_separate("Output Properties");
                     output->properties(config);
+                    config.st_separate("Resource Properties");
+                    cur_resouruce->properties(config);
+
                     config.st_end_child();
                 }
             }
@@ -497,13 +507,13 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             for (auto& [input, per_input_info] : data.input_connections) {
                 if (config.st_begin_child(input->name, input->name)) {
                     config.output_text(fmt::format(
-                        "descriptor set binding: {}\nreceiving from: {}, {} ({})",
+                        "Descriptor set binding: {}\nReceiving from: {}, {} ({})",
                         per_input_info.descriptor_set_binding == NodeData::NO_DESCRIPTOR_BINDING
                             ? "None"
                             : std::to_string(per_input_info.descriptor_set_binding),
                         per_input_info.output->name, node_data.at(per_input_info.node).name,
                         per_input_info.node->name));
-                    config.st_separate();
+                    config.st_separate("Input Properties");
                     input->properties(config);
                     config.st_end_child();
                 }

@@ -25,6 +25,18 @@ class TextureArrayResource : public GraphResource {
         return textures[index];
     }
 
+    void properties(merian::Properties& props) override {
+        props.output_text(fmt::format("Array size: {}\nPending updates: {}\nPending updates: {}\n",
+                                      textures.size(), current_updates.size(),
+                                      pending_updates.size()));
+        for (uint32_t i = 0; i < textures.size(); i++) {
+            if (props.st_begin_child(std::to_string(i), fmt::format("Texture {:04d}", i))) {
+                textures[i]->properties(props);
+                props.st_end_child();
+            }
+        }
+    }
+
   private:
     // the updates to "textures" are recorded here.
     std::vector<uint32_t> current_updates;

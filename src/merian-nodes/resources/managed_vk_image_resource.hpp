@@ -2,6 +2,8 @@
 
 #include "merian-nodes/graph/resource.hpp"
 
+#include "merian/vk/memory/resource_allocations.hpp"
+
 namespace merian_nodes {
 
 class ManagedVkImageResource : public GraphResource {
@@ -9,15 +11,19 @@ class ManagedVkImageResource : public GraphResource {
     friend class ManagedVkImageOut;
 
   public:
-    ManagedVkImageResource(const ImageHandle& image,
-                    const vk::PipelineStageFlags2& input_stage_flags,
-                    const vk::AccessFlags2& input_access_flags)
+    ManagedVkImageResource(const merian::ImageHandle& image,
+                           const vk::PipelineStageFlags2& input_stage_flags,
+                           const vk::AccessFlags2& input_access_flags)
         : image(image), input_stage_flags(input_stage_flags),
           input_access_flags(input_access_flags) {}
 
+    void properties(merian::Properties& props) override {
+        image->properties(props);
+    }
+
   private:
-    const ImageHandle image;
-    std::optional<TextureHandle> tex;
+    const merian::ImageHandle image;
+    std::optional<merian::TextureHandle> tex;
 
     // for barrier insertions
     vk::PipelineStageFlags2 current_stage_flags = vk::PipelineStageFlagBits2::eTopOfPipe;

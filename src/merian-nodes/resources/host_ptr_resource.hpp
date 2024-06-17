@@ -1,6 +1,7 @@
 #pragma once
 
 #include "merian-nodes/graph/resource.hpp"
+#include <fmt/format.h>
 
 namespace merian_nodes {
 
@@ -10,6 +11,10 @@ template <typename T> class PtrResource : public GraphResource {
 
   public:
     PtrResource(const int32_t num_inputs) : num_inputs(num_inputs) {}
+
+    void properties(merian::Properties& props) override {
+        props.output_text(fmt::format("Raw: {}", ptr != nullptr ? fmt::ptr(ptr.get()) : "<null>"));
+    }
 
   private:
     const int32_t num_inputs;
