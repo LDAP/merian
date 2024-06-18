@@ -50,7 +50,7 @@ class TextureArrayResource : public GraphResource {
 
     void properties(merian::Properties& props) override {
         props.output_text(
-            fmt::format("Array size: {}\nPending updates: {}\nPending updates: {}\nInput access "
+            fmt::format("Array size: {}\nCurrent updates: {}\nPending updates: {}\nInput access "
                         "flags: {}\nInput pipeline stages: {}\nInput first layout: {}",
                         textures.size(), current_updates.size(), pending_updates.size(),
                         vk::to_string(input_access_flags), vk::to_string(input_stage_flags),
