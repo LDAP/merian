@@ -481,8 +481,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                     }
 
                     const uint32_t set_idx = iteration % data.descriptor_sets.size();
-                    auto& [cur_resouruce, cur_resource_index] =
-                        per_output_info.precomputed_resources[set_idx];
+                    auto& [_, cur_resource_index] = per_output_info.precomputed_resources[set_idx];
 
                     config.output_text(fmt::format(
                         "Descriptor set binding: {}\n# Resources: {:02}\nResource index: "
@@ -493,10 +492,16 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                         per_output_info.resources.size(), cur_resource_index,
                         fmt::join(receivers, ", ")));
 
-                    config.st_separate("Output Properties");
+                    config.st_separate("Connector Properties");
                     output->properties(config);
                     config.st_separate("Resource Properties");
-                    cur_resouruce->properties(config);
+                    for (uint32_t i = 0; i < per_output_info.resources.size(); i++) {
+                        if (config.st_begin_child(fmt::format("resource_{}", i),
+                                                  fmt::format("Resource {:02}", i))) {
+                            per_output_info.resources[i].resource->properties(config);
+                            config.st_end_child();
+                        }
+                    }
 
                     config.st_end_child();
                 }
