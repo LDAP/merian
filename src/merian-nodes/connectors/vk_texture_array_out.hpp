@@ -21,18 +21,8 @@ class TextureArrayOut : public TypedOutputConnector<TextureArrayResource&> {
     friend class TextureArrayIn;
 
   public:
-    // A descriptor binding is only created if stage flags are supplied.
-    // Note that you are responsible to convert the image to the layout that is required for the
-    // descriptor binding.
-    TextureArrayOut(const std::string& name,
-                    const uint32_t array_size,
-                    const std::optional<vk::ShaderStageFlags>& stage_flags = {});
-
-    std::optional<vk::DescriptorSetLayoutBinding> get_descriptor_info() const override;
-
-    void get_descriptor_update(const uint32_t binding,
-                               GraphResourceHandle& resource,
-                               DescriptorSetUpdate& update) override;
+    // No descriptor binding is created.
+    TextureArrayOut(const std::string& name, const uint32_t array_size);
 
     GraphResourceHandle
     create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
@@ -66,7 +56,6 @@ class TextureArrayOut : public TypedOutputConnector<TextureArrayResource&> {
 
   private:
     std::vector<merian::TextureHandle> textures;
-    const std::optional<vk::ShaderStageFlags> stage_flags;
 };
 
 } // namespace merian_nodes

@@ -26,6 +26,8 @@ class OutputConnector : public Connector {
     // connector.on_post_process with this resource the memory is not in use and syncronization is
     // ensured.
     //
+    // The inputs are supplied in the order they are serialized by the graph.
+    //
     // resource_index: 0 <= i <= max_delay
     // ring_size: Number of iterations in flight
     virtual GraphResourceHandle
