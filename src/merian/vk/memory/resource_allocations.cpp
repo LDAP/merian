@@ -228,6 +228,10 @@ vk::DeviceAddress AccelerationStructure::get_acceleration_structure_device_addre
 }
 
 void AccelerationStructure::properties(Properties& props) {
+    props.output_text(fmt::format("Size: {}\nBuild scratch size: {}\nUpdate scratch size: {}",
+                                  format_size(size_info.accelerationStructureSize),
+                                  format_size(size_info.buildScratchSize),
+                                  format_size(size_info.updateScratchSize)));
     if (props.st_begin_child("buffer_info", "Buffer")) {
         buffer->properties(props);
         props.st_end_child();

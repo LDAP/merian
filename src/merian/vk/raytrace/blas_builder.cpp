@@ -89,9 +89,10 @@ void BLASBuilder::queue_rebuild(
     pending.emplace_back(build_info, geometry, range_info);
 }
 
-void BLASBuilder::get_cmds(const vk::CommandBuffer& cmd, const EventHandle& compact_signal_event) {
+BufferHandle BLASBuilder::get_cmds(const vk::CommandBuffer& cmd,
+                                   const EventHandle& compact_signal_event) {
     if (pending.empty())
-        return;
+        return nullptr;
 
     std::lock_guard<std::mutex> lock(mutex);
 
@@ -132,6 +133,7 @@ void BLASBuilder::get_cmds(const vk::CommandBuffer& cmd, const EventHandle& comp
 
     pending.clear();
     pending_min_scratch_buffer = 0;
+    return scratch_buffer;
 }
 
 } // namespace merian

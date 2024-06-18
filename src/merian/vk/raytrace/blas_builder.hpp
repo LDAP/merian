@@ -105,9 +105,11 @@ class BLASBuilder : public ASBuilder {
                        const AccelerationStructureHandle as,
                        const vk::BuildAccelerationStructureFlagsKHR build_flags);
 
-    // Note that you must execute the command buffer, else the returned acceleration structures are
-    // not valid.
-    void get_cmds(const vk::CommandBuffer& cmd, const EventHandle& compact_signal_event = nullptr);
+    // The returned buffer is the scratch buffer for this build, which has to be kept alive while
+    // the build is not finished.
+    [[nodiscard]]
+    BufferHandle get_cmds(const vk::CommandBuffer& cmd,
+                          const EventHandle& compact_signal_event = nullptr);
 
   private:
     // The BLASs that are build when calling build()
