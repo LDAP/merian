@@ -7,8 +7,8 @@
 namespace merian_nodes {
 
 class BufferArrayResource : public GraphResource {
-    friend class BufferArrayOut;
-    friend class BufferArrayIn;
+    friend class VkBufferArrayOut;
+    friend class VkBufferArrayIn;
 
   public:
     BufferArrayResource(std::vector<merian::BufferHandle>& buffers,

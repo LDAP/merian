@@ -7,10 +7,10 @@
 
 namespace merian_nodes {
 
-TextureArrayOut::TextureArrayOut(const std::string& name, const uint32_t array_size)
+VkTextureArrayOut::VkTextureArrayOut(const std::string& name, const uint32_t array_size)
     : TypedOutputConnector(name, false), textures(array_size) {}
 
-GraphResourceHandle TextureArrayOut::create_resource(
+GraphResourceHandle VkTextureArrayOut::create_resource(
     [[maybe_unused]] const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
     const ResourceAllocatorHandle& allocator,
     [[maybe_unused]] const ResourceAllocatorHandle& aliasing_allocator,
@@ -22,7 +22,7 @@ GraphResourceHandle TextureArrayOut::create_resource(
     vk::ImageLayout first_input_layout = vk::ImageLayout::eUndefined;
 
     for (auto& [input_node, input] : inputs) {
-        const auto& con_in = std::dynamic_pointer_cast<TextureArrayIn>(input);
+        const auto& con_in = std::dynamic_pointer_cast<VkTextureArrayIn>(input);
         if (!con_in) {
             throw graph_errors::connector_error{
                 fmt::format("VkImageOut {} cannot output to {}.", name, input->name)};
@@ -40,11 +40,11 @@ GraphResourceHandle TextureArrayOut::create_resource(
         input_access_flags, first_input_layout);
 }
 
-TextureArrayResource& TextureArrayOut::resource(const GraphResourceHandle& resource) {
+TextureArrayResource& VkTextureArrayOut::resource(const GraphResourceHandle& resource) {
     return *debugable_ptr_cast<TextureArrayResource>(resource);
 }
 
-Connector::ConnectorStatusFlags TextureArrayOut::on_pre_process(
+Connector::ConnectorStatusFlags VkTextureArrayOut::on_pre_process(
     [[maybe_unused]] GraphRun& run,
     [[maybe_unused]] const vk::CommandBuffer& cmd,
     GraphResourceHandle& resource,
@@ -62,7 +62,7 @@ Connector::ConnectorStatusFlags TextureArrayOut::on_pre_process(
     return {};
 }
 
-Connector::ConnectorStatusFlags TextureArrayOut::on_post_process(
+Connector::ConnectorStatusFlags VkTextureArrayOut::on_post_process(
     GraphRun& run,
     [[maybe_unused]] const vk::CommandBuffer& cmd,
     GraphResourceHandle& resource,
@@ -84,11 +84,11 @@ Connector::ConnectorStatusFlags TextureArrayOut::on_post_process(
     return flags;
 }
 
-TextureArrayOutHandle TextureArrayOut::create(const std::string& name, const uint32_t array_size) {
-    return std::make_shared<TextureArrayOut>(name, array_size);
+VkTextureArrayOutHandle VkTextureArrayOut::create(const std::string& name, const uint32_t array_size) {
+    return std::make_shared<VkTextureArrayOut>(name, array_size);
 }
 
-uint32_t TextureArrayOut::array_size() const {
+uint32_t VkTextureArrayOut::array_size() const {
     return textures.size();
 }
 

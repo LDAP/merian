@@ -5,8 +5,8 @@
 
 namespace merian_nodes {
 
-class BufferArrayOut;
-using BufferArrayOutHandle = std::shared_ptr<BufferArrayOut>;
+class VkBufferArrayOut;
+using VkBufferArrayOutHandle = std::shared_ptr<VkBufferArrayOut>;
 
 // Output an array of buffers to use in a shader.
 //
@@ -14,12 +14,12 @@ using BufferArrayOutHandle = std::shared_ptr<BufferArrayOut>;
 // set all descriptor slots to a dummy buffer (ResourceAllocator::get_dummy_buffer()) if not set.
 //
 // The output keeps the buffers alive for all in-flight iterations.
-class BufferArrayOut : public TypedOutputConnector<BufferArrayResource&> {
-    friend class BufferArrayIn;
+class VkBufferArrayOut : public TypedOutputConnector<BufferArrayResource&> {
+    friend class VkBufferArrayIn;
 
   public:
     // No descriptor binding is created.
-    BufferArrayOut(const std::string& name, const uint32_t array_size);
+    VkBufferArrayOut(const std::string& name, const uint32_t array_size);
 
     GraphResourceHandle
     create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
@@ -49,7 +49,7 @@ class BufferArrayOut : public TypedOutputConnector<BufferArrayResource&> {
     uint32_t array_size() const;
 
   public:
-    static BufferArrayOutHandle create(const std::string& name, const uint32_t array_size);
+    static VkBufferArrayOutHandle create(const std::string& name, const uint32_t array_size);
 
   private:
     std::vector<merian::BufferHandle> buffers;

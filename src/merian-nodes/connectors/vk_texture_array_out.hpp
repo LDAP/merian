@@ -5,8 +5,8 @@
 
 namespace merian_nodes {
 
-class TextureArrayOut;
-using TextureArrayOutHandle = std::shared_ptr<TextureArrayOut>;
+class VkTextureArrayOut;
+using VkTextureArrayOutHandle = std::shared_ptr<VkTextureArrayOut>;
 
 // Output an array of textures.
 //
@@ -14,12 +14,12 @@ using TextureArrayOutHandle = std::shared_ptr<TextureArrayOut>;
 // set all descriptor slots to a dummy texture (ResourceAllocator::get_dummy_texture()) if not set.
 //
 // The output keeps the textures alive for all in-flight iterations.
-class TextureArrayOut : public TypedOutputConnector<TextureArrayResource&> {
-    friend class TextureArrayIn;
+class VkTextureArrayOut : public TypedOutputConnector<TextureArrayResource&> {
+    friend class VkTextureArrayIn;
 
   public:
     // No descriptor binding is created.
-    TextureArrayOut(const std::string& name, const uint32_t array_size);
+    VkTextureArrayOut(const std::string& name, const uint32_t array_size);
 
     GraphResourceHandle
     create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
@@ -49,7 +49,7 @@ class TextureArrayOut : public TypedOutputConnector<TextureArrayResource&> {
     uint32_t array_size() const;
 
   public:
-    static TextureArrayOutHandle create(const std::string& name, const uint32_t array_size);
+    static VkTextureArrayOutHandle create(const std::string& name, const uint32_t array_size);
 
   private:
     std::vector<merian::TextureHandle> textures;

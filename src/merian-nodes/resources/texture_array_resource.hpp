@@ -7,8 +7,8 @@
 namespace merian_nodes {
 
 class TextureArrayResource : public GraphResource {
-    friend class TextureArrayOut;
-    friend class TextureArrayIn;
+    friend class VkTextureArrayOut;
+    friend class VkTextureArrayIn;
 
   public:
     TextureArrayResource(std::vector<merian::TextureHandle>& textures,

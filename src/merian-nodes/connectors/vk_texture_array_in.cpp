@@ -4,7 +4,7 @@
 
 namespace merian_nodes {
 
-TextureArrayIn::TextureArrayIn(const std::string& name,
+VkTextureArrayIn::VkTextureArrayIn(const std::string& name,
                                const vk::ShaderStageFlags stage_flags,
                                const vk::ImageLayout required_layout,
                                const vk::AccessFlags2 access_flags,
@@ -17,14 +17,14 @@ TextureArrayIn::TextureArrayIn(const std::string& name,
                             access_flags & vk::AccessFlagBits2::eShaderRead));
 }
 
-std::optional<vk::DescriptorSetLayoutBinding> TextureArrayIn::get_descriptor_info() const {
+std::optional<vk::DescriptorSetLayoutBinding> VkTextureArrayIn::get_descriptor_info() const {
     if (stage_flags)
         return vk::DescriptorSetLayoutBinding{0, vk::DescriptorType::eCombinedImageSampler,
                                               array_size, stage_flags, nullptr};
     return std::nullopt;
 }
 
-void TextureArrayIn::get_descriptor_update(const uint32_t binding,
+void VkTextureArrayIn::get_descriptor_update(const uint32_t binding,
                                            GraphResourceHandle& resource,
                                            DescriptorSetUpdate& update) {
     const auto& res = debugable_ptr_cast<TextureArrayResource>(resource);
@@ -35,7 +35,7 @@ void TextureArrayIn::get_descriptor_update(const uint32_t binding,
     }
 }
 
-Connector::ConnectorStatusFlags TextureArrayIn::on_pre_process(
+Connector::ConnectorStatusFlags VkTextureArrayIn::on_pre_process(
     [[maybe_unused]] GraphRun& run,
     [[maybe_unused]] const vk::CommandBuffer& cmd,
     GraphResourceHandle& resource,
@@ -60,12 +60,12 @@ Connector::ConnectorStatusFlags TextureArrayIn::on_pre_process(
     return {};
 }
 
-const TextureArrayResource& TextureArrayIn::resource(const GraphResourceHandle& resource) {
+const TextureArrayResource& VkTextureArrayIn::resource(const GraphResourceHandle& resource) {
     return *debugable_ptr_cast<const TextureArrayResource>(resource);
 }
 
-void TextureArrayIn::on_connect_output(const OutputConnectorHandle& output) {
-    auto casted_output = std::dynamic_pointer_cast<TextureArrayOut>(output);
+void VkTextureArrayIn::on_connect_output(const OutputConnectorHandle& output) {
+    auto casted_output = std::dynamic_pointer_cast<VkTextureArrayOut>(output);
     if (!casted_output) {
         throw graph_errors::connector_error{
             fmt::format("TextureArrayIn {} cannot recive from {}.", name, output->name)};
@@ -73,8 +73,8 @@ void TextureArrayIn::on_connect_output(const OutputConnectorHandle& output) {
     array_size = casted_output->textures.size();
 }
 
-TextureArrayInHandle TextureArrayIn::compute_read(const std::string& name) {
-    return std::make_shared<TextureArrayIn>(
+VkTextureArrayInHandle VkTextureArrayIn::compute_read(const std::string& name) {
+    return std::make_shared<VkTextureArrayIn>(
         name, vk::ShaderStageFlagBits::eCompute, vk::ImageLayout::eShaderReadOnlyOptimal,
         vk::AccessFlagBits2::eShaderRead, vk::PipelineStageFlagBits2::eComputeShader);
 }

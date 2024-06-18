@@ -6,20 +6,20 @@
 
 namespace merian_nodes {
 
-class TextureArrayIn;
-using TextureArrayInHandle = std::shared_ptr<TextureArrayIn>;
+class VkTextureArrayIn;
+using VkTextureArrayInHandle = std::shared_ptr<VkTextureArrayIn>;
 
-class TextureArrayIn
-    : public TypedInputConnector<TextureArrayOutHandle, const TextureArrayResource&> {
-    friend class TextureArrayOut;
+class VkTextureArrayIn
+    : public TypedInputConnector<VkTextureArrayOutHandle, const TextureArrayResource&> {
+    friend class VkTextureArrayOut;
 
   public:
     // A descriptor binding is only created if stage flags are supplied.
-    TextureArrayIn(const std::string& name,
-                   const vk::ShaderStageFlags stage_flags = {},
-                   const vk::ImageLayout required_layout = {},
-                   const vk::AccessFlags2 access_flags = {},
-                   const vk::PipelineStageFlags2 pipeline_stages = {});
+    VkTextureArrayIn(const std::string& name,
+                     const vk::ShaderStageFlags stage_flags = {},
+                     const vk::ImageLayout required_layout = {},
+                     const vk::AccessFlags2 access_flags = {},
+                     const vk::PipelineStageFlags2 pipeline_stages = {});
 
     std::optional<vk::DescriptorSetLayoutBinding> get_descriptor_info() const override;
 
@@ -39,7 +39,7 @@ class TextureArrayIn
 
     void on_connect_output(const OutputConnectorHandle& output) override;
 
-    static TextureArrayInHandle compute_read(const std::string& name);
+    static VkTextureArrayInHandle compute_read(const std::string& name);
 
   private:
     const vk::ShaderStageFlags stage_flags;
