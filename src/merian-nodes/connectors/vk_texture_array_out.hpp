@@ -8,13 +8,10 @@ namespace merian_nodes {
 class TextureArrayOut;
 using TextureArrayOutHandle = std::shared_ptr<TextureArrayOut>;
 
-// Output an array of textures to use in a shader.
+// Output an array of textures.
 //
 // Note that this connector does also persist the textures accross graph rebuilds and it does
-// inititalize all slots with an dummy texture (ResourceAllocator::get_dummy_texture()).
-//
-// When you set the texture the layout is automatically converted to eShaderReadOnlyOptimal after
-// Node::process was called.
+// set all descriptor slots to a dummy texture (ResourceAllocator::get_dummy_texture()) if not set.
 //
 // The output keeps the textures alive for all in-flight iterations.
 class TextureArrayOut : public TypedOutputConnector<TextureArrayResource&> {
