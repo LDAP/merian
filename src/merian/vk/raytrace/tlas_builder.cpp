@@ -67,7 +67,7 @@ void TLASBuilder::queue_rebuild(
         vk::AccelerationStructureTypeKHR::eTopLevel,
         flags,
         vk::BuildAccelerationStructureModeKHR::eBuild,
-        *src_as,
+        {},
         *src_as,
         top_as_geometry};
 
@@ -77,8 +77,12 @@ void TLASBuilder::queue_rebuild(
     pending.emplace_back(build_info, instance_count, top_as_geometry);
 }
 
-BufferHandle TLASBuilder::get_cmds(const vk::CommandBuffer cmd) {
-    ensure_scratch_buffer(pending_min_scratch_buffer);
+void TLASBuilder::get_cmds(const vk::CommandBuffer cmd, BufferHandle& scratch_buffer) {
+    if (pending.empty()) {
+        return;
+    }
+
+    ensure_scratch_buffer(pending_min_scratch_buffer, scratch_buffer);
 
     vk::AccelerationStructureBuildRangeInfoKHR build_offset_info{0, 0, 0, 0};
 
@@ -106,7 +110,7 @@ BufferHandle TLASBuilder::get_cmds(const vk::CommandBuffer cmd) {
     pending.clear();
     pending_min_scratch_buffer = 0;
 
-    return scratch_buffer;
+    return;
 }
 
 } // namespace merian

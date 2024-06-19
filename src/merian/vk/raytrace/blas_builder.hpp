@@ -1,6 +1,5 @@
 #pragma once
 
-#include "merian/vk/command/event.hpp"
 #include "merian/vk/memory/resource_allocations.hpp"
 #include "merian/vk/raytrace/as_builder.hpp"
 
@@ -65,58 +64,100 @@ class BLASBuilder : public ASBuilder {
     struct PendingBLAS {
         // src/dstAccelerationStructures and scratchData.deviceAddress are left empty until build
         vk::AccelerationStructureBuildGeometryInfoKHR build_info;
-        std::vector<vk::AccelerationStructureGeometryKHR> geometry;
-        std::vector<vk::AccelerationStructureBuildRangeInfoKHR> range_info;
+        const vk::AccelerationStructureBuildRangeInfoKHR* range_info;
     };
 
   public:
     BLASBuilder(const SharedContext context, const ResourceAllocatorHandle allocator);
 
     // Enqueues a BLAS to build for the next get_cmds().
-    // Returns the acceleration structure. Note that you must keep the as alive and the structure is
-    // only valid after the next build. For static BLAS it is recommended to compact them
-    // afterwards.
+    // Returns the acceleration structure.
+    //
+    // You must wait until after calling get_cmds() to free the geometry and range_info (pointers
+    // need to remain valid)!
     AccelerationStructureHandle
     queue_build(const std::vector<vk::AccelerationStructureGeometryKHR>& geometry,
                 const std::vector<vk::AccelerationStructureBuildRangeInfoKHR>& range_info,
                 const vk::BuildAccelerationStructureFlagsKHR build_flags =
                     vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace);
 
+    // Enqueues a BLAS to build for the next get_cmds().
+    // Returns the acceleration structure.
+    //
+    // You must wait until after calling get_cmds() to free the geometry and range_info (pointers
+    // need to remain valid)!
+    AccelerationStructureHandle
+    queue_build(const vk::AccelerationStructureGeometryKHR* geometry,
+                const vk::AccelerationStructureBuildRangeInfoKHR* range_info,
+                const vk::BuildAccelerationStructureFlagsKHR build_flags =
+                    vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace,
+                const uint32_t geometry_count = 1);
+
+    // Enqueues a BLAS to be (re)build with the next get_cmds().
+    //
+    // The geometry_count and build_flags members must have the same value which was specified when
+    // `as` was last built.
+    //
+    // You must wait until after calling get_cmds() to free the geometry and range_info (pointers
+    // need to remain valid)!
+    void queue_build(const std::vector<vk::AccelerationStructureGeometryKHR>& geometry,
+                     const std::vector<vk::AccelerationStructureBuildRangeInfoKHR>& range_info,
+                     const AccelerationStructureHandle& as,
+                     const vk::BuildAccelerationStructureFlagsKHR build_flags);
+
+    // Enqueues a BLAS to be (re)build with the next get_cmds().
+    //
+    // The geometry_count and build_flags members must have the same value which was specified when
+    // `as` was last built.
+    //
+    // You must wait until after calling get_cmds() to free the geometry and range_info (pointers
+    // need to remain valid)!
+    void queue_build(const vk::AccelerationStructureGeometryKHR* geometry,
+                     const vk::AccelerationStructureBuildRangeInfoKHR* range_info,
+                     const AccelerationStructureHandle& as,
+                     const vk::BuildAccelerationStructureFlagsKHR build_flags,
+                     const uint32_t geometry_count = 1);
+
     // Enqueues a BLAS to be updated with the next get_cmds().
-    // Returns the acceleration structure. Note that you must keep the as alive and the structure is
-    // only valid after the next build. You can free the pp_range_info and p_geometry after
-    // get_cmds().
+    //
     // The geometry_count and build_flags members must have the same value which was specified when
     // `as` was last built. Note: You should call queue_rebuild after many updates or major
     // deformation.
+    //
+    // You must wait until after calling get_cmds() to free the geometry and range_info (pointers
+    // need to remain valid)!
     void queue_update(const std::vector<vk::AccelerationStructureGeometryKHR>& geometry,
                       const std::vector<vk::AccelerationStructureBuildRangeInfoKHR>& range_info,
-                      const AccelerationStructureHandle as,
+                      const AccelerationStructureHandle& as,
                       const vk::BuildAccelerationStructureFlagsKHR build_flags);
 
-    // Enqueues a BLAS to be rebuild with the next get_cmds().
-    // Returns the acceleration structure. Note that you must keep the as alive and the structure is
-    // only valid after the next build. You can free the pp_range_info and p_geometry after
-    // get_cmds().
+    // Enqueues a BLAS to be updated with the next get_cmds().
+    //
     // The geometry_count and build_flags members must have the same value which was specified when
-    // `as` was last built.
-    void queue_rebuild(const std::vector<vk::AccelerationStructureGeometryKHR>& geometry,
-                       const std::vector<vk::AccelerationStructureBuildRangeInfoKHR>& range_info,
-                       const AccelerationStructureHandle as,
-                       const vk::BuildAccelerationStructureFlagsKHR build_flags);
+    // `as` was last built. Note: You should call queue_rebuild after many updates or major
+    // deformation.
+    //
+    // You must wait until after calling get_cmds() to free the geometry and range_info (pointers
+    // need to remain valid)!
+    void queue_update(const vk::AccelerationStructureGeometryKHR* geometry,
+                      const vk::AccelerationStructureBuildRangeInfoKHR* range_info,
+                      const AccelerationStructureHandle& as,
+                      const vk::BuildAccelerationStructureFlagsKHR build_flags,
+                      const uint32_t geometry_count = 1);
 
     // The returned buffer is the scratch buffer for this build, which has to be kept alive while
     // the build is not finished.
-    [[nodiscard]]
-    BufferHandle get_cmds(const vk::CommandBuffer& cmd,
-                          const EventHandle& compact_signal_event = nullptr);
+    //
+    // Provide a BufferHandle to a (optinally null) scratch_buffer. The scratch buffer is reused if
+    // it is large enough else it is replaced with a larger one. Make sure to keep the scratch
+    // buffer alive while processing has not finished on the GPU.
+    void get_cmds(const vk::CommandBuffer& cmd, BufferHandle& scratch_buffer);
 
   private:
-    // The BLASs that are build when calling build()
+    // The BLASs that are build when calling get_cmds()
     std::vector<PendingBLAS> pending;
     // The minimum scratch buffer size that is required to build all pending BLASs.
     vk::DeviceSize pending_min_scratch_buffer = 0;
-    std::mutex mutex;
 };
 
 } // namespace merian

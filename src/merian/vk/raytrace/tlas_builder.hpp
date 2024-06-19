@@ -142,10 +142,10 @@ class TLASBuilder : public ASBuilder {
     // Note: This method does not insert a synchronization barrier. You must enure proper
     // synchronization before using the TLAS (you can use the helper cmd_barrier()).
     //
-    // The returned buffer is the scratch buffer for this build, which has to be kept alive while
-    // the build is not finished.
-    [[nodiscard]]
-    BufferHandle get_cmds(const vk::CommandBuffer cmd);
+    // Provide a BufferHandle to a (optinally null) scratch_buffer. The scratch buffer is reused if
+    // it is large enough else it is replaced with a larger one. Make sure to keep the scratch
+    // buffer alive while processing has not finished on the GPU.
+    void get_cmds(const vk::CommandBuffer cmd, BufferHandle& scratch_buffer);
 
   private:
     std::vector<PendingTLAS> pending;

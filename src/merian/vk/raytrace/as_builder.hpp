@@ -1,10 +1,12 @@
 #pragma once
 
+#include "merian/vk/extension/extension_vk_acceleration_structure.hpp"
 #include "merian/vk/memory/resource_allocations.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 
 #include <vector>
 #include <vulkan/vulkan.hpp>
+
 namespace merian {
 
 /*
@@ -43,47 +45,28 @@ class ASBuilder {
 
   public:
     ASBuilder(const SharedContext context, const ResourceAllocatorHandle& allocator)
-        : context(context), allocator(allocator) {
-
-        // query min scratch buffer alignment
-        vk::PhysicalDeviceAccelerationStructurePropertiesKHR acceleration_structure_properties;
-        vk::PhysicalDeviceProperties2KHR props2;
-        props2.pNext = &acceleration_structure_properties;
-        context->physical_device.physical_device.getProperties2(&props2);
-        scratch_buffer_min_alignment =
-            acceleration_structure_properties.minAccelerationStructureScratchOffsetAlignment;
+        : context(context), allocator(allocator),
+          scratch_buffer_min_alignment(
+              context->get_extension<ExtensionVkAccelerationStructure>()->min_scratch_alignment()) {
     }
 
     virtual ~ASBuilder() {}
 
-    /* Releases the scratch buffer.
-     */
-    void release() {
-        scratch_buffer.reset();
-        current_scratch_buffer_size = 0;
-    }
-
   protected:
     // Ensures the scratch buffer has min size `min_size`.
-    void ensure_scratch_buffer(vk::DeviceSize min_size) {
-        if (scratch_buffer && current_scratch_buffer_size >= min_size) {
+    void ensure_scratch_buffer(const vk::DeviceSize min_size, BufferHandle& scratch_buffer) {
+        if (scratch_buffer && scratch_buffer->get_size() >= min_size) {
             return;
         }
         scratch_buffer.reset();
         scratch_buffer = allocator->createScratchBuffer(min_size, scratch_buffer_min_alignment,
                                                         "ASBuilder scratch buffer");
-        current_scratch_buffer_size = min_size;
     }
 
   protected:
     const SharedContext context;
     const ResourceAllocatorHandle allocator;
-    vk::DeviceSize scratch_buffer_min_alignment;
-
-    // The current scratch buffer, can be nullptr
-    BufferHandle scratch_buffer;
-    // Helps to determine if the scratch buffer needs to be enlarged
-    vk::DeviceSize current_scratch_buffer_size = 0;
+    const vk::DeviceSize scratch_buffer_min_alignment;
 };
 
 } // namespace merian
