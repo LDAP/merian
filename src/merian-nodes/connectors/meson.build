@@ -9,4 +9,5 @@ merian_nodes_src += files(
     'vk_buffer_array_out.cpp',
     'vk_texture_array_in.cpp',
     'vk_texture_array_out.cpp',
+    'vk_tlas_out.cpp',
 )

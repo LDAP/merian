@@ -1,26 +1,19 @@
 #pragma once
 
-#include "vk_tlas_out.hpp"
-
-#include "merian-nodes/graph/connector_output.hpp"
+#include "merian-nodes/graph/connector_input.hpp"
 #include "merian-nodes/resources/tlas_resource.hpp"
 
 namespace merian_nodes {
 
-class VkTLASOut;
-using VkTLASOutHandle = std::shared_ptr<VkTLASOut>;
+class VkTLASIn;
+using VkTLASInHandle = std::shared_ptr<VkTLASIn>;
 
-// Output a TLAS.
-//
-// Note that this connector does also persists the tlas accross graph rebuilds.
-//
-// The output keeps the tlas alive for all in-flight iterations.
-class VkTLASOut : public TypedOutputConnector<AccelerationStructureHandle&> {
-    friend class VkTLASIn;
+// Input a TLAS.
+class VkTLASIn : public TypedInputConnector<VkTLASOutHandle, const AccelerationStructureHandle&> {
+    friend class VkTLASOut;
 
   public:
-    // A descriptor binding is only created if stage_flags is not empty.
-    VkTLASOut(const std::string& name, const vk::ShaderStageFlags stage_flags);
+    VkTLASIn(const std::string& name, const vk::ShaderStageFlags stage_flags);
 
     std::optional<vk::DescriptorSetLayoutBinding> get_descriptor_info() const override;
 
@@ -55,10 +48,7 @@ class VkTLASOut : public TypedOutputConnector<AccelerationStructureHandle&> {
 
   public:
     // Creates an output that has to set the TLAS and can it read in a shader.
-    static VkTLASOutHandle compute_read(const std::string& name);
-
-    // Creates an output that has to set the TLAS (but a descriptor binding is not created).
-    static VkTLASOutHandle create(const std::string& name);
+    static VkTLASInHandle compute_read(const std::string& name);
 
   private:
     const vk::ShaderStageFlags stage_flags;
