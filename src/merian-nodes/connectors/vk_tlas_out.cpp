@@ -54,8 +54,8 @@ VkTLASOut::on_pre_process([[maybe_unused]] GraphRun& run,
                         node->name, name)};
     }
 
-    if (res->needs_descriptor_update) {
-        res->needs_descriptor_update = false;
+    if (res->last_tlas != res->tlas) {
+        res->last_tlas = res->tlas;
         return NEEDS_DESCRIPTOR_UPDATE;
     }
 
@@ -78,11 +78,10 @@ Connector::ConnectorStatusFlags VkTLASOut::on_post_process(
     }
 
     Connector::ConnectorStatusFlags flags{};
-    if (res->needs_descriptor_update) {
-        res->needs_descriptor_update = false;
+    if (res->last_tlas != res->tlas) {
+        res->last_tlas = res->tlas;
         flags |= NEEDS_DESCRIPTOR_UPDATE;
     }
-
     res->in_flight_tlas[run.get_in_flight_index()] = res->tlas;
 
     return flags;

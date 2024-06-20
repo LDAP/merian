@@ -5,9 +5,9 @@
 namespace merian_nodes {
 
 VkBufferArrayIn::VkBufferArrayIn(const std::string& name,
-                             const vk::ShaderStageFlags stage_flags,
-                             const vk::AccessFlags2 access_flags,
-                             const vk::PipelineStageFlags2 pipeline_stages)
+                                 const vk::ShaderStageFlags stage_flags,
+                                 const vk::AccessFlags2 access_flags,
+                                 const vk::PipelineStageFlags2 pipeline_stages)
     : TypedInputConnector(name, 0), stage_flags(stage_flags), access_flags(access_flags),
       pipeline_stages(pipeline_stages) {
 
@@ -23,8 +23,8 @@ std::optional<vk::DescriptorSetLayoutBinding> VkBufferArrayIn::get_descriptor_in
 }
 
 void VkBufferArrayIn::get_descriptor_update(const uint32_t binding,
-                                          GraphResourceHandle& resource,
-                                          DescriptorSetUpdate& update) {
+                                            GraphResourceHandle& resource,
+                                            DescriptorSetUpdate& update) {
     const auto& res = debugable_ptr_cast<BufferArrayResource>(resource);
     for (auto& pending_update : res->pending_updates) {
         const BufferHandle tex =
@@ -48,8 +48,15 @@ void VkBufferArrayIn::on_connect_output(const OutputConnectorHandle& output) {
 
 VkBufferArrayInHandle VkBufferArrayIn::compute_read(const std::string& name) {
     return std::make_shared<VkBufferArrayIn>(name, vk::ShaderStageFlagBits::eCompute,
-                                           vk::AccessFlagBits2::eShaderRead,
-                                           vk::PipelineStageFlagBits2::eComputeShader);
+                                             vk::AccessFlagBits2::eShaderRead,
+                                             vk::PipelineStageFlagBits2::eComputeShader);
+}
+
+VkBufferArrayInHandle VkBufferArrayIn::acceleration_structure_read(const std::string& name) {
+    return std::make_shared<VkBufferArrayIn>(
+        name, vk::ShaderStageFlags{},
+        vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eAccelerationStructureReadKHR,
+        vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR);
 }
 
 } // namespace merian_nodes

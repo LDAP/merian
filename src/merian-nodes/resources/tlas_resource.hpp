@@ -14,14 +14,18 @@ class TLASResource : public GraphResource {
     TLASResource(const uint32_t ring_size) : in_flight_tlas(ring_size) {}
 
     void properties(merian::Properties& props) override {
-        tlas->properties(props);
+        if (tlas) {
+            tlas->properties(props);
+        } else {
+            props.output_text("<no TLAS build>");
+        }
     }
 
   private:
     merian::AccelerationStructureHandle tlas;
-    std::vector<merian::AccelerationStructureHandle> in_flight_tlas;
+    merian::AccelerationStructureHandle last_tlas;
 
-    bool needs_descriptor_update = true;
+    std::vector<merian::AccelerationStructureHandle> in_flight_tlas;
 };
 
 using TLASResourceHandle = std::shared_ptr<TLASResource>;

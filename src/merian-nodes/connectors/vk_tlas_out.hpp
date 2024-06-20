@@ -1,7 +1,5 @@
 #pragma once
 
-#include "vk_tlas_out.hpp"
-
 #include "merian-nodes/graph/connector_output.hpp"
 #include "merian-nodes/resources/tlas_resource.hpp"
 

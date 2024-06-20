@@ -31,6 +31,8 @@ class VkBufferArrayIn : public TypedInputConnector<VkBufferArrayOutHandle, const
 
     static VkBufferArrayInHandle compute_read(const std::string& name);
 
+    static VkBufferArrayInHandle acceleration_structure_read(const std::string& name);
+
   private:
     const vk::ShaderStageFlags stage_flags;
     const vk::AccessFlags2 access_flags;

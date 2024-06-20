@@ -1,5 +1,7 @@
 #pragma once
 
+#include "vk_tlas_out.hpp"
+
 #include "merian-nodes/graph/connector_input.hpp"
 #include "merian-nodes/resources/tlas_resource.hpp"
 
@@ -21,30 +23,7 @@ class VkTLASIn : public TypedInputConnector<VkTLASOutHandle, const AccelerationS
                                GraphResourceHandle& resource,
                                DescriptorSetUpdate& update) override;
 
-    GraphResourceHandle
-    create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
-                    const ResourceAllocatorHandle& allocator,
-                    const ResourceAllocatorHandle& aliasing_allocator,
-                    const uint32_t resoruce_index,
-                    const uint32_t ring_size) override;
-
-    AccelerationStructureHandle& resource(const GraphResourceHandle& resource) override;
-
-    ConnectorStatusFlags
-    on_pre_process(GraphRun& run,
-                   const vk::CommandBuffer& cmd,
-                   GraphResourceHandle& resource,
-                   const NodeHandle& node,
-                   std::vector<vk::ImageMemoryBarrier2>& image_barriers,
-                   std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) override;
-
-    ConnectorStatusFlags
-    on_post_process(GraphRun& run,
-                    const vk::CommandBuffer& cmd,
-                    GraphResourceHandle& resource,
-                    const NodeHandle& node,
-                    std::vector<vk::ImageMemoryBarrier2>& image_barriers,
-                    std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) override;
+    const AccelerationStructureHandle& resource(const GraphResourceHandle& resource) override;
 
   public:
     // Creates an output that has to set the TLAS and can it read in a shader.
