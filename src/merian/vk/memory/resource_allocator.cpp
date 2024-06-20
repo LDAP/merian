@@ -88,6 +88,16 @@ BufferHandle ResourceAllocator::createScratchBuffer(const vk::DeviceSize size,
                         MemoryMappingType::NONE, debug_name, alignment);
 }
 
+BufferHandle ResourceAllocator::createInstancesBuffer(const uint32_t instance_count,
+                                                      const std::string& debug_name) {
+    static const vk::BufferUsageFlags instances_buffer_usage =
+        vk::BufferUsageFlagBits::eShaderDeviceAddress |
+        vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR;
+
+    return createBuffer(sizeof(vk::AccelerationStructureInstanceKHR) * instance_count,
+                        instances_buffer_usage, merian::MemoryMappingType::NONE, debug_name, 16);
+}
+
 ImageHandle ResourceAllocator::createImage(const vk::ImageCreateInfo& info_,
                                            const MemoryMappingType mapping_type,
                                            const std::string& debug_name) {

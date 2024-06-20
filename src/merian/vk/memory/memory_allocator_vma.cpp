@@ -93,6 +93,10 @@ MemoryAllocationInfo VMAMemoryAllocation::get_memory_info() const {
                                 allocInfo.pName};
 };
 
+MemoryAllocatorHandle VMAMemoryAllocation::get_allocator() const {
+    return allocator;
+}
+
 void VMAMemoryAllocation::properties(Properties& props) {
     MemoryAllocation::properties(props);
     props.output_text(fmt::format("Mapped: {}", is_mapped));

@@ -59,6 +59,8 @@ class VMAMemoryAllocation : public MemoryAllocation {
 
     // ------------------------------------------------------------------------------------
 
+    MemoryAllocatorHandle get_allocator() const override;
+
     VmaAllocation getAllocation() const {
         return m_allocation;
     }

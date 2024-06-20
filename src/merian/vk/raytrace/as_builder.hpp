@@ -137,14 +137,6 @@ class ASBuilder {
                       const vk::BuildAccelerationStructureFlagsKHR build_flags,
                       const uint32_t geometry_count = 1);
 
-    // The returned buffer is the scratch buffer for this build, which has to be kept alive while
-    // the build is not finished.
-    //
-    // Provide a BufferHandle to a (optinally null) scratch_buffer. The scratch buffer is reused if
-    // it is large enough else it is replaced with a larger one. Make sure to keep the scratch
-    // buffer alive while processing has not finished on the GPU.
-    void get_cmds_blas(const vk::CommandBuffer& cmd, BufferHandle& scratch_buffer);
-
     // TLAS BUILDS
     // ---------------------------------------------------------------------------
 
@@ -240,14 +232,6 @@ class ASBuilder {
                        const AccelerationStructureHandle src_as,
                        const vk::BuildAccelerationStructureFlagsKHR flags);
 
-    // Note: This method does not insert a synchronization barrier. You must enure proper
-    // synchronization before using the TLAS (you can use the helper cmd_barrier()).
-    //
-    // Provide a BufferHandle to a (optinally null) scratch_buffer. The scratch buffer is reused if
-    // it is large enough else it is replaced with a larger one. Make sure to keep the scratch
-    // buffer alive while processing has not finished on the GPU.
-    void get_cmds_tlas(const vk::CommandBuffer cmd, BufferHandle& scratch_buffer);
-
     // TLAS BUILDS
     // ---------------------------------------------------------------------------
 
@@ -260,6 +244,22 @@ class ASBuilder {
     }
 
   private:
+    // The returned buffer is the scratch buffer for this build, which has to be kept alive while
+    // the build is not finished.
+    //
+    // Provide a BufferHandle to a (optinally null) scratch_buffer. The scratch buffer is reused if
+    // it is large enough else it is replaced with a larger one. Make sure to keep the scratch
+    // buffer alive while processing has not finished on the GPU.
+    void get_cmds_blas(const vk::CommandBuffer& cmd, BufferHandle& scratch_buffer);
+
+    // Note: This method does not insert a synchronization barrier. You must enure proper
+    // synchronization before using the TLAS (you can use the helper cmd_barrier()).
+    //
+    // Provide a BufferHandle to a (optinally null) scratch_buffer. The scratch buffer is reused if
+    // it is large enough else it is replaced with a larger one. Make sure to keep the scratch
+    // buffer alive while processing has not finished on the GPU.
+    void get_cmds_tlas(const vk::CommandBuffer cmd, BufferHandle& scratch_buffer);
+
     // Ensures the scratch buffer has min size `min_size`.
     void ensure_scratch_buffer(const vk::DeviceSize min_size, BufferHandle& scratch_buffer) {
         if (scratch_buffer && scratch_buffer->get_size() >= min_size) {

@@ -25,6 +25,9 @@ class DeviceASBuilder : public Node {
      * Calling both request_update() and request_rebuild() results in a rebuild.
      */
     class BlasBuildInfo {
+        friend DeviceASBuilder;
+
+      public:
         BlasBuildInfo(const vk::BuildAccelerationStructureFlagsKHR build_flags)
             : build_flags(build_flags) {}
 
@@ -91,8 +94,11 @@ class DeviceASBuilder : public Node {
      * TLASs are always rebuild and never updated (since that is not recommended anyways).
      */
     class TlasBuildInfo {
+        friend DeviceASBuilder;
+
       public:
-        TlasBuildInfo() {}
+        TlasBuildInfo(const vk::BuildAccelerationStructureFlagsKHR build_flags)
+            : build_flags(build_flags) {}
 
         TlasBuildInfo&
         add_instance(const std::shared_ptr<BlasBuildInfo>& blas,
@@ -120,6 +126,8 @@ class DeviceASBuilder : public Node {
         }
 
       private:
+        const vk::BuildAccelerationStructureFlagsKHR build_flags;
+
         std::vector<vk::AccelerationStructureInstanceKHR> instances;
         std::vector<std::shared_ptr<BlasBuildInfo>> blases;
 
@@ -132,12 +140,12 @@ class DeviceASBuilder : public Node {
     struct InFlightData {
         std::vector<AccelerationStructureHandle> blases;
         BufferHandle instances_buffer;
-        uint32_t instances_buffer_size;
+        BufferHandle scratch_buffer;
     };
 
-    public : DeviceASBuilder()
-        : Node("Acceleration Structure Builder") {
-    }
+  public:
+    DeviceASBuilder(const SharedContext& context, const ResourceAllocatorHandle& allocator)
+        : Node("Acceleration Structure Builder"), as_builder(context, allocator) {}
 
     std::vector<InputConnectorHandle> describe_inputs() {
         return {
@@ -156,7 +164,24 @@ class DeviceASBuilder : public Node {
                  const vk::CommandBuffer& cmd,
                  [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
                  const NodeIO& io) {
-        
+        InFlightData& in_flight_data = io.frame_data<InFlightData>();
+        TlasBuildInfo& tlas_build_info = *io[con_in_instance_info];
+
+        for (uint32_t instance_index = 0; instance_index < tlas_build_info.instances.size();
+             instance_index++) {
+        }
+
+
+        if (tlas_build_info.tlas) {
+            as_builder.queue_rebuild(tlas_build_info.instances.size(),
+                                     in_flight_data.instances_buffer, tlas_build_info.tlas);
+        } else {
+            tlas_build_info.tlas = as_builder.queue_build(tlas_build_info.instances.size(),
+                                                          in_flight_data.instances_buffer);
+        }
+
+        as_builder.get_cmds(cmd, in_flight_data.scratch_buffer);
+        io[con_out_tlas] = tlas_build_info.tlas;
     }
 
   private:
@@ -164,8 +189,9 @@ class DeviceASBuilder : public Node {
     PtrInHandle<TlasBuildInfo> con_in_instance_info = PtrIn<TlasBuildInfo>::create("tlas_info");
 
     VkTLASOutHandle con_out_tlas = VkTLASOut::create("tlas");
-
     // clang-format on
+
+    ASBuilder as_builder;
 };
 
 } // namespace merian_nodes

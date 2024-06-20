@@ -6,17 +6,17 @@ namespace merian {
 
 AccelerationStructureHandle
 ASBuilder::queue_build(const std::vector<vk::AccelerationStructureGeometryKHR>& geometry,
-                         const std::vector<vk::AccelerationStructureBuildRangeInfoKHR>& range_info,
-                         const vk::BuildAccelerationStructureFlagsKHR build_flags) {
+                       const std::vector<vk::AccelerationStructureBuildRangeInfoKHR>& range_info,
+                       const vk::BuildAccelerationStructureFlagsKHR build_flags) {
     assert(geometry.size() == range_info.size());
     return queue_build(geometry.data(), range_info.data(), build_flags, geometry.size());
 }
 
 AccelerationStructureHandle
 ASBuilder::queue_build(const vk::AccelerationStructureGeometryKHR* geometry,
-                         const vk::AccelerationStructureBuildRangeInfoKHR* range_info,
-                         const vk::BuildAccelerationStructureFlagsKHR build_flags,
-                         const uint32_t geometry_count) {
+                       const vk::AccelerationStructureBuildRangeInfoKHR* range_info,
+                       const vk::BuildAccelerationStructureFlagsKHR build_flags,
+                       const uint32_t geometry_count) {
 
     // 1. Query the size of the AS to build
     //--------------------------------------------
@@ -62,10 +62,10 @@ void ASBuilder::queue_build(
 }
 
 void ASBuilder::queue_build(const vk::AccelerationStructureGeometryKHR* geometry,
-                              const vk::AccelerationStructureBuildRangeInfoKHR* range_info,
-                              const AccelerationStructureHandle& as,
-                              const vk::BuildAccelerationStructureFlagsKHR build_flags,
-                              const uint32_t geometry_count) {
+                            const vk::AccelerationStructureBuildRangeInfoKHR* range_info,
+                            const AccelerationStructureHandle& as,
+                            const vk::BuildAccelerationStructureFlagsKHR build_flags,
+                            const uint32_t geometry_count) {
     vk::AccelerationStructureBuildGeometryInfoKHR build_info{
         vk::AccelerationStructureTypeKHR::eBottomLevel,
         build_flags,
@@ -89,10 +89,10 @@ void ASBuilder::queue_update(
 }
 
 void ASBuilder::queue_update(const vk::AccelerationStructureGeometryKHR* geometry,
-                               const vk::AccelerationStructureBuildRangeInfoKHR* range_info,
-                               const AccelerationStructureHandle& as,
-                               const vk::BuildAccelerationStructureFlagsKHR build_flags,
-                               const uint32_t geometry_count) {
+                             const vk::AccelerationStructureBuildRangeInfoKHR* range_info,
+                             const AccelerationStructureHandle& as,
+                             const vk::BuildAccelerationStructureFlagsKHR build_flags,
+                             const uint32_t geometry_count) {
     vk::AccelerationStructureBuildGeometryInfoKHR build_info{
         vk::AccelerationStructureTypeKHR::eBottomLevel,
         build_flags,
@@ -123,11 +123,13 @@ void ASBuilder::get_cmds_blas(const vk::CommandBuffer& cmd, BufferHandle& scratc
                                            vk::AccessFlagBits::eAccelerationStructureWriteKHR);
 
     for (uint32_t idx = 0; idx < pending_blas_builds.size(); idx++) {
-        pending_blas_builds[idx].build_info.scratchData.deviceAddress = scratch_buffer->get_device_address();
+        pending_blas_builds[idx].build_info.scratchData.deviceAddress =
+            scratch_buffer->get_device_address();
         // Vulkan allows to create multiple as at once, however then the scratch buffer cannot be
         // reused! (This is the reason why we need to supply a pointer to a pointer for range
         // infos...)
-        cmd.buildAccelerationStructuresKHR(1, &pending_blas_builds[idx].build_info, &pending_blas_builds[idx].range_info);
+        cmd.buildAccelerationStructuresKHR(1, &pending_blas_builds[idx].build_info,
+                                           &pending_blas_builds[idx].range_info);
         cmd.pipelineBarrier(vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR,
                             vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR, {}, {},
                             scratch_barrier, {});

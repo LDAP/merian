@@ -86,9 +86,14 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
 
     //--------------------------------------------------------------------------------------------------
 
+    // Create a scratch buffer for acceleration buffer builds.
     BufferHandle createScratchBuffer(const vk::DeviceSize size,
                                      const vk::DeviceSize alignment,
                                      const std::string& debug_name = {});
+
+    // Create a buffer that holds acceleration strcture instances.
+    BufferHandle createInstancesBuffer(const uint32_t instance_count,
+                                       const std::string& debug_name = {});
 
     //--------------------------------------------------------------------------------------------------
 
@@ -133,12 +138,12 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
     //
     // Important: You are responsible to perform the image transition!
     TextureHandle createTextureFromRGBA8(const vk::CommandBuffer& cmd,
-                                        const uint32_t* data,
-                                        const uint32_t width,
-                                        const uint32_t height,
-                                        const vk::Filter filter,
-                                        const bool isSRGB = true,
-                                        const std::string& debug_name = {});
+                                         const uint32_t* data,
+                                         const uint32_t width,
+                                         const uint32_t height,
+                                         const vk::Filter filter,
+                                         const bool isSRGB = true,
+                                         const std::string& debug_name = {});
 
     // Returns a dummy 4x4 texture with the "missing texture" color (1,0,1,1).
     const TextureHandle& get_dummy_texture() const;
