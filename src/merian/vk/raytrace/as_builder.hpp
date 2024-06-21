@@ -43,6 +43,7 @@ class ASBuilder {
   private:
     struct PendingBLAS {
         // src/dstAccelerationStructures and scratchData.deviceAddress are left empty until build
+        AccelerationStructureHandle blas;
         vk::AccelerationStructureBuildGeometryInfoKHR build_info;
         const vk::AccelerationStructureBuildRangeInfoKHR* range_info;
     };
@@ -143,17 +144,6 @@ class ASBuilder {
     // TLAS BUILDS
     // ---------------------------------------------------------------------------
 
-    // Ensures a TLAS build has finished.
-    static void cmd_barrier(const vk::CommandBuffer cmd,
-                            const vk::PipelineStageFlags dst_pipeline_stages) {
-        const vk::MemoryBarrier barrier{vk::AccessFlagBits::eAccelerationStructureReadKHR |
-                                            vk::AccessFlagBits::eAccelerationStructureWriteKHR,
-                                        vk::AccessFlagBits::eAccelerationStructureReadKHR |
-                                            vk::AccessFlagBits::eShaderRead};
-        cmd.pipelineBarrier(vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR,
-                            dst_pipeline_stages, {}, 1, &barrier, 0, nullptr, 0, nullptr);
-    }
-
     // Build a TLAS from instances that are stored on the device.
     [[nodiscard]]
     AccelerationStructureHandle
@@ -230,7 +220,7 @@ class ASBuilder {
     // it is large enough else it is replaced with a larger one. Make sure to keep the scratch
     // buffer alive while processing has not finished on the GPU.
     // 
-    // This command inserts a barrier for the BLAS.
+    // This command inserts a barrier for the BLAS that are built.
     void get_cmds_blas(const vk::CommandBuffer& cmd, BufferHandle& scratch_buffer);
 
     // Note: This method does not insert a synchronization barrier. You must enure proper

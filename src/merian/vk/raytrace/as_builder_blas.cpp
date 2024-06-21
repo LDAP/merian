@@ -77,7 +77,7 @@ void ASBuilder::queue_build(const vk::AccelerationStructureGeometryKHR* geometry
 
     pending_min_scratch_buffer =
         std::max(pending_min_scratch_buffer, as->get_size_info().buildScratchSize);
-    pending_blas_builds.emplace_back(build_info, range_info);
+    pending_blas_builds.emplace_back(as, build_info, range_info);
 }
 
 void ASBuilder::queue_update(
@@ -104,7 +104,7 @@ void ASBuilder::queue_update(const vk::AccelerationStructureGeometryKHR* geometr
 
     pending_min_scratch_buffer =
         std::max(pending_min_scratch_buffer, as->get_size_info().updateScratchSize);
-    pending_blas_builds.emplace_back(build_info, range_info);
+    pending_blas_builds.emplace_back(as, build_info, range_info);
 }
 
 void ASBuilder::get_cmds_blas(const vk::CommandBuffer& cmd, BufferHandle& scratch_buffer) {
@@ -130,18 +130,13 @@ void ASBuilder::get_cmds_blas(const vk::CommandBuffer& cmd, BufferHandle& scratc
         // infos...)
         cmd.buildAccelerationStructuresKHR(1, &pending_blas_builds[idx].build_info,
                                            &pending_blas_builds[idx].range_info);
+        // Barrier for TLAS build / compaction reads (hope this is enough... the spec does not state
+        // if a global barrier is necessary)
         cmd.pipelineBarrier(vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR,
                             vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR, {}, {},
-                            scratch_barrier, {});
+                            {scratch_barrier, pending_blas_builds[idx].blas->blas_read_barrier()},
+                            {});
     }
-
-    // Barrier for TLAS build / compaction reads
-    const vk::MemoryBarrier barrier{vk::AccessFlagBits::eAccelerationStructureReadKHR |
-                                        vk::AccessFlagBits::eAccelerationStructureWriteKHR,
-                                    vk::AccessFlagBits::eAccelerationStructureReadKHR};
-    cmd.pipelineBarrier(vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR,
-                        vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR, {}, 1, &barrier,
-                        0, nullptr, 0, nullptr);
 
     pending_blas_builds.clear();
     pending_min_scratch_buffer = 0;

@@ -15,7 +15,9 @@ class VkTLASIn : public TypedInputConnector<VkTLASOutHandle, const AccelerationS
     friend class VkTLASOut;
 
   public:
-    VkTLASIn(const std::string& name, const vk::ShaderStageFlags stage_flags);
+    VkTLASIn(const std::string& name,
+             const vk::ShaderStageFlags stage_flags,
+             const vk::PipelineStageFlags2 pipeline_stages);
 
     std::optional<vk::DescriptorSetLayoutBinding> get_descriptor_info() const override;
 
@@ -31,6 +33,7 @@ class VkTLASIn : public TypedInputConnector<VkTLASOutHandle, const AccelerationS
 
   private:
     const vk::ShaderStageFlags stage_flags;
+    const vk::PipelineStageFlags2 pipeline_stages;
 };
 
 } // namespace merian_nodes

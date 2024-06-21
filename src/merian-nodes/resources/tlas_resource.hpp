@@ -11,7 +11,8 @@ class TLASResource : public GraphResource {
     friend class VkTLASOut;
 
   public:
-    TLASResource(const uint32_t ring_size) : in_flight_tlas(ring_size) {}
+    TLASResource(const vk::PipelineStageFlags2 read_pipeline_stages, const uint32_t ring_size)
+        : read_pipeline_stages(read_pipeline_stages), in_flight_tlas(ring_size) {}
 
     void properties(merian::Properties& props) override {
         if (tlas) {
@@ -20,6 +21,13 @@ class TLASResource : public GraphResource {
             props.output_text("<no TLAS build>");
         }
     }
+
+    void operator=(const merian::AccelerationStructureHandle& tlas) {
+        this->tlas = tlas;
+    }
+
+  public:
+    const vk::PipelineStageFlags2 read_pipeline_stages;
 
   private:
     merian::AccelerationStructureHandle tlas;

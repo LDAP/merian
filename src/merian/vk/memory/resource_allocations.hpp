@@ -368,7 +368,7 @@ class AccelerationStructure : public std::enable_shared_from_this<AccelerationSt
         return as;
     }
 
-    const vk::AccelerationStructureBuildSizesInfoKHR& get_size_info() {
+    const vk::AccelerationStructureBuildSizesInfoKHR& get_size_info() const {
         return size_info;
     }
 
@@ -376,6 +376,50 @@ class AccelerationStructure : public std::enable_shared_from_this<AccelerationSt
 
     // E.g. needed for accelerationStructureReference in VkAccelerationStructureInstanceKHR
     vk::DeviceAddress get_acceleration_structure_device_address();
+
+    // A barrier to insert between tlas builds and tlas usage.
+    vk::BufferMemoryBarrier2 tlas_read_barrier2(const vk::PipelineStageFlags2 read_stages) const {
+        return buffer->buffer_barrier2(vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
+                                       read_stages,
+                                       vk::AccessFlagBits2::eAccelerationStructureWriteKHR,
+                                       vk::AccessFlagBits2::eAccelerationStructureReadKHR);
+    }
+
+    // A barier to insert between blas builds and blas usage.
+    vk::BufferMemoryBarrier2 blas_read_barrier2() const {
+        return buffer->buffer_barrier2(vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
+                                       vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
+                                       vk::AccessFlagBits2::eAccelerationStructureWriteKHR,
+                                       vk::AccessFlagBits2::eAccelerationStructureReadKHR);
+    }
+
+    // A barier to insert between blas builds and blas usage.
+    vk::BufferMemoryBarrier blas_read_barrier() const {
+        return buffer->buffer_barrier(vk::AccessFlagBits::eAccelerationStructureWriteKHR,
+                                      vk::AccessFlagBits::eAccelerationStructureReadKHR);
+    }
+
+    // A barrier to insert between tlas usage and tlas rebuild/update.
+    vk::BufferMemoryBarrier2 tlas_build_barrier2(const vk::PipelineStageFlags2 read_stages) const {
+        return buffer->buffer_barrier2(read_stages,
+                                       vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
+                                       vk::AccessFlagBits2::eAccelerationStructureReadKHR,
+                                       vk::AccessFlagBits2::eAccelerationStructureWriteKHR);
+    }
+
+    // A barier to insert between blas read (for TLAS build) and blas rebuild/update.
+    vk::BufferMemoryBarrier2 blas_build_barrier2() const {
+        return buffer->buffer_barrier2(vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
+                                       vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
+                                       vk::AccessFlagBits2::eAccelerationStructureReadKHR,
+                                       vk::AccessFlagBits2::eAccelerationStructureWriteKHR);
+    }
+
+    // A barier to insert between blas usage and blas rebuild/update.
+    vk::BufferMemoryBarrier blas_build_barrier() const {
+        return buffer->buffer_barrier(vk::AccessFlagBits::eAccelerationStructureReadKHR,
+                                      vk::AccessFlagBits::eAccelerationStructureWriteKHR);
+    }
 
     // -----------------------------------------------------------
 

@@ -30,8 +30,12 @@ class DeviceASBuilder : public Node {
         friend DeviceASBuilder;
 
       public:
-        BlasBuildInfo(const vk::BuildAccelerationStructureFlagsKHR build_flags)
-            : build_flags(build_flags) {}
+        // Set release_scratch_buffer_after to true to release the scratch buffer after the build of
+        // this BLAS (because it needs much memory for example).
+        BlasBuildInfo(const vk::BuildAccelerationStructureFlagsKHR build_flags,
+                      const bool release_scratch_buffer_after)
+            : build_flags(build_flags), release_scratch_buffer_after(release_scratch_buffer_after) {
+        }
 
         /**
          * @brief      Adds geometry with rgb32f vertices and uint32 index.
@@ -77,6 +81,7 @@ class DeviceASBuilder : public Node {
 
       private:
         const vk::BuildAccelerationStructureFlagsKHR build_flags;
+        const bool release_scratch_buffer_after;
 
         // Info for the build
         std::vector<vk::AccelerationStructureGeometryKHR> geometries;
@@ -173,6 +178,9 @@ class DeviceASBuilder : public Node {
                  const NodeIO& io) {
         TlasBuildInfo& tlas_build_info = *io[con_in_instance_info];
 
+        std::vector<vk::BufferMemoryBarrier2> pre_build_barriers;
+        bool any_release_scratch_buffer_after = false;
+
         // 1. Iterate over instances to queue the BLAS builds and update the BLAS addresses in the
         // instances
         for (uint32_t instance_index = 0; instance_index < tlas_build_info.instances.size();
@@ -186,16 +194,21 @@ class DeviceASBuilder : public Node {
                 blas_info.blas = as_builder.queue_build(blas_info.geometries, blas_info.range_infos,
                                                         blas_info.build_flags);
                 tlas_build_info.rebuild = true;
+                any_release_scratch_buffer_after |= blas_info.release_scratch_buffer_after;
             } else if (blas_info.rebuild) {
                 // build reusing existing buffers and acceleration structures
+                pre_build_barriers.push_back(blas_info.blas->blas_build_barrier2());
                 as_builder.queue_build(blas_info.geometries, blas_info.range_infos, blas_info.blas,
                                        blas_info.build_flags);
                 tlas_build_info.rebuild = true;
+                any_release_scratch_buffer_after |= blas_info.release_scratch_buffer_after;
             } else if (blas_info.update) {
                 // update
+                pre_build_barriers.push_back(blas_info.blas->blas_build_barrier2());
                 as_builder.queue_update(blas_info.geometries, blas_info.range_infos, blas_info.blas,
                                         blas_info.build_flags);
                 tlas_build_info.rebuild = true;
+                any_release_scratch_buffer_after |= blas_info.release_scratch_buffer_after;
             }
 
             blas_info.update = false;
@@ -221,23 +234,25 @@ class DeviceASBuilder : public Node {
         allocator->getStaging()->cmdToBuffer(cmd, *tlas_build_info.instances_buffer, 0,
                                              size_of(tlas_build_info.instances),
                                              tlas_build_info.instances.data());
-        cmd.pipelineBarrier(
-            vk::PipelineStageFlagBits::eTransfer,
-            vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR, {}, {},
-            tlas_build_info.instances_buffer->buffer_barrier(vk::AccessFlagBits::eTransferWrite,
-                                                             vk::AccessFlagBits::eShaderRead),
-            {});
+
+        pre_build_barriers.push_back(tlas_build_info.instances_buffer->buffer_barrier2(
+            vk::PipelineStageFlagBits2::eTransfer,
+            vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
+            vk::AccessFlagBits2::eTransferWrite, vk::AccessFlagBits2::eShaderRead));
 
         // 3. Queue TLAS build
         if (!tlas_build_info.tlas) {
             tlas_build_info.tlas = as_builder.queue_build(tlas_build_info.instances.size(),
-                                   tlas_build_info.instances_buffer,
-                                   tlas_build_info.build_flags);
+                                                          tlas_build_info.instances_buffer,
+                                                          tlas_build_info.build_flags);
         } else if (tlas_build_info.rebuild) {
+            pre_build_barriers.push_back(
+                tlas_build_info.tlas->tlas_build_barrier2(io[con_out_tlas].read_pipeline_stages));
             tlas_build_info.tlas = as_builder.queue_build(tlas_build_info.instances.size(),
                                                           tlas_build_info.instances_buffer,
                                                           tlas_build_info.build_flags);
         }
+        cmd.pipelineBarrier2(vk::DependencyInfo{{}, {}, pre_build_barriers});
 
         // 4. Run builds (reusing the same scratch buffer)
         as_builder.get_cmds(cmd, scratch_buffer, run.get_profiler());
@@ -247,6 +262,10 @@ class DeviceASBuilder : public Node {
         in_flight_data.scratch_buffer = scratch_buffer;
         in_flight_data.instances_buffer = tlas_build_info.instances_buffer;
         io[con_out_tlas] = tlas_build_info.tlas;
+
+        if (any_release_scratch_buffer_after) {
+            scratch_buffer.reset();
+        }
     }
 
   private:
