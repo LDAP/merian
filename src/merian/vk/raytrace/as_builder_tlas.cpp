@@ -53,11 +53,10 @@ void ASBuilder::queue_update(
     pending_tlas_builds.emplace_back(build_info, instance_count, top_as_geometry);
 }
 
-void ASBuilder::queue_rebuild(
-    const uint32_t instance_count,
-    const vk::AccelerationStructureGeometryInstancesDataKHR& instances_data,
-    const AccelerationStructureHandle src_as,
-    const vk::BuildAccelerationStructureFlagsKHR flags) {
+void ASBuilder::queue_build(const uint32_t instance_count,
+                            const vk::AccelerationStructureGeometryInstancesDataKHR& instances_data,
+                            const AccelerationStructureHandle& src_as,
+                            const vk::BuildAccelerationStructureFlagsKHR flags) {
     vk::AccelerationStructureGeometryKHR top_as_geometry{vk::GeometryTypeKHR::eInstances,
                                                          {instances_data}};
     vk::AccelerationStructureBuildGeometryInfoKHR build_info{
@@ -83,6 +82,14 @@ void ASBuilder::get_cmds_tlas(const vk::CommandBuffer cmd, BufferHandle& scratch
 
     vk::AccelerationStructureBuildRangeInfoKHR build_offset_info{0, 0, 0, 0};
 
+    // Since the scratch buffer is reused across builds, we need a barrier to ensure one
+    // build is finished before starting the next one.
+    const vk::BufferMemoryBarrier scratch_barrier =
+        scratch_buffer->buffer_barrier(vk::AccessFlagBits::eAccelerationStructureReadKHR |
+                                           vk::AccessFlagBits::eAccelerationStructureWriteKHR,
+                                       vk::AccessFlagBits::eAccelerationStructureReadKHR |
+                                           vk::AccessFlagBits::eAccelerationStructureWriteKHR);
+
     for (uint32_t pending_idx = 0; pending_idx < pending_tlas_builds.size(); pending_idx++) {
         pending_tlas_builds[pending_idx].build_info.scratchData.deviceAddress =
             scratch_buffer->get_device_address();
@@ -93,14 +100,6 @@ void ASBuilder::get_cmds_tlas(const vk::CommandBuffer cmd, BufferHandle& scratch
 
         cmd.buildAccelerationStructuresKHR(pending_tlas_builds[pending_idx].build_info,
                                            &build_offset_info);
-
-        // Since the scratch buffer is reused across builds, we need a barrier to ensure one
-        // build is finished before starting the next one.
-        const vk::BufferMemoryBarrier scratch_barrier =
-            scratch_buffer->buffer_barrier(vk::AccessFlagBits::eAccelerationStructureReadKHR |
-                                               vk::AccessFlagBits::eAccelerationStructureWriteKHR,
-                                           vk::AccessFlagBits::eAccelerationStructureReadKHR |
-                                               vk::AccessFlagBits::eAccelerationStructureWriteKHR);
         cmd.pipelineBarrier(vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR,
                             vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR, {}, {},
                             scratch_barrier, {});

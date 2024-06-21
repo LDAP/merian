@@ -20,6 +20,15 @@ class Buffer;
 using BufferHandle = std::shared_ptr<Buffer>;
 
 class Buffer : public std::enable_shared_from_this<Buffer> {
+
+  public:
+    constexpr static vk::BufferUsageFlags SCRATCH_BUFFER_USAGE =
+        vk::BufferUsageFlagBits::eShaderDeviceAddress | vk::BufferUsageFlagBits::eStorageBuffer;
+
+    constexpr static vk::BufferUsageFlags INSTANCES_BUFFER_USAGE =
+        vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eShaderDeviceAddress |
+        vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR;
+
   public:
     // Creats a Buffer objects that automatically destroys buffer when destructed.
     // The memory is not freed explicitly to let it free itself.

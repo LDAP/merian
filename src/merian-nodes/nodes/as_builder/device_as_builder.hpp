@@ -1,8 +1,10 @@
 #pragma once
 
 #include "merian-nodes/connectors/ptr_in.hpp"
+#include "merian-nodes/connectors/vk_buffer_array_in.hpp"
 #include "merian-nodes/connectors/vk_tlas_out.hpp"
 #include "merian-nodes/graph/node.hpp"
+#include "merian/utils/vector.hpp"
 #include "merian/vk/raytrace/as_builder.hpp"
 #include "merian/vk/utils/math.hpp"
 
@@ -65,7 +67,7 @@ class DeviceASBuilder : public Node {
 
         // call if you updated the geometry buffers and performed major deformations.
         void request_rebuild() {
-            blas.reset();
+            rebuild = true;
         }
 
         // call if you updated the geometry buffers and performed only slight deformations.
@@ -83,6 +85,7 @@ class DeviceASBuilder : public Node {
         // After the build stored here for rebuilds / updates
         AccelerationStructureHandle blas;
         bool update = false;
+        bool rebuild = false;
     };
 
     /**
@@ -97,17 +100,17 @@ class DeviceASBuilder : public Node {
         friend DeviceASBuilder;
 
       public:
-        TlasBuildInfo(const vk::BuildAccelerationStructureFlagsKHR build_flags)
+        TlasBuildInfo(const vk::BuildAccelerationStructureFlagsKHR build_flags =
+                          vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace)
             : build_flags(build_flags) {}
 
         TlasBuildInfo&
-        add_instance(const std::shared_ptr<BlasBuildInfo>& blas,
+        add_instance(const std::shared_ptr<BlasBuildInfo>& blas_info,
                      const vk::GeometryInstanceFlagsKHR instance_flags = {},
                      const uint32_t custom_index = 0,
                      const uint32_t mask = 0xFF,
                      const vk::TransformMatrixKHR& transform = merian::transform_identity()) {
             tlas.reset();
-            instances_buffer.reset();
 
             // clang-format off
             const vk::AccelerationStructureInstanceKHR instance{
@@ -120,7 +123,7 @@ class DeviceASBuilder : public Node {
             };
             // clang-format on
             instances.emplace_back(instance);
-            blases.emplace_back(blas);
+            blases.emplace_back(blas_info);
 
             return *this;
         }
@@ -134,6 +137,8 @@ class DeviceASBuilder : public Node {
         // After the build stored here for rebuilds / updates
         AccelerationStructureHandle tlas;
         BufferHandle instances_buffer;
+
+        bool rebuild = false;
     };
 
   private:
@@ -150,6 +155,8 @@ class DeviceASBuilder : public Node {
     std::vector<InputConnectorHandle> describe_inputs() {
         return {
             con_in_instance_info,
+            // con_in_vtx_buffers,
+            // con_in_idx_buffers,
         };
     }
 
@@ -160,38 +167,103 @@ class DeviceASBuilder : public Node {
         };
     }
 
-    void process([[maybe_unused]] GraphRun& run,
+    void process(GraphRun& run,
                  const vk::CommandBuffer& cmd,
                  [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
                  const NodeIO& io) {
-        InFlightData& in_flight_data = io.frame_data<InFlightData>();
         TlasBuildInfo& tlas_build_info = *io[con_in_instance_info];
 
+        // 1. Iterate over instances to queue the BLAS builds and update the BLAS addresses in the
+        // instances
         for (uint32_t instance_index = 0; instance_index < tlas_build_info.instances.size();
              instance_index++) {
+            BlasBuildInfo& blas_info = *tlas_build_info.blases[instance_index];
+            vk::AccelerationStructureInstanceKHR& instance =
+                tlas_build_info.instances[instance_index];
+
+            if (!blas_info.blas) {
+                // build
+                blas_info.blas = as_builder.queue_build(blas_info.geometries, blas_info.range_infos,
+                                                        blas_info.build_flags);
+                tlas_build_info.rebuild = true;
+            } else if (blas_info.rebuild) {
+                // build reusing existing buffers and acceleration structures
+                as_builder.queue_build(blas_info.geometries, blas_info.range_infos, blas_info.blas,
+                                       blas_info.build_flags);
+                tlas_build_info.rebuild = true;
+            } else if (blas_info.update) {
+                // update
+                as_builder.queue_update(blas_info.geometries, blas_info.range_infos, blas_info.blas,
+                                        blas_info.build_flags);
+                tlas_build_info.rebuild = true;
+            }
+
+            blas_info.update = false;
+            blas_info.rebuild = false;
+            instance.accelerationStructureReference =
+                blas_info.blas->get_acceleration_structure_device_address();
         }
 
+        // 2. Create Instance buffer
+        if (!allocator->ensureBufferSize(
+                tlas_build_info.instances_buffer, size_of(tlas_build_info.instances),
+                Buffer::INSTANCES_BUFFER_USAGE, "DeviceASBuilder Instances",
+                merian::MemoryMappingType::NONE, 16, 1.25)) {
+            // old buffer reused -> insert barrier for last iteration
+            cmd.pipelineBarrier(
+                vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR,
+                vk::PipelineStageFlagBits::eTransfer, {}, {},
+                tlas_build_info.instances_buffer->buffer_barrier(
+                    vk::AccessFlagBits::eShaderRead, vk::AccessFlagBits::eTransferWrite),
+                {});
+        }
+        // 2.1. Upload instances to GPU and copy to buffer
+        allocator->getStaging()->cmdToBuffer(cmd, *tlas_build_info.instances_buffer, 0,
+                                             size_of(tlas_build_info.instances),
+                                             tlas_build_info.instances.data());
+        cmd.pipelineBarrier(
+            vk::PipelineStageFlagBits::eTransfer,
+            vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR, {}, {},
+            tlas_build_info.instances_buffer->buffer_barrier(vk::AccessFlagBits::eTransferWrite,
+                                                             vk::AccessFlagBits::eShaderRead),
+            {});
 
-        if (tlas_build_info.tlas) {
-            as_builder.queue_rebuild(tlas_build_info.instances.size(),
-                                     in_flight_data.instances_buffer, tlas_build_info.tlas);
-        } else {
+        // 3. Queue TLAS build
+        if (!tlas_build_info.tlas) {
             tlas_build_info.tlas = as_builder.queue_build(tlas_build_info.instances.size(),
-                                                          in_flight_data.instances_buffer);
+                                   tlas_build_info.instances_buffer,
+                                   tlas_build_info.build_flags);
+        } else if (tlas_build_info.rebuild) {
+            tlas_build_info.tlas = as_builder.queue_build(tlas_build_info.instances.size(),
+                                                          tlas_build_info.instances_buffer,
+                                                          tlas_build_info.build_flags);
         }
 
-        as_builder.get_cmds(cmd, in_flight_data.scratch_buffer);
+        // 4. Run builds (reusing the same scratch buffer)
+        as_builder.get_cmds(cmd, scratch_buffer, run.get_profiler());
+
+        // 5. Prevent object destruction
+        InFlightData& in_flight_data = io.frame_data<InFlightData>();
+        in_flight_data.scratch_buffer = scratch_buffer;
+        in_flight_data.instances_buffer = tlas_build_info.instances_buffer;
         io[con_out_tlas] = tlas_build_info.tlas;
     }
 
   private:
+    const ResourceAllocatorHandle allocator;
+    ASBuilder as_builder;
+
     // clang-format off
     PtrInHandle<TlasBuildInfo> con_in_instance_info = PtrIn<TlasBuildInfo>::create("tlas_info");
+
+    // todo: Add those as optional inputs somehow to ensure proper synchronization.
+    // VkBufferArrayInHandle con_in_vtx_buffers = VkBufferArrayIn::acceleration_structure_read("vtx_buffers");
+    // VkBufferArrayInHandle con_in_idx_buffers = VkBufferArrayIn::acceleration_structure_read("idx_buffers");
 
     VkTLASOutHandle con_out_tlas = VkTLASOut::create("tlas");
     // clang-format on
 
-    ASBuilder as_builder;
+    BufferHandle scratch_buffer;
 };
 
 } // namespace merian_nodes

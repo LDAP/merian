@@ -82,20 +82,16 @@ const BufferHandle& ResourceAllocator::get_dummy_buffer() const {
 BufferHandle ResourceAllocator::createScratchBuffer(const vk::DeviceSize size,
                                                     const vk::DeviceSize alignment,
                                                     const std::string& debug_name) {
-    return createBuffer(size,
-                        vk::BufferUsageFlagBits::eShaderDeviceAddress |
-                            vk::BufferUsageFlagBits::eStorageBuffer,
-                        MemoryMappingType::NONE, debug_name, alignment);
+    return createBuffer(size, Buffer::SCRATCH_BUFFER_USAGE, MemoryMappingType::NONE, debug_name,
+                        alignment);
 }
 
 BufferHandle ResourceAllocator::createInstancesBuffer(const uint32_t instance_count,
                                                       const std::string& debug_name) {
-    static const vk::BufferUsageFlags instances_buffer_usage =
-        vk::BufferUsageFlagBits::eShaderDeviceAddress |
-        vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR;
 
     return createBuffer(sizeof(vk::AccelerationStructureInstanceKHR) * instance_count,
-                        instances_buffer_usage, merian::MemoryMappingType::NONE, debug_name, 16);
+                        Buffer::INSTANCES_BUFFER_USAGE, merian::MemoryMappingType::NONE, debug_name,
+                        16);
 }
 
 ImageHandle ResourceAllocator::createImage(const vk::ImageCreateInfo& info_,

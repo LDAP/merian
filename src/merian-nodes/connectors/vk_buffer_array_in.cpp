@@ -54,8 +54,7 @@ VkBufferArrayInHandle VkBufferArrayIn::compute_read(const std::string& name) {
 
 VkBufferArrayInHandle VkBufferArrayIn::acceleration_structure_read(const std::string& name) {
     return std::make_shared<VkBufferArrayIn>(
-        name, vk::ShaderStageFlags{},
-        vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eAccelerationStructureReadKHR,
+        name, vk::ShaderStageFlags{}, vk::AccessFlagBits2::eShaderRead,
         vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR);
 }
 
