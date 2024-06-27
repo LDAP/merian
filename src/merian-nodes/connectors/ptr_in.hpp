@@ -14,11 +14,11 @@ template <typename T> using PtrOutHandle = std::shared_ptr<PtrOut<T>>;
 
 // Transfer information between nodes on the host using shared_ptr.
 template <typename T>
-class PtrIn : public TypedInputConnector<PtrOut<T>, const std::shared_ptr<T>&> {
+class PtrIn : public TypedInputConnector<PtrOutHandle<T>, const std::shared_ptr<T>&> {
 
   public:
     PtrIn(const std::string& name, const uint32_t delay)
-        : TypedInputConnector<PtrOut<T>, const std::shared_ptr<T>&>(name, delay) {}
+        : TypedInputConnector<PtrOutHandle<T>, const std::shared_ptr<T>&>(name, delay) {}
 
     const std::shared_ptr<T>& resource(const GraphResourceHandle& resource) override {
         return debugable_ptr_cast<PtrResource<T>>(resource)->ptr;

@@ -17,7 +17,7 @@ VkBufferArrayIn::VkBufferArrayIn(const std::string& name,
 
 std::optional<vk::DescriptorSetLayoutBinding> VkBufferArrayIn::get_descriptor_info() const {
     if (stage_flags)
-        return vk::DescriptorSetLayoutBinding{0, vk::DescriptorType::eCombinedImageSampler,
+        return vk::DescriptorSetLayoutBinding{0, vk::DescriptorType::eStorageBuffer,
                                               array_size, stage_flags, nullptr};
     return std::nullopt;
 }

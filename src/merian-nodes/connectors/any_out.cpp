@@ -1,5 +1,4 @@
 #include "any_out.hpp"
-#include "any_in.hpp"
 
 #include "merian-nodes/graph/errors.hpp"
 #include "merian-nodes/resources/host_any_resource.hpp"
@@ -15,17 +14,6 @@ AnyOut::create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorH
                         [[maybe_unused]] const ResourceAllocatorHandle& aliasing_allocator,
                         [[maybe_unused]] const uint32_t resoruce_index,
                         [[maybe_unused]] const uint32_t ring_size) {
-
-    for (auto& [node, input] : inputs) {
-        // check compatibility
-
-        const auto& casted_in = std::dynamic_pointer_cast<AnyIn>(input);
-        if (!casted_in) {
-            throw graph_errors::connector_error{
-                fmt::format("AnyOut {} cannot output to {} of node {}.", Connector::name,
-                            input->name, node->name)};
-        }
-    }
 
     return std::make_shared<AnyResource>(persistent ? -1 : (int32_t)inputs.size());
 }

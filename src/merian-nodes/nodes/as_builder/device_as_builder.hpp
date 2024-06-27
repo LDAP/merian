@@ -30,19 +30,22 @@ class DeviceASBuilder : public Node {
         friend DeviceASBuilder;
 
       public:
+        using GeometryHandle = uint32_t;
+
         // Set release_scratch_buffer_after to true to release the scratch buffer after the build of
         // this BLAS (because it needs much memory for example).
         BlasBuildInfo(const vk::BuildAccelerationStructureFlagsKHR build_flags,
-                      const bool release_scratch_buffer_after)
+                      const bool release_scratch_buffer_after = false)
             : build_flags(build_flags), release_scratch_buffer_after(release_scratch_buffer_after) {
         }
 
         /**
          * @brief      Adds geometry with rgb32f vertices and uint32 index.
          *
-         * You must ensure that the buffers are not destructed until the build has finished.
+         * You must ensure that the buffers are not destructed until the build has
+         * finished.
          */
-        BlasBuildInfo& add_geometry_f32_u32(const uint32_t vertex_count,
+        GeometryHandle add_geometry_f32_u32(const uint32_t vertex_count,
                                             const uint32_t primitive_count,
                                             const BufferHandle& vtx_buffer,
                                             const BufferHandle& idx_buffer) {
@@ -65,8 +68,62 @@ class DeviceASBuilder : public Node {
 
             geometries.emplace_back(geometry);
             range_infos.emplace_back(range_info);
+            vtx_buffers.emplace_back(vtx_buffer);
+            idx_buffers.emplace_back(idx_buffer);
 
-            return *this;
+            return geometries.size() - 1;
+        }
+
+        void update_geometry_f32_u32(const GeometryHandle handle,
+                                     const uint32_t vertex_count,
+                                     const uint32_t primitive_count,
+                                     const BufferHandle& vtx_buffer,
+                                     const BufferHandle& idx_buffer,
+                                     const bool prefer_update = false) {
+            assert(handle < geometries.size());
+            assert(handle < range_infos.size());
+            assert(handle < vtx_buffers.size());
+            assert(handle < idx_buffers.size());
+            assert(geometries[handle].geometryType == vk::GeometryTypeKHR::eTriangles);
+            assert(geometries[handle].geometry.triangles.vertexFormat ==
+                   vk::Format::eR32G32B32Sfloat);
+            assert(geometries[handle].geometry.triangles.vertexStride == 3 * sizeof(float));
+            assert(geometries[handle].geometry.triangles.indexType == vk::IndexType::eUint32);
+            assert(range_infos[handle].firstVertex == 0);
+            assert(range_infos[handle].primitiveOffset == 0);
+            assert(range_infos[handle].transformOffset == 0);
+
+            const uint32_t max_vertex = vertex_count - 1;
+            if (geometries[handle].geometry.triangles.maxVertex == max_vertex &&
+                range_infos[handle].primitiveCount == primitive_count) {
+                // can reuse the blas but needs rebuild
+                if (prefer_update &&
+                    (build_flags & vk::BuildAccelerationStructureFlagBitsKHR::eAllowUpdate)) {
+                    update = true;
+                } else {
+                    rebuild = true;
+                }
+            } else {
+                geometries[handle].geometry.triangles.maxVertex = max_vertex;
+                range_infos[handle].primitiveCount = primitive_count;
+
+                if (geometries[handle].geometry.triangles.maxVertex > max_vertex &&
+                    range_infos[handle].primitiveCount > primitive_count) {
+                    rebuild = true;
+                } else {
+                    blas.reset();
+                }
+            }
+
+            geometries[handle].geometry.triangles.vertexData = vtx_buffer->get_device_address();
+            geometries[handle].geometry.triangles.indexData = idx_buffer->get_device_address();
+
+            vtx_buffers[handle] = vtx_buffer;
+            idx_buffers[handle] = idx_buffer;
+        }
+
+        void set_release_scratch_buffer_after(const bool value) {
+            release_scratch_buffer_after = value;
         }
 
         // call if you updated the geometry buffers and performed major deformations.
@@ -81,11 +138,14 @@ class DeviceASBuilder : public Node {
 
       private:
         const vk::BuildAccelerationStructureFlagsKHR build_flags;
-        const bool release_scratch_buffer_after;
+        bool release_scratch_buffer_after;
 
         // Info for the build
         std::vector<vk::AccelerationStructureGeometryKHR> geometries;
         std::vector<vk::AccelerationStructureBuildRangeInfoKHR> range_infos;
+        // Buffers that hold geometry and must be kept alive for the build
+        std::vector<BufferHandle> vtx_buffers;
+        std::vector<BufferHandle> idx_buffers;
 
         // After the build stored here for rebuilds / updates
         AccelerationStructureHandle blas;
@@ -133,6 +193,10 @@ class DeviceASBuilder : public Node {
             return *this;
         }
 
+        void request_rebuild() {
+            rebuild = true;
+        }
+
       private:
         const vk::BuildAccelerationStructureFlagsKHR build_flags;
 
@@ -149,19 +213,19 @@ class DeviceASBuilder : public Node {
   private:
     struct InFlightData {
         std::vector<AccelerationStructureHandle> blases;
-        BufferHandle instances_buffer;
-        BufferHandle scratch_buffer;
+        std::vector<BufferHandle> build_buffers;
     };
 
   public:
     DeviceASBuilder(const SharedContext& context, const ResourceAllocatorHandle& allocator)
-        : Node("Acceleration Structure Builder"), as_builder(context, allocator) {}
+        : Node("Acceleration Structure Builder"), allocator(allocator),
+          as_builder(context, allocator) {}
 
     std::vector<InputConnectorHandle> describe_inputs() {
         return {
             con_in_instance_info,
-            // con_in_vtx_buffers,
-            // con_in_idx_buffers,
+            con_in_vtx_buffers,
+            con_in_idx_buffers,
         };
     }
 
@@ -176,7 +240,10 @@ class DeviceASBuilder : public Node {
                  const vk::CommandBuffer& cmd,
                  [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
                  const NodeIO& io) {
+        InFlightData& in_flight_data = io.frame_data<InFlightData>();
+        in_flight_data.build_buffers.clear();
         TlasBuildInfo& tlas_build_info = *io[con_in_instance_info];
+        in_flight_data.blases.clear();
 
         std::vector<vk::BufferMemoryBarrier2> pre_build_barriers;
         bool any_release_scratch_buffer_after = false;
@@ -195,6 +262,9 @@ class DeviceASBuilder : public Node {
                                                         blas_info.build_flags);
                 tlas_build_info.rebuild = true;
                 any_release_scratch_buffer_after |= blas_info.release_scratch_buffer_after;
+                merian::insert_all(in_flight_data.build_buffers, blas_info.vtx_buffers);
+                merian::insert_all(in_flight_data.build_buffers, blas_info.idx_buffers);
+
             } else if (blas_info.rebuild) {
                 // build reusing existing buffers and acceleration structures
                 pre_build_barriers.push_back(blas_info.blas->blas_build_barrier2());
@@ -202,6 +272,8 @@ class DeviceASBuilder : public Node {
                                        blas_info.build_flags);
                 tlas_build_info.rebuild = true;
                 any_release_scratch_buffer_after |= blas_info.release_scratch_buffer_after;
+                merian::insert_all(in_flight_data.build_buffers, blas_info.vtx_buffers);
+                merian::insert_all(in_flight_data.build_buffers, blas_info.idx_buffers);
             } else if (blas_info.update) {
                 // update
                 pre_build_barriers.push_back(blas_info.blas->blas_build_barrier2());
@@ -209,7 +281,10 @@ class DeviceASBuilder : public Node {
                                         blas_info.build_flags);
                 tlas_build_info.rebuild = true;
                 any_release_scratch_buffer_after |= blas_info.release_scratch_buffer_after;
+                merian::insert_all(in_flight_data.build_buffers, blas_info.vtx_buffers);
+                merian::insert_all(in_flight_data.build_buffers, blas_info.idx_buffers);
             }
+            in_flight_data.blases.push_back(blas_info.blas);
 
             blas_info.update = false;
             blas_info.rebuild = false;
@@ -219,7 +294,12 @@ class DeviceASBuilder : public Node {
 
         // 2. Create Instance buffer
         if (!allocator->ensureBufferSize(
-                tlas_build_info.instances_buffer, size_of(tlas_build_info.instances),
+                tlas_build_info.instances_buffer,
+                std::max(
+                    size_of(tlas_build_info.instances),
+                    16 * sizeof(
+                             vk::AccelerationStructureInstanceKHR)), // prevent resizes at low count
+                                                                     // and support empty TLASes
                 Buffer::INSTANCES_BUFFER_USAGE, "DeviceASBuilder Instances",
                 merian::MemoryMappingType::NONE, 16, 1.25)) {
             // old buffer reused -> insert barrier for last iteration
@@ -235,10 +315,13 @@ class DeviceASBuilder : public Node {
                                              size_of(tlas_build_info.instances),
                                              tlas_build_info.instances.data());
 
+        // Validation Layers complain if dst does not include transfer write?!
         pre_build_barriers.push_back(tlas_build_info.instances_buffer->buffer_barrier2(
             vk::PipelineStageFlagBits2::eTransfer,
-            vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
-            vk::AccessFlagBits2::eTransferWrite, vk::AccessFlagBits2::eShaderRead));
+            vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR |
+                vk::PipelineStageFlagBits2::eTransfer,
+            vk::AccessFlagBits2::eTransferWrite,
+            vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eTransferWrite));
 
         // 3. Queue TLAS build
         if (!tlas_build_info.tlas) {
@@ -252,15 +335,15 @@ class DeviceASBuilder : public Node {
                                                           tlas_build_info.instances_buffer,
                                                           tlas_build_info.build_flags);
         }
+        tlas_build_info.rebuild = false;
         cmd.pipelineBarrier2(vk::DependencyInfo{{}, {}, pre_build_barriers});
 
         // 4. Run builds (reusing the same scratch buffer)
         as_builder.get_cmds(cmd, scratch_buffer, run.get_profiler());
 
         // 5. Prevent object destruction
-        InFlightData& in_flight_data = io.frame_data<InFlightData>();
-        in_flight_data.scratch_buffer = scratch_buffer;
-        in_flight_data.instances_buffer = tlas_build_info.instances_buffer;
+        in_flight_data.build_buffers.emplace_back(scratch_buffer);
+        in_flight_data.build_buffers.emplace_back(tlas_build_info.instances_buffer);
         io[con_out_tlas] = tlas_build_info.tlas;
 
         if (any_release_scratch_buffer_after) {
@@ -276,8 +359,8 @@ class DeviceASBuilder : public Node {
     PtrInHandle<TlasBuildInfo> con_in_instance_info = PtrIn<TlasBuildInfo>::create("tlas_info");
 
     // todo: Add those as optional inputs somehow to ensure proper synchronization.
-    // VkBufferArrayInHandle con_in_vtx_buffers = VkBufferArrayIn::acceleration_structure_read("vtx_buffers");
-    // VkBufferArrayInHandle con_in_idx_buffers = VkBufferArrayIn::acceleration_structure_read("idx_buffers");
+    VkBufferArrayInHandle con_in_vtx_buffers = VkBufferArrayIn::acceleration_structure_read("vtx");
+    VkBufferArrayInHandle con_in_idx_buffers = VkBufferArrayIn::acceleration_structure_read("idx");
 
     VkTLASOutHandle con_out_tlas = VkTLASOut::create("tlas");
     // clang-format on

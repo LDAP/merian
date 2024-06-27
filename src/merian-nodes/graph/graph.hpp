@@ -113,7 +113,17 @@ struct NodeData {
     };
     std::vector<PerDescriptorSetInfo> descriptor_sets;
     std::vector<NodeIO> resource_maps;
+
+    struct NodeStatistics {
+        uint32_t last_descriptor_set_updates;
+    };
+    NodeStatistics statistics;
 };
+
+inline std::string format_as(const NodeData::NodeStatistics stats) {
+    return fmt::format("Descriptor bindings updated: {}", stats.last_descriptor_set_updates);
+}
+
 } // namespace graph_internal
 
 using namespace merian;
@@ -458,6 +468,10 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 const Node::NodeStatusFlags flags = node->properties(props);
                 needs_reconnect |= flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT;
                 props.st_separate();
+                if (props.st_begin_child("stats", "Statistics")) {
+                    props.output_text(fmt::format("{}", data.statistics));
+                    props.st_end_child();
+                };
                 io_props_for_node(props, data);
                 props.st_end_child();
             }
@@ -585,6 +599,9 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                                               src_data.output_connections[per_input_info.output],
                                               resource_index);
                 }
+                if (flags & Connector::ConnectorStatusFlagBits::NEEDS_RECONNECT) {
+                    request_reconnect();
+                }
             }
             for (auto& [output, per_output_info] : data.output_connections) {
                 auto& [resource, resource_index] = per_output_info.precomputed_resources[set_idx];
@@ -592,6 +609,9 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                     run, cmd, resource, node, image_barriers, buffer_barriers);
                 if (flags & Connector::ConnectorStatusFlagBits::NEEDS_DESCRIPTOR_UPDATE) {
                     record_descriptor_updates(data, output, per_output_info, resource_index);
+                }
+                if (flags & Connector::ConnectorStatusFlagBits::NEEDS_RECONNECT) {
+                    request_reconnect();
                 }
             }
 
@@ -606,8 +626,9 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         auto& descriptor_set = data.descriptor_sets[set_idx];
         {
             // apply descriptor set updates
+            data.statistics.last_descriptor_set_updates = descriptor_set.update->count();
             if (!descriptor_set.update->empty()) {
-                SPDLOG_DEBUG("applying {} descriptor set updates for node {}, set {}",
+                SPDLOG_TRACE("applying {} descriptor set updates for node {}, set {}",
                              descriptor_set.update->count(), data.name, set_idx);
                 descriptor_set.update->update(context);
                 descriptor_set.update->next();
@@ -628,6 +649,9 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                                               src_data.output_connections[per_input_info.output],
                                               resource_index);
                 }
+                if (flags & Connector::ConnectorStatusFlagBits::NEEDS_RECONNECT) {
+                    request_reconnect();
+                }
             }
             for (auto& [output, per_output_info] : data.output_connections) {
                 auto& [resource, resource_index] = per_output_info.precomputed_resources[set_idx];
@@ -635,6 +659,9 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                     run, cmd, resource, node, image_barriers, buffer_barriers);
                 if (flags & Connector::ConnectorStatusFlagBits::NEEDS_DESCRIPTOR_UPDATE) {
                     record_descriptor_updates(data, output, per_output_info, resource_index);
+                }
+                if (flags & Connector::ConnectorStatusFlagBits::NEEDS_RECONNECT) {
+                    request_reconnect();
                 }
             }
 
