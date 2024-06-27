@@ -31,10 +31,14 @@ class BufferArrayResource : public GraphResource {
              const vk::CommandBuffer cmd,
              const vk::AccessFlags2 prior_access_flags,
              const vk::PipelineStageFlags2 prior_pipeline_stages) {
-        buffers[index] = buffer;
-        current_updates.push_back(index);
+        assert(index < buffers.size());
 
-        if (buffer) {
+        if (buffers[index] != buffer) {
+            buffers[index] = buffer;
+            current_updates.push_back(index);
+        }
+
+        if (buffer && prior_access_flags) {
             const vk::BufferMemoryBarrier2 buf_bar = buffer->buffer_barrier2(
                 prior_pipeline_stages, input_stage_flags, prior_access_flags, input_access_flags);
 
@@ -43,6 +47,8 @@ class BufferArrayResource : public GraphResource {
     }
 
     const merian::BufferHandle& get(const uint32_t index) const {
+        assert(index < buffers.size());
+
         return buffers[index];
     }
 

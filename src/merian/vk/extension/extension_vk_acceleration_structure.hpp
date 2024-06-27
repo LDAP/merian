@@ -37,6 +37,10 @@ class ExtensionVkAccelerationStructure : public Extension {
         return &acceleration_structure_features;
     }
 
+    const uint32_t& min_scratch_alignment() const {
+        return acceleration_structure_properties.minAccelerationStructureScratchOffsetAlignment;
+    }
+
   private:
     vk::PhysicalDeviceAccelerationStructureFeaturesKHR acceleration_structure_features;
 

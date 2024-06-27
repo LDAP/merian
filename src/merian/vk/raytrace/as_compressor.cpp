@@ -66,11 +66,11 @@ ASCompressor::compact(const SharedContext& context,
 
     // Make sure tlas is not build before copy finished
     vk::MemoryBarrier2 copy_tlas_barrier{vk::PipelineStageFlagBits2::eAccelerationStructureCopyKHR,
-                       vk::AccessFlagBits2::eAccelerationStructureReadKHR |
-                           vk::AccessFlagBits2::eAccelerationStructureWriteKHR,
-                       vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
-                       vk::AccessFlagBits2::eAccelerationStructureReadKHR |
-                           vk::AccessFlagBits2::eAccelerationStructureWriteKHR};
+                                         vk::AccessFlagBits2::eAccelerationStructureReadKHR |
+                                             vk::AccessFlagBits2::eAccelerationStructureWriteKHR,
+                                         vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
+                                         vk::AccessFlagBits2::eAccelerationStructureReadKHR |
+                                             vk::AccessFlagBits2::eAccelerationStructureWriteKHR};
     vk::DependencyInfo dep_copy_tlas{{}, copy_tlas_barrier};
     cmd.pipelineBarrier2(dep_copy_tlas);
 

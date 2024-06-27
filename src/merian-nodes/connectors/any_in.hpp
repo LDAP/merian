@@ -20,6 +20,8 @@ class AnyIn : public TypedInputConnector<AnyOutHandle, const std::any&> {
 
     const std::any& resource(const GraphResourceHandle& resource) override;
 
+    void on_connect_output(const OutputConnectorHandle& output) override;
+
     Connector::ConnectorStatusFlags
     on_post_process(GraphRun& run,
                     const vk::CommandBuffer& cmd,

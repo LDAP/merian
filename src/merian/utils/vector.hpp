@@ -61,4 +61,9 @@ template <class T> void remove_duplicates(std::vector<T>& vector) {
     vector.erase(std::unique(vector.begin(), vector.end()), vector.end());
 }
 
+// Returns the size of the vector in bytes.
+template <class T> inline std::size_t size_of(const std::vector<T>& vector) {
+    return vector.size() * sizeof(T);
+}
+
 } // namespace merian

@@ -25,7 +25,7 @@ GraphResourceHandle VkTextureArrayOut::create_resource(
         const auto& con_in = std::dynamic_pointer_cast<VkTextureArrayIn>(input);
         if (!con_in) {
             throw graph_errors::connector_error{
-                fmt::format("VkImageOut {} cannot output to {}.", name, input->name)};
+                fmt::format("VkTextureArrayOut {} cannot output to {}.", name, input->name)};
         }
         input_pipeline_stages |= con_in->pipeline_stages;
         input_access_flags |= con_in->access_flags;
@@ -84,7 +84,8 @@ Connector::ConnectorStatusFlags VkTextureArrayOut::on_post_process(
     return flags;
 }
 
-VkTextureArrayOutHandle VkTextureArrayOut::create(const std::string& name, const uint32_t array_size) {
+VkTextureArrayOutHandle VkTextureArrayOut::create(const std::string& name,
+                                                  const uint32_t array_size) {
     return std::make_shared<VkTextureArrayOut>(name, array_size);
 }
 

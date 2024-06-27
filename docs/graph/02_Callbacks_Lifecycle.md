@@ -24,18 +24,16 @@ Note, topological order includes all connections with delay == 0.
     - Node::on_connected
         - If RESET_IN_FLIGHT_DATA is set, then all shared_ptrs for frame data are reset to nullptr.
 
-### Garph Run
+### Graph Run
 
 - Nodes are processed in topological order (excluding connections with delay > 0).
 
 - for each node (in topological order):
     - Node::pre_process
-    - For each connector:
-        - Connector::on_pre_process
-    - for each resource corresponding to an output connector:
-        - GraphResource::get_status (descriptor set writes are prepared)
     - If for at least on node NEEDS_REBUILD is set, then a build is executed and the run begins again from the start.
 - for each node (in topological order):
+    - For each connector:
+        - Connector::on_pre_process
     - (descriptor set writes are executed)
     - Node::process
     - For each connector:

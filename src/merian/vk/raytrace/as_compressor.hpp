@@ -17,12 +17,13 @@ namespace merian {
  * Note: This is slow: The pool is submitted twice while building.
  */
 class ASCompressor {
-public:
-  static constexpr vk::MemoryBarrier2 build_compress_barrier{vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
-                               vk::AccessFlagBits2::eAccelerationStructureReadKHR |
-                                   vk::AccessFlagBits2::eAccelerationStructureWriteKHR,
-                               vk::PipelineStageFlagBits2::eAccelerationStructureCopyKHR,
-                               vk::AccessFlagBits2::eAccelerationStructureReadKHR};
+  public:
+    static constexpr vk::MemoryBarrier2 build_compress_barrier{
+        vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
+        vk::AccessFlagBits2::eAccelerationStructureReadKHR |
+            vk::AccessFlagBits2::eAccelerationStructureWriteKHR,
+        vk::PipelineStageFlagBits2::eAccelerationStructureCopyKHR,
+        vk::AccessFlagBits2::eAccelerationStructureReadKHR};
 
   public:
     // You must ensure proper synchronization with the build

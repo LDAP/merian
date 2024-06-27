@@ -18,7 +18,7 @@ ResourceAllocator::ResourceAllocator(const SharedContext& context,
     const std::vector<uint32_t> data = {missing_rgba, missing_rgba, missing_rgba, missing_rgba};
     context->get_queue_GCT()->submit_wait([&](const vk::CommandBuffer& cmd) {
         dummy_texture = createTextureFromRGBA8(cmd, data.data(), 2, 2, vk::Filter::eLinear, true,
-                                              "ResourceAllocator::dummy_texture");
+                                               "ResourceAllocator::dummy_texture");
         const auto img_transition =
             dummy_texture->get_image()->barrier2(vk::ImageLayout::eShaderReadOnlyOptimal);
         cmd.pipelineBarrier2(vk::DependencyInfo{{}, {}, {}, img_transition});
@@ -82,10 +82,16 @@ const BufferHandle& ResourceAllocator::get_dummy_buffer() const {
 BufferHandle ResourceAllocator::createScratchBuffer(const vk::DeviceSize size,
                                                     const vk::DeviceSize alignment,
                                                     const std::string& debug_name) {
-    return createBuffer(size,
-                        vk::BufferUsageFlagBits::eShaderDeviceAddress |
-                            vk::BufferUsageFlagBits::eStorageBuffer,
-                        MemoryMappingType::NONE, debug_name, alignment);
+    return createBuffer(size, Buffer::SCRATCH_BUFFER_USAGE, MemoryMappingType::NONE, debug_name,
+                        alignment);
+}
+
+BufferHandle ResourceAllocator::createInstancesBuffer(const uint32_t instance_count,
+                                                      const std::string& debug_name) {
+
+    return createBuffer(sizeof(vk::AccelerationStructureInstanceKHR) * instance_count,
+                        Buffer::INSTANCES_BUFFER_USAGE, merian::MemoryMappingType::NONE, debug_name,
+                        16);
 }
 
 ImageHandle ResourceAllocator::createImage(const vk::ImageCreateInfo& info_,
@@ -185,12 +191,12 @@ TextureHandle ResourceAllocator::createTexture(const ImageHandle& image,
 }
 
 TextureHandle ResourceAllocator::createTextureFromRGBA8(const vk::CommandBuffer& cmd,
-                                                       const uint32_t* data,
-                                                       const uint32_t width,
-                                                       const uint32_t height,
-                                                       const vk::Filter filter,
-                                                       const bool isSRGB,
-                                                       const std::string& debug_name) {
+                                                        const uint32_t* data,
+                                                        const uint32_t width,
+                                                        const uint32_t height,
+                                                        const vk::Filter filter,
+                                                        const bool isSRGB,
+                                                        const std::string& debug_name) {
     const vk::ImageCreateInfo tex_image_info{
         {},
         vk::ImageType::e2D,
@@ -238,6 +244,7 @@ AccelerationStructureHandle ResourceAllocator::createAccelerationStructure(
 
 #ifndef NDEBUG
     if (debug_utils) {
+        debug_utils->set_object_name(context->device, **buffer, debug_name);
         debug_utils->set_object_name(context->device, as, debug_name);
     }
 #endif

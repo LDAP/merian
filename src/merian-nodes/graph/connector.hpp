@@ -29,6 +29,9 @@ class Connector : public std::enable_shared_from_this<Connector> {
         //  the resource is
         //  updated.
         NEEDS_DESCRIPTOR_UPDATE = 0b1,
+
+        // Signalize that a graph reconnect is required, for example to recreate all resoruces.
+        NEEDS_RECONNECT = 0b10,
     };
 
   public:

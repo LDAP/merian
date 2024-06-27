@@ -32,10 +32,15 @@ class TextureArrayResource : public GraphResource {
              const vk::CommandBuffer cmd,
              const vk::AccessFlags2 prior_access_flags,
              const vk::PipelineStageFlags2 prior_pipeline_stages) {
-        textures[index] = tex;
-        current_updates.push_back(index);
+        assert(index < textures.size());
 
-        if (tex) {
+        if (textures[index] != tex) {
+            textures[index] = tex;
+            current_updates.push_back(index);
+        }
+
+        if (tex &&
+            (prior_access_flags || tex->get_image()->get_current_layout() != first_input_layout)) {
             const vk::ImageMemoryBarrier2 img_bar = tex->get_image()->barrier2(
                 first_input_layout, prior_access_flags, input_access_flags, prior_pipeline_stages,
                 input_stage_flags);
@@ -45,6 +50,7 @@ class TextureArrayResource : public GraphResource {
     }
 
     const merian::TextureHandle& get(const uint32_t index) const {
+        assert(index < textures.size());
         return textures[index];
     }
 
