@@ -43,21 +43,6 @@ template <typename T> class PtrOut : public TypedOutputConnector<std::shared_ptr
         return debugable_ptr_cast<PtrResource<T>>(resource)->ptr;
     }
 
-    Connector::ConnectorStatusFlags on_pre_process(
-        [[maybe_unused]] GraphRun& run,
-        [[maybe_unused]] const vk::CommandBuffer& cmd,
-        GraphResourceHandle& resource,
-        [[maybe_unused]] const NodeHandle& node,
-        [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
-        [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) override {
-        const auto& res = debugable_ptr_cast<PtrResource<T>>(resource);
-        if (!persistent) {
-            res->ptr.reset();
-        }
-
-        return {};
-    }
-
     Connector::ConnectorStatusFlags on_post_process(
         [[maybe_unused]] GraphRun& run,
         [[maybe_unused]] const vk::CommandBuffer& cmd,
