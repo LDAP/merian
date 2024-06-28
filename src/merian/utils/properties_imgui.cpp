@@ -47,96 +47,114 @@ void ImGuiProperties::output_plot_line(const std::string& label,
                      {0, ImGui::GetFontSize() * 5});
 }
 
-void ImGuiProperties::config_color(const std::string& id,
+bool ImGuiProperties::config_color(const std::string& id,
                                    glm::vec3& color,
                                    const std::string& desc) {
-    ImGui::ColorEdit3(id.c_str(), &color.x);
+    const bool value_changed = ImGui::ColorEdit3(id.c_str(), &color.x);
     tooltip(desc);
+    return value_changed;
 }
-void ImGuiProperties::config_color(const std::string& id,
+bool ImGuiProperties::config_color(const std::string& id,
                                    glm::vec4& color,
                                    const std::string& desc) {
-    ImGui::ColorEdit4(id.c_str(), &color.x);
+    const bool value_changed = ImGui::ColorEdit4(id.c_str(), &color.x);
     tooltip(desc);
+    return value_changed;
 }
-void ImGuiProperties::config_vec(const std::string& id, glm::vec3& value, const std::string& desc) {
-    ImGui::InputFloat3(id.c_str(), &value.x);
+bool ImGuiProperties::config_vec(const std::string& id, glm::vec3& value, const std::string& desc) {
+    const bool value_changed = ImGui::InputFloat3(id.c_str(), &value.x);
     tooltip(desc);
+    return value_changed;
 }
-void ImGuiProperties::config_vec(const std::string& id, glm::vec4& value, const std::string& desc) {
-    ImGui::InputFloat4(id.c_str(), &value.x);
+bool ImGuiProperties::config_vec(const std::string& id, glm::vec4& value, const std::string& desc) {
+    const bool value_changed = ImGui::InputFloat4(id.c_str(), &value.x);
     tooltip(desc);
+    return value_changed;
 }
-void ImGuiProperties::config_angle(const std::string& id,
+bool ImGuiProperties::config_angle(const std::string& id,
                                    float& angle,
                                    const std::string& desc,
                                    const float min,
                                    const float max) {
-    ImGui::SliderAngle(id.c_str(), &angle, min, max);
+    const bool value_changed = ImGui::SliderAngle(id.c_str(), &angle, min, max);
     tooltip(desc);
+    return value_changed;
 }
-void ImGuiProperties::config_percent(const std::string& id, float& value, const std::string& desc) {
-    ImGui::SliderFloat(id.c_str(), &value, 0, 1, "%.06f");
+bool ImGuiProperties::config_percent(const std::string& id, float& value, const std::string& desc) {
+    const bool value_changed = ImGui::SliderFloat(id.c_str(), &value, 0, 1, "%.06f");
     tooltip(desc);
+    return value_changed;
 }
-void ImGuiProperties::config_float(const std::string& id,
+bool ImGuiProperties::config_float(const std::string& id,
                                    float& value,
                                    const std::string& desc,
                                    const float sensitivity) {
-    ImGui::DragFloat(
+    const bool value_changed = ImGui::DragFloat(
         id.c_str(), &value, sensitivity, 0.0f, 0.0f,
         fmt::format("%.{}f", std::max(0, (int)std::ceil(-std::log10(sensitivity)))).c_str());
     tooltip(desc);
+    return value_changed;
 }
-void ImGuiProperties::config_float(const std::string& id,
+bool ImGuiProperties::config_float(const std::string& id,
                                    float& value,
                                    const float& min,
                                    const float& max,
                                    const std::string& desc) {
-    ImGui::SliderFloat(id.c_str(), &value, min, max);
+    const bool value_changed = ImGui::SliderFloat(id.c_str(), &value, min, max);
     tooltip(desc);
+    return value_changed;
 }
-void ImGuiProperties::config_int(const std::string& id, int& value, const std::string& desc) {
-    ImGui::DragInt(id.c_str(), &value);
+bool ImGuiProperties::config_int(const std::string& id, int& value, const std::string& desc) {
+    const bool value_changed = ImGui::DragInt(id.c_str(), &value);
     tooltip(desc);
+    return value_changed;
 }
-void ImGuiProperties::config_int(
+bool ImGuiProperties::config_int(
     const std::string& id, int& value, const int& min, const int& max, const std::string& desc) {
-    ImGui::SliderInt(id.c_str(), &value, min, max);
+    const bool value_changed = ImGui::SliderInt(id.c_str(), &value, min, max);
     tooltip(desc);
+    return value_changed;
 }
-void ImGuiProperties::config_uint(const std::string& id, uint32_t& value, const std::string& desc) {
-    ImGui::DragScalar(id.c_str(), ImGuiDataType_U32, &value);
+bool ImGuiProperties::config_uint(const std::string& id, uint32_t& value, const std::string& desc) {
+    const bool value_changed = ImGui::DragScalar(id.c_str(), ImGuiDataType_U32, &value);
     tooltip(desc);
+    return value_changed;
 }
-void ImGuiProperties::config_uint(const std::string& id,
+bool ImGuiProperties::config_uint(const std::string& id,
                                   uint32_t& value,
                                   const uint32_t& min,
                                   const uint32_t& max,
                                   const std::string& desc) {
-    ImGui::SliderScalar(id.c_str(), ImGuiDataType_U32, &value, &min, &max);
+    const bool value_changed =
+        ImGui::SliderScalar(id.c_str(), ImGuiDataType_U32, &value, &min, &max);
     tooltip(desc);
+    return value_changed;
 }
-void ImGuiProperties::config_float3(const std::string& id,
+bool ImGuiProperties::config_float3(const std::string& id,
                                     float value[3],
                                     const std::string& desc) {
-    ImGui::InputFloat3(id.c_str(), value);
+    const bool value_changed = ImGui::InputFloat3(id.c_str(), value);
     tooltip(desc);
+    return value_changed;
 }
-void ImGuiProperties::config_bool(const std::string& id, bool& value, const std::string& desc) {
+bool ImGuiProperties::config_bool(const std::string& id, bool& value, const std::string& desc) {
+    const bool old_value = value;
     ImGui::Checkbox(id.c_str(), &value);
     tooltip(desc);
+    return old_value != value;
 }
 bool ImGuiProperties::config_bool(const std::string& id, const std::string& desc) {
     bool pressed = ImGui::Button(id.c_str());
     tooltip(desc);
     return pressed;
 }
-void ImGuiProperties::config_options(const std::string& id,
+bool ImGuiProperties::config_options(const std::string& id,
                                      int& selected,
                                      const std::vector<std::string>& options,
                                      const OptionsStyle style,
                                      const std::string& desc) {
+    const int old_selected = selected;
+
     switch (style) {
     case OptionsStyle::RADIO_BUTTON:
         for (uint32_t i = 0; i < options.size(); i++) {
@@ -168,6 +186,8 @@ void ImGuiProperties::config_options(const std::string& id,
     default:
         throw std::runtime_error{"OptionsStyle not supported"};
     }
+
+    return old_selected != selected;
 }
 bool ImGuiProperties::config_text(const std::string& id,
                                   const uint32_t max_len,

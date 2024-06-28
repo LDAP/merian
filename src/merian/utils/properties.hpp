@@ -58,64 +58,84 @@ class Properties {
 
     // Config
 
-    virtual void
+    // Returns true if the value changed.
+    virtual bool
     config_color(const std::string& id, glm::vec3& color, const std::string& desc = "") = 0;
-    virtual void
+    // Returns true if the value changed.
+    virtual bool
     config_color(const std::string& id, glm::vec4& color, const std::string& desc = "") = 0;
-    virtual void
+    // Returns true if the value changed.
+    virtual bool
     config_vec(const std::string& id, glm::vec3& value, const std::string& desc = "") = 0;
-    virtual void
+    // Returns true if the value changed.
+    virtual bool
     config_vec(const std::string& id, glm::vec4& value, const std::string& desc = "") = 0;
-    virtual void config_angle(const std::string& id,
+    // Returns true if the value changed.
+    virtual bool config_angle(const std::string& id,
                               float& angle,
                               const std::string& desc = "",
                               const float min = -360,
                               const float max = 360) = 0;
-    virtual void
+    // Returns true if the value changed.
+    virtual bool
     config_percent(const std::string& id, float& value, const std::string& desc = "") = 0;
 
-    virtual void config_float(const std::string& id,
+    // Returns true if the value changed.
+    virtual bool config_float(const std::string& id,
                               float& value,
                               const std::string& desc = "",
                               const float sensitivity = 1.0f) = 0;
-    virtual void config_float(const std::string& id,
+    // Returns true if the value changed.
+    virtual bool config_float(const std::string& id,
                               float& value,
                               const float& min,
                               const float& max,
                               const std::string& desc = "") = 0;
-    virtual void config_int(const std::string& id, int& value, const std::string& desc = "") = 0;
-    virtual void config_int(const std::string& id,
+    // Returns true if the value changed.
+    virtual bool config_int(const std::string& id, int& value, const std::string& desc = "") = 0;
+    // Returns true if the value changed.
+    virtual bool config_int(const std::string& id,
                             int& value,
                             const int& min = std::numeric_limits<int>::min(),
                             const int& max = std::numeric_limits<int>::max(),
                             const std::string& desc = "") = 0;
-    virtual void
+    // Returns true if the value changed.
+    virtual bool
     config_uint(const std::string& id, uint32_t& value, const std::string& desc = "") = 0;
-    virtual void config_uint(const std::string& id,
+    // Returns true if the value changed.
+    virtual bool config_uint(const std::string& id,
                              uint32_t& value,
                              const uint32_t& min = std::numeric_limits<uint32_t>::min(),
                              const uint32_t& max = std::numeric_limits<uint32_t>::max(),
                              const std::string& desc = "") = 0;
-    virtual void
+    // Returns true if the value changed.
+    virtual bool
     config_float3(const std::string& id, float value[3], const std::string& desc = "") = 0;
     // Holds the supplied `value` if not changed by the configuration.
     // Converts to a checkbox in a GUI context.
-    virtual void config_bool(const std::string& id, int& value, const std::string& desc = "") {
+    // Returns true if the value changed.
+    virtual bool config_bool(const std::string& id, int& value, const std::string& desc = "") {
         bool bool_value = value;
-        config_bool(id, bool_value, desc);
+        const bool changed = config_bool(id, bool_value, desc);
         value = bool_value;
+        return changed;
     }
     // Holds the supplied `value` if not changed by the configuration.
     // Converts to a checkbox in a GUI context.
-    virtual void config_bool(const std::string& id, bool& value, const std::string& desc = "") = 0;
-    // If set by the configuration returns true only once `one-shot`.
-    // Converts to a button in a GUI context.
-    [[nodiscard]] virtual bool config_bool(const std::string& id, const std::string& desc = "") = 0;
-    virtual void config_options(const std::string& id,
+    // Returns true if the value changed.
+    virtual bool config_bool(const std::string& id, bool& value, const std::string& desc = "") = 0;
+    // Returns true if the value changed.
+    virtual bool config_options(const std::string& id,
                                 int& selected,
                                 const std::vector<std::string>& options,
                                 const OptionsStyle style = OptionsStyle::DONT_CARE,
                                 const std::string& desc = "") = 0;
+
+    // If set by the configuration returns true only once `one-shot`.
+    // Converts to a button in a GUI context.
+    // Note that this behavior is different to most config_ methods.
+    [[nodiscard]] virtual bool config_bool(const std::string& id, const std::string& desc = "") = 0;
+
     // If `needs_submit` is true then the user can enter the text and then explicitly submit in a
     // GUI context (e.g using a button or by pressing enter). If `needs_submit` is false, then true
     // is returned at every change.

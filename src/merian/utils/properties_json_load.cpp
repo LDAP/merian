@@ -69,93 +69,108 @@ void JSONLoadProperties::output_text(const std::string&) {}
 void JSONLoadProperties::output_plot_line(
     const std::string&, const float*, const uint32_t, const float, const float) {}
 
-void JSONLoadProperties::config_color(const std::string& id,
-                                         glm::vec3& color,
-                                         const std::string&) {
+bool JSONLoadProperties::config_color(const std::string& id, glm::vec3& color, const std::string&) {
+    const glm::vec3 old_color = color;
     if (o.back().contains(id))
         color = load_vec3(o.back()[id]);
+    return old_color != color;
 }
-void JSONLoadProperties::config_color(const std::string& id,
-                                         glm::vec4& color,
-                                         const std::string&) {
+bool JSONLoadProperties::config_color(const std::string& id, glm::vec4& color, const std::string&) {
+    const glm::vec4 old_color = color;
     if (o.back().contains(id))
         color = load_vec4(o.back()[id]);
+    return old_color != color;
 }
-void JSONLoadProperties::config_vec(const std::string& id,
-                                       glm::vec3& value,
-                                       const std::string&) {
+bool JSONLoadProperties::config_vec(const std::string& id, glm::vec3& value, const std::string&) {
+    const glm::vec3 old_value = value;
     if (o.back().contains(id))
         value = load_vec3(o.back()[id]);
+    return old_value != value;
 }
-void JSONLoadProperties::config_vec(const std::string& id,
-                                       glm::vec4& value,
-                                       const std::string&) {
+bool JSONLoadProperties::config_vec(const std::string& id, glm::vec4& value, const std::string&) {
+    const glm::vec4 old_value = value;
     if (o.back().contains(id))
         value = load_vec4(o.back()[id]);
+    return old_value != value;
 }
-void JSONLoadProperties::config_angle(
+bool JSONLoadProperties::config_angle(
     const std::string& id, float& angle, const std::string&, const float, const float) {
+    const float old_angle = angle;
     if (o.back().contains(id))
         angle = decode_float(o.back()[id]);
+    return old_angle != angle;
 }
-void JSONLoadProperties::config_percent(const std::string& id,
-                                           float& value,
-                                           const std::string&) {
+bool JSONLoadProperties::config_percent(const std::string& id, float& value, const std::string&) {
+    const float old_value = value;
     if (o.back().contains(id))
         value = decode_float(o.back()[id]);
+    return old_value != value;
 }
-void JSONLoadProperties::config_float(const std::string& id,
-                                         float& value,
-                                         const std::string&,
-                                         const float) {
+bool JSONLoadProperties::config_float(const std::string& id,
+                                      float& value,
+                                      const std::string&,
+                                      const float) {
+    const float old_value = value;
     if (o.back().contains(id))
         value = decode_float(o.back()[id]);
+    return value != old_value;
 }
-void JSONLoadProperties::config_float(
+bool JSONLoadProperties::config_float(
     const std::string& id, float& value, const float&, const float&, const std::string&) {
+    const float old_value = value;
     if (o.back().contains(id))
         value = decode_float(o.back()[id]);
+    return old_value != value;
 }
-void JSONLoadProperties::config_int(const std::string& id, int& value, const std::string&) {
+bool JSONLoadProperties::config_int(const std::string& id, int& value, const std::string&) {
+    const int old_value = value;
     if (o.back().contains(id))
         value = o.back()[id].template get<int>();
+    return old_value != value;
 }
-void JSONLoadProperties::config_int(
+bool JSONLoadProperties::config_int(
     const std::string& id, int& value, const int&, const int&, const std::string&) {
+    const int old_value = value;
     if (o.back().contains(id))
         value = o.back()[id].template get<int>();
+    return old_value != value;
 }
-void JSONLoadProperties::config_uint(const std::string& id,
-                                        uint32_t& value,
-                                        const std::string&) {
+bool JSONLoadProperties::config_uint(const std::string& id, uint32_t& value, const std::string&) {
+    const uint32_t old_value = value;
     if (o.back().contains(id))
         value = o.back()[id].template get<uint32_t>();
+    return old_value != value;
 }
-void JSONLoadProperties::config_uint(
+bool JSONLoadProperties::config_uint(
     const std::string& id, uint32_t& value, const uint32_t&, const uint32_t&, const std::string&) {
+    const uint32_t old_value = value;
     if (o.back().contains(id))
         value = o.back()[id].template get<uint32_t>();
+    return old_value != value;
 }
-void JSONLoadProperties::config_float3(const std::string& id,
-                                          float value[3],
-                                          const std::string&) {
+bool JSONLoadProperties::config_float3(const std::string& id, float value[3], const std::string&) {
+    const float old_value[3] = {value[0], value[1], value[2]};
     if (o.back().contains(id))
         *merian::as_vec3(value) = load_vec3(o.back()[id]);
+    return old_value[0] != value[0] || old_value[1] != value[1] || old_value[2] != value[2];
 }
-void JSONLoadProperties::config_bool(const std::string& id, bool& value, const std::string&) {
+bool JSONLoadProperties::config_bool(const std::string& id, bool& value, const std::string&) {
+    const bool old_value = value;
     if (o.back().contains(id))
         value = o.back()[id].template get<bool>();
+    return old_value != value;
 }
 bool JSONLoadProperties::config_bool(const std::string& id, const std::string&) {
     if (o.back().contains(id))
         return o.back()[id].template get<bool>();
     return false;
 }
-void JSONLoadProperties::config_options(const std::string& id,
-                                           int& selected,
-                                           const std::vector<std::string>& options,
-                                           const OptionsStyle,
-                                           const std::string&) {
+bool JSONLoadProperties::config_options(const std::string& id,
+                                        int& selected,
+                                        const std::vector<std::string>& options,
+                                        const OptionsStyle,
+                                        const std::string&) {
+    const int old_selected = selected;
     if (o.back().contains(id)) {
         std::string option = o.back()[id].template get<std::string>();
         for (uint32_t i = 0; i < options.size(); i++) {
@@ -163,12 +178,13 @@ void JSONLoadProperties::config_options(const std::string& id,
                 selected = i;
         }
     }
+    return old_selected != selected;
 }
 bool JSONLoadProperties::config_text(const std::string& id,
-                                        [[maybe_unused]] const uint32_t max_len,
-                                        char* string,
-                                        const bool,
-                                        const std::string&) {
+                                     [[maybe_unused]] const uint32_t max_len,
+                                     char* string,
+                                     const bool,
+                                     const std::string&) {
 
     if (o.back().contains(id)) {
         std::string s = o.back()[id].template get<std::string>();
@@ -180,10 +196,10 @@ bool JSONLoadProperties::config_text(const std::string& id,
     return false;
 }
 bool JSONLoadProperties::config_text_multiline(const std::string& id,
-                                                  [[maybe_unused]] const uint32_t max_len,
-                                                  char* string,
-                                                  const bool,
-                                                  const std::string&) {
+                                               [[maybe_unused]] const uint32_t max_len,
+                                               char* string,
+                                               const bool,
+                                               const std::string&) {
 
     if (o.back().contains(id)) {
         std::string s = o.back()[id].template get<std::string>();

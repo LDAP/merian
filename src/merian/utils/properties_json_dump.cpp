@@ -63,78 +63,79 @@ void JSONDumpProperties::output_text(const std::string&) {}
 void JSONDumpProperties::output_plot_line(
     const std::string&, const float*, const uint32_t, const float, const float) {}
 
-void JSONDumpProperties::config_color(const std::string& id,
-                                         glm::vec3& color,
-                                         const std::string&) {
+bool JSONDumpProperties::config_color(const std::string& id, glm::vec3& color, const std::string&) {
     current()[id] = dump_vec3(color);
+    return false;
 }
-void JSONDumpProperties::config_color(const std::string& id,
-                                         glm::vec4& color,
-                                         const std::string&) {
+bool JSONDumpProperties::config_color(const std::string& id, glm::vec4& color, const std::string&) {
     current()[id] = dump_vec4(color);
+    return false;
 }
-void JSONDumpProperties::config_vec(const std::string& id,
-                                       glm::vec3& value,
-                                       const std::string&) {
+bool JSONDumpProperties::config_vec(const std::string& id, glm::vec3& value, const std::string&) {
     current()[id] = dump_vec3(value);
+    return false;
 }
-void JSONDumpProperties::config_vec(const std::string& id,
-                                       glm::vec4& value,
-                                       const std::string&) {
+bool JSONDumpProperties::config_vec(const std::string& id, glm::vec4& value, const std::string&) {
     current()[id] = dump_vec4(value);
+    return false;
 }
-void JSONDumpProperties::config_angle(
+bool JSONDumpProperties::config_angle(
     const std::string& id, float& angle, const std::string&, const float, const float) {
     current()[id] = encode_float(angle);
+    return false;
 }
-void JSONDumpProperties::config_percent(const std::string& id,
-                                           float& value,
-                                           const std::string&) {
+bool JSONDumpProperties::config_percent(const std::string& id, float& value, const std::string&) {
     current()[id] = encode_float(value);
+    return false;
 }
-void JSONDumpProperties::config_float(const std::string& id,
-                                         float& value,
-                                         const std::string&,
-                                         const float) {
+bool JSONDumpProperties::config_float(const std::string& id,
+                                      float& value,
+                                      const std::string&,
+                                      const float) {
     current()[id] = encode_float(value);
+    return false;
 }
-void JSONDumpProperties::config_float(
+bool JSONDumpProperties::config_float(
     const std::string& id, float& value, const float&, const float&, const std::string&) {
     current()[id] = encode_float(value);
+    return false;
 }
-void JSONDumpProperties::config_int(const std::string& id, int& value, const std::string&) {
+bool JSONDumpProperties::config_int(const std::string& id, int& value, const std::string&) {
     current()[id] = value;
+    return false;
 }
-void JSONDumpProperties::config_int(
+bool JSONDumpProperties::config_int(
     const std::string& id, int& value, const int&, const int&, const std::string&) {
     current()[id] = value;
+    return false;
 }
-void JSONDumpProperties::config_uint(const std::string& id,
-                                        uint32_t& value,
-                                        const std::string&) {
+bool JSONDumpProperties::config_uint(const std::string& id, uint32_t& value, const std::string&) {
     current()[id] = value;
+    return false;
 }
-void JSONDumpProperties::config_uint(
+bool JSONDumpProperties::config_uint(
     const std::string& id, uint32_t& value, const uint32_t&, const uint32_t&, const std::string&) {
     current()[id] = value;
+    return false;
 }
-void JSONDumpProperties::config_float3(const std::string& id,
-                                          float value[3],
-                                          const std::string&) {
+bool JSONDumpProperties::config_float3(const std::string& id, float value[3], const std::string&) {
     current()[id] = dump_vec3(*merian::as_vec3(value));
+    return false;
 }
-void JSONDumpProperties::config_bool(const std::string& id, bool& value, const std::string&) {
+bool JSONDumpProperties::config_bool(const std::string& id, bool& value, const std::string&) {
     current()[id] = value;
+    return false;
 }
 bool JSONDumpProperties::config_bool(const std::string&, const std::string&) {
     return false;
 }
-void JSONDumpProperties::config_options(const std::string& id,
-                                           int& selected,
-                                           const std::vector<std::string>& options,
-                                           const OptionsStyle,
-                                           const std::string&) {
+bool JSONDumpProperties::config_options(const std::string& id,
+                                        int& selected,
+                                        const std::vector<std::string>& options,
+                                        const OptionsStyle,
+                                        const std::string&) {
     current()[id] = options[selected];
+    return false;
 }
 bool JSONDumpProperties::config_text(
     const std::string& id, const uint32_t, char* buf, const bool needs_submit, const std::string&) {

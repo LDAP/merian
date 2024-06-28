@@ -26,51 +26,51 @@ class ImGuiProperties : public Properties {
                                   const float scale_min,
                                   const float scale_max) override;
 
-    virtual void
+    virtual bool
     config_color(const std::string& id, glm::vec3& color, const std::string& desc = "") override;
-    virtual void
+    virtual bool
     config_color(const std::string& id, glm::vec4& color, const std::string& desc = "") override;
-    virtual void
+    virtual bool
     config_vec(const std::string& id, glm::vec3& value, const std::string& desc = "") override;
-    virtual void
+    virtual bool
     config_vec(const std::string& id, glm::vec4& value, const std::string& desc = "") override;
-    virtual void config_angle(const std::string& id,
+    virtual bool config_angle(const std::string& id,
                               float& angle,
                               const std::string& desc = "",
                               const float min = -360,
                               const float max = 360) override;
-    virtual void
+    virtual bool
     config_percent(const std::string& id, float& value, const std::string& desc = "") override;
-    virtual void config_float(const std::string& id,
+    virtual bool config_float(const std::string& id,
                               float& value,
                               const std::string& desc = "",
                               const float sensitivity = 1.0f) override;
-    virtual void config_float(const std::string& id,
+    virtual bool config_float(const std::string& id,
                               float& value,
                               const float& min = FLT_MIN,
                               const float& max = FLT_MAX,
                               const std::string& desc = "") override;
-    virtual void
+    virtual bool
     config_int(const std::string& id, int& value, const std::string& desc = "") override;
-    virtual void config_int(const std::string& id,
+    virtual bool config_int(const std::string& id,
                             int& value,
                             const int& min = std::numeric_limits<int>::min(),
                             const int& max = std::numeric_limits<int>::max(),
                             const std::string& desc = "") override;
-    virtual void
+    virtual bool
     config_uint(const std::string& id, uint32_t& value, const std::string& desc = "") override;
-    virtual void config_uint(const std::string& id,
+    virtual bool config_uint(const std::string& id,
                              uint32_t& value,
                              const uint32_t& min = std::numeric_limits<uint32_t>::min(),
                              const uint32_t& max = std::numeric_limits<uint32_t>::max(),
                              const std::string& desc = "") override;
-    virtual void
+    virtual bool
     config_float3(const std::string& id, float value[3], const std::string& desc = "") override;
-    virtual void
+    virtual bool
     config_bool(const std::string& id, bool& value, const std::string& desc = "") override;
     // For buttons
     virtual bool config_bool(const std::string& id, const std::string& desc = "") override;
-    virtual void config_options(const std::string& id,
+    virtual bool config_options(const std::string& id,
                                 int& selected,
                                 const std::vector<std::string>& options,
                                 const OptionsStyle style = OptionsStyle::DONT_CARE,
