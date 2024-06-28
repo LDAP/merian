@@ -330,7 +330,7 @@ class DeviceASBuilder : public Node {
                                                           tlas_build_info.build_flags);
         } else if (tlas_build_info.rebuild) {
             pre_build_barriers.push_back(
-                tlas_build_info.tlas->tlas_build_barrier2(io[con_out_tlas].read_pipeline_stages));
+                tlas_build_info.tlas->tlas_build_barrier2(io[con_out_tlas].input_pipeline_stages));
             tlas_build_info.tlas = as_builder.queue_build(tlas_build_info.instances.size(),
                                                           tlas_build_info.instances_buffer,
                                                           tlas_build_info.build_flags);

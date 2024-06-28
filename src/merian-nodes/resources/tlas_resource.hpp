@@ -12,7 +12,7 @@ class TLASResource : public GraphResource {
 
   public:
     TLASResource(const vk::PipelineStageFlags2 read_pipeline_stages, const uint32_t ring_size)
-        : read_pipeline_stages(read_pipeline_stages), in_flight_tlas(ring_size) {}
+        : input_pipeline_stages(read_pipeline_stages), in_flight_tlas(ring_size) {}
 
     void properties(merian::Properties& props) override {
         if (tlas) {
@@ -27,7 +27,8 @@ class TLASResource : public GraphResource {
     }
 
   public:
-    const vk::PipelineStageFlags2 read_pipeline_stages;
+    // combined pipeline stage flags of all inputs
+    const vk::PipelineStageFlags2 input_pipeline_stages;
 
   private:
     merian::AccelerationStructureHandle tlas;

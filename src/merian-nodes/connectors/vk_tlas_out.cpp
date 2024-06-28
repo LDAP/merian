@@ -69,7 +69,7 @@ Connector::ConnectorStatusFlags VkTLASOut::on_post_process(
         flags |= NEEDS_DESCRIPTOR_UPDATE;
     }
 
-    buffer_barriers.push_back(res->tlas->tlas_read_barrier2(res->read_pipeline_stages));
+    buffer_barriers.push_back(res->tlas->tlas_read_barrier2(res->input_pipeline_stages));
     res->in_flight_tlas[run.get_in_flight_index()] = res->tlas;
 
     return flags;

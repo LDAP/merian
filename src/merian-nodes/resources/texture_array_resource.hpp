@@ -17,8 +17,8 @@ class TextureArrayResource : public GraphResource {
                          const vk::PipelineStageFlags2 input_stage_flags,
                          const vk::AccessFlags2 input_access_flags,
                          const vk::ImageLayout first_input_layout)
-        : textures(textures), dummy_texture(dummy_texture), input_stage_flags(input_stage_flags),
-          input_access_flags(input_access_flags), first_input_layout(first_input_layout) {
+        : input_stage_flags(input_stage_flags), input_access_flags(input_access_flags),
+          textures(textures), dummy_texture(dummy_texture), first_input_layout(first_input_layout) {
         in_flight_textures.assign(ring_size, std::vector<merian::TextureHandle>(textures.size()));
 
         for (uint32_t i = 0; i < textures.size(); i++) {
@@ -70,6 +70,12 @@ class TextureArrayResource : public GraphResource {
         }
     }
 
+  public:
+    // combined pipeline stage flags of all inputs
+    const vk::PipelineStageFlags2 input_stage_flags;
+    // combined access flags of all inputs
+    const vk::AccessFlags2 input_access_flags;
+
   private:
     // the updates to "textures" are recorded here.
     std::vector<uint32_t> current_updates;
@@ -81,11 +87,6 @@ class TextureArrayResource : public GraphResource {
     std::vector<std::vector<merian::TextureHandle>> in_flight_textures;
 
     const merian::TextureHandle dummy_texture;
-
-    // combined pipeline stage flags of all inputs
-    const vk::PipelineStageFlags2 input_stage_flags;
-    // combined access flags of all inputs
-    const vk::AccessFlags2 input_access_flags;
     const vk::ImageLayout first_input_layout;
 };
 

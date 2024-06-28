@@ -16,8 +16,8 @@ class BufferArrayResource : public GraphResource {
                         const merian::BufferHandle& dummy_buffer,
                         const vk::PipelineStageFlags2 input_stage_flags,
                         const vk::AccessFlags2 input_access_flags)
-        : buffers(buffers), dummy_buffer(dummy_buffer), input_stage_flags(input_stage_flags),
-          input_access_flags(input_access_flags) {
+        : input_stage_flags(input_stage_flags), input_access_flags(input_access_flags),
+          buffers(buffers), dummy_buffer(dummy_buffer) {
         in_flight_buffers.assign(ring_size, std::vector<merian::BufferHandle>(buffers.size()));
 
         for (uint32_t i = 0; i < buffers.size(); i++) {
@@ -67,6 +67,12 @@ class BufferArrayResource : public GraphResource {
         }
     }
 
+  public:
+    // combined pipeline stage flags of all inputs
+    const vk::PipelineStageFlags2 input_stage_flags;
+    // combined access flags of all inputs
+    const vk::AccessFlags2 input_access_flags;
+
   private:
     // the updates to "buffers" are recorded here.
     std::vector<uint32_t> current_updates;
@@ -78,11 +84,6 @@ class BufferArrayResource : public GraphResource {
     std::vector<std::vector<merian::BufferHandle>> in_flight_buffers;
 
     const merian::BufferHandle dummy_buffer;
-
-    // combined pipeline stage flags of all inputs
-    const vk::PipelineStageFlags2 input_stage_flags;
-    // combined access flags of all inputs
-    const vk::AccessFlags2 input_access_flags;
 };
 
 } // namespace merian_nodes
