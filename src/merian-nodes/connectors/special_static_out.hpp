@@ -57,6 +57,10 @@ class SpecialStaticOut : public TypedOutputConnector<const ValueType&>, public G
     void properties(Properties& config) override {
         if constexpr (fmt::is_formattable<ValueType>()) {
             config.output_text(fmt::format("Current value: {}", connector_value));
+        } else if constexpr (requires { vk::to_string(connector_value); }) {
+            config.output_text(fmt::format("Current value: {}", vk::to_string(connector_value)));
+        } else {
+            config.output_text("type not formattable");
         }
     }
 
