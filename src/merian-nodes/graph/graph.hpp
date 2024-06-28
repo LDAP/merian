@@ -45,6 +45,11 @@ struct NodeData {
     // (on add_node)
     std::string name;
 
+    // User disabled
+    bool disable{};
+    // Disabled because a input is not connected;
+    bool disable_missing_input{};
+
     // Cache input connectors (node->describe_inputs())
     // (on start_nodes added and checked for name conflicts)
     std::vector<InputConnectorHandle> input_connectors;
@@ -115,9 +120,26 @@ struct NodeData {
     std::vector<NodeIO> resource_maps;
 
     struct NodeStatistics {
-        uint32_t last_descriptor_set_updates;
+        uint32_t last_descriptor_set_updates{};
     };
-    NodeStatistics statistics;
+    NodeStatistics statistics{};
+
+    void reset() {
+        input_connectors.clear();
+        output_connectors.clear();
+
+        input_connector_for_name.clear();
+        output_connector_for_name.clear();
+
+        input_connections.clear();
+        output_connections.clear();
+
+        descriptor_sets.clear();
+        descriptor_pool.reset();
+        descriptor_set_layout.reset();
+
+        disable_missing_input = false;
+    }
 };
 
 inline std::string format_as(const NodeData::NodeStatistics stats) {
@@ -273,6 +295,8 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             for (auto& [input_name, input] : data.input_connector_for_name) {
                 if (!data.input_connections.contains(input)) {
 
+                    data.disable_missing_input = true;
+
                     // there might be a connection queued up but was never processed because of the
                     // actual fail.
                     bool found = false;
@@ -299,10 +323,10 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             }
         }
         if (!missing_connections.empty()) {
-            throw graph_errors::connection_missing{fmt::format(
+            SPDLOG_WARN(
                 "Graph not fully connected.\n\nMissing connections:\n - {}\n\nConsequences:\n - {}",
                 fmt::join(missing_connections, "\n - "),
-                fmt::join(maybe_missing_connections, "\n - "))};
+                fmt::join(maybe_missing_connections, "\n - "));
         }
 
         {
@@ -463,8 +487,20 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         props.st_separate("Nodes");
 
         for (auto& [node, data] : node_data) {
-            std::string node_label = fmt::format("{} ({})", data.name, node->name);
+            std::string node_label;
+            if (data.disable || data.disable_missing_input) {
+                node_label = fmt::format("[DISABLED] {} ({})", data.name, node->name);
+            } else {
+                node_label = fmt::format("{} ({})", data.name, node->name);
+            }
+
             if (props.st_begin_child(data.name.c_str(), node_label.c_str())) {
+                if (props.config_bool("disable node", data.disable))
+                    request_reconnect();
+                if (data.disable_missing_input) {
+                    props.output_text("Disabled because not all inputs are connected.");
+                }
+
                 const Node::NodeStatusFlags flags = node->properties(props);
                 needs_reconnect |= flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT;
                 props.st_separate();
@@ -704,19 +740,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
         this->flat_topology.clear();
         for (auto& [node, data] : node_data) {
-
-            data.input_connectors.clear();
-            data.output_connectors.clear();
-
-            data.input_connector_for_name.clear();
-            data.output_connector_for_name.clear();
-
-            data.input_connections.clear();
-            data.output_connections.clear();
-
-            data.descriptor_sets.clear();
-            data.descriptor_pool.reset();
-            data.descriptor_set_layout.reset();
+            data.reset();
         }
     }
 
@@ -758,6 +782,10 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         topological_order.reserve(node_data.size());
 
         topological_visit([&](NodeHandle& node, NodeData& data) {
+            if (data.disable) {
+                SPDLOG_DEBUG("skipping {} ({})", data.name, node->name);
+                return;
+            }
             SPDLOG_DEBUG("connecting {} ({})", data.name, node->name);
 
             topological_order.emplace_back(node);
@@ -845,7 +873,8 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
     }
 
     void allocate_resources() {
-        for (auto& [node, data] : node_data) {
+        for (auto& node : flat_topology) {
+            auto& data = node_data.at(node);
             for (auto& [output, per_output_info] : data.output_connections) {
                 uint32_t max_delay = 0;
                 for (auto& input : per_output_info.inputs) {
@@ -866,7 +895,9 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
     }
 
     void prepare_descriptor_sets() {
-        for (auto& [dst_node, dst_data] : node_data) {
+        for (auto& dst_node : flat_topology) {
+            auto& dst_data = node_data.at(dst_node);
+
             // --- PREPARE LAYOUT ---
             auto layout_builder = DescriptorSetLayoutBuilder();
             uint32_t binding_counter = 0;
