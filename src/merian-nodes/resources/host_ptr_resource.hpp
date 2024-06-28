@@ -14,6 +14,12 @@ template <typename T> class PtrResource : public GraphResource {
 
     void properties(merian::Properties& props) override {
         props.output_text(fmt::format("Raw: {}", ptr != nullptr ? fmt::ptr(ptr.get()) : "<null>"));
+
+        if constexpr (fmt::is_formattable<T>()) {
+            if (ptr) {
+                props.output_text(fmt::format("{}", *ptr));
+            }
+        }
     }
 
   private:
