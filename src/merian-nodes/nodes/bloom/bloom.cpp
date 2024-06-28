@@ -23,13 +23,13 @@ std::vector<InputConnectorHandle> Bloom::describe_inputs() {
     return {con_src};
 }
 
-std::vector<OutputConnectorHandle>
-Bloom::describe_outputs(const ConnectorIOMap& output_for_input) {
+std::vector<OutputConnectorHandle> Bloom::describe_outputs(const ConnectorIOMap& output_for_input) {
     const vk::Format format = output_for_input[con_src]->create_info.format;
     const vk::Extent3D extent = output_for_input[con_src]->create_info.extent;
 
     con_out = ManagedVkImageOut::compute_write("out", format, extent);
-    con_interm = ManagedVkImageOut::compute_read_write("interm", vk::Format::eR16G16B16A16Sfloat, extent);
+    con_interm =
+        ManagedVkImageOut::compute_read_write("interm", vk::Format::eR16G16B16A16Sfloat, extent);
 
     return {
         con_out,
@@ -53,9 +53,9 @@ Bloom::NodeStatusFlags Bloom::on_connected(const DescriptorSetLayoutHandle& grap
 }
 
 void Bloom::process([[maybe_unused]] GraphRun& run,
-                        const vk::CommandBuffer& cmd,
-                        const DescriptorSetHandle& descriptor_set,
-                        const NodeIO& io) {
+                    const vk::CommandBuffer& cmd,
+                    const DescriptorSetHandle& descriptor_set,
+                    const NodeIO& io) {
     const auto group_count_x = (io[con_out]->get_extent().width + local_size_x - 1) / local_size_x;
     const auto group_count_y = (io[con_out]->get_extent().height + local_size_y - 1) / local_size_y;
 
@@ -81,10 +81,10 @@ Bloom::NodeStatusFlags Bloom::properties(Properties& config) {
     config.config_float("strengh", pc.strength, "Controls the strength of the effect", .0001);
 
     config.st_separate("Debug");
-    int32_t old_mode = mode;
-    config.config_options("mode", mode, {"combined", "bloom only", "bloom off"});
+    bool value_changed =
+        config.config_options("mode", mode, {"combined", "bloom only", "bloom off"});
 
-    if (old_mode != mode) {
+    if (value_changed) {
         return NEEDS_RECONNECT;
     } else {
         return {};

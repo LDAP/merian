@@ -36,10 +36,10 @@ Accumulate::describe_outputs(const ConnectorIOMap& output_for_input) {
     irr_create_info = output_for_input[con_irr_in]->create_info;
     const auto moments_create_info = output_for_input[con_moments_in]->create_info;
 
-    con_irr_out = ManagedVkImageOut::compute_write("out_irr", format.value_or(irr_create_info.format),
-                                            irr_create_info.extent);
+    con_irr_out = ManagedVkImageOut::compute_write(
+        "out_irr", format.value_or(irr_create_info.format), irr_create_info.extent);
     con_moments_out = ManagedVkImageOut::compute_write("out_moments", moments_create_info.format,
-                                                moments_create_info.extent);
+                                                       moments_create_info.extent);
 
     return {
         con_irr_out,
@@ -183,19 +183,16 @@ Accumulate::NodeStatusFlags Accumulate::properties(Properties& config) {
     accumulate_pc.normal_reject_cos = glm::cos(angle);
     config.config_percent("depth threshold", accumulate_pc.depth_reject_percent,
                           "Reject points with depths farther apart (relative to the max)");
-    int old_filter_mode = filter_mode;
-    config.config_options("filter mode", filter_mode, {"nearest", "linear"});
-    needs_rebuild |= old_filter_mode != filter_mode;
-    const int old_extended_search = extended_search;
-    const int old_reuse_border = reuse_border;
-    config.config_bool("extended search", extended_search,
-                       "search in a 3x3 radius with weakened rejection thresholds for valid "
-                       "information if nothing was found. Helps "
-                       "with artifacts at edges");
-    config.config_bool("reuse border", reuse_border,
-                       "Reuse border information (if valid) for pixel where the motion vector "
-                       "points outside of the image. Can lead to smearing.");
-    needs_rebuild |= old_extended_search != extended_search || old_reuse_border != reuse_border;
+    needs_rebuild |= config.config_options("filter mode", filter_mode, {"nearest", "linear"});
+    needs_rebuild |=
+        config.config_bool("extended search", extended_search,
+                           "search in a 3x3 radius with weakened rejection thresholds for valid "
+                           "information if nothing was found. Helps "
+                           "with artifacts at edges");
+    needs_rebuild |=
+        config.config_bool("reuse border", reuse_border,
+                           "Reuse border information (if valid) for pixel where the motion vector "
+                           "points outside of the image. Can lead to smearing.");
 
     config.st_separate("Firefly Suppression");
     config.config_bool("firefly filter enable", accumulate_pc.firefly_filter_enable);
