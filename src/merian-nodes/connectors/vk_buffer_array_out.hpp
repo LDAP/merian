@@ -33,7 +33,7 @@ class VkBufferArrayOut : public TypedOutputConnector<BufferArrayResource&> {
     ConnectorStatusFlags
     on_pre_process(GraphRun& run,
                    const vk::CommandBuffer& cmd,
-                   GraphResourceHandle& resource,
+                   const GraphResourceHandle& resource,
                    const NodeHandle& node,
                    std::vector<vk::ImageMemoryBarrier2>& image_barriers,
                    std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) override;
@@ -41,7 +41,7 @@ class VkBufferArrayOut : public TypedOutputConnector<BufferArrayResource&> {
     ConnectorStatusFlags
     on_post_process(GraphRun& run,
                     const vk::CommandBuffer& cmd,
-                    GraphResourceHandle& resource,
+                    const GraphResourceHandle& resource,
                     const NodeHandle& node,
                     std::vector<vk::ImageMemoryBarrier2>& image_barriers,
                     std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) override;

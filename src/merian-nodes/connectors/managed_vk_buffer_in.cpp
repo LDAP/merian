@@ -6,11 +6,11 @@
 namespace merian_nodes {
 
 ManagedVkBufferIn::ManagedVkBufferIn(const std::string& name,
-                       const vk::AccessFlags2& access_flags,
-                       const vk::PipelineStageFlags2& pipeline_stages,
-                       const vk::BufferUsageFlags& usage_flags,
-                       const vk::ShaderStageFlags& stage_flags,
-                       const uint32_t delay)
+                                     const vk::AccessFlags2& access_flags,
+                                     const vk::PipelineStageFlags2& pipeline_stages,
+                                     const vk::BufferUsageFlags& usage_flags,
+                                     const vk::ShaderStageFlags& stage_flags,
+                                     const uint32_t delay)
     : TypedInputConnector(name, delay), access_flags(access_flags),
       pipeline_stages(pipeline_stages), usage_flags(usage_flags), stage_flags(stage_flags) {}
 
@@ -24,16 +24,19 @@ std::optional<vk::DescriptorSetLayoutBinding> ManagedVkBufferIn::get_descriptor_
     }
 }
 
-void ManagedVkBufferIn::get_descriptor_update(const uint32_t binding,
-                                       GraphResourceHandle& resource,
-                                       DescriptorSetUpdate& update) {
-    update.write_descriptor_buffer(binding, debugable_ptr_cast<ManagedVkBufferResource>(resource)->buffer);
+void ManagedVkBufferIn::get_descriptor_update(
+    const uint32_t binding,
+    const GraphResourceHandle& resource,
+    DescriptorSetUpdate& update,
+    [[maybe_unused]] const ResourceAllocatorHandle& allocator) {
+    update.write_descriptor_buffer(binding,
+                                   debugable_ptr_cast<ManagedVkBufferResource>(resource)->buffer);
 }
 
 Connector::ConnectorStatusFlags ManagedVkBufferIn::on_pre_process(
     [[maybe_unused]] GraphRun& run,
     [[maybe_unused]] const vk::CommandBuffer& cmd,
-    GraphResourceHandle& resource,
+    const GraphResourceHandle& resource,
     [[maybe_unused]] const NodeHandle& node,
     [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
     [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {
@@ -53,14 +56,14 @@ BufferHandle ManagedVkBufferIn::resource(const GraphResourceHandle& resource) {
 }
 
 std::shared_ptr<ManagedVkBufferIn> ManagedVkBufferIn::compute_read(const std::string& name,
-                                                     const uint32_t delay) {
+                                                                   const uint32_t delay) {
     return std::make_shared<ManagedVkBufferIn>(
         name, vk::AccessFlagBits2::eShaderRead, vk::PipelineStageFlagBits2::eComputeShader,
         vk::BufferUsageFlagBits::eStorageBuffer, vk::ShaderStageFlagBits::eCompute, delay);
 }
 
 std::shared_ptr<ManagedVkBufferIn> ManagedVkBufferIn::transfer_src(const std::string& name,
-                                                     const uint32_t delay) {
+                                                                   const uint32_t delay) {
     return std::make_shared<ManagedVkBufferIn>(
         name, vk::AccessFlagBits2::eTransferRead, vk::PipelineStageFlagBits2::eAllTransfer,
         vk::BufferUsageFlagBits::eTransferSrc, vk::ShaderStageFlags(), delay);

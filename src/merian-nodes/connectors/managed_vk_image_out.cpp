@@ -26,9 +26,11 @@ std::optional<vk::DescriptorSetLayoutBinding> ManagedVkImageOut::get_descriptor_
     }
 }
 
-void ManagedVkImageOut::get_descriptor_update(const uint32_t binding,
-                                              GraphResourceHandle& resource,
-                                              DescriptorSetUpdate& update) {
+void ManagedVkImageOut::get_descriptor_update(
+    const uint32_t binding,
+    const GraphResourceHandle& resource,
+    DescriptorSetUpdate& update,
+    [[maybe_unused]] const ResourceAllocatorHandle& allocator) {
     // or vk::ImageLayout::eGeneral instead of required?
     assert(debugable_ptr_cast<ManagedVkImageResource>(resource)->tex && "missing usage flags?");
     update.write_descriptor_texture(
@@ -38,7 +40,7 @@ void ManagedVkImageOut::get_descriptor_update(const uint32_t binding,
 Connector::ConnectorStatusFlags ManagedVkImageOut::on_pre_process(
     [[maybe_unused]] GraphRun& run,
     [[maybe_unused]] const vk::CommandBuffer& cmd,
-    GraphResourceHandle& resource,
+    const GraphResourceHandle& resource,
     [[maybe_unused]] const NodeHandle& node,
     std::vector<vk::ImageMemoryBarrier2>& image_barriers,
     [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {
@@ -64,7 +66,7 @@ Connector::ConnectorStatusFlags ManagedVkImageOut::on_pre_process(
 Connector::ConnectorStatusFlags ManagedVkImageOut::on_post_process(
     [[maybe_unused]] GraphRun& run,
     [[maybe_unused]] const vk::CommandBuffer& cmd,
-    GraphResourceHandle& resource,
+    const GraphResourceHandle& resource,
     [[maybe_unused]] const NodeHandle& node,
     [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
     [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {

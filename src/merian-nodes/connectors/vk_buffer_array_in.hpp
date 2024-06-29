@@ -9,21 +9,23 @@ namespace merian_nodes {
 class VkBufferArrayIn;
 using VkBufferArrayInHandle = std::shared_ptr<VkBufferArrayIn>;
 
-class VkBufferArrayIn : public TypedInputConnector<VkBufferArrayOutHandle, const BufferArrayResource&> {
+class VkBufferArrayIn
+    : public TypedInputConnector<VkBufferArrayOutHandle, const BufferArrayResource&> {
     friend class VkBufferArrayOut;
 
   public:
     // A descriptor binding is only created if stage flags are supplied.
     VkBufferArrayIn(const std::string& name,
-                  const vk::ShaderStageFlags stage_flags = {},
-                  const vk::AccessFlags2 access_flags = {},
-                  const vk::PipelineStageFlags2 pipeline_stages = {});
+                    const vk::ShaderStageFlags stage_flags = {},
+                    const vk::AccessFlags2 access_flags = {},
+                    const vk::PipelineStageFlags2 pipeline_stages = {});
 
     std::optional<vk::DescriptorSetLayoutBinding> get_descriptor_info() const override;
 
     void get_descriptor_update(const uint32_t binding,
-                               GraphResourceHandle& resource,
-                               DescriptorSetUpdate& update) override;
+                               const GraphResourceHandle& resource,
+                               DescriptorSetUpdate& update,
+                               const ResourceAllocatorHandle& allocator) override;
 
     const BufferArrayResource& resource(const GraphResourceHandle& resource) override;
 

@@ -5,10 +5,10 @@
 namespace merian_nodes {
 
 VkTextureArrayIn::VkTextureArrayIn(const std::string& name,
-                               const vk::ShaderStageFlags stage_flags,
-                               const vk::ImageLayout required_layout,
-                               const vk::AccessFlags2 access_flags,
-                               const vk::PipelineStageFlags2 pipeline_stages)
+                                   const vk::ShaderStageFlags stage_flags,
+                                   const vk::ImageLayout required_layout,
+                                   const vk::AccessFlags2 access_flags,
+                                   const vk::PipelineStageFlags2 pipeline_stages)
     : TypedInputConnector(name, 0), stage_flags(stage_flags), required_layout(required_layout),
       access_flags(access_flags), pipeline_stages(pipeline_stages) {
 
@@ -24,9 +24,11 @@ std::optional<vk::DescriptorSetLayoutBinding> VkTextureArrayIn::get_descriptor_i
     return std::nullopt;
 }
 
-void VkTextureArrayIn::get_descriptor_update(const uint32_t binding,
-                                           GraphResourceHandle& resource,
-                                           DescriptorSetUpdate& update) {
+void VkTextureArrayIn::get_descriptor_update(
+    const uint32_t binding,
+    const GraphResourceHandle& resource,
+    DescriptorSetUpdate& update,
+    [[maybe_unused]] const ResourceAllocatorHandle& allocator) {
     const auto& res = debugable_ptr_cast<TextureArrayResource>(resource);
     for (auto& pending_update : res->pending_updates) {
         const TextureHandle tex =
@@ -38,7 +40,7 @@ void VkTextureArrayIn::get_descriptor_update(const uint32_t binding,
 Connector::ConnectorStatusFlags VkTextureArrayIn::on_pre_process(
     [[maybe_unused]] GraphRun& run,
     [[maybe_unused]] const vk::CommandBuffer& cmd,
-    GraphResourceHandle& resource,
+    const GraphResourceHandle& resource,
     [[maybe_unused]] const NodeHandle& node,
     std::vector<vk::ImageMemoryBarrier2>& image_barriers,
     [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {

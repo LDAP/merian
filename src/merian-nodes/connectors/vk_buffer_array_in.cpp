@@ -17,14 +17,16 @@ VkBufferArrayIn::VkBufferArrayIn(const std::string& name,
 
 std::optional<vk::DescriptorSetLayoutBinding> VkBufferArrayIn::get_descriptor_info() const {
     if (stage_flags)
-        return vk::DescriptorSetLayoutBinding{0, vk::DescriptorType::eStorageBuffer,
-                                              array_size, stage_flags, nullptr};
+        return vk::DescriptorSetLayoutBinding{0, vk::DescriptorType::eStorageBuffer, array_size,
+                                              stage_flags, nullptr};
     return std::nullopt;
 }
 
-void VkBufferArrayIn::get_descriptor_update(const uint32_t binding,
-                                            GraphResourceHandle& resource,
-                                            DescriptorSetUpdate& update) {
+void VkBufferArrayIn::get_descriptor_update(
+    const uint32_t binding,
+    const GraphResourceHandle& resource,
+    DescriptorSetUpdate& update,
+    [[maybe_unused]] const ResourceAllocatorHandle& allocator) {
     const auto& res = debugable_ptr_cast<BufferArrayResource>(resource);
     for (auto& pending_update : res->pending_updates) {
         const BufferHandle tex =

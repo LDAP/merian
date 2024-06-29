@@ -47,7 +47,7 @@ TextureArrayResource& VkTextureArrayOut::resource(const GraphResourceHandle& res
 Connector::ConnectorStatusFlags VkTextureArrayOut::on_pre_process(
     [[maybe_unused]] GraphRun& run,
     [[maybe_unused]] const vk::CommandBuffer& cmd,
-    GraphResourceHandle& resource,
+    const GraphResourceHandle& resource,
     [[maybe_unused]] const NodeHandle& node,
     [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
     [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {
@@ -65,7 +65,7 @@ Connector::ConnectorStatusFlags VkTextureArrayOut::on_pre_process(
 Connector::ConnectorStatusFlags VkTextureArrayOut::on_post_process(
     GraphRun& run,
     [[maybe_unused]] const vk::CommandBuffer& cmd,
-    GraphResourceHandle& resource,
+    const GraphResourceHandle& resource,
     [[maybe_unused]] const NodeHandle& node,
     [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
     [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {

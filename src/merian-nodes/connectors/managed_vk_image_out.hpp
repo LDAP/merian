@@ -23,13 +23,14 @@ class ManagedVkImageOut : public TypedOutputConnector<ImageHandle> {
     virtual std::optional<vk::DescriptorSetLayoutBinding> get_descriptor_info() const override;
 
     virtual void get_descriptor_update(const uint32_t binding,
-                                       GraphResourceHandle& resource,
-                                       DescriptorSetUpdate& update) override;
+                                       const GraphResourceHandle& resource,
+                                       DescriptorSetUpdate& update,
+                                       const ResourceAllocatorHandle& allocator) override;
 
     virtual ConnectorStatusFlags
     on_pre_process(GraphRun& run,
                    const vk::CommandBuffer& cmd,
-                   GraphResourceHandle& resource,
+                   const GraphResourceHandle& resource,
                    const NodeHandle& node,
                    std::vector<vk::ImageMemoryBarrier2>& image_barriers,
                    std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) override;
@@ -37,7 +38,7 @@ class ManagedVkImageOut : public TypedOutputConnector<ImageHandle> {
     virtual ConnectorStatusFlags
     on_post_process(GraphRun& run,
                     const vk::CommandBuffer& cmd,
-                    GraphResourceHandle& resource,
+                    const GraphResourceHandle& resource,
                     const NodeHandle& node,
                     std::vector<vk::ImageMemoryBarrier2>& image_barriers,
                     std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) override;

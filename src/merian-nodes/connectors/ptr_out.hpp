@@ -46,7 +46,7 @@ template <typename T> class PtrOut : public TypedOutputConnector<std::shared_ptr
     Connector::ConnectorStatusFlags on_post_process(
         [[maybe_unused]] GraphRun& run,
         [[maybe_unused]] const vk::CommandBuffer& cmd,
-        GraphResourceHandle& resource,
+        const GraphResourceHandle& resource,
         [[maybe_unused]] const NodeHandle& node,
         [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
         [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) override {

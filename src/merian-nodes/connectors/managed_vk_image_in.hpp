@@ -16,23 +16,26 @@ class ManagedVkImageIn : public TypedInputConnector<ManagedVkImageOutHandle, Ima
 
   public:
     ManagedVkImageIn(const std::string& name,
-              const vk::AccessFlags2 access_flags,
-              const vk::PipelineStageFlags2 pipeline_stages,
-              const vk::ImageLayout required_layout,
-              const vk::ImageUsageFlags usage_flags,
-              const vk::ShaderStageFlags stage_flags,
-              const uint32_t delay = 0);
+                     const vk::AccessFlags2 access_flags,
+                     const vk::PipelineStageFlags2 pipeline_stages,
+                     const vk::ImageLayout required_layout,
+                     const vk::ImageUsageFlags usage_flags,
+                     const vk::ShaderStageFlags stage_flags,
+                     const uint32_t delay = 0);
 
     virtual std::optional<vk::DescriptorSetLayoutBinding> get_descriptor_info() const override;
 
+    // For a optional input, resource can be nullptr here to signalize that no output was connected.
+    // Provide a dummy binding in this case so that descriptor sets do not need to change.
     virtual void get_descriptor_update(const uint32_t binding,
-                                       GraphResourceHandle& resource,
-                                       DescriptorSetUpdate& update) override;
+                                       const GraphResourceHandle& resource,
+                                       DescriptorSetUpdate& update,
+                                       const ResourceAllocatorHandle& allocator) override;
 
     virtual ConnectorStatusFlags
     on_pre_process(GraphRun& run,
                    const vk::CommandBuffer& cmd,
-                   GraphResourceHandle& resource,
+                   const GraphResourceHandle& resource,
                    const NodeHandle& node,
                    std::vector<vk::ImageMemoryBarrier2>& image_barriers,
                    std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) override;

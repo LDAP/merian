@@ -37,7 +37,7 @@ TLASResource& VkTLASOut::resource(const GraphResourceHandle& resource) {
 Connector::ConnectorStatusFlags
 VkTLASOut::on_pre_process([[maybe_unused]] GraphRun& run,
                           [[maybe_unused]] const vk::CommandBuffer& cmd,
-                          GraphResourceHandle& resource,
+                          const GraphResourceHandle& resource,
                           [[maybe_unused]] const NodeHandle& node,
                           [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
                           [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {
@@ -51,7 +51,7 @@ VkTLASOut::on_pre_process([[maybe_unused]] GraphRun& run,
 Connector::ConnectorStatusFlags VkTLASOut::on_post_process(
     GraphRun& run,
     [[maybe_unused]] const vk::CommandBuffer& cmd,
-    GraphResourceHandle& resource,
+    const GraphResourceHandle& resource,
     [[maybe_unused]] const NodeHandle& node,
     [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
     [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {

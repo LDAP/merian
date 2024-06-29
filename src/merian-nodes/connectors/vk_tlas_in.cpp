@@ -16,8 +16,9 @@ std::optional<vk::DescriptorSetLayoutBinding> VkTLASIn::get_descriptor_info() co
 }
 
 void VkTLASIn::get_descriptor_update(const uint32_t binding,
-                                     GraphResourceHandle& resource,
-                                     DescriptorSetUpdate& update) {
+                                     const GraphResourceHandle& resource,
+                                     DescriptorSetUpdate& update,
+                                     [[maybe_unused]] const ResourceAllocatorHandle& allocator) {
     const auto& res = debugable_ptr_cast<TLASResource>(resource);
     update.write_descriptor_acceleration_structure(binding, *res->tlas);
 }

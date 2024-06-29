@@ -22,8 +22,9 @@ class VkTLASIn : public TypedInputConnector<VkTLASOutHandle, const AccelerationS
     std::optional<vk::DescriptorSetLayoutBinding> get_descriptor_info() const override;
 
     void get_descriptor_update(const uint32_t binding,
-                               GraphResourceHandle& resource,
-                               DescriptorSetUpdate& update) override;
+                               const GraphResourceHandle& resource,
+                               DescriptorSetUpdate& update,
+                               const ResourceAllocatorHandle& allocator) override;
 
     const AccelerationStructureHandle& resource(const GraphResourceHandle& resource) override;
 

@@ -2,10 +2,11 @@
 
 #include <memory>
 
+#include "graph_run.hpp"
+
 #include "merian/utils/properties.hpp"
 #include "merian/vk/descriptors/descriptor_set_update.hpp"
-
-#include "graph_run.hpp"
+#include "merian/vk/memory/resource_allocator.hpp"
 
 namespace merian_nodes {
 
@@ -50,8 +51,9 @@ class Connector : public std::enable_shared_from_this<Connector> {
     //
     // Assume that the last updates are persisted and only changes need to be recorded.
     virtual void get_descriptor_update([[maybe_unused]] const uint32_t binding,
-                                       [[maybe_unused]] GraphResourceHandle& resource,
-                                       [[maybe_unused]] DescriptorSetUpdate& update) {
+                                       [[maybe_unused]] const GraphResourceHandle& resource,
+                                       [[maybe_unused]] DescriptorSetUpdate& update,
+                                       [[maybe_unused]] const ResourceAllocatorHandle& allocator) {
         throw std::runtime_error{"resource is not accessible using a descriptor"};
     }
 
@@ -69,7 +71,7 @@ class Connector : public std::enable_shared_from_this<Connector> {
     virtual ConnectorStatusFlags
     on_pre_process([[maybe_unused]] GraphRun& run,
                    [[maybe_unused]] const vk::CommandBuffer& cmd,
-                   [[maybe_unused]] GraphResourceHandle& resource,
+                   [[maybe_unused]] const GraphResourceHandle& resource,
                    [[maybe_unused]] const NodeHandle& node,
                    [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
                    [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {
@@ -85,7 +87,7 @@ class Connector : public std::enable_shared_from_this<Connector> {
     virtual ConnectorStatusFlags
     on_post_process([[maybe_unused]] GraphRun& run,
                     [[maybe_unused]] const vk::CommandBuffer& cmd,
-                    [[maybe_unused]] GraphResourceHandle& resource,
+                    [[maybe_unused]] const GraphResourceHandle& resource,
                     [[maybe_unused]] const NodeHandle& node,
                     [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
                     [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {

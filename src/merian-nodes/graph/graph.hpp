@@ -716,18 +716,18 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
         if (per_output_info.descriptor_set_binding != NodeData::NO_DESCRIPTOR_BINDING)
             for (auto& set_idx : resource_info.set_indices) {
-                src_output->get_descriptor_update(per_output_info.descriptor_set_binding,
-                                                  resource_info.resource,
-                                                  *src_data.descriptor_sets[set_idx].update);
+                src_output->get_descriptor_update(
+                    per_output_info.descriptor_set_binding, resource_info.resource,
+                    *src_data.descriptor_sets[set_idx].update, resource_allocator);
             }
 
         for (auto& [dst_node, dst_input, set_idx] : resource_info.other_set_indices) {
             NodeData& dst_data = node_data.at(dst_node);
             NodeData::PerInputInfo& per_input_info = dst_data.input_connections[dst_input];
             if (per_input_info.descriptor_set_binding != NodeData::NO_DESCRIPTOR_BINDING)
-                dst_input->get_descriptor_update(per_input_info.descriptor_set_binding,
-                                                 resource_info.resource,
-                                                 *dst_data.descriptor_sets[set_idx].update);
+                dst_input->get_descriptor_update(
+                    per_input_info.descriptor_set_binding, resource_info.resource,
+                    *dst_data.descriptor_sets[set_idx].update, resource_allocator);
         }
     }
 

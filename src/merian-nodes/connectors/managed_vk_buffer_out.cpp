@@ -28,9 +28,11 @@ std::optional<vk::DescriptorSetLayoutBinding> ManagedVkBufferOut::get_descriptor
     }
 }
 
-void ManagedVkBufferOut::get_descriptor_update(const uint32_t binding,
-                                               GraphResourceHandle& resource,
-                                               DescriptorSetUpdate& update) {
+void ManagedVkBufferOut::get_descriptor_update(
+    const uint32_t binding,
+    const GraphResourceHandle& resource,
+    DescriptorSetUpdate& update,
+    [[maybe_unused]] const ResourceAllocatorHandle& allocator) {
     update.write_descriptor_buffer(binding,
                                    debugable_ptr_cast<ManagedVkBufferResource>(resource)->buffer);
 }
@@ -38,7 +40,7 @@ void ManagedVkBufferOut::get_descriptor_update(const uint32_t binding,
 Connector::ConnectorStatusFlags ManagedVkBufferOut::on_pre_process(
     [[maybe_unused]] GraphRun& run,
     [[maybe_unused]] const vk::CommandBuffer& cmd,
-    GraphResourceHandle& resource,
+    const GraphResourceHandle& resource,
     [[maybe_unused]] const NodeHandle& node,
     [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
     std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {
@@ -63,7 +65,7 @@ Connector::ConnectorStatusFlags ManagedVkBufferOut::on_pre_process(
 Connector::ConnectorStatusFlags ManagedVkBufferOut::on_post_process(
     [[maybe_unused]] GraphRun& run,
     [[maybe_unused]] const vk::CommandBuffer& cmd,
-    GraphResourceHandle& resource,
+    const GraphResourceHandle& resource,
     [[maybe_unused]] const NodeHandle& node,
     [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
     std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {
