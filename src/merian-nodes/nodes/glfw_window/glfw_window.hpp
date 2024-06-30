@@ -35,7 +35,6 @@ class GLFWWindow : public Node {
                          const NodeIO& io) override {
         auto& old_swapchains = io.frame_data<std::vector<SwapchainHandle>>();
         old_swapchains.clear();
-        const auto& src_image = io[image_in];
 
         swapchain->set_vsync(vsync);
 
@@ -50,21 +49,26 @@ class GLFWWindow : public Node {
         }
 
         if (acquire) {
-            const auto bar = barrier_image_layout(acquire->image, vk::ImageLayout::eUndefined,
-                                            vk::ImageLayout::eTransferDstOptimal,
-                                            all_levels_and_layers(vk::ImageAspectFlagBits::eColor));
+            const auto bar = barrier_image_layout(
+                acquire->image, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal,
+                all_levels_and_layers(vk::ImageAspectFlagBits::eColor));
+
             cmd.pipelineBarrier(vk::PipelineStageFlagBits::eBottomOfPipe,
                                 vk::PipelineStageFlagBits::eTransfer, {}, {}, {}, bar);
 
-            const vk::Filter filter =
-                src_image->format_features() & vk::FormatFeatureFlagBits::eSampledImageFilterLinear
-                    ? vk::Filter::eLinear
-                    : vk::Filter::eNearest;
-            const vk::Extent3D extent(acquire->extent, 1);
+            if (io.is_connected(image_in)) {
+                const auto& src_image = io[image_in];
+                const vk::Filter filter =
+                    src_image->format_features() &
+                            vk::FormatFeatureFlagBits::eSampledImageFilterLinear
+                        ? vk::Filter::eLinear
+                        : vk::Filter::eNearest;
+                const vk::Extent3D extent(acquire->extent, 1);
 
-            cmd_blit(mode, cmd, *src_image, vk::ImageLayout::eTransferSrcOptimal,
-                     src_image->get_extent(), acquire->image, vk::ImageLayout::eTransferDstOptimal,
-                     extent, std::nullopt, filter);
+                cmd_blit(mode, cmd, *src_image, vk::ImageLayout::eTransferSrcOptimal,
+                         src_image->get_extent(), acquire->image,
+                         vk::ImageLayout::eTransferDstOptimal, extent, std::nullopt, filter);
+            }
 
             cmd_barrier_image_layout(cmd, acquire->image, vk::ImageLayout::eTransferDstOptimal,
                                      vk::ImageLayout::ePresentSrcKHR);
@@ -165,7 +169,7 @@ class GLFWWindow : public Node {
         on_blit_completed = []([[maybe_unused]] const vk::CommandBuffer& cmd,
                                [[maybe_unused]] SwapchainAcquireResult& acquire_result) {};
 
-    ManagedVkImageInHandle image_in = ManagedVkImageIn::transfer_src("src");
+    ManagedVkImageInHandle image_in = ManagedVkImageIn::transfer_src("src", 0, true);
 
     std::array<int, 4> windowed_pos_size;
     bool vsync;

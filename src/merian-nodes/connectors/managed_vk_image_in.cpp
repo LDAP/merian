@@ -10,8 +10,9 @@ ManagedVkImageIn::ManagedVkImageIn(const std::string& name,
                                    const vk::ImageLayout required_layout,
                                    const vk::ImageUsageFlags usage_flags,
                                    const vk::ShaderStageFlags stage_flags,
-                                   const uint32_t delay)
-    : TypedInputConnector(name, delay), access_flags(access_flags),
+                                   const uint32_t delay,
+                                   const bool optional)
+    : TypedInputConnector(name, delay, optional), access_flags(access_flags),
       pipeline_stages(pipeline_stages), required_layout(required_layout), usage_flags(usage_flags),
       stage_flags(stage_flags) {}
 
@@ -29,6 +30,7 @@ void ManagedVkImageIn::get_descriptor_update(const uint32_t binding,
                                              DescriptorSetUpdate& update,
                                              const ResourceAllocatorHandle& allocator) {
     if (!resource) {
+        // the optional connector was not connected
         update.write_descriptor_texture(binding, allocator->get_dummy_texture(), 0, 1,
                                         vk::ImageLayout::eShaderReadOnlyOptimal);
     }
@@ -79,20 +81,20 @@ ImageHandle ManagedVkImageIn::resource(const GraphResourceHandle& resource) {
     return debugable_ptr_cast<ManagedVkImageResource>(resource)->image;
 }
 
-std::shared_ptr<ManagedVkImageIn> ManagedVkImageIn::compute_read(const std::string& name,
-                                                                 const uint32_t delay) {
+std::shared_ptr<ManagedVkImageIn>
+ManagedVkImageIn::compute_read(const std::string& name, const uint32_t delay, const bool optional) {
     return std::make_shared<ManagedVkImageIn>(
         name, vk::AccessFlagBits2::eShaderRead, vk::PipelineStageFlagBits2::eComputeShader,
         vk::ImageLayout::eShaderReadOnlyOptimal, vk::ImageUsageFlagBits::eSampled,
-        vk::ShaderStageFlagBits::eCompute, delay);
+        vk::ShaderStageFlagBits::eCompute, delay, optional);
 }
 
-std::shared_ptr<ManagedVkImageIn> ManagedVkImageIn::transfer_src(const std::string& name,
-                                                                 const uint32_t delay) {
+std::shared_ptr<ManagedVkImageIn>
+ManagedVkImageIn::transfer_src(const std::string& name, const uint32_t delay, const bool optional) {
     return std::make_shared<ManagedVkImageIn>(
         name, vk::AccessFlagBits2::eTransferRead, vk::PipelineStageFlagBits2::eAllTransfer,
         vk::ImageLayout::eTransferSrcOptimal, vk::ImageUsageFlagBits::eTransferSrc,
-        vk::ShaderStageFlags(), delay);
+        vk::ShaderStageFlags(), delay, optional);
 }
 
 } // namespace merian_nodes
