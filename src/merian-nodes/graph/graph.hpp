@@ -49,7 +49,7 @@ struct NodeData {
     // User disabled
     bool disable{};
     // Disabled because a input is not connected;
-    bool disable_missing_input{};
+    std::vector<std::string> errors{};
 
     // Cache input connectors (node->describe_inputs())
     // (on start_nodes added and checked for name conflicts)
@@ -144,7 +144,7 @@ struct NodeData {
         descriptor_pool.reset();
         descriptor_set_layout.reset();
 
-        disable_missing_input = false;
+        errors.clear();
     }
 };
 
@@ -469,17 +469,21 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             auto& data = node_data.at(node);
 
             std::string node_label;
-            if (data.disable || data.disable_missing_input) {
-                node_label = fmt::format("[DISABLED] {} ({})", data.name, node->name);
-            } else {
-                node_label = fmt::format("{} ({})", data.name, node->name);
+            std::string state = "OK";
+            if (data.disable) {
+                state = "DISABLED";
+            } else if (!data.errors.empty()) {
+                state = "ERROR";
             }
+
+            node_label = fmt::format("[{}] {} ({})", state, data.name, node->name);
 
             if (props.st_begin_child(data.name.c_str(), node_label.c_str())) {
                 if (props.config_bool("disable node", data.disable))
                     request_reconnect();
-                if (data.disable_missing_input) {
-                    props.output_text("Disabled because not all inputs are connected.");
+                if (!data.errors.empty()) {
+                    props.output_text(
+                        fmt::format("Errors:\n  - {}", fmt::join(data.errors, "\n   - ")));
                 }
 
                 const Node::NodeStatusFlags flags = node->properties(props);
@@ -902,8 +906,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                     const NodeHandle& connecting_node = maybe_connected_inputs[input];
                     const NodeData& connecting_node_data = node_data.at(connecting_node);
 
-                    if (connecting_node_data.disable ||
-                        connecting_node_data.disable_missing_input) {
+                    if (connecting_node_data.disable || !connecting_node_data.errors.empty()) {
                         will_not_connect = true;
                     }
                 }
@@ -912,10 +915,9 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                     if (!input->optional) {
                         // This is bad. No node will connect to this input and the input is not
                         // optional...
-                        data.disable_missing_input = true;
-                        SPDLOG_WARN("the non-optional input {} on node {} ({}) is not "
-                                    "connected. The node will be forcefully disabled.",
-                                    input->name, data.name, node->name);
+                        const std::string error = make_error_input_not_connected(input, node, data);
+                        SPDLOG_WARN(error);
+                        data.errors.emplace_back(std::move(error));
 
                         to_erase.push_back(node);
                         satisfied = false;
@@ -975,7 +977,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 NodeData& data = node_data.at(queue.top());
 
                 {
-                    assert(!data.disable && !data.disable_missing_input);
+                    assert(!data.disable && data.errors.empty());
                     SPDLOG_DEBUG("connecting {} ({})", data.name, node->name);
 
                     preliminary_topological_order.emplace_back(node);
@@ -1006,19 +1008,19 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                     if (input->optional) {
                         data.input_connections.try_emplace(input, NodeData::PerInputInfo());
                     } else {
-                        data.disable_missing_input = true;
+                        data.errors.emplace_back(make_error_input_not_connected(input, node, data));
                         break;
                     }
                 } else {
                     NodeData::PerInputInfo& input_info = data.input_connections[input];
-                    if (input_info.node && node_data.at(input_info.node).disable_missing_input) {
-                        data.disable_missing_input = true;
+                    if (input_info.node && !node_data.at(input_info.node).errors.empty()) {
+                        data.input_connections.try_emplace(input, NodeData::PerInputInfo());
                         break;
                     }
                 }
             }
 
-            if (!data.disable_missing_input) {
+            if (data.errors.empty()) {
                 topology.emplace_back(node);
             }
         }
@@ -1034,8 +1036,8 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
                     const auto& [dst_node, dst_input] = *it;
                     const auto& dst_data = node_data.at(dst_node);
-                    if (dst_data.disable_missing_input) {
-                        SPDLOG_TRACE("cleanup output connection to disabled node: {}, {} ({}) -> "
+                    if (!dst_data.errors.empty()) {
+                        SPDLOG_TRACE("cleanup output connection to erroneous node: {}, {} ({}) -> "
                                      "{}, {} ({})",
                                      src_output->name, src_data.name, src_node->name,
                                      dst_input->name, dst_data.name, dst_node->name);
@@ -1201,6 +1203,14 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                     });
             }
         }
+    }
+
+    std::string make_error_input_not_connected(const InputConnectorHandle& input,
+                                               const NodeHandle& node,
+                                               const NodeData& data) {
+        return fmt::format("the non-optional input {} on node {} ({}) is not "
+                           "connected.",
+                           input->name, data.name, node->name);
     }
 
   public:
