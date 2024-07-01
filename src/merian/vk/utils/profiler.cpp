@@ -243,7 +243,6 @@ void Profiler::get_gpu_report_as_config(Properties& config, const Profiler::Repo
     to_config(config, report.gpu_report, 1u << 31);
 }
 
-
 void Profiler::get_report_as_config(Properties& config, const Profiler::Report& report) {
     if (!report.cpu_report.empty()) {
         config.st_separate("CPU");
@@ -258,8 +257,9 @@ void Profiler::get_report_as_config(Properties& config, const Profiler::Report& 
 
 Profiler::Report Profiler::get_report() {
     Profiler::Report report;
-    report.cpu_report = make_report<chrono_clock::time_point>(cpu_sections.front(), cpu_sections);
-    report.gpu_report = make_report<uint64_t>(gpu_sections.front(), gpu_sections);
+    report.cpu_report =
+        make_report<chrono_clock::time_point>(cpu_sections[current_cpu_section], cpu_sections);
+    report.gpu_report = make_report<uint64_t>(gpu_sections[current_gpu_section], gpu_sections);
     return report;
 }
 

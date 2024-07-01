@@ -21,7 +21,8 @@ class ManagedVkImageIn : public TypedInputConnector<ManagedVkImageOutHandle, Ima
                      const vk::ImageLayout required_layout,
                      const vk::ImageUsageFlags usage_flags,
                      const vk::ShaderStageFlags stage_flags,
-                     const uint32_t delay = 0);
+                     const uint32_t delay = 0,
+                     const bool optional = false);
 
     virtual std::optional<vk::DescriptorSetLayoutBinding> get_descriptor_info() const override;
 
@@ -43,9 +44,11 @@ class ManagedVkImageIn : public TypedInputConnector<ManagedVkImageOutHandle, Ima
     virtual ImageHandle resource(const GraphResourceHandle& resource) override;
 
   public:
-    static ManagedVkImageInHandle compute_read(const std::string& name, const uint32_t delay = 0);
+    static ManagedVkImageInHandle
+    compute_read(const std::string& name, const uint32_t delay = 0, const bool optional = false);
 
-    static ManagedVkImageInHandle transfer_src(const std::string& name, const uint32_t delay = 0);
+    static ManagedVkImageInHandle
+    transfer_src(const std::string& name, const uint32_t delay = 0, const bool optional = false);
 
   private:
     const vk::AccessFlags2 access_flags;

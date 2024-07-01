@@ -2,7 +2,6 @@
 
 #include "connector_input.hpp"
 
-#include "merian/utils/pointer.hpp"
 #include <any>
 
 namespace merian_nodes {
@@ -14,6 +13,7 @@ class ConnectorIOMap {
         const std::function<OutputConnectorHandle(const InputConnectorHandle&)>& output_for_input)
         : output_for_input(output_for_input) {}
 
+    // Behavior undefined if an optional input connector is not connected.
     template <
         typename T,
         typename ResourceAccessType = T::resource_access_type,
@@ -22,7 +22,15 @@ class ConnectorIOMap {
             std::is_base_of_v<TypedInputConnector<OutputConnectorType, ResourceAccessType>, T>,
             bool> = true>
     const OutputConnectorType operator[](const std::shared_ptr<T>& input_connector) const {
+        assert(output_for_input(input_connector) && "optional input connector is not connected");
         return input_connector->output_connector(output_for_input(input_connector));
+    }
+
+    // Returns if an input is connected. This is always true for non-optional inputs.
+    bool is_connected(const InputConnectorHandle& input_connector) const {
+        // if not optional, an output must exist!
+        assert(input_connector->optional || output_for_input(input_connector));
+        return output_for_input(input_connector) != nullptr;
     }
 
   private:
@@ -40,6 +48,7 @@ class NodeIO {
           resource_for_output_connector(resource_for_output_connector),
           get_frame_data(get_frame_data) {}
 
+    // Behavior undefined if an optional input connector is not connected.
     template <
         typename T,
         typename ResourceAccessType = T::resource_access_type,
@@ -48,6 +57,8 @@ class NodeIO {
             std::is_base_of_v<TypedInputConnector<OutputConnectorType, ResourceAccessType>, T>,
             bool> = true>
     ResourceAccessType operator[](const std::shared_ptr<T>& input_connector) const {
+        assert(resource_for_input_connector(input_connector) &&
+               "optional input connector is not connected");
         return input_connector->resource(resource_for_input_connector(input_connector));
     }
 
@@ -57,6 +68,13 @@ class NodeIO {
                                bool> = true>
     ResourceAccessType operator[](const std::shared_ptr<T>& output_connector) const {
         return output_connector->resource(resource_for_output_connector(output_connector));
+    }
+
+    // Returns if an input is connected. This is always true for non-optional inputs.
+    bool is_connected(const InputConnectorHandle& input_connector) const {
+        // if not optional, a resource must exist!
+        assert(input_connector->optional || resource_for_input_connector(input_connector));
+        return resource_for_input_connector(input_connector) != nullptr;
     }
 
     // Returns a reference to the frame data as the template type.
