@@ -118,7 +118,7 @@ class Context : public std::enable_shared_from_this<Context> {
     }
 
   private: // Vulkan initialization
-    void create_instance(const std::string& application_name, uint32_t application_vk_version);
+    void create_instance();
     void prepare_physical_device(uint32_t filter_vendor_id,
                                  uint32_t filter_device_id,
                                  std::string filter_device_name);
@@ -192,9 +192,9 @@ class Context : public std::enable_shared_from_this<Context> {
     std::vector<const char*> device_extensions;
 
   public:
-    std::string application_name;
-    uint32_t vk_api_version = VK_API_VERSION_1_3;
-    uint32_t application_vk_version;
+    const std::string application_name;
+    const uint32_t vk_api_version = VK_API_VERSION_1_3;
+    const uint32_t application_vk_version;
 
     // in create_instance
 
@@ -210,6 +210,9 @@ class Context : public std::enable_shared_from_this<Context> {
     // the vk::Device for this Context
     vk::Device device;
 
+    vk::PipelineCache pipeline_cache;
+
+    // -----------------
     // A shared thread pool with default size.
     ThreadPool thread_pool;
 

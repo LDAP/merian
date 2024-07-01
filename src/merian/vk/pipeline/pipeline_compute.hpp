@@ -16,8 +16,7 @@ class ComputePipeline : public Pipeline {
         const vk::PipelineShaderStageCreateFlags stage_flags = {},
         const vk::PipelineCreateFlags flags = {},
         const std::shared_ptr<Pipeline>& shared_base_pipeline_handle = {},
-        const int32_t base_pipeline_index = {},
-        const vk::PipelineCache cache = {})
+        const int32_t base_pipeline_index = {})
         : Pipeline(pipeline_layout->get_context(), pipeline_layout), shader_module(shader_module),
           shared_base_pipeline_handle(shared_base_pipeline_handle) {
         SPDLOG_DEBUG("create ComputePipeline ({})", fmt::ptr(this));
@@ -30,7 +29,7 @@ class ComputePipeline : public Pipeline {
         vk::ComputePipelineCreateInfo info{flags, stage, *pipeline_layout, base_pipeline_handle,
                                            base_pipeline_index};
         // Hm. This is a bug in the API there should not be .value
-        pipeline = context->device.createComputePipeline(cache, info).value;
+        pipeline = context->device.createComputePipeline(context->pipeline_cache, info).value;
     }
 
     ~ComputePipeline() {

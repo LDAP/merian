@@ -34,7 +34,8 @@ Context::Context(const std::vector<std::shared_ptr<Extension>>& desired_extensio
                  uint32_t preffered_number_compute_queues,
                  uint32_t filter_vendor_id,
                  uint32_t filter_device_id,
-                 const std::string& filter_device_name) {
+                 const std::string& filter_device_name)
+    : application_name(application_name), application_vk_version(application_vk_version) {
     SPDLOG_INFO("\n\n\
 __  __ ___ ___ ___   _   _  _ \n\
 |  \\/  | __| _ \\_ _| /_\\ | \\| |\n\
@@ -61,7 +62,7 @@ Version: {}\n\n",
         }
     }
 
-    create_instance(application_name, application_vk_version);
+    create_instance();
     prepare_physical_device(filter_vendor_id, filter_device_id, filter_device_name);
     find_queues();
     create_device_and_queues(preffered_number_compute_queues);
@@ -76,6 +77,9 @@ Context::~Context() {
     for (auto& ext : extensions) {
         ext.second->on_destroy_context();
     }
+
+    SPDLOG_DEBUG("destroy pipeline cache");
+    device.destroyPipelineCache(pipeline_cache);
 
     SPDLOG_DEBUG("destroy device");
     for (auto& ext : extensions) {
@@ -92,8 +96,7 @@ Context::~Context() {
     SPDLOG_INFO("context destroyed");
 }
 
-void Context::create_instance(const std::string& application_name,
-                              uint32_t application_vk_version) {
+void Context::create_instance() {
     extensions_check_instance_layer_support();
     extensions_check_instance_extension_support();
 
@@ -511,6 +514,10 @@ void Context::create_device_and_queues(uint32_t preferred_number_compute_queues)
     for (auto& ext : extensions) {
         ext.second->on_device_created(device);
     }
+
+    SPDLOG_DEBUG("create pipeline cache");
+    vk::PipelineCacheCreateInfo pipeline_cache_create_info{};
+    pipeline_cache = device.createPipelineCache(pipeline_cache_create_info);
 }
 
 ////////////
