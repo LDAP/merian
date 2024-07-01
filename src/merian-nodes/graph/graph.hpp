@@ -294,6 +294,17 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
             {
                 MERIAN_PROFILE_SCOPE(profiler, "connect nodes");
+                /*
+                 * The connetion procedure works roughtly as follows:
+                 * - while not all nodes were visited
+                 *      - check if nodes must be disabled (required inputs cannot be satisfied)
+                 *      - search nodes that are satisfied
+                 *      - connect those nodes outputs with inputs
+                 * - check if nodes must be disabled because of dependencies on backward edges are
+                 * not satisfied
+                 * - cleanup output connections to disabled nodes
+                 * - call on_connect callbacks on the connectors
+                 */
                 flat_topology = connect_nodes();
             }
 
