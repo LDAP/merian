@@ -775,6 +775,91 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         }
     }
 
+    // Only for a "satisfied node". Means, all inputs are connected, or delayed or optional and will
+    // not be connected.
+    void cache_node_output_connectors(const NodeHandle& node, NodeData& data) {
+        data.output_connectors =
+            node->describe_outputs(ConnectorIOMap([&](const InputConnectorHandle& input) {
+#ifndef NDEBUG
+                if (input->delay > 0) {
+                    throw std::runtime_error{
+                        fmt::format("Node {} tried to access an output connector that is connected "
+                                    "through a delayed input {} (which is not allowed).",
+                                    node->name, input->name)};
+                }
+                if (std::find(data.input_connectors.begin(), data.input_connectors.end(), input) ==
+                    data.input_connectors.end()) {
+                    throw std::runtime_error{
+                        fmt::format("Node {} tried to get an output connector for an input {} "
+                                    "which was not returned in describe_inputs (which is not "
+                                    "how this works).",
+                                    node->name, input->name)};
+                }
+#endif
+                // for optional inputs we inserted a input connection with nullptr in
+                // start_nodes, no problem here.
+                return data.input_connections.at(input).output;
+            }));
+        for (const auto& output : data.output_connectors) {
+            if (data.output_connector_for_name.contains(output->name)) {
+                throw graph_errors::connector_error{
+                    fmt::format("node {} contains two output connectors with the same name {}",
+                                node->name, output->name)};
+            }
+            data.output_connector_for_name.try_emplace(output->name, output);
+            data.output_connections.try_emplace(output);
+        }
+    }
+
+    void connect_node(const NodeHandle& node,
+                      NodeData& data,
+                      const std::unordered_set<NodeHandle>& visited) {
+        assert(visited.contains(node) && "necessary for self loop check");
+
+        for (const NodeConnection& connection : data.desired_connections) {
+            NodeData& dst_data = node_data.at(connection.dst);
+            if (!data.output_connector_for_name.contains(connection.src_output)) {
+                throw graph_errors::illegal_connection{
+                    fmt::format("node {} ({}) does not have an output {}.", data.name, node->name,
+                                connection.src_output)};
+            }
+            const OutputConnectorHandle src_output =
+                data.output_connector_for_name[connection.src_output];
+            if (!dst_data.input_connector_for_name.contains(connection.dst_input)) {
+                throw graph_errors::illegal_connection{
+                    fmt::format("node {} ({}) does not have an input {}.", dst_data.name,
+                                connection.dst->name, connection.dst_input)};
+            }
+            const InputConnectorHandle dst_input =
+                dst_data.input_connector_for_name[connection.dst_input];
+
+            // made sure in cache_node_input_connectors
+            assert(!dst_data.input_connections.contains(dst_input));
+
+            if (dst_input->delay == 0 && visited.contains(connection.dst)) {
+                // this includes self loops because we insert the current node into visited before
+                // calling this method. Back-edges with delay > 1 are allowed!
+                throw graph_errors::illegal_connection{
+                    fmt::format("undelayed (edges with delay = 0) graph is not "
+                                "acyclic! {} -> {}",
+                                data.name, node_data.at(connection.dst).name)};
+            }
+
+            if (!src_output->supports_delay && dst_input->delay > 0) {
+                throw graph_errors::illegal_connection{
+                    fmt::format("input connector {} of node {} ({}) was connected to output "
+                                "connector {} on node {} ({}) with delay {}, however the output "
+                                "connector does not support delay.",
+                                dst_input->name, dst_data.name, connection.dst->name,
+                                src_output->name, data.name, node->name, dst_input->delay)};
+            }
+
+            dst_data.input_connections.try_emplace(dst_input,
+                                                   NodeData::PerInputInfo{node, src_output});
+            data.output_connections[src_output].inputs.emplace_back(connection.dst, dst_input);
+        }
+    }
+
     // Helper for topological visit that calculates the next topological layer from the 'not yet
     // visited' cadidate nodes.
     //
@@ -782,7 +867,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
     // is removed from candidates.
     //
     // This is used to initialize a topological traversal of the graph to connect the nodes.
-    void next_topological_level(std::set<NodeHandle>& candidates,
+    void search_satisfied_nodes(std::set<NodeHandle>& candidates,
                                 std::priority_queue<NodeHandle>& queue) {
         std::vector<NodeHandle> to_erase;
         // find nodes with all inputs conencted, delayed, or optional and will not be connected
@@ -848,10 +933,17 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         }
     }
 
-    // Visites nodes in topological order.
-    //
-    // Throws if the undelayed graph is not acyclic (feedback edges must have a delay > 0).
-    void topological_visit(const std::function<void(const NodeHandle&, NodeData&)> visitor) {
+    // Attemps to connect the graph from the desired connections.
+    // Returns a topological order in which the nodes can be executed, which only includes
+    // non-disabled nodes.
+    std::vector<NodeHandle> connect_nodes() {
+        SPDLOG_DEBUG("connecting nodes");
+
+        cache_node_input_connectors();
+
+        std::vector<NodeHandle> preliminary_topological_order;
+        preliminary_topological_order.reserve(node_data.size());
+
         // nodes that are active, and were visited.
         std::unordered_set<NodeHandle> visited;
         // nodes that might be active but could not be checked yet.
@@ -863,163 +955,90 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
         std::priority_queue<NodeHandle> queue;
         while (!candidates.empty()) {
-            next_topological_level(candidates, queue);
-            while (!queue.empty()) {
-                NodeData& data = node_data.at(queue.top());
-                visitor(queue.top(), data);
-                visited.insert(queue.top());
 
-                // Check for (undelayed) cycles
-                for (auto& output : data.output_connections) {
-                    for (auto& [dst_node, image_input] : output.second.inputs) {
-                        if (image_input->delay == 0) {
-                            if (visited.contains(dst_node)) {
-                                // Back-edges with delay > 1 are allowed!
-                                throw graph_errors::illegal_connection{
-                                    fmt::format("undelayed (edges with delay = 0) graph is not "
-                                                "acyclic! {} -> {}",
-                                                data.name, node_data.at(dst_node).name)};
-                            }
-                        }
-                    }
+            search_satisfied_nodes(candidates, queue);
+
+            while (!queue.empty()) {
+                const NodeHandle node = queue.top();
+                visited.insert(queue.top());
+                NodeData& data = node_data.at(queue.top());
+
+                {
+                    assert(!data.disable && !data.disable_missing_input);
+                    SPDLOG_DEBUG("connecting {} ({})", data.name, node->name);
+
+                    preliminary_topological_order.emplace_back(node);
+
+                    // 1. Get node output connectors and check for name conflicts
+                    cache_node_output_connectors(node, data);
+
+                    // 2. Connect outputs to the inputs of destination nodes (fill in their
+                    // input_connections and the current nodes output_connections).
+                    connect_node(node, data, visited);
                 }
 
                 queue.pop();
             }
         }
-    }
-
-    // Attemps to connect the graph from the desired connections.
-    // Returns a topological order in which the nodes can be executed, which only includes
-    // non-disabled nodes.
-    std::vector<NodeHandle> connect_nodes() {
-        SPDLOG_DEBUG("connecting nodes");
-
-        cache_node_input_connectors();
-
-        std::vector<NodeHandle> topological_order;
-        topological_order.reserve(node_data.size());
-
-        topological_visit([&](const NodeHandle& node, NodeData& data) {
-            assert(!data.disable && !data.disable_missing_input);
-            SPDLOG_DEBUG("connecting {} ({})", data.name, node->name);
-
-            topological_order.emplace_back(node);
-
-            // All possible inputs are connected, i.e. input_connectors and input_connections are
-            // valid.
-            //
-            // That means, we can compute the nodes' outputs and fill in inputs
-            // of the following nodes.
-
-            // 1. Get node output connectors and check for name conflicts
-            data.output_connectors =
-                node->describe_outputs(ConnectorIOMap([&](const InputConnectorHandle& input) {
-#ifndef NDEBUG
-                    if (input->delay > 0) {
-                        throw std::runtime_error{fmt::format(
-                            "Node {} tried to access an output connector that is connected "
-                            "through a delayed input {} (which is not allowed).",
-                            node->name, input->name)};
-                    }
-                    if (std::find(data.input_connectors.begin(), data.input_connectors.end(),
-                                  input) == data.input_connectors.end()) {
-                        throw std::runtime_error{
-                            fmt::format("Node {} tried to get an output connector for an input {} "
-                                        "which was not returned in describe_inputs (which is not "
-                                        "how this works).",
-                                        node->name, input->name)};
-                    }
-#endif
-                    // for optional inputs we inserted a input connection with nullptr in
-                    // start_nodes, no problem here.
-                    return data.input_connections.at(input).output;
-                }));
-            for (const auto& output : data.output_connectors) {
-                if (data.output_connector_for_name.contains(output->name)) {
-                    throw graph_errors::connector_error{
-                        fmt::format("node {} contains two output connectors with the same name {}",
-                                    node->name, output->name)};
-                }
-                data.output_connector_for_name.try_emplace(output->name, output);
-                data.output_connections.try_emplace(output);
-            }
-
-            // 2. Connect outputs to the inputs of destination nodes (fill in their
-            // input_connections and the current nodes output_connections).
-            for (const NodeConnection& connection : data.desired_connections) {
-                NodeData& dst_data = node_data.at(connection.dst);
-                if (!data.output_connector_for_name.contains(connection.src_output)) {
-                    throw graph_errors::illegal_connection{
-                        fmt::format("node {} ({}) does not have an output {}.", data.name,
-                                    node->name, connection.src_output)};
-                }
-                const OutputConnectorHandle src_output =
-                    data.output_connector_for_name[connection.src_output];
-                if (!dst_data.input_connector_for_name.contains(connection.dst_input)) {
-                    throw graph_errors::illegal_connection{
-                        fmt::format("node {} ({}) does not have an input {}.", dst_data.name,
-                                    connection.dst->name, connection.dst_input)};
-                }
-                const InputConnectorHandle dst_input =
-                    dst_data.input_connector_for_name[connection.dst_input];
-
-                // made sure in cache_node_input_connectors
-                assert(!dst_data.input_connections.contains(dst_input));
-
-                if (node == connection.dst && dst_input->delay == 0) {
-                    throw graph_errors::illegal_connection{fmt::format(
-                        "node {} ({}) is connected to itself {} -> {} with delay 0.", dst_data.name,
-                        node->name, connection.src_output, connection.dst_input)};
-                }
-                if (!src_output->supports_delay && dst_input->delay > 0) {
-                    throw graph_errors::illegal_connection{fmt::format(
-                        "input connector {} of node {} ({}) was connected to output "
-                        "connector {} on node {} ({}) with delay {}, however the output "
-                        "connector does not support delay.",
-                        dst_input->name, dst_data.name, connection.dst->name, src_output->name,
-                        data.name, node->name, dst_input->delay)};
-                }
-
-                dst_data.input_connections.try_emplace(dst_input,
-                                                       NodeData::PerInputInfo{node, src_output});
-                data.output_connections[src_output].inputs.emplace_back(connection.dst, dst_input);
-
-                src_output->on_connect_input(dst_input);
-                dst_input->on_connect_output(src_output);
-            }
-        });
 
         // Now it might be possible that a node later in the topolgy was disabled and thus the
         // backward edge does not exist. Therefore we need to traverse the topology one more time
         // and disable those nodes recursively
-        std::unordered_set<NodeHandle> disable_nodes;
-        for (const auto& node : topological_order) {
+        std::vector<NodeHandle> topology;
+        topology.reserve(preliminary_topological_order.size());
+
+        for (const auto& node : preliminary_topological_order) {
             NodeData& data = node_data.at(node);
+            assert(!data.disable);
             for (const auto& input : data.input_connectors) {
                 if (!data.input_connections.contains(input)) {
                     if (input->optional) {
                         data.input_connections.try_emplace(input, NodeData::PerInputInfo());
                     } else {
                         data.disable_missing_input = true;
-                        disable_nodes.insert(node);
+                        break;
                     }
                 } else {
                     NodeData::PerInputInfo& input_info = data.input_connections[input];
                     if (input_info.node && node_data.at(input_info.node).disable_missing_input) {
                         data.disable_missing_input = true;
-                        disable_nodes.insert(node);
+                        break;
+                    }
+                }
+            }
+
+            if (!data.disable_missing_input) {
+                topology.emplace_back(node);
+            }
+        }
+
+        // Now clean up all output connections going to disabled nodes...
+        // And finally also call the connector callbacks.
+        for (const auto& src_node : topology) {
+            NodeData& src_data = node_data.at(src_node);
+
+            for (auto& [src_output, per_output_info] : src_data.output_connections) {
+                for (auto it = per_output_info.inputs.begin();
+                     it != per_output_info.inputs.end();) {
+
+                    const auto& [dst_node, dst_input] = *it;
+                    const auto& dst_data = node_data.at(dst_node);
+                    if (dst_data.disable_missing_input) {
+                        SPDLOG_WARN("cleanup output connection to disabled node: {}, {} ({}) -> "
+                                    "{}, {} ({})",
+                                    src_output->name, src_data.name, src_node->name,
+                                    dst_input->name, dst_data.name, dst_node->name);
+                        per_output_info.inputs.erase(it);
+                    } else {
+                        src_output->on_connect_input(dst_input);
+                        dst_input->on_connect_output(src_output);
+                        it++;
                     }
                 }
             }
         }
-        std::erase_if(topological_order, [&disable_nodes](const NodeHandle& node) {
-            return disable_nodes.contains(node);
-        });
 
-        // Now it might be possible that 
-
-        return topological_order;
+        return topology;
     }
 
     void allocate_resources() {
