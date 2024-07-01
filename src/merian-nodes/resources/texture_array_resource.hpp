@@ -39,7 +39,7 @@ class TextureArrayResource : public GraphResource {
             current_updates.push_back(index);
         }
 
-        if (tex &&
+        if (tex && first_input_layout != vk::ImageLayout::eUndefined &&
             (prior_access_flags || tex->get_image()->get_current_layout() != first_input_layout)) {
             const vk::ImageMemoryBarrier2 img_bar = tex->get_image()->barrier2(
                 first_input_layout, prior_access_flags, input_access_flags, prior_pipeline_stages,
