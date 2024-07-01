@@ -315,11 +315,12 @@ class DeviceASBuilder : public Node {
                                              size_of(tlas_build_info.instances),
                                              tlas_build_info.instances.data());
 
-        // Validation Layers complain if dst does not include transfer write?!
+        // Validation Layers complain if dst does not include transfer write and compute shader dst stage?!
+        // Seems like a bug to me or wrong specs...
         pre_build_barriers.push_back(tlas_build_info.instances_buffer->buffer_barrier2(
             vk::PipelineStageFlagBits2::eTransfer,
             vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR |
-                vk::PipelineStageFlagBits2::eTransfer,
+                vk::PipelineStageFlagBits2::eTransfer | vk::PipelineStageFlagBits2::eComputeShader,
             vk::AccessFlagBits2::eTransferWrite,
             vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eTransferWrite));
 
