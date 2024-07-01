@@ -15,6 +15,9 @@ class TLASResource : public GraphResource {
         : input_pipeline_stages(read_pipeline_stages), in_flight_tlas(ring_size) {}
 
     void properties(merian::Properties& props) override {
+        props.output_text(
+            fmt::format("Input pipeline stages: {}", vk::to_string(input_pipeline_stages)));
+
         if (tlas) {
             tlas->properties(props);
         } else {
