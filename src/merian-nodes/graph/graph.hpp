@@ -1024,10 +1024,10 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                     const auto& [dst_node, dst_input] = *it;
                     const auto& dst_data = node_data.at(dst_node);
                     if (dst_data.disable_missing_input) {
-                        SPDLOG_WARN("cleanup output connection to disabled node: {}, {} ({}) -> "
-                                    "{}, {} ({})",
-                                    src_output->name, src_data.name, src_node->name,
-                                    dst_input->name, dst_data.name, dst_node->name);
+                        SPDLOG_TRACE("cleanup output connection to disabled node: {}, {} ({}) -> "
+                                     "{}, {} ({})",
+                                     src_output->name, src_data.name, src_node->name,
+                                     dst_input->name, dst_data.name, dst_node->name);
                         per_output_info.inputs.erase(it);
                     } else {
                         src_output->on_connect_input(dst_input);
