@@ -12,8 +12,7 @@ class Add : public AbstractCompute {
     static constexpr uint32_t local_size_y = 32;
 
   public:
-    Add(const SharedContext context,
-            const std::optional<vk::Format> output_format = std::nullopt);
+    Add(const SharedContext context, const std::optional<vk::Format> output_format = std::nullopt);
 
     ~Add();
 
@@ -36,8 +35,8 @@ class Add : public AbstractCompute {
     ShaderModuleHandle shader;
     SpecializationInfoHandle spec_info;
 
-    ManagedVkImageInHandle con_a = ManagedVkImageIn::compute_read("a");
-    ManagedVkImageInHandle con_b = ManagedVkImageIn::compute_read("b");
+    ManagedVkImageInHandle con_a = ManagedVkImageIn::compute_read("a", 0, true);
+    ManagedVkImageInHandle con_b = ManagedVkImageIn::compute_read("b", 0, true);
 };
 
 } // namespace merian_nodes

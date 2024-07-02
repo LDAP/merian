@@ -8,10 +8,18 @@ layout(set = 0, binding = 1) uniform sampler2D img_b;
 
 layout(set = 0, binding = 2) uniform writeonly restrict image2D img_output;
 
+layout(constant_id = 2) const bool ADD_A = true;
+layout(constant_id = 3) const bool ADD_B = true;
 
 void main() {
     const ivec2 ipos = ivec2(gl_GlobalInvocationID);
     if (any(greaterThanEqual(ipos, imageSize(img_output)))) return;
 
-    imageStore(img_output, ipos, texelFetch(img_a, ipos, 0) + texelFetch(img_b, ipos, 0));
+    if (ADD_A && ADD_B) {
+        imageStore(img_output, ipos, texelFetch(img_a, ipos, 0) + texelFetch(img_b, ipos, 0));
+    } else if (ADD_A) {
+        imageStore(img_output, ipos, texelFetch(img_a, ipos, 0));
+    } else if (ADD_B) {
+        imageStore(img_output, ipos, texelFetch(img_b, ipos, 0));
+    }
 }

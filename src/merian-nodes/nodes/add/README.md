@@ -11,6 +11,6 @@ Inputs:
 
 Outputs:
 
-| Type       | Input name | Description         | Format/Resolution        | Persistent |
-|------------|------------|---------------------|--------------------------|------------|
-| VkImageOut | out        | sum of a and b      | user defined or like `a` | no         |
+| Type       | Input name | Description         | Format/Resolution                                  | Persistent |
+|------------|------------|---------------------|----------------------------------------------------|------------|
+| VkImageOut | out        | sum of a and b      | priority: user defined, equal to `a`, equal to `a` | no         |
