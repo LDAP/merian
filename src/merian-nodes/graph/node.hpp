@@ -46,6 +46,9 @@ class Node : public std::enable_shared_from_this<Node> {
     // are created later.
     //
     // Note that input and output names must be unique.
+    //
+    // If you throw a node error here the graph will disable the node for this connect attempt and
+    // set the error state for this node.
     [[nodiscard]]
     virtual std::vector<OutputConnectorHandle>
     describe_outputs([[maybe_unused]] const ConnectorIOMap& output_for_input) {

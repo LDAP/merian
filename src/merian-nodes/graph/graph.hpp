@@ -793,28 +793,33 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
     // Only for a "satisfied node". Means, all inputs are connected, or delayed or optional and will
     // not be connected.
     void cache_node_output_connectors(const NodeHandle& node, NodeData& data) {
-        data.output_connectors =
-            node->describe_outputs(ConnectorIOMap([&](const InputConnectorHandle& input) {
+        try {
+            data.output_connectors =
+                node->describe_outputs(ConnectorIOMap([&](const InputConnectorHandle& input) {
 #ifndef NDEBUG
-                if (input->delay > 0) {
-                    throw std::runtime_error{
-                        fmt::format("Node {} tried to access an output connector that is connected "
-                                    "through a delayed input {} (which is not allowed).",
-                                    node->name, input->name)};
-                }
-                if (std::find(data.input_connectors.begin(), data.input_connectors.end(), input) ==
-                    data.input_connectors.end()) {
-                    throw std::runtime_error{
-                        fmt::format("Node {} tried to get an output connector for an input {} "
-                                    "which was not returned in describe_inputs (which is not "
-                                    "how this works).",
-                                    node->name, input->name)};
-                }
+                    if (input->delay > 0) {
+                        throw std::runtime_error{fmt::format(
+                            "Node {} tried to access an output connector that is connected "
+                            "through a delayed input {} (which is not allowed).",
+                            node->name, input->name)};
+                    }
+                    if (std::find(data.input_connectors.begin(), data.input_connectors.end(),
+                                  input) == data.input_connectors.end()) {
+                        throw std::runtime_error{
+                            fmt::format("Node {} tried to get an output connector for an input {} "
+                                        "which was not returned in describe_inputs (which is not "
+                                        "how this works).",
+                                        node->name, input->name)};
+                    }
 #endif
-                // for optional inputs we inserted a input connection with nullptr in
-                // start_nodes, no problem here.
-                return data.input_connections.at(input).output;
-            }));
+                    // for optional inputs we inserted a input connection with nullptr in
+                    // search_satisfied_nodes, no problem here.
+                    return data.input_connections.at(input).output;
+                }));
+        } catch (const graph_errors::node_error& e) {
+            data.errors.emplace_back(std::move(e.what()));
+        }
+
         for (const auto& output : data.output_connectors) {
             if (data.output_connector_for_name.contains(output->name)) {
                 throw graph_errors::connector_error{
@@ -973,24 +978,29 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
             while (!queue.empty()) {
                 const NodeHandle node = queue.top();
-                visited.insert(queue.top());
-                NodeData& data = node_data.at(queue.top());
+                queue.pop();
+
+                visited.insert(node);
+                NodeData& data = node_data.at(node);
 
                 {
                     assert(!data.disable && data.errors.empty());
                     SPDLOG_DEBUG("connecting {} ({})", data.name, node->name);
 
-                    topology.emplace_back(node);
-
                     // 1. Get node output connectors and check for name conflicts
                     cache_node_output_connectors(node, data);
+
+                    if (!data.errors.empty()) {
+                        // something went wrong earlier (eg. node threw in describe outputs).
+                        continue;
+                    }
 
                     // 2. Connect outputs to the inputs of destination nodes (fill in their
                     // input_connections and the current nodes output_connections).
                     connect_node(node, data, visited);
-                }
 
-                queue.pop();
+                    topology.emplace_back(node);
+                }
             }
         }
 
