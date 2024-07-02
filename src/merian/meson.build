@@ -3,7 +3,6 @@ merian_src = files(
     'io/tinyobj.cpp',
     'utils/audio/audio_device.cpp',
     'utils/audio/sdl_audio_device.cpp',
-    'utils/bitpacking.cpp',
     'utils/camera/camera.cpp',
     'utils/camera/camera_animator.cpp',
     'utils/concurrent/thread_pool.cpp',
