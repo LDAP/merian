@@ -6,19 +6,9 @@ namespace merian {
 typedef union FP32 {
     uint32_t u;
     float f;
-    struct {
-        uint32_t Mantissa : 23;
-        uint32_t Exponent : 8;
-        uint32_t Sign : 1;
-    };
 } FP32;
 typedef union FP16 {
     uint16_t u;
-    struct {
-        uint16_t Mantissa : 10;
-        uint16_t Exponent : 5;
-        uint16_t Sign : 1;
-    };
 } FP16;
 
 // float->half variants.
