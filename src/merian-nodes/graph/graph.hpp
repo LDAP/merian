@@ -954,8 +954,8 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
         cache_node_input_connectors();
 
-        std::vector<NodeHandle> preliminary_topological_order;
-        preliminary_topological_order.reserve(node_data.size());
+        std::vector<NodeHandle> topology;
+        topology.reserve(node_data.size());
 
         // nodes that are active, and were visited.
         std::unordered_set<NodeHandle> visited;
@@ -980,7 +980,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                     assert(!data.disable && data.errors.empty());
                     SPDLOG_DEBUG("connecting {} ({})", data.name, node->name);
 
-                    preliminary_topological_order.emplace_back(node);
+                    topology.emplace_back(node);
 
                     // 1. Get node output connectors and check for name conflicts
                     cache_node_output_connectors(node, data);
@@ -995,38 +995,51 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         }
 
         // Now it might be possible that a node later in the topolgy was disabled and thus the
-        // backward edge does not exist. Therefore we need to traverse the topology one more time
-        // and disable those nodes recursively
-        std::vector<NodeHandle> topology;
-        topology.reserve(preliminary_topological_order.size());
+        // backward edge does not exist. Therefore we need to traverse the topology and disable
+        // those nodes iteratively. Multiple times since disabled nodes, can have backward edges
+        // themselfes...
+        {
+            std::vector<NodeHandle> filtered_topology;
+            filtered_topology.reserve(topology.size());
 
-        for (const auto& node : preliminary_topological_order) {
-            NodeData& data = node_data.at(node);
-            assert(!data.disable);
-            for (const auto& input : data.input_connectors) {
-                if (!data.input_connections.contains(input)) {
-                    if (input->optional) {
-                        data.input_connections.try_emplace(input, NodeData::PerInputInfo());
-                    } else {
-                        data.errors.emplace_back(make_error_input_not_connected(input, node, data));
-                        break;
+            for (bool changed = true; changed;) {
+                changed = false;
+                filtered_topology.clear();
+
+                for (const auto& node : topology) {
+                    NodeData& data = node_data.at(node);
+                    assert(!data.disable);
+                    for (const auto& input : data.input_connectors) {
+                        if (!data.input_connections.contains(input)) {
+                            if (input->optional) {
+                                data.input_connections.try_emplace(input, NodeData::PerInputInfo());
+                            } else {
+                                data.errors.emplace_back(
+                                    make_error_input_not_connected(input, node, data));
+                                break;
+                            }
+                        } else {
+                            NodeData::PerInputInfo& input_info = data.input_connections[input];
+                            if (input_info.node && !node_data.at(input_info.node).errors.empty()) {
+                                data.input_connections.try_emplace(input, NodeData::PerInputInfo());
+                                break;
+                            }
+                        }
                     }
-                } else {
-                    NodeData::PerInputInfo& input_info = data.input_connections[input];
-                    if (input_info.node && !node_data.at(input_info.node).errors.empty()) {
-                        data.input_connections.try_emplace(input, NodeData::PerInputInfo());
-                        break;
+
+                    if (data.errors.empty()) {
+                        filtered_topology.emplace_back(node);
+                    } else {
+                        changed = true;
                     }
                 }
-            }
 
-            if (data.errors.empty()) {
-                topology.emplace_back(node);
-            }
+                std::swap(filtered_topology, topology);
+            };
         }
 
-        // Now clean up all output connections going to disabled nodes...
-        // And finally also call the connector callbacks.
+        // Now clean up this mess. All output connections going to disabled nodes must be
+        // eliminated. And finally also call the connector callbacks.
         for (const auto& src_node : topology) {
             NodeData& src_data = node_data.at(src_node);
 
