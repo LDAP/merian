@@ -8,9 +8,9 @@ namespace merian_nodes {
 class ColorImage : public Node {
 
   public:
-    ColorImage(const vk::Format format,
-                    const vk::Extent3D extent,
-                    const vk::ClearColorValue color = {});
+    ColorImage(const vk::Format format = vk::Format::eR16G16B16A16Sfloat,
+               const vk::Extent3D extent = vk::Extent3D{1920, 1080, 1},
+               const vk::ClearColorValue color = {});
 
     ~ColorImage();
 

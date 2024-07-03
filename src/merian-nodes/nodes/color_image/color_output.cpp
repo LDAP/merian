@@ -5,8 +5,8 @@
 namespace merian_nodes {
 
 ColorImage::ColorImage(const vk::Format format,
-                                 const vk::Extent3D extent,
-                                 const vk::ClearColorValue color)
+                       const vk::Extent3D extent,
+                       const vk::ClearColorValue color)
     : Node("Color Output"), color(color) {
     con_out = ManagedVkImageOut::transfer_write("out", format, extent, true);
 }
@@ -21,9 +21,9 @@ ColorImage::describe_outputs([[maybe_unused]] const ConnectorIOMap& output_for_i
 }
 
 void ColorImage::process([[maybe_unused]] GraphRun& run,
-                              const vk::CommandBuffer& cmd,
-                              [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
-                              const NodeIO& io) {
+                         const vk::CommandBuffer& cmd,
+                         [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
+                         const NodeIO& io) {
     if (needs_run) {
         cmd.clearColorImage(*io[con_out], io[con_out]->get_current_layout(), color,
                             all_levels_and_layers());
