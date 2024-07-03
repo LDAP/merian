@@ -16,4 +16,15 @@ inline glm::vec4* as_vec4(float v[4]) {
     return reinterpret_cast<glm::vec4*>(v);
 }
 
+inline const glm::vec3* as_vec3(const float v[3]) {
+    assert(sizeof(glm::vec3) == 3 * sizeof(float));
+    return reinterpret_cast<const glm::vec3*>(v);
+}
+
+// Reinterprests a float as vec3.
+inline const glm::vec4* as_vec4(const float v[4]) {
+    assert(sizeof(glm::vec4) == 4 * sizeof(float));
+    return reinterpret_cast<const glm::vec4*>(v);
+}
+
 }
