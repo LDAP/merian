@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ext/json.hpp"
 #include "glm/glm.hpp"
 
 #include <string>
@@ -149,6 +150,22 @@ class Properties {
                                                      char* string,
                                                      const bool needs_submit = false,
                                                      const std::string& desc = "") = 0;
+
+    // Serialization
+
+    // Serializaion allows to store and load data. These possibly not shown in the UI.
+
+    // Returns true if you should provide valid data to the serialize_* methods. If this is false no
+    // data is stored and you can skip computing the data. serialize_* methods may still return
+    // true, meaning that you should load new data.
+    [[nodiscard]]
+    virtual bool serialize() = 0;
+
+    // Returns true, if new data was loaded.
+    virtual bool serialize_json(const std::string& id, nlohmann::json& json) = 0;
+
+    // Returns true, if new data was loaded.
+    virtual bool serialize_string(const std::string& id, std::string& s) = 0;
 };
 
 } // namespace merian

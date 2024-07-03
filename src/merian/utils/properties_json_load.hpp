@@ -89,6 +89,10 @@ class JSONLoadProperties : public Properties {
                                        const bool needs_submit = false,
                                        const std::string& desc = "") override;
 
+    virtual bool serialize() override;
+    virtual bool serialize_json(const std::string& id, nlohmann::json& json) override;
+    virtual bool serialize_string(const std::string& id, std::string& s) override;
+
   private:
     std::string object_name;
     std::vector<nlohmann::json> o;

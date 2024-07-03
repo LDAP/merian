@@ -211,4 +211,24 @@ bool JSONLoadProperties::config_text_multiline(const std::string& id,
     return false;
 }
 
+bool JSONLoadProperties::serialize() {
+    return false;
+}
+bool JSONLoadProperties::serialize_json(const std::string& id, nlohmann::json& json) {
+    if (o.back().contains(id)) {
+        json = o.back()[id];
+        return true;
+    }
+
+    return false;
+}
+bool JSONLoadProperties::serialize_string(const std::string& id, std::string& s) {
+    if (o.back().contains(id)) {
+        s = o.back()[id].template get<std::string>();
+        return true;
+    }
+
+    return false;
+}
+
 } // namespace merian

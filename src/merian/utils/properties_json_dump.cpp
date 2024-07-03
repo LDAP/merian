@@ -150,4 +150,16 @@ bool JSONDumpProperties::config_text_multiline(
     return false;
 }
 
+bool JSONDumpProperties::serialize() {
+    return true;
+}
+bool JSONDumpProperties::serialize_json(const std::string& id, nlohmann::json& json) {
+    current()[id] = json;
+    return false;
+}
+bool JSONDumpProperties::serialize_string(const std::string& id, std::string& s) {
+    current()[id] = s;
+    return false;
+}
+
 } // namespace merian
