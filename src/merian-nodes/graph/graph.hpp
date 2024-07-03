@@ -1031,7 +1031,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                         } else {
                             NodeData::PerInputInfo& input_info = data.input_connections[input];
                             if (input_info.node && !node_data.at(input_info.node).errors.empty()) {
-                                data.input_connections.try_emplace(input, NodeData::PerInputInfo());
+                                data.input_connections[input] = NodeData::PerInputInfo();
                                 break;
                             }
                         }
