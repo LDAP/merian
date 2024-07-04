@@ -36,6 +36,7 @@ merian_src = files(
     'vk/shader/shader_hotreloader.cpp',
     'vk/sync/semaphore_timeline.cpp',
     'vk/utils/barriers.cpp',
+    'vk/utils/enums.cpp',
     'vk/utils/profiler.cpp',
     'vk/window/glfw_imgui.cpp',
     'vk/window/glfw_window.cpp',
