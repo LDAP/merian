@@ -6,6 +6,7 @@
 #include "merian/vk/extension/extension_vk_glfw.hpp"
 #include "merian/vk/utils/barriers.hpp"
 #include "merian/vk/utils/blits.hpp"
+#include "merian/vk/utils/subresource_ranges.hpp"
 #include "merian/vk/window/glfw_window.hpp"
 #include "merian/vk/window/swapchain.hpp"
 
@@ -67,7 +68,10 @@ class GLFWWindow : public Node {
 
                 cmd_blit(mode, cmd, *src_image, vk::ImageLayout::eTransferSrcOptimal,
                          src_image->get_extent(), acquire->image,
-                         vk::ImageLayout::eTransferDstOptimal, extent, std::nullopt, filter);
+                         vk::ImageLayout::eTransferDstOptimal, extent, vk::ClearColorValue{}, filter);
+            } else {
+                cmd.clearColorImage(acquire->image, vk::ImageLayout::eTransferDstOptimal,
+                                    vk::ClearColorValue{}, all_levels_and_layers());
             }
 
             cmd_barrier_image_layout(cmd, acquire->image, vk::ImageLayout::eTransferDstOptimal,
