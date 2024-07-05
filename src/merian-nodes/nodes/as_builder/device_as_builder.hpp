@@ -3,6 +3,7 @@
 #include "merian-nodes/connectors/ptr_in.hpp"
 #include "merian-nodes/connectors/vk_buffer_array_in.hpp"
 #include "merian-nodes/connectors/vk_tlas_out.hpp"
+#include "merian-nodes/graph/errors.hpp"
 #include "merian-nodes/graph/node.hpp"
 #include "merian/utils/vector.hpp"
 #include "merian/vk/raytrace/as_builder.hpp"
@@ -218,7 +219,7 @@ class DeviceASBuilder : public Node {
 
   public:
     DeviceASBuilder(const SharedContext& context, const ResourceAllocatorHandle& allocator)
-        : Node("Acceleration Structure Builder"), allocator(allocator),
+        : Node("Acceleration Structure Builder"), context(context), allocator(allocator),
           as_builder(context, allocator) {}
 
     std::vector<InputConnectorHandle> describe_inputs() {
@@ -231,6 +232,11 @@ class DeviceASBuilder : public Node {
 
     std::vector<OutputConnectorHandle>
     describe_outputs([[maybe_unused]] const ConnectorIOMap& output_for_input) {
+        if (!context->get_extension<ExtensionVkAccelerationStructure>()) {
+            throw graph_errors::node_error{
+                "context extension ExtensionVkAccelerationStructure is required."};
+        }
+
         return {
             con_out_tlas,
         };
@@ -315,8 +321,8 @@ class DeviceASBuilder : public Node {
                                              size_of(tlas_build_info.instances),
                                              tlas_build_info.instances.data());
 
-        // Validation Layers complain if dst does not include transfer write and compute shader dst stage?!
-        // Seems like a bug to me or wrong specs...
+        // Validation Layers complain if dst does not include transfer write and compute shader dst
+        // stage?! Seems like a bug to me or wrong specs...
         pre_build_barriers.push_back(tlas_build_info.instances_buffer->buffer_barrier2(
             vk::PipelineStageFlagBits2::eTransfer,
             vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR |
@@ -353,6 +359,7 @@ class DeviceASBuilder : public Node {
     }
 
   private:
+    const SharedContext context;
     const ResourceAllocatorHandle allocator;
     ASBuilder as_builder;
 

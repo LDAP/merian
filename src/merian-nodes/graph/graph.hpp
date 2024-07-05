@@ -767,7 +767,11 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
     void cache_node_input_connectors() {
         for (auto& [node, data] : node_data) {
             // Cache input connectors in node_data and check that there are no name conflicts.
-            data.input_connectors = node->describe_inputs();
+            try {
+                data.input_connectors = node->describe_inputs();
+            } catch (const graph_errors::node_error& e) {
+                data.errors.push_back(e.what());
+            }
             for (const InputConnectorHandle& input : data.input_connectors) {
                 if (data.input_connector_for_name.contains(input->name)) {
                     throw graph_errors::connector_error{
