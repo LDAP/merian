@@ -431,71 +431,83 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
         props.output_text(fmt::format("Current iteration: {}", iteration));
 
-        props.st_separate("Profiler");
-        props.config_bool("profiling", profiler_enable);
-        props.st_no_space();
-        props.config_uint("report intervall", profiler_report_intervall_ms,
-                          "Set the time period for the profiler to update in ms. Meaning, "
-                          "averages and deviations are calculated over this this period.");
+        if (props.st_begin_child("profiler", "Profiler",
+                                 Properties::ChildFlagBits::DEFAULT_OPEN |
+                                     Properties::ChildFlagBits::FRAMED)) {
+            props.config_bool("profiling", profiler_enable);
+            props.st_no_space();
+            props.config_uint("report intervall", profiler_report_intervall_ms,
+                              "Set the time period for the profiler to update in ms. Meaning, "
+                              "averages and deviations are calculated over this this period.");
 
-        if (profiler_enable) {
-            if (last_run_report && props.st_begin_child("run", "Graph Run")) {
-                if (!last_run_report.cpu_report.empty()) {
-                    props.st_separate("CPU");
-                    props.output_plot_line("", cpu_time_history.data() + time_history_current + 1,
-                                           (cpu_time_history.size() / 2) - 1, 0, cpu_max);
-                    props.config_float("cpu max ms", cpu_max, 0, 1000);
-                    Profiler::get_cpu_report_as_config(props, last_run_report);
-                }
+            if (profiler_enable) {
+                if (last_run_report && props.st_begin_child("run", "Graph Run")) {
+                    if (!last_run_report.cpu_report.empty()) {
+                        props.st_separate("CPU");
+                        props.output_plot_line("",
+                                               cpu_time_history.data() + time_history_current + 1,
+                                               (cpu_time_history.size() / 2) - 1, 0, cpu_max);
+                        props.config_float("cpu max ms", cpu_max, 0, 1000);
+                        Profiler::get_cpu_report_as_config(props, last_run_report);
+                    }
 
-                if (!last_run_report.gpu_report.empty()) {
-                    props.st_separate("GPU");
-                    props.output_plot_line("", gpu_time_history.data() + time_history_current + 1,
-                                           (gpu_time_history.size() / 2) - 1, 0, gpu_max);
-                    props.config_float("gpu max ms", gpu_max, 0, 1000);
-                    Profiler::get_gpu_report_as_config(props, last_run_report);
+                    if (!last_run_report.gpu_report.empty()) {
+                        props.st_separate("GPU");
+                        props.output_plot_line("",
+                                               gpu_time_history.data() + time_history_current + 1,
+                                               (gpu_time_history.size() / 2) - 1, 0, gpu_max);
+                        props.config_float("gpu max ms", gpu_max, 0, 1000);
+                        Profiler::get_gpu_report_as_config(props, last_run_report);
+                    }
+                    props.st_end_child();
                 }
-                props.st_end_child();
+                if (last_build_report && props.st_begin_child("build", "Last Graph Build")) {
+                    Profiler::get_report_as_config(props, last_build_report);
+                    props.st_end_child();
+                }
             }
-            if (last_build_report && props.st_begin_child("build", "Last Graph Build")) {
-                Profiler::get_report_as_config(props, last_build_report);
-                props.st_end_child();
-            }
+            props.st_end_child();
         }
 
-        props.st_separate("Nodes");
+        if (props.st_begin_child("nodes", "Nodes",
+                                 Properties::ChildFlagBits::DEFAULT_OPEN |
+                                     Properties::ChildFlagBits::FRAMED)) {
+            for (const auto& [name, node] : node_for_name) {
+                auto& data = node_data.at(node);
 
-        for (const auto& [name, node] : node_for_name) {
-            auto& data = node_data.at(node);
-
-            std::string node_label;
-            std::string state = "OK";
-            if (data.disable) {
-                state = "DISABLED";
-            } else if (!data.errors.empty()) {
-                state = "ERROR";
-            }
-
-            node_label = fmt::format("[{}] {} ({})", state, data.name, node->name);
-
-            if (props.st_begin_child(data.name.c_str(), node_label.c_str())) {
-                if (props.config_bool("disable node", data.disable))
-                    request_reconnect();
-                if (!data.errors.empty()) {
-                    props.output_text(
-                        fmt::format("Errors:\n  - {}", fmt::join(data.errors, "\n   - ")));
+                std::string node_label;
+                std::string state = "OK";
+                if (data.disable) {
+                    state = "DISABLED";
+                } else if (!data.errors.empty()) {
+                    state = "ERROR";
                 }
 
-                const Node::NodeStatusFlags flags = node->properties(props);
-                needs_reconnect |= flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT;
-                props.st_separate();
-                if (props.st_begin_child("stats", "Statistics")) {
-                    props.output_text(fmt::format("{}", data.statistics));
+                node_label = fmt::format("[{}] {} ({})", state, data.name, node->name);
+
+                if (props.st_begin_child(data.name.c_str(), node_label.c_str())) {
+                    if (props.config_bool("disable node", data.disable))
+                        request_reconnect();
+                    if (!data.errors.empty()) {
+                        props.output_text(
+                            fmt::format("Errors:\n  - {}", fmt::join(data.errors, "\n   - ")));
+                    }
+                    props.st_separate();
+                    if (props.st_begin_child("properties", "Properties",
+                                             Properties::ChildFlagBits::DEFAULT_OPEN)) {
+                        const Node::NodeStatusFlags flags = node->properties(props);
+                        needs_reconnect |= flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT;
+                        props.st_end_child();
+                    }
+                    if (props.st_begin_child("stats", "Statistics")) {
+                        props.output_text(fmt::format("{}", data.statistics));
+                        props.st_end_child();
+                    };
+                    io_props_for_node(props, data);
                     props.st_end_child();
-                };
-                io_props_for_node(props, data);
-                props.st_end_child();
+                }
             }
+            props.st_end_child();
         }
     }
 

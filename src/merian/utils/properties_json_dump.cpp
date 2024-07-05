@@ -59,7 +59,7 @@ JSONDumpProperties::~JSONDumpProperties() {
     }
 }
 
-bool JSONDumpProperties::st_begin_child(const std::string& id, const std::string&) {
+bool JSONDumpProperties::st_begin_child(const std::string& id, const std::string&, const ChildFlags) {
     o.emplace_back(id, nlohmann::json());
     return true;
 }
@@ -69,9 +69,6 @@ void JSONDumpProperties::st_end_child() {
     o.pop_back();
 }
 
-bool JSONDumpProperties::st_new_section(const std::string&) {
-    return true;
-}
 void JSONDumpProperties::st_separate(const std::string&) {}
 void JSONDumpProperties::st_no_space() {}
 

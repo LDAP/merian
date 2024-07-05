@@ -24,6 +24,13 @@ class Properties {
         LIST_BOX,
     };
 
+    enum ChildFlagBits : uint32_t {
+        DEFAULT_OPEN = 0b1,
+        FRAMED = 0b10,
+    };
+
+    using ChildFlags = uint32_t;
+
     virtual ~Properties(){};
 
     // Structure
@@ -31,15 +38,10 @@ class Properties {
     // Returns true if the child should be examined. Call st_end_child at the end of the
     // section if true was returned.
     [[nodiscard]] virtual bool st_begin_child(const std::string& id,
-                                              const std::string& label = "") = 0;
+                                              const std::string& label = "",
+                                              const ChildFlags flags = {}) = 0;
     // Must only be called if begin_child was true
     virtual void st_end_child() = 0;
-
-    // Starts a new configuration section.
-    // This has no meaning when identifying the configuration option
-    // but can structure config when displayed.
-    // Retuns true if the section should be examined.
-    virtual bool st_new_section(const std::string& label) = 0;
 
     // Separates config options.
     // This has no meaning when identifying the configuration option

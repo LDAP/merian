@@ -16,14 +16,20 @@ void tooltip(const std::string& tooltip) {
 
 ImGuiProperties::~ImGuiProperties() {}
 
-bool ImGuiProperties::st_begin_child(const std::string& id, const std::string& label) {
-    return ImGui::TreeNode(id.c_str(), "%s", label.c_str());
+bool ImGuiProperties::st_begin_child(const std::string& id,
+                                     const std::string& label,
+                                     const ChildFlags flags) {
+    ImGuiTreeNodeFlags imgui_flags{};
+    if (flags & ChildFlagBits::DEFAULT_OPEN) {
+        imgui_flags |= ImGuiTreeNodeFlags_DefaultOpen;
+    }
+    if (flags & ChildFlagBits::FRAMED) {
+        imgui_flags |= ImGuiTreeNodeFlags_Framed;
+    }
+    return ImGui::TreeNodeEx(id.c_str(), imgui_flags, "%s", label.c_str());
 }
 void ImGuiProperties::st_end_child() {
     ImGui::TreePop();
-}
-bool ImGuiProperties::st_new_section(const std::string& label) {
-    return ImGui::CollapsingHeader(label.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
 }
 void ImGuiProperties::st_separate(const std::string& label) {
     if (label.empty())

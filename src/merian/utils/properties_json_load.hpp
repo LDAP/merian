@@ -16,10 +16,11 @@ class JSONLoadProperties : public Properties {
 
     virtual ~JSONLoadProperties() override;
 
-    virtual bool st_begin_child(const std::string& id, const std::string& label = "") override;
+    virtual bool st_begin_child(const std::string& id,
+                                const std::string& label = "",
+                                const ChildFlags flags = {}) override;
     virtual void st_end_child() override;
 
-    virtual bool st_new_section(const std::string& label = "") override;
     virtual void st_separate(const std::string& label = "") override;
     virtual void st_no_space() override;
 

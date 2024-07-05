@@ -58,7 +58,9 @@ JSONLoadProperties::JSONLoadProperties(const std::filesystem::path& filename) : 
 
 JSONLoadProperties::~JSONLoadProperties() {}
 
-bool JSONLoadProperties::st_begin_child(const std::string& id, const std::string&) {
+bool JSONLoadProperties::st_begin_child(const std::string& id,
+                                        const std::string&,
+                                        const ChildFlags) {
     if (o.back().contains(id)) {
         o.push_back(o.back()[id]);
         return true;
@@ -69,9 +71,6 @@ void JSONLoadProperties::st_end_child() {
     o.pop_back();
 }
 
-bool JSONLoadProperties::st_new_section(const std::string&) {
-    return true;
-}
 void JSONLoadProperties::st_separate(const std::string&) {}
 void JSONLoadProperties::st_no_space() {}
 
