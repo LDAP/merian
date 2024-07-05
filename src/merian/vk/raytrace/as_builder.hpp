@@ -56,9 +56,13 @@ class ASBuilder {
 
   public:
     ASBuilder(const SharedContext context, const ResourceAllocatorHandle& allocator)
-        : context(context), allocator(allocator),
-          scratch_buffer_min_alignment(
-              context->get_extension<ExtensionVkAccelerationStructure>()->min_scratch_alignment()) {
+        : context(context), allocator(allocator) {
+        const auto ext = context->get_extension<ExtensionVkAccelerationStructure>();
+        if (ext) {
+            scratch_buffer_min_alignment = ext->min_scratch_alignment();
+        } else {
+            SPDLOG_ERROR("ExtensionVkAccelerationStructure is required. Undefined behavior.");
+        }
     }
 
     // BLAS BUILDS
@@ -265,7 +269,7 @@ class ASBuilder {
   private:
     const SharedContext context;
     const ResourceAllocatorHandle allocator;
-    const vk::DeviceSize scratch_buffer_min_alignment;
+    vk::DeviceSize scratch_buffer_min_alignment;
 
     // The BLASs/TLASs that are build when calling get_cmds()
     std::vector<PendingBLAS> pending_blas_builds;
