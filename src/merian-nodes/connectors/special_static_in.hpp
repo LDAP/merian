@@ -15,8 +15,9 @@ template <typename ValueType>
 class SpecialStaticIn
     : public TypedInputConnector<SpecialStaticOutHandle<ValueType>, const ValueType&> {
   public:
-    SpecialStaticIn(const std::string& name)
-        : TypedInputConnector<SpecialStaticOutHandle<ValueType>, const ValueType&>(name, 0) {}
+    SpecialStaticIn(const std::string& name, const bool optional = false)
+        : TypedInputConnector<SpecialStaticOutHandle<ValueType>, const ValueType&>(
+              name, 0, optional) {}
 
     const ValueType& resource([[maybe_unused]] const GraphResourceHandle& resource) override {
         return debugable_ptr_cast<SpecialStaticOut<ValueType>>(resource)->connector_value;
@@ -30,8 +31,9 @@ class SpecialStaticIn
         }
     }
 
-    static SpecialStaticInHandle<ValueType> create(const std::string& name) {
-        return std::make_shared<SpecialStaticIn<ValueType>>(name);
+    static SpecialStaticInHandle<ValueType> create(const std::string& name,
+                                                   const bool optional = false) {
+        return std::make_shared<SpecialStaticIn<ValueType>>(name, optional);
     }
 };
 

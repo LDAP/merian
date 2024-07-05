@@ -4,18 +4,25 @@
 
 namespace merian_nodes {
 
-ColorImage::ColorImage(const vk::Format format,
-                       const vk::Extent3D extent,
-                       const vk::ClearColorValue color)
-    : Node("Color Output"), color(color) {
-    con_out = ManagedVkImageOut::transfer_write("out", format, extent, true);
-}
+ColorImage::ColorImage()
+    : Node("Color Output") {}
 
 ColorImage::~ColorImage() {}
+
+std::vector<InputConnectorHandle> ColorImage::describe_inputs() {
+    return {con_resolution};
+}
 
 std::vector<OutputConnectorHandle>
 ColorImage::describe_outputs([[maybe_unused]] const ConnectorIOMap& output_for_input) {
     needs_run = true;
+
+    extent_from_input = output_for_input.is_connected(con_resolution);
+    if (extent_from_input) {
+        extent = output_for_input[con_resolution]->value();
+    }
+
+    con_out = ManagedVkImageOut::transfer_write("out", format, extent, true);
 
     return {con_out};
 }
@@ -33,6 +40,20 @@ void ColorImage::process([[maybe_unused]] GraphRun& run,
 
 ColorImage::NodeStatusFlags ColorImage::properties(Properties& config) {
     needs_run = config.config_color("color", *merian::as_vec4((float*)&color));
+
+    bool needs_reconnect = false;
+    needs_reconnect |=
+        config.config_enum("format", format, merian::Properties::OptionsStyle::COMBO);
+
+    if (extent_from_input) {
+        config.output_text("extent determined by input: {}x{}x{}", extent.width, extent.height, extent.depth);
+    } else {
+        needs_reconnect |= config.config_vec("extent", *merian::as_uvec3(&extent.width));
+    }
+
+    if (needs_reconnect) {
+        return NEEDS_RECONNECT;
+    }
 
     return {};
 }
