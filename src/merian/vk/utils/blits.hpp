@@ -15,9 +15,17 @@ inline void cmd_blit_stretch(const vk::CommandBuffer& cmd,
                              const vk::Extent3D& dst_extent,
                              const std::optional<vk::ClearColorValue> clear_color = std::nullopt,
                              const vk::Filter filter = vk::Filter::eLinear) {
-    if (clear_color)
+    if (clear_color) {
         cmd.clearColorImage(dst_image, dst_layout, clear_color.value(),
                             {merian::all_levels_and_layers()});
+        cmd.pipelineBarrier(
+            vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer, {}, {}, {},
+            vk::ImageMemoryBarrier{vk::AccessFlagBits::eTransferWrite,
+                                   vk::AccessFlagBits::eTransferRead |
+                                       vk::AccessFlagBits::eTransferWrite,
+                                   dst_layout, dst_layout, VK_QUEUE_FAMILY_IGNORED,
+                                   VK_QUEUE_FAMILY_IGNORED, dst_image, all_levels_and_layers()});
+    }
 
     vk::ImageBlit region{merian::first_layer(), {}, merian::first_layer(), {{}}};
     region.srcOffsets[1] = extent_to_offset(src_extent);
@@ -35,9 +43,17 @@ inline void cmd_blit_fit(const vk::CommandBuffer& cmd,
                          const vk::Extent3D& dst_extent,
                          const std::optional<vk::ClearColorValue> clear_color = std::nullopt,
                          const vk::Filter filter = vk::Filter::eLinear) {
-    if (clear_color)
+    if (clear_color) {
         cmd.clearColorImage(dst_image, dst_layout, clear_color.value(),
                             {merian::all_levels_and_layers()});
+        cmd.pipelineBarrier(
+            vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer, {}, {}, {},
+            vk::ImageMemoryBarrier{vk::AccessFlagBits::eTransferWrite,
+                                   vk::AccessFlagBits::eTransferRead |
+                                       vk::AccessFlagBits::eTransferWrite,
+                                   dst_layout, dst_layout, VK_QUEUE_FAMILY_IGNORED,
+                                   VK_QUEUE_FAMILY_IGNORED, dst_image, all_levels_and_layers()});
+    }
 
     vk::ImageBlit region{merian::first_layer(), {}, merian::first_layer(), {}};
     region.srcOffsets[1] = extent_to_offset(src_extent);
@@ -58,9 +74,17 @@ inline void cmd_blit_fill(const vk::CommandBuffer& cmd,
                           const vk::Extent3D& dst_extent,
                           const std::optional<vk::ClearColorValue> clear_color = std::nullopt,
                           const vk::Filter filter = vk::Filter::eLinear) {
-    if (clear_color)
+    if (clear_color) {
         cmd.clearColorImage(dst_image, dst_layout, clear_color.value(),
                             {merian::all_levels_and_layers()});
+        cmd.pipelineBarrier(
+            vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer, {}, {}, {},
+            vk::ImageMemoryBarrier{vk::AccessFlagBits::eTransferWrite,
+                                   vk::AccessFlagBits::eTransferRead |
+                                       vk::AccessFlagBits::eTransferWrite,
+                                   dst_layout, dst_layout, VK_QUEUE_FAMILY_IGNORED,
+                                   VK_QUEUE_FAMILY_IGNORED, dst_image, all_levels_and_layers()});
+    }
 
     vk::ImageBlit region{merian::first_layer(), {}, merian::first_layer(), {}};
     region.dstOffsets[1] = extent_to_offset(dst_extent);
