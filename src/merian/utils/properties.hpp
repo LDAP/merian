@@ -2,7 +2,9 @@
 
 #include "ext/json.hpp"
 #include "glm/glm.hpp"
+#include "merian/utils/enums.hpp"
 
+#include <fmt/format.h>
 #include <string>
 #include <vector>
 
@@ -51,6 +53,9 @@ class Properties {
     // Output
 
     virtual void output_text(const std::string& text) = 0;
+    template <typename... T> void output_text(fmt::format_string<T...> fmt, T&&... args) {
+        output_text(fmt::format(fmt, args...));
+    }
     virtual void output_plot_line(const std::string& label,
                                   const float* samples,
                                   const uint32_t count,
@@ -71,6 +76,12 @@ class Properties {
     // Returns true if the value changed.
     virtual bool
     config_vec(const std::string& id, glm::vec4& value, const std::string& desc = "") = 0;
+    // Returns true if the value changed.
+    virtual bool
+    config_vec(const std::string& id, glm::uvec3& value, const std::string& desc = "") = 0;
+    // Returns true if the value changed.
+    virtual bool
+    config_vec(const std::string& id, glm::uvec4& value, const std::string& desc = "") = 0;
     // Returns true if the value changed.
     virtual bool config_angle(const std::string& id,
                               float& angle,
@@ -131,6 +142,30 @@ class Properties {
                                 const std::vector<std::string>& options,
                                 const OptionsStyle style = OptionsStyle::DONT_CARE,
                                 const std::string& desc = "") = 0;
+
+    // Needs specializations for the enum_size(), enum_values() and enum_to_string() methods.
+    template <typename ENUM_TYPE>
+    bool config_enum(const std::string& id,
+                     ENUM_TYPE& value,
+                     const OptionsStyle style = OptionsStyle::DONT_CARE,
+                     const std::string& desc = "") {
+        std::vector<std::string> options;
+        int selected = 0;
+        int i = 0;
+        for (const ENUM_TYPE* p = enum_values<ENUM_TYPE>();
+             p < enum_values<ENUM_TYPE>() + enum_size<ENUM_TYPE>(); p++) {
+            options.emplace_back(enum_to_string(*p));
+            if (*p == value) {
+                selected = i;
+            }
+            i++;
+        }
+
+        const bool value_changed = config_options(id, selected, options, style, desc);
+        value = enum_values<ENUM_TYPE>()[selected];
+
+        return value_changed;
+    }
 
     // If set by the configuration returns true only once `one-shot`.
     // Converts to a button in a GUI context.

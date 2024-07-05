@@ -31,6 +31,22 @@ json dump_vec4(glm::vec4& v) {
     return j;
 }
 
+json dump_vec3(glm::uvec3& v) {
+    json j;
+    for (int i = 0; i < 3; i++) {
+        j.push_back(v[i]);
+    }
+    return j;
+}
+
+json dump_vec4(glm::uvec4& v) {
+    json j;
+    for (int i = 0; i < 4; i++) {
+        j.push_back(v[i]);
+    }
+    return j;
+}
+
 JSONDumpProperties::JSONDumpProperties(const std::optional<std::filesystem::path>& filename)
     : filename(filename), o(1) {}
 
@@ -76,6 +92,14 @@ bool JSONDumpProperties::config_vec(const std::string& id, glm::vec3& value, con
     return false;
 }
 bool JSONDumpProperties::config_vec(const std::string& id, glm::vec4& value, const std::string&) {
+    current()[id] = dump_vec4(value);
+    return false;
+}
+bool JSONDumpProperties::config_vec(const std::string& id, glm::uvec3& value, const std::string&) {
+    current()[id] = dump_vec3(value);
+    return false;
+}
+bool JSONDumpProperties::config_vec(const std::string& id, glm::uvec4& value, const std::string&) {
     current()[id] = dump_vec4(value);
     return false;
 }

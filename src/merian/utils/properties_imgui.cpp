@@ -71,6 +71,20 @@ bool ImGuiProperties::config_vec(const std::string& id, glm::vec4& value, const 
     tooltip(desc);
     return value_changed;
 }
+bool ImGuiProperties::config_vec(const std::string& id,
+                                 glm::uvec3& value,
+                                 const std::string& desc) {
+    const bool value_changed = ImGui::InputScalarN(id.c_str(), ImGuiDataType_U32, &value.x, 3);
+    tooltip(desc);
+    return value_changed;
+}
+bool ImGuiProperties::config_vec(const std::string& id,
+                                 glm::uvec4& value,
+                                 const std::string& desc) {
+    const bool value_changed = ImGui::InputScalarN(id.c_str(), ImGuiDataType_U32, &value.x, 4);
+    tooltip(desc);
+    return value_changed;
+}
 bool ImGuiProperties::config_angle(const std::string& id,
                                    float& angle,
                                    const std::string& desc,

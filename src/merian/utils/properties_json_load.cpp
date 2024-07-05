@@ -15,22 +15,32 @@ float decode_float(json& j) {
     return j.template get<float>();
 }
 
-glm::vec3 load_vec3(json& j) {
-    glm::vec3 v;
+void load_vec3(json& j, glm::vec3& v) {
     json::iterator it = j.begin();
     for (int i = 0; i < 3; i++, it++) {
         v[i] = decode_float(*it);
     }
-    return v;
 }
 
-glm::vec4 load_vec4(json& j) {
-    glm::vec4 v;
+void load_vec4(json& j, glm::vec4& v) {
     json::iterator it = j.begin();
     for (int i = 0; i < 4; i++, it++) {
         v[i] = decode_float(*it);
     }
-    return v;
+}
+
+void load_vec3(json& j, glm::uvec3& v) {
+    json::iterator it = j.begin();
+    for (int i = 0; i < 3; i++, it++) {
+        v[i] = *it;
+    }
+}
+
+void load_vec4(json& j, glm::uvec4& v) {
+    json::iterator it = j.begin();
+    for (int i = 0; i < 4; i++, it++) {
+        v[i] = *it;
+    }
 }
 
 JSONLoadProperties::JSONLoadProperties(const std::string& json_string) : o(1) {
@@ -72,25 +82,37 @@ void JSONLoadProperties::output_plot_line(
 bool JSONLoadProperties::config_color(const std::string& id, glm::vec3& color, const std::string&) {
     const glm::vec3 old_color = color;
     if (o.back().contains(id))
-        color = load_vec3(o.back()[id]);
+        load_vec3(o.back()[id], color);
     return old_color != color;
 }
 bool JSONLoadProperties::config_color(const std::string& id, glm::vec4& color, const std::string&) {
     const glm::vec4 old_color = color;
     if (o.back().contains(id))
-        color = load_vec4(o.back()[id]);
+        load_vec4(o.back()[id], color);
     return old_color != color;
 }
 bool JSONLoadProperties::config_vec(const std::string& id, glm::vec3& value, const std::string&) {
     const glm::vec3 old_value = value;
     if (o.back().contains(id))
-        value = load_vec3(o.back()[id]);
+        load_vec3(o.back()[id], value);
     return old_value != value;
 }
 bool JSONLoadProperties::config_vec(const std::string& id, glm::vec4& value, const std::string&) {
     const glm::vec4 old_value = value;
     if (o.back().contains(id))
-        value = load_vec4(o.back()[id]);
+        load_vec4(o.back()[id], value);
+    return old_value != value;
+}
+bool JSONLoadProperties::config_vec(const std::string& id, glm::uvec3& value, const std::string&) {
+    const glm::uvec3 old_value = value;
+    if (o.back().contains(id))
+        load_vec3(o.back()[id], value);
+    return old_value != value;
+}
+bool JSONLoadProperties::config_vec(const std::string& id, glm::uvec4& value, const std::string&) {
+    const glm::uvec4 old_value = value;
+    if (o.back().contains(id))
+        load_vec4(o.back()[id], value);
     return old_value != value;
 }
 bool JSONLoadProperties::config_angle(
@@ -151,7 +173,7 @@ bool JSONLoadProperties::config_uint(
 bool JSONLoadProperties::config_float3(const std::string& id, float value[3], const std::string&) {
     const float old_value[3] = {value[0], value[1], value[2]};
     if (o.back().contains(id))
-        *merian::as_vec3(value) = load_vec3(o.back()[id]);
+        load_vec3(o.back()[id], *merian::as_vec3(value));
     return old_value[0] != value[0] || old_value[1] != value[1] || old_value[2] != value[2];
 }
 bool JSONLoadProperties::config_bool(const std::string& id, bool& value, const std::string&) {
