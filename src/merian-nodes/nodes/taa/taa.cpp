@@ -12,7 +12,7 @@ TAA::TAA(const SharedContext context,
                  const float alpha,
                  const int clamp_method,
                  const bool inverse_motion)
-    : AbstractCompute(context, "Temporal Anti-Aliasing", sizeof(PushConstant)),
+    : AbstractCompute(context, sizeof(PushConstant)),
       inverse_motion(inverse_motion) {
     shader = std::make_shared<ShaderModule>(context, sizeof(spv), spv);
     pc.temporal_alpha = alpha;

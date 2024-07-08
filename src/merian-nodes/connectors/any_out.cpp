@@ -46,8 +46,8 @@ AnyOut::on_post_process([[maybe_unused]] GraphRun& run,
                         [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {
     const auto& res = debugable_ptr_cast<AnyResource>(resource);
     if (!res->any.has_value()) {
-        throw graph_errors::connector_error{fmt::format(
-            "Node {} did not set the resource for output {}.", node->name, Connector::name)};
+        throw graph_errors::connector_error{
+            fmt::format("Node did not set the resource for output {}.", Connector::name)};
     }
     res->processed_inputs = 0;
 

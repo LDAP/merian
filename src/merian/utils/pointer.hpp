@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <typeindex>
 
 namespace merian {
 
@@ -22,6 +23,12 @@ template <typename OutType, typename InType>
 std::shared_ptr<OutType> debugable_ptr_cast(const std::shared_ptr<InType>& ptr) {
     assert(std::dynamic_pointer_cast<OutType>(ptr));
     return std::static_pointer_cast<OutType>(ptr);
+}
+
+template<typename PTR_TYPE>
+inline std::type_index typeindex_from_pointer(const PTR_TYPE ptr) {
+    auto& r = *ptr;
+    return typeid(r);
 }
 
 } // namespace merian

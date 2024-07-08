@@ -15,9 +15,7 @@ class HDRImageRead : public Node {
     //
     // Set keep_on_host to keep a copy in host memory, otherwise the image is reloaded from disk
     // everytime the graph reconnects.
-    HDRImageRead(const StagingMemoryManagerHandle& staging,
-                 const std::filesystem::path& path,
-                 const bool keep_on_host = false);
+    HDRImageRead(const SharedContext& context);
 
     ~HDRImageRead();
 
@@ -32,8 +30,8 @@ class HDRImageRead : public Node {
     NodeStatusFlags properties(Properties& config) override;
 
   private:
-    const StagingMemoryManagerHandle staging;
-    bool keep_on_host;
+    const SharedContext context;
+    bool keep_on_host = false;
 
     ManagedVkImageOutHandle con_out;
 
@@ -43,6 +41,7 @@ class HDRImageRead : public Node {
 
     int width, height, channels;
     std::filesystem::path filename;
+    std::array<char, 256> config_filename;
 };
 
 } // namespace merian_nodes

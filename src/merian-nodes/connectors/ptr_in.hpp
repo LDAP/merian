@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ptr_out.hpp"
+
 #include "merian-nodes/graph/connector_input.hpp"
 #include "merian-nodes/resources/host_ptr_resource.hpp"
 
@@ -9,8 +11,6 @@ namespace merian_nodes {
 
 template <typename T> class PtrIn;
 template <typename T> using PtrInHandle = std::shared_ptr<PtrIn<T>>;
-template <typename T> class PtrOut;
-template <typename T> using PtrOutHandle = std::shared_ptr<PtrOut<T>>;
 
 // Transfer information between nodes on the host using shared_ptr.
 template <typename T>
@@ -19,6 +19,14 @@ class PtrIn : public TypedInputConnector<PtrOutHandle<T>, const std::shared_ptr<
   public:
     PtrIn(const std::string& name, const uint32_t delay)
         : TypedInputConnector<PtrOutHandle<T>, const std::shared_ptr<T>&>(name, delay) {}
+
+    void on_connect_output(const OutputConnectorHandle& output) override {
+        auto casted_output = std::dynamic_pointer_cast<PtrOut<T>>(output);
+        if (!casted_output) {
+            throw graph_errors::connector_error{
+                fmt::format("AnyIn {} cannot recive from {}.", Connector::name, output->name)};
+        }
+    }
 
     const std::shared_ptr<T>& resource(const GraphResourceHandle& resource) override {
         return debugable_ptr_cast<PtrResource<T>>(resource)->ptr;

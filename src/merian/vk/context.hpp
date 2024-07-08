@@ -1,5 +1,6 @@
 #pragma once
 
+#include "merian/io/file_loader.hpp"
 #include "merian/utils/concurrent/thread_pool.hpp"
 #include <spdlog/logger.h>
 
@@ -215,6 +216,8 @@ class Context : public std::enable_shared_from_this<Context> {
     // -----------------
     // A shared thread pool with default size.
     ThreadPool thread_pool;
+
+    merian::FileLoader loader;
 
   private:
     // in find_queues. Indexes are -1 if no suitable queue was found!

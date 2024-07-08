@@ -21,8 +21,7 @@ static std::unordered_map<uint32_t, std::string> FILE_EXTENSIONS = {
 ImageWrite::ImageWrite(const SharedContext context,
                        const ResourceAllocatorHandle allocator,
                        const std::string& filename_format)
-    : Node("Image Write"), context(context), allocator(allocator), filename_format(filename_format),
-      buf(1024) {
+    : Node(), context(context), allocator(allocator), filename_format(filename_format), buf(1024) {
     assert(filename_format.size() < buf.size());
     std::copy(filename_format.begin(), filename_format.end(), buf.begin());
 }
@@ -293,8 +292,7 @@ void ImageWrite::process(GraphRun& run,
 
 ImageWrite::NodeStatusFlags ImageWrite::properties([[maybe_unused]] Properties& config) {
     config.st_separate("General");
-    config.config_options("format", format, {"PNG", "JPG", "HDR"},
-                          Properties::OptionsStyle::COMBO);
+    config.config_options("format", format, {"PNG", "JPG", "HDR"}, Properties::OptionsStyle::COMBO);
     config.config_bool("rebuild after capture", rebuild_after_capture,
                        "forces a graph rebuild after every capture");
     if (config.config_text("filename", buf.size(), buf.data(), false,

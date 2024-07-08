@@ -60,7 +60,7 @@ Connector::ConnectorStatusFlags VkTLASOut::on_post_process(
 
     if (!res->tlas) {
         throw graph_errors::connector_error{
-            fmt::format("Node {} must set the TLAS for connector {}", node->name, name)};
+            fmt::format("Node must set the TLAS for connector {}", name)};
     }
 
     Connector::ConnectorStatusFlags flags{};

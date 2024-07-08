@@ -20,7 +20,8 @@ class JSONLoadProperties : public Properties {
                                 const std::string& label = "",
                                 const ChildFlags flags = {}) override;
     virtual void st_end_child() override;
-
+    virtual std::vector<std::string> st_list_children() override;
+    
     virtual void st_separate(const std::string& label = "") override;
     virtual void st_no_space() override;
 
@@ -94,7 +95,7 @@ class JSONLoadProperties : public Properties {
                                        const bool needs_submit = false,
                                        const std::string& desc = "") override;
 
-    virtual bool serialize() override;
+    virtual bool is_ui() override;
     virtual bool serialize_json(const std::string& id, nlohmann::json& json) override;
     virtual bool serialize_string(const std::string& id, std::string& s) override;
 

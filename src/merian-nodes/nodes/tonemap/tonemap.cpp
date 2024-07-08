@@ -9,9 +9,9 @@ static const uint32_t spv[] = {
 namespace merian_nodes {
 
 Tonemap::Tonemap(const SharedContext context, const std::optional<vk::Format> output_format)
-    : AbstractCompute(context, "Tonemap", sizeof(PushConstant)), output_format(output_format) {
+    : AbstractCompute(context, sizeof(PushConstant)), output_format(output_format) {
     shader = std::make_shared<ShaderModule>(context, sizeof(spv), spv);
-    make_spec_info();    
+    make_spec_info();
 }
 
 Tonemap::~Tonemap() {}
@@ -21,7 +21,6 @@ void Tonemap::make_spec_info() {
     spec_builder.add_entry(local_size_x, local_size_y, tonemap, alpha_mode, clamp_output);
     spec_info = spec_builder.build();
 }
-
 
 std::vector<InputConnectorHandle> Tonemap::describe_inputs() {
     return {

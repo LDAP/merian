@@ -11,9 +11,8 @@ namespace merian_nodes {
 class AbstractABCompare : public Node {
 
   protected:
-    AbstractABCompare(const std::string& name,
-                  const std::optional<vk::Format> output_format = std::nullopt,
-                  const std::optional<vk::Extent2D> output_extent = std::nullopt);
+    AbstractABCompare(const std::optional<vk::Format> output_format = std::nullopt,
+                      const std::optional<vk::Extent2D> output_extent = std::nullopt);
 
     virtual ~AbstractABCompare();
 
@@ -31,7 +30,7 @@ class ABSplit : public AbstractABCompare {
 
   public:
     ABSplit(const std::optional<vk::Format> output_format = std::nullopt,
-                const std::optional<vk::Extent2D> output_extent = std::nullopt);
+            const std::optional<vk::Extent2D> output_extent = std::nullopt);
 
     std::vector<OutputConnectorHandle>
     describe_outputs(const ConnectorIOMap& output_for_input) override;
@@ -49,7 +48,7 @@ class ABSideBySide : public AbstractABCompare {
 
   public:
     ABSideBySide(const std::optional<vk::Format> output_format = std::nullopt,
-                     const std::optional<vk::Extent2D> output_extent = std::nullopt);
+                 const std::optional<vk::Extent2D> output_extent = std::nullopt);
 
     std::vector<OutputConnectorHandle>
     describe_outputs(const ConnectorIOMap& output_for_input) override;

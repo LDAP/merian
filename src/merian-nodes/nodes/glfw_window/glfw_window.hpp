@@ -19,7 +19,7 @@ namespace merian_nodes {
  */
 class GLFWWindow : public Node {
   public:
-    GLFWWindow(const SharedContext context) : Node("GLFW window") {
+    GLFWWindow(const SharedContext context) : Node() {
         window = std::make_shared<merian::GLFWWindow>(context);
         surface = window->get_surface();
         swapchain = std::make_shared<merian::Swapchain>(context, surface);
@@ -68,7 +68,8 @@ class GLFWWindow : public Node {
 
                 cmd_blit(mode, cmd, *src_image, vk::ImageLayout::eTransferSrcOptimal,
                          src_image->get_extent(), acquire->image,
-                         vk::ImageLayout::eTransferDstOptimal, extent, vk::ClearColorValue{}, filter);
+                         vk::ImageLayout::eTransferDstOptimal, extent, vk::ClearColorValue{},
+                         filter);
             } else {
                 cmd.clearColorImage(acquire->image, vk::ImageLayout::eTransferDstOptimal,
                                     vk::ClearColorValue{}, all_levels_and_layers());

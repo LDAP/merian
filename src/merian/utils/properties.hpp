@@ -11,10 +11,12 @@
 namespace merian {
 
 // "Record" configurtation options and information to display.
-// Some implementations will not allowed that parameters called `id` have the same name in the same
-// child.
-// Different recorders can for example display the configuration in a GUI,
+// Some implementations will not allow that parameters called `id` have the same name in the same
+// child. Different recorders can for example display the configuration in a GUI,
 // dump it to a file or load a dump from a file.
+//
+// Empty IDs are allowed when "is_ui" returnes true, otherwise it depends on the implementation or
+// may lead to undefined behavior. Empty IDs are never allowed at st_begin_child().
 class Properties {
   public:
     enum class OptionsStyle {
@@ -42,6 +44,11 @@ class Properties {
                                               const ChildFlags flags = {}) = 0;
     // Must only be called if begin_child was true
     virtual void st_end_child() = 0;
+
+    // List known children, if supported. This is useful as "lookahead" when first loading.
+    virtual std::vector<std::string> st_list_children() {
+        return {};
+    }
 
     // Separates config options.
     // This has no meaning when identifying the configuration option
@@ -192,11 +199,10 @@ class Properties {
 
     // Serializaion allows to store and load data. These possibly not shown in the UI.
 
-    // Returns true if you should provide valid data to the serialize_* methods. If this is false no
-    // data is stored and you can skip computing the data. serialize_* methods may still return
-    // true, meaning that you should load new data.
+    // Returns true if the Properties object is a UI interface. You can use that to selectively hide
+    // elements that should only be shown on UI or serialized.
     [[nodiscard]]
-    virtual bool serialize() = 0;
+    virtual bool is_ui() = 0;
 
     // Returns true, if new data was loaded.
     virtual bool serialize_json(const std::string& id, nlohmann::json& json) = 0;

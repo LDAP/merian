@@ -4,8 +4,7 @@
 
 namespace merian_nodes {
 
-ColorImage::ColorImage()
-    : Node("Color Output") {}
+ColorImage::ColorImage() : Node() {}
 
 ColorImage::~ColorImage() {}
 
@@ -46,7 +45,8 @@ ColorImage::NodeStatusFlags ColorImage::properties(Properties& config) {
         config.config_enum("format", format, merian::Properties::OptionsStyle::COMBO);
 
     if (extent_from_input) {
-        config.output_text("extent determined by input: {}x{}x{}", extent.width, extent.height, extent.depth);
+        config.output_text("extent determined by input: {}x{}x{}", extent.width, extent.height,
+                           extent.depth);
     } else {
         needs_reconnect |= config.config_vec("extent", *merian::as_uvec3(&extent.width));
     }

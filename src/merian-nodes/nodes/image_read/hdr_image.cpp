@@ -1,23 +1,13 @@
 #include "hdr_image.hpp"
 
 #include "ext/stb_image.h"
+#include "merian-nodes/graph/errors.hpp"
+
 #include <filesystem>
 
 namespace merian_nodes {
 
-HDRImageRead::HDRImageRead(const StagingMemoryManagerHandle& staging,
-                           const std::filesystem::path& filename,
-                           const bool keep_on_host)
-    : Node("HDR Image"), staging(staging), keep_on_host(keep_on_host), filename(filename) {
-
-    assert(std::filesystem::exists(filename));
-    if (!stbi_info(filename.string().c_str(), &width, &height, &channels)) {
-        throw std::runtime_error{"format not supported!"};
-    }
-
-    con_out =
-        ManagedVkImageOut::transfer_write("out", vk::Format::eR32G32B32A32Sfloat, width, height, 1, true);
-}
+HDRImageRead::HDRImageRead(const SharedContext& context) : Node(), context(context) {}
 
 HDRImageRead::~HDRImageRead() {
     if (image) {
@@ -27,6 +17,19 @@ HDRImageRead::~HDRImageRead() {
 
 std::vector<OutputConnectorHandle>
 HDRImageRead::describe_outputs([[maybe_unused]] const ConnectorIOMap& output_for_input) {
+    if (filename.empty()) {
+        throw graph_errors::node_error{"no file set"};
+    }
+    if (!std::filesystem::exists(filename)) {
+        throw graph_errors::node_error{fmt::format("file does not exist: {}", filename.string())};
+    }
+    if (!stbi_info(filename.string().c_str(), &width, &height, &channels)) {
+        throw graph_errors::node_error{"format not supported!"};
+    }
+
+    con_out = ManagedVkImageOut::transfer_write("out", vk::Format::eR32G32B32A32Sfloat, width,
+                                                height, 1, true);
+
     needs_run = true;
     return {con_out};
 }
@@ -42,12 +45,13 @@ void HDRImageRead::process([[maybe_unused]] GraphRun& run,
             assert(width == (int)io[con_out]->get_extent().width &&
                    height == (int)io[con_out]->get_extent().height);
 
-            SPDLOG_INFO("Loaded image from {} ({}x{}, {} channels)", filename.string(), width, height,
-                         channels);
+            SPDLOG_INFO("Loaded image from {} ({}x{}, {} channels)", filename.string(), width,
+                        height, channels);
         }
 
-        staging->cmdToImage(cmd, *io[con_out], {0, 0, 0}, io[con_out]->get_extent(), first_layer(),
-                            width * height * 4 * sizeof(float), image);
+        run.get_allocator()->getStaging()->cmdToImage(cmd, *io[con_out], {0, 0, 0},
+                                                      io[con_out]->get_extent(), first_layer(),
+                                                      width * height * 4 * sizeof(float), image);
 
         if (!keep_on_host) {
             stbi_image_free(image);
@@ -59,17 +63,32 @@ void HDRImageRead::process([[maybe_unused]] GraphRun& run,
 }
 
 HDRImageRead::NodeStatusFlags HDRImageRead::properties(Properties& config) {
+    bool needs_rebuild = false;
+
+    if (config.config_text("path", config_filename.size(), config_filename.data(), true)) {
+        needs_rebuild = true;
+        filename =
+            context->loader.find_file(config_filename.data()).value_or(config_filename.data());
+        if (image) {
+            stbi_image_free(image);
+            image = nullptr;
+        }
+    }
+
     config.config_bool("keep in host memory", keep_on_host, "");
     if (!keep_on_host && image) {
         stbi_image_free(image);
         image = nullptr;
     }
 
-    const std::string text = fmt::format("filename: {}\nextent: {}x{}\nhost cached: {}\n", filename.string(),
-                                         width, height, image != nullptr);
+    const std::string text = fmt::format("filename: {}\nextent: {}x{}\nhost cached: {}\n",
+                                         filename.string(), width, height, image != nullptr);
 
     config.output_text(text);
 
+    if (needs_rebuild) {
+        return NEEDS_RECONNECT;
+    }
     return {};
 }
 

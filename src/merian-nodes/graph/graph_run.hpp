@@ -1,5 +1,6 @@
 #pragma once
 
+#include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/sync/semaphore_binary.hpp"
 #include "merian/vk/sync/semaphore_timeline.hpp"
 #include "merian/vk/utils/profiler.hpp"
@@ -15,7 +16,8 @@ class GraphRun {
     template <uint32_t> friend class Graph;
 
   public:
-    GraphRun(const uint32_t ring_size) : ring_size(ring_size) {}
+    GraphRun(const uint32_t ring_size)
+        : ring_size(ring_size) {}
 
     void add_wait_semaphore(const BinarySemaphoreHandle& wait_semaphore,
                             const vk::PipelineStageFlags& wait_stage_flags) noexcept {
@@ -108,18 +110,24 @@ class GraphRun {
 
     // Returns the profiler that is attached to this run.
     // Can be nullptr if profiling is disabled!
-    const ProfilerHandle get_profiler() const {
+    const ProfilerHandle& get_profiler() const {
         return profiler;
+    }
+
+    const ResourceAllocatorHandle& get_allocator() const {
+        return allocator;
     }
 
   private:
     void reset(const uint64_t iteration,
                const uint32_t in_flight_index,
                const ProfilerHandle profiler,
-               const CommandPoolHandle& cmd_pool) {
+               const CommandPoolHandle& cmd_pool,
+               const ResourceAllocatorHandle& allocator) {
         this->iteration = iteration;
         this->in_flight_index = in_flight_index;
         this->cmd_pool = cmd_pool;
+        this->allocator = allocator;
         wait_semaphores.clear();
         wait_stages.clear();
         wait_values.clear();
@@ -144,6 +152,8 @@ class GraphRun {
 
     ProfilerHandle profiler = nullptr;
     CommandPoolHandle cmd_pool = nullptr;
+    ResourceAllocatorHandle allocator = nullptr;
+
     bool needs_reconnect = false;
     uint64_t iteration;
     uint32_t in_flight_index;

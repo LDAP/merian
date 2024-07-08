@@ -70,6 +70,15 @@ bool JSONLoadProperties::st_begin_child(const std::string& id,
 void JSONLoadProperties::st_end_child() {
     o.pop_back();
 }
+std::vector<std::string> JSONLoadProperties::st_list_children() {
+    std::vector<std::string> children;
+    for (auto it = o.back().begin(); it != o.back().end(); it++) {
+        if (it.value().is_object()) {
+            children.emplace_back(it.key());
+        }
+    }
+    return children;
+}
 
 void JSONLoadProperties::st_separate(const std::string&) {}
 void JSONLoadProperties::st_no_space() {}
@@ -232,7 +241,7 @@ bool JSONLoadProperties::config_text_multiline(const std::string& id,
     return false;
 }
 
-bool JSONLoadProperties::serialize() {
+bool JSONLoadProperties::is_ui() {
     return false;
 }
 bool JSONLoadProperties::serialize_json(const std::string& id, nlohmann::json& json) {
