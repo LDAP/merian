@@ -102,9 +102,9 @@ GraphResourceHandle ManagedVkImageOut::create_resource(
             layouts_per_node.at(std::make_pair(input_node, input->delay)) !=
                 image_in->required_layout) {
             throw graph_errors::connector_error{
-                fmt::format("node {} has two input descriptors (one is {}) pointing to the "
+                fmt::format("node has two input descriptors (one is {}) pointing to the "
                             "same underlying resource with different image layouts.",
-                            input_node->name, name)};
+                            name)};
         } else {
             layouts_per_node.try_emplace(std::make_pair(input_node, input->delay),
                                          image_in->required_layout);

@@ -9,7 +9,7 @@
 
 namespace merian_nodes {
 
-Bloom::Bloom(const SharedContext context) : Node("Bloom"), context(context) {
+Bloom::Bloom(const SharedContext context) : Node(), context(context) {
 
     separate_module = std::make_shared<ShaderModule>(context, merian_bloom_separate_comp_spv_size(),
                                                      merian_bloom_separate_comp_spv());

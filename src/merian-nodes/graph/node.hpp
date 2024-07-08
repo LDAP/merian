@@ -26,7 +26,7 @@ class Node : public std::enable_shared_from_this<Node> {
     };
 
   public:
-    Node(const std::string& name) : name(name) {}
+    Node() {}
 
     virtual ~Node() {}
 
@@ -34,7 +34,7 @@ class Node : public std::enable_shared_from_this<Node> {
     // If you need to access the resources directly, you need to maintain a copy of the InputHandle.
     //
     // Note that input and output names must be unique.
-    // 
+    //
     // If you throw a node error here the graph will disable the node for this connect attempt and
     // set the error state for this node.
     [[nodiscard]]
@@ -115,9 +115,6 @@ class Node : public std::enable_shared_from_this<Node> {
     virtual NodeStatusFlags properties([[maybe_unused]] Properties& config) {
         return {};
     }
-
-  public:
-    const std::string name;
 };
 
 using NodeHandle = std::shared_ptr<Node>;

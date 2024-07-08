@@ -233,8 +233,8 @@ bool ImGuiProperties::config_text_multiline(const std::string& id,
     return submit_change;
 }
 
-bool ImGuiProperties::serialize() {
-    return false;
+bool ImGuiProperties::is_ui() {
+    return true;
 }
 bool ImGuiProperties::serialize_json(const std::string&, nlohmann::json&) {
     return false;

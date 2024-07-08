@@ -4,7 +4,6 @@
 #include "merian-nodes/connectors/managed_vk_image_in.hpp"
 #include "merian-nodes/graph/node.hpp"
 
-#include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
 #include "merian/vk/shader/shader_module.hpp"
 
@@ -21,7 +20,7 @@ class MedianApproxNode : public Node {
     };
 
   public:
-    MedianApproxNode(const SharedContext context, const int component = 0);
+    MedianApproxNode(const SharedContext context);
 
     virtual ~MedianApproxNode();
 
@@ -41,7 +40,7 @@ class MedianApproxNode : public Node {
 
   private:
     const SharedContext context;
-    const int component;
+    int component;
 
     ManagedVkImageInHandle con_src = ManagedVkImageIn::compute_read("src");
     ManagedVkBufferOutHandle con_median;

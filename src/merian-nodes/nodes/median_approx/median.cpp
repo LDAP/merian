@@ -9,9 +9,7 @@
 
 namespace merian_nodes {
 
-MedianApproxNode::MedianApproxNode(const SharedContext context, const int component)
-    : Node("Median Approximation"), context(context), component(component) {
-    assert(component < 4 && component >= 0);
+MedianApproxNode::MedianApproxNode(const SharedContext context) : Node(), context(context) {
 
     histogram = std::make_shared<ShaderModule>(context, merian_median_histogram_comp_spv_size(),
                                                merian_median_histogram_comp_spv());
@@ -90,6 +88,8 @@ void MedianApproxNode::process([[maybe_unused]] GraphRun& run,
 }
 
 MedianApproxNode::NodeStatusFlags MedianApproxNode::properties(Properties& config) {
+    config.config_options("component", component, {"R", "G", "B", "A"});
+
     config.config_float("min", pc.min);
     config.config_float("max", pc.max);
 

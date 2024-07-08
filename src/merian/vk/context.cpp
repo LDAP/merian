@@ -1,6 +1,7 @@
 #include "merian/vk/context.hpp"
 #include "merian/utils/vector.hpp"
 #include "merian/vk/extension/extension.hpp"
+#include "utils/pointer.hpp"
 
 #include <spdlog/spdlog.h>
 #include <tuple>
@@ -54,11 +55,10 @@ Version: {}\n\n",
     SPDLOG_DEBUG("supplied extensions:");
     for (auto& ext : desired_extensions) {
         SPDLOG_DEBUG("{}", ext->name);
-        auto& r = *ext.get();
-        if (extensions.contains(typeid(r))) {
+        if (extensions.contains(typeindex_from_pointer(ext))) {
             std::runtime_error{"A extension type can only be added once."};
         } else {
-            extensions[typeid(r)] = ext;
+            extensions[typeindex_from_pointer(ext)] = ext;
         }
     }
 

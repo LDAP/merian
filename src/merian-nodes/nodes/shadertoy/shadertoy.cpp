@@ -70,7 +70,7 @@ class ShadertoyInjectCompiler : public ShaderCompiler {
 Shadertoy::Shadertoy(const SharedContext context,
                      const std::string& path,
                      const ShaderCompilerHandle& compiler)
-    : AbstractCompute(context, "Shadertoy", sizeof(PushConstant)), shader_path(path),
+    : AbstractCompute(context, sizeof(PushConstant)), shader_path(path),
       reloader(context, std::make_shared<ShadertoyInjectCompiler>(compiler)) {
 
     sw.reset();

@@ -219,8 +219,7 @@ class DeviceASBuilder : public Node {
 
   public:
     DeviceASBuilder(const SharedContext& context, const ResourceAllocatorHandle& allocator)
-        : Node("Acceleration Structure Builder"), context(context), allocator(allocator),
-          as_builder(context, allocator) {}
+        : Node(), context(context), allocator(allocator), as_builder(context, allocator) {}
 
     std::vector<InputConnectorHandle> describe_inputs() {
         return {

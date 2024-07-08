@@ -10,7 +10,7 @@ namespace merian_nodes {
 VKDTFilmcurv::VKDTFilmcurv(const SharedContext context,
                            const std::optional<Options> options,
                            const std::optional<vk::Format> output_format)
-    : AbstractCompute(context, "VKDT Filmcurv", sizeof(Options)), output_format(output_format) {
+    : AbstractCompute(context, sizeof(Options)), output_format(output_format) {
     if (options) {
         pc = options.value();
     }

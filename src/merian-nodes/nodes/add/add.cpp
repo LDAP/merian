@@ -7,7 +7,7 @@
 namespace merian_nodes {
 
 Add::Add(const SharedContext context, const std::optional<vk::Format> output_format)
-    : AbstractCompute(context, "Add"), output_format(output_format) {
+    : AbstractCompute(context), output_format(output_format) {
     shader =
         std::make_shared<ShaderModule>(context, merian_add_comp_spv_size(), merian_add_comp_spv());
 }

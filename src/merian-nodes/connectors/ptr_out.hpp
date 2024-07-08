@@ -1,6 +1,7 @@
 #pragma once
 
-#include "merian-nodes/connectors/ptr_in.hpp"
+#include "merian-nodes/resources/host_ptr_resource.hpp"
+
 #include "merian-nodes/graph/connector_output.hpp"
 #include "merian-nodes/graph/errors.hpp"
 #include "merian-nodes/graph/node.hpp"
@@ -25,17 +26,6 @@ template <typename T> class PtrOut : public TypedOutputConnector<std::shared_ptr
                     [[maybe_unused]] const ResourceAllocatorHandle& aliasing_allocator,
                     [[maybe_unused]] const uint32_t resoruce_index,
                     [[maybe_unused]] const uint32_t ring_size) override {
-
-        for (auto& [node, input] : inputs) {
-            // check compatibility
-            const auto& casted_in = std::dynamic_pointer_cast<PtrIn<T>>(input);
-            if (!casted_in) {
-                throw graph_errors::connector_error{
-                    fmt::format("PtrOut {} cannot output to {} of node {}.", Connector::name,
-                                input->name, node->name)};
-            }
-        }
-
         return std::make_shared<PtrResource<T>>(persistent ? -1 : (int32_t)inputs.size());
     }
 
@@ -52,8 +42,8 @@ template <typename T> class PtrOut : public TypedOutputConnector<std::shared_ptr
         [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) override {
         const auto& res = debugable_ptr_cast<PtrResource<T>>(resource);
         if (!res->ptr) {
-            throw graph_errors::connector_error{fmt::format(
-                "Node {} did not set the resource for output {}.", node->name, Connector::name)};
+            throw graph_errors::connector_error{
+                fmt::format("Node did not set the resource for output {}.", Connector::name)};
         }
         res->processed_inputs = 0;
 

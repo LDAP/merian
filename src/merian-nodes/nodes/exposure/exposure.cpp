@@ -18,7 +18,7 @@ static const uint32_t exposure_spv[] = {
 #include "exposure.comp.spv.h"
 };
 
-AutoExposure::AutoExposure(const SharedContext context) : Node("Auto Exposure"), context(context) {
+AutoExposure::AutoExposure(const SharedContext context) : Node(), context(context) {
 
     histogram_module =
         std::make_shared<ShaderModule>(context, sizeof(histogram_spv), histogram_spv);

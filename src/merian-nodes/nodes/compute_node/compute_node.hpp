@@ -15,7 +15,6 @@ class AbstractCompute : public Node {
 
   public:
     AbstractCompute(const SharedContext context,
-                    const std::string& name,
                     const std::optional<uint32_t> push_constant_size = std::nullopt);
 
     virtual ~AbstractCompute() {}

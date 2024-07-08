@@ -59,7 +59,9 @@ JSONDumpProperties::~JSONDumpProperties() {
     }
 }
 
-bool JSONDumpProperties::st_begin_child(const std::string& id, const std::string&, const ChildFlags) {
+bool JSONDumpProperties::st_begin_child(const std::string& id,
+                                        const std::string&,
+                                        const ChildFlags) {
     o.emplace_back(id, nlohmann::json());
     return true;
 }
@@ -159,10 +161,8 @@ bool JSONDumpProperties::config_options(const std::string& id,
     return false;
 }
 bool JSONDumpProperties::config_text(
-    const std::string& id, const uint32_t, char* buf, const bool needs_submit, const std::string&) {
-    if (!needs_submit) {
-        current()[id] = buf;
-    }
+    const std::string& id, const uint32_t, char* buf, const bool, const std::string&) {
+    current()[id] = buf;
     return false;
 }
 bool JSONDumpProperties::config_text_multiline(
@@ -171,8 +171,8 @@ bool JSONDumpProperties::config_text_multiline(
     return false;
 }
 
-bool JSONDumpProperties::serialize() {
-    return true;
+bool JSONDumpProperties::is_ui() {
+    return false;
 }
 bool JSONDumpProperties::serialize_json(const std::string& id, nlohmann::json& json) {
     current()[id] = json;

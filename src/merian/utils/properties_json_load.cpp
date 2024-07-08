@@ -232,7 +232,7 @@ bool JSONLoadProperties::config_text_multiline(const std::string& id,
     return false;
 }
 
-bool JSONLoadProperties::serialize() {
+bool JSONLoadProperties::is_ui() {
     return false;
 }
 bool JSONLoadProperties::serialize_json(const std::string& id, nlohmann::json& json) {

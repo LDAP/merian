@@ -13,7 +13,7 @@ namespace merian_nodes {
 Accumulate::Accumulate(const SharedContext context,
                        const ResourceAllocatorHandle allocator,
                        const std::optional<vk::Format> format)
-    : Node("Accumulate"), context(context), allocator(allocator), format(format) {
+    : Node(), context(context), allocator(allocator), format(format) {
     percentile_module =
         std::make_shared<ShaderModule>(context, merian_calculate_percentiles_comp_spv_size(),
                                        merian_calculate_percentiles_comp_spv());

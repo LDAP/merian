@@ -6,9 +6,8 @@
 namespace merian_nodes {
 
 AbstractCompute::AbstractCompute(const SharedContext context,
-                                 const std::string& name,
                                  const std::optional<uint32_t> push_constant_size)
-    : Node(name), context(context), push_constant_size(push_constant_size) {}
+    : Node(), context(context), push_constant_size(push_constant_size) {}
 
 AbstractCompute::NodeStatusFlags
 AbstractCompute::on_connected(const DescriptorSetLayoutHandle& descriptor_set_layout) {
@@ -30,7 +29,7 @@ void AbstractCompute::process(GraphRun& run,
 
     if (spec_info && shader &&
         (!pipe || current_spec_info != spec_info || current_shader_module != shader)) {
-        SPDLOG_DEBUG("(re)create pipeline for {}", name);
+        SPDLOG_DEBUG("(re)create pipeline");
         old_pipeline = pipe;
 
         auto pipe_builder = PipelineLayoutBuilder(context);

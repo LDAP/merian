@@ -28,7 +28,7 @@ uint32_t get_ve_local_size(const SharedContext& context) {
 SVGF::SVGF(const SharedContext context,
            const ResourceAllocatorHandle allocator,
            const std::optional<vk::Format> output_format)
-    : Node("SVGF"), context(context), allocator(allocator), output_format(output_format),
+    : Node(), context(context), allocator(allocator), output_format(output_format),
       variance_estimate_local_size_x(get_ve_local_size(context)),
       variance_estimate_local_size_y(get_ve_local_size(context)) {
     variance_estimate_module =
