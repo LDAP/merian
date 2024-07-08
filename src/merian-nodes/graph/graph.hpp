@@ -209,51 +209,21 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         return registry;
     }
 
+    // Adds a node to the graph.
+    //
+    // The node_type must be a known type to the registry.
+    //
+    // Throws invalid_argument, if a node with this name already exists, the graph contains the
+    // same node under a different name.
     std::string add_node(const std::string& node_type,
                          const std::optional<std::string>& name = std::nullopt) {
         return add_node(registry.create_node_from_name(node_type), name);
     }
 
-    // Adds a node to the graph.
-    //
-    // Throws invalid_argument, if a node with this name already exists, the graph contains the
-    // same node under a different name.
-    std::string add_node(const std::shared_ptr<Node>& node,
-                         const std::optional<std::string>& name = std::nullopt) {
-        if (node_data.contains(node)) {
-            throw std::invalid_argument{
-                fmt::format("graph already contains this node as '{}'", node_data.at(node).name)};
-        }
-
-        std::string node_name;
-        if (name) {
-            if (name->empty()) {
-                throw std::invalid_argument{"node name cannot be empty"};
-            }
-            if (node_for_name.contains(name.value())) {
-                throw std::invalid_argument{
-                    fmt::format("graph already contains a node with name '{}'", name.value())};
-            }
-            node_name = name.value();
-        } else {
-            uint32_t i = 0;
-            do {
-                node_name = fmt::format("{} {}", registry.node_name(node), i++);
-            } while (node_for_name.contains(node_name));
-        }
-
-        node_for_name[node_name] = node;
-        node_data.try_emplace(node, node_name);
-
-        needs_reconnect = true;
-        SPDLOG_DEBUG("added node {} ({})", node_name, registry.node_name(node));
-
-        return node_name;
-    }
-
-    NodeHandle get_node_for_name(const std::string& name) {
+    // Returns nullptr if the node does not exist.
+    NodeHandle get_node_for_name(const std::string& name) const {
         if (!node_for_name.contains(name)) {
-            std::invalid_argument{fmt::format("node {} does not exists.", name)};
+            return nullptr;
         }
         return node_for_name.at(name);
     }
@@ -263,16 +233,11 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
     // Throws invalid_argument if one of the node does not exist in the graph.
     // The connection is validated on connect(). This means if you want to validate the connection
     // make sure to call connect() as well.
-    void add_connection(const NodeHandle& src,
-                        const NodeHandle& dst,
+    void add_connection(const std::string& src,
+                        const std::string& dst,
                         const std::string& src_output,
                         const std::string& dst_input) {
-        if (!node_data.contains(src) || !node_data.contains(dst)) {
-            throw std::invalid_argument{"graph does not contain the source or destination node"};
-        }
-
-        node_data.at(src).desired_connections.emplace(dst, src_output, dst_input);
-        needs_reconnect = true;
+        add_connection(get_node_for_name(src), get_node_for_name(dst), src_output, dst_input);
     }
 
     // --- connect / run graph ---
@@ -441,6 +406,14 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         ring_fences.wait_all();
     }
 
+    // removes all nodes and connections from the graph.
+    void reset() {
+        wait();
+        node_data.clear();
+        node_for_name.clear();
+        needs_reconnect = true;
+    }
+
     // Ensures at reconnect at the next run
     void request_reconnect() {
         needs_reconnect = true;
@@ -450,15 +423,9 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         needs_reconnect |= props.config_bool("Rebuild");
         props.output_text(fmt::format("Current iteration: {}", iteration));
 
-        if (!props.is_ui()) {
-            {
-                nlohmann::json nodes;
-            }
-            { nlohmann::json connections; }
-        }
-
         if (props.is_ui() &&
             props.st_begin_child("edit", "Edit Graph", Properties::ChildFlagBits::FRAMED)) {
+
             if (props.config_bool("Create Node")) {
                 add_node(registry.node_names()[selected_new_node]);
             }
@@ -507,26 +474,63 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             props.st_end_child();
         }
 
+        bool loading = false;
         if (props.st_begin_child("nodes", "Nodes",
                                  Properties::ChildFlagBits::DEFAULT_OPEN |
                                      Properties::ChildFlagBits::FRAMED)) {
+            std::vector<std::string> nodes;
             for (const auto& [name, node] : node_for_name) {
-                auto& data = node_data.at(node);
+                nodes.emplace_back(name);
+            }
+
+            if (nodes.empty() && !props.is_ui()) {
+                nodes = props.st_list_children();
+
+                if (!nodes.empty()) {
+                    // go into "loading" mode
+                    SPDLOG_INFO(
+                        "Attempt to reconstruct the graph from properties. Fingers crossed!");
+                    loading = true;
+                    reset(); // never know...#
+                }
+            }
+
+            for (const auto& name : nodes) {
 
                 std::string node_label;
-                std::string state = "OK";
-                if (data.disable) {
-                    state = "DISABLED";
-                } else if (!data.errors.empty()) {
-                    state = "ERROR";
+                if (!loading) {
+                    // otherwise the node data does not exist!
+                    const NodeHandle& node = node_for_name.at(name);
+                    const auto& data = node_data.at(node);
+                    std::string state = "OK";
+                    if (data.disable) {
+                        state = "DISABLED";
+                    } else if (!data.errors.empty()) {
+                        state = "ERROR";
+                    }
+
+                    node_label =
+                        fmt::format("[{}] {} ({})", state, data.name, registry.node_name(node));
                 }
 
-                node_label =
-                    fmt::format("[{}] {} ({})", state, data.name, registry.node_name(node));
+                if (props.st_begin_child(name.c_str(), node_label.c_str())) {
+                    NodeHandle node;
+                    std::string type;
 
-                if (props.st_begin_child(data.name.c_str(), node_label.c_str())) {
+                    // Create Node
+                    if (!loading) {
+                        node = node_for_name.at(name);
+                        type = registry.node_name(node);
+                    }
+                    props.serialize_string("type", type);
+                    if (loading) {
+                        node = node_for_name.at(add_node(type, name));
+                    }
+                    NodeData& data = node_data.at(node);
+
                     if (props.config_bool("disable node", data.disable))
                         request_reconnect();
+
                     if (!data.errors.empty()) {
                         props.output_text(
                             fmt::format("Errors:\n  - {}", fmt::join(data.errors, "\n   - ")));
@@ -548,9 +552,81 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             }
             props.st_end_child();
         }
+
+        if (!props.is_ui()) {
+            nlohmann::json connections;
+            if (!loading) {
+                for (const auto& [node, data] : node_data) {
+                    for (const NodeConnection& con : data.desired_connections) {
+                        nlohmann::json j_con;
+                        j_con["src"] = data.name;
+                        j_con["dst"] = node_data.at(con.dst).name;
+                        j_con["src_output"] = con.src_output;
+                        j_con["dst_input"] = con.dst_input;
+
+                        connections.push_back(j_con);
+                    }
+                }
+            }
+            props.serialize_json("connections", connections);
+            if (loading) {
+                for (auto& j_con : connections) {
+                    add_connection(j_con["src"], j_con["dst"], j_con["src_output"],
+                                   j_con["dst_input"]);
+                }
+            }
+        }
     }
 
   private:
+    /*--- Graph Edit --- */
+
+    std::string add_node(const std::shared_ptr<Node>& node,
+                         const std::optional<std::string>& name = std::nullopt) {
+        if (node_data.contains(node)) {
+            throw std::invalid_argument{
+                fmt::format("graph already contains this node as '{}'", node_data.at(node).name)};
+        }
+
+        std::string node_name;
+        if (name) {
+            if (name->empty()) {
+                throw std::invalid_argument{"node name cannot be empty"};
+            }
+            if (node_for_name.contains(name.value())) {
+                throw std::invalid_argument{
+                    fmt::format("graph already contains a node with name '{}'", name.value())};
+            }
+            node_name = name.value();
+        } else {
+            uint32_t i = 0;
+            do {
+                node_name = fmt::format("{} {}", registry.node_name(node), i++);
+            } while (node_for_name.contains(node_name));
+        }
+
+        node_for_name[node_name] = node;
+        node_data.try_emplace(node, node_name);
+
+        needs_reconnect = true;
+        SPDLOG_DEBUG("added node {} ({})", node_name, registry.node_name(node));
+
+        return node_name;
+    }
+
+    void add_connection(const NodeHandle& src,
+                        const NodeHandle& dst,
+                        const std::string& src_output,
+                        const std::string& dst_input) {
+        if (!node_data.contains(src) || !node_data.contains(dst)) {
+            throw std::invalid_argument{"graph does not contain the source or destination node"};
+        }
+
+        node_data.at(src).desired_connections.emplace(dst, src_output, dst_input);
+        needs_reconnect = true;
+    }
+
+    /*--- Properties ---*/
     void io_props_for_node(Properties& config, NodeData& data) {
         if (data.descriptor_set_layout &&
             config.st_begin_child("desc_set_layout", "Descriptor Set Layout")) {

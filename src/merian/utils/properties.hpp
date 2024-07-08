@@ -45,6 +45,11 @@ class Properties {
     // Must only be called if begin_child was true
     virtual void st_end_child() = 0;
 
+    // List known children, if supported. This is useful as "lookahead" when first loading.
+    virtual std::vector<std::string> st_list_children() {
+        return {};
+    }
+
     // Separates config options.
     // This has no meaning when identifying the configuration option
     // but can structure config when displayed.
