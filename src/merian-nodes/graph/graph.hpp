@@ -21,17 +21,18 @@
 
 namespace merian_nodes {
 namespace graph_internal {
+
 // Describes a connection between two connectors of two nodes.
-struct NodeConnection {
+struct OutgoingNodeConnection {
     const NodeHandle dst;
     const std::string src_output;
     const std::string dst_input;
 
-    bool operator==(const NodeConnection&) const = default;
+    bool operator==(const OutgoingNodeConnection&) const = default;
 
   public:
     struct Hash {
-        size_t operator()(const NodeConnection& c) const noexcept {
+        size_t operator()(const OutgoingNodeConnection& c) const noexcept {
             return hash_val(c.dst, c.src_output, c.dst_input);
         }
     };
@@ -64,7 +65,11 @@ struct NodeData {
     // --- Desired connections. ---
     // Set by the user using the public add_connection method.
     // This information is used by connect() to connect the graph
-    std::unordered_set<NodeConnection, typename NodeConnection::Hash> desired_connections;
+    std::unordered_set<OutgoingNodeConnection, typename OutgoingNodeConnection::Hash>
+        desired_outgoing_connections;
+    // (input connector name -> (src_node, src_output_name))
+    std::unordered_map<std::string, std::pair<NodeHandle, std::string>>
+        desired_incoming_connections;
 
     // --- Actual connections. ---
     // For each input the connected node and the corresponding output connector on the other
@@ -141,9 +146,12 @@ struct NodeData {
         input_connections.clear();
         output_connections.clear();
 
+        resource_maps.clear();
         descriptor_sets.clear();
         descriptor_pool.reset();
         descriptor_set_layout.reset();
+
+        statistics = {};
 
         errors.clear();
     }
@@ -233,11 +241,74 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
     // Throws invalid_argument if one of the node does not exist in the graph.
     // The connection is validated on connect(). This means if you want to validate the connection
     // make sure to call connect() as well.
+    //
+    // New conenctions replace existing connections to the same input.
     void add_connection(const std::string& src,
                         const std::string& dst,
                         const std::string& src_output,
                         const std::string& dst_input) {
-        add_connection(get_node_for_name(src), get_node_for_name(dst), src_output, dst_input);
+        const NodeHandle src_node = get_node_for_name(src);
+        const NodeHandle dst_node = get_node_for_name(dst);
+        assert(src_node);
+        assert(dst_node);
+        add_connection(src_node, dst_node, src_output, dst_input);
+    }
+
+    bool remove_connection(const std::string& src,
+                           const std::string& dst,
+                           const std::string& dst_input) {
+        const NodeHandle src_node = get_node_for_name(src);
+        const NodeHandle dst_node = get_node_for_name(dst);
+        assert(src_node);
+        assert(dst_node);
+        remove_connection(src_node, dst_node, dst_input);
+    }
+
+    // Removes a node from the graph.
+    // If a run is in progress the removal is queued for the end of the run.
+    bool remove_node(const std::string& name) {
+        if (!node_for_name.contains(name)) {
+            return false;
+        }
+
+        const std::function<void()> remove_task = [this, name] {
+            wait();
+
+            const NodeHandle node = node_for_name.at(name);
+            const NodeData& data = node_data.at(node);
+
+            for (auto it = data.desired_outgoing_connections.begin();
+                 it != data.desired_outgoing_connections.end();
+                 it = data.desired_outgoing_connections.begin()) {
+                remove_connection(node, it->dst, it->dst_input);
+            }
+
+            for (auto it = data.desired_incoming_connections.begin();
+                 it != data.desired_incoming_connections.end();
+                 it = data.desired_incoming_connections.begin()) {
+                remove_connection(it->second.first, node, it->first);
+            }
+
+            const std::string node_name = std::move(data.name);
+            node_data.erase(node);
+            node_for_name.erase(name);
+            for (uint32_t i = 0; i < RING_SIZE; i++) {
+                InFlightData& in_flight_data = ring_fences.get(i).user_data;
+                in_flight_data.in_flight_data.erase(node);
+            }
+
+            SPDLOG_DEBUG("removed node {} ({})", node_name, registry.node_name(node));
+            needs_reconnect = true;
+        };
+
+        if (run_in_progress) {
+            SPDLOG_DEBUG("schedule removal of node {} for the end of run the current run.", name);
+            on_run_finished_tasks.emplace_back(std::move(remove_task));
+        } else {
+            remove_task();
+        }
+
+        return true;
     }
 
     // --- connect / run graph ---
@@ -329,6 +400,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
     // Interaction with the run is possible using the callbacks.
     void run() {
         // PREPARE RUN: wait for fence, release resources, reset cmd pool
+        run_in_progress = true;
 
         // wait for the in-flight processing to finish
         InFlightData& in_flight_data = ring_fences.next_cycle_wait_get();
@@ -399,6 +471,10 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
         needs_reconnect |= run.needs_reconnect;
         iteration++;
+        for (const auto& task : on_run_finished_tasks)
+            task();
+        on_run_finished_tasks.clear();
+        run_in_progress = false;
     }
 
     // waits until all in-flight iterations have finished
@@ -419,19 +495,82 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         needs_reconnect = true;
     }
 
-    void properties(Properties& props) {
-        needs_reconnect |= props.config_bool("Rebuild");
-        props.output_text(fmt::format("Current iteration: {}", iteration));
+    std::vector<std::string> node_identifiers() {
+        std::vector<std::string> nodes;
+        for (const auto& [name, node] : node_for_name) {
+            nodes.emplace_back(name);
+        }
+        return nodes;
+    }
 
+    void properties(Properties& props) {
         if (props.is_ui() &&
             props.st_begin_child("edit", "Edit Graph", Properties::ChildFlagBits::FRAMED)) {
-
-            if (props.config_bool("Create Node")) {
-                add_node(registry.node_names()[selected_new_node]);
-            }
+            needs_reconnect |= props.config_bool("Rebuild");
             props.st_no_space();
-            props.config_options("", selected_new_node, registry.node_names(),
+            props.output_text(fmt::format("Current iteration: {}", iteration));
+
+            props.st_separate("Add Node");
+            props.config_options("new type", new_node_selected, registry.node_names(),
                                  Properties::OptionsStyle::COMBO);
+            if (props.config_text("new identifier", new_node_name.size(), new_node_name.data(),
+                                  true, "Set an optional name for the node and press enter.") ||
+                props.config_bool("Add Node")) {
+                std::optional<std::string> optional_identifier;
+                if (new_node_name[0]) {
+                    optional_identifier = new_node_name.data();
+                }
+                add_node(registry.node_names()[new_node_selected], optional_identifier);
+            }
+
+            const std::vector<std::string> node_ids = node_identifiers();
+            props.st_separate("Add Connection");
+            props.config_options("connection src", add_connection_selected_src, node_ids,
+                                 Properties::OptionsStyle::COMBO);
+            std::vector<std::string> src_outputs;
+            for (const auto& [output_name, output] :
+                 node_data.at(node_for_name.at(node_ids[add_connection_selected_src]))
+                     .output_connector_for_name) {
+                src_outputs.emplace_back(output_name);
+            }
+            props.config_options("connection src output", add_connection_selected_src_output,
+                                 src_outputs, Properties::OptionsStyle::COMBO);
+            props.config_options("connection dst", add_connection_selected_dst, node_ids,
+                                 Properties::OptionsStyle::COMBO);
+            NodeData& dst_data =
+                node_data.at(node_for_name.at(node_ids[add_connection_selected_dst]));
+            std::vector<std::string> dst_inputs;
+            for (const auto& [input_name, input] : dst_data.input_connector_for_name) {
+                dst_inputs.emplace_back(input_name);
+            }
+            props.config_options("connection dst input", add_connection_selected_dst_input,
+                                 dst_inputs, Properties::OptionsStyle::COMBO);
+            const bool valid_connection =
+                add_connection_selected_src_output < (int)src_outputs.size() &&
+                add_connection_selected_dst_input < (int)dst_inputs.size();
+            if (valid_connection) {
+                if (props.config_bool("Add Connection")) {
+                    add_connection(node_ids[add_connection_selected_src],
+                                   node_ids[add_connection_selected_dst],
+                                   src_outputs[add_connection_selected_src_output],
+                                   dst_inputs[add_connection_selected_dst_input]);
+                }
+
+                const auto it = dst_data.desired_incoming_connections.find(
+                    dst_inputs[add_connection_selected_dst_input]);
+                if (it != dst_data.desired_incoming_connections.end()) {
+                    props.st_no_space();
+                    props.output_text("Warning: Input already connected with {}, {} ({})",
+                                      it->second.second, node_data.at(it->second.first).name,
+                                      registry.node_name(it->second.first));
+                }
+            }
+            props.st_separate("Remove Node");
+            props.config_options("remove identifier", remove_node_selected, node_ids,
+                                 Properties::OptionsStyle::COMBO);
+            if (props.config_bool("Remove Node")) {
+                remove_node(node_ids[remove_node_selected]);
+            }
 
             props.st_end_child();
         }
@@ -478,10 +617,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         if (props.st_begin_child("nodes", "Nodes",
                                  Properties::ChildFlagBits::DEFAULT_OPEN |
                                      Properties::ChildFlagBits::FRAMED)) {
-            std::vector<std::string> nodes;
-            for (const auto& [name, node] : node_for_name) {
-                nodes.emplace_back(name);
-            }
+            std::vector<std::string> nodes = node_identifiers();
 
             if (nodes.empty() && !props.is_ui()) {
                 nodes = props.st_list_children();
@@ -528,8 +664,12 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                     }
                     NodeData& data = node_data.at(node);
 
-                    if (props.config_bool("disable node", data.disable))
+                    if (props.config_bool("Disable", data.disable))
                         request_reconnect();
+                    props.st_no_space();
+                    if (props.config_bool("Remove")) {
+                        remove_node(name);
+                    }
 
                     if (!data.errors.empty()) {
                         props.output_text(
@@ -546,7 +686,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                         props.output_text(fmt::format("{}", data.statistics));
                         props.st_end_child();
                     };
-                    io_props_for_node(props, data);
+                    io_props_for_node(props, node, data);
                     props.st_end_child();
                 }
             }
@@ -557,7 +697,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             nlohmann::json connections;
             if (!loading) {
                 for (const auto& [node, data] : node_data) {
-                    for (const NodeConnection& con : data.desired_connections) {
+                    for (const OutgoingNodeConnection& con : data.desired_outgoing_connections) {
                         nlohmann::json j_con;
                         j_con["src"] = data.name;
                         j_con["dst"] = node_data.at(con.dst).name;
@@ -622,12 +762,77 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             throw std::invalid_argument{"graph does not contain the source or destination node"};
         }
 
-        node_data.at(src).desired_connections.emplace(dst, src_output, dst_input);
+        NodeData& src_data = node_data.at(src);
+        NodeData& dst_data = node_data.at(dst);
+
+        if (dst_data.desired_incoming_connections.contains(dst_input)) {
+            const auto& [old_src, old_src_output] =
+                dst_data.desired_incoming_connections.at(dst_input);
+            const NodeData& old_src_data = node_data.at(old_src);
+            SPDLOG_DEBUG("remove conflicting connection {}, {} ({}) -> {}, {} ({})", old_src_output,
+                         old_src_data.name, registry.node_name(old_src), dst_input, dst_data.name,
+                         registry.node_name(dst));
+            remove_connection(old_src, dst, dst_input);
+        }
+
+        {
+            // outgoing
+            const auto [it, inserted] =
+                src_data.desired_outgoing_connections.emplace(dst, src_output, dst_input);
+            assert(inserted);
+        }
+
+        {
+            // incoming
+            const auto [it, inserted] =
+                dst_data.desired_incoming_connections.try_emplace(dst_input, src, src_output);
+            assert(inserted);
+        }
+
         needs_reconnect = true;
+        SPDLOG_DEBUG("added connection {}, {} ({}) -> {}, {} ({})", src_output, src_data.name,
+                     registry.node_name(src), dst_input, dst_data.name, registry.node_name(dst));
+    }
+
+    bool
+    remove_connection(const NodeHandle src, const NodeHandle dst, const std::string dst_input) {
+        // Developer note: Pass by reference is not used because this might be called with
+        // references to iterator objects of the sets/maps we edit.
+
+        if (!node_data.contains(src) || !node_data.contains(dst)) {
+            throw std::invalid_argument{"graph does not contain the source or destination node"};
+        }
+        NodeData& src_data = node_data.at(src);
+        NodeData& dst_data = node_data.at(dst);
+
+        const auto it = dst_data.desired_incoming_connections.find(dst_input);
+        if (it == dst_data.desired_incoming_connections.end()) {
+            SPDLOG_WARN("connection {} ({}) -> {}, {} ({}) does not exist and cannot be removed.",
+                        src_data.name, registry.node_name(src), dst_input, dst_data.name,
+                        registry.node_name(dst));
+            return false;
+        }
+
+        const std::string src_output = it->second.second;
+        dst_data.desired_incoming_connections.erase(it);
+
+        const auto out_it =
+            src_data.desired_outgoing_connections.find({dst, src_output, dst_input});
+        // else we did not add the connection properly
+        assert(out_it != src_data.desired_outgoing_connections.end());
+        src_data.desired_outgoing_connections.erase(out_it);
+        SPDLOG_DEBUG("removed connection {}, {} ({}) -> {}, {} ({})", src_output, src_data.name,
+                     registry.node_name(src), dst_input, dst_data.name, registry.node_name(dst));
+
+        needs_reconnect = true;
+        return true;
+
+        // Note: Since the connections are not needed in a graph run we do not need to wait until
+        // the end of a run to remove the conenction.
     }
 
     /*--- Properties ---*/
-    void io_props_for_node(Properties& config, NodeData& data) {
+    void io_props_for_node(Properties& config, NodeHandle& node, NodeData& data) {
         if (data.descriptor_set_layout &&
             config.st_begin_child("desc_set_layout", "Descriptor Set Layout")) {
             config.output_text(fmt::format("{}", data.descriptor_set_layout));
@@ -671,24 +876,38 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             }
             config.st_end_child();
         }
-        if (!data.input_connections.empty() && config.st_begin_child("inputs", "Inputs")) {
-            for (auto& [input, per_input_info] : data.input_connections) {
+        if (!data.input_connectors.empty() && config.st_begin_child("inputs", "Inputs")) {
+            for (const auto& input : data.input_connectors) {
                 if (config.st_begin_child(input->name, input->name)) {
-                    config.output_text(fmt::format(
-                        "Descriptor set binding: {}",
-                        per_input_info.descriptor_set_binding == NodeData::NO_DESCRIPTOR_BINDING
-                            ? "None"
-                            : std::to_string(per_input_info.descriptor_set_binding)));
-                    if (per_input_info.output) {
-                        config.output_text(fmt::format("Receiving from: {}, {} ({})",
-                                                       per_input_info.output->name,
-                                                       node_data.at(per_input_info.node).name,
-                                                       registry.node_name(per_input_info.node)));
-                    } else {
-                        config.output_text("Optional input not connected.");
-                    }
                     config.st_separate("Input Properties");
                     input->properties(config);
+                    config.st_separate("Connection");
+                    if (data.input_connections.contains(input)) {
+                        auto& per_input_info = data.input_connections.at(input);
+                        config.output_text(fmt::format(
+                            "Descriptor set binding: {}",
+                            per_input_info.descriptor_set_binding == NodeData::NO_DESCRIPTOR_BINDING
+                                ? "None"
+                                : std::to_string(per_input_info.descriptor_set_binding)));
+                        if (per_input_info.output) {
+                            config.output_text(fmt::format(
+                                "Receiving from: {}, {} ({})", per_input_info.output->name,
+                                node_data.at(per_input_info.node).name,
+                                registry.node_name(per_input_info.node)));
+                        } else {
+                            config.output_text("Optional input not connected.");
+                        }
+                    } else {
+                        config.output_text("Input not connected.");
+                    }
+
+                    if (data.desired_incoming_connections.contains(input->name) &&
+                        config.config_bool("Remove Connection")) {
+                        auto& incoming_conection =
+                            data.desired_incoming_connections.at(input->name);
+                        remove_connection(incoming_conection.first, node, input->name);
+                    }
+
                     config.st_end_child();
                 }
             }
@@ -737,7 +956,8 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                   [[maybe_unused]] const ProfilerHandle& profiler) {
         const uint32_t set_idx = iteration % data.descriptor_sets.size();
 
-        MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, fmt::format("{} ({})", data.name, registry.node_name(node)));
+        MERIAN_PROFILE_SCOPE_GPU(profiler, cmd,
+                                 fmt::format("{} ({})", data.name, registry.node_name(node)));
 
         std::vector<vk::ImageMemoryBarrier2> image_barriers;
         std::vector<vk::BufferMemoryBarrier2> buffer_barriers;
@@ -902,8 +1122,16 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
         // Store connectors that might be connected (there may still be an invalid connection...)
         for (auto& [node, data] : node_data) {
-            for (const auto& connection : data.desired_connections) {
+            for (const auto& connection : data.desired_outgoing_connections) {
                 NodeData& dst_data = node_data.at(connection.dst);
+                if (!dst_data.errors.empty()) {
+                    SPDLOG_WARN("node {} has errors and connection {}, {} ({}) -> {}, {} ({}) "
+                                "cannot be validated.",
+                                dst_data.name, connection.src_output, data.name,
+                                registry.node_name(node), connection.dst_input, dst_data.name,
+                                registry.node_name(connection.dst));
+                    continue;
+                }
                 if (!dst_data.input_connector_for_name.contains(connection.dst_input)) {
                     throw graph_errors::illegal_connection{
                         fmt::format("node {} ({}) does not have an input {}.", dst_data.name,
@@ -914,11 +1142,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                     dst_data.input_connector_for_name[connection.dst_input];
                 const auto [it, inserted] = maybe_connected_inputs.try_emplace(dst_input, node);
 
-                if (!inserted) {
-                    throw graph_errors::illegal_connection{
-                        fmt::format("the input {} on node ({}) {} is already connected.",
-                                    connection.dst_input, data.name, registry.node_name(node))};
-                }
+                assert(inserted); // uniqueness should be made sure in add_connection!
             }
         }
     }
@@ -969,7 +1193,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                       const std::unordered_set<NodeHandle>& visited) {
         assert(visited.contains(node) && "necessary for self loop check");
 
-        for (const NodeConnection& connection : data.desired_connections) {
+        for (const OutgoingNodeConnection& connection : data.desired_outgoing_connections) {
             NodeData& dst_data = node_data.at(connection.dst);
             if (!data.output_connector_for_name.contains(connection.src_output)) {
                 throw graph_errors::illegal_connection{
@@ -1266,7 +1490,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 }
             }
             dst_data.descriptor_set_layout = layout_builder.build_layout(context);
-            SPDLOG_DEBUG("descriptor set layout for node {} ({}): {}", dst_data.name,
+            SPDLOG_DEBUG("descriptor set layout for node {} ({}):\n{}", dst_data.name,
                          registry.node_name(dst_node), dst_data.descriptor_set_layout);
 
             // --- FIND NUMBER OF SETS ---
@@ -1416,6 +1640,8 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
     uint64_t iteration = 0;
     bool profiler_enable = true;
     uint32_t profiler_report_intervall_ms = 50;
+    bool run_in_progress = false;
+    std::vector<std::function<void()>> on_run_finished_tasks;
 
     Profiler::Report last_build_report;
     Profiler::Report last_run_report;
@@ -1438,7 +1664,13 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
     std::unordered_map<InputConnectorHandle, NodeHandle> maybe_connected_inputs;
 
     // Properties helper
-    int selected_new_node = 0;
+    int new_node_selected = 0;
+    std::array<char, 128> new_node_name = {0};
+    int remove_node_selected = 0;
+    int add_connection_selected_src = 0;
+    int add_connection_selected_src_output = 0;
+    int add_connection_selected_dst = 0;
+    int add_connection_selected_dst_input = 0;
 };
 
 } // namespace merian_nodes

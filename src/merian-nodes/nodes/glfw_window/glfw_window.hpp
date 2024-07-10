@@ -1,6 +1,7 @@
 #pragma once
 
 #include "merian-nodes/connectors/managed_vk_image_in.hpp"
+#include "merian-nodes/graph/errors.hpp"
 #include "merian-nodes/graph/node.hpp"
 
 #include "merian/vk/extension/extension_vk_glfw.hpp"
@@ -14,19 +15,23 @@ namespace merian_nodes {
 
 /*
  * Outputs to a GLFW window.
- * This node makes use of the error handling features of ExtensionVkGLFW, meaning, consider using
- * that to initialize GLFW.
+ * This node requires the error handling features of ExtensionVkGLFW
  */
 class GLFWWindow : public Node {
   public:
     GLFWWindow(const SharedContext context) : Node() {
-        window = std::make_shared<merian::GLFWWindow>(context);
-        surface = window->get_surface();
-        swapchain = std::make_shared<merian::Swapchain>(context, surface);
-        vsync = swapchain->vsync_enabled();
+        if (context->get_extension<ExtensionVkGLFW>()) {
+            window = std::make_shared<merian::GLFWWindow>(context);
+            swapchain = std::make_shared<merian::Swapchain>(context, window->get_surface());
+            vsync = swapchain->vsync_enabled();
+        }
     }
 
     virtual std::vector<InputConnectorHandle> describe_inputs() override {
+        if (!window) {
+            throw graph_errors::node_error{"node requires ExtensionVkGLFW context extension"};
+        }
+
         return {image_in};
     }
 
@@ -164,7 +169,6 @@ class GLFWWindow : public Node {
 
   private:
     GLFWWindowHandle window;
-    SurfaceHandle surface;
 
     SwapchainHandle swapchain;
     std::optional<SwapchainAcquireResult> acquire;

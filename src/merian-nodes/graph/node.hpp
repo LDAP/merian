@@ -35,8 +35,8 @@ class Node : public std::enable_shared_from_this<Node> {
     //
     // Note that input and output names must be unique.
     //
-    // If you throw a node error here the graph will disable the node for this connect attempt and
-    // set the error state for this node.
+    // If you throw a node_error here the graph will disable the node for this connect attempt and
+    // set the error state for this node. Your inputs will then be invisible.
     [[nodiscard]]
     virtual std::vector<InputConnectorHandle> describe_inputs() {
         return {};
@@ -50,7 +50,7 @@ class Node : public std::enable_shared_from_this<Node> {
     //
     // Note that input and output names must be unique.
     //
-    // If you throw a node error here the graph will disable the node for this connect attempt and
+    // If you throw a node_error here the graph will disable the node for this connect attempt and
     // set the error state for this node.
     [[nodiscard]]
     virtual std::vector<OutputConnectorHandle>
