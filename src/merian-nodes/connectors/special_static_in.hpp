@@ -26,7 +26,7 @@ class SpecialStaticIn
     void on_connect_output(const OutputConnectorHandle& output) override {
         auto casted_output = std::dynamic_pointer_cast<SpecialStaticOut<ValueType>>(output);
         if (!casted_output) {
-            throw graph_errors::connector_error{fmt::format(
+            throw graph_errors::invalid_connection{fmt::format(
                 "SpecialStaticIn {} cannot recive from {}.", Connector::name, output->name)};
         }
     }

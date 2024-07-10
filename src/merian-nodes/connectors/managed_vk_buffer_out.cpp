@@ -98,11 +98,7 @@ GraphResourceHandle ManagedVkBufferOut::create_resource(
     vk::AccessFlags2 input_access_flags;
 
     for (auto& [input_node, input] : inputs) {
-        const auto& buffer_in = std::dynamic_pointer_cast<ManagedVkBufferIn>(input);
-        if (!buffer_in) {
-            throw graph_errors::connector_error{
-                fmt::format("VkImageOut {} cannot output to {}.", name, input->name)};
-        }
+        const auto& buffer_in = debugable_ptr_cast<ManagedVkBufferIn>(input);
         usage_flags |= buffer_in->usage_flags;
         input_pipeline_stages |= buffer_in->pipeline_stages;
         input_access_flags |= buffer_in->access_flags;

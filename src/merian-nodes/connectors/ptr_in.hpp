@@ -23,7 +23,7 @@ class PtrIn : public TypedInputConnector<PtrOutHandle<T>, const std::shared_ptr<
     void on_connect_output(const OutputConnectorHandle& output) override {
         auto casted_output = std::dynamic_pointer_cast<PtrOut<T>>(output);
         if (!casted_output) {
-            throw graph_errors::connector_error{
+            throw graph_errors::invalid_connection{
                 fmt::format("AnyIn {} cannot recive from {}.", Connector::name, output->name)};
         }
     }

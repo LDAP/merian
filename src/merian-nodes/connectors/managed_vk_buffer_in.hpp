@@ -29,6 +29,8 @@ class ManagedVkBufferIn : public TypedInputConnector<ManagedVkBufferOutHandle, B
                                        DescriptorSetUpdate& update,
                                        const ResourceAllocatorHandle& allocator) override;
 
+    virtual void on_connect_output(const OutputConnectorHandle& output) override;
+
     virtual BufferHandle resource(const GraphResourceHandle& resource) override;
 
     virtual ConnectorStatusFlags

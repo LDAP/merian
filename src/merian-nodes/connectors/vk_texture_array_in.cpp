@@ -69,7 +69,7 @@ const TextureArrayResource& VkTextureArrayIn::resource(const GraphResourceHandle
 void VkTextureArrayIn::on_connect_output(const OutputConnectorHandle& output) {
     auto casted_output = std::dynamic_pointer_cast<VkTextureArrayOut>(output);
     if (!casted_output) {
-        throw graph_errors::connector_error{
+        throw graph_errors::invalid_connection{
             fmt::format("TextureArrayIn {} cannot recive from {}.", name, output->name)};
     }
     array_size = casted_output->textures.size();

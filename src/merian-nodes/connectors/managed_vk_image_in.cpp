@@ -1,4 +1,6 @@
 #include "managed_vk_image_in.hpp"
+
+#include "merian-nodes/graph/errors.hpp"
 #include "merian-nodes/graph/node.hpp"
 #include "merian-nodes/resources/managed_vk_image_resource.hpp"
 
@@ -76,6 +78,14 @@ Connector::ConnectorStatusFlags ManagedVkImageIn::on_pre_process(
     }
 
     return flags;
+}
+
+void ManagedVkImageIn::on_connect_output(const OutputConnectorHandle& output) {
+    auto casted_output = std::dynamic_pointer_cast<ManagedVkImageOut>(output);
+    if (!casted_output) {
+        throw graph_errors::invalid_connection{
+            fmt::format("ManagedVkImageIn {} cannot recive from {}.", name, output->name)};
+    }
 }
 
 ImageHandle ManagedVkImageIn::resource(const GraphResourceHandle& resource) {

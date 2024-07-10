@@ -19,11 +19,7 @@ VkTLASOut::create_resource(const std::vector<std::tuple<NodeHandle, InputConnect
     vk::PipelineStageFlags2 read_stages;
 
     for (auto& [input_node, input] : inputs) {
-        const auto& con_in = std::dynamic_pointer_cast<VkTLASIn>(input);
-        if (!con_in) {
-            throw graph_errors::connector_error{
-                fmt::format("VkTLASOut {} cannot output to {}.", name, input->name)};
-        }
+        const auto& con_in = debugable_ptr_cast<VkTLASIn>(input);
         read_stages |= con_in->pipeline_stages;
     }
 

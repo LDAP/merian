@@ -16,7 +16,6 @@ class OutputConnector : public Connector {
         : Connector(name), supports_delay(supports_delay) {}
 
     // Create the resource for this output. This is called max_delay + 1 times per graph build.
-    // Throw connector_error if this output cannot output to one of the supplied inputs.
     //
     // If the resource is availible via descriptors you must ensure needs_descriptor_update.
     //
@@ -37,7 +36,7 @@ class OutputConnector : public Connector {
                     const uint32_t resoruce_index,
                     const uint32_t ring_size) = 0;
 
-    // Throw connector_error, if the resource cannot interface with the supplied connector (try
+    // Throw invalid_connection, if the resource cannot interface with the supplied connector (try
     // dynamic cast or use merian::test_shared_ptr_types). Can also be used to pre-compute barriers
     // or similar.
     virtual void on_connect_input([[maybe_unused]] const InputConnectorHandle& input) {}

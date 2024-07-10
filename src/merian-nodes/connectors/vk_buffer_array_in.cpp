@@ -42,7 +42,7 @@ const BufferArrayResource& VkBufferArrayIn::resource(const GraphResourceHandle& 
 void VkBufferArrayIn::on_connect_output(const OutputConnectorHandle& output) {
     auto casted_output = std::dynamic_pointer_cast<VkBufferArrayOut>(output);
     if (!casted_output) {
-        throw graph_errors::connector_error{
+        throw graph_errors::invalid_connection{
             fmt::format("BufferArrayIn {} cannot recive from {}.", name, output->name)};
     }
     array_size = casted_output->buffers.size();

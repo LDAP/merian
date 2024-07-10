@@ -1,4 +1,5 @@
 #include "vk_tlas_in.hpp"
+#include "merian-nodes/graph/errors.hpp"
 
 namespace merian_nodes {
 
@@ -8,6 +9,14 @@ VkTLASIn::VkTLASIn(const std::string& name,
     : TypedInputConnector(name, 0), stage_flags(stage_flags), pipeline_stages(pipeline_stages) {
     assert(stage_flags);
     assert(pipeline_stages);
+}
+
+void VkTLASIn::on_connect_output(const OutputConnectorHandle& output) {
+    auto casted_output = std::dynamic_pointer_cast<VkTLASOut>(output);
+    if (!casted_output) {
+        throw graph_errors::invalid_connection{
+            fmt::format("VkTLASIn {} cannot receive from {}.", name, output->name)};
+    }
 }
 
 std::optional<vk::DescriptorSetLayoutBinding> VkTLASIn::get_descriptor_info() const {

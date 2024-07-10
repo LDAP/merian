@@ -89,11 +89,7 @@ GraphResourceHandle ManagedVkImageOut::create_resource(
     std::map<std::pair<NodeHandle, uint32_t>, vk::ImageLayout> layouts_per_node;
 
     for (auto& [input_node, input] : inputs) {
-        const auto& image_in = std::dynamic_pointer_cast<ManagedVkImageIn>(input);
-        if (!image_in) {
-            throw graph_errors::connector_error{
-                fmt::format("VkImageOut {} cannot output to {}.", name, input->name)};
-        }
+        const auto& image_in = debugable_ptr_cast<ManagedVkImageIn>(input);
         create_info.usage |= image_in->usage_flags;
         input_pipeline_stages |= image_in->pipeline_stages;
         input_access_flags |= image_in->access_flags;

@@ -1,7 +1,6 @@
 #include "vk_buffer_array_out.hpp"
 #include "vk_buffer_array_in.hpp"
 
-#include "merian-nodes/graph/errors.hpp"
 #include "merian-nodes/graph/node.hpp"
 #include "merian/utils/pointer.hpp"
 
@@ -21,11 +20,7 @@ GraphResourceHandle VkBufferArrayOut::create_resource(
     vk::AccessFlags2 input_access_flags;
 
     for (auto& [input_node, input] : inputs) {
-        const auto& con_in = std::dynamic_pointer_cast<VkBufferArrayIn>(input);
-        if (!con_in) {
-            throw graph_errors::connector_error{
-                fmt::format("VkImageOut {} cannot output to {}.", name, input->name)};
-        }
+        const auto& con_in = debugable_ptr_cast<VkBufferArrayIn>(input);
         input_pipeline_stages |= con_in->pipeline_stages;
         input_access_flags |= con_in->access_flags;
     }

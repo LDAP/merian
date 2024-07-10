@@ -18,7 +18,7 @@ const std::any& AnyIn::resource(const GraphResourceHandle& resource) {
 void AnyIn::on_connect_output(const OutputConnectorHandle& output) {
     auto casted_output = std::dynamic_pointer_cast<AnyOut>(output);
     if (!casted_output) {
-        throw graph_errors::connector_error{
+        throw graph_errors::invalid_connection{
             fmt::format("AnyIn {} cannot recive from {}.", Connector::name, output->name)};
     }
 }

@@ -41,6 +41,8 @@ class ManagedVkImageIn : public TypedInputConnector<ManagedVkImageOutHandle, Ima
                    std::vector<vk::ImageMemoryBarrier2>& image_barriers,
                    std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) override;
 
+    void on_connect_output(const OutputConnectorHandle& output) override;
+
     virtual ImageHandle resource(const GraphResourceHandle& resource) override;
 
   public:

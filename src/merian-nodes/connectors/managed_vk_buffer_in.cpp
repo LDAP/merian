@@ -1,5 +1,6 @@
 #include "managed_vk_buffer_in.hpp"
 
+#include "merian-nodes/graph/errors.hpp"
 #include "merian-nodes/resources/managed_vk_buffer_resource.hpp"
 #include "merian/utils/pointer.hpp"
 
@@ -49,6 +50,14 @@ Connector::ConnectorStatusFlags ManagedVkBufferIn::on_pre_process(
     }
 
     return flags;
+}
+
+void ManagedVkBufferIn::on_connect_output(const OutputConnectorHandle& output) {
+    auto casted_output = std::dynamic_pointer_cast<ManagedVkBufferOut>(output);
+    if (!casted_output) {
+        throw graph_errors::invalid_connection{
+            fmt::format("ManagedVkBufferIn {} cannot recive from {}.", name, output->name)};
+    }
 }
 
 BufferHandle ManagedVkBufferIn::resource(const GraphResourceHandle& resource) {

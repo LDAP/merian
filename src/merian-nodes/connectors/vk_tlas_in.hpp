@@ -19,6 +19,8 @@ class VkTLASIn : public TypedInputConnector<VkTLASOutHandle, const AccelerationS
              const vk::ShaderStageFlags stage_flags,
              const vk::PipelineStageFlags2 pipeline_stages);
 
+    void on_connect_output(const OutputConnectorHandle& output) override;
+
     std::optional<vk::DescriptorSetLayoutBinding> get_descriptor_info() const override;
 
     void get_descriptor_update(const uint32_t binding,

@@ -22,11 +22,7 @@ GraphResourceHandle VkTextureArrayOut::create_resource(
     vk::ImageLayout first_input_layout = vk::ImageLayout::eUndefined;
 
     for (auto& [input_node, input] : inputs) {
-        const auto& con_in = std::dynamic_pointer_cast<VkTextureArrayIn>(input);
-        if (!con_in) {
-            throw graph_errors::connector_error{
-                fmt::format("VkTextureArrayOut {} cannot output to {}.", name, input->name)};
-        }
+        const auto& con_in = debugable_ptr_cast<VkTextureArrayIn>(input);
         input_pipeline_stages |= con_in->pipeline_stages;
         input_access_flags |= con_in->access_flags;
 

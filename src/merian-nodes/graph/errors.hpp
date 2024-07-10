@@ -30,9 +30,9 @@ class node_error : public graph_error {
 
 // attempted to connect() a graph with an illegal connection present. For example, an input does not
 // support the resource / output that is connected into it.)
-class illegal_connection : public graph_error {
+class invalid_connection : public graph_error {
   public:
-    illegal_connection(const std::string& what_arg) : graph_error(what_arg) {}
+    invalid_connection(const std::string& what_arg) : graph_error(what_arg) {}
 };
 
 // attempted to connect() a graph with a missing connection. Meaning a node input was not connected
