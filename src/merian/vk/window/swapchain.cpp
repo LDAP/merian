@@ -276,7 +276,7 @@ Swapchain::acquire(const std::function<vk::Extent2D()>& framebuffer_extent,
         }
     }
 
-    vk::Result result = context->device.acquireNextImageKHR(
+    const vk::Result result = context->device.acquireNextImageKHR(
         swapchain, timeout, *current_read_semaphore(), {}, &current_image_idx);
 
     if (result == vk::Result::eSuccess) {
@@ -305,7 +305,9 @@ void Swapchain::present(const QueueHandle& queue) {
     vk::PresentInfoKHR present_info{
         1,
         &**current_written_semaphore(), // wait until the user is done writing to the image
-        1,        &swapchain, &current_image_idx,
+        1,
+        &swapchain,
+        &current_image_idx,
     };
     vk::Result result = queue->present(present_info);
     if (result == vk::Result::eSuccess || result == vk::Result::eSuboptimalKHR) {

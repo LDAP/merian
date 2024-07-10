@@ -232,7 +232,7 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
     uint32_t current_image_idx;
     // updated in present
     std::vector<SemaphoreGroup> semaphore_groups;
-    uint32_t current_semaphore_idx;
+    uint32_t current_semaphore_idx = 0;
     std::vector<vk::ImageMemoryBarrier> barriers;
     uint32_t cur_width = 0;
     uint32_t cur_height = 0;
