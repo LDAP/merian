@@ -42,11 +42,12 @@ struct OutgoingNodeConnection {
 struct NodeData {
     static const uint32_t NO_DESCRIPTOR_BINDING = -1u;
 
-    NodeData(const std::string& name) : name(name) {}
+    NodeData(const std::string& identifier) : identifier(identifier) {}
 
-    // A unique name for this node from the user. This is not the name from the node registry.
+    // A unique name that identifies this node (user configurable).
+    // This is not the name from the node registry.
     // (on add_node)
-    std::string name;
+    std::string identifier;
 
     // User disabled
     bool disable{};
@@ -221,19 +222,20 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
     //
     // The node_type must be a known type to the registry.
     //
-    // Throws invalid_argument, if a node with this name already exists, the graph contains the
-    // same node under a different name.
-    std::string add_node(const std::string& node_type,
-                         const std::optional<std::string>& name = std::nullopt) {
-        return add_node(registry.create_node_from_name(node_type), name);
+    // Throws invalid_argument, if a node with this identifier already exists.
+    //
+    // Returns the node identifier.
+    const std::string& add_node(const std::string& node_type,
+                                const std::optional<std::string>& identifier = std::nullopt) {
+        return add_node(registry.create_node_from_name(node_type), identifier);
     }
 
     // Returns nullptr if the node does not exist.
-    NodeHandle get_node_for_name(const std::string& name) const {
-        if (!node_for_name.contains(name)) {
+    NodeHandle get_node_for_identifier(const std::string& identifier) const {
+        if (!node_for_identifier.contains(identifier)) {
             return nullptr;
         }
-        return node_for_name.at(name);
+        return node_for_identifier.at(identifier);
     }
 
     // Adds a connection to the graph.
@@ -247,8 +249,8 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                         const std::string& dst,
                         const std::string& src_output,
                         const std::string& dst_input) {
-        const NodeHandle src_node = get_node_for_name(src);
-        const NodeHandle dst_node = get_node_for_name(dst);
+        const NodeHandle src_node = get_node_for_identifier(src);
+        const NodeHandle dst_node = get_node_for_identifier(dst);
         assert(src_node);
         assert(dst_node);
         add_connection(src_node, dst_node, src_output, dst_input);
@@ -257,24 +259,25 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
     bool remove_connection(const std::string& src,
                            const std::string& dst,
                            const std::string& dst_input) {
-        const NodeHandle src_node = get_node_for_name(src);
-        const NodeHandle dst_node = get_node_for_name(dst);
+        const NodeHandle src_node = get_node_for_identifier(src);
+        const NodeHandle dst_node = get_node_for_identifier(dst);
         assert(src_node);
         assert(dst_node);
         remove_connection(src_node, dst_node, dst_input);
     }
 
     // Removes a node from the graph.
+    //
     // If a run is in progress the removal is queued for the end of the run.
-    bool remove_node(const std::string& name) {
-        if (!node_for_name.contains(name)) {
+    bool remove_node(const std::string& identifier) {
+        if (!node_for_identifier.contains(identifier)) {
             return false;
         }
 
-        const std::function<void()> remove_task = [this, name] {
+        const std::function<void()> remove_task = [this, identifier] {
             wait();
 
-            const NodeHandle node = node_for_name.at(name);
+            const NodeHandle node = node_for_identifier.at(identifier);
             const NodeData& data = node_data.at(node);
 
             for (auto it = data.desired_outgoing_connections.begin();
@@ -289,20 +292,21 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 remove_connection(it->second.first, node, it->first);
             }
 
-            const std::string node_name = std::move(data.name);
+            const std::string node_identifier = std::move(data.identifier);
             node_data.erase(node);
-            node_for_name.erase(name);
+            node_for_identifier.erase(identifier);
             for (uint32_t i = 0; i < RING_SIZE; i++) {
                 InFlightData& in_flight_data = ring_fences.get(i).user_data;
                 in_flight_data.in_flight_data.erase(node);
             }
 
-            SPDLOG_DEBUG("removed node {} ({})", node_name, registry.node_name(node));
-            needs_reconnect = true;
+            SPDLOG_DEBUG("removed node {} ({})", node_identifier, registry.node_name(node));
+            _needs_reconnect = true;
         };
 
         if (run_in_progress) {
-            SPDLOG_DEBUG("schedule removal of node {} for the end of run the current run.", name);
+            SPDLOG_DEBUG("schedule removal of node {} for the end of run the current run.",
+                         identifier);
             on_run_finished_tasks.emplace_back(std::move(remove_task));
         } else {
             remove_task();
@@ -313,24 +317,18 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
     // --- connect / run graph ---
 
-    // Attempts to connect the graph with the current set of connections
-    // May fail with invalid_connection if there is a illegal connection present (a node input does
-    // not support the connected output or the graph contains a undelayed cycle). May fail with
-    // connection_missing if a node input was not connected. May fail with conenector_error if two
-    // input or output connectors have the same name.
+    // Attempts to connect the graph with the current set of connections.
     //
-    // If this method returns without throwing the graph was successfully connected and can be run
-    // using the run() method.
+    // Invalid connections are automatically eliminated. In this case connect returns with
+    // needs_reconnect still being true. For this reason connect should be called in a loop.
     //
-    // the configuration allow to inspect the partial connections as well
-    //
-    // Usually you need to call this in a loop until "needs_reconnect" is false.
+    // May fail with conenector_error if two input or output connectors have the same name.
     void connect() {
         ProfilerHandle profiler = std::make_shared<Profiler>(context);
         {
             MERIAN_PROFILE_SCOPE(profiler, "connect");
 
-            needs_reconnect = false;
+            _needs_reconnect = false;
 
             // no nodes -> no connect necessary
             if (node_data.empty()) {
@@ -364,7 +362,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 if (!connect_nodes()) {
                     SPDLOG_WARN(
                         "Connecting nodes failed :( But attempted self healing. Retry, please!");
-                    needs_reconnect = true;
+                    _needs_reconnect = true;
                     return;
                 }
             }
@@ -383,11 +381,12 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 MERIAN_PROFILE_SCOPE(profiler, "Node::on_connected");
                 for (auto& node : flat_topology) {
                     NodeData& data = node_data.at(node);
-                    MERIAN_PROFILE_SCOPE(
-                        profiler, fmt::format("{} ({})", data.name, registry.node_name(node)));
-                    SPDLOG_DEBUG("on_connected node: {} ({})", data.name, registry.node_name(node));
+                    MERIAN_PROFILE_SCOPE(profiler, fmt::format("{} ({})", data.identifier,
+                                                               registry.node_name(node)));
+                    SPDLOG_DEBUG("on_connected node: {} ({})", data.identifier,
+                                 registry.node_name(node));
                     Node::NodeStatusFlags flags = node->on_connected(data.descriptor_set_layout);
-                    needs_reconnect |= flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT;
+                    _needs_reconnect |= flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT;
                     if (flags & Node::NodeStatusFlagBits::RESET_IN_FLIGHT_DATA) {
                         for (uint32_t i = 0; i < RING_SIZE; i++) {
                             ring_fences.get(i).user_data.in_flight_data.at(node).reset();
@@ -402,7 +401,8 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
     // Runs one iteration of the graph.
     //
-    // If necessary, the graph is automatically built.
+    // If necessary, the graph is automatically connected.
+    //
     // The execution is blocked until the fence according to the current iteration is signaled.
     // Interaction with the run is possible using the callbacks.
     void run() {
@@ -425,7 +425,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         // CONNECT and PREPROCESS
         do {
             // While connection nodes can signalize that they need to reconnect
-            while (needs_reconnect) {
+            while (_needs_reconnect) {
                 connect();
             }
 
@@ -436,18 +436,18 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 MERIAN_PROFILE_SCOPE(profiler, "Preprocess nodes");
                 for (auto& node : flat_topology) {
                     NodeData& data = node_data.at(node);
-                    MERIAN_PROFILE_SCOPE(
-                        profiler, fmt::format("{} ({})", data.name, registry.node_name(node)));
+                    MERIAN_PROFILE_SCOPE(profiler, fmt::format("{} ({})", data.identifier,
+                                                               registry.node_name(node)));
                     const uint32_t set_idx = iteration % data.descriptor_sets.size();
                     Node::NodeStatusFlags flags =
                         node->pre_process(run, data.resource_maps[set_idx]);
-                    needs_reconnect |= flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT;
+                    _needs_reconnect |= flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT;
                     if (flags & Node::NodeStatusFlagBits::RESET_IN_FLIGHT_DATA) {
                         in_flight_data.in_flight_data[node].reset();
                     }
                 }
             }
-        } while (needs_reconnect);
+        } while (_needs_reconnect);
 
         // RUN
         {
@@ -476,7 +476,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         run.execute_callbacks(queue);
         on_post_submit();
 
-        needs_reconnect |= run.needs_reconnect;
+        _needs_reconnect |= run.needs_reconnect;
         iteration++;
         for (const auto& task : on_run_finished_tasks)
             task();
@@ -492,26 +492,31 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
     // removes all nodes and connections from the graph.
     void reset() {
         wait();
+
         node_data.clear();
-        node_for_name.clear();
-        needs_reconnect = true;
+        node_for_identifier.clear();
+        for (uint32_t i = 0; i < RING_SIZE; i++) {
+            InFlightData& in_flight_data = ring_fences.get(i).user_data;
+            in_flight_data.in_flight_data.clear();
+        }
+        _needs_reconnect = true;
     }
 
     // Ensures at reconnect at the next run
     void request_reconnect() {
-        needs_reconnect = true;
+        _needs_reconnect = true;
     }
 
-    std::vector<std::string> node_identifiers() {
-        std::vector<std::string> nodes;
-        for (const auto& [name, node] : node_for_name) {
-            nodes.emplace_back(name);
-        }
-        return nodes;
+    bool needs_reconnect() {
+        return _needs_reconnect;
+    }
+
+    auto identifiers() {
+        return std::as_const(node_for_identifier) | std::ranges::views::keys;
     }
 
     void properties(Properties& props) {
-        needs_reconnect |= props.config_bool("Rebuild");
+        _needs_reconnect |= props.config_bool("Rebuild");
         props.st_no_space();
         props.output_text(fmt::format("Current iteration: {}", iteration));
 
@@ -520,23 +525,23 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             props.st_separate("Add Node");
             props.config_options("new type", new_node_selected, registry.node_names(),
                                  Properties::OptionsStyle::COMBO);
-            if (props.config_text("new identifier", new_node_name.size(), new_node_name.data(),
+            if (props.config_text("new identifier", new_node_identifier.size(), new_node_identifier.data(),
                                   true, "Set an optional name for the node and press enter.") ||
                 props.config_bool("Add Node")) {
                 std::optional<std::string> optional_identifier;
-                if (new_node_name[0]) {
-                    optional_identifier = new_node_name.data();
+                if (new_node_identifier[0]) {
+                    optional_identifier = new_node_identifier.data();
                 }
                 add_node(registry.node_names()[new_node_selected], optional_identifier);
             }
 
-            const std::vector<std::string> node_ids = node_identifiers();
+            const std::vector<std::string> node_ids(identifiers().begin(), identifiers().end());
             props.st_separate("Add Connection");
             props.config_options("connection src", add_connection_selected_src, node_ids,
                                  Properties::OptionsStyle::COMBO);
             std::vector<std::string> src_outputs;
             for (const auto& [output_name, output] :
-                 node_data.at(node_for_name.at(node_ids[add_connection_selected_src]))
+                 node_data.at(node_for_identifier.at(node_ids[add_connection_selected_src]))
                      .output_connector_for_name) {
                 src_outputs.emplace_back(output_name);
             }
@@ -545,7 +550,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             props.config_options("connection dst", add_connection_selected_dst, node_ids,
                                  Properties::OptionsStyle::COMBO);
             NodeData& dst_data =
-                node_data.at(node_for_name.at(node_ids[add_connection_selected_dst]));
+                node_data.at(node_for_identifier.at(node_ids[add_connection_selected_dst]));
             std::vector<std::string> dst_inputs;
             for (const auto& [input_name, input] : dst_data.input_connector_for_name) {
                 dst_inputs.emplace_back(input_name);
@@ -568,7 +573,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 if (it != dst_data.desired_incoming_connections.end()) {
                     props.st_no_space();
                     props.output_text("Warning: Input already connected with {}, {} ({})",
-                                      it->second.second, node_data.at(it->second.first).name,
+                                      it->second.second, node_data.at(it->second.first).identifier,
                                       registry.node_name(it->second.first));
                 }
             }
@@ -624,7 +629,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         if (props.st_begin_child("nodes", "Nodes",
                                  Properties::ChildFlagBits::DEFAULT_OPEN |
                                      Properties::ChildFlagBits::FRAMED)) {
-            std::vector<std::string> nodes = node_identifiers();
+            std::vector<std::string> nodes(identifiers().begin(), identifiers().end());
 
             if (nodes.empty() && !props.is_ui()) {
                 nodes = props.st_list_children();
@@ -638,12 +643,12 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 }
             }
 
-            for (const auto& name : nodes) {
+            for (const auto& identifier : nodes) {
 
                 std::string node_label;
                 if (!loading) {
                     // otherwise the node data does not exist!
-                    const NodeHandle& node = node_for_name.at(name);
+                    const NodeHandle& node = node_for_identifier.at(identifier);
                     const auto& data = node_data.at(node);
                     std::string state = "OK";
                     if (data.disable) {
@@ -652,22 +657,22 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                         state = "ERROR";
                     }
 
-                    node_label =
-                        fmt::format("[{}] {} ({})", state, data.name, registry.node_name(node));
+                    node_label = fmt::format("[{}] {} ({})", state, data.identifier,
+                                             registry.node_name(node));
                 }
 
-                if (props.st_begin_child(name.c_str(), node_label.c_str())) {
+                if (props.st_begin_child(identifier.c_str(), node_label.c_str())) {
                     NodeHandle node;
                     std::string type;
 
                     // Create Node
                     if (!loading) {
-                        node = node_for_name.at(name);
+                        node = node_for_identifier.at(identifier);
                         type = registry.node_name(node);
                     }
                     props.serialize_string("type", type);
                     if (loading) {
-                        node = node_for_name.at(add_node(type, name));
+                        node = node_for_identifier.at(add_node(type, identifier));
                     }
                     NodeData& data = node_data.at(node);
 
@@ -675,7 +680,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                         request_reconnect();
                     props.st_no_space();
                     if (props.config_bool("Remove")) {
-                        remove_node(name);
+                        remove_node(identifier);
                     }
 
                     if (!data.errors.empty()) {
@@ -686,7 +691,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                     if (props.st_begin_child("properties", "Properties",
                                              Properties::ChildFlagBits::DEFAULT_OPEN)) {
                         const Node::NodeStatusFlags flags = node->properties(props);
-                        needs_reconnect |= flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT;
+                        _needs_reconnect |= flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT;
                         props.st_end_child();
                     }
                     if (props.st_begin_child("stats", "Statistics")) {
@@ -706,8 +711,8 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 for (const auto& [node, data] : node_data) {
                     for (const OutgoingNodeConnection& con : data.desired_outgoing_connections) {
                         nlohmann::json j_con;
-                        j_con["src"] = data.name;
-                        j_con["dst"] = node_data.at(con.dst).name;
+                        j_con["src"] = data.identifier;
+                        j_con["dst"] = node_data.at(con.dst).identifier;
                         j_con["src_output"] = con.src_output;
                         j_con["dst_input"] = con.dst_input;
 
@@ -728,37 +733,38 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
   private:
     /*--- Graph Edit --- */
 
-    std::string add_node(const std::shared_ptr<Node>& node,
-                         const std::optional<std::string>& name = std::nullopt) {
+    const std::string& add_node(const std::shared_ptr<Node>& node,
+                                const std::optional<std::string>& identifier = std::nullopt) {
         if (node_data.contains(node)) {
-            throw std::invalid_argument{
-                fmt::format("graph already contains this node as '{}'", node_data.at(node).name)};
+            throw std::invalid_argument{fmt::format("graph already contains this node as '{}'",
+                                                    node_data.at(node).identifier)};
         }
 
-        std::string node_name;
-        if (name) {
-            if (name->empty()) {
-                throw std::invalid_argument{"node name cannot be empty"};
+        std::string node_identifier;
+        if (identifier) {
+            if (identifier->empty()) {
+                throw std::invalid_argument{"node identifier cannot be empty"};
             }
-            if (node_for_name.contains(name.value())) {
-                throw std::invalid_argument{
-                    fmt::format("graph already contains a node with name '{}'", name.value())};
+            if (node_for_identifier.contains(identifier.value())) {
+                throw std::invalid_argument{fmt::format(
+                    "graph already contains a node with identifier '{}'", identifier.value())};
             }
-            node_name = name.value();
+            node_identifier = identifier.value();
         } else {
             uint32_t i = 0;
             do {
-                node_name = fmt::format("{} {}", registry.node_name(node), i++);
-            } while (node_for_name.contains(node_name));
+                node_identifier = fmt::format("{} {}", registry.node_name(node), i++);
+            } while (node_for_identifier.contains(node_identifier));
         }
 
-        node_for_name[node_name] = node;
-        node_data.try_emplace(node, node_name);
+        node_for_identifier[node_identifier] = node;
+        auto [it, inserted] = node_data.try_emplace(node, node_identifier);
+        assert(inserted);
 
-        needs_reconnect = true;
-        SPDLOG_DEBUG("added node {} ({})", node_name, registry.node_name(node));
+        _needs_reconnect = true;
+        SPDLOG_DEBUG("added node {} ({})", node_identifier, registry.node_name(node));
 
-        return node_name;
+        return it->second.identifier;
     }
 
     void add_connection(const NodeHandle& src,
@@ -777,8 +783,8 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 dst_data.desired_incoming_connections.at(dst_input);
             const NodeData& old_src_data = node_data.at(old_src);
             SPDLOG_DEBUG("remove conflicting connection {}, {} ({}) -> {}, {} ({})", old_src_output,
-                         old_src_data.name, registry.node_name(old_src), dst_input, dst_data.name,
-                         registry.node_name(dst));
+                         old_src_data.identifier, registry.node_name(old_src), dst_input,
+                         dst_data.identifier, registry.node_name(dst));
             remove_connection(old_src, dst, dst_input);
         }
 
@@ -796,9 +802,10 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             assert(inserted);
         }
 
-        needs_reconnect = true;
-        SPDLOG_DEBUG("added connection {}, {} ({}) -> {}, {} ({})", src_output, src_data.name,
-                     registry.node_name(src), dst_input, dst_data.name, registry.node_name(dst));
+        _needs_reconnect = true;
+        SPDLOG_DEBUG("added connection {}, {} ({}) -> {}, {} ({})", src_output, src_data.identifier,
+                     registry.node_name(src), dst_input, dst_data.identifier,
+                     registry.node_name(dst));
     }
 
     bool
@@ -815,8 +822,8 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         const auto it = dst_data.desired_incoming_connections.find(dst_input);
         if (it == dst_data.desired_incoming_connections.end()) {
             SPDLOG_WARN("connection {} ({}) -> {}, {} ({}) does not exist and cannot be removed.",
-                        src_data.name, registry.node_name(src), dst_input, dst_data.name,
-                        registry.node_name(dst));
+                        src_data.identifier, registry.node_name(src), dst_input,
+                        dst_data.identifier, registry.node_name(dst));
             return false;
         }
 
@@ -828,10 +835,11 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         // else we did not add the connection properly
         assert(out_it != src_data.desired_outgoing_connections.end());
         src_data.desired_outgoing_connections.erase(out_it);
-        SPDLOG_DEBUG("removed connection {}, {} ({}) -> {}, {} ({})", src_output, src_data.name,
-                     registry.node_name(src), dst_input, dst_data.name, registry.node_name(dst));
+        SPDLOG_DEBUG("removed connection {}, {} ({}) -> {}, {} ({})", src_output,
+                     src_data.identifier, registry.node_name(src), dst_input, dst_data.identifier,
+                     registry.node_name(dst));
 
-        needs_reconnect = true;
+        _needs_reconnect = true;
         return true;
 
         // Note: Since the connections are not needed in a graph run we do not need to wait until
@@ -851,7 +859,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                     std::vector<std::string> receivers;
                     for (auto& [node, input] : per_output_info.inputs) {
                         receivers.emplace_back(fmt::format("({}, {} ({}))", input->name,
-                                                           node_data.at(node).name,
+                                                           node_data.at(node).identifier,
                                                            registry.node_name(node)));
                     }
 
@@ -899,7 +907,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                         if (per_input_info.output) {
                             config.output_text(fmt::format(
                                 "Receiving from: {}, {} ({})", per_input_info.output->name,
-                                node_data.at(per_input_info.node).name,
+                                node_data.at(per_input_info.node).identifier,
                                 registry.node_name(per_input_info.node)));
                         } else {
                             config.output_text("Optional input not connected.");
@@ -964,7 +972,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         const uint32_t set_idx = iteration % data.descriptor_sets.size();
 
         MERIAN_PROFILE_SCOPE_GPU(profiler, cmd,
-                                 fmt::format("{} ({})", data.name, registry.node_name(node)));
+                                 fmt::format("{} ({})", data.identifier, registry.node_name(node)));
 
         std::vector<vk::ImageMemoryBarrier2> image_barriers;
         std::vector<vk::BufferMemoryBarrier2> buffer_barriers;
@@ -1135,14 +1143,14 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 if (!dst_data.errors.empty()) {
                     SPDLOG_WARN("node {} has errors and connection {}, {} ({}) -> {}, {} ({}) "
                                 "cannot be validated.",
-                                dst_data.name, connection.src_output, data.name,
-                                registry.node_name(node), connection.dst_input, dst_data.name,
+                                dst_data.identifier, connection.src_output, data.identifier,
+                                registry.node_name(node), connection.dst_input, dst_data.identifier,
                                 registry.node_name(connection.dst));
                     continue;
                 }
                 if (!dst_data.input_connector_for_name.contains(connection.dst_input)) {
                     SPDLOG_ERROR("node {} ({}) does not have an input {}. Connection is removed.",
-                                 dst_data.name, registry.node_name(connection.dst),
+                                 dst_data.identifier, registry.node_name(connection.dst),
                                  connection.dst_input);
                     remove_connection(node, connection.dst, connection.dst_input);
                     return false;
@@ -1152,7 +1160,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                     // eliminate self loops
                     SPDLOG_ERROR("undelayed (edges with delay = 0) selfloop {} -> {} detected on "
                                  "node {}! Removing connection.",
-                                 data.name, connection.src_output, connection.dst_input);
+                                 data.identifier, connection.src_output, connection.dst_input);
                     remove_connection(node, connection.dst, connection.dst_input);
                     return false;
                 }
@@ -1220,7 +1228,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             // since the node is not disabled and not in error state we know the outputs are valid.
             if (!data.output_connector_for_name.contains(connection.src_output)) {
                 SPDLOG_ERROR("node {} ({}) does not have an output {}. Removing connection.",
-                             data.name, registry.node_name(node), connection.src_output);
+                             data.identifier, registry.node_name(node), connection.src_output);
                 remove_connection(node, connection.dst, connection.dst_input);
                 return false;
             }
@@ -1229,13 +1237,13 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             NodeData& dst_data = node_data.at(connection.dst);
             if (dst_data.disable) {
                 SPDLOG_DEBUG("skipping connection to disabled node {}, {} ({})",
-                             connection.dst_input, dst_data.name,
+                             connection.dst_input, dst_data.identifier,
                              registry.node_name(connection.dst));
                 continue;
             }
             if (!dst_data.errors.empty()) {
                 SPDLOG_WARN("skipping connection to erroneous node {}, {} ({})",
-                            connection.dst_input, dst_data.name,
+                            connection.dst_input, dst_data.identifier,
                             registry.node_name(connection.dst));
                 continue;
             }
@@ -1243,7 +1251,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 // since the node is not disabled and not in error state we know the inputs are
                 // valid.
                 SPDLOG_ERROR("node {} ({}) does not have an input {}. Removing connection.",
-                             dst_data.name, registry.node_name(connection.dst),
+                             dst_data.identifier, registry.node_name(connection.dst),
                              connection.dst_input);
                 remove_connection(node, connection.dst, connection.dst_input);
                 return false;
@@ -1259,7 +1267,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 // Back-edges with delay > 1 are allowed!
                 SPDLOG_ERROR("undelayed (edges with delay = 0) graph is not "
                              "acyclic! {} -> {}. Removing arbitraty edge on the cycle.",
-                             data.name, node_data.at(connection.dst).name);
+                             data.identifier, node_data.at(connection.dst).identifier);
                 remove_connection(node, connection.dst, connection.dst_input);
                 return false;
             }
@@ -1268,9 +1276,9 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 SPDLOG_ERROR("input connector {} of node {} ({}) was connected to output "
                              "connector {} on node {} ({}) with delay {}, however the output "
                              "connector does not support delay. Removing connection.",
-                             dst_input->name, dst_data.name, registry.node_name(connection.dst),
-                             src_output->name, data.name, registry.node_name(node),
-                             dst_input->delay);
+                             dst_input->name, dst_data.identifier,
+                             registry.node_name(connection.dst), src_output->name, data.identifier,
+                             registry.node_name(node), dst_input->delay);
                 remove_connection(node, connection.dst, connection.dst_input);
                 return false;
             }
@@ -1298,7 +1306,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             NodeData& data = node_data.at(node);
 
             if (data.disable) {
-                SPDLOG_DEBUG("node {} ({}) is disabled, skipping...", data.name,
+                SPDLOG_DEBUG("node {} ({}) is disabled, skipping...", data.identifier,
                              registry.node_name(node));
                 to_erase.push_back(node);
                 continue;
@@ -1393,7 +1401,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
                 {
                     assert(!data.disable && data.errors.empty());
-                    SPDLOG_DEBUG("connecting {} ({})", data.name, registry.node_name(node));
+                    SPDLOG_DEBUG("connecting {} ({})", data.identifier, registry.node_name(node));
 
                     // 1. Get node output connectors and check for name conflicts
                     cache_node_output_connectors(node, data);
@@ -1482,9 +1490,10 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                         } catch (const graph_errors::invalid_connection& e) {
                             SPDLOG_ERROR("Removing invalid connection {}, {} ({}) -> {}, {} ({}). "
                                          "Reason: {}",
-                                         src_output->name, src_data.name,
+                                         src_output->name, src_data.identifier,
                                          registry.node_name(src_node), dst_input->name,
-                                         dst_data.name, registry.node_name(dst_node), e.what());
+                                         dst_data.identifier, registry.node_name(dst_node),
+                                         e.what());
                             remove_connection(src_node, dst_node, dst_input->name);
                             return false;
                         }
@@ -1508,7 +1517,8 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
                 SPDLOG_DEBUG("creating, connecting and allocating {} resources for output {} on "
                              "node {} ({})",
-                             max_delay + 1, output->name, data.name, registry.node_name(node));
+                             max_delay + 1, output->name, data.identifier,
+                             registry.node_name(node));
                 for (uint32_t i = 0; i <= max_delay; i++) {
                     const GraphResourceHandle res =
                         output->create_resource(per_output_info.inputs, resource_allocator,
@@ -1552,7 +1562,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 }
             }
             dst_data.descriptor_set_layout = layout_builder.build_layout(context);
-            SPDLOG_DEBUG("descriptor set layout for node {} ({}):\n{}", dst_data.name,
+            SPDLOG_DEBUG("descriptor set layout for node {} ({}):\n{}", dst_data.identifier,
                          registry.node_name(dst_node), dst_data.descriptor_set_layout);
 
             // --- FIND NUMBER OF SETS ---
@@ -1579,8 +1589,8 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             const uint32_t k = (RING_SIZE + num_sets - 1) / num_sets;
             num_sets *= k;
 
-            SPDLOG_DEBUG("needing {} descriptor sets for node {} ({})", num_sets, dst_data.name,
-                         registry.node_name(dst_node));
+            SPDLOG_DEBUG("needing {} descriptor sets for node {} ({})", num_sets,
+                         dst_data.identifier, registry.node_name(dst_node));
 
             // --- ALLOCATE POOL ---
             dst_data.descriptor_pool =
@@ -1653,7 +1663,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                                                const NodeData& data) {
         return fmt::format("the non-optional input {} on node {} ({}) is not "
                            "connected.",
-                           input->name, data.name, registry.node_name(node));
+                           input->name, data.identifier, registry.node_name(node));
     }
 
   public:
@@ -1698,7 +1708,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
     merian::RingFences<RING_SIZE, InFlightData> ring_fences;
 
     // State
-    bool needs_reconnect = false;
+    bool _needs_reconnect = false;
     uint64_t iteration = 0;
     bool profiler_enable = true;
     uint32_t profiler_report_intervall_ms = 50;
@@ -1716,7 +1726,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
     merian::ProfilerHandle run_profiler;
 
     // Nodes
-    std::map<std::string, NodeHandle> node_for_name;
+    std::map<std::string, NodeHandle> node_for_identifier;
     std::unordered_map<NodeHandle, NodeData> node_data;
     // After connect() contains the nodes as far as a connection was possible in topological
     // order
@@ -1727,7 +1737,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
     // Properties helper
     int new_node_selected = 0;
-    std::array<char, 128> new_node_name = {0};
+    std::array<char, 128> new_node_identifier = {0};
     int remove_node_selected = 0;
     int add_connection_selected_src = 0;
     int add_connection_selected_src_output = 0;
