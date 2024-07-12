@@ -196,25 +196,68 @@ TextureHandle ResourceAllocator::createTextureFromRGBA8(const vk::CommandBuffer&
                                                         const uint32_t height,
                                                         const vk::Filter filter,
                                                         const bool isSRGB,
-                                                        const std::string& debug_name) {
+                                                        const std::string& debug_name,
+                                                        const bool generate_mipmaps) {
+    uint32_t mip_levels = 1;
+    vk::ImageUsageFlags usage_flags =
+        vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled;
+    if (generate_mipmaps) {
+        mip_levels = static_cast<uint32_t>(floor(log2(std::max(width, height))) + 1);
+        usage_flags |= vk::ImageUsageFlagBits::eTransferSrc;
+    }
+
     const vk::ImageCreateInfo tex_image_info{
         {},
         vk::ImageType::e2D,
         isSRGB ? vk::Format::eR8G8B8A8Srgb : vk::Format::eR8G8B8A8Unorm,
         {width, height, 1},
-        1,
+        mip_levels,
         1,
         vk::SampleCountFlagBits::e1,
         vk::ImageTiling::eOptimal,
-        vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
+        usage_flags,
         vk::SharingMode::eExclusive,
         {},
         {},
         vk::ImageLayout::eUndefined,
     };
+    // transfers all levels to TransferDstOptimal
     const merian::ImageHandle image =
         createImage(cmd, width * height * sizeof(uint32_t), data, tex_image_info,
                     MemoryMappingType::NONE, debug_name);
+
+    if (generate_mipmaps) {
+        for (uint32_t i = 1; i <= mip_levels; i++) {
+            const vk::ImageMemoryBarrier bar{
+                vk::AccessFlagBits::eTransferWrite,
+                vk::AccessFlagBits::eTransferRead,
+                vk::ImageLayout::eTransferDstOptimal,
+                vk::ImageLayout::eTransferSrcOptimal,
+                VK_QUEUE_FAMILY_IGNORED,
+                VK_QUEUE_FAMILY_IGNORED,
+                *image,
+                vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, i - 1, 1, 0, 1}};
+            cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
+                                vk::PipelineStageFlagBits::eTransfer, {}, {}, {}, bar);
+            // let the loop run one iteration more to get the whole image transitioned to transfer
+            // src.
+            if (i == mip_levels) {
+                break;
+            }
+
+            vk::ImageBlit blit{
+                vk::ImageSubresourceLayers{vk::ImageAspectFlagBits::eColor, i - 1, 0, 1},
+                {},
+                vk::ImageSubresourceLayers{vk::ImageAspectFlagBits::eColor, i, 0, 1},
+                {}};
+            blit.srcOffsets[1] =
+                vk::Offset3D{int32_t(width >> (i - 1)), int32_t(height >> (i - 1)), 1};
+            blit.dstOffsets[1] = vk::Offset3D{int32_t(width >> i), int32_t(height >> i), 1};
+            cmd.blitImage(*image, vk::ImageLayout::eTransferSrcOptimal, *image,
+                          vk::ImageLayout::eTransferDstOptimal, blit, vk::Filter::eLinear);
+        }
+        image->_set_current_layout(vk::ImageLayout::eTransferSrcOptimal);
+    }
 
     merian::SamplerHandle sampler =
         get_sampler_pool()->for_filter_and_address_mode(filter, vk::SamplerAddressMode::eRepeat);
