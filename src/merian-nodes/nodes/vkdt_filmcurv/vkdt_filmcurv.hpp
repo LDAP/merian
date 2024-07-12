@@ -1,7 +1,7 @@
 #pragma once
 
-#include "merian-nodes/nodes/compute_node/compute_node.hpp"
 #include "merian-nodes/connectors/managed_vk_image_in.hpp"
+#include "merian-nodes/nodes/compute_node/compute_node.hpp"
 
 namespace merian_nodes {
 
@@ -29,11 +29,12 @@ class VKDTFilmcurv : public AbstractCompute {
     std::vector<OutputConnectorHandle>
     describe_outputs(const ConnectorIOMap& output_for_input) override;
 
-    SpecializationInfoHandle get_specialization_info() const noexcept override;
+    SpecializationInfoHandle get_specialization_info(const NodeIO& io) const noexcept override;
 
-    const void* get_push_constant([[maybe_unused]] GraphRun& run) override;
+    const void* get_push_constant(GraphRun& run, const NodeIO& io) override;
 
-    std::tuple<uint32_t, uint32_t, uint32_t> get_group_count() const noexcept override;
+    std::tuple<uint32_t, uint32_t, uint32_t>
+    get_group_count(const NodeIO& io) const noexcept override;
 
     ShaderModuleHandle get_shader_module() override;
 
@@ -51,4 +52,4 @@ class VKDTFilmcurv : public AbstractCompute {
     Options pc;
 };
 
-} // namespace merian
+} // namespace merian_nodes

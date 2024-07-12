@@ -25,19 +25,23 @@ FXAA::describe_outputs([[maybe_unused]] const ConnectorIOMap& output_for_input) 
     extent = output_for_input[con_src]->create_info.extent;
 
     return {
-        ManagedVkImageOut::compute_write("out", output_for_input[con_src]->create_info.format, extent),
+        ManagedVkImageOut::compute_write("out", output_for_input[con_src]->create_info.format,
+                                         extent),
     };
 }
 
-SpecializationInfoHandle FXAA::get_specialization_info() const noexcept {
+SpecializationInfoHandle
+FXAA::get_specialization_info([[maybe_unused]] const NodeIO& io) const noexcept {
     return spec_info;
 }
 
-const void* FXAA::get_push_constant([[maybe_unused]] GraphRun& run) {
+const void* FXAA::get_push_constant([[maybe_unused]] GraphRun& run,
+                                    [[maybe_unused]] const NodeIO& io) {
     return &pc;
 }
 
-std::tuple<uint32_t, uint32_t, uint32_t> FXAA::get_group_count() const noexcept {
+std::tuple<uint32_t, uint32_t, uint32_t>
+FXAA::get_group_count([[maybe_unused]] const NodeIO& io) const noexcept {
     return {(extent.width + local_size_x - 1) / local_size_x,
             (extent.height + local_size_y - 1) / local_size_y, 1};
 }

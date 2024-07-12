@@ -21,20 +21,23 @@ class AbstractCompute : public Node {
 
     // Return a SpecializationInfoHandle if you want to add specialization constants
     // In every run (rebuilds the pipeline if handle changed.)
-    virtual SpecializationInfoHandle get_specialization_info() const noexcept {
+    virtual SpecializationInfoHandle
+    get_specialization_info([[maybe_unused]] const NodeIO& io) const noexcept {
         return MERIAN_SPECIALIZATION_INFO_NONE;
     }
 
     // Return a pointer to your push constant if push_constant_size is not std::nullop
     // In every run (rebuilds the pipeline if handle changed.)
-    virtual const void* get_push_constant([[maybe_unused]] GraphRun& run) {
+    virtual const void* get_push_constant([[maybe_unused]] GraphRun& run,
+                                          [[maybe_unused]] const NodeIO& io) {
         throw std::runtime_error{
             "get_push_constant must be overwritten when push_constant_size is not std::nullopt"};
     }
 
     // Return the group count for x, y and z
     // Called in every run
-    virtual std::tuple<uint32_t, uint32_t, uint32_t> get_group_count() const noexcept = 0;
+    virtual std::tuple<uint32_t, uint32_t, uint32_t>
+    get_group_count(const NodeIO& io) const noexcept = 0;
 
     // In every run (rebuilds the pipeline if handle changed.)
     virtual ShaderModuleHandle get_shader_module() = 0;

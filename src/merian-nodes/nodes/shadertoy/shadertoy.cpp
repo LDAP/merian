@@ -95,11 +95,13 @@ AbstractCompute::NodeStatusFlags Shadertoy::pre_process([[maybe_unused]] GraphRu
     return flags;
 }
 
-SpecializationInfoHandle Shadertoy::get_specialization_info() const noexcept {
+SpecializationInfoHandle
+Shadertoy::get_specialization_info([[maybe_unused]] const NodeIO& io) const noexcept {
     return spec_info;
 }
 
-const void* Shadertoy::get_push_constant([[maybe_unused]] GraphRun& run) {
+const void* Shadertoy::get_push_constant([[maybe_unused]] GraphRun& run,
+                                         [[maybe_unused]] const NodeIO& io) {
     float new_time = sw.seconds();
     constant.iTimeDelta = new_time - constant.iTime;
     constant.iTime = new_time;
@@ -108,7 +110,8 @@ const void* Shadertoy::get_push_constant([[maybe_unused]] GraphRun& run) {
     return &constant;
 }
 
-std::tuple<uint32_t, uint32_t, uint32_t> Shadertoy::get_group_count() const noexcept {
+std::tuple<uint32_t, uint32_t, uint32_t>
+Shadertoy::get_group_count([[maybe_unused]] const NodeIO& io) const noexcept {
     return {(extent.width + local_size_x - 1) / local_size_x,
             (extent.height + local_size_y - 1) / local_size_y, 1};
 };

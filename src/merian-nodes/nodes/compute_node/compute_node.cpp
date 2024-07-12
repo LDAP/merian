@@ -24,7 +24,7 @@ void AbstractCompute::process(GraphRun& run,
     PipelineHandle& old_pipeline = io.frame_data<PipelineHandle>();
     old_pipeline.reset();
 
-    const auto spec_info = get_specialization_info();
+    const auto spec_info = get_specialization_info(io);
     const auto shader = get_shader_module();
 
     if (spec_info && shader &&
@@ -39,19 +39,18 @@ void AbstractCompute::process(GraphRun& run,
 
         PipelineLayoutHandle pipe_layout =
             pipe_builder.add_descriptor_set_layout(descriptor_set_layout).build_pipeline_layout();
-        pipe = std::make_shared<ComputePipeline>(pipe_layout, get_shader_module(),
-                                                 get_specialization_info());
+        pipe = std::make_shared<ComputePipeline>(pipe_layout, shader, spec_info);
 
-        current_spec_info = get_specialization_info();
-        current_shader_module = get_shader_module();
+        current_spec_info = spec_info;
+        current_shader_module = shader;
     }
 
     if (pipe) {
         pipe->bind(cmd);
         pipe->bind_descriptor_set(cmd, descriptor_set);
         if (push_constant_size.has_value())
-            pipe->push_constant(cmd, get_push_constant(run));
-        auto [x, y, z] = get_group_count();
+            pipe->push_constant(cmd, get_push_constant(run, io));
+        auto [x, y, z] = get_group_count(io);
         cmd.dispatch(x, y, z);
     }
 }

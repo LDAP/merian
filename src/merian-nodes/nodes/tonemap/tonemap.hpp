@@ -23,7 +23,7 @@ class Tonemap : public AbstractCompute {
 
   public:
     Tonemap(const SharedContext context,
-                const std::optional<vk::Format> output_format = std::nullopt);
+            const std::optional<vk::Format> output_format = std::nullopt);
 
     ~Tonemap();
 
@@ -32,11 +32,12 @@ class Tonemap : public AbstractCompute {
     std::vector<OutputConnectorHandle>
     describe_outputs(const ConnectorIOMap& output_for_input) override;
 
-    SpecializationInfoHandle get_specialization_info() const noexcept override;
+    SpecializationInfoHandle get_specialization_info(const NodeIO& io) const noexcept override;
 
-    const void* get_push_constant([[maybe_unused]] GraphRun& run) override;
+    const void* get_push_constant(GraphRun& run, const NodeIO& io) override;
 
-    std::tuple<uint32_t, uint32_t, uint32_t> get_group_count() const noexcept override;
+    std::tuple<uint32_t, uint32_t, uint32_t>
+    get_group_count(const NodeIO& io) const noexcept override;
 
     ShaderModuleHandle get_shader_module() override;
 

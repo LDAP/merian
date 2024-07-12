@@ -26,7 +26,9 @@ class Shadertoy : public AbstractCompute {
     };
 
   public:
-    Shadertoy(const SharedContext context, const std::string& path, const ShaderCompilerHandle& compiler);
+    Shadertoy(const SharedContext context,
+              const std::string& path,
+              const ShaderCompilerHandle& compiler);
 
     void set_resolution(uint32_t width, uint32_t height);
 
@@ -35,11 +37,12 @@ class Shadertoy : public AbstractCompute {
     std::vector<OutputConnectorHandle>
     describe_outputs(const ConnectorIOMap& output_for_input) override;
 
-    SpecializationInfoHandle get_specialization_info() const noexcept override;
+    SpecializationInfoHandle get_specialization_info(const NodeIO& io) const noexcept override;
 
-    const void* get_push_constant([[maybe_unused]] GraphRun& run) override;
+    const void* get_push_constant(GraphRun& run, const NodeIO& io) override;
 
-    std::tuple<uint32_t, uint32_t, uint32_t> get_group_count() const noexcept override;
+    std::tuple<uint32_t, uint32_t, uint32_t>
+    get_group_count(const NodeIO& io) const noexcept override;
 
     ShaderModuleHandle get_shader_module() override;
 

@@ -38,15 +38,18 @@ Tonemap::describe_outputs([[maybe_unused]] const ConnectorIOMap& output_for_inpu
     };
 }
 
-SpecializationInfoHandle Tonemap::get_specialization_info() const noexcept {
+SpecializationInfoHandle
+Tonemap::get_specialization_info([[maybe_unused]] const NodeIO& io) const noexcept {
     return spec_info;
 }
 
-const void* Tonemap::get_push_constant([[maybe_unused]] GraphRun& run) {
+const void* Tonemap::get_push_constant([[maybe_unused]] GraphRun& run,
+                                       [[maybe_unused]] const NodeIO& io) {
     return &pc;
 }
 
-std::tuple<uint32_t, uint32_t, uint32_t> Tonemap::get_group_count() const noexcept {
+std::tuple<uint32_t, uint32_t, uint32_t>
+Tonemap::get_group_count([[maybe_unused]] const NodeIO& io) const noexcept {
     return {(extent.width + local_size_x - 1) / local_size_x,
             (extent.height + local_size_y - 1) / local_size_y, 1};
 };

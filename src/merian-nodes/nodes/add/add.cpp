@@ -45,15 +45,18 @@ std::vector<OutputConnectorHandle> Add::describe_outputs(const ConnectorIOMap& o
     };
 }
 
-SpecializationInfoHandle Add::get_specialization_info() const noexcept {
+SpecializationInfoHandle
+Add::get_specialization_info([[maybe_unused]] const NodeIO& io) const noexcept {
     return spec_info;
 }
 
-// const void* AddNode::get_push_constant([[maybe_unused]] GraphRun& run) {
+// const void* AddNode::get_push_constant([[maybe_unused]] GraphRun& run, [[maybe_unused]] const
+// NodeIO& io) {
 //     return &pc;
 // }
 
-std::tuple<uint32_t, uint32_t, uint32_t> Add::get_group_count() const noexcept {
+std::tuple<uint32_t, uint32_t, uint32_t>
+Add::get_group_count([[maybe_unused]] const merian_nodes::NodeIO& io) const noexcept {
     return {(extent.width + local_size_x - 1) / local_size_x,
             (extent.height + local_size_y - 1) / local_size_y, 1};
 };

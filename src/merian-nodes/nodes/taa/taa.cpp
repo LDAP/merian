@@ -9,11 +9,10 @@ static const uint32_t spv[] = {
 namespace merian_nodes {
 
 TAA::TAA(const SharedContext context,
-                 const float alpha,
-                 const int clamp_method,
-                 const bool inverse_motion)
-    : AbstractCompute(context, sizeof(PushConstant)),
-      inverse_motion(inverse_motion) {
+         const float alpha,
+         const int clamp_method,
+         const bool inverse_motion)
+    : AbstractCompute(context, sizeof(PushConstant)), inverse_motion(inverse_motion) {
     shader = std::make_shared<ShaderModule>(context, sizeof(spv), spv);
     pc.temporal_alpha = alpha;
     pc.clamp_method = clamp_method;
@@ -37,20 +36,23 @@ TAA::describe_outputs([[maybe_unused]] const ConnectorIOMap& output_for_input) {
     height = output_for_input[con_src]->create_info.extent.height;
 
     return {
-        ManagedVkImageOut::compute_write("out", output_for_input[con_src]->create_info.format, width,
-                                  height),
+        ManagedVkImageOut::compute_write("out", output_for_input[con_src]->create_info.format,
+                                         width, height),
     };
 }
 
-SpecializationInfoHandle TAA::get_specialization_info() const noexcept {
+SpecializationInfoHandle
+TAA::get_specialization_info([[maybe_unused]] const NodeIO& io) const noexcept {
     return spec_info;
 }
 
-const void* TAA::get_push_constant([[maybe_unused]] GraphRun& run) {
+const void* TAA::get_push_constant([[maybe_unused]] GraphRun& run,
+                                   [[maybe_unused]] const NodeIO& io) {
     return &pc;
 }
 
-std::tuple<uint32_t, uint32_t, uint32_t> TAA::get_group_count() const noexcept {
+std::tuple<uint32_t, uint32_t, uint32_t>
+TAA::get_group_count([[maybe_unused]] const NodeIO& io) const noexcept {
     return {(width + local_size_x - 1) / local_size_x, (height + local_size_y - 1) / local_size_y,
             1};
 }
