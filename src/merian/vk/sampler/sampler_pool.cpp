@@ -88,7 +88,7 @@ SamplerHandle SamplerPool::for_filter_and_address_mode(const vk::Filter filter,
         false,
         {},
         0.0f,
-        128.0f,
+        VK_LOD_CLAMP_NONE,
         vk::BorderColor::eIntTransparentBlack,
         false};
     return acquire_sampler(info);
