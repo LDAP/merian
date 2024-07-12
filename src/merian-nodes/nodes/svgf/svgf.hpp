@@ -1,8 +1,8 @@
 #pragma once
 
-#include "merian-nodes/graph/node.hpp"
-#include "merian-nodes/connectors/managed_vk_image_in.hpp"
 #include "merian-nodes/connectors/managed_vk_buffer_in.hpp"
+#include "merian-nodes/connectors/managed_vk_image_in.hpp"
+#include "merian-nodes/graph/node.hpp"
 
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
@@ -36,8 +36,8 @@ class SVGF : public Node {
 
   public:
     SVGF(const SharedContext context,
-             const ResourceAllocatorHandle allocator,
-             const std::optional<vk::Format> output_format = std::nullopt);
+         const ResourceAllocatorHandle allocator,
+         const std::optional<vk::Format> output_format = std::nullopt);
 
     ~SVGF();
 
@@ -102,11 +102,11 @@ class SVGF : public Node {
     };
     std::array<EAWRes, 2> ping_pong_res; // Ping pong sets
 
-    int filter_variance = 0;
+    VkBool32 filter_variance = false;
     int filter_type = 0;
 
     int taa_debug = 0;
-    int taa_filter_prev = 0;
+    int taa_filter_prev = false;
     int taa_clamping = 0;
     int taa_mv_sampling = 0;
 };

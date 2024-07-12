@@ -12,8 +12,8 @@ layout(constant_id = 2) const uint WG_ROUNDED_IRR_SIZE_X = 1;
 layout(constant_id = 3) const uint WG_ROUNDED_IRR_SIZE_Y = 1;
 
 layout (constant_id = 4) const int FILTER_MODE = FILTER_MODE_NEAREST;
-layout (constant_id = 5) const int EXTENDED_SEARCH = 1;
-layout (constant_id = 6) const int REUSE_BORDER = 0;
+layout (constant_id = 5) const bool EXTENDED_SEARCH = true;
+layout (constant_id = 6) const bool REUSE_BORDER = false;
 
 layout(set = 1, binding = 0) uniform sampler2D img_quartiles;
 
@@ -161,7 +161,7 @@ void main() {
   // REPROJECTION
   vec2 prev_pos = ipos + mv;;
   float max_history = pc.accum_max_hist;
-  if (REUSE_BORDER == 1) {
+  if (REUSE_BORDER) {
     // Attemp to reuse information at the image border.
     // This results in minor smearing but looks a lot better than
     // noise / SVGF blotches.
@@ -202,7 +202,7 @@ void main() {
                         prev_moments,
                         sum_w);
 
-    if (EXTENDED_SEARCH == 1) {
+    if (EXTENDED_SEARCH) {
       if (sum_w <= 0.01) {
         // only if data is not already reliable
         prev_irr_histlen = vec4(0);

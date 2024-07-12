@@ -10,7 +10,7 @@ layout(set = 1, binding = 0) uniform sampler2D img_filter_in;
 layout(set = 1, binding = 1) uniform writeonly restrict image2D img_filter_out;
 
 layout (constant_id = 2) const int GAP = 1;
-layout (constant_id = 3) const int FILTER_VARIANCE = 0;
+layout (constant_id = 3) const bool FILTER_VARIANCE = false;
 layout (constant_id = 4) const int FILTER_TYPE = 0;
 layout (constant_id = 5) const int ITERATION = 0;
 
@@ -103,7 +103,7 @@ main() {
 
 
 
-  if (FILTER_VARIANCE == 1) {
+  if (FILTER_VARIANCE) {
     // the reference implementation does that
     // but it looks better without
     sigma_l = get_sigma_l(filter_in.a, ipos) * params.param_l;

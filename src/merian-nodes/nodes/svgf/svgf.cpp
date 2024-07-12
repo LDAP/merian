@@ -260,9 +260,8 @@ SVGF::NodeStatusFlags SVGF::properties(Properties& config) {
     config.config_options("filter type", filter_type, {"atrous", "box", "subsampled"},
                           Properties::OptionsStyle::COMBO);
     needs_rebuild |= old_filter_type != filter_type;
-    int old_filter_variance = filter_variance;
-    config.config_bool("filter variance", filter_variance, "Filter variance with a 3x3 gaussian");
-    needs_rebuild |= old_filter_variance != filter_variance;
+    needs_rebuild |= config.config_bool("filter variance", filter_variance,
+                                        "Filter variance with a 3x3 gaussian");
 
     config.st_separate("TAA");
     config.config_float(

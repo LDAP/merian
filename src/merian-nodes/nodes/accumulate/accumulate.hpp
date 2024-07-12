@@ -113,8 +113,8 @@ class Accumulate : public Node {
 
     bool clear = false;
     int filter_mode = 0;
-    int extended_search = 1;
-    int reuse_border = 0;
+    VkBool32 extended_search = true;
+    VkBool32 reuse_border = false;
 };
 
 } // namespace merian_nodes
