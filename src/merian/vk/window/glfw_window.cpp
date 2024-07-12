@@ -8,6 +8,7 @@ GLFWWindow::operator GLFWwindow*() const {
 }
 
 bool GLFWWindow::should_close() const {
+    assert(window);
     return glfwWindowShouldClose(window);
 }
 

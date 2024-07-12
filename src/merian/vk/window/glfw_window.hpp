@@ -42,7 +42,7 @@ class GLFWWindow : public Window {
 
   private:
     SharedContext context;
-    GLFWwindow* window;
+    GLFWwindow* window = NULL;
 };
 
 using GLFWWindowHandle = std::shared_ptr<GLFWWindow>;

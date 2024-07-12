@@ -42,7 +42,7 @@ class GLFWWindow : public Node {
         auto& old_swapchains = io.frame_data<std::vector<SwapchainHandle>>();
         old_swapchains.clear();
 
-        swapchain->set_vsync(vsync);
+        vsync = swapchain->set_vsync(vsync);
 
         acquire.reset();
         for (uint32_t tries = 0; !acquire && tries < 2; tries++) {
@@ -106,11 +106,11 @@ class GLFWWindow : public Node {
     }
 
     NodeStatusFlags properties(Properties& config) override {
-        GLFWmonitor* monitor = glfwGetWindowMonitor(*window);
+        GLFWmonitor* monitor = window ? glfwGetWindowMonitor(*window) : NULL;
         int fullscreen = monitor != NULL;
         const int old_fullscreen = fullscreen;
         config.config_options("mode", fullscreen, {"windowed", "fullscreen"});
-        if (fullscreen != old_fullscreen) {
+        if (window && fullscreen != old_fullscreen) {
             if (fullscreen) {
                 try {
                     glfwGetWindowPos(*window, &windowed_pos_size[0], &windowed_pos_size[1]);
@@ -138,7 +138,6 @@ class GLFWWindow : public Node {
 
         // Perform the change in cmd_process, since recreating the swapchain here may interfere
         // with other accesses to the swapchain images.
-        vsync = swapchain->vsync_enabled();
         config.config_bool("vsync", vsync, "Enables or disables vsync on the swapchain.");
         config.config_bool("rebuild on recreate", request_rebuild_on_recreate,
                            "requests a graph rebuild if the swapchain was recreated.");
@@ -155,6 +154,7 @@ class GLFWWindow : public Node {
         return {};
     }
 
+    // Window can be nullptr if GLFW extension is not available
     const GLFWWindowHandle& get_window() const {
         return window;
     }
@@ -168,7 +168,7 @@ class GLFWWindow : public Node {
     }
 
   private:
-    GLFWWindowHandle window;
+    GLFWWindowHandle window = nullptr;
 
     SwapchainHandle swapchain;
     std::optional<SwapchainAcquireResult> acquire;

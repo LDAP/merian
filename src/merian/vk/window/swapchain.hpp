@@ -186,11 +186,14 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
     /* Remember to also transition image layouts */
     vk::Extent2D create_swapchain(int width, int height);
 
-    /* Sets vsync and recreates the swapchain if necessary (without resize) */
-    void set_vsync(bool state) {
+    /* Sets vsync. The swapchain is automatically recreated on next aquire.
+     * Returns if vsync could be enabled.
+     */
+    bool set_vsync(bool state) {
         if (state != vsync_enabled()) {
             present_mode = select_present_mode(state);
         }
+        return vsync_enabled();
     }
 
     bool vsync_enabled() const {
