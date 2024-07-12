@@ -14,6 +14,9 @@ layout(set = 0, binding = 1) uniform writeonly restrict image2D img_output;
 
 layout(push_constant) uniform params_t { 
     int enable;
+    float fxaaQualitySubpix;
+    float fxaaQualityEdgeThreshold;
+    float fxaaQualityEdgeThresholdMin;
 } params;
 
 void main() {
@@ -25,7 +28,23 @@ void main() {
 
     vec4 output_color;
     if (params.enable != 0)
-        output_color = FxaaPixelShader(pos, vec4(0), img_src, img_src, img_src, 1. / size, vec4(0), vec4(0), vec4(0), 0.5, 0.166, 0.0833, 8.0, 0.125, 0.05, vec4(0));
+        output_color = FxaaPixelShader(pos,         // center of pixel
+                                       vec4(0),     // Used only for FXAA Console; {xy__} = upper left of pixel {__zw} = lower right of pixel
+                                       img_src,     // Input color texture, {rgb_} = color in linear or perceptual color space, {___a} = luma in perceptual color space (not linear)
+                                       img_src,     // Only used on the optimized 360 version of FXAA Console
+                                       img_src,     // Only used on the optimized 360 version of FXAA Console
+                                       1. / size,   // Only used on FXAA Quality.
+                                       vec4(0),     // Only used on FXAA Console.
+                                       vec4(0),     // Only used on FXAA Console.
+                                       vec4(0),     // Only used on FXAA Console.
+                                       params.fxaaQualitySubpix,
+                                       params.fxaaQualityEdgeThreshold,
+                                       params.fxaaQualityEdgeThresholdMin,
+                                       8.0,         // Only used on FXAA Console.
+                                       0.125,       // Only used on FXAA Console.
+                                       0.05,        // Only used on FXAA Console.
+                                       vec4(0)      // Extra constants for 360 FXAA Console only.
+        );
     else
         output_color = texelFetch(img_src, ipos, 0);
 

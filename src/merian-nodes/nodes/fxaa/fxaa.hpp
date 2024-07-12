@@ -13,6 +13,9 @@ class FXAA : public AbstractCompute {
 
     struct PushConstant {
         int32_t enable = 1;
+        float fxaaQualitySubpix = 0.5;
+        float fxaaQualityEdgeThreshold = 0.166;
+        float fxaaQualityEdgeThresholdMin = 0.0833;
     };
 
   public:
