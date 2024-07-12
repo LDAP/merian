@@ -1315,6 +1315,12 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 to_erase.push_back(node);
                 continue;
             }
+            if (!data.errors.empty()) {
+                SPDLOG_DEBUG("node {} ({}) is erroneous, skipping...", data.identifier,
+                             registry.node_name(node));
+                to_erase.push_back(node);
+                continue;
+            }
 
             bool satisfied = true;
             for (const auto& input : data.input_connectors) {
