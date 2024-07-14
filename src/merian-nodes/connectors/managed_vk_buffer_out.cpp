@@ -97,11 +97,17 @@ GraphResourceHandle ManagedVkBufferOut::create_resource(
     vk::PipelineStageFlags2 input_pipeline_stages;
     vk::AccessFlags2 input_access_flags;
 
-    for (auto& [input_node, input] : inputs) {
-        const auto& buffer_in = debugable_ptr_cast<ManagedVkBufferIn>(input);
-        usage_flags |= buffer_in->usage_flags;
-        input_pipeline_stages |= buffer_in->pipeline_stages;
-        input_access_flags |= buffer_in->access_flags;
+    if (!inputs.empty()) {
+        for (auto& [input_node, input] : inputs) {
+            const auto& buffer_in = debugable_ptr_cast<ManagedVkBufferIn>(input);
+            usage_flags |= buffer_in->usage_flags;
+            input_pipeline_stages |= buffer_in->pipeline_stages;
+            input_access_flags |= buffer_in->access_flags;
+        }
+    } else {
+        // prevent write after write hazard validation error.
+        input_pipeline_stages |= pipeline_stages;
+        input_access_flags |= access_flags;
     }
 
     ResourceAllocatorHandle alloc = persistent ? allocator : aliasing_allocator;
