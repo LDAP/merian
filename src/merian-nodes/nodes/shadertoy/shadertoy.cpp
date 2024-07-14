@@ -96,7 +96,7 @@ AbstractCompute::NodeStatusFlags Shadertoy::pre_process([[maybe_unused]] GraphRu
 }
 
 SpecializationInfoHandle
-Shadertoy::get_specialization_info([[maybe_unused]] const NodeIO& io) const noexcept {
+Shadertoy::get_specialization_info([[maybe_unused]] const NodeIO& io) noexcept {
     return spec_info;
 }
 

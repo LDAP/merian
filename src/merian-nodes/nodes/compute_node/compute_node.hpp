@@ -22,7 +22,7 @@ class AbstractCompute : public Node {
     // Return a SpecializationInfoHandle if you want to add specialization constants
     // In every run (rebuilds the pipeline if handle changed.)
     virtual SpecializationInfoHandle
-    get_specialization_info([[maybe_unused]] const NodeIO& io) const noexcept {
+    get_specialization_info([[maybe_unused]] const NodeIO& io) noexcept {
         return MERIAN_SPECIALIZATION_INFO_NONE;
     }
 

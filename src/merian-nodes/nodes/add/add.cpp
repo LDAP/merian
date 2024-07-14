@@ -46,7 +46,7 @@ std::vector<OutputConnectorHandle> Add::describe_outputs(const ConnectorIOMap& o
 }
 
 SpecializationInfoHandle
-Add::get_specialization_info([[maybe_unused]] const NodeIO& io) const noexcept {
+Add::get_specialization_info([[maybe_unused]] const NodeIO& io) noexcept {
     return spec_info;
 }
 

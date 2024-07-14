@@ -39,7 +39,7 @@ VKDTFilmcurv::describe_outputs([[maybe_unused]] const ConnectorIOMap& output_for
 }
 
 SpecializationInfoHandle
-VKDTFilmcurv::get_specialization_info([[maybe_unused]] const NodeIO& io) const noexcept {
+VKDTFilmcurv::get_specialization_info([[maybe_unused]] const NodeIO& io) noexcept {
     return spec_info;
 }
 

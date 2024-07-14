@@ -41,8 +41,7 @@ TAA::describe_outputs([[maybe_unused]] const ConnectorIOMap& output_for_input) {
     };
 }
 
-SpecializationInfoHandle
-TAA::get_specialization_info([[maybe_unused]] const NodeIO& io) const noexcept {
+SpecializationInfoHandle TAA::get_specialization_info([[maybe_unused]] const NodeIO& io) noexcept {
     return spec_info;
 }
 
