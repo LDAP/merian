@@ -6,11 +6,12 @@ Inputs:
 
 | Type      | Input name | Delay |
 |-----------|------------|-------|
-| VkImageIn | a          | no    |
-| VkImageIn | b          | no    |
+| VkImageIn | image_0    | no    |
+| VkImageIn | image_1    | no    |
+| VkImageIn | ...        | no    |
 
 Outputs:
 
-| Type       | Input name | Description         | Format/Resolution                                  | Persistent |
-|------------|------------|---------------------|----------------------------------------------------|------------|
-| VkImageOut | out        | sum of a and b      | priority: user defined, equal to `a`, equal to `a` | no         |
+| Type       | Input name | Description         | Format/Resolution                                                               | Persistent |
+|------------|------------|---------------------|---------------------------------------------------------------------------------|------------|
+| VkImageOut | out        | sum of inputs       | format: user defined, equal to `a`, equal to `a`, resolution: min of all images | no         |

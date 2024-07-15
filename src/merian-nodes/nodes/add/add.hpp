@@ -36,8 +36,8 @@ class Add : public AbstractCompute {
     ShaderModuleHandle shader;
     SpecializationInfoHandle spec_info;
 
-    ManagedVkImageInHandle con_a = ManagedVkImageIn::compute_read("a", 0, true);
-    ManagedVkImageInHandle con_b = ManagedVkImageIn::compute_read("b", 0, true);
+    static constexpr uint32_t number_inputs = 10;
+    std::vector<ManagedVkImageInHandle> input_connectors;
 };
 
 } // namespace merian_nodes
