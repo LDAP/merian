@@ -65,6 +65,22 @@ class ManagedVkImageOut : public TypedOutputConnector<ImageHandle> {
                                                  const uint32_t depth = 1,
                                                  const bool persistent = false);
 
+    static ManagedVkImageOutHandle
+    compute_read_write_transfer_dst(const std::string& name,
+                                    const vk::Format format,
+                                    const vk::Extent3D extent,
+                                    const vk::ImageLayout layout = vk::ImageLayout::eGeneral,
+                                    const bool persistent = false);
+
+    static ManagedVkImageOutHandle
+    compute_read_write_transfer_dst(const std::string& name,
+                                    const vk::Format format,
+                                    const uint32_t width,
+                                    const uint32_t height,
+                                    const uint32_t depth = 1,
+                                    const vk::ImageLayout layout = vk::ImageLayout::eGeneral,
+                                    const bool persistent = false);
+
     static ManagedVkImageOutHandle compute_read_write(const std::string& name,
                                                       const vk::Format format,
                                                       const vk::Extent3D extent,

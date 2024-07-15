@@ -186,6 +186,49 @@ std::shared_ptr<ManagedVkImageOut> ManagedVkImageOut::compute_read_write(const s
         vk::ShaderStageFlagBits::eCompute, create_info, persistent);
 }
 
+std::shared_ptr<ManagedVkImageOut>
+ManagedVkImageOut::compute_read_write_transfer_dst(const std::string& name,
+                                                   const vk::Format format,
+                                                   const vk::Extent3D extent,
+                                                   const vk::ImageLayout layout,
+                                                   const bool persistent) {
+    const vk::ImageCreateInfo create_info{
+        {},
+        extent.depth == 1 ? vk::ImageType::e2D : vk::ImageType::e3D,
+        format,
+        extent,
+        1,
+        1,
+        vk::SampleCountFlagBits::e1,
+        vk::ImageTiling::eOptimal,
+        vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled |
+            vk::ImageUsageFlagBits::eTransferDst,
+        vk::SharingMode::eExclusive,
+        {},
+        {},
+        vk::ImageLayout::eUndefined,
+    };
+
+    return std::make_shared<ManagedVkImageOut>(
+        name,
+        vk::AccessFlagBits2::eShaderWrite | vk::AccessFlagBits2::eShaderRead |
+            vk::AccessFlagBits2::eTransferWrite,
+        vk::PipelineStageFlagBits2::eComputeShader | vk::PipelineStageFlagBits2::eTransfer, layout,
+        vk::ShaderStageFlagBits::eCompute, create_info, persistent);
+}
+
+std::shared_ptr<ManagedVkImageOut>
+ManagedVkImageOut::compute_read_write_transfer_dst(const std::string& name,
+                                                   const vk::Format format,
+                                                   const uint32_t width,
+                                                   const uint32_t height,
+                                                   const uint32_t depth,
+                                                   const vk::ImageLayout layout,
+                                                   const bool persistent) {
+    return compute_read_write_transfer_dst(name, format, {width, height, depth}, layout,
+                                           persistent);
+}
+
 std::shared_ptr<ManagedVkImageOut> ManagedVkImageOut::transfer_write(const std::string& name,
                                                                      const vk::Format format,
                                                                      const vk::Extent3D extent,
