@@ -33,8 +33,12 @@ void ManagedVkImageOut::get_descriptor_update(
     [[maybe_unused]] const ResourceAllocatorHandle& allocator) {
     // or vk::ImageLayout::eGeneral instead of required?
     assert(debugable_ptr_cast<ManagedVkImageResource>(resource)->tex && "missing usage flags?");
-    update.write_descriptor_texture(
-        binding, *debugable_ptr_cast<ManagedVkImageResource>(resource)->tex, 0, 1, required_layout);
+    // From Spec 14.1.1: The image subresources for a storage image must be in the
+    // VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR or VK_IMAGE_LAYOUT_GENERAL layout in order to access its
+    // data in a shader.
+    update.write_descriptor_texture(binding,
+                                    *debugable_ptr_cast<ManagedVkImageResource>(resource)->tex, 0,
+                                    1, vk::ImageLayout::eGeneral);
 }
 
 Connector::ConnectorStatusFlags ManagedVkImageOut::on_pre_process(
