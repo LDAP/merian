@@ -43,10 +43,11 @@ class NodeIO {
                resource_for_input_connector,
            const std::function<GraphResourceHandle(const OutputConnectorHandle&)>&
                resource_for_output_connector,
+           const std::function<bool(const OutputConnectorHandle&)>& output_is_connected,
            const std::function<std::any&()>& get_frame_data)
         : resource_for_input_connector(resource_for_input_connector),
           resource_for_output_connector(resource_for_output_connector),
-          get_frame_data(get_frame_data) {}
+          output_is_connected(output_is_connected), get_frame_data(get_frame_data) {}
 
     // Behavior undefined if an optional input connector is not connected.
     template <
@@ -77,6 +78,11 @@ class NodeIO {
         return resource_for_input_connector(input_connector) != nullptr;
     }
 
+    // Returns if at least one input is connected to this output.
+    bool is_connected(const OutputConnectorHandle& output_connector) const {
+        return output_is_connected(output_connector);
+    }
+
     // Returns a reference to the frame data as the template type.
     //
     // If no frame data exists it will constructed with the given parameters, if the cast fails the
@@ -97,6 +103,9 @@ class NodeIO {
         resource_for_input_connector;
     const std::function<GraphResourceHandle(const OutputConnectorHandle&)>
         resource_for_output_connector;
+
+    const std::function<bool(const OutputConnectorHandle&)> output_is_connected;
+
     const std::function<std::any&()> get_frame_data;
 };
 } // namespace merian_nodes

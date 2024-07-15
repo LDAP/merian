@@ -541,23 +541,42 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
             const std::vector<std::string> node_ids(identifiers().begin(), identifiers().end());
             props.st_separate("Add Connection");
-            props.config_options("connection src", add_connection_selected_src, node_ids,
-                                 Properties::OptionsStyle::COMBO);
+            bool autodetect_dst_input = false;
+            if (props.config_options("connection src", add_connection_selected_src, node_ids,
+                                     Properties::OptionsStyle::COMBO)) {
+                add_connection_selected_src_output = 0;
+                autodetect_dst_input = true;
+            }
             std::vector<std::string> src_outputs;
             for (const auto& [output_name, output] :
                  node_data.at(node_for_identifier.at(node_ids[add_connection_selected_src]))
                      .output_connector_for_name) {
                 src_outputs.emplace_back(output_name);
+                std::sort(src_outputs.begin(), src_outputs.end());
             }
-            props.config_options("connection src output", add_connection_selected_src_output,
-                                 src_outputs, Properties::OptionsStyle::COMBO);
-            props.config_options("connection dst", add_connection_selected_dst, node_ids,
-                                 Properties::OptionsStyle::COMBO);
+            autodetect_dst_input |=
+                props.config_options("connection src output", add_connection_selected_src_output,
+                                     src_outputs, Properties::OptionsStyle::COMBO);
+            if (props.config_options("connection dst", add_connection_selected_dst, node_ids,
+                                     Properties::OptionsStyle::COMBO)) {
+                add_connection_selected_dst_input = 0;
+                autodetect_dst_input |= true;
+            }
             NodeData& dst_data =
                 node_data.at(node_for_identifier.at(node_ids[add_connection_selected_dst]));
             std::vector<std::string> dst_inputs;
             for (const auto& [input_name, input] : dst_data.input_connector_for_name) {
                 dst_inputs.emplace_back(input_name);
+            }
+            std::sort(dst_inputs.begin(), dst_inputs.end());
+            if (autodetect_dst_input &&
+                add_connection_selected_src_output < (int)src_outputs.size()) {
+                // maybe there is a input that is named exactly like the output
+                for (uint32_t i = 0; i < dst_inputs.size(); i++) {
+                    if (dst_inputs[i] == src_outputs[add_connection_selected_src_output]) {
+                        add_connection_selected_dst_input = i;
+                    }
+                }
             }
             props.config_options("connection dst input", add_connection_selected_dst_input,
                                  dst_inputs, Properties::OptionsStyle::COMBO);
@@ -1660,6 +1679,9 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                     [&, set_idx](const OutputConnectorHandle& connector) {
                         return std::get<0>(
                             dst_data.output_connections[connector].precomputed_resources[set_idx]);
+                    },
+                    [&](const OutputConnectorHandle& connector) {
+                        return !dst_data.output_connections[connector].inputs.empty();
                     },
                     [&, dst_node]() -> std::any& {
                         return ring_fences.get().user_data.in_flight_data[dst_node];
