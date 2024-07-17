@@ -136,7 +136,7 @@ class Image : public std::enable_shared_from_this<Image> {
         return image;
     }
 
-    const vk::Image& operator*() {
+    const vk::Image& operator*() const {
         return image;
     }
 
@@ -292,7 +292,7 @@ class Texture : public std::enable_shared_from_this<Texture> {
         return view;
     }
 
-    const vk::ImageView& operator*() {
+    const vk::ImageView& operator*() const {
         return view;
     }
 
@@ -356,7 +356,7 @@ class AccelerationStructure : public std::enable_shared_from_this<AccelerationSt
         return &as;
     }
 
-    const vk::AccelerationStructureKHR& operator*() {
+    const vk::AccelerationStructureKHR& operator*() const {
         return as;
     }
 
