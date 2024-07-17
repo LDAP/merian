@@ -4,7 +4,7 @@
 
 namespace merian {
 
-TimelineSemaphore::TimelineSemaphore(const SharedContext& context, const uint64_t initial_value)
+TimelineSemaphore::TimelineSemaphore(const ContextHandle& context, const uint64_t initial_value)
     : Semaphore(context, {vk::SemaphoreType::eTimeline, initial_value}) {}
 
 uint64_t TimelineSemaphore::get_counter_value() const {

@@ -19,7 +19,7 @@ class FXAA : public AbstractCompute {
     };
 
   public:
-    FXAA(const SharedContext context);
+    FXAA(const ContextHandle context);
 
     std::vector<InputConnectorHandle> describe_inputs() override;
 

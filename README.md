@@ -23,7 +23,7 @@ int main() {
     auto debug_utils = std::make_shared<merian::ExtensionVkDebugUtils>(false);
     auto resources = std::make_shared<merian::ExtensionResources>();
 
-    merian::SharedContext context = merian::Context::make_context({debug_utils, resources}, "merian");
+    merian::ContextHandle context = merian::Context::make_context({debug_utils, resources}, "merian");
     auto alloc = resources->resource_allocator();
 
     // allocating, rendering,...

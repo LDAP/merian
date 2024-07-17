@@ -8,7 +8,7 @@ static const uint32_t spv[] = {
 
 namespace merian_nodes {
 
-Tonemap::Tonemap(const SharedContext context, const std::optional<vk::Format> output_format)
+Tonemap::Tonemap(const ContextHandle context, const std::optional<vk::Format> output_format)
     : AbstractCompute(context, sizeof(PushConstant)), output_format(output_format) {
     shader = std::make_shared<ShaderModule>(context, sizeof(spv), spv);
     make_spec_info();

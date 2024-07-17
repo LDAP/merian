@@ -114,14 +114,14 @@ void VMAMemoryAllocation::properties(Properties& props) {
  * https://en.cppreference.com/w/cpp/memory/enable_shared_from_this.
  */
 std::shared_ptr<VMAMemoryAllocator>
-VMAMemoryAllocator::make_allocator(const SharedContext& context,
+VMAMemoryAllocator::make_allocator(const ContextHandle& context,
                                    const VmaAllocatorCreateFlags flags) {
     std::shared_ptr<VMAMemoryAllocator> allocator =
         std::shared_ptr<VMAMemoryAllocator>(new VMAMemoryAllocator(context, flags));
     return allocator;
 }
 
-VMAMemoryAllocator::VMAMemoryAllocator(const SharedContext& context,
+VMAMemoryAllocator::VMAMemoryAllocator(const ContextHandle& context,
                                        const VmaAllocatorCreateFlags flags)
     : MemoryAllocator(context) {
     VmaAllocatorCreateInfo allocatorInfo = {.flags = flags,

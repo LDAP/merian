@@ -9,7 +9,7 @@ class Event : public std::enable_shared_from_this<Event> {
   public:
     Event() = delete;
 
-    Event(const SharedContext& context, const vk::EventCreateFlags flags = {}) : context(context) {
+    Event(const ContextHandle& context, const vk::EventCreateFlags flags = {}) : context(context) {
         vk::EventCreateInfo info{flags};
         event = context->device.createEvent(info);
     }
@@ -27,7 +27,7 @@ class Event : public std::enable_shared_from_this<Event> {
     }
 
   private:
-    const SharedContext context;
+    const ContextHandle context;
     vk::Event event;
 };
 

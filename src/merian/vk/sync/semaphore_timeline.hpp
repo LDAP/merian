@@ -5,7 +5,7 @@
 namespace merian {
 class TimelineSemaphore : public Semaphore {
   public:
-    TimelineSemaphore(const SharedContext& context, const uint64_t initial_value = 0);
+    TimelineSemaphore(const ContextHandle& context, const uint64_t initial_value = 0);
 
     uint64_t get_counter_value() const;
 

@@ -27,7 +27,7 @@ namespace merian {
 class PipelineLayoutBuilder {
 
   public:
-    PipelineLayoutBuilder(const SharedContext& context) : context(context) {}
+    PipelineLayoutBuilder(const ContextHandle& context) : context(context) {}
 
     PipelineLayoutBuilder&
     add_descriptor_set_layout(const std::shared_ptr<DescriptorSetLayout>& layout) {
@@ -66,7 +66,7 @@ class PipelineLayoutBuilder {
     }
 
   private:
-    const SharedContext context;
+    const ContextHandle context;
     std::vector<std::shared_ptr<DescriptorSetLayout>> shared_descriptor_set_layouts;
     std::vector<vk::PushConstantRange> ranges;
     uint32_t current_push_constant_offset = 0;

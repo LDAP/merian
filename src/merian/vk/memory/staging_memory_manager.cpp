@@ -3,7 +3,7 @@
 
 namespace merian {
 
-StagingMemoryManager::StagingMemoryManager(const SharedContext context,
+StagingMemoryManager::StagingMemoryManager(const ContextHandle context,
                                            const std::shared_ptr<MemoryAllocator> memAllocator,
                                            const vk::DeviceSize stagingBlockSize)
     : context(context), memAllocator(memAllocator) {

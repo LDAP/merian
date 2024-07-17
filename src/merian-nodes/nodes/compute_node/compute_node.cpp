@@ -5,7 +5,7 @@
 
 namespace merian_nodes {
 
-AbstractCompute::AbstractCompute(const SharedContext context,
+AbstractCompute::AbstractCompute(const ContextHandle context,
                                  const std::optional<uint32_t> push_constant_size)
     : Node(), context(context), push_constant_size(push_constant_size) {}
 

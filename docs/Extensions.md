@@ -13,7 +13,7 @@ int main() {
     const auto resources = std::make_shared<merian::ExtensionResources>();
     const std::vector<std::shared_ptr<merian::Extension>> extensions = {extGLFW, resources, debug_utils};
 
-    const merian::SharedContext context = merian::Context::make_context(extensions, "merian");
+    const merian::ContextHandle context = merian::Context::make_context(extensions, "merian");
 
     // use extensions...
 }

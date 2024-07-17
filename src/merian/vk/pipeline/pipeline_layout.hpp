@@ -12,7 +12,7 @@ class PipelineLayout : public std::enable_shared_from_this<PipelineLayout> {
 
   public:
     PipelineLayout(
-        const SharedContext& context,
+        const ContextHandle& context,
         const std::vector<std::shared_ptr<DescriptorSetLayout>>& shared_descriptor_set_layouts,
         const std::vector<vk::PushConstantRange>& ranges = {},
         const vk::PipelineLayoutCreateFlags flags = {})
@@ -42,7 +42,7 @@ class PipelineLayout : public std::enable_shared_from_this<PipelineLayout> {
         return pipeline_layout;
     }
 
-    const SharedContext& get_context() {
+    const ContextHandle& get_context() {
         return context;
     }
 
@@ -52,7 +52,7 @@ class PipelineLayout : public std::enable_shared_from_this<PipelineLayout> {
     }
 
   private:
-    const SharedContext context;
+    const ContextHandle context;
     const std::vector<vk::PushConstantRange> ranges;
     const std::vector<std::shared_ptr<DescriptorSetLayout>> shared_descriptor_set_layouts;
     vk::PipelineLayout pipeline_layout;

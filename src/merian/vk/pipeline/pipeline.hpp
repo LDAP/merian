@@ -11,7 +11,7 @@ namespace merian {
 class Pipeline : public std::enable_shared_from_this<Pipeline> {
 
   public:
-    Pipeline(const SharedContext& context, const std::shared_ptr<PipelineLayout>& pipeline_layout)
+    Pipeline(const ContextHandle& context, const std::shared_ptr<PipelineLayout>& pipeline_layout)
         : context(context), pipeline_layout(pipeline_layout) {}
 
     virtual ~Pipeline(){};
@@ -70,7 +70,7 @@ class Pipeline : public std::enable_shared_from_this<Pipeline> {
     }
 
   protected:
-    const SharedContext context;
+    const ContextHandle context;
     const std::shared_ptr<PipelineLayout> pipeline_layout;
     vk::Pipeline pipeline;
     vk::PipelineBindPoint bind_point;

@@ -25,7 +25,7 @@ class MeanToBuffer : public Node {
     };
 
   public:
-    MeanToBuffer(const SharedContext context);
+    MeanToBuffer(const ContextHandle context);
 
     ~MeanToBuffer();
 
@@ -42,7 +42,7 @@ class MeanToBuffer : public Node {
                  const NodeIO& io) override;
 
   private:
-    const SharedContext context;
+    const ContextHandle context;
 
     ManagedVkImageInHandle con_src = ManagedVkImageIn::compute_read("src");
     ManagedVkBufferOutHandle con_mean;

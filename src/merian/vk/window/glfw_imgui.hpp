@@ -19,7 +19,7 @@ class GLFWImGui {
     // context.
     // Adapt pool sizes to your needs (eg to fit all fonts).
     // Make sure to add all fonts before calling new_frame
-    GLFWImGui(const SharedContext& context,
+    GLFWImGui(const ContextHandle& context,
               const ImGuiContextWrapperHandle& ctx,
               const bool no_mouse_cursor_change = false,
               const vk::ImageLayout initial_layout = vk::ImageLayout::ePresentSrcKHR,
@@ -41,7 +41,7 @@ class GLFWImGui {
     void create_render_pass(SwapchainAcquireResult& aquire_result);
 
   private:
-    const SharedContext context;
+    const ContextHandle context;
     const ImGuiContextWrapperHandle ctx;
 
     const bool no_mouse_cursor_change;

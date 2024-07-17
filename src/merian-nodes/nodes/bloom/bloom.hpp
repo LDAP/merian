@@ -19,7 +19,7 @@ class Bloom : public Node {
     };
 
   public:
-    Bloom(const SharedContext context);
+    Bloom(const ContextHandle context);
 
     virtual ~Bloom();
 
@@ -38,7 +38,7 @@ class Bloom : public Node {
     NodeStatusFlags properties(Properties& config) override;
 
   private:
-    const SharedContext context;
+    const ContextHandle context;
 
     ManagedVkImageInHandle con_src = ManagedVkImageIn::compute_read("src");
     ManagedVkImageOutHandle con_out;

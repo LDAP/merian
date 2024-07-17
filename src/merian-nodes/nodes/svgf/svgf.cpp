@@ -13,7 +13,7 @@
 
 namespace merian_nodes {
 
-uint32_t get_ve_local_size(const SharedContext& context) {
+uint32_t get_ve_local_size(const ContextHandle& context) {
     if (32 * 32 * VE_SHARED_MEMORY_PER_PIXEL <=
         context->physical_device.get_physical_device_limits().maxComputeSharedMemorySize) {
         return 32;
@@ -25,7 +25,7 @@ uint32_t get_ve_local_size(const SharedContext& context) {
     }
 }
 
-SVGF::SVGF(const SharedContext context,
+SVGF::SVGF(const ContextHandle context,
            const ResourceAllocatorHandle allocator,
            const std::optional<vk::Format> output_format)
     : Node(), context(context), allocator(allocator), output_format(output_format),

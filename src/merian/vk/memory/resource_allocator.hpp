@@ -25,7 +25,7 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
     ResourceAllocator& operator=(ResourceAllocator const&) = delete;
     ResourceAllocator() = delete;
 
-    ResourceAllocator(const SharedContext& context,
+    ResourceAllocator(const ContextHandle& context,
                       const std::shared_ptr<MemoryAllocator>& memAllocator,
                       const StagingMemoryManagerHandle staging,
                       const SamplerPoolHandle& samplerPool);
@@ -194,7 +194,7 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
     //--------------------------------------------------------------------------------------------------
 
   protected:
-    const SharedContext context;
+    const ContextHandle context;
     const std::shared_ptr<MemoryAllocator> m_memAlloc;
     const StagingMemoryManagerHandle m_staging;
     const SamplerPoolHandle m_samplerPool;

@@ -10,7 +10,7 @@ namespace merian {
  */
 class HotReloader {
   public:
-    HotReloader(const SharedContext& context, const ShaderCompilerHandle& compiler)
+    HotReloader(const ContextHandle& context, const ShaderCompilerHandle& compiler)
         : context(context), compiler(compiler) {}
 
     // Compiles the shader at the specified path and returns a ShaderModule.
@@ -23,7 +23,7 @@ class HotReloader {
                const std::optional<vk::ShaderStageFlagBits> shader_kind = std::nullopt);
 
   private:
-    const SharedContext context;
+    const ContextHandle context;
     const ShaderCompilerHandle compiler;
 
     struct per_path {

@@ -50,7 +50,7 @@ enum class MemoryMappingType {
  */
 class MemoryAllocator : public std::enable_shared_from_this<MemoryAllocator> {
   public:
-    MemoryAllocator(const SharedContext& context) : context(context) {}
+    MemoryAllocator(const ContextHandle& context) : context(context) {}
 
     // Make sure the dtor is virtual
     virtual ~MemoryAllocator() = default;
@@ -79,12 +79,12 @@ class MemoryAllocator : public std::enable_shared_from_this<MemoryAllocator> {
     // ------------------------------------------------------------------------------------
 
   public:
-    const SharedContext& get_context() {
+    const ContextHandle& get_context() {
         return context;
     }
 
   protected:
-    const SharedContext context;
+    const ContextHandle context;
 };
 
 struct MemoryAllocationInfo {
@@ -116,7 +116,7 @@ inline std::string format_as(const MemoryAllocationInfo& alloc_info) {
  */
 class MemoryAllocation : public std::enable_shared_from_this<MemoryAllocation> {
   public:
-    MemoryAllocation(const SharedContext& context) : context(context) {}
+    MemoryAllocation(const ContextHandle& context) : context(context) {}
 
     // unmaps and frees the memory when called
     virtual ~MemoryAllocation() = default;
@@ -155,7 +155,7 @@ class MemoryAllocation : public std::enable_shared_from_this<MemoryAllocation> {
 
     virtual MemoryAllocatorHandle get_allocator() const = 0;
 
-    const SharedContext& get_context() const {
+    const ContextHandle& get_context() const {
         return context;
     }
 
@@ -164,7 +164,7 @@ class MemoryAllocation : public std::enable_shared_from_this<MemoryAllocation> {
     }
 
   protected:
-    const SharedContext context;
+    const ContextHandle context;
 };
 
 } // namespace merian

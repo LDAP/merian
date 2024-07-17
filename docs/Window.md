@@ -9,7 +9,7 @@ Merian provides an extension `ExtensionVkGLFW` that initializes GLFW. With the e
 
 int main() {
     auto extGLFW = std::make_shared<merian::ExtensionVkGLFW>();
-    merian::SharedContext context = merian::Context::make_context({extGLFW}, "Quake");
+    merian::ContextHandle context = merian::Context::make_context({extGLFW}, "Quake");
 
     merian::GLFWWindowHandle window = std::make_shared<merian::GLFWWindow>(context);
     // Creates a corresponding Vulkan surface

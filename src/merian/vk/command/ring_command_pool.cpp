@@ -2,7 +2,7 @@
 
 namespace merian {
 
-RingCommandPoolCycle::RingCommandPoolCycle(const SharedContext& context,
+RingCommandPoolCycle::RingCommandPoolCycle(const ContextHandle& context,
                                            const uint32_t queue_family_index,
                                            const vk::CommandPoolCreateFlags create_flags,
                                            const uint32_t cycle_index,

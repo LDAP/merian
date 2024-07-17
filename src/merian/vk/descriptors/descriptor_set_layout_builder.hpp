@@ -161,7 +161,7 @@ class DescriptorSetLayoutBuilder {
 
     // Requires that there is a binding from 0 to num_bindings-1.
     // Return a shared ptr since many descriptor sets may have a reference on this.
-    DescriptorSetLayoutHandle build_layout(const SharedContext& context,
+    DescriptorSetLayoutHandle build_layout(const ContextHandle& context,
                                            const vk::DescriptorSetLayoutCreateFlags flags = {}) {
 
         std::vector<vk::DescriptorSetLayoutBinding> sorted_bindings(bindings.size());

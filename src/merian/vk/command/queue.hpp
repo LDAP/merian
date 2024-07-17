@@ -22,7 +22,7 @@ class Queue : public std::enable_shared_from_this<Queue> {
   public:
     Queue() = delete;
 
-    Queue(const SharedContext& context, uint32_t queue_family_index, uint32_t queue_index);
+    Queue(const ContextHandle& context, uint32_t queue_family_index, uint32_t queue_index);
 
     void submit(const std::shared_ptr<CommandPool>& pool,
                 const vk::Fence fence = VK_NULL_HANDLE,
@@ -88,7 +88,7 @@ class Queue : public std::enable_shared_from_this<Queue> {
 
     void wait_idle();
 
-    const SharedContext& get_context() const {
+    const ContextHandle& get_context() const {
         return context;
     }
 
@@ -116,7 +116,7 @@ class Queue : public std::enable_shared_from_this<Queue> {
     }
 
   private:
-    const SharedContext context;
+    const ContextHandle context;
     // Try to not use the queue directly
     const vk::Queue queue;
     const uint32_t queue_family_index;

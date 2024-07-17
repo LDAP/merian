@@ -6,7 +6,7 @@
 
 namespace merian_nodes {
 
-FXAA::FXAA(const SharedContext context) : AbstractCompute(context, sizeof(PushConstant)) {
+FXAA::FXAA(const ContextHandle context) : AbstractCompute(context, sizeof(PushConstant)) {
     auto spec_builder = SpecializationInfoBuilder();
     spec_builder.add_entry(local_size_x, local_size_y);
     spec_info = spec_builder.build();

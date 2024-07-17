@@ -218,7 +218,7 @@ class DeviceASBuilder : public Node {
     };
 
   public:
-    DeviceASBuilder(const SharedContext& context, const ResourceAllocatorHandle& allocator)
+    DeviceASBuilder(const ContextHandle& context, const ResourceAllocatorHandle& allocator)
         : Node(), context(context), allocator(allocator), as_builder(context, allocator) {}
 
     std::vector<InputConnectorHandle> describe_inputs() {
@@ -358,7 +358,7 @@ class DeviceASBuilder : public Node {
     }
 
   private:
-    const SharedContext context;
+    const ContextHandle context;
     const ResourceAllocatorHandle allocator;
     ASBuilder as_builder;
 

@@ -8,7 +8,7 @@ static const uint32_t spv[] = {
 
 namespace merian_nodes {
 
-TAA::TAA(const SharedContext context,
+TAA::TAA(const ContextHandle context,
          const float alpha,
          const int clamp_method,
          const bool inverse_motion)

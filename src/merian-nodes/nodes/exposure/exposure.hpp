@@ -40,7 +40,7 @@ class AutoExposure : public Node {
     };
 
   public:
-    AutoExposure(const SharedContext context);
+    AutoExposure(const ContextHandle context);
 
     virtual ~AutoExposure();
 
@@ -59,7 +59,7 @@ class AutoExposure : public Node {
     NodeStatusFlags properties(Properties& config) override;
 
   private:
-    const SharedContext context;
+    const ContextHandle context;
 
     ManagedVkImageInHandle con_src = ManagedVkImageIn::compute_read("src");
 

@@ -63,7 +63,7 @@ vk::SurfaceFormatKHR select_surface_format(const std::vector<vk::SurfaceFormatKH
 
 // -------------------------------------------------------------------------------------
 
-Swapchain::Swapchain(const SharedContext& context,
+Swapchain::Swapchain(const ContextHandle& context,
                      const SurfaceHandle& surface,
                      const std::vector<vk::SurfaceFormatKHR>& preferred_surface_formats,
                      const vk::PresentModeKHR preferred_vsync_off_mode)

@@ -6,7 +6,7 @@ namespace merian {
 
 // You must ensure proper synchronization with the build
 std::vector<AccelerationStructureHandle>
-ASCompressor::compact(const SharedContext& context,
+ASCompressor::compact(const ContextHandle& context,
                       const ResourceAllocatorHandle& allocator,
                       const CommandPoolHandle& pool,
                       const QueueHandle& queue,

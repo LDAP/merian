@@ -20,7 +20,7 @@ class VKDTFilmcurv : public AbstractCompute {
     };
 
   public:
-    VKDTFilmcurv(const SharedContext context,
+    VKDTFilmcurv(const ContextHandle context,
                  const std::optional<Options> options = std::nullopt,
                  const std::optional<vk::Format> output_format = std::nullopt);
 

@@ -8,7 +8,7 @@
 
 namespace merian {
 
-Profiler::Profiler(const SharedContext& context)
+Profiler::Profiler(const ContextHandle& context)
     : timestamp_period(context->physical_device.get_physical_device_limits().timestampPeriod) {
     cpu_sections.assign(1, {});
     gpu_sections.assign(1, {});

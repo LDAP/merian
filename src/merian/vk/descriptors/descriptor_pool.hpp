@@ -45,7 +45,7 @@ class DescriptorPool : public std::enable_shared_from_this<DescriptorPool> {
         return layout;
     }
 
-    const SharedContext get_context() const {
+    const ContextHandle get_context() const {
         return context;
     }
 
@@ -61,7 +61,7 @@ class DescriptorPool : public std::enable_shared_from_this<DescriptorPool> {
     // }
 
   private:
-    const SharedContext context;
+    const ContextHandle context;
     const std::shared_ptr<DescriptorSetLayout> layout;
     const vk::DescriptorPoolCreateFlags flags;
     vk::DescriptorPool pool;

@@ -28,7 +28,7 @@ class ASCompressor {
   public:
     // You must ensure proper synchronization with the build
     static std::vector<AccelerationStructureHandle>
-    compact(const SharedContext& context,
+    compact(const ContextHandle& context,
             const ResourceAllocatorHandle& allocator,
             const CommandPoolHandle& pool,
             const QueueHandle& queue,

@@ -7,7 +7,7 @@
 
 namespace merian {
 
-inline vk::SurfaceKHR surface_from_glfw_window(const SharedContext& context,
+inline vk::SurfaceKHR surface_from_glfw_window(const ContextHandle& context,
                                                const GLFWWindowHandle& window) {
     VkSurfaceKHR psurf;
     if (glfwCreateWindowSurface(context->instance, *window, NULL, &psurf))
@@ -17,7 +17,7 @@ inline vk::SurfaceKHR surface_from_glfw_window(const SharedContext& context,
 
 class GLFWSurface : public Surface {
   public:
-    GLFWSurface(const SharedContext& context, const GLFWWindowHandle& window)
+    GLFWSurface(const ContextHandle& context, const GLFWWindowHandle& window)
         : Surface(context, surface_from_glfw_window(context, window)), window(window) {
         SPDLOG_DEBUG("create surface ({})", fmt::ptr(this));
     }

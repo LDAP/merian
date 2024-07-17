@@ -21,7 +21,7 @@
 
 namespace merian_nodes {
 
-NodeRegistry::NodeRegistry(const SharedContext& context, const ResourceAllocatorHandle& allocator) {
+NodeRegistry::NodeRegistry(const ContextHandle& context, const ResourceAllocatorHandle& allocator) {
     register_node<ABSplit>(NodeInfo{"AB Split", "Compare two inputs in a split-view.",
                                     []() { return std::make_shared<ABSplit>(); }});
     register_node<ABSideBySide>(NodeInfo{"AB Side By Side",

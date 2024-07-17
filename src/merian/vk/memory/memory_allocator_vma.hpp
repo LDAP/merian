@@ -21,7 +21,7 @@ class VMAMemoryAllocation : public MemoryAllocation {
      * @brief      Constructs a new instance.
      *
      */
-    VMAMemoryAllocation(const SharedContext& context,
+    VMAMemoryAllocation(const ContextHandle& context,
                         const std::shared_ptr<VMAMemoryAllocator>& allocator,
                         const MemoryMappingType mapping_type,
                         const VmaAllocation allocation)
@@ -83,11 +83,11 @@ class VMAMemoryAllocator : public MemoryAllocator {
     static std::shared_ptr<VMAMemoryAllocator>
     // E.g. supply VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT if you want to use the device
     // address feature
-    make_allocator(const SharedContext& context, const VmaAllocatorCreateFlags flags = {});
+    make_allocator(const ContextHandle& context, const VmaAllocatorCreateFlags flags = {});
 
   private:
     VMAMemoryAllocator() = delete;
-    explicit VMAMemoryAllocator(const SharedContext& context,
+    explicit VMAMemoryAllocator(const ContextHandle& context,
                                 const VmaAllocatorCreateFlags flags = {});
 
   public:

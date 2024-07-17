@@ -19,7 +19,7 @@ class TAA : public AbstractCompute {
     };
 
   public:
-    TAA(const SharedContext context,
+    TAA(const ContextHandle context,
         const float alpha = 0.,
         const int clamp_method = MERIAN_NODES_TAA_CLAMP_MIN_MAX,
         const bool inverse_motion = false);

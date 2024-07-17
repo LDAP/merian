@@ -15,7 +15,7 @@ class LDRImageRead : public Node {
     //
     // Set keep_on_host to keep a copy in host memory, otherwise the image is reloaded from disk
     // everytime the graph reconnects.
-    LDRImageRead(const SharedContext& context);
+    LDRImageRead(const ContextHandle& context);
 
     ~LDRImageRead();
 
@@ -30,7 +30,7 @@ class LDRImageRead : public Node {
     NodeStatusFlags properties(Properties& config) override;
 
   private:
-    const SharedContext context;
+    const ContextHandle context;
     bool keep_on_host = false;
 
     ManagedVkImageOutHandle con_out;

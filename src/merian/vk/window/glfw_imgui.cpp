@@ -7,7 +7,7 @@
 
 namespace merian {
 
-GLFWImGui::GLFWImGui(const SharedContext& context,
+GLFWImGui::GLFWImGui(const ContextHandle& context,
                      const ImGuiContextWrapperHandle& ctx,
                      const bool no_mouse_cursor_change,
                      const vk::ImageLayout initial_layout,
@@ -126,7 +126,7 @@ vk::Framebuffer GLFWImGui::new_frame(QueueHandle& queue,
     if (aquire_result.did_recreate) {
         const std::vector<vk::Framebuffer> old_framebuffers = framebuffers;
         const vk::RenderPass old_renderpass = renderpass;
-        const SharedContext context = this->context;
+        const ContextHandle context = this->context;
 
         const std::function<void()> cleanup = [context, old_framebuffers, old_renderpass]() {
             SPDLOG_DEBUG("destroy framebuffers and renderpass");

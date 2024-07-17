@@ -10,7 +10,7 @@ namespace merian {
 class DescriptorSetLayout : public std::enable_shared_from_this<DescriptorSetLayout> {
 
   public:
-    DescriptorSetLayout(const SharedContext context,
+    DescriptorSetLayout(const ContextHandle context,
                         const std::vector<vk::DescriptorSetLayoutBinding>& bindings,
                         const vk::DescriptorSetLayoutCreateFlags flags = {})
         : context(context), bindings(bindings) {
@@ -36,7 +36,7 @@ class DescriptorSetLayout : public std::enable_shared_from_this<DescriptorSetLay
         return bindings;
     }
 
-    const SharedContext& get_context() const {
+    const ContextHandle& get_context() const {
         return context;
     }
 
@@ -45,7 +45,7 @@ class DescriptorSetLayout : public std::enable_shared_from_this<DescriptorSetLay
     }
 
   private:
-    const SharedContext context;
+    const ContextHandle context;
     const std::vector<vk::DescriptorSetLayoutBinding> bindings;
     vk::DescriptorSetLayout layout;
 };

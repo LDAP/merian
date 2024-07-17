@@ -9,7 +9,7 @@
 
 namespace merian_nodes {
 
-MeanToBuffer::MeanToBuffer(const SharedContext context) : Node(), context(context) {
+MeanToBuffer::MeanToBuffer(const ContextHandle context) : Node(), context(context) {
 
     image_to_buffer_shader = std::make_shared<ShaderModule>(
         context, merian_image_to_buffer_comp_spv_size(), merian_image_to_buffer_comp_spv());

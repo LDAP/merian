@@ -19,7 +19,7 @@ namespace merian_nodes {
  */
 class GLFWWindow : public Node {
   public:
-    GLFWWindow(const SharedContext context) : Node() {
+    GLFWWindow(const ContextHandle context) : Node() {
         if (context->get_extension<ExtensionVkGLFW>()) {
             window = std::make_shared<merian::GLFWWindow>(context);
             swapchain = std::make_shared<merian::Swapchain>(context, window->get_surface());

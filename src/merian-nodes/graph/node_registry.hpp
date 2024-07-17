@@ -16,7 +16,7 @@ class NodeRegistry {
     };
 
   public:
-    NodeRegistry(const SharedContext& context, const ResourceAllocatorHandle& allocator);
+    NodeRegistry(const ContextHandle& context, const ResourceAllocatorHandle& allocator);
 
     template <typename NODE_TYPE> void register_node(const NodeInfo& node_info) {
         const std::type_index type = typeid(std::remove_pointer_t<NODE_TYPE>);

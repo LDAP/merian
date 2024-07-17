@@ -26,7 +26,7 @@ class RenderPass : public std::enable_shared_from_this<RenderPass> {
     }
 
   private:
-    const SharedContext context;
+    const ContextHandle context;
 
     vk::RenderPass renderpass;
 };

@@ -103,7 +103,7 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
      * @param[in]  fallback_format            The fallback format if non of the preferred formats is
      * available
      */
-    Swapchain(const SharedContext& context,
+    Swapchain(const ContextHandle& context,
               const SurfaceHandle& surface,
               const std::vector<vk::SurfaceFormatKHR>& preferred_surface_formats =
                   {vk::Format::eR8G8B8A8Srgb, vk::Format::eB8G8R8A8Srgb},
@@ -218,7 +218,7 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
     [[nodiscard]] vk::PresentModeKHR select_present_mode(const bool vsync);
 
   private:
-    const SharedContext context;
+    const ContextHandle context;
     const SurfaceHandle surface;
     const std::vector<vk::SurfaceFormatKHR> preferred_surface_formats;
     const vk::PresentModeKHR preferred_vsync_off_mode;

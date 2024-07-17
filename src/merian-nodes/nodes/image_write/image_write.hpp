@@ -20,7 +20,7 @@ class ImageWrite : public Node {
      *
      * @param      allocator      The allocator used to create copies of the input to be able to
      */
-    ImageWrite(const SharedContext context,
+    ImageWrite(const ContextHandle context,
                    const ResourceAllocatorHandle allocator,
                    const std::string& base_filename =
                        "image_{record_iteration:06}_{image_index:06}_{run_iteration:06}");
@@ -57,7 +57,7 @@ class ImageWrite : public Node {
     }
 
   private:
-    const SharedContext context;
+    const ContextHandle context;
     const ResourceAllocatorHandle allocator;
 
     ManagedVkImageInHandle con_src = ManagedVkImageIn::transfer_src("src");

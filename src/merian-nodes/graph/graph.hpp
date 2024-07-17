@@ -195,7 +195,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
     };
 
   public:
-    Graph(const SharedContext& context, const ResourceAllocatorHandle& resource_allocator)
+    Graph(const ContextHandle& context, const ResourceAllocatorHandle& resource_allocator)
         : context(context), resource_allocator(resource_allocator), queue(context->get_queue_GCT()),
           registry(context, resource_allocator), ring_fences(context) {
         for (uint32_t i = 0; i < RING_SIZE; i++) {
@@ -1722,7 +1722,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
   private:
     // General stuff
-    const SharedContext context;
+    const ContextHandle context;
     const ResourceAllocatorHandle resource_allocator;
     const QueueHandle queue;
     std::shared_ptr<ExtensionVkDebugUtils> debug_utils = nullptr;

@@ -11,7 +11,7 @@ CommandPool::CommandPool(const std::shared_ptr<Queue> queue,
                          vk::CommandPoolCreateFlags create_flags)
     : CommandPool(queue->get_context(), queue->get_queue_family_index(), create_flags) {}
 
-CommandPool::CommandPool(const SharedContext context,
+CommandPool::CommandPool(const ContextHandle context,
                          uint32_t queue_family_index,
                          vk::CommandPoolCreateFlags create_flags)
     : context(context), queue_family_index(queue_family_index) {
@@ -120,7 +120,7 @@ const vk::CommandPool& CommandPool::get_pool() const {
     return pool;
 }
 
-void update_cached_cmds(const SharedContext context,
+void update_cached_cmds(const ContextHandle context,
                         const vk::CommandPool& pool,
                         std::vector<vk::CommandBuffer>& inuse,
                         std::vector<vk::CommandBuffer>& cached,

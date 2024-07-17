@@ -35,7 +35,7 @@ class SVGF : public Node {
     };
 
   public:
-    SVGF(const SharedContext context,
+    SVGF(const ContextHandle context,
          const ResourceAllocatorHandle allocator,
          const std::optional<vk::Format> output_format = std::nullopt);
 
@@ -56,7 +56,7 @@ class SVGF : public Node {
     NodeStatusFlags properties(Properties& config) override;
 
   private:
-    const SharedContext context;
+    const ContextHandle context;
     const ResourceAllocatorHandle allocator;
     const std::optional<vk::Format> output_format;
 

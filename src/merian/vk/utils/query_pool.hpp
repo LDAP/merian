@@ -12,7 +12,7 @@ class QueryPool : public std::enable_shared_from_this<QueryPool<QUERY_TYPE>> {
 
   public:
     // Creates a query pool and resets it.
-    QueryPool(const SharedContext& context,
+    QueryPool(const ContextHandle& context,
               const uint32_t query_count = 1024,
               bool reset_after_creation = false)
         : context(context), query_count(query_count) {
@@ -106,7 +106,7 @@ class QueryPool : public std::enable_shared_from_this<QueryPool<QUERY_TYPE>> {
     }
 
   private:
-    const SharedContext context;
+    const ContextHandle context;
     const uint32_t query_count;
     vk::QueryPool query_pool;
 };

@@ -55,7 +55,7 @@ class ASBuilder {
     };
 
   public:
-    ASBuilder(const SharedContext context, const ResourceAllocatorHandle& allocator)
+    ASBuilder(const ContextHandle context, const ResourceAllocatorHandle& allocator)
         : context(context), allocator(allocator) {
         const auto ext = context->get_extension<ExtensionVkAccelerationStructure>();
         if (ext) {
@@ -267,7 +267,7 @@ class ASBuilder {
     }
 
   private:
-    const SharedContext context;
+    const ContextHandle context;
     const ResourceAllocatorHandle allocator;
     vk::DeviceSize scratch_buffer_min_alignment;
 

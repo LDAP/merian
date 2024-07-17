@@ -23,7 +23,7 @@ class SamplerPool : public std::enable_shared_from_this<SamplerPool> {
     SamplerPool& operator=(SamplerPool const&) = delete;
     SamplerPool() = delete;
 
-    SamplerPool(const SharedContext& context) : context(context) {
+    SamplerPool(const ContextHandle& context) : context(context) {
         SPDLOG_DEBUG("create sampler pool ({})", fmt::ptr(this));
     }
     ~SamplerPool();
@@ -61,7 +61,7 @@ class SamplerPool : public std::enable_shared_from_this<SamplerPool> {
         const Chain* pNext;
     };
 
-    const SharedContext context;
+    const ContextHandle context;
 
     std::unordered_map<SamplerState, std::weak_ptr<Sampler>, HashAligned32<SamplerState>> state_map;
 };

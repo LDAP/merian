@@ -10,7 +10,7 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
 namespace merian {
 
-SharedContext Context::make_context(const std::vector<std::shared_ptr<Extension>>& extensions,
+ContextHandle Context::create(const std::vector<std::shared_ptr<Extension>>& extensions,
                                     const std::string& application_name,
                                     uint32_t application_vk_version,
                                     uint32_t preffered_number_compute_queues,

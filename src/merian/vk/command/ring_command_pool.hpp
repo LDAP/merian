@@ -11,7 +11,7 @@ class RingCommandPoolCycle : public CommandPool {
   public:
     RingCommandPoolCycle() = delete;
 
-    RingCommandPoolCycle(const SharedContext& context,
+    RingCommandPoolCycle(const ContextHandle& context,
                          const uint32_t queue_family_index,
                          const vk::CommandPoolCreateFlags create_flags,
                          const uint32_t cycle_index,
@@ -63,7 +63,7 @@ template <uint32_t RING_SIZE = 2> class RingCommandPool {
     RingCommandPool& operator=(RingCommandPool const&) = delete;
 
     RingCommandPool(
-        const SharedContext& context,
+        const ContextHandle& context,
         const QueueHandle queue,
         vk::CommandPoolCreateFlags create_flags = vk::CommandPoolCreateFlagBits::eTransient)
         : context(context), create_flags(create_flags) {
@@ -91,7 +91,7 @@ template <uint32_t RING_SIZE = 2> class RingCommandPool {
     }
 
   private:
-    const SharedContext context;
+    const ContextHandle context;
     vk::CommandPoolCreateFlags create_flags;
 
     std::array<std::shared_ptr<RingCommandPoolCycle>, RING_SIZE> pools;

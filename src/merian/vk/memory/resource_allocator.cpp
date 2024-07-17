@@ -6,7 +6,7 @@
 
 namespace merian {
 
-ResourceAllocator::ResourceAllocator(const SharedContext& context,
+ResourceAllocator::ResourceAllocator(const ContextHandle& context,
                                      const std::shared_ptr<MemoryAllocator>& memAllocator,
                                      const std::shared_ptr<StagingMemoryManager> staging,
                                      const std::shared_ptr<SamplerPool>& samplerPool)
@@ -172,7 +172,7 @@ TextureHandle ResourceAllocator::createTexture(const ImageHandle& image,
 TextureHandle ResourceAllocator::createTexture(const ImageHandle& image,
                                                const vk::ImageViewCreateInfo& view_create_info,
                                                const std::string& debug_name) {
-    const SharedContext& context = image->get_memory()->get_context();
+    const ContextHandle& context = image->get_memory()->get_context();
 
     const vk::FormatProperties props =
         context->physical_device.physical_device.getFormatProperties(view_create_info.format);

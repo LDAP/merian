@@ -7,7 +7,7 @@
 
 namespace merian_nodes {
 
-HDRImageRead::HDRImageRead(const SharedContext& context) : Node(), context(context) {}
+HDRImageRead::HDRImageRead(const ContextHandle& context) : Node(), context(context) {}
 
 HDRImageRead::~HDRImageRead() {
     if (image) {

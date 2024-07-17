@@ -21,14 +21,14 @@ class Context;
 class Queue;
 class CommandPool;
 
-using SharedContext = std::shared_ptr<Context>;
+using ContextHandle = std::shared_ptr<Context>;
 
 /* Initializes the Vulkan instance and device and holds core objects.
  *
  * Common features are automatically enabled.
  *
  * Extensions can extend the functionality and hook into the creation process.
- * Use SharedContext instead of Context directly. This way it is ensured that Context is destroyed
+ * Use ContextHandle instead of Context directly. This way it is ensured that Context is destroyed
  * last.
  */
 class Context : public std::enable_shared_from_this<Context> {
@@ -85,8 +85,8 @@ class Context : public std::enable_shared_from_this<Context> {
      * Needed for enable_shared_from_this, see
      * https://en.cppreference.com/w/cpp/memory/enable_shared_from_this.
      */
-    static SharedContext
-    make_context(const std::vector<std::shared_ptr<Extension>>& extensions,
+    static ContextHandle
+    create(const std::vector<std::shared_ptr<Extension>>& extensions,
                  const std::string& application_name = "",
                  uint32_t application_vk_version = VK_MAKE_VERSION(1, 0, 0),
                  uint32_t preffered_number_compute_queues = 1, // Additionally to the GCT queue

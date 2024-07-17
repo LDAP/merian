@@ -14,7 +14,7 @@ namespace merian_nodes {
 class AbstractCompute : public Node {
 
   public:
-    AbstractCompute(const SharedContext context,
+    AbstractCompute(const ContextHandle context,
                     const std::optional<uint32_t> push_constant_size = std::nullopt);
 
     virtual ~AbstractCompute() {}
@@ -51,7 +51,7 @@ class AbstractCompute : public Node {
                          const NodeIO& io) override final;
 
   protected:
-    const SharedContext context;
+    const ContextHandle context;
     const std::optional<uint32_t> push_constant_size;
 
   private:

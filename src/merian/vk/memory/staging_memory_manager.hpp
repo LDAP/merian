@@ -105,7 +105,7 @@ class StagingMemoryManager : public std::enable_shared_from_this<StagingMemoryMa
     StagingMemoryManager& operator=(StagingMemoryManager const&) = delete;
     StagingMemoryManager() = delete;
 
-    StagingMemoryManager(const SharedContext context, const std::shared_ptr<MemoryAllocator> memAllocator,
+    StagingMemoryManager(const ContextHandle context, const std::shared_ptr<MemoryAllocator> memAllocator,
                          const vk::DeviceSize stagingBlockSize = (vk::DeviceSize(64) * 1024 * 1024));
 
     virtual ~StagingMemoryManager();
@@ -246,7 +246,7 @@ class StagingMemoryManager : public std::enable_shared_from_this<StagingMemoryMa
     };
 
   protected:
-    const SharedContext context;
+    const ContextHandle context;
     // Buffer sub allocator holds a raw ref, make sure allocator is not destroyed
     const std::shared_ptr<MemoryAllocator> memAllocator;
 

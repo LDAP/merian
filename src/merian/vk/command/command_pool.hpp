@@ -19,7 +19,7 @@ class CommandPool : public std::enable_shared_from_this<CommandPool> {
     // Cache size is the number of primary command buffers that are kept on hand to prevent
     // reallocation.
     CommandPool(
-        const SharedContext context,
+        const ContextHandle context,
         const uint32_t queue_family_index,
         const vk::CommandPoolCreateFlags create_flags = vk::CommandPoolCreateFlagBits::eTransient);
 
@@ -72,7 +72,7 @@ class CommandPool : public std::enable_shared_from_this<CommandPool> {
     const std::vector<vk::CommandBuffer>& get_command_buffers() const;
 
   private:
-    const SharedContext context;
+    const ContextHandle context;
     const uint32_t queue_family_index;
     vk::CommandPool pool = VK_NULL_HANDLE;
 

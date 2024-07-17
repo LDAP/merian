@@ -8,7 +8,7 @@
 
 namespace merian {
 
-Queue::Queue(const SharedContext& context, uint32_t queue_family_index, uint32_t queue_index)
+Queue::Queue(const ContextHandle& context, uint32_t queue_family_index, uint32_t queue_index)
     : context(context), queue(context->device.getQueue(queue_family_index, queue_index)),
       queue_family_index(queue_family_index) {}
 

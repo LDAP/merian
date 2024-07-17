@@ -10,7 +10,7 @@
 
 namespace merian_nodes {
 
-Accumulate::Accumulate(const SharedContext context,
+Accumulate::Accumulate(const ContextHandle context,
                        const ResourceAllocatorHandle allocator,
                        const std::optional<vk::Format> format)
     : Node(), context(context), allocator(allocator), format(format) {

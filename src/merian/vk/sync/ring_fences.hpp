@@ -30,7 +30,7 @@ class RingFences : public std::enable_shared_from_this<RingFences<RING_SIZE, Use
     RingFences& operator=(RingFences const&) = delete;
     RingFences() = delete;
 
-    RingFences(const SharedContext& context) : context(context) {
+    RingFences(const ContextHandle& context) : context(context) {
         for (uint32_t i = 0; i < RING_SIZE; i++) {
             vk::FenceCreateInfo fence_create_info{vk::FenceCreateFlagBits::eSignaled};
             ring_data[i].fence = context->device.createFence(fence_create_info);
@@ -120,7 +120,7 @@ class RingFences : public std::enable_shared_from_this<RingFences<RING_SIZE, Use
     }
 
     uint32_t current_index = 0;
-    const SharedContext context;
+    const ContextHandle context;
     std::array<RingData, RING_SIZE> ring_data;
 };
 

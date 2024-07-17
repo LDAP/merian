@@ -40,7 +40,7 @@ class Accumulate : public Node {
     };
 
   public:
-    Accumulate(const SharedContext context,
+    Accumulate(const ContextHandle context,
                    const ResourceAllocatorHandle allocator,
                    const std::optional<vk::Format> format = vk::Format::eR32G32B32A32Sfloat);
 
@@ -64,7 +64,7 @@ class Accumulate : public Node {
     void request_clear();
 
   private:
-    const SharedContext context;
+    const ContextHandle context;
     const ResourceAllocatorHandle allocator;
     const std::optional<vk::Format> format;
 

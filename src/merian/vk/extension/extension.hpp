@@ -96,7 +96,7 @@ class Extension {
                                         Context::FeaturesContainer&) {}
     virtual void on_device_created(const vk::Device&) {}
     /* Called right before context constructor returns. */
-    virtual void on_context_created(const SharedContext) {}
+    virtual void on_context_created(const ContextHandle) {}
     /* Called after device is idle and before context is destroyed. */
     virtual void on_destroy_context() {}
     /* Called right before device is destroyed. */

@@ -26,7 +26,7 @@ class Shadertoy : public AbstractCompute {
     };
 
   public:
-    Shadertoy(const SharedContext context,
+    Shadertoy(const ContextHandle context,
               const std::string& path,
               const ShaderCompilerHandle& compiler);
 

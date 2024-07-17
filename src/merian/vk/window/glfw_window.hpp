@@ -11,7 +11,7 @@ namespace merian {
 
 class GLFWWindow : public Window {
   public:
-    GLFWWindow(const SharedContext& context,
+    GLFWWindow(const ContextHandle& context,
                int width = 1280,
                int height = 720,
                const char* title = "")
@@ -41,7 +41,7 @@ class GLFWWindow : public Window {
     vk::Extent2D framebuffer_extent() override;
 
   private:
-    SharedContext context;
+    ContextHandle context;
     GLFWwindow* window = NULL;
 };
 

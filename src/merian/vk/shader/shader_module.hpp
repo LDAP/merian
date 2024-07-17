@@ -23,7 +23,7 @@ class ShaderModule : public std::enable_shared_from_this<ShaderModule> {
   public:
     ShaderModule() = delete;
 
-    ShaderModule(const SharedContext& context,
+    ShaderModule(const ContextHandle& context,
                  const std::string spv_filename,
                  const std::optional<FileLoader>& file_loader = std::nullopt)
         : context(context) {
@@ -33,18 +33,18 @@ class ShaderModule : public std::enable_shared_from_this<ShaderModule> {
         shader_module = context->device.createShaderModule(info);
     }
 
-    ShaderModule(const SharedContext& context, const vk::ShaderModuleCreateInfo& info)
+    ShaderModule(const ContextHandle& context, const vk::ShaderModuleCreateInfo& info)
         : context(context) {
         shader_module = context->device.createShaderModule(info);
     }
 
-    ShaderModule(const SharedContext& context, const std::size_t spv_size, const uint32_t spv[])
+    ShaderModule(const ContextHandle& context, const std::size_t spv_size, const uint32_t spv[])
         : context(context) {
         vk::ShaderModuleCreateInfo info{{}, spv_size, spv};
         shader_module = context->device.createShaderModule(info);
     }
 
-    ShaderModule(const SharedContext& context, const std::vector<uint32_t>& spv)
+    ShaderModule(const ContextHandle& context, const std::vector<uint32_t>& spv)
         : ShaderModule(context, spv.size() * sizeof(uint32_t), spv.data()) {}
 
     ~ShaderModule() {
@@ -71,7 +71,7 @@ class ShaderModule : public std::enable_shared_from_this<ShaderModule> {
     }
 
   private:
-    const SharedContext context;
+    const ContextHandle context;
     vk::ShaderModule shader_module;
 };
 

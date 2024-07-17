@@ -155,7 +155,7 @@ class DescriptorSetUpdate {
     }
 
     // Updates the vk::DescriptorSet immediately (!) to point to the configured resources.
-    void update(SharedContext context) {
+    void update(ContextHandle context) {
         assert(writes.size() == write_buffer_infos.size() + write_image_infos.size() +
                                     write_acceleration_structures.size());
         context->device.updateDescriptorSets(writes, {});

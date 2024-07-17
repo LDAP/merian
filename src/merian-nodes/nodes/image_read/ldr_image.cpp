@@ -7,7 +7,7 @@
 
 namespace merian_nodes {
 
-LDRImageRead::LDRImageRead(const SharedContext& context) : Node(), context(context) {}
+LDRImageRead::LDRImageRead(const ContextHandle& context) : Node(), context(context) {}
 
 LDRImageRead::~LDRImageRead() {
     if (image) {

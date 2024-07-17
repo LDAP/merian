@@ -20,7 +20,7 @@ class MedianApproxNode : public Node {
     };
 
   public:
-    MedianApproxNode(const SharedContext context);
+    MedianApproxNode(const ContextHandle context);
 
     virtual ~MedianApproxNode();
 
@@ -39,7 +39,7 @@ class MedianApproxNode : public Node {
     NodeStatusFlags properties(Properties& config) override;
 
   private:
-    const SharedContext context;
+    const ContextHandle context;
     int component;
 
     ManagedVkImageInHandle con_src = ManagedVkImageIn::compute_read("src");

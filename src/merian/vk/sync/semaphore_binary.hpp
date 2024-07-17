@@ -5,7 +5,7 @@
 namespace merian {
 class BinarySemaphore : public Semaphore {
   public:
-    BinarySemaphore(const SharedContext& context)
+    BinarySemaphore(const ContextHandle& context)
         : Semaphore(context, {vk::SemaphoreType::eBinary, 0}) {}
 };
 

@@ -67,7 +67,7 @@ class ShadertoyInjectCompiler : public ShaderCompiler {
     const ShaderCompilerHandle forwarding_compiler;
 };
 
-Shadertoy::Shadertoy(const SharedContext context,
+Shadertoy::Shadertoy(const ContextHandle context,
                      const std::string& path,
                      const ShaderCompilerHandle& compiler)
     : AbstractCompute(context, sizeof(PushConstant)), shader_path(path),

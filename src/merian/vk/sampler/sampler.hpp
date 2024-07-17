@@ -14,7 +14,7 @@ namespace merian {
 class Sampler : public std::enable_shared_from_this<Sampler> {
 public:
 
-    Sampler(const SharedContext& context, const vk::SamplerCreateInfo& create_info) : context(context) {
+    Sampler(const ContextHandle& context, const vk::SamplerCreateInfo& create_info) : context(context) {
         SPDLOG_DEBUG("create sampler ({})", fmt::ptr(this));
         sampler = context->device.createSampler(create_info);
     }
@@ -37,7 +37,7 @@ public:
     }
 
 private:
-    const SharedContext context;
+    const ContextHandle context;
     vk::Sampler sampler;
 };
 

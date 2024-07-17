@@ -7,7 +7,7 @@
 namespace merian {
 class Semaphore : public std::enable_shared_from_this<Semaphore> {
   public:
-    Semaphore(const SharedContext& context, const vk::SemaphoreTypeCreateInfo& type_create_info)
+    Semaphore(const ContextHandle& context, const vk::SemaphoreTypeCreateInfo& type_create_info)
         : context(context) {
         vk::SemaphoreCreateInfo create_info{{}, &type_create_info};
         semaphore = context->device.createSemaphore(create_info);
@@ -28,7 +28,7 @@ class Semaphore : public std::enable_shared_from_this<Semaphore> {
     }
 
   protected:
-    const SharedContext context;
+    const ContextHandle context;
     vk::Semaphore semaphore;
 };
 

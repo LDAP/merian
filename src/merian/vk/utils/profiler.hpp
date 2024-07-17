@@ -95,7 +95,7 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
     };
 
   public:
-    Profiler(const SharedContext& context);
+    Profiler(const ContextHandle& context);
 
     ~Profiler();
 
@@ -150,7 +150,7 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
     static void get_report_as_config(Properties& config, const Profiler::Report& report);
 
   private:
-    const SharedContext context;
+    const ContextHandle context;
     const float timestamp_period;
 
     QueryPoolHandle<vk::QueryType::eTimestamp> query_pool;

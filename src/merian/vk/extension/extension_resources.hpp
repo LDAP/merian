@@ -23,7 +23,7 @@ class ExtensionResources : public Extension {
     void enable_device_features(const Context::FeaturesContainer& supported,
                                 Context::FeaturesContainer& enable) override;
 
-    void on_context_created(const SharedContext context) override;
+    void on_context_created(const ContextHandle context) override;
     void on_destroy_context() override;
 
     std::shared_ptr<MemoryAllocator> memory_allocator();

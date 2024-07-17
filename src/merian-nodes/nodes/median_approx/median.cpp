@@ -9,7 +9,7 @@
 
 namespace merian_nodes {
 
-MedianApproxNode::MedianApproxNode(const SharedContext context) : Node(), context(context) {
+MedianApproxNode::MedianApproxNode(const ContextHandle context) : Node(), context(context) {
 
     histogram = std::make_shared<ShaderModule>(context, merian_median_histogram_comp_spv_size(),
                                                merian_median_histogram_comp_spv());
