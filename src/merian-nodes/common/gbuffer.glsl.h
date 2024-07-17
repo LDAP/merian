@@ -20,21 +20,29 @@ struct GBuffer {
     float vel_z;
 };
 
-// power of two
-#define gbuffer_block_size_power 3 // 2^3 = 8
+// Defines the block size in which a morton curve is used.
+#define gbuffer_block_size_power 5 // 2^5 = 32
 #define gbuffer_block_size (1 << gbuffer_block_size_power)
 #define gbuffer_block_size_minus_one (gbuffer_block_size - 1)
-// increases the number such that it is divisible by the block size
+
+
+// Round up to a multiple of block size
 #define gbuffer_dimension_for_block_size(number) ((number + gbuffer_block_size_minus_one) & ~gbuffer_block_size_minus_one)
 // computes the buffer size for the GBuffer
 #define gbuffer_size(width, height) (gbuffer_dimension_for_block_size(width) * gbuffer_dimension_for_block_size(height))
 // only valid in C
 #define gbuffer_size_bytes(width, height) (gbuffer_size(width, height) * sizeof(merian_nodes::GBuffer))
 
+#ifndef __cplusplus
+
+#include "common/morton.glsl"
+
 // z-Curve for better memory locality
 #define gbuffer_block(ipos, resolution) ((ipos.x >> gbuffer_block_size_power) + ((resolution.x + gbuffer_block_size_minus_one) >> gbuffer_block_size_power) * (ipos.y >> gbuffer_block_size_power))
 #define gbuffer_inner(ipos) ((ipos.x & gbuffer_block_size_minus_one) + gbuffer_block_size * (ipos.y & gbuffer_block_size_minus_one))
-#define gbuffer_index(ipos, resolution) (gbuffer_inner(ipos) + gbuffer_block(ipos, resolution) * gbuffer_block_size * gbuffer_block_size)
+#define gbuffer_index(ipos, resolution) (morton_encode2d(ipos & gbuffer_block_size_minus_one) + gbuffer_block(ipos, resolution) * gbuffer_block_size * gbuffer_block_size)
+
+#endif
 
 #ifdef __cplusplus
 }
