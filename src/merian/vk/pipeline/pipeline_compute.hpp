@@ -13,7 +13,6 @@ class ComputePipeline : public Pipeline {
         const ShaderModuleHandle& shader_module,
         const SpecializationInfoHandle specialization_info = MERIAN_SPECIALIZATION_INFO_NONE,
         const char* shader_module_entry_point = "main",
-        const vk::PipelineShaderStageCreateFlags stage_flags = {},
         const vk::PipelineCreateFlags flags = {},
         const PipelineHandle& base_pipeline = {})
         : Pipeline(pipeline_layout->get_context(), pipeline_layout), shader_module(shader_module),
@@ -21,8 +20,7 @@ class ComputePipeline : public Pipeline {
         SPDLOG_DEBUG("create ComputePipeline ({})", fmt::ptr(this));
 
         const vk::PipelineShaderStageCreateInfo stage = shader_module->get_shader_stage_create_info(
-            vk::ShaderStageFlagBits::eCompute, specialization_info, shader_module_entry_point,
-            stage_flags);
+            specialization_info, shader_module_entry_point);
 
         const vk::ComputePipelineCreateInfo info{
             flags, stage, *pipeline_layout, base_pipeline ? base_pipeline->get_pipeline() : nullptr,

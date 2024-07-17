@@ -1,7 +1,7 @@
 #pragma once
 
 #include "merian/io/file_loader.hpp"
-#include <vulkan/vulkan.hpp>
+#include "merian/vk/shader/shader_module.hpp"
 
 #include <cstdint>
 #include <filesystem>
@@ -28,12 +28,18 @@ class ShaderCompiler {
     // May throw compilation_failed.
     std::vector<uint32_t>
     compile_glsl(const std::filesystem::path& path,
-                 const std::optional<vk::ShaderStageFlagBits> shader_kind = std::nullopt) {
-        if (shader_kind) {
-            return compile_glsl(FileLoader::load_file(path), path.string(), *shader_kind);
-        } else {
-            return compile_glsl(FileLoader::load_file(path), path.string(), guess_kind(path));
-        }
+                 const std::optional<vk::ShaderStageFlagBits> optional_shader_kind = std::nullopt) {
+        return compile_glsl(FileLoader::load_file(path), path.string(),
+                            optional_shader_kind.value_or(guess_kind(path)));
+    }
+
+    ShaderModuleHandle compile_glsl_to_shadermodule(
+        const ContextHandle& context,
+        const std::filesystem::path& path,
+        const std::optional<vk::ShaderStageFlagBits> optional_shader_kind = std::nullopt) {
+        const vk::ShaderStageFlagBits shader_kind = optional_shader_kind.value_or(guess_kind(path));
+        return std::make_shared<ShaderModule>(context, compile_glsl(path, shader_kind),
+                                              shader_kind);
     }
 
     // May throw compilation_failed.

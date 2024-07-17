@@ -10,8 +10,6 @@
 
 namespace merian {
 
-class ShaderModuleLoader;
-
 /**
  * @brief      Holds a vk::ShaderModule and detroys it when the object is destroyed.
  *
@@ -20,32 +18,39 @@ class ShaderModuleLoader;
  */
 class ShaderModule : public std::enable_shared_from_this<ShaderModule> {
   public:
-  public:
     ShaderModule() = delete;
 
     ShaderModule(const ContextHandle& context,
                  const std::string spv_filename,
+                 const vk::ShaderStageFlagBits stage_flags = vk::ShaderStageFlagBits::eCompute,
                  const std::optional<FileLoader>& file_loader = std::nullopt)
-        : context(context) {
-        std::string code = FileLoader::load_file(
+        : context(context), stage_flags(stage_flags) {
+        const std::string code = FileLoader::load_file(
             file_loader.value().find_file(spv_filename).value_or(spv_filename));
-        vk::ShaderModuleCreateInfo info{{}, code.size(), (const uint32_t*)code.c_str()};
+        const vk::ShaderModuleCreateInfo info{{}, code.size(), (const uint32_t*)code.c_str()};
         shader_module = context->device.createShaderModule(info);
     }
 
-    ShaderModule(const ContextHandle& context, const vk::ShaderModuleCreateInfo& info)
-        : context(context) {
+    ShaderModule(const ContextHandle& context,
+                 const vk::ShaderModuleCreateInfo& info,
+                 const vk::ShaderStageFlagBits stage_flags = vk::ShaderStageFlagBits::eCompute)
+        : context(context), stage_flags(stage_flags) {
         shader_module = context->device.createShaderModule(info);
     }
 
-    ShaderModule(const ContextHandle& context, const std::size_t spv_size, const uint32_t spv[])
-        : context(context) {
+    ShaderModule(const ContextHandle& context,
+                 const std::size_t spv_size,
+                 const uint32_t spv[],
+                 const vk::ShaderStageFlagBits stage_flags = vk::ShaderStageFlagBits::eCompute)
+        : context(context), stage_flags(stage_flags) {
         vk::ShaderModuleCreateInfo info{{}, spv_size, spv};
         shader_module = context->device.createShaderModule(info);
     }
 
-    ShaderModule(const ContextHandle& context, const std::vector<uint32_t>& spv)
-        : ShaderModule(context, spv.size() * sizeof(uint32_t), spv.data()) {}
+    ShaderModule(const ContextHandle& context,
+                 const std::vector<uint32_t>& spv,
+                 const vk::ShaderStageFlagBits stage_flags = vk::ShaderStageFlagBits::eCompute)
+        : ShaderModule(context, spv.size() * sizeof(uint32_t), spv.data(), stage_flags) {}
 
     ~ShaderModule() {
         SPDLOG_DEBUG("destroy shader module ({})", fmt::ptr(this));
@@ -61,8 +66,11 @@ class ShaderModule : public std::enable_shared_from_this<ShaderModule> {
         return shader_module;
     }
 
+    vk::ShaderStageFlagBits get_stage_flags() const {
+        return stage_flags;
+    }
+
     vk::PipelineShaderStageCreateInfo get_shader_stage_create_info(
-        const vk::ShaderStageFlagBits stage_flags = vk::ShaderStageFlagBits::eCompute,
         const SpecializationInfoHandle specialization_info = MERIAN_SPECIALIZATION_INFO_NONE,
         const char* entry_point = "main",
         const vk::PipelineShaderStageCreateFlags flags = {}) {
@@ -72,6 +80,8 @@ class ShaderModule : public std::enable_shared_from_this<ShaderModule> {
 
   private:
     const ContextHandle context;
+    const vk::ShaderStageFlagBits stage_flags;
+
     vk::ShaderModule shader_module;
 };
 
