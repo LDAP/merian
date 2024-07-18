@@ -67,7 +67,15 @@ if not sdl2.found()
         compile_args : sdl2_subp.get_variable('c_args')
     )
 endif
-shaderc = dependency('shaderc', version: ['>=2023.8.1'], required: get_option('shaderc'))
+shaderc = dependency('shaderc', version: ['>=2023.8.1'], required: false)
+if not shaderc.found() and get_option('shaderc').enabled()
+    shaderc_options = cmake.subproject_options()
+    shaderc_options.add_cmake_defines({'SHADERC_SKIP_TESTS': true})
+    shaderc_options.add_cmake_defines({'SHADERC_SKIP_GLSLC': true})
+    shaderc_options.add_cmake_defines({'SHADERC_SKIP_EXAMPLES': true})
+    shaderc_subp = cmake.subproject('shaderc', options: shaderc_options)
+    shaderc = shaderc_subp.dependency('shaderc')
+endif
 
 if shaderc.found()
     add_project_arguments('-DFOUND_LIBSHADERC', language: 'cpp')

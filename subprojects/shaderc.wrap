@@ -1,0 +1,11 @@
+[wrap-git]
+directory = shaderc
+
+url = https://github.com/LDAP/shaderc
+revision = v2023.8-deps
+depth = 1
+method = cmake
+clone-recursive = true
+
+[provide]
+shaderc = shaderc_dep
