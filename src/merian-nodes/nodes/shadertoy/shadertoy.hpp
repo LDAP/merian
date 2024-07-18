@@ -26,13 +26,7 @@ class Shadertoy : public AbstractCompute {
     };
 
   public:
-    Shadertoy(const ContextHandle context,
-              const std::string& path,
-              const ShaderCompilerHandle& compiler);
-
-    void set_resolution(uint32_t width, uint32_t height);
-
-    NodeStatusFlags pre_process(GraphRun& run, const NodeIO& io) override;
+    Shadertoy(const ContextHandle context);
 
     std::vector<OutputConnectorHandle>
     describe_outputs(const ConnectorIOMap& output_for_input) override;
@@ -49,8 +43,11 @@ class Shadertoy : public AbstractCompute {
     NodeStatusFlags properties(Properties& config) override;
 
   private:
-    const std::string shader_path;
-    HotReloader reloader;
+    // none if shader compiler is not available.
+    std::unique_ptr<HotReloader> reloader = nullptr;
+
+    std::array<char, 256> shader_path = {0};
+    std::filesystem::path resolved_shader_path;
 
     vk::Extent3D extent = {1920, 1080, 1};
 
@@ -60,7 +57,6 @@ class Shadertoy : public AbstractCompute {
 
     PushConstant constant;
     Stopwatch sw;
-    bool requires_rebuild = false;
 };
 
 } // namespace merian_nodes

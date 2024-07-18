@@ -49,7 +49,12 @@ class ShaderCompiler {
 
   private:
     vk::ShaderStageFlagBits guess_kind(const std::filesystem::path& path) {
-        const std::string extension = path.extension().string();
+        std::string extension;
+        if (path.extension().string() == ".glsl") {
+            extension = std::filesystem::path(path.string().substr(0, path.string().size() - 5)).extension();
+        } else {
+            extension = path.extension();
+        }
         if (extension == ".vert") {
             return vk::ShaderStageFlagBits::eVertex;
         } else if (extension == ".tesc") {
@@ -63,7 +68,7 @@ class ShaderCompiler {
         } else if (extension == ".comp") {
             return vk::ShaderStageFlagBits::eCompute;
         } else {
-            throw std::runtime_error{
+            throw compilation_failed{
                 fmt::format("Shader kind could not be determined for path {}", path.string())};
         }
     }

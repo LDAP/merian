@@ -76,6 +76,20 @@ class NodeRegistry {
         return type_to_info.at(name_to_type.at(name));
     }
 
+    template <typename NODE_TYPE> const NodeInfo& node_info() const {
+        const std::type_index type = typeid(std::remove_pointer_t<NODE_TYPE>);
+        if (!type_to_info.contains(type)) {
+            throw std::invalid_argument{
+                fmt::format("node with type {} was not registered.", type.name())};
+        }
+        return type_to_info.at(type);
+    }
+
+    // shortcut for node_info<TYPE>().name;
+    template <typename NODE_TYPE> const std::string& node_name() const {
+        return node_info<NODE_TYPE>().name;
+    }
+
   private:
     void assert_node_exists(const std::string& name) const {
         if (!name_to_type.contains(name)) {

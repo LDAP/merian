@@ -77,8 +77,8 @@ if not shaderc.found() and get_option('shaderc').enabled()
     shaderc = shaderc_subp.dependency('shaderc')
 endif
 
-if shaderc.found()
-    add_project_arguments('-DFOUND_LIBSHADERC', language: 'cpp')
+if get_option('shaderc').enabled()
+    add_project_arguments('-DMERIAN_ENABLE_SHADERC', language: 'cpp')
 endif
 
 inc_dirs = [

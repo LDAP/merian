@@ -18,6 +18,7 @@
 #include "merian-nodes/nodes/taa/taa.hpp"
 #include "merian-nodes/nodes/tonemap/tonemap.hpp"
 #include "merian-nodes/nodes/vkdt_filmcurv/vkdt_filmcurv.hpp"
+#include "nodes/shadertoy/shadertoy.hpp"
 
 namespace merian_nodes {
 
@@ -65,7 +66,9 @@ NodeRegistry::NodeRegistry(const ContextHandle& context, const ResourceAllocator
     register_node<MedianApproxNode>(NodeInfo{
         "Median (Approximation)", "Computes an approximation of the median of a component.",
         [=]() { return std::make_shared<MedianApproxNode>(context); }});
-    // TODO: Shadertoy
+    register_node<Shadertoy>(NodeInfo{"Shadertoy",
+                                      "Execute Shadertoy-like shaders (Limited implementation).",
+                                      [=]() { return std::make_shared<Shadertoy>(context); }});
     register_node<SVGF>(NodeInfo{"Denoiser (SVGF)", "Spatiotemporal Variance-Guided Filtering.",
                                  [=]() { return std::make_shared<SVGF>(context, allocator); }});
     register_node<TAA>(NodeInfo{"TAA", "Temporal Anti-Aliasing.",

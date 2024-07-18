@@ -1,7 +1,12 @@
 #include "shadertoy.hpp"
 
 #include "merian-nodes/connectors/managed_vk_image_out.hpp"
+#include "merian-nodes/graph/errors.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
+
+#if MERIAN_ENABLE_SHADERC
+#include "merian/vk/shader/shader_compiler_shaderc.hpp"
+#endif
 
 namespace merian_nodes {
 
@@ -67,13 +72,21 @@ class ShadertoyInjectCompiler : public ShaderCompiler {
     const ShaderCompilerHandle forwarding_compiler;
 };
 
-Shadertoy::Shadertoy(const ContextHandle context,
-                     const std::string& path,
-                     const ShaderCompilerHandle& compiler)
-    : AbstractCompute(context, sizeof(PushConstant)), shader_path(path),
-      reloader(context, std::make_shared<ShadertoyInjectCompiler>(compiler)) {
-
+Shadertoy::Shadertoy(const ContextHandle context) : AbstractCompute(context, sizeof(PushConstant)) {
     sw.reset();
+
+    ShaderCompilerHandle compiler = nullptr;
+#if MERIAN_ENABLE_SHADERC
+    compiler = std::make_shared<merian::ShadercCompiler>();
+#endif
+
+    if (!compiler) {
+        return;
+    }
+
+    reloader =
+        std::make_unique<HotReloader>(context, std::make_shared<ShadertoyInjectCompiler>(compiler));
+
     auto spec_builder = SpecializationInfoBuilder();
     spec_builder.add_entry(local_size_x, local_size_y);
     spec_info = spec_builder.build();
@@ -81,18 +94,19 @@ Shadertoy::Shadertoy(const ContextHandle context,
 
 std::vector<OutputConnectorHandle>
 Shadertoy::describe_outputs([[maybe_unused]] const ConnectorIOMap& output_for_input) {
+    if (!reloader) {
+        throw graph_errors::node_error{"the shaderc feature must be enabled for this node."};
+    }
+    if (resolved_shader_path.empty()) {
+        throw graph_errors::node_error{"no shader path is set."};
+    }
+    if (!std::filesystem::exists(resolved_shader_path)) {
+        throw graph_errors::node_error{
+            fmt::format("file does not exist: {}", resolved_shader_path.string())};
+    }
+
     constant.iResolution = {extent.width, extent.height};
     return {ManagedVkImageOut::compute_write("out", vk::Format::eR8G8B8A8Unorm, extent)};
-}
-
-AbstractCompute::NodeStatusFlags Shadertoy::pre_process([[maybe_unused]] GraphRun& run,
-                                                        [[maybe_unused]] const NodeIO& io) {
-    NodeStatusFlags flags{};
-    if (requires_rebuild) {
-        flags |= NodeStatusFlagBits::NEEDS_RECONNECT;
-    }
-    requires_rebuild = false;
-    return flags;
 }
 
 SpecializationInfoHandle
@@ -120,7 +134,7 @@ ShaderModuleHandle Shadertoy::get_shader_module() {
     ShaderModuleHandle shader;
 
     try {
-        shader = reloader.get_shader(shader_path, vk::ShaderStageFlagBits::eCompute);
+        shader = reloader->get_shader(resolved_shader_path, vk::ShaderStageFlagBits::eCompute);
         error.reset();
     } catch (const ShaderCompiler::compilation_failed& e) {
         error = e;
@@ -130,16 +144,23 @@ ShaderModuleHandle Shadertoy::get_shader_module() {
 }
 
 AbstractCompute::NodeStatusFlags Shadertoy::properties(Properties& config) {
-    vk::Extent3D old_extent = extent;
-    config.config_uint("width", extent.width, "");
-    config.config_uint("height", extent.height, "");
+    bool needs_reconnect = false;
+
+    if (config.config_text("shader path", shader_path.size(), shader_path.data(), true)) {
+        needs_reconnect = true;
+        resolved_shader_path =
+            context->loader.find_file(shader_path.data()).value_or(shader_path.data());
+    }
+
+    needs_reconnect |= config.config_uint("width", extent.width, "");
+    needs_reconnect |= config.config_uint("height", extent.height, "");
 
     if (error) {
         config.st_separate("Compilation failed.");
         config.output_text(error->what());
     }
 
-    if (old_extent != extent) {
+    if (needs_reconnect) {
         return NEEDS_RECONNECT;
     } else {
         return {};

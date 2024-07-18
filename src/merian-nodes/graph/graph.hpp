@@ -231,11 +231,35 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
     }
 
     // Returns nullptr if the node does not exist.
-    NodeHandle get_node_for_identifier(const std::string& identifier) const {
+    NodeHandle find_node_for_identifier(const std::string& identifier) const {
         if (!node_for_identifier.contains(identifier)) {
             return nullptr;
         }
         return node_for_identifier.at(identifier);
+    }
+
+    // finds any node with the given type. Returns nullptr if not found.
+    template <typename NODE_TYPE> std::shared_ptr<NODE_TYPE> find_node_for_type() {
+        for (const auto& [node, data] : node_data) {
+            if (registry.node_name(node) == registry.node_name<NODE_TYPE>()) {
+                return debugable_ptr_cast<NODE_TYPE>(node);
+            }
+        }
+
+        return nullptr;
+    }
+
+    template <typename NODE_TYPE>
+    std::shared_ptr<NODE_TYPE> find_node_for_identifier_and_type(const std::string& identifier) {
+        NodeHandle maybe_match = find_node_for_identifier(identifier);
+        if (!maybe_match) {
+            return nullptr;
+        }
+        if (registry.node_name(maybe_match) == registry.node_name<NODE_TYPE>()) {
+            return debugable_ptr_cast<NODE_TYPE>(maybe_match);
+        }
+
+        return nullptr;
     }
 
     // Adds a connection to the graph.
@@ -249,8 +273,8 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                         const std::string& dst,
                         const std::string& src_output,
                         const std::string& dst_input) {
-        const NodeHandle src_node = get_node_for_identifier(src);
-        const NodeHandle dst_node = get_node_for_identifier(dst);
+        const NodeHandle src_node = find_node_for_identifier(src);
+        const NodeHandle dst_node = find_node_for_identifier(dst);
         assert(src_node);
         assert(dst_node);
         add_connection(src_node, dst_node, src_output, dst_input);
@@ -259,8 +283,8 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
     bool remove_connection(const std::string& src,
                            const std::string& dst,
                            const std::string& dst_input) {
-        const NodeHandle src_node = get_node_for_identifier(src);
-        const NodeHandle dst_node = get_node_for_identifier(dst);
+        const NodeHandle src_node = find_node_for_identifier(src);
+        const NodeHandle dst_node = find_node_for_identifier(dst);
         assert(src_node);
         assert(dst_node);
         remove_connection(src_node, dst_node, dst_input);
