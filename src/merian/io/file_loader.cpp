@@ -35,11 +35,27 @@ std::string FileLoader::load_file(const std::filesystem::path& path) {
     return result;
 }
 
-// Searches the file in cwd and search paths and returns the full path to the file
+// Searches the file in cwd and search paths and returns the full
+// path to the file. If the filename is relative parents are searched if configured.
 std::optional<std::filesystem::path>
 FileLoader::find_file(const std::filesystem::path& filename) const {
     if (exists(filename)) {
         return std::filesystem::weakly_canonical(filename);
+    }
+    if (search_parents && filename.is_relative()) {
+        std::filesystem::path current = std::filesystem::current_path();
+        while(true) {
+            const std::filesystem::path full_path = current / filename;
+            if (exists(full_path)) {
+                return std::filesystem::weakly_canonical(full_path);
+            }
+
+            if (current.parent_path() == current) {
+                break;
+            }
+            current = current.parent_path();
+        };
+
     }
     for (const auto& path : search_paths) {
         const std::filesystem::path full_path = path / filename;
@@ -86,6 +102,10 @@ void FileLoader::add_search_path(const std::filesystem::path path) {
 
 bool FileLoader::remove_search_path(const std::filesystem::path path) {
     return search_paths.erase(std::filesystem::weakly_canonical(path)) > 0;
+}
+
+void FileLoader::set_search_parents(const bool search_parents) {
+    this->search_parents = search_parents;
 }
 
 } // namespace merian

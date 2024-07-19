@@ -37,8 +37,11 @@ class FileLoader {
 
     bool remove_search_path(const std::filesystem::path path);
 
+    void set_search_parents(const bool search_parents);
+
   private:
     std::set<std::filesystem::path> search_paths;
+    bool search_parents = true;
 };
 using FileLoaderHandle = std::shared_ptr<FileLoader>;
 
