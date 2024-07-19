@@ -75,7 +75,20 @@ if not shaderc.found() and get_option('shaderc').enabled()
     shaderc_options.add_cmake_defines({'SHADERC_SKIP_EXAMPLES': true})
     shaderc_options.add_cmake_defines({'SHADERC_ENABLE_SHARED_CRT': true})
     shaderc_subp = cmake.subproject('shaderc', options: shaderc_options)
-    shaderc = shaderc_subp.dependency('shaderc')
+    # ideally we would use shaderc_subp.dependency('shaderc_combined') but that does not work
+    # therefore we combine all dependencies into one (shaderc build is pretty messed up)
+    shaderc = declare_dependency(
+        dependencies: [
+            shaderc_subp.dependency('shaderc'),
+            shaderc_subp.dependency('glslang'),
+            shaderc_subp.dependency('MachineIndependent'),
+            shaderc_subp.dependency('GenericCodeGen'),
+            shaderc_subp.dependency('shaderc_util'),
+            shaderc_subp.dependency('SPIRV'),
+            shaderc_subp.dependency('SPIRV-Tools-static'),
+            shaderc_subp.dependency('SPIRV-Tools-opt'),
+        ],
+    )
 endif
 
 if get_option('shaderc').enabled()
