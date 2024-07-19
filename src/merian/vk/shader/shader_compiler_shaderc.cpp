@@ -55,7 +55,7 @@ class FileIncluder final : public shaderc::CompileOptions::IncluderInterface {
     struct ShadercIncludeInformation {
 
         ShadercIncludeInformation(const std::filesystem::path& full_path)
-            : full_path(full_path), content(FileLoader::load_file(full_path)) {
+            : full_path(full_path.string()), content(FileLoader::load_file(full_path)) {
             include_result.source_name = this->full_path.c_str();
             include_result.source_name_length = this->full_path.size();
             include_result.content = content.c_str();

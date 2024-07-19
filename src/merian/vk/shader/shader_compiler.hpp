@@ -51,9 +51,9 @@ class ShaderCompiler {
     vk::ShaderStageFlagBits guess_kind(const std::filesystem::path& path) {
         std::string extension;
         if (path.extension().string() == ".glsl") {
-            extension = std::filesystem::path(path.string().substr(0, path.string().size() - 5)).extension();
+            extension = std::filesystem::path(path.string().substr(0, path.string().size() - 5)).extension().string();
         } else {
-            extension = path.extension();
+            extension = path.extension().string();
         }
         if (extension == ".vert") {
             return vk::ShaderStageFlagBits::eVertex;

@@ -73,6 +73,7 @@ if not shaderc.found() and get_option('shaderc').enabled()
     shaderc_options.add_cmake_defines({'SHADERC_SKIP_TESTS': true})
     shaderc_options.add_cmake_defines({'SHADERC_SKIP_GLSLC': true})
     shaderc_options.add_cmake_defines({'SHADERC_SKIP_EXAMPLES': true})
+    shaderc_options.add_cmake_defines({'SHADERC_ENABLE_SHARED_CRT': true})
     shaderc_subp = cmake.subproject('shaderc', options: shaderc_options)
     shaderc = shaderc_subp.dependency('shaderc')
 endif
