@@ -44,7 +44,7 @@ FileLoader::find_file(const std::filesystem::path& filename) const {
     }
     if (search_cwd_parents && filename.is_relative()) {
         std::filesystem::path current = std::filesystem::current_path();
-        while(true) {
+        while (true) {
             const std::filesystem::path full_path = current / filename;
             if (exists(full_path)) {
                 return std::filesystem::weakly_canonical(full_path);
@@ -55,7 +55,6 @@ FileLoader::find_file(const std::filesystem::path& filename) const {
             }
             current = current.parent_path();
         };
-
     }
     for (const auto& path : search_paths) {
         const std::filesystem::path full_path = path / filename;
@@ -104,7 +103,7 @@ bool FileLoader::remove_search_path(const std::filesystem::path path) {
     return search_paths.erase(std::filesystem::weakly_canonical(path)) > 0;
 }
 
-void FileLoader::set_search_parents(const bool search_parents) {
+void FileLoader::set_cwd_search_parents(const bool search_parents) {
     this->search_cwd_parents = search_parents;
 }
 
