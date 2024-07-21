@@ -93,6 +93,8 @@ Shadertoy::Shadertoy(const ContextHandle context)
 
     compiler = std::make_shared<ShadertoyInjectCompiler>(shaderc_compiler);
     reloader = std::make_unique<HotReloader>(context, compiler);
+    shader = compiler->compile_glsl_to_shadermodule(context, shader_glsl, "<memory>Shadertoy.comp",
+                                                    vk::ShaderStageFlagBits::eCompute);
 
     auto spec_builder = SpecializationInfoBuilder();
     spec_builder.add_entry(local_size_x, local_size_y);
