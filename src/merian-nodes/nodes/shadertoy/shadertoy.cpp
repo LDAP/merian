@@ -102,7 +102,7 @@ Shadertoy::Shadertoy(const ContextHandle context)
 }
 
 std::vector<OutputConnectorHandle>
-Shadertoy::describe_outputs([[maybe_unused]] const ConnectorIOMap& output_for_input) {
+Shadertoy::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
     if (!reloader) {
         throw graph_errors::node_error{"the shaderc feature must be enabled for this node."};
     }

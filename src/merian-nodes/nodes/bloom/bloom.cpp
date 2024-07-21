@@ -23,9 +23,9 @@ std::vector<InputConnectorHandle> Bloom::describe_inputs() {
     return {con_src};
 }
 
-std::vector<OutputConnectorHandle> Bloom::describe_outputs(const ConnectorIOMap& output_for_input) {
-    const vk::Format format = output_for_input[con_src]->create_info.format;
-    const vk::Extent3D extent = output_for_input[con_src]->create_info.extent;
+std::vector<OutputConnectorHandle> Bloom::describe_outputs(const NodeIOLayout& io_layout) {
+    const vk::Format format = io_layout[con_src]->create_info.format;
+    const vk::Extent3D extent = io_layout[con_src]->create_info.extent;
 
     con_out = ManagedVkImageOut::compute_write("out", format, extent);
     con_interm =
@@ -37,7 +37,8 @@ std::vector<OutputConnectorHandle> Bloom::describe_outputs(const ConnectorIOMap&
     };
 }
 
-Bloom::NodeStatusFlags Bloom::on_connected(const DescriptorSetLayoutHandle& graph_layout) {
+Bloom::NodeStatusFlags Bloom::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
+                                           const DescriptorSetLayoutHandle& graph_layout) {
     auto pipe_layout = PipelineLayoutBuilder(context)
                            .add_descriptor_set_layout(graph_layout)
                            .add_push_constant<PushConstant>()

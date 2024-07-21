@@ -41,17 +41,17 @@ class Accumulate : public Node {
 
   public:
     Accumulate(const ContextHandle context,
-                   const ResourceAllocatorHandle allocator,
-                   const std::optional<vk::Format> format = vk::Format::eR32G32B32A32Sfloat);
+               const ResourceAllocatorHandle allocator,
+               const std::optional<vk::Format> format = vk::Format::eR32G32B32A32Sfloat);
 
     ~Accumulate();
 
     std::vector<InputConnectorHandle> describe_inputs() override;
 
-    std::vector<OutputConnectorHandle>
-    describe_outputs(const ConnectorIOMap& output_for_input) override;
+    std::vector<OutputConnectorHandle> describe_outputs(const NodeIOLayout& io_layout) override;
 
-    NodeStatusFlags on_connected(const DescriptorSetLayoutHandle& descriptor_set_layout) override;
+    NodeStatusFlags on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
+                                 const DescriptorSetLayoutHandle& descriptor_set_layout) override;
 
     void process(GraphRun& run,
                  const vk::CommandBuffer& cmd,

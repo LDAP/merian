@@ -21,9 +21,9 @@ class ImageWrite : public Node {
      * @param      allocator      The allocator used to create copies of the input to be able to
      */
     ImageWrite(const ContextHandle context,
-                   const ResourceAllocatorHandle allocator,
-                   const std::string& base_filename =
-                       "image_{record_iteration:06}_{image_index:06}_{run_iteration:06}");
+               const ResourceAllocatorHandle allocator,
+               const std::string& base_filename =
+                   "image_{record_iteration:06}_{image_index:06}_{run_iteration:06}");
 
     virtual ~ImageWrite();
 

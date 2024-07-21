@@ -54,7 +54,7 @@ class Node : public std::enable_shared_from_this<Node> {
     // set the error state for this node.
     [[nodiscard]]
     virtual std::vector<OutputConnectorHandle>
-    describe_outputs([[maybe_unused]] const ConnectorIOMap& output_for_input) {
+    describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
         return {};
     }
 
@@ -68,9 +68,12 @@ class Node : public std::enable_shared_from_this<Node> {
     // It contains all input and output connectors for which get_descriptor_info() method does not
     // return std::nullopt. The order is guaranteed to be all inputs in the order of
     // describe_inputs() then outputs in the order of describe_outputs().
+    // 
+    // Here also delayed inputs can be accessed from io_layout.
     [[nodiscard]]
     virtual NodeStatusFlags
-    on_connected([[maybe_unused]] const DescriptorSetLayoutHandle& descriptor_set_layout) {
+    on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
+                 [[maybe_unused]] const DescriptorSetLayoutHandle& descriptor_set_layout) {
         return {};
     }
 

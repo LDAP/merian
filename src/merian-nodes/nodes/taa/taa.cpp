@@ -31,13 +31,13 @@ std::vector<InputConnectorHandle> TAA::describe_inputs() {
 }
 
 std::vector<OutputConnectorHandle>
-TAA::describe_outputs([[maybe_unused]] const ConnectorIOMap& output_for_input) {
-    width = output_for_input[con_src]->create_info.extent.width;
-    height = output_for_input[con_src]->create_info.extent.height;
+TAA::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
+    width = io_layout[con_src]->create_info.extent.width;
+    height = io_layout[con_src]->create_info.extent.height;
 
     return {
-        ManagedVkImageOut::compute_write("out", output_for_input[con_src]->create_info.format,
-                                         width, height),
+        ManagedVkImageOut::compute_write("out", io_layout[con_src]->create_info.format, width,
+                                         height),
     };
 }
 

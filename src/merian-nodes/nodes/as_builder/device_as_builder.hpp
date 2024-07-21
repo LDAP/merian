@@ -230,7 +230,7 @@ class DeviceASBuilder : public Node {
     }
 
     std::vector<OutputConnectorHandle>
-    describe_outputs([[maybe_unused]] const ConnectorIOMap& output_for_input) {
+    describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
         if (!context->get_extension<ExtensionVkAccelerationStructure>()) {
             throw graph_errors::node_error{
                 "context extension ExtensionVkAccelerationStructure is required."};

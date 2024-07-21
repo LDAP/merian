@@ -24,7 +24,7 @@ std::vector<InputConnectorHandle> MedianApproxNode::describe_inputs() {
 }
 
 std::vector<OutputConnectorHandle>
-MedianApproxNode::describe_outputs([[maybe_unused]] const ConnectorIOMap& output_for_input) {
+MedianApproxNode::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
 
     con_median = std::make_shared<ManagedVkBufferOut>(
         "median", vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
@@ -39,7 +39,8 @@ MedianApproxNode::describe_outputs([[maybe_unused]] const ConnectorIOMap& output
 }
 
 MedianApproxNode::NodeStatusFlags
-MedianApproxNode::on_connected(const DescriptorSetLayoutHandle& descriptor_set_layout) {
+MedianApproxNode::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
+                               const DescriptorSetLayoutHandle& descriptor_set_layout) {
     if (!pipe_reduce) {
         auto pipe_layout = PipelineLayoutBuilder(context)
                                .add_descriptor_set_layout(descriptor_set_layout)

@@ -43,7 +43,8 @@ class AbstractCompute : public Node {
     virtual ShaderModuleHandle get_shader_module() = 0;
 
     virtual NodeStatusFlags
-    on_connected(const DescriptorSetLayoutHandle& descriptor_set_layout) override final;
+    on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
+                 const DescriptorSetLayoutHandle& descriptor_set_layout) override final;
 
     virtual void process(GraphRun& run,
                          const vk::CommandBuffer& cmd,

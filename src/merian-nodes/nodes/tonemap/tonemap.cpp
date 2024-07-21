@@ -29,9 +29,9 @@ std::vector<InputConnectorHandle> Tonemap::describe_inputs() {
 }
 
 std::vector<OutputConnectorHandle>
-Tonemap::describe_outputs([[maybe_unused]] const ConnectorIOMap& output_for_input) {
-    extent = output_for_input[con_src]->create_info.extent;
-    const vk::Format format = output_format.value_or(output_for_input[con_src]->create_info.format);
+Tonemap::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
+    extent = io_layout[con_src]->create_info.extent;
+    const vk::Format format = output_format.value_or(io_layout[con_src]->create_info.format);
 
     return {
         ManagedVkImageOut::compute_write("out", format, extent),

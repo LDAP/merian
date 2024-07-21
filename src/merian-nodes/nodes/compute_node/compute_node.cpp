@@ -10,7 +10,8 @@ AbstractCompute::AbstractCompute(const ContextHandle context,
     : Node(), context(context), push_constant_size(push_constant_size) {}
 
 AbstractCompute::NodeStatusFlags
-AbstractCompute::on_connected(const DescriptorSetLayoutHandle& descriptor_set_layout) {
+AbstractCompute::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
+                              const DescriptorSetLayoutHandle& descriptor_set_layout) {
     this->descriptor_set_layout = descriptor_set_layout;
     this->pipe.reset();
 

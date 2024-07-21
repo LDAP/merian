@@ -15,8 +15,7 @@ class ColorImage : public Node {
 
     std::vector<InputConnectorHandle> describe_inputs() override;
 
-    std::vector<OutputConnectorHandle>
-    describe_outputs(const ConnectorIOMap& output_for_input) override;
+    std::vector<OutputConnectorHandle> describe_outputs(const NodeIOLayout& io_layout) override;
 
     void process(GraphRun& run,
                  const vk::CommandBuffer& cmd,

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "merian-nodes/graph/node.hpp"
-#include "merian-nodes/connectors/managed_vk_image_in.hpp"
 #include "merian-nodes/connectors/managed_vk_buffer_out.hpp"
+#include "merian-nodes/connectors/managed_vk_image_in.hpp"
+#include "merian-nodes/graph/node.hpp"
 
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
@@ -31,10 +31,10 @@ class MeanToBuffer : public Node {
 
     std::vector<InputConnectorHandle> describe_inputs() override;
 
-    std::vector<OutputConnectorHandle>
-    describe_outputs(const ConnectorIOMap& output_for_input) override;
+    std::vector<OutputConnectorHandle> describe_outputs(const NodeIOLayout& io_layout) override;
 
-    NodeStatusFlags on_connected(const DescriptorSetLayoutHandle& descriptor_set_layout) override;
+    NodeStatusFlags on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
+                                 const DescriptorSetLayoutHandle& descriptor_set_layout) override;
 
     void process(GraphRun& run,
                  const vk::CommandBuffer& cmd,
@@ -56,4 +56,4 @@ class MeanToBuffer : public Node {
     PipelineHandle reduce_buffer;
 };
 
-} // namespace merian
+} // namespace merian_nodes

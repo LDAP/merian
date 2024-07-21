@@ -16,7 +16,7 @@ LDRImageRead::~LDRImageRead() {
 }
 
 std::vector<OutputConnectorHandle>
-LDRImageRead::describe_outputs([[maybe_unused]] const ConnectorIOMap& output_for_input) {
+LDRImageRead::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
     if (filename.empty()) {
         throw graph_errors::node_error{"no file set"};
     }

@@ -19,14 +19,12 @@ ABSplit::ABSplit(const std::optional<vk::Format> output_format,
                  const std::optional<vk::Extent2D> output_extent)
     : AbstractABCompare(output_format, output_extent) {}
 
-std::vector<OutputConnectorHandle>
-ABSplit::describe_outputs(const ConnectorIOMap& output_for_input) {
+std::vector<OutputConnectorHandle> ABSplit::describe_outputs(const NodeIOLayout& io_layout) {
 
-    vk::Format format = output_format.has_value() ? output_format.value()
-                                                  : output_for_input[con_in_a]->create_info.format;
-    vk::Extent3D extent = output_extent.has_value()
-                              ? vk::Extent3D(output_extent.value(), 1)
-                              : output_for_input[con_in_a]->create_info.extent;
+    vk::Format format =
+        output_format.has_value() ? output_format.value() : io_layout[con_in_a]->create_info.format;
+    vk::Extent3D extent = output_extent.has_value() ? vk::Extent3D(output_extent.value(), 1)
+                                                    : io_layout[con_in_a]->create_info.extent;
 
     con_out = ManagedVkImageOut::transfer_write("out", format, extent.width, extent.height);
 
@@ -59,17 +57,16 @@ ABSideBySide::ABSideBySide(const std::optional<vk::Format> output_format,
                            const std::optional<vk::Extent2D> output_extent)
     : AbstractABCompare(output_format, output_extent) {}
 
-std::vector<OutputConnectorHandle>
-ABSideBySide::describe_outputs(const ConnectorIOMap& output_for_input) {
+std::vector<OutputConnectorHandle> ABSideBySide::describe_outputs(const NodeIOLayout& io_layout) {
 
-    vk::Format format = output_format.has_value() ? output_format.value()
-                                                  : output_for_input[con_in_a]->create_info.format;
+    vk::Format format =
+        output_format.has_value() ? output_format.value() : io_layout[con_in_a]->create_info.format;
 
     vk::Extent3D extent;
     if (output_extent.has_value()) {
         extent = vk::Extent3D(output_extent.value(), 1);
     } else {
-        extent = output_for_input[con_in_a]->create_info.extent;
+        extent = io_layout[con_in_a]->create_info.extent;
         extent.width *= 2;
     }
 

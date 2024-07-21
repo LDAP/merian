@@ -21,7 +21,7 @@ class JSONLoadProperties : public Properties {
                                 const ChildFlags flags = {}) override;
     virtual void st_end_child() override;
     virtual std::vector<std::string> st_list_children() override;
-    
+
     virtual void st_separate(const std::string& label = "") override;
     virtual void st_no_space() override;
 

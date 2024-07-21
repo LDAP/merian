@@ -23,9 +23,8 @@ std::vector<InputConnectorHandle> MeanToBuffer::describe_inputs() {
     return {con_src};
 }
 
-std::vector<OutputConnectorHandle>
-MeanToBuffer::describe_outputs(const ConnectorIOMap& output_for_input) {
-    vk::Extent3D extent = output_for_input[con_src]->create_info.extent;
+std::vector<OutputConnectorHandle> MeanToBuffer::describe_outputs(const NodeIOLayout& io_layout) {
+    vk::Extent3D extent = io_layout[con_src]->create_info.extent;
 
     const auto group_count_x = (extent.width + local_size_x - 1) / local_size_x;
     const auto group_count_y = (extent.height + local_size_y - 1) / local_size_y;
@@ -41,7 +40,8 @@ MeanToBuffer::describe_outputs(const ConnectorIOMap& output_for_input) {
 }
 
 MeanToBuffer::NodeStatusFlags
-MeanToBuffer::on_connected(const DescriptorSetLayoutHandle& descriptor_set_layout) {
+MeanToBuffer::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
+                           const DescriptorSetLayoutHandle& descriptor_set_layout) {
     if (!image_to_buffer) {
         auto pipe_layout = PipelineLayoutBuilder(context)
                                .add_descriptor_set_layout(descriptor_set_layout)

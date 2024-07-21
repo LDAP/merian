@@ -27,7 +27,7 @@ std::vector<InputConnectorHandle> Add::describe_inputs() {
     return {input_connectors.begin(), input_connectors.end()};
 }
 
-std::vector<OutputConnectorHandle> Add::describe_outputs(const ConnectorIOMap& output_for_input) {
+std::vector<OutputConnectorHandle> Add::describe_outputs(const NodeIOLayout& io_layout) {
     auto spec_builder = SpecializationInfoBuilder();
     spec_builder.add_entry(local_size_x, local_size_y);
 
@@ -40,13 +40,13 @@ std::vector<OutputConnectorHandle> Add::describe_outputs(const ConnectorIOMap& o
     };
 
     for (const auto& input : input_connectors) {
-        if (output_for_input.is_connected(input)) {
+        if (io_layout.is_connected(input)) {
             at_least_one_input_connected = true;
             if (format == vk::Format::eUndefined)
-                format = output_for_input[input]->create_info.format;
-            extent = min(extent, output_for_input[input]->create_info.extent);
+                format = io_layout[input]->create_info.format;
+            extent = min(extent, io_layout[input]->create_info.extent);
         }
-        spec_builder.add_entry<VkBool32>(output_for_input.is_connected(input));
+        spec_builder.add_entry<VkBool32>(io_layout.is_connected(input));
     }
 
     if (!at_least_one_input_connected) {

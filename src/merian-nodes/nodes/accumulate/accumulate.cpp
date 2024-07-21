@@ -30,11 +30,10 @@ std::vector<InputConnectorHandle> Accumulate::describe_inputs() {
     };
 }
 
-std::vector<OutputConnectorHandle>
-Accumulate::describe_outputs(const ConnectorIOMap& output_for_input) {
+std::vector<OutputConnectorHandle> Accumulate::describe_outputs(const NodeIOLayout& io_layout) {
 
-    irr_create_info = output_for_input[con_irr_in]->create_info;
-    const auto moments_create_info = output_for_input[con_moments_in]->create_info;
+    irr_create_info = io_layout[con_irr_in]->create_info;
+    const auto moments_create_info = io_layout[con_moments_in]->create_info;
 
     con_irr_out = ManagedVkImageOut::compute_write(
         "out_irr", format.value_or(irr_create_info.format), irr_create_info.extent);
@@ -49,7 +48,8 @@ Accumulate::describe_outputs(const ConnectorIOMap& output_for_input) {
 }
 
 Accumulate::NodeStatusFlags
-Accumulate::on_connected(const DescriptorSetLayoutHandle& graph_layout) {
+Accumulate::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
+                         const DescriptorSetLayoutHandle& graph_layout) {
     if (!percentile_desc_layout) {
         percentile_desc_layout =
             DescriptorSetLayoutBuilder().add_binding_storage_image().build_layout(context);

@@ -32,8 +32,7 @@ class ABSplit : public AbstractABCompare {
     ABSplit(const std::optional<vk::Format> output_format = std::nullopt,
             const std::optional<vk::Extent2D> output_extent = std::nullopt);
 
-    std::vector<OutputConnectorHandle>
-    describe_outputs(const ConnectorIOMap& output_for_input) override;
+    std::vector<OutputConnectorHandle> describe_outputs(const NodeIOLayout& io_layout) override;
 
     void process(GraphRun& run,
                  const vk::CommandBuffer& cmd,
@@ -50,8 +49,7 @@ class ABSideBySide : public AbstractABCompare {
     ABSideBySide(const std::optional<vk::Format> output_format = std::nullopt,
                  const std::optional<vk::Extent2D> output_extent = std::nullopt);
 
-    std::vector<OutputConnectorHandle>
-    describe_outputs(const ConnectorIOMap& output_for_input) override;
+    std::vector<OutputConnectorHandle> describe_outputs(const NodeIOLayout& io_layout) override;
 
     void process(GraphRun& run,
                  const vk::CommandBuffer& cmd,

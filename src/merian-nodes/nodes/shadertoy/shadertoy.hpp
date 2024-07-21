@@ -28,8 +28,7 @@ class Shadertoy : public AbstractCompute {
   public:
     Shadertoy(const ContextHandle context);
 
-    std::vector<OutputConnectorHandle>
-    describe_outputs(const ConnectorIOMap& output_for_input) override;
+    std::vector<OutputConnectorHandle> describe_outputs(const NodeIOLayout& io_layout) override;
 
     SpecializationInfoHandle get_specialization_info(const NodeIO& io) noexcept override;
 

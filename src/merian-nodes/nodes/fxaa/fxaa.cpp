@@ -21,12 +21,11 @@ std::vector<InputConnectorHandle> FXAA::describe_inputs() {
 }
 
 std::vector<OutputConnectorHandle>
-FXAA::describe_outputs([[maybe_unused]] const ConnectorIOMap& output_for_input) {
-    extent = output_for_input[con_src]->create_info.extent;
+FXAA::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
+    extent = io_layout[con_src]->create_info.extent;
 
     return {
-        ManagedVkImageOut::compute_write("out", output_for_input[con_src]->create_info.format,
-                                         extent),
+        ManagedVkImageOut::compute_write("out", io_layout[con_src]->create_info.format, extent),
     };
 }
 

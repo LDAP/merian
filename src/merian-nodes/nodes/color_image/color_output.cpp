@@ -13,12 +13,12 @@ std::vector<InputConnectorHandle> ColorImage::describe_inputs() {
 }
 
 std::vector<OutputConnectorHandle>
-ColorImage::describe_outputs([[maybe_unused]] const ConnectorIOMap& output_for_input) {
+ColorImage::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
     needs_run = true;
 
-    extent_from_input = output_for_input.is_connected(con_resolution);
+    extent_from_input = io_layout.is_connected(con_resolution);
     if (extent_from_input) {
-        extent = output_for_input[con_resolution]->value();
+        extent = io_layout[con_resolution]->value();
     }
 
     con_out = ManagedVkImageOut::transfer_write("out", format, extent, true);

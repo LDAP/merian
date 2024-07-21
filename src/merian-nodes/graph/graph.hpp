@@ -287,7 +287,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         const NodeHandle dst_node = find_node_for_identifier(dst);
         assert(src_node);
         assert(dst_node);
-        remove_connection(src_node, dst_node, dst_input);
+        return remove_connection(src_node, dst_node, dst_input);
     }
 
     // Removes a node from the graph.
@@ -409,7 +409,23 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                                                                registry.node_name(node)));
                     SPDLOG_DEBUG("on_connected node: {} ({})", data.identifier,
                                  registry.node_name(node));
-                    Node::NodeStatusFlags flags = node->on_connected(data.descriptor_set_layout);
+                    const NodeIOLayout io_layout([&](const InputConnectorHandle& input) {
+#ifndef NDEBUG
+                        if (std::find(data.input_connectors.begin(), data.input_connectors.end(),
+                                      input) == data.input_connectors.end()) {
+                            throw std::runtime_error{fmt::format(
+                                "Node {} tried to get an output connector for an input {} "
+                                "which was not returned in describe_inputs (which is not "
+                                "how this works).",
+                                registry.node_name(node), input->name)};
+                        }
+#endif
+                        // for optional inputs we inserted a input connection with nullptr in
+                        // search_satisfied_nodes, no problem here.
+                        return data.input_connections.at(input).output;
+                    });
+                    const Node::NodeStatusFlags flags =
+                        node->on_connected(io_layout, data.descriptor_set_layout);
                     _needs_reconnect |= flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT;
                     if (flags & Node::NodeStatusFlagBits::RESET_IN_FLIGHT_DATA) {
                         for (uint32_t i = 0; i < RING_SIZE; i++) {
@@ -827,7 +843,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         if (dst_data.desired_incoming_connections.contains(dst_input)) {
             const auto& [old_src, old_src_output] =
                 dst_data.desired_incoming_connections.at(dst_input);
-            const NodeData& old_src_data = node_data.at(old_src);
+            [[maybe_unused]] const NodeData& old_src_data = node_data.at(old_src);
             SPDLOG_DEBUG("remove conflicting connection {}, {} ({}) -> {}, {} ({})", old_src_output,
                          old_src_data.identifier, registry.node_name(old_src), dst_input,
                          dst_data.identifier, registry.node_name(dst));
@@ -836,14 +852,14 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
         {
             // outgoing
-            const auto [it, inserted] =
+            [[maybe_unused]] const auto [it, inserted] =
                 src_data.desired_outgoing_connections.emplace(dst, src_output, dst_input);
             assert(inserted);
         }
 
         {
             // incoming
-            const auto [it, inserted] =
+            [[maybe_unused]] const auto [it, inserted] =
                 dst_data.desired_incoming_connections.try_emplace(dst_input, src, src_output);
             assert(inserted);
         }
@@ -1213,7 +1229,8 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
                 const InputConnectorHandle& dst_input =
                     dst_data.input_connector_for_name[connection.dst_input];
-                const auto [it, inserted] = maybe_connected_inputs.try_emplace(dst_input, node);
+                [[maybe_unused]] const auto [it, inserted] =
+                    maybe_connected_inputs.try_emplace(dst_input, node);
 
                 assert(inserted); // uniqueness should be made sure in add_connection!
             }
@@ -1227,12 +1244,13 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
     void cache_node_output_connectors(const NodeHandle& node, NodeData& data) {
         try {
             data.output_connectors =
-                node->describe_outputs(ConnectorIOMap([&](const InputConnectorHandle& input) {
+                node->describe_outputs(NodeIOLayout([&](const InputConnectorHandle& input) {
 #ifndef NDEBUG
                     if (input->delay > 0) {
                         throw std::runtime_error{fmt::format(
                             "Node {} tried to access an output connector that is connected "
-                            "through a delayed input {} (which is not allowed).",
+                            "through a delayed input {} (which is not allowed here but only in "
+                            "on_connected).",
                             registry.node_name(node), input->name)};
                     }
                     if (std::find(data.input_connectors.begin(), data.input_connectors.end(),

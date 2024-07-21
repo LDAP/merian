@@ -46,5 +46,4 @@ class FileLoader {
 };
 using FileLoaderHandle = std::shared_ptr<FileLoader>;
 
-
 } // namespace merian

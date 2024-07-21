@@ -7,11 +7,10 @@
 namespace merian_nodes {
 
 // Access the outputs that are connected to your inputs.
-class ConnectorIOMap {
+class NodeIOLayout {
   public:
-    ConnectorIOMap(
-        const std::function<OutputConnectorHandle(const InputConnectorHandle&)>& output_for_input)
-        : output_for_input(output_for_input) {}
+    NodeIOLayout(const std::function<OutputConnectorHandle(const InputConnectorHandle&)>& io_layout)
+        : io_layout(io_layout) {}
 
     // Behavior undefined if an optional input connector is not connected.
     template <
@@ -22,19 +21,19 @@ class ConnectorIOMap {
             std::is_base_of_v<TypedInputConnector<OutputConnectorType, ResourceAccessType>, T>,
             bool> = true>
     const OutputConnectorType operator[](const std::shared_ptr<T>& input_connector) const {
-        assert(output_for_input(input_connector) && "optional input connector is not connected");
-        return input_connector->output_connector(output_for_input(input_connector));
+        assert(io_layout(input_connector) && "optional input connector is not connected");
+        return input_connector->output_connector(io_layout(input_connector));
     }
 
     // Returns if an input is connected. This is always true for non-optional inputs.
     bool is_connected(const InputConnectorHandle& input_connector) const {
         // if not optional, an output must exist!
-        assert(input_connector->optional || output_for_input(input_connector));
-        return output_for_input(input_connector) != nullptr;
+        assert(input_connector->optional || io_layout(input_connector));
+        return io_layout(input_connector) != nullptr;
     }
 
   private:
-    const std::function<OutputConnectorHandle(const InputConnectorHandle&)> output_for_input;
+    const std::function<OutputConnectorHandle(const InputConnectorHandle&)> io_layout;
 };
 
 class NodeIO {
