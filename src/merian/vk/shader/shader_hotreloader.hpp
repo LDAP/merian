@@ -22,6 +22,8 @@ class HotReloader {
     get_shader(const std::filesystem::path& path,
                const std::optional<vk::ShaderStageFlagBits> shader_kind = std::nullopt);
 
+    void clear();
+
   private:
     const ContextHandle context;
     const ShaderCompilerHandle compiler;

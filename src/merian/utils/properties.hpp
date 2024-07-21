@@ -191,13 +191,11 @@ class Properties {
     // GUI context (e.g using a button or by pressing enter). If `needs_submit` is false, then true
     // is returned at every change.
     [[nodiscard]] virtual bool config_text(const std::string& id,
-                                           const uint32_t max_len,
-                                           char* string,
+                                           std::string& string,
                                            const bool needs_submit = false,
                                            const std::string& desc = "") = 0;
     [[nodiscard]] virtual bool config_text_multiline(const std::string& id,
-                                                     const uint32_t max_len,
-                                                     char* string,
+                                                     std::string& string,
                                                      const bool needs_submit = false,
                                                      const std::string& desc = "") = 0;
 

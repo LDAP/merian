@@ -160,14 +160,18 @@ bool JSONDumpProperties::config_options(const std::string& id,
     current()[id] = options[selected];
     return false;
 }
-bool JSONDumpProperties::config_text(
-    const std::string& id, const uint32_t, char* buf, const bool, const std::string&) {
-    current()[id] = buf;
+bool JSONDumpProperties::config_text(const std::string& id,
+                                     std::string& string,
+                                     const bool,
+                                     const std::string&) {
+    current()[id] = string;
     return false;
 }
-bool JSONDumpProperties::config_text_multiline(
-    const std::string& id, const uint32_t, char* buf, const bool, const std::string&) {
-    current()[id] = buf;
+bool JSONDumpProperties::config_text_multiline(const std::string& id,
+                                               std::string& string,
+                                               const bool,
+                                               const std::string&) {
+    current()[id] = string;
     return false;
 }
 

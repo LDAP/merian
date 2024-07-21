@@ -44,9 +44,13 @@ class Shadertoy : public AbstractCompute {
 
   private:
     // none if shader compiler is not available.
+    ShaderCompilerHandle compiler = nullptr;
+    // none if shader compiler is not available.
     std::unique_ptr<HotReloader> reloader = nullptr;
 
-    std::array<char, 256> shader_path = {0};
+    int shader_source_selector = 0;
+    std::string shader_glsl;
+    std::string shader_path = {0};
     std::filesystem::path resolved_shader_path;
 
     vk::Extent3D extent = {1920, 1080, 1};

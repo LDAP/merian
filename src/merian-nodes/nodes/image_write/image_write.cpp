@@ -21,9 +21,8 @@ static std::unordered_map<uint32_t, std::string> FILE_EXTENSIONS = {
 ImageWrite::ImageWrite(const ContextHandle context,
                        const ResourceAllocatorHandle allocator,
                        const std::string& filename_format)
-    : Node(), context(context), allocator(allocator), filename_format(filename_format), buf(1024) {
+    : Node(), context(context), allocator(allocator), filename_format(filename_format) {
     assert(filename_format.size() < buf.size());
-    std::copy(filename_format.begin(), filename_format.end(), buf.begin());
 }
 
 ImageWrite::~ImageWrite() {}
@@ -295,11 +294,10 @@ ImageWrite::NodeStatusFlags ImageWrite::properties([[maybe_unused]] Properties& 
     config.config_options("format", format, {"PNG", "JPG", "HDR"}, Properties::OptionsStyle::COMBO);
     config.config_bool("rebuild after capture", rebuild_after_capture,
                        "forces a graph rebuild after every capture");
-    if (config.config_text("filename", buf.size(), buf.data(), false,
+    std::ignore =
+        config.config_text("filename", filename_format, false,
                            "Provide a format string for the path. Supported variables are: "
-                           "record_iteration, run_iteration, image_index, width, height")) {
-        filename_format = buf.data();
-    }
+                           "record_iteration, run_iteration, image_index, width, height");
     std::vector<std::string> variables;
     get_format_args([&](const auto& arg) { variables.push_back(arg.name); }, {1920, 1080, 1}, 1);
     fmt::dynamic_format_arg_store<fmt::format_context> arg_store;

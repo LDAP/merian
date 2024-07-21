@@ -81,13 +81,11 @@ class ImGuiProperties : public Properties {
                                 const OptionsStyle style = OptionsStyle::DONT_CARE,
                                 const std::string& desc = "") override;
     virtual bool config_text(const std::string& id,
-                             const uint32_t max_len,
-                             char* string,
+                             std::string& string,
                              const bool needs_submit = false,
                              const std::string& desc = "") override;
     virtual bool config_text_multiline(const std::string& id,
-                                       const uint32_t max_len,
-                                       char* string,
+                                       std::string& string,
                                        const bool needs_submit = false,
                                        const std::string& desc = "") override;
 

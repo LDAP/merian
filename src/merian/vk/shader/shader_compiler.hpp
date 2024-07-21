@@ -42,6 +42,14 @@ class ShaderCompiler {
                                               shader_kind);
     }
 
+    ShaderModuleHandle compile_glsl_to_shadermodule(const ContextHandle& context,
+                                                    const std::string& source,
+                                                    const std::string& source_name,
+                                                    const vk::ShaderStageFlagBits shader_kind) {
+        return std::make_shared<ShaderModule>(
+            context, compile_glsl(source, source_name, shader_kind), shader_kind);
+    }
+
     // May throw compilation_failed.
     virtual std::vector<uint32_t> compile_glsl(const std::string& source,
                                                const std::string& source_name,
@@ -51,7 +59,9 @@ class ShaderCompiler {
     vk::ShaderStageFlagBits guess_kind(const std::filesystem::path& path) {
         std::string extension;
         if (path.extension().string() == ".glsl") {
-            extension = std::filesystem::path(path.string().substr(0, path.string().size() - 5)).extension().string();
+            extension = std::filesystem::path(path.string().substr(0, path.string().size() - 5))
+                            .extension()
+                            .string();
         } else {
             extension = path.extension().string();
         }

@@ -70,7 +70,6 @@ class ImageWrite : public Node {
     std::function<void()> callback;
 
     std::string filename_format;
-    std::vector<char> buf;
 
     float scale = 1;
     int64_t iteration = 0;

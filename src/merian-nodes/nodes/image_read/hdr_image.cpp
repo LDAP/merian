@@ -65,10 +65,9 @@ void HDRImageRead::process([[maybe_unused]] GraphRun& run,
 HDRImageRead::NodeStatusFlags HDRImageRead::properties(Properties& config) {
     bool needs_rebuild = false;
 
-    if (config.config_text("path", config_filename.size(), config_filename.data(), true)) {
+    if (config.config_text("path", config_filename, true)) {
         needs_rebuild = true;
-        filename =
-            context->loader.find_file(config_filename.data()).value_or(config_filename.data());
+        filename = context->loader.find_file(config_filename).value_or(config_filename);
         if (image) {
             stbi_image_free(image);
             image = nullptr;

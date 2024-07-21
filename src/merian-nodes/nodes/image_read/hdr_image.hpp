@@ -41,7 +41,7 @@ class HDRImageRead : public Node {
 
     int width, height, channels;
     std::filesystem::path filename;
-    std::array<char, 256> config_filename;
+    std::string config_filename;
 };
 
 } // namespace merian_nodes

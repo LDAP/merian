@@ -10,6 +10,7 @@ ext_src = files(
     'imgui/imgui_widgets.cpp',
     'imgui/backends/imgui_impl_vulkan.cpp',
     'imgui/backends/imgui_impl_glfw.cpp',
+    'imgui/misc/cpp/imgui_stdlib.cpp',
 )
 
 ext_lib = static_library(

@@ -1,6 +1,8 @@
 #include "properties_imgui.hpp"
 
 #include "imgui.h"
+#include "misc/cpp/imgui_stdlib.h"
+
 #include <fmt/format.h>
 
 #include <algorithm>
@@ -210,25 +212,22 @@ bool ImGuiProperties::config_options(const std::string& id,
     return old_selected != selected;
 }
 bool ImGuiProperties::config_text(const std::string& id,
-                                  const uint32_t max_len,
-                                  char* string,
+                                  std::string& string,
                                   const bool needs_submit,
                                   const std::string& desc) {
 
-    bool submit_change = ImGui::InputText(id.c_str(), string, max_len,
+    bool submit_change = ImGui::InputText(id.c_str(), &string,
                                           needs_submit ? ImGuiInputTextFlags_EnterReturnsTrue : 0);
     tooltip(desc);
     return submit_change;
 }
 
 bool ImGuiProperties::config_text_multiline(const std::string& id,
-                                            const uint32_t max_len,
-                                            char* string,
+                                            std::string& string,
                                             const bool needs_submit,
                                             const std::string& desc) {
-    bool submit_change =
-        ImGui::InputTextMultiline(id.c_str(), string, max_len, ImVec2(0, 0),
-                                  needs_submit ? ImGuiInputTextFlags_EnterReturnsTrue : 0);
+    bool submit_change = ImGui::InputTextMultiline(
+        id.c_str(), &string, ImVec2(0, 0), needs_submit ? ImGuiInputTextFlags_EnterReturnsTrue : 0);
     tooltip(desc);
     return submit_change;
 }

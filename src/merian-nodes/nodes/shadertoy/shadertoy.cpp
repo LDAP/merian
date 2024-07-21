@@ -53,6 +53,12 @@ void main()
 
 )";
 
+static const char* default_shader = R"(
+void mainImage(out vec4 fragColor, in vec2 fragCoord) { 
+    fragColor = vec4(vec3(0), 1.);
+}
+)";
+
 class ShadertoyInjectCompiler : public ShaderCompiler {
   public:
     ShadertoyInjectCompiler(const ShaderCompilerHandle forwarding_compiler)
@@ -72,20 +78,21 @@ class ShadertoyInjectCompiler : public ShaderCompiler {
     const ShaderCompilerHandle forwarding_compiler;
 };
 
-Shadertoy::Shadertoy(const ContextHandle context) : AbstractCompute(context, sizeof(PushConstant)) {
+Shadertoy::Shadertoy(const ContextHandle context)
+    : AbstractCompute(context, sizeof(PushConstant)), shader_glsl(default_shader) {
     sw.reset();
 
-    ShaderCompilerHandle compiler = nullptr;
+    ShaderCompilerHandle shaderc_compiler = nullptr;
 #if MERIAN_ENABLE_SHADERC
-    compiler = std::make_shared<merian::ShadercCompiler>();
+    shaderc_compiler = std::make_shared<merian::ShadercCompiler>();
 #endif
 
-    if (!compiler) {
+    if (!shaderc_compiler) {
         return;
     }
 
-    reloader =
-        std::make_unique<HotReloader>(context, std::make_shared<ShadertoyInjectCompiler>(compiler));
+    compiler = std::make_shared<ShadertoyInjectCompiler>(shaderc_compiler);
+    reloader = std::make_unique<HotReloader>(context, compiler);
 
     auto spec_builder = SpecializationInfoBuilder();
     spec_builder.add_entry(local_size_x, local_size_y);
@@ -97,12 +104,19 @@ Shadertoy::describe_outputs([[maybe_unused]] const ConnectorIOMap& output_for_in
     if (!reloader) {
         throw graph_errors::node_error{"the shaderc feature must be enabled for this node."};
     }
-    if (resolved_shader_path.empty()) {
-        throw graph_errors::node_error{"no shader path is set."};
-    }
-    if (!std::filesystem::exists(resolved_shader_path)) {
-        throw graph_errors::node_error{
-            fmt::format("file does not exist: {}", resolved_shader_path.string())};
+
+    if (shader_source_selector == 0) {
+        if (error) {
+            throw graph_errors::node_error{error->what()};
+        }
+    } else if (shader_source_selector == 1) {
+        if (resolved_shader_path.empty()) {
+            throw graph_errors::node_error{"no shader path is set."};
+        }
+        if (!std::filesystem::exists(resolved_shader_path)) {
+            throw graph_errors::node_error{
+                fmt::format("file does not exist: {}", resolved_shader_path.string())};
+        }
     }
 
     constant.iResolution = {extent.width, extent.height};
@@ -131,13 +145,13 @@ Shadertoy::get_group_count([[maybe_unused]] const NodeIO& io) const noexcept {
 };
 
 ShaderModuleHandle Shadertoy::get_shader_module() {
-    ShaderModuleHandle shader;
-
-    try {
-        shader = reloader->get_shader(resolved_shader_path, vk::ShaderStageFlagBits::eCompute);
-        error.reset();
-    } catch (const ShaderCompiler::compilation_failed& e) {
-        error = e;
+    if (shader_source_selector == 1) {
+        try {
+            shader = reloader->get_shader(resolved_shader_path, vk::ShaderStageFlagBits::eCompute);
+            error.reset();
+        } catch (const ShaderCompiler::compilation_failed& e) {
+            error = e;
+        }
     }
 
     return shader;
@@ -145,20 +159,65 @@ ShaderModuleHandle Shadertoy::get_shader_module() {
 
 AbstractCompute::NodeStatusFlags Shadertoy::properties(Properties& config) {
     bool needs_reconnect = false;
+    bool needs_compile = false;
 
-    if (config.config_text("shader path", shader_path.size(), shader_path.data(), true)) {
+    if (config.config_options("shader source", shader_source_selector, {"inline", "file"},
+                              Properties::OptionsStyle::COMBO)) {
         needs_reconnect = true;
-        resolved_shader_path =
-            context->loader.find_file(shader_path.data()).value_or(shader_path.data());
+        if (shader_source_selector == 0) {
+            needs_compile = true;
+        }
+        error.reset();
     }
 
-    needs_reconnect |= config.config_uint("width", extent.width, "");
-    needs_reconnect |= config.config_uint("height", extent.height, "");
+    switch (shader_source_selector) {
+    case 0: {
+        if (config.config_text_multiline("shader", shader_glsl, false)) {
+            needs_compile = true;
+        }
+        if (reloader) {
+            reloader->clear();
+        }
+        break;
+    }
+    case 1: {
+        if (config.config_text("shader path", shader_path, true)) {
+            needs_reconnect = true;
+            resolved_shader_path = context->loader.find_file(shader_path).value_or(shader_path);
+        }
+
+        if (std::filesystem::exists(resolved_shader_path)) {
+            if (config.config_bool("convert to inline")) {
+                shader_source_selector = 0;
+                shader_glsl = FileLoader::load_file(resolved_shader_path);
+                needs_compile = true;
+            }
+        }
+        break;
+    }
+    default:
+        assert(0);
+    }
 
     if (error) {
         config.st_separate("Compilation failed.");
         config.output_text(error->what());
     }
+
+    if (compiler && needs_compile) {
+        try {
+            shader = compiler->compile_glsl_to_shadermodule(
+                context, shader_glsl, "<memory>Shadertoy.comp", vk::ShaderStageFlagBits::eCompute);
+            error.reset();
+        } catch (const ShaderCompiler::compilation_failed& e) {
+            error = e;
+        }
+    }
+
+    config.st_separate();
+
+    needs_reconnect |= config.config_uint("width", extent.width, "");
+    needs_reconnect |= config.config_uint("height", extent.height, "");
 
     if (needs_reconnect) {
         return NEEDS_RECONNECT;

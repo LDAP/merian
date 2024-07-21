@@ -7,7 +7,7 @@ HotReloader::get_shader(const std::filesystem::path& path,
                         const std::optional<vk::ShaderStageFlagBits> shader_kind) {
     std::optional<std::filesystem::path> canonical = std::filesystem::weakly_canonical(path);
     if (!canonical) {
-        throw std::runtime_error{fmt::format("file not found {}", path.string())};
+        throw ShaderCompiler::compilation_failed{fmt::format("file not found {}", path.string())};
     }
 
     using namespace std::chrono_literals;
@@ -42,6 +42,10 @@ HotReloader::get_shader(const std::filesystem::path& path,
         throw *path_info.error;
     }
     return path_info.shader;
+}
+
+void HotReloader::clear() {
+    shaders.clear();
 }
 
 } // namespace merian

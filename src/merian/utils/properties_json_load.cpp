@@ -211,30 +211,24 @@ bool JSONLoadProperties::config_options(const std::string& id,
     return old_selected != selected;
 }
 bool JSONLoadProperties::config_text(const std::string& id,
-                                     [[maybe_unused]] const uint32_t max_len,
-                                     char* string,
+                                     std::string& string,
                                      const bool,
                                      const std::string&) {
 
     if (o.back().contains(id)) {
-        std::string s = o.back()[id].template get<std::string>();
-        assert(s.size() < max_len);
-        strcpy(string, s.c_str());
+        string = o.back()[id].template get<std::string>();
         return true;
     }
 
     return false;
 }
 bool JSONLoadProperties::config_text_multiline(const std::string& id,
-                                               [[maybe_unused]] const uint32_t max_len,
-                                               char* string,
+                                               std::string& string,
                                                const bool,
                                                const std::string&) {
 
     if (o.back().contains(id)) {
-        std::string s = o.back()[id].template get<std::string>();
-        assert(s.size() < max_len);
-        strcpy(string, s.c_str());
+        string = o.back()[id].template get<std::string>();
         return true;
     }
 
