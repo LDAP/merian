@@ -31,6 +31,8 @@ merian_src = files(
     'vk/raytrace/as_compressor.cpp',
     'vk/raytrace/as_builder_blas.cpp',
     'vk/raytrace/as_builder_tlas.cpp',
+    'vk/renderpass/renderpass.cpp',
+    'vk/renderpass/renderpass_builder.cpp',
     'vk/sampler/sampler_pool.cpp',
     'vk/shader/shader_compiler.cpp',
     'vk/shader/shader_hotreloader.cpp',
