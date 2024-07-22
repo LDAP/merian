@@ -569,7 +569,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                                   "Set an optional name for the node and press enter.") ||
                 props.config_bool("Add Node")) {
                 std::optional<std::string> optional_identifier;
-                if (!new_node_identifier.empty()) {
+                if (!new_node_identifier.empty() && new_node_identifier[0] != 0) {
                     optional_identifier = new_node_identifier;
                 }
                 add_node(registry.node_names()[new_node_selected], optional_identifier);
@@ -1810,7 +1810,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
     // Properties helper
     int new_node_selected = 0;
-    std::string new_node_identifier = {0};
+    std::string new_node_identifier;
     int remove_node_selected = 0;
     int add_connection_selected_src = 0;
     int add_connection_selected_src_output = 0;
