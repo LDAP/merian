@@ -104,6 +104,7 @@ class DescriptorSetUpdate {
                              const uint32_t dst_array_element = 0,
                              const uint32_t descriptor_count = 1,
                              const std::optional<vk::ImageLayout> access_layout = std::nullopt) {
+        textures.emplace_back(texture);
         return write_descriptor_image_type(
             binding, set->get_type_for_binding(binding), texture->get_view(),
             access_layout.value_or(texture->get_current_layout()), *texture->get_sampler(),
@@ -170,12 +171,14 @@ class DescriptorSetUpdate {
         write_buffer_infos.clear();
         write_image_infos.clear();
         write_acceleration_structures.clear();
+        textures.clear();
     }
 
   private:
     std::shared_ptr<DescriptorSet> set;
 
     std::vector<vk::WriteDescriptorSet> writes;
+    std::vector<TextureHandle> textures;
 
     // vk::WriteDescriptorSet takes pointers. We must ensure that these stay valid until update() ->
     // use unique ptrs
