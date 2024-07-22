@@ -17,7 +17,6 @@ namespace merian {
 class SpecializationInfoBuilder {
 
   public:
-
     SpecializationInfoBuilder(const SpecializationInfoBuilder&) = delete;
     SpecializationInfoBuilder(const SpecializationInfoBuilder&&) = delete;
 
@@ -32,7 +31,8 @@ class SpecializationInfoBuilder {
 
     // -----------------------------------------------------------------
 
-    SpecializationInfoBuilder& add_entry_id_raw(uint32_t constant_id, uint32_t size, char* data) {
+    SpecializationInfoBuilder&
+    add_entry_id_raw(uint32_t constant_id, uint32_t size, const char* data) {
         assert(!entries.contains(constant_id));
 
         while (size + data_size > alloc_size) {
@@ -54,13 +54,12 @@ class SpecializationInfoBuilder {
         return *this;
     }
 
-    template<typename T>
-    SpecializationInfoBuilder& add_entry_id(uint32_t constant_id, T entry) {
+    template <typename T> SpecializationInfoBuilder& add_entry_id(uint32_t constant_id, T entry) {
         add_entry_id_raw(constant_id, sizeof(T), reinterpret_cast<char*>(&entry));
         return *this;
     }
 
-    template<typename T>
+    template <typename T>
     SpecializationInfoBuilder& add_entry_id_p(uint32_t constant_id, T* entry) {
         add_entry_id_raw(constant_id, sizeof(T), reinterpret_cast<char*>(entry));
         return *this;
@@ -68,7 +67,7 @@ class SpecializationInfoBuilder {
 
     // Assigns the constant to the next free constant id (use that in your shader). The id is
     // returned.
-    uint32_t add_entry_raw(uint32_t size, char* data) {
+    uint32_t add_entry_raw(uint32_t size, const char* data) {
         uint32_t next_free = 0;
         for (uint32_t i = 0; i <= entries.size(); i++) {
             if (!entries.contains(i)) {
@@ -79,24 +78,26 @@ class SpecializationInfoBuilder {
         return next_free;
     }
 
-    // Assigns the constant to the next free constant id (use that in your shader). The id is
-    // returned.
-    template<typename T>
-    uint32_t add_entry(T entry) {
-        return add_entry_raw(sizeof(T), reinterpret_cast<char*>(&entry));
+    uint32_t add_entry(const bool& entry) {
+        const VkBool32 entry32 = entry;
+        return add_entry(entry32);
     }
 
     // Assigns the constant to the next free constant id (use that in your shader). The id is
     // returned.
-    template<typename T>
-    uint32_t add_entry_p(T* entry) {
+    template <typename T> uint32_t add_entry(const T& entry) {
+        return add_entry_raw(sizeof(T), reinterpret_cast<const char*>(&entry));
+    }
+
+    // Assigns the constant to the next free constant id (use that in your shader). The id is
+    // returned.
+    template <typename T> uint32_t add_entry_p(const T* entry) {
         return add_entry_raw(sizeof(T), reinterpret_cast<char*>(entry));
     }
 
     // Assigns the constants to the next free constant ids (use that in your shader). The ids are
     // returned.
-    template<typename... T>
-    std::vector<uint32_t> add_entry(T... entries) {
+    template <typename... T> std::vector<uint32_t> add_entry(const T&... entries) {
         std::vector<uint32_t> ids = {add_entry(entries)...};
         return ids;
     }
@@ -108,7 +109,8 @@ class SpecializationInfoBuilder {
         for (auto& map_entry : entries) {
             vec_entries.push_back(map_entry.second);
         }
-        SpecializationInfoHandle result = std::make_shared<SpecializationInfo>(vec_entries, data_size, data);
+        SpecializationInfoHandle result =
+            std::make_shared<SpecializationInfo>(vec_entries, data_size, data);
         return result;
     }
 
