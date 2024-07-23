@@ -2,13 +2,13 @@
 
 namespace merian {
 
-RenderPass::RenderPass(const ContextHandle context,
+RenderPass::RenderPass(const ContextHandle& context,
                        const vk::RenderPassCreateInfo2 renderpass_create_info)
     : context(context) {
     renderpass = context->device.createRenderPass2(renderpass_create_info);
 }
 
-RenderPass::RenderPass(const ContextHandle context,
+RenderPass::RenderPass(const ContextHandle& context,
                        const vk::RenderPassCreateInfo renderpass_create_info)
     : context(context) {
     renderpass = context->device.createRenderPass(renderpass_create_info);

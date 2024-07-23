@@ -9,9 +9,9 @@ namespace merian {
 class RenderPass : public std::enable_shared_from_this<RenderPass> {
 
   public:
-    RenderPass(const ContextHandle context, const vk::RenderPassCreateInfo2 renderpass_create_info);
+    RenderPass(const ContextHandle& context, const vk::RenderPassCreateInfo2 renderpass_create_info);
 
-    RenderPass(const ContextHandle context, const vk::RenderPassCreateInfo renderpass_create_info);
+    RenderPass(const ContextHandle& context, const vk::RenderPassCreateInfo renderpass_create_info);
 
     ~RenderPass();
 

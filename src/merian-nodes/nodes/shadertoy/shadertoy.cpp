@@ -185,7 +185,7 @@ AbstractCompute::NodeStatusFlags Shadertoy::properties(Properties& config) {
     case 1: {
         if (config.config_text("shader path", shader_path, true)) {
             needs_reconnect = true;
-            resolved_shader_path = context->loader.find_file(shader_path).value_or(shader_path);
+            resolved_shader_path = context->file_loader.find_file(shader_path).value_or(shader_path);
         }
 
         if (std::filesystem::exists(resolved_shader_path)) {
