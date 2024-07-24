@@ -104,14 +104,13 @@ FileLoader::find_and_load_file(const std::filesystem::path& filename,
     return load_file(full_path.value());
 }
 
-void FileLoader::add_search_path(std::filesystem::path path) {
-    const auto resolved = find_file(path);
-    if (resolved) {
-        path = *resolved;
+void FileLoader::add_search_path(const std::filesystem::path path) {
+    auto resolved = find_file(path);
+    if (!resolved) {
+        resolved = std::filesystem::weakly_canonical(path);
     }
-    path = std::filesystem::weakly_canonical(path);
-    search_paths.insert(path);
-    SPDLOG_DEBUG("added search path {}", path.string());
+    search_paths.insert(*resolved);
+    SPDLOG_DEBUG("added search path {}", resolved->string());
 }
 
 bool FileLoader::remove_search_path(const std::filesystem::path path) {
