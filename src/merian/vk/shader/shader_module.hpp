@@ -10,6 +10,8 @@
 
 namespace merian {
 
+class ShaderStageCreateInfo;
+
 /**
  * @brief      Holds a vk::ShaderModule and detroys it when the object is destroyed.
  *
@@ -70,13 +72,10 @@ class ShaderModule : public std::enable_shared_from_this<ShaderModule> {
         return stage_flags;
     }
 
-    vk::PipelineShaderStageCreateInfo get_shader_stage_create_info(
+    ShaderStageCreateInfo get_shader_stage_create_info(
         const SpecializationInfoHandle specialization_info = MERIAN_SPECIALIZATION_INFO_NONE,
         const char* entry_point = "main",
-        const vk::PipelineShaderStageCreateFlags flags = {}) {
-        return vk::PipelineShaderStageCreateInfo{flags, stage_flags, shader_module, entry_point,
-                                                 *specialization_info};
-    }
+        const vk::PipelineShaderStageCreateFlags flags = {});
 
   private:
     const ContextHandle context;
@@ -86,5 +85,43 @@ class ShaderModule : public std::enable_shared_from_this<ShaderModule> {
 };
 
 using ShaderModuleHandle = std::shared_ptr<ShaderModule>;
+
+class ShaderStageCreateInfo {
+  public:
+    ShaderStageCreateInfo(
+        const ShaderModuleHandle& shader_module,
+        const SpecializationInfoHandle& specialization_info = MERIAN_SPECIALIZATION_INFO_NONE,
+        const std::string entry_point = "main",
+        const vk::PipelineShaderStageCreateFlags flags = {})
+        : shader_module(shader_module), specialization_info(specialization_info),
+          entry_point(entry_point), flags(flags) {}
+
+    operator vk::PipelineShaderStageCreateInfo() const {
+        return get();
+    }
+
+    vk::PipelineShaderStageCreateInfo operator*() const {
+        return get();
+    }
+
+    vk::PipelineShaderStageCreateInfo get() const {
+        return vk::PipelineShaderStageCreateInfo{flags, shader_module->get_stage_flags(),
+                                                 *shader_module, entry_point.c_str(),
+                                                 *specialization_info};
+    }
+
+    const ShaderModuleHandle shader_module;
+    const SpecializationInfoHandle specialization_info;
+    const std::string entry_point;
+    const vk::PipelineShaderStageCreateFlags flags;
+};
+using ShaderStageCreateInfoHandle = std::shared_ptr<ShaderStageCreateInfo>;
+
+inline ShaderStageCreateInfo
+ShaderModule::get_shader_stage_create_info(const SpecializationInfoHandle specialization_info,
+                                           const char* entry_point,
+                                           const vk::PipelineShaderStageCreateFlags flags) {
+    return ShaderStageCreateInfo(shared_from_this(), specialization_info, entry_point, flags);
+}
 
 } // namespace merian

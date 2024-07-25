@@ -8,6 +8,25 @@ namespace merian {
 class ComputePipeline : public Pipeline {
 
   public:
+    ComputePipeline(const PipelineLayoutHandle& pipeline_layout,
+                    const ShaderStageCreateInfo& shader_stage_create_info,
+                    const vk::PipelineCreateFlags flags = {},
+                    const PipelineHandle& base_pipeline = {})
+        : Pipeline(pipeline_layout->get_context(), pipeline_layout),
+          shader_module(shader_stage_create_info.shader_module), base_pipeline(base_pipeline) {
+        SPDLOG_DEBUG("create ComputePipeline ({})", fmt::ptr(this));
+
+        const vk::ComputePipelineCreateInfo info{
+            flags,
+            shader_stage_create_info,
+            *pipeline_layout,
+            base_pipeline ? base_pipeline->get_pipeline() : nullptr,
+            0,
+        };
+        // Hm. This is a bug in the API there should not be .value
+        pipeline = context->device.createComputePipeline(context->pipeline_cache, info).value;
+    }
+
     ComputePipeline(
         const PipelineLayoutHandle& pipeline_layout,
         const ShaderModuleHandle& shader_module,
@@ -15,20 +34,11 @@ class ComputePipeline : public Pipeline {
         const char* shader_module_entry_point = "main",
         const vk::PipelineCreateFlags flags = {},
         const PipelineHandle& base_pipeline = {})
-        : Pipeline(pipeline_layout->get_context(), pipeline_layout), shader_module(shader_module),
-          base_pipeline(base_pipeline) {
-        SPDLOG_DEBUG("create ComputePipeline ({})", fmt::ptr(this));
-
-        const vk::PipelineShaderStageCreateInfo stage = shader_module->get_shader_stage_create_info(
-            specialization_info, shader_module_entry_point);
-
-        const vk::ComputePipelineCreateInfo info{
-            flags, stage, *pipeline_layout, base_pipeline ? base_pipeline->get_pipeline() : nullptr,
-            0,
-        };
-        // Hm. This is a bug in the API there should not be .value
-        pipeline = context->device.createComputePipeline(context->pipeline_cache, info).value;
-    }
+        : ComputePipeline(pipeline_layout,
+                          ShaderStageCreateInfo{
+                              shader_module, specialization_info, shader_module_entry_point, {}},
+                          flags,
+                          base_pipeline) {}
 
     ~ComputePipeline() {
         SPDLOG_DEBUG("destroy ComputePipeline ({})", fmt::ptr(this));

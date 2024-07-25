@@ -28,6 +28,7 @@ merian_src = files(
     'vk/memory/resource_allocations.cpp',
     'vk/memory/resource_allocator.cpp',
     'vk/memory/staging_memory_manager.cpp',
+    'vk/pipeline/pipeline_graphics_builder.cpp',
     'vk/raytrace/as_compressor.cpp',
     'vk/raytrace/as_builder_blas.cpp',
     'vk/raytrace/as_builder_tlas.cpp',

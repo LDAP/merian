@@ -9,15 +9,15 @@ class GraphicsPipeline : public Pipeline {
 
   public:
     GraphicsPipeline(const std::vector<vk::PipelineShaderStageCreateInfo>& stages,
-                     const vk::PipelineVertexInputStateCreateInfo* pVertexInputState,
-                     const vk::PipelineInputAssemblyStateCreateInfo* pInputAssemblyState,
-                     const vk::PipelineTessellationStateCreateInfo* pTessellationState,
-                     const vk::PipelineViewportStateCreateInfo* pViewportState,
-                     const vk::PipelineRasterizationStateCreateInfo* pRasterizationState,
-                     const vk::PipelineMultisampleStateCreateInfo* pMultisampleState,
-                     const vk::PipelineDepthStencilStateCreateInfo* pDepthStencilState,
-                     const vk::PipelineColorBlendStateCreateInfo* pColorBlendState,
-                     const vk::PipelineDynamicStateCreateInfo* pDynamicState,
+                     const vk::PipelineVertexInputStateCreateInfo& pVertexInputState,
+                     const vk::PipelineInputAssemblyStateCreateInfo& pInputAssemblyState,
+                     const vk::PipelineTessellationStateCreateInfo& pTessellationState,
+                     const vk::PipelineViewportStateCreateInfo& pViewportState,
+                     const vk::PipelineRasterizationStateCreateInfo& pRasterizationState,
+                     const vk::PipelineMultisampleStateCreateInfo& pMultisampleState,
+                     const vk::PipelineDepthStencilStateCreateInfo& pDepthStencilState,
+                     const vk::PipelineColorBlendStateCreateInfo& pColorBlendState,
+                     const vk::PipelineDynamicStateCreateInfo& pDynamicState,
                      const PipelineLayoutHandle& pipeline_layout,
                      const RenderPassHandle& renderpass,
                      const uint32_t subpass,
@@ -28,15 +28,15 @@ class GraphicsPipeline : public Pipeline {
         SPDLOG_DEBUG("create GraphicsPipeline ({})", fmt::ptr(this));
         const vk::GraphicsPipelineCreateInfo info{flags,
                                                   stages,
-                                                  pVertexInputState,
-                                                  pInputAssemblyState,
-                                                  pTessellationState,
-                                                  pViewportState,
-                                                  pRasterizationState,
-                                                  pMultisampleState,
-                                                  pDepthStencilState,
-                                                  pColorBlendState,
-                                                  pDynamicState,
+                                                  &pVertexInputState,
+                                                  &pInputAssemblyState,
+                                                  &pTessellationState,
+                                                  &pViewportState,
+                                                  &pRasterizationState,
+                                                  &pMultisampleState,
+                                                  &pDepthStencilState,
+                                                  &pColorBlendState,
+                                                  &pDynamicState,
                                                   *pipeline_layout,
                                                   *renderpass,
                                                   subpass,
@@ -67,5 +67,6 @@ class GraphicsPipeline : public Pipeline {
   private:
     const std::shared_ptr<Pipeline> base_pipeline;
 };
+using GraphicsPipelineHandle = std::shared_ptr<GraphicsPipeline>;
 
 } // namespace merian
