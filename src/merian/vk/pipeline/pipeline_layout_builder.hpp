@@ -41,14 +41,14 @@ class PipelineLayoutBuilder {
     // You can get the id by supplying a pointer to push_constant_id;
     template <typename T>
     PipelineLayoutBuilder&
-    add_push_constant(const vk::ShaderStageFlags flags = vk::ShaderStageFlagBits::eCompute,
+    add_push_constant(const vk::ShaderStageFlags flags = vk::ShaderStageFlagBits::eAll,
                       uint32_t* push_constant_id = nullptr) {
         return add_push_constant(sizeof(T), flags, push_constant_id);
     }
 
     PipelineLayoutBuilder&
     add_push_constant(uint32_t size,
-                      const vk::ShaderStageFlags flags = vk::ShaderStageFlagBits::eCompute,
+                      const vk::ShaderStageFlags flags = vk::ShaderStageFlagBits::eAll,
                       uint32_t* push_constant_id = nullptr) {
         vk::PushConstantRange range{flags, current_push_constant_offset, size};
         current_push_constant_offset += size;
