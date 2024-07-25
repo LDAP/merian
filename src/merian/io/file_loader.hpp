@@ -33,6 +33,8 @@ class FileLoader {
     find_and_load_file(const std::filesystem::path& filename,
                        const std::filesystem::path& relative_to_file_or_directory) const;
 
+    // adds the path to the file loader. The path is searched using the file loader, that means it
+    // can be relative to any previously added search path.
     void add_search_path(const std::filesystem::path path);
 
     bool remove_search_path(const std::filesystem::path path);
@@ -42,7 +44,7 @@ class FileLoader {
 
   private:
     std::set<std::filesystem::path> search_paths;
-    bool search_cwd_parents = true;
+    bool enable_search_cwd_parents = true;
 };
 using FileLoaderHandle = std::shared_ptr<FileLoader>;
 

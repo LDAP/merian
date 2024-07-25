@@ -66,7 +66,7 @@ LDRImageRead::NodeStatusFlags LDRImageRead::properties(Properties& config) {
 
     if (config.config_text("path", config_filename, true)) {
         needs_rebuild = true;
-        filename = context->loader.find_file(config_filename).value_or(config_filename);
+        filename = context->file_loader.find_file(config_filename).value_or(config_filename);
         if (image) {
             stbi_image_free(image);
             image = nullptr;

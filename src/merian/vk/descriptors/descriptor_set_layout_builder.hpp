@@ -64,23 +64,33 @@ class DescriptorSetLayoutBuilder {
     DescriptorSetLayoutBuilder&
     add_binding_storage_buffer(vk::ShaderStageFlags stage_flags = vk::ShaderStageFlagBits::eCompute,
                                uint32_t descriptor_count = 1,
-                               const vk::Sampler* immutable_sampler = nullptr,
                                std::optional<uint32_t> binding = std::nullopt) {
-        add_binding(stage_flags, vk::DescriptorType::eStorageBuffer, descriptor_count,
-                    immutable_sampler, binding);
+        add_binding(stage_flags, vk::DescriptorType::eStorageBuffer, descriptor_count, nullptr,
+                    binding);
+        return *this;
+    }
+
+    DescriptorSetLayoutBuilder&
+    add_binding_uniform_buffer(vk::ShaderStageFlags stage_flags = vk::ShaderStageFlagBits::eCompute,
+                               uint32_t descriptor_count = 1,
+                               std::optional<uint32_t> binding = std::nullopt) {
+        add_binding(stage_flags, vk::DescriptorType::eUniformBuffer, descriptor_count, nullptr,
+                    binding);
         return *this;
     }
 
     DescriptorSetLayoutBuilder&
     add_binding_storage_image(vk::ShaderStageFlags stage_flags = vk::ShaderStageFlagBits::eCompute,
                               uint32_t descriptor_count = 1,
-                              const vk::Sampler* immutable_sampler = nullptr,
                               std::optional<uint32_t> binding = std::nullopt) {
-        add_binding(stage_flags, vk::DescriptorType::eStorageImage, descriptor_count,
-                    immutable_sampler, binding);
+        add_binding(stage_flags, vk::DescriptorType::eStorageImage, descriptor_count, nullptr,
+                    binding);
         return *this;
     }
 
+    // immutable_sampler can be used to initialize a set of immutable samplers. Immutable samplers
+    // are permanently bound into the set layout and must not be changed; updating a
+    // VK_DESCRIPTOR_TYPE_SAMPLER descriptor with immutable samplers is not allowed.
     DescriptorSetLayoutBuilder&
     add_binding_sampler(vk::ShaderStageFlags stage_flags = vk::ShaderStageFlagBits::eCompute,
                         uint32_t descriptor_count = 1,
@@ -91,6 +101,10 @@ class DescriptorSetLayoutBuilder {
         return *this;
     }
 
+    // pImmutableSamplers can be used to initialize a set of immutable samplers. Immutable samplers
+    // are permanently bound into the set layout and must not be changed; updates to a
+    // VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER descriptor with immutable samplers does not modify
+    // the samplers (the image views are updated, but the sampler updates are ignored).
     DescriptorSetLayoutBuilder& add_binding_combined_sampler(
         vk::ShaderStageFlags stage_flags = vk::ShaderStageFlagBits::eCompute,
         uint32_t descriptor_count = 1,

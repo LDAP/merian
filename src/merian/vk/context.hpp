@@ -217,7 +217,7 @@ class Context : public std::enable_shared_from_this<Context> {
     // A shared thread pool with default size.
     ThreadPool thread_pool;
 
-    merian::FileLoader loader;
+    merian::FileLoader file_loader;
 
   private:
     // in find_queues. Indexes are -1 if no suitable queue was found!

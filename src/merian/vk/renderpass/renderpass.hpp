@@ -9,25 +9,20 @@ namespace merian {
 class RenderPass : public std::enable_shared_from_this<RenderPass> {
 
   public:
-    ~RenderPass() {
-        context->device.destroyRenderPass(renderpass);
-    }
+    RenderPass(const ContextHandle& context, const vk::RenderPassCreateInfo2 renderpass_create_info);
 
-    operator const vk::RenderPass&() const {
-        return renderpass;
-    }
+    RenderPass(const ContextHandle& context, const vk::RenderPassCreateInfo renderpass_create_info);
 
-    const vk::RenderPass& get_renderpass() const {
-        return renderpass;
-    }
+    ~RenderPass();
 
-    const vk::RenderPass& operator*() const {
-        return renderpass;
-    }
+    operator const vk::RenderPass&() const;
+
+    const vk::RenderPass& get_renderpass() const;
+
+    const vk::RenderPass& operator*() const;
 
   private:
     const ContextHandle context;
-
     vk::RenderPass renderpass;
 };
 
