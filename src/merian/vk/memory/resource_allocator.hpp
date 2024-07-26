@@ -166,7 +166,8 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
                                          const uint32_t* data,
                                          const uint32_t width,
                                          const uint32_t height,
-                                         const vk::Filter filter,
+                                         const vk::Filter mag_filter,
+                                         const vk::Filter min_filter,
                                          const bool isSRGB = true,
                                          const std::string& debug_name = {},
                                          const bool generate_mipmaps = false);

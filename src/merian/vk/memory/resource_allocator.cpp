@@ -17,8 +17,9 @@ ResourceAllocator::ResourceAllocator(const ContextHandle& context,
     const uint32_t missing_rgba = merian::uint32_from_rgba(1, 0, 1, 1);
     const std::vector<uint32_t> data = {missing_rgba, missing_rgba, missing_rgba, missing_rgba};
     context->get_queue_GCT()->submit_wait([&](const vk::CommandBuffer& cmd) {
-        dummy_texture = createTextureFromRGBA8(cmd, data.data(), 2, 2, vk::Filter::eLinear, true,
-                                               "ResourceAllocator::dummy_texture");
+        dummy_texture =
+            createTextureFromRGBA8(cmd, data.data(), 2, 2, vk::Filter::eNearest,
+                                   vk::Filter::eNearest, true, "ResourceAllocator::dummy_texture");
         const auto img_transition =
             dummy_texture->get_image()->barrier2(vk::ImageLayout::eShaderReadOnlyOptimal);
         cmd.pipelineBarrier2(vk::DependencyInfo{{}, {}, {}, img_transition});
@@ -194,7 +195,8 @@ TextureHandle ResourceAllocator::createTextureFromRGBA8(const vk::CommandBuffer&
                                                         const uint32_t* data,
                                                         const uint32_t width,
                                                         const uint32_t height,
-                                                        const vk::Filter filter,
+                                                        const vk::Filter mag_filter,
+                                                        const vk::Filter min_filter,
                                                         const bool isSRGB,
                                                         const std::string& debug_name,
                                                         const bool generate_mipmaps) {
@@ -259,8 +261,8 @@ TextureHandle ResourceAllocator::createTextureFromRGBA8(const vk::CommandBuffer&
         image->_set_current_layout(vk::ImageLayout::eTransferSrcOptimal);
     }
 
-    merian::SamplerHandle sampler =
-        get_sampler_pool()->for_filter_and_address_mode(filter, vk::SamplerAddressMode::eRepeat);
+    merian::SamplerHandle sampler = get_sampler_pool()->for_filter_and_address_mode(
+        mag_filter, min_filter, vk::SamplerAddressMode::eRepeat);
 
     return createTexture(image, image->make_view_create_info(), sampler, debug_name);
 }
