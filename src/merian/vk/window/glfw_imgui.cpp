@@ -97,7 +97,7 @@ void GLFWImGui::init_imgui(GLFWwindow* window,
     init_info.Device = context->device;
     init_info.QueueFamily = queue->get_queue_family_index();
     init_info.Queue = queue->get_queue();
-    init_info.PipelineCache = VK_NULL_HANDLE;
+    init_info.PipelineCache = context->pipeline_cache;
     init_info.DescriptorPool = imgui_pool;
     init_info.Subpass = 0;
     init_info.MinImageCount = aquire_result.min_images;
