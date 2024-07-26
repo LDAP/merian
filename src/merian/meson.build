@@ -50,6 +50,8 @@ if shaderc.found()
     merian_src += files('vk/shader/shader_compiler_shaderc.cpp')
 endif
 
+subdir('vk/shader')
+
 merian_lib = static_library(
     'merian',
     [merian_src],

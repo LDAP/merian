@@ -102,6 +102,10 @@ inc_dirs = [
     tol_subp.include_directories('tinyobjloader'),
 ]
 
+shader_include_dir = dir_source_root + '/src/merian-nodes'
+spv_compile_script = [dir_source_root + '/scripts/compile_shader.py']
+glslc_args = ['-I' + dir_source_root + '/src', '-I' + shader_include_dir,'--target-env', 'vulkan1.3']
+
 subdir('src/ext')
 subdir('src/merian')
 subdir('src/merian-nodes')

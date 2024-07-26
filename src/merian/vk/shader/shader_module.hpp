@@ -3,13 +3,13 @@
 #include "merian/io/file_loader.hpp"
 #include "merian/vk/context.hpp"
 #include "merian/vk/pipeline/specialization_info.hpp"
-#include <spdlog/spdlog.h>
-#include <vulkan/vulkan.hpp>
 
 #include <optional>
 
 namespace merian {
 
+class ShaderModule;
+using ShaderModuleHandle = std::shared_ptr<ShaderModule>;
 class ShaderStageCreateInfo;
 
 /**
@@ -25,52 +25,28 @@ class ShaderModule : public std::enable_shared_from_this<ShaderModule> {
     ShaderModule(const ContextHandle& context,
                  const std::string spv_filename,
                  const vk::ShaderStageFlagBits stage_flags = vk::ShaderStageFlagBits::eCompute,
-                 const std::optional<FileLoader>& file_loader = std::nullopt)
-        : context(context), stage_flags(stage_flags) {
-        const std::string code = FileLoader::load_file(
-            file_loader.value().find_file(spv_filename).value_or(spv_filename));
-        const vk::ShaderModuleCreateInfo info{{}, code.size(), (const uint32_t*)code.c_str()};
-        shader_module = context->device.createShaderModule(info);
-    }
+                 const std::optional<FileLoader>& file_loader = std::nullopt);
 
     ShaderModule(const ContextHandle& context,
                  const vk::ShaderModuleCreateInfo& info,
-                 const vk::ShaderStageFlagBits stage_flags = vk::ShaderStageFlagBits::eCompute)
-        : context(context), stage_flags(stage_flags) {
-        shader_module = context->device.createShaderModule(info);
-    }
-
+                 const vk::ShaderStageFlagBits stage_flags = vk::ShaderStageFlagBits::eCompute);
     ShaderModule(const ContextHandle& context,
                  const std::size_t spv_size,
                  const uint32_t spv[],
-                 const vk::ShaderStageFlagBits stage_flags = vk::ShaderStageFlagBits::eCompute)
-        : context(context), stage_flags(stage_flags) {
-        vk::ShaderModuleCreateInfo info{{}, spv_size, spv};
-        shader_module = context->device.createShaderModule(info);
-    }
+                 const vk::ShaderStageFlagBits stage_flags = vk::ShaderStageFlagBits::eCompute);
 
     ShaderModule(const ContextHandle& context,
                  const std::vector<uint32_t>& spv,
-                 const vk::ShaderStageFlagBits stage_flags = vk::ShaderStageFlagBits::eCompute)
-        : ShaderModule(context, spv.size() * sizeof(uint32_t), spv.data(), stage_flags) {}
+                 const vk::ShaderStageFlagBits stage_flags = vk::ShaderStageFlagBits::eCompute);
 
-    ~ShaderModule() {
-        SPDLOG_DEBUG("destroy shader module ({})", fmt::ptr(this));
-        context->device.destroyShaderModule(shader_module);
-    }
+    ~ShaderModule();
 
   public:
-    operator const vk::ShaderModule&() const {
-        return shader_module;
-    }
+    operator const vk::ShaderModule&() const;
 
-    const vk::ShaderModule& get_shader_module() const {
-        return shader_module;
-    }
+    const vk::ShaderModule& get_shader_module() const;
 
-    vk::ShaderStageFlagBits get_stage_flags() const {
-        return stage_flags;
-    }
+    vk::ShaderStageFlagBits get_stage_flags() const;
 
     operator ShaderStageCreateInfo();
 
@@ -79,6 +55,11 @@ class ShaderModule : public std::enable_shared_from_this<ShaderModule> {
         const char* entry_point = "main",
         const vk::PipelineShaderStageCreateFlags flags = {});
 
+  public:
+    // Returns a vertex shader that generates a fullscreen triangle when called with vertex count 3
+    // and instance count 1.
+    static ShaderModuleHandle fullscreen_triangle(const ContextHandle& context);
+
   private:
     const ContextHandle context;
     const vk::ShaderStageFlagBits stage_flags;
@@ -86,31 +67,19 @@ class ShaderModule : public std::enable_shared_from_this<ShaderModule> {
     vk::ShaderModule shader_module;
 };
 
-using ShaderModuleHandle = std::shared_ptr<ShaderModule>;
-
 class ShaderStageCreateInfo {
   public:
     ShaderStageCreateInfo(
         const ShaderModuleHandle& shader_module,
         const SpecializationInfoHandle& specialization_info = MERIAN_SPECIALIZATION_INFO_NONE,
         const std::string entry_point = "main",
-        const vk::PipelineShaderStageCreateFlags flags = {})
-        : shader_module(shader_module), specialization_info(specialization_info),
-          entry_point(entry_point), flags(flags) {}
+        const vk::PipelineShaderStageCreateFlags flags = {});
 
-    operator vk::PipelineShaderStageCreateInfo() const {
-        return get();
-    }
+    operator vk::PipelineShaderStageCreateInfo() const;
 
-    vk::PipelineShaderStageCreateInfo operator*() const {
-        return get();
-    }
+    vk::PipelineShaderStageCreateInfo operator*() const;
 
-    vk::PipelineShaderStageCreateInfo get() const {
-        return vk::PipelineShaderStageCreateInfo{flags, shader_module->get_stage_flags(),
-                                                 *shader_module, entry_point.c_str(),
-                                                 *specialization_info};
-    }
+    vk::PipelineShaderStageCreateInfo get() const;
 
     const ShaderModuleHandle shader_module;
     const SpecializationInfoHandle specialization_info;
@@ -118,16 +87,5 @@ class ShaderStageCreateInfo {
     const vk::PipelineShaderStageCreateFlags flags;
 };
 using ShaderStageCreateInfoHandle = std::shared_ptr<ShaderStageCreateInfo>;
-
-inline ShaderModule::operator ShaderStageCreateInfo() {
-    return get_shader_stage_create_info();
-}
-
-inline ShaderStageCreateInfo
-ShaderModule::get_shader_stage_create_info(const SpecializationInfoHandle specialization_info,
-                                           const char* entry_point,
-                                           const vk::PipelineShaderStageCreateFlags flags) {
-    return ShaderStageCreateInfo(shared_from_this(), specialization_info, entry_point, flags);
-}
 
 } // namespace merian
