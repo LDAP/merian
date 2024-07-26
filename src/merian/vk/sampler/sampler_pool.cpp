@@ -72,18 +72,20 @@ SamplerHandle SamplerPool::acquire_sampler(const vk::SamplerCreateInfo& createIn
     }
 }
 
-SamplerHandle SamplerPool::for_filter_and_address_mode(const vk::Filter filter,
-                                                       const vk::SamplerAddressMode address_mode) {
+SamplerHandle SamplerPool::for_filter_and_address_mode(const vk::Filter mag_filter,
+                                                       const vk::Filter min_filter,
+                                                       const vk::SamplerAddressMode address_mode,
+                                                       const bool anisotropy) {
     const vk::SamplerCreateInfo info{
         {},
-        filter,
-        filter,
+        mag_filter,
+        min_filter,
         vk::SamplerMipmapMode::eLinear,
         address_mode,
         address_mode,
         address_mode,
         {},
-        false,
+        anisotropy,
         context->physical_device.get_physical_device_limits().maxSamplerAnisotropy,
         false,
         {},
@@ -95,19 +97,23 @@ SamplerHandle SamplerPool::for_filter_and_address_mode(const vk::Filter filter,
 }
 
 SamplerHandle SamplerPool::linear_mirrored_repeat() {
-    return for_filter_and_address_mode(vk::Filter::eLinear, vk::SamplerAddressMode::eMirroredRepeat);
+    return for_filter_and_address_mode(vk::Filter::eLinear, vk::Filter::eLinear,
+                                       vk::SamplerAddressMode::eMirroredRepeat);
 }
 
 SamplerHandle SamplerPool::nearest_mirrored_repeat() {
-    return for_filter_and_address_mode(vk::Filter::eNearest, vk::SamplerAddressMode::eMirroredRepeat);
+    return for_filter_and_address_mode(vk::Filter::eNearest, vk::Filter::eNearest,
+                                       vk::SamplerAddressMode::eMirroredRepeat);
 }
 
 SamplerHandle SamplerPool::linear_repeat() {
-    return for_filter_and_address_mode(vk::Filter::eLinear, vk::SamplerAddressMode::eRepeat);
+    return for_filter_and_address_mode(vk::Filter::eLinear, vk::Filter::eLinear,
+                                       vk::SamplerAddressMode::eRepeat);
 }
 
 SamplerHandle SamplerPool::nearest_repeat() {
-    return for_filter_and_address_mode(vk::Filter::eNearest, vk::SamplerAddressMode::eRepeat);
+    return for_filter_and_address_mode(vk::Filter::eNearest, vk::Filter::eNearest,
+                                       vk::SamplerAddressMode::eRepeat);
 }
 
 } // namespace merian
