@@ -40,7 +40,10 @@ class VkTextureArrayIn
 
     void on_connect_output(const OutputConnectorHandle& output) override;
 
+  public:
     static VkTextureArrayInHandle compute_read(const std::string& name);
+
+    static VkTextureArrayInHandle fragment_read(const std::string& name);
 
   private:
     const vk::ShaderStageFlags stage_flags;

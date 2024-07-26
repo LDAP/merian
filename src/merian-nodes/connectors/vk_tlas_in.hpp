@@ -34,6 +34,8 @@ class VkTLASIn : public TypedInputConnector<VkTLASOutHandle, const AccelerationS
     // Creates an output that has to set the TLAS and can it read in a shader.
     static VkTLASInHandle compute_read(const std::string& name);
 
+    static VkTLASInHandle fragment_read(const std::string& name);
+
   private:
     const vk::ShaderStageFlags stage_flags;
     const vk::PipelineStageFlags2 pipeline_stages;

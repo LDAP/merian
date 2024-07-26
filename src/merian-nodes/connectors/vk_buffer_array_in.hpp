@@ -33,6 +33,8 @@ class VkBufferArrayIn
 
     static VkBufferArrayInHandle compute_read(const std::string& name);
 
+    static VkBufferArrayInHandle fragment_read(const std::string& name);
+
     static VkBufferArrayInHandle acceleration_structure_read(const std::string& name);
 
   private:

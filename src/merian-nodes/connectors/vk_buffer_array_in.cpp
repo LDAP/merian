@@ -54,6 +54,12 @@ VkBufferArrayInHandle VkBufferArrayIn::compute_read(const std::string& name) {
                                              vk::PipelineStageFlagBits2::eComputeShader);
 }
 
+VkBufferArrayInHandle VkBufferArrayIn::fragment_read(const std::string& name) {
+    return std::make_shared<VkBufferArrayIn>(name, vk::ShaderStageFlagBits::eFragment,
+                                             vk::AccessFlagBits2::eShaderRead,
+                                             vk::PipelineStageFlagBits2::eFragmentShader);
+}
+
 VkBufferArrayInHandle VkBufferArrayIn::acceleration_structure_read(const std::string& name) {
     return std::make_shared<VkBufferArrayIn>(
         name, vk::ShaderStageFlags{}, vk::AccessFlagBits2::eShaderRead,

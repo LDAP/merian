@@ -41,4 +41,9 @@ VkTLASInHandle VkTLASIn::compute_read(const std::string& name) {
                                       vk::PipelineStageFlagBits2::eComputeShader);
 }
 
+VkTLASInHandle VkTLASIn::fragment_read(const std::string& name) {
+    return std::make_shared<VkTLASIn>(name, vk::ShaderStageFlagBits::eFragment,
+                                      vk::PipelineStageFlagBits2::eFragmentShader);
+}
+
 } // namespace merian_nodes

@@ -81,4 +81,10 @@ VkTextureArrayInHandle VkTextureArrayIn::compute_read(const std::string& name) {
         vk::AccessFlagBits2::eShaderRead, vk::PipelineStageFlagBits2::eComputeShader);
 }
 
+VkTextureArrayInHandle VkTextureArrayIn::fragment_read(const std::string& name) {
+    return std::make_shared<VkTextureArrayIn>(
+        name, vk::ShaderStageFlagBits::eFragment, vk::ImageLayout::eShaderReadOnlyOptimal,
+        vk::AccessFlagBits2::eShaderRead, vk::PipelineStageFlagBits2::eFragmentShader);
+}
+
 } // namespace merian_nodes
