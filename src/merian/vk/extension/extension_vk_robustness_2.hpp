@@ -22,14 +22,14 @@ class ExtensionVkRobustnessAccess2 : public Extension {
             SPDLOG_DEBUG("robustImageAccess2 supported. Enabling feature");
             enable_image_robustness_features.robustImageAccess2 = true;
         } else {
-            SPDLOG_WARN("shaderImageFloat32Atomics not supported");
+            SPDLOG_WARN("robustImageAccess2 requested but not supported");
         }
 
         if (supported_image_robustness_features.robustBufferAccess2) {
             SPDLOG_DEBUG("robustBufferAccess2 supported. Enabling feature");
             enable_image_robustness_features.robustBufferAccess2 = true;
         } else {
-            SPDLOG_WARN("{} not supported", VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
+            SPDLOG_WARN("robustBufferAccess2 requested but not supported");
         }
 
         enable_image_robustness_features.pNext = p_next;
