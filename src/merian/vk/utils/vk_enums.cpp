@@ -1576,7 +1576,7 @@ template<> std::string enum_to_string<VULKAN_HPP_NAMESPACE::VendorId>(VULKAN_HPP
     return vk::to_string(value);
 }
 
-static constexpr std::array<VULKAN_HPP_NAMESPACE::DriverId, 26> _DriverId_values = {
+static constexpr std::array<VULKAN_HPP_NAMESPACE::DriverId, 25> _DriverId_values = {
     VULKAN_HPP_NAMESPACE::DriverId::eAmdProprietary,
     VULKAN_HPP_NAMESPACE::DriverId::eAmdOpenSource,
     VULKAN_HPP_NAMESPACE::DriverId::eMesaRadv,
@@ -1601,8 +1601,7 @@ static constexpr std::array<VULKAN_HPP_NAMESPACE::DriverId, 26> _DriverId_values
     VULKAN_HPP_NAMESPACE::DriverId::eMesaVenus,
     VULKAN_HPP_NAMESPACE::DriverId::eMesaDozen,
     VULKAN_HPP_NAMESPACE::DriverId::eMesaNvk,
-    VULKAN_HPP_NAMESPACE::DriverId::eImaginationOpenSourceMESA,
-    VULKAN_HPP_NAMESPACE::DriverId::eMesaAgxv};
+    VULKAN_HPP_NAMESPACE::DriverId::eImaginationOpenSourceMESA};
 
 template<> uint32_t enum_size<VULKAN_HPP_NAMESPACE::DriverId>() {
     return _DriverId_values.size();
