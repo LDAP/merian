@@ -106,9 +106,7 @@ class Extension {
     // Called by context if extension was determined as unsupported. The extension might not receive
     // further callbacks.
     virtual void on_unsupported([[maybe_unused]] const std::string reason) {
-        const std::string error = fmt::format("extension {} not supported ({})", name, reason);
-        SPDLOG_ERROR(error);
-        throw std::runtime_error{error};
+        spdlog::warn("extension {} not supported ({})", name, reason);
     }
 
   public:
