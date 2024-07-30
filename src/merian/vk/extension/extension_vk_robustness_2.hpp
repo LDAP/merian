@@ -32,6 +32,13 @@ class ExtensionVkRobustnessAccess2 : public Extension {
             SPDLOG_WARN("robustBufferAccess2 requested but not supported");
         }
 
+        if (supported_image_robustness_features.nullDescriptor) {
+            SPDLOG_DEBUG("nullDescriptor supported. Enabling feature");
+            enable_image_robustness_features.nullDescriptor = true;
+        } else {
+            SPDLOG_WARN("nullDescriptor requested but not supported");
+        }
+
         enable_image_robustness_features.pNext = p_next;
         return &enable_image_robustness_features;
     }
