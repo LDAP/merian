@@ -12,6 +12,7 @@ float XorShift32(inout uint state) {
 }
 
 #define XorShift32Vec2(state) vec2(XorShift32(state), XorShift32(state))
+#define XorShift32Vec3(state) vec3(XorShift32(state), XorShift32(state), XorShift32(state))
 #define XorShift32Vec4(state) vec4(XorShift32(state), XorShift32(state), XorShift32(state), XorShift32(state))
 
 // -------------------------------------------------------
