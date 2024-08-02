@@ -56,6 +56,7 @@ glm = dependency('glm', fallback : ['glm', 'glm_dep'], version: ['>=0.9.9.8'])
 tol_subp = cmake.subproject('tinyobjloader')
 tol = tol_subp.dependency('tinyobjloader')
 tgltf = dependency('tinygltf', required: get_option('tinygltf'), fallback: ['tinygltf', 'tinygltf_dep'])
+imgui = dependency('imgui', version: ['>=1.90.9'], fallback: ['imgui', 'imgui_dep'])
 sdl2 = dependency('sdl2', required: false)
 if not sdl2.found()
     # Workaround because SDL2 ships Vulkan which conflicts
@@ -97,7 +98,6 @@ endif
 
 inc_dirs = [
     include_directories('./src'),
-    include_directories('./src/ext/imgui'),
     cmake.subproject('VulkanMemoryAllocator').include_directories('VulkanMemoryAllocator'),
     tol_subp.include_directories('tinyobjloader'),
 ]
@@ -113,5 +113,5 @@ subdir('src/merian-nodes')
 merian_dep = declare_dependency(
     link_with : [ext_lib, merian_lib, merian_nodes_lib],
     include_directories : inc_dirs,
-    dependencies : [glfw, glm, vulkan, fmt, spdlog]
+    dependencies : [glfw, glm, vulkan, fmt, spdlog, imgui]
 )
