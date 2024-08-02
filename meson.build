@@ -100,7 +100,7 @@ if get_option('shaderc').enabled()
 endif
 
 inc_dirs = [
-    include_directories('./src'),
+    include_directories('include'),
 ]
 
 shader_include_dir = dir_source_root + '/src/merian-nodes'
