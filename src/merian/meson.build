@@ -66,6 +66,7 @@ merian_lib = static_library(
         spdlog,
         tgltf,
         tol,
+        vma,
         vulkan,
     ],
     include_directories: inc_dirs,

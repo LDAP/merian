@@ -58,6 +58,7 @@ tol = tol_subp.dependency('tinyobjloader')
 tgltf = dependency('tinygltf', required: get_option('tinygltf'), fallback: ['tinygltf', 'tinygltf_dep'])
 imgui = dependency('imgui', version: ['>=1.90.9'], fallback: ['imgui', 'imgui_dep'])
 nlohmann_json = dependency('nlohmann_json', version: ['>=3.11.3'], fallback: ['nlohmann_json', 'nlohmann_json_dep'])
+vma = dependency('VulkanMemoryAllocator', version: ['>=3.1.0'], fallback: ['VulkanMemoryAllocator', 'VulkanMemoryAllocator_dep'])
 sdl2 = dependency('sdl2', required: false)
 if not sdl2.found()
     # Workaround because SDL2 ships Vulkan which conflicts
@@ -99,7 +100,6 @@ endif
 
 inc_dirs = [
     include_directories('./src'),
-    cmake.subproject('VulkanMemoryAllocator').include_directories('VulkanMemoryAllocator'),
     tol_subp.include_directories('tinyobjloader'),
 ]
 
@@ -121,6 +121,7 @@ merian_dep = declare_dependency(
         imgui,
         nlohmann_json,
         spdlog,
+        vma,
         vulkan,
     ]
 )

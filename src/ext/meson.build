@@ -1,7 +1,6 @@
 ext_src = files(
     'stb_image.cpp',
     'stb_image_write.cpp',
-    'vma.cpp',
 )
 
 ext_lib = static_library(
