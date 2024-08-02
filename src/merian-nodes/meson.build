@@ -9,10 +9,11 @@ merian_nodes_lib = static_library(
     merian_nodes_src,
     dependencies: [
         fmt,
+        glfw,
         glm,
+        nlohmann_json,
         spdlog,
         vulkan,
-        glfw,
     ],
     include_directories: inc_dirs,
     link_with: merian_lib,

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "ext/json.hpp"
 #include "glm/glm.hpp"
 #include "merian/utils/enums.hpp"
+#include "nlohmann/json.hpp"
 
 #include <fmt/format.h>
 #include <string>

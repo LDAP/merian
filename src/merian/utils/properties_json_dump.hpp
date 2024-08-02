@@ -1,8 +1,10 @@
 #pragma once
 
-#include "ext/json.hpp"
+#include "nlohmann/json.hpp"
 #include "properties.hpp"
 
+#include <filesystem>
+#include <optional>
 #include <string>
 #include <vector>
 

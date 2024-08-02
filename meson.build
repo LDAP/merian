@@ -57,6 +57,7 @@ tol_subp = cmake.subproject('tinyobjloader')
 tol = tol_subp.dependency('tinyobjloader')
 tgltf = dependency('tinygltf', required: get_option('tinygltf'), fallback: ['tinygltf', 'tinygltf_dep'])
 imgui = dependency('imgui', version: ['>=1.90.9'], fallback: ['imgui', 'imgui_dep'])
+nlohmann_json = dependency('nlohmann_json', version: ['>=3.11.3'], fallback: ['nlohmann_json', 'nlohmann_json_dep'])
 sdl2 = dependency('sdl2', required: false)
 if not sdl2.found()
     # Workaround because SDL2 ships Vulkan which conflicts
@@ -113,5 +114,13 @@ subdir('src/merian-nodes')
 merian_dep = declare_dependency(
     link_with : [ext_lib, merian_lib, merian_nodes_lib],
     include_directories : inc_dirs,
-    dependencies : [glfw, glm, vulkan, fmt, spdlog, imgui]
+    dependencies : [
+        fmt,
+        glfw,
+        glm,
+        imgui,
+        nlohmann_json,
+        spdlog,
+        vulkan,
+    ]
 )

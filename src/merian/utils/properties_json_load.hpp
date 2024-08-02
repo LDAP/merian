@@ -1,8 +1,9 @@
 #pragma once
 
-#include "ext/json.hpp"
 #include "merian/utils/properties.hpp"
+#include "nlohmann/json.hpp"
 
+#include <filesystem>
 #include <string>
 #include <vector>
 

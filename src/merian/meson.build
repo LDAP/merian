@@ -60,6 +60,7 @@ merian_lib = static_library(
         glfw,
         glm,
         imgui,
+        nlohmann_json,
         sdl2,
         shaderc,
         spdlog,
