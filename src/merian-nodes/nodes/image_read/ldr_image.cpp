@@ -1,6 +1,6 @@
 #include "ldr_image.hpp"
 
-#include "ext/stb_image.h"
+#include "stb_image.h"
 #include "merian-nodes/graph/errors.hpp"
 
 #include <filesystem>

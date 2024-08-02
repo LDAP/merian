@@ -1,0 +1,27 @@
+option(
+  'stb_libraries',
+  type: 'array',
+  choices: [
+    'stb_c_lexer',
+    'stb_connected_components',
+    'stb_divide',
+    'stb_ds',
+    'stb_dxt',
+    'stb_easy_font',
+    'stb_herringbone_wang_tile',
+    'stb_hexwave',
+    'stb_image',
+    'stb_image_resize2',
+    'stb_image_write',
+    'stb_include',
+    'stb_leakcheck',
+    'stb_perlin',
+    'stb_rect_pack',
+    'stb_sprintf',
+    'stb_textedit',
+    'stb_tilemap_editor',
+    'stb_truetype',
+    'stb_voxel_render',
+  ],
+  value: []
+)

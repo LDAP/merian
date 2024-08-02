@@ -70,6 +70,5 @@ merian_lib = static_library(
         vulkan,
     ],
     include_directories: inc_dirs,
-    link_with: ext_lib,
     install : true
 )

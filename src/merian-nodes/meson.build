@@ -13,6 +13,7 @@ merian_nodes_lib = static_library(
         glm,
         nlohmann_json,
         spdlog,
+        stb,
         vma,
         vulkan,
     ],

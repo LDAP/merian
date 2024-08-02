@@ -1,5 +1,5 @@
 #include "image_write.hpp"
-#include "ext/stb_image_write.h"
+#include "stb_image_write.h"
 
 #include "merian/utils/defer.hpp"
 #include "merian/vk/utils/blits.hpp"

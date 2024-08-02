@@ -59,6 +59,7 @@ tgltf = dependency('tinygltf', required: get_option('tinygltf'), fallback: ['tin
 imgui = dependency('imgui', version: ['>=1.90.9'], fallback: ['imgui', 'imgui_dep'])
 nlohmann_json = dependency('nlohmann_json', version: ['>=3.11.3'], fallback: ['nlohmann_json', 'nlohmann_json_dep'])
 vma = dependency('VulkanMemoryAllocator', version: ['>=3.1.0'], fallback: ['VulkanMemoryAllocator', 'VulkanMemoryAllocator_dep'])
+stb = dependency('stb', fallback: ['stb', 'stb_dep'], default_options : ['stb_libraries=[\'stb_image\', \'stb_image_write\']'])
 sdl2 = dependency('sdl2', required: false)
 if not sdl2.found()
     # Workaround because SDL2 ships Vulkan which conflicts
@@ -107,12 +108,11 @@ shader_include_dir = dir_source_root + '/src/merian-nodes'
 spv_compile_script = [dir_source_root + '/scripts/compile_shader.py']
 glslc_args = ['-I' + dir_source_root + '/src', '-I' + shader_include_dir,'--target-env', 'vulkan1.3']
 
-subdir('src/ext')
 subdir('src/merian')
 subdir('src/merian-nodes')
 
 merian_dep = declare_dependency(
-    link_with : [ext_lib, merian_lib, merian_nodes_lib],
+    link_with : [merian_lib, merian_nodes_lib],
     include_directories : inc_dirs,
     dependencies : [
         fmt,
