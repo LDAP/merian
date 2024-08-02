@@ -101,7 +101,6 @@ endif
 
 inc_dirs = [
     include_directories('./src'),
-    tol_subp.include_directories('tinyobjloader'),
 ]
 
 shader_include_dir = dir_source_root + '/src/merian-nodes'
@@ -121,6 +120,7 @@ merian_dep = declare_dependency(
         imgui,
         nlohmann_json,
         spdlog,
+        tol,
         vma,
         vulkan,
     ]
