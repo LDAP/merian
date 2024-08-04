@@ -1,4 +1,4 @@
-#include "input_controller_dummy.hpp"
+#include "merian/utils/input_controller_dummy.hpp"
 
 namespace merian {
 

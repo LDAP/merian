@@ -14,8 +14,6 @@ cmake = import('cmake')
 ccx = meson.get_compiler('cpp')
 glslc = find_program('glslangValidator')
 
-dir_source_root = meson.project_source_root()
-
 if get_option('loglevel') == 'auto'
     if get_option('buildtype').startswith('debug')
         add_project_arguments('-DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_DEBUG', language : 'cpp')
@@ -53,8 +51,7 @@ else
 endif
 glfw = dependency('glfw3', version: ['>=3.4.0'], fallback: ['glfw', 'glfw_dep'])
 glm = dependency('glm', fallback : ['glm', 'glm_dep'], version: ['>=0.9.9.8'])
-tol_subp = cmake.subproject('tinyobjloader')
-tol = tol_subp.dependency('tinyobjloader')
+tol = dependency('tinyobjloader', fallback : ['tinyobjloader', 'tinyobjloader_dep'])
 tgltf = dependency('tinygltf', required: get_option('tinygltf'), fallback: ['tinygltf', 'tinygltf_dep'])
 imgui = dependency('imgui', version: ['>=1.90.9'], fallback: ['imgui', 'imgui_dep'])
 nlohmann_json = dependency('nlohmann_json', version: ['>=3.11.3'], fallback: ['nlohmann_json', 'nlohmann_json_dep'])
@@ -99,13 +96,26 @@ if get_option('shaderc').enabled()
     add_project_arguments('-DMERIAN_ENABLE_SHADERC', language: 'cpp')
 endif
 
+project_root = meson.current_source_dir()
 inc_dirs = [
-    include_directories('./src'),
+    include_directories('./include'),
 ]
 
-shader_include_dir = dir_source_root + '/src/merian-nodes'
-spv_compile_script = [dir_source_root + '/scripts/compile_shader.py']
-glslc_args = ['-I' + dir_source_root + '/src', '-I' + shader_include_dir,'--target-env', 'vulkan1.3']
+spv_compile_script = [meson.project_source_root() + '/scripts/compile_shader.py']
+glslc_args = ['--target-env', 'vulkan1.3']
+glslc_args += ['-I' + meson.project_source_root()]
+glslc_args += ['-I' + join_paths(project_root, 'src')]
+glslc_args += ['-I' + join_paths(project_root, 'include')]
+glslc_args += ['--depfile', '@DEPFILE@']
+
+py = import('python').find_installation('python3') 
+shader_generator = generator(
+    py,
+    output: ['@PLAINNAME@.spv.h', '@PLAINNAME@.spv.c'],
+    depfile: '@PLAINNAME@.d',
+    arguments: spv_compile_script + ['@INPUT@', '@BUILD_DIR@'] + glslc_args,
+)
+
 
 subdir('src/merian')
 subdir('src/merian-nodes')

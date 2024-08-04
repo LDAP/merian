@@ -1,5 +1,5 @@
-#include "common/common.glsl"
-#include "common/frames.glsl"
+#include "merian-shaders/common.glsl"
+#include "merian-shaders/frames.glsl"
 
 #ifndef _VON_MISES_FISHER_H_
 #define _VON_MISES_FISHER_H_

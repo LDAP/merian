@@ -1,4 +1,4 @@
-#include "input_controller_glfw.hpp"
+#include "merian/utils/input_controller_glfw.hpp"
 
 namespace merian {
 

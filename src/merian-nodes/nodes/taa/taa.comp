@@ -2,7 +2,7 @@
 #extension GL_GOOGLE_include_directive              : enable
 
 #include "config.h"
-#include "common/sampler.glsl"
+#include "merian-shaders/sampler.glsl"
 
 // Good blog post on TAA: https://www.elopezr.com/temporal-aa-and-the-quest-for-the-holy-trail/
 

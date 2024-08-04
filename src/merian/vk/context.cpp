@@ -1,7 +1,7 @@
 #include "merian/vk/context.hpp"
 #include "merian/utils/vector.hpp"
 #include "merian/vk/extension/extension.hpp"
-#include "utils/pointer.hpp"
+#include "merian/utils/pointer.hpp"
 
 #include <spdlog/spdlog.h>
 #include <tuple>

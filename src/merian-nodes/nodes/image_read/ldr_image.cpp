@@ -1,4 +1,4 @@
-#include "ldr_image.hpp"
+#include "merian-nodes/nodes/image_read/ldr_image.hpp"
 
 #include "stb_image.h"
 #include "merian-nodes/graph/errors.hpp"

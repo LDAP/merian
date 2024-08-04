@@ -1,5 +1,5 @@
-#include "common/common.glsl"
-#include "common/sampling.glsl"
+#include "merian-shaders/common.glsl"
+#include "merian-shaders/sampling.glsl"
 
 /*
  * microfacet model by jonathan:

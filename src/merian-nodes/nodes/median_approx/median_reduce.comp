@@ -2,7 +2,7 @@
 #extension GL_GOOGLE_include_directive    : enable
 
 #include "layout.glsl"
-#include "common/camera.glsl"
+#include "merian-shaders/camera.glsl"
 
 const uint hist_size = gl_WorkGroupSize.x * gl_WorkGroupSize.y;
 shared uint[hist_size] local_hist;

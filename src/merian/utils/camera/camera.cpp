@@ -1,4 +1,4 @@
-#include "camera.hpp"
+#include "merian/utils/camera/camera.hpp"
 
 namespace merian {
 

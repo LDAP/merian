@@ -1,4 +1,4 @@
-#include "shader_module.hpp"
+#include "merian/vk/shader/shader_module.hpp"
 #include "fullscreen_triangle.vert.spv.h"
 
 namespace merian {

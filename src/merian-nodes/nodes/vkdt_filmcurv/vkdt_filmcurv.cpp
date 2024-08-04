@@ -1,9 +1,7 @@
-#include "vkdt_filmcurv.hpp"
+#include "merian-nodes/nodes/vkdt_filmcurv/vkdt_filmcurv.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 
-static const uint32_t spv[] = {
 #include "vkdt_filmcurv.comp.spv.h"
-};
 
 namespace merian_nodes {
 
@@ -19,7 +17,8 @@ VKDTFilmcurv::VKDTFilmcurv(const ContextHandle context,
     spec_builder.add_entry(local_size_x, local_size_y);
     spec_info = spec_builder.build();
 
-    shader = std::make_shared<ShaderModule>(context, sizeof(spv), spv);
+    shader = std::make_shared<ShaderModule>(context, merian_vkdt_filmcurv_comp_spv_size(),
+                                            merian_vkdt_filmcurv_comp_spv());
 }
 
 std::vector<InputConnectorHandle> VKDTFilmcurv::describe_inputs() {

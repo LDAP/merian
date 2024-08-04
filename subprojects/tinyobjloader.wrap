@@ -1,0 +1,10 @@
+[wrap-git]
+directory = tinyobjloader
+
+url = https://github.com/tinyobjloader/tinyobjloader
+revision = cab4ad7254cbf7eaaafdb73d272f99e92f166df8
+depth = 1
+method = cmake
+
+[provide]
+tinyobjloader = tinyobjloader_dep

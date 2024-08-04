@@ -1,16 +1,15 @@
-#include "tonemap.hpp"
+#include "merian-nodes/nodes/tonemap/tonemap.hpp"
 #include "config.h"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 
-static const uint32_t spv[] = {
 #include "tonemap.comp.spv.h"
-};
 
 namespace merian_nodes {
 
 Tonemap::Tonemap(const ContextHandle context, const std::optional<vk::Format> output_format)
     : AbstractCompute(context, sizeof(PushConstant)), output_format(output_format) {
-    shader = std::make_shared<ShaderModule>(context, sizeof(spv), spv);
+    shader = std::make_shared<ShaderModule>(context, merian_tonemap_comp_spv_size(),
+                                            merian_tonemap_comp_spv());
     make_spec_info();
 }
 

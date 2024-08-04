@@ -1,4 +1,4 @@
-#include "add.hpp"
+#include "merian-nodes/nodes/add/add.hpp"
 #include "add.comp.spv.h"
 
 #include "merian-nodes/graph/errors.hpp"

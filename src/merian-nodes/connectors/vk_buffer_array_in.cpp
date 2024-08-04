@@ -1,4 +1,4 @@
-#include "vk_buffer_array_in.hpp"
+#include "merian-nodes/connectors/vk_buffer_array_in.hpp"
 
 #include "merian-nodes/graph/errors.hpp"
 

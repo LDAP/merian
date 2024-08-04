@@ -1,4 +1,4 @@
-#include "semaphore_timeline.hpp"
+#include "merian/vk/sync/semaphore_timeline.hpp"
 
 #include "merian/vk/utils/check_result.hpp"
 

@@ -1,5 +1,5 @@
-#include "common/common.glsl"
-#include "common/random.glsl"
+#include "merian-shaders/common.glsl"
+#include "merian-shaders/random.glsl"
 
 #ifndef _SAMPLING_H_
 #define _SAMPLING_H_

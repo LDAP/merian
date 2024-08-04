@@ -1,4 +1,4 @@
-#include "svgf.hpp"
+#include "merian-nodes/nodes/svgf/svgf.hpp"
 #include "config.h"
 #include "merian/vk/descriptors/descriptor_set_layout_builder.hpp"
 #include "merian/vk/descriptors/descriptor_set_update.hpp"

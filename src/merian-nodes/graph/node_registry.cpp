@@ -1,4 +1,4 @@
-#include "node_registry.hpp"
+#include "merian-nodes/graph/node_registry.hpp"
 
 #include "merian-nodes/nodes/ab_compare/ab_compare.hpp"
 #include "merian-nodes/nodes/accumulate/accumulate.hpp"
@@ -18,7 +18,7 @@
 #include "merian-nodes/nodes/taa/taa.hpp"
 #include "merian-nodes/nodes/tonemap/tonemap.hpp"
 #include "merian-nodes/nodes/vkdt_filmcurv/vkdt_filmcurv.hpp"
-#include "nodes/shadertoy/shadertoy.hpp"
+#include "merian-nodes/nodes/shadertoy/shadertoy.hpp"
 
 namespace merian_nodes {
 

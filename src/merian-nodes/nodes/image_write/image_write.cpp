@@ -1,4 +1,4 @@
-#include "image_write.hpp"
+#include "merian-nodes/nodes/image_write/image_write.hpp"
 #include "stb_image_write.h"
 
 #include "merian/utils/defer.hpp"

@@ -1,5 +1,5 @@
-#include "vk_buffer_array_out.hpp"
-#include "vk_buffer_array_in.hpp"
+#include "merian-nodes/connectors/vk_buffer_array_out.hpp"
+#include "merian-nodes/connectors/vk_buffer_array_in.hpp"
 
 #include "merian-nodes/graph/node.hpp"
 #include "merian/utils/pointer.hpp"

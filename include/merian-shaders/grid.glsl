@@ -1,4 +1,4 @@
-#include "common/cubemap.glsl"
+#include "merian-shaders/cubemap.glsl"
 
 #ifndef _GRID_H_
 #define _GRID_H_

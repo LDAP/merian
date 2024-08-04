@@ -1,5 +1,5 @@
-#include "common/sampling.glsl"
-#include "common/frames.glsl"
+#include "merian-shaders/sampling.glsl"
+#include "merian-shaders/frames.glsl"
 
 #ifndef _PHASE_ISOTROPIC_H_
 #define _PHASE_ISOTROPIC_H_

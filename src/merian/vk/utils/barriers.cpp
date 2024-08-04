@@ -1,5 +1,5 @@
 #include "merian/vk/utils/barriers.hpp"
-#include "vk/utils/subresource_ranges.hpp"
+#include "merian/vk/utils/subresource_ranges.hpp"
 #include <vulkan/vulkan.hpp>
 
 #include <unordered_map>

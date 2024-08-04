@@ -1,7 +1,7 @@
-#include "vk_tlas_out.hpp"
-#include "vk_tlas_in.hpp"
+#include "merian-nodes/connectors/vk_tlas_out.hpp"
+#include "merian-nodes/connectors/vk_tlas_in.hpp"
 
-#include "graph/errors.hpp"
+#include "merian-nodes/graph/errors.hpp"
 #include "merian-nodes/graph/node.hpp"
 #include "merian/utils/pointer.hpp"
 

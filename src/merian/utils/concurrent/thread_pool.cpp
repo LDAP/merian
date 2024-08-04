@@ -1,4 +1,5 @@
 #include "merian/utils/concurrent/thread_pool.hpp"
+
 #include <cassert>
 
 namespace merian {

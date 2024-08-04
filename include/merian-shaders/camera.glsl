@@ -1,4 +1,4 @@
-#include "common/common.glsl"
+#include "merian-shaders/common.glsl"
 
 #ifndef _CAMERA_H_
 #define _CAMERA_H_

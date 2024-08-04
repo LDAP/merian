@@ -1,4 +1,4 @@
-#include "ab_compare.hpp"
+#include "merian-nodes/nodes/ab_compare/ab_compare.hpp"
 #include "merian/vk/utils/blits.hpp"
 
 namespace merian_nodes {

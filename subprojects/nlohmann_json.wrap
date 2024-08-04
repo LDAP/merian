@@ -2,7 +2,7 @@
 directory = nlohmann_json
 
 url = https://github.com/nlohmann/json
-revision =  v3.11.3
+revision = v3.11.3
 depth = 1
 
 [provide]

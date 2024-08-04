@@ -1,7 +1,7 @@
 #ifndef _MORTON_H_
 #define _MORTON_H_
 
-#include "common/bit_twiddling.glsl"
+#include "merian-shaders/bit_twiddling.glsl"
 
 // Works only if width is power of two
 // https://fgiesen.wordpress.com/2022/09/09/morton-codes-addendum/

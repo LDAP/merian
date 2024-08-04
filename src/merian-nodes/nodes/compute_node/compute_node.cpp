@@ -1,4 +1,4 @@
-#include "compute_node.hpp"
+#include "merian-nodes/nodes/compute_node/compute_node.hpp"
 
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"

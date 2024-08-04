@@ -1,4 +1,4 @@
-#include "properties_json_load.hpp"
+#include "merian/utils/properties_json_load.hpp"
 #include "merian/utils/glm.hpp"
 
 #include <fstream>

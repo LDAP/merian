@@ -1,4 +1,4 @@
-#include "vk_tlas_in.hpp"
+#include "merian-nodes/connectors/vk_tlas_in.hpp"
 #include "merian-nodes/graph/errors.hpp"
 
 namespace merian_nodes {

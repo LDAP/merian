@@ -1,4 +1,4 @@
-#include "fxaa.hpp"
+#include "merian-nodes/nodes/fxaa/fxaa.hpp"
 
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 

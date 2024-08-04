@@ -1,4 +1,4 @@
-#include "color_output.hpp"
+#include "merian-nodes/nodes/color_image/color_output.hpp"
 
 #include "merian/utils/glm.hpp"
 

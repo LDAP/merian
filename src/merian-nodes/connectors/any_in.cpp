@@ -1,5 +1,5 @@
-#include "any_in.hpp"
-#include "any_out.hpp"
+#include "merian-nodes/connectors/any_in.hpp"
+#include "merian-nodes/connectors/any_out.hpp"
 
 #include "merian-nodes/graph/errors.hpp"
 #include "merian-nodes/resources/host_any_resource.hpp"

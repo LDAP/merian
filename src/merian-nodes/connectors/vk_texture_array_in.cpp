@@ -1,4 +1,4 @@
-#include "vk_texture_array_in.hpp"
+#include "merian-nodes/connectors/vk_texture_array_in.hpp"
 
 #include "merian-nodes/graph/errors.hpp"
 

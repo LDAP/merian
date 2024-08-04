@@ -1,5 +1,5 @@
-#include "vk_texture_array_out.hpp"
-#include "vk_texture_array_in.hpp"
+#include "merian-nodes/connectors/vk_texture_array_out.hpp"
+#include "merian-nodes/connectors/vk_texture_array_in.hpp"
 
 #include "merian-nodes/graph/errors.hpp"
 #include "merian-nodes/graph/node.hpp"

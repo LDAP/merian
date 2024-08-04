@@ -3,7 +3,7 @@
 #extension GL_EXT_control_flow_attributes : require
 
 #include "graph_layout.glsl"
-#include "common/interpolate.glsl"
+#include "merian-shaders/interpolate.glsl"
 
 #define FILTER_MODE_NEAREST 0
 #define FILTER_MODE_BILINEAR 1
@@ -33,9 +33,9 @@ layout(push_constant, std140) uniform pc_t {
     float adaptive_alpha_ipr_factor;
 } pc;
 
-#include "common/normal_encode.glsl"
-#include "common/reprojection.glsl"
-#include "common/colors_yuv.glsl"
+#include "merian-shaders/normal_encode.glsl"
+#include "merian-shaders/reprojection.glsl"
+#include "merian-shaders/colors_yuv.glsl"
 
 void get_prev_nearest(const vec2 prev_pos,
                       const float linear_z,

@@ -1,4 +1,4 @@
-#include "shadertoy.hpp"
+#include "merian-nodes/nodes/shadertoy/shadertoy.hpp"
 
 #include "merian-nodes/connectors/managed_vk_image_out.hpp"
 #include "merian-nodes/graph/errors.hpp"

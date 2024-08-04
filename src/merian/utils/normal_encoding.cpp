@@ -1,4 +1,4 @@
-#include "normal_encoding.hpp"
+#include "merian/utils/normal_encoding.hpp"
 
 #include <math.h>
 

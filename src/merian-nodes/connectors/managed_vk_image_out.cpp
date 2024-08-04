@@ -1,4 +1,4 @@
-#include "managed_vk_image_out.hpp"
+#include "merian-nodes/connectors/managed_vk_image_out.hpp"
 
 #include "merian-nodes/connectors/managed_vk_image_in.hpp"
 #include "merian-nodes/graph/errors.hpp"

@@ -1,4 +1,4 @@
-#include "median.hpp"
+#include "merian-nodes/nodes/median_approx/median.hpp"
 
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"

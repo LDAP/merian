@@ -1,24 +1,19 @@
-#include "taa.hpp"
+#include "merian-nodes/nodes/taa/taa.hpp"
 
+#include "config.h"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
-
-static const uint32_t spv[] = {
 #include "taa.comp.spv.h"
-};
 
 namespace merian_nodes {
 
-TAA::TAA(const ContextHandle context,
-         const float alpha,
-         const int clamp_method,
-         const bool inverse_motion)
-    : AbstractCompute(context, sizeof(PushConstant)), inverse_motion(inverse_motion) {
-    shader = std::make_shared<ShaderModule>(context, sizeof(spv), spv);
-    pc.temporal_alpha = alpha;
-    pc.clamp_method = clamp_method;
+TAA::TAA(const ContextHandle context) : AbstractCompute(context, sizeof(PushConstant)) {
+    shader =
+        std::make_shared<ShaderModule>(context, merian_taa_comp_spv_size(), merian_taa_comp_spv());
+    pc.temporal_alpha = 0.;
+    pc.clamp_method = MERIAN_NODES_TAA_CLAMP_MIN_MAX;
 
     auto spec_builder = SpecializationInfoBuilder();
-    spec_builder.add_entry(local_size_x, local_size_y, int(inverse_motion));
+    spec_builder.add_entry(local_size_x, local_size_y, inverse_motion);
     spec_info = spec_builder.build();
 }
 

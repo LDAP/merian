@@ -1,5 +1,5 @@
-#include "common/sampling.glsl"
-#include "common/frames.glsl"
+#include "merian-shaders/sampling.glsl"
+#include "merian-shaders/frames.glsl"
 
 #ifndef _BSDF_DIFFUSE_H_
 #define _BSDF_DIFFUSE_H_

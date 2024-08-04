@@ -2,7 +2,6 @@
 
 #include "merian-nodes/connectors/managed_vk_image_in.hpp"
 #include "merian-nodes/nodes/compute_node/compute_node.hpp"
-#include "merian-nodes/nodes/taa/config.h"
 
 namespace merian_nodes {
 
@@ -19,10 +18,7 @@ class TAA : public AbstractCompute {
     };
 
   public:
-    TAA(const ContextHandle context,
-        const float alpha = 0.,
-        const int clamp_method = MERIAN_NODES_TAA_CLAMP_MIN_MAX,
-        const bool inverse_motion = false);
+    TAA(const ContextHandle context);
 
     std::vector<InputConnectorHandle> describe_inputs() override;
 
@@ -41,7 +37,7 @@ class TAA : public AbstractCompute {
     NodeStatusFlags properties(Properties& config) override;
 
   private:
-    const bool inverse_motion;
+    const bool inverse_motion = false;
     ShaderModuleHandle shader;
     SpecializationInfoHandle spec_info;
 

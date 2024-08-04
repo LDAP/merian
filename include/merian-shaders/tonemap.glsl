@@ -1,6 +1,6 @@
-#include "common/colors_yuv.glsl"
-#include "common/colors_srgb.glsl"
-#include "common/common.glsl"
+#include "merian-shaders/colors_yuv.glsl"
+#include "merian-shaders/colors_srgb.glsl"
+#include "merian-shaders/common.glsl"
 
 #ifndef _TONEMAP_H_
 #define _TONEMAP_H_

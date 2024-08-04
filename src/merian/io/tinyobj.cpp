@@ -1,4 +1,4 @@
-#include "tinyobj.hpp"
+#include "merian/io/tinyobj.hpp"
 
 namespace merian {
 

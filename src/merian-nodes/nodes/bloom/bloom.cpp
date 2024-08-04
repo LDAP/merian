@@ -1,4 +1,4 @@
-#include "bloom.hpp"
+#include "merian-nodes/nodes/bloom/bloom.hpp"
 
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"

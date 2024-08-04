@@ -1,30 +1,23 @@
-#include "exposure.hpp"
+#include "merian-nodes/nodes/exposure/exposure.hpp"
 
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 
-namespace merian_nodes {
-
-static const uint32_t histogram_spv[] = {
-#include "histogram.comp.spv.h"
-};
-
-static const uint32_t luminance_spv[] = {
-#include "luminance.comp.spv.h"
-};
-
-static const uint32_t exposure_spv[] = {
 #include "exposure.comp.spv.h"
-};
+#include "histogram.comp.spv.h"
+#include "luminance.comp.spv.h"
+
+namespace merian_nodes {
 
 AutoExposure::AutoExposure(const ContextHandle context) : Node(), context(context) {
 
-    histogram_module =
-        std::make_shared<ShaderModule>(context, sizeof(histogram_spv), histogram_spv);
-    luminance_module =
-        std::make_shared<ShaderModule>(context, sizeof(luminance_spv), luminance_spv);
-    exposure_module = std::make_shared<ShaderModule>(context, sizeof(exposure_spv), exposure_spv);
+    histogram_module = std::make_shared<ShaderModule>(context, merian_histogram_comp_spv_size(),
+                                                      merian_histogram_comp_spv());
+    luminance_module = std::make_shared<ShaderModule>(context, merian_luminance_comp_spv_size(),
+                                                      merian_luminance_comp_spv());
+    exposure_module = std::make_shared<ShaderModule>(context, merian_exposure_comp_spv_size(),
+                                                     merian_exposure_comp_spv());
 }
 
 AutoExposure::~AutoExposure() {}

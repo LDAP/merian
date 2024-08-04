@@ -1,4 +1,4 @@
-#include "accumulate.hpp"
+#include "merian-nodes/nodes/accumulate/accumulate.hpp"
 
 #include "accumulate.comp.spv.h"
 #include "calculate_percentiles.comp.spv.h"
