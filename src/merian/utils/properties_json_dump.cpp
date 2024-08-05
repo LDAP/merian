@@ -157,6 +157,9 @@ bool JSONDumpProperties::config_options(const std::string& id,
                                         const std::vector<std::string>& options,
                                         const OptionsStyle,
                                         const std::string&) {
+    if (selected >= static_cast<int>(options.size())) {
+        return false;
+    }
     current()[id] = options[selected];
     return false;
 }
