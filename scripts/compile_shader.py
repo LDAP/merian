@@ -10,7 +10,7 @@ outputs a file "filename.ext.spv.c" that contains
 
 as well as a "filename.ext.spv.h" containing declarations for the above.
 
-Usage: python compile_shader.py in.ext outdir
+Usage: python compile_shader.py in.ext header.h impl.c
 """
 
 import argparse
@@ -56,16 +56,21 @@ def compile_shader(input_path, glslc_args, optimize) -> bytes:
 def main():
     parser = argparse.ArgumentParser("compile_shader.py")
     parser.add_argument("--optimize", action="store_true")
+    parser.add_argument("--debug", action="store_true")
     parser.add_argument("--name")
     parser.add_argument("--prefix", default="merian")
-    parser.add_argument("shader")
-    parser.add_argument("out")
+    parser.add_argument("shader_path", type=Path)
+    parser.add_argument("header_path", type=Path)
+    parser.add_argument("implementation_path", type=Path)
     parser.add_argument("glslc_args", nargs=argparse.REMAINDER)
     args = parser.parse_args()
+    if args.debug:
+        print(args)
+        print(f"cwd {os.getcwd()}")
 
-    in_path = Path(args.shader)
-
-    shader_name = re.sub(r"[^A-Za-z0-9]", "_", args.name if args.name else in_path.name)
+    shader_name = re.sub(
+        r"[^A-Za-z0-9]", "_", args.name if args.name else args.shader_path.name
+    )
     prefix = re.sub(r"[^A-Za-z0-9]", "_", args.prefix)
 
     header = """\
@@ -86,12 +91,12 @@ uint32_t {prefix}_{shader_name}_spv_size(void);
 #endif
 """.format(prefix=prefix, shader_name=shader_name)
 
-    header_path = os.path.join(args.out, in_path.name + ".spv.h")
-    with open(header_path, "w") as f:
+    with open(args.header_path, "w") as f:
         f.write(header)
-        # print(f"wrote header to {header_path}")
+        if args.debug:
+            print(f"wrote header to {args.header_path}")
 
-    spv = compile_shader(in_path, args.glslc_args, args.optimize)
+    spv = compile_shader(args.shader_path, args.glslc_args, args.optimize)
     implementation = """\
 #include "stdint.h"
 
@@ -113,17 +118,18 @@ uint32_t {prefix}_{shader_name}_spv_size(void) {{
         spv_int_array=", ".join(f"{s:#010x}" for s in to_int_array(spv)),
     )
 
-    impl_path = Path(os.path.join(args.out, in_path.name + ".spv.c"))
-    with open(impl_path, "w") as f:
+    with open(args.implementation_path, "w") as f:
         f.write(implementation)
-        # print(f"wrote implementation to {impl_path}")
+        if args.debug:
+            print(f"wrote implementation to {args.implementation_path}")
 
     if "--depfile" in args.glslc_args:
         depfile_path = args.glslc_args[args.glslc_args.index("--depfile") + 1]
-        # print(f"fixup depfile {depfile_path}")
+        if args.debug:
+            print(f"fixup depfile {depfile_path}")
         with open(depfile_path, "r") as f:
             depfile = f.read()
-        depfile = re.sub("^(.*):", impl_path.name + ":", depfile)
+        depfile = re.sub("^(.*):", args.implementation_path.name + ":", depfile)
         with open(depfile_path, "w") as f:
             f.write(depfile)
 

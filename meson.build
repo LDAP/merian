@@ -113,7 +113,7 @@ shader_generator = generator(
     py,
     output: ['@PLAINNAME@.spv.h', '@PLAINNAME@.spv.c'],
     depfile: '@PLAINNAME@.d',
-    arguments: spv_compile_script + ['@INPUT@', '@BUILD_DIR@'] + glslc_args,
+    arguments: spv_compile_script + ['@INPUT@', '@OUTPUT0@', '@OUTPUT1@'] + glslc_args,
 )
 
 
