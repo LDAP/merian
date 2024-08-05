@@ -325,7 +325,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             }
 
             SPDLOG_DEBUG("removed node {} ({})", node_identifier, registry.node_name(node));
-            _needs_reconnect = true;
+            needs_reconnect = true;
         };
 
         if (run_in_progress) {
@@ -352,7 +352,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         {
             MERIAN_PROFILE_SCOPE(profiler, "connect");
 
-            _needs_reconnect = false;
+            needs_reconnect = false;
 
             // no nodes -> no connect necessary
             if (node_data.empty()) {
@@ -386,7 +386,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 if (!connect_nodes()) {
                     SPDLOG_WARN(
                         "Connecting nodes failed :( But attempted self healing. Retry, please!");
-                    _needs_reconnect = true;
+                    needs_reconnect = true;
                     return;
                 }
             }
@@ -426,7 +426,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                     });
                     const Node::NodeStatusFlags flags =
                         node->on_connected(io_layout, data.descriptor_set_layout);
-                    _needs_reconnect |= flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT;
+                    needs_reconnect |= flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT;
                     if (flags & Node::NodeStatusFlagBits::RESET_IN_FLIGHT_DATA) {
                         for (uint32_t i = 0; i < RING_SIZE; i++) {
                             ring_fences.get(i).user_data.in_flight_data.at(node).reset();
@@ -465,7 +465,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         // CONNECT and PREPROCESS
         do {
             // While connection nodes can signalize that they need to reconnect
-            while (_needs_reconnect) {
+            while (needs_reconnect) {
                 connect();
             }
 
@@ -481,13 +481,13 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                     const uint32_t set_idx = iteration % data.descriptor_sets.size();
                     Node::NodeStatusFlags flags =
                         node->pre_process(run, data.resource_maps[set_idx]);
-                    _needs_reconnect |= flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT;
+                    needs_reconnect |= flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT;
                     if (flags & Node::NodeStatusFlagBits::RESET_IN_FLIGHT_DATA) {
                         in_flight_data.in_flight_data[node].reset();
                     }
                 }
             }
-        } while (_needs_reconnect);
+        } while (needs_reconnect);
 
         // RUN
         {
@@ -516,7 +516,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         run.execute_callbacks(queue);
         on_post_submit();
 
-        _needs_reconnect |= run.needs_reconnect;
+        needs_reconnect |= run.needs_reconnect;
         iteration++;
         for (const auto& task : on_run_finished_tasks)
             task();
@@ -539,16 +539,16 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             InFlightData& in_flight_data = ring_fences.get(i).user_data;
             in_flight_data.in_flight_data.clear();
         }
-        _needs_reconnect = true;
+        needs_reconnect = true;
     }
 
     // Ensures at reconnect at the next run
     void request_reconnect() {
-        _needs_reconnect = true;
+        needs_reconnect = true;
     }
 
-    bool needs_reconnect() {
-        return _needs_reconnect;
+    bool get_needs_reconnect() {
+        return needs_reconnect;
     }
 
     auto identifiers() {
@@ -556,7 +556,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
     }
 
     void properties(Properties& props) {
-        _needs_reconnect |= props.config_bool("Rebuild");
+        needs_reconnect |= props.config_bool("Rebuild");
         props.st_no_space();
         props.output_text(fmt::format("Current iteration: {}", iteration));
 
@@ -753,7 +753,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                     if (props.st_begin_child("properties", "Properties",
                                              Properties::ChildFlagBits::DEFAULT_OPEN)) {
                         const Node::NodeStatusFlags flags = node->properties(props);
-                        _needs_reconnect |= flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT;
+                        needs_reconnect |= flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT;
                         props.st_end_child();
                     }
                     if (props.st_begin_child("stats", "Statistics")) {
@@ -823,7 +823,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         auto [it, inserted] = node_data.try_emplace(node, node_identifier);
         assert(inserted);
 
-        _needs_reconnect = true;
+        needs_reconnect = true;
         SPDLOG_DEBUG("added node {} ({})", node_identifier, registry.node_name(node));
 
         return it->second.identifier;
@@ -864,7 +864,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             assert(inserted);
         }
 
-        _needs_reconnect = true;
+        needs_reconnect = true;
         SPDLOG_DEBUG("added connection {}, {} ({}) -> {}, {} ({})", src_output, src_data.identifier,
                      registry.node_name(src), dst_input, dst_data.identifier,
                      registry.node_name(dst));
@@ -901,7 +901,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                      src_data.identifier, registry.node_name(src), dst_input, dst_data.identifier,
                      registry.node_name(dst));
 
-        _needs_reconnect = true;
+        needs_reconnect = true;
         return true;
 
         // Note: Since the connections are not needed in a graph run we do not need to wait until
@@ -1788,7 +1788,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
     merian::RingFences<RING_SIZE, InFlightData> ring_fences;
 
     // State
-    bool _needs_reconnect = false;
+    bool needs_reconnect = false;
     uint64_t iteration = 0;
     bool profiler_enable = true;
     uint32_t profiler_report_intervall_ms = 50;
