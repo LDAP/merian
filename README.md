@@ -47,7 +47,13 @@ merian = merian_subp.get_variable('merian_dep')
 shader_generator = merian_subp.get_variable('shader_generator')
 
 sources = ['app.cpp']
-sources += shader_generator.process('shader.comp')
+sources += shader_generator.process('shader0.comp', 'shader1.comp',...)
+# or to prevent conflicts:
+sources += shader_generator.process(
+    'shader0.comp', 'shader1.comp',...
+    extra_args: ['--prefix', 'my_app_c_prefix'],
+    preserve_path_from: meson.source_root(),
+)
 
 exe = executable(
     'my-app',
