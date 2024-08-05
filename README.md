@@ -5,9 +5,9 @@
 
 Merian is split into two libraries:
 
- - `merian`: Provides core abstractions and utilities (Vulkan context, memory allocation, configuration, IO, ...).
- - `merian-nodes`: Implements an extensible Vulkan processing graph. Already implemented nodes can be found [here](https://github.com/LDAP/merian/tree/main/include/merian-nodes/nodes).
- - `merian-shaders`: Collection of reused shader-code.
+ - [`merian`](https://github.com/LDAP/merian/tree/main/include/merian): Provides core abstractions and utilities (Vulkan context, memory allocation, configuration, IO, ...).
+ - [`merian-nodes`](https://github.com/LDAP/merian/tree/main/include/merian-nodes): Implements an extensible Vulkan processing graph. Already implemented nodes can be found [here](https://github.com/LDAP/merian/tree/main/include/merian-nodes/nodes).
+ - [`merian-shaders`](https://github.com/LDAP/merian/tree/main/include/merian-shaders): Collection of reused shader-code.
 
 ## Examples
 
