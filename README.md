@@ -41,13 +41,23 @@ This library uses the [Meson Build System](https://mesonbuild.com/) and declares
 # in your meson.build
 
 merian = dependency('merian', version: ['>=1.0.0'], fallback: ['merian', 'merian_dep'])
+# or if you want to use the shader compiler from merian
+merian_subp = subproject('merian', version: ['>=1.0.0'])
+merian = merian_subp.get_variable('merian_dep')
+shader_generator = merian_subp.get_variable('shader_generator')
+
+sources = ['app.cpp']
+sources += shader_generator.process('shader.comp')
+
 exe = executable(
     'my-app',
+    sources,
     dependencies: [
         merian,
     ],
-    // ...
+    # ...
 )
+
 
 ```
 
