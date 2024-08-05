@@ -1271,6 +1271,13 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         }
 
         for (const auto& output : data.output_connectors) {
+#ifndef NDEBUG
+            if (!output) {
+                SPDLOG_CRITICAL("node {} ({}) returned nullptr in describe_outputs",
+                                data.identifier, registry.node_name(node));
+                assert(output && "node returned nullptr in describe_outputs");
+            }
+#endif
             if (data.output_connector_for_name.contains(output->name)) {
                 throw graph_errors::connector_error{
                     fmt::format("node {} contains two output connectors with the same name {}",
