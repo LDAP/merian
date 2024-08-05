@@ -30,12 +30,10 @@ def to_int_array(b_array: bytes):
     return result
 
 
-def compile_shader(input_path, glslc_args, optimize) -> bytes:
+def compile_shader(glslc_path, input_path, glslc_args, optimize) -> bytes:
     with tempfile.TemporaryDirectory() as tempdir:
         shader = Path(tempdir) / "shader.spv"
-        glslc_command = (
-            ["glslangValidator", "-V"] + glslc_args + ["-o", shader, input_path]
-        )
+        glslc_command = [glslc_path, "-V"] + glslc_args + ["-o", shader, input_path]
         subprocess.check_call(glslc_command)
 
         if optimize:
@@ -59,6 +57,7 @@ def main():
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--name")
     parser.add_argument("--prefix", default="merian")
+    parser.add_argument("--glslc_path", default="glslangValidator")
     parser.add_argument("shader_path", type=Path)
     parser.add_argument("header_path", type=Path)
     parser.add_argument("implementation_path", type=Path)
@@ -96,7 +95,9 @@ uint32_t {prefix}_{shader_name}_spv_size(void);
         if args.debug:
             print(f"wrote header to {args.header_path}")
 
-    spv = compile_shader(args.shader_path, args.glslc_args, args.optimize)
+    spv = compile_shader(
+        args.glslc_path, args.shader_path, args.glslc_args, args.optimize
+    )
     implementation = """\
 #include "stdint.h"
 

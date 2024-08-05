@@ -12,7 +12,6 @@ project(
 cmake = import('cmake')
 
 ccx = meson.get_compiler('cpp')
-glslc = find_program('glslangValidator')
 
 if get_option('loglevel') == 'auto'
     if get_option('buildtype').startswith('debug')
@@ -101,7 +100,10 @@ inc_dirs = [
     include_directories('./include'),
 ]
 
-spv_compile_script = [meson.project_source_root() + '/scripts/compile_shader.py', '@EXTRA_ARGS@']
+system_glslc = find_program('glslangValidator')
+glslc_path = system_glslc.full_path()
+
+spv_compile_script = [meson.project_source_root() + '/scripts/compile_shader.py', '--glslc_path', glslc_path, '@EXTRA_ARGS@']
 glslc_args = ['--target-env', 'vulkan1.3']
 glslc_args += ['-I' + meson.project_source_root()]
 glslc_args += ['-I' + join_paths(project_root, 'src')]
