@@ -30,7 +30,7 @@ class ComputePipeline : public Pipeline {
     ComputePipeline(
         const PipelineLayoutHandle& pipeline_layout,
         const ShaderModuleHandle& shader_module,
-        const SpecializationInfoHandle specialization_info = MERIAN_SPECIALIZATION_INFO_NONE,
+        const SpecializationInfoHandle& specialization_info = MERIAN_SPECIALIZATION_INFO_NONE,
         const char* shader_module_entry_point = "main",
         const vk::PipelineCreateFlags flags = {},
         const PipelineHandle& base_pipeline = {})
