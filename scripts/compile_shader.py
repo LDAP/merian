@@ -2,13 +2,15 @@
 
 """
 Compiles a GLSL shader "filename.ext" and
-outputs a c compatible file that contains
+outputs a file "filename.ext.spv.c" that contains
 
 - an array uint32_t filename_ext_spv[].
-- a function uint32_t *merian_filename_ext_spv(void)
-- a function uint32_t merian_filename_ext_spv_size(void)
+- a function uint32_t *<prefix>_<name or filename_ext>_spv(void)
+- a function uint32_t <prefix>_<name or filename_ext>_spv_size(void)
 
-Usage: python compile_shader.py in.ext [output.h]
+as well as a "filename.ext.spv.h" containing declarations for the above.
+
+Usage: python compile_shader.py in.ext outdir
 """
 
 import argparse
@@ -53,15 +55,18 @@ def compile_shader(input_path, glslc_args, optimize) -> bytes:
 
 def main():
     parser = argparse.ArgumentParser("compile_shader.py")
+    parser.add_argument("--optimize", action="store_true")
+    parser.add_argument("--name")
+    parser.add_argument("--prefix", default="merian")
     parser.add_argument("shader")
     parser.add_argument("out")
     parser.add_argument("glslc_args", nargs=argparse.REMAINDER)
-    parser.add_argument("--optimize", action="store_true")
-    parser.add_argument("--name")
     args = parser.parse_args()
 
     in_path = Path(args.shader)
-    shader_name = args.name if args.name else re.sub(r"[^A-Za-z0-9]", "_", in_path.name)
+
+    shader_name = re.sub(r"[^A-Za-z0-9]", "_", args.name if args.name else in_path.name)
+    prefix = re.sub(r"[^A-Za-z0-9]", "_", args.prefix)
 
     header = """\
 #pragma once
@@ -72,14 +77,14 @@ def main():
 extern "C" {{
 #endif
 
-const uint32_t* merian_{shader_name}_spv(void);
+const uint32_t* {prefix}_{shader_name}_spv(void);
 
-uint32_t merian_{shader_name}_spv_size(void);
+uint32_t {prefix}_{shader_name}_spv_size(void);
 
 #if __cplusplus
 }}
 #endif
-""".format(shader_name=shader_name)
+""".format(prefix=prefix, shader_name=shader_name)
 
     header_path = os.path.join(args.out, in_path.name + ".spv.h")
     with open(header_path, "w") as f:
@@ -94,15 +99,16 @@ static const uint32_t {shader_name}_spv[] = {{
     {spv_int_array}
 }};
 
-const uint32_t* merian_{shader_name}_spv(void) {{
+const uint32_t* {prefix}_{shader_name}_spv(void) {{
     return {shader_name}_spv;
 }}
 
-uint32_t merian_{shader_name}_spv_size(void) {{
+uint32_t {prefix}_{shader_name}_spv_size(void) {{
     return sizeof({shader_name}_spv);
 }}
 
 """.format(
+        prefix=prefix,
         shader_name=shader_name,
         spv_int_array=", ".join(f"{s:#010x}" for s in to_int_array(spv)),
     )

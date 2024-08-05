@@ -101,7 +101,7 @@ inc_dirs = [
     include_directories('./include'),
 ]
 
-spv_compile_script = [meson.project_source_root() + '/scripts/compile_shader.py']
+spv_compile_script = [meson.project_source_root() + '/scripts/compile_shader.py', '@EXTRA_ARGS@']
 glslc_args = ['--target-env', 'vulkan1.3']
 glslc_args += ['-I' + meson.project_source_root()]
 glslc_args += ['-I' + join_paths(project_root, 'src')]
