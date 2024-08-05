@@ -1,0 +1,40 @@
+name: Build Merian
+
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  build:
+    name: Build ${{ matrix.buildtype }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        buildtype: [debugoptimized, release]
+        meson_version: ["1.5.1"]
+    steps:
+      - name: Install Vulkan SDK
+        uses: jakoch/install-vulkan-sdk-action@v1.0.4
+        with:
+          install_runtime: true
+          cache: true
+          stripdown: true
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Install dependencies
+        run: python -m pip install meson==${{ matrix.meson_version }} ninja
+      - name: Configure Project
+        run: meson setup build --buildtype=${{ matrix.buildtype }}
+        env:
+          CC: gcc
+      # - name: Run Tests
+      #   run: meson test -C build -v
+      # - name: Upload Test Log
+      #   uses: actions/upload-artifact@v4
+      #   if: failure()
+      #   with:
+      #     name: ${{ matrix.os }}_Meson_Testlog
+      #     path: build/meson-logs/testlog.txt
