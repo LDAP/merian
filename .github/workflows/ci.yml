@@ -32,10 +32,10 @@ jobs:
           sudo apt-get -y install \
             libxkbcommon-dev \
             xorg-dev
-      - name: Configure Project
+      - name: Setup Project
         run: meson setup build --buildtype=${{ matrix.buildtype }}
-        env:
-          CC: gcc
+      - name: Compile Project
+        run: meson compile -C build
       # - name: Run Tests
       #   run: meson test -C build -v
       # - name: Upload Test Log
