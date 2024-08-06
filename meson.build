@@ -100,8 +100,20 @@ inc_dirs = [
     include_directories('./include'),
 ]
 
-system_glslc = find_program('glslangValidator')
-glslc_path = system_glslc.full_path()
+glslc = find_program('glslangValidator', required: false)
+if glslc.found()
+    glslc_path = glslc.full_path()
+    shader_generator_deps = []
+else
+    # :( in this case we have to build glslangValidator ourselves
+    glslang_options = cmake.subproject_options()
+    glslang_options.add_cmake_defines({'GLSLANG_TESTS': false})
+    glslang_options.add_cmake_defines({'GLSLANG_ENABLE_INSTALL': false})
+    glslang_subp = cmake.subproject('glslang', options: glslang_options)
+    glslc_tgt = glslang_subp.target('glslang-standalone')
+    glslc_path = glslc_tgt.full_path()
+    shader_generator_deps = [glslc_tgt]
+endif
 
 spv_compile_script = [meson.project_source_root() + '/scripts/compile_shader.py', '--glslc_path', glslc_path, '@EXTRA_ARGS@']
 glslc_args = ['--target-env', 'vulkan1.3']
@@ -116,6 +128,7 @@ shader_generator = generator(
     output: ['@PLAINNAME@.spv.h', '@PLAINNAME@.spv.c'],
     depfile: '@PLAINNAME@.d',
     arguments: spv_compile_script + ['@INPUT@', '@OUTPUT0@', '@OUTPUT1@'] + glslc_args,
+    depends: shader_generator_deps
 )
 
 
