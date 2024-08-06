@@ -130,7 +130,7 @@ uint32_t {prefix}_{shader_name}_spv_size(void) {{
             print(f"fixup depfile {depfile_path}")
         with open(depfile_path, "r") as f:
             depfile = f.read()
-        depfile = re.sub("^(.*):(?!\\\\)", args.implementation_path.name + ":", depfile)
+        depfile = re.sub("^(.*):(?![\\\\/])", args.implementation_path.name + ":", depfile)
         with open(depfile_path, "w") as f:
             f.write(depfile)
 
