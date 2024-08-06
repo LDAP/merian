@@ -278,7 +278,9 @@ function(glslang_pch target pch)
     endif()
 endfunction()
 
-execute_process(COMMAND "python" "${CMAKE_CURRENT_SOURCE_DIR}/update_glslang_sources.py" WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+# @LDAP: pull dependencies
+find_package (Python3 COMPONENTS Interpreter)
+execute_process(COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/update_glslang_sources.py" WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
 
 if(BUILD_EXTERNAL AND IS_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/External)
     # We depend on these for later projects, so they should come first.
