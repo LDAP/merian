@@ -1,5 +1,7 @@
 #include "merian/vk/shader/shader_hotreloader.hpp"
 
+#include <chrono>
+
 namespace merian {
 
 ShaderModuleHandle
@@ -16,8 +18,11 @@ HotReloader::get_shader(const std::filesystem::path& path,
         std::filesystem::last_write_time(*canonical);
 
     if (!shaders.contains(*canonical) ||
-        (clock_cast<std::chrono::file_clock>(std::chrono::system_clock::now() - 200ms) >
-             last_write_time &&
+        // workaround for this not working in older Ubuntu versions
+        // (std::chrono::system_clock::now().time_since_epoch() - 200ms >
+        // last_write_time.time_since_epoch()
+        ((std::chrono::system_clock::now().time_since_epoch() - 200ms) >
+             last_write_time.time_since_epoch() &&
          last_write_time > shaders[*canonical].last_write_time)) {
         // wait additional 200ms, else the write to the file might still be in process.
 
