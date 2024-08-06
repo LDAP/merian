@@ -1,5 +1,7 @@
 #include "merian/vk/shader/shader_hotreloader.hpp"
 
+#include <chrono>
+
 namespace merian {
 
 ShaderModuleHandle
@@ -16,7 +18,7 @@ HotReloader::get_shader(const std::filesystem::path& path,
         std::filesystem::last_write_time(*canonical);
 
     if (!shaders.contains(*canonical) ||
-        (clock_cast<std::chrono::file_clock>(std::chrono::system_clock::now() - 200ms) >
+        (std::chrono::clock_cast<std::chrono::file_clock>(std::chrono::system_clock::now() - 200ms) >
              last_write_time &&
          last_write_time > shaders[*canonical].last_write_time)) {
         // wait additional 200ms, else the write to the file might still be in process.
