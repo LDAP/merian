@@ -30,7 +30,8 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get -y install \
-            libxkbcommon-dev
+            libxkbcommon-dev \
+            libxinerama-dev
       - name: Configure Project
         run: meson setup build --buildtype=${{ matrix.buildtype }}
         env:
