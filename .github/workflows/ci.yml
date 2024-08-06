@@ -31,7 +31,7 @@ jobs:
         run: |
           sudo apt-get -y install \
             libxkbcommon-dev \
-            libxinerama-dev
+            xorg-dev
       - name: Configure Project
         run: meson setup build --buildtype=${{ matrix.buildtype }}
         env:
