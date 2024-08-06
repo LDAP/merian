@@ -12,18 +12,18 @@ jobs:
         buildtype: [debugoptimized, release]
         meson_version: ["1.5.1"]
     steps:
-      - name: Install Vulkan SDK
-        uses: jakoch/install-vulkan-sdk-action@v1.0.4
-        with:
-          install_runtime: true
-          cache: true
-          stripdown: true
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.x'
+      - name: Install Vulkan SDK
+        uses: jakoch/install-vulkan-sdk-action@v1.0.4
+        with:
+          install_runtime: true
+          cache: true
+          stripdown: true
       - name: Install dependencies
         run: python -m pip install meson==${{ matrix.meson_version }} ninja
       - name: Configure Project
