@@ -26,6 +26,11 @@ jobs:
           vulkan-use-cache: true
       - name: Install dependencies
         run: python -m pip install meson==${{ matrix.meson_version }} ninja
+      - name: Install dependencies for Linux
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get -y install \
+            xorg-dev
       - name: Configure Project
         run: meson setup build --buildtype=${{ matrix.buildtype }}
         env:
