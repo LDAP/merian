@@ -12,7 +12,6 @@ project(
 cmake = import('cmake')
 
 ccx = meson.get_compiler('cpp')
-glslc = find_program('glslangValidator')
 
 if get_option('loglevel') == 'auto'
     if get_option('buildtype').startswith('debug')
@@ -72,12 +71,11 @@ shaderc = dependency('shaderc', version: ['>=2023.8.1'], required: false)
 if not shaderc.found() and get_option('shaderc').enabled()
     shaderc_options = cmake.subproject_options()
     shaderc_options.add_cmake_defines({'SHADERC_SKIP_TESTS': true})
-    shaderc_options.add_cmake_defines({'SHADERC_SKIP_GLSLC': true})
     shaderc_options.add_cmake_defines({'SHADERC_SKIP_EXAMPLES': true})
     shaderc_options.add_cmake_defines({'SHADERC_ENABLE_SHARED_CRT': true})
     shaderc_subp = cmake.subproject('shaderc', options: shaderc_options)
     # ideally we would use shaderc_subp.dependency('shaderc_combined') but that does not work
-    # therefore we combine all dependencies into one (shaderc build is pretty messed up)
+    # therefore we combine all dependencies into one.
     shaderc = declare_dependency(
         dependencies: [
             shaderc_subp.dependency('shaderc'),
@@ -101,7 +99,22 @@ inc_dirs = [
     include_directories('./include'),
 ]
 
-spv_compile_script = [meson.project_source_root() + '/scripts/compile_shader.py', '@EXTRA_ARGS@']
+glslc = find_program('glslangValidator', required: false)
+if glslc.found()
+    glslc_path = glslc.full_path()
+    shader_generator_deps = []
+else
+    # :( in this case we have to build glslangValidator ourselves
+    glslang_options = cmake.subproject_options()
+    glslang_options.add_cmake_defines({'GLSLANG_TESTS': false})
+    glslang_options.add_cmake_defines({'GLSLANG_ENABLE_INSTALL': false})
+    glslang_subp = cmake.subproject('glslang', options: glslang_options)
+    glslc_tgt = glslang_subp.target('glslang-standalone')
+    glslc_path = glslc_tgt.full_path()
+    shader_generator_deps = [glslc_tgt]
+endif
+
+spv_compile_script = [meson.project_source_root() + '/scripts/compile_shader.py', '--glslc_path', glslc_path, '@EXTRA_ARGS@']
 glslc_args = ['--target-env', 'vulkan1.3']
 glslc_args += ['-I' + meson.project_source_root()]
 glslc_args += ['-I' + join_paths(project_root, 'src')]
@@ -114,6 +127,7 @@ shader_generator = generator(
     output: ['@PLAINNAME@.spv.h', '@PLAINNAME@.spv.c'],
     depfile: '@PLAINNAME@.d',
     arguments: spv_compile_script + ['@INPUT@', '@OUTPUT0@', '@OUTPUT1@'] + glslc_args,
+    depends: shader_generator_deps
 )
 
 
