@@ -61,10 +61,10 @@ def main():
     parser.add_argument("shader_path", type=Path)
     parser.add_argument("header_path", type=Path)
     parser.add_argument("implementation_path", type=Path)
-    parser.add_argument("glslc_args", nargs=argparse.REMAINDER)
-    args = parser.parse_args()
+    args, glslc_args = parser.parse_known_args()
     if args.debug:
         print(args)
+        print(f"glslc args: {glslc_args}")
         print(f"cwd {os.getcwd()}")
 
     shader_name = re.sub(
@@ -96,7 +96,7 @@ uint32_t {prefix}_{shader_name}_spv_size(void);
             print(f"wrote header to {args.header_path}")
 
     spv = compile_shader(
-        args.glslc_path, args.shader_path, args.glslc_args, args.optimize
+        args.glslc_path, args.shader_path, glslc_args, args.optimize
     )
     implementation = """\
 #include "stdint.h"
@@ -124,8 +124,8 @@ uint32_t {prefix}_{shader_name}_spv_size(void) {{
         if args.debug:
             print(f"wrote implementation to {args.implementation_path}")
 
-    if "--depfile" in args.glslc_args:
-        depfile_path = args.glslc_args[args.glslc_args.index("--depfile") + 1]
+    if "--depfile" in glslc_args:
+        depfile_path = glslc_args[glslc_args.index("--depfile") + 1]
         if args.debug:
             print(f"fixup depfile {depfile_path}")
         with open(depfile_path, "r") as f:

@@ -113,7 +113,7 @@ else
     shader_generator_deps = [glslc_tgt]
 endif
 
-spv_compile_script = [meson.project_source_root() + '/scripts/compile_shader.py', '--glslc_path', glslc_path, '@EXTRA_ARGS@']
+spv_compile_script = [meson.project_source_root() + '/scripts/compile_shader.py', '--glslc_path', glslc_path]
 glslc_args = ['--target-env', 'vulkan1.3']
 glslc_args += ['-I' + meson.project_source_root()]
 glslc_args += ['-I' + join_paths(project_root, 'src')]
@@ -125,7 +125,7 @@ shader_generator = generator(
     py,
     output: ['@PLAINNAME@.spv.h', '@PLAINNAME@.spv.c'],
     depfile: '@PLAINNAME@.d',
-    arguments: spv_compile_script + ['@INPUT@', '@OUTPUT0@', '@OUTPUT1@'] + glslc_args,
+    arguments: spv_compile_script + ['@INPUT@', '@OUTPUT0@', '@OUTPUT1@'] + glslc_args + ['@EXTRA_ARGS@'],
     depends: shader_generator_deps
 )
 
