@@ -8,7 +8,7 @@ project(
 
 include_dirs = include_directories('.')
 
-tol = library(
+tol = static_library(
   'tol',
   ['tiny_obj_loader.cc'],
   include_directories: include_dirs,

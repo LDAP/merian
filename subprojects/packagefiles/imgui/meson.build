@@ -3,6 +3,7 @@ project(
   'cpp',
   license: 'MIT',
   version: run_command(['git', 'describe', '--exact-match', '--tags']).stdout().substring(1),
+  default_options: ['default_library=static'],
   meson_version: '>=0.56.0',
 )
 

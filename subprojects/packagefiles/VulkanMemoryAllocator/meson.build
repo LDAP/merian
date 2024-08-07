@@ -11,7 +11,7 @@ include_dirs = include_directories('include')
 
 implementation = import('fs').copyfile('include/vk_mem_alloc.h', 'vk_mem_alloc.cpp')
 
-vma = library(
+vma = static_library(
   'vma',
   [implementation],
   dependencies: [vulkan],

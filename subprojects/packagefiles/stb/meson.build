@@ -24,7 +24,7 @@ foreach lib : get_option('stb_libraries')
   endif
 endforeach
 
-stb = library(
+stb = static_library(
   'stb',
   implementations,
   cpp_args: args,
