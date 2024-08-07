@@ -2,7 +2,7 @@
 directory = imgui
 
 url = https://github.com/ocornut/imgui
-revision = v1.90.9
+revision = v1.90.8
 depth = 1
 
 patch_directory = imgui
