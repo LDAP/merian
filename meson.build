@@ -6,7 +6,8 @@ project(
         'warning_level=3',
         'cpp_std=c++20',
         'b_ndebug=if-release',
-    ]
+    ],
+    meson_version: '>=1.5.0',
 )
 
 cmake = import('cmake')
