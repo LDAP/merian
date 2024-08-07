@@ -44,10 +44,8 @@ fmt = dependency('fmt', version : ['>=10.0.0'], fallback : ['fmt', 'fmt_dep'])
 spdlog = dependency('spdlog', version : ['>=1.12.0'], fallback : ['spdlog', 'spdlog_dep'], default_options : ['external_fmt=enabled'])
 vulkan = dependency('vulkan', version: ['>=1.3.0'], required: false)
 if not vulkan.found()
-    # version specifier is broken for vulkan https://github.com/mesonbuild/meson/issues/12072
+    # version specifier is broken for vulkan in older meson versions. https://github.com/mesonbuild/meson/issues/12072
     vulkan = dependency('vulkan')
-else
-    
 endif
 glfw = dependency('glfw3', version: ['>=3.4.0'], fallback: ['glfw', 'glfw_dep'])
 glm = dependency('glm', fallback : ['glm', 'glm_dep'], version: ['>=0.9.9.8'])
