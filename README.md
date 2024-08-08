@@ -3,11 +3,11 @@
 ~ _A *Vulkan 1.3* development framework._ ~
 
 
-Merian is split into two libraries:
+Merian is split into multiple components:
 
  - [`merian`](https://github.com/LDAP/merian/tree/main/include/merian): Provides core abstractions and utilities (Vulkan context, memory allocation, configuration, IO, ...).
  - [`merian-nodes`](https://github.com/LDAP/merian/tree/main/include/merian-nodes): Implements an extensible Vulkan processing graph. Already implemented nodes can be found [here](https://github.com/LDAP/merian/tree/main/include/merian-nodes/nodes).
- - [`merian-shaders`](https://github.com/LDAP/merian/tree/main/include/merian-shaders): Collection of reused shader-code.
+ - [`merian-shaders`](https://github.com/LDAP/merian/tree/main/include/merian-shaders): Collection of reusable shader-code.
 
 ## Examples
 
@@ -86,7 +86,7 @@ merian = merian_dep
 
 Documentation is in the `docs` subdirectory of this repository.
 
-Nodes are documented in their [respective subfolder](https://github.com/LDAP/merian/tree/main/src/merian-nodes/nodes).
+Nodes are documented in their [respective subfolder](https://github.com/LDAP/merian/tree/main/include/merian-nodes/nodes).
 
 ## Usage
 
