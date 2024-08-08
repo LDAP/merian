@@ -1364,8 +1364,14 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
     // Helper for topological visit that calculates the next topological layer from the 'not yet
     // visited' cadidate nodes.
     //
-    // - Sets errors if a required input is not connected. In this case the node
+    // Sets errors if a required non-delayed input is not connected. In this case the node
     // is removed from candidates.
+    //
+    // Satisfied means:
+    // - All non-delayed optional inputs that might get connected are connected
+    // - All non-delayed required inputs are connected
+    // - Delayed inputs might be connected (but don't have to). Meaning: We also checkout a node
+    // that does not run eventually. We do this to get the outputs for the GUI.
     //
     // This is used to initialize a topological traversal of the graph to connect the nodes.
     void search_satisfied_nodes(std::set<NodeHandle>& candidates,
@@ -1405,13 +1411,21 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 }
 
                 if (will_not_connect) {
-                    if (!input->optional) {
+                    if (input->delay > 0) {
+                        // Special case: We could remove the node here already since it will
+                        // never be fully connected. However we might want to know the outputs
+                        // of the node for GUI and technically the node is "satisfied" for a
+                        // call to describe_outputs.
+                        // Note: We cannot set the error here since that would lead to other nodes
+                        // not connecting other inputs.
+                    } else if (!input->optional) {
                         // This is bad. No node will connect to this input and the input is not
                         // optional...
                         std::string error = make_error_input_not_connected(input, node, data);
                         SPDLOG_WARN(error);
                         data.errors.emplace_back(std::move(error));
 
+                        // We can't even call describe_outputs... Kill the node.
                         to_erase.push_back(node);
                         satisfied = false;
                         break;
@@ -1518,6 +1532,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                             if (input->optional) {
                                 data.input_connections.try_emplace(input, NodeData::PerInputInfo());
                             } else {
+                                // Not connected delayed inputs are filtered here.
                                 data.errors.emplace_back(
                                     make_error_input_not_connected(input, node, data));
                                 break;
