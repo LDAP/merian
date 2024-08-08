@@ -22,14 +22,18 @@ else
     add_project_arguments('-DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_' + get_option('loglevel').to_upper(), language : 'cpp')
 endif
 
+global_args = [
+    # Vulkan dynamic loader (VULKAN_HPP_DEFAULT_DISPATCHER initialized in Context)
+    '-DVULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1',
+    # Vulkan uses [0, 1] for depth instead of [-1, 1] like OpenGL
+    '-DGLM_FORCE_DEPTH_ZERO_TO_ONE',
+]
+
 if get_option('performance_profiling')
-  add_project_arguments('-DMERIAN_PROFILER_ENABLE', language : 'cpp')
+  global_args += ['-DMERIAN_PROFILER_ENABLE']
 endif
 
-# Vulkan dynamic loader (VULKAN_HPP_DEFAULT_DISPATCHER initialized in Context)
-add_project_arguments('-DVULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1', language : 'cpp')
-# Vulkan uses [0, 1] for depth instead of [-1, 1] like OpenGL
-add_project_arguments('-DGLM_FORCE_DEPTH_ZERO_TO_ONE', language : 'cpp')
+add_project_arguments(global_args, language: 'cpp')
 
 commit = run_command('git', 'rev-parse', 'HEAD', check: true)
 version_split = meson.project_version().split('.')
@@ -134,6 +138,7 @@ subdir('src/merian')
 subdir('src/merian-nodes')
 
 merian_dep = declare_dependency(
+    compile_args: global_args,
     link_with : [merian_lib, merian_nodes_lib],
     include_directories : inc_dirs,
     dependencies : [
