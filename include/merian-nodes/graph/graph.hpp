@@ -1192,9 +1192,8 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                     throw graph_errors::connector_error{
                         fmt::format("node {} contains two input connectors with the same name {}",
                                     registry.node_name(node), input->name)};
-                } else {
-                    data.input_connector_for_name[input->name] = input;
                 }
+                data.input_connector_for_name[input->name] = input;
             }
         }
 
@@ -1267,7 +1266,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                     return data.input_connections.at(input).output;
                 }));
         } catch (const graph_errors::node_error& e) {
-            data.errors.emplace_back(std::move(e.what()));
+            data.errors.emplace_back(e.what());
         }
 
         for (const auto& output : data.output_connectors) {
@@ -1365,7 +1364,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
     // Helper for topological visit that calculates the next topological layer from the 'not yet
     // visited' cadidate nodes.
     //
-    // - Sets disable_missing_input flag if a required input is not connected. In this case the node
+    // - Sets errors if a required input is not connected. In this case the node
     // is removed from candidates.
     //
     // This is used to initialize a topological traversal of the graph to connect the nodes.
@@ -1409,7 +1408,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                     if (!input->optional) {
                         // This is bad. No node will connect to this input and the input is not
                         // optional...
-                        const std::string error = make_error_input_not_connected(input, node, data);
+                        std::string error = make_error_input_not_connected(input, node, data);
                         SPDLOG_WARN(error);
                         data.errors.emplace_back(std::move(error));
 
