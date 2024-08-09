@@ -298,7 +298,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             return false;
         }
 
-        const std::function<void()> remove_task = [this, identifier] {
+        std::function<void()> remove_task = [this, identifier] {
             wait();
 
             const NodeHandle node = node_for_identifier.at(identifier);
@@ -316,7 +316,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 remove_connection(it->second.first, node, it->first);
             }
 
-            const std::string node_identifier = std::move(data.identifier);
+            const std::string node_identifier = data.identifier;
             node_data.erase(node);
             node_for_identifier.erase(identifier);
             for (uint32_t i = 0; i < RING_SIZE; i++) {
@@ -427,7 +427,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                     const Node::NodeStatusFlags flags =
                         node->on_connected(io_layout, data.descriptor_set_layout);
                     needs_reconnect |= flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT;
-                    if (flags & Node::NodeStatusFlagBits::RESET_IN_FLIGHT_DATA) {
+                    if ((flags & Node::NodeStatusFlagBits::RESET_IN_FLIGHT_DATA) != 0u) {
                         for (uint32_t i = 0; i < RING_SIZE; i++) {
                             ring_fences.get(i).user_data.in_flight_data.at(node).reset();
                         }
@@ -482,7 +482,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                     Node::NodeStatusFlags flags =
                         node->pre_process(run, data.resource_maps[set_idx]);
                     needs_reconnect |= flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT;
-                    if (flags & Node::NodeStatusFlagBits::RESET_IN_FLIGHT_DATA) {
+                    if ((flags & Node::NodeStatusFlagBits::RESET_IN_FLIGHT_DATA) != 0u) {
                         in_flight_data.in_flight_data[node].reset();
                     }
                 }
@@ -604,6 +604,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             NodeData& dst_data =
                 node_data.at(node_for_identifier.at(node_ids[add_connection_selected_dst]));
             std::vector<std::string> dst_inputs;
+            dst_inputs.reserve(dst_data.input_connector_for_name.size());
             for (const auto& [input_name, input] : dst_data.input_connector_for_name) {
                 dst_inputs.emplace_back(input_name);
             }
@@ -611,7 +612,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             if (autodetect_dst_input &&
                 add_connection_selected_src_output < (int)src_outputs.size()) {
                 // maybe there is a input that is named exactly like the output
-                for (uint32_t i = 0; i < dst_inputs.size(); i++) {
+                for (int i = 0; i < static_cast<int>(dst_inputs.size()); i++) {
                     if (dst_inputs[i] == src_outputs[add_connection_selected_src_output]) {
                         add_connection_selected_dst_input = i;
                     }
@@ -723,7 +724,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                                              registry.node_name(node));
                 }
 
-                if (props.st_begin_child(identifier.c_str(), node_label.c_str())) {
+                if (props.st_begin_child(identifier, node_label)) {
                     NodeHandle node;
                     std::string type;
 
@@ -919,6 +920,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             for (auto& [output, per_output_info] : data.output_connections) {
                 if (config.st_begin_child(output->name, output->name)) {
                     std::vector<std::string> receivers;
+                    receivers.reserve(per_output_info.inputs.size());
                     for (auto& [node, input] : per_output_info.inputs) {
                         receivers.emplace_back(fmt::format("({}, {} ({}))", input->name,
                                                            node_data.at(node).identifier,
@@ -1050,13 +1052,13 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 auto& [resource, resource_index] = per_input_info.precomputed_resources[set_idx];
                 const Connector::ConnectorStatusFlags flags = input->on_pre_process(
                     run, cmd, resource, node, image_barriers, buffer_barriers);
-                if (flags & Connector::ConnectorStatusFlagBits::NEEDS_DESCRIPTOR_UPDATE) {
+                if ((flags & Connector::ConnectorStatusFlagBits::NEEDS_DESCRIPTOR_UPDATE) != 0u) {
                     NodeData& src_data = node_data.at(per_input_info.node);
                     record_descriptor_updates(src_data, per_input_info.output,
                                               src_data.output_connections[per_input_info.output],
                                               resource_index);
                 }
-                if (flags & Connector::ConnectorStatusFlagBits::NEEDS_RECONNECT) {
+                if ((flags & Connector::ConnectorStatusFlagBits::NEEDS_RECONNECT) != 0u) {
                     request_reconnect();
                 }
             }
@@ -1064,10 +1066,10 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 auto& [resource, resource_index] = per_output_info.precomputed_resources[set_idx];
                 const Connector::ConnectorStatusFlags flags = output->on_pre_process(
                     run, cmd, resource, node, image_barriers, buffer_barriers);
-                if (flags & Connector::ConnectorStatusFlagBits::NEEDS_DESCRIPTOR_UPDATE) {
+                if ((flags & Connector::ConnectorStatusFlagBits::NEEDS_DESCRIPTOR_UPDATE) != 0u) {
                     record_descriptor_updates(data, output, per_output_info, resource_index);
                 }
-                if (flags & Connector::ConnectorStatusFlagBits::NEEDS_RECONNECT) {
+                if ((flags & Connector::ConnectorStatusFlagBits::NEEDS_RECONNECT) != 0u) {
                     request_reconnect();
                 }
             }
@@ -1105,13 +1107,13 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 auto& [resource, resource_index] = per_input_info.precomputed_resources[set_idx];
                 const Connector::ConnectorStatusFlags flags = input->on_post_process(
                     run, cmd, resource, node, image_barriers, buffer_barriers);
-                if (flags & Connector::ConnectorStatusFlagBits::NEEDS_DESCRIPTOR_UPDATE) {
+                if ((flags & Connector::ConnectorStatusFlagBits::NEEDS_DESCRIPTOR_UPDATE) != 0u) {
                     NodeData& src_data = node_data.at(per_input_info.node);
                     record_descriptor_updates(src_data, per_input_info.output,
                                               src_data.output_connections[per_input_info.output],
                                               resource_index);
                 }
-                if (flags & Connector::ConnectorStatusFlagBits::NEEDS_RECONNECT) {
+                if ((flags & Connector::ConnectorStatusFlagBits::NEEDS_RECONNECT) != 0u) {
                     request_reconnect();
                 }
             }
@@ -1119,10 +1121,10 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 auto& [resource, resource_index] = per_output_info.precomputed_resources[set_idx];
                 const Connector::ConnectorStatusFlags flags = output->on_post_process(
                     run, cmd, resource, node, image_barriers, buffer_barriers);
-                if (flags & Connector::ConnectorStatusFlagBits::NEEDS_DESCRIPTOR_UPDATE) {
+                if ((flags & Connector::ConnectorStatusFlagBits::NEEDS_DESCRIPTOR_UPDATE) != 0u) {
                     record_descriptor_updates(data, output, per_output_info, resource_index);
                 }
-                if (flags & Connector::ConnectorStatusFlagBits::NEEDS_RECONNECT) {
+                if ((flags & Connector::ConnectorStatusFlagBits::NEEDS_RECONNECT) != 0u) {
                     request_reconnect();
                 }
             }
