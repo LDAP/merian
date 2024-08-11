@@ -17,7 +17,7 @@ class AutoExposure : public Node {
     static constexpr uint32_t local_size_y = 16;
 
     struct PushConstant {
-        int automatic = false;
+        int automatic = 0;
 
         float iso = 100.0;
         float q = 0.65;

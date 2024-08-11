@@ -16,8 +16,7 @@ class GraphRun {
     template <uint32_t> friend class Graph;
 
   public:
-    GraphRun(const uint32_t ring_size)
-        : ring_size(ring_size) {}
+    GraphRun(const uint32_t ring_size) : ring_size(ring_size) {}
 
     void add_wait_semaphore(const BinarySemaphoreHandle& wait_semaphore,
                             const vk::PipelineStageFlags& wait_stage_flags) noexcept {
@@ -45,7 +44,8 @@ class GraphRun {
         signal_values.push_back(value);
     }
 
-    void add_submit_callback(std::function<void(const QueueHandle& queue)> callback) noexcept {
+    void
+    add_submit_callback(const std::function<void(const QueueHandle& queue)>& callback) noexcept {
         submit_callbacks.push_back(callback);
     }
 
@@ -69,7 +69,7 @@ class GraphRun {
         return ring_size;
     }
 
-    const CommandPoolHandle get_cmd_pool() noexcept {
+    const CommandPoolHandle& get_cmd_pool() noexcept {
         return cmd_pool;
     }
 
@@ -96,14 +96,14 @@ class GraphRun {
 
     // You must call every callback after you submited the graph command buffer
     // Or you use the execute_callbacks function.
-    const std::vector<std::function<void(const QueueHandle& queue)>>
+    const std::vector<std::function<void(const QueueHandle& queue)>>&
     get_submit_callbacks() const noexcept {
         return submit_callbacks;
     }
 
     // Call this after you submitted the graph command buffer
     void execute_callbacks(const QueueHandle& queue) const {
-        for (auto& callback : submit_callbacks) {
+        for (const auto& callback : submit_callbacks) {
             callback(queue);
         }
     }
@@ -118,16 +118,55 @@ class GraphRun {
         return allocator;
     }
 
+    // Returns the time difference to the last run in seconds.
+    // For the first run of a build the difference to the last run in the previous run is returned.
+    const std::chrono::nanoseconds& get_time_delta_duration() const {
+        return time_delta;
+    }
+
+    // Returns the time difference to the last run in seconds.
+    // For the first run of a build the difference to the last run in the previous run is returned.
+    double get_time_delta() const {
+        return std::chrono::duration_cast<std::chrono::duration<double>>(time_delta).count();
+    }
+
+    // Return elapsed time since graph initialization
+    const std::chrono::nanoseconds& get_elapsed_duration() const {
+        return elapsed;
+    }
+
+    // Return elapsed time since graph initialization in seconds.
+    double get_elapsed() const {
+        return std::chrono::duration_cast<std::chrono::duration<double>>(elapsed).count();
+    }
+
+    // Return elapsed time since the last connect()
+    const std::chrono::nanoseconds& get_elapsed_since_connect_duration() const {
+        return elapsed_since_connect;
+    }
+
+    // Return elapsed time since graph initialization in seconds.
+    double get_elapsed_since_connect() const {
+        return std::chrono::duration_cast<std::chrono::duration<double>>(elapsed_since_connect)
+            .count();
+    }
+
   private:
     void reset(const uint64_t iteration,
                const uint32_t in_flight_index,
                const ProfilerHandle profiler,
                const CommandPoolHandle& cmd_pool,
-               const ResourceAllocatorHandle& allocator) {
+               const ResourceAllocatorHandle& allocator,
+               const std::chrono::nanoseconds time_delta,
+               const std::chrono::nanoseconds elapsed,
+               const std::chrono::nanoseconds elapsed_run) {
         this->iteration = iteration;
         this->in_flight_index = in_flight_index;
         this->cmd_pool = cmd_pool;
         this->allocator = allocator;
+        this->time_delta = time_delta;
+        this->elapsed = elapsed;
+        this->elapsed_since_connect = elapsed_run;
         wait_semaphores.clear();
         wait_stages.clear();
         wait_values.clear();
@@ -157,6 +196,9 @@ class GraphRun {
     bool needs_reconnect = false;
     uint64_t iteration;
     uint32_t in_flight_index;
+    std::chrono::nanoseconds time_delta;
+    std::chrono::nanoseconds elapsed;
+    std::chrono::nanoseconds elapsed_since_connect;
 };
 
 } // namespace merian_nodes

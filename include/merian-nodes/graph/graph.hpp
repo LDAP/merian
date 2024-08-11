@@ -19,6 +19,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include <fmt/chrono.h>
 namespace merian_nodes {
 namespace graph_internal {
 
@@ -156,6 +157,10 @@ struct NodeData {
 
         errors.clear();
     }
+
+    uint32_t set_index(const uint64_t run_iteration) const {
+        return run_iteration % descriptor_sets.size();
+    }
 };
 
 inline std::string format_as(const NodeData::NodeStatistics stats) {
@@ -166,6 +171,7 @@ inline std::string format_as(const NodeData::NodeStatistics stats) {
 
 using namespace merian;
 using namespace graph_internal;
+using namespace std::literals::chrono_literals;
 
 /**
  * @brief      A Vulkan processing graph.
@@ -206,6 +212,8 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         }
         debug_utils = context->get_extension<ExtensionVkDebugUtils>();
         run_profiler = std::make_shared<merian::Profiler>(context);
+        time_connect_reference = time_reference = std::chrono::high_resolution_clock::now();
+        duration_elapsed = 0ns;
     }
 
     ~Graph() {
@@ -435,8 +443,10 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 }
             }
         }
-        iteration = 0;
+        run_iteration = 0;
         last_build_report = profiler->get_report();
+        time_connect_reference = std::chrono::high_resolution_clock::now();
+        duration_elapsed_since_connect = 0ns;
     }
 
     // Runs one iteration of the graph.
@@ -469,7 +479,30 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 connect();
             }
 
-            run.reset(iteration, iteration % RING_SIZE, profiler, cmd_pool, resource_allocator);
+            // Compute time stuff
+            assert(time_overwrite < 3);
+            const std::chrono::nanoseconds last_elapsed_ns = duration_elapsed;
+            if (time_overwrite == 1) {
+                const auto delta = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    std::chrono::duration<double>(time_delta_overwrite_ms / 1000.));
+                duration_elapsed += delta;
+                duration_elapsed_since_connect += delta;
+                time_delta_overwrite_ms = 0;
+            } else if (time_overwrite == 2) {
+                const auto delta = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    std::chrono::duration<double>(time_delta_overwrite_ms / 1000.));
+                duration_elapsed += delta;
+                duration_elapsed_since_connect += delta;
+            } else {
+                auto now = std::chrono::high_resolution_clock::now();
+                duration_elapsed = now - time_reference;
+                duration_elapsed_since_connect = now - time_connect_reference;
+            }
+            time_delta_ns = duration_elapsed - last_elapsed_ns;
+
+            run.reset(run_iteration, run_iteration % RING_SIZE, profiler, cmd_pool,
+                      resource_allocator, time_delta_ns, duration_elapsed,
+                      duration_elapsed_since_connect);
 
             // While preprocessing nodes can signalize that they need to reconnect as well
             {
@@ -478,7 +511,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                     NodeData& data = node_data.at(node);
                     MERIAN_PROFILE_SCOPE(profiler, fmt::format("{} ({})", data.identifier,
                                                                registry.node_name(node)));
-                    const uint32_t set_idx = iteration % data.descriptor_sets.size();
+                    const uint32_t set_idx = data.set_index(run_iteration);
                     Node::NodeStatusFlags flags =
                         node->pre_process(run, data.resource_maps[set_idx]);
                     needs_reconnect |= flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT;
@@ -517,7 +550,8 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         on_post_submit();
 
         needs_reconnect |= run.needs_reconnect;
-        iteration++;
+        ++run_iteration;
+        ++total_iteration;
         for (const auto& task : on_run_finished_tasks)
             task();
         on_run_finished_tasks.clear();
@@ -558,7 +592,38 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
     void properties(Properties& props) {
         needs_reconnect |= props.config_bool("Rebuild");
         props.st_no_space();
-        props.output_text(fmt::format("Current iteration: {}", iteration));
+        props.output_text("Run iteration: {}", run_iteration);
+        if (props.st_begin_child("graph_properties", "Graph Properties",
+                                 Properties::ChildFlagBits::FRAMED)) {
+            props.output_text("Run iteration: {}", run_iteration);
+            props.output_text("Run Elapsed: {:%H:%M:%S}s", duration_elapsed_since_connect);
+            props.output_text("Total iterations: {}", total_iteration);
+            props.output_text("Total Elapsed: {:%H:%M:%S}s", duration_elapsed);
+            const double delta_ms =
+                std::chrono::duration_cast<
+                    std::chrono::duration<double, std::chrono::milliseconds::period>>(time_delta_ns)
+                    .count();
+            props.output_text("Time delta: {:04f}ms", delta_ms);
+            if (props.config_options("time overwrite", time_overwrite, {"None", "Time", "Delta"},
+                                     Properties::OptionsStyle::COMBO)) {
+                if (time_overwrite == 0) {
+                    // move reference to prevent jump
+                    const auto now = std::chrono::high_resolution_clock::now();
+                    time_reference = now - duration_elapsed;
+                    time_connect_reference = now - duration_elapsed_since_connect;
+                }
+            }
+
+            if (time_overwrite == 1) {
+                float delta_s = 0;
+                props.config_float("offset (s)", delta_s, "", 0.01);
+                time_delta_overwrite_ms += delta_s * 1000.;
+            } else if (time_overwrite == 2) {
+                props.config_float("delta (ms)", time_delta_overwrite_ms, "", 0.001);
+            }
+
+            props.st_end_child();
+        }
 
         if (props.is_ui() &&
             props.st_begin_child("edit", "Edit Graph", Properties::ChildFlagBits::FRAMED)) {
@@ -927,7 +992,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                                                            registry.node_name(node)));
                     }
 
-                    const uint32_t set_idx = iteration % data.descriptor_sets.size();
+                    const uint32_t set_idx = data.set_index(run_iteration);
                     auto& [_, cur_resource_index] = per_output_info.precomputed_resources[set_idx];
 
                     config.output_text(fmt::format(
@@ -1033,7 +1098,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                   const NodeHandle& node,
                   NodeData& data,
                   [[maybe_unused]] const ProfilerHandle& profiler) {
-        const uint32_t set_idx = iteration % data.descriptor_sets.size();
+        const uint32_t set_idx = data.set_index(run_iteration);
 
         MERIAN_PROFILE_SCOPE_GPU(profiler, cmd,
                                  fmt::format("{} ({})", data.identifier, registry.node_name(node)));
@@ -1805,11 +1870,25 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
     // State
     bool needs_reconnect = false;
-    uint64_t iteration = 0;
     bool profiler_enable = true;
     uint32_t profiler_report_intervall_ms = 50;
     bool run_in_progress = false;
     std::vector<std::function<void()>> on_run_finished_tasks;
+
+    uint64_t total_iteration = 0;
+    uint64_t run_iteration = 0;
+    // assert(overwrite_time || elapsed == now() - time_reference)
+    // to prevent divergence
+    std::chrono::high_resolution_clock::time_point time_reference;
+    std::chrono::high_resolution_clock::time_point time_connect_reference;
+    std::chrono::nanoseconds duration_elapsed_since_connect;
+    std::chrono::nanoseconds duration_elapsed;
+    int time_overwrite = 0; // NONE, TIME, DIFFERENCE
+    // this is also used for overwrite time. In this case this should only be applied once and then
+    // reset.
+    float time_delta_overwrite_ms = 0.;
+    // across builds. Might be not 0 at begin of run.
+    std::chrono::nanoseconds time_delta_ns = 0ns;
 
     Profiler::Report last_build_report;
     Profiler::Report last_run_report;

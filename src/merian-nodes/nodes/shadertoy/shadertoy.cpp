@@ -80,7 +80,6 @@ class ShadertoyInjectCompiler : public ShaderCompiler {
 
 Shadertoy::Shadertoy(const ContextHandle context)
     : AbstractCompute(context, sizeof(PushConstant)), shader_glsl(default_shader) {
-    sw.reset();
 
     ShaderCompilerHandle shaderc_compiler = nullptr;
 #if MERIAN_ENABLE_SHADERC
@@ -132,9 +131,8 @@ Shadertoy::get_specialization_info([[maybe_unused]] const NodeIO& io) noexcept {
 
 const void* Shadertoy::get_push_constant([[maybe_unused]] GraphRun& run,
                                          [[maybe_unused]] const NodeIO& io) {
-    float new_time = sw.seconds();
-    constant.iTimeDelta = new_time - constant.iTime;
-    constant.iTime = new_time;
+    constant.iTimeDelta = static_cast<float>(run.get_time_delta());
+    constant.iTime = static_cast<float>(run.get_elapsed());
     constant.iFrame++;
 
     return &constant;
@@ -185,7 +183,8 @@ AbstractCompute::NodeStatusFlags Shadertoy::properties(Properties& config) {
     case 1: {
         if (config.config_text("shader path", shader_path, true)) {
             needs_reconnect = true;
-            resolved_shader_path = context->file_loader.find_file(shader_path).value_or(shader_path);
+            resolved_shader_path =
+                context->file_loader.find_file(shader_path).value_or(shader_path);
         }
 
         if (std::filesystem::exists(resolved_shader_path)) {

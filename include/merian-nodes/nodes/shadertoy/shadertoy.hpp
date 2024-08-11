@@ -59,7 +59,6 @@ class Shadertoy : public AbstractCompute {
     std::optional<ShaderCompiler::compilation_failed> error;
 
     PushConstant constant;
-    Stopwatch sw;
 };
 
 } // namespace merian_nodes
