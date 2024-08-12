@@ -62,8 +62,9 @@ class Properties {
     // Output
 
     virtual void output_text(const std::string& text) = 0;
+
     template <typename... T> void output_text(fmt::format_string<T...> fmt, T&&... args) {
-        output_text(fmt::format(fmt, args...));
+        output_text(vformat(fmt, fmt::make_format_args(args...)));
     }
     virtual void output_plot_line(const std::string& label,
                                   const float* samples,
