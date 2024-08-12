@@ -89,6 +89,40 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
         std::vector<ReportEntry> cpu_report;
         std::vector<ReportEntry> gpu_report;
 
+        double cpu_total_std_deviation() const {
+            if (cpu_report.empty()) {
+                return 0;
+            }
+            return std::sqrt(std::transform_reduce(
+                cpu_report.begin(), cpu_report.end(), 0.0, std::plus{},
+                [](const auto& v) { return v.std_deviation * v.std_deviation; }));
+        }
+
+        double cpu_total() const {
+            if (cpu_report.empty()) {
+                return 0;
+            }
+            return std::transform_reduce(cpu_report.begin(), cpu_report.end(), 0.0, std::plus{},
+                                         [](const auto& v) { return v.duration; });
+        }
+
+        double gpu_total_std_deviation() const {
+            if (gpu_report.empty()) {
+                return 0;
+            }
+            return std::sqrt(std::transform_reduce(
+                gpu_report.begin(), gpu_report.end(), 0.0, std::plus{},
+                [](const auto& v) { return v.std_deviation * v.std_deviation; }));
+        }
+
+        double gpu_total() const {
+            if (gpu_report.empty()) {
+                return 0;
+            }
+            return std::transform_reduce(gpu_report.begin(), gpu_report.end(), 0.0, std::plus{},
+                                         [](const auto& v) { return v.duration; });
+        }
+
         operator bool() const {
             return !cpu_report.empty() || !gpu_report.empty();
         }
