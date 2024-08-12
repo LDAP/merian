@@ -1,5 +1,6 @@
 #pragma once
 
+#include "merian/utils/chrono.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/sync/semaphore_binary.hpp"
 #include "merian/vk/sync/semaphore_timeline.hpp"
@@ -127,7 +128,7 @@ class GraphRun {
     // Returns the time difference to the last run in seconds.
     // For the first run of a build the difference to the last run in the previous run is returned.
     double get_time_delta() const {
-        return std::chrono::duration_cast<std::chrono::duration<double>>(time_delta).count();
+        return to_seconds(time_delta);
     }
 
     // Return elapsed time since graph initialization
@@ -137,7 +138,7 @@ class GraphRun {
 
     // Return elapsed time since graph initialization in seconds.
     double get_elapsed() const {
-        return std::chrono::duration_cast<std::chrono::duration<double>>(elapsed).count();
+        return to_seconds(elapsed);
     }
 
     // Return elapsed time since the last connect()
@@ -147,8 +148,7 @@ class GraphRun {
 
     // Return elapsed time since graph initialization in seconds.
     double get_elapsed_since_connect() const {
-        return std::chrono::duration_cast<std::chrono::duration<double>>(elapsed_since_connect)
-            .count();
+        return to_seconds(elapsed_since_connect);
     }
 
   private:
