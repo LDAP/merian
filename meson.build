@@ -123,6 +123,9 @@ glslc_args += ['-I' + meson.project_source_root()]
 glslc_args += ['-I' + join_paths(project_root, 'src')]
 glslc_args += ['-I' + join_paths(project_root, 'include')]
 glslc_args += ['--depfile', '@DEPFILE@']
+if get_option('buildtype').startswith('debug')
+    glslc_args += ['-g']
+endif
 
 py = import('python').find_installation('python3') 
 shader_generator = generator(
