@@ -465,10 +465,9 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         InFlightData& in_flight_data = ring_fences.next_cycle_wait_get();
         gpu_wait_time = gpu_wait_time * 0.9 + sw_gpu_wait.duration() * 0.1;
 
-        // last pred: gpu_time > cpu_time
-        const auto total_wait =
-            std::max((gpu_wait_time + external_wait_time + cpu_sleep_time - 0.1ms), 0.1ms);
-        if (low_latency_mode && !needs_reconnect && (total_wait > time_delta - total_wait)) {
+        if (low_latency_mode && !needs_reconnect) {
+            const auto total_wait =
+                std::max((gpu_wait_time + external_wait_time + cpu_sleep_time - 0.1ms), 0.01ms);
             cpu_sleep_time = 0.92 * total_wait;
             std::this_thread::sleep_for(cpu_sleep_time);
         } else {
