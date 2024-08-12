@@ -88,11 +88,35 @@ class RingFences : public std::enable_shared_from_this<RingFences<RING_SIZE, Use
         return set_cycle_wait_get(current_index + 1);
     }
 
+    // Advances the cycle, waits for the cycle to be available and returns the ring data.
+    // reset() has to be manually called.
+    UserDataType& next_cycle_wait_get(bool& did_wait) {
+        return set_cycle_wait_get(current_index + 1, did_wait);
+    }
+
     // Sets cycle, waits for the cycle to be available and returns the ring data.
     // reset() has to be manually called.
     UserDataType& set_cycle_wait_get(uint32_t cycle) {
         current_index = cycle % RING_SIZE;
         RingData& data = ring_data[current_index];
+        check_result(context->device.waitForFences(1, &data.fence, VK_TRUE, ~0ULL),
+                     "failed waiting for fence");
+        return data.user_data;
+    }
+
+    // Sets cycle, waits for the cycle to be available and returns the ring data.
+    // reset() has to be manually called.
+    UserDataType& set_cycle_wait_get(uint32_t cycle, bool& did_wait) {
+        current_index = cycle % RING_SIZE;
+        RingData& data = ring_data[current_index];
+
+        const vk::Result status = context->device.getFenceStatus(data.fence);
+        if (status == vk::Result::eSuccess) {
+            did_wait = false;
+            return data.user_data;
+        }
+
+        did_wait = true;
         check_result(context->device.waitForFences(1, &data.fence, VK_TRUE, ~0ULL),
                      "failed waiting for fence");
         return data.user_data;
