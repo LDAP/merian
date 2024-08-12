@@ -2,6 +2,7 @@
 
 #include "errors.hpp"
 #include "graph_run.hpp"
+#include "merian/utils/chrono.hpp"
 #include "node.hpp"
 #include "resource.hpp"
 
@@ -460,7 +461,19 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         run_in_progress = true;
 
         // wait for the in-flight processing to finish
+        const auto before_gpu_wait = std::chrono::high_resolution_clock::now();
         InFlightData& in_flight_data = ring_fences.next_cycle_wait_get();
+        gpu_wait_time = gpu_wait_time * 0.8 +
+                        (std::chrono::high_resolution_clock::now() - before_gpu_wait) * 0.2;
+
+        if (low_latency_mode && !needs_reconnect) {
+            const auto total_wait = gpu_wait_time + cpu_sleep_time;
+            cpu_sleep_time = 0.95 * total_wait;
+            if (cpu_sleep_time < 1ms) {
+                cpu_sleep_time = 0ms;
+            }
+            std::this_thread::sleep_for(cpu_sleep_time);
+        }
 
         // now we can release the resources from staging space and reset the command pool
         resource_allocator->getStaging()->releaseResourceSet(in_flight_data.staging_set_id);
@@ -498,10 +511,10 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 duration_elapsed = now - time_reference;
                 duration_elapsed_since_connect = now - time_connect_reference;
             }
-            time_delta_ns = duration_elapsed - last_elapsed_ns;
+            time_delta = duration_elapsed - last_elapsed_ns;
 
             run.reset(run_iteration, run_iteration % RING_SIZE, profiler, cmd_pool,
-                      resource_allocator, time_delta_ns, duration_elapsed,
+                      resource_allocator, time_delta, duration_elapsed,
                       duration_elapsed_since_connect);
 
             // While preprocessing nodes can signalize that they need to reconnect as well
@@ -599,11 +612,10 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             props.output_text("Run Elapsed: {:%H:%M:%S}s", duration_elapsed_since_connect);
             props.output_text("Total iterations: {}", total_iteration);
             props.output_text("Total Elapsed: {:%H:%M:%S}s", duration_elapsed);
-            const double delta_ms =
-                std::chrono::duration_cast<
-                    std::chrono::duration<double, std::chrono::milliseconds::period>>(time_delta_ns)
-                    .count();
-            props.output_text("Time delta: {:04f}ms", delta_ms);
+            props.output_text("Time delta: {:04f}ms", to_milliseconds(time_delta));
+            props.output_text("GPU wait: {:04f}ms", to_milliseconds(gpu_wait_time));
+
+            props.st_separate();
             if (props.config_options("time overwrite", time_overwrite, {"None", "Time", "Delta"},
                                      Properties::OptionsStyle::COMBO)) {
                 if (time_overwrite == 0) {
@@ -613,13 +625,20 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                     time_connect_reference = now - duration_elapsed_since_connect;
                 }
             }
-
             if (time_overwrite == 1) {
                 float delta_s = 0;
                 props.config_float("offset (s)", delta_s, "", 0.01);
                 time_delta_overwrite_ms += delta_s * 1000.;
             } else if (time_overwrite == 2) {
                 props.config_float("delta (ms)", time_delta_overwrite_ms, "", 0.001);
+            }
+
+            props.st_separate();
+            props.config_bool("low latency", low_latency_mode,
+                              "Delays CPU processing to recude input latency in GPU bound "
+                              "applications. Might reduce framerate.");
+            if (low_latency_mode) {
+                props.output_text("CPU sleep time: {:04f}ms", to_milliseconds(cpu_sleep_time));
             }
 
             props.st_end_child();
@@ -1064,6 +1083,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
     // Creates the profiler if necessary
     ProfilerHandle prepare_profiler_for_run(InFlightData& in_flight_data) {
         if (!profiler_enable) {
+            last_run_report = {};
             return nullptr;
         }
 
@@ -1888,7 +1908,11 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
     // reset.
     float time_delta_overwrite_ms = 0.;
     // across builds. Might be not 0 at begin of run.
-    std::chrono::nanoseconds time_delta_ns = 0ns;
+    std::chrono::nanoseconds time_delta = 0ns;
+
+    bool low_latency_mode = false;
+    std::chrono::duration<double> gpu_wait_time = 0ns;
+    std::chrono::duration<double> cpu_sleep_time = 0ns;
 
     Profiler::Report last_build_report;
     Profiler::Report last_run_report;
