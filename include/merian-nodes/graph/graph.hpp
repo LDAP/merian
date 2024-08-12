@@ -467,7 +467,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
         if (low_latency_mode && !needs_reconnect) {
             const auto total_wait =
-                std::max((gpu_wait_time + external_wait_time + cpu_sleep_time - 0.1ms), 0.01ms);
+                std::max((gpu_wait_time + external_wait_time + cpu_sleep_time - 0.1ms), 0.00ms);
             cpu_sleep_time = 0.92 * total_wait;
             std::this_thread::sleep_for(cpu_sleep_time);
         } else {
