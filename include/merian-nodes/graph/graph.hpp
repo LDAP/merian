@@ -536,8 +536,11 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
         // RUN
         {
-            MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "Run nodes");
+            MERIAN_PROFILE_SCOPE(profiler, "on_run_starting");
             on_run_starting(run);
+        }
+        {
+            MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "Run nodes");
             for (auto& node : flat_topology) {
                 NodeData& data = node_data.at(node);
                 if (debug_utils)
@@ -553,7 +556,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         // FINISH RUN: submit
 
         {
-            MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "Pre-Submit");
+            MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "on_pre_submit");
             on_pre_submit(run, cmd);
         }
         cmd_pool->end_all();
@@ -565,11 +568,11 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                           run.get_timeline_semaphore_submit_info());
         }
         {
-            MERIAN_PROFILE_SCOPE(profiler, "Execute callbacks");
+            MERIAN_PROFILE_SCOPE(profiler, "run::execute_callbacks");
             run.execute_callbacks(queue);
         }
         {
-            MERIAN_PROFILE_SCOPE(profiler, "Post-Submit");
+            MERIAN_PROFILE_SCOPE(profiler, "on_post_submit");
             on_post_submit();
         }
 
@@ -578,9 +581,13 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         ++run_iteration;
         ++total_iteration;
         run_in_progress = false;
-        for (const auto& task : on_run_finished_tasks)
-            task();
-        on_run_finished_tasks.clear();
+
+        {
+            MERIAN_PROFILE_SCOPE(profiler, "on_run_finished_tasks");
+            for (const auto& task : on_run_finished_tasks)
+                task();
+            on_run_finished_tasks.clear();
+        }
     }
 
     // waits until all in-flight iterations have finished
