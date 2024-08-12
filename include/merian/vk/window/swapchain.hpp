@@ -162,7 +162,7 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
     }
 
     /* Image index only valid until the next acquire_*() */
-    uint32_t current_image_index() {
+    uint32_t current_image_index() const {
         return current_image_idx;
     }
 
@@ -184,7 +184,7 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
     }
 
     /* Remember to also transition image layouts */
-    vk::Extent2D create_swapchain(int width, int height);
+    vk::Extent2D create_swapchain(const uint32_t width, const uint32_t height);
 
     /* Sets vsync. The swapchain is automatically recreated on next aquire.
      * Returns if vsync could be enabled.
@@ -197,11 +197,11 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
     }
 
     bool vsync_enabled() const {
-        return cur_present_mode == vk::PresentModeKHR::eFifo;
+        return present_mode == vk::PresentModeKHR::eFifo;
     }
 
     vk::PresentModeKHR get_present_mode() {
-        return cur_present_mode;
+        return present_mode;
     }
 
     // intened to destroy framebuffers and renderpasses when the swapchain is destroyed.

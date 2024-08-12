@@ -19,7 +19,7 @@ namespace merian_nodes {
  */
 class GLFWWindow : public Node {
   public:
-    GLFWWindow(const ContextHandle context) : Node() {
+    GLFWWindow(const ContextHandle& context) : Node() {
         if (context->get_extension<ExtensionVkGLFW>()) {
             window = std::make_shared<merian::GLFWWindow>(context);
             swapchain = std::make_shared<merian::Swapchain>(context, window->get_surface());
@@ -47,7 +47,7 @@ class GLFWWindow : public Node {
         acquire.reset();
         for (uint32_t tries = 0; !acquire && tries < 2; tries++) {
             try {
-                acquire = swapchain->acquire(window, 1000 * 1000 /* 1s */);
+                acquire = swapchain->acquire(window, 1000L * 1000L /* 1s */);
             } catch (const Swapchain::needs_recreate& e) {
                 old_swapchains.emplace_back(swapchain);
                 swapchain = std::make_shared<Swapchain>(swapchain);
@@ -87,9 +87,11 @@ class GLFWWindow : public Node {
 
             run.add_wait_semaphore(acquire->wait_semaphore, vk::PipelineStageFlagBits::eTransfer);
             run.add_signal_semaphore(acquire->signal_semaphore);
-            run.add_submit_callback([&](const QueueHandle& queue) {
+            run.add_submit_callback([&](const QueueHandle& queue, GraphRun& run) {
                 try {
+                    Stopwatch present_duration;
                     swapchain->present(queue);
+                    run.hint_external_wait_time(present_duration.duration());
                 } catch (const Swapchain::needs_recreate& e) {
                     // do nothing and hope for the best
                     return;
@@ -106,12 +108,12 @@ class GLFWWindow : public Node {
     }
 
     NodeStatusFlags properties(Properties& config) override {
-        GLFWmonitor* monitor = window ? glfwGetWindowMonitor(*window) : NULL;
-        int fullscreen = monitor != NULL;
+        GLFWmonitor* monitor = window ? glfwGetWindowMonitor(*window) : nullptr;
+        int fullscreen = static_cast<int>(monitor != nullptr);
         const int old_fullscreen = fullscreen;
         config.config_options("mode", fullscreen, {"windowed", "fullscreen"});
         if (window && fullscreen != old_fullscreen) {
-            if (fullscreen) {
+            if (fullscreen != 0) {
                 try {
                     glfwGetWindowPos(*window, &windowed_pos_size[0], &windowed_pos_size[1]);
                 } catch (const ExtensionVkGLFW::glfw_error& e) {

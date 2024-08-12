@@ -11,6 +11,7 @@
 namespace merian_nodes {
 
 using namespace merian;
+using namespace std::literals::chrono_literals;
 
 // Manages data of a single graph run.
 class GraphRun {
@@ -45,8 +46,8 @@ class GraphRun {
         signal_values.push_back(value);
     }
 
-    void
-    add_submit_callback(const std::function<void(const QueueHandle& queue)>& callback) noexcept {
+    void add_submit_callback(
+        const std::function<void(const QueueHandle& queue, GraphRun& run)>& callback) noexcept {
         submit_callbacks.push_back(callback);
     }
 
@@ -97,15 +98,15 @@ class GraphRun {
 
     // You must call every callback after you submited the graph command buffer
     // Or you use the execute_callbacks function.
-    const std::vector<std::function<void(const QueueHandle& queue)>>&
+    const std::vector<std::function<void(const QueueHandle& queue, GraphRun& run)>>&
     get_submit_callbacks() const noexcept {
         return submit_callbacks;
     }
 
     // Call this after you submitted the graph command buffer
-    void execute_callbacks(const QueueHandle& queue) const {
+    void execute_callbacks(const QueueHandle& queue) {
         for (const auto& callback : submit_callbacks) {
-            callback(queue);
+            callback(queue, *this);
         }
     }
 
@@ -151,6 +152,12 @@ class GraphRun {
         return to_seconds(elapsed_since_connect);
     }
 
+    // Hint the graph that waiting was necessary for external events. This information can be used
+    // to shift CPU processing back to reduce waiting and reduce latency.
+    void hint_external_wait_time(auto chrono_duration) {
+        external_wait_time = std::max(external_wait_time, chrono_duration);
+    }
+
   private:
     void reset(const uint64_t iteration,
                const uint32_t in_flight_index,
@@ -173,6 +180,7 @@ class GraphRun {
         signal_semaphores.clear();
         signal_values.clear();
         submit_callbacks.clear();
+        external_wait_time = 0ns;
 
         this->profiler = profiler;
         this->needs_reconnect = false;
@@ -187,7 +195,8 @@ class GraphRun {
     std::vector<vk::Semaphore> signal_semaphores;
     std::vector<uint64_t> signal_values;
 
-    std::vector<std::function<void(const QueueHandle& queue)>> submit_callbacks;
+    std::vector<std::function<void(const QueueHandle& queue, GraphRun& run)>> submit_callbacks;
+    std::chrono::nanoseconds external_wait_time;
 
     ProfilerHandle profiler = nullptr;
     CommandPoolHandle cmd_pool = nullptr;

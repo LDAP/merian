@@ -93,7 +93,7 @@ if not shaderc.found() and get_option('shaderc').enabled()
     )
 endif
 
-if get_option('shaderc').enabled()
+if shaderc.found()
     add_project_arguments('-DMERIAN_ENABLE_SHADERC', language: 'cpp')
 endif
 

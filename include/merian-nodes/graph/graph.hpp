@@ -461,18 +461,18 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         run_in_progress = true;
 
         // wait for the in-flight processing to finish
-        const auto before_gpu_wait = std::chrono::high_resolution_clock::now();
+        Stopwatch sw_gpu_wait;
         InFlightData& in_flight_data = ring_fences.next_cycle_wait_get();
-        gpu_wait_time = gpu_wait_time * 0.8 +
-                        (std::chrono::high_resolution_clock::now() - before_gpu_wait) * 0.2;
+        gpu_wait_time = gpu_wait_time * 0.9 + sw_gpu_wait.duration() * 0.1;
 
-        if (low_latency_mode && !needs_reconnect) {
-            const auto total_wait = gpu_wait_time + cpu_sleep_time;
-            cpu_sleep_time = 0.95 * total_wait;
-            if (cpu_sleep_time < 1ms) {
-                cpu_sleep_time = 0ms;
-            }
+        // last pred: gpu_time > cpu_time
+        const auto total_wait =
+            std::max((gpu_wait_time + external_wait_time + cpu_sleep_time - 0.1ms), 0.1ms);
+        if (low_latency_mode && !needs_reconnect && (total_wait > time_delta - total_wait)) {
+            cpu_sleep_time = 0.92 * total_wait;
             std::this_thread::sleep_for(cpu_sleep_time);
+        } else {
+            cpu_sleep_time = 0ms;
         }
 
         // now we can release the resources from staging space and reset the command pool
@@ -553,22 +553,35 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
         // FINISH RUN: submit
 
-        on_pre_submit(run, cmd);
+        {
+            MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "Pre-Submit");
+            on_pre_submit(run, cmd);
+        }
         cmd_pool->end_all();
         in_flight_data.staging_set_id = resource_allocator->getStaging()->finalizeResourceSet();
-        queue->submit(cmd_pool, ring_fences.reset(), run.get_signal_semaphores(),
-                      run.get_wait_semaphores(), run.get_wait_stages(),
-                      run.get_timeline_semaphore_submit_info());
-        run.execute_callbacks(queue);
-        on_post_submit();
+        {
+            MERIAN_PROFILE_SCOPE(profiler, "Submit");
+            queue->submit(cmd_pool, ring_fences.reset(), run.get_signal_semaphores(),
+                          run.get_wait_semaphores(), run.get_wait_stages(),
+                          run.get_timeline_semaphore_submit_info());
+        }
+        {
+            MERIAN_PROFILE_SCOPE(profiler, "Execute callbacks");
+            run.execute_callbacks(queue);
+        }
+        {
+            MERIAN_PROFILE_SCOPE(profiler, "Post-Submit");
+            on_post_submit();
+        }
 
+        external_wait_time = 0.9 * external_wait_time + 0.1 * run.external_wait_time;
         needs_reconnect |= run.needs_reconnect;
         ++run_iteration;
         ++total_iteration;
+        run_in_progress = false;
         for (const auto& task : on_run_finished_tasks)
             task();
         on_run_finished_tasks.clear();
-        run_in_progress = false;
     }
 
     // waits until all in-flight iterations have finished
@@ -614,6 +627,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             props.output_text("Total Elapsed: {:%H:%M:%S}s", duration_elapsed);
             props.output_text("Time delta: {:04f}ms", to_milliseconds(time_delta));
             props.output_text("GPU wait: {:04f}ms", to_milliseconds(gpu_wait_time));
+            props.output_text("External wait: {:04f}ms", to_milliseconds(external_wait_time));
 
             props.st_separate();
             if (props.config_options("time overwrite", time_overwrite, {"None", "Time", "Delta"},
@@ -634,9 +648,10 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             }
 
             props.st_separate();
-            props.config_bool("low latency", low_latency_mode,
-                              "Delays CPU processing to recude input latency in GPU bound "
-                              "applications. Might reduce framerate.");
+            props.config_bool(
+                "low latency", low_latency_mode,
+                "Experimental: Delays CPU processing to recude input latency in GPU bound "
+                "applications. Might reduce framerate.");
             if (low_latency_mode) {
                 props.output_text("CPU sleep time: {:04f}ms", to_milliseconds(cpu_sleep_time));
             }
@@ -1675,7 +1690,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                             remove_connection(src_node, dst_node, dst_input->name);
                             return false;
                         }
-                        it++;
+                        ++it;
                     }
                 }
             }
@@ -1913,6 +1928,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
     bool low_latency_mode = false;
     std::chrono::duration<double> gpu_wait_time = 0ns;
     std::chrono::duration<double> cpu_sleep_time = 0ns;
+    std::chrono::duration<double> external_wait_time = 0ns;
 
     Profiler::Report last_build_report;
     Profiler::Report last_run_report;

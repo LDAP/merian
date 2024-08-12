@@ -26,16 +26,15 @@ namespace merian {
 
     if (vsync) {
         return best;
-    } else {
-        // Find a faster mode
-        for (const auto& present_mode : present_modes) {
-            if (present_mode == preferred_vsync_off_mode) {
-                return present_mode;
-            }
-            if (present_mode == vk::PresentModeKHR::eImmediate ||
-                present_mode == vk::PresentModeKHR::eMailbox) {
-                best = present_mode;
-            }
+    }
+    // Find a faster mode
+    for (const auto& present_mode : present_modes) {
+        if (present_mode == preferred_vsync_off_mode) {
+            return present_mode;
+        }
+        if (present_mode == vk::PresentModeKHR::eImmediate ||
+            present_mode == vk::PresentModeKHR::eMailbox) {
+            best = present_mode;
         }
     }
 
@@ -97,7 +96,9 @@ Swapchain::~Swapchain() {
 
 // -------------------------------------------------------------------------------------
 
-vk::Extent2D make_extent2D(vk::SurfaceCapabilitiesKHR capabilities, int width, int height) {
+vk::Extent2D make_extent2D(const vk::SurfaceCapabilitiesKHR capabilities,
+                           const uint32_t width,
+                           const uint32_t height) {
     vk::Extent2D extent;
     if (capabilities.currentExtent.width != UINT32_MAX) {
         // If the surface size is defined, the image size must match
@@ -112,7 +113,7 @@ vk::Extent2D make_extent2D(vk::SurfaceCapabilitiesKHR capabilities, int width, i
     return extent;
 }
 
-vk::Extent2D Swapchain::create_swapchain(int width, int height) {
+vk::Extent2D Swapchain::create_swapchain(const uint32_t width, const uint32_t height) {
     vk::SwapchainKHR old = VK_NULL_HANDLE;
     if (old_swapchain.expired()) {
         SPDLOG_DEBUG("create swapchain");
@@ -137,7 +138,7 @@ vk::Extent2D Swapchain::create_swapchain(int width, int height) {
     }
 
     // clang-format off
-    vk::SwapchainCreateInfoKHR createInfo(
+    vk::SwapchainCreateInfoKHR create_info(
                                           vk::SwapchainCreateFlagBitsKHR(),
                                           *surface,
                                           min_images,
@@ -152,11 +153,11 @@ vk::Extent2D Swapchain::create_swapchain(int width, int height) {
                                           pre_transform,
                                           vk::CompositeAlphaFlagBitsKHR::eOpaque,
                                           present_mode,
-                                          false,
+                                          VK_FALSE,
                                           old
                                           );
 
-    swapchain = context->device.createSwapchainKHR(createInfo, nullptr);
+    swapchain = context->device.createSwapchainKHR(create_info, nullptr);
 
     std::vector<vk::Image> swapchain_images = context->device.getSwapchainImagesKHR(swapchain);
     num_images = swapchain_images.size();
@@ -172,7 +173,7 @@ vk::Extent2D Swapchain::create_swapchain(int width, int height) {
         entry.image = swapchain_images[i];
 
         // View
-        vk::ImageViewCreateInfo createInfo(
+        vk::ImageViewCreateInfo create_info(
                                            vk::ImageViewCreateFlagBits(),
                                            entry.image,
                                            vk::ImageViewType::e2D,
@@ -188,14 +189,14 @@ vk::Extent2D Swapchain::create_swapchain(int width, int height) {
                                             0, 1, 0, 1
                                         }
                                         );
-        entry.imageView = context->device.createImageView(createInfo);
+        entry.imageView = context->device.createImageView(create_info);
 
         // Semaphore
         semaphore_group.read_semaphore = std::make_shared<BinarySemaphore>(context);
         semaphore_group.written_semaphore = std::make_shared<BinarySemaphore>(context);
 
         // Barrier
-        vk::ImageSubresourceRange imageSubresourceRange {
+        vk::ImageSubresourceRange image_subresource_range {
             vk::ImageAspectFlagBits::eColor,    
             0,
             VK_REMAINING_MIP_LEVELS,    
@@ -210,7 +211,7 @@ vk::Extent2D Swapchain::create_swapchain(int width, int height) {
             {},
             {},
             entry.image,
-            imageSubresourceRange,
+            image_subresource_range,
         };
         barriers[i] = barrier;
     }
@@ -267,13 +268,12 @@ Swapchain::acquire(const std::function<vk::Extent2D()>& framebuffer_extent,
 
     SwapchainAcquireResult aquire_result;
 
-    if ((extent.width != cur_width || extent.height != cur_height ||
-         present_mode != cur_present_mode)) {
-        if (!swapchain) {
-            create_swapchain(extent.width, extent.height);
-        } else {
-            throw needs_recreate("changed framebuffer size");
-        }
+    if (!swapchain) {
+        create_swapchain(extent.width, extent.height);
+    } else if (extent.width != cur_width || extent.height != cur_height) {
+        throw needs_recreate("changed framebuffer size");
+    } else if (present_mode != cur_present_mode) {
+        throw needs_recreate("changed present mode (vsync)");
     }
 
     const vk::Result result = context->device.acquireNextImageKHR(
@@ -294,11 +294,13 @@ Swapchain::acquire(const std::function<vk::Extent2D()>& framebuffer_extent,
         created = false;
 
         return aquire_result;
-    } else if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR) {
-        throw needs_recreate(result);
-    } else {
-        return std::nullopt;
     }
+
+    if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR) {
+        throw needs_recreate(result);
+    }
+
+    return std::nullopt;
 }
 
 void Swapchain::present(const QueueHandle& queue) {

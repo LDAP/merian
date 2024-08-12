@@ -15,6 +15,7 @@ class Stopwatch {
     uint64_t nanos() const;
     double millis() const;
     double seconds() const;
+    std::chrono::nanoseconds duration() const;
 
   private:
     chrono_clock::time_point start;
