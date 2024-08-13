@@ -1,5 +1,5 @@
-#ifndef _NORMAL_ENCODE_H_
-#define _NORMAL_ENCODE_H_
+#ifndef _MERIAN_SHADERS_NORMAL_ENCODE_H_
+#define _MERIAN_SHADERS_NORMAL_ENCODE_H_
 
 vec2 sign_no0(const vec2 v)
 {

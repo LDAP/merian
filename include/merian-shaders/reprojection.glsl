@@ -1,3 +1,5 @@
+#ifndef _MERIAN_SHADERS_REPROJECTION
+#define _MERIAN_SHADERS_REPROJECTION
 
 // Computes a weight for the quality of the reprojection.
 // Reprojections with normals further away than normal_reject_cos = cos(alpha)
@@ -40,3 +42,5 @@ bool reprojection_intersect_border(inout vec2 prev_pos, const vec2 mv, const vec
     }
     return false;
 }
+
+#endif

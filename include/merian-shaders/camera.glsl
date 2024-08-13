@@ -1,7 +1,7 @@
 #include "merian-shaders/common.glsl"
 
-#ifndef _CAMERA_H_
-#define _CAMERA_H_
+#ifndef _MERIAN_SHADERS_CAMERA_H_
+#define _MERIAN_SHADERS_CAMERA_H_
 
 // importance sample the blackman harris pixel filter with 1.5px radius support
 vec2 pixel_offset_blackman_harris(const vec2 rand) {

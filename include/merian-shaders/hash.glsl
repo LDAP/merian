@@ -1,5 +1,5 @@
-#ifndef _HASH_H_
-#define _HASH_H_
+#ifndef _MERIAN_SHADERS_HASH_H_
+#define _MERIAN_SHADERS_HASH_H_
 
 // Jarzynski et al. From Hash Functions for GPU Rendering
 // Fastest to highest quality

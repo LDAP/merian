@@ -1,5 +1,5 @@
-#ifndef _RAYTRACE_H_
-#define _RAYTRACE_H_
+#ifndef _MERIAN_SHADERS_RAYTRACE_H_
+#define _MERIAN_SHADERS_RAYTRACE_H_
 
 #define _rq_get_t(ray_query, commited) rayQueryGetIntersectionTEXT(ray_query, commited)
 #define _rq_instance_id(ray_query, commited) rayQueryGetIntersectionInstanceIdEXT(ray_query, commited)

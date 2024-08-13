@@ -1,5 +1,5 @@
-#ifndef _FRAMES_H_
-#define _FRAMES_H_
+#ifndef _MERIAN_SHADERS_FRAMES_H_
+#define _MERIAN_SHADERS_FRAMES_H_
 
 // Returns a matrix of axis (x, y, z) which all being perpendicular to each other
 mat3x3 make_frame(vec3 z) {

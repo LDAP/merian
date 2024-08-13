@@ -1,8 +1,8 @@
 #include "merian-shaders/common.glsl"
 #include "merian-shaders/frames.glsl"
 
-#ifndef _VON_MISES_FISHER_H_
-#define _VON_MISES_FISHER_H_
+#ifndef _MERIAN_SHADERS_VON_MISES_FISHER_H_
+#define _MERIAN_SHADERS_VON_MISES_FISHER_H_
 
 // Based on Wenzel Jakob, Numerically stable sampling of the von Mises Fisher distribution on S2 (and other tricks)
 

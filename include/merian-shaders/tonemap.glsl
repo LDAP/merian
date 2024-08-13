@@ -2,8 +2,8 @@
 #include "merian-shaders/color/colors_srgb.glsl"
 #include "merian-shaders/common.glsl"
 
-#ifndef _TONEMAP_H_
-#define _TONEMAP_H_
+#ifndef _MERIAN_SHADERS_TONEMAP_H_
+#define _MERIAN_SHADERS_TONEMAP_H_
 
 vec3 tonemap_clamp(const vec3 rgb) {
     return clamp(rgb, vec3(0), vec3(1));

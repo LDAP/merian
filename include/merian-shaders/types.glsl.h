@@ -1,5 +1,5 @@
-#ifndef _TYPES_H_
-#define _TYPES_H_
+#ifndef _MERIAN_SHADERS_TYPES_H_
+#define _MERIAN_SHADERS_TYPES_H_
 
 #ifdef __cplusplus
 

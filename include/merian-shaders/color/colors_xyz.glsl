@@ -1,5 +1,5 @@
-#ifndef _COLORS_XYZ_H_
-#define _COLORS_XYZ_H_
+#ifndef _MERIAN_SHADERS_COLORS_XYZ_H_
+#define _MERIAN_SHADERS_COLORS_XYZ_H_
 
 float XYZ_luminance(const vec3 rgb) {
     return dot(rgb, vec3(0.2126729, 0.7151522, 0.0721750));

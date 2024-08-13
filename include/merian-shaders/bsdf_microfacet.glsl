@@ -5,8 +5,8 @@
  * microfacet model by jonathan:
  */
 
-#ifndef _BSDF_MICROFACET_H_
-#define _BSDF_MICROFACET_H_
+#ifndef _MERIAN_SHADERS_BSDF_MICROFACET_H_
+#define _MERIAN_SHADERS_BSDF_MICROFACET_H_
 
 //-----------------------------------------------------------------
 

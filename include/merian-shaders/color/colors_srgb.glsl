@@ -1,5 +1,5 @@
-#ifndef _COLORS_SRGB_H_
-#define _COLORS_SRGB_H_
+#ifndef _MERIAN_SHADERS_COLORS_SRGB_H_
+#define _MERIAN_SHADERS_COLORS_SRGB_H_
 
 // Converts the curve from sRGB to linear. Primary chromaticities are not transformed (output is close to rec709).
 vec3 srgb_to_rgb(vec3 srgb) {

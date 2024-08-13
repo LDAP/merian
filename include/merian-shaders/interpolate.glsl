@@ -1,5 +1,5 @@
-#ifndef _INTERPOLATE_H_
-#define _INTERPOLATE_H_
+#ifndef _MERIAN_SHADERS_INTERPOLATE_H_
+#define _MERIAN_SHADERS_INTERPOLATE_H_
 
 // like smoothstep but without Hermite smoothing
 float linearstep(const float edge0, const float edge1, const float x) {

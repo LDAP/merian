@@ -1,5 +1,5 @@
-#ifndef _BIT_TWIDDLING_H_
-#define _BIT_TWIDDLING_H_
+#ifndef _MERIAN_SHADERS_BIT_TWIDDLING_H_
+#define _MERIAN_SHADERS_BIT_TWIDDLING_H_
 
 uint next_power_of_two(uint v) {
     v--;
@@ -13,4 +13,4 @@ uint next_power_of_two(uint v) {
     return v;
 }
 
-#endif // _BIT_TWIDDLING_H_
+#endif // _MERIAN_SHADERS_BIT_TWIDDLING_H_

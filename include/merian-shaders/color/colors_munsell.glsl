@@ -1,7 +1,7 @@
 #include "merian-shaders/common.glsl"
 
-#ifndef _COLORS_MUNSELL_H_
-#define _COLORS_MUNSELL_H_
+#ifndef _MERIAN_SHADERS_COLORS_MUNSELL_H_
+#define _MERIAN_SHADERS_COLORS_MUNSELL_H_
 
 /*
 Adapted from VKDT, licensed under:

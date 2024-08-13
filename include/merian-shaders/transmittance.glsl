@@ -1,5 +1,5 @@
-#ifndef _TRANSMITTANCE_H_
-#define _TRANSMITTANCE_H_
+#ifndef _MERIAN_SHADERS_TRANSMITTANCE_H_
+#define _MERIAN_SHADERS_TRANSMITTANCE_H_
 
 // Beer-Lambert law / Beer's law
 

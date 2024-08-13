@@ -1,5 +1,5 @@
-#ifndef _PHASE_RAYLEIGH_H_
-#define _PHASE_RAYLEIGH_H_
+#ifndef _MERIAN_SHADERS_PHASE_RAYLEIGH_H_
+#define _MERIAN_SHADERS_PHASE_RAYLEIGH_H_
 
 float phase_rayleigh(const float cos_theta) {
     return 3 * (1 + cos_theta * cos_theta) / 4;

@@ -1,8 +1,8 @@
 #include "merian-shaders/common.glsl"
 #include "merian-shaders/random.glsl"
 
-#ifndef _SAMPLING_H_
-#define _SAMPLING_H_
+#ifndef _MERIAN_SHADERS_SAMPLING_H_
+#define _MERIAN_SHADERS_SAMPLING_H_
 
 // sample sphere, p = 1 / 4pi
 vec3 sample_sphere(const vec2 random) {

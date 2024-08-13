@@ -1,8 +1,8 @@
 #include "merian-shaders/sampling.glsl"
 #include "merian-shaders/frames.glsl"
 
-#ifndef _PHASE_ISOTROPIC_H_
-#define _PHASE_ISOTROPIC_H_
+#ifndef _MERIAN_SHADERS_PHASE_ISOTROPIC_H_
+#define _MERIAN_SHADERS_PHASE_ISOTROPIC_H_
 
 #define phase_isotropic_sample(random) sample_sphere(random)
 

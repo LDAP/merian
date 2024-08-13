@@ -1,5 +1,5 @@
-#ifndef _MORTON_H_
-#define _MORTON_H_
+#ifndef _MERIAN_SHADERS_MORTON_H_
+#define _MERIAN_SHADERS_MORTON_H_
 
 #include "merian-shaders/bit_twiddling.glsl"
 
@@ -31,4 +31,4 @@ uint morton_encode2d(const uvec2 p, in uint width, in uint height) {
 }
 
 
-#endif // _MORTON_H_
+#endif // _MERIAN_SHADERS_MORTON_H_

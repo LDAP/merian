@@ -1,5 +1,5 @@
-#ifndef _COLORS_YUV_H_
-#define _COLORS_YUV_H_
+#ifndef _MERIAN_SHADERS_COLORS_YUV_H_
+#define _MERIAN_SHADERS_COLORS_YUV_H_
 
 #define yuv_luminance(rgb) dot(rgb, vec3(0.299, 0.587, 0.114))
 

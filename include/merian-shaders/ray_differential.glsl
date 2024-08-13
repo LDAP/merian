@@ -1,5 +1,5 @@
-#ifndef _RAYDIFFERENTIAL_H_
-#define _RAYDIFFERENTIAL_H_
+#ifndef _MERIAN_SHADERS_RAYDIFFERENTIAL_H_
+#define _MERIAN_SHADERS_RAYDIFFERENTIAL_H_
 
 struct RayDifferential {
     // current differential of origin
@@ -29,4 +29,4 @@ void ray_diff_propagate(inout RayDifferential rd,
 }
 
 
-#endif // _RAYDIFFERENT_H_
+#endif // _MERIAN_SHADERS_RAYDIFFERENTIAL_H_

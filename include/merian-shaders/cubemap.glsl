@@ -1,5 +1,5 @@
-#ifndef _CUBEMAP_H_
-#define _CUBEMAP_H_
+#ifndef _MERIAN_SHADERS_CUBEMAP_H_
+#define _MERIAN_SHADERS_CUBEMAP_H_
 
 // 0: pos x, 1: neg x, 2: pos y, 3: neg: y, 4: pos z, 5: neg z
 uint cubemap_side(const vec3 w) {

@@ -1,5 +1,5 @@
-#ifndef _SAMPLER_H_
-#define _SAMPLER_H_
+#ifndef _MERIAN_SHADERS_SAMPLER_H_
+#define _MERIAN_SHADERS_SAMPLER_H_
 
 // Adapted for Vulkan from https://gist.github.com/TheRealMJP/c83b8c0f46b63f3a88a5986f4fa982b1
 // (MIT License)

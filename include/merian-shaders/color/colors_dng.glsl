@@ -1,5 +1,5 @@
-#ifndef _COLORS_DNG_H_
-#define _COLORS_DNG_H_
+#ifndef _MERIAN_SHADERS_COLORS_DNG_H_
+#define _MERIAN_SHADERS_COLORS_DNG_H_
 
 /*
 Adapted from VKDT, licensed under:

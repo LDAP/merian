@@ -1,5 +1,5 @@
-#ifndef _LINALG_H_
-#define _LINALG_H_
+#ifndef _MERIAN_SHADERS_LINALG_H_
+#define _MERIAN_SHADERS_LINALG_H_
 
 
 // Returns the Moore-Penrose inverse also known as the pseudoinverse A+ = (A^TA)^-1 * A^T.
@@ -31,4 +31,4 @@ void pseudoinverse(const vec3 du, const vec3 dv, out vec3 du_dx, out vec3 dv_dx)
     pseudoinverse(du, dv, cross(du, dv), du_dx, dv_dx);
 }
 
-#endif // _LINALG_H_
+#endif // _MERIAN_SHADERS_LINALG_H_

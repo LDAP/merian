@@ -1,7 +1,7 @@
 #include "merian-shaders/types.glsl.h"
 
-#ifndef _GBUFFER_H_
-#define _GBUFFER_H_
+#ifndef _MERIAN_SHADERS_GBUFFER_H_
+#define _MERIAN_SHADERS_GBUFFER_H_
 
 #ifdef __cplusplus
 namespace merian_nodes {

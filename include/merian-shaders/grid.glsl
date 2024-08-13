@@ -1,7 +1,7 @@
 #include "merian-shaders/cubemap.glsl"
 
-#ifndef _GRID_H_
-#define _GRID_H_
+#ifndef _MERIAN_SHADERS_GRID_H_
+#define _MERIAN_SHADERS_GRID_H_
 
 // Determines the grid cell of pos and returns the lower vertex indices.
 // The vertex pos then is index * cell_width.

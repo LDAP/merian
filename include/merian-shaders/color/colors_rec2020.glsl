@@ -1,5 +1,5 @@
-#ifndef _COLORS_REC2020_H_
-#define _COLORS_REC2020_H_
+#ifndef _MERIAN_SHADERS_COLORS_REC2020_H_
+#define _MERIAN_SHADERS_COLORS_REC2020_H_
 
 
 vec3 rec2020_to_xyY(vec3 rec2020) {

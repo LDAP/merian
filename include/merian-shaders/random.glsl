@@ -1,5 +1,5 @@
-#ifndef _RANDOM_H_
-#define _RANDOM_H_
+#ifndef _MERIAN_SHADERS_RANDOM_H_
+#define _MERIAN_SHADERS_RANDOM_H_
 
 // Algorithm "xor" from p. 4 of Marsaglia, "Xorshift RNGs"
 // Returns random float in [0, 1) and updates state.

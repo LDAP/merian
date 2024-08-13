@@ -1,5 +1,5 @@
-#ifndef _COLORS_DTUCS_H_
-#define _COLORS_DTUCS_H_
+#ifndef _MERIAN_SHADERS_COLORS_DTUCS_H_
+#define _MERIAN_SHADERS_COLORS_DTUCS_H_
 
 /* The following is darktable Uniform Color Space 2022
  * © Aurélien Pierre

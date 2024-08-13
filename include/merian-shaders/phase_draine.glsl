@@ -1,5 +1,5 @@
-#ifndef _PHASE_DRAINE_H_
-#define _PHASE_DRAINE_H_
+#ifndef _MERIAN_SHADERS_PHASE_DRAINE_H_
+#define _MERIAN_SHADERS_PHASE_DRAINE_H_
 
 /*
  * SPDX-FileCopyrightText: Copyright (c) <2023> NVIDIA CORPORATION & AFFILIATES. All rights reserved.
