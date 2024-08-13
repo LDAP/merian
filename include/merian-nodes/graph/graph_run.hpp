@@ -51,13 +51,24 @@ class GraphRun {
         submit_callbacks.push_back(callback);
     }
 
-    void request_reconnect() {
+    void request_reconnect() noexcept {
         needs_reconnect = true;
     }
 
-    // increases with each run, resets at rebuild
+    // Number of iterations since connect.
+    // Use get_total_iteration() for iterations since graph initialization.
+    // 
+    // Iterations are 0-indexed.
     const uint64_t& get_iteration() const noexcept {
         return iteration;
+    }
+
+    // Number of iterations since graph initialization.
+    // Use get_iteration() for iterations since connect.
+    // 
+    // Iterations are 0-indexed.
+    const uint64_t& get_total_iteration() const noexcept {
+        return total_iteration;
     }
 
     // returns the current in-flight index i, with 0 <= i < get_ring_size().
@@ -111,6 +122,7 @@ class GraphRun {
     }
 
     // Returns the profiler that is attached to this run.
+    // 
     // Can be nullptr if profiling is disabled!
     const ProfilerHandle& get_profiler() const {
         return profiler;
@@ -166,7 +178,8 @@ class GraphRun {
                const ResourceAllocatorHandle& allocator,
                const std::chrono::nanoseconds time_delta,
                const std::chrono::nanoseconds elapsed,
-               const std::chrono::nanoseconds elapsed_run) {
+               const std::chrono::nanoseconds elapsed_run,
+               const uint64_t total_iterations) {
         this->iteration = iteration;
         this->in_flight_index = in_flight_index;
         this->cmd_pool = cmd_pool;
@@ -174,6 +187,7 @@ class GraphRun {
         this->time_delta = time_delta;
         this->elapsed = elapsed;
         this->elapsed_since_connect = elapsed_run;
+        this->total_iteration = total_iterations;
         wait_semaphores.clear();
         wait_stages.clear();
         wait_values.clear();
@@ -204,6 +218,7 @@ class GraphRun {
 
     bool needs_reconnect = false;
     uint64_t iteration;
+    uint64_t total_iteration;
     uint32_t in_flight_index;
     std::chrono::nanoseconds time_delta;
     std::chrono::nanoseconds elapsed;

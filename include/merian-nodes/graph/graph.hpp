@@ -514,7 +514,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
             run.reset(run_iteration, run_iteration % RING_SIZE, profiler, cmd_pool,
                       resource_allocator, time_delta, duration_elapsed,
-                      duration_elapsed_since_connect);
+                      duration_elapsed_since_connect, total_iteration);
 
             // While preprocessing nodes can signalize that they need to reconnect as well
             {
