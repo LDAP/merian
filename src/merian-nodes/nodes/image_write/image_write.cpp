@@ -122,7 +122,8 @@ void ImageWrite::process(GraphRun& run,
         }
         path = std::filesystem::absolute(fmt::vformat(this->filename_format, arg_store) +
                                          FILE_EXTENSIONS[this->format]);
-    } catch (const fmt::format_error& e) {
+    } catch (const std::exception& e) {
+        // catch std::filesystem::filesystem_error and fmt::format_error
         record_enable = false;
         record_next = false;
         SPDLOG_ERROR(e.what());
@@ -305,7 +306,8 @@ ImageWrite::NodeStatusFlags ImageWrite::properties([[maybe_unused]] Properties& 
     std::filesystem::path abs_path;
     try {
         abs_path = std::filesystem::absolute(fmt::vformat(filename_format, arg_store)).string();
-    } catch (const fmt::format_error& e) {
+    } catch (const std::exception& e) {
+        // catch std::filesystem::filesystem_error and fmt::format_error
         abs_path.clear();
     }
     config.output_text(
