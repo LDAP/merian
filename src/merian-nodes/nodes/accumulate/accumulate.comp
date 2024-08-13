@@ -35,7 +35,7 @@ layout(push_constant, std140) uniform pc_t {
 
 #include "merian-shaders/normal_encode.glsl"
 #include "merian-shaders/reprojection.glsl"
-#include "merian-shaders/colors_yuv.glsl"
+#include "merian-shaders/color/colors_yuv.glsl"
 
 void get_prev_nearest(const vec2 prev_pos,
                       const float linear_z,

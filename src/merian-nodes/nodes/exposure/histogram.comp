@@ -2,7 +2,7 @@
 #extension GL_GOOGLE_include_directive    : enable
 
 #include "layout.glsl"
-#include "merian-shaders/colors_xyz.glsl"
+#include "merian-shaders/color/colors_xyz.glsl"
 
 const uint hist_size = gl_WorkGroupSize.x * gl_WorkGroupSize.y;
 shared uint[hist_size] local_hist;

@@ -101,7 +101,8 @@ void ImageWrite::process(GraphRun& run,
             std::abs(time_millis - optimal_timing) <
                 std::abs(time_millis + estimated_frametime_millis - optimal_timing)) {
             record_next = true;
-            if ((undersampling = (frametime_millis > record_frametime_millis)))
+            undersampling = (frametime_millis > record_frametime_millis);
+            if (undersampling)
                 SPDLOG_WARN("undersampling, video may stutter");
         }
     }

@@ -1,5 +1,5 @@
-#include "merian-shaders/colors_yuv.glsl"
-#include "merian-shaders/colors_srgb.glsl"
+#include "merian-shaders/color/colors_yuv.glsl"
+#include "merian-shaders/color/colors_srgb.glsl"
 #include "merian-shaders/common.glsl"
 
 #ifndef _TONEMAP_H_

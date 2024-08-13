@@ -3,7 +3,7 @@
 #extension GL_EXT_control_flow_attributes : enable
 
 #include "svgf_graph_layout.glsl"
-#include "merian-shaders/colors_yuv.glsl"
+#include "merian-shaders/color/colors_yuv.glsl"
 #include "merian-shaders/normal_encode.glsl"
 
 layout(set = 1, binding = 0) uniform sampler2D img_filter_in;

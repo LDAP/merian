@@ -1,4 +1,4 @@
-#include "common.glsl"
+#include "merian-shaders/common.glsl"
 
 #ifndef _COLORS_MUNSELL_H_
 #define _COLORS_MUNSELL_H_

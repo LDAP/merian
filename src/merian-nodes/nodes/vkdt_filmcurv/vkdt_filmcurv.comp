@@ -3,10 +3,10 @@
 #extension GL_EXT_nonuniform_qualifier    : enable
 #extension GL_EXT_shader_explicit_arithmetic_types_float16 : enable
 
-#include "merian-shaders/colors_rec2020.glsl"
-#include "merian-shaders/colors_dng.glsl"
-#include "merian-shaders/colors_dtucs.glsl"
-#include "merian-shaders/colors_munsell.glsl"
+#include "merian-shaders/color/colors_rec2020.glsl"
+#include "merian-shaders/color/colors_dng.glsl"
+#include "merian-shaders/color/colors_dtucs.glsl"
+#include "merian-shaders/color/colors_munsell.glsl"
 
 layout(local_size_x_id = 0, local_size_y_id = 1) in;
 
