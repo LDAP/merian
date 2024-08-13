@@ -7,7 +7,7 @@ float reprojection_weight(const vec3 curr_normal, const vec3 prev_normal, const 
 
     return smoothstep(normal_reject_cos, 1.0, dot(curr_normal, prev_normal))                        // Similar normals
                                                                              // move vel_z outside of abs to reject less
-           * (1.0 - smoothstep(0.0, z_reject_percent * max(curr_z, prev_z), abs(curr_z - prev_z + vel_z))); // Similar depth
+                      * (1.0 - smoothstep(0.0, z_reject_percent * max(curr_z, prev_z), abs(curr_z - prev_z + vel_z))); // Similar depth
 }
 
 float reprojection_weight(const vec3 curr_normal, const vec3 prev_normal, const float normal_reject_cos,
@@ -15,7 +15,7 @@ float reprojection_weight(const vec3 curr_normal, const vec3 prev_normal, const 
                           const float prev_z, const float z_reject_percent) {
 
     return smoothstep(normal_reject_cos, 1.0, dot(curr_normal, prev_normal))                        // Similar normals
-           * (1.0 - smoothstep(0.0, z_reject_percent * max(curr_z, prev_z), abs(curr_z - prev_z + vel_z) - dot(pixel_offset, grad_z))); // Similar depth
+                      * (1.0 - smoothstep(0.0, z_reject_percent * max(curr_z, prev_z), abs(curr_z - prev_z + vel_z) - dot(pixel_offset, grad_z))); // Similar depth
 }
 
 // Like reprojection_weight but binary
@@ -24,4 +24,19 @@ bool reprojection_valid(const vec3 curr_normal, const vec3 prev_normal, const fl
 
     return normal_reject_cos <= dot(curr_normal, prev_normal)                 // Similar normals
            && abs(curr_z - prev_z) <= z_reject_percent * max(curr_z, prev_z); // Similar depth
+}
+
+// Intersects the motion vector with the image borders.
+// 
+// Returns true if prev pos was outside the image borders.
+// prev_pos = pos + mv
+bool reprojection_intersect_border(inout vec2 prev_pos, const vec2 mv, const vec2 image_size_minus_one) {
+    if (any(greaterThan(round(prev_pos), image_size_minus_one)) || any(lessThan(round(prev_pos), vec2(0)))) {
+        // Intersect motion vector with image:
+        const float tmin = max(min(prev_pos.x / mv.x, (prev_pos.x - image_size_minus_one.x) / mv.x),
+                               min(prev_pos.y / mv.y, (prev_pos.y - image_size_minus_one.y) / mv.y));
+        prev_pos = prev_pos - mv * tmin;
+        return true;
+    }
+    return false;
 }
