@@ -7,6 +7,7 @@
 
 #define FILTER_MODE_NEAREST 0
 #define FILTER_MODE_BILINEAR 1
+#define FILTER_MODE_STOCHASTIC_BILINEAR 2
 
 layout(constant_id = 2) const uint WG_ROUNDED_IRR_SIZE_X = 1;
 layout(constant_id = 3) const uint WG_ROUNDED_IRR_SIZE_Y = 1;
@@ -31,20 +32,23 @@ layout(push_constant, std140) uniform pc_t {
 
     float adaptive_alpha_reduction;
     float adaptive_alpha_ipr_factor;
+
+    uint iteration;
 } pc;
 
 #include "merian-shaders/normal_encode.glsl"
 #include "merian-shaders/reprojection.glsl"
+#include "merian-shaders/hash.glsl"
+#include "merian-shaders/random.glsl"
 #include "merian-shaders/color/colors_yuv.glsl"
 
-void get_prev_nearest(const vec2 prev_pos,
+void get_prev_nearest(const ivec2 prev_ipos,
                       const float linear_z,
                       const float vel_z,
                       const vec3 normal,
                       inout vec4 prev_irr_histlen,
                       inout vec2 prev_moments,
                       inout float sum_w) {
-  const ivec2 prev_ipos = ivec2(round(prev_pos));
   if(any(greaterThanEqual(prev_ipos, textureSize(img_prev_accum, 0))) || any(lessThan(prev_ipos, ivec2(0))))
     return;
 
@@ -180,15 +184,15 @@ void main() {
     const GBuffer gbuf = gbuffer[gbuffer_index(ipos, imageSize(img_accum))];
     const vec3 normal = geo_decode_normal(gbuf.enc_normal);
 
-    if (FILTER_MODE == FILTER_MODE_NEAREST)
-      get_prev_nearest(prev_pos,
+    if (FILTER_MODE == FILTER_MODE_NEAREST) {
+      get_prev_nearest(ivec2(round(prev_pos)),
                        gbuf.linear_z,
                        gbuf.vel_z,
                        normal,
                        prev_irr_histlen,
                        prev_moments,
                        sum_w);
-    else if (FILTER_MODE == FILTER_MODE_BILINEAR)
+    } else if (FILTER_MODE == FILTER_MODE_BILINEAR) {
       get_prev_bilinear(prev_pos,
                         gbuf.linear_z,
                         gbuf.vel_z,
@@ -196,6 +200,16 @@ void main() {
                         prev_irr_histlen,
                         prev_moments,
                         sum_w);
+    } else if (FILTER_MODE == FILTER_MODE_STOCHASTIC_BILINEAR) {
+      uint rng_state = pcg3d16(uvec3(ipos, pc.iteration));
+      get_prev_nearest(reproject_pixel_stochastic(prev_pos, XorShift32(rng_state)),
+                       gbuf.linear_z,
+                       gbuf.vel_z,
+                       normal,
+                       prev_irr_histlen,
+                       prev_moments,
+                       sum_w);
+    }
 
     if (EXTENDED_SEARCH) {
       if (sum_w <= 0.01) {

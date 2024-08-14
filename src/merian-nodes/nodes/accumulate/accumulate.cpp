@@ -126,6 +126,7 @@ void Accumulate::process(GraphRun& run,
                          const vk::CommandBuffer& cmd,
                          const DescriptorSetHandle& descriptor_set,
                          [[maybe_unused]] const NodeIO& io) {
+    accumulate_pc.iteration = run.get_total_iteration();
 
     if (accumulate_pc.firefly_filter_enable || accumulate_pc.adaptive_alpha_reduction > 0.0f) {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "compute percentiles");
@@ -183,7 +184,8 @@ Accumulate::NodeStatusFlags Accumulate::properties(Properties& config) {
     accumulate_pc.normal_reject_cos = glm::cos(angle);
     config.config_percent("depth threshold", accumulate_pc.depth_reject_percent,
                           "Reject points with depths farther apart (relative to the max)");
-    needs_rebuild |= config.config_options("filter mode", filter_mode, {"nearest", "linear"});
+    needs_rebuild |= config.config_options("filter mode", filter_mode,
+                                           {"nearest", "bilinear", "stochastic bilinear"});
     needs_rebuild |=
         config.config_bool("extended search", extended_search,
                            "search in a 3x3 radius with weakened rejection thresholds for valid "

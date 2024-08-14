@@ -43,4 +43,29 @@ bool reprojection_intersect_border(inout vec2 prev_pos, const vec2 mv, const vec
     return false;
 }
 
+ivec2 reproject_pixel_nearest(const vec2 pixel) {
+    return ivec2(round(pixel));
+}
+
+// Performs stochastic bilinear interpolation when reprojecting
+ivec2 reproject_pixel_stochastic(const vec2 pixel, const float random) {
+    const vec2 relative_pos = fract(pixel);
+
+    // (0, 0)
+    float bary_sum = relative_pos.x * relative_pos.y;
+    if (random <= bary_sum)
+        return ivec2(ceil(pixel));
+
+    bary_sum += relative_pos.x * (1. - relative_pos.y);
+    if (random <= bary_sum)
+        return ivec2(0, 1) * ivec2(floor(pixel)) + (1 - ivec2(0, 1)) * ivec2(ceil(pixel));
+
+    bary_sum += (1. - relative_pos.x) * relative_pos.y;
+    if (random <= bary_sum)
+        return ivec2(1, 0) * ivec2(floor(pixel)) + (1 - ivec2(1, 0)) * ivec2(ceil(pixel));
+
+    // (1, 1)
+    return ivec2(floor(pixel));
+}
+
 #endif
