@@ -79,7 +79,7 @@ class SpecializationInfoBuilder {
     }
 
     uint32_t add_entry(const bool& entry) {
-        const VkBool32 entry32 = entry;
+        const VkBool32 entry32 = static_cast<VkBool32>(entry);
         return add_entry(entry32);
     }
 
