@@ -22,10 +22,17 @@ float reprojection_weight(const vec3 curr_normal, const vec3 prev_normal, const 
 
 // Like reprojection_weight but binary
 bool reprojection_valid(const vec3 curr_normal, const vec3 prev_normal, const float normal_reject_cos,
-                          const float curr_z, const float prev_z, const float z_reject_percent) {
+                          const float curr_z,  const float vel_z, const ivec2 pixel_offset, const vec2 grad_z, const float prev_z, const float z_reject_percent) {
 
     return normal_reject_cos <= dot(curr_normal, prev_normal)                 // Similar normals
-           && abs(curr_z - prev_z) <= z_reject_percent * max(curr_z, prev_z); // Similar depth
+           && abs(curr_z + dot(pixel_offset, grad_z) - prev_z + vel_z) <= z_reject_percent * max(curr_z, prev_z); // Similar depth
+}
+
+bool reprojection_valid(const vec3 curr_normal, const vec3 prev_normal, const float normal_reject_cos,
+                          const float curr_z,  const float vel_z, const float prev_z, const float z_reject_percent) {
+
+    return normal_reject_cos <= dot(curr_normal, prev_normal)                 // Similar normals
+           && abs(curr_z - prev_z + vel_z) <= z_reject_percent * max(curr_z, prev_z); // Similar depth
 }
 
 // Intersects the motion vector with the image borders.
