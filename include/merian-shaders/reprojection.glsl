@@ -17,7 +17,7 @@ float reprojection_weight(const vec3 curr_normal, const vec3 prev_normal, const 
                           const float prev_z, const float z_reject_percent) {
 
     return smoothstep(normal_reject_cos, 1.0, dot(curr_normal, prev_normal))                        // Similar normals
-                      * (1.0 - smoothstep(0.0, z_reject_percent * max(curr_z, prev_z), abs(curr_z - prev_z + vel_z) - dot(pixel_offset, grad_z))); // Similar depth
+                      * (1.0 - smoothstep(0.0, z_reject_percent * max(curr_z, prev_z), abs(curr_z + dot(pixel_offset, grad_z) - prev_z + vel_z))); // Similar depth
 }
 
 // Like reprojection_weight but binary
@@ -43,11 +43,13 @@ bool reprojection_intersect_border(inout vec2 prev_pos, const vec2 mv, const vec
     return false;
 }
 
+// pixel = current_pixel + mv
 ivec2 reproject_pixel_nearest(const vec2 pixel) {
     return ivec2(round(pixel));
 }
 
 // Performs stochastic bilinear interpolation when reprojecting
+// pixel = current_pixel + mv
 ivec2 reproject_pixel_stochastic(const vec2 pixel, const float random) {
     const vec2 relative_pos = fract(pixel);
 

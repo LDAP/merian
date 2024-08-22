@@ -105,24 +105,23 @@ void get_prev_extended_search(const vec2 prev_pos,
                               inout vec2 prev_moments,
                               inout float sum_w) {
   const ivec2 prev_ipos = ivec2(round(prev_pos));
+  uint rng_state = pcg3d16(uvec3(pc.iteration, prev_ipos));
 
   [[unroll]]
-  for(int yy = -1; yy <= 1; yy++) {
-    [[unroll]]
-    for(int xx = -1; xx <= 1; xx++) {
-      const ivec2 tc = prev_ipos + ivec2(xx, yy);
-      if(any(greaterThanEqual(tc, textureSize(img_prev_accum, 0))) || any(lessThan(tc, ivec2(0))))
-        continue;
+  for(int i = 0; i <= 9; i++) {
+    const ivec2 offset = ivec2(round(XorShift32Vec2(rng_state) * 4)) - 2;
+    const ivec2 tc = prev_ipos + offset;
+    if(any(greaterThanEqual(tc, textureSize(img_prev_accum, 0))) || any(lessThan(tc, ivec2(0))))
+      continue;
 
-      const GBuffer prev_gbuf = prev_gbuffer[gbuffer_index(tc, imageSize(img_accum))];
-      const vec3 prev_normal = geo_decode_normal(prev_gbuf.enc_normal);
-      const float w = reprojection_weight(normal, prev_normal, pc.normal_reject_cos * 0.8,
-                        linear_z, vel_z, ivec2(xx, yy), grad_z, prev_gbuf.linear_z, pc.z_reject_percent * 2.);
+    const GBuffer prev_gbuf = prev_gbuffer[gbuffer_index(tc, imageSize(img_accum))];
+    const vec3 prev_normal = geo_decode_normal(prev_gbuf.enc_normal);
+    const float w = reprojection_weight(normal, prev_normal, pc.normal_reject_cos * 0.8,
+                      linear_z, vel_z, offset, grad_z, prev_gbuf.linear_z, pc.z_reject_percent * 2.);
 
-      prev_irr_histlen        += w * texelFetch(img_prev_accum, tc, 0);
-      prev_moments            += w * texelFetch(img_prev_moments, tc, 0).rg;
-      sum_w                   += w;
-    }
+    prev_irr_histlen        += w * texelFetch(img_prev_accum, tc, 0);
+    prev_moments            += w * texelFetch(img_prev_moments, tc, 0).rg;
+    sum_w                   += w;
   }
 }
 

@@ -186,11 +186,10 @@ Accumulate::NodeStatusFlags Accumulate::properties(Properties& config) {
                           "Reject points with depths farther apart (relative to the max)");
     needs_rebuild |= config.config_options("filter mode", filter_mode,
                                            {"nearest", "bilinear", "stochastic bilinear"});
-    needs_rebuild |=
-        config.config_bool("extended search", extended_search,
-                           "search in a 3x3 radius with weakened rejection thresholds for valid "
-                           "information if nothing was found. Helps "
-                           "with artifacts at edges");
+    needs_rebuild |= config.config_bool(
+        "extended search", extended_search,
+        "search randomly in a 4x4 radius with weakened rejection thresholds for valid "
+        "information if nothing was found.");
     needs_rebuild |=
         config.config_bool("reuse border", reuse_border,
                            "Reuse border information (if valid) for pixel where the motion vector "
