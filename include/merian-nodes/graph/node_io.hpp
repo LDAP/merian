@@ -57,7 +57,11 @@ class NodeIO {
             std::is_base_of_v<TypedInputConnector<OutputConnectorType, ResourceAccessType>, T>,
             bool> = true>
     ResourceAccessType operator[](const std::shared_ptr<T>& input_connector) const {
-        assert(resource_for_input_connector(input_connector) &&
+        assert(input_connector && "input connector cannot be null");
+        assert((input_connector->optional || resource_for_input_connector(input_connector)) &&
+               "non-optional input connector is not connected. This should be prevented by the "
+               "Graph.");
+        assert((!input_connector->optional || resource_for_input_connector(input_connector)) &&
                "optional input connector is not connected");
         return input_connector->resource(resource_for_input_connector(input_connector));
     }
