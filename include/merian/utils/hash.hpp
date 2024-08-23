@@ -15,7 +15,7 @@ template <typename T, typename... Types> void hash_combine(std::size_t& seed, co
     hash_combine(seed, args...);
 }
 // Optional auxiliary generic functions to support hash_val() without arguments
-inline void hashCombine(std::size_t&) {}
+inline void hash_combine(std::size_t& /*unused*/) {}
 
 // Generic function to create a hash value out of a heterogeneous list of arguments
 template <typename... Types> std::size_t hash_val(const Types&... args) {
@@ -25,12 +25,22 @@ template <typename... Types> std::size_t hash_val(const Types&... args) {
 }
 //--------------
 
-template <typename T> std::size_t hash_aligned_32(const T& v) {
-    const uint32_t size = sizeof(T) / sizeof(uint32_t);
-    const uint32_t* vBits = reinterpret_cast<const uint32_t*>(&v);
+template <typename T> std::size_t hash_aligned_8(const T& v) {
+    const std::size_t size = sizeof(T) / sizeof(uint8_t);
+    const uint8_t* v_bits = reinterpret_cast<const uint8_t*>(&v);
     std::size_t seed = 0;
-    for (uint32_t i = 0u; i < size; i++) {
-        hash_combine(seed, vBits[i]);
+    for (std::size_t i = 0u; i < size; i++) {
+        hash_combine(seed, v_bits[i]);
+    }
+    return seed;
+}
+
+template <typename T> std::size_t hash_aligned_32(const T& v) {
+    const std::size_t size = sizeof(T) / sizeof(uint32_t);
+    const uint32_t* v_bits = reinterpret_cast<const uint32_t*>(&v);
+    std::size_t seed = 0;
+    for (std::size_t i = 0u; i < size; i++) {
+        hash_combine(seed, v_bits[i]);
     }
     return seed;
 }
@@ -41,6 +51,15 @@ template <typename T> std::size_t hash_aligned_32(const T& v) {
 template <typename T> struct HashAligned32 {
     std::size_t operator()(const T& s) const {
         return hash_aligned_32(s);
+    }
+};
+
+// Generic hash function to use when using a struct aligned to 8-bit as std::map-like container key
+// Important: this only works if the struct contains integral types, as it will not
+// do any pointer chasing
+template <typename T> struct HashAligned8 {
+    std::size_t operator()(const T& s) const {
+        return hash_aligned_8(s);
     }
 };
 

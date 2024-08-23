@@ -6,6 +6,7 @@
 
 #include <spdlog/spdlog.h>
 #include <vulkan/vulkan.hpp>
+#include <vulkan/vulkan_hash.hpp>
 
 #include <unordered_map>
 
@@ -59,6 +60,18 @@ class SamplerPool : public std::enable_shared_from_this<SamplerPool> {
         auto operator<=>(const SamplerState&) const = default;
     };
 
+    struct SamplerStateHash {
+        std::size_t operator()(const SamplerState& s) const {
+            return hash_val(create_hash(s.createInfo), reduction_hash(s.reduction),
+                            ycbcr_conversion_hash(s.ycbr));
+        }
+
+      private:
+        std::hash<vk::SamplerCreateInfo> create_hash;
+        std::hash<vk::SamplerReductionModeCreateInfo> reduction_hash;
+        std::hash<vk::SamplerYcbcrConversionCreateInfo> ycbcr_conversion_hash;
+    };
+
     struct Chain {
         VkStructureType sType;
         const Chain* pNext;
@@ -66,7 +79,7 @@ class SamplerPool : public std::enable_shared_from_this<SamplerPool> {
 
     const ContextHandle context;
 
-    std::unordered_map<SamplerState, std::weak_ptr<Sampler>, HashAligned32<SamplerState>> state_map;
+    std::unordered_map<SamplerState, std::weak_ptr<Sampler>, SamplerStateHash> state_map;
 };
 
 using SamplerPoolHandle = std::shared_ptr<SamplerPool>;
