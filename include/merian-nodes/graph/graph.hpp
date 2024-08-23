@@ -1653,7 +1653,15 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                         } else {
                             NodeData::PerInputInfo& input_info = data.input_connections[input];
                             if (input_info.node && !node_data.at(input_info.node).errors.empty()) {
-                                data.input_connections[input] = NodeData::PerInputInfo();
+                                if (input->optional) {
+                                    data.input_connections[input] = NodeData::PerInputInfo();
+                                } else {
+                                    data.input_connections.erase(input);
+                                    std::string error =
+                                        make_error_input_not_connected(input, node, data);
+                                    SPDLOG_WARN(error);
+                                    data.errors.emplace_back(std::move(error));
+                                }
                                 break;
                             }
                         }
