@@ -160,6 +160,7 @@ struct NodeData {
     }
 
     uint32_t set_index(const uint64_t run_iteration) const {
+        assert(descriptor_sets.size());
         return run_iteration % descriptor_sets.size();
     }
 };
@@ -1032,16 +1033,20 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                                                            registry.node_name(node)));
                     }
 
-                    const uint32_t set_idx = data.set_index(run_iteration);
-                    auto& [_, cur_resource_index] = per_output_info.precomputed_resources[set_idx];
+                    std::string current_resource_index = "none";
+                    if (!per_output_info.precomputed_resources.empty()) {
+                        const uint32_t set_idx = data.set_index(run_iteration);
+                        current_resource_index = fmt::format(
+                            "{:02}", std::get<1>(per_output_info.precomputed_resources[set_idx]));
+                    }
 
                     config.output_text(fmt::format(
                         "Descriptor set binding: {}\n# Resources: {:02}\nResource index: "
-                        "{:02}\nSending to: [{}]",
+                        "{}\nSending to: [{}]",
                         per_output_info.descriptor_set_binding == NodeData::NO_DESCRIPTOR_BINDING
-                            ? "None"
+                            ? "none"
                             : std::to_string(per_output_info.descriptor_set_binding),
-                        per_output_info.resources.size(), cur_resource_index,
+                        per_output_info.resources.size(), current_resource_index,
                         fmt::join(receivers, ", ")));
 
                     config.st_separate("Connector Properties");
