@@ -31,12 +31,12 @@ float Lambda(const float cosTheta, const float sigmaSq) {
 
 vec3 bsdf_microfacet_sample(const vec3 wi, const vec3 du, const vec3 dv, const vec3 n, const vec2 random) {
     // this is just regular diffuse sampling for now
-    return mat3(du, dv, n) * sample_cos(random);
+    return make_frame(n) * sample_cos(random);
 }
 
 float bsdf_microfacet_pdf(const vec3 wi, const vec3 n, const vec3 wo) {
     // this is just regular diffuse pdf for now
-    return INV_PI;
+    return INV_PI * dot(wo, n);
 }
 
 // -wi, frame_mat=(du, dv, n), wo in world space
