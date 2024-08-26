@@ -1,8 +1,19 @@
 #ifndef _MERIAN_SHADERS_FRAMES_H_
 #define _MERIAN_SHADERS_FRAMES_H_
 
+// Returns a matrix of axis (tangent, bitangent, z) which all being perpendicular to each other
+// Follows Building an Orthonormal Basis, Revisited, Duff et al. 2017
+mat3x3 make_frame(const vec3 z) {
+    const float sign = (z.z >= 0) ? 1 : -1;
+    const float a = -1.0 / (sign + z.z);
+    const float b = z.x * z.y * a;
+    return mat3(vec3(1.0 + sign * z.x * z.x * a, sign * b, -sign * z.x),
+                vec3(b, sign + z.y * z.y * a, -z.y),
+                z);
+}
+
 // Returns a matrix of axis (x, y, z) which all being perpendicular to each other
-mat3x3 make_frame(vec3 z) {
+mat3x3 make_frame_naive(const vec3 z) {
     const vec3 up = (abs(z.x) > abs(z.y)) ? vec3(0,1,0) : vec3(1,0,0);
     const vec3 du = normalize(cross(up, z));
     return mat3(du, normalize(cross(du, z)), z);
