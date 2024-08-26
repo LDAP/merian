@@ -32,84 +32,62 @@ ivec3 grid_idx_closest(const vec3 pos, const float cell_width) {
 // Returns a vertex index such that the expected value is equal to the interpolated value.
 // Random must be uniformly drawn in [0, 1].
 ivec3 grid_idx_interpolate(const vec3 pos, const float cell_width, const float random) {
-    const ivec3 lower = grid_idx_lower(pos, cell_width);
-    const ivec3 upper = grid_idx_upper(pos, cell_width);
     const vec3 grid_pos = fract(pos / cell_width);
-
     float bary_sum = 0;
     
     // (0, 0, 0)
     bary_sum += grid_pos.x * grid_pos.y * grid_pos.z;
     if (random <= bary_sum)
-        return upper;
+        return grid_idx_upper(pos, cell_width);
 
-    ivec3 vtx = ivec3(0, 0, 1);
-    vec3 dist = abs(grid_pos - vtx);
-    bary_sum += dist.x * dist.y * dist.z;
+    bary_sum += grid_pos.x * grid_pos.y * (1. - grid_pos.z);
     if (random <= bary_sum)
-        return vtx * lower + (1 - vtx) * upper;
+        return mix(grid_idx_upper(pos, cell_width), grid_idx_lower(pos, cell_width), bvec3(0, 0, 1));
 
-    vtx = ivec3(0, 1, 0);
-    dist = abs(grid_pos - vtx);
-    bary_sum += dist.x * dist.y * dist.z;
+    bary_sum += grid_pos.x * (1. - grid_pos.y) * grid_pos.z;
     if (random <= bary_sum)
-        return vtx * lower + (1 - vtx) * upper;
+        return mix(grid_idx_upper(pos, cell_width), grid_idx_lower(pos, cell_width), bvec3(0, 1, 0));
 
-    vtx = ivec3(0, 1, 1);
-    dist = abs(grid_pos - vtx);
-    bary_sum += dist.x * dist.y * dist.z;
+    bary_sum += grid_pos.x * (1. - grid_pos.y) * (1. - grid_pos.z);
     if (random <= bary_sum)
-        return vtx * lower + (1 - vtx) * upper;
+        return mix(grid_idx_upper(pos, cell_width), grid_idx_lower(pos, cell_width), bvec3(0, 1, 1));
 
-    vtx = ivec3(1, 0, 0);
-    dist = abs(grid_pos - vtx);
-    bary_sum += dist.x * dist.y * dist.z;
+    bary_sum += (1. - grid_pos.x) * grid_pos.y * grid_pos.z;
     if (random <= bary_sum)
-        return vtx * lower + (1 - vtx) * upper;
+        return mix(grid_idx_upper(pos, cell_width), grid_idx_lower(pos, cell_width), bvec3(1, 0, 0));
 
-    vtx = ivec3(1, 0, 1);
-    dist = abs(grid_pos - vtx);
-    bary_sum += dist.x * dist.y * dist.z;
+    bary_sum += (1. - grid_pos.x) * grid_pos.y * (1. - grid_pos.z);
     if (random <= bary_sum)
-        return vtx * lower + (1 - vtx) * upper;
+        return mix(grid_idx_upper(pos, cell_width), grid_idx_lower(pos, cell_width), bvec3(1, 0, 1));
 
-    vtx = ivec3(1, 1, 0);
-    dist = abs(grid_pos - vtx);
-    bary_sum += dist.x * dist.y * dist.z;
+    bary_sum += (1. - grid_pos.x) * (1. - grid_pos.y) * grid_pos.z;
     if (random <= bary_sum)
-        return vtx * lower + (1 - vtx) * upper;
+        return mix(grid_idx_upper(pos, cell_width), grid_idx_lower(pos, cell_width), bvec3(1, 1, 0));
 
     // (1, 1, 1)
-    return lower;
+    return grid_idx_lower(pos, cell_width);
 }
 
 // Same as above for a 2d grid
 ivec2 grid_idx_interpolate(const vec2 pos, const float cell_width, const float random) {
-    const ivec2 lower = grid_idx_lower(pos, cell_width);
-    const ivec2 upper = grid_idx_upper(pos, cell_width);
     const vec2 grid_pos = fract(pos / cell_width);
-
     float bary_sum = 0;
 
     // (0, 0)
     bary_sum += grid_pos.x * grid_pos.y;
     if (random <= bary_sum)
-        return upper;
+        return grid_idx_upper(pos, cell_width);
 
-    ivec2 vtx = ivec2(0, 1);
-    vec2 dist = abs(grid_pos - vtx);
-    bary_sum += dist.x * dist.y;
+    bary_sum += grid_pos.x * (1. - grid_pos.y);
     if (random <= bary_sum)
-        return vtx * lower + (1 - vtx) * upper;
+        return mix(grid_idx_upper(pos, cell_width), grid_idx_lower(pos, cell_width), bvec2(0, 1));
 
-    vtx = ivec2(1, 0);
-    dist = abs(grid_pos - vtx);
-    bary_sum += dist.x * dist.y;
+    bary_sum += (1. - grid_pos.x) * grid_pos.y;
     if (random <= bary_sum)
-        return vtx * lower + (1 - vtx) * upper;
+        return mix(grid_idx_upper(pos, cell_width), grid_idx_lower(pos, cell_width), bvec2(1, 0));
 
     // (1, 1)
-    return lower;
+    return grid_idx_lower(pos, cell_width);
 }
 
 // See Müller et al. (2022): Instant Neural Graphics Primitives with a Multiresolution Hash Encoding
