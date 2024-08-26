@@ -7,6 +7,8 @@
 #define INV_SQRT_TWO_PI 0.3989422804014327
 
 // returns 1/x if x > 0 else 1.
-#define SAFE_RECIPROCAL(x) (x > 0. ? 1. / x : 1.0)
+#define MERIAN_SAFE_RECIPROCAL(x) (x > 0. ? 1. / x : 1.0)
+
+#define MERIAN_SQUARE(x) ((x) * (x))
 
 #endif // _MERIAN_SHADERS_COMMON_H_

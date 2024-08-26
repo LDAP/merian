@@ -12,7 +12,7 @@ vec3 tonemap_clamp(const vec3 rgb) {
 vec3 tonemap_reinhard(const vec3 rgb, const float white) {
     float l = yuv_luminance(rgb);
     float l_new = (l * (1.0f + (l / (white * white)))) / (1.0f + l);
-    return rgb * l_new * SAFE_RECIPROCAL(l);
+    return rgb * l_new * MERIAN_SAFE_RECIPROCAL(l);
 }
 
 vec3 _tonemap_uncharted2(const vec3 x) {
