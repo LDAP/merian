@@ -200,6 +200,8 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         std::vector<std::function<void()>> tasks;
         // For each node: optional in-flight data.
         std::unordered_map<NodeHandle, std::any> in_flight_data{};
+        // How long did the CPU delay processing
+        std::chrono::duration<double> cpu_sleep_time = 0ns;
     };
 
   public:
@@ -467,12 +469,17 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         gpu_wait_time = gpu_wait_time * 0.9 + sw_gpu_wait.duration() * 0.1;
 
         if (low_latency_mode && !needs_reconnect) {
-            const auto total_wait =
-                std::max((gpu_wait_time + external_wait_time + cpu_sleep_time - 0.1ms), 0.00ms);
-            cpu_sleep_time = 0.92 * total_wait;
-            std::this_thread::sleep_for(cpu_sleep_time);
+            const auto total_wait = std::max((std::max(gpu_wait_time, external_wait_time) +
+                                              in_flight_data.cpu_sleep_time - 0.1ms),
+                                             0.00ms);
+            const auto last_cpu_sleep_time = in_flight_data.cpu_sleep_time;
+            in_flight_data.cpu_sleep_time = 0.92 * total_wait;
+            in_flight_data.cpu_sleep_time =
+                std::min(in_flight_data.cpu_sleep_time,
+                         std::chrono::duration<double>(last_cpu_sleep_time * 1.05 + 1ms));
+            std::this_thread::sleep_for(in_flight_data.cpu_sleep_time);
         } else {
-            cpu_sleep_time = 0ms;
+            in_flight_data.cpu_sleep_time = 0ms;
         }
 
         // now we can release the resources from staging space and reset the command pool
@@ -563,7 +570,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         cmd_pool->end_all();
         in_flight_data.staging_set_id = resource_allocator->getStaging()->finalizeResourceSet();
         {
-            MERIAN_PROFILE_SCOPE(profiler, "Submit");
+            MERIAN_PROFILE_SCOPE(profiler, "submit");
             queue->submit(cmd_pool, ring_fences.reset(), run.get_signal_semaphores(),
                           run.get_wait_semaphores(), run.get_wait_stages(),
                           run.get_timeline_semaphore_submit_info());
@@ -660,7 +667,8 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 "Experimental: Delays CPU processing to recude input latency in GPU bound "
                 "applications. Might reduce framerate.");
             if (low_latency_mode) {
-                props.output_text("CPU sleep time: {:04f}ms", to_milliseconds(cpu_sleep_time));
+                const InFlightData& in_flight_data = ring_fences.get().user_data;
+                props.output_text("CPU sleep time: {:04f}ms", to_milliseconds(in_flight_data.cpu_sleep_time));
             }
 
             props.st_end_child();
@@ -1946,7 +1954,6 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
     bool low_latency_mode = false;
     std::chrono::duration<double> gpu_wait_time = 0ns;
-    std::chrono::duration<double> cpu_sleep_time = 0ns;
     std::chrono::duration<double> external_wait_time = 0ns;
 
     Profiler::Report last_build_report;
