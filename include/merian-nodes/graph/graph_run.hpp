@@ -18,7 +18,7 @@ class GraphRun {
     template <uint32_t> friend class Graph;
 
   public:
-    GraphRun(const uint32_t ring_size) : ring_size(ring_size) {}
+    GraphRun(const uint32_t iterations_in_flight) : iterations_in_flight(iterations_in_flight) {}
 
     void add_wait_semaphore(const BinarySemaphoreHandle& wait_semaphore,
                             const vk::PipelineStageFlags& wait_stage_flags) noexcept {
@@ -57,7 +57,7 @@ class GraphRun {
 
     // Number of iterations since connect.
     // Use get_total_iteration() for iterations since graph initialization.
-    // 
+    //
     // Iterations are 0-indexed.
     const uint64_t& get_iteration() const noexcept {
         return iteration;
@@ -65,21 +65,21 @@ class GraphRun {
 
     // Number of iterations since graph initialization.
     // Use get_iteration() for iterations since connect.
-    // 
+    //
     // Iterations are 0-indexed.
     const uint64_t& get_total_iteration() const noexcept {
         return total_iteration;
     }
 
-    // returns the current in-flight index i, with 0 <= i < get_ring_size().
+    // returns the current in-flight index i, with 0 <= i < get_iterations_in_flight().
     // It is guaranteed that processing of the last iteration with that index has finished.
     const uint32_t& get_in_flight_index() const noexcept {
         return in_flight_index;
     }
 
     // returns the number of iterations that might be in flight at a certain time.
-    const uint32_t& get_ring_size() const noexcept {
-        return ring_size;
+    const uint32_t& get_iterations_in_flight() const noexcept {
+        return iterations_in_flight;
     }
 
     const CommandPoolHandle& get_cmd_pool() noexcept {
@@ -122,7 +122,7 @@ class GraphRun {
     }
 
     // Returns the profiler that is attached to this run.
-    // 
+    //
     // Can be nullptr if profiling is disabled!
     const ProfilerHandle& get_profiler() const {
         return profiler;
@@ -173,7 +173,7 @@ class GraphRun {
   private:
     void reset(const uint64_t iteration,
                const uint32_t in_flight_index,
-               const ProfilerHandle profiler,
+               const ProfilerHandle& profiler,
                const CommandPoolHandle& cmd_pool,
                const ResourceAllocatorHandle& allocator,
                const std::chrono::nanoseconds time_delta,
@@ -201,7 +201,7 @@ class GraphRun {
     }
 
   private:
-    const uint32_t ring_size;
+    const uint32_t iterations_in_flight;
 
     std::vector<vk::Semaphore> wait_semaphores;
     std::vector<uint64_t> wait_values;

@@ -180,8 +180,8 @@ using namespace std::literals::chrono_literals;
  *
  * @tparam     RING_SIZE  Controls the amount of in-flight processing (frames-in-flight).
  */
-template <uint32_t RING_SIZE = 2>
-class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
+template <uint32_t ITERATIONS_IN_FLIGHT = 2>
+class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
     // Data that is stored for every iteration in flight.
     // Created for each iteration in flight in Graph::Graph.
     struct InFlightData {
@@ -193,7 +193,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
         // to device local memory has finished.
         merian::StagingMemoryManager::SetID staging_set_id{};
         // The graph run, holds semaphores and such.
-        GraphRun graph_run{RING_SIZE};
+        GraphRun graph_run{ITERATIONS_IN_FLIGHT};
         // Query pools for the profiler
         QueryPoolHandle<vk::QueryType::eTimestamp> profiler_query_pool;
         // Tasks that should be run in the current iteration after acquiring the fence.
@@ -208,7 +208,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
     Graph(const ContextHandle& context, const ResourceAllocatorHandle& resource_allocator)
         : context(context), resource_allocator(resource_allocator), queue(context->get_queue_GCT()),
           registry(context, resource_allocator), ring_fences(context) {
-        for (uint32_t i = 0; i < RING_SIZE; i++) {
+        for (uint32_t i = 0; i < ITERATIONS_IN_FLIGHT; i++) {
             InFlightData& in_flight_data = ring_fences.get(i).user_data;
             in_flight_data.command_pool = std::make_shared<CommandPool>(queue);
             in_flight_data.profiler_query_pool =
@@ -331,7 +331,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             const std::string node_identifier = data.identifier;
             node_data.erase(node);
             node_for_identifier.erase(identifier);
-            for (uint32_t i = 0; i < RING_SIZE; i++) {
+            for (uint32_t i = 0; i < ITERATIONS_IN_FLIGHT; i++) {
                 InFlightData& in_flight_data = ring_fences.get(i).user_data;
                 in_flight_data.in_flight_data.erase(node);
             }
@@ -440,7 +440,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                         node->on_connected(io_layout, data.descriptor_set_layout);
                     needs_reconnect |= flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT;
                     if ((flags & Node::NodeStatusFlagBits::RESET_IN_FLIGHT_DATA) != 0u) {
-                        for (uint32_t i = 0; i < RING_SIZE; i++) {
+                        for (uint32_t i = 0; i < ITERATIONS_IN_FLIGHT; i++) {
                             ring_fences.get(i).user_data.in_flight_data.at(node).reset();
                         }
                     }
@@ -520,7 +520,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
             }
             time_delta = duration_elapsed - last_elapsed_ns;
 
-            run.reset(run_iteration, run_iteration % RING_SIZE, profiler, cmd_pool,
+            run.reset(run_iteration, run_iteration % ITERATIONS_IN_FLIGHT, profiler, cmd_pool,
                       resource_allocator, time_delta, duration_elapsed,
                       duration_elapsed_since_connect, total_iteration);
 
@@ -609,7 +609,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
 
         node_data.clear();
         node_for_identifier.clear();
-        for (uint32_t i = 0; i < RING_SIZE; i++) {
+        for (uint32_t i = 0; i < ITERATIONS_IN_FLIGHT; i++) {
             InFlightData& in_flight_data = ring_fences.get(i).user_data;
             in_flight_data.in_flight_data.clear();
         }
@@ -1742,7 +1742,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 for (uint32_t i = 0; i <= max_delay; i++) {
                     const GraphResourceHandle res =
                         output->create_resource(per_output_info.inputs, resource_allocator,
-                                                resource_allocator, i, RING_SIZE);
+                                                resource_allocator, i, ITERATIONS_IN_FLIGHT);
                     per_output_info.resources.emplace_back(res);
                 }
             }
@@ -1803,10 +1803,10 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
                 num_resources.push_back(per_output_info.resources.size());
             }
 
-            uint32_t num_sets = std::max(lcm(num_resources), RING_SIZE);
+            uint32_t num_sets = std::max(lcm(num_resources), ITERATIONS_IN_FLIGHT);
             // make sure it is at least RING_SIZE to allow updates while iterations are in-flight
             // solve k * num_sets >= RING_SIZE
-            const uint32_t k = (RING_SIZE + num_sets - 1) / num_sets;
+            const uint32_t k = (ITERATIONS_IN_FLIGHT + num_sets - 1) / num_sets;
             num_sets *= k;
 
             SPDLOG_DEBUG("needing {} descriptor sets for node {} ({})", num_sets,
@@ -1928,7 +1928,7 @@ class Graph : public std::enable_shared_from_this<Graph<RING_SIZE>> {
     // clang-format on
 
     // Per-iteration data management
-    merian::RingFences<RING_SIZE, InFlightData> ring_fences;
+    merian::RingFences<ITERATIONS_IN_FLIGHT, InFlightData> ring_fences;
 
     // State
     bool needs_reconnect = false;
