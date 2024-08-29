@@ -56,7 +56,7 @@ class DescriptorSetLayoutBuilder {
 
   public:
     DescriptorSetLayoutBuilder(std::vector<vk::DescriptorSetLayoutBinding> bindings = {}) {
-        add_binding(bindings);
+        add_binding(std::move(bindings));
     }
 
     // --------------------------------------------------------------------------------------------------------------------
@@ -153,8 +153,8 @@ class DescriptorSetLayoutBuilder {
         return *this;
     }
 
-    DescriptorSetLayoutBuilder& add_binding(std::vector<vk::DescriptorSetLayoutBinding> bindings) {
-        for (auto& binding : bindings) {
+    DescriptorSetLayoutBuilder& add_binding(const std::vector<vk::DescriptorSetLayoutBinding>& bindings) {
+        for (const auto& binding : bindings) {
             add_binding(binding);
         }
         return *this;

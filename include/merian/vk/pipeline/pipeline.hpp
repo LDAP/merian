@@ -18,7 +18,7 @@ class Pipeline : public std::enable_shared_from_this<Pipeline> {
 
     // ---------------------------------------------------------------------------
 
-    operator const vk::Pipeline() const {
+    operator const vk::Pipeline&() const {
         return pipeline;
     }
 
@@ -38,7 +38,13 @@ class Pipeline : public std::enable_shared_from_this<Pipeline> {
                              const std::shared_ptr<DescriptorSet>& descriptor_set,
                              const uint32_t first_set = 0) {
         cmd.bindDescriptorSets(get_pipeline_bind_point(), *pipeline_layout, first_set, 1,
-                               &descriptor_set->get_descriptor_set(), 0, nullptr);
+                               &**descriptor_set, 0, nullptr);
+    }
+
+    void push_descriptor_set(const vk::CommandBuffer& cmd,
+                             const uint32_t set,
+                             const std::vector<vk::WriteDescriptorSet>& writes) {
+        cmd.pushDescriptorSetKHR(get_pipeline_bind_point(), *pipeline_layout, set, writes);
     }
 
     // ---------------------------------------------------------------------------

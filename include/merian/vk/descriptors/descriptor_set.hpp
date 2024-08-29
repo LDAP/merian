@@ -63,7 +63,11 @@ class DescriptorSet : public std::enable_shared_from_this<DescriptorSet> {
     }
 
     operator const vk::DescriptorSetLayout&() const {
-        return *layout.get();
+        return *layout;
+    }
+
+    const vk::DescriptorSet& operator*() const {
+        return set;
     }
 
     const vk::DescriptorSet& get_descriptor_set() const {
