@@ -1,7 +1,7 @@
 #include "merian/vk/context.hpp"
+#include "merian/utils/pointer.hpp"
 #include "merian/utils/vector.hpp"
 #include "merian/vk/extension/extension.hpp"
-#include "merian/utils/pointer.hpp"
 
 #include <spdlog/spdlog.h>
 #include <tuple>
@@ -11,12 +11,12 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 namespace merian {
 
 ContextHandle Context::create(const std::vector<std::shared_ptr<Extension>>& extensions,
-                                    const std::string& application_name,
-                                    uint32_t application_vk_version,
-                                    uint32_t preffered_number_compute_queues,
-                                    uint32_t filter_vendor_id,
-                                    uint32_t filter_device_id,
-                                    const std::string& filter_device_name) {
+                              const std::string& application_name,
+                              uint32_t application_vk_version,
+                              uint32_t preffered_number_compute_queues,
+                              uint32_t filter_vendor_id,
+                              uint32_t filter_device_id,
+                              const std::string& filter_device_name) {
 
     auto shared_context = std::shared_ptr<Context>(new Context(
         extensions, application_name, application_vk_version, preffered_number_compute_queues,
@@ -46,20 +46,24 @@ Version: {}\n\n",
                 MERIAN_VERSION);
     SPDLOG_INFO("context initializing...");
 
+    SPDLOG_DEBUG("compiled with Vulkan header: {}.{}.{}",
+                 VK_API_VERSION_MAJOR(VK_HEADER_VERSION_COMPLETE),
+                 VK_API_VERSION_MINOR(VK_HEADER_VERSION_COMPLETE),
+                 VK_API_VERSION_PATCH(VK_HEADER_VERSION_COMPLETE));
+
     // Init dynamic loader
     static vk::DynamicLoader dl;
-    static PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr =
+    static PFN_vkGetInstanceProcAddr vk_get_instance_proc_addr =
         dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
-    VULKAN_HPP_DEFAULT_DISPATCHER.init(vkGetInstanceProcAddr);
+    VULKAN_HPP_DEFAULT_DISPATCHER.init(vk_get_instance_proc_addr);
 
     SPDLOG_DEBUG("supplied extensions:");
-    for (auto& ext : desired_extensions) {
+    for (const auto& ext : desired_extensions) {
         SPDLOG_DEBUG("{}", ext->name);
         if (extensions.contains(typeindex_from_pointer(ext))) {
-            std::runtime_error{"A extension type can only be added once."};
-        } else {
-            extensions[typeindex_from_pointer(ext)] = ext;
+            throw std::runtime_error{"A extension type can only be added once."};
         }
+        extensions[typeindex_from_pointer(ext)] = ext;
     }
 
     create_instance();
@@ -128,7 +132,11 @@ void Context::create_instance() {
     };
 
     instance = vk::createInstance(instance_create_info);
-    SPDLOG_DEBUG("instance created");
+    const uint32_t instance_vulkan_version = vk::enumerateInstanceVersion();
+    SPDLOG_DEBUG("instance created (version: {}.{}.{})",
+                 VK_API_VERSION_MAJOR(instance_vulkan_version),
+                 VK_API_VERSION_MINOR(instance_vulkan_version),
+                 VK_API_VERSION_PATCH(instance_vulkan_version));
 
     // Must happen before on_instance_created since it requires dynamic loading
     VULKAN_HPP_DEFAULT_DISPATCHER.init(instance);
@@ -147,24 +155,26 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id,
 
     // Check environment variables
     if (const char* env_vendor_id = std::getenv("MERIAN_DEFAULT_FILTER_VENDOR_ID");
-        filter_vendor_id == (uint32_t)-1 && env_vendor_id) {
+        filter_vendor_id == (uint32_t)-1 && (env_vendor_id != nullptr)) {
         filter_vendor_id = std::strtoul(env_vendor_id, nullptr, 10);
     }
     if (const char* env_device_id = std::getenv("MERIAN_DEFAULT_FILTER_DEVICE_ID");
-        filter_device_id == (uint32_t)-1 && env_device_id) {
+        filter_device_id == (uint32_t)-1 && (env_device_id != nullptr)) {
         filter_device_id = std::strtoul(env_device_id, nullptr, 10);
     }
     if (const char* env_device_name = std::getenv("MERIAN_DEFAULT_FILTER_DEVICE_NAME");
-        filter_device_name.empty() && env_device_name) {
+        filter_device_name.empty() && (env_device_name != nullptr)) {
         filter_device_name = env_device_name;
     }
 
     std::vector<std::tuple<vk::PhysicalDevice, vk::PhysicalDeviceProperties2>> matches;
     for (std::size_t i = 0; i < devices.size(); i++) {
         vk::PhysicalDeviceProperties2 props = devices[i].getProperties2();
-        SPDLOG_INFO("found physical device {}, vendor id: {}, device id: {}",
+        SPDLOG_INFO("found physical device {}, vendor id: {}, device id: {}, Vulkan: {}.{}.{}",
                     props.properties.deviceName.data(), props.properties.vendorID,
-                    props.properties.deviceID);
+                    props.properties.deviceID, VK_API_VERSION_MAJOR(props.properties.apiVersion),
+                    VK_API_VERSION_MINOR(props.properties.apiVersion),
+                    VK_API_VERSION_PATCH(props.properties.apiVersion));
         if ((filter_vendor_id == (uint32_t)-1 || filter_vendor_id == props.properties.vendorID) &&
             (filter_device_id == (uint32_t)-1 || filter_device_id == props.properties.deviceID) &&
             (filter_device_name == "" || filter_device_name == props.properties.deviceName)) {
@@ -263,11 +273,11 @@ void Context::find_queues() {
 #ifndef NDEBUG
     for (std::size_t i = 0; i < queue_family_props.size(); i++) {
         const bool supports_graphics =
-            queue_family_props[i].queueFlags & Flags::eGraphics ? true : false;
+            static_cast<bool>(queue_family_props[i].queueFlags & Flags::eGraphics);
         const bool supports_transfer =
-            queue_family_props[i].queueFlags & Flags::eTransfer ? true : false;
+            static_cast<bool>(queue_family_props[i].queueFlags & Flags::eTransfer);
         const bool supports_compute =
-            queue_family_props[i].queueFlags & Flags::eCompute ? true : false;
+            static_cast<bool>(queue_family_props[i].queueFlags & Flags::eCompute);
         SPDLOG_DEBUG("queue family {}: supports graphics: {} transfer: {} compute: {}, count {}", i,
                      supports_graphics, supports_transfer, supports_compute,
                      queue_family_props[i].queueCount);
@@ -330,9 +340,9 @@ void Context::find_queues() {
     std::sort(candidates.begin(), candidates.end(), std::greater<>());
     auto best = candidates[0];
 
-    bool found_GCT = std::get<0>(best);
-    bool found_T = std::get<1>(best);
-    bool found_C = std::get<2>(best);
+    const bool found_GCT = std::get<0>(best);
+    const bool found_T = std::get<1>(best);
+    const bool found_C = std::get<2>(best);
 
     if (!found_GCT || !found_T || !found_C) {
         SPDLOG_WARN("not all requested queue families found! GCT: {} T: {} C: {}", found_GCT,
@@ -431,11 +441,11 @@ void Context::create_device_and_queues(uint32_t preferred_number_compute_queues)
     uint32_t actual_number_compute_queues = 0;
 
     if (queue_family_idx_GCT >= 0) {
-        queue_idx_GCT = count_per_family[queue_family_idx_GCT]++;
+        queue_idx_GCT = (int32_t)count_per_family[queue_family_idx_GCT]++;
         SPDLOG_DEBUG("queue index GCT: {}", queue_idx_GCT);
     }
     if (queue_family_idx_T >= 0) {
-        queue_idx_T = count_per_family[queue_family_idx_T]++;
+        queue_idx_T = (int32_t)count_per_family[queue_family_idx_T]++;
         SPDLOG_DEBUG("queue index T: {}", queue_idx_T);
     }
     if (queue_family_idx_C >= 0) {
@@ -535,7 +545,7 @@ void Context::extensions_check_instance_layer_support() {
         for (auto& layer : layers) {
             bool layer_found = false;
             for (auto& layer_prop : layer_props) {
-                if (!strcmp(layer_prop.layerName, layer)) {
+                if (strcmp(layer_prop.layerName, layer) == 0) {
                     layer_found = true;
                     break;
                 }
@@ -563,7 +573,7 @@ void Context::extensions_check_instance_extension_support() {
         for (auto& layer : instance_extensions) {
             bool extension_found = false;
             for (auto& extension_prop : extension_props) {
-                if (!strcmp(extension_prop.extensionName, layer)) {
+                if (strcmp(extension_prop.extensionName, layer) == 0) {
                     extension_found = true;
                     break;
                 }
@@ -589,7 +599,7 @@ void Context::extensions_check_device_extension_support() {
         for (auto& layer : device_extensions) {
             bool extension_found = false;
             for (auto& extension_prop : physical_device.physical_device_extension_properties) {
-                if (!strcmp(extension_prop.extensionName, layer)) {
+                if (strcmp(extension_prop.extensionName, layer) == 0) {
                     extension_found = true;
                     break;
                 }
@@ -616,11 +626,10 @@ void Context::extensions_self_check_support() {
     destroy_extensions(not_supported);
 }
 
-void Context::destroy_extensions(std::vector<std::shared_ptr<Extension>> extensions) {
-    for (auto& ext : extensions) {
+void Context::destroy_extensions(const std::vector<std::shared_ptr<Extension>>& extensions) {
+    for (const auto& ext : extensions) {
         SPDLOG_DEBUG("remove extension {} from context", ext->name);
-        auto& r = *ext.get(); // suppress warnings...
-        this->extensions.erase(typeid(r));
+        this->extensions.erase(typeindex_from_pointer(ext));
     }
 }
 
@@ -635,30 +644,28 @@ uint32_t Context::get_number_compute_queues() const noexcept {
 std::shared_ptr<Queue> Context::get_queue_GCT() {
     if (!queue_GCT.expired()) {
         return queue_GCT.lock();
-    } else if (queue_family_idx_GCT < 0) {
-        return nullptr;
-    } else {
-        auto queue =
-            std::make_shared<Queue>(shared_from_this(), queue_family_idx_GCT, queue_idx_GCT);
-        queue_GCT = queue;
-        return queue;
     }
+    if (queue_family_idx_GCT < 0) {
+        return nullptr;
+    }
+    const auto queue =
+        std::make_shared<Queue>(shared_from_this(), queue_family_idx_GCT, queue_idx_GCT);
+    queue_GCT = queue;
+    return queue;
 }
 
 std::shared_ptr<Queue> Context::get_queue_T(const bool fallback) {
     if (queue_family_idx_T < 0) {
         if (fallback)
             return get_queue_GCT();
-        else
-            return nullptr;
+        return nullptr;
     }
     if (!queue_T.expired()) {
         return queue_T.lock();
-    } else {
-        auto queue = std::make_shared<Queue>(shared_from_this(), queue_family_idx_T, queue_idx_T);
-        queue_T = queue;
-        return queue;
     }
+    const auto queue = std::make_shared<Queue>(shared_from_this(), queue_family_idx_T, queue_idx_T);
+    queue_T = queue;
+    return queue;
 }
 
 std::shared_ptr<Queue> Context::get_queue_C(uint32_t index, const bool fallback) {
@@ -667,58 +674,54 @@ std::shared_ptr<Queue> Context::get_queue_C(uint32_t index, const bool fallback)
     if (index < queues_C.size()) {
         if (!queues_C[index].expired()) {
             return queues_C[index].lock();
-        } else {
-            auto queue =
-                std::make_shared<Queue>(shared_from_this(), queue_family_idx_C, queue_idx_C[index]);
-            queues_C[index] = queue;
-            return queue;
         }
-    } else if (!fallback) {
+        const auto queue =
+            std::make_shared<Queue>(shared_from_this(), queue_family_idx_C, queue_idx_C[index]);
+        queues_C[index] = queue;
+        return queue;
+    }
+    if (!fallback) {
         // early out, fallback is not allowed
         return nullptr;
-    } else if (!queues_C.empty()) {
+    }
+    if (!queues_C.empty()) {
         auto unused_queue = std::find_if(queues_C.begin(), queues_C.end(),
                                          [](auto& queue) { return queue.expired(); });
         if (unused_queue == queues_C.end()) {
             // there is no unused queue, use first
             return get_queue_C(0);
-        } else {
-            return get_queue_C(unused_queue - queues_C.begin());
         }
-    } else {
-        // there are no extra compute queues, maybe at least a graphics queue with compute support
-        return get_queue_GCT();
+        return get_queue_C(unused_queue - queues_C.begin());
     }
+    // there are no extra compute queues, maybe at least a graphics queue with compute support
+    return get_queue_GCT();
 }
 
 std::shared_ptr<CommandPool> Context::get_cmd_pool_GCT() {
     if (!cmd_pool_GCT.expired()) {
         return cmd_pool_GCT.lock();
-    } else {
-        auto cmd = std::make_shared<CommandPool>(get_queue_GCT());
-        cmd_pool_GCT = cmd;
-        return cmd;
     }
+    const auto cmd = std::make_shared<CommandPool>(get_queue_GCT());
+    cmd_pool_GCT = cmd;
+    return cmd;
 }
 
 std::shared_ptr<CommandPool> Context::get_cmd_pool_T() {
     if (!cmd_pool_T.expired()) {
         return cmd_pool_T.lock();
-    } else {
-        auto cmd = std::make_shared<CommandPool>(get_queue_T());
-        cmd_pool_T = cmd;
-        return cmd;
     }
+    const auto cmd = std::make_shared<CommandPool>(get_queue_T());
+    cmd_pool_T = cmd;
+    return cmd;
 }
 
 std::shared_ptr<CommandPool> Context::get_cmd_pool_C() {
     if (!cmd_pool_C.expired()) {
         return cmd_pool_C.lock();
-    } else {
-        auto cmd = std::make_shared<CommandPool>(get_queue_C());
-        cmd_pool_C = cmd;
-        return cmd;
     }
+    const auto cmd = std::make_shared<CommandPool>(get_queue_C());
+    cmd_pool_C = cmd;
+    return cmd;
 }
 
 bool Context::device_extension_enabled(const std::string& name) {

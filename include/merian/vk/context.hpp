@@ -87,12 +87,12 @@ class Context : public std::enable_shared_from_this<Context> {
      */
     static ContextHandle
     create(const std::vector<std::shared_ptr<Extension>>& extensions,
-                 const std::string& application_name = "",
-                 uint32_t application_vk_version = VK_MAKE_VERSION(1, 0, 0),
-                 uint32_t preffered_number_compute_queues = 1, // Additionally to the GCT queue
-                 uint32_t filter_vendor_id = -1,
-                 uint32_t filter_device_id = -1,
-                 const std::string& filter_device_name = "");
+           const std::string& application_name = "",
+           uint32_t application_vk_version = VK_MAKE_VERSION(1, 0, 0),
+           uint32_t preffered_number_compute_queues = 1, // Additionally to the GCT queue
+           uint32_t filter_vendor_id = -1,
+           uint32_t filter_device_id = -1,
+           const std::string& filter_device_name = "");
 
   private:
     Context(const std::vector<std::shared_ptr<Extension>>& extensions,
@@ -131,7 +131,7 @@ class Context : public std::enable_shared_from_this<Context> {
     void extensions_check_instance_extension_support();
     void extensions_check_device_extension_support();
     void extensions_self_check_support();
-    void destroy_extensions(std::vector<std::shared_ptr<Extension>> extensions);
+    void destroy_extensions(const std::vector<std::shared_ptr<Extension>>& extensions);
 
   public: // Getter
     // The actual number of compute queues (< preffered_number_compute_queues).
@@ -171,9 +171,8 @@ class Context : public std::enable_shared_from_this<Context> {
     template <class Extension> std::shared_ptr<Extension> get_extension() {
         if (extensions.contains(typeid(Extension))) {
             return std::static_pointer_cast<Extension>(extensions[typeid(Extension)]);
-        } else {
-            return nullptr;
         }
+        return nullptr;
     }
 
     bool device_extension_enabled(const std::string& name);
