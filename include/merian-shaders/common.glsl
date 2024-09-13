@@ -11,4 +11,10 @@
 
 #define MERIAN_SQUARE(x) ((x) * (x))
 
+bool merian_relative_distance_greather_than(const vec3 center, const vec3 p1, const vec3 p2, const float threshold) {
+    const float d1 = distance(center, p1);
+    const float d2 = distance(center, p2);
+    return abs(d1 - d2) / max(d1, d2) > threshold;
+}
+
 #endif // _MERIAN_SHADERS_COMMON_H_
