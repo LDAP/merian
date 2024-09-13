@@ -841,8 +841,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
 
                 if (!nodes.empty()) {
                     // go into "loading" mode
-                    SPDLOG_INFO(
-                        "Attempt to reconstruct the graph from properties. Fingers crossed!");
+                    SPDLOG_INFO("Reconstructing graph from properties.");
                     loading = true;
                     reset(); // never know...
                 }
@@ -913,7 +912,9 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
         if (!props.is_ui()) {
             nlohmann::json connections;
             if (!loading) {
-                for (const auto& [node, data] : node_data) {
+                for (const auto& identifier : identifiers()) {
+                    const NodeHandle& node = node_for_identifier.at(identifier);
+                    const auto& data = node_data.at(node);
                     for (const OutgoingNodeConnection& con : data.desired_outgoing_connections) {
                         nlohmann::json j_con;
                         j_con["src"] = data.identifier;
@@ -925,6 +926,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                     }
                 }
             }
+            std::sort(connections.begin(), connections.end());
             props.serialize_json("connections", connections);
             if (loading) {
                 for (auto& j_con : connections) {
