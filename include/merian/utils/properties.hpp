@@ -137,16 +137,20 @@ class Properties {
     // Converts to a checkbox in a GUI context.
     // Returns true if the value changed.
     virtual bool config_bool(const std::string& id, int& value, const std::string& desc = "") {
-        bool bool_value = value;
-        const bool changed = config_bool(id, bool_value, desc);
-        value = bool_value;
-        return changed;
+        bool bool_value = value != 0;
+        if (config_bool(id, bool_value, desc)) {
+            value = static_cast<int>(bool_value);
+            return true;
+        }
+        return false;
     }
     virtual bool config_bool(const std::string& id, uint32_t& value, const std::string& desc = "") {
-        bool bool_value = value;
-        const bool changed = config_bool(id, bool_value, desc);
-        value = bool_value;
-        return changed;
+        bool bool_value = value != 0u;
+        if (config_bool(id, bool_value, desc)) {
+            value = static_cast<uint32_t>(bool_value);
+            return true;
+        }
+        return false;
     }
     // Holds the supplied `value` if not changed by the configuration.
     // Converts to a checkbox in a GUI context.
