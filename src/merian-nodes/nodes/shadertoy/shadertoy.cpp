@@ -21,7 +21,9 @@ layout(push_constant) uniform constants {
     vec2 iResolution;
     float iTime;
     float iTimeDelta;
-    float iFrame;
+    int iFrame;
+    vec4 iMouse;
+    vec4 iDate;
 };
 
 )";
@@ -61,7 +63,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 
 class ShadertoyInjectCompiler : public ShaderCompiler {
   public:
-    ShadertoyInjectCompiler(const ShaderCompilerHandle forwarding_compiler)
+    ShadertoyInjectCompiler(const ShaderCompilerHandle& forwarding_compiler)
         : forwarding_compiler(forwarding_compiler) {}
 
     ~ShadertoyInjectCompiler() {}
@@ -78,7 +80,7 @@ class ShadertoyInjectCompiler : public ShaderCompiler {
     const ShaderCompilerHandle forwarding_compiler;
 };
 
-Shadertoy::Shadertoy(const ContextHandle context)
+Shadertoy::Shadertoy(const ContextHandle& context)
     : AbstractCompute(context, sizeof(PushConstant)), shader_glsl(default_shader) {
 
     ShaderCompilerHandle shaderc_compiler = nullptr;
@@ -133,7 +135,16 @@ const void* Shadertoy::get_push_constant([[maybe_unused]] GraphRun& run,
                                          [[maybe_unused]] const NodeIO& io) {
     constant.iTimeDelta = static_cast<float>(run.get_time_delta());
     constant.iTime = static_cast<float>(run.get_elapsed());
-    constant.iFrame++;
+    constant.iFrame = static_cast<int32_t>(run.get_total_iteration());
+
+    const auto now = std::chrono::system_clock::now();
+    const auto now_d = std::chrono::floor<std::chrono::days>(now);
+    const std::chrono::year_month_day ymd(now_d);
+    constant.iDate.x = static_cast<float>(static_cast<int>(ymd.year()));
+    constant.iDate.y = static_cast<float>(static_cast<unsigned int>(ymd.month()));
+    constant.iDate.y = static_cast<float>(static_cast<unsigned int>(ymd.day()));
+    constant.iDate.w =
+        std::chrono::duration_cast<std::chrono::duration<float>>(now - now_d).count();
 
     return &constant;
 }
@@ -222,9 +233,8 @@ AbstractCompute::NodeStatusFlags Shadertoy::properties(Properties& config) {
 
     if (needs_reconnect) {
         return NEEDS_RECONNECT;
-    } else {
-        return {};
     }
+    return {};
 }
 
 } // namespace merian_nodes

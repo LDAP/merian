@@ -4,7 +4,6 @@
 
 #include "merian-nodes/nodes/compute_node/compute_node.hpp"
 
-#include "merian/utils/stopwatch.hpp"
 #include "merian/vk/shader/shader_compiler.hpp"
 #include "merian/vk/shader/shader_hotreloader.hpp"
 #include "merian/vk/shader/shader_module.hpp"
@@ -22,11 +21,13 @@ class Shadertoy : public AbstractCompute {
         glm::vec2 iResolution{};
         float iTime{};
         float iTimeDelta{};
-        float iFrame{};
+        int32_t iFrame{};
+        glm::vec4 iMouse{};
+        glm::vec4 iDate{};
     };
 
   public:
-    Shadertoy(const ContextHandle context);
+    Shadertoy(const ContextHandle& context);
 
     std::vector<OutputConnectorHandle> describe_outputs(const NodeIOLayout& io_layout) override;
 
