@@ -468,18 +468,29 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
         InFlightData& in_flight_data = ring_fences.next_cycle_wait_get();
         gpu_wait_time = gpu_wait_time * 0.9 + sw_gpu_wait.duration() * 0.1;
 
+        // LOW LATENCY MODE
         if (low_latency_mode && !needs_reconnect) {
             const auto total_wait = std::max((std::max(gpu_wait_time, external_wait_time) +
                                               in_flight_data.cpu_sleep_time - 0.1ms),
                                              0.00ms);
-            const auto last_cpu_sleep_time = in_flight_data.cpu_sleep_time;
             in_flight_data.cpu_sleep_time = 0.92 * total_wait;
+        } else {
+            in_flight_data.cpu_sleep_time = 0ms;
+        }
+
+        // FPS LIMITER
+        if (limit_fps != 0) {
+            in_flight_data.cpu_sleep_time =
+                std::max(in_flight_data.cpu_sleep_time,
+                         1s / (double)limit_fps - std::chrono::duration<double>(cpu_time));
+        }
+
+        if (in_flight_data.cpu_sleep_time > 0ms) {
+            const auto last_cpu_sleep_time = in_flight_data.cpu_sleep_time;
             in_flight_data.cpu_sleep_time =
                 std::min(in_flight_data.cpu_sleep_time,
                          std::chrono::duration<double>(last_cpu_sleep_time * 1.05 + 1ms));
             std::this_thread::sleep_for(in_flight_data.cpu_sleep_time);
-        } else {
-            in_flight_data.cpu_sleep_time = 0ms;
         }
 
         // now we can release the resources from staging space and reset the command pool
@@ -491,6 +502,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
         const vk::CommandBuffer cmd = cmd_pool->create_and_begin();
         // get profiler and reports
         const ProfilerHandle& profiler = prepare_profiler_for_run(in_flight_data);
+        const auto run_start = std::chrono::high_resolution_clock::now();
 
         // CONNECT and PREPROCESS
         do {
@@ -596,6 +608,8 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                 task();
             on_run_finished_tasks.clear();
         }
+
+        cpu_time = std::chrono::high_resolution_clock::now() - run_start;
     }
 
     // waits until all in-flight iterations have finished
@@ -654,21 +668,35 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                 }
             }
             if (time_overwrite == 1) {
-                float delta_s = 0;
+                float time_s = to_seconds(duration_elapsed);
+                props.config_float("time (s)", time_s, "", 0.1);
+                float delta_s = time_s - to_seconds(duration_elapsed);
                 props.config_float("offset (s)", delta_s, "", 0.01);
                 time_delta_overwrite_ms += delta_s * 1000.;
             } else if (time_overwrite == 2) {
                 props.config_float("delta (ms)", time_delta_overwrite_ms, "", 0.001);
+                float fps = 1000. / time_delta_overwrite_ms;
+                props.config_float("fps", fps, "", 0.01);
+                time_delta_overwrite_ms = 1000 / fps;
             }
 
             props.st_separate();
+            if (props.config_bool("fps limiter", limit_fps) && limit_fps != 0) {
+                limit_fps = 60;
+            }
+            if (limit_fps != 0) {
+                if (props.config_int("fps limit", limit_fps, "")) {
+                    limit_fps = std::max(1, limit_fps);
+                }
+            }
             props.config_bool(
                 "low latency", low_latency_mode,
                 "Experimental: Delays CPU processing to recude input latency in GPU bound "
                 "applications. Might reduce framerate.");
-            if (low_latency_mode) {
+            if (low_latency_mode || limit_fps > 0) {
                 const InFlightData& in_flight_data = ring_fences.get().user_data;
-                props.output_text("CPU sleep time: {:04f}ms", to_milliseconds(in_flight_data.cpu_sleep_time));
+                props.output_text("CPU sleep time: {:04f}ms",
+                                  to_milliseconds(in_flight_data.cpu_sleep_time));
             }
 
             props.st_end_child();
@@ -1951,10 +1979,12 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
     float time_delta_overwrite_ms = 0.;
     // across builds. Might be not 0 at begin of run.
     std::chrono::nanoseconds time_delta = 0ns;
+    std::chrono::nanoseconds cpu_time = 0ns;
 
     bool low_latency_mode = false;
     std::chrono::duration<double> gpu_wait_time = 0ns;
     std::chrono::duration<double> external_wait_time = 0ns;
+    int32_t limit_fps = 0;
 
     Profiler::Report last_build_report;
     Profiler::Report last_run_report;
