@@ -44,7 +44,7 @@ void main()
   }
 
   vec4 frag_color;
-  mainImage(frag_color, pixel);
+  mainImage(frag_color, vec2(pixel.x, iResolution.y - pixel.y - 1));
   // WebGL or Shadertoy does not do a Linear->sRGB conversion
   // thus the shader must output sRGB. But here the shader is expected to output
   // linear!
