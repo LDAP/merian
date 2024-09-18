@@ -4,6 +4,7 @@
 #include "merian/vk/extension/extension.hpp"
 
 #include <spdlog/spdlog.h>
+#include <fmt/ranges.h>
 #include <tuple>
 
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE

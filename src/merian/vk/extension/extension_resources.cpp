@@ -1,20 +1,22 @@
 #include "merian/vk/extension/extension_resources.hpp"
 #include "merian/vk/memory/memory_allocator_vma.hpp"
 
+#include <fmt/ranges.h>
+
 namespace merian {
 
 void ExtensionResources::on_physical_device_selected(
     const Context::PhysicalDeviceContainer& physical_device) {
-    for (auto& extension : physical_device.physical_device_extension_properties) {
-        if (!strcmp(extension.extensionName, "VK_KHR_maintenance4")) {
+    for (const auto& extension : physical_device.physical_device_extension_properties) {
+        if (strcmp(extension.extensionName, "VK_KHR_maintenance4") == 0) {
             required_extensions.push_back("VK_KHR_maintenance4");
             flags |= VMA_ALLOCATOR_CREATE_KHR_MAINTENANCE4_BIT;
         }
-        if (!strcmp(extension.extensionName, "VK_KHR_maintenance5")) {
+        if (strcmp(extension.extensionName, "VK_KHR_maintenance5") == 0) {
             required_extensions.push_back("VK_KHR_maintenance5");
             flags |= VMA_ALLOCATOR_CREATE_KHR_MAINTENANCE5_BIT;
         }
-        if (!strcmp(extension.extensionName, "VK_KHR_buffer_device_address")) {
+        if (strcmp(extension.extensionName, "VK_KHR_buffer_device_address") == 0) {
             required_extensions.push_back("VK_KHR_buffer_device_address");
         }
     }

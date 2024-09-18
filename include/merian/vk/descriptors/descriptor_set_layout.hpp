@@ -4,13 +4,14 @@
 #include <spdlog/spdlog.h>
 #include <vector>
 #include <vulkan/vulkan.hpp>
+#include <fmt/ranges.h>
 
 namespace merian {
 
 class DescriptorSetLayout : public std::enable_shared_from_this<DescriptorSetLayout> {
 
   public:
-    DescriptorSetLayout(const ContextHandle context,
+    DescriptorSetLayout(const ContextHandle& context,
                         const std::vector<vk::DescriptorSetLayoutBinding>& bindings,
                         const vk::DescriptorSetLayoutCreateFlags flags = {})
         : context(context), bindings(bindings) {
@@ -57,7 +58,7 @@ inline std::string format_as(const DescriptorSetLayoutHandle& layout) {
 
     std::vector<std::string> binding_strs;
 
-    for (auto& binding : layout->get_bindings()) {
+    for (const auto& binding : layout->get_bindings()) {
         binding_strs.emplace_back(
             fmt::format("(binding = {}, count = {}, type = {}, stage flags = {})", binding.binding,
                         binding.descriptorCount, vk::to_string(binding.descriptorType),
