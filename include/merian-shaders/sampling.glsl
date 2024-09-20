@@ -19,8 +19,24 @@ vec3 sample_hemisphere(const vec2 random) {
 
 // sample hemisphere (around 0,0,1), cos lobe, p = cos(theta) / pi
 vec3 sample_cos(const vec2 random) {
-    const float su = sqrt(random.x);
-    return vec3(su * cos(TWO_PI * random.y), su * sin(TWO_PI * random.y), sqrt(1.0 - random.x));
+   const float su = sqrt(random.x);
+   return vec3(su * cos(TWO_PI * random.y), su * sin(TWO_PI * random.y), sqrt(1.0 - random.x));
+}
+
+// samples barycentric coordinates of a triangle, p = 1 / A
+vec3 sample_triangle(const vec2 random) {
+   const float x = sqrt(random.x);
+
+   return vec3(
+      1 - x,
+      x * (1 - random.y),
+      x * random.y);
+}
+
+// samples coordinates on a unit disk, p = 1 / A
+vec2 sample_disk(const vec2 random) {
+   const float angle = TWO_PI * random.x;
+   return vec2(cos(angle), sin(angle)) * sqrt(random.y);
 }
 
 // returns two pseudorandom normal distributed values.

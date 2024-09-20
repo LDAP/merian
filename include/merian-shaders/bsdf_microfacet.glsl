@@ -1,5 +1,6 @@
 #include "merian-shaders/common.glsl"
 #include "merian-shaders/sampling.glsl"
+#include "merian-shaders/fresnel.glsl"
 
 /*
  * microfacet model by jonathan:
@@ -63,7 +64,7 @@ float bsdf_microfacet_eval(const vec3 minus_wi, const mat3x3 frame_mat, const ve
   const float sigmaL2 = sigmaSq.x * cosL2 + sigmaSq.y * (1.0 - cosL2);
 
   // Schlick's approximation
-  const float fresnel = 0.02 + 0.98 * pow(1.0 - dot(minus_wi, H), 5.0);
+  const float fresnel = fresnel_schlick(dot(minus_wi, H), 0.02);
 
   zL = max(zL, 0.01);
   zV = max(zV, 0.01);
