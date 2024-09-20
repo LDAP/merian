@@ -67,7 +67,7 @@ void tap(const ivec2 offset,
 
   const float w_l = abs(p_l - c_l) / (sigma_l + 1e-10);
   
-  float w_z = exp(-10 * abs(c_gbuf.linear_z + dot(c_gbuf.grad_z, offset) - p_gbuf.linear_z) / params.param_z);
+  float w_z = exp(-10 * abs(c_gbuf.linear_z + dot(vec2(c_gbuf.grad_z), offset) - p_gbuf.linear_z) / params.param_z);
   w_z = mix(w_z, 1.0, z_bias_depth_mix);
 
   // was: pow(max(0, dot(p_n, c_n)), params.param_n); 
