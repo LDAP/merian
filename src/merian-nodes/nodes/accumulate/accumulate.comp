@@ -131,6 +131,7 @@ void main() {
   if (any(greaterThanEqual(ipos, imageSize(img_accum)))) return;
 
   vec3 irr = texelFetch(img_irr, ipos, 0).rgb;
+  float samples = texelFetch(img_irr, ipos, 0).a;
   vec2 moments = texelFetch(img_moments, ipos, 0).rg;
   vec4 percentiles;
 
@@ -246,8 +247,8 @@ void main() {
       prev_irr_histlen.a = min(1.0 / (1.0 - adaptive_alpha) - 1, prev_irr_histlen.a);
     }
 
-    prev_irr_histlen.a = min(prev_irr_histlen.a + 1, max_history);
-    float alpha = min(pc.accum_alpha, 1. - 1. / prev_irr_histlen.a);
+    float alpha = min(pc.accum_alpha, prev_irr_histlen.a / (prev_irr_histlen.a + samples));
+    prev_irr_histlen.a = min(prev_irr_histlen.a + samples, max_history);
 
     irr     = mix(irr, prev_irr_histlen.rgb, alpha);
     moments = mix(moments,         prev_moments, alpha);

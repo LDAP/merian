@@ -21,7 +21,7 @@ Inputs:
 | VkImageIn  | prev_accum   | feedback last `accum`                                                                  | 1     |
 | VkImageIn  | prev_moments | feedback last `moments`                                                                | 1     |
 |            |              |                                                                                        |       |
-| VkImageIn  | irr          | irradiance input (irradiance in `rgb`, sample count in `a`)                            | no    |
+| VkImageIn  | irr          | irradiance input (irradiance in `rgb`, sample count in `a`!)                            | no    |
 |            |              |                                                                                        |       |
 | VkImageIn  | mv           | motion vectors in `r` and `g` channel                                                  | no    |
 | VkImageIn  | moments_in   | moments in `r` and `g` channel                                                         | no    |
