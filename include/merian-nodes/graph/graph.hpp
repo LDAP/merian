@@ -1684,9 +1684,10 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                                 data.input_connections.try_emplace(input, NodeData::PerInputInfo());
                             } else {
                                 // Not connected delayed inputs are filtered here.
-                                data.errors.emplace_back(
-                                    make_error_input_not_connected(input, node, data));
-                                break;
+                                std::string error =
+                                    make_error_input_not_connected(input, node, data);
+                                data.errors.emplace_back(error);
+                                SPDLOG_WARN(error);
                             }
                         } else {
                             NodeData::PerInputInfo& input_info = data.input_connections[input];
@@ -1700,7 +1701,6 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                                     SPDLOG_WARN(error);
                                     data.errors.emplace_back(std::move(error));
                                 }
-                                break;
                             }
                         }
                     }
@@ -1870,6 +1870,8 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                         }
                     } else {
                         NodeData& src_data = node_data.at(per_input_info.node);
+                        assert(src_data.errors.empty());
+                        assert(!src_data.disable);
                         auto& resources =
                             src_data.output_connections.at(per_input_info.output).resources;
                         const uint32_t num_resources = resources.size();
