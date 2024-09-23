@@ -163,7 +163,7 @@ void main() {
   const vec2 mv = texelFetch(img_mv, ipos, 0).rg;
 
   // REPROJECTION
-  vec2 prev_pos = ipos + mv;;
+  vec2 prev_pos = ipos + mv;
   float max_history = pc.accum_max_hist;
   if (REUSE_BORDER) {
     // Attemp to reuse information at the image border.
