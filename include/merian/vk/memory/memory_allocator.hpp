@@ -18,7 +18,7 @@ using MemoryAllocationHandle = std::shared_ptr<MemoryAllocation>;
 class MemoryAllocator;
 using MemoryAllocatorHandle = std::shared_ptr<MemoryAllocator>;
 
-static const MemoryAllocationHandle NullMememoryAllocationHandle = nullptr;
+static const MemoryAllocationHandle NULL_MEMEMORY_ALLOCATION_HANDLE = nullptr;
 
 enum class MemoryMappingType {
     // Memory mapping is not possible. GPU-only resources.

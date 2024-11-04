@@ -254,7 +254,7 @@ class BufferSubAllocator {
         vk::DeviceSize size = 0;
         vk::Buffer buffer = VK_NULL_HANDLE;
         TRangeAllocator<BASE_ALIGNMENT> range;
-        MemoryAllocationHandle memory = NullMememoryAllocationHandle;
+        MemoryAllocationHandle memory = NULL_MEMEMORY_ALLOCATION_HANDLE;
         uint8_t* mapping = nullptr;
         vk::DeviceAddress address = 0;
         bool isDedicated = false;

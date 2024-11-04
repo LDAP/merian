@@ -178,7 +178,7 @@ void BufferSubAllocator::freeBlock(Block& block) {
     if (!block.isDedicated) {
         block.range.deinit();
     }
-    block.memory = NullMememoryAllocationHandle;
+    block.memory = NULL_MEMEMORY_ALLOCATION_HANDLE;
     block.buffer = VK_NULL_HANDLE;
     block.mapping = nullptr;
     block.isDedicated = false;
