@@ -116,15 +116,10 @@ inline std::string format_as(const MemoryAllocationInfo& alloc_info) {
  */
 class MemoryAllocation : public std::enable_shared_from_this<MemoryAllocation> {
   public:
-    MemoryAllocation(const ContextHandle& context) : context(context) {}
+    MemoryAllocation(const ContextHandle& context);
 
     // unmaps and frees the memory when called
-    virtual ~MemoryAllocation() = default;
-
-    // ------------------------------------------------------------------------------------
-
-    // can only be called once
-    virtual void free() = 0;
+    virtual ~MemoryAllocation();
 
     // ------------------------------------------------------------------------------------
 
@@ -133,7 +128,19 @@ class MemoryAllocation : public std::enable_shared_from_this<MemoryAllocation> {
         return (T*)map();
     }
 
-    // Maps device memory to system memory.
+    // Invalidates memory of a allocation. Call this before reading from non host-coherent memory
+    // type or before reading from persistently mapped host-coherent memory.
+    // Map does not do that automatically, internally this is a call to
+    // vkInvalidateMappedMemoryRanges
+    virtual void invalidate(const VkDeviceSize offset = 0, const VkDeviceSize size = VK_WHOLE_SIZE) = 0;
+
+    // Call this after writing to non host-coherent memory
+    // or after writing to persistently mapped host-coherent memory.
+    // Map does not do that automatically, internally this is a call to vkFlushMappedMemoryRanges
+    virtual void flush(const VkDeviceSize offset = 0, const VkDeviceSize size = VK_WHOLE_SIZE) = 0;
+
+    // Maps device memory to system memory. This should return the same pointer if called multiple
+    // times before "unmap".
     virtual void* map() = 0;
 
     // Unmap memHandle

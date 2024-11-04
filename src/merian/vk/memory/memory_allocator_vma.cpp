@@ -9,9 +9,7 @@ namespace merian {
 
 VMAMemoryAllocation::~VMAMemoryAllocation() {
     SPDLOG_TRACE("destroy VMA allocation ({})", fmt::ptr(this));
-    if (is_mapped) {
-        unmap();
-    }
+    unmap();
     free();
 };
 
@@ -19,38 +17,50 @@ VMAMemoryAllocation::~VMAMemoryAllocation() {
 
 void VMAMemoryAllocation::free() {
     std::lock_guard<std::mutex> lock(allocation_mutex);
+    assert(m_allocation);
 
-    if (m_allocation) {
-        SPDLOG_TRACE("freeing memory ({})", fmt::ptr(this));
-        vmaFreeMemory(allocator->vma_allocator, m_allocation);
-        m_allocation = nullptr;
-    } else {
-        SPDLOG_WARN("VMA allocation ({}) was already freed", fmt::ptr(this));
-    }
+    SPDLOG_TRACE("freeing memory ({})", fmt::ptr(this));
+    vmaFreeMemory(allocator->vma_allocator, m_allocation);
+    m_allocation = nullptr;
 };
 
 // ------------------------------------------------------------------------------------
 
+void VMAMemoryAllocation::invalidate(const VkDeviceSize offset, const VkDeviceSize size) {
+    vmaInvalidateAllocation(allocator->vma_allocator, m_allocation, offset, size);
+};
+
+void VMAMemoryAllocation::flush(const VkDeviceSize offset, const VkDeviceSize size) {
+    vmaFlushAllocation(allocator->vma_allocator, m_allocation, offset, size);
+};
+
 // Maps device memory to system memory.
 void* VMAMemoryAllocation::map() {
     std::lock_guard<std::mutex> lock(allocation_mutex);
+
     assert(m_allocation); // freed?
     assert(mapping_type != MemoryMappingType::NONE);
 
-    void* ptr;
-    check_result(vmaMapMemory(allocator->vma_allocator, m_allocation, &ptr),
+    if (mapped_memory != nullptr) {
+        return mapped_memory;
+    }
+
+    check_result(vmaMapMemory(allocator->vma_allocator, m_allocation, &mapped_memory),
                  "mapping memory failed");
-    is_mapped = true;
-    return ptr;
+    return mapped_memory;
 };
 
 // Unmap memHandle
 void VMAMemoryAllocation::unmap() {
     std::lock_guard<std::mutex> lock(allocation_mutex);
-    assert(m_allocation); // freed?
+    assert(m_allocation);
+
+    if (mapped_memory == nullptr) {
+        return;
+    }
 
     vmaUnmapMemory(allocator->vma_allocator, m_allocation);
-    is_mapped = false;
+    mapped_memory = nullptr;
 };
 
 // ------------------------------------------------------------------------------------
@@ -87,10 +97,10 @@ VMAMemoryAllocation::create_aliasing_buffer(const vk::BufferCreateInfo& buffer_c
 MemoryAllocationInfo VMAMemoryAllocation::get_memory_info() const {
     const std::lock_guard<std::mutex> lock(allocation_mutex);
 
-    VmaAllocationInfo allocInfo;
-    vmaGetAllocationInfo(allocator->vma_allocator, m_allocation, &allocInfo);
-    return MemoryAllocationInfo{allocInfo.deviceMemory, allocInfo.offset, allocInfo.size,
-                                allocInfo.pName};
+    VmaAllocationInfo alloc_info;
+    vmaGetAllocationInfo(allocator->vma_allocator, m_allocation, &alloc_info);
+    return MemoryAllocationInfo{alloc_info.deviceMemory, alloc_info.offset, alloc_info.size,
+                                alloc_info.pName};
 };
 
 MemoryAllocatorHandle VMAMemoryAllocation::get_allocator() const {
@@ -99,7 +109,11 @@ MemoryAllocatorHandle VMAMemoryAllocation::get_allocator() const {
 
 void VMAMemoryAllocation::properties(Properties& props) {
     MemoryAllocation::properties(props);
-    props.output_text(fmt::format("Mapped: {}", is_mapped));
+
+    props.output_text(fmt::format("Mapped: {}", mapped_memory != nullptr));
+    if (mapped_memory != nullptr) {
+        props.output_text(fmt::format("Mapped at: {}", fmt::ptr(mapped_memory)));
+    }
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -124,23 +138,23 @@ VMAMemoryAllocator::make_allocator(const ContextHandle& context,
 VMAMemoryAllocator::VMAMemoryAllocator(const ContextHandle& context,
                                        const VmaAllocatorCreateFlags flags)
     : MemoryAllocator(context) {
-    VmaAllocatorCreateInfo allocatorInfo = {.flags = flags,
-                                            .physicalDevice =
-                                                context->physical_device.physical_device,
-                                            .device = context->device,
-                                            .preferredLargeHeapBlockSize = 0,
-                                            .pAllocationCallbacks = nullptr,
-                                            .pDeviceMemoryCallbacks = nullptr,
-                                            .pHeapSizeLimit = nullptr,
-                                            .pVulkanFunctions = nullptr,
-                                            .instance = context->instance,
-                                            .vulkanApiVersion = context->vk_api_version,
+    VmaAllocatorCreateInfo allocator_info = {.flags = flags,
+                                             .physicalDevice =
+                                                 context->physical_device.physical_device,
+                                             .device = context->device,
+                                             .preferredLargeHeapBlockSize = 0,
+                                             .pAllocationCallbacks = nullptr,
+                                             .pDeviceMemoryCallbacks = nullptr,
+                                             .pHeapSizeLimit = nullptr,
+                                             .pVulkanFunctions = nullptr,
+                                             .instance = context->instance,
+                                             .vulkanApiVersion = context->vk_api_version,
 #if VMA_EXTERNAL_MEMORY
-                                            .pTypeExternalMemoryHandleTypes = nullptr
+                                             .pTypeExternalMemoryHandleTypes = nullptr
 #endif
     };
     SPDLOG_DEBUG("create VMA allocator ({})", fmt::ptr(this));
-    vmaCreateAllocator(&allocatorInfo, &vma_allocator);
+    vmaCreateAllocator(&allocator_info, &vma_allocator);
 }
 
 VMAMemoryAllocator::~VMAMemoryAllocator() {
@@ -151,7 +165,7 @@ VMAMemoryAllocator::~VMAMemoryAllocator() {
 // ----------------------------------------------------------------------------------------------
 
 void log_allocation([[maybe_unused]] const VmaAllocationInfo& info,
-                    [[maybe_unused]] const MemoryAllocationHandle memory,
+                    [[maybe_unused]] const MemoryAllocationHandle& memory,
                     [[maybe_unused]] const std::string& name) {
     if (!name.empty())
         SPDLOG_TRACE("allocated {} of memory at offset {} ({}, {})", format_size(info.size),
@@ -176,7 +190,7 @@ VmaAllocationCreateInfo make_create_info(const VmaMemoryUsage usage,
                                          const MemoryMappingType mapping_type,
                                          const bool dedicated,
                                          const float dedicated_priority) {
-    VmaAllocationCreateInfo vmaAllocInfo{
+    VmaAllocationCreateInfo vma_alloc_info{
         .flags = {},
         .usage = usage,
         .requiredFlags = static_cast<VkMemoryPropertyFlags>(required_flags),
@@ -187,11 +201,11 @@ VmaAllocationCreateInfo make_create_info(const VmaMemoryUsage usage,
         .priority = dedicated_priority,
     };
     // clang-format off
-    vmaAllocInfo.flags |= dedicated ? VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT : 0;
-    vmaAllocInfo.flags |= mapping_type == MemoryMappingType::HOST_ACCESS_RANDOM ? VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT : 0;
-    vmaAllocInfo.flags |= mapping_type == MemoryMappingType::HOST_ACCESS_SEQUENTIAL_WRITE ? VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT : 0;
+    vma_alloc_info.flags |= dedicated ? VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT : 0;
+    vma_alloc_info.flags |= mapping_type == MemoryMappingType::HOST_ACCESS_RANDOM ? VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT : 0;
+    vma_alloc_info.flags |= mapping_type == MemoryMappingType::HOST_ACCESS_SEQUENTIAL_WRITE ? VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT : 0;
     // clang-format on
-    return vmaAllocInfo;
+    return vma_alloc_info;
 }
 
 MemoryAllocationHandle
@@ -202,7 +216,7 @@ VMAMemoryAllocator::allocate_memory(const vk::MemoryPropertyFlags required_flags
                                     const vk::MemoryPropertyFlags preferred_flags,
                                     const bool dedicated,
                                     const float dedicated_priority) {
-    VmaAllocationCreateInfo vmaAllocInfo =
+    VmaAllocationCreateInfo vma_alloc_info =
         make_create_info(VMA_MEMORY_USAGE_UNKNOWN, required_flags, preferred_flags, mapping_type,
                          dedicated, dedicated_priority);
 
@@ -211,7 +225,7 @@ VMAMemoryAllocator::allocate_memory(const vk::MemoryPropertyFlags required_flags
     VmaAllocationInfo allocation_info;
     VmaAllocation allocation;
     check_result(
-        vmaAllocateMemory(vma_allocator, &mem_reqs, &vmaAllocInfo, &allocation, &allocation_info),
+        vmaAllocateMemory(vma_allocator, &mem_reqs, &vma_alloc_info, &allocation, &allocation_info),
         "could not allocate memory");
 
     if (!debug_name.empty())

@@ -35,14 +35,12 @@ class VMAMemoryAllocation : public MemoryAllocation {
 
     // ------------------------------------------------------------------------------------
 
-    void free() override;
+    void invalidate(const VkDeviceSize offset = 0, const VkDeviceSize size = VK_WHOLE_SIZE) override;
 
-    // ------------------------------------------------------------------------------------
+    void flush(const VkDeviceSize offset = 0, const VkDeviceSize size = VK_WHOLE_SIZE) override;
 
-    // Maps device memory to system memory.
     void* map() override;
 
-    // Unmap memHandle
     void unmap() override;
 
     // ------------------------------------------------------------------------------------
@@ -52,7 +50,7 @@ class VMAMemoryAllocation : public MemoryAllocation {
     MemoryAllocationInfo get_memory_info() const override;
 
     // ------------------------------------------------------------------------------------
-    
+
     ImageHandle create_aliasing_image(const vk::ImageCreateInfo& image_create_info) override;
 
     BufferHandle create_aliasing_buffer(const vk::BufferCreateInfo& buffer_create_info) override;
@@ -68,11 +66,13 @@ class VMAMemoryAllocation : public MemoryAllocation {
     void properties(Properties& props) override;
 
   private:
+    void free();
+
     const std::shared_ptr<VMAMemoryAllocator> allocator;
     const MemoryMappingType mapping_type;
     VmaAllocation m_allocation;
     mutable std::mutex allocation_mutex;
-    bool is_mapped = false;
+    void* mapped_memory = nullptr;
 };
 
 class VMAMemoryAllocator : public MemoryAllocator {
@@ -95,13 +95,14 @@ class VMAMemoryAllocator : public MemoryAllocator {
 
     // ------------------------------------------------------------------------------------
 
-    MemoryAllocationHandle allocate_memory(const vk::MemoryPropertyFlags required_flags,
-                                           const vk::MemoryRequirements& requirements,
-                                           const std::string& debug_name = {},
-                                           const MemoryMappingType mapping_type = MemoryMappingType::NONE,
-                                           const vk::MemoryPropertyFlags preferred_flags = {},
-                                           const bool dedicated = false,
-                                           const float dedicated_priority = 1.0) override;
+    MemoryAllocationHandle
+    allocate_memory(const vk::MemoryPropertyFlags required_flags,
+                    const vk::MemoryRequirements& requirements,
+                    const std::string& debug_name = {},
+                    const MemoryMappingType mapping_type = MemoryMappingType::NONE,
+                    const vk::MemoryPropertyFlags preferred_flags = {},
+                    const bool dedicated = false,
+                    const float dedicated_priority = 1.0) override;
 
     BufferHandle
     create_buffer(const vk::BufferCreateInfo buffer_create_info,

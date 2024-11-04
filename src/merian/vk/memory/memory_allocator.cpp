@@ -15,4 +15,9 @@ uint32_t getMemoryType(const vk::PhysicalDeviceMemoryProperties& memoryPropertie
     return ~0u;
 }
 
+MemoryAllocation::MemoryAllocation(const ContextHandle& context) : context(context) {}
+
+// unmaps and frees the memory when called
+MemoryAllocation::~MemoryAllocation() {}
+
 } // namespace merian
