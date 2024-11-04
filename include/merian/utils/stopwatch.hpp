@@ -17,8 +17,12 @@ class Stopwatch {
     double seconds() const;
     std::chrono::nanoseconds duration() const;
 
+    friend std::ostream& operator<<(std::ostream& stream, const Stopwatch& sw);
+
   private:
     chrono_clock::time_point start;
 };
+
+auto format_as(const Stopwatch& sw);
 
 } // namespace merian

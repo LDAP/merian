@@ -9,15 +9,26 @@
 
 namespace merian {
 
-[[nodiscard]] inline std::string format_size(const uint64_t size) {
-    std::vector<const char*> units = {"B", "KB", "MB", "GB", "TB"};
+[[nodiscard]] inline std::string format_size(const uint64_t size_bytes) {
+    const std::vector<const char*> units = {"B", "KB", "MB", "GB", "TB"};
     std::size_t unit_index;
-    if (size == 0) {
+    if (size_bytes == 0) {
         unit_index = 0;
     } else {
-        unit_index = std::min((std::size_t)std::log2(size) / 10, units.size() - 1);
+        unit_index = std::min((std::size_t)std::log2(size_bytes) / 10, units.size() - 1);
     }
-    return fmt::format("{} {}", size / std::pow(1024, unit_index), units[unit_index]);
+    return fmt::format("{} {}", (double)size_bytes / std::pow(1024, unit_index), units[unit_index]);
+}
+
+[[nodiscard]] inline std::string format_duration(const uint64_t duration_ns) {
+    const std::vector<const char*> units = {"ns", "μs", "ms", "s"};
+    std::size_t unit_index;
+    if (duration_ns == 0) {
+        unit_index = 0;
+    } else {
+        unit_index = std::min((std::size_t)(std::log10(duration_ns) / 3), units.size() - 1);
+    }
+    return fmt::format("{} {}", (double)duration_ns / std::pow(1000, unit_index), units[unit_index]);
 }
 
 [[nodiscard]] inline bool ends_with(const std::string& value, const std::string& suffix) {
