@@ -133,7 +133,7 @@ void Context::create_instance() {
     };
 
     instance = vk::createInstance(instance_create_info);
-    const uint32_t instance_vulkan_version = vk::enumerateInstanceVersion();
+    [[maybe_unused]] const uint32_t instance_vulkan_version = vk::enumerateInstanceVersion();
     SPDLOG_DEBUG("instance created (version: {}.{}.{})",
                  VK_API_VERSION_MAJOR(instance_vulkan_version),
                  VK_API_VERSION_MINOR(instance_vulkan_version),
