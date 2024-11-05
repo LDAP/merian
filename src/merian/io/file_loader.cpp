@@ -11,11 +11,8 @@ namespace merian {
 
 bool FileLoader::exists(const std::filesystem::path& path,
                         std::filesystem::file_status file_status) {
-    if (std::filesystem::status_known(file_status) ? std::filesystem::exists(file_status)
-                                                   : std::filesystem::exists(path))
-        return true;
-    else
-        return false;
+    return (std::filesystem::status_known(file_status) ? std::filesystem::exists(file_status)
+                                                       : std::filesystem::exists(path));
 }
 
 std::string FileLoader::load_file(const std::filesystem::path& path) {
@@ -36,7 +33,8 @@ std::string FileLoader::load_file(const std::filesystem::path& path) {
 }
 
 // returns empty path if not found.
-std::optional<std::filesystem::path> search_cwd_parents(const std::filesystem::path& path) {
+std::optional<std::filesystem::path>
+FileLoader::search_cwd_parents(const std::filesystem::path& path) {
     std::filesystem::path current = std::filesystem::current_path();
     while (true) {
         const std::filesystem::path full_path = current / path;
@@ -104,7 +102,7 @@ FileLoader::find_and_load_file(const std::filesystem::path& filename,
     return load_file(full_path.value());
 }
 
-void FileLoader::add_search_path(const std::filesystem::path path) {
+void FileLoader::add_search_path(const std::filesystem::path& path) {
     auto resolved = find_file(path);
     if (!resolved) {
         resolved = std::filesystem::weakly_canonical(path);
@@ -113,7 +111,7 @@ void FileLoader::add_search_path(const std::filesystem::path path) {
     SPDLOG_DEBUG("added search path {}", resolved->string());
 }
 
-bool FileLoader::remove_search_path(const std::filesystem::path path) {
+bool FileLoader::remove_search_path(const std::filesystem::path& path) {
     return search_paths.erase(std::filesystem::weakly_canonical(path)) > 0;
 }
 

@@ -16,12 +16,14 @@ class FileLoader {
 
     static std::string load_file(const std::filesystem::path& path);
 
+    static std::optional<std::filesystem::path> search_cwd_parents(const std::filesystem::path& path);
+
   public:
-    FileLoader(std::set<std::filesystem::path> search_paths = {"./"})
+    FileLoader(const std::set<std::filesystem::path>& search_paths = {"./"})
         : search_paths(search_paths) {}
 
     // Searches the file in cwd and search paths and returns the full path to the file
-    std::optional<std::filesystem::path> find_file(const std::filesystem::path& filename) const;
+    std::optional<std::filesystem::path> find_file(const std::filesystem::path& path) const;
 
     std::optional<std::filesystem::path>
     find_file(const std::filesystem::path& filename,
@@ -35,9 +37,9 @@ class FileLoader {
 
     // adds the path to the file loader. The path is searched using the file loader, that means it
     // can be relative to any previously added search path.
-    void add_search_path(const std::filesystem::path path);
+    void add_search_path(const std::filesystem::path& path);
 
-    bool remove_search_path(const std::filesystem::path path);
+    bool remove_search_path(const std::filesystem::path& path);
 
     // Search in parents of cwd
     void set_cwd_search_parents(const bool search_parents);
