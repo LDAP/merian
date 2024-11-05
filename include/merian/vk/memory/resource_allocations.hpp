@@ -63,7 +63,12 @@ class Buffer : public std::enable_shared_from_this<Buffer> {
 
     // -----------------------------------------------------------
 
-    vk::BufferDeviceAddressInfo get_buffer_device_address_info() {
+    vk::DescriptorBufferInfo get_descriptor_info(const vk::DeviceSize offset = 0,
+                                                 const vk::DeviceSize range = VK_WHOLE_SIZE) const {
+        return vk::DescriptorBufferInfo{buffer, offset, range};
+    }
+
+    vk::BufferDeviceAddressInfo get_buffer_device_address_info() const {
         return vk::BufferDeviceAddressInfo{buffer};
     }
 
