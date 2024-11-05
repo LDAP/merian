@@ -11,6 +11,9 @@
 
 #define MERIAN_SQUARE(x) ((x) * (x))
 
+#define MERIAN_WORKGROUP_INDEX (gl_WorkGroupID.x + gl_WorkGroupID.y * gl_NumWorkGroups.x + gl_WorkGroupID.z * gl_NumWorkGroups.x * gl_NumWorkGroups.y)
+#define MERIAN_GLOBAL_INVOCATION_INDEX (MERIAN_WORKGROUP_INDEX * gl_WorkGroupSize.x * gl_WorkGroupSize.y * gl_WorkGroupSize.z + gl_LocalInvocationIndex)
+
 bool merian_relative_distance_greather_than(const vec3 center, const vec3 p1, const vec3 p2, const float threshold) {
     const float d1 = distance(center, p1);
     const float d2 = distance(center, p2);
