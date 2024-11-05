@@ -38,7 +38,7 @@ GraphicsPipelineBuilder::input_assembly_topology(const vk::PrimitiveTopology top
 
 GraphicsPipelineBuilder&
 GraphicsPipelineBuilder::input_assembly_primitive_restart(const bool enable) {
-    input_assembly_state.primitiveRestartEnable = enable;
+    input_assembly_state.primitiveRestartEnable = static_cast<vk::Bool32>(enable);
     return *this;
 }
 
@@ -108,12 +108,12 @@ GraphicsPipelineBuilder::rasterizer_flags(const vk::PipelineRasterizationStateCr
 }
 
 GraphicsPipelineBuilder& GraphicsPipelineBuilder::rasterizer_depth_clamp(const bool enable) {
-    rasterization_state.depthClampEnable = enable;
+    rasterization_state.depthClampEnable = static_cast<vk::Bool32>(enable);
     return *this;
 }
 
 GraphicsPipelineBuilder& GraphicsPipelineBuilder::rasterizer_discard(const bool enable) {
-    rasterization_state.rasterizerDiscardEnable = enable;
+    rasterization_state.rasterizerDiscardEnable = static_cast<vk::Bool32>(enable);
     return *this;
 }
 
@@ -147,7 +147,7 @@ GraphicsPipelineBuilder::rasterizer_depth_bias(const float depth_bias_constant_f
 }
 
 GraphicsPipelineBuilder& GraphicsPipelineBuilder::rasterizer_depth_bias_enable(const bool enable) {
-    rasterization_state.depthBiasEnable = enable;
+    rasterization_state.depthBiasEnable = static_cast<vk::Bool32>(enable);
     return *this;
 }
 
@@ -177,19 +177,19 @@ GraphicsPipelineBuilder::multisample_sample_shading(const float min_sample_shadi
 }
 
 GraphicsPipelineBuilder& GraphicsPipelineBuilder::multisample_shading_enable(const bool enable) {
-    multisample_state.sampleShadingEnable = enable;
+    multisample_state.sampleShadingEnable = static_cast<vk::Bool32>(enable);
     return *this;
 }
 
 GraphicsPipelineBuilder&
 GraphicsPipelineBuilder::multisample_sample_alpha_to_coverage(const bool enable) {
-    multisample_state.alphaToCoverageEnable = enable;
+    multisample_state.alphaToCoverageEnable = static_cast<vk::Bool32>(enable);
     return *this;
 }
 
 GraphicsPipelineBuilder&
 GraphicsPipelineBuilder::multisample_sample_alpha_to_one(const bool enable) {
-    multisample_state.alphaToOneEnable = enable;
+    multisample_state.alphaToOneEnable = static_cast<vk::Bool32>(enable);
     return *this;
 }
 
@@ -202,12 +202,12 @@ GraphicsPipelineBuilder::depth_stencil_flags(const vk::PipelineDepthStencilState
 }
 
 GraphicsPipelineBuilder& GraphicsPipelineBuilder::depth_test_enable(const bool enable) {
-    depth_stencil_state.depthTestEnable = enable;
+    depth_stencil_state.depthTestEnable = static_cast<vk::Bool32>(enable);
     return *this;
 }
 
 GraphicsPipelineBuilder& GraphicsPipelineBuilder::depth_write_enable(const bool enable) {
-    depth_stencil_state.depthWriteEnable = enable;
+    depth_stencil_state.depthWriteEnable = static_cast<vk::Bool32>(enable);
     return *this;
 }
 
@@ -218,7 +218,7 @@ GraphicsPipelineBuilder& GraphicsPipelineBuilder::depth_compare(const vk::Compar
 }
 
 GraphicsPipelineBuilder& GraphicsPipelineBuilder::stencil_test_enable(const bool enable) {
-    depth_stencil_state.stencilTestEnable = enable;
+    depth_stencil_state.stencilTestEnable = static_cast<vk::Bool32>(enable);
     return *this;
 }
 
@@ -231,7 +231,7 @@ GraphicsPipelineBuilder& GraphicsPipelineBuilder::stencil_operation(const vk::St
 }
 
 GraphicsPipelineBuilder& GraphicsPipelineBuilder::depth_bounds_test_enable(const bool enable) {
-    depth_stencil_state.depthBoundsTestEnable = enable;
+    depth_stencil_state.depthBoundsTestEnable = static_cast<vk::Bool32>(enable);
     return *this;
 }
 
@@ -251,7 +251,7 @@ GraphicsPipelineBuilder::blend_flags(const vk::PipelineColorBlendStateCreateFlag
 }
 
 GraphicsPipelineBuilder& GraphicsPipelineBuilder::blend_logic_op_enable(const bool enable) {
-    color_blend_state.logicOpEnable = enable;
+    color_blend_state.logicOpEnable = static_cast<vk::Bool32>(enable);
     return *this;
 }
 
@@ -343,8 +343,7 @@ GraphicsPipelineBuilder& GraphicsPipelineBuilder::set_tessellation_shader(
 // --- Build ---
 
 GraphicsPipelineHandle
-GraphicsPipelineBuilder::build(const ContextHandle& context,
-                               const PipelineLayoutHandle& pipeline_layout,
+GraphicsPipelineBuilder::build(const PipelineLayoutHandle& pipeline_layout,
                                const RenderPassHandle& renderpass,
                                const uint32_t subpass,
                                const std::shared_ptr<Pipeline>& base_pipeline) {

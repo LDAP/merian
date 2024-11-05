@@ -165,7 +165,7 @@ class GraphicsPipelineBuilder {
     blend_add_attachment(const vk::PipelineColorBlendAttachmentState& state);
 
     GraphicsPipelineBuilder& blend_add_attachment(
-        const vk::Bool32 blend_enable = true,
+        const vk::Bool32 blend_enable = VK_TRUE,
         const vk::BlendFactor src_color_blend_factor = vk::BlendFactor::eOne,
         const vk::BlendFactor dst_color_blend_factor = vk::BlendFactor::eOne,
         const vk::BlendOp color_blend_op = vk::BlendOp::eAdd,
@@ -197,8 +197,7 @@ class GraphicsPipelineBuilder {
 
     // --- Build ---
 
-    GraphicsPipelineHandle build(const ContextHandle& context,
-                                 const PipelineLayoutHandle& pipeline_layout,
+    GraphicsPipelineHandle build(const PipelineLayoutHandle& pipeline_layout,
                                  const RenderPassHandle& renderpass,
                                  const uint32_t subpass = 0,
                                  const std::shared_ptr<Pipeline>& opt_base_pipeline = {});
@@ -218,7 +217,7 @@ class GraphicsPipelineBuilder {
     std::vector<vk::VertexInputAttributeDescription> vertex_input_attributes;
 
     vk::PipelineInputAssemblyStateCreateInfo input_assembly_state{
-        {}, vk::PrimitiveTopology::eTriangleList, false};
+        {}, vk::PrimitiveTopology::eTriangleList, VK_FALSE};
     vk::PipelineTessellationStateCreateInfo tessellation_state{{}, 0};
 
     vk::PipelineViewportStateCreateFlags viewport_create_flags;
@@ -226,29 +225,29 @@ class GraphicsPipelineBuilder {
     std::vector<vk::Rect2D> scissors;
 
     vk::PipelineRasterizationStateCreateInfo rasterization_state{{},
-                                                                 false,
-                                                                 false,
+                                                                 VK_FALSE,
+                                                                 VK_FALSE,
                                                                  vk::PolygonMode::eFill,
                                                                  vk::CullModeFlagBits::eBack,
                                                                  vk::FrontFace::eCounterClockwise,
-                                                                 false,
+                                                                 VK_FALSE,
                                                                  0,
                                                                  0,
                                                                  0,
                                                                  1.0};
     vk::PipelineMultisampleStateCreateInfo multisample_state{
-        {}, vk::SampleCountFlagBits::e1, false, 0, nullptr, false, false};
+        {}, vk::SampleCountFlagBits::e1, VK_FALSE, 0, nullptr, VK_FALSE, VK_FALSE};
     vk::PipelineDepthStencilStateCreateInfo depth_stencil_state{{},
-                                                                false,
-                                                                false,
+                                                                VK_FALSE,
+                                                                VK_FALSE,
                                                                 vk::CompareOp::eLess,
-                                                                false,
-                                                                false,
+                                                                VK_FALSE,
+                                                                VK_FALSE,
                                                                 vk::StencilOp::eIncrementAndClamp,
                                                                 vk::StencilOp::eIncrementAndClamp,
                                                                 0.f,
                                                                 0.f};
-    vk::PipelineColorBlendStateCreateInfo color_blend_state{{}, false, vk::LogicOp::eClear};
+    vk::PipelineColorBlendStateCreateInfo color_blend_state{{}, VK_FALSE, vk::LogicOp::eClear};
     std::vector<vk::PipelineColorBlendAttachmentState> attachment_blend_states;
 
     vk::PipelineDynamicStateCreateFlags dynamic_state_create_flags;
