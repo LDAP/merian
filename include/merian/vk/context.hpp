@@ -168,16 +168,22 @@ class Context : public std::enable_shared_from_this<Context> {
     // Make sure to keep a reference, else the pool and its buffers are destroyed
     std::shared_ptr<CommandPool> get_cmd_pool_C();
 
-    template <class Extension> std::shared_ptr<Extension> get_extension() {
+    template <class Extension> std::shared_ptr<Extension> get_extension() const {
         if (extensions.contains(typeid(Extension))) {
-            return std::static_pointer_cast<Extension>(extensions[typeid(Extension)]);
+            return std::static_pointer_cast<Extension>(extensions.at(typeid(Extension)));
         }
         return nullptr;
     }
 
-    bool device_extension_enabled(const std::string& name);
+    bool device_extension_enabled(const std::string& name) const;
 
-    bool instance_extension_enabled(const std::string& name);
+    bool instance_extension_enabled(const std::string& name) const;
+
+    auto get_context_extensions() const;
+
+    const std::vector<const char*>& get_enabled_device_extensions() const;
+
+    const std::vector<const char*>& get_enabled_instance_extensions() const;
 
   private:
     std::unordered_map<std::type_index, std::shared_ptr<Extension>> extensions;
@@ -216,6 +222,7 @@ class Context : public std::enable_shared_from_this<Context> {
     // A shared thread pool with default size.
     ThreadPool thread_pool;
 
+    // A shared file_loader for convenience.
     merian::FileLoader file_loader;
 
   private:

@@ -3,8 +3,9 @@
 #include "merian/utils/vector.hpp"
 #include "merian/vk/extension/extension.hpp"
 
-#include <spdlog/spdlog.h>
 #include <fmt/ranges.h>
+#include <ranges>
+#include <spdlog/spdlog.h>
 #include <tuple>
 
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
@@ -725,14 +726,26 @@ std::shared_ptr<CommandPool> Context::get_cmd_pool_C() {
     return cmd;
 }
 
-bool Context::device_extension_enabled(const std::string& name) {
+bool Context::device_extension_enabled(const std::string& name) const {
     return std::find_if(device_extensions.begin(), device_extensions.end(),
                         [&](const char* s) { return name == s; }) != device_extensions.end();
 }
 
-bool Context::instance_extension_enabled(const std::string& name) {
+bool Context::instance_extension_enabled(const std::string& name) const {
     return std::find_if(instance_extension_names.begin(), instance_extension_names.end(),
                         [&](const char* s) { return name == s; }) != instance_extension_names.end();
+}
+
+auto Context::get_context_extensions() const {
+    return std::views::values(extensions);
+}
+
+const std::vector<const char*>& Context::get_enabled_device_extensions() const {
+    return device_extensions;
+}
+
+const std::vector<const char*>& Context::get_enabled_instance_extensions() const {
+    return instance_extension_names;
 }
 
 } // namespace merian
