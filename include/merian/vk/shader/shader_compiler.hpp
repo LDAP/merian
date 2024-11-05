@@ -11,6 +11,9 @@
 
 namespace merian {
 
+// A compiler for shaders.
+//
+// Include paths for the merian-nodes library and context extensions must be automatically added.
 class ShaderCompiler {
   public:
     class compilation_failed : public std::runtime_error {
@@ -19,7 +22,13 @@ class ShaderCompiler {
     };
 
   public:
-    ShaderCompiler() {}
+    ShaderCompiler(const std::vector<std::string>& user_include_paths = {},
+                   const std::map<std::string, std::string>& user_macro_definitions = {})
+        : include_paths(user_include_paths), macro_definitions(user_macro_definitions) {
+        // search merian-shaders
+            
+        // add macro definitions from context extensions and enabled instance and device extensions.
+    }
 
     virtual ~ShaderCompiler() = 0;
 
@@ -55,8 +64,16 @@ class ShaderCompiler {
                                                const std::string& source_name,
                                                const vk::ShaderStageFlagBits shader_kind) = 0;
 
+    const std::vector<std::string>& get_include_paths() const {
+        return include_paths;
+    }
+
+    const std::map<std::string, std::string>& get_macro_definitions() const {
+        return macro_definitions;
+    }
+
   private:
-    vk::ShaderStageFlagBits guess_kind(const std::filesystem::path& path) {
+    static vk::ShaderStageFlagBits guess_kind(const std::filesystem::path& path) {
         std::string extension;
         if (path.extension().string() == ".glsl") {
             extension = std::filesystem::path(path.string().substr(0, path.string().size() - 5))
@@ -65,23 +82,32 @@ class ShaderCompiler {
         } else {
             extension = path.extension().string();
         }
+
         if (extension == ".vert") {
             return vk::ShaderStageFlagBits::eVertex;
-        } else if (extension == ".tesc") {
-            return vk::ShaderStageFlagBits::eTessellationControl;
-        } else if (extension == ".tese") {
-            return vk::ShaderStageFlagBits::eTessellationEvaluation;
-        } else if (extension == ".geom") {
-            return vk::ShaderStageFlagBits::eGeometry;
-        } else if (extension == ".frag") {
-            return vk::ShaderStageFlagBits::eFragment;
-        } else if (extension == ".comp") {
-            return vk::ShaderStageFlagBits::eCompute;
-        } else {
-            throw compilation_failed{
-                fmt::format("Shader kind could not be determined for path {}", path.string())};
         }
+        if (extension == ".tesc") {
+            return vk::ShaderStageFlagBits::eTessellationControl;
+        }
+        if (extension == ".tese") {
+            return vk::ShaderStageFlagBits::eTessellationEvaluation;
+        }
+        if (extension == ".geom") {
+            return vk::ShaderStageFlagBits::eGeometry;
+        }
+        if (extension == ".frag") {
+            return vk::ShaderStageFlagBits::eFragment;
+        }
+        if (extension == ".comp") {
+            return vk::ShaderStageFlagBits::eCompute;
+        }
+
+        throw compilation_failed{
+            fmt::format("Shader kind could not be determined for path {}", path.string())};
     }
+
+    std::vector<std::string> include_paths;
+    std::map<std::string, std::string> macro_definitions;
 };
 using ShaderCompilerHandle = std::shared_ptr<ShaderCompiler>;
 

@@ -105,14 +105,15 @@ shaderc_shader_kind_for_stage_flag_bit(const vk::ShaderStageFlagBits shader_kind
 }
 
 ShadercCompiler::ShadercCompiler(const std::vector<std::string>& include_paths,
-                                 const std::map<std::string, std::string>& macro_definitions) {
+                                 const std::map<std::string, std::string>& macro_definitions)
+    : ShaderCompiler(include_paths, macro_definitions) {
 
-    for (const auto& [key, value] : macro_definitions) {
+    for (const auto& [key, value] : get_macro_definitions()) {
         compile_options.AddMacroDefinition(key, value);
     }
 
     auto includer = std::make_unique<FileIncluder>();
-    for (const auto& include_path : include_paths) {
+    for (const auto& include_path : get_include_paths()) {
         includer->get_file_loader().add_search_path(include_path);
     }
     compile_options.SetIncluder(std::move(includer));

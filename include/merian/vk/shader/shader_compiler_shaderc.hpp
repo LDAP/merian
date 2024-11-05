@@ -17,7 +17,6 @@ namespace merian {
 
 class ShadercCompiler : public ShaderCompiler {
   public:
-    // Include paths for the merian-nodes library are automatically added
     ShadercCompiler(const std::vector<std::string>& include_paths = {},
                     const std::map<std::string, std::string>& macro_definitions = {});
 
