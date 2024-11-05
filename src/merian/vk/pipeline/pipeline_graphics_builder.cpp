@@ -347,7 +347,6 @@ GraphicsPipelineBuilder::build(const PipelineLayoutHandle& pipeline_layout,
                                const RenderPassHandle& renderpass,
                                const uint32_t subpass,
                                const std::shared_ptr<Pipeline>& base_pipeline) {
-    assert(context);
     assert(pipeline_layout);
     assert(vertex_shader);
     assert(fragment_shader);
