@@ -25,6 +25,7 @@ Profiler::~Profiler() {}
 // Remember to reset the query pool after creation
 void Profiler::set_query_pool(const QueryPoolHandle<vk::QueryType::eTimestamp>& query_pool) {
     this->query_pool = query_pool;
+    query_pool_infos[query_pool].clear_index = clear_index;
 }
 
 void Profiler::clear() {
@@ -38,7 +39,7 @@ void Profiler::clear() {
 }
 
 void Profiler::cmd_start(const vk::CommandBuffer& cmd,
-                         const std::string name,
+                         const std::string& name,
                          const vk::PipelineStageFlagBits pipeline_stage) {
     assert(query_pool);
     PerQueryPoolInfo& qp_info = query_pool_infos[query_pool];
@@ -77,7 +78,7 @@ void Profiler::cmd_end(const vk::CommandBuffer& cmd,
     current_gpu_section = section.parent_index;
 }
 
-void Profiler::collect(const bool wait) {
+void Profiler::collect(const bool wait, const bool keep_query_pool) {
     if (!query_pool) {
         return;
     }
@@ -115,7 +116,12 @@ void Profiler::collect(const bool wait) {
     }
 
     query_pool->reset(0, qp_info.pending_gpu_sections.size() * SW_QUERY_COUNT);
-    qp_info.pending_gpu_sections.clear();
+
+    if (keep_query_pool) {
+        qp_info.pending_gpu_sections.clear();
+    } else {
+        query_pool_infos.erase(query_pool);
+    }
 }
 
 void Profiler::start(const std::string& name) {
@@ -149,12 +155,12 @@ void Profiler::end() {
 }
 
 std::string to_string(const std::vector<Profiler::ReportEntry>& entries,
-                      const std::string indent = "") {
+                      const std::size_t indent_depth = 0) {
     std::string result = "";
-    for (auto& entry : entries) {
-        result += fmt::format("{}{}: {:.04f} (± {:.04f}) ms\n", indent, entry.name, entry.duration,
-                              entry.std_deviation);
-        result += to_string(entry.children, indent + "  ");
+    for (const auto& entry : entries) {
+        result += fmt::format("{}{}: {:.04f} (± {:.04f}) ms\n", std::string(2 * indent_depth, ' '),
+                              entry.name, entry.duration, entry.std_deviation);
+        result += to_string(entry.children, indent_depth + 1);
     }
     return result;
 }
@@ -164,6 +170,7 @@ std::vector<Profiler::ReportEntry> make_report(SectionType& section,
                                                std::vector<SectionType>& sections) {
     std::vector<Profiler::ReportEntry> report;
     std::vector<std::pair<TimeMeasure, std::string>> children;
+    children.reserve(section.children.size());
     for (auto& child : section.children) {
         children.emplace_back(sections[child.second].start, child.first);
     }
@@ -189,7 +196,7 @@ Profiler::set_collect_get_every(const QueryPoolHandle<vk::QueryType::eTimestamp>
                                 const uint32_t report_intervall_millis) {
     set_query_pool(query_pool);
 
-    collect();
+    collect(false, true);
 
     std::optional<Profiler::Report> report;
 
@@ -213,22 +220,22 @@ std::string Profiler::get_report_str(const Profiler::Report& report) {
 
     std::string result = "";
     result += "CPU:\n";
-    result += to_string(report.cpu_report);
+    result += to_string(report.cpu_report, 1);
     result += "GPU:\n";
-    result += to_string(report.gpu_report);
+    result += to_string(report.gpu_report, 1);
     return result;
 }
 
 void to_config(Properties& config,
                const std::vector<Profiler::ReportEntry>& entries,
                const uint32_t level = 0) {
-    for (auto& entry : entries) {
+    for (const auto& entry : entries) {
         std::string str = fmt::format("{}: {:.04f} (± {:.04f}) ms\n", entry.name, entry.duration,
                                       entry.std_deviation);
         if (entry.children.empty()) {
             // Add 3 spaces to fit with the child item symbol.
             config.output_text(fmt::format("   {}", str.c_str()));
-        } else if (config.st_begin_child(fmt::format("{}-{}", level, entry.name).c_str(), str)) {
+        } else if (config.st_begin_child(fmt::format("{}-{}", level, entry.name), str)) {
             to_config(config, entry.children, level + 1);
             config.st_end_child();
         }

@@ -141,7 +141,7 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
     // Start a GPU section
     void cmd_start(
         const vk::CommandBuffer& cmd,
-        const std::string name,
+        const std::string& name,
         const vk::PipelineStageFlagBits pipeline_stage = vk::PipelineStageFlagBits::eAllCommands);
 
     // Stop a GPU section
@@ -149,8 +149,8 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
         const vk::CommandBuffer& cmd,
         const vk::PipelineStageFlagBits pipeline_stage = vk::PipelineStageFlagBits::eAllCommands);
 
-    // Collects the results from the GPU.
-    void collect(const bool wait = false);
+    // Collects the results from the GPU and resets the query pool.
+    void collect(const bool wait = false, const bool keep_query_pool = false);
 
     // Start a CPU section
     void start(const std::string& name);
@@ -211,7 +211,7 @@ using ProfilerHandle = std::shared_ptr<Profiler>;
 
 class ProfileScope {
   public:
-    ProfileScope(const ProfilerHandle profiler, const std::string& name) : profiler(profiler) {
+    ProfileScope(const ProfilerHandle& profiler, const std::string& name) : profiler(profiler) {
         if (!profiler) {
             return;
         }
@@ -244,7 +244,7 @@ class ProfileScope {
 class ProfileScopeGPU {
   public:
     // Make sure the command buffers stays valid
-    ProfileScopeGPU(const ProfilerHandle profiler,
+    ProfileScopeGPU(const ProfilerHandle& profiler,
                     const vk::CommandBuffer& cmd,
                     const std::string& name)
         : profiler(profiler), cmd(cmd) {
