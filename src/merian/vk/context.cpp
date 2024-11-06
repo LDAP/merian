@@ -53,11 +53,11 @@ Version: {}\n\n",
                  VK_API_VERSION_MINOR(VK_HEADER_VERSION_COMPLETE),
                  VK_API_VERSION_PATCH(VK_HEADER_VERSION_COMPLETE));
 
+    // add common folders to file loader
+    file_loader.add_search_path(MERIAN_INSTALL_DATA_DIR);
+
     // Init dynamic loader
-    static vk::DynamicLoader dl;
-    static PFN_vkGetInstanceProcAddr vk_get_instance_proc_addr =
-        dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
-    VULKAN_HPP_DEFAULT_DISPATCHER.init(vk_get_instance_proc_addr);
+    VULKAN_HPP_DEFAULT_DISPATCHER.init();
 
     SPDLOG_DEBUG("supplied extensions:");
     for (const auto& ext : desired_extensions) {
