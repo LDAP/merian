@@ -1,6 +1,8 @@
 #pragma once
 
+#include "merian/utils/string.hpp"
 #include <filesystem>
+#include <fstream>
 #include <optional>
 #include <set>
 #include <spdlog/spdlog.h>
@@ -14,9 +16,32 @@ class FileLoader {
     static bool exists(const std::filesystem::path& path,
                        std::filesystem::file_status file_status = std::filesystem::file_status{});
 
+    template <typename T> static std::vector<T> load_file(const std::filesystem::path& path) {
+        if (!exists(path)) {
+            throw std::runtime_error{
+                fmt::format("failed to load {} (does not exist)", path.string())};
+        }
+
+        // Open the stream to 'lock' the file.
+        std::ifstream f(path, std::ios::in | std::ios::binary);
+        const std::size_t size = std::filesystem::file_size(path);
+
+        if (size % sizeof(T)) {
+            SPDLOG_WARN("loading {} B of data into a vector quantized to {} B", size, sizeof(T));
+        }
+
+        std::vector<T> result((size + sizeof(T) - 1) / sizeof(T), {});
+        f.read((char*)result.data(), (std::streamsize)size);
+
+        SPDLOG_DEBUG("load {} of data from {}", format_size(size), path.string());
+
+        return result;
+    }
+
     static std::string load_file(const std::filesystem::path& path);
 
-    static std::optional<std::filesystem::path> search_cwd_parents(const std::filesystem::path& path);
+    static std::optional<std::filesystem::path>
+    search_cwd_parents(const std::filesystem::path& path);
 
   public:
     FileLoader(const std::set<std::filesystem::path>& search_paths = {"./"})
