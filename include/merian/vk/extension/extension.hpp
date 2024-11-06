@@ -3,6 +3,7 @@
 #include "merian/vk/context.hpp"
 #include <spdlog/spdlog.h>
 #include <vector>
+#include <map>
 
 namespace merian {
 
@@ -114,7 +115,7 @@ class Extension {
     // return strings that should be defined when compiling shaders with Merians shader compiler.
     // Note that device and instance extensions are automatically defined as 
     // MERIAN_DEVICE_EXT_ENABLE_<NAME> and MERIAN_INSTANCE_EXT_ENABLE_<NAME>
-    virtual std::vector<std::string> shader_defines() {
+    virtual std::map<std::string, std::string> shader_macro_definitions() {
         return {};
     }
 

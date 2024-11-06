@@ -2,6 +2,8 @@
 
 #include "merian/io/file_loader.hpp"
 #include "merian/utils/concurrent/thread_pool.hpp"
+#include <map>
+#include <ranges>
 #include <spdlog/logger.h>
 
 #include <typeindex>
@@ -125,6 +127,7 @@ class Context : public std::enable_shared_from_this<Context> {
                                  std::string filter_device_name);
     void find_queues();
     void create_device_and_queues(uint32_t preffered_number_compute_queues);
+    void prepare_shader_include_defines();
 
   private: // Helper
     void extensions_check_instance_layer_support();
@@ -179,11 +182,13 @@ class Context : public std::enable_shared_from_this<Context> {
 
     bool instance_extension_enabled(const std::string& name) const;
 
-    auto get_context_extensions() const;
-
     const std::vector<const char*>& get_enabled_device_extensions() const;
 
     const std::vector<const char*>& get_enabled_instance_extensions() const;
+
+    const std::vector<std::string>& get_default_shader_include_paths() const;
+
+    const std::map<std::string, std::string>& get_default_shader_macro_definitions() const;
 
   private:
     std::unordered_map<std::type_index, std::shared_ptr<Extension>> extensions;
@@ -257,6 +262,10 @@ class Context : public std::enable_shared_from_this<Context> {
     std::weak_ptr<CommandPool> cmd_pool_T;
     // Convenience command pool for compute (can be nullptr in very rare occasions)
     std::weak_ptr<CommandPool> cmd_pool_C;
+
+
+    std::vector<std::string> default_shader_include_paths;
+    std::map<std::string, std::string> default_shader_macro_definitions;
 };
 
 } // namespace merian

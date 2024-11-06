@@ -22,10 +22,10 @@ std::string FileLoader::load_file(const std::filesystem::path& path) {
 
     // Open the stream to 'lock' the file.
     std::ifstream f(path, std::ios::in | std::ios::binary);
-    const auto size = std::filesystem::file_size(path);
+    const std::size_t size = std::filesystem::file_size(path);
 
     std::string result(size, '\0');
-    f.read(result.data(), size);
+    f.read(result.data(), (std::streamsize)size);
 
     SPDLOG_DEBUG("load {} of data from {}", format_size(size), path.string());
 

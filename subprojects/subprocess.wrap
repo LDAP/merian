@@ -1,0 +1,11 @@
+[wrap-git]
+directory = subprocess
+
+url = https://github.com/benman64/subprocess
+revision = 1b35a489e92ebe261ce781a65d7bf47d71be3655
+depth = 1
+method = cmake
+clone-recursive = true
+
+[provide]
+subprocess = subprocess_dep

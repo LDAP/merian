@@ -23,7 +23,7 @@ class ShaderModule : public std::enable_shared_from_this<ShaderModule> {
     ShaderModule() = delete;
 
     ShaderModule(const ContextHandle& context,
-                 const std::string spv_filename,
+                 const std::string& spv_filename,
                  const vk::ShaderStageFlagBits stage_flags = vk::ShaderStageFlagBits::eCompute,
                  const std::optional<FileLoader>& file_loader = std::nullopt);
 

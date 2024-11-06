@@ -3,13 +3,7 @@
 #include "merian/vk/shader/shader_compiler.hpp"
 #include <map>
 
-#ifdef __has_include
-#if !__has_include(<shaderc/shaderc.hpp>)
-static_assert(false, "shaderc is required for ShadercCompiler");
-#else
-#include <shaderc/shaderc.hpp>
-#endif
-#else
+#ifdef MERIAN_SHADERC_FOUND
 #include <shaderc/shaderc.hpp>
 #endif
 
@@ -17,7 +11,8 @@ namespace merian {
 
 class ShadercCompiler : public ShaderCompiler {
   public:
-    ShadercCompiler(const std::vector<std::string>& include_paths = {},
+    ShadercCompiler(const ContextHandle& context,
+                    const std::vector<std::string>& include_paths = {},
                     const std::map<std::string, std::string>& macro_definitions = {});
 
     ~ShadercCompiler();
@@ -26,9 +21,13 @@ class ShadercCompiler : public ShaderCompiler {
                                        const std::string& source_name,
                                        const vk::ShaderStageFlagBits shader_kind) override;
 
+    bool available() const override;
+
   private:
+#ifdef MERIAN_SHADERC_FOUND
     shaderc::Compiler shader_compiler;
     shaderc::CompileOptions compile_options;
+#endif
 };
 
 } // namespace merian

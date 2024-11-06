@@ -104,9 +104,10 @@ shaderc_shader_kind_for_stage_flag_bit(const vk::ShaderStageFlagBits shader_kind
     }
 }
 
-ShadercCompiler::ShadercCompiler(const std::vector<std::string>& include_paths,
-                                 const std::map<std::string, std::string>& macro_definitions)
-    : ShaderCompiler(include_paths, macro_definitions) {
+ShadercCompiler::ShadercCompiler(const ContextHandle& context,
+                                 const std::vector<std::string>& user_include_paths,
+                                 const std::map<std::string, std::string>& user_macro_definitions)
+    : ShaderCompiler(context, user_include_paths, user_macro_definitions) {
 
     for (const auto& [key, value] : get_macro_definitions()) {
         compile_options.AddMacroDefinition(key, value);
@@ -149,6 +150,10 @@ std::vector<uint32_t> ShadercCompiler::compile_glsl(const std::string& source,
     }
 
     return std::vector<uint32_t>(binary_result.begin(), binary_result.end());
+}
+
+bool ShadercCompiler::available() const {
+    return true;
 }
 
 } // namespace merian
