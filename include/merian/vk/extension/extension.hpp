@@ -3,6 +3,7 @@
 #include "merian/vk/context.hpp"
 #include <spdlog/spdlog.h>
 #include <vector>
+#include <map>
 
 namespace merian {
 
@@ -21,7 +22,7 @@ class Extension {
     friend Context;
 
   public:
-    Extension(std::string name) : name(name) {}
+    Extension(const std::string& name) : name(name) {}
 
     virtual ~Extension() = 0;
 
@@ -107,6 +108,15 @@ class Extension {
     // further callbacks.
     virtual void on_unsupported([[maybe_unused]] const std::string reason) {
         spdlog::warn("extension {} not supported ({})", name, reason);
+    }
+
+    // OTHER
+
+    // return strings that should be defined when compiling shaders with Merians shader compiler.
+    // Note that device and instance extensions are automatically defined as 
+    // MERIAN_DEVICE_EXT_ENABLE_<NAME> and MERIAN_INSTANCE_EXT_ENABLE_<NAME>
+    virtual std::map<std::string, std::string> shader_macro_definitions() {
+        return {};
     }
 
   public:

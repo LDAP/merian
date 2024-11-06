@@ -43,6 +43,11 @@ add_project_arguments('-DMERIAN_VERSION_MINOR=@0@'.format(version_split[1]), lan
 add_project_arguments('-DMERIAN_VERSION_PATCH=@0@'.format(version_split[2]), language : 'cpp')
 add_project_arguments('-DMERIAN_PROJECT_NAME="@0@"'.format(meson.project_name()), language : 'cpp')
 
+add_project_arguments('-DMERIAN_INSTALL_PREFIX="@0@"'.format(get_option('prefix')), language : 'cpp')
+add_project_arguments('-DMERIAN_INSTALL_INCLUDE_DIR="@0@"'.format(join_paths(get_option('prefix'), get_option('includedir'))), language : 'cpp')
+add_project_arguments('-DMERIAN_INSTALL_DATA_DIR="@0@"'.format(join_paths(get_option('prefix'), get_option('datadir'), meson.project_name())), language : 'cpp')
+add_project_arguments('-DMERIAN_DEVELOPMENT_INCLUDE_DIR="@0@"'.format(join_paths(meson.current_source_dir(), 'include')), language : 'cpp')
+
 # Dependencies
 fmt = dependency('fmt', version : ['>=10.0.0'], fallback : ['fmt', 'fmt_dep'])
 spdlog = dependency('spdlog', version : ['>=1.12.0'], fallback : ['spdlog', 'spdlog_dep'], default_options : ['external_fmt=enabled'])
@@ -52,6 +57,7 @@ if not vulkan.found()
     vulkan = dependency('vulkan')
 endif
 glfw = dependency('glfw3', version: ['>=3.4.0'], fallback: ['glfw', 'glfw_dep'])
+subprocess = dependency('subprocess', version: ['>=0.4.0'], fallback: ['subprocess', 'subprocess_dep'])
 glm = dependency('glm', fallback : ['glm', 'glm_dep'], version: ['>=0.9.9.8'])
 tol = dependency('tinyobjloader', fallback : ['tinyobjloader', 'tinyobjloader_dep'])
 tgltf = dependency('tinygltf', required: get_option('tinygltf'), fallback: ['tinygltf', 'tinygltf_dep'])
@@ -93,10 +99,6 @@ if not shaderc.found() and get_option('shaderc').enabled()
     )
 endif
 
-if shaderc.found()
-    add_project_arguments('-DMERIAN_ENABLE_SHADERC', language: 'cpp')
-endif
-
 project_root = meson.current_source_dir()
 inc_dirs = [
     include_directories('./include'),
@@ -111,6 +113,9 @@ else
     glslang_options = cmake.subproject_options()
     glslang_options.add_cmake_defines({'GLSLANG_TESTS': false})
     glslang_options.add_cmake_defines({'GLSLANG_ENABLE_INSTALL': false})
+    glslang_options.set_install(false)
+    # installs as glslang_standalone
+    # glslang_options.set_install(true, target: 'glslang-standalone')
     glslang_subp = cmake.subproject('glslang', options: glslang_options)
     glslc_tgt = glslang_subp.target('glslang-standalone')
     glslc_path = glslc_tgt.full_path()
@@ -156,3 +161,5 @@ merian_dep = declare_dependency(
         vulkan,
     ]
 )
+
+install_subdir('include', install_dir: get_option('includedir'), strip_directory: true)

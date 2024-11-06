@@ -4,10 +4,6 @@
 #include "merian-nodes/graph/errors.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 
-#if MERIAN_ENABLE_SHADERC
-#include "merian/vk/shader/shader_compiler_shaderc.hpp"
-#endif
-
 namespace merian_nodes {
 
 static const char* shadertoy_pre = R"(#version 460
@@ -63,17 +59,22 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 
 class ShadertoyInjectCompiler : public ShaderCompiler {
   public:
-    ShadertoyInjectCompiler(const ShaderCompilerHandle& forwarding_compiler)
-        : forwarding_compiler(forwarding_compiler) {}
+    ShadertoyInjectCompiler(const ContextHandle& context,
+                            const ShaderCompilerHandle& forwarding_compiler)
+        : ShaderCompiler(context), forwarding_compiler(forwarding_compiler) {}
 
     ~ShadertoyInjectCompiler() {}
 
     std::vector<uint32_t> compile_glsl(const std::string& source,
                                        const std::string& source_name,
-                                       const vk::ShaderStageFlagBits shader_kind) final {
+                                       const vk::ShaderStageFlagBits shader_kind) final override {
         SPDLOG_INFO("(re-)compiling {}", source_name);
         return forwarding_compiler->compile_glsl(shadertoy_pre + source + shadertoy_post,
                                                  source_name, shader_kind);
+    }
+
+    bool available() const override {
+        return true;
     }
 
   private:
@@ -83,16 +84,13 @@ class ShadertoyInjectCompiler : public ShaderCompiler {
 Shadertoy::Shadertoy(const ContextHandle& context)
     : AbstractCompute(context, sizeof(PushConstant)), shader_glsl(default_shader) {
 
-    ShaderCompilerHandle shaderc_compiler = nullptr;
-#if MERIAN_ENABLE_SHADERC
-    shaderc_compiler = std::make_shared<merian::ShadercCompiler>();
-#endif
+    ShaderCompilerHandle forwarding_compiler = ShaderCompiler::get(context);
 
-    if (!shaderc_compiler) {
+    if (!forwarding_compiler->available()) {
         return;
     }
 
-    compiler = std::make_shared<ShadertoyInjectCompiler>(shaderc_compiler);
+    compiler = std::make_shared<ShadertoyInjectCompiler>(context, forwarding_compiler);
     reloader = std::make_unique<HotReloader>(context, compiler);
     shader = compiler->compile_glsl_to_shadermodule(context, shader_glsl, "<memory>Shadertoy.comp",
                                                     vk::ShaderStageFlagBits::eCompute);
@@ -105,7 +103,7 @@ Shadertoy::Shadertoy(const ContextHandle& context)
 std::vector<OutputConnectorHandle>
 Shadertoy::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
     if (!reloader) {
-        throw graph_errors::node_error{"the shaderc feature must be enabled for this node."};
+        throw graph_errors::node_error{"no shader compiler available."};
     }
 
     if (shader_source_selector == 0) {

@@ -4,7 +4,7 @@
 namespace merian {
 
 ShaderModule::ShaderModule(const ContextHandle& context,
-                           const std::string spv_filename,
+                           const std::string& spv_filename,
                            const vk::ShaderStageFlagBits stage_flags,
                            const std::optional<FileLoader>& file_loader)
     : context(context), stage_flags(stage_flags) {

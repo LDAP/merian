@@ -4,7 +4,6 @@
 #include "merian/vk/extension/extension.hpp"
 
 #include <fmt/ranges.h>
-#include <ranges>
 #include <spdlog/spdlog.h>
 #include <tuple>
 
@@ -72,6 +71,8 @@ Version: {}\n\n",
     prepare_physical_device(filter_vendor_id, filter_device_id, filter_device_name);
     find_queues();
     create_device_and_queues(preffered_number_compute_queues);
+
+    prepare_shader_include_defines();
 
     SPDLOG_INFO("context ready.");
 }
@@ -532,6 +533,48 @@ void Context::create_device_and_queues(uint32_t preferred_number_compute_queues)
     pipeline_cache = device.createPipelineCache(pipeline_cache_create_info);
 }
 
+void Context::prepare_shader_include_defines() {
+    // search merian-shaders
+    const std::filesystem::path development_headers =
+        std::filesystem::path(MERIAN_DEVELOPMENT_INCLUDE_DIR);
+    const std::filesystem::path installed_headers =
+        std::filesystem::path(MERIAN_INSTALL_INCLUDE_DIR);
+
+    if (FileLoader::exists(development_headers / "merian-shaders")) {
+        SPDLOG_DEBUG("found merian-shaders development headers headers at {}", development_headers.string());
+        default_shader_include_paths.emplace_back(development_headers);
+    } else if (FileLoader::exists(installed_headers / "merian-shaders")) {
+        SPDLOG_DEBUG("found merian-shaders installed at {}", installed_headers.string());
+        default_shader_include_paths.emplace_back(installed_headers);
+    } else {
+        SPDLOG_ERROR("merian-shaders header not found! Shader compilers might not work correctly");
+    }
+
+    // add macro definitions from context extensions and enabled instance and device extensions.
+    for (const auto& ext : extensions) {
+        const auto extension_macro_definitions = ext.second->shader_macro_definitions();
+        default_shader_macro_definitions.insert(extension_macro_definitions.begin(),
+                                                extension_macro_definitions.end());
+    }
+    const std::string instance_ext_define_prefix = "MERIAN_INSTANCE_EXT_ENABLE_";
+    for (const auto* ext : instance_extension_names) {
+        default_shader_macro_definitions.emplace(instance_ext_define_prefix + ext, "1");
+    }
+    const std::string device_ext_define_prefix = "MERIAN_DEVICE_EXT_ENABLE_";
+    for (const auto* ext : device_extensions) {
+        default_shader_macro_definitions.emplace(device_ext_define_prefix + ext, "1");
+    }
+
+#ifndef NDEBUG
+    std::vector<std::string> string_defines;
+    string_defines.reserve(default_shader_macro_definitions.size());
+    for (const auto& def : default_shader_macro_definitions) {
+        string_defines.emplace_back(def.first + "=" + def.second);
+    }
+    SPDLOG_DEBUG("shader defines: {}", fmt::join(string_defines, "\n"));
+#endif
+}
+
 ////////////
 // HELPERS
 ////////////
@@ -736,16 +779,20 @@ bool Context::instance_extension_enabled(const std::string& name) const {
                         [&](const char* s) { return name == s; }) != instance_extension_names.end();
 }
 
-auto Context::get_context_extensions() const {
-    return std::views::values(extensions);
-}
-
 const std::vector<const char*>& Context::get_enabled_device_extensions() const {
     return device_extensions;
 }
 
 const std::vector<const char*>& Context::get_enabled_instance_extensions() const {
     return instance_extension_names;
+}
+
+const std::vector<std::string>& Context::get_default_shader_include_paths() const {
+    return default_shader_include_paths;
+}
+
+const std::map<std::string, std::string>& Context::get_default_shader_macro_definitions() const {
+    return default_shader_macro_definitions;
 }
 
 } // namespace merian
