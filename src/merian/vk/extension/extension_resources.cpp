@@ -37,7 +37,7 @@ void ExtensionResources::enable_device_features(const Context::FeaturesContainer
     }
 }
 
-void ExtensionResources::on_context_created(const ContextHandle context) {
+void ExtensionResources::on_context_created(const ContextHandle& context) {
     weak_context = context;
 }
 

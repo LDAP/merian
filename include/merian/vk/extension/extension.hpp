@@ -1,9 +1,9 @@
 #pragma once
 
 #include "merian/vk/context.hpp"
+#include <map>
 #include <spdlog/spdlog.h>
 #include <vector>
-#include <map>
 
 namespace merian {
 
@@ -38,7 +38,8 @@ class Extension {
     }
     /* Extensions that should be enabled device-wide. Note that on_physical_device_selected is
      * called before. */
-    virtual std::vector<const char*> required_device_extension_names(vk::PhysicalDevice) const {
+    virtual std::vector<const char*>
+    required_device_extension_names(vk::PhysicalDevice /*unused*/) const {
         return {};
     }
 
@@ -54,10 +55,10 @@ class Extension {
     virtual void* pnext_instance_create_info(void* const p_next) {
         return p_next;
     }
-    virtual void on_instance_created(const vk::Instance&) {}
+    virtual void on_instance_created(const vk::Instance& /*unused*/) {}
     /* Called after the physical device was select and before extensions are checked for
      * compativility and check_support is called.*/
-    virtual void on_physical_device_selected(const Context::PhysicalDeviceContainer&) {}
+    virtual void on_physical_device_selected(const Context::PhysicalDeviceContainer& /*unused*/) {}
 
     /* Append a structure to pNext of a getFeatures() call. This can be used to determine extension
      * support.
@@ -72,8 +73,10 @@ class Extension {
 
     /* Custom check for compatibility after the physical device is ready.
      * If this method returns false, it is guaranteed that on_unsupported is called.
+     *
+     * At this time the structs wired up in pnext_get_features_2 is valid.
      */
-    virtual bool extension_supported(const Context::PhysicalDeviceContainer&) {
+    virtual bool extension_supported(const Context::PhysicalDeviceContainer& /*unused*/) {
         return true;
     }
     /* E.g. to dismiss a queue that does not support present-to-surface. */
@@ -93,28 +96,28 @@ class Extension {
         return p_next;
     }
     /* Do not change pNext. You can use pnext_device_create_info for that. */
-    virtual void enable_device_features(const Context::FeaturesContainer&,
-                                        Context::FeaturesContainer&) {}
-    virtual void on_device_created(const vk::Device&) {}
+    virtual void enable_device_features(const Context::FeaturesContainer& /*unused*/,
+                                        Context::FeaturesContainer& /*unused*/) {}
+    virtual void on_device_created(const vk::Device& /*unused*/) {}
     /* Called right before context constructor returns. */
-    virtual void on_context_created(const ContextHandle) {}
+    virtual void on_context_created(const ContextHandle& /*unused*/) {}
     /* Called after device is idle and before context is destroyed. */
     virtual void on_destroy_context() {}
     /* Called right before device is destroyed. */
-    virtual void on_destroy_device(const vk::Device&) {}
+    virtual void on_destroy_device(const vk::Device& /*unused*/) {}
     /* Called before the instance is destroyed or if the extension is determined as unsupported. */
-    virtual void on_destroy_instance(const vk::Instance&) {}
+    virtual void on_destroy_instance(const vk::Instance& /*unused*/) {}
     // Called by context if extension was determined as unsupported. The extension might not receive
     // further callbacks.
-    virtual void on_unsupported([[maybe_unused]] const std::string reason) {
+    virtual void on_unsupported([[maybe_unused]] const std::string& reason) {
         spdlog::warn("extension {} not supported ({})", name, reason);
     }
 
     // OTHER
 
     // return strings that should be defined when compiling shaders with Merians shader compiler.
-    // Note that device and instance extensions are automatically defined as 
-    // MERIAN_DEVICE_EXT_ENABLE_<NAME> and MERIAN_INSTANCE_EXT_ENABLE_<NAME>
+    // Note that device, instance and Merian context extensions are automatically defined as
+    // MERIAN_DEVICE_EXT_ENABLED_<NAME>, MERIAN_INSTANCE_EXT_ENABLED_<NAME>, MERIAN_CONTEXT_EXT_ENABLED_
     virtual std::map<std::string, std::string> shader_macro_definitions() {
         return {};
     }
