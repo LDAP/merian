@@ -120,6 +120,20 @@ ShadercCompiler::ShadercCompiler(const ContextHandle& context,
     compile_options.SetIncluder(std::move(includer));
     compile_options.SetOptimizationLevel(
         shaderc_optimization_level::shaderc_optimization_level_performance);
+
+    if (context->vk_api_version == VK_API_VERSION_1_0) {
+        compile_options.SetTargetEnvironment(shaderc_target_env_vulkan,
+                                             shaderc_env_version_vulkan_1_0);
+    } else if (context->vk_api_version == VK_API_VERSION_1_1) {
+        compile_options.SetTargetEnvironment(shaderc_target_env_vulkan,
+                                             shaderc_env_version_vulkan_1_1);
+    } else if (context->vk_api_version == VK_API_VERSION_1_2) {
+        compile_options.SetTargetEnvironment(shaderc_target_env_vulkan,
+                                             shaderc_env_version_vulkan_1_2);
+    } else {
+        compile_options.SetTargetEnvironment(shaderc_target_env_vulkan,
+                                             shaderc_env_version_vulkan_1_3);
+    }
 }
 
 ShadercCompiler::~ShadercCompiler() {}
@@ -136,20 +150,10 @@ std::vector<uint32_t> ShadercCompiler::compile_glsl(const std::string& source,
         throw ShaderCompiler::compilation_failed{preprocess_result.GetErrorMessage()};
     }
 
-    SPDLOG_DEBUG("compile {}", source_name);
-    const auto assembly_result = shader_compiler.CompileGlslToSpvAssembly(
+    SPDLOG_DEBUG("compile and assemble {}", source_name);
+    const auto binary_result = shader_compiler.CompileGlslToSpv(
         preprocess_result.begin(), preprocess_result.end() - preprocess_result.begin(), kind,
-        source_name.c_str(), compile_options);
-    if (assembly_result.GetCompilationStatus() != shaderc_compilation_status_success) {
-        throw ShaderCompiler::compilation_failed{assembly_result.GetErrorMessage()};
-    }
-
-    SPDLOG_DEBUG("assemble {}", source_name);
-    const auto binary_result = shader_compiler.AssembleToSpv(
-        assembly_result.begin(), assembly_result.end() - assembly_result.begin(), compile_options);
-    if (binary_result.GetCompilationStatus() != shaderc_compilation_status_success) {
-        throw ShaderCompiler::compilation_failed{binary_result.GetErrorMessage()};
-    }
+        source_name.data(), compile_options);
 
     return std::vector<uint32_t>(binary_result.begin(), binary_result.end());
 }
