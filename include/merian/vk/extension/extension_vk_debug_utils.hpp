@@ -3,8 +3,8 @@
 #include "merian/vk/context.hpp"
 #include "merian/vk/extension/extension.hpp"
 
-#include <vulkan/vulkan.hpp>
 #include <unordered_set>
+#include <vulkan/vulkan.hpp>
 
 namespace merian {
 
@@ -48,9 +48,9 @@ class ExtensionVkDebugUtils : public Extension {
 
     // Own methods
     template <typename T> void set_object_name(vk::Device& device, T handle, std::string name) {
-        vk::DebugUtilsObjectNameInfoEXT infoEXT(
+        vk::DebugUtilsObjectNameInfoEXT info_ext(
             handle.objectType, uint64_t(static_cast<typename T::CType>(handle)), name.c_str());
-        device.setDebugUtilsObjectNameEXT(infoEXT);
+        device.setDebugUtilsObjectNameEXT(info_ext);
     }
 
     void cmd_begin_label(const vk::CommandBuffer& cmd, const std::string& name) {

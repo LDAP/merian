@@ -13,11 +13,12 @@ namespace merian {
  */
 class ExtensionVkRayTracingPipeline : public Extension {
   public:
-    ExtensionVkRayTracingPipeline() : Extension("ExtensionVkRayTracingPipeline") {
-        ray_tracing_pipeline_features.rayTracingPipeline = VK_TRUE;
-    }
+    ExtensionVkRayTracingPipeline() : Extension("ExtensionVkRayTracingPipeline") {}
+
     ~ExtensionVkRayTracingPipeline() {}
-    std::vector<const char*> required_device_extension_names(vk::PhysicalDevice) const override {
+
+    std::vector<const char*>
+    required_device_extension_names(vk::PhysicalDevice /*unused*/) const override {
         return {
             VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME,
             VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME,
@@ -29,12 +30,22 @@ class ExtensionVkRayTracingPipeline : public Extension {
 
     // LIFECYCLE
 
+    void* pnext_get_features_2(void* const p_next) override {
+        ray_tracing_pipeline_features.setPNext(p_next);
+        return &ray_tracing_pipeline_features;
+    }
+
+    bool extension_supported(const Context::PhysicalDeviceContainer& /*unused*/) override {
+        return ray_tracing_pipeline_features.rayTracingPipeline == VK_TRUE;
+    }
+
     void
     on_physical_device_selected(const Context::PhysicalDeviceContainer& pd_container) override {
         vk::PhysicalDeviceProperties2KHR props2;
         props2.pNext = &ray_tracing_pipeline_properties;
         pd_container.physical_device.getProperties2(&props2);
     }
+
     void* pnext_device_create_info(void* const p_next) override {
         ray_tracing_pipeline_features.pNext = p_next;
         return &ray_tracing_pipeline_features;

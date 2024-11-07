@@ -20,16 +20,16 @@ class ExtensionVkFloatAtomics : public Extension {
     }
 
     void* pnext_device_create_info(void* const p_next) override {
-        if (supported_atomic_features.shaderImageFloat32Atomics) {
+        if (supported_atomic_features.shaderImageFloat32Atomics == VK_TRUE) {
             SPDLOG_DEBUG("shaderImageFloat32Atomics supported. Enabling feature");
-            enable_atomic_features.shaderImageFloat32Atomics = true;
+            enable_atomic_features.shaderImageFloat32Atomics = VK_TRUE;
         } else {
             SPDLOG_WARN("shaderImageFloat32Atomics not supported");
         }
 
-        if (supported_atomic_features.shaderImageFloat32AtomicAdd) {
+        if (supported_atomic_features.shaderImageFloat32AtomicAdd == VK_TRUE) {
             SPDLOG_DEBUG("shaderImageFloat32AtomicAdd supported. Enabling feature");
-            enable_atomic_features.shaderImageFloat32AtomicAdd = true;
+            enable_atomic_features.shaderImageFloat32AtomicAdd = VK_TRUE;
         } else {
             SPDLOG_WARN("shaderImageFloat32AtomicAdd not supported");
         }

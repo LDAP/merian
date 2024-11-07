@@ -18,23 +18,23 @@ class ExtensionVkRobustnessAccess2 : public Extension {
     }
 
     void* pnext_device_create_info(void* const p_next) override {
-        if (supported_image_robustness_features.robustImageAccess2) {
+        if (supported_image_robustness_features.robustImageAccess2 == VK_TRUE) {
             SPDLOG_DEBUG("robustImageAccess2 supported. Enabling feature");
-            enable_image_robustness_features.robustImageAccess2 = true;
+            enable_image_robustness_features.robustImageAccess2 = VK_TRUE;
         } else {
             SPDLOG_WARN("robustImageAccess2 requested but not supported");
         }
 
-        if (supported_image_robustness_features.robustBufferAccess2) {
+        if (supported_image_robustness_features.robustBufferAccess2 == VK_TRUE) {
             SPDLOG_DEBUG("robustBufferAccess2 supported. Enabling feature");
-            enable_image_robustness_features.robustBufferAccess2 = true;
+            enable_image_robustness_features.robustBufferAccess2 = VK_TRUE;
         } else {
             SPDLOG_WARN("robustBufferAccess2 requested but not supported");
         }
 
-        if (supported_image_robustness_features.nullDescriptor) {
+        if (supported_image_robustness_features.nullDescriptor == VK_TRUE) {
             SPDLOG_DEBUG("nullDescriptor supported. Enabling feature");
-            enable_image_robustness_features.nullDescriptor = true;
+            enable_image_robustness_features.nullDescriptor = VK_TRUE;
         } else {
             SPDLOG_WARN("nullDescriptor requested but not supported");
         }

@@ -7,14 +7,12 @@ namespace merian {
 /**
  * @brief      This class describes an extension to access
  * VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME.
- * 
+ *
  * Note that you must enable Ray Query or Ray Tracing Pipeline extension for this to work.
  */
 class ExtensionVkAccelerationStructure : public Extension {
   public:
-    ExtensionVkAccelerationStructure() : Extension("ExtensionVkAccelerationStructure") {
-        acceleration_structure_features.accelerationStructure = VK_TRUE;
-    }
+    ExtensionVkAccelerationStructure() : Extension("ExtensionVkAccelerationStructure") {}
     ~ExtensionVkAccelerationStructure() {}
 
     std::vector<const char*> required_device_extension_names(vk::PhysicalDevice) const override {
@@ -32,6 +30,16 @@ class ExtensionVkAccelerationStructure : public Extension {
         props2.pNext = &acceleration_structure_properties;
         pd_container.physical_device.getProperties2(&props2);
     }
+
+    void* pnext_get_features_2(void* const p_next) override {
+        acceleration_structure_features.setPNext(p_next);
+        return &acceleration_structure_features;
+    }
+
+    bool extension_supported(const Context::PhysicalDeviceContainer& /*unused*/) override {
+        return acceleration_structure_features.accelerationStructure == VK_TRUE;
+    }
+
     void* pnext_device_create_info(void* const p_next) override {
         acceleration_structure_features.pNext = p_next;
         return &acceleration_structure_features;

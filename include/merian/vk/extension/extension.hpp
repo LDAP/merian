@@ -72,9 +72,10 @@ class Extension {
     }
 
     /* Custom check for compatibility after the physical device is ready.
-     * If this method returns false, it is guaranteed that on_unsupported is called.
+     * At this time the structs wired up in pnext_get_features_2 is valid, you can use those to
+     * check if features are available.
      *
-     * At this time the structs wired up in pnext_get_features_2 is valid.
+     * If this method returns false, it is guaranteed that on_unsupported is called.
      */
     virtual bool extension_supported(const Context::PhysicalDeviceContainer& /*unused*/) {
         return true;
@@ -96,8 +97,8 @@ class Extension {
         return p_next;
     }
     /* Do not change pNext. You can use pnext_device_create_info for that. */
-    virtual void enable_device_features(const Context::FeaturesContainer& /*unused*/,
-                                        Context::FeaturesContainer& /*unused*/) {}
+    virtual void enable_device_features(const Context::FeaturesContainer& /*supportedFeatures*/,
+                                        Context::FeaturesContainer& /*enableFeatures*/) {}
     virtual void on_device_created(const vk::Device& /*unused*/) {}
     /* Called right before context constructor returns. */
     virtual void on_context_created(const ContextHandle& /*unused*/) {}
@@ -117,7 +118,8 @@ class Extension {
 
     // return strings that should be defined when compiling shaders with Merians shader compiler.
     // Note that device, instance and Merian context extensions are automatically defined as
-    // MERIAN_DEVICE_EXT_ENABLED_<NAME>, MERIAN_INSTANCE_EXT_ENABLED_<NAME>, MERIAN_CONTEXT_EXT_ENABLED_
+    // MERIAN_DEVICE_EXT_ENABLED_<NAME>, MERIAN_INSTANCE_EXT_ENABLED_<NAME>,
+    // MERIAN_CONTEXT_EXT_ENABLED_
     virtual std::map<std::string, std::string> shader_macro_definitions() {
         return {};
     }

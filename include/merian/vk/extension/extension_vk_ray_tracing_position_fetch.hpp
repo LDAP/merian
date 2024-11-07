@@ -8,7 +8,8 @@ class ExtensionVkRayTracingPositionFetch : public Extension {
   public:
     ExtensionVkRayTracingPositionFetch() : Extension("ExtensionVkRayTracingPositionFetch") {}
     ~ExtensionVkRayTracingPositionFetch() {}
-    std::vector<const char*> required_device_extension_names(vk::PhysicalDevice) const override {
+    std::vector<const char*>
+    required_device_extension_names(vk::PhysicalDevice /*unused*/) const override {
         return {VK_KHR_RAY_TRACING_POSITION_FETCH_EXTENSION_NAME};
     }
 
@@ -17,10 +18,14 @@ class ExtensionVkRayTracingPositionFetch : public Extension {
         return &supported_features;
     }
 
+    bool extension_supported(const Context::PhysicalDeviceContainer& /*unused*/) override {
+        return supported_features.rayTracingPositionFetch == VK_TRUE;
+    }
+
     void* pnext_device_create_info(void* const p_next) override {
-        if (supported_features.rayTracingPositionFetch) {
+        if (supported_features.rayTracingPositionFetch == VK_TRUE) {
             SPDLOG_DEBUG("rayTracingPositionFetch supported. Enabling feature");
-            enabled_features.rayTracingPositionFetch = true;
+            enabled_features.rayTracingPositionFetch = VK_TRUE;
         } else {
             SPDLOG_ERROR("rayTracingPositionFetch requested but not supported");
         }
