@@ -118,6 +118,8 @@ ShadercCompiler::ShadercCompiler(const ContextHandle& context,
         includer->get_file_loader().add_search_path(include_path);
     }
     compile_options.SetIncluder(std::move(includer));
+    compile_options.SetOptimizationLevel(
+        shaderc_optimization_level::shaderc_optimization_level_performance);
 }
 
 ShadercCompiler::~ShadercCompiler() {}

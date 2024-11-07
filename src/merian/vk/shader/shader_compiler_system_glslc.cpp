@@ -54,6 +54,9 @@ SystemGlslcCompiler::compile_glsl(const std::string& source,
         command.emplace_back(fmt::format("-D{}={}", macro_def.first, macro_def.second));
     }
 
+    // turn on optimization
+    command.emplace_back("-O");
+
     command.emplace_back("-");
 
     command.emplace_back("-o");
