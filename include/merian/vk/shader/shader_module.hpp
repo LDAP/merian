@@ -51,7 +51,7 @@ class ShaderModule : public std::enable_shared_from_this<ShaderModule> {
     operator ShaderStageCreateInfo();
 
     ShaderStageCreateInfo get_shader_stage_create_info(
-        const SpecializationInfoHandle specialization_info = MERIAN_SPECIALIZATION_INFO_NONE,
+        const SpecializationInfoHandle& specialization_info = MERIAN_SPECIALIZATION_INFO_NONE,
         const char* entry_point = "main",
         const vk::PipelineShaderStageCreateFlags flags = {});
 
@@ -72,7 +72,7 @@ class ShaderStageCreateInfo {
     ShaderStageCreateInfo(
         const ShaderModuleHandle& shader_module,
         const SpecializationInfoHandle& specialization_info = MERIAN_SPECIALIZATION_INFO_NONE,
-        const std::string entry_point = "main",
+        const std::string& entry_point = "main",
         const vk::PipelineShaderStageCreateFlags flags = {});
 
     operator vk::PipelineShaderStageCreateInfo() const;

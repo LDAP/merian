@@ -57,7 +57,7 @@ ShaderModule::operator ShaderStageCreateInfo() {
 }
 
 ShaderStageCreateInfo
-ShaderModule::get_shader_stage_create_info(const SpecializationInfoHandle specialization_info,
+ShaderModule::get_shader_stage_create_info(const SpecializationInfoHandle& specialization_info,
                                            const char* entry_point,
                                            const vk::PipelineShaderStageCreateFlags flags) {
     return ShaderStageCreateInfo(shared_from_this(), specialization_info, entry_point, flags);
@@ -71,7 +71,7 @@ ShaderModuleHandle ShaderModule::fullscreen_triangle(const ContextHandle& contex
 
 ShaderStageCreateInfo::ShaderStageCreateInfo(const ShaderModuleHandle& shader_module,
                                              const SpecializationInfoHandle& specialization_info,
-                                             const std::string entry_point,
+                                             const std::string& entry_point,
                                              const vk::PipelineShaderStageCreateFlags flags)
     : shader_module(shader_module), specialization_info(specialization_info),
       entry_point(entry_point), flags(flags) {}
