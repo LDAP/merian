@@ -61,7 +61,7 @@ class ShaderCompiler {
     };
 
   public:
-    // Returns any of the available shader compilers. Returns nullptr if none is available.
+    // Returns any of the available shader compilers. Returns a stub compiler if none is available.
     static ShaderCompilerHandle
     get(const ContextHandle& context,
         const std::vector<std::string>& user_include_paths = {},

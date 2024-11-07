@@ -7,6 +7,27 @@
 
 namespace merian {
 
+class DummyShaderCompiler : public ShaderCompiler {
+  public:
+    DummyShaderCompiler(const ContextHandle& context,
+                        const std::vector<std::string>& include_paths = {},
+                        const std::map<std::string, std::string>& macro_definitions = {})
+        : ShaderCompiler(context, include_paths, macro_definitions) {}
+
+    ~DummyShaderCompiler() {}
+
+    std::vector<uint32_t>
+    compile_glsl([[maybe_unused]] const std::string& source,
+                 [[maybe_unused]] const std::string& source_name,
+                 [[maybe_unused]] const vk::ShaderStageFlagBits shader_kind) override {
+        throw compilation_failed{"compiler not available"};
+    }
+
+    bool available() const override {
+        return false;
+    }
+};
+
 ShaderCompilerHandle
 ShaderCompiler::get(const ContextHandle& context,
                     const std::vector<std::string>& user_include_paths,
@@ -26,13 +47,16 @@ ShaderCompiler::get(const ContextHandle& context,
     }
 
     ShaderCompilerHandle glslc =
-        std::make_shared<SystemGlslcCompiler>(context, user_include_paths, user_macro_definitions);
+        std::make_shared<SystemGlslcCompiler>(context, user_include_paths,
+        user_macro_definitions);
     if (glslc->available()) {
         SPDLOG_DEBUG("using installed glslc as default compiler");
         return glslc;
     }
 
-    return nullptr;
+    SPDLOG_WARN("no shader compiler available");
+    return std::make_shared<DummyShaderCompiler>(context, user_include_paths,
+                                                 user_macro_definitions);
 }
 
 ShaderCompiler::ShaderCompiler(const ContextHandle& context,
