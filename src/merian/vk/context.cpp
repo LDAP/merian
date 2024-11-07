@@ -2,6 +2,7 @@
 #include "merian/utils/pointer.hpp"
 #include "merian/utils/vector.hpp"
 #include "merian/vk/extension/extension.hpp"
+#include "merian/vk/shader/shader_compiler.hpp"
 
 #include <fmt/ranges.h>
 #include <spdlog/spdlog.h>
@@ -19,15 +20,17 @@ ContextHandle Context::create(const std::vector<std::shared_ptr<Extension>>& ext
                               uint32_t filter_device_id,
                               const std::string& filter_device_name) {
 
-    auto shared_context = std::shared_ptr<Context>(new Context(
+    const ContextHandle context = std::shared_ptr<Context>(new Context(
         extensions, application_name, application_vk_version, preffered_number_compute_queues,
         filter_vendor_id, filter_device_id, filter_device_name));
 
-    for (auto& ext : shared_context->extensions) {
-        ext.second->on_context_created(shared_context);
+    for (auto& ext : context->extensions) {
+        ext.second->on_context_created(context);
     }
 
-    return shared_context;
+    context->shader_compiler = ShaderCompiler::get(context);
+
+    return context;
 }
 
 Context::Context(const std::vector<std::shared_ptr<Extension>>& desired_extensions,
@@ -561,12 +564,14 @@ void Context::prepare_shader_include_defines() {
         const auto extension_macro_definitions = ext.second->shader_macro_definitions();
         default_shader_macro_definitions.insert(extension_macro_definitions.begin(),
                                                 extension_macro_definitions.end());
+        default_shader_macro_definitions.emplace("MERIAN_CONTEXT_EXT_ENABLED_" + ext.second->name,
+                                                 "1");
     }
-    const std::string instance_ext_define_prefix = "MERIAN_INSTANCE_EXT_ENABLE_";
+    const std::string instance_ext_define_prefix = "MERIAN_INSTANCE_EXT_ENABLED_";
     for (const auto* ext : instance_extension_names) {
         default_shader_macro_definitions.emplace(instance_ext_define_prefix + ext, "1");
     }
-    const std::string device_ext_define_prefix = "MERIAN_DEVICE_EXT_ENABLE_";
+    const std::string device_ext_define_prefix = "MERIAN_DEVICE_EXT_ENABLED_";
     for (const auto* ext : device_extensions) {
         default_shader_macro_definitions.emplace(device_ext_define_prefix + ext, "1");
     }

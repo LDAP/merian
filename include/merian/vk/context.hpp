@@ -3,7 +3,6 @@
 #include "merian/io/file_loader.hpp"
 #include "merian/utils/concurrent/thread_pool.hpp"
 #include <map>
-#include <ranges>
 #include <spdlog/logger.h>
 
 #include <typeindex>
@@ -24,6 +23,10 @@ class Queue;
 class CommandPool;
 
 using ContextHandle = std::shared_ptr<Context>;
+class ShaderModule;
+using ShaderModuleHandle = std::shared_ptr<ShaderModule>;
+class ShaderCompiler;
+using ShaderCompilerHandle = std::shared_ptr<ShaderCompiler>;
 
 /* Initializes the Vulkan instance and device and holds core objects.
  *
@@ -228,7 +231,10 @@ class Context : public std::enable_shared_from_this<Context> {
     ThreadPool thread_pool;
 
     // A shared file_loader for convenience.
-    merian::FileLoader file_loader;
+    FileLoader file_loader;
+
+    // A shader compiler with default include paths for convenience.
+    ShaderCompilerHandle shader_compiler;
 
   private:
     // in find_queues. Indexes are -1 if no suitable queue was found!
@@ -263,7 +269,6 @@ class Context : public std::enable_shared_from_this<Context> {
     // Convenience command pool for compute (can be nullptr in very rare occasions)
     std::weak_ptr<CommandPool> cmd_pool_C;
 
-
     std::vector<std::string> default_shader_include_paths;
     std::map<std::string, std::string> default_shader_macro_definitions;
 };
@@ -272,3 +277,4 @@ class Context : public std::enable_shared_from_this<Context> {
 
 #include "merian/vk/command/command_pool.hpp"
 #include "merian/vk/command/queue.hpp"
+#include "merian/vk/shader/shader_compiler.hpp"
