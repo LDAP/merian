@@ -542,10 +542,10 @@ void Context::prepare_shader_include_defines() {
 
     if (FileLoader::exists(development_headers / "merian-shaders")) {
         SPDLOG_DEBUG("found merian-shaders development headers headers at {}", development_headers.string());
-        default_shader_include_paths.emplace_back(development_headers);
+        default_shader_include_paths.emplace_back(development_headers.string());
     } else if (FileLoader::exists(installed_headers / "merian-shaders")) {
         SPDLOG_DEBUG("found merian-shaders installed at {}", installed_headers.string());
-        default_shader_include_paths.emplace_back(installed_headers);
+        default_shader_include_paths.emplace_back(installed_headers.string());
     } else {
         SPDLOG_ERROR("merian-shaders header not found! Shader compilers might not work correctly");
     }
