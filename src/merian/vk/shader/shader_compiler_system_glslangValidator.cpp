@@ -13,7 +13,8 @@ SystemGlslangValidatorCompiler::SystemGlslangValidatorCompiler(
     const ContextHandle& context,
     const std::vector<std::string>& user_include_paths,
     const std::map<std::string, std::string>& user_macro_definitions)
-    : ShaderCompiler(context, user_include_paths, user_macro_definitions), context(context) {}
+    : ShaderCompiler(context, user_include_paths, user_macro_definitions), context(context),
+      compiler_executable(subprocess::find_program("glslangValidator")) {}
 
 SystemGlslangValidatorCompiler::~SystemGlslangValidatorCompiler() {}
 
@@ -21,13 +22,19 @@ std::vector<uint32_t>
 SystemGlslangValidatorCompiler::compile_glsl(const std::string& source,
                                              [[maybe_unused]] const std::string& source_name,
                                              const vk::ShaderStageFlagBits shader_kind) {
-    std::vector<std::string> command = {subprocess::find_program("glslangValidator")};
+    if (compiler_executable.empty()) {
+        throw compilation_failed{"compiler not available"};
+    }
+
+    std::vector<std::string> command = {compiler_executable};
 
     command.emplace_back("--target-env");
     if (context->vk_api_version == VK_API_VERSION_1_0) {
         command.emplace_back("vulkan1.0");
     } else if (context->vk_api_version == VK_API_VERSION_1_1) {
         command.emplace_back("vulkan1.1");
+    } else if (context->vk_api_version == VK_API_VERSION_1_2) {
+        command.emplace_back("vulkan1.2");
     } else {
         command.emplace_back("vulkan1.3");
     }
@@ -73,7 +80,7 @@ SystemGlslangValidatorCompiler::compile_glsl(const std::string& source,
 }
 
 bool SystemGlslangValidatorCompiler::available() const {
-    return !subprocess::find_program("glslangValidator").empty();
+    return !compiler_executable.empty();
 }
 
 } // namespace merian

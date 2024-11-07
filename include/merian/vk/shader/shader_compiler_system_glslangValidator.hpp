@@ -24,6 +24,7 @@ class SystemGlslangValidatorCompiler : public ShaderCompiler {
 
   private:
     const ContextHandle context;
+    const std::string compiler_executable;
 };
 
 } // namespace merian

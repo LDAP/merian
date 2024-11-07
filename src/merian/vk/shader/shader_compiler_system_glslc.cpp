@@ -13,17 +13,20 @@ SystemGlslcCompiler::SystemGlslcCompiler(
     const ContextHandle& context,
     const std::vector<std::string>& user_include_paths,
     const std::map<std::string, std::string>& user_macro_definitions)
-    : ShaderCompiler(context, user_include_paths, user_macro_definitions), context(context) {}
+    : ShaderCompiler(context, user_include_paths, user_macro_definitions), context(context),
+      compiler_executable(subprocess::find_program("glslc")) {}
 
 SystemGlslcCompiler::~SystemGlslcCompiler() {}
-
-
 
 std::vector<uint32_t>
 SystemGlslcCompiler::compile_glsl(const std::string& source,
                                   [[maybe_unused]] const std::string& source_name,
                                   const vk::ShaderStageFlagBits shader_kind) {
-    std::vector<std::string> command = {subprocess::find_program("glslc")};
+    if (compiler_executable.empty()) {
+        throw compilation_failed{"compiler not available"};
+    }
+
+    std::vector<std::string> command = {compiler_executable};
 
     if (context->vk_api_version == VK_API_VERSION_1_0) {
         command.emplace_back("--target-env=vulkan1.0");
@@ -40,7 +43,8 @@ SystemGlslcCompiler::compile_glsl(const std::string& source,
             fmt::format("shader kind {} unsupported.", vk::to_string(shader_kind))};
     }
 
-    command.emplace_back(fmt::format("-fshader-stage={}", SHADER_STAGE_EXTENSION_MAP.at(shader_kind).substr(1)));
+    command.emplace_back(
+        fmt::format("-fshader-stage={}", SHADER_STAGE_EXTENSION_MAP.at(shader_kind).substr(1)));
 
     for (const auto& inc_dir : get_include_paths()) {
         command.emplace_back("-I");
@@ -63,8 +67,8 @@ SystemGlslcCompiler::compile_glsl(const std::string& source,
                                      .cout(subprocess::PipeOption::pipe));
 
     if (process.returncode != 0) {
-        throw compilation_failed{fmt::format("glslc command failed:\n{}\n\n{}\n\n{}",
-                                             process.cout, process.cerr, fmt::join(command, " "))};
+        throw compilation_failed{fmt::format("glslc command failed:\n{}\n\n{}\n\n{}", process.cout,
+                                             process.cerr, fmt::join(command, " "))};
     }
 
     std::vector<uint32_t> spv((process.cout.size() + sizeof(uint32_t) - 1) / sizeof(uint32_t));
@@ -74,7 +78,7 @@ SystemGlslcCompiler::compile_glsl(const std::string& source,
 }
 
 bool SystemGlslcCompiler::available() const {
-    return !subprocess::find_program("glslc").empty();
+    return !compiler_executable.empty();
 }
 
 } // namespace merian
