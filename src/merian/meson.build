@@ -46,13 +46,6 @@ merian_src = files(
     'vk/window/swapchain.cpp',
 )
 
-if shaderc.found()
-    merian_src += files('vk/shader/shader_compiler_shaderc.cpp')
-    add_project_arguments('-DMERIAN_SHADERC_FOUND', language: 'cpp')
-else
-    merian_src += files('vk/shader/shader_compiler_shaderc_stub.cpp')
-endif
-
 subdir('vk/shader')
 
 merian_lib = static_library(

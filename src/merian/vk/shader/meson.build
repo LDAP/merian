@@ -5,3 +5,10 @@ merian_src += files(
     'shader_compiler_system_glslangValidator.cpp',
     'shader_compiler_system_glslc.cpp'
 )
+
+if shaderc.found()
+    merian_src += files('shader_compiler_shaderc.cpp')
+    add_project_arguments('-DMERIAN_SHADERC_FOUND', language: 'cpp')
+else
+    merian_src += files('shader_compiler_shaderc_stub.cpp')
+endif
