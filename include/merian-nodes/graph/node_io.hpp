@@ -20,7 +20,7 @@ class NodeIOLayout {
         std::enable_if_t<
             std::is_base_of_v<TypedInputConnector<OutputConnectorType, ResourceAccessType>, T>,
             bool> = true>
-    const OutputConnectorType operator[](const std::shared_ptr<T>& input_connector) const {
+    OutputConnectorType operator[](const std::shared_ptr<T>& input_connector) const {
         assert(io_layout(input_connector) && "optional input connector is not connected");
         return input_connector->output_connector(io_layout(input_connector));
     }
