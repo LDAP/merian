@@ -69,7 +69,7 @@ FileLoader::find_file(const std::filesystem::path& path) const {
             return std::filesystem::weakly_canonical(full_path);
     }
 
-    SPDLOG_WARN("file {} not found in search paths", path.string());
+    SPDLOG_DEBUG("file {} not found in search paths", path.string());
     return std::nullopt;
 }
 
