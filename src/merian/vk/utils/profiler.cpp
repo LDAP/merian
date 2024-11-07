@@ -25,7 +25,6 @@ Profiler::~Profiler() {}
 // Remember to reset the query pool after creation
 void Profiler::set_query_pool(const QueryPoolHandle<vk::QueryType::eTimestamp>& query_pool) {
     this->query_pool = query_pool;
-    query_pool_infos[query_pool].clear_index = clear_index;
 }
 
 void Profiler::clear() {
