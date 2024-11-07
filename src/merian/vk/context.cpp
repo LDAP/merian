@@ -541,11 +541,17 @@ void Context::prepare_shader_include_defines() {
         std::filesystem::path(MERIAN_INSTALL_INCLUDE_DIR);
 
     if (FileLoader::exists(development_headers / "merian-shaders")) {
-        SPDLOG_DEBUG("found merian-shaders development headers headers at {}", development_headers.string());
+        SPDLOG_DEBUG("found merian-shaders development headers headers at {}",
+                     development_headers.string());
         default_shader_include_paths.emplace_back(development_headers.string());
     } else if (FileLoader::exists(installed_headers / "merian-shaders")) {
         SPDLOG_DEBUG("found merian-shaders installed at {}", installed_headers.string());
         default_shader_include_paths.emplace_back(installed_headers.string());
+    } else if (const std::optional<std::filesystem::path> headers =
+                   FileLoader::search_cwd_parents("include/merian-shaders");
+               headers.has_value()) {
+        SPDLOG_DEBUG("found merian-shaders at {}", headers->parent_path().string());
+        default_shader_include_paths.emplace_back(headers->parent_path().string());
     } else {
         SPDLOG_ERROR("merian-shaders header not found! Shader compilers might not work correctly");
     }
