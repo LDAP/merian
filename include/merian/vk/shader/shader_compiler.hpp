@@ -101,6 +101,23 @@ class ShaderCompiler {
                                               shader_kind);
     }
 
+    // uses the file_loader provided from context.
+    ShaderModuleHandle find_compile_glsl_to_shadermodule(
+        const ContextHandle& context,
+        const std::filesystem::path& path,
+        const std::optional<vk::ShaderStageFlagBits> optional_shader_kind = std::nullopt) {
+
+        const std::optional<std::filesystem::path> resolved = context->file_loader.find_file(path);
+        if (!resolved) {
+            throw compilation_failed{fmt::format("file {} not found", path.string())};
+        }
+
+        const vk::ShaderStageFlagBits shader_kind =
+            optional_shader_kind.value_or(guess_kind(*resolved));
+        return std::make_shared<ShaderModule>(context, compile_glsl(*resolved, shader_kind),
+                                              shader_kind);
+    }
+
     ShaderModuleHandle compile_glsl_to_shadermodule(const ContextHandle& context,
                                                     const std::string& source,
                                                     const std::string& source_name,

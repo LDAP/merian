@@ -13,14 +13,24 @@ SystemGlslangValidatorCompiler::SystemGlslangValidatorCompiler(
     const ContextHandle& context,
     const std::vector<std::string>& user_include_paths,
     const std::map<std::string, std::string>& user_macro_definitions)
-    : ShaderCompiler(context, user_include_paths, user_macro_definitions), context(context),
-      compiler_executable(subprocess::find_program("glslangValidator")) {}
+    : ShaderCompiler(context, user_include_paths, user_macro_definitions),
+      compiler_executable(subprocess::find_program("glslangValidator")) {
+    if (context->vk_api_version == VK_API_VERSION_1_0) {
+        target_env_arg = "vulkan1.0";
+    } else if (context->vk_api_version == VK_API_VERSION_1_1) {
+        target_env_arg = "vulkan1.1";
+    } else if (context->vk_api_version == VK_API_VERSION_1_2) {
+        target_env_arg = "vulkan1.2";
+    } else {
+        target_env_arg = "vulkan1.3";
+    }
+}
 
 SystemGlslangValidatorCompiler::~SystemGlslangValidatorCompiler() {}
 
 std::vector<uint32_t>
 SystemGlslangValidatorCompiler::compile_glsl(const std::string& source,
-                                             [[maybe_unused]] const std::string& source_name,
+                                             const std::string& source_name,
                                              const vk::ShaderStageFlagBits shader_kind) {
     if (compiler_executable.empty()) {
         throw compilation_failed{"compiler not available"};
@@ -29,15 +39,7 @@ SystemGlslangValidatorCompiler::compile_glsl(const std::string& source,
     std::vector<std::string> command = {compiler_executable};
 
     command.emplace_back("--target-env");
-    if (context->vk_api_version == VK_API_VERSION_1_0) {
-        command.emplace_back("vulkan1.0");
-    } else if (context->vk_api_version == VK_API_VERSION_1_1) {
-        command.emplace_back("vulkan1.1");
-    } else if (context->vk_api_version == VK_API_VERSION_1_2) {
-        command.emplace_back("vulkan1.2");
-    } else {
-        command.emplace_back("vulkan1.3");
-    }
+    command.emplace_back(target_env_arg);
 
     command.emplace_back("--stdin");
 
@@ -49,6 +51,11 @@ SystemGlslangValidatorCompiler::compile_glsl(const std::string& source,
     command.emplace_back("-S");
     command.emplace_back(SHADER_STAGE_EXTENSION_MAP.at(shader_kind).substr(1));
 
+    const std::filesystem::path source_path(source_name);
+    if (FileLoader::exists(source_path)) {
+        const std::filesystem::path parent_path = source_path.parent_path();
+        command.emplace_back(fmt::format("-I{}", parent_path.string()));
+    }
     for (const auto& inc_dir : get_include_paths()) {
         command.emplace_back(fmt::format("-I{}", inc_dir));
     }
@@ -68,8 +75,9 @@ SystemGlslangValidatorCompiler::compile_glsl(const std::string& source,
                                      .cout(subprocess::PipeOption::pipe));
 
     if (process.returncode != 0) {
-        throw compilation_failed{fmt::format("glslangValidator command failed:\n{}\n\n{}\n\n{}",
-                                             process.cout, process.cerr, fmt::join(command, " "))};
+        throw compilation_failed{
+            fmt::format("glslangValidator command failed compiling {}:\n{}\n\n{}\n\n{}",
+                        source_name, process.cout, process.cerr, fmt::join(command, " "))};
     }
 
     std::vector<uint32_t> spv = FileLoader::load_file<uint32_t>(output_file);

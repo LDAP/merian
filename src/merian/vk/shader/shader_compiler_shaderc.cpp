@@ -23,6 +23,10 @@ class FileIncluder final : public shaderc::CompileOptions::IncluderInterface {
         }
         case shaderc_include_type_relative: {
             full_path = file_loader.find_file(requested_source, requesting_source);
+            if (!full_path) {
+                // test absolute as well
+                full_path = file_loader.find_file(requested_source);
+            }
             break;
         }
         default:

@@ -13,30 +13,31 @@ SystemGlslcCompiler::SystemGlslcCompiler(
     const ContextHandle& context,
     const std::vector<std::string>& user_include_paths,
     const std::map<std::string, std::string>& user_macro_definitions)
-    : ShaderCompiler(context, user_include_paths, user_macro_definitions), context(context),
-      compiler_executable(subprocess::find_program("glslc")) {}
+    : ShaderCompiler(context, user_include_paths, user_macro_definitions),
+      compiler_executable(subprocess::find_program("glslc")) {
+    if (context->vk_api_version == VK_API_VERSION_1_0) {
+        target_env_arg = "--target-env=vulkan1.0";
+    } else if (context->vk_api_version == VK_API_VERSION_1_1) {
+        target_env_arg = "--target-env=vulkan1.1";
+    } else if (context->vk_api_version == VK_API_VERSION_1_2) {
+        target_env_arg = "--target-env=vulkan1.2";
+    } else {
+        target_env_arg = "--target-env=vulkan1.3";
+    }
+}
 
 SystemGlslcCompiler::~SystemGlslcCompiler() {}
 
-std::vector<uint32_t>
-SystemGlslcCompiler::compile_glsl(const std::string& source,
-                                  [[maybe_unused]] const std::string& source_name,
-                                  const vk::ShaderStageFlagBits shader_kind) {
+std::vector<uint32_t> SystemGlslcCompiler::compile_glsl(const std::string& source,
+                                                        const std::string& source_name,
+                                                        const vk::ShaderStageFlagBits shader_kind) {
     if (compiler_executable.empty()) {
         throw compilation_failed{"compiler not available"};
     }
 
     std::vector<std::string> command = {compiler_executable};
 
-    if (context->vk_api_version == VK_API_VERSION_1_0) {
-        command.emplace_back("--target-env=vulkan1.0");
-    } else if (context->vk_api_version == VK_API_VERSION_1_1) {
-        command.emplace_back("--target-env=vulkan1.1");
-    } else if (context->vk_api_version == VK_API_VERSION_1_2) {
-        command.emplace_back("--target-env=vulkan1.2");
-    } else {
-        command.emplace_back("--target-env=vulkan1.3");
-    }
+    command.emplace_back(target_env_arg);
 
     if (!SHADER_STAGE_EXTENSION_MAP.contains(shader_kind)) {
         throw compilation_failed{
@@ -46,6 +47,12 @@ SystemGlslcCompiler::compile_glsl(const std::string& source,
     command.emplace_back(
         fmt::format("-fshader-stage={}", SHADER_STAGE_EXTENSION_MAP.at(shader_kind).substr(1)));
 
+    const std::filesystem::path source_path(source_name);
+    if (FileLoader::exists(source_path)) {
+        const std::filesystem::path parent_path = source_path.parent_path();
+        command.emplace_back("-I");
+        command.emplace_back(parent_path.string());
+    }
     for (const auto& inc_dir : get_include_paths()) {
         command.emplace_back("-I");
         command.emplace_back(inc_dir);
@@ -70,8 +77,9 @@ SystemGlslcCompiler::compile_glsl(const std::string& source,
                                      .cout(subprocess::PipeOption::pipe));
 
     if (process.returncode != 0) {
-        throw compilation_failed{fmt::format("glslc command failed:\n{}\n\n{}\n\n{}", process.cout,
-                                             process.cerr, fmt::join(command, " "))};
+        throw compilation_failed{fmt::format("glslc command failed compiling {}:\n{}\n\n{}\n\n{}",
+                                             source_name, process.cout, process.cerr,
+                                             fmt::join(command, " "))};
     }
 
     std::vector<uint32_t> spv((process.cout.size() + sizeof(uint32_t) - 1) / sizeof(uint32_t));

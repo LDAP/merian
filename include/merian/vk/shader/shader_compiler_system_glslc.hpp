@@ -22,8 +22,8 @@ class SystemGlslcCompiler : public ShaderCompiler {
     bool available() const override;
 
   private:
-    const ContextHandle context;
     const std::string compiler_executable;
+    std::string target_env_arg;
 };
 
 } // namespace merian

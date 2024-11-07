@@ -16,7 +16,7 @@ ShadercCompiler::compile_glsl([[maybe_unused]] const std::string& source,
                               [[maybe_unused]] const std::string& source_name,
                               [[maybe_unused]] const vk::ShaderStageFlagBits shader_kind) {
     throw merian::ShaderCompiler::compilation_failed{
-        "shaderc is not available (was not found at compile time)"};
+        "shaderc is not available (was not found or enabled at compile time)"};
 }
 
 bool ShadercCompiler::available() const {
