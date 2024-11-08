@@ -30,9 +30,9 @@ ExtensionResources::required_device_extension_names(vk::PhysicalDevice) const {
 
 void ExtensionResources::enable_device_features(const Context::FeaturesContainer& supported,
                                                 Context::FeaturesContainer& enable) {
-    if (supported.physical_device_features_v12.bufferDeviceAddress) {
+    if (supported.physical_device_features_v12.bufferDeviceAddress == VK_TRUE) {
         SPDLOG_DEBUG("bufferDeviceAddress supported. Enabling feature");
-        enable.physical_device_features_v12.bufferDeviceAddress = true;
+        enable.physical_device_features_v12.bufferDeviceAddress = VK_TRUE;
         flags |= VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
     }
 }

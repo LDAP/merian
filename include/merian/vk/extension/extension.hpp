@@ -55,7 +55,20 @@ class Extension {
     virtual void* pnext_instance_create_info(void* const p_next) {
         return p_next;
     }
+
     virtual void on_instance_created(const vk::Instance& /*unused*/) {}
+
+    /**
+     * Vote against a physical device by returning false. The context attemps to select a physical
+     * device that is accepted by most extensions, meaning this is not a hard criteria and you
+     * should check support in "extension_supported" again!
+     */
+    virtual bool
+    accept_physical_device([[maybe_unused]] const vk::PhysicalDevice& physical_device,
+                           [[maybe_unused]] const vk::PhysicalDeviceProperties2& props) {
+        return true;
+    }
+
     /* Called after the physical device was select and before extensions are checked for
      * compativility and check_support is called.*/
     virtual void on_physical_device_selected(const Context::PhysicalDeviceContainer& /*unused*/) {}
@@ -80,6 +93,7 @@ class Extension {
     virtual bool extension_supported(const Context::PhysicalDeviceContainer& /*unused*/) {
         return true;
     }
+
     /* E.g. to dismiss a queue that does not support present-to-surface. */
     virtual bool accept_graphics_queue([[maybe_unused]] const vk::Instance& instance,
                                        [[maybe_unused]] const vk::PhysicalDevice& physical_device,
@@ -99,15 +113,21 @@ class Extension {
     /* Do not change pNext. You can use pnext_device_create_info for that. */
     virtual void enable_device_features(const Context::FeaturesContainer& /*supportedFeatures*/,
                                         Context::FeaturesContainer& /*enableFeatures*/) {}
+
     virtual void on_device_created(const vk::Device& /*unused*/) {}
+
     /* Called right before context constructor returns. */
     virtual void on_context_created(const ContextHandle& /*unused*/) {}
+
     /* Called after device is idle and before context is destroyed. */
     virtual void on_destroy_context() {}
+
     /* Called right before device is destroyed. */
     virtual void on_destroy_device(const vk::Device& /*unused*/) {}
+
     /* Called before the instance is destroyed or if the extension is determined as unsupported. */
     virtual void on_destroy_instance(const vk::Instance& /*unused*/) {}
+
     // Called by context if extension was determined as unsupported. The extension might not receive
     // further callbacks.
     virtual void on_unsupported([[maybe_unused]] const std::string& reason) {

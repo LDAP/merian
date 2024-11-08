@@ -16,9 +16,9 @@ class ExtensionResources : public Extension {
     ExtensionResources() : Extension("ExtensionResources") {}
     ~ExtensionResources() {}
 
-    void on_physical_device_selected(const Context::PhysicalDeviceContainer&) override;
+    void on_physical_device_selected(const Context::PhysicalDeviceContainer& /*unused*/) override;
 
-    std::vector<const char*> required_device_extension_names(vk::PhysicalDevice) const override;
+    std::vector<const char*> required_device_extension_names(vk::PhysicalDevice /*unused*/) const override;
 
     void enable_device_features(const Context::FeaturesContainer& supported,
                                 Context::FeaturesContainer& enable) override;

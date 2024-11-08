@@ -15,14 +15,15 @@ namespace merian {
 ContextHandle Context::create(const std::vector<std::shared_ptr<Extension>>& extensions,
                               const std::string& application_name,
                               uint32_t application_vk_version,
+                              uint32_t vk_api_version,
                               uint32_t preffered_number_compute_queues,
                               uint32_t filter_vendor_id,
                               uint32_t filter_device_id,
                               const std::string& filter_device_name) {
 
     const ContextHandle context = std::shared_ptr<Context>(new Context(
-        extensions, application_name, application_vk_version, preffered_number_compute_queues,
-        filter_vendor_id, filter_device_id, filter_device_name));
+        extensions, application_name, application_vk_version, vk_api_version,
+        preffered_number_compute_queues, filter_vendor_id, filter_device_id, filter_device_name));
 
     for (auto& ext : context->extensions) {
         ext.second->on_context_created(context);
@@ -36,11 +37,13 @@ ContextHandle Context::create(const std::vector<std::shared_ptr<Extension>>& ext
 Context::Context(const std::vector<std::shared_ptr<Extension>>& desired_extensions,
                  const std::string& application_name,
                  uint32_t application_vk_version,
+                 uint32_t vk_api_version,
                  uint32_t preffered_number_compute_queues,
                  uint32_t filter_vendor_id,
                  uint32_t filter_device_id,
                  const std::string& filter_device_name)
-    : application_name(application_name), application_vk_version(application_vk_version) {
+    : application_name(application_name), vk_api_version(vk_api_version),
+      application_vk_version(application_vk_version) {
     SPDLOG_INFO("\n\n\
 __  __ ___ ___ ___   _   _  _ \n\
 |  \\/  | __| _ \\_ _| /_\\ | \\| |\n\
@@ -173,7 +176,8 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id,
         filter_device_name = env_device_name;
     }
 
-    std::vector<std::tuple<vk::PhysicalDevice, vk::PhysicalDeviceProperties2>> matches;
+    // (device, props, number_of_accept_votes)
+    std::vector<std::tuple<vk::PhysicalDevice, vk::PhysicalDeviceProperties2, uint32_t>> matches;
     for (std::size_t i = 0; i < devices.size(); i++) {
         vk::PhysicalDeviceProperties2 props = devices[i].getProperties2();
         SPDLOG_INFO("found physical device {}, vendor id: {}, device id: {}, Vulkan: {}.{}.{}",
@@ -184,7 +188,14 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id,
         if ((filter_vendor_id == (uint32_t)-1 || filter_vendor_id == props.properties.vendorID) &&
             (filter_device_id == (uint32_t)-1 || filter_device_id == props.properties.deviceID) &&
             (filter_device_name == "" || filter_device_name == props.properties.deviceName)) {
-            matches.emplace_back(devices[i], props);
+
+            uint32_t number_of_accept_votes = 0;
+            for (auto& ext : extensions) {
+                number_of_accept_votes +=
+                    static_cast<uint32_t>(ext.second->accept_physical_device(devices[i], props));
+            }
+
+            matches.emplace_back(devices[i], props, number_of_accept_votes);
         }
     }
 
@@ -196,8 +207,13 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id,
             filter_device_name.empty() ? "any" : filter_device_name));
     }
     std::sort(matches.begin(), matches.end(),
-              [](std::tuple<vk::PhysicalDevice, vk::PhysicalDeviceProperties2>& a,
-                 std::tuple<vk::PhysicalDevice, vk::PhysicalDeviceProperties2>& b) {
+              [](std::tuple<vk::PhysicalDevice, vk::PhysicalDeviceProperties2, uint32_t>& a,
+                 std::tuple<vk::PhysicalDevice, vk::PhysicalDeviceProperties2, uint32_t>& b) {
+                  // compare number of accept votes.
+                  if (std::get<2>(a) != std::get<2>(b)) {
+                      return std::get<2>(a) < std::get<2>(b);
+                  }
+
                   const vk::PhysicalDeviceProperties& props_a = std::get<1>(a).properties;
                   const vk::PhysicalDeviceProperties& props_b = std::get<1>(b).properties;
                   if (props_a.deviceType != props_b.deviceType) {
