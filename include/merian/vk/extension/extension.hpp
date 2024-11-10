@@ -62,11 +62,13 @@ class Extension {
      * Vote against a physical device by returning false. The context attemps to select a physical
      * device that is accepted by most extensions, meaning this is not a hard criteria and you
      * should check support in "extension_supported" again!
+     * 
+     * The default implementation checks if the desired device extensions are supported.
      */
     virtual bool
     accept_physical_device([[maybe_unused]] const vk::PhysicalDevice& physical_device,
                            [[maybe_unused]] const vk::PhysicalDeviceProperties2& props) {
-        return true;
+        return ;
     }
 
     /* Called after the physical device was select and before extensions are checked for

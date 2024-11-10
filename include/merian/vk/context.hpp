@@ -94,8 +94,8 @@ class Context : public std::enable_shared_from_this<Context> {
     create(const std::vector<std::shared_ptr<Extension>>& extensions,
            const std::string& application_name = "",
            uint32_t application_vk_version = VK_MAKE_VERSION(1, 0, 0),
-           uint32_t vk_api_version = VK_API_VERSION_1_3,
            uint32_t preffered_number_compute_queues = 1, // Additionally to the GCT queue
+           uint32_t vk_api_version = VK_API_VERSION_1_3,
            uint32_t filter_vendor_id = -1,
            uint32_t filter_device_id = -1,
            const std::string& filter_device_name = "");
@@ -104,8 +104,8 @@ class Context : public std::enable_shared_from_this<Context> {
     Context(const std::vector<std::shared_ptr<Extension>>& extensions,
             const std::string& application_name,
             uint32_t application_vk_version,
-            uint32_t vk_api_version,
             uint32_t preffered_number_compute_queues,
+            uint32_t vk_api_version,
             uint32_t filter_vendor_id,
             uint32_t filter_device_id,
             const std::string& filter_device_name);

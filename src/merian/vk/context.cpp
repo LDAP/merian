@@ -15,8 +15,8 @@ namespace merian {
 ContextHandle Context::create(const std::vector<std::shared_ptr<Extension>>& extensions,
                               const std::string& application_name,
                               uint32_t application_vk_version,
-                              uint32_t vk_api_version,
                               uint32_t preffered_number_compute_queues,
+                              uint32_t vk_api_version,
                               uint32_t filter_vendor_id,
                               uint32_t filter_device_id,
                               const std::string& filter_device_name) {
@@ -37,8 +37,8 @@ ContextHandle Context::create(const std::vector<std::shared_ptr<Extension>>& ext
 Context::Context(const std::vector<std::shared_ptr<Extension>>& desired_extensions,
                  const std::string& application_name,
                  uint32_t application_vk_version,
-                 uint32_t vk_api_version,
                  uint32_t preffered_number_compute_queues,
+                 uint32_t vk_api_version,
                  uint32_t filter_vendor_id,
                  uint32_t filter_device_id,
                  const std::string& filter_device_name)
