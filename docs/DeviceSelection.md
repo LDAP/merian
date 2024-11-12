@@ -3,6 +3,7 @@
 ### Automatic selection
 
 Merian attempts to select the most capable physical device by selecting devices following this priority list:
+ - Context Extension Votes
  - Dedicated GPU
  - Number of Extensions
 

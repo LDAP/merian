@@ -39,11 +39,19 @@ class Extension {
     /* Extensions that should be enabled device-wide. Note that on_physical_device_selected is
      * called before. */
     virtual std::vector<const char*>
-    required_device_extension_names(vk::PhysicalDevice /*unused*/) const {
+    required_device_extension_names(const vk::PhysicalDevice& /*unused*/) const {
         return {};
     }
 
     // LIFECYCLE (in order)
+
+    /**
+     * Notifies the extensions that the context is starting and allows extensions to communicate.
+     *
+     * Note, this are the desired extensions and support is yet to be determined.
+     */
+    virtual void
+    on_context_initializing([[maybe_unused]] const ExtensionContainer& extension_container) {}
 
     /**
      * Append structs to vkInstanceCreateInfo to enable features of extensions.
@@ -55,10 +63,41 @@ class Extension {
     virtual void* pnext_instance_create_info(void* const p_next) {
         return p_next;
     }
+
     virtual void on_instance_created(const vk::Instance& /*unused*/) {}
+
+    /**
+     * Vote against a physical device by returning false. The context attemps to select a physical
+     * device that is accepted by most extensions, meaning this is not a hard criteria and you
+     * should check support in "extension_supported" again!
+     *
+     * The default implementation checks if the desired device extensions are supported.
+     */
+    virtual bool
+    accept_physical_device([[maybe_unused]] const vk::PhysicalDevice& physical_device,
+                           [[maybe_unused]] const vk::PhysicalDeviceProperties2& props) {
+        bool all_extensions_supported = true;
+        const auto supported_extensions = physical_device.enumerateDeviceExtensionProperties();
+        for (const auto& required_extension : required_device_extension_names(physical_device)) {
+            bool found = false;
+            for (const auto& supported_extension : supported_extensions) {
+                if (strcmp(supported_extension.extensionName, required_extension) == 0) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                all_extensions_supported = false;
+                break;
+            }
+        }
+
+        return all_extensions_supported;
+    }
+
     /* Called after the physical device was select and before extensions are checked for
      * compativility and check_support is called.*/
-    virtual void on_physical_device_selected(const Context::PhysicalDeviceContainer& /*unused*/) {}
+    virtual void on_physical_device_selected(const PhysicalDevice& /*unused*/) {}
 
     /* Append a structure to pNext of a getFeatures() call. This can be used to determine extension
      * support.
@@ -77,9 +116,20 @@ class Extension {
      *
      * If this method returns false, it is guaranteed that on_unsupported is called.
      */
-    virtual bool extension_supported(const Context::PhysicalDeviceContainer& /*unused*/) {
+    virtual bool
+    extension_supported([[maybe_unused]] const PhysicalDevice& physical_device,
+                        [[maybe_unused]] const ExtensionContainer& extension_container) {
         return true;
     }
+
+    /**
+     * Called when extension support should be determined. Can be used to communicate with other
+     * extensions.
+     */
+    virtual void
+    on_extension_support_confirmed([[maybe_unused]] const ExtensionContainer& extension_container) {
+    }
+
     /* E.g. to dismiss a queue that does not support present-to-surface. */
     virtual bool accept_graphics_queue([[maybe_unused]] const vk::Instance& instance,
                                        [[maybe_unused]] const vk::PhysicalDevice& physical_device,
@@ -96,18 +146,23 @@ class Extension {
     virtual void* pnext_device_create_info(void* const p_next) {
         return p_next;
     }
-    /* Do not change pNext. You can use pnext_device_create_info for that. */
-    virtual void enable_device_features(const Context::FeaturesContainer& /*supportedFeatures*/,
-                                        Context::FeaturesContainer& /*enableFeatures*/) {}
+
     virtual void on_device_created(const vk::Device& /*unused*/) {}
+
     /* Called right before context constructor returns. */
-    virtual void on_context_created(const ContextHandle& /*unused*/) {}
+    virtual void
+    on_context_created([[maybe_unused]] const ContextHandle& context,
+                       [[maybe_unused]] const ExtensionContainer& extension_container) {}
+
     /* Called after device is idle and before context is destroyed. */
     virtual void on_destroy_context() {}
+
     /* Called right before device is destroyed. */
     virtual void on_destroy_device(const vk::Device& /*unused*/) {}
+
     /* Called before the instance is destroyed or if the extension is determined as unsupported. */
     virtual void on_destroy_instance(const vk::Instance& /*unused*/) {}
+
     // Called by context if extension was determined as unsupported. The extension might not receive
     // further callbacks.
     virtual void on_unsupported([[maybe_unused]] const std::string& reason) {

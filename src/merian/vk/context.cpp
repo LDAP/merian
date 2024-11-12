@@ -16,16 +16,17 @@ ContextHandle Context::create(const std::vector<std::shared_ptr<Extension>>& ext
                               const std::string& application_name,
                               uint32_t application_vk_version,
                               uint32_t preffered_number_compute_queues,
+                              uint32_t vk_api_version,
                               uint32_t filter_vendor_id,
                               uint32_t filter_device_id,
                               const std::string& filter_device_name) {
 
     const ContextHandle context = std::shared_ptr<Context>(new Context(
         extensions, application_name, application_vk_version, preffered_number_compute_queues,
-        filter_vendor_id, filter_device_id, filter_device_name));
+        vk_api_version, filter_vendor_id, filter_device_id, filter_device_name));
 
     for (auto& ext : context->extensions) {
-        ext.second->on_context_created(context);
+        ext.second->on_context_created(context, *context);
     }
 
     context->shader_compiler = ShaderCompiler::get(context);
@@ -37,10 +38,12 @@ Context::Context(const std::vector<std::shared_ptr<Extension>>& desired_extensio
                  const std::string& application_name,
                  uint32_t application_vk_version,
                  uint32_t preffered_number_compute_queues,
+                 uint32_t vk_api_version,
                  uint32_t filter_vendor_id,
                  uint32_t filter_device_id,
                  const std::string& filter_device_name)
-    : application_name(application_name), application_vk_version(application_vk_version) {
+    : application_name(application_name), vk_api_version(vk_api_version),
+      application_vk_version(application_vk_version) {
     SPDLOG_INFO("\n\n\
 __  __ ___ ___ ___   _   _  _ \n\
 |  \\/  | __| _ \\_ _| /_\\ | \\| |\n\
@@ -68,6 +71,10 @@ Version: {}\n\n",
             throw std::runtime_error{"A extension type can only be added once."};
         }
         extensions[typeindex_from_pointer(ext)] = ext;
+    }
+
+    for (const auto& ext : desired_extensions) {
+        ext->on_context_initializing(*this);
     }
 
     create_instance();
@@ -173,7 +180,8 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id,
         filter_device_name = env_device_name;
     }
 
-    std::vector<std::tuple<vk::PhysicalDevice, vk::PhysicalDeviceProperties2>> matches;
+    // (device, props, number_of_accept_votes)
+    std::vector<std::tuple<vk::PhysicalDevice, vk::PhysicalDeviceProperties2, uint32_t>> matches;
     for (std::size_t i = 0; i < devices.size(); i++) {
         vk::PhysicalDeviceProperties2 props = devices[i].getProperties2();
         SPDLOG_INFO("found physical device {}, vendor id: {}, device id: {}, Vulkan: {}.{}.{}",
@@ -181,10 +189,21 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id,
                     props.properties.deviceID, VK_API_VERSION_MAJOR(props.properties.apiVersion),
                     VK_API_VERSION_MINOR(props.properties.apiVersion),
                     VK_API_VERSION_PATCH(props.properties.apiVersion));
+
         if ((filter_vendor_id == (uint32_t)-1 || filter_vendor_id == props.properties.vendorID) &&
             (filter_device_id == (uint32_t)-1 || filter_device_id == props.properties.deviceID) &&
             (filter_device_name == "" || filter_device_name == props.properties.deviceName)) {
-            matches.emplace_back(devices[i], props);
+
+            uint32_t number_of_accept_votes = 0;
+            for (auto& ext : extensions) {
+                number_of_accept_votes +=
+                    static_cast<uint32_t>(ext.second->accept_physical_device(devices[i], props));
+            }
+
+            SPDLOG_DEBUG("device received {} of {} extension votes.", number_of_accept_votes,
+                         extensions.size());
+
+            matches.emplace_back(devices[i], props, number_of_accept_votes);
         }
     }
 
@@ -196,8 +215,13 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id,
             filter_device_name.empty() ? "any" : filter_device_name));
     }
     std::sort(matches.begin(), matches.end(),
-              [](std::tuple<vk::PhysicalDevice, vk::PhysicalDeviceProperties2>& a,
-                 std::tuple<vk::PhysicalDevice, vk::PhysicalDeviceProperties2>& b) {
+              [](std::tuple<vk::PhysicalDevice, vk::PhysicalDeviceProperties2, uint32_t>& a,
+                 std::tuple<vk::PhysicalDevice, vk::PhysicalDeviceProperties2, uint32_t>& b) {
+                  // compare number of accept votes.
+                  if (std::get<2>(a) != std::get<2>(b)) {
+                      return std::get<2>(a) < std::get<2>(b);
+                  }
+
                   const vk::PhysicalDeviceProperties& props_a = std::get<1>(a).properties;
                   const vk::PhysicalDeviceProperties& props_b = std::get<1>(b).properties;
                   if (props_a.deviceType != props_b.deviceType) {
@@ -231,20 +255,8 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id,
     for (auto& ext : extensions) {
         extension_features_pnext = ext.second->pnext_get_features_2(extension_features_pnext);
     }
-    // ^
-    physical_device.features.physical_device_features_v13.setPNext(extension_features_pnext);
-    // ^
-    physical_device.features.physical_device_features_v12.setPNext(
-        &physical_device.features.physical_device_features_v13);
-    // ^
-    physical_device.features.physical_device_features_v11.setPNext(
-        &physical_device.features.physical_device_features_v12);
-    // ^
-    physical_device.features.physical_device_features.setPNext(
-        &physical_device.features.physical_device_features_v11);
-    // ^
-    physical_device.physical_device.getFeatures2(
-        &physical_device.features.physical_device_features);
+    physical_device.physical_device_features.setPNext(extension_features_pnext);
+    physical_device.physical_device.getFeatures2(&physical_device.physical_device_features);
 
     physical_device.physical_device_memory_properties =
         physical_device.physical_device.getMemoryProperties2();
@@ -258,6 +270,10 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id,
 
     extensions_check_device_extension_support();
     extensions_self_check_support();
+
+    for (auto& ext : extensions) {
+        ext.second->on_extension_support_confirmed(*this);
+    }
 }
 
 void Context::find_queues() {
@@ -363,81 +379,6 @@ void Context::find_queues() {
                  queue_family_idx_T, queue_family_idx_C);
 }
 
-void enable_common_features(const Context::FeaturesContainer& supported,
-                            Context::FeaturesContainer& enable) {
-    if (supported.physical_device_features_v11.storageBuffer16BitAccess) {
-        SPDLOG_DEBUG("storageBuffer16BitAccess supported. Enabling feature");
-        enable.physical_device_features_v11.storageBuffer16BitAccess = true;
-    }
-
-    if (supported.physical_device_features_v12.scalarBlockLayout) {
-        SPDLOG_DEBUG("scalarBlockLayout supported. Enabling feature");
-        enable.physical_device_features_v12.scalarBlockLayout = true;
-    }
-    if (supported.physical_device_features_v12.shaderFloat16) {
-        SPDLOG_DEBUG("shaderFloat16 supported. Enabling feature");
-        enable.physical_device_features_v12.shaderFloat16 = true;
-    }
-    if (supported.physical_device_features_v12.uniformAndStorageBuffer8BitAccess) {
-        SPDLOG_DEBUG("uniformAndStorageBuffer8BitAccess supported. Enabling feature");
-        enable.physical_device_features_v12.uniformAndStorageBuffer8BitAccess = true;
-    }
-    if (supported.physical_device_features_v12.bufferDeviceAddress) {
-        SPDLOG_DEBUG("bufferDeviceAddress supported. Enabling feature");
-        enable.physical_device_features_v12.bufferDeviceAddress = true;
-    }
-
-    if (supported.physical_device_features_v12.runtimeDescriptorArray) {
-        SPDLOG_DEBUG("runtimeDescriptorArray supported. Enabling feature");
-        enable.physical_device_features_v12.runtimeDescriptorArray = true;
-    }
-    if (supported.physical_device_features_v12.descriptorIndexing) {
-        SPDLOG_DEBUG("descriptorIndexing supported. Enabling feature");
-        enable.physical_device_features_v12.descriptorIndexing = true;
-    }
-    if (supported.physical_device_features_v12.shaderSampledImageArrayNonUniformIndexing) {
-        SPDLOG_DEBUG("shaderSampledImageArrayNonUniformIndexing supported. Enabling feature");
-        enable.physical_device_features_v12.shaderSampledImageArrayNonUniformIndexing = true;
-    }
-    if (supported.physical_device_features_v12.shaderStorageImageArrayNonUniformIndexing) {
-        SPDLOG_DEBUG("shaderStorageImageArrayNonUniformIndexing supported. Enabling feature");
-        enable.physical_device_features_v12.shaderStorageImageArrayNonUniformIndexing = true;
-    }
-    if (supported.physical_device_features_v12.shaderStorageBufferArrayNonUniformIndexing) {
-        SPDLOG_DEBUG("shaderStorageBufferArrayNonUniformIndexing supported. Enabling feature");
-        enable.physical_device_features_v12.shaderStorageBufferArrayNonUniformIndexing = true;
-    }
-    if (supported.physical_device_features_v12.shaderUniformBufferArrayNonUniformIndexing) {
-        SPDLOG_DEBUG("shaderUniformBufferArrayNonUniformIndexing supported. Enabling feature");
-        enable.physical_device_features_v12.shaderUniformBufferArrayNonUniformIndexing = true;
-    }
-    if (supported.physical_device_features_v12.shaderInt8) {
-        SPDLOG_DEBUG("shaderInt8 supported. Enabling feature");
-        enable.physical_device_features_v12.shaderInt8 = true;
-    }
-    if (supported.physical_device_features_v12.timelineSemaphore) {
-        SPDLOG_DEBUG("timelineSemaphore supported. Enabling feature");
-        enable.physical_device_features_v12.timelineSemaphore = true;
-    }
-    if (supported.physical_device_features_v12.hostQueryReset) {
-        SPDLOG_DEBUG("hostQueryReset supported. Enabling feature");
-        enable.physical_device_features_v12.hostQueryReset = true;
-    }
-
-    if (supported.physical_device_features_v13.robustImageAccess) {
-        SPDLOG_DEBUG("robustImageAccess supported. Enabling feature");
-        enable.physical_device_features_v13.robustImageAccess = true;
-    }
-    if (supported.physical_device_features_v13.synchronization2) {
-        SPDLOG_DEBUG("synchronization2 supported. Enabling feature");
-        enable.physical_device_features_v13.synchronization2 = true;
-    }
-    if (supported.physical_device_features_v13.maintenance4) {
-        SPDLOG_DEBUG("maintenance4 supported. Enabling feature");
-        enable.physical_device_features_v13.maintenance4 = true;
-    }
-}
-
 void Context::create_device_and_queues(uint32_t preferred_number_compute_queues) {
     // PREPARE QUEUES
 
@@ -491,37 +432,19 @@ void Context::create_device_and_queues(uint32_t preferred_number_compute_queues)
 
     // FEATURES
 
-    FeaturesContainer enable;
-    // TODO: This enables all features which may be overkill
-    enable.physical_device_features = physical_device.features.physical_device_features;
-    enable_common_features(physical_device.features, enable);
-    for (auto& ext : extensions) {
-        ext.second->enable_device_features(physical_device.features, enable);
-    }
-
     // Setup p_next for extensions
-
     // Extensions can enable features of their extensions
     void* extensions_device_create_p_next = nullptr;
     for (auto& ext : extensions) {
         extensions_device_create_p_next =
             ext.second->pnext_device_create_info(extensions_device_create_p_next);
     }
-    // ^
-    enable.physical_device_features_v13.setPNext(extensions_device_create_p_next);
-    // ^
-    enable.physical_device_features_v12.setPNext(&enable.physical_device_features_v13);
-    // ^
-    enable.physical_device_features_v11.setPNext(&enable.physical_device_features_v12);
-    // ^
-    enable.physical_device_features.setPNext(&enable.physical_device_features_v11);
-    // ^
     vk::DeviceCreateInfo device_create_info{{},
                                             queue_create_infos,
                                             instance_layer_names,
                                             device_extensions,
                                             nullptr,
-                                            &enable.physical_device_features};
+                                            extensions_device_create_p_next};
 
     device = physical_device.physical_device.createDevice(device_create_info);
     SPDLOG_DEBUG("device created and queues created");
@@ -674,7 +597,7 @@ void Context::extensions_self_check_support() {
     SPDLOG_DEBUG("extensions: self-check support...");
     std::vector<std::shared_ptr<Extension>> not_supported;
     for (auto& ext : extensions) {
-        if (!ext.second->extension_supported(physical_device)) {
+        if (!ext.second->extension_supported(physical_device, *this)) {
             ext.second->on_unsupported("self-check failed");
             not_supported.push_back(ext.second);
         }

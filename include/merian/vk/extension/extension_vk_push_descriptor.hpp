@@ -10,7 +10,7 @@ class ExtensionVkPushDescriptor : public Extension {
     ~ExtensionVkPushDescriptor() {}
 
     std::vector<const char*>
-    required_device_extension_names(vk::PhysicalDevice) const override {
+    required_device_extension_names(const vk::PhysicalDevice& /*unused*/) const override {
         return {VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME};
     }
 };

@@ -9,7 +9,7 @@ class ExtensionVkShaderMaximalReconvergence : public Extension {
     ExtensionVkShaderMaximalReconvergence() : Extension("ExtensionVkShaderMaximalReconvergence") {}
     ~ExtensionVkShaderMaximalReconvergence() {}
     std::vector<const char*>
-    required_device_extension_names(vk::PhysicalDevice /*unused*/) const override {
+    required_device_extension_names(const vk::PhysicalDevice& /*unused*/) const override {
         return {VK_KHR_SHADER_MAXIMAL_RECONVERGENCE_EXTENSION_NAME};
     }
 
@@ -30,7 +30,8 @@ class ExtensionVkShaderMaximalReconvergence : public Extension {
         return &enabled_features;
     }
 
-    bool extension_supported(const Context::PhysicalDeviceContainer& /*unused*/) override {
+    bool extension_supported(const PhysicalDevice& /*unused*/,
+                             const ExtensionContainer& /*unused*/) override {
         return supported_features.shaderMaximalReconvergence == VK_TRUE;
     }
 

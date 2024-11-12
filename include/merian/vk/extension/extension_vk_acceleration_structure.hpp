@@ -15,7 +15,8 @@ class ExtensionVkAccelerationStructure : public Extension {
     ExtensionVkAccelerationStructure() : Extension("ExtensionVkAccelerationStructure") {}
     ~ExtensionVkAccelerationStructure() {}
 
-    std::vector<const char*> required_device_extension_names(vk::PhysicalDevice) const override {
+    std::vector<const char*>
+    required_device_extension_names(const vk::PhysicalDevice&) const override {
         return {
             VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
             VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
@@ -24,8 +25,7 @@ class ExtensionVkAccelerationStructure : public Extension {
 
     // LIFECYCLE
 
-    void
-    on_physical_device_selected(const Context::PhysicalDeviceContainer& pd_container) override {
+    void on_physical_device_selected(const PhysicalDevice& pd_container) override {
         vk::PhysicalDeviceProperties2KHR props2;
         props2.pNext = &acceleration_structure_properties;
         pd_container.physical_device.getProperties2(&props2);
@@ -36,7 +36,8 @@ class ExtensionVkAccelerationStructure : public Extension {
         return &acceleration_structure_features;
     }
 
-    bool extension_supported(const Context::PhysicalDeviceContainer& /*unused*/) override {
+    bool extension_supported(const PhysicalDevice& /*unused*/,
+                             const ExtensionContainer& /*unused*/) override {
         return acceleration_structure_features.accelerationStructure == VK_TRUE;
     }
 

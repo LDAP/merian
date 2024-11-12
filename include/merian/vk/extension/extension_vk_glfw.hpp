@@ -33,7 +33,8 @@ class ExtensionVkGLFW : public Extension {
 
     std::vector<const char*> required_instance_extension_names() const override;
 
-    std::vector<const char*> required_device_extension_names(vk::PhysicalDevice) const override;
+    std::vector<const char*>
+    required_device_extension_names(const vk::PhysicalDevice&) const override;
 
     bool accept_graphics_queue(const vk::Instance& instance,
                                const vk::PhysicalDevice& physical_device,

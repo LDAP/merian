@@ -8,7 +8,8 @@ class ExtensionVkFloatAtomics : public Extension {
   public:
     ExtensionVkFloatAtomics() : Extension("ExtensionVkFloatAtomics") {}
     ~ExtensionVkFloatAtomics() {}
-    std::vector<const char*> required_device_extension_names(vk::PhysicalDevice) const override {
+    std::vector<const char*>
+    required_device_extension_names(const vk::PhysicalDevice& /*unused*/) const override {
         return {
             VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME,
         };

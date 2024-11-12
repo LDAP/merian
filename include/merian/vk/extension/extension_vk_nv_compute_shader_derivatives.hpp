@@ -8,7 +8,8 @@ class ExtensionVkNvComputeShaderDerivatives : public Extension {
   public:
     ExtensionVkNvComputeShaderDerivatives() : Extension("ExtensionVkNvComputeShaderDerivatives") {}
     ~ExtensionVkNvComputeShaderDerivatives() {}
-    std::vector<const char*> required_device_extension_names(vk::PhysicalDevice /*unused*/) const override {
+    std::vector<const char*>
+    required_device_extension_names(const vk::PhysicalDevice& /*unused*/) const override {
         return {VK_NV_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME};
     }
 
@@ -17,7 +18,8 @@ class ExtensionVkNvComputeShaderDerivatives : public Extension {
         return &supported_features;
     }
 
-    bool extension_supported(const Context::PhysicalDeviceContainer& /*unused*/) override {
+    bool extension_supported(const PhysicalDevice& /*unused*/,
+                             const ExtensionContainer& /*unused*/) override {
         return supported_features.computeDerivativeGroupLinear == VK_TRUE ||
                supported_features.computeDerivativeGroupQuads == VK_TRUE;
     }

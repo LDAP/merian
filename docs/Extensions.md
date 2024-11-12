@@ -15,7 +15,8 @@ int main() {
 
     const merian::ContextHandle context = merian::Context::make_context(extensions, "merian");
 
-    // use extensions...
+    // extension support was checked and extensions are ready to be used.
+    // if context->get_extension<ExtName> is nullptr then the extension is not active or is not supported.
 }
 ```
 
@@ -29,6 +30,7 @@ int main() {
 Common:
 
 - `ExtensionResources`: Convenience extension to initialize a `ResourceAllocator`, `MemoryAllocator` and `SamplerPool` using `MemoryAllocatorVMA`.
+- `ExtensionVkCode`: Enable core features and add additional layers and instance or device extensions.
 - `ExtensionVkAccelerationStructure`: Enables extensions to build ray tracing acceleration structures.
 - `ExtensionVkDebugUtils`: Enables Validation Layers and forwards messages to spdlog.
 - `ExtensionVkFloatAtomics`: Enables the atomic float extension if available (`VK_EXT_shader_atomic_float`).

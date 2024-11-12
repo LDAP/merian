@@ -9,7 +9,7 @@ class ExtensionVkRayTracingPositionFetch : public Extension {
     ExtensionVkRayTracingPositionFetch() : Extension("ExtensionVkRayTracingPositionFetch") {}
     ~ExtensionVkRayTracingPositionFetch() {}
     std::vector<const char*>
-    required_device_extension_names(vk::PhysicalDevice /*unused*/) const override {
+    required_device_extension_names(const vk::PhysicalDevice& /*unused*/) const override {
         return {VK_KHR_RAY_TRACING_POSITION_FETCH_EXTENSION_NAME};
     }
 
@@ -18,7 +18,8 @@ class ExtensionVkRayTracingPositionFetch : public Extension {
         return &supported_features;
     }
 
-    bool extension_supported(const Context::PhysicalDeviceContainer& /*unused*/) override {
+    bool extension_supported(const PhysicalDevice& /*unused*/,
+                             const ExtensionContainer& /*unused*/) override {
         return supported_features.rayTracingPositionFetch == VK_TRUE;
     }
 

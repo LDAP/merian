@@ -39,7 +39,8 @@ class ExtensionVkDebugUtils : public Extension {
             "VK_LAYER_KHRONOS_validation",
         };
     }
-    std::vector<const char*> required_device_extension_names(vk::PhysicalDevice) const override {
+    std::vector<const char*>
+    required_device_extension_names(const vk::PhysicalDevice&) const override {
         return {};
     }
     void on_instance_created(const vk::Instance&) override;

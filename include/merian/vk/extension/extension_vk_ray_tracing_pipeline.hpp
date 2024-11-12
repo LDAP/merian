@@ -18,7 +18,7 @@ class ExtensionVkRayTracingPipeline : public Extension {
     ~ExtensionVkRayTracingPipeline() {}
 
     std::vector<const char*>
-    required_device_extension_names(vk::PhysicalDevice /*unused*/) const override {
+    required_device_extension_names(const vk::PhysicalDevice& /*unused*/) const override {
         return {
             VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME,
             VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME,
@@ -35,12 +35,12 @@ class ExtensionVkRayTracingPipeline : public Extension {
         return &ray_tracing_pipeline_features;
     }
 
-    bool extension_supported(const Context::PhysicalDeviceContainer& /*unused*/) override {
+    bool extension_supported(const PhysicalDevice& /*unused*/,
+                             const ExtensionContainer& /*unused*/) override {
         return ray_tracing_pipeline_features.rayTracingPipeline == VK_TRUE;
     }
 
-    void
-    on_physical_device_selected(const Context::PhysicalDeviceContainer& pd_container) override {
+    void on_physical_device_selected(const PhysicalDevice& pd_container) override {
         vk::PhysicalDeviceProperties2KHR props2;
         props2.pNext = &ray_tracing_pipeline_properties;
         pd_container.physical_device.getProperties2(&props2);

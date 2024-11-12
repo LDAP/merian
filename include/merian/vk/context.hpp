@@ -28,6 +28,45 @@ using ShaderModuleHandle = std::shared_ptr<ShaderModule>;
 class ShaderCompiler;
 using ShaderCompilerHandle = std::shared_ptr<ShaderCompiler>;
 
+struct PhysicalDevice {
+    const vk::PhysicalDevice& operator*() const {
+        return physical_device;
+    }
+
+    operator const vk::PhysicalDevice&() const {
+        return physical_device;
+    }
+
+    operator vk::PhysicalDevice&() {
+        return physical_device;
+    }
+
+    const vk::PhysicalDeviceLimits& get_physical_device_limits() const {
+        return physical_device_properties.properties.limits;
+    }
+
+    vk::PhysicalDevice physical_device;
+    vk::PhysicalDeviceProperties2 physical_device_properties;
+    // all supported features. Must be enabled with ExtensionVkCore.
+    vk::PhysicalDeviceFeatures2 physical_device_features;
+    vk::PhysicalDeviceMemoryProperties2 physical_device_memory_properties;
+    vk::PhysicalDeviceSubgroupProperties physical_device_subgroup_properties;
+    std::vector<vk::ExtensionProperties> physical_device_extension_properties;
+};
+
+class ExtensionContainer {
+  public:
+    template <class Extension> std::shared_ptr<Extension> get_extension() const {
+        if (extensions.contains(typeid(Extension))) {
+            return std::static_pointer_cast<Extension>(extensions.at(typeid(Extension)));
+        }
+        return nullptr;
+    }
+
+  protected:
+    std::unordered_map<std::type_index, std::shared_ptr<Extension>> extensions;
+};
+
 /* Initializes the Vulkan instance and device and holds core objects.
  *
  * Common features are automatically enabled.
@@ -36,53 +75,9 @@ using ShaderCompilerHandle = std::shared_ptr<ShaderCompiler>;
  * Use ContextHandle instead of Context directly. This way it is ensured that Context is destroyed
  * last.
  */
-class Context : public std::enable_shared_from_this<Context> {
+class Context : public std::enable_shared_from_this<Context>, public ExtensionContainer {
 
   public:
-    struct FeaturesContainer {
-        operator const vk::PhysicalDeviceFeatures2&() const {
-            return physical_device_features;
-        }
-
-        operator vk::PhysicalDeviceFeatures2&() {
-            return physical_device_features;
-        }
-
-        operator const vk::PhysicalDeviceFeatures&() const {
-            return physical_device_features.features;
-        }
-
-        operator vk::PhysicalDeviceFeatures&() {
-            return physical_device_features.features;
-        }
-
-        vk::PhysicalDeviceFeatures2 physical_device_features;
-        vk::PhysicalDeviceVulkan11Features physical_device_features_v11;
-        vk::PhysicalDeviceVulkan12Features physical_device_features_v12;
-        vk::PhysicalDeviceVulkan13Features physical_device_features_v13;
-    };
-
-    struct PhysicalDeviceContainer {
-        operator const vk::PhysicalDevice&() const {
-            return physical_device;
-        }
-
-        operator vk::PhysicalDevice&() {
-            return physical_device;
-        }
-
-        const vk::PhysicalDeviceLimits& get_physical_device_limits() const {
-            return physical_device_properties.properties.limits;
-        }
-
-        vk::PhysicalDevice physical_device;
-        vk::PhysicalDeviceProperties2 physical_device_properties;
-        vk::PhysicalDeviceMemoryProperties2 physical_device_memory_properties;
-        vk::PhysicalDeviceSubgroupProperties physical_device_subgroup_properties;
-        std::vector<vk::ExtensionProperties> physical_device_extension_properties;
-        FeaturesContainer features;
-    };
-
     /**
      * @brief      Use this method to create the context.
      *
@@ -95,6 +90,7 @@ class Context : public std::enable_shared_from_this<Context> {
            const std::string& application_name = "",
            uint32_t application_vk_version = VK_MAKE_VERSION(1, 0, 0),
            uint32_t preffered_number_compute_queues = 1, // Additionally to the GCT queue
+           uint32_t vk_api_version = VK_API_VERSION_1_3,
            uint32_t filter_vendor_id = -1,
            uint32_t filter_device_id = -1,
            const std::string& filter_device_name = "");
@@ -104,6 +100,7 @@ class Context : public std::enable_shared_from_this<Context> {
             const std::string& application_name,
             uint32_t application_vk_version,
             uint32_t preffered_number_compute_queues,
+            uint32_t vk_api_version,
             uint32_t filter_vendor_id,
             uint32_t filter_device_id,
             const std::string& filter_device_name);
@@ -174,13 +171,6 @@ class Context : public std::enable_shared_from_this<Context> {
     // Make sure to keep a reference, else the pool and its buffers are destroyed
     std::shared_ptr<CommandPool> get_cmd_pool_C();
 
-    template <class Extension> std::shared_ptr<Extension> get_extension() const {
-        if (extensions.contains(typeid(Extension))) {
-            return std::static_pointer_cast<Extension>(extensions.at(typeid(Extension)));
-        }
-        return nullptr;
-    }
-
     bool device_extension_enabled(const std::string& name) const;
 
     bool instance_extension_enabled(const std::string& name) const;
@@ -194,8 +184,6 @@ class Context : public std::enable_shared_from_this<Context> {
     const std::map<std::string, std::string>& get_default_shader_macro_definitions() const;
 
   private:
-    std::unordered_map<std::type_index, std::shared_ptr<Extension>> extensions;
-
     // in create_instance
 
     std::vector<const char*> instance_layer_names;
@@ -207,7 +195,7 @@ class Context : public std::enable_shared_from_this<Context> {
 
   public:
     const std::string application_name;
-    const uint32_t vk_api_version = VK_API_VERSION_1_3;
+    const uint32_t vk_api_version;
     const uint32_t application_vk_version;
 
     // in create_instance
@@ -217,7 +205,7 @@ class Context : public std::enable_shared_from_this<Context> {
     // in prepare_physical_device
 
     // the vk::PhysicalDevice for this Context
-    PhysicalDeviceContainer physical_device;
+    PhysicalDevice physical_device;
 
     // in create_device_and_queues
 

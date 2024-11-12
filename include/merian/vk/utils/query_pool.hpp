@@ -1,6 +1,7 @@
 #pragma once
 
 #include "merian/vk/context.hpp"
+#include "merian/vk/extension/extension_vk_core.hpp"
 #include "merian/vk/utils/check_result.hpp"
 
 #include <memory>
@@ -16,6 +17,12 @@ class QueryPool : public std::enable_shared_from_this<QueryPool<QUERY_TYPE>> {
               const uint32_t query_count = 1024,
               bool reset_after_creation = false)
         : context(context), query_count(query_count) {
+        assert(context->get_extension<ExtensionVkCore>());
+        assert(context->get_extension<ExtensionVkCore>()
+                   ->get_enabled_features()
+                   .get_physical_device_features_v12()
+                   .hostQueryReset);
+
         vk::QueryPoolCreateInfo createInfo({}, QUERY_TYPE, query_count);
         query_pool = context->device.createQueryPool(createInfo);
         if (reset_after_creation) {
@@ -43,7 +50,6 @@ class QueryPool : public std::enable_shared_from_this<QueryPool<QUERY_TYPE>> {
 
     // uses the Vulkan 1.2 hostQueryReset feature to reset the pool
     void reset(const uint32_t first_query, const uint32_t query_count) const {
-        assert(context->physical_device.features.physical_device_features_v12.hostQueryReset);
         context->device.resetQueryPool(query_pool, first_query, query_count);
     }
 

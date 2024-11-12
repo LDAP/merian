@@ -8,7 +8,8 @@ class ExtensionVkRobustnessAccess2 : public Extension {
   public:
     ExtensionVkRobustnessAccess2() : Extension("ExtensionVkRobustnessAccess2") {}
     ~ExtensionVkRobustnessAccess2() {}
-    std::vector<const char*> required_device_extension_names(vk::PhysicalDevice) const override {
+    std::vector<const char*>
+    required_device_extension_names(const vk::PhysicalDevice& /*unused*/) const override {
         return {VK_EXT_ROBUSTNESS_2_EXTENSION_NAME};
     }
 

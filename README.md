@@ -21,10 +21,14 @@ Merian aims for compatibility with Windows, Linux as well as all major GPU vendo
 
 ```c++
 int main() {
+    // Validation Layers, Debug labels,...
     auto debug_utils = std::make_shared<merian::ExtensionVkDebugUtils>(false);
+    // Initializes a memory, resource allocator and staging manager.
     auto resources = std::make_shared<merian::ExtensionResources>();
+    // Configure core features for VK 1.0...1.3
+    auto core = std::make_shared<merian::ExtensionVkCore>();
 
-    merian::ContextHandle context = merian::Context::make_context({debug_utils, resources}, "merian");
+    merian::ContextHandle context = merian::Context::make_context({debug_utils, resources, core}, "merian");
     auto alloc = resources->resource_allocator();
 
     // allocating, rendering,...

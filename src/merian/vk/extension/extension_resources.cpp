@@ -1,12 +1,23 @@
 #include "merian/vk/extension/extension_resources.hpp"
+#include "merian/vk/extension/extension_vk_core.hpp"
 #include "merian/vk/memory/memory_allocator_vma.hpp"
 
 #include <fmt/ranges.h>
 
 namespace merian {
 
-void ExtensionResources::on_physical_device_selected(
-    const Context::PhysicalDeviceContainer& physical_device) {
+void ExtensionResources::on_context_initializing(const ExtensionContainer& extension_container) {
+    const auto core_extension = extension_container.get_extension<ExtensionVkCore>();
+
+    if (!core_extension) {
+        SPDLOG_WARN("extension ExtensionVkCore missing. Cannot request features.");
+        return;
+    }
+
+    core_extension->request_optional_feature("vk12/bufferDeviceAddress");
+}
+
+void ExtensionResources::on_physical_device_selected(const PhysicalDevice& physical_device) {
     for (const auto& extension : physical_device.physical_device_extension_properties) {
         if (strcmp(extension.extensionName, "VK_KHR_maintenance4") == 0) {
             required_extensions.push_back("VK_KHR_maintenance4");
@@ -23,22 +34,24 @@ void ExtensionResources::on_physical_device_selected(
 }
 
 std::vector<const char*>
-ExtensionResources::required_device_extension_names(vk::PhysicalDevice) const {
-    SPDLOG_DEBUG("{}", fmt::join(required_extensions, ", "));
+ExtensionResources::required_device_extension_names(const vk::PhysicalDevice& /*unused*/) const {
     return required_extensions;
 }
 
-void ExtensionResources::enable_device_features(const Context::FeaturesContainer& supported,
-                                                Context::FeaturesContainer& enable) {
-    if (supported.physical_device_features_v12.bufferDeviceAddress) {
-        SPDLOG_DEBUG("bufferDeviceAddress supported. Enabling feature");
-        enable.physical_device_features_v12.bufferDeviceAddress = true;
-        flags |= VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
-    }
-}
-
-void ExtensionResources::on_context_created(const ContextHandle& context) {
+void ExtensionResources::on_context_created(const ContextHandle& context,
+                                            const ExtensionContainer& extension_container) {
     weak_context = context;
+
+    const auto core_extension = extension_container.get_extension<ExtensionVkCore>();
+
+    if (core_extension) {
+        if (core_extension->get_enabled_features()
+                .get_physical_device_features_v12()
+                .bufferDeviceAddress == VK_TRUE) {
+            SPDLOG_DEBUG("bufferDeviceAddress supported. Enabling feature in allocator.");
+            flags |= VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
+        }
+    }
 }
 
 void ExtensionResources::on_destroy_context() {}

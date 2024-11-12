@@ -16,7 +16,7 @@ class ExtensionVkRayQuery : public Extension {
     ~ExtensionVkRayQuery() {}
 
     std::vector<const char*>
-    required_device_extension_names(vk::PhysicalDevice /*unused*/) const override {
+    required_device_extension_names(const vk::PhysicalDevice& /*unused*/) const override {
         return {
             VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME,
             VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME,
@@ -32,7 +32,8 @@ class ExtensionVkRayQuery : public Extension {
         return &physical_device_ray_query_features;
     }
 
-    bool extension_supported(const Context::PhysicalDeviceContainer& /*unused*/) override {
+    bool extension_supported(const PhysicalDevice& /*unused*/,
+                             const ExtensionContainer& /*unused*/) override {
         return physical_device_ray_query_features.rayQuery == VK_TRUE;
     }
 

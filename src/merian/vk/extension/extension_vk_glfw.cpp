@@ -8,9 +8,9 @@ ExtensionVkGLFW::ExtensionVkGLFW() : Extension("ExtensionVkGLFW") {
     glfwSetErrorCallback(glfw_error_callback);
 
     SPDLOG_DEBUG("Initialize GLFW");
-    if (!glfwInit())
+    if (glfwInit() == GLFW_FALSE)
         throw std::runtime_error("GLFW initialization failed!");
-    if (!glfwVulkanSupported())
+    if (glfwVulkanSupported() == GLFW_FALSE)
         throw std::runtime_error("GLFW reports to have no Vulkan support! Maybe it couldn't "
                                  "find the Vulkan loader!");
 }
@@ -29,7 +29,7 @@ std::vector<const char*> ExtensionVkGLFW::required_instance_extension_names() co
 }
 
 std::vector<const char*>
-ExtensionVkGLFW::required_device_extension_names(vk::PhysicalDevice) const {
+ExtensionVkGLFW::required_device_extension_names(const vk::PhysicalDevice& /*unused*/) const {
     return {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
     };

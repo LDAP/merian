@@ -10,6 +10,8 @@ Also, you do not need to keep pointers alive if not explicitly stated.
 - `PipelineLayout`: Wraps a pipeline layout and destroys it in its destructor.
 - `Pipeline`: Interface for a pipeline. Allows binding the pipeline, descriptor sets and pushing constants.
 - `ComputePipeline`: A concrete implementation of `Pipeline` for compute pipelines.
+- `GraphicsPipelineBuilder`: A builder for graphics pipelines
+- `GraphicsPipeline`: A concrete implementation of `Pipeline` for graphics.
 
 ### Example
 
