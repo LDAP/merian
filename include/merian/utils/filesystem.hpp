@@ -1,10 +1,12 @@
 #pragma once
 
 #include <string>
-#include <unistd.h>
+#include <cstdlib>
 
 #ifdef _WIN32
 #include <cstdio>
+#else
+#include <unistd.h>
 #endif
 
 namespace merian {
