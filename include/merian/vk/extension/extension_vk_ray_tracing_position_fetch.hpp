@@ -18,8 +18,10 @@ class ExtensionVkRayTracingPositionFetch : public Extension {
         return &supported_features;
     }
 
-    bool extension_supported(const PhysicalDevice& /*unused*/,
-                             const ExtensionContainer& /*unused*/) override {
+    bool extension_supported(const vk::Instance& /*unused*/,
+                             const PhysicalDevice& /*unused*/,
+                             const ExtensionContainer& /*unused*/,
+                             const QueueInfo& /*unused*/) override {
         return supported_features.rayTracingPositionFetch == VK_TRUE;
     }
 

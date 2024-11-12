@@ -2,7 +2,7 @@
 
 #include "merian/vk/context.hpp"
 #include "merian/vk/window/window.hpp"
-#include "merian/vk/extension/extension_vk_glfw.hpp"
+#include "merian/vk/extension/extension_glfw.hpp"
 
 #include <GLFW/glfw3.h>
 #include <spdlog/spdlog.h>
@@ -16,7 +16,7 @@ class GLFWWindow : public Window {
                int height = 720,
                const char* title = "")
         : context(context) {
-        if (!context->get_extension<ExtensionVkGLFW>()) {
+        if (!context->get_extension<ExtensionGLFW>()) {
             SPDLOG_WARN("ExtensionVkGLFW not found. You have to init GLFW manually!");
         }
 

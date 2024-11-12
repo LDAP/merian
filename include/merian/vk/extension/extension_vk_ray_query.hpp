@@ -32,8 +32,10 @@ class ExtensionVkRayQuery : public Extension {
         return &physical_device_ray_query_features;
     }
 
-    bool extension_supported(const PhysicalDevice& /*unused*/,
-                             const ExtensionContainer& /*unused*/) override {
+    bool extension_supported(const vk::Instance& /*unused*/,
+                             const PhysicalDevice& /*unused*/,
+                             const ExtensionContainer& /*unused*/,
+                             const QueueInfo& /*unused*/) override {
         return physical_device_ray_query_features.rayQuery == VK_TRUE;
     }
 

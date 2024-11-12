@@ -110,32 +110,37 @@ class Extension {
         return p_next;
     }
 
-    /* Custom check for compatibility after the physical device is ready.
-     * At this time the structs wired up in pnext_get_features_2 is valid, you can use those to
-     * check if features are available.
+    /* E.g. to dismiss a queue that does not support present-to-surface. Similar to
+     * accpet_physical_device, the context attemps to select a graphics queue that is accepted by
+     * most extensions.
+     */
+    virtual bool accept_graphics_queue([[maybe_unused]] const vk::Instance& instance,
+                                       [[maybe_unused]] const PhysicalDevice& physical_device,
+                                       [[maybe_unused]] std::size_t queue_family_index) {
+        return true;
+    }
+
+    /* Custom check for compatibility after the physical device is ready and queue family indeces
+     * are determined. At this time the structs wired up in pnext_get_features_2 is valid, you can
+     * use those to check if features are available.
      *
      * If this method returns false, it is guaranteed that on_unsupported is called.
      */
-    virtual bool
-    extension_supported([[maybe_unused]] const PhysicalDevice& physical_device,
-                        [[maybe_unused]] const ExtensionContainer& extension_container) {
+    virtual bool extension_supported([[maybe_unused]] const vk::Instance& instance,
+                                     [[maybe_unused]] const PhysicalDevice& physical_device,
+                                     [[maybe_unused]] const ExtensionContainer& extension_container,
+                                     [[maybe_unused]] const QueueInfo& queue_info) {
         return true;
     }
 
     /**
-     * Called when extension support should be determined. Can be used to communicate with other
-     * extensions.
+     * Called when extension support is confirmed for all extensions. Can be used to communicate
+     * with other extensions.
      */
     virtual void
     on_extension_support_confirmed([[maybe_unused]] const ExtensionContainer& extension_container) {
     }
 
-    /* E.g. to dismiss a queue that does not support present-to-surface. */
-    virtual bool accept_graphics_queue([[maybe_unused]] const vk::Instance& instance,
-                                       [[maybe_unused]] const vk::PhysicalDevice& physical_device,
-                                       [[maybe_unused]] std::size_t queue_family_index) {
-        return true;
-    }
     /**
      * Append structs to VkDeviceCreateInfo to enable features of extensions.
      *

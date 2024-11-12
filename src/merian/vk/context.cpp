@@ -15,17 +15,19 @@ namespace merian {
 
 ContextHandle Context::create(const std::vector<std::shared_ptr<Extension>>& extensions,
                               const std::string& application_name,
-                              uint32_t application_vk_version,
-                              uint32_t preffered_number_compute_queues,
-                              uint32_t vk_api_version,
-                              uint32_t filter_vendor_id,
-                              uint32_t filter_device_id,
+                              const uint32_t application_vk_version,
+                              const uint32_t preffered_number_compute_queues,
+                              const uint32_t vk_api_version,
+                              const bool require_extension_support,
+                              const uint32_t filter_vendor_id,
+                              const uint32_t filter_device_id,
                               const std::string& filter_device_name) {
 
     // call constructor manually since its private for make_shared...
-    const ContextHandle context = std::shared_ptr<Context>(new Context(
-        extensions, application_name, application_vk_version, preffered_number_compute_queues,
-        vk_api_version, filter_vendor_id, filter_device_id, filter_device_name));
+    const ContextHandle context = std::shared_ptr<Context>(
+        new Context(extensions, application_name, application_vk_version,
+                    preffered_number_compute_queues, vk_api_version, require_extension_support,
+                    filter_vendor_id, filter_device_id, filter_device_name));
 
     for (auto& ext : context->extensions) {
         ext.second->on_context_created(context, *context);
@@ -38,11 +40,12 @@ ContextHandle Context::create(const std::vector<std::shared_ptr<Extension>>& ext
 
 Context::Context(const std::vector<std::shared_ptr<Extension>>& desired_extensions,
                  const std::string& application_name,
-                 uint32_t application_vk_version,
-                 uint32_t preffered_number_compute_queues,
-                 uint32_t vk_api_version,
-                 uint32_t filter_vendor_id,
-                 uint32_t filter_device_id,
+                 const uint32_t application_vk_version,
+                 const uint32_t preffered_number_compute_queues,
+                 const uint32_t vk_api_version,
+                 const bool require_extension_support,
+                 const uint32_t filter_vendor_id,
+                 const uint32_t filter_device_id,
                  const std::string& filter_device_name)
     : application_name(application_name), vk_api_version(vk_api_version),
       application_vk_version(application_vk_version) {
@@ -79,9 +82,20 @@ Version: {}\n\n",
         ext->on_context_initializing(*this);
     }
 
+    extensions_check_instance_layer_support(require_extension_support);
+
+    extensions_check_instance_extension_support(require_extension_support);
+
     create_instance();
+
     prepare_physical_device(filter_vendor_id, filter_device_id, filter_device_name);
+
+    extensions_check_device_extension_support(require_extension_support);
     find_queues();
+    extensions_self_check_support(require_extension_support);
+    for (auto& ext : extensions) {
+        ext.second->on_extension_support_confirmed(*this);
+    }
     create_device_and_queues(preffered_number_compute_queues);
 
     prepare_shader_include_defines();
@@ -116,9 +130,6 @@ Context::~Context() {
 }
 
 void Context::create_instance() {
-    extensions_check_instance_layer_support();
-    extensions_check_instance_extension_support();
-
     for (auto& ext : extensions) {
         insert_all(instance_layer_names, ext.second->required_instance_layer_names());
         insert_all(instance_extension_names, ext.second->required_instance_extension_names());
@@ -269,13 +280,6 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id,
     for (auto& ext : extensions) {
         ext.second->on_physical_device_selected(physical_device);
     }
-
-    extensions_check_device_extension_support();
-    extensions_self_check_support();
-
-    for (auto& ext : extensions) {
-        ext.second->on_extension_support_confirmed(*this);
-    }
 }
 
 void Context::find_queues() {
@@ -342,8 +346,7 @@ void Context::find_queues() {
                         : std::accumulate(extensions.begin(), extensions.end(), 0,
                                           [&](uint32_t accum, auto ext) {
                                               return accum + ext.second->accept_graphics_queue(
-                                                                 instance,
-                                                                 physical_device.physical_device,
+                                                                 instance, physical_device,
                                                                  queue_family_idx_GCT);
                                           });
                 // Prio 2: T (additional)
@@ -381,13 +384,14 @@ void Context::find_queues() {
                     found_T, found_C);
     }
 
-    this->queue_family_idx_GCT = found_GCT ? std::get<5>(best) : -1;
-    this->queue_family_idx_T = found_T ? std::get<6>(best) : -1;
-    this->queue_family_idx_C = found_C ? std::get<7>(best) : -1;
+    this->queue_info.queue_family_idx_GCT = found_GCT ? std::get<5>(best) : -1;
+    this->queue_info.queue_family_idx_T = found_T ? std::get<6>(best) : -1;
+    this->queue_info.queue_family_idx_C = found_C ? std::get<7>(best) : -1;
 
     SPDLOG_DEBUG("determined queue families indices: GCT: {} ({}/{} accept votes), T: {} C: {}",
-                 queue_family_idx_GCT, std::get<1>(best), found_GCT ? extensions.size() : 0,
-                 queue_family_idx_T, queue_family_idx_C);
+                 queue_info.queue_family_idx_GCT, std::get<1>(best),
+                 found_GCT ? extensions.size() : 0, queue_info.queue_family_idx_T,
+                 queue_info.queue_family_idx_C);
 }
 
 void Context::create_device_and_queues(uint32_t preferred_number_compute_queues) {
@@ -398,24 +402,25 @@ void Context::create_device_and_queues(uint32_t preferred_number_compute_queues)
     std::vector<uint32_t> count_per_family(queue_family_props.size());
     uint32_t actual_number_compute_queues = 0;
 
-    if (queue_family_idx_GCT >= 0) {
-        queue_idx_GCT = (int32_t)count_per_family[queue_family_idx_GCT]++;
-        SPDLOG_DEBUG("queue index GCT: {}", queue_idx_GCT);
+    if (queue_info.queue_family_idx_GCT >= 0) {
+        queue_info.queue_idx_GCT = (int32_t)count_per_family[queue_info.queue_family_idx_GCT]++;
+        SPDLOG_DEBUG("queue index GCT: {}", queue_info.queue_idx_GCT);
     }
-    if (queue_family_idx_T >= 0) {
-        queue_idx_T = (int32_t)count_per_family[queue_family_idx_T]++;
-        SPDLOG_DEBUG("queue index T: {}", queue_idx_T);
+    if (queue_info.queue_family_idx_T >= 0) {
+        queue_info.queue_idx_T = (int32_t)count_per_family[queue_info.queue_family_idx_T]++;
+        SPDLOG_DEBUG("queue index T: {}", queue_info.queue_idx_T);
     }
-    if (queue_family_idx_C >= 0) {
-        uint32_t remaining_compute_queues = queue_family_props[queue_family_idx_C].queueCount -
-                                            count_per_family[queue_family_idx_C];
+    if (queue_info.queue_family_idx_C >= 0) {
+        uint32_t remaining_compute_queues =
+            queue_family_props[queue_info.queue_family_idx_C].queueCount -
+            count_per_family[queue_info.queue_family_idx_C];
         actual_number_compute_queues =
             std::min(remaining_compute_queues, preferred_number_compute_queues);
 
         for (uint32_t i = 0; i < actual_number_compute_queues; i++) {
-            queue_idx_C.emplace_back(count_per_family[queue_family_idx_C]++);
+            queue_info.queue_idx_C.emplace_back(count_per_family[queue_info.queue_family_idx_C]++);
         }
-        SPDLOG_DEBUG("queue indices C: [{}]", fmt::join(queue_idx_C, ", "));
+        SPDLOG_DEBUG("queue indices C: [{}]", fmt::join(queue_info.queue_idx_C, ", "));
     }
     queues_C.resize(actual_number_compute_queues);
 
@@ -524,7 +529,7 @@ void Context::prepare_shader_include_defines() {
 // HELPERS
 ////////////
 
-void Context::extensions_check_instance_layer_support() {
+void Context::extensions_check_instance_layer_support(const bool fail_if_unsupported) {
     SPDLOG_DEBUG("extensions: checking instance layer support...");
     std::vector<std::shared_ptr<Extension>> not_supported;
     std::vector<vk::LayerProperties> layer_props = vk::enumerateInstanceLayerProperties();
@@ -547,10 +552,10 @@ void Context::extensions_check_instance_layer_support() {
             ext.second->on_unsupported("instance layer missing");
         }
     }
-    destroy_extensions(not_supported);
+    destroy_unsupported_extensions(not_supported, fail_if_unsupported);
 }
 
-void Context::extensions_check_instance_extension_support() {
+void Context::extensions_check_instance_extension_support(const bool fail_if_unsupported) {
     SPDLOG_DEBUG("extensions: checking instance extension support...");
     std::vector<std::shared_ptr<Extension>> not_supported;
     std::vector<vk::ExtensionProperties> extension_props =
@@ -575,10 +580,10 @@ void Context::extensions_check_instance_extension_support() {
             ext.second->on_unsupported("instance extension missing");
         }
     }
-    destroy_extensions(not_supported);
+    destroy_unsupported_extensions(not_supported, fail_if_unsupported);
 }
 
-void Context::extensions_check_device_extension_support() {
+void Context::extensions_check_device_extension_support(const bool fail_if_unsupported) {
     SPDLOG_DEBUG("extensions: checking device extension support...");
     std::vector<std::shared_ptr<Extension>> not_supported;
 
@@ -601,25 +606,40 @@ void Context::extensions_check_device_extension_support() {
             ext.second->on_unsupported("device extension missing");
         }
     }
-    destroy_extensions(not_supported);
+    destroy_unsupported_extensions(not_supported, fail_if_unsupported);
 }
 
-void Context::extensions_self_check_support() {
+void Context::extensions_self_check_support(const bool fail_if_unsupported) {
     SPDLOG_DEBUG("extensions: self-check support...");
     std::vector<std::shared_ptr<Extension>> not_supported;
     for (auto& ext : extensions) {
-        if (!ext.second->extension_supported(physical_device, *this)) {
+        if (!ext.second->extension_supported(instance, physical_device, *this, queue_info)) {
             ext.second->on_unsupported("self-check failed");
             not_supported.push_back(ext.second);
         }
     }
-    destroy_extensions(not_supported);
+    destroy_unsupported_extensions(not_supported, fail_if_unsupported);
 }
 
-void Context::destroy_extensions(const std::vector<std::shared_ptr<Extension>>& extensions) {
-    for (const auto& ext : extensions) {
-        SPDLOG_DEBUG("remove extension {} from context", ext->name);
-        this->extensions.erase(typeindex_from_pointer(ext));
+void Context::destroy_unsupported_extensions(
+    const std::vector<std::shared_ptr<Extension>>& extensions, const bool fail_if_unsupported) {
+
+    if (fail_if_unsupported) {
+        if (!extensions.empty()) {
+            for (const auto& ext : extensions) {
+                SPDLOG_ERROR("extension {} unsupported. Context was created with "
+                             "require_extension_support == true. This is a hard error.",
+                             ext->name);
+            }
+            throw std::invalid_argument{
+                "At least one context extension not supported and require_extension_support "
+                "== true making this a hard error."};
+        }
+    } else {
+        for (const auto& ext : extensions) {
+            this->extensions.erase(typeindex_from_pointer(ext));
+            SPDLOG_DEBUG("extension {} unsupported, removing from context", ext->name);
+        }
     }
 }
 
@@ -635,17 +655,17 @@ std::shared_ptr<Queue> Context::get_queue_GCT() {
     if (!queue_GCT.expired()) {
         return queue_GCT.lock();
     }
-    if (queue_family_idx_GCT < 0) {
+    if (queue_info.queue_family_idx_GCT < 0) {
         return nullptr;
     }
-    const auto queue =
-        std::make_shared<Queue>(shared_from_this(), queue_family_idx_GCT, queue_idx_GCT);
+    const auto queue = std::make_shared<Queue>(shared_from_this(), queue_info.queue_family_idx_GCT,
+                                               queue_info.queue_idx_GCT);
     queue_GCT = queue;
     return queue;
 }
 
 std::shared_ptr<Queue> Context::get_queue_T(const bool fallback) {
-    if (queue_family_idx_T < 0) {
+    if (queue_info.queue_family_idx_T < 0) {
         if (fallback)
             return get_queue_GCT();
         return nullptr;
@@ -653,7 +673,8 @@ std::shared_ptr<Queue> Context::get_queue_T(const bool fallback) {
     if (!queue_T.expired()) {
         return queue_T.lock();
     }
-    const auto queue = std::make_shared<Queue>(shared_from_this(), queue_family_idx_T, queue_idx_T);
+    const auto queue = std::make_shared<Queue>(shared_from_this(), queue_info.queue_family_idx_T,
+                                               queue_info.queue_idx_T);
     queue_T = queue;
     return queue;
 }
@@ -665,8 +686,8 @@ std::shared_ptr<Queue> Context::get_queue_C(uint32_t index, const bool fallback)
         if (!queues_C[index].expired()) {
             return queues_C[index].lock();
         }
-        const auto queue =
-            std::make_shared<Queue>(shared_from_this(), queue_family_idx_C, queue_idx_C[index]);
+        const auto queue = std::make_shared<Queue>(
+            shared_from_this(), queue_info.queue_family_idx_C, queue_info.queue_idx_C[index]);
         queues_C[index] = queue;
         return queue;
     }

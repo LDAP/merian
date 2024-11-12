@@ -23,8 +23,10 @@ void* ExtensionVkFloatAtomics::pnext_get_features_2(void* const p_next) {
     return &supported_atomic_features;
 }
 
-bool ExtensionVkFloatAtomics::extension_supported(const PhysicalDevice& /*unused*/,
-                                                  const ExtensionContainer& /*unused*/) {
+bool ExtensionVkFloatAtomics::extension_supported(const vk::Instance& /*unused*/,
+                                                  const PhysicalDevice& /*unused*/,
+                                                  const ExtensionContainer& /*unused*/,
+                                                  const QueueInfo& /*unused*/) {
     bool all_required_supported = true;
 
     MERIAN_EXT_ENABLE_IF_REQUESTED(shaderBufferFloat32Atomics, supported_atomic_features,

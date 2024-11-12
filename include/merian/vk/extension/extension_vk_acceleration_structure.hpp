@@ -36,8 +36,10 @@ class ExtensionVkAccelerationStructure : public Extension {
         return &acceleration_structure_features;
     }
 
-    bool extension_supported(const PhysicalDevice& /*unused*/,
-                             const ExtensionContainer& /*unused*/) override {
+    bool extension_supported(const vk::Instance& /*unused*/,
+                             const PhysicalDevice& /*unused*/,
+                             const ExtensionContainer& /*unused*/,
+                             const QueueInfo& /*unused*/) override {
         return acceleration_structure_features.accelerationStructure == VK_TRUE;
     }
 

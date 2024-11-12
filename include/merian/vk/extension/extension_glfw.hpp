@@ -11,7 +11,7 @@ namespace merian {
 /*
  * @brief      Initializes GLFW and makes sure the graphics queue supports present.
  */
-class ExtensionVkGLFW : public Extension {
+class ExtensionGLFW : public Extension {
   public:
     struct glfw_error : public std::runtime_error {
         glfw_error(int id, const char* desc)
@@ -27,18 +27,27 @@ class ExtensionVkGLFW : public Extension {
     }
 
   public:
-    ExtensionVkGLFW();
+    ExtensionGLFW();
 
-    ~ExtensionVkGLFW();
+    ~ExtensionGLFW();
 
     std::vector<const char*> required_instance_extension_names() const override;
 
     std::vector<const char*>
-    required_device_extension_names(const vk::PhysicalDevice&) const override;
+    required_device_extension_names(const vk::PhysicalDevice& /*unused*/) const override;
 
     bool accept_graphics_queue(const vk::Instance& instance,
-                               const vk::PhysicalDevice& physical_device,
+                               const PhysicalDevice& physical_device,
                                std::size_t queue_family_indext) override;
+
+    bool extension_supported(const vk::Instance& instance,
+                             const PhysicalDevice& physical_device,
+                             const ExtensionContainer& extension_container,
+                             const QueueInfo& queue_info) override;
+
+  private:
+    int glfw_initialized = GLFW_FALSE;
+    int glfw_vulkan_support = GLFW_FALSE;
 };
 
 } // namespace merian

@@ -35,8 +35,10 @@ class ExtensionVkRayTracingPipeline : public Extension {
         return &ray_tracing_pipeline_features;
     }
 
-    bool extension_supported(const PhysicalDevice& /*unused*/,
-                             const ExtensionContainer& /*unused*/) override {
+    bool extension_supported(const vk::Instance& /*unused*/,
+                             const PhysicalDevice& /*unused*/,
+                             const ExtensionContainer& /*unused*/,
+                             const QueueInfo& /*unused*/) override {
         return ray_tracing_pipeline_features.rayTracingPipeline == VK_TRUE;
     }
 

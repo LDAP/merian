@@ -45,8 +45,10 @@ void* ExtensionVkCore::pnext_get_features_2(void* const p_next) {
     return &supported.physical_device_features_v11;
 }
 
-bool ExtensionVkCore::extension_supported(const PhysicalDevice& physical_device,
-                                          const ExtensionContainer& /*unused*/) {
+bool ExtensionVkCore::extension_supported(const vk::Instance& /*unused*/,
+                                          const PhysicalDevice& physical_device,
+                                          const ExtensionContainer& /*unused*/,
+                                          const QueueInfo& /*unused*/) {
     bool all_required_supported = true;
 
     supported.physical_device_features = physical_device.physical_device_features;

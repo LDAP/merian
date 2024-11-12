@@ -21,8 +21,10 @@ class ExtensionVkFloatAtomics : public Extension {
 
     void* pnext_get_features_2(void* const p_next) override;
 
-    bool extension_supported(const PhysicalDevice& /*unused*/,
-                             const ExtensionContainer& /*unused*/) override;
+    bool extension_supported(const vk::Instance& /*unused*/,
+                             const PhysicalDevice& /*unused*/,
+                             const ExtensionContainer& /*unused*/,
+                             const QueueInfo& /*unused*/) override;
 
     void* pnext_device_create_info(void* const p_next) override;
 

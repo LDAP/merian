@@ -149,8 +149,10 @@ class ExtensionVkCore : public Extension {
 
     void* pnext_get_features_2(void* const p_next) override;
 
-    bool extension_supported(const PhysicalDevice& physical_device,
-                             const ExtensionContainer& /*unused*/) override;
+    bool extension_supported(const vk::Instance& /*unused*/,
+                             const PhysicalDevice& physical_device,
+                             const ExtensionContainer& /*unused*/,
+                             const QueueInfo& /*unused*/) override;
 
     void* pnext_device_create_info(void* const p_next) override;
 

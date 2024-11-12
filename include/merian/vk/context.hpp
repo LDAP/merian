@@ -67,13 +67,25 @@ class ExtensionContainer {
     std::unordered_map<std::type_index, std::shared_ptr<Extension>> extensions;
 };
 
+struct QueueInfo {
+    // A queue family index guaranteed to support graphics+compute+transfer (or -1)
+    int32_t queue_family_idx_GCT = -1;
+    // A queue family index guaranteed to support compute (or -1)
+    int32_t queue_family_idx_C = -1;
+    // A queue family index guaranteed to support transfer (or -1)
+    int32_t queue_family_idx_T = -1;
+
+    // The queue indices (not family!) used for the graphics queue
+    int32_t queue_idx_GCT = -1;
+    // The queue indices (not family!) used for the compute queue
+    std::vector<uint32_t> queue_idx_C;
+    // The queue indices (not family!) used for the transfer queue
+    int32_t queue_idx_T = -1;
+};
+
 /* Initializes the Vulkan instance and device and holds core objects.
  *
- * Common features are automatically enabled.
- *
  * Extensions can extend the functionality and hook into the creation process.
- * Use ContextHandle instead of Context directly. This way it is ensured that Context is destroyed
- * last.
  */
 class Context : public std::enable_shared_from_this<Context>, public ExtensionContainer {
 
@@ -81,28 +93,27 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
     /**
      * @brief      Use this method to create the context.
      *
-     *
-     * Needed for enable_shared_from_this, see
-     * https://en.cppreference.com/w/cpp/memory/enable_shared_from_this.
      */
     static ContextHandle
     create(const std::vector<std::shared_ptr<Extension>>& extensions,
            const std::string& application_name = "",
-           uint32_t application_vk_version = VK_MAKE_VERSION(1, 0, 0),
-           uint32_t preffered_number_compute_queues = 1, // Additionally to the GCT queue
-           uint32_t vk_api_version = VK_API_VERSION_1_3,
-           uint32_t filter_vendor_id = -1,
-           uint32_t filter_device_id = -1,
+           const uint32_t application_vk_version = VK_MAKE_VERSION(1, 0, 0),
+           const uint32_t preffered_number_compute_queues = 1, // Additionally to the GCT queue
+           const uint32_t vk_api_version = VK_API_VERSION_1_3,
+           const bool require_extension_support = false,
+           const uint32_t filter_vendor_id = -1,
+           const uint32_t filter_device_id = -1,
            const std::string& filter_device_name = "");
 
   private:
     Context(const std::vector<std::shared_ptr<Extension>>& extensions,
             const std::string& application_name,
-            uint32_t application_vk_version,
-            uint32_t preffered_number_compute_queues,
-            uint32_t vk_api_version,
-            uint32_t filter_vendor_id,
-            uint32_t filter_device_id,
+            const uint32_t application_vk_version,
+            const uint32_t preffered_number_compute_queues,
+            const uint32_t vk_api_version,
+            const bool require_extension_support,
+            const uint32_t filter_vendor_id,
+            const uint32_t filter_device_id,
             const std::string& filter_device_name);
 
   public:
@@ -130,11 +141,12 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
     void prepare_shader_include_defines();
 
   private: // Helper
-    void extensions_check_instance_layer_support();
-    void extensions_check_instance_extension_support();
-    void extensions_check_device_extension_support();
-    void extensions_self_check_support();
-    void destroy_extensions(const std::vector<std::shared_ptr<Extension>>& extensions);
+    void extensions_check_instance_layer_support(const bool fail_if_unsupported);
+    void extensions_check_instance_extension_support(const bool fail_if_unsupported);
+    void extensions_check_device_extension_support(const bool fail_if_unsupported);
+    void extensions_self_check_support(const bool fail_if_unsupported);
+    void destroy_unsupported_extensions(const std::vector<std::shared_ptr<Extension>>& extensions,
+                                        const bool fail_if_unsupported);
 
   public: // Getter
     // The actual number of compute queues (< preffered_number_compute_queues).
@@ -227,19 +239,7 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
   private:
     // in find_queues. Indexes are -1 if no suitable queue was found!
 
-    // A queue family index guaranteed to support graphics+compute+transfer (or -1)
-    int32_t queue_family_idx_GCT = -1;
-    // A queue family index guaranteed to support compute (or -1)
-    int32_t queue_family_idx_C = -1;
-    // A queue family index guaranteed to support transfer (or -1)
-    int32_t queue_family_idx_T = -1;
-
-    // The queue indices (not family!) used for the graphics queue
-    int32_t queue_idx_GCT = -1;
-    // The queue indices (not family!) used for the compute queue
-    std::vector<uint32_t> queue_idx_C;
-    // The queue indices (not family!) used for the transfer queue
-    int32_t queue_idx_T = -1;
+    QueueInfo queue_info;
 
     // can be nullptr in very rare occasions, you can check that with if (shrd_ptr) {...}
     std::weak_ptr<Queue> queue_GCT;

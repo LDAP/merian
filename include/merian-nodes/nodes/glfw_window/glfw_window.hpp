@@ -4,7 +4,7 @@
 #include "merian-nodes/graph/errors.hpp"
 #include "merian-nodes/graph/node.hpp"
 
-#include "merian/vk/extension/extension_vk_glfw.hpp"
+#include "merian/vk/extension/extension_glfw.hpp"
 #include "merian/vk/utils/barriers.hpp"
 #include "merian/vk/utils/blits.hpp"
 #include "merian/vk/utils/subresource_ranges.hpp"
@@ -20,7 +20,7 @@ namespace merian_nodes {
 class GLFWWindow : public Node {
   public:
     GLFWWindow(const ContextHandle& context) : Node() {
-        if (context->get_extension<ExtensionVkGLFW>()) {
+        if (context->get_extension<ExtensionGLFW>()) {
             window = std::make_shared<merian::GLFWWindow>(context);
             swapchain = std::make_shared<merian::Swapchain>(context, window->get_surface());
             vsync = swapchain->vsync_enabled();
@@ -116,7 +116,7 @@ class GLFWWindow : public Node {
             if (fullscreen != 0) {
                 try {
                     glfwGetWindowPos(*window, &windowed_pos_size[0], &windowed_pos_size[1]);
-                } catch (const ExtensionVkGLFW::glfw_error& e) {
+                } catch (const ExtensionGLFW::glfw_error& e) {
                     if (e.id != GLFW_FEATURE_UNAVAILABLE) {
                         throw e;
                     }
