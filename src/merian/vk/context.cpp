@@ -5,6 +5,7 @@
 #include "merian/vk/shader/shader_compiler.hpp"
 
 #include <fmt/ranges.h>
+#include <numeric>
 #include <spdlog/spdlog.h>
 #include <tuple>
 
@@ -21,6 +22,7 @@ ContextHandle Context::create(const std::vector<std::shared_ptr<Extension>>& ext
                               uint32_t filter_device_id,
                               const std::string& filter_device_name) {
 
+    // call constructor manually since its private for make_shared...
     const ContextHandle context = std::shared_ptr<Context>(new Context(
         extensions, application_name, application_vk_version, preffered_number_compute_queues,
         vk_api_version, filter_vendor_id, filter_device_id, filter_device_name));
@@ -288,9 +290,10 @@ void Context::find_queues() {
     using Flags = vk::QueueFlagBits;
 
     // We calculate all possible index candidates then sort descending the list to get the best
-    // match. (GCT found, additional T found, additional C found, number remaining compute queues,
-    // GCT family index, T family index, C family index)
-    std::vector<std::tuple<bool, bool, bool, uint32_t, uint32_t, uint32_t, uint32_t>> candidates;
+    // match. (GCT found, GCT extension_accept, additional T found, additional C found, number
+    // remaining compute queues, GCT family index, T family index, C family index)
+    std::vector<std::tuple<bool, uint32_t, bool, bool, uint32_t, uint32_t, uint32_t, uint32_t>>
+        candidates;
 
 #ifndef NDEBUG
     for (std::size_t i = 0; i < queue_family_props.size(); i++) {
@@ -328,14 +331,21 @@ void Context::find_queues() {
                 if ((queue_family_props[queue_family_idx_GCT].queueFlags & Flags::eGraphics) &&
                     (queue_family_props[queue_family_idx_GCT].queueFlags & Flags::eCompute) &&
                     (queue_family_props[queue_family_idx_GCT].queueFlags & Flags::eTransfer) &&
-                    remaining_queue_count[queue_family_idx_GCT] > 0 &&
-                    std::all_of(extensions.begin(), extensions.end(), [&](auto ext) {
-                        return ext.second->accept_graphics_queue(
-                            instance, physical_device.physical_device, queue_family_idx_GCT);
-                    })) {
+                    remaining_queue_count[queue_family_idx_GCT] > 0) {
                     found_GCT = true;
                     remaining_queue_count[queue_family_idx_GCT]--;
                 }
+                // Prio 2: GCT accepted by extensions
+                uint32_t GCT_accepts =
+                    !found_GCT
+                        ? 0
+                        : std::accumulate(extensions.begin(), extensions.end(), 0,
+                                          [&](uint32_t accum, auto ext) {
+                                              return accum + ext.second->accept_graphics_queue(
+                                                                 instance,
+                                                                 physical_device.physical_device,
+                                                                 queue_family_idx_GCT);
+                                          });
                 // Prio 2: T (additional)
                 if ((queue_family_props[queue_family_idx_T].queueFlags & Flags::eTransfer) &&
                     remaining_queue_count[queue_family_idx_T] > 0) {
@@ -351,9 +361,9 @@ void Context::find_queues() {
                     num_compute_queues = remaining_queue_count[queue_family_idx_C];
                 }
 
-                candidates.emplace_back(found_GCT, found_T, found_C, num_compute_queues,
-                                        queue_family_idx_GCT, queue_family_idx_T,
-                                        queue_family_idx_C);
+                candidates.emplace_back(found_GCT, GCT_accepts, found_T, found_C,
+                                        num_compute_queues, queue_family_idx_GCT,
+                                        queue_family_idx_T, queue_family_idx_C);
             }
         }
     }
@@ -363,19 +373,20 @@ void Context::find_queues() {
     auto best = candidates[0];
 
     const bool found_GCT = std::get<0>(best);
-    const bool found_T = std::get<1>(best);
-    const bool found_C = std::get<2>(best);
+    const bool found_T = std::get<2>(best);
+    const bool found_C = std::get<3>(best);
 
     if (!found_GCT || !found_T || !found_C) {
         SPDLOG_WARN("not all requested queue families found! GCT: {} T: {} C: {}", found_GCT,
                     found_T, found_C);
     }
 
-    this->queue_family_idx_GCT = found_GCT ? std::get<4>(best) : -1;
-    this->queue_family_idx_T = found_T ? std::get<5>(best) : -1;
-    this->queue_family_idx_C = found_C ? std::get<6>(best) : -1;
+    this->queue_family_idx_GCT = found_GCT ? std::get<5>(best) : -1;
+    this->queue_family_idx_T = found_T ? std::get<6>(best) : -1;
+    this->queue_family_idx_C = found_C ? std::get<7>(best) : -1;
 
-    SPDLOG_DEBUG("determined queue families indices: GCT: {} T: {} C: {}", queue_family_idx_GCT,
+    SPDLOG_DEBUG("determined queue families indices: GCT: {} ({}/{} accept votes), T: {} C: {}",
+                 queue_family_idx_GCT, std::get<1>(best), found_GCT ? extensions.size() : 0,
                  queue_family_idx_T, queue_family_idx_C);
 }
 
