@@ -6,42 +6,38 @@ namespace merian {
 
 class ExtensionVkFloatAtomics : public Extension {
   public:
-    ExtensionVkFloatAtomics() : Extension("ExtensionVkFloatAtomics") {}
-    ~ExtensionVkFloatAtomics() {}
+    ExtensionVkFloatAtomics(const std::set<std::string>& required_features = {},
+                            const std::set<std::string>& optional_features = {
+                                "shaderBufferFloat32Atomics", "shaderBufferFloat32AtomicAdd",
+                                "shaderBufferFloat64Atomics", "shaderBufferFloat64AtomicAdd",
+                                "shaderSharedFloat32Atomics", "shaderSharedFloat32AtomicAdd",
+                                "shaderSharedFloat64Atomics", "shaderSharedFloat64AtomicAdd",
+                                "shaderImageFloat32Atomics", "shaderImageFloat32AtomicAdd",
+                                "sparseImageFloat32Atomics", "sparseImageFloat32AtomicAdd"});
+    ~ExtensionVkFloatAtomics();
+
     std::vector<const char*>
-    required_device_extension_names(const vk::PhysicalDevice& /*unused*/) const override {
-        return {
-            VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME,
-        };
-    }
+    required_device_extension_names(const vk::PhysicalDevice& /*unused*/) const override;
 
-    void* pnext_get_features_2(void* const p_next) override {
-        supported_atomic_features.setPNext(p_next);
-        return &supported_atomic_features;
-    }
+    void* pnext_get_features_2(void* const p_next) override;
 
-    void* pnext_device_create_info(void* const p_next) override {
-        if (supported_atomic_features.shaderImageFloat32Atomics == VK_TRUE) {
-            SPDLOG_DEBUG("shaderImageFloat32Atomics supported. Enabling feature");
-            enable_atomic_features.shaderImageFloat32Atomics = VK_TRUE;
-        } else {
-            SPDLOG_WARN("shaderImageFloat32Atomics not supported");
-        }
+    bool extension_supported(const PhysicalDevice& /*unused*/,
+                             const ExtensionContainer& /*unused*/) override;
 
-        if (supported_atomic_features.shaderImageFloat32AtomicAdd == VK_TRUE) {
-            SPDLOG_DEBUG("shaderImageFloat32AtomicAdd supported. Enabling feature");
-            enable_atomic_features.shaderImageFloat32AtomicAdd = VK_TRUE;
-        } else {
-            SPDLOG_WARN("shaderImageFloat32AtomicAdd not supported");
-        }
+    void* pnext_device_create_info(void* const p_next) override;
 
-        enable_atomic_features.pNext = p_next;
-        return &enable_atomic_features;
-    }
+    // --------------------------------------------------------------------------
+
+    const vk::PhysicalDeviceShaderAtomicFloatFeaturesEXT& get_supported_features() const;
+
+    const vk::PhysicalDeviceShaderAtomicFloatFeaturesEXT& get_enabled_features() const;
 
   private:
+    std::set<std::string> required_features;
+    std::set<std::string> optional_features;
+
     vk::PhysicalDeviceShaderAtomicFloatFeaturesEXT supported_atomic_features;
-    vk::PhysicalDeviceShaderAtomicFloatFeaturesEXT enable_atomic_features;
+    vk::PhysicalDeviceShaderAtomicFloatFeaturesEXT enabled_atomic_features;
 };
 
 } // namespace merian
