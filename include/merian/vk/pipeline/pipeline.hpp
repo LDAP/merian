@@ -2,6 +2,7 @@
 
 #include "merian/vk/context.hpp"
 #include "merian/vk/descriptors/descriptor_set.hpp"
+#include "merian/vk/memory/resource_allocations.hpp"
 #include "merian/vk/pipeline/pipeline_layout.hpp"
 
 #include <spdlog/spdlog.h>
@@ -45,6 +46,65 @@ class Pipeline : public std::enable_shared_from_this<Pipeline> {
                              const uint32_t set,
                              const std::vector<vk::WriteDescriptorSet>& writes) {
         cmd.pushDescriptorSetKHR(get_pipeline_bind_point(), *pipeline_layout, set, writes);
+    }
+
+    // shortcut to push the descriptor set 0.
+    void push_descriptor_set(const vk::CommandBuffer& cmd,
+                             const std::vector<vk::WriteDescriptorSet>& writes) {
+        push_descriptor_set(cmd, 0, writes);
+    }
+
+  private:
+    vk::WriteDescriptorSet make_descriptor_write(const vk::DescriptorBufferInfo& buffer_info,
+                                                 const uint32_t set,
+                                                 const uint32_t binding) {
+
+        return vk::WriteDescriptorSet{
+            {},
+            binding,
+            0,
+            1,
+            pipeline_layout->get_descriptor_set_layout(set)->get_type_for_binding(binding),
+            nullptr,
+            &buffer_info,
+        };
+    }
+
+    vk::WriteDescriptorSet make_descriptor_write(const vk::DescriptorImageInfo& image_info,
+                                                 const uint32_t set,
+                                                 const uint32_t binding) {
+        return vk::WriteDescriptorSet{
+            {},
+            binding,
+            0,
+            1,
+            pipeline_layout->get_descriptor_set_layout(set)->get_type_for_binding(binding),
+            &image_info,
+            nullptr,
+        };
+    }
+
+    template <typename... T, std::size_t... Is>
+    void push_descriptor_set(const vk::CommandBuffer& cmd,
+                             const uint32_t set,
+                             const std::index_sequence<Is...> /*unused*/,
+                             const T&... resources) {
+        const std::vector<vk::WriteDescriptorSet> writes = {
+            make_descriptor_write(resources, set, Is)...};
+        push_descriptor_set(cmd, set, writes);
+    }
+
+  public:
+    template <typename... T>
+    void
+    push_descriptor_set(const vk::CommandBuffer& cmd, const uint32_t set, const T&... resources) {
+        push_descriptor_set(cmd, set, std::index_sequence_for<T...>{}, resources...);
+    }
+
+    template <typename... T>
+    std::enable_if_t<(std::negation_v<std::is_same<int32_t, T>> && ...)>
+    push_descriptor_set(const vk::CommandBuffer& cmd, const T&... resources) {
+        push_descriptor_set(cmd, 0, std::index_sequence_for<T...>{}, resources...);
     }
 
     // ---------------------------------------------------------------------------

@@ -106,7 +106,8 @@ class SpecializationInfoBuilder {
 
     SpecializationInfoHandle build() const {
         std::vector<vk::SpecializationMapEntry> vec_entries;
-        for (auto& map_entry : entries) {
+        vec_entries.reserve(entries.size());
+        for (const auto& map_entry : entries) {
             vec_entries.push_back(map_entry.second);
         }
         SpecializationInfoHandle result =

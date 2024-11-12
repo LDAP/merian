@@ -309,7 +309,7 @@ class Texture : public std::enable_shared_from_this<Texture> {
         return image->get_memory();
     }
 
-    const SamplerHandle get_sampler() const {
+    const SamplerHandle& get_sampler() const {
         return sampler;
     }
 
@@ -322,7 +322,7 @@ class Texture : public std::enable_shared_from_this<Texture> {
         return view;
     }
 
-    const vk::DescriptorImageInfo get_descriptor_info() {
+    vk::DescriptorImageInfo get_descriptor_info() const {
         return vk::DescriptorImageInfo{*get_sampler(), view, image->get_current_layout()};
     }
 

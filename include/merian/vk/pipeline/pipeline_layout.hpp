@@ -51,6 +51,11 @@ class PipelineLayout : public std::enable_shared_from_this<PipelineLayout> {
         return ranges[id];
     }
 
+    const std::shared_ptr<DescriptorSetLayout>& get_descriptor_set_layout(const uint32_t set = 0) {
+        assert(set < shared_descriptor_set_layouts.size());
+        return shared_descriptor_set_layouts[set];
+    }
+
   private:
     const ContextHandle context;
     const std::vector<vk::PushConstantRange> ranges;

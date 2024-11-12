@@ -153,7 +153,8 @@ class DescriptorSetLayoutBuilder {
         return *this;
     }
 
-    DescriptorSetLayoutBuilder& add_binding(const std::vector<vk::DescriptorSetLayoutBinding>& bindings) {
+    DescriptorSetLayoutBuilder&
+    add_binding(const std::vector<vk::DescriptorSetLayoutBinding>& bindings) {
         for (const auto& binding : bindings) {
             add_binding(binding);
         }
@@ -186,6 +187,13 @@ class DescriptorSetLayoutBuilder {
         }
 
         return make_shared<DescriptorSetLayout>(context, std::move(sorted_bindings), flags);
+    }
+
+    DescriptorSetLayoutHandle
+    build_push_descriptor_layout(const ContextHandle& context,
+                                 const vk::DescriptorSetLayoutCreateFlags flags = {}) {
+        return build_layout(context,
+                            flags | vk::DescriptorSetLayoutCreateFlagBits::ePushDescriptorKHR);
     }
 
     // --------------------------------------------------------------------------------------------------------------------
