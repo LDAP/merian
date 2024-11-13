@@ -96,15 +96,39 @@ class Pipeline : public std::enable_shared_from_this<Pipeline> {
 
   public:
     template <typename... T>
-    void
+    std::enable_if_t<(std::disjunction_v<std::is_same<vk::DescriptorBufferInfo, T>,
+                                         std::is_same<vk::DescriptorImageInfo, T>> &&
+                      ...)>
     push_descriptor_set(const vk::CommandBuffer& cmd, const uint32_t set, const T&... resources) {
         push_descriptor_set(cmd, set, std::index_sequence_for<T...>{}, resources...);
     }
 
     template <typename... T>
-    std::enable_if_t<(std::negation_v<std::is_same<int32_t, T>> && ...)>
+    std::enable_if_t<(std::disjunction_v<std::is_same<vk::DescriptorBufferInfo, T>,
+                                         std::is_same<vk::DescriptorImageInfo, T>> &&
+                      ...)>
     push_descriptor_set(const vk::CommandBuffer& cmd, const T&... resources) {
         push_descriptor_set(cmd, 0, std::index_sequence_for<T...>{}, resources...);
+    }
+
+    template <typename... T>
+    std::enable_if_t<
+        (std::disjunction_v<std::is_same<BufferHandle, T>, std::is_same<TextureHandle, T>> && ...)>
+    push_descriptor_set(const vk::CommandBuffer& cmd, const uint32_t set, const T&... resources) {
+        // need this recursive call else the Image and Buffer descriptor info is deallocated from
+        // stack and we need the addresses.
+        push_descriptor_set(cmd, set, std::index_sequence_for<T...>{},
+                            resources->get_descriptor_info()...);
+    }
+
+    template <typename... T>
+    std::enable_if_t<
+        (std::disjunction_v<std::is_same<BufferHandle, T>, std::is_same<TextureHandle, T>> && ...)>
+    push_descriptor_set(const vk::CommandBuffer& cmd, const T&... resources) {
+        // need this recursive call else the Image and Buffer descriptor info is deallocated from
+        // stack and we need the addresses.
+        push_descriptor_set(cmd, 0, std::index_sequence_for<T...>{},
+                            resources->get_descriptor_info()...);
     }
 
     // ---------------------------------------------------------------------------
