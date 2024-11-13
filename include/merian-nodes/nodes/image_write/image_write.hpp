@@ -18,11 +18,11 @@ class ImageWrite : public Node {
     /**
      * @brief      Constructs a new instance.
      *
-     * @param      allocator      The allocator used to create copies of the input to be able to
+     * @param      allocator      The allocator used to create copies of the input.
      */
-    ImageWrite(const ContextHandle context,
-               const ResourceAllocatorHandle allocator,
-               const std::string& base_filename =
+    ImageWrite(const ContextHandle& context,
+               const ResourceAllocatorHandle& allocator,
+               const std::string& filename_format =
                    "image_{record_iteration:06}_{image_index:06}_{run_iteration:06}");
 
     virtual ~ImageWrite();
@@ -39,7 +39,7 @@ class ImageWrite : public Node {
     virtual NodeStatusFlags properties(Properties& config) override;
 
     // Set a callback that can be called on capture or record.
-    void set_callback(const std::function<void()> callback);
+    void set_callback(const std::function<void()>& callback);
 
     void record();
 

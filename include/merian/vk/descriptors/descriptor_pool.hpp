@@ -33,7 +33,7 @@ class DescriptorPool : public std::enable_shared_from_this<DescriptorPool> {
         context->device.destroyDescriptorPool(pool);
     }
 
-    operator const vk::DescriptorPool() const {
+    operator const vk::DescriptorPool&() const {
         return pool;
     }
 
@@ -41,15 +41,15 @@ class DescriptorPool : public std::enable_shared_from_this<DescriptorPool> {
         return pool;
     }
 
-    const std::shared_ptr<DescriptorSetLayout> get_layout() const {
+    const std::shared_ptr<DescriptorSetLayout>& get_layout() const {
         return layout;
     }
 
-    const ContextHandle get_context() const {
+    const ContextHandle& get_context() const {
         return context;
     }
 
-    const vk::DescriptorPoolCreateFlags get_create_flags() {
+    vk::DescriptorPoolCreateFlags get_create_flags() {
         return flags;
     }
 
@@ -78,7 +78,7 @@ class DescriptorPool : public std::enable_shared_from_this<DescriptorPool> {
         std::vector<vk::DescriptorPoolSize> sizes;
         std::map<vk::DescriptorType, uint32_t> type_to_index;
 
-        for (auto& binding : bindings) {
+        for (const auto& binding : bindings) {
             if (!type_to_index.contains(binding.descriptorType)) {
                 vk::DescriptorPoolSize size_for_type{binding.descriptorType,
                                                      binding.descriptorCount * set_count};

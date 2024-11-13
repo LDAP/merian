@@ -23,7 +23,7 @@ class Accumulate : public Node {
     };
 
     struct FilterPushConstant {
-        int32_t firefly_filter_enable = 0;
+        VkBool32 firefly_filter_enable = 0;
         float firefly_bias = 0.2;
         float firefly_ipr_factor = 50;
 
@@ -33,7 +33,7 @@ class Accumulate : public Node {
         float accum_max_hist = INFINITY;
         float normal_reject_cos = 0.8;
         float depth_reject_percent = 0.02;
-        int32_t clear = 0;
+        VkBool32 clear = 0;
 
         float adaptive_alpha_reduction = 0.0;
         float adaptive_alpha_ipr_factor = 1.5;
@@ -42,8 +42,8 @@ class Accumulate : public Node {
     };
 
   public:
-    Accumulate(const ContextHandle context,
-               const ResourceAllocatorHandle allocator,
+    Accumulate(const ContextHandle& context,
+               const ResourceAllocatorHandle& allocator,
                const std::optional<vk::Format> format = vk::Format::eR32G32B32A32Sfloat);
 
     ~Accumulate();
@@ -70,10 +70,10 @@ class Accumulate : public Node {
     const ResourceAllocatorHandle allocator;
     const std::optional<vk::Format> format;
 
-    static constexpr uint32_t percentile_local_size_x = 8;
-    static constexpr uint32_t percentile_local_size_y = 8;
-    static constexpr uint32_t filter_local_size_x = 16;
-    static constexpr uint32_t filter_local_size_y = 16;
+    static constexpr uint32_t PERCENTILE_LOCAL_SIZE_X = 8;
+    static constexpr uint32_t PERCENTILE_LOCAL_SIZE_Y = 8;
+    static constexpr uint32_t FILTER_LOCAL_SIZE_X = 16;
+    static constexpr uint32_t FILTER_LOCAL_SIZE_Y = 16;
 
     // Graph IO
     ManagedVkImageInHandle con_prev_accum = ManagedVkImageIn::compute_read("prev_accum", 1);

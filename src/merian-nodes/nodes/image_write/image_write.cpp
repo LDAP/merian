@@ -15,17 +15,19 @@ namespace merian_nodes {
 #define FORMAT_JPG 1
 #define FORMAT_HDR 2
 
-static std::unordered_map<uint32_t, std::string> FILE_EXTENSIONS = {
+static const std::unordered_map<uint32_t, std::string> FILE_EXTENSIONS = {
     {FORMAT_PNG, ".png"}, {FORMAT_JPG, ".jpg"}, {FORMAT_HDR, ".hdr"}};
 
-ImageWrite::ImageWrite(const ContextHandle context,
-                       const ResourceAllocatorHandle allocator,
+ImageWrite::ImageWrite(const ContextHandle& context,
+                       const ResourceAllocatorHandle& allocator,
                        const std::string& filename_format)
     : Node(), context(context), allocator(allocator), filename_format(filename_format) {}
 
 ImageWrite::~ImageWrite() {}
 
 std::vector<InputConnectorHandle> ImageWrite::describe_inputs() {
+    estimated_frametime_millis = 0;
+
     return {con_src};
 }
 
@@ -121,7 +123,7 @@ void ImageWrite::process(GraphRun& run,
             throw fmt::format_error{"empty filename"};
         }
         path = std::filesystem::absolute(fmt::vformat(this->filename_format, arg_store) +
-                                         FILE_EXTENSIONS[this->format]);
+                                         FILE_EXTENSIONS.at(this->format));
     } catch (const std::exception& e) {
         // catch std::filesystem::filesystem_error and fmt::format_error
         record_enable = false;
@@ -228,6 +230,7 @@ void ImageWrite::process(GraphRun& run,
     TimelineSemaphoreHandle image_ready = std::make_shared<TimelineSemaphore>(context, 0);
     run.add_signal_semaphore(image_ready, 1);
 
+    // Pause execution if to many tasks are queued to allow the write threads to keep up.
     std::unique_lock lk(mutex_concurrent);
     cv_concurrent.wait(lk, [&] { return concurrent_tasks < max_concurrent_tasks; });
     concurrent_tasks++;
@@ -240,7 +243,7 @@ void ImageWrite::process(GraphRun& run,
     const std::function<void()> write_task =
         ([this, image_ready, linear_image, path, tmp_filename]() {
             image_ready->wait(1);
-            void* mem = linear_image->get_memory()->map();
+            float* mem = linear_image->get_memory()->map_as<float>();
 
             switch (this->format) {
             case FORMAT_PNG: {
@@ -256,7 +259,7 @@ void ImageWrite::process(GraphRun& run,
             }
             case FORMAT_HDR: {
                 stbi_write_hdr(tmp_filename.c_str(), linear_image->get_extent().width,
-                               linear_image->get_extent().height, 4, static_cast<float*>(mem));
+                               linear_image->get_extent().height, 4, mem);
                 break;
             }
             }
@@ -396,7 +399,7 @@ ImageWrite::NodeStatusFlags ImageWrite::properties([[maybe_unused]] Properties& 
     return {};
 }
 
-void ImageWrite::set_callback(const std::function<void()> callback) {
+void ImageWrite::set_callback(const std::function<void()>& callback) {
     this->callback = callback;
 }
 

@@ -10,8 +10,8 @@
 
 namespace merian_nodes {
 
-Accumulate::Accumulate(const ContextHandle context,
-                       const ResourceAllocatorHandle allocator,
+Accumulate::Accumulate(const ContextHandle& context,
+                       const ResourceAllocatorHandle& allocator,
                        const std::optional<vk::Format> format)
     : Node(), context(context), allocator(allocator), format(format) {
     percentile_module =
@@ -64,13 +64,13 @@ Accumulate::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
     }
 
     percentile_group_count_x =
-        (irr_create_info.extent.width + percentile_local_size_x - 1) / percentile_local_size_x;
+        (irr_create_info.extent.width + PERCENTILE_LOCAL_SIZE_X - 1) / PERCENTILE_LOCAL_SIZE_X;
     percentile_group_count_y =
-        (irr_create_info.extent.height + percentile_local_size_y - 1) / percentile_local_size_y;
+        (irr_create_info.extent.height + PERCENTILE_LOCAL_SIZE_Y - 1) / PERCENTILE_LOCAL_SIZE_Y;
     filter_group_count_x =
-        (irr_create_info.extent.width + filter_local_size_x - 1) / filter_local_size_x;
+        (irr_create_info.extent.width + FILTER_LOCAL_SIZE_X - 1) / FILTER_LOCAL_SIZE_X;
     filter_group_count_y =
-        (irr_create_info.extent.height + filter_local_size_y - 1) / filter_local_size_y;
+        (irr_create_info.extent.height + FILTER_LOCAL_SIZE_Y - 1) / FILTER_LOCAL_SIZE_Y;
 
     vk::ImageCreateInfo quartile_image_create_info = irr_create_info;
     quartile_image_create_info.usage |= vk::ImageUsageFlagBits::eSampled;
@@ -99,7 +99,7 @@ Accumulate::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
                                     .build_pipeline_layout();
 
     auto quartile_spec_builder = SpecializationInfoBuilder();
-    quartile_spec_builder.add_entry(percentile_local_size_x, percentile_local_size_y);
+    quartile_spec_builder.add_entry(PERCENTILE_LOCAL_SIZE_X, PERCENTILE_LOCAL_SIZE_Y);
     auto quartile_spec = quartile_spec_builder.build();
     calculate_percentiles =
         std::make_shared<ComputePipeline>(quartile_pipe_layout, percentile_module, quartile_spec);
@@ -110,9 +110,9 @@ Accumulate::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
                                   .add_push_constant<FilterPushConstant>()
                                   .build_pipeline_layout();
     auto filter_spec_builder = SpecializationInfoBuilder();
-    const uint32_t wg_rounded_irr_size_x = percentile_group_count_x * percentile_local_size_x;
-    const uint32_t wg_rounded_irr_size_y = percentile_group_count_y * percentile_local_size_y;
-    filter_spec_builder.add_entry(filter_local_size_x, filter_local_size_y, wg_rounded_irr_size_x,
+    const uint32_t wg_rounded_irr_size_x = percentile_group_count_x * PERCENTILE_LOCAL_SIZE_X;
+    const uint32_t wg_rounded_irr_size_y = percentile_group_count_y * PERCENTILE_LOCAL_SIZE_Y;
+    filter_spec_builder.add_entry(FILTER_LOCAL_SIZE_X, FILTER_LOCAL_SIZE_Y, wg_rounded_irr_size_x,
                                   wg_rounded_irr_size_y, filter_mode, extended_search,
                                   reuse_border);
     auto filter_spec = filter_spec_builder.build();
@@ -128,7 +128,8 @@ void Accumulate::process(GraphRun& run,
                          [[maybe_unused]] const NodeIO& io) {
     accumulate_pc.iteration = run.get_total_iteration();
 
-    if (accumulate_pc.firefly_filter_enable || accumulate_pc.adaptive_alpha_reduction > 0.0f) {
+    if (accumulate_pc.firefly_filter_enable == VK_TRUE ||
+        accumulate_pc.adaptive_alpha_reduction > 0.0f) {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "compute percentiles");
         auto bar = percentile_texture->get_image()->barrier(
             vk::ImageLayout::eGeneral, vk::AccessFlagBits::eShaderRead,
@@ -152,7 +153,7 @@ void Accumulate::process(GraphRun& run,
                         vk::PipelineStageFlagBits::eComputeShader, {}, {}, {}, bar);
 
     {
-        accumulate_pc.clear = run.get_iteration() == 0 || clear;
+        accumulate_pc.clear = static_cast<int32_t>(run.get_iteration() == 0 || clear);
         clear = false;
 
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "accumulate");
