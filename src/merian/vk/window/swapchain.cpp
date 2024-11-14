@@ -137,6 +137,20 @@ vk::Extent2D Swapchain::create_swapchain(const uint32_t width, const uint32_t he
         pre_transform = capabilities.currentTransform;
     }
 
+    // Find a supported composite type.
+    vk::CompositeAlphaFlagBitsKHR composite = vk::CompositeAlphaFlagBitsKHR::eOpaque;
+    if (capabilities.supportedCompositeAlpha & vk::CompositeAlphaFlagBitsKHR::eOpaque) {
+        composite = vk::CompositeAlphaFlagBitsKHR::eOpaque;
+    } else if (capabilities.supportedCompositeAlpha & vk::CompositeAlphaFlagBitsKHR::eInherit) {
+        composite = vk::CompositeAlphaFlagBitsKHR::eInherit;
+    } else if (capabilities.supportedCompositeAlpha &
+               vk::CompositeAlphaFlagBitsKHR::ePreMultiplied) {
+        composite = vk::CompositeAlphaFlagBitsKHR::ePreMultiplied;
+    } else if (capabilities.supportedCompositeAlpha &
+               vk::CompositeAlphaFlagBitsKHR::ePostMultiplied) {
+        composite = vk::CompositeAlphaFlagBitsKHR::ePostMultiplied;
+    }
+
     // clang-format off
     vk::SwapchainCreateInfoKHR create_info(
                                           vk::SwapchainCreateFlagBitsKHR(),
@@ -151,7 +165,7 @@ vk::Extent2D Swapchain::create_swapchain(const uint32_t width, const uint32_t he
                                           0,
                                           nullptr,
                                           pre_transform,
-                                          vk::CompositeAlphaFlagBitsKHR::eOpaque,
+                                          composite,
                                           present_mode,
                                           VK_FALSE,
                                           old
