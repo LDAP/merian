@@ -244,6 +244,14 @@ void Swapchain::destroy_entries() {
 void Swapchain::destroy_swapchain() {
     SPDLOG_DEBUG("destroy swapchain ({})", fmt::ptr(this));
 
+    // TODO: use
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_EXT_swapchain_maintenance1.html
+    // to wait for the present operation to signal a fence.
+    // this is not supported on much hardware therefore use queue->wait_idle...
+    // see https://github.com/KhronosGroup/Vulkan-Samples/tree/main/samples/api/swapchain_recreation
+    // Note: even wait idle does not quarantee what we want here but whatever...
+    context->get_queue_GCT()->wait_idle();
+
     for (const auto& cleanup_function : cleanup_functions) {
         cleanup_function();
     }
