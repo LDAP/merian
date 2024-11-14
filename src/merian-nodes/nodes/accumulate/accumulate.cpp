@@ -40,6 +40,12 @@ std::vector<OutputConnectorHandle> Accumulate::describe_outputs(const NodeIOLayo
     con_moments_out = ManagedVkImageOut::compute_write("out_moments", moments_create_info.format,
                                                        moments_create_info.extent);
 
+    io_layout.register_event_listener(clear_event_listener_pattern,
+                                      [this](const GraphEvent::Info&, const GraphEvent::Data&) {
+                                          request_clear();
+                                          return true;
+                                      });
+
     return {
         con_irr_out,
         con_moments_out,
@@ -153,8 +159,13 @@ void Accumulate::process(GraphRun& run,
                         vk::PipelineStageFlagBits::eComputeShader, {}, {}, {}, bar);
 
     {
-        accumulate_pc.clear = static_cast<int32_t>(run.get_iteration() == 0 || clear);
-        clear = false;
+        if (run.get_iteration() == 0 || clear) {
+            accumulate_pc.clear = VK_TRUE;
+            io.send_event("clear");
+            clear = false;
+        } else {
+            accumulate_pc.clear = VK_FALSE;
+        }
 
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "accumulate");
         accumulate->bind(cmd);
@@ -176,7 +187,11 @@ Accumulate::NodeStatusFlags Accumulate::properties(Properties& config) {
     config.st_no_space();
     accumulate_pc.accum_max_hist =
         config.config_bool("inf history") ? INFINITY : accumulate_pc.accum_max_hist;
-    clear = config.config_bool("clear");
+    clear |= config.config_bool("clear");
+    config.st_no_space();
+    needs_rebuild |=
+        config.config_text("clear event pattern", clear_event_listener_pattern, true,
+                           "Set the event pattern which triggers a clear. Press enter to confirm.");
 
     config.st_separate("Reproject");
     float angle = glm::acos(accumulate_pc.normal_reject_cos);

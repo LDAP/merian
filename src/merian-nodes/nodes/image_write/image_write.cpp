@@ -286,6 +286,7 @@ void ImageWrite::process(GraphRun& run,
         run.request_reconnect();
     if (callback_after_capture && callback)
         callback();
+    io.send_event("capture");
     record_next = false;
 
     record_iteration *= record_enable ? it_power : 1;

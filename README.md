@@ -14,6 +14,7 @@ Merian is split into multiple components:
 - [merian-quake](https://github.com/LDAP/merian-quake-rt): A path-tracer for the original Quake game. (coming soon)
 - [merian-shadertoy](https://github.com/LDAP/merian-shadertoy): A limited Vulkan implementation Shadertoys with hot reloading.
 - [merian-hdr-viewer](https://github.com/LDAP/merian-hdr-viewer): A simple HDR viewer with various exposure and tone-mapping controls.
+- [merian-example-sum](https://github.com/LDAP/merian-example-sum): Example on how to compute a sum on the GPU.
 
 Merian aims for compatibility with Windows, Linux as well as all major GPU vendors.
 

@@ -3,7 +3,6 @@
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_vulkan.h"
 #include "imgui.h"
-#include "merian/vk/utils/subresource_ranges.hpp"
 
 namespace merian {
 
@@ -130,7 +129,7 @@ vk::Framebuffer GLFWImGui::new_frame(QueueHandle& queue,
 
         const std::function<void()> cleanup = [context, old_framebuffers, old_renderpass]() {
             SPDLOG_DEBUG("destroy framebuffers and renderpass");
-            for (auto& framebuffer : old_framebuffers) {
+            for (const auto& framebuffer : old_framebuffers) {
                 if (framebuffer)
                     context->device.destroyFramebuffer(framebuffer);
             }

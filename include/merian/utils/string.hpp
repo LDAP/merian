@@ -28,7 +28,8 @@ namespace merian {
     } else {
         unit_index = std::min((std::size_t)(std::log10(duration_ns) / 3), units.size() - 1);
     }
-    return fmt::format("{} {}", (double)duration_ns / std::pow(1000, unit_index), units[unit_index]);
+    return fmt::format("{} {}", (double)duration_ns / std::pow(1000, unit_index),
+                       units[unit_index]);
 }
 
 [[nodiscard]] inline bool ends_with(const std::string& value, const std::string& suffix) {
@@ -45,7 +46,7 @@ namespace merian {
 
 inline void split(const std::string& value,
                   const std::string& delim,
-                  const std::function<void(const std::string&)> function) {
+                  const std::function<void(const std::string&)>& function) {
     std::size_t last = 0;
     std::size_t pos = 0;
     while ((pos = value.find(delim, last)) != std::string::npos) {

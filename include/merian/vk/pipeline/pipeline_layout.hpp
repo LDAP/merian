@@ -34,24 +34,24 @@ class PipelineLayout : public std::enable_shared_from_this<PipelineLayout> {
         context->device.destroyPipelineLayout(pipeline_layout);
     }
 
-    operator const vk::PipelineLayout() const {
+    operator const vk::PipelineLayout&() const {
         return pipeline_layout;
     }
 
-    const vk::PipelineLayout& get_pipeline_layout() {
+    const vk::PipelineLayout& get_pipeline_layout() const {
         return pipeline_layout;
     }
 
-    const ContextHandle& get_context() {
+    const ContextHandle& get_context() const {
         return context;
     }
 
-    const vk::PushConstantRange get_push_constant_range(uint32_t id) {
+    const vk::PushConstantRange& get_push_constant_range(uint32_t id) const {
         assert(id < ranges.size() && "No such push constant. Did you declare a push constant?");
         return ranges[id];
     }
 
-    const std::shared_ptr<DescriptorSetLayout>& get_descriptor_set_layout(const uint32_t set = 0) {
+    const std::shared_ptr<DescriptorSetLayout>& get_descriptor_set_layout(const uint32_t set = 0) const {
         assert(set < shared_descriptor_set_layouts.size());
         return shared_descriptor_set_layouts[set];
     }

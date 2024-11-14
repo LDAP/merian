@@ -115,8 +115,10 @@ class Accumulate : public Node {
 
     bool clear = false;
     int filter_mode = 0;
-    VkBool32 extended_search = true;
-    VkBool32 reuse_border = false;
+    VkBool32 extended_search = VK_TRUE;
+    VkBool32 reuse_border = VK_FALSE;
+
+    std::string clear_event_listener_pattern = "/user/clear";
 };
 
 } // namespace merian_nodes

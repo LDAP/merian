@@ -6,11 +6,31 @@
 
 namespace merian_nodes {
 
+class GraphEvent {
+  public:
+    struct Info {
+        // nullptr sent by the user or graph
+        const NodeHandle& sender_node;
+        // "" sent by the user or graph
+        const std::string& node_name;
+        // "user" if sent by the user or "graph" if sent by runtime
+        const std::string& identifier;
+
+        const std::string& event_name;
+    };
+
+    using Data = std::any;
+
+    using Listener = std::function<bool(const GraphEvent::Info&, const GraphEvent::Data&)>;
+};
+
 // Access the outputs that are connected to your inputs.
 class NodeIOLayout {
   public:
-    NodeIOLayout(const std::function<OutputConnectorHandle(const InputConnectorHandle&)>& io_layout)
-        : io_layout(io_layout) {}
+    NodeIOLayout(const std::function<OutputConnectorHandle(const InputConnectorHandle&)>& io_layout,
+                 const std::function<void(const std::string&, const GraphEvent::Listener&)>&
+                     register_event_listener_f)
+        : io_layout(io_layout), register_event_listener_f(register_event_listener_f) {}
 
     // Behavior undefined if an optional input connector is not connected.
     template <
@@ -32,8 +52,29 @@ class NodeIOLayout {
         return io_layout(input_connector) != nullptr;
     }
 
+    /*
+     * Event pattern:
+     * - nodeType/nodeIdentifier/eventName
+     * - /user/eventName (user events, sent using the graph methods)
+     * - /graph/eventName (user events, sent using the graph methods)
+     * - comma separated list of those patterns
+     *
+     * Empty nodeType, nodeIdentifier, eventName mean "any".
+     *
+     * The listener recives info about the event and optional data. The listener can return if the
+     * event was processed. In this case processing ends if "notify_all = false", otherwise the
+     * event is distributed to all listeners.
+     */
+    void register_event_listener(const std::string& event_pattern,
+                                 const GraphEvent::Listener& event_listerner) const {
+        register_event_listener_f(event_pattern, event_listerner);
+    }
+
   private:
     const std::function<OutputConnectorHandle(const InputConnectorHandle&)> io_layout;
+
+    const std::function<void(const std::string&, const GraphEvent::Listener&)>
+        register_event_listener_f;
 };
 
 class NodeIO {
@@ -43,10 +84,13 @@ class NodeIO {
            const std::function<GraphResourceHandle(const OutputConnectorHandle&)>&
                resource_for_output_connector,
            const std::function<bool(const OutputConnectorHandle&)>& output_is_connected,
-           const std::function<std::any&()>& get_frame_data)
+           const std::function<std::any&()>& get_frame_data,
+           const std::function<void(
+               const std::string& event_name, const GraphEvent::Data&, const bool)>& send_event_f)
         : resource_for_input_connector(resource_for_input_connector),
           resource_for_output_connector(resource_for_output_connector),
-          output_is_connected(output_is_connected), get_frame_data(get_frame_data) {}
+          output_is_connected(output_is_connected), get_frame_data(get_frame_data),
+          send_event_f(send_event_f) {}
 
     // Behavior undefined if an optional input connector is not connected.
     template <
@@ -101,6 +145,12 @@ class NodeIO {
         }
     }
 
+    void send_event(const std::string& event_name,
+                    const GraphEvent::Data& data = {},
+                    const bool notify_all = true) const {
+        send_event_f(event_name, data, notify_all);
+    }
+
   private:
     const std::function<GraphResourceHandle(const InputConnectorHandle&)>
         resource_for_input_connector;
@@ -110,5 +160,8 @@ class NodeIO {
     const std::function<bool(const OutputConnectorHandle&)> output_is_connected;
 
     const std::function<std::any&()> get_frame_data;
+
+    const std::function<void(const std::string& event_name, const GraphEvent::Data&, const bool)>
+        send_event_f;
 };
 } // namespace merian_nodes
