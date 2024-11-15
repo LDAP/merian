@@ -41,16 +41,19 @@ class ImageWrite : public Node {
     // Set a callback that can be called on capture or record.
     void set_callback(const std::function<void()>& callback);
 
-    void record();
+    void record(const std::chrono::nanoseconds& current_graph_time);
 
   private:
     template <typename T>
-    void
-    get_format_args(const T& consumer, const vk::Extent3D& extent, const uint64_t run_iteration) {
+    void get_format_args(const T& consumer,
+                         const vk::Extent3D& extent,
+                         const uint64_t run_iteration,
+                         const std::chrono::nanoseconds& time_since_record) {
         consumer(fmt::arg("record_iteration", iteration));
-        consumer(fmt::arg("image_index", this->image_index++));
+        consumer(fmt::arg("image_index_total", num_captures_since_init));
+        consumer(fmt::arg("image_index_record", num_captures_since_record));
         consumer(fmt::arg("run_iteration", run_iteration));
-        consumer(fmt::arg("time", time_since_record.millis()));
+        consumer(fmt::arg("time", to_milliseconds(time_since_record)));
         consumer(fmt::arg("width", extent.width));
         consumer(fmt::arg("height", extent.height));
         consumer(fmt::arg("random", rand()));
@@ -73,19 +76,23 @@ class ImageWrite : public Node {
 
     float scale = 1;
     int64_t iteration = 0;
-    uint32_t image_index = 0;
-    Stopwatch time_since_record;
+    uint32_t num_captures_since_init = 0;
+    std::chrono::nanoseconds record_time_point;
+
     double last_record_time_millis;
     double last_frame_time_millis;
-    double estimated_frametime_millis = 0;
     bool undersampling = false;
 
+    bool start_stop_record = false;
     int format = 0;
 
     bool record_enable = false;
     int enable_run = -1;
     int trigger = 0;
-    int record_iteration = 0;
+    int record_iteration = 1;
+    int record_iteration_at_start = 1;
+    int num_captures_since_record = 0;
+    bool reset_record_iteration_at_stop = true;
 
     float record_framerate = 30;
     float record_frametime_millis = 1000.f / 30.f;
@@ -97,13 +104,14 @@ class ImageWrite : public Node {
     bool callback_on_record = false;
 
     int it_power = 1;
-    int it_offset = 0;
+    int it_offset = 1;
 
-    int stop_run = -1;
-    int stop_iteration = -1;
+    int stop_at_run = -1;
+    int stop_after_iteration = -1;
     float stop_after_seconds = -1;
-    int exit_run = -1;
-    int exit_iteration = -1;
+    int stop_after_num_captures_since_record = -1;
+    int exit_at_run = -1;
+    int exit_at_iteration = -1;
     float exit_after_seconds = -1;
 
     bool needs_rebuild = false;

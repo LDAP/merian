@@ -26,19 +26,18 @@ ImageWrite::ImageWrite(const ContextHandle& context,
 ImageWrite::~ImageWrite() {}
 
 std::vector<InputConnectorHandle> ImageWrite::describe_inputs() {
-    estimated_frametime_millis = 0;
-
     return {con_src};
 }
 
-void ImageWrite::record() {
+void ImageWrite::record(const std::chrono::nanoseconds& current_graph_time) {
     record_enable = true;
     needs_rebuild |= rebuild_on_record;
-    this->iteration = 1;
-    estimated_frametime_millis = 0;
+    iteration = 1;
     last_record_time_millis = -std::numeric_limits<double>::infinity();
     last_frame_time_millis = 0;
-    time_since_record.reset();
+    record_time_point = current_graph_time;
+    num_captures_since_record = 0;
+    record_iteration_at_start = record_iteration;
 
     if (callback_on_record && callback)
         callback();
@@ -46,13 +45,45 @@ void ImageWrite::record() {
 
 ImageWrite::NodeStatusFlags ImageWrite::pre_process(GraphRun& run,
                                                     [[maybe_unused]] const NodeIO& io) {
-    if (!record_enable && ((int64_t)run.get_iteration() == enable_run)) {
-        record();
+    // START TRIGGER
+    if (!record_enable && (start_stop_record || (int64_t)run.get_iteration() == enable_run)) {
+        record(run.get_elapsed_duration());
+        start_stop_record = false;
+        io.send_event("start");
     }
+
+    const std::chrono::nanoseconds time_since_record =
+        run.get_elapsed_duration() - record_time_point;
+
+    // STOP TRIGGER
+    if (record_enable &&
+        (start_stop_record || stop_at_run == (int64_t)run.get_iteration() ||
+         (stop_after_iteration >= 0 && stop_after_iteration < iteration) ||
+         stop_after_num_captures_since_record == num_captures_since_record ||
+         (stop_after_seconds >= 0 && to_seconds(time_since_record) >= stop_after_seconds))) {
+        record_enable = false;
+        start_stop_record = false;
+        num_captures_since_record = 0;
+        iteration = 1;
+        if (reset_record_iteration_at_stop) {
+            record_iteration = record_iteration_at_start;
+        }
+        io.send_event("stop");
+    }
+
+    // SIGTERM TRIGGER
+    if (exit_at_run == (int64_t)run.get_iteration() || exit_at_iteration == iteration) {
+        raise(SIGTERM);
+    }
+    if (exit_after_seconds >= 0 && to_seconds(time_since_record) >= exit_after_seconds) {
+        raise(SIGTERM);
+    }
+
     if (needs_rebuild) {
         needs_rebuild = false;
         return NodeStatusFlagBits::NEEDS_RECONNECT;
     }
+
     return {};
 };
 
@@ -66,26 +97,15 @@ void ImageWrite::process(GraphRun& run,
         iteration++;
     };
 
-    //--------- STOP TRIGGER
-    if (stop_run == (int64_t)run.get_iteration() || stop_iteration == iteration) {
-        record_enable = false;
-    }
-    if (exit_run == (int64_t)run.get_iteration() || exit_iteration == iteration) {
-        raise(SIGTERM);
-    }
-    if (stop_after_seconds >= 0 && time_since_record.seconds() >= stop_after_seconds) {
-        record_enable = false;
-    }
-    if (exit_after_seconds >= 0 && time_since_record.seconds() >= exit_after_seconds) {
-        raise(SIGTERM);
-    }
+    const std::chrono::nanoseconds time_since_record =
+        run.get_elapsed_duration() - record_time_point;
 
     //--------- RECORD TRIGGER
     // RECORD TRIGGER 0: Iteration
     record_next |= record_enable && (trigger == 0) && record_iteration == iteration;
 
     // RECORD TRIGGER 1: Frametime
-    const double time_millis = time_since_record.millis();
+    const double time_millis = to_milliseconds(time_since_record);
     const double optimal_timing = last_record_time_millis + record_frametime_millis;
     if (record_enable && (trigger == 1) && last_frame_time_millis <= 0) {
         record_next = true;
@@ -93,15 +113,10 @@ void ImageWrite::process(GraphRun& run,
         // estimate how long a frame takes and reduce stutter
         const double frametime_millis = time_millis - last_frame_time_millis;
 
-        if (estimated_frametime_millis == 0)
-            estimated_frametime_millis = frametime_millis;
-        else
-            estimated_frametime_millis = estimated_frametime_millis * 0.9 + frametime_millis * 0.1;
-
         // am I this time closer to the optimal point or next frame?
         if (record_enable && (trigger == 1) &&
             std::abs(time_millis - optimal_timing) <
-                std::abs(time_millis + estimated_frametime_millis - optimal_timing)) {
+                std::abs(time_millis + frametime_millis - optimal_timing)) {
             record_next = true;
             undersampling = (frametime_millis > record_frametime_millis);
             if (undersampling)
@@ -115,8 +130,8 @@ void ImageWrite::process(GraphRun& run,
     const ImageHandle src = io[con_src];
     vk::Extent3D scaled = max(multiply(src->get_extent(), scale), {1, 1, 1});
     fmt::dynamic_format_arg_store<fmt::format_context> arg_store;
-    get_format_args([&](const auto& arg) { arg_store.push_back(arg); }, scaled,
-                    run.get_iteration());
+    get_format_args([&](const auto& arg) { arg_store.push_back(arg); }, scaled, run.get_iteration(),
+                    time_since_record);
     std::filesystem::path path;
     try {
         if (filename_format.empty()) {
@@ -288,6 +303,8 @@ void ImageWrite::process(GraphRun& run,
         callback();
     io.send_event("capture");
     record_next = false;
+    num_captures_since_record++;
+    num_captures_since_init++;
 
     record_iteration *= record_enable ? it_power : 1;
     record_iteration += record_enable ? it_offset : 0;
@@ -296,16 +313,13 @@ void ImageWrite::process(GraphRun& run,
 ImageWrite::NodeStatusFlags ImageWrite::properties([[maybe_unused]] Properties& config) {
     config.st_separate("General");
     config.config_options("format", format, {"PNG", "JPG", "HDR"}, Properties::OptionsStyle::COMBO);
-    config.config_bool("rebuild after capture", rebuild_after_capture,
-                       "forces a graph rebuild after every capture");
-    std::ignore =
-        config.config_text("filename", filename_format, false,
-                           "Provide a format string for the path. Supported variables are: "
-                           "record_iteration, run_iteration, image_index, width, height");
+    std::ignore = config.config_text("filename", filename_format, false,
+                                     "Provide a format string for the path.");
     std::vector<std::string> variables;
-    get_format_args([&](const auto& arg) { variables.push_back(arg.name); }, {1920, 1080, 1}, 1);
+    get_format_args([&](const auto& arg) { variables.push_back(arg.name); }, {1920, 1080, 1}, 1,
+                    1000ns);
     fmt::dynamic_format_arg_store<fmt::format_context> arg_store;
-    get_format_args([&](const auto& arg) { arg_store.push_back(arg); }, {1920, 1080, 1}, 1);
+    get_format_args([&](const auto& arg) { arg_store.push_back(arg); }, {1920, 1080, 1}, 1, 1000ns);
 
     std::filesystem::path abs_path;
     try {
@@ -322,15 +336,11 @@ ImageWrite::NodeStatusFlags ImageWrite::properties([[maybe_unused]] Properties& 
     record_next = config.config_bool("record_next");
 
     config.st_separate("Multiple");
-    config.output_text(fmt::format(
-        "current iteration: {}\ncurrent time: {}\nundersampling: {}\nestimated frametime: {:.2f}",
-        record_enable ? fmt::to_string(iteration) : "stopped",
-        record_enable ? fmt::format("{:.2f}", time_since_record.seconds()) : "stopped",
-        undersampling, estimated_frametime_millis));
-    const bool old_record_enable = record_enable;
-    config.config_bool("enable", record_enable);
-    if (record_enable && old_record_enable != record_enable)
-        record();
+    config.output_text(fmt::format("current iteration: {}\nundersampling: {}",
+                                   record_enable ? fmt::to_string(iteration) : "stopped",
+                                   undersampling));
+    bool prop_record_enable = record_enable;
+    start_stop_record = config.config_bool("enable", prop_record_enable);
     config.st_separate();
 
     config.config_options("trigger", trigger, {"iteration", "frametime"},
@@ -346,6 +356,9 @@ ImageWrite::NodeStatusFlags ImageWrite::properties([[maybe_unused]] Properties& 
         config.config_int("iteration offset", it_offset,
                           "Adds this value to the iteration specifier after every capture. (After "
                           "applying the power).");
+        config.config_bool(
+            "reset iteration at stop", reset_record_iteration_at_stop,
+            "resets the record iteration to the value it had when recording started.");
         config.output_text("note: Iterations are 1-indexed");
     }
     if (trigger == 1) {
@@ -366,6 +379,8 @@ ImageWrite::NodeStatusFlags ImageWrite::properties([[maybe_unused]] Properties& 
             "The specified run starts recording and resets the iteration and calls the "
             "configured callback and forces a rebuild if enabled.");
 
+        config.config_bool("rebuild after capture", rebuild_after_capture,
+                           "forces a graph rebuild after every capture");
         config.config_bool("rebuild on record", rebuild_on_record,
                            "Rebuilds when recording starts");
         config.config_bool("callback after capture", callback_after_capture,
@@ -373,18 +388,22 @@ ImageWrite::NodeStatusFlags ImageWrite::properties([[maybe_unused]] Properties& 
         config.config_bool("callback on record", callback_on_record,
                            "calls the callback when the recording starts");
         config.st_separate();
-        config.config_int("stop at run", stop_run,
-                          "Stops recording at the specified run. -1 to disable.");
-        config.config_int("stop at iteration", stop_iteration,
-                          "Stops recording at the specified iteration. -1 to disable.");
+        config.config_int("stop at run", stop_at_run,
+                          "Stops recording at the specified run (before capture). -1 to disable.");
+        config.config_int(
+            "stop after iteration", stop_after_iteration,
+            "Stops recording after the specified iteration (after capture). -1 to disable.");
+        config.config_int("stop after number captures", stop_after_num_captures_since_record,
+                          "stops recording after the specified number of images have been captured "
+                          "since recording started.");
         config.config_float(
             "stop after seconds", stop_after_seconds,
             "Stops recording after the specified seconds have passed. -1 to dissable.");
         config.config_int(
-            "exit at run", exit_run,
+            "exit at run", exit_at_run,
             "Raises SIGTERM at the specified run. -1 to disable. Add a signal handler to "
             "shut down properly and not corrupt the images.");
-        config.config_int("exit at iteration", exit_iteration,
+        config.config_int("exit at iteration", exit_at_iteration,
                           "Raises SIGTERM at the specified iteration. -1 to disable. Add a signal "
                           "handler to shut down properly and not corrupt the images.");
         config.config_float(
