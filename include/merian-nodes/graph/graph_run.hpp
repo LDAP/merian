@@ -176,9 +176,9 @@ class GraphRun {
                const ProfilerHandle& profiler,
                const CommandPoolHandle& cmd_pool,
                const ResourceAllocatorHandle& allocator,
-               const std::chrono::nanoseconds time_delta,
-               const std::chrono::nanoseconds elapsed,
-               const std::chrono::nanoseconds elapsed_run,
+               const std::chrono::nanoseconds& time_delta,
+               const std::chrono::nanoseconds& elapsed,
+               const std::chrono::nanoseconds& elapsed_since_connect,
                const uint64_t total_iterations) {
         this->iteration = iteration;
         this->in_flight_index = in_flight_index;
@@ -186,7 +186,7 @@ class GraphRun {
         this->allocator = allocator;
         this->time_delta = time_delta;
         this->elapsed = elapsed;
-        this->elapsed_since_connect = elapsed_run;
+        this->elapsed_since_connect = elapsed_since_connect;
         this->total_iteration = total_iterations;
         wait_semaphores.clear();
         wait_stages.clear();
