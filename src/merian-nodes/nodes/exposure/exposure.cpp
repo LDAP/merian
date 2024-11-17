@@ -10,7 +10,7 @@
 
 namespace merian_nodes {
 
-AutoExposure::AutoExposure(const ContextHandle context) : Node(), context(context) {
+AutoExposure::AutoExposure(const ContextHandle& context) : Node(), context(context) {
 
     histogram_module = std::make_shared<ShaderModule>(context, merian_histogram_comp_spv_size(),
                                                       merian_histogram_comp_spv());
@@ -37,9 +37,9 @@ std::vector<OutputConnectorHandle> AutoExposure::describe_outputs(const NodeIOLa
             vk::AccessFlagBits2::eTransferWrite,
         vk::PipelineStageFlagBits2::eComputeShader | vk::PipelineStageFlagBits2::eTransfer,
         vk::ShaderStageFlagBits::eCompute,
-        vk::BufferCreateInfo({}, local_size_x * local_size_y * sizeof(uint32_t) + sizeof(uint32_t),
-                             vk::BufferUsageFlagBits::eStorageBuffer |
-                                 vk::BufferUsageFlagBits::eTransferDst));
+        vk::BufferCreateInfo(
+            {}, (vk::DeviceSize)LOCAL_SIZE_X * LOCAL_SIZE_Y * sizeof(uint32_t) + sizeof(uint32_t),
+            vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst));
     con_luminance = std::make_shared<ManagedVkBufferOut>(
         "avg_luminance", vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
         vk::PipelineStageFlagBits2::eComputeShader, vk::ShaderStageFlagBits::eCompute,
@@ -57,7 +57,7 @@ AutoExposure::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
                                .add_push_constant<PushConstant>()
                                .build_pipeline_layout();
         auto spec_builder = SpecializationInfoBuilder();
-        spec_builder.add_entry(local_size_x, local_size_y);
+        spec_builder.add_entry(LOCAL_SIZE_X, LOCAL_SIZE_Y);
         SpecializationInfoHandle spec = spec_builder.build();
 
         histogram = std::make_shared<ComputePipeline>(pipe_layout, histogram_module, spec);
@@ -72,13 +72,12 @@ void AutoExposure::process(GraphRun& run,
                            const vk::CommandBuffer& cmd,
                            const DescriptorSetHandle& descriptor_set,
                            const NodeIO& io) {
-    const auto group_count_x = (io[con_out]->get_extent().width + local_size_x - 1) / local_size_x;
-    const auto group_count_y = (io[con_out]->get_extent().height + local_size_y - 1) / local_size_y;
+    const auto group_count_x = (io[con_out]->get_extent().width + LOCAL_SIZE_X - 1) / LOCAL_SIZE_X;
+    const auto group_count_y = (io[con_out]->get_extent().height + LOCAL_SIZE_Y - 1) / LOCAL_SIZE_Y;
 
-    if (pc.automatic) {
-        pc.reset = run.get_iteration() == 0;
-        pc.timediff = sw.seconds();
-        sw.reset();
+    if (pc.automatic == VK_TRUE) {
+        pc.reset = run.get_iteration() == 0 ? VK_TRUE : VK_FALSE;
+        pc.timediff = static_cast<float>(run.get_time_delta());
 
         auto bar = io[con_hist]->buffer_barrier(vk::AccessFlagBits::eShaderRead |
                                                     vk::AccessFlagBits::eShaderWrite,
@@ -123,9 +122,7 @@ void AutoExposure::process(GraphRun& run,
 
 AutoExposure::NodeStatusFlags AutoExposure::properties(Properties& config) {
     config.st_separate("General");
-    bool autoexposure = pc.automatic;
-    config.config_bool("autoexposure", autoexposure);
-    pc.automatic = autoexposure;
+    config.config_bool("autoexposure", pc.automatic);
     config.config_float("q", pc.q, "Lens and vignetting attenuation", 0.01);
     config.config_float("min exposure", pc.min_exposure, "", 0.1);
     pc.min_exposure = std::max(pc.min_exposure, 0.f);
@@ -145,7 +142,7 @@ AutoExposure::NodeStatusFlags AutoExposure::properties(Properties& config) {
 
     config.st_separate("Manual");
     config.config_float("ISO", pc.iso, "Sensor sensitivity/gain (ISO)");
-    float shutter_time = pc.shutter_time * 1000.0;
+    float shutter_time = pc.shutter_time * 1000.0f;
     config.config_float("shutter time (ms)", shutter_time);
     pc.shutter_time = std::max(0.f, shutter_time / 1000);
     config.config_float("aperature", pc.aperature, "", .01);

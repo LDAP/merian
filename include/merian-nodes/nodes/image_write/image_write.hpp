@@ -2,7 +2,6 @@
 
 #include "merian-nodes/connectors/managed_vk_image_in.hpp"
 #include "merian-nodes/graph/node.hpp"
-#include "merian/utils/stopwatch.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 
 namespace merian_nodes {

@@ -4,7 +4,6 @@
 #include "merian-nodes/connectors/managed_vk_image_in.hpp"
 #include "merian-nodes/graph/node.hpp"
 
-#include "merian/utils/stopwatch.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
 #include "merian/vk/shader/shader_module.hpp"
 
@@ -13,11 +12,11 @@ namespace merian_nodes {
 class AutoExposure : public Node {
   private:
     // Histogram uses local_size_x * local_size_y bins;
-    static constexpr uint32_t local_size_x = 16;
-    static constexpr uint32_t local_size_y = 16;
+    static constexpr uint32_t LOCAL_SIZE_X = 16;
+    static constexpr uint32_t LOCAL_SIZE_Y = 16;
 
     struct PushConstant {
-        int automatic = 0;
+        int automatic = VK_FALSE;
 
         float iso = 100.0;
         float q = 0.65;
@@ -40,7 +39,7 @@ class AutoExposure : public Node {
     };
 
   public:
-    AutoExposure(const ContextHandle context);
+    AutoExposure(const ContextHandle& context);
 
     virtual ~AutoExposure();
 
@@ -76,8 +75,6 @@ class AutoExposure : public Node {
     PipelineHandle histogram;
     PipelineHandle luminance;
     PipelineHandle exposure;
-
-    Stopwatch sw;
 };
 
 } // namespace merian_nodes
