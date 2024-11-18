@@ -86,7 +86,7 @@ class ImageWrite : public Node {
     int format = 0;
 
     bool record_enable = false;
-    int enable_run = -1;
+    int start_at_run = -1;
     int trigger = 0;
     int record_iteration = 1;
     int record_iteration_at_start = 1;

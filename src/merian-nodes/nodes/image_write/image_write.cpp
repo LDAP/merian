@@ -46,7 +46,7 @@ void ImageWrite::record(const std::chrono::nanoseconds& current_graph_time) {
 ImageWrite::NodeStatusFlags ImageWrite::pre_process(GraphRun& run,
                                                     [[maybe_unused]] const NodeIO& io) {
     // START TRIGGER
-    if (!record_enable && (start_stop_record || (int64_t)run.get_iteration() == enable_run)) {
+    if (!record_enable && (start_stop_record || (int64_t)run.get_iteration() == start_at_run)) {
         record(run.get_elapsed_duration());
         start_stop_record = false;
         io.send_event("start");
@@ -374,10 +374,6 @@ ImageWrite::NodeStatusFlags ImageWrite::properties([[maybe_unused]] Properties& 
                            "Limit the maximum concurrency. Might be necessary with low memory.");
         config.config_percent("scale", scale);
         config.st_separate();
-        config.config_int(
-            "enable run", enable_run,
-            "The specified run starts recording and resets the iteration and calls the "
-            "configured callback and forces a rebuild if enabled.");
 
         config.config_bool("rebuild after capture", rebuild_after_capture,
                            "forces a graph rebuild after every capture");
@@ -387,6 +383,11 @@ ImageWrite::NodeStatusFlags ImageWrite::properties([[maybe_unused]] Properties& 
                            "calls the on_record callback after every capture");
         config.config_bool("callback on record", callback_on_record,
                            "calls the callback when the recording starts");
+        config.st_separate();
+        config.config_int(
+            "start at run", start_at_run,
+            "The specified run starts recording and resets the iteration and calls the "
+            "configured callback and forces a rebuild if enabled.");
         config.st_separate();
         config.config_int("stop at run", stop_at_run,
                           "Stops recording at the specified run (before capture). -1 to disable.");
