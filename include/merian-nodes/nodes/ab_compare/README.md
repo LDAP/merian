@@ -1,3 +1,5 @@
+## ABCompare
+
 Simple A/B comparison nodes `ABSplitNode` and `ABSideBySideNode`. 
 
 ### `ABSplitNode`
