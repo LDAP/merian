@@ -45,17 +45,25 @@ class ImageWrite : public Node {
   private:
     template <typename T>
     void get_format_args(const T& consumer,
-                         const vk::Extent3D& extent,
+                         const vk::Extent3D& output_extent,
                          const uint64_t run_iteration,
-                         const std::chrono::nanoseconds& time_since_record) {
+                         const std::chrono::nanoseconds& graph_time_since_record,
+                         const std::chrono::nanoseconds& graph_time,
+                         const std::chrono::nanoseconds& system_time_since_record) {
         consumer(fmt::arg("record_iteration", iteration));
         consumer(fmt::arg("image_index_total", num_captures_since_init));
         consumer(fmt::arg("image_index_record", num_captures_since_record));
         consumer(fmt::arg("run_iteration", run_iteration));
-        consumer(fmt::arg("time", to_milliseconds(time_since_record)));
-        consumer(fmt::arg("width", extent.width));
-        consumer(fmt::arg("height", extent.height));
+        consumer(fmt::arg("graph_time", to_seconds(graph_time)));
+        consumer(fmt::arg("graph_time_since_record", to_seconds(graph_time_since_record)));
+        consumer(fmt::arg("system_time_since_record", to_seconds(system_time_since_record)));
+        consumer(fmt::arg("output_width", output_extent.width));
+        consumer(fmt::arg("output_height", output_extent.height));
         consumer(fmt::arg("random", rand()));
+        // backward compat
+        consumer(fmt::arg("time", to_seconds(graph_time_since_record)));
+        consumer(fmt::arg("width", output_extent.width));
+        consumer(fmt::arg("height", output_extent.height));
     }
 
   private:
@@ -76,7 +84,8 @@ class ImageWrite : public Node {
     float scale = 1;
     int64_t iteration = 0;
     uint32_t num_captures_since_init = 0;
-    std::chrono::nanoseconds record_time_point;
+    std::chrono::nanoseconds record_graph_time_point;
+    Stopwatch record_time_point;
 
     double last_record_time_millis;
     double last_frame_time_millis;
@@ -93,6 +102,7 @@ class ImageWrite : public Node {
     int num_captures_since_record = 0;
     bool reset_record_iteration_at_stop = true;
 
+    int time_reference = 0; // system, graph
     float record_framerate = 30;
     float record_frametime_millis = 1000.f / 30.f;
 

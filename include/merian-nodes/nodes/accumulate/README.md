@@ -35,3 +35,7 @@ Outputs:
 |------------|---------------|-------------------------------------------------------------|-----------------------------|------------|
 | VkImageOut | out_irr       | exp average of irradiance in `rgb`, history length in `a`   | user defined or like irr    | no         |
 | VkImageOut | out_moments   | exp average of moments in `rg`                              | like moments_in             | no         |
+
+Events:
+
+- `clear`: Sent in `process` if the accumulation buffer is reset

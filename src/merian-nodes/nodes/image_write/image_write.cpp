@@ -35,9 +35,10 @@ void ImageWrite::record(const std::chrono::nanoseconds& current_graph_time) {
     iteration = 1;
     last_record_time_millis = -std::numeric_limits<double>::infinity();
     last_frame_time_millis = 0;
-    record_time_point = current_graph_time;
+    record_graph_time_point = current_graph_time;
     num_captures_since_record = 0;
     record_iteration_at_start = record_iteration;
+    record_time_point.reset();
 
     if (callback_on_record && callback)
         callback();
@@ -53,7 +54,7 @@ ImageWrite::NodeStatusFlags ImageWrite::pre_process(GraphRun& run,
     }
 
     const std::chrono::nanoseconds time_since_record =
-        run.get_elapsed_duration() - record_time_point;
+        run.get_elapsed_duration() - record_graph_time_point;
 
     // STOP TRIGGER
     if (record_enable &&
@@ -97,8 +98,13 @@ void ImageWrite::process(GraphRun& run,
         iteration++;
     };
 
+    const std::chrono::nanoseconds system_time_since_record = record_time_point.duration();
+    const std::chrono::nanoseconds& graph_time = run.get_elapsed_duration();
+    const std::chrono::nanoseconds graph_time_since_record = graph_time - record_graph_time_point;
+
+    assert(time_reference == 0 || time_reference == 1);
     const std::chrono::nanoseconds time_since_record =
-        run.get_elapsed_duration() - record_time_point;
+        time_reference == 0 ? system_time_since_record : graph_time_since_record;
 
     //--------- RECORD TRIGGER
     // RECORD TRIGGER 0: Iteration
@@ -131,7 +137,7 @@ void ImageWrite::process(GraphRun& run,
     vk::Extent3D scaled = max(multiply(src->get_extent(), scale), {1, 1, 1});
     fmt::dynamic_format_arg_store<fmt::format_context> arg_store;
     get_format_args([&](const auto& arg) { arg_store.push_back(arg); }, scaled, run.get_iteration(),
-                    time_since_record);
+                    graph_time_since_record, graph_time, system_time_since_record);
     std::filesystem::path path;
     try {
         if (filename_format.empty()) {
@@ -317,9 +323,10 @@ ImageWrite::NodeStatusFlags ImageWrite::properties([[maybe_unused]] Properties& 
                                      "Provide a format string for the path.");
     std::vector<std::string> variables;
     get_format_args([&](const auto& arg) { variables.push_back(arg.name); }, {1920, 1080, 1}, 1,
-                    1000ns);
+                    1000ns, 1000ns, 1000ns);
     fmt::dynamic_format_arg_store<fmt::format_context> arg_store;
-    get_format_args([&](const auto& arg) { arg_store.push_back(arg); }, {1920, 1080, 1}, 1, 1000ns);
+    get_format_args([&](const auto& arg) { arg_store.push_back(arg); }, {1920, 1080, 1}, 1, 1000ns,
+                    1000ns, 1000ns);
 
     std::filesystem::path abs_path;
     try {
@@ -362,6 +369,8 @@ ImageWrite::NodeStatusFlags ImageWrite::properties([[maybe_unused]] Properties& 
         config.output_text("note: Iterations are 1-indexed");
     }
     if (trigger == 1) {
+        config.config_options("time reference", time_reference, {"system", "graph"},
+                              Properties::OptionsStyle::COMBO);
         config.config_float("framerate", record_framerate, "", 0.01);
         record_frametime_millis = 1000 / record_framerate;
         config.config_float("frametime", record_frametime_millis, "", 0.01);
