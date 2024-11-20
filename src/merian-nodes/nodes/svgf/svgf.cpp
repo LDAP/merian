@@ -17,16 +17,16 @@ uint32_t get_ve_local_size(const ContextHandle& context) {
     if (32 * 32 * VE_SHARED_MEMORY_PER_PIXEL <=
         context->physical_device.get_physical_device_limits().maxComputeSharedMemorySize) {
         return 32;
-    } else if (16 * 16 * VE_SHARED_MEMORY_PER_PIXEL <=
-               context->physical_device.get_physical_device_limits().maxComputeSharedMemorySize) {
-        return 16;
-    } else {
-        throw std::runtime_error{"SVGF: Not enough shared memory for spatial variance estimate."};
     }
+    if (16 * 16 * VE_SHARED_MEMORY_PER_PIXEL <=
+        context->physical_device.get_physical_device_limits().maxComputeSharedMemorySize) {
+        return 16;
+    }
+    throw std::runtime_error{"SVGF: Not enough shared memory for spatial variance estimate."};
 }
 
-SVGF::SVGF(const ContextHandle context,
-           const ResourceAllocatorHandle allocator,
+SVGF::SVGF(const ContextHandle& context,
+           const ResourceAllocatorHandle& allocator,
            const std::optional<vk::Format> output_format)
     : Node(), context(context), allocator(allocator), output_format(output_format),
       variance_estimate_local_size_x(get_ve_local_size(context)),
@@ -135,7 +135,8 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
         {
             auto spec_builder = SpecializationInfoBuilder();
             spec_builder.add_entry(local_size_x, local_size_y, taa_debug, taa_filter_prev,
-                                   taa_clamping, taa_mv_sampling);
+                                   taa_clamping, taa_mv_sampling,
+                                   enable_mv && io_layout.is_connected(con_mv));
             SpecializationInfoHandle taa_spec = spec_builder.build();
             taa = std::make_shared<ComputePipeline>(taa_pipe_layout, taa_module, taa_spec);
         }
@@ -244,10 +245,8 @@ SVGF::NodeStatusFlags SVGF::properties(Properties& config) {
     config.config_float("depth accept", variance_estimate_pc.depth_accept, "More means more reuse");
 
     config.st_separate("Filter");
-    const int old_svgf_iterations = svgf_iterations;
-    config.config_int("SVGF iterations", svgf_iterations, 0, 10,
-                      "0 disables SVGF completely (TAA-only mode)");
-    needs_rebuild |= old_svgf_iterations != svgf_iterations;
+    needs_rebuild |= config.config_int("SVGF iterations", svgf_iterations, 0, 10,
+                                       "0 disables SVGF completely (TAA-only mode)");
     config.config_float("filter depth", filter_pc.param_z, "more means more blur");
     angle = glm::acos(filter_pc.param_n);
     config.config_angle("filter normals", angle, "Reject with normals farther apart", 0, 180);
@@ -257,10 +256,9 @@ SVGF::NodeStatusFlags SVGF::properties(Properties& config) {
                         "z-dependent rejection: increase to reject more. Disable with <= 0.");
     config.config_float("z-bias depth", filter_pc.z_bias_depth,
                         "z-dependent rejection: increase to reject more. Disable with <= 0.");
-    int old_filter_type = filter_type;
-    config.config_options("filter type", filter_type, {"atrous", "box", "subsampled"},
-                          Properties::OptionsStyle::COMBO);
-    needs_rebuild |= old_filter_type != filter_type;
+    needs_rebuild |=
+        config.config_options("filter type", filter_type, {"atrous", "box", "subsampled"},
+                              Properties::OptionsStyle::COMBO);
     needs_rebuild |= config.config_bool("filter variance", filter_variance,
                                         "Filter variance with a 3x3 gaussian");
 
@@ -269,34 +267,30 @@ SVGF::NodeStatusFlags SVGF::properties(Properties& config) {
         "TAA alpha", taa_pc.blend_alpha, 0, 1,
         "Blend factor for the final image and the previous image. More means more reuse.");
 
-    const int old_taa_debug = taa_debug;
-    const int old_taa_filter_prev = taa_filter_prev;
-    const int old_taa_clamping = taa_clamping;
-    const int old_taa_mv_sampling = taa_mv_sampling;
-    config.config_options("mv sampling", taa_mv_sampling, {"center", "magnitude dilation"},
-                          Properties::OptionsStyle::COMBO);
-    config.config_options("filter", taa_filter_prev, {"none", "catmull rom"},
-                          Properties::OptionsStyle::COMBO);
-    config.config_options("clamping", taa_clamping, {"min-max", "moments"},
-                          Properties::OptionsStyle::COMBO);
+    needs_rebuild |=
+        config.config_bool("enable motion vectors", enable_mv, "uses motion vectors if connected.");
+    if (enable_mv) {
+        needs_rebuild |=
+            config.config_options("mv sampling", taa_mv_sampling, {"center", "magnitude dilation"},
+                                  Properties::OptionsStyle::COMBO);
+    }
+    needs_rebuild |= config.config_options("filter", taa_filter_prev, {"none", "catmull rom"},
+                                           Properties::OptionsStyle::COMBO);
+    needs_rebuild |= config.config_options("clamping", taa_clamping, {"min-max", "moments"},
+                                           Properties::OptionsStyle::COMBO);
     if (taa_clamping == 1)
         config.config_float(
             "TAA rejection threshold", taa_pc.rejection_threshold,
             "TAA rejection threshold for the previous frame, in units of standard deviation", 0.01);
-    config.config_options("debug", taa_debug,
-                          {"none", "irradiance", "variance", "normal", "depth", "albedo", "grad z",
-                           "irradiance nan/inf", "mv"});
-
-    needs_rebuild |= old_taa_debug != taa_debug;
-    needs_rebuild |= old_taa_filter_prev != taa_filter_prev;
-    needs_rebuild |= old_taa_clamping != taa_clamping;
-    needs_rebuild |= old_taa_mv_sampling != taa_mv_sampling;
+    needs_rebuild |= config.config_options("debug", taa_debug,
+                                           {"none", "irradiance", "variance", "normal", "depth",
+                                            "albedo", "grad z", "irradiance nan/inf", "mv"});
 
     if (needs_rebuild) {
         return NEEDS_RECONNECT;
-    } else {
-        return {};
     }
+
+    return {};
 }
 
 } // namespace merian_nodes

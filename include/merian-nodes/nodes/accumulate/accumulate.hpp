@@ -79,7 +79,7 @@ class Accumulate : public Node {
     ManagedVkImageInHandle con_prev_accum = ManagedVkImageIn::compute_read("prev_accum", 1);
     ManagedVkImageInHandle con_prev_moments = ManagedVkImageIn::compute_read("prev_moments", 1);
     ManagedVkImageInHandle con_irr_in = ManagedVkImageIn::compute_read("irr");
-    ManagedVkImageInHandle con_mv = ManagedVkImageIn::compute_read("mv");
+    ManagedVkImageInHandle con_mv = ManagedVkImageIn::compute_read("mv", 0, true);
     ManagedVkImageInHandle con_moments_in = ManagedVkImageIn::compute_read("moments_in");
 
     ManagedVkBufferInHandle con_gbuf = ManagedVkBufferIn::compute_read("gbuf");
@@ -117,6 +117,7 @@ class Accumulate : public Node {
     int filter_mode = 0;
     VkBool32 extended_search = VK_TRUE;
     VkBool32 reuse_border = VK_FALSE;
+    bool enable_mv = VK_TRUE;
 
     std::string clear_event_listener_pattern = "/user/clear";
 };

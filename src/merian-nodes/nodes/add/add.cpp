@@ -7,7 +7,7 @@
 
 namespace merian_nodes {
 
-Add::Add(const ContextHandle context, const std::optional<vk::Format> output_format)
+Add::Add(const ContextHandle& context, const std::optional<vk::Format>& output_format)
     : AbstractCompute(context), output_format(output_format) {
     shader =
         std::make_shared<ShaderModule>(context, merian_add_comp_spv_size(), merian_add_comp_spv());
@@ -46,7 +46,7 @@ std::vector<OutputConnectorHandle> Add::describe_outputs(const NodeIOLayout& io_
                 format = io_layout[input]->create_info.format;
             extent = min(extent, io_layout[input]->create_info.extent);
         }
-        spec_builder.add_entry<VkBool32>(io_layout.is_connected(input));
+        spec_builder.add_entry(io_layout.is_connected(input));
     }
 
     if (!at_least_one_input_connected) {

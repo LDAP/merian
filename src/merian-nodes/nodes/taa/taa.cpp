@@ -20,8 +20,8 @@ TAA::TAA(const ContextHandle context) : AbstractCompute(context, sizeof(PushCons
 std::vector<InputConnectorHandle> TAA::describe_inputs() {
     return {
         con_src,
-        ManagedVkImageIn::compute_read("feedback", 1),
-        ManagedVkImageIn::compute_read("mv"),
+        ManagedVkImageIn::compute_read("prev_src", 1),
+        con_mv,
     };
 }
 
@@ -30,6 +30,7 @@ TAA::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
     width = io_layout[con_src]->create_info.extent.width;
     height = io_layout[con_src]->create_info.extent.height;
 
+    pc.enable_mv = static_cast<VkBool32>(io_layout.is_connected(con_mv));
     return {
         ManagedVkImageOut::compute_write("out", io_layout[con_src]->create_info.format, width,
                                          height),

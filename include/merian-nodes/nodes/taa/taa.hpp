@@ -15,6 +15,7 @@ class TAA : public AbstractCompute {
         // higher value means more temporal reuse
         float temporal_alpha;
         int clamp_method;
+        VkBool32 enable_mv;
     };
 
   public:
@@ -42,6 +43,7 @@ class TAA : public AbstractCompute {
     SpecializationInfoHandle spec_info;
 
     ManagedVkImageInHandle con_src = ManagedVkImageIn::compute_read("src");
+    ManagedVkImageInHandle con_mv = ManagedVkImageIn::compute_read("mv", 0, true);
 
     PushConstant pc;
     uint32_t width{};

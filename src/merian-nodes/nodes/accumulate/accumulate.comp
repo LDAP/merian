@@ -15,6 +15,7 @@ layout(constant_id = 3) const uint WG_ROUNDED_IRR_SIZE_Y = 1;
 layout (constant_id = 4) const int FILTER_MODE = FILTER_MODE_NEAREST;
 layout (constant_id = 5) const bool EXTENDED_SEARCH = true;
 layout (constant_id = 6) const bool REUSE_BORDER = false;
+layout (constant_id = 7) const bool USE_MOTION_VECTORS = true;
 
 layout(set = 1, binding = 0) uniform sampler2D img_quartiles;
 
@@ -160,20 +161,28 @@ void main() {
     return;
   }
 
-  const vec2 mv = texelFetch(img_mv, ipos, 0).rg;
+  vec2 prev_pos;
+  float max_history;
+  if (USE_MOTION_VECTORS) {
+    const vec2 mv = texelFetch(img_mv, ipos, 0).rg;
 
-  // REPROJECTION
-  vec2 prev_pos = ipos + mv;
-  float max_history = pc.accum_max_hist;
-  if (REUSE_BORDER) {
-    // Attemp to reuse information at the image border.
-    // This results in minor smearing but looks a lot better than
-    // noise / SVGF blotches.
-    if (reprojection_intersect_border(prev_pos, mv, imageSize(img_accum) - 1)) {
-      // reset history to converge faster
-      max_history = 2.0;
+    // REPROJECTION
+    prev_pos = ipos + mv;
+    float max_history = pc.accum_max_hist;
+    if (REUSE_BORDER) {
+      // Attemp to reuse information at the image border.
+      // This results in minor smearing but looks a lot better than
+      // noise / SVGF blotches.
+      if (reprojection_intersect_border(prev_pos, mv, imageSize(img_accum) - 1)) {
+        // reset history to converge faster
+        max_history = 2.0;
+      }
     }
+  } else {
+    prev_pos = ipos;
+    max_history = pc.accum_max_hist;
   }
+  
 
   vec4 prev_irr_histlen = vec4(0);
   vec2 prev_moments     = vec2(0);

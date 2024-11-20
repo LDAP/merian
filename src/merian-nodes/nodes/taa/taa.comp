@@ -20,6 +20,7 @@ layout(push_constant) uniform PushConstant {
     // higher value means more temporal reuse
     float temporal_alpha;
     int clamp_method;
+    int enable_mv;
 } params;
 
 vec4 merge_frames(const vec4 current_color,
@@ -70,7 +71,13 @@ void main() {
     if (any(greaterThanEqual(pixel, resolution)))
         return;
 
-    vec2 motion_vector = sample_motion_vector(img_mv, pixel, 1);
+    vec2 motion_vector;
+    if (params.enable_mv != 0) {
+        motion_vector = sample_motion_vector(img_mv, pixel, 1);
+    } else {
+        motion_vector = vec2(0);
+    }
+
     if (INVERSE_MOTION > 0) {
         motion_vector *= -1;
     }

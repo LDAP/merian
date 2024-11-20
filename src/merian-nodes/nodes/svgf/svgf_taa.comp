@@ -13,6 +13,7 @@ layout (constant_id = 2) const int DEBUG = 0;
 layout (constant_id = 3) const int FILTER_PREV = 0;
 layout (constant_id = 4) const int CLAMPING = 0;
 layout (constant_id = 5) const int MV_SAMPLING = 0;
+layout (constant_id = 6) const bool USE_MOTION_VECTORS = true;
 
 layout(push_constant, std140) uniform params_t { 
     float blend_alpha;
@@ -25,11 +26,15 @@ main()
   const ivec2 ipos = ivec2(gl_GlobalInvocationID);
   if (any(greaterThanEqual(ipos, imageSize(img_out)))) return;
 
-  vec2 mv = vec2(0);
-  if (MV_SAMPLING == 0)
-    mv = texelFetch(img_mv, ipos, 0).rg;
-  else if (MV_SAMPLING == 1)
-    mv = sample_motion_vector(img_mv, ipos, 1);
+  vec2 mv;
+  if (USE_MOTION_VECTORS) {
+    if (MV_SAMPLING == 0)
+      mv = texelFetch(img_mv, ipos, 0).rg;
+    else if (MV_SAMPLING == 1)
+      mv = sample_motion_vector(img_mv, ipos, 1);
+  } else {
+    mv = vec2(0);
+  }
 
   const vec4 filter_result = texelFetch(img_filter_result, ipos, 0);
 

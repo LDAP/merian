@@ -110,20 +110,20 @@ Accumulate::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
     calculate_percentiles =
         std::make_shared<ComputePipeline>(quartile_pipe_layout, percentile_module, quartile_spec);
 
-    auto filter_pipe_layout = PipelineLayoutBuilder(context)
-                                  .add_descriptor_set_layout(graph_layout)
-                                  .add_descriptor_set_layout(accumulate_desc_layout)
-                                  .add_push_constant<FilterPushConstant>()
-                                  .build_pipeline_layout();
-    auto filter_spec_builder = SpecializationInfoBuilder();
+    auto accum_pipe_layout = PipelineLayoutBuilder(context)
+                                 .add_descriptor_set_layout(graph_layout)
+                                 .add_descriptor_set_layout(accumulate_desc_layout)
+                                 .add_push_constant<FilterPushConstant>()
+                                 .build_pipeline_layout();
+    auto accum_spec_builder = SpecializationInfoBuilder();
     const uint32_t wg_rounded_irr_size_x = percentile_group_count_x * PERCENTILE_LOCAL_SIZE_X;
     const uint32_t wg_rounded_irr_size_y = percentile_group_count_y * PERCENTILE_LOCAL_SIZE_Y;
-    filter_spec_builder.add_entry(FILTER_LOCAL_SIZE_X, FILTER_LOCAL_SIZE_Y, wg_rounded_irr_size_x,
-                                  wg_rounded_irr_size_y, filter_mode, extended_search,
-                                  reuse_border);
-    auto filter_spec = filter_spec_builder.build();
+    accum_spec_builder.add_entry(FILTER_LOCAL_SIZE_X, FILTER_LOCAL_SIZE_Y, wg_rounded_irr_size_x,
+                                 wg_rounded_irr_size_y, filter_mode, extended_search, reuse_border,
+                                 enable_mv && io_layout.is_connected(con_mv));
+    const auto accum_spec = accum_spec_builder.build();
     accumulate =
-        std::make_shared<ComputePipeline>(filter_pipe_layout, accumulate_module, filter_spec);
+        std::make_shared<ComputePipeline>(accum_pipe_layout, accumulate_module, accum_spec);
 
     return {};
 }
@@ -192,7 +192,8 @@ Accumulate::NodeStatusFlags Accumulate::properties(Properties& config) {
     needs_rebuild |=
         config.config_text("clear event pattern", clear_event_listener_pattern, true,
                            "Set the event pattern which triggers a clear. Press enter to confirm.");
-
+    needs_rebuild |=
+        config.config_bool("enable motion vectors", enable_mv, "uses motion vectors if connected.");
     config.st_separate("Reproject");
     float angle = glm::acos(accumulate_pc.normal_reject_cos);
     config.config_angle("normal threshold", angle, "Reject points with normals farther apart", 0,

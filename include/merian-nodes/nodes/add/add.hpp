@@ -12,7 +12,8 @@ class Add : public AbstractCompute {
     static constexpr uint32_t local_size_y = 32;
 
   public:
-    Add(const ContextHandle context, const std::optional<vk::Format> output_format = std::nullopt);
+    Add(const ContextHandle& context,
+        const std::optional<vk::Format>& output_format = std::nullopt);
 
     ~Add();
 

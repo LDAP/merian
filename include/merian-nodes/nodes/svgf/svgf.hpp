@@ -35,8 +35,8 @@ class SVGF : public Node {
     };
 
   public:
-    SVGF(const ContextHandle context,
-         const ResourceAllocatorHandle allocator,
+    SVGF(const ContextHandle& context,
+         const ResourceAllocatorHandle& allocator,
          const std::optional<vk::Format> output_format = std::nullopt);
 
     ~SVGF();
@@ -70,7 +70,7 @@ class SVGF : public Node {
     ManagedVkImageInHandle con_irr = ManagedVkImageIn::compute_read("irr");
     ManagedVkImageInHandle con_moments = ManagedVkImageIn::compute_read("moments");
     ManagedVkImageInHandle con_albedo = ManagedVkImageIn::compute_read("albedo");
-    ManagedVkImageInHandle con_mv = ManagedVkImageIn::compute_read("mv");
+    ManagedVkImageInHandle con_mv = ManagedVkImageIn::compute_read("mv", 0, true);
     ManagedVkBufferInHandle con_gbuffer = ManagedVkBufferIn::compute_read("gbuffer");
     ManagedVkBufferInHandle con_prev_gbuffer = ManagedVkBufferIn::compute_read("prev_gbuffer", 1);
 
@@ -109,6 +109,7 @@ class SVGF : public Node {
     int taa_filter_prev = false;
     int taa_clamping = 0;
     int taa_mv_sampling = 0;
+    bool enable_mv = true;
 };
 
 } // namespace merian_nodes
