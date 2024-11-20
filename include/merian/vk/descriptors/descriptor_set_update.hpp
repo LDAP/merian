@@ -22,7 +22,7 @@ namespace merian {
 class DescriptorSetUpdate {
 
   public:
-    DescriptorSetUpdate(const std::shared_ptr<DescriptorSet> set) : set(set) {
+    DescriptorSetUpdate(const std::shared_ptr<DescriptorSet>& set) : set(set) {
         assert(set);
     }
 
@@ -156,14 +156,14 @@ class DescriptorSetUpdate {
     }
 
     // Updates the vk::DescriptorSet immediately (!) to point to the configured resources.
-    void update(ContextHandle context) {
+    void update(const ContextHandle& context) {
         assert(writes.size() == write_buffer_infos.size() + write_image_infos.size() +
                                     write_acceleration_structures.size());
         context->device.updateDescriptorSets(writes, {});
     }
 
     // Start a new update. If set == nullptr then the current set is reused.
-    void next(const std::shared_ptr<DescriptorSet> set = nullptr) {
+    void next(const std::shared_ptr<DescriptorSet>& set = nullptr) {
         if (set)
             this->set = set;
 
