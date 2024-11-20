@@ -35,7 +35,7 @@ class Node : public std::enable_shared_from_this<Node> {
     //
     // Note that input and output names must be unique.
     //
-    // If you throw a node_error here the graph will disable the node for this connect attempt and
+    // If you throw node_error or compilation_failed the graph will disable the node for this connect attempt and
     // set the error state for this node. Your inputs will then be invisible.
     [[nodiscard]]
     virtual std::vector<InputConnectorHandle> describe_inputs() {
@@ -50,8 +50,8 @@ class Node : public std::enable_shared_from_this<Node> {
     //
     // Note that input and output names must be unique.
     //
-    // If you throw a node_error here the graph will disable the node for this connect attempt and
-    // set the error state for this node.
+    // If you throw node_error or compilation_failed the graph will disable the node for this
+    // connect attempt and set the error state for this node.
     [[nodiscard]]
     virtual std::vector<OutputConnectorHandle>
     describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
@@ -68,7 +68,7 @@ class Node : public std::enable_shared_from_this<Node> {
     // It contains all input and output connectors for which get_descriptor_info() method does not
     // return std::nullopt. The order is guaranteed to be all inputs in the order of
     // describe_inputs() then outputs in the order of describe_outputs().
-    // 
+    //
     // Here also delayed inputs can be accessed from io_layout.
     [[nodiscard]]
     virtual NodeStatusFlags

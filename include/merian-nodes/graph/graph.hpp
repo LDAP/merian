@@ -1386,7 +1386,9 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
             try {
                 data.input_connectors = node->describe_inputs();
             } catch (const graph_errors::node_error& e) {
-                data.errors.push_back(e.what());
+                data.errors.emplace_back(fmt::format("node error: ", e.what()));
+            } catch (const ShaderCompiler::compilation_failed& e) {
+                data.errors.emplace_back(fmt::format("compilation failed: ", e.what()));
             }
             for (const InputConnectorHandle& input : data.input_connectors) {
                 if (data.input_connector_for_name.contains(input->name)) {
@@ -1470,7 +1472,9 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                     register_event_listener_for_connect(event_pattern, listener);
                 }));
         } catch (const graph_errors::node_error& e) {
-            data.errors.emplace_back(e.what());
+            data.errors.emplace_back(fmt::format("node error: ", e.what()));
+        } catch (const ShaderCompiler::compilation_failed& e) {
+            data.errors.emplace_back(fmt::format("compilation failed: ", e.what()));
         }
 
         for (const auto& output : data.output_connectors) {

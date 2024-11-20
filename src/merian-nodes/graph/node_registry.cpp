@@ -14,11 +14,11 @@
 #include "merian-nodes/nodes/image_write/image_write.hpp"
 #include "merian-nodes/nodes/mean/mean.hpp"
 #include "merian-nodes/nodes/median_approx/median.hpp"
+#include "merian-nodes/nodes/shadertoy/shadertoy.hpp"
 #include "merian-nodes/nodes/svgf/svgf.hpp"
 #include "merian-nodes/nodes/taa/taa.hpp"
 #include "merian-nodes/nodes/tonemap/tonemap.hpp"
 #include "merian-nodes/nodes/vkdt_filmcurv/vkdt_filmcurv.hpp"
-#include "merian-nodes/nodes/shadertoy/shadertoy.hpp"
 
 namespace merian_nodes {
 
