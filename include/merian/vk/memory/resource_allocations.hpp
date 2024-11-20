@@ -13,13 +13,16 @@
 
 namespace merian {
 
+class Resource {};
+using ResourceHandle = std::shared_ptr<Resource>;
+
 // Forward def
 class MemoryAllocation;
 using MemoryAllocationHandle = std::shared_ptr<MemoryAllocation>;
 class Buffer;
 using BufferHandle = std::shared_ptr<Buffer>;
 
-class Buffer : public std::enable_shared_from_this<Buffer> {
+class Buffer : public std::enable_shared_from_this<Buffer>, public Resource {
 
   public:
     constexpr static vk::BufferUsageFlags SCRATCH_BUFFER_USAGE =
@@ -116,7 +119,7 @@ using ImageHandle = std::shared_ptr<Image>;
  *
  * Use the barrier() function to perform layout transitions to keep the internal state valid.
  */
-class Image : public std::enable_shared_from_this<Image> {
+class Image : public std::enable_shared_from_this<Image>, public Resource {
 
   public:
     // Creates a Image objects that automatically destroys Image when destructed.
@@ -281,7 +284,7 @@ class Image : public std::enable_shared_from_this<Image> {
  *  Try to only use the barrier() function to perform layout transitions,
  *  to keep the internal state valid.
  */
-class Texture : public std::enable_shared_from_this<Texture> {
+class Texture : public std::enable_shared_from_this<Texture>, public Resource {
   public:
     Texture(const vk::ImageView& view, const ImageHandle& image, const SamplerHandle& sampler);
 
@@ -340,7 +343,8 @@ class Texture : public std::enable_shared_from_this<Texture> {
 
 using TextureHandle = std::shared_ptr<Texture>;
 
-class AccelerationStructure : public std::enable_shared_from_this<AccelerationStructure> {
+class AccelerationStructure : public std::enable_shared_from_this<AccelerationStructure>,
+                              public Resource {
   public:
     // Creats a AccelerationStructure objects that automatically destroys `as` when destructed.
     // The memory is not freed explicitly to let it free itself.
