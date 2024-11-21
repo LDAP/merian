@@ -65,20 +65,22 @@ float bsdf_ggx_diffuse_mix_times_wodotn(const vec3 minuswi, const vec3 wo, const
     const vec3 H = normalize(wo + minuswi);
 
     const float wodotn = clamp(dot(n, wo), 0, 1);
+    if (wodotn <= 0) {
+        return 0;
+    }
+
     const float minuswi_dot_h = clamp(dot(minuswi, H), 0, 1);
     const float ndotv = clamp(dot(n, minuswi), 0, 1);
     const float ndoth = clamp(dot(n, H), 0, 1);
 
-    if (wodotn > 0) {
-        const float G = smith_g_over_minuswidotn(roughness, ndotv, wodotn);
-        const float alpha = MERIAN_SQUARE(roughness);
-        const float D = MERIAN_SQUARE(alpha) / (M_PI * MERIAN_SQUARE(MERIAN_SQUARE(ndoth) * MERIAN_SQUARE(alpha) + (1 - MERIAN_SQUARE(ndoth))));
+    const float G = smith_g_over_minuswidotn(roughness, ndotv, wodotn);
+    const float alpha = MERIAN_SQUARE(roughness);
+    const float D = MERIAN_SQUARE(alpha) / (M_PI * MERIAN_SQUARE(MERIAN_SQUARE(ndoth) * MERIAN_SQUARE(alpha) + (1 - MERIAN_SQUARE(ndoth))));
 
-        const float F = fresnel_schlick(minuswi_dot_h, F0);
+    const float F = fresnel_schlick(minuswi_dot_h, F0);
 
-        return mix(INV_PI * wodotn, (D * G / 4), F);
-    }
-    return 0;
+    return mix(INV_PI * wodotn, (D * G / 4), F);
+    
 }
 
 // returns a half vector in tangent space
@@ -129,8 +131,10 @@ float bsdf_ggx_VNDF_pdf(const float roughness, const vec3 N, const vec3 minus_wi
 
 float bsdf_ggx_diffuse_mix_pdf(const vec3 minuswi, const vec3 wo, const vec3 n, const float roughness) {
     const float wodotn = dot(wo, n);
-    if (wodotn <= 0)
+    if (wodotn <= 0) {
         return 0;
+    }
+
     const float diffuse_pdf = bsdf_diffuse_pdf(wodotn);
     const float ggx_vndf_pdf = bsdf_ggx_VNDF_pdf(roughness, n, minuswi, wo);
 
