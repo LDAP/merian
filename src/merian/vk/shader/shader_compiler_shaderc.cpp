@@ -158,6 +158,9 @@ std::vector<uint32_t> ShadercCompiler::compile_glsl(const std::string& source,
     const auto binary_result = shader_compiler.CompileGlslToSpv(
         preprocess_result.begin(), preprocess_result.end() - preprocess_result.begin(), kind,
         source_name.data(), compile_options);
+    if (binary_result.GetCompilationStatus() != shaderc_compilation_status_success) {
+        throw ShaderCompiler::compilation_failed{binary_result.GetErrorMessage()};
+    }
 
     return std::vector<uint32_t>(binary_result.begin(), binary_result.end());
 }
