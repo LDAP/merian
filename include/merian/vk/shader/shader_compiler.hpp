@@ -78,34 +78,46 @@ class ShaderCompiler {
     // Attempt to guess the shader_kind from the file extension if shader_kind = std::nullopt.
     //
     // May throw compilation_failed.
-    virtual std::vector<uint32_t>
-    compile_glsl(const std::filesystem::path& path,
-                 const std::optional<vk::ShaderStageFlagBits> optional_shader_kind = std::nullopt) {
+    virtual std::vector<uint32_t> compile_glsl(
+        const std::filesystem::path& path,
+        const std::optional<vk::ShaderStageFlagBits> optional_shader_kind = std::nullopt,
+        const std::vector<std::string>& additional_include_paths = {},
+        const std::map<std::string, std::string>& additional_macro_definitions = {}) const {
         return compile_glsl(FileLoader::load_file(path), path.string(),
-                            optional_shader_kind.value_or(guess_kind(path)));
+                            optional_shader_kind.value_or(guess_kind(path)),
+                            additional_include_paths, additional_macro_definitions);
     }
 
     // May throw compilation_failed.
-    virtual std::vector<uint32_t> compile_glsl(const std::string& source,
-                                               const std::string& source_name,
-                                               const vk::ShaderStageFlagBits shader_kind) = 0;
+    virtual std::vector<uint32_t> compile_glsl(
+        const std::string& source,
+        const std::string& source_name,
+        const vk::ShaderStageFlagBits shader_kind,
+        const std::vector<std::string>& additional_include_paths = {},
+        const std::map<std::string, std::string>& additional_macro_definitions = {}) const = 0;
 
     // ------------------------------------------------
 
     ShaderModuleHandle compile_glsl_to_shadermodule(
         const ContextHandle& context,
         const std::filesystem::path& path,
-        const std::optional<vk::ShaderStageFlagBits> optional_shader_kind = std::nullopt) {
+        const std::optional<vk::ShaderStageFlagBits> optional_shader_kind = std::nullopt,
+        const std::vector<std::string>& additional_include_paths = {},
+        const std::map<std::string, std::string>& additional_macro_definitions = {}) const {
         const vk::ShaderStageFlagBits shader_kind = optional_shader_kind.value_or(guess_kind(path));
-        return std::make_shared<ShaderModule>(context, compile_glsl(path, shader_kind),
-                                              shader_kind);
+        return std::make_shared<ShaderModule>(
+            context,
+            compile_glsl(path, shader_kind, additional_include_paths, additional_macro_definitions),
+            shader_kind);
     }
 
     // uses the file_loader provided from context.
     ShaderModuleHandle find_compile_glsl_to_shadermodule(
         const ContextHandle& context,
         const std::filesystem::path& path,
-        const std::optional<vk::ShaderStageFlagBits> optional_shader_kind = std::nullopt) {
+        const std::optional<vk::ShaderStageFlagBits> optional_shader_kind = std::nullopt,
+        const std::vector<std::string>& additional_include_paths = {},
+        const std::map<std::string, std::string>& additional_macro_definitions = {}) const {
 
         const std::optional<std::filesystem::path> resolved = context->file_loader.find_file(path);
         if (!resolved) {
@@ -114,19 +126,36 @@ class ShaderCompiler {
 
         const vk::ShaderStageFlagBits shader_kind =
             optional_shader_kind.value_or(guess_kind(*resolved));
-        return std::make_shared<ShaderModule>(context, compile_glsl(*resolved, shader_kind),
+        return std::make_shared<ShaderModule>(context,
+                                              compile_glsl(*resolved, shader_kind,
+                                                           additional_include_paths,
+                                                           additional_macro_definitions),
                                               shader_kind);
     }
 
-    ShaderModuleHandle compile_glsl_to_shadermodule(const ContextHandle& context,
-                                                    const std::string& source,
-                                                    const std::string& source_name,
-                                                    const vk::ShaderStageFlagBits shader_kind) {
-        return std::make_shared<ShaderModule>(
-            context, compile_glsl(source, source_name, shader_kind), shader_kind);
+    ShaderModuleHandle compile_glsl_to_shadermodule(
+        const ContextHandle& context,
+        const std::string& source,
+        const std::string& source_name,
+        const vk::ShaderStageFlagBits shader_kind,
+        const std::vector<std::string>& additional_include_paths = {},
+        const std::map<std::string, std::string>& additional_macro_definitions = {}) const {
+        return std::make_shared<ShaderModule>(context,
+                                              compile_glsl(source, source_name, shader_kind,
+                                                           additional_include_paths,
+                                                           additional_macro_definitions),
+                                              shader_kind);
     }
 
     // ------------------------------------------------
+
+    void add_include_path(const std::string& include_path) {
+        include_paths.emplace_back(include_path);
+    }
+
+    void add_macro_definition(const std::string& key, const std::string& value) {
+        macro_definitions.emplace(key, value);
+    }
 
     const std::vector<std::string>& get_include_paths() const {
         return include_paths;

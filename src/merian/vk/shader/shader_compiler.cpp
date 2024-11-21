@@ -19,7 +19,10 @@ class DummyShaderCompiler : public ShaderCompiler {
     std::vector<uint32_t>
     compile_glsl([[maybe_unused]] const std::string& source,
                  [[maybe_unused]] const std::string& source_name,
-                 [[maybe_unused]] const vk::ShaderStageFlagBits shader_kind) override {
+                 [[maybe_unused]] const vk::ShaderStageFlagBits shader_kind,
+                 [[maybe_unused]] const std::vector<std::string>& additional_include_paths = {},
+                 [[maybe_unused]] const std::map<std::string, std::string>&
+                     additional_macro_definitions = {}) const override {
         throw compilation_failed{"compiler not available"};
     }
 
@@ -47,8 +50,7 @@ ShaderCompiler::get(const ContextHandle& context,
     }
 
     ShaderCompilerHandle glslc =
-        std::make_shared<SystemGlslcCompiler>(context, user_include_paths,
-        user_macro_definitions);
+        std::make_shared<SystemGlslcCompiler>(context, user_include_paths, user_macro_definitions);
     if (glslc->available()) {
         SPDLOG_DEBUG("using installed glslc as default compiler");
         return glslc;
@@ -62,7 +64,8 @@ ShaderCompiler::get(const ContextHandle& context,
 ShaderCompiler::ShaderCompiler(const ContextHandle& context,
                                const std::vector<std::string>& user_include_paths,
                                const std::map<std::string, std::string>& user_macro_definitions)
-    : include_paths(user_include_paths), macro_definitions(user_macro_definitions) {
+    : include_paths(user_include_paths.begin(), user_include_paths.end()),
+      macro_definitions(user_macro_definitions) {
 
     insert_all(include_paths, context->get_default_shader_include_paths());
     macro_definitions.insert(context->get_default_shader_macro_definitions().begin(),

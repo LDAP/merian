@@ -65,12 +65,17 @@ class ShadertoyInjectCompiler : public ShaderCompiler {
 
     ~ShadertoyInjectCompiler() {}
 
-    std::vector<uint32_t> compile_glsl(const std::string& source,
-                                       const std::string& source_name,
-                                       const vk::ShaderStageFlagBits shader_kind) final override {
+    std::vector<uint32_t>
+    compile_glsl(const std::string& source,
+                 const std::string& source_name,
+                 const vk::ShaderStageFlagBits shader_kind,
+                 const std::vector<std::string>& additional_include_paths = {},
+                 const std::map<std::string, std::string>& additional_macro_definitions = {})
+        const final override {
         SPDLOG_INFO("(re-)compiling {}", source_name);
         return forwarding_compiler->compile_glsl(shadertoy_pre + source + shadertoy_post,
-                                                 source_name, shader_kind);
+                                                 source_name, shader_kind, additional_include_paths,
+                                                 additional_macro_definitions);
     }
 
     bool available() const override {

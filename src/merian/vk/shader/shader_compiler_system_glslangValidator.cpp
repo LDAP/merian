@@ -28,10 +28,12 @@ SystemGlslangValidatorCompiler::SystemGlslangValidatorCompiler(
 
 SystemGlslangValidatorCompiler::~SystemGlslangValidatorCompiler() {}
 
-std::vector<uint32_t>
-SystemGlslangValidatorCompiler::compile_glsl(const std::string& source,
-                                             const std::string& source_name,
-                                             const vk::ShaderStageFlagBits shader_kind) {
+std::vector<uint32_t> SystemGlslangValidatorCompiler::compile_glsl(
+    const std::string& source,
+    const std::string& source_name,
+    const vk::ShaderStageFlagBits shader_kind,
+    const std::vector<std::string>& additional_include_paths,
+    const std::map<std::string, std::string>& additional_macro_definitions) const {
     if (compiler_executable.empty()) {
         throw compilation_failed{"compiler not available"};
     }
@@ -59,8 +61,14 @@ SystemGlslangValidatorCompiler::compile_glsl(const std::string& source,
     for (const auto& inc_dir : get_include_paths()) {
         command.emplace_back(fmt::format("-I{}", inc_dir));
     }
-    for (const auto& macro_def : get_macro_definitions()) {
-        command.emplace_back(fmt::format("-D{}={}", macro_def.first, macro_def.second));
+    for (const auto& inc_dir : additional_include_paths) {
+        command.emplace_back(fmt::format("-I{}", inc_dir));
+    }
+    for (const auto& [key, value] : get_macro_definitions()) {
+        command.emplace_back(fmt::format("-D{}={}", key, value));
+    }
+    for (const auto& [key, value] : additional_macro_definitions) {
+        command.emplace_back(fmt::format("-D{}={}", key, value));
     }
 
     const std::string output_file = temporary_file();
