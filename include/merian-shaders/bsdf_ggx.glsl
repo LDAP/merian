@@ -173,15 +173,19 @@ vec3 bsdf_ggx_VNDF_sample(const vec3 wi, const vec3 n, const float alpha, const 
     return reflect(wi, h);
 }
 
+float bsdf_ggx_VNDF_pdf(const float minuswidotn, const float ndoth_squared, const float alpha_squared) {
+    const float G1 = bsdf_ggx_smith_g1_over_minuswidotn(minuswidotn, alpha_squared);
+    const float D = bsdf_ggx_D(ndoth_squared, alpha_squared);
+
+    return (D * G1) / 4;
+}
+
 float bsdf_ggx_VNDF_pdf(const vec3 wi, const vec3 wo, const vec3 n, const float alpha) {
     const vec3 h = normalize(wo - wi);
     const float minuswidotn = dot(-wi, n);
     const float ndoth = clamp(dot(n, h), 0, 1);
 
-    const float G1 = bsdf_ggx_smith_g1_over_minuswidotn(minuswidotn, alpha * alpha);
-    const float D = bsdf_ggx_D(ndoth * ndoth, alpha * alpha);
-
-    return (D * G1) / 4;
+    return bsdf_ggx_VNDF_pdf(minuswidotn, ndoth * ndoth, alpha * alpha);
 }
 
 float bsdf_ggx_diffuse_mix_pdf(const vec3 wi, const vec3 wo, const vec3 n, const float alpha) {
@@ -191,10 +195,14 @@ float bsdf_ggx_diffuse_mix_pdf(const vec3 wi, const vec3 wo, const vec3 n, const
         return 0;
     }
 
-    const float diffuse_pdf = bsdf_diffuse_pdf(wodotn);
-    const float ggx_vndf_pdf = bsdf_ggx_VNDF_pdf(wi, wo, n, alpha);
+    const vec3 h = normalize(wo - wi);
+    const float minuswidotn = dot(-wi, n);
+    const float ndoth = clamp(dot(n, h), 0, 1);
 
-    const float fresnel = fresnel_schlick(dot(-wi, n), 0.02);
+    const float diffuse_pdf = bsdf_diffuse_pdf(wodotn);
+    const float ggx_vndf_pdf = bsdf_ggx_VNDF_pdf(minuswidotn, ndoth * ndoth, alpha * alpha);
+
+    const float fresnel = fresnel_schlick(minuswidotn, 0.02);
     return mix(diffuse_pdf, ggx_vndf_pdf, fresnel);
 }
 
