@@ -11,6 +11,10 @@
 
 #define MERIAN_SQUARE(x) ((x) * (x))
 
+float merian_square(const float x) {
+    return x * x;
+}
+
 #define MERIAN_WORKGROUP_INDEX (gl_WorkGroupID.x + gl_WorkGroupID.y * gl_NumWorkGroups.x + gl_WorkGroupID.z * gl_NumWorkGroups.x * gl_NumWorkGroups.y)
 #define MERIAN_GLOBAL_INVOCATION_INDEX (MERIAN_WORKGROUP_INDEX * gl_WorkGroupSize.x * gl_WorkGroupSize.y * gl_WorkGroupSize.z + gl_LocalInvocationIndex)
 
