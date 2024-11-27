@@ -7,4 +7,8 @@
 #define MERIAN_TEXTUREEFFECT_WAVES(st, time) (-vec2(.1, 0) * cos((st).x * 5 + (time) * 2) * pow(max(sin((st).x * 5 + (time) * 2), 0), 5) \
                          -vec2(.07, 0) * cos(-(st).x * 5 + -(st).y * 3 + (time) * 3) * pow(max(sin(-(st).x * 5 + -(st).y * 3 + (time) * 3), 0), 5))
 
+#define MERIAN_TEX_COORD_TO_PIXEL(tc, resolution) ((tc) * (resolution) - 0.5)
+
+#define MERIAN_PIXEL_TO_TEX_COORD(pixel, resolution) (((pixel) + 0.5) / (resolution))
+
 #endif // _MERIAN_SHADERS_TEXTURES_H_
