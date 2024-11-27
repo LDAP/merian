@@ -77,10 +77,9 @@ vec3 tonemap_lottes(const vec3 rgb, const float contrast, const float shoulder, 
     const float c = (pow(hdrMax, contrast*shoulder)*pow(midIn, contrast) - pow(hdrMax, contrast)*pow(midIn, contrast*shoulder)*midOut) /
            (pow(hdrMax, contrast*shoulder)*midOut - pow(midIn, contrast*shoulder)*midOut);
 
-    #define EPS 1e-7f
     float peak = max(rgb.r, max(rgb.g, rgb.b));
 
-    peak = max(EPS, peak);
+    peak = max(1e-7f, peak);
 
     vec3 ratio = rgb / peak;
     const float z = pow(peak, contrast);
@@ -95,8 +94,6 @@ vec3 tonemap_lottes(const vec3 rgb, const float contrast, const float shoulder, 
     ratio = pow(abs(ratio), vec3(saturation / crossSaturation));
     ratio = mix(ratio, vec3(white), pow(peak, crosstalk));
     ratio = pow(abs(ratio), vec3(crossSaturation));
-
-    #undef EPS
 
     return peak * ratio;
 }
