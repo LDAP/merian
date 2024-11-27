@@ -168,7 +168,7 @@ void main() {
 
     // REPROJECTION
     prev_pos = ipos + mv;
-    float max_history = pc.accum_max_hist;
+    max_history = pc.accum_max_hist;
     if (REUSE_BORDER) {
       // Attemp to reuse information at the image border.
       // This results in minor smearing but looks a lot better than
