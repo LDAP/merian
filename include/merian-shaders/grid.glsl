@@ -92,7 +92,7 @@ ivec2 grid_idx_interpolate(const vec2 pos, const float cell_width, const float r
 
 // See Müller et al. (2022): Instant Neural Graphics Primitives with a Multiresolution Hash Encoding
 // Müller et al. uses 1 for X but we observed artifacts when doing so
-#define GRID_PRIME_X 44761931
+#define GRID_PRIME_X 1
 #define GRID_PRIME_Y 2654435761
 #define GRID_PRIME_Z 805459861
 
