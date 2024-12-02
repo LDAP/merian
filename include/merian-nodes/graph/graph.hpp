@@ -3,6 +3,7 @@
 #include "errors.hpp"
 #include "graph_run.hpp"
 #include "merian/utils/chrono.hpp"
+#include "merian/utils/vector.hpp"
 #include "node.hpp"
 #include "resource.hpp"
 
@@ -54,8 +55,10 @@ struct NodeData {
 
     // User disabled
     bool disable{};
-    // Disabled because a input is not connected;
+    // Errors during build
     std::vector<std::string> errors{};
+    // Errors during run - triggers rebuild and gets build error
+    std::vector<std::string> run_errors{};
 
     // Cache input connectors (node->describe_inputs())
     // (on start_nodes added and checked for name conflicts)
@@ -587,7 +590,20 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                 if (debug_utils)
                     debug_utils->cmd_begin_label(cmd, registry.node_name(node));
 
-                run_node(run, cmd, node, data, profiler);
+                try {
+                    run_node(run, cmd, node, data, profiler);
+                } catch (const graph_errors::node_error& e) {
+                    data.run_errors.emplace_back(fmt::format("node error: {}", e.what()));
+                } catch (const ShaderCompiler::compilation_failed& e) {
+                    data.run_errors.emplace_back(fmt::format("compilation failed: {}", e.what()));
+                }
+                if (!data.run_errors.empty()) {
+                    SPDLOG_ERROR("executing node '{}' failed:\n - {}", data.identifier,
+                                 fmt::join(data.run_errors, "\n   - "));
+
+                    request_reconnect();
+                    SPDLOG_ERROR("emergency reconnect.");
+                }
 
                 if (debug_utils)
                     debug_utils->cmd_end_label(cmd);
@@ -1594,6 +1610,11 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                              registry.node_name(node));
                 to_erase.push_back(node);
                 continue;
+            }
+            if (!data.run_errors.empty()) {
+                SPDLOG_DEBUG("node {} ({}) has run errors, converting to build errors.");
+                move_all(data.errors, data.run_errors);
+                data.run_errors.clear();
             }
             if (!data.errors.empty()) {
                 SPDLOG_DEBUG("node {} ({}) is erroneous, skipping...", data.identifier,

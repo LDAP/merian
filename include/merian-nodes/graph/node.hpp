@@ -35,8 +35,8 @@ class Node : public std::enable_shared_from_this<Node> {
     //
     // Note that input and output names must be unique.
     //
-    // If you throw node_error or compilation_failed the graph will disable the node for this connect attempt and
-    // set the error state for this node. Your inputs will then be invisible.
+    // If you throw node_error or compilation_failed the graph will disable the node for this
+    // connect attempt and set the error state for this node. Your inputs will then be invisible.
     [[nodiscard]]
     virtual std::vector<InputConnectorHandle> describe_inputs() {
         return {};
@@ -101,6 +101,9 @@ class Node : public std::enable_shared_from_this<Node> {
     //
     // You can provide data that that is required for the current run by setting the io map
     // in_flight_data. The pointer is persisted and supplied again after (graph ring size - 1) runs.
+    //
+    // You can throw node_error and compilation_failed here. The graph then attemps to finish the
+    // run and rebuild, however this is not supported and not recommened.
     virtual void process([[maybe_unused]] GraphRun& run,
                          [[maybe_unused]] const vk::CommandBuffer& cmd,
                          [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
