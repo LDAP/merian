@@ -14,6 +14,7 @@
 #include "merian-nodes/nodes/image_write/image_write.hpp"
 #include "merian-nodes/nodes/mean/mean.hpp"
 #include "merian-nodes/nodes/median_approx/median.hpp"
+#include "merian-nodes/nodes/mse_error/mse_error.hpp"
 #include "merian-nodes/nodes/svgf/svgf.hpp"
 #include "merian-nodes/nodes/taa/taa.hpp"
 #include "merian-nodes/nodes/tonemap/tonemap.hpp"
@@ -66,6 +67,9 @@ NodeRegistry::NodeRegistry(const ContextHandle& context, const ResourceAllocator
     register_node<MedianApproxNode>(NodeInfo{
         "Median (Approximation)", "Computes an approximation of the median of a component.",
         [=]() { return std::make_shared<MedianApproxNode>(context); }});
+    register_node<ErrorToBuffer>(
+        NodeInfo{"MSE Error", "Computes the mean square error of two images and outputs it as a single buffer element.",
+                 [=]() { return std::make_shared<ErrorToBuffer>(context); }});
     register_node<Shadertoy>(NodeInfo{"Shadertoy",
                                       "Execute Shadertoy-like shaders (Limited implementation).",
                                       [=]() { return std::make_shared<Shadertoy>(context); }});
