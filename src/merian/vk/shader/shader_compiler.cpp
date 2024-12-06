@@ -70,6 +70,7 @@ ShaderCompiler::ShaderCompiler(const ContextHandle& context,
     insert_all(include_paths, context->get_default_shader_include_paths());
     macro_definitions.insert(context->get_default_shader_macro_definitions().begin(),
                              context->get_default_shader_macro_definitions().end());
+    generate_debug_info = Context::IS_DEBUG_BUILD;
 }
 
 ShaderCompiler::~ShaderCompiler(){};

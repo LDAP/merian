@@ -71,6 +71,10 @@ std::vector<uint32_t> SystemGlslangValidatorCompiler::compile_glsl(
         command.emplace_back(fmt::format("-D{}={}", key, value));
     }
 
+    if (generate_debug_info_enabled()) {
+        command.emplace_back("-g");
+    }
+
     const std::string output_file = temporary_file();
     command.emplace_back("-o");
     command.emplace_back(output_file);

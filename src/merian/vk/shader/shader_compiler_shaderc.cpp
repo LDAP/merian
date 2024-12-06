@@ -125,6 +125,8 @@ std::vector<uint32_t> ShadercCompiler::compile_glsl(
     const shaderc_shader_kind kind = shaderc_shader_kind_for_stage_flag_bit(shader_kind);
 
     shaderc::CompileOptions compile_options;
+    if (generate_debug_info_enabled())
+        compile_options.SetGenerateDebugInfo();
 
     for (const auto& [key, value] : get_macro_definitions()) {
         compile_options.AddMacroDefinition(key, value);

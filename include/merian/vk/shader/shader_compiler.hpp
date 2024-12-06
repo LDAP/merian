@@ -147,6 +147,10 @@ class ShaderCompiler {
                                               shader_kind);
     }
 
+    void set_generate_debug_info(const bool enable) {
+        generate_debug_info = enable;
+    }
+
     // ------------------------------------------------
 
     void add_include_path(const std::string& include_path) {
@@ -166,6 +170,10 @@ class ShaderCompiler {
     }
 
     virtual bool available() const = 0;
+
+    bool generate_debug_info_enabled() const {
+        return generate_debug_info;
+    }
 
   private:
     static vk::ShaderStageFlagBits guess_kind(const std::filesystem::path& path) {
@@ -188,6 +196,7 @@ class ShaderCompiler {
 
     std::vector<std::string> include_paths;
     std::map<std::string, std::string> macro_definitions;
+    bool generate_debug_info;
 };
 
 } // namespace merian

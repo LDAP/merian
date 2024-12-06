@@ -71,6 +71,10 @@ std::vector<uint32_t> SystemGlslcCompiler::compile_glsl(
         command.emplace_back(fmt::format("-D{}={}", key, value));
     }
 
+    if (generate_debug_info_enabled()) {
+        command.emplace_back("-g");
+    }
+
     // turn on optimization
     command.emplace_back("-O");
 
