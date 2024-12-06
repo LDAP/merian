@@ -90,6 +90,12 @@ struct QueueInfo {
 class Context : public std::enable_shared_from_this<Context>, public ExtensionContainer {
 
   public:
+#ifdef NDEBUG
+    static constexpr bool IS_DEBUG_BUILD = false;
+#else
+    static constexpr bool IS_DEBUG_BUILD = true;
+#endif
+
     /**
      * @brief      Use this method to create the context.
      *
