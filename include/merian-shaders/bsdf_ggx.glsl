@@ -155,8 +155,8 @@ vec3 bsdf_ggx_VNDF_H_sample(const vec3 minuswi, const vec3 n, const float alpha,
     const float y = sinTheta * sin(phi);
     const vec3 cStd = vec3(x, y, z);
     // reflect sample to align with normal
-    const vec3 up = vec3(0, 0, 1);
-    const vec3 wr = n + up;
+    const vec3 upper = vec3(0, 0, 1.0000001); // @LDAP: Changed to 1.0000001 to prevent dividing by 0.
+    const vec3 wr = n + upper;
     const vec3 c = dot(wr, cStd) * wr / wr.z - cStd;
     // compute halfway direction as standard normal
     const vec3 wmStd = c + wiStd;
