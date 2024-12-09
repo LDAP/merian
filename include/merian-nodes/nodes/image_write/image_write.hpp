@@ -21,8 +21,7 @@ class ImageWrite : public Node {
      */
     ImageWrite(const ContextHandle& context,
                const ResourceAllocatorHandle& allocator,
-               const std::string& filename_format =
-                   "image_{record_iteration:06}_{image_index:06}_{run_iteration:06}");
+               const std::string& filename_format = "image_{image_index_total:04}");
 
     virtual ~ImageWrite();
 
