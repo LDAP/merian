@@ -5,6 +5,7 @@
 #include "merian-nodes/nodes/add/add.hpp"
 #include "merian-nodes/nodes/as_builder/device_as_builder.hpp"
 #include "merian-nodes/nodes/bloom/bloom.hpp"
+#include "merian-nodes/nodes/buffer_download/buffer_download.hpp"
 #include "merian-nodes/nodes/color_image/color_output.hpp"
 #include "merian-nodes/nodes/exposure/exposure.hpp"
 #include "merian-nodes/nodes/fxaa/fxaa.hpp"
@@ -40,6 +41,8 @@ NodeRegistry::NodeRegistry(const ContextHandle& context, const ResourceAllocator
                  [=]() { return std::make_shared<DeviceASBuilder>(context, allocator); }});
     register_node<Bloom>(NodeInfo{"Bloom", "Selectively blurs pixels that surpass a threshold.",
                                   [=]() { return std::make_shared<Bloom>(context); }});
+    register_node<BufferDownload>(NodeInfo{"Buffer Download", "Prints the content of a buffer to the console.",
+                                  [=]() { return std::make_shared<BufferDownload>(context); }});
     register_node<ColorImage>(NodeInfo{"Color",
                                        "Outputs a image filled cleared with the selected color.",
                                        [=]() { return std::make_shared<ColorImage>(); }});

@@ -2,7 +2,7 @@
 #extension GL_GOOGLE_include_directive          : enable
 #extension GL_KHR_shader_subgroup_arithmetic    : enable
 
-#include "layout.glsl"
+#include "mse_layout.glsl"
 
 shared vec4 subgroup_sums[gl_WorkGroupSize.x * gl_WorkGroupSize.y / SUBGROUP_SIZE + 1];
 
@@ -14,7 +14,7 @@ void main() {
         v = vec4(0);
     } else {
         v = (texelFetch(img_src1, ipos, 0) - texelFetch(img_src2, ipos, 0));
-        v= v * v / params.divisor;
+        v = v * v / params.divisor;
     }
 
     v.x = subgroupAdd(v.x);

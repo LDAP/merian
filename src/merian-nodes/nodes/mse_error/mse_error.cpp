@@ -5,17 +5,20 @@
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 #include "merian-nodes/graph/errors.hpp"
 
-#include "image_to_buffer.comp.spv.h"
-#include "reduce_buffer.comp.spv.h"
+#include "mse_image_to_buffer.comp.spv.h"
+#include "mse_reduce_buffer.comp.spv.h"
+
+#include <fmt/chrono.h>
+#include <iostream>
 
 namespace merian_nodes {
 
 ErrorToBuffer::ErrorToBuffer(const ContextHandle context) : Node(), context(context) {
 
     image_to_buffer_shader = std::make_shared<ShaderModule>(
-        context, merian_image_to_buffer_comp_spv_size(), merian_image_to_buffer_comp_spv());
+        context, merian_mse_image_to_buffer_comp_spv_size(), merian_mse_image_to_buffer_comp_spv());
     reduce_buffer_shader = std::make_shared<ShaderModule>(
-        context, merian_reduce_buffer_comp_spv_size(), merian_reduce_buffer_comp_spv());
+        context, merian_mse_reduce_buffer_comp_spv_size(), merian_mse_reduce_buffer_comp_spv());
 }
 
 ErrorToBuffer::~ErrorToBuffer() {}
@@ -108,11 +111,6 @@ void ErrorToBuffer::process([[maybe_unused]] GraphRun& run,
         pc.count = (pc.count + workgroup_size - 1) / workgroup_size;
         pc.offset *= workgroup_size;
     }
-
-    /*run.add_submit_callback([&](const QueueHandle& queue, GraphRun& run) {
-                queue->wait_idle();
-                descriptor_set.
-            });*/
 }
 
 } // namespace merian_nodes
