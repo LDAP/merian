@@ -136,8 +136,9 @@ void ImageWrite::process(GraphRun& run,
     const ImageHandle src = io[con_src];
     vk::Extent3D scaled = max(multiply(src->get_extent(), scale), {1, 1, 1});
     fmt::dynamic_format_arg_store<fmt::format_context> arg_store;
-    get_format_args([&](const auto& arg) { arg_store.push_back(arg); }, scaled, run.get_iteration(),
-                    graph_time_since_record, graph_time, system_time_since_record);
+    get_format_args([&](const auto& arg) { arg_store.push_back(arg); }, src->get_extent(), scaled,
+                    run.get_iteration(), graph_time_since_record, graph_time,
+                    system_time_since_record);
     std::filesystem::path path;
     try {
         if (filename_format.empty()) {
@@ -322,11 +323,11 @@ ImageWrite::NodeStatusFlags ImageWrite::properties([[maybe_unused]] Properties& 
     std::ignore = config.config_text("filename", filename_format, false,
                                      "Provide a format string for the path.");
     std::vector<std::string> variables;
-    get_format_args([&](const auto& arg) { variables.push_back(arg.name); }, {1920, 1080, 1}, 1,
-                    1000ns, 1000ns, 1000ns);
+    get_format_args([&](const auto& arg) { variables.push_back(arg.name); }, {1920, 1080, 1},
+                    {1920, 1080, 1}, 1, 1000ns, 1000ns, 1000ns);
     fmt::dynamic_format_arg_store<fmt::format_context> arg_store;
-    get_format_args([&](const auto& arg) { arg_store.push_back(arg); }, {1920, 1080, 1}, 1, 1000ns,
-                    1000ns, 1000ns);
+    get_format_args([&](const auto& arg) { arg_store.push_back(arg); }, {1920, 1080, 1},
+                    {1920, 1080, 1}, 1, 1000ns, 1000ns, 1000ns);
 
     std::filesystem::path abs_path;
     try {

@@ -44,6 +44,7 @@ class ImageWrite : public Node {
   private:
     template <typename T>
     void get_format_args(const T& consumer,
+                         const vk::Extent3D& input_extent,
                          const vk::Extent3D& output_extent,
                          const uint64_t run_iteration,
                          const std::chrono::nanoseconds& graph_time_since_record,
@@ -56,6 +57,8 @@ class ImageWrite : public Node {
         consumer(fmt::arg("graph_time", to_seconds(graph_time)));
         consumer(fmt::arg("graph_time_since_record", to_seconds(graph_time_since_record)));
         consumer(fmt::arg("system_time_since_record", to_seconds(system_time_since_record)));
+        consumer(fmt::arg("input_width", input_extent.width));
+        consumer(fmt::arg("input_height", input_extent.height));
         consumer(fmt::arg("output_width", output_extent.width));
         consumer(fmt::arg("output_height", output_extent.height));
         consumer(fmt::arg("random", rand()));
