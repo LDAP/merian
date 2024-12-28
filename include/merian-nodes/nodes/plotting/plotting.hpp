@@ -45,6 +45,14 @@ public:
 private:
     const ContextHandle context;
 
+    uint32_t shown_history_size = 128;
+    uint32_t plotting_idx;
+    float max_value = 1.0f;
+    float test_value;
+
+    std::vector<float> history;
+    uint32_t current_history_idx;
+
     PtrInHandle<const glm::vec4*> con_src = PtrIn<const glm::vec4*>::create("src");
     PtrOutHandle<const glm::vec4*> con_out = PtrOut<const glm::vec4*>::create("out");
 };
