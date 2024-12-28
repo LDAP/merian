@@ -1,16 +1,18 @@
 #pragma once
 
-#include "merian-nodes/connectors/managed_vk_buffer_in.hpp"
 #include "merian-nodes/connectors/managed_vk_buffer_out.hpp"
 #include "merian-nodes/connectors/managed_vk_image_in.hpp"
 #include "merian-nodes/graph/node.hpp"
 
-#include <merian-nodes/connectors/ptr_out.hpp>
-#include <merian-nodes/nodes/ab_compare/ab_compare.hpp>
+#include "merian/vk/memory/resource_allocator.hpp"
+#include "merian/vk/pipeline/pipeline.hpp"
+#include "merian/vk/shader/shader_module.hpp"
+
+#include <merian-nodes/connectors/ptr_in.hpp>
 
 namespace merian_nodes {
 
-class BufferDownload : public Node {
+class Plotting : public Node {
 private:
     static constexpr uint32_t local_size_x = 16;
     static constexpr uint32_t local_size_y = 16;
@@ -25,16 +27,15 @@ private:
     };
 
 public:
-    BufferDownload(const ContextHandle context);
+    Plotting(const ContextHandle context);
 
-    ~BufferDownload();
+    ~Plotting();
 
     std::vector<InputConnectorHandle> describe_inputs() override;
 
     std::vector<OutputConnectorHandle> describe_outputs(const NodeIOLayout& io_layout) override;
 
-    NodeStatusFlags on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
-                                 const DescriptorSetLayoutHandle& descriptor_set_layout) override;
+    NodeStatusFlags properties(Properties& config) override;
 
     void process(GraphRun& run,
                  const vk::CommandBuffer& cmd,
@@ -44,10 +45,8 @@ public:
 private:
     const ContextHandle context;
 
-    ManagedVkBufferInHandle con_src = ManagedVkBufferIn::transfer_src("src");
+    PtrInHandle<const glm::vec4*> con_src = PtrIn<const glm::vec4*>::create("src");
     PtrOutHandle<const glm::vec4*> con_out = PtrOut<const glm::vec4*>::create("out");
-
-    std::vector<const glm::vec4*> results;
 };
 
 } // namespace merian_nodes

@@ -16,11 +16,13 @@
 #include "merian-nodes/nodes/mean/mean.hpp"
 #include "merian-nodes/nodes/median_approx/median.hpp"
 #include "merian-nodes/nodes/mse_error/mse_error.hpp"
+#include "merian-nodes/nodes/shadertoy/shadertoy.hpp"
 #include "merian-nodes/nodes/svgf/svgf.hpp"
 #include "merian-nodes/nodes/taa/taa.hpp"
 #include "merian-nodes/nodes/tonemap/tonemap.hpp"
 #include "merian-nodes/nodes/vkdt_filmcurv/vkdt_filmcurv.hpp"
-#include "merian-nodes/nodes/shadertoy/shadertoy.hpp"
+
+#include <merian-nodes/nodes/plotting/plotting.hpp>
 
 namespace merian_nodes {
 
@@ -73,6 +75,9 @@ NodeRegistry::NodeRegistry(const ContextHandle& context, const ResourceAllocator
     register_node<ErrorToBuffer>(
         NodeInfo{"MSE Error", "Computes the mean square error of two images and outputs it as a single buffer element.",
                  [=]() { return std::make_shared<ErrorToBuffer>(context); }});
+    register_node<Plotting>(
+        NodeInfo{"Plot", "Plots the data at the given index in a graph over time.",
+                 [=]() { return std::make_shared<Plotting>(context); }});
     register_node<Shadertoy>(NodeInfo{"Shadertoy",
                                       "Execute Shadertoy-like shaders (Limited implementation).",
                                       [=]() { return std::make_shared<Shadertoy>(context); }});

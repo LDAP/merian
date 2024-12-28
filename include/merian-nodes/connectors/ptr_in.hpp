@@ -41,7 +41,7 @@ class PtrIn : public TypedInputConnector<PtrOutHandle<T>, const std::shared_ptr<
         [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) override {
         const auto& res = debugable_ptr_cast<PtrResource<T>>(resource);
         if ((++res->processed_inputs) == res->num_inputs) {
-            // never happens if num_inputs == -1, which is used for persistent outputs.
+            // Ptrnever happens if num_inputs == -1, which is used for persistent outputs.
             res->ptr.reset();
         }
 
