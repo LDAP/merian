@@ -45,9 +45,9 @@ private:
     const ContextHandle context;
 
     ManagedVkBufferInHandle con_src = ManagedVkBufferIn::transfer_src("src");
-    PtrOutHandle<const glm::vec4*> con_out = PtrOut<const glm::vec4*>::create("out");
+    PtrOutHandle<const void*> con_out = PtrOut<const void*>::create("out");
 
-    std::vector<const glm::vec4*> results;
+    std::vector<const void*> results;
 };
 
 } // namespace merian_nodes

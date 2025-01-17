@@ -2,6 +2,7 @@
 
 #include "glm/glm.hpp"
 #include "merian/utils/enums.hpp"
+#include "merian-nodes/nodes/plotting/plotting_types.hpp"
 #include "nlohmann/json.hpp"
 
 #include <fmt/format.h>

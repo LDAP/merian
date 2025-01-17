@@ -7,6 +7,7 @@
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
 #include "merian/vk/shader/shader_module.hpp"
+#include "merian-nodes/nodes/plotting/plotting_types.hpp"
 
 #include <merian-nodes/connectors/ptr_in.hpp>
 
@@ -43,18 +44,28 @@ public:
                  const NodeIO& io) override;
 
 private:
+    void resetHistory();
+
     const ContextHandle context;
 
+    bool reset_history = false;
     uint32_t shown_history_size = 128;
-    uint32_t plotting_idx;
+
+    uint32_t offset;
+    PlottingType plotting_type = PlottingType::FLOAT_32;
+
+    bool log_x_axis = false, log_y_axis = false;
+
+    uint32_t skip_interval = 1, skip_counter;
+
     float max_value = 1.0f;
+    bool auto_find_max = true;
     float test_value;
 
     std::vector<float> history;
     uint32_t current_history_idx;
 
-    PtrInHandle<const glm::vec4*> con_src = PtrIn<const glm::vec4*>::create("src");
-    PtrOutHandle<const glm::vec4*> con_out = PtrOut<const glm::vec4*>::create("out");
+    PtrInHandle<const void*> con_src = PtrIn<const void*>::create("src");
 };
 
 } // namespace merian_nodes
