@@ -242,7 +242,7 @@ class DeviceASBuilder : public Node {
     }
 
     void process(GraphRun& run,
-                 const vk::CommandBuffer& cmd,
+                 const CommandBufferHandle& cmd,
                  [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
                  const NodeIO& io) {
         InFlightData& in_flight_data = io.frame_data<InFlightData>();
@@ -308,12 +308,10 @@ class DeviceASBuilder : public Node {
                 Buffer::INSTANCES_BUFFER_USAGE, "DeviceASBuilder Instances",
                 merian::MemoryMappingType::NONE, 16, 1.25)) {
             // old buffer reused -> insert barrier for last iteration
-            cmd.pipelineBarrier(
-                vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR,
-                vk::PipelineStageFlagBits::eTransfer, {}, {},
-                tlas_build_info.instances_buffer->buffer_barrier(
-                    vk::AccessFlagBits::eShaderRead, vk::AccessFlagBits::eTransferWrite),
-                {});
+            cmd->barrier(vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR,
+                         vk::PipelineStageFlagBits::eTransfer,
+                         tlas_build_info.instances_buffer->buffer_barrier(
+                             vk::AccessFlagBits::eShaderRead, vk::AccessFlagBits::eTransferWrite));
         }
         // 2.1. Upload instances to GPU and copy to buffer
         allocator->getStaging()->cmdToBuffer(cmd, *tlas_build_info.instances_buffer, 0,
@@ -342,7 +340,7 @@ class DeviceASBuilder : public Node {
                                                           tlas_build_info.build_flags);
         }
         tlas_build_info.rebuild = false;
-        cmd.pipelineBarrier2(vk::DependencyInfo{{}, {}, pre_build_barriers});
+        cmd->barrier(pre_build_barriers);
 
         // 4. Run builds (reusing the same scratch buffer)
         as_builder.get_cmds(cmd, scratch_buffer, run.get_profiler());

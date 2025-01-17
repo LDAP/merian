@@ -83,7 +83,7 @@ class MemoryAllocator : public std::enable_shared_from_this<MemoryAllocator> {
         return context;
     }
 
-  protected:
+  private:
     const ContextHandle context;
 };
 
@@ -104,7 +104,7 @@ inline std::string format_as(const MemoryAllocationInfo& alloc_info) {
     return fmt::format("DeviceMemory: {}\nOffset: {}\nSize: {}\nName: {}",
                        fmt::ptr(static_cast<VkDeviceMemory>(alloc_info.memory)),
                        format_size(alloc_info.offset), format_size(alloc_info.size),
-                       alloc_info.name ? alloc_info.name : "<unknown>");
+                       (alloc_info.name != nullptr) ? alloc_info.name : "<unknown>");
 }
 
 /* MemoryAllocation represents a memory allocation or sub-allocation from the
@@ -132,27 +132,43 @@ class MemoryAllocation : public std::enable_shared_from_this<MemoryAllocation> {
     // type or before reading from persistently mapped host-coherent memory.
     // Map does not do that automatically, internally this is a call to
     // vkInvalidateMappedMemoryRanges
-    virtual void invalidate(const VkDeviceSize offset = 0, const VkDeviceSize size = VK_WHOLE_SIZE) = 0;
+    virtual void invalidate([[maybe_unused]] const VkDeviceSize offset = 0,
+                            [[maybe_unused]] const VkDeviceSize size = VK_WHOLE_SIZE) {
+        throw std::runtime_error{"invalidate is unsupported for this memory type"};
+    }
 
     // Call this after writing to non host-coherent memory
     // or after writing to persistently mapped host-coherent memory.
     // Map does not do that automatically, internally this is a call to vkFlushMappedMemoryRanges
-    virtual void flush(const VkDeviceSize offset = 0, const VkDeviceSize size = VK_WHOLE_SIZE) = 0;
+    virtual void flush([[maybe_unused]] const VkDeviceSize offset = 0,
+                       [[maybe_unused]] const VkDeviceSize size = VK_WHOLE_SIZE) {
+        throw std::runtime_error{"flush is unsupported for this memory type"};
+    }
 
     // Maps device memory to system memory. This should return the same pointer if called multiple
     // times before "unmap".
-    virtual void* map() = 0;
+    virtual void* map() {
+        throw std::runtime_error{"mapping is unsupported for this memory type"};
+    };
 
     // Unmap memHandle
-    virtual void unmap() = 0;
+    virtual void unmap() {
+        throw std::runtime_error{"mapping is unsupported for this memory type"};
+    }
 
     // ------------------------------------------------------------------------------------
 
     // Creates an image that points to this memory
-    virtual ImageHandle create_aliasing_image(const vk::ImageCreateInfo& image_create_info) = 0;
+    virtual ImageHandle
+    create_aliasing_image([[maybe_unused]] const vk::ImageCreateInfo& image_create_info) {
+        throw std::runtime_error{"create aliasing images is unsupported for this memory type"};
+    }
 
     // Creates a buffer that points to this memory
-    virtual BufferHandle create_aliasing_buffer(const vk::BufferCreateInfo& buffer_create_info) = 0;
+    virtual BufferHandle
+    create_aliasing_buffer([[maybe_unused]] const vk::BufferCreateInfo& buffer_create_info) {
+        throw std::runtime_error{"create aliasing images is unsupported for this memory type"};
+    }
 
     // ------------------------------------------------------------------------------------
 
@@ -170,7 +186,7 @@ class MemoryAllocation : public std::enable_shared_from_this<MemoryAllocation> {
         props.output_text(fmt::format("{}", get_memory_info()));
     }
 
-  protected:
+  private:
     const ContextHandle context;
 };
 

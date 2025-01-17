@@ -1,14 +1,16 @@
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/utils/colors.hpp"
+#include "merian/vk/command/command_buffer.hpp"
 #include "merian/vk/extension/extension_vk_debug_utils.hpp"
 #include "merian/vk/utils/check_result.hpp"
+
 #include <spdlog/spdlog.h>
 
 namespace merian {
 
 ResourceAllocator::ResourceAllocator(const ContextHandle& context,
                                      const std::shared_ptr<MemoryAllocator>& memAllocator,
-                                     const std::shared_ptr<StagingMemoryManager> staging,
+                                     const std::shared_ptr<StagingMemoryManager>& staging,
                                      const std::shared_ptr<SamplerPool>& samplerPool)
     : context(context), m_memAlloc(memAllocator), m_staging(staging), m_samplerPool(samplerPool),
       debug_utils(context->get_extension<ExtensionVkDebugUtils>()) {
@@ -16,13 +18,13 @@ ResourceAllocator::ResourceAllocator(const ContextHandle& context,
 
     const uint32_t missing_rgba = merian::uint32_from_rgba(1, 0, 1, 1);
     const std::vector<uint32_t> data = {missing_rgba, missing_rgba, missing_rgba, missing_rgba};
-    context->get_queue_GCT()->submit_wait([&](const vk::CommandBuffer& cmd) {
+    context->get_queue_GCT()->submit_wait([&](const CommandBufferHandle& cmd) {
         dummy_texture =
             createTextureFromRGBA8(cmd, data.data(), 2, 2, vk::Filter::eNearest,
                                    vk::Filter::eNearest, true, "ResourceAllocator::dummy_texture");
         const auto img_transition =
             dummy_texture->get_image()->barrier2(vk::ImageLayout::eShaderReadOnlyOptimal);
-        cmd.pipelineBarrier2(vk::DependencyInfo{{}, {}, {}, img_transition});
+        cmd->barrier(img_transition);
         dummy_buffer = createBuffer(cmd, data.size() * sizeof(uint32_t),
                                     vk::BufferUsageFlagBits::eStorageBuffer, data.data(),
                                     MemoryMappingType::NONE, "ResourceAllocator::dummy_buffer");
@@ -57,7 +59,7 @@ BufferHandle ResourceAllocator::createBuffer(const vk::DeviceSize size_,
     return createBuffer(info, mapping_type, debug_name, min_alignment);
 }
 
-BufferHandle ResourceAllocator::createBuffer(const vk::CommandBuffer& cmdBuf,
+BufferHandle ResourceAllocator::createBuffer(const CommandBufferHandle& cmdBuf,
                                              const vk::DeviceSize& size_,
                                              const vk::BufferUsageFlags usage_,
                                              const void* data_,
@@ -110,7 +112,7 @@ ImageHandle ResourceAllocator::createImage(const vk::ImageCreateInfo& info_,
     return image;
 }
 
-ImageHandle ResourceAllocator::createImage(const vk::CommandBuffer& cmdBuf,
+ImageHandle ResourceAllocator::createImage(const CommandBufferHandle& cmdBuf,
                                            const size_t size_,
                                            const void* data_,
                                            const vk::ImageCreateInfo& info_,
@@ -124,11 +126,11 @@ ImageHandle ResourceAllocator::createImage(const vk::CommandBuffer& cmdBuf,
                                                0, 1};
 
     // doing these transitions per copy is not efficient, should do in bulk for many images
-    cmdBuf.pipelineBarrier(
-        vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eTransfer, {}, {}, {},
-        resultImage->barrier(vk::ImageLayout::eTransferDstOptimal, {},
-                             vk::AccessFlagBits::eTransferWrite, VK_QUEUE_FAMILY_IGNORED,
-                             VK_QUEUE_FAMILY_IGNORED, all_levels_and_layers(), true));
+    cmdBuf->barrier(vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eTransfer,
+                    resultImage->barrier(vk::ImageLayout::eTransferDstOptimal, {},
+                                         vk::AccessFlagBits::eTransferWrite,
+                                         VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
+                                         all_levels_and_layers(), true));
 
     m_staging->cmdToImage(cmdBuf, *resultImage, {}, info_.extent, first_layer(), size_, data_);
 
@@ -191,7 +193,7 @@ TextureHandle ResourceAllocator::createTexture(const ImageHandle& image,
     return createTexture(image, view_create_info, sampler, debug_name);
 }
 
-TextureHandle ResourceAllocator::createTextureFromRGBA8(const vk::CommandBuffer& cmd,
+TextureHandle ResourceAllocator::createTextureFromRGBA8(const CommandBufferHandle& cmd,
                                                         const uint32_t* data,
                                                         const uint32_t width,
                                                         const uint32_t height,
@@ -239,8 +241,8 @@ TextureHandle ResourceAllocator::createTextureFromRGBA8(const vk::CommandBuffer&
                 VK_QUEUE_FAMILY_IGNORED,
                 *image,
                 vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, i - 1, 1, 0, 1}};
-            cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
-                                vk::PipelineStageFlagBits::eTransfer, {}, {}, {}, bar);
+            cmd->barrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer,
+                         bar);
             // let the loop run one iteration more to get the whole image transitioned to transfer
             // src.
             if (i == mip_levels) {
@@ -255,8 +257,8 @@ TextureHandle ResourceAllocator::createTextureFromRGBA8(const vk::CommandBuffer&
             blit.srcOffsets[1] =
                 vk::Offset3D{int32_t(width >> (i - 1)), int32_t(height >> (i - 1)), 1};
             blit.dstOffsets[1] = vk::Offset3D{int32_t(width >> i), int32_t(height >> i), 1};
-            cmd.blitImage(*image, vk::ImageLayout::eTransferSrcOptimal, *image,
-                          vk::ImageLayout::eTransferDstOptimal, blit, vk::Filter::eLinear);
+            cmd->blit(image, vk::ImageLayout::eTransferSrcOptimal, image,
+                            vk::ImageLayout::eTransferDstOptimal, blit, vk::Filter::eLinear);
         }
         image->_set_current_layout(vk::ImageLayout::eTransferSrcOptimal);
     }

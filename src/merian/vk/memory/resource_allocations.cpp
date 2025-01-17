@@ -11,16 +11,16 @@ namespace merian {
 Buffer::Buffer(const vk::Buffer& buffer,
                const MemoryAllocationHandle& memory,
                const vk::BufferCreateInfo& create_info)
-    : buffer(buffer), memory(memory), create_info(create_info) {}
+    : context(memory->get_context()), buffer(buffer), memory(memory), create_info(create_info) {}
 
 Buffer::~Buffer() {
     SPDLOG_TRACE("destroy buffer ({})", fmt::ptr(static_cast<VkBuffer>(buffer)));
-    memory->get_context()->device.destroyBuffer(buffer);
+    destroy();
 }
 
 vk::DeviceAddress Buffer::get_device_address() {
     assert(create_info.usage | vk::BufferUsageFlagBits::eShaderDeviceAddress);
-    return memory->get_context()->device.getBufferAddress(get_buffer_device_address_info());
+    return context->device.getBufferAddress(get_buffer_device_address_info());
 }
 
 vk::BufferMemoryBarrier Buffer::buffer_barrier(const vk::AccessFlags src_access_flags,
@@ -57,17 +57,22 @@ vk::BufferMemoryBarrier2 Buffer::buffer_barrier2(const vk::PipelineStageFlags2 s
 }
 
 BufferHandle Buffer::create_aliasing_buffer() {
-    return get_memory()->create_aliasing_buffer(create_info);
+    assert(memory && "buffer is not bound to memory, cannot create aliasing buffer.");
+    return memory->create_aliasing_buffer(create_info);
 }
 
 void Buffer::properties(Properties& props) {
     props.output_text(fmt::format("Handle: {}\nSize: {}\nUsage: {}",
                                   fmt::ptr(static_cast<VkBuffer>(buffer)),
                                   format_size(create_info.size), vk::to_string(create_info.usage)));
-    if (props.st_begin_child("memory_info", "Memory")) {
+    if (memory && props.st_begin_child("memory_info", "Memory")) {
         get_memory()->properties(props);
         props.st_end_child();
     }
+}
+
+void Buffer::destroy() {
+    context->device.destroyBuffer(buffer);
 }
 
 // --------------------------------------------------------------------------
@@ -76,23 +81,27 @@ Image::Image(const vk::Image& image,
              const MemoryAllocationHandle& memory,
              const vk::ImageCreateInfo create_info,
              const vk::ImageLayout current_layout)
-    : image(image), memory(memory), create_info(create_info), current_layout(current_layout) {}
+    : context(memory->get_context()), image(image), memory(memory), create_info(create_info),
+      current_layout(current_layout) {}
+
+Image::Image(const ContextHandle& context,
+             const vk::Image& image,
+             const vk::ImageCreateInfo create_info,
+             const vk::ImageLayout current_layout)
+    : context(context), image(image), create_info(create_info), current_layout(current_layout) {}
 
 Image::~Image() {
     SPDLOG_TRACE("destroy image ({})", fmt::ptr(static_cast<VkImage>(image)));
-    memory->get_context()->device.destroyImage(image);
+    destroy();
 }
 
 vk::FormatFeatureFlags Image::format_features() const {
     if (get_tiling() == vk::ImageTiling::eOptimal) {
-        return memory->get_context()
-            ->physical_device.physical_device.getFormatProperties(get_format())
+        return context->physical_device.physical_device.getFormatProperties(get_format())
             .optimalTilingFeatures;
-    } else {
-        return memory->get_context()
-            ->physical_device.physical_device.getFormatProperties(get_format())
-            .linearTilingFeatures;
     }
+    return context->physical_device.physical_device.getFormatProperties(get_format())
+        .linearTilingFeatures;
 }
 
 vk::ImageMemoryBarrier Image::barrier(const vk::ImageLayout new_layout) {
@@ -160,14 +169,12 @@ bool Image::valid_for_view() {
 #endif
         vk::ImageUsageFlagBits::eSampleWeightQCOM | vk::ImageUsageFlagBits::eSampleBlockMatchQCOM;
 
-    if (create_info.usage & VALID_IMAGE_USAGE_FOR_IMAGE_VIEWS) {
-        return true;
-    }
-    return false;
+    return static_cast<bool>(create_info.usage & VALID_IMAGE_USAGE_FOR_IMAGE_VIEWS);
 }
 
 ImageHandle Image::create_aliasing_image() {
-    return get_memory()->create_aliasing_image(create_info);
+    assert(memory && "image is not bound to memory, cannot create aliasing image.");
+    return memory->create_aliasing_image(create_info);
 }
 
 void Image::properties(Properties& props) {
@@ -176,23 +183,52 @@ void Image::properties(Properties& props) {
         fmt::ptr(static_cast<VkImage>(image)), get_extent().width, get_extent().height,
         get_extent().depth, vk::to_string(get_usage_flags()), vk::to_string(get_tiling()),
         vk::to_string(get_format()), vk::to_string(get_current_layout())));
-    if (props.st_begin_child("memory_info", "Memory")) {
+    if (memory && props.st_begin_child("memory_info", "Memory")) {
         get_memory()->properties(props);
+        props.st_end_child();
+    }
+}
+
+void Image::destroy() {
+    context->device.destroyImage(image);
+}
+
+// --------------------------------------------------------------------------
+
+ImageView::ImageView(const vk::ImageViewCreateInfo& view_create_info, const ImageHandle& image) {
+    assert(image->valid_for_view());
+    assert(view_create_info.image == **image);
+
+    view = image->get_context()->device.createImageView(view_create_info);
+    SPDLOG_TRACE("create image view ({})", fmt::ptr(static_cast<VkImageView>(view)));
+}
+
+ImageView::ImageView(const vk::ImageView& view, const ImageHandle& image)
+    : view(view), image(image) {
+    SPDLOG_TRACE("create image view ({})", fmt::ptr(static_cast<VkImageView>(view)));
+}
+
+ImageView::~ImageView() {
+    SPDLOG_TRACE("destroy image view ({})", fmt::ptr(static_cast<VkImageView>(view)));
+    image->get_context()->device.destroyImageView(view);
+}
+
+void ImageView::properties(Properties& props) {
+    if (props.st_begin_child("image_info", "Image")) {
+        image->properties(props);
         props.st_end_child();
     }
 }
 
 // --------------------------------------------------------------------------
 
-Texture::Texture(const vk::ImageView& view, const ImageHandle& image, const SamplerHandle& sampler)
-    : view(view), image(image), sampler(sampler) {
+Texture::Texture(const ImageViewHandle& view, const SamplerHandle& sampler)
+    : view(view), sampler(sampler) {
+    assert(view);
     assert(sampler);
 }
 
-Texture::~Texture() {
-    SPDLOG_TRACE("destroy image view ({})", fmt::ptr(static_cast<VkImageView>(view)));
-    image->get_memory()->get_context()->device.destroyImageView(view);
-}
+Texture::~Texture() {}
 
 void Texture::set_sampler(const SamplerHandle& sampler) {
     assert(sampler);
@@ -200,8 +236,8 @@ void Texture::set_sampler(const SamplerHandle& sampler) {
 }
 
 void Texture::properties(Properties& props) {
-    if (props.st_begin_child("image_info", "Image")) {
-        image->properties(props);
+    if (props.st_begin_child("image_view_info", "Image View")) {
+        view->properties(props);
         props.st_end_child();
     }
 }

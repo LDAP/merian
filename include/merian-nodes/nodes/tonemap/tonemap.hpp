@@ -22,7 +22,7 @@ class Tonemap : public AbstractCompute {
     };
 
   public:
-    Tonemap(const ContextHandle context,
+    Tonemap(const ContextHandle& context,
             const std::optional<vk::Format> output_format = std::nullopt);
 
     ~Tonemap();

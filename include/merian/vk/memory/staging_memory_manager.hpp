@@ -34,7 +34,7 @@ namespace merian {
   > - cannot manage a copy > 4 GB
 
   Usage:
-  - Enqueue transfers into your vk::CommandBuffer and then finalize the copy operations.
+  - Enqueue transfers into your CommandBuffer and then finalize the copy operations.
   - Associate the copy operations with a vk::Fence or retrieve a SetID
   - The release of the resources allows to safely recycle the buffer space for future transfers.
 
@@ -122,7 +122,7 @@ class StagingMemoryManager : public std::enable_shared_from_this<StagingMemoryMa
 
     // if data != nullptr memcpies to mapping and returns nullptr
     // otherwise returns temporary mapping (valid until "complete" functions)
-    void* cmdToImage(vk::CommandBuffer cmd,
+    void* cmdToImage(const CommandBufferHandle& cmd,
                      vk::Image image,
                      const vk::Offset3D& offset,
                      const vk::Extent3D& extent,
@@ -132,7 +132,7 @@ class StagingMemoryManager : public std::enable_shared_from_this<StagingMemoryMa
                      vk::ImageLayout layout = vk::ImageLayout::eTransferDstOptimal);
 
     template <class T>
-    T* cmdToImageT(vk::CommandBuffer cmd,
+    T* cmdToImageT(const CommandBufferHandle& cmd,
                    vk::Image image,
                    const vk::Offset3D& offset,
                    const vk::Extent3D& extent,
@@ -145,7 +145,7 @@ class StagingMemoryManager : public std::enable_shared_from_this<StagingMemoryMa
 
     // pointer can be used after cmd execution but only valid until associated resources haven't
     // been released
-    const void* cmdFromImage(vk::CommandBuffer cmd,
+    const void* cmdFromImage(const CommandBufferHandle& cmd,
                              vk::Image image,
                              const vk::Offset3D& offset,
                              const vk::Extent3D& extent,
@@ -154,7 +154,7 @@ class StagingMemoryManager : public std::enable_shared_from_this<StagingMemoryMa
                              vk::ImageLayout layout = vk::ImageLayout::eTransferSrcOptimal);
 
     template <class T>
-    const T* cmdFromImageT(vk::CommandBuffer cmd,
+    const T* cmdFromImageT(const CommandBufferHandle& cmd,
                            vk::Image image,
                            const vk::Offset3D& offset,
                            const vk::Extent3D& extent,
@@ -166,14 +166,14 @@ class StagingMemoryManager : public std::enable_shared_from_this<StagingMemoryMa
 
     // if data != nullptr memcpies to mapping and returns nullptr
     // otherwise returns temporary mapping (valid until appropriate release)
-    void* cmdToBuffer(vk::CommandBuffer cmd,
+    void* cmdToBuffer(const CommandBufferHandle& cmd,
                       vk::Buffer buffer,
                       vk::DeviceSize offset,
                       vk::DeviceSize size,
                       const void* data);
 
     template <class T>
-    T* cmdToBufferT(vk::CommandBuffer cmd,
+    T* cmdToBufferT(const CommandBufferHandle& cmd,
                     vk::Buffer buffer,
                     vk::DeviceSize offset,
                     vk::DeviceSize size) {
@@ -182,13 +182,13 @@ class StagingMemoryManager : public std::enable_shared_from_this<StagingMemoryMa
 
     // pointer can be used after cmd execution but only valid until associated resources haven't
     // been released
-    const void* cmdFromBuffer(vk::CommandBuffer cmd,
+    const void* cmdFromBuffer(const CommandBufferHandle& cmd,
                               vk::Buffer buffer,
                               vk::DeviceSize offset,
                               vk::DeviceSize size);
 
     template <class T>
-    const T* cmdFromBufferT(vk::CommandBuffer cmd,
+    const T* cmdFromBufferT(const CommandBufferHandle& cmd,
                             vk::Buffer buffer,
                             vk::DeviceSize offset,
                             vk::DeviceSize size) {

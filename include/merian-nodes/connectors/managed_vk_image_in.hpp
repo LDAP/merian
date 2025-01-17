@@ -35,7 +35,7 @@ class ManagedVkImageIn : public TypedInputConnector<ManagedVkImageOutHandle, Ima
 
     virtual ConnectorStatusFlags
     on_pre_process(GraphRun& run,
-                   const vk::CommandBuffer& cmd,
+                   const CommandBufferHandle& cmd,
                    const GraphResourceHandle& resource,
                    const NodeHandle& node,
                    std::vector<vk::ImageMemoryBarrier2>& image_barriers,

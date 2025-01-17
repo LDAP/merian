@@ -30,7 +30,7 @@ class ImageWrite : public Node {
     virtual NodeStatusFlags pre_process(GraphRun& run, const NodeIO& io) override;
 
     virtual void process(GraphRun& run,
-                         const vk::CommandBuffer& cmd,
+                         const CommandBufferHandle& cmd,
                          const DescriptorSetHandle& descriptor_set,
                          const NodeIO& io) override;
 

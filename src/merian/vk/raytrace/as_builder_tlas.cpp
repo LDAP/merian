@@ -1,3 +1,4 @@
+#include "merian/vk/command/command_buffer.hpp"
 #include "merian/vk/raytrace/as_builder.hpp"
 
 namespace merian {
@@ -35,7 +36,7 @@ ASBuilder::queue_build(const uint32_t instance_count,
 void ASBuilder::queue_update(
     const uint32_t instance_count,
     const vk::AccelerationStructureGeometryInstancesDataKHR& instances_data,
-    const AccelerationStructureHandle src_as,
+    const AccelerationStructureHandle& src_as,
     const vk::BuildAccelerationStructureFlagsKHR flags) {
     vk::AccelerationStructureGeometryKHR top_as_geometry{vk::GeometryTypeKHR::eInstances,
                                                          {instances_data}};
@@ -73,9 +74,9 @@ void ASBuilder::queue_build(const uint32_t instance_count,
     pending_tlas_builds.emplace_back(build_info, instance_count, top_as_geometry);
 }
 
-void ASBuilder::get_cmds_tlas(const vk::CommandBuffer cmd,
+void ASBuilder::get_cmds_tlas(const CommandBufferHandle& cmd,
                               BufferHandle& scratch_buffer,
-                              const ProfilerHandle profiler) {
+                              const ProfilerHandle& profiler) {
     if (pending_tlas_builds.empty()) {
         return;
     }
@@ -91,7 +92,7 @@ void ASBuilder::get_cmds_tlas(const vk::CommandBuffer cmd,
                                            vk::AccessFlagBits::eAccelerationStructureWriteKHR,
                                        vk::AccessFlagBits::eAccelerationStructureReadKHR |
                                            vk::AccessFlagBits::eAccelerationStructureWriteKHR);
-
+    cmd->keep_until_pool_reset(scratch_buffer);
     for (uint32_t pending_idx = 0; pending_idx < pending_tlas_builds.size(); pending_idx++) {
         MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, fmt::format("TLAS build {:02}", pending_idx));
 
@@ -102,17 +103,14 @@ void ASBuilder::get_cmds_tlas(const vk::CommandBuffer cmd,
             &pending_tlas_builds[pending_idx].geometry;
         build_offset_info.primitiveCount = pending_tlas_builds[pending_idx].instance_count;
 
-        cmd.buildAccelerationStructuresKHR(pending_tlas_builds[pending_idx].build_info,
-                                           &build_offset_info);
-        cmd.pipelineBarrier(vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR,
-                            vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR, {}, {},
-                            scratch_barrier, {});
+        cmd->get_command_buffer().buildAccelerationStructuresKHR(
+            pending_tlas_builds[pending_idx].build_info, &build_offset_info);
+        cmd->barrier(vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR,
+                     vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR, scratch_barrier);
     }
 
     pending_tlas_builds.clear();
     pending_min_scratch_buffer = 0;
-
-    return;
 }
 
 } // namespace merian

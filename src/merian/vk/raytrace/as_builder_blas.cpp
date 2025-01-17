@@ -1,3 +1,4 @@
+#include "merian/vk/command/command_buffer.hpp"
 #include "merian/vk/raytrace/as_builder.hpp"
 
 #include <vector>
@@ -107,9 +108,9 @@ void ASBuilder::queue_update(const vk::AccelerationStructureGeometryKHR* geometr
     pending_blas_builds.emplace_back(as, build_info, range_info);
 }
 
-void ASBuilder::get_cmds_blas(const vk::CommandBuffer& cmd,
+void ASBuilder::get_cmds_blas(const CommandBufferHandle& cmd,
                               BufferHandle& scratch_buffer,
-                              const ProfilerHandle profiler) {
+                              const ProfilerHandle& profiler) {
     if (pending_blas_builds.empty())
         return;
 
@@ -123,7 +124,7 @@ void ASBuilder::get_cmds_blas(const vk::CommandBuffer& cmd,
                                            vk::AccessFlagBits::eAccelerationStructureWriteKHR,
                                        vk::AccessFlagBits::eAccelerationStructureReadKHR |
                                            vk::AccessFlagBits::eAccelerationStructureWriteKHR);
-
+    cmd->keep_until_pool_reset(scratch_buffer);
     for (uint32_t idx = 0; idx < pending_blas_builds.size(); idx++) {
         MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, fmt::format("BLAS build {:02}", idx));
 
@@ -132,14 +133,14 @@ void ASBuilder::get_cmds_blas(const vk::CommandBuffer& cmd,
         // Vulkan allows to create multiple as at once, however then the scratch buffer cannot be
         // reused! (This is the reason why we need to supply a pointer to a pointer for range
         // infos...)
-        cmd.buildAccelerationStructuresKHR(1, &pending_blas_builds[idx].build_info,
-                                           &pending_blas_builds[idx].range_info);
+        cmd->get_command_buffer().buildAccelerationStructuresKHR(
+            1, &pending_blas_builds[idx].build_info, &pending_blas_builds[idx].range_info);
+        cmd->keep_until_pool_reset(pending_blas_builds[idx].blas);
         // Barrier for TLAS build / compaction reads (hope this is enough... the spec does not state
         // if a global barrier is necessary)
-        cmd.pipelineBarrier(vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR,
-                            vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR, {}, {},
-                            {scratch_barrier, pending_blas_builds[idx].blas->blas_read_barrier()},
-                            {});
+        cmd->barrier(vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR,
+                     vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR,
+                     {scratch_barrier, pending_blas_builds[idx].blas->blas_read_barrier()});
     }
 
     pending_blas_builds.clear();

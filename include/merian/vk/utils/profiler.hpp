@@ -140,13 +140,13 @@ class Profiler : public std::enable_shared_from_this<Profiler> {
 
     // Start a GPU section
     void cmd_start(
-        const vk::CommandBuffer& cmd,
+        const CommandBufferHandle& cmd,
         const std::string& name,
         const vk::PipelineStageFlagBits pipeline_stage = vk::PipelineStageFlagBits::eAllCommands);
 
     // Stop a GPU section
     void cmd_end(
-        const vk::CommandBuffer& cmd,
+        const CommandBufferHandle& cmd,
         const vk::PipelineStageFlagBits pipeline_stage = vk::PipelineStageFlagBits::eAllCommands);
 
     // Collects the results from the GPU and resets the query pool.
@@ -234,7 +234,7 @@ class ProfileScope {
     }
 
   private:
-    ProfilerHandle profiler;
+    const ProfilerHandle profiler;
 #ifndef NDEBUG
     // Detect overlapping regions
     uint32_t section_index;
@@ -245,7 +245,7 @@ class ProfileScopeGPU {
   public:
     // Make sure the command buffers stays valid
     ProfileScopeGPU(const ProfilerHandle& profiler,
-                    const vk::CommandBuffer& cmd,
+                    const CommandBufferHandle& cmd,
                     const std::string& name)
         : profiler(profiler), cmd(cmd) {
         if (!profiler)
@@ -276,8 +276,8 @@ class ProfileScopeGPU {
     }
 
   private:
-    ProfilerHandle profiler;
-    vk::CommandBuffer cmd;
+    const ProfilerHandle profiler;
+    const CommandBufferHandle cmd;
 #ifndef NDEBUG
     // Detect overlapping regions
     uint32_t cpu_section_index;

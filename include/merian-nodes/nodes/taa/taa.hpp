@@ -19,7 +19,7 @@ class TAA : public AbstractCompute {
     };
 
   public:
-    TAA(const ContextHandle context);
+    TAA(const ContextHandle& context);
 
     std::vector<InputConnectorHandle> describe_inputs() override;
 

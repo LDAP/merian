@@ -149,7 +149,7 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
 }
 
 void SVGF::process([[maybe_unused]] GraphRun& run,
-                   [[maybe_unused]] const vk::CommandBuffer& cmd,
+                   [[maybe_unused]] const CommandBufferHandle& cmd,
                    const DescriptorSetHandle& descriptor_set,
                    [[maybe_unused]] const NodeIO& io) {
     // PREPARE (VARIANCE ESTIMATE)
@@ -160,32 +160,26 @@ void SVGF::process([[maybe_unused]] GraphRun& run,
             vk::ImageLayout::eGeneral, vk::AccessFlagBits::eShaderRead,
             vk::AccessFlagBits::eShaderWrite, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
             all_levels_and_layers(), true);
-        cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
-                            vk::PipelineStageFlagBits::eComputeShader, {}, {}, {}, bar);
+        cmd->barrier(vk::PipelineStageFlagBits::eComputeShader,
+                     vk::PipelineStageFlagBits::eComputeShader, bar);
 
         // run kernel
-        variance_estimate->bind(cmd);
-        variance_estimate->bind_descriptor_set(cmd, descriptor_set, 0);
-        variance_estimate->bind_descriptor_set(cmd, ping_pong_res[1].set, 1);
-        variance_estimate->push_constant(cmd, variance_estimate_pc);
+        cmd->bind(variance_estimate);
+        cmd->bind_descriptor_set(variance_estimate, descriptor_set, 0);
+        cmd->bind_descriptor_set(variance_estimate, ping_pong_res[1].set, 1);
+        cmd->push_constant(variance_estimate, variance_estimate_pc);
         // run more workgroups to prevent special cases in shader
-        const uint32_t variance_estimate_group_count_x =
-            (irr_create_info.extent.width +
-             (variance_estimate_local_size_x - VE_SPATIAL_RADIUS * 2) - 1) /
-            (variance_estimate_local_size_x - VE_SPATIAL_RADIUS * 2);
-        const uint32_t variance_estimate_group_count_y =
-            (irr_create_info.extent.height +
-             (variance_estimate_local_size_y - VE_SPATIAL_RADIUS * 2) - 1) /
-            (variance_estimate_local_size_y - VE_SPATIAL_RADIUS * 2);
-        cmd.dispatch(variance_estimate_group_count_x, variance_estimate_group_count_y, 1);
+        cmd->dispatch(irr_create_info.extent,
+                      variance_estimate_local_size_x - (2 * VE_SPATIAL_RADIUS),
+                      variance_estimate_local_size_y - (2 * VE_SPATIAL_RADIUS));
 
         // make sure writes are visible
         bar = ping_pong_res[0].ping_pong->get_image()->barrier(
             vk::ImageLayout::eShaderReadOnlyOptimal, vk::AccessFlagBits::eShaderWrite,
             vk::AccessFlagBits::eShaderRead, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
             all_levels_and_layers());
-        cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
-                            vk::PipelineStageFlagBits::eComputeShader, {}, {}, {}, bar);
+        cmd->barrier(vk::PipelineStageFlagBits::eComputeShader,
+                     vk::PipelineStageFlagBits::eComputeShader, bar);
     }
 
     // FILTER
@@ -199,22 +193,22 @@ void SVGF::process([[maybe_unused]] GraphRun& run,
             vk::ImageLayout::eGeneral, vk::AccessFlagBits::eShaderRead,
             vk::AccessFlagBits::eShaderWrite, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
             all_levels_and_layers(), true);
-        cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
-                            vk::PipelineStageFlagBits::eComputeShader, {}, {}, {}, bar);
+        cmd->barrier(vk::PipelineStageFlagBits::eComputeShader,
+                     vk::PipelineStageFlagBits::eComputeShader, bar);
 
         // run filter
-        filters[i]->bind(cmd);
-        filters[i]->bind_descriptor_set(cmd, descriptor_set, 0);
-        filters[i]->bind_descriptor_set(cmd, read_set, 1);
-        filters[i]->push_constant(cmd, filter_pc);
-        cmd.dispatch(group_count_x, group_count_y, 1);
+        cmd->bind(filters[i]);
+        cmd->bind_descriptor_set(filters[i], descriptor_set, 0);
+        cmd->bind_descriptor_set(filters[i], read_set, 1);
+        cmd->push_constant(filters[i], filter_pc);
+        cmd->dispatch(group_count_x, group_count_y, 1);
 
         bar = write_res.ping_pong->get_image()->barrier(
             vk::ImageLayout::eShaderReadOnlyOptimal, vk::AccessFlagBits::eShaderWrite,
             vk::AccessFlagBits::eShaderRead, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
             all_levels_and_layers());
-        cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
-                            vk::PipelineStageFlagBits::eComputeShader, {}, {}, {}, bar);
+        cmd->barrier(vk::PipelineStageFlagBits::eComputeShader,
+                     vk::PipelineStageFlagBits::eComputeShader, bar);
 
         read_set = write_res.set;
     }
@@ -222,11 +216,11 @@ void SVGF::process([[maybe_unused]] GraphRun& run,
     // TAA
     {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "taa");
-        taa->bind(cmd);
-        taa->bind_descriptor_set(cmd, descriptor_set, 0);
-        taa->bind_descriptor_set(cmd, read_set, 1);
-        taa->push_constant(cmd, taa_pc);
-        cmd.dispatch(group_count_x, group_count_y, 1);
+        cmd->bind(taa);
+        cmd->bind_descriptor_set(taa, descriptor_set, 0);
+        cmd->bind_descriptor_set(taa, read_set, 1);
+        cmd->push_constant(taa, taa_pc);
+        cmd->dispatch(group_count_x, group_count_y, 1);
     }
 }
 

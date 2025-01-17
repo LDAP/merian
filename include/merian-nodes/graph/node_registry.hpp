@@ -35,7 +35,7 @@ class NodeRegistry {
         std::sort(nodes.begin(), nodes.end());
     }
 
-    template <typename NODE_TYPE> void register_node(const NodeInfo&& node_info) {
+    template <typename NODE_TYPE> void register_node(NodeInfo&& node_info) {
         const std::type_index type = typeid(std::remove_pointer_t<NODE_TYPE>);
         if (name_to_type.contains(node_info.name)) {
             throw std::invalid_argument{

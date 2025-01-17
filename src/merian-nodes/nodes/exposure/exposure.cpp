@@ -38,7 +38,7 @@ std::vector<OutputConnectorHandle> AutoExposure::describe_outputs(const NodeIOLa
         vk::PipelineStageFlagBits2::eComputeShader | vk::PipelineStageFlagBits2::eTransfer,
         vk::ShaderStageFlagBits::eCompute,
         vk::BufferCreateInfo(
-            {}, (vk::DeviceSize)LOCAL_SIZE_X * LOCAL_SIZE_Y * sizeof(uint32_t) + sizeof(uint32_t),
+            {}, ((vk::DeviceSize)LOCAL_SIZE_X * LOCAL_SIZE_Y * sizeof(uint32_t)) + sizeof(uint32_t),
             vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst));
     con_luminance = std::make_shared<ManagedVkBufferOut>(
         "avg_luminance", vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
@@ -69,12 +69,9 @@ AutoExposure::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
 }
 
 void AutoExposure::process(GraphRun& run,
-                           const vk::CommandBuffer& cmd,
+                           const CommandBufferHandle& cmd,
                            const DescriptorSetHandle& descriptor_set,
                            const NodeIO& io) {
-    const auto group_count_x = (io[con_out]->get_extent().width + LOCAL_SIZE_X - 1) / LOCAL_SIZE_X;
-    const auto group_count_y = (io[con_out]->get_extent().height + LOCAL_SIZE_Y - 1) / LOCAL_SIZE_Y;
-
     if (pc.automatic == VK_TRUE) {
         pc.reset = run.get_iteration() == 0 ? VK_TRUE : VK_FALSE;
         pc.timediff = static_cast<float>(run.get_time_delta());
@@ -82,42 +79,44 @@ void AutoExposure::process(GraphRun& run,
         auto bar = io[con_hist]->buffer_barrier(vk::AccessFlagBits::eShaderRead |
                                                     vk::AccessFlagBits::eShaderWrite,
                                                 vk::AccessFlagBits::eTransferWrite);
-        cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
-                            vk::PipelineStageFlagBits::eTransfer, {}, {}, bar, {});
-        io[con_hist]->fill(cmd);
+        cmd->barrier(vk::PipelineStageFlagBits::eComputeShader,
+                     vk::PipelineStageFlagBits::eTransfer, bar);
+
+        cmd->fill(io[con_hist]);
+
         bar = io[con_hist]->buffer_barrier(vk::AccessFlagBits::eTransferWrite,
                                            vk::AccessFlagBits::eShaderRead |
                                                vk::AccessFlagBits::eShaderWrite);
-        cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
-                            vk::PipelineStageFlagBits::eComputeShader, {}, {}, bar, {});
+        cmd->barrier(vk::PipelineStageFlagBits::eTransfer,
+                     vk::PipelineStageFlagBits::eComputeShader, bar);
 
-        histogram->bind(cmd);
-        histogram->bind_descriptor_set(cmd, descriptor_set);
-        histogram->push_constant(cmd, pc);
-        cmd.dispatch(group_count_x, group_count_y, 1);
+        cmd->bind(histogram);
+        cmd->bind_descriptor_set(histogram, descriptor_set);
+        cmd->push_constant(histogram, pc);
+        cmd->dispatch(io[con_out]->get_extent(), LOCAL_SIZE_X, LOCAL_SIZE_Y);
 
         bar = io[con_hist]->buffer_barrier(vk::AccessFlagBits::eShaderRead |
                                                vk::AccessFlagBits::eShaderWrite,
                                            vk::AccessFlagBits::eShaderRead);
-        cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
-                            vk::PipelineStageFlagBits::eComputeShader, {}, {}, bar, {});
+        cmd->barrier(vk::PipelineStageFlagBits::eComputeShader,
+                     vk::PipelineStageFlagBits::eComputeShader, bar);
     }
 
-    luminance->bind(cmd);
-    luminance->bind_descriptor_set(cmd, descriptor_set);
-    luminance->push_constant(cmd, pc);
-    cmd.dispatch(1, 1, 1);
+    cmd->bind(luminance);
+    cmd->bind_descriptor_set(luminance, descriptor_set);
+    cmd->push_constant(luminance, pc);
+    cmd->dispatch(1, 1, 1);
 
     auto bar = io[con_luminance]->buffer_barrier(vk::AccessFlagBits::eShaderRead |
                                                      vk::AccessFlagBits::eShaderWrite,
                                                  vk::AccessFlagBits::eShaderRead);
-    cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
-                        vk::PipelineStageFlagBits::eComputeShader, {}, {}, bar, {});
+    cmd->barrier(vk::PipelineStageFlagBits::eComputeShader,
+                 vk::PipelineStageFlagBits::eComputeShader, bar);
 
-    exposure->bind(cmd);
-    exposure->bind_descriptor_set(cmd, descriptor_set);
-    exposure->push_constant(cmd, pc);
-    cmd.dispatch(group_count_x, group_count_y, 1);
+    cmd->bind(exposure);
+    cmd->bind_descriptor_set(exposure, descriptor_set);
+    cmd->push_constant(exposure, pc);
+    cmd->dispatch(io[con_out]->get_extent(), LOCAL_SIZE_X, LOCAL_SIZE_Y);
 }
 
 AutoExposure::NodeStatusFlags AutoExposure::properties(Properties& config) {

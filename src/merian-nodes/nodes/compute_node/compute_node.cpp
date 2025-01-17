@@ -5,7 +5,7 @@
 
 namespace merian_nodes {
 
-AbstractCompute::AbstractCompute(const ContextHandle context,
+AbstractCompute::AbstractCompute(const ContextHandle& context,
                                  const std::optional<uint32_t> push_constant_size)
     : Node(), context(context), push_constant_size(push_constant_size) {}
 
@@ -19,7 +19,7 @@ AbstractCompute::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
 }
 
 void AbstractCompute::process(GraphRun& run,
-                              const vk::CommandBuffer& cmd,
+                              const CommandBufferHandle& cmd,
                               const DescriptorSetHandle& descriptor_set,
                               const NodeIO& io) {
     PipelineHandle& old_pipeline = io.frame_data<PipelineHandle>();
@@ -47,12 +47,12 @@ void AbstractCompute::process(GraphRun& run,
     }
 
     if (pipe) {
-        pipe->bind(cmd);
-        pipe->bind_descriptor_set(cmd, descriptor_set);
+        cmd->bind(pipe);
+        cmd->bind_descriptor_set(pipe, descriptor_set);
         if (push_constant_size.has_value())
-            pipe->push_constant(cmd, get_push_constant(run, io));
-        auto [x, y, z] = get_group_count(io);
-        cmd.dispatch(x, y, z);
+            cmd->push_constant(pipe, get_push_constant(run, io));
+        const auto [x, y, z] = get_group_count(io);
+        cmd->dispatch(x, y, z);
     }
 }
 

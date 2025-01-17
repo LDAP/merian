@@ -19,7 +19,7 @@ GraphResourceHandle VkBufferArrayOut::create_resource(
     vk::PipelineStageFlags2 input_pipeline_stages;
     vk::AccessFlags2 input_access_flags;
 
-    for (auto& [input_node, input] : inputs) {
+    for (const auto& [input_node, input] : inputs) {
         const auto& con_in = debugable_ptr_cast<VkBufferArrayIn>(input);
         input_pipeline_stages |= con_in->pipeline_stages;
         input_access_flags |= con_in->access_flags;
@@ -35,7 +35,7 @@ BufferArrayResource& VkBufferArrayOut::resource(const GraphResourceHandle& resou
 
 Connector::ConnectorStatusFlags VkBufferArrayOut::on_pre_process(
     [[maybe_unused]] GraphRun& run,
-    [[maybe_unused]] const vk::CommandBuffer& cmd,
+    [[maybe_unused]] const CommandBufferHandle& cmd,
     const GraphResourceHandle& resource,
     [[maybe_unused]] const NodeHandle& node,
     [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
@@ -53,7 +53,7 @@ Connector::ConnectorStatusFlags VkBufferArrayOut::on_pre_process(
 
 Connector::ConnectorStatusFlags VkBufferArrayOut::on_post_process(
     GraphRun& run,
-    [[maybe_unused]] const vk::CommandBuffer& cmd,
+    [[maybe_unused]] const CommandBufferHandle& cmd,
     const GraphResourceHandle& resource,
     [[maybe_unused]] const NodeHandle& node,
     [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,

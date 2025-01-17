@@ -20,7 +20,10 @@ namespace merian {
 class Extension;
 class Context;
 class Queue;
+using QueueHandle = std::shared_ptr<Queue>;
 class CommandPool;
+class CommandBuffer;
+using CommandBufferHandle = std::shared_ptr<CommandBuffer>;
 
 using ContextHandle = std::shared_ptr<Context>;
 class ShaderModule;

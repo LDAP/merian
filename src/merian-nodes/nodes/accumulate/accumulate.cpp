@@ -129,7 +129,7 @@ Accumulate::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
 }
 
 void Accumulate::process(GraphRun& run,
-                         const vk::CommandBuffer& cmd,
+                         const CommandBufferHandle& cmd,
                          const DescriptorSetHandle& descriptor_set,
                          [[maybe_unused]] const NodeIO& io) {
     accumulate_pc.iteration = run.get_total_iteration();
@@ -137,26 +137,26 @@ void Accumulate::process(GraphRun& run,
     if (accumulate_pc.firefly_filter_enable == VK_TRUE ||
         accumulate_pc.adaptive_alpha_reduction > 0.0f) {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "compute percentiles");
-        auto bar = percentile_texture->get_image()->barrier(
+        const auto bar = percentile_texture->get_image()->barrier(
             vk::ImageLayout::eGeneral, vk::AccessFlagBits::eShaderRead,
             vk::AccessFlagBits::eShaderWrite, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
             all_levels_and_layers(), true);
-        cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
-                            vk::PipelineStageFlagBits::eComputeShader, {}, {}, {}, bar);
+        cmd->barrier(vk::PipelineStageFlagBits::eComputeShader,
+                     vk::PipelineStageFlagBits::eComputeShader, bar);
 
-        calculate_percentiles->bind(cmd);
-        calculate_percentiles->bind_descriptor_set(cmd, descriptor_set, 0);
-        calculate_percentiles->bind_descriptor_set(cmd, percentile_set, 1);
-        calculate_percentiles->push_constant(cmd, percentile_pc);
-        cmd.dispatch(percentile_group_count_x, percentile_group_count_y, 1);
+        cmd->bind(calculate_percentiles);
+        cmd->bind_descriptor_set(calculate_percentiles, descriptor_set, 0);
+        cmd->bind_descriptor_set(calculate_percentiles, percentile_set, 1);
+        cmd->push_constant(calculate_percentiles, percentile_pc);
+        cmd->dispatch(percentile_group_count_x, percentile_group_count_y, 1);
     }
 
     auto bar = percentile_texture->get_image()->barrier(
         vk::ImageLayout::eShaderReadOnlyOptimal, vk::AccessFlagBits::eShaderWrite,
         vk::AccessFlagBits::eShaderRead, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
         all_levels_and_layers());
-    cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
-                        vk::PipelineStageFlagBits::eComputeShader, {}, {}, {}, bar);
+    cmd->barrier(vk::PipelineStageFlagBits::eComputeShader,
+                 vk::PipelineStageFlagBits::eComputeShader, bar);
 
     {
         if (run.get_iteration() == 0 || clear) {
@@ -168,11 +168,11 @@ void Accumulate::process(GraphRun& run,
         }
 
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "accumulate");
-        accumulate->bind(cmd);
-        accumulate->bind_descriptor_set(cmd, descriptor_set, 0);
-        accumulate->bind_descriptor_set(cmd, accumulate_set, 1);
-        accumulate->push_constant(cmd, accumulate_pc);
-        cmd.dispatch(filter_group_count_x, filter_group_count_y, 1);
+        cmd->bind(accumulate);
+        cmd->bind_descriptor_set(accumulate, descriptor_set, 0);
+        cmd->bind_descriptor_set(accumulate, accumulate_set, 1);
+        cmd->push_constant(accumulate, accumulate_pc);
+        cmd->dispatch(filter_group_count_x, filter_group_count_y);
     }
 }
 

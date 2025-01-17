@@ -27,7 +27,7 @@ class AnyOut : public TypedOutputConnector<std::any&> {
 
     Connector::ConnectorStatusFlags on_pre_process(
         [[maybe_unused]] GraphRun& run,
-        [[maybe_unused]] const vk::CommandBuffer& cmd,
+        [[maybe_unused]] const CommandBufferHandle& cmd,
         const GraphResourceHandle& resource,
         [[maybe_unused]] const NodeHandle& node,
         [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
@@ -35,7 +35,7 @@ class AnyOut : public TypedOutputConnector<std::any&> {
 
     Connector::ConnectorStatusFlags on_post_process(
         [[maybe_unused]] GraphRun& run,
-        [[maybe_unused]] const vk::CommandBuffer& cmd,
+        [[maybe_unused]] const CommandBufferHandle& cmd,
         const GraphResourceHandle& resource,
         [[maybe_unused]] const NodeHandle& node,
         [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,

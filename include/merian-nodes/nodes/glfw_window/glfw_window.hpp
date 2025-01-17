@@ -36,7 +36,7 @@ class GLFWWindow : public Node {
     }
 
     virtual void process(GraphRun& run,
-                         const vk::CommandBuffer& cmd,
+                         const CommandBufferHandle& cmd,
                          [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
                          const NodeIO& io) override {
         auto& old_swapchains = io.frame_data<std::vector<SwapchainHandle>>();
@@ -55,12 +55,9 @@ class GLFWWindow : public Node {
         }
 
         if (acquire) {
-            const auto bar = barrier_image_layout(
-                acquire->image, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal,
-                all_levels_and_layers(vk::ImageAspectFlagBits::eColor));
-
-            cmd.pipelineBarrier(vk::PipelineStageFlagBits::eBottomOfPipe,
-                                vk::PipelineStageFlagBits::eTransfer, {}, {}, {}, bar);
+            const ImageHandle image = acquire->image_view->get_image();
+            const auto bar = image->barrier2(vk::ImageLayout::eTransferDstOptimal);
+            cmd->barrier(bar);
 
             if (io.is_connected(image_in)) {
                 const auto& src_image = io[image_in];
@@ -71,17 +68,15 @@ class GLFWWindow : public Node {
                         : vk::Filter::eNearest;
                 const vk::Extent3D extent(acquire->extent, 1);
 
-                cmd_blit(mode, cmd, *src_image, vk::ImageLayout::eTransferSrcOptimal,
-                         src_image->get_extent(), acquire->image,
-                         vk::ImageLayout::eTransferDstOptimal, extent, vk::ClearColorValue{},
-                         filter);
+                cmd_blit(mode, cmd, src_image, vk::ImageLayout::eTransferSrcOptimal,
+                         src_image->get_extent(), image, vk::ImageLayout::eTransferDstOptimal,
+                         extent, vk::ClearColorValue{}, filter);
             } else {
-                cmd.clearColorImage(acquire->image, vk::ImageLayout::eTransferDstOptimal,
-                                    vk::ClearColorValue{}, all_levels_and_layers());
+                cmd->clear(image);
             }
 
-            cmd_barrier_image_layout(cmd, acquire->image, vk::ImageLayout::eTransferDstOptimal,
-                                     vk::ImageLayout::ePresentSrcKHR);
+            const auto bar2 = image->barrier2(vk::ImageLayout::ePresentSrcKHR);
+            cmd->barrier(bar2);
 
             on_blit_completed(cmd, *acquire);
 
@@ -164,7 +159,7 @@ class GLFWWindow : public Node {
     // Set a callback for when the blit of the node input was completed.
     // The image will have vk::ImageLayout::ePresentSrcKHR.
     void set_on_blit_completed(
-        const std::function<void(const vk::CommandBuffer& cmd,
+        const std::function<void(const CommandBufferHandle& cmd,
                                  SwapchainAcquireResult& acquire_result)>& on_blit_completed) {
         this->on_blit_completed = on_blit_completed;
     }
@@ -176,8 +171,8 @@ class GLFWWindow : public Node {
     std::optional<SwapchainAcquireResult> acquire;
     BlitMode mode = FIT;
 
-    std::function<void(const vk::CommandBuffer& cmd, SwapchainAcquireResult& acquire_result)>
-        on_blit_completed = []([[maybe_unused]] const vk::CommandBuffer& cmd,
+    std::function<void(const CommandBufferHandle& cmd, SwapchainAcquireResult& acquire_result)>
+        on_blit_completed = []([[maybe_unused]] const CommandBufferHandle& cmd,
                                [[maybe_unused]] SwapchainAcquireResult& acquire_result) {};
 
     ManagedVkImageInHandle image_in = ManagedVkImageIn::transfer_src("src", 0, true);

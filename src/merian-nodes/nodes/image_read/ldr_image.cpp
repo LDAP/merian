@@ -1,7 +1,7 @@
 #include "merian-nodes/nodes/image_read/ldr_image.hpp"
 
-#include "stb_image.h"
 #include "merian-nodes/graph/errors.hpp"
+#include "stb_image.h"
 
 #include <filesystem>
 
@@ -10,7 +10,7 @@ namespace merian_nodes {
 LDRImageRead::LDRImageRead(const ContextHandle& context) : Node(), context(context) {}
 
 LDRImageRead::~LDRImageRead() {
-    if (image) {
+    if (image != nullptr) {
         stbi_image_free(image);
     }
 }
@@ -23,7 +23,7 @@ LDRImageRead::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
     if (!std::filesystem::exists(filename)) {
         throw graph_errors::node_error{fmt::format("file does not exist: {}", filename.string())};
     }
-    if (!stbi_info(filename.string().c_str(), &width, &height, &channels)) {
+    if (stbi_info(filename.string().c_str(), &width, &height, &channels) == 0) {
         throw graph_errors::node_error{"format not supported!"};
     }
 
@@ -34,11 +34,11 @@ LDRImageRead::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
 }
 
 void LDRImageRead::process([[maybe_unused]] GraphRun& run,
-                           const vk::CommandBuffer& cmd,
+                           const CommandBufferHandle& cmd,
                            [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
                            const NodeIO& io) {
     if (needs_run) {
-        if (!image) {
+        if (image == nullptr) {
             image = stbi_load(filename.string().c_str(), &width, &height, &channels, 4);
             assert(image);
             assert(width == (int)io[con_out]->get_extent().width &&
@@ -50,7 +50,7 @@ void LDRImageRead::process([[maybe_unused]] GraphRun& run,
 
         run.get_allocator()->getStaging()->cmdToImage(cmd, *io[con_out], {0, 0, 0},
                                                       io[con_out]->get_extent(), first_layer(),
-                                                      width * height * 4, image);
+                                                      static_cast<long>(width * height) * 4, image);
 
         if (!keep_on_host) {
             stbi_image_free(image);
@@ -67,7 +67,7 @@ LDRImageRead::NodeStatusFlags LDRImageRead::properties(Properties& config) {
     if (config.config_text("path", config_filename, true)) {
         needs_rebuild = true;
         filename = context->file_loader.find_file(config_filename).value_or(config_filename);
-        if (image) {
+        if (image != nullptr) {
             stbi_image_free(image);
             image = nullptr;
         }
@@ -79,7 +79,7 @@ LDRImageRead::NodeStatusFlags LDRImageRead::properties(Properties& config) {
     format = linear ? vk::Format::eR8G8B8A8Unorm : vk::Format::eR8G8B8A8Srgb;
     needs_rebuild |= format != old_format;
     config.config_bool("keep in host memory", keep_on_host, "");
-    if (!keep_on_host && image) {
+    if (!keep_on_host && (image != nullptr)) {
         stbi_image_free(image);
         image = nullptr;
     }

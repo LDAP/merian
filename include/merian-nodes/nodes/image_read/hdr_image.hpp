@@ -22,7 +22,7 @@ class HDRImageRead : public Node {
     std::vector<OutputConnectorHandle> describe_outputs(const NodeIOLayout& io_layout) override;
 
     void process(GraphRun& run,
-                 const vk::CommandBuffer& cmd,
+                 const CommandBufferHandle& cmd,
                  const DescriptorSetHandle& descriptor_set,
                  const NodeIO& io) override;
 

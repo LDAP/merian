@@ -8,12 +8,13 @@
 #include "resource.hpp"
 
 #include "merian-nodes/graph/node_registry.hpp"
+#include "merian/vk/command/caching_command_pool.hpp"
 #include "merian/vk/context.hpp"
+#include "merian/vk/descriptors/descriptor_set_layout_builder.hpp"
 #include "merian/vk/extension/extension_vk_debug_utils.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/sync/ring_fences.hpp"
 #include "merian/vk/utils/math.hpp"
-#include <merian/vk/descriptors/descriptor_set_layout_builder.hpp>
 
 #include <cstdint>
 #include <queue>
@@ -192,7 +193,8 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
         // The command pool for the current iteration.
         // We do not use RingCommandPool here since we might want to add a more custom
         // setup later (multi-threaded, multi-queues,...).
-        std::shared_ptr<CommandPool> command_pool;
+        CommandPoolHandle command_pool;
+        std::shared_ptr<CachingCommandPool> command_buffer_cache;
         // Staging set, to release staging buffers and images when the copy
         // to device local memory has finished.
         merian::StagingMemoryManager::SetID staging_set_id{};
@@ -215,6 +217,8 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
         for (uint32_t i = 0; i < ITERATIONS_IN_FLIGHT; i++) {
             InFlightData& in_flight_data = ring_fences.get(i).user_data;
             in_flight_data.command_pool = std::make_shared<CommandPool>(queue);
+            in_flight_data.command_buffer_cache =
+                std::make_shared<CachingCommandPool>(in_flight_data.command_pool);
             in_flight_data.profiler_query_pool =
                 std::make_shared<merian::QueryPool<vk::QueryType::eTimestamp>>(context, 512, true);
         }
@@ -519,11 +523,14 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
 
         // now we can release the resources from staging space and reset the command pool
         resource_allocator->getStaging()->releaseResourceSet(in_flight_data.staging_set_id);
-        const std::shared_ptr<CommandPool>& cmd_pool = in_flight_data.command_pool;
+        const CommandPoolHandle& cmd_pool = in_flight_data.command_pool;
+        const std::shared_ptr<CachingCommandPool>& cmd_cache = in_flight_data.command_buffer_cache;
+
         GraphRun& run = in_flight_data.graph_run;
         cmd_pool->reset();
 
-        const vk::CommandBuffer cmd = cmd_pool->create_and_begin();
+        const CommandBufferHandle cmd = cmd_cache->create_and_begin();
+
         // get profiler and reports
         const ProfilerHandle& profiler = prepare_profiler_for_run(in_flight_data);
         const auto run_start = std::chrono::high_resolution_clock::now();
@@ -588,7 +595,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
             for (auto& node : flat_topology) {
                 NodeData& data = node_data.at(node);
                 if (debug_utils)
-                    debug_utils->cmd_begin_label(cmd, registry.node_name(node));
+                    debug_utils->cmd_begin_label(*cmd, registry.node_name(node));
 
                 try {
                     run_node(run, cmd, node, data, profiler);
@@ -606,7 +613,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                 }
 
                 if (debug_utils)
-                    debug_utils->cmd_end_label(cmd);
+                    debug_utils->cmd_end_label(*cmd);
             }
         }
 
@@ -616,11 +623,12 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
             MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "on_pre_submit");
             on_pre_submit(run, cmd);
         }
-        cmd_pool->end_all();
+
+        cmd->end();
         in_flight_data.staging_set_id = resource_allocator->getStaging()->finalizeResourceSet();
         {
             MERIAN_PROFILE_SCOPE(profiler, "submit");
-            queue->submit(cmd_pool, ring_fences.reset(), run.get_signal_semaphores(),
+            queue->submit(cmd, ring_fences.reset(), run.get_signal_semaphores(),
                           run.get_wait_semaphores(), run.get_wait_stages(),
                           run.get_timeline_semaphore_submit_info());
         }
@@ -1243,7 +1251,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
     // Calls connector callbacks, checks resource states and records as well as applies descriptor
     // set updates.
     void run_node(GraphRun& run,
-                  const vk::CommandBuffer& cmd,
+                  const CommandBufferHandle& cmd,
                   const NodeHandle& node,
                   NodeData& data,
                   [[maybe_unused]] const ProfilerHandle& profiler) {
@@ -1290,7 +1298,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
 
             if (!image_barriers.empty() || !buffer_barriers.empty()) {
                 vk::DependencyInfoKHR dep_info{{}, {}, buffer_barriers, image_barriers};
-                cmd.pipelineBarrier2(dep_info);
+                cmd->barrier({}, buffer_barriers, image_barriers);
                 image_barriers.clear();
                 buffer_barriers.clear();
             }
@@ -1308,7 +1316,9 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
             }
         }
 
-        { node->process(run, cmd, descriptor_set.descriptor_set, data.resource_maps[set_idx]); }
+        {
+            node->process(run, cmd, descriptor_set.descriptor_set, data.resource_maps[set_idx]);
+        }
 
         {
             // Call connector callbacks (post_process) and record descriptor set updates
@@ -1344,8 +1354,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
             }
 
             if (!image_barriers.empty() || !buffer_barriers.empty()) {
-                vk::DependencyInfoKHR dep_info{{}, {}, buffer_barriers, image_barriers};
-                cmd.pipelineBarrier2(dep_info);
+                cmd->barrier({}, buffer_barriers, image_barriers);
             }
         }
     }
@@ -2113,8 +2122,9 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
 
     // Set a callback that is executed right before the commands for this run are submitted to
     // the GPU.
-    void set_on_pre_submit(const std::function<void(GraphRun& graph_run,
-                                                    const vk::CommandBuffer& cmd)>& on_pre_submit) {
+    void set_on_pre_submit(
+        const std::function<void(GraphRun& graph_run, const CommandBufferHandle& cmd)>&
+            on_pre_submit) {
         this->on_pre_submit = on_pre_submit;
     }
 
@@ -2136,7 +2146,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
     // Outside callbacks
     // clang-format off
     std::function<void(GraphRun& graph_run)>                                on_run_starting = [](GraphRun&) {};
-    std::function<void(GraphRun& graph_run, const vk::CommandBuffer& cmd)>  on_pre_submit = [](GraphRun&, const vk::CommandBuffer&) {};
+    std::function<void(GraphRun& graph_run, const CommandBufferHandle& cmd)>  on_pre_submit = [](GraphRun&, const CommandBufferHandle&) {};
     std::function<void()>                                                   on_post_submit = [] {};
     // clang-format on
 

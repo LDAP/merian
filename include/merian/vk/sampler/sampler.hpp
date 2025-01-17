@@ -11,7 +11,7 @@ namespace merian {
 /**
  * @brief      This class describes a vk::Sampler with automatic cleanup.
  */
-class Sampler : public std::enable_shared_from_this<Sampler> {
+class Sampler : public std::enable_shared_from_this<Sampler>, public Object {
 public:
 
     Sampler(const ContextHandle& context, const vk::SamplerCreateInfo& create_info) : context(context) {

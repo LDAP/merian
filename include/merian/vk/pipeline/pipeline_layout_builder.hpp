@@ -52,7 +52,7 @@ class PipelineLayoutBuilder {
                       uint32_t* push_constant_id = nullptr) {
         vk::PushConstantRange range{flags, current_push_constant_offset, size};
         current_push_constant_offset += size;
-        if (push_constant_id) {
+        if (push_constant_id != nullptr) {
             *push_constant_id = ranges.size();
         }
         ranges.push_back(range);

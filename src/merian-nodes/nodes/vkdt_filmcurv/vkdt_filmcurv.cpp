@@ -5,7 +5,7 @@
 
 namespace merian_nodes {
 
-VKDTFilmcurv::VKDTFilmcurv(const ContextHandle context,
+VKDTFilmcurv::VKDTFilmcurv(const ContextHandle& context,
                            const std::optional<Options> options,
                            const std::optional<vk::Format> output_format)
     : AbstractCompute(context, sizeof(Options)), output_format(output_format) {

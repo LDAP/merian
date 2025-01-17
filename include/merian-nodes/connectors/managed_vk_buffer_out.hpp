@@ -27,7 +27,7 @@ class ManagedVkBufferOut : public TypedOutputConnector<BufferHandle> {
 
     virtual ConnectorStatusFlags
     on_pre_process(GraphRun& run,
-                   const vk::CommandBuffer& cmd,
+                   const CommandBufferHandle& cmd,
                    const GraphResourceHandle& resource,
                    const NodeHandle& node,
                    std::vector<vk::ImageMemoryBarrier2>& image_barriers,
@@ -35,7 +35,7 @@ class ManagedVkBufferOut : public TypedOutputConnector<BufferHandle> {
 
     virtual ConnectorStatusFlags
     on_post_process(GraphRun& run,
-                    const vk::CommandBuffer& cmd,
+                    const CommandBufferHandle& cmd,
                     const GraphResourceHandle& resource,
                     const NodeHandle& node,
                     std::vector<vk::ImageMemoryBarrier2>& image_barriers,
