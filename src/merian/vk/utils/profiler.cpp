@@ -1,4 +1,5 @@
 #include "merian/vk/utils/profiler.hpp"
+#include "merian/vk/command/command_buffer.hpp"
 
 #ifndef MERIAN_PROFILER_ENABLE
 #include "spdlog/spdlog.h"
@@ -37,7 +38,7 @@ void Profiler::clear() {
     clear_index++;
 }
 
-void Profiler::cmd_start(const vk::CommandBuffer& cmd,
+void Profiler::cmd_start(const CommandBufferHandle& cmd,
                          const std::string& name,
                          const vk::PipelineStageFlagBits pipeline_stage) {
     assert(query_pool);
@@ -59,11 +60,11 @@ void Profiler::cmd_start(const vk::CommandBuffer& cmd,
            "two sections with the same name or missing collect()?");
     current_section.timestamp_idx = qp_info.pending_gpu_sections.size() * SW_QUERY_COUNT;
 
-    query_pool->write_timestamp(cmd, current_section.timestamp_idx, pipeline_stage);
+    cmd->write_timestamp(query_pool, current_section.timestamp_idx, pipeline_stage);
     qp_info.pending_gpu_sections.emplace_back(current_gpu_section);
 }
 
-void Profiler::cmd_end(const vk::CommandBuffer& cmd,
+void Profiler::cmd_end(const CommandBufferHandle& cmd,
                        const vk::PipelineStageFlagBits pipeline_stage) {
     assert(query_pool && "num_gpu_timers is 0?");
     assert(current_gpu_section != 0 && "missing cmd_start?");
@@ -71,7 +72,7 @@ void Profiler::cmd_end(const vk::CommandBuffer& cmd,
     GPUSection& section = gpu_sections[current_gpu_section];
 
     assert(section.timestamp_idx != (uint32_t)-1);
-    query_pool->write_timestamp(cmd, section.timestamp_idx + 1, pipeline_stage);
+    cmd->write_timestamp(query_pool, section.timestamp_idx + 1, pipeline_stage);
     section.timestamp_idx = (uint32_t)-1;
 
     current_gpu_section = section.parent_index;

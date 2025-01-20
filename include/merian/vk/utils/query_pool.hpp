@@ -8,24 +8,23 @@
 
 namespace merian {
 
+template <vk::QueryType QUERY_TYPE> class QueryPool;
+template <vk::QueryType QUERY_TYPE> using QueryPoolHandle = std::shared_ptr<QueryPool<QUERY_TYPE>>;
+
 template <vk::QueryType QUERY_TYPE>
-class QueryPool : public std::enable_shared_from_this<QueryPool<QUERY_TYPE>> {
+class QueryPool : public std::enable_shared_from_this<QueryPool<QUERY_TYPE>>, public Object {
 
   public:
     // Creates a query pool and resets it.
     QueryPool(const ContextHandle& context,
               const uint32_t query_count = 1024,
-              bool reset_after_creation = false)
+              bool host_reset_after_creation = false)
         : context(context), query_count(query_count) {
-        assert(context->get_extension<ExtensionVkCore>());
-        assert(context->get_extension<ExtensionVkCore>()
-                   ->get_enabled_features()
-                   .get_physical_device_features_v12()
-                   .hostQueryReset);
 
-        vk::QueryPoolCreateInfo createInfo({}, QUERY_TYPE, query_count);
-        query_pool = context->device.createQueryPool(createInfo);
-        if (reset_after_creation) {
+        const vk::QueryPoolCreateInfo create_info({}, QUERY_TYPE, query_count);
+        query_pool = context->device.createQueryPool(create_info);
+
+        if (host_reset_after_creation) {
             reset();
         }
     }
@@ -34,23 +33,38 @@ class QueryPool : public std::enable_shared_from_this<QueryPool<QUERY_TYPE>> {
         context->device.destroyQueryPool(query_pool);
     }
 
-    void reset(const vk::CommandBuffer& cmd) {
-        reset(cmd, 0, query_count);
+    // ------------------------------------------------------------------
+
+    operator const vk::QueryPool&() const {
+        return query_pool;
     }
 
-    void reset() {
-        reset(0, query_count);
+    const vk::QueryPool& operator*() const {
+        return query_pool;
     }
 
-    void reset(const vk::CommandBuffer& cmd,
-               const uint32_t first_query,
-               const uint32_t query_count) const {
-        cmd.resetQueryPool(query_pool, first_query, query_count);
+    const vk::QueryPool& get_query_pool() const {
+        return query_pool;
+    }
+
+    // ------------------------------------------------------------------
+
+    // uses the Vulkan 1.2 hostQueryReset feature to reset the pool,
+    // use CommandBuffer::reset_query_pool to use the command buffer to reset.
+    void reset(const uint32_t first_query, const uint32_t query_count) const {
+        assert(context->get_extension<ExtensionVkCore>());
+        assert(context->get_extension<ExtensionVkCore>()
+                   ->get_enabled_features()
+                   .get_physical_device_features_v12()
+                   .hostQueryReset);
+
+        context->device.resetQueryPool(query_pool, first_query, query_count);
     }
 
     // uses the Vulkan 1.2 hostQueryReset feature to reset the pool
-    void reset(const uint32_t first_query, const uint32_t query_count) const {
-        context->device.resetQueryPool(query_pool, first_query, query_count);
+    // use CommandBuffer::reset_query_pool to use the command buffer to reset.
+    void reset() {
+        reset(0, query_count);
     }
 
     const uint32_t& get_query_count() const {
@@ -60,9 +74,19 @@ class QueryPool : public std::enable_shared_from_this<QueryPool<QUERY_TYPE>> {
     template <typename RETURN_TYPE>
     std::vector<RETURN_TYPE> get_query_pool_results(const uint32_t first_query,
                                                     const uint32_t query_count,
-                                                    const vk::QueryResultFlags flags) const {
+                                                    const vk::QueryResultFlags flags = {}) const {
         std::vector<RETURN_TYPE> data(query_count);
         check_result(context->device.getQueryPoolResults(query_pool, first_query, data.size(),
+                                                         sizeof(RETURN_TYPE) * data.size(),
+                                                         data.data(), sizeof(RETURN_TYPE), flags),
+                     "could not get query results");
+        return data;
+    }
+
+    template <typename RETURN_TYPE>
+    std::vector<RETURN_TYPE> get_query_pool_results(const vk::QueryResultFlags flags = {}) const {
+        std::vector<RETURN_TYPE> data(query_count);
+        check_result(context->device.getQueryPoolResults(query_pool, 0, data.size(),
                                                          sizeof(RETURN_TYPE) * data.size(),
                                                          data.data(), sizeof(RETURN_TYPE), flags),
                      "could not get query results");
@@ -93,29 +117,17 @@ class QueryPool : public std::enable_shared_from_this<QueryPool<QUERY_TYPE>> {
                                                     vk::QueryResultFlagBits::eWait);
     }
 
-    template <vk::QueryType U = QUERY_TYPE,
-              typename = std::enable_if_t<U == vk::QueryType::eTimestamp>>
-    void write_timestamp(const vk::CommandBuffer& cmd,
-                         const uint32_t query,
-                         const vk::PipelineStageFlagBits pipeline_stage =
-                             vk::PipelineStageFlagBits::eAllCommands) const {
-        cmd.writeTimestamp(pipeline_stage, query_pool, query);
-    }
-
-    template <vk::QueryType U = QUERY_TYPE,
-              typename = std::enable_if_t<U == vk::QueryType::eTimestamp>>
-    void write_timestamp2(const vk::CommandBuffer& cmd,
-                          const uint32_t query,
-                          const vk::PipelineStageFlagBits2 pipeline_stage =
-                              vk::PipelineStageFlagBits2::eAllCommands) const {
-        cmd.writeTimestamp2(pipeline_stage, query_pool, query);
-    }
-
   private:
     const ContextHandle context;
     const uint32_t query_count;
     vk::QueryPool query_pool;
+
+  public:
+    static QueryPoolHandle<QUERY_TYPE> create(const ContextHandle& context,
+                                              const uint32_t query_count = 1024,
+                                              bool host_reset_after_creation = false) {
+        return std::make_shared<QueryPool>(context, query_count, host_reset_after_creation);
+    }
 };
-template <vk::QueryType QUERY_TYPE> using QueryPoolHandle = std::shared_ptr<QueryPool<QUERY_TYPE>>;
 
 } // namespace merian

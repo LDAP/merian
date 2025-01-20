@@ -35,7 +35,7 @@ inline vk::DescriptorSet allocate_descriptor_set(const vk::Device& device,
 }
 
 // A DescriptorSet that knows its layout -> Can be used to simplify DescriptorSetUpdate.
-class DescriptorSet : public std::enable_shared_from_this<DescriptorSet> {
+class DescriptorSet : public std::enable_shared_from_this<DescriptorSet>, public Object {
 
   public:
     // Allocates a DescriptorSet that matches the layout that is attached to the Pool

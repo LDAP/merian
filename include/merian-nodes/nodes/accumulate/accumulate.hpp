@@ -56,7 +56,7 @@ class Accumulate : public Node {
                                  const DescriptorSetLayoutHandle& descriptor_set_layout) override;
 
     void process(GraphRun& run,
-                 const vk::CommandBuffer& cmd,
+                 const CommandBufferHandle& cmd,
                  const DescriptorSetHandle& descriptor_set,
                  const NodeIO& io) override;
 

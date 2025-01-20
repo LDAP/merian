@@ -4,7 +4,6 @@
 #include "merian-nodes/connectors/managed_vk_image_in.hpp"
 #include "merian-nodes/graph/node.hpp"
 
-#include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
 #include "merian/vk/shader/shader_module.hpp"
 
@@ -25,7 +24,7 @@ class MeanToBuffer : public Node {
     };
 
   public:
-    MeanToBuffer(const ContextHandle context);
+    MeanToBuffer(const ContextHandle& context);
 
     ~MeanToBuffer();
 
@@ -37,7 +36,7 @@ class MeanToBuffer : public Node {
                                  const DescriptorSetLayoutHandle& descriptor_set_layout) override;
 
     void process(GraphRun& run,
-                 const vk::CommandBuffer& cmd,
+                 const CommandBufferHandle& cmd,
                  const DescriptorSetHandle& descriptor_set,
                  const NodeIO& io) override;
 

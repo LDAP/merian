@@ -27,7 +27,7 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
 
     ResourceAllocator(const ContextHandle& context,
                       const std::shared_ptr<MemoryAllocator>& memAllocator,
-                      const StagingMemoryManagerHandle staging,
+                      const StagingMemoryManagerHandle& staging,
                       const SamplerPoolHandle& samplerPool);
 
     // All staging buffers must be cleared before
@@ -59,7 +59,7 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
 
     // Simple buffer creation with data uploaded through staging manager
     // implicitly sets VK_BUFFER_USAGE_TRANSFER_DST_BIT
-    BufferHandle createBuffer(const vk::CommandBuffer& cmdBuf,
+    BufferHandle createBuffer(const CommandBufferHandle& cmdBuf,
                               const vk::DeviceSize& size_,
                               const vk::BufferUsageFlags usage_ = {},
                               const void* data_ = nullptr,
@@ -70,7 +70,7 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
     // Simple buffer creation with data uploaded through staging manager
     // implicitly sets VK_BUFFER_USAGE_TRANSFER_DST_BIT
     template <typename T>
-    BufferHandle createBuffer(const vk::CommandBuffer& cmdBuf,
+    BufferHandle createBuffer(const CommandBufferHandle& cmdBuf,
                               const std::vector<T>& data_,
                               const vk::BufferUsageFlags usage_,
                               const std::string& debug_name = {},
@@ -130,7 +130,7 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
     // Create an image with data uploaded through staging manager
     //
     // Important: You are responsible to insert a barrier for the upload.
-    ImageHandle createImage(const vk::CommandBuffer& cmdBuf,
+    ImageHandle createImage(const CommandBufferHandle& cmdBuf,
                             const size_t size_,
                             const void* data_,
                             const vk::ImageCreateInfo& info_,
@@ -139,30 +139,40 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
 
     //--------------------------------------------------------------------------------------------------
 
+    ImageViewHandle create_image_view(const ImageHandle& image,
+                                      const vk::ImageViewCreateInfo& imageViewCreateInfo,
+                                      const std::string& debug_name = {});
+
+    //--------------------------------------------------------------------------------------------------
+
+    // shortcut to create an image view and a texture
     TextureHandle createTexture(const ImageHandle& image,
                                 const vk::ImageViewCreateInfo& imageViewCreateInfo,
                                 const SamplerHandle& sampler,
                                 const std::string& debug_name = {});
 
+    // shortcut to create an image view and a texture
     TextureHandle createTexture(const ImageHandle& image,
                                 const vk::ImageViewCreateInfo& imageViewCreateInfo,
                                 const vk::SamplerCreateInfo& samplerCreateInfo,
                                 const std::string& debug_name = {});
 
+    // shortcut to create an image view and a texture
     // Create a texture with a linear sampler if the view format supports it.
     // With a view to the whole subresource (using image->make_view_create_info()).
     TextureHandle createTexture(const ImageHandle& image, const std::string& debug_name = {});
 
+    // shortcut to create an image view and a texture
     // Create a texture with a linear sampler if the view format supports it.
     TextureHandle createTexture(const ImageHandle& image,
                                 const vk::ImageViewCreateInfo& imageViewCreateInfo,
                                 const std::string& debug_name = {});
 
-    // shortcut to create a texture from RGB8 data.
+    // shortcut to create an image view and a texture from RGB8 data
     // layout: the layout for the image view
     //
     // Important: You are responsible to perform the image transition!
-    TextureHandle createTextureFromRGBA8(const vk::CommandBuffer& cmd,
+    TextureHandle createTextureFromRGBA8(const CommandBufferHandle& cmd,
                                          const uint32_t* data,
                                          const uint32_t width,
                                          const uint32_t height,

@@ -9,7 +9,7 @@
 
 namespace merian_nodes {
 
-Bloom::Bloom(const ContextHandle context) : Node(), context(context) {
+Bloom::Bloom(const ContextHandle& context) : Node(), context(context) {
 
     separate_module = std::make_shared<ShaderModule>(context, merian_bloom_separate_comp_spv_size(),
                                                      merian_bloom_separate_comp_spv());
@@ -38,9 +38,9 @@ std::vector<OutputConnectorHandle> Bloom::describe_outputs(const NodeIOLayout& i
 }
 
 Bloom::NodeStatusFlags Bloom::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
-                                           const DescriptorSetLayoutHandle& graph_layout) {
+                                           const DescriptorSetLayoutHandle& descriptor_set_layout) {
     auto pipe_layout = PipelineLayoutBuilder(context)
-                           .add_descriptor_set_layout(graph_layout)
+                           .add_descriptor_set_layout(descriptor_set_layout)
                            .add_push_constant<PushConstant>()
                            .build_pipeline_layout();
     auto spec_builder = SpecializationInfoBuilder();
@@ -54,26 +54,24 @@ Bloom::NodeStatusFlags Bloom::on_connected([[maybe_unused]] const NodeIOLayout& 
 }
 
 void Bloom::process([[maybe_unused]] GraphRun& run,
-                    const vk::CommandBuffer& cmd,
+                    const CommandBufferHandle& cmd,
                     const DescriptorSetHandle& descriptor_set,
                     const NodeIO& io) {
-    const auto group_count_x = (io[con_out]->get_extent().width + local_size_x - 1) / local_size_x;
-    const auto group_count_y = (io[con_out]->get_extent().height + local_size_y - 1) / local_size_y;
+    cmd->bind(separate);
+    cmd->bind_descriptor_set(separate, descriptor_set);
+    cmd->push_constant(separate, pc);
+    cmd->dispatch(io[con_out]->get_extent(), local_size_x, local_size_y);
 
-    separate->bind(cmd);
-    separate->bind_descriptor_set(cmd, descriptor_set);
-    separate->push_constant(cmd, pc);
-    cmd.dispatch(group_count_x, group_count_y, 1);
+    const auto bar =
+        io[con_interm]->barrier(vk::ImageLayout::eGeneral, vk::AccessFlagBits::eShaderWrite,
+                                vk::AccessFlagBits::eShaderRead);
+    cmd->barrier(vk::PipelineStageFlagBits::eComputeShader,
+                 vk::PipelineStageFlagBits::eComputeShader, bar);
 
-    auto bar = io[con_interm]->barrier(vk::ImageLayout::eGeneral, vk::AccessFlagBits::eShaderWrite,
-                                       vk::AccessFlagBits::eShaderRead);
-    cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
-                        vk::PipelineStageFlagBits::eComputeShader, {}, {}, {}, bar);
-
-    composite->bind(cmd);
-    composite->bind_descriptor_set(cmd, descriptor_set);
-    composite->push_constant(cmd, pc);
-    cmd.dispatch(group_count_x, group_count_y, 1);
+    cmd->bind(composite);
+    cmd->bind_descriptor_set(composite, descriptor_set);
+    cmd->push_constant(composite, pc);
+    cmd->dispatch(io[con_out]->get_extent(), local_size_x, local_size_y);
 }
 
 Bloom::NodeStatusFlags Bloom::properties(Properties& config) {
@@ -87,9 +85,8 @@ Bloom::NodeStatusFlags Bloom::properties(Properties& config) {
 
     if (value_changed) {
         return NEEDS_RECONNECT;
-    } else {
-        return {};
     }
+    return {};
 }
 
 } // namespace merian_nodes

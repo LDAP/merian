@@ -5,7 +5,7 @@
 #include <memory>
 
 namespace merian {
-class Semaphore : public std::enable_shared_from_this<Semaphore> {
+class Semaphore : public std::enable_shared_from_this<Semaphore>, public Object {
   public:
     Semaphore(const ContextHandle& context, const vk::SemaphoreTypeCreateInfo& type_create_info)
         : context(context) {
@@ -24,7 +24,7 @@ class Semaphore : public std::enable_shared_from_this<Semaphore> {
     }
 
     const vk::Semaphore& operator*() {
-      return semaphore;
+        return semaphore;
     }
 
   protected:

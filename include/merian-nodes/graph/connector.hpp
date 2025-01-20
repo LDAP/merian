@@ -38,7 +38,7 @@ class Connector : public std::enable_shared_from_this<Connector> {
   public:
     Connector(const std::string& name) : name(name) {}
 
-    virtual ~Connector(){};
+    virtual ~Connector() {};
 
     // If the resource should be available in a shader, return a DescriptorSetLayoutBinding.
     // Note, that the binding value is ignored!
@@ -70,7 +70,7 @@ class Connector : public std::enable_shared_from_this<Connector> {
     [[nodiscard]]
     virtual ConnectorStatusFlags
     on_pre_process([[maybe_unused]] GraphRun& run,
-                   [[maybe_unused]] const vk::CommandBuffer& cmd,
+                   [[maybe_unused]] const CommandBufferHandle& cmd,
                    [[maybe_unused]] const GraphResourceHandle& resource,
                    [[maybe_unused]] const NodeHandle& node,
                    [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
@@ -86,7 +86,7 @@ class Connector : public std::enable_shared_from_this<Connector> {
     [[nodiscard]]
     virtual ConnectorStatusFlags
     on_post_process([[maybe_unused]] GraphRun& run,
-                    [[maybe_unused]] const vk::CommandBuffer& cmd,
+                    [[maybe_unused]] const CommandBufferHandle& cmd,
                     [[maybe_unused]] const GraphResourceHandle& resource,
                     [[maybe_unused]] const NodeHandle& node,
                     [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,

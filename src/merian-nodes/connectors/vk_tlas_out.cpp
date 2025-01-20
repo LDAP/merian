@@ -18,7 +18,7 @@ VkTLASOut::create_resource(const std::vector<std::tuple<NodeHandle, InputConnect
 
     vk::PipelineStageFlags2 read_stages;
 
-    for (auto& [input_node, input] : inputs) {
+    for (const auto& [input_node, input] : inputs) {
         const auto& con_in = debugable_ptr_cast<VkTLASIn>(input);
         read_stages |= con_in->pipeline_stages;
     }
@@ -32,7 +32,7 @@ TLASResource& VkTLASOut::resource(const GraphResourceHandle& resource) {
 
 Connector::ConnectorStatusFlags
 VkTLASOut::on_pre_process([[maybe_unused]] GraphRun& run,
-                          [[maybe_unused]] const vk::CommandBuffer& cmd,
+                          [[maybe_unused]] const CommandBufferHandle& cmd,
                           const GraphResourceHandle& resource,
                           [[maybe_unused]] const NodeHandle& node,
                           [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
@@ -46,7 +46,7 @@ VkTLASOut::on_pre_process([[maybe_unused]] GraphRun& run,
 
 Connector::ConnectorStatusFlags VkTLASOut::on_post_process(
     GraphRun& run,
-    [[maybe_unused]] const vk::CommandBuffer& cmd,
+    [[maybe_unused]] const CommandBufferHandle& cmd,
     const GraphResourceHandle& resource,
     [[maybe_unused]] const NodeHandle& node,
     [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,

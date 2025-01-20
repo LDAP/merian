@@ -35,7 +35,8 @@ class VMAMemoryAllocation : public MemoryAllocation {
 
     // ------------------------------------------------------------------------------------
 
-    void invalidate(const VkDeviceSize offset = 0, const VkDeviceSize size = VK_WHOLE_SIZE) override;
+    void invalidate(const VkDeviceSize offset = 0,
+                    const VkDeviceSize size = VK_WHOLE_SIZE) override;
 
     void flush(const VkDeviceSize offset = 0, const VkDeviceSize size = VK_WHOLE_SIZE) override;
 

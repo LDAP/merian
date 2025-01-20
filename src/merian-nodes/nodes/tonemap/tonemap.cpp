@@ -6,7 +6,7 @@
 
 namespace merian_nodes {
 
-Tonemap::Tonemap(const ContextHandle context, const std::optional<vk::Format> output_format)
+Tonemap::Tonemap(const ContextHandle& context, const std::optional<vk::Format> output_format)
     : AbstractCompute(context, sizeof(PushConstant)), output_format(output_format) {
     shader = std::make_shared<ShaderModule>(context, merian_tonemap_comp_spv_size(),
                                             merian_tonemap_comp_spv());

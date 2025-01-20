@@ -3,30 +3,34 @@
 #include <spdlog/spdlog.h>
 #include <vulkan/vulkan.hpp>
 
-namespace merian {
-
-spdlog::level::level_enum get_severity(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity) {
-    if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
-        return spdlog::level::level_enum::err;
-    } else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
-        return spdlog::level::level_enum::warn;
-    } else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) {
-        return spdlog::level::level_enum::info;
-    } else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) {
-        return spdlog::level::level_enum::trace;
-    } else {
+namespace {
+spdlog::level::level_enum get_severity(vk::DebugUtilsMessageSeverityFlagBitsEXT messageSeverity) {
+    if (messageSeverity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eError) {
         return spdlog::level::level_enum::err;
     }
+    if (messageSeverity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning) {
+        return spdlog::level::level_enum::warn;
+    }
+    if (messageSeverity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo) {
+        return spdlog::level::level_enum::info;
+    }
+    if (messageSeverity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose) {
+        return spdlog::level::level_enum::trace;
+    }
+    return spdlog::level::level_enum::err;
 }
+} // namespace
+
+namespace merian {
 
 /*
     This is the function in which errors will go through to be displayed.
 */
-VKAPI_ATTR VkBool32 VKAPI_CALL
-ExtensionVkDebugUtils::messenger_callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-                                          VkDebugUtilsMessageTypeFlagsEXT messageTypes,
-                                          VkDebugUtilsMessengerCallbackDataEXT const* pCallbackData,
-                                          void* pUserData) {
+VKAPI_ATTR vk::Bool32 VKAPI_CALL ExtensionVkDebugUtils::messenger_callback(
+    vk::DebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+    vk::DebugUtilsMessageTypeFlagsEXT messageTypes,
+    vk::DebugUtilsMessengerCallbackDataEXT const* pCallbackData,
+    void* pUserData) {
 
     UserData* user_data = static_cast<UserData*>(pUserData);
     if (user_data->ignore_message_ids.contains(pCallbackData->messageIdNumber)) {
@@ -42,7 +46,7 @@ ExtensionVkDebugUtils::messenger_callback(VkDebugUtilsMessageSeverityFlagBitsEXT
     if (0 < pCallbackData->queueLabelCount) {
         std::string additional_info;
         additional_info += "Queue Labels:\n";
-        for (uint8_t i = 0; i < pCallbackData->queueLabelCount; i++) {
+        for (uint32_t i = 0; i < pCallbackData->queueLabelCount; i++) {
             additional_info += "\t\t";
             additional_info += "labelName = <";
             additional_info += pCallbackData->pQueueLabels[i].pLabelName;
@@ -53,7 +57,7 @@ ExtensionVkDebugUtils::messenger_callback(VkDebugUtilsMessageSeverityFlagBitsEXT
     if (0 < pCallbackData->cmdBufLabelCount) {
         std::string additional_info;
         additional_info += "CommandBuffer Labels:\n";
-        for (uint8_t i = 0; i < pCallbackData->cmdBufLabelCount; i++) {
+        for (uint32_t i = 0; i < pCallbackData->cmdBufLabelCount; i++) {
             additional_info += "\t\t";
             additional_info += "labelName = <";
             additional_info += pCallbackData->pCmdBufLabels[i].pLabelName;
@@ -64,10 +68,10 @@ ExtensionVkDebugUtils::messenger_callback(VkDebugUtilsMessageSeverityFlagBitsEXT
     if (0 < pCallbackData->objectCount) {
         std::string additional_info;
         additional_info += "Objects:\n";
-        for (uint8_t i = 0; i < pCallbackData->objectCount; i++) {
+        for (uint32_t i = 0; i < pCallbackData->objectCount; i++) {
             additional_info += "\t";
             additional_info += "Object ";
-            additional_info += i;
+            additional_info += std::to_string(i);
             additional_info += "\n";
             additional_info += "\t\t";
             additional_info += "objectType   = ";
@@ -78,7 +82,7 @@ ExtensionVkDebugUtils::messenger_callback(VkDebugUtilsMessageSeverityFlagBitsEXT
             additional_info += "objectHandle = ";
             additional_info += fmt::format("{:x}", pCallbackData->pObjects[i].objectHandle);
             additional_info += "\n";
-            if (pCallbackData->pObjects[i].pObjectName) {
+            if (pCallbackData->pObjects[i].pObjectName != nullptr) {
                 additional_info += "\t\t";
                 additional_info += "objectName   = ";
                 additional_info += pCallbackData->pObjects[i].pObjectName;
@@ -89,7 +93,7 @@ ExtensionVkDebugUtils::messenger_callback(VkDebugUtilsMessageSeverityFlagBitsEXT
     }
 
     assert(!user_data->assert_message ||
-           !(messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT));
+           !(messageSeverity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eError));
 
     return VK_FALSE;
 }

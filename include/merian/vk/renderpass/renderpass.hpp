@@ -6,10 +6,14 @@
 
 namespace merian {
 
-class RenderPass : public std::enable_shared_from_this<RenderPass> {
+class RenderPass;
+using RenderPassHandle = std::shared_ptr<RenderPass>;
+
+class RenderPass : public std::enable_shared_from_this<RenderPass>, public Object {
 
   public:
-    RenderPass(const ContextHandle& context, const vk::RenderPassCreateInfo2 renderpass_create_info);
+    RenderPass(const ContextHandle& context,
+               const vk::RenderPassCreateInfo2 renderpass_create_info);
 
     RenderPass(const ContextHandle& context, const vk::RenderPassCreateInfo renderpass_create_info);
 
@@ -21,11 +25,23 @@ class RenderPass : public std::enable_shared_from_this<RenderPass> {
 
     const vk::RenderPass& operator*() const;
 
+    const uint32_t& get_attachment_count() const;
+
   private:
     const ContextHandle context;
     vk::RenderPass renderpass;
-};
+    const uint32_t attachment_count;
 
-using RenderPassHandle = std::shared_ptr<RenderPass>;
+  public:
+    static RenderPassHandle create(const ContextHandle& context,
+                                   const vk::RenderPassCreateInfo2 renderpass_create_info) {
+        return std::make_shared<RenderPass>(context, renderpass_create_info);
+    }
+
+    static RenderPassHandle create(const ContextHandle& context,
+                                   const vk::RenderPassCreateInfo renderpass_create_info) {
+        return std::make_shared<RenderPass>(context, renderpass_create_info);
+    }
+};
 
 } // namespace merian

@@ -6,7 +6,7 @@
 
 namespace merian_nodes {
 
-TAA::TAA(const ContextHandle context) : AbstractCompute(context, sizeof(PushConstant)) {
+TAA::TAA(const ContextHandle& context) : AbstractCompute(context, sizeof(PushConstant)) {
     shader =
         std::make_shared<ShaderModule>(context, merian_taa_comp_spv_size(), merian_taa_comp_spv());
     pc.temporal_alpha = 0.;

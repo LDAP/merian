@@ -1,10 +1,11 @@
 #pragma once
 
 #include "merian/vk/command/queue.hpp"
+#include "merian/vk/memory/resource_allocations.hpp"
 #include "merian/vk/sync/semaphore_binary.hpp"
 #include "merian/vk/window/surface.hpp"
 #include "merian/vk/window/window.hpp"
-#include "vulkan/vulkan.hpp"
+
 #include <GLFW/glfw3.h>
 
 #include <optional>
@@ -13,11 +14,22 @@ namespace merian {
 
 class Swapchain;
 using SwapchainHandle = std::shared_ptr<Swapchain>;
+using WeakSwapchainHandle = std::weak_ptr<Swapchain>;
+
+class SwapchainImage : public Image {
+  public:
+    SwapchainImage(const ContextHandle& context,
+                   const vk::Image& image,
+                   const vk::ImageCreateInfo create_info);
+
+    ~SwapchainImage() override;
+
+  private:
+};
 
 struct SwapchainAcquireResult {
     // The image and its view and index in the swap chain.
-    vk::Image image;
-    vk::ImageView view;
+    ImageViewHandle image_view;
     uint32_t index;
 
     uint16_t num_images;
@@ -31,12 +43,13 @@ struct SwapchainAcquireResult {
     // You MUST signal this semaphore when done writing to the image, and
     // before presenting it. (The system waits for this before presenting).
     BinarySemaphoreHandle signal_semaphore;
+
     // Swapchain was created or recreated.
     // You can use cmd_update_image_layouts() to update the image layouts to PresentSrc.
     bool did_recreate;
     // A pointer to the old swapchain if it was not already destroyed.
     // Can be used to enqueue cleanup functions.
-    std::weak_ptr<Swapchain> old_swapchain;
+    WeakSwapchainHandle old_swapchain;
 
     vk::Extent2D extent;
 };
@@ -77,11 +90,6 @@ struct SwapchainAcquireResult {
  */
 class Swapchain : public std::enable_shared_from_this<Swapchain> {
   private:
-    struct Entry {
-        vk::Image image{};
-        vk::ImageView imageView{};
-    };
-
     struct SemaphoreGroup {
         // be aware semaphore index may not match active image index!
         BinarySemaphoreHandle read_semaphore{};
@@ -152,13 +160,8 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
     }
 
     /* Image only valid until the next acquire_*() */
-    vk::Image& current_image() {
-        return entries[current_image_idx].image;
-    }
-
-    /* Image only valid until the next acquire_*() */
-    vk::ImageView& current_image_view() {
-        return entries[current_image_idx].imageView;
+    const ImageViewHandle& current_image_view() {
+        return image_views[current_image_idx];
     }
 
     /* Image index only valid until the next acquire_*() */
@@ -167,20 +170,15 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
     }
 
     uint32_t current_image_count() {
-        return entries.size();
+        return image_views.size();
     }
 
-    vk::ImageView image_view(uint32_t idx) const;
+    ImageViewHandle image_view(uint32_t idx) const;
 
-    vk::Image image(uint32_t idx) const;
+    ImageHandle image(uint32_t idx) const;
 
     vk::SurfaceFormatKHR get_surface_format() {
         return surface_format;
-    }
-
-    void cmd_update_image_layouts(vk::CommandBuffer cmd) const {
-        cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
-                            vk::PipelineStageFlagBits::eTopOfPipe, {}, {}, nullptr, barriers);
     }
 
     /* Remember to also transition image layouts */
@@ -209,12 +207,17 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
         cleanup_functions.emplace_back(cleanup_function);
     }
 
+    const ContextHandle& get_context() const {
+        return context;
+    }
+
   private:
     /* Destroys swapchain and image views */
     void destroy_swapchain();
 
     /* Destroys image views only (for recreate) */
     void destroy_entries();
+
     [[nodiscard]] vk::PresentModeKHR select_present_mode(const bool vsync);
 
   private:
@@ -230,13 +233,12 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
     uint32_t num_images = 0;
 
     vk::SurfaceFormatKHR surface_format;
-    std::vector<Entry> entries;
+    std::vector<ImageViewHandle> image_views;
     // updated in aquire_custom
     uint32_t current_image_idx;
     // updated in present
     std::vector<SemaphoreGroup> semaphore_groups;
     uint32_t current_semaphore_idx = 0;
-    std::vector<vk::ImageMemoryBarrier> barriers;
     uint32_t cur_width = 0;
     uint32_t cur_height = 0;
     // Only valid after the first acquire!

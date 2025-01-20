@@ -22,7 +22,7 @@ Merian provides several abstractions and utilities for synchronization:
 - `RingFences`: Provide a fence for each frame in flight, see example below.
 - `Semaphore`: Abstract class for semaphores
     - `TimelineSemaphore`: A semaphore with a monotonically increasing counter. Can be waited and signaled from the CPU.
-    - `BinarySemaphore`: The old-school binary semaphore which is used manily to synchronize multiple queue submits.
+    - `BinarySemaphore`: The old-school binary semaphore which is used mainly to synchronize multiple queue submits.
 
 ### Example
 

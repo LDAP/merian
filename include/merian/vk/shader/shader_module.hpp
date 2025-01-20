@@ -2,6 +2,7 @@
 
 #include "merian/io/file_loader.hpp"
 #include "merian/vk/context.hpp"
+#include "merian/vk/object.hpp"
 #include "merian/vk/pipeline/specialization_info.hpp"
 
 #include <optional>
@@ -18,7 +19,7 @@ class ShaderStageCreateInfo;
  * The object can only be created using the create_module(...) methods. This is to ensure there is
  * only on object and the vk::ShaderModule is destroyed when there are no references left.
  */
-class ShaderModule : public std::enable_shared_from_this<ShaderModule> {
+class ShaderModule : public std::enable_shared_from_this<ShaderModule>, public Object {
   public:
     ShaderModule() = delete;
 

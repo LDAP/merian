@@ -1,7 +1,7 @@
 #include "merian-nodes/nodes/image_read/hdr_image.hpp"
 
-#include "stb_image.h"
 #include "merian-nodes/graph/errors.hpp"
+#include "stb_image.h"
 
 #include <filesystem>
 
@@ -10,7 +10,7 @@ namespace merian_nodes {
 HDRImageRead::HDRImageRead(const ContextHandle& context) : Node(), context(context) {}
 
 HDRImageRead::~HDRImageRead() {
-    if (image) {
+    if (image != nullptr) {
         stbi_image_free(image);
     }
 }
@@ -23,7 +23,7 @@ HDRImageRead::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
     if (!std::filesystem::exists(filename)) {
         throw graph_errors::node_error{fmt::format("file does not exist: {}", filename.string())};
     }
-    if (!stbi_info(filename.string().c_str(), &width, &height, &channels)) {
+    if (stbi_info(filename.string().c_str(), &width, &height, &channels) == 0) {
         throw graph_errors::node_error{"format not supported!"};
     }
 
@@ -35,11 +35,11 @@ HDRImageRead::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
 }
 
 void HDRImageRead::process([[maybe_unused]] GraphRun& run,
-                           const vk::CommandBuffer& cmd,
+                           const CommandBufferHandle& cmd,
                            [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
                            const NodeIO& io) {
     if (needs_run) {
-        if (!image) {
+        if (image == nullptr) {
             image = stbi_loadf(filename.string().c_str(), &width, &height, &channels, 4);
             assert(image);
             assert(width == (int)io[con_out]->get_extent().width &&
@@ -49,9 +49,9 @@ void HDRImageRead::process([[maybe_unused]] GraphRun& run,
                         height, channels);
         }
 
-        run.get_allocator()->getStaging()->cmdToImage(cmd, *io[con_out], {0, 0, 0},
-                                                      io[con_out]->get_extent(), first_layer(),
-                                                      width * height * 4 * sizeof(float), image);
+        run.get_allocator()->getStaging()->cmdToImage(
+            cmd, *io[con_out], {0, 0, 0}, io[con_out]->get_extent(), first_layer(),
+            static_cast<long>(width * height) * 4 * sizeof(float), image);
 
         if (!keep_on_host) {
             stbi_image_free(image);
@@ -68,14 +68,14 @@ HDRImageRead::NodeStatusFlags HDRImageRead::properties(Properties& config) {
     if (config.config_text("path", config_filename, true)) {
         needs_rebuild = true;
         filename = context->file_loader.find_file(config_filename).value_or(config_filename);
-        if (image) {
+        if (image != nullptr) {
             stbi_image_free(image);
             image = nullptr;
         }
     }
 
     config.config_bool("keep in host memory", keep_on_host, "");
-    if (!keep_on_host && image) {
+    if (!keep_on_host && (image != nullptr)) {
         stbi_image_free(image);
         image = nullptr;
     }

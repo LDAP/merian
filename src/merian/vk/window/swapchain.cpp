@@ -62,6 +62,21 @@ vk::SurfaceFormatKHR select_surface_format(const std::vector<vk::SurfaceFormatKH
 
 // -------------------------------------------------------------------------------------
 
+SwapchainImage::SwapchainImage(const ContextHandle& context,
+                               const vk::Image& image,
+                               const vk::ImageCreateInfo create_info)
+    : Image(context,
+            image,
+            create_info,
+            vk::ImageLayout::ePresentSrcKHR /*needed for barriers using bottom of pipe*/) {}
+
+SwapchainImage::~SwapchainImage() {
+    // prevent image destruction, swapchain (presentation engine) destroys the image
+    get_image() = VK_NULL_HANDLE;
+}
+
+// -------------------------------------------------------------------------------------
+
 Swapchain::Swapchain(const ContextHandle& context,
                      const SurfaceHandle& surface,
                      const std::vector<vk::SurfaceFormatKHR>& preferred_surface_formats,
@@ -151,83 +166,73 @@ vk::Extent2D Swapchain::create_swapchain(const uint32_t width, const uint32_t he
         composite = vk::CompositeAlphaFlagBitsKHR::ePostMultiplied;
     }
 
-    // clang-format off
-    vk::SwapchainCreateInfoKHR create_info(
-                                          vk::SwapchainCreateFlagBitsKHR(),
-                                          *surface,
-                                          min_images,
-                                          surface_format.format,
-                                          surface_format.colorSpace,
-                                          extent,
-                                          1,
-                                          vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferDst,
-                                          vk::SharingMode::eExclusive,
-                                          0,
-                                          nullptr,
-                                          pre_transform,
-                                          composite,
-                                          present_mode,
-                                          VK_FALSE,
-                                          old
-                                          );
+    vk::ImageCreateInfo image_create_info{
+        {},
+        vk::ImageType::e2D,
+        surface_format.format,
+        vk::Extent3D(extent, 1),
+        1,
+        1,
+        vk::SampleCountFlagBits::e1,
+        vk::ImageTiling::eOptimal,
+        vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferDst,
+        vk::SharingMode::eExclusive,
+        0,
+        nullptr,
+        vk::ImageLayout::eUndefined,
+        nullptr,
+    };
+
+    vk::SwapchainCreateInfoKHR create_info{
+        vk::SwapchainCreateFlagBitsKHR(),
+        *surface,
+        min_images,
+        image_create_info.format,
+        surface_format.colorSpace,
+        extent,
+        image_create_info.arrayLayers,
+        image_create_info.usage,
+        image_create_info.sharingMode,
+        image_create_info.queueFamilyIndexCount,
+        image_create_info.pQueueFamilyIndices,
+        pre_transform,
+        composite,
+        present_mode,
+        VK_FALSE,
+        old,
+    };
 
     swapchain = context->device.createSwapchainKHR(create_info, nullptr);
 
     std::vector<vk::Image> swapchain_images = context->device.getSwapchainImagesKHR(swapchain);
     num_images = swapchain_images.size();
-    entries.resize(swapchain_images.size());
+
+    image_views.resize(swapchain_images.size());
     semaphore_groups.resize(swapchain_images.size());
-    barriers.resize(swapchain_images.size());
 
     for (std::size_t i = 0; i < swapchain_images.size(); i++) {
-        Entry& entry = entries[i];
+        ImageViewHandle& image_view = image_views[i];
         SemaphoreGroup& semaphore_group = semaphore_groups[i];
 
         // Image
-        entry.image = swapchain_images[i];
+        ImageHandle image =
+            std::make_shared<SwapchainImage>(context, swapchain_images[i], image_create_info);
 
         // View
-        vk::ImageViewCreateInfo create_info(
-                                           vk::ImageViewCreateFlagBits(),
-                                           entry.image,
-                                           vk::ImageViewType::e2D,
-                                           surface_format.format,
-                                           {
-                                            vk::ComponentSwizzle::eR,
-                                            vk::ComponentSwizzle::eG,
-                                            vk::ComponentSwizzle::eB,
-                                            vk::ComponentSwizzle::eA
-                                        },
-                                        {
-                                            vk::ImageAspectFlagBits::eColor,
-                                            0, 1, 0, 1
-                                        }
-                                        );
-        entry.imageView = context->device.createImageView(create_info);
+        vk::ImageViewCreateInfo create_info{
+            vk::ImageViewCreateFlagBits(),
+            *image,
+            vk::ImageViewType::e2D,
+            surface_format.format,
+            {vk::ComponentSwizzle::eR, vk::ComponentSwizzle::eG, vk::ComponentSwizzle::eB,
+             vk::ComponentSwizzle::eA},
+            {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1},
+        };
+        image_view = ImageView::create(create_info, image);
 
         // Semaphore
         semaphore_group.read_semaphore = std::make_shared<BinarySemaphore>(context);
         semaphore_group.written_semaphore = std::make_shared<BinarySemaphore>(context);
-
-        // Barrier
-        vk::ImageSubresourceRange image_subresource_range {
-            vk::ImageAspectFlagBits::eColor,    
-            0,
-            VK_REMAINING_MIP_LEVELS,    
-            0,
-            VK_REMAINING_ARRAY_LAYERS
-        };
-        vk::ImageMemoryBarrier barrier{
-            {},
-            {},
-            vk::ImageLayout::eUndefined,
-            vk::ImageLayout::ePresentSrcKHR,
-            {},
-            {},
-            entry.image,
-            image_subresource_range,
-        };
-        barriers[i] = barrier;
     }
 
     cur_width = width;
@@ -235,7 +240,6 @@ vk::Extent2D Swapchain::create_swapchain(const uint32_t width, const uint32_t he
     cur_present_mode = present_mode;
     created = true;
 
-    // clang-format on
     SPDLOG_DEBUG("created swapchain ({}) {}x{} ({} {} {})", fmt::ptr(this), cur_width, cur_height,
                  vk::to_string(surface_format.format), vk::to_string(surface_format.colorSpace),
                  vk::to_string(cur_present_mode));
@@ -243,16 +247,11 @@ vk::Extent2D Swapchain::create_swapchain(const uint32_t width, const uint32_t he
 }
 
 void Swapchain::destroy_entries() {
-    SPDLOG_DEBUG("destroy entries");
-    for (auto& entry : entries) {
-        context->device.destroyImageView(entry.imageView);
-    }
+    SPDLOG_DEBUG("destroy image views");
+    image_views.clear();
 
     SPDLOG_DEBUG("destroy semaphores");
-    semaphore_groups.resize(0);
-
-    entries.resize(0);
-    barriers.resize(0);
+    semaphore_groups.clear();
 }
 
 void Swapchain::destroy_swapchain() {
@@ -302,8 +301,7 @@ Swapchain::acquire(const std::function<vk::Extent2D()>& framebuffer_extent,
         swapchain, timeout, *current_read_semaphore(), {}, &current_image_idx);
 
     if (result == vk::Result::eSuccess) {
-        aquire_result.image = current_image();
-        aquire_result.view = current_image_view();
+        aquire_result.image_view = current_image_view();
         aquire_result.index = current_image_index();
         aquire_result.wait_semaphore = current_read_semaphore();
         aquire_result.signal_semaphore = current_written_semaphore();
@@ -348,14 +346,14 @@ void Swapchain::present(const QueueHandle& queue) {
     check_result(result, "present failed");
 }
 
-vk::ImageView Swapchain::image_view(uint32_t idx) const {
-    check_size(entries, idx);
-    return entries[idx].imageView;
+ImageViewHandle Swapchain::image_view(uint32_t idx) const {
+    check_size(image_views, idx);
+    return image_views[idx];
 }
 
-vk::Image Swapchain::image(uint32_t idx) const {
-    check_size(entries, idx);
-    return entries[idx].image;
+ImageHandle Swapchain::image(uint32_t idx) const {
+    check_size(image_views, idx);
+    return image_views[idx]->get_image();
 }
 
 } // namespace merian

@@ -113,49 +113,24 @@ inline vk::PipelineStageFlags2 pipeline_stage2_for_image_layout(const vk::ImageL
 // Heuristic to infer pipeline stage from access flags
 vk::PipelineStageFlags pipeline_stage_for_access_flags(const vk::AccessFlags& flags);
 
-// This is very conservative (i.e. attemps to include all stages that may access a layout).
-// However, no extensions are taken into account. For example,
-// vk::PipelineStageFlagBits::eRayTracingShaderKHR might never be included!
-vk::ImageMemoryBarrier barrier_image_layout(const vk::Image& image,
-                                            const vk::ImageLayout& old_image_layout,
-                                            const vk::ImageLayout& new_image_layout,
-                                            const vk::ImageSubresourceRange& subresource_range);
+// Heuristic to infer pipeline stage from access flags
+vk::PipelineStageFlags2 pipeline_stage_for_access_flags2(const vk::AccessFlags2& flags);
 
 // This is very conservative (i.e. attemps to include all stages that may access a layout).
 // However, no extensions are taken into account. For example,
 // vk::PipelineStageFlagBits::eRayTracingShaderKHR might never be included!
-void cmd_barrier_image_layout(const vk::CommandBuffer& cmd,
-                              const vk::Image& image,
-                              const vk::ImageLayout& old_image_layout,
-                              const vk::ImageLayout& new_image_layout,
-                              const vk::ImageSubresourceRange& subresource_range);
+vk::ImageMemoryBarrier2 barrier_image_layout(const vk::Image& image,
+                                             const vk::ImageLayout& old_image_layout,
+                                             const vk::ImageLayout& new_image_layout,
+                                             const vk::ImageSubresourceRange& subresource_range);
 
 // This is very conservative (i.e. attemps to include all stages that may access a layout).
 // However, no extensions are taken into account. For example,
 // vk::PipelineStageFlagBits::eRayTracingShaderKHR might never be included!
-vk::ImageMemoryBarrier barrier_image_layout(const vk::Image& image,
-                                            const vk::ImageLayout& old_image_layout,
-                                            const vk::ImageLayout& new_image_layout,
-                                            const vk::ImageAspectFlags& aspect_mask);
-
-// This is very conservative (i.e. attemps to include all stages that may access a layout).
-// However, no extensions are taken into account. For example,
-// vk::PipelineStageFlagBits::eRayTracingShaderKHR might never be included!
-void cmd_barrier_image_layout(const vk::CommandBuffer& cmd,
-                              const vk::Image& image,
-                              const vk::ImageLayout& old_image_layout,
-                              const vk::ImageLayout& new_image_layout,
-                              const vk::ImageAspectFlags& aspect_mask);
-
-// This is very conservative (i.e. attemps to include all stages that may access a layout).
-// However, no extensions are taken into account. For example,
-// vk::PipelineStageFlagBits::eRayTracingShaderKHR might never be included!
-inline void cmd_barrier_image_layout(const vk::CommandBuffer& cmd,
-                                     const vk::Image& image,
-                                     const vk::ImageLayout& old_image_layout,
-                                     const vk::ImageLayout& new_image_layout) {
-    cmd_barrier_image_layout(cmd, image, old_image_layout, new_image_layout,
-                             vk::ImageAspectFlagBits::eColor);
-}
+vk::ImageMemoryBarrier2
+barrier_image_layout(const vk::Image& image,
+                     const vk::ImageLayout& old_image_layout,
+                     const vk::ImageLayout& new_image_layout,
+                     const vk::ImageAspectFlags& aspect_mask = vk::ImageAspectFlagBits::eColor);
 
 } // namespace merian

@@ -9,7 +9,7 @@
 
 namespace merian_nodes {
 
-MeanToBuffer::MeanToBuffer(const ContextHandle context) : Node(), context(context) {
+MeanToBuffer::MeanToBuffer(const ContextHandle& context) : Node(), context(context) {
 
     image_to_buffer_shader = std::make_shared<ShaderModule>(
         context, merian_image_to_buffer_comp_spv_size(), merian_image_to_buffer_comp_spv());
@@ -67,7 +67,7 @@ MeanToBuffer::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
 }
 
 void MeanToBuffer::process([[maybe_unused]] GraphRun& run,
-                           const vk::CommandBuffer& cmd,
+                           const CommandBufferHandle& cmd,
                            const DescriptorSetHandle& descriptor_set,
                            const NodeIO& io) {
     const auto group_count_x = (io[con_src]->get_extent().width + local_size_x - 1) / local_size_x;
@@ -77,10 +77,10 @@ void MeanToBuffer::process([[maybe_unused]] GraphRun& run,
 
     {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "image to buffer");
-        image_to_buffer->bind(cmd);
-        image_to_buffer->bind_descriptor_set(cmd, descriptor_set);
-        image_to_buffer->push_constant(cmd, pc);
-        cmd.dispatch(group_count_x, group_count_y, 1);
+        cmd->bind(image_to_buffer);
+        cmd->bind_descriptor_set(image_to_buffer, descriptor_set);
+        cmd->push_constant(image_to_buffer, pc);
+        cmd->dispatch(group_count_x, group_count_y, 1);
     }
 
     pc.size = group_count_x * group_count_y;
@@ -93,13 +93,13 @@ void MeanToBuffer::process([[maybe_unused]] GraphRun& run,
         auto bar = io[con_mean]->buffer_barrier(
             vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite,
             vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite);
-        cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
-                            vk::PipelineStageFlagBits::eComputeShader, {}, {}, bar, {});
+        cmd->barrier(vk::PipelineStageFlagBits::eComputeShader,
+                     vk::PipelineStageFlagBits::eComputeShader, bar);
 
-        reduce_buffer->bind(cmd);
-        reduce_buffer->bind_descriptor_set(cmd, descriptor_set);
-        reduce_buffer->push_constant(cmd, pc);
-        cmd.dispatch((pc.count + workgroup_size - 1) / workgroup_size, 1, 1);
+        cmd->bind(reduce_buffer);
+        cmd->bind_descriptor_set(reduce_buffer, descriptor_set);
+        cmd->push_constant(reduce_buffer, pc);
+        cmd->dispatch((pc.count + workgroup_size - 1) / workgroup_size, 1, 1);
 
         pc.count = (pc.count + workgroup_size - 1) / workgroup_size;
         pc.offset *= workgroup_size;

@@ -20,7 +20,7 @@ class MedianApproxNode : public Node {
     };
 
   public:
-    MedianApproxNode(const ContextHandle context);
+    MedianApproxNode(const ContextHandle& context);
 
     virtual ~MedianApproxNode();
 
@@ -32,7 +32,7 @@ class MedianApproxNode : public Node {
                                  const DescriptorSetLayoutHandle& descriptor_set_layout) override;
 
     void process(GraphRun& run,
-                 const vk::CommandBuffer& cmd,
+                 const CommandBufferHandle& cmd,
                  const DescriptorSetHandle& descriptor_set,
                  const NodeIO& io) override;
 
@@ -50,6 +50,8 @@ class MedianApproxNode : public Node {
 
     ShaderModuleHandle histogram;
     ShaderModuleHandle reduce;
+
+    PipelineLayoutHandle pipe_layout;
 
     PipelineHandle pipe_histogram;
     PipelineHandle pipe_reduce;

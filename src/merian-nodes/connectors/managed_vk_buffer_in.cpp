@@ -20,9 +20,8 @@ std::optional<vk::DescriptorSetLayoutBinding> ManagedVkBufferIn::get_descriptor_
         return vk::DescriptorSetLayoutBinding{
             0, vk::DescriptorType::eStorageBuffer, 1, stage_flags, nullptr,
         };
-    } else {
-        return std::nullopt;
-    }
+    }          return std::nullopt;
+   
 }
 
 void ManagedVkBufferIn::get_descriptor_update(
@@ -36,7 +35,7 @@ void ManagedVkBufferIn::get_descriptor_update(
 
 Connector::ConnectorStatusFlags ManagedVkBufferIn::on_pre_process(
     [[maybe_unused]] GraphRun& run,
-    [[maybe_unused]] const vk::CommandBuffer& cmd,
+    [[maybe_unused]] const CommandBufferHandle& cmd,
     const GraphResourceHandle& resource,
     [[maybe_unused]] const NodeHandle& node,
     [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,

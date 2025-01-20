@@ -6,6 +6,7 @@
 #include "node_io.hpp"
 
 #include "merian/utils/properties.hpp"
+#include "merian/vk/command/command_buffer.hpp"
 #include "merian/vk/descriptors/descriptor_set.hpp"
 #include "merian/vk/descriptors/descriptor_set_layout.hpp"
 
@@ -105,7 +106,7 @@ class Node : public std::enable_shared_from_this<Node> {
     // You can throw node_error and compilation_failed here. The graph then attemps to finish the
     // run and rebuild, however this is not supported and not recommened.
     virtual void process([[maybe_unused]] GraphRun& run,
-                         [[maybe_unused]] const vk::CommandBuffer& cmd,
+                         [[maybe_unused]] const CommandBufferHandle& cmd,
                          [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
                          [[maybe_unused]] const NodeIO& io) {}
 

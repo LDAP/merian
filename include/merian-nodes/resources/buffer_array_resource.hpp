@@ -2,6 +2,7 @@
 
 #include "merian-nodes/graph/resource.hpp"
 
+#include "merian/vk/command/command_buffer.hpp"
 #include "merian/vk/memory/resource_allocations.hpp"
 
 namespace merian_nodes {
@@ -28,7 +29,7 @@ class BufferArrayResource : public GraphResource {
     // Automatically inserts barrier, can be nullptr to reset to dummy buffer.
     void set(const uint32_t index,
              const merian::BufferHandle& buffer,
-             const vk::CommandBuffer cmd,
+             const merian::CommandBufferHandle& cmd,
              const vk::AccessFlags2 prior_access_flags,
              const vk::PipelineStageFlags2 prior_pipeline_stages) {
         assert(index < buffers.size());
@@ -42,7 +43,7 @@ class BufferArrayResource : public GraphResource {
             const vk::BufferMemoryBarrier2 buf_bar = buffer->buffer_barrier2(
                 prior_pipeline_stages, input_stage_flags, prior_access_flags, input_access_flags);
 
-            cmd.pipelineBarrier2(vk::DependencyInfo{{}, {}, buf_bar, {}});
+            cmd->barrier(buf_bar);
         }
     }
 

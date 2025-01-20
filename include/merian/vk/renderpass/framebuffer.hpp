@@ -5,7 +5,10 @@
 
 namespace merian {
 
-class Framebuffer {
+class Framebuffer;
+using FramebufferHandle = std::shared_ptr<Framebuffer>;
+
+class Framebuffer : public Object {
 
   public:
     Framebuffer(const ContextHandle& context,
@@ -16,18 +19,11 @@ class Framebuffer {
                 const std::vector<vk::ImageView>& attachments = {},
                 const vk::FramebufferCreateFlags flags = {})
         : context(context), renderpass(renderpass), extent(width, height) {
+        assert(attachments.size() == renderpass->get_attachment_count());
         vk::FramebufferCreateInfo create_info{flags, *renderpass, attachments,
                                               width, height,      layers};
         framebuffer = context->device.createFramebuffer(create_info);
     }
-
-    Framebuffer(const ContextHandle& context,
-                const RenderPassHandle& renderpass,
-                const vk::Extent3D extent,
-                const std::vector<vk::ImageView>& attachments = {},
-                const vk::FramebufferCreateFlags flags = {})
-        : merian::Framebuffer(
-              context, renderpass, extent.width, extent.height, extent.depth, attachments, flags) {}
 
     ~Framebuffer() {
         context->device.destroyFramebuffer(framebuffer);
@@ -45,20 +41,12 @@ class Framebuffer {
         return framebuffer;
     }
 
-    void
-    begin_renderpass(const vk::CommandBuffer& cmd,
-                     const vk::Rect2D& render_area,
-                     const std::vector<vk::ClearValue>& clear_values = {},
-                     const vk::SubpassContents subpass_contents = vk::SubpassContents::eInline) {
-        vk::RenderPassBeginInfo begin_info{*renderpass, framebuffer, render_area, clear_values};
-        cmd.beginRenderPass(begin_info, subpass_contents);
+    const RenderPassHandle& get_renderpass() const {
+        return renderpass;
     }
 
-    void
-    begin_renderpass(const vk::CommandBuffer& cmd,
-                     const std::vector<vk::ClearValue>& clear_values = {},
-                     const vk::SubpassContents subpass_contents = vk::SubpassContents::eInline) {
-        begin_renderpass(cmd, vk::Rect2D{{}, extent}, clear_values, subpass_contents);
+    const vk::Extent2D& get_extent() const {
+        return extent;
     }
 
   private:
@@ -66,8 +54,27 @@ class Framebuffer {
     const RenderPassHandle renderpass;
     vk::Extent2D extent;
     vk::Framebuffer framebuffer;
-};
 
-using FramebufferHandle = std::shared_ptr<Framebuffer>;
+  public:
+    static FramebufferHandle create(const ContextHandle& context,
+                                    const RenderPassHandle& renderpass,
+                                    const uint32_t width,
+                                    const uint32_t height,
+                                    const uint32_t layers = 1,
+                                    const std::vector<vk::ImageView>& attachments = {},
+                                    const vk::FramebufferCreateFlags flags = {}) {
+        return std::make_shared<Framebuffer>(context, renderpass, width, height, layers,
+                                             attachments, flags);
+    }
+
+    static FramebufferHandle create(const ContextHandle& context,
+                                    const RenderPassHandle& renderpass,
+                                    const vk::Extent3D extent,
+                                    const std::vector<vk::ImageView>& attachments = {},
+                                    const vk::FramebufferCreateFlags flags = {}) {
+        return std::make_shared<Framebuffer>(context, renderpass, extent.width, extent.height,
+                                             extent.depth, attachments, flags);
+    }
+};
 
 } // namespace merian

@@ -107,7 +107,7 @@ class DescriptorSetUpdate {
                              const std::optional<vk::ImageLayout> access_layout = std::nullopt) {
         resources.emplace_back(texture);
         return write_descriptor_image_type(
-            binding, set->get_type_for_binding(binding), texture->get_view(),
+            binding, set->get_type_for_binding(binding), *texture->get_view(),
             access_layout.value_or(texture->get_current_layout()), *texture->get_sampler(),
             dst_array_element, descriptor_count);
     }

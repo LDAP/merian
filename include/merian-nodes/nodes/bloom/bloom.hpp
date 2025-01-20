@@ -19,7 +19,7 @@ class Bloom : public Node {
     };
 
   public:
-    Bloom(const ContextHandle context);
+    Bloom(const ContextHandle& context);
 
     virtual ~Bloom();
 
@@ -31,7 +31,7 @@ class Bloom : public Node {
                                  const DescriptorSetLayoutHandle& descriptor_set_layout) override;
 
     void process(GraphRun& run,
-                 const vk::CommandBuffer& cmd,
+                 const CommandBufferHandle& cmd,
                  const DescriptorSetHandle& descriptor_set,
                  const NodeIO& io) override;
 

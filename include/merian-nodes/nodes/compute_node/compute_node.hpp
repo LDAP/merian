@@ -14,7 +14,7 @@ namespace merian_nodes {
 class AbstractCompute : public Node {
 
   public:
-    AbstractCompute(const ContextHandle context,
+    AbstractCompute(const ContextHandle& context,
                     const std::optional<uint32_t> push_constant_size = std::nullopt);
 
     virtual ~AbstractCompute() {}
@@ -47,7 +47,7 @@ class AbstractCompute : public Node {
                  const DescriptorSetLayoutHandle& descriptor_set_layout) override final;
 
     virtual void process(GraphRun& run,
-                         const vk::CommandBuffer& cmd,
+                         const CommandBufferHandle& cmd,
                          const DescriptorSetHandle& descriptor_set,
                          const NodeIO& io) override final;
 

@@ -2,6 +2,7 @@
 
 #include "merian-nodes/graph/resource.hpp"
 
+#include "merian/vk/command/command_buffer.hpp"
 #include "merian/vk/memory/resource_allocations.hpp"
 
 namespace merian_nodes {
@@ -29,7 +30,7 @@ class TextureArrayResource : public GraphResource {
     // Automatically inserts barrier, can be nullptr to reset to dummy texture.
     void set(const uint32_t index,
              const merian::TextureHandle& tex,
-             const vk::CommandBuffer cmd,
+             const merian::CommandBufferHandle& cmd,
              const vk::AccessFlags2 prior_access_flags,
              const vk::PipelineStageFlags2 prior_pipeline_stages) {
         assert(index < textures.size());
@@ -45,7 +46,7 @@ class TextureArrayResource : public GraphResource {
                 first_input_layout, prior_access_flags, input_access_flags, prior_pipeline_stages,
                 input_stage_flags);
 
-            cmd.pipelineBarrier2(vk::DependencyInfo{{}, {}, {}, img_bar});
+            cmd->barrier(img_bar);
         }
     }
 

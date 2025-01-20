@@ -1,5 +1,7 @@
 #pragma once
 
+#include "merian/vk/renderpass/framebuffer.hpp"
+
 #include "merian/vk/window/imgui_context.hpp"
 #include "merian/vk/window/swapchain.hpp"
 
@@ -23,18 +25,18 @@ class GLFWImGui {
               const ImGuiContextWrapperHandle& ctx,
               const bool no_mouse_cursor_change = false,
               const vk::ImageLayout initial_layout = vk::ImageLayout::ePresentSrcKHR,
-              const std::vector<vk::DescriptorPoolSize> pool_sizes =
+              const std::vector<vk::DescriptorPoolSize>& pool_sizes =
                   MERIAN_GLFW_IMGUI_DEFAULT_POOL_SIZES);
     ~GLFWImGui();
 
     // Start a new ImGui frame
-    vk::Framebuffer new_frame(QueueHandle& queue,
-                              const vk::CommandBuffer& cmd,
-                              GLFWwindow* window,
-                              SwapchainAcquireResult& aquire_result);
+    FramebufferHandle new_frame(QueueHandle& queue,
+                                const CommandBufferHandle& cmd,
+                                GLFWwindow* window,
+                                SwapchainAcquireResult& aquire_result);
 
     // Render the ImGui to the current swapchain image
-    void render(const vk::CommandBuffer& cmd);
+    void render(const CommandBufferHandle& cmd);
 
   private:
     void init_imgui(GLFWwindow* window, SwapchainAcquireResult& aquire_result, QueueHandle& queue);
@@ -51,8 +53,8 @@ class GLFWImGui {
     bool imgui_initialized = false;
     GLFWwindow* window; // only valid if initialized
     vk::DescriptorPool imgui_pool{VK_NULL_HANDLE};
-    vk::RenderPass renderpass{VK_NULL_HANDLE};
-    std::vector<vk::Framebuffer> framebuffers;
+    RenderPassHandle renderpass = nullptr;
+    std::vector<FramebufferHandle> framebuffers;
 };
 
 } // namespace merian

@@ -28,7 +28,7 @@ class Add : public AbstractCompute {
 
     ShaderModuleHandle get_shader_module() override;
 
-    NodeStatusFlags properties(Properties& config) override;
+    NodeStatusFlags properties(Properties& props) override;
 
   private:
     const std::optional<vk::Format> output_format;

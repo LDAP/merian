@@ -55,13 +55,13 @@ class ASBuilder {
     };
 
   public:
-    ASBuilder(const ContextHandle context, const ResourceAllocatorHandle& allocator)
+    ASBuilder(const ContextHandle& context, const ResourceAllocatorHandle& allocator)
         : context(context), allocator(allocator) {
         const auto ext = context->get_extension<ExtensionVkAccelerationStructure>();
         if (ext) {
             scratch_buffer_min_alignment = ext->min_scratch_alignment();
         } else {
-            SPDLOG_ERROR("ExtensionVkAccelerationStructure is required. Undefined behavior.");
+            SPDLOG_ERROR("ExtensionVkAccelerationStructure is required.");
         }
     }
 
@@ -157,7 +157,7 @@ class ASBuilder {
                     vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace) {
         // Note: For some reason using a host buffer here kills the GPU (without layer error) :/
         vk::AccelerationStructureGeometryInstancesDataKHR instances_data{
-            false, {instances->get_device_address()}};
+            VK_FALSE, {instances->get_device_address()}};
         return queue_build(instance_count, instances_data, flags);
     }
 
@@ -172,12 +172,12 @@ class ASBuilder {
     // Update a TLAS from instances that are stored on the device.
     void queue_update(const uint32_t instance_count,
                       const BufferHandle& instances,
-                      const AccelerationStructureHandle src_as,
+                      const AccelerationStructureHandle& src_as,
                       const vk::BuildAccelerationStructureFlagsKHR flags =
                           vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace) {
         // Note: For some reason using a host buffer here kills the GPU (without layer error) :/
         vk::AccelerationStructureGeometryInstancesDataKHR instances_data{
-            false, {instances->get_device_address()}};
+            VK_FALSE, {instances->get_device_address()}};
         queue_update(instance_count, instances_data, src_as, flags);
     }
 
@@ -192,7 +192,7 @@ class ASBuilder {
                          vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace) {
         // Note: For some reason using a host buffer here kills the GPU (without layer error) :/
         vk::AccelerationStructureGeometryInstancesDataKHR instances_data{
-            false, {instances->get_device_address()}};
+            VK_FALSE, {instances->get_device_address()}};
         queue_build(instance_count, instances_data, src_as, flags);
     }
 
@@ -211,7 +211,7 @@ class ASBuilder {
     // performance.
     void queue_update(const uint32_t instance_count,
                       const vk::AccelerationStructureGeometryInstancesDataKHR& instances_data,
-                      const AccelerationStructureHandle src_as,
+                      const AccelerationStructureHandle& src_as,
                       const vk::BuildAccelerationStructureFlagsKHR flags =
                           vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace);
 
@@ -225,9 +225,9 @@ class ASBuilder {
     // buffer alive while processing has not finished on the GPU.
     //
     // This command inserts a barrier for the BLAS that are built.
-    void get_cmds_blas(const vk::CommandBuffer& cmd,
+    void get_cmds_blas(const CommandBufferHandle& cmd,
                        BufferHandle& scratch_buffer,
-                       const ProfilerHandle profiler = nullptr);
+                       const ProfilerHandle& profiler = nullptr);
 
     // Note: This method does not insert a synchronization barrier. You must enure proper
     // synchronization before using the TLAS (you can use the helper cmd_barrier()).
@@ -235,16 +235,16 @@ class ASBuilder {
     // Provide a BufferHandle to a (optinally null) scratch_buffer. The scratch buffer is reused if
     // it is large enough else it is replaced with a larger one. Make sure to keep the scratch
     // buffer alive while processing has not finished on the GPU.
-    void get_cmds_tlas(const vk::CommandBuffer cmd,
+    void get_cmds_tlas(const CommandBufferHandle& cmd,
                        BufferHandle& scratch_buffer,
-                       const ProfilerHandle profiler = nullptr);
+                       const ProfilerHandle& profiler = nullptr);
 
     // Provide a BufferHandle to a (optinally null) scratch_buffer. The scratch buffer is reused if
     // it is large enough else it is replaced with a larger one. Make sure to keep the scratch
     // buffer alive while processing has not finished on the GPU.
-    void get_cmds(const vk::CommandBuffer cmd,
+    void get_cmds(const CommandBufferHandle& cmd,
                   BufferHandle& scratch_buffer,
-                  const ProfilerHandle profiler = nullptr) {
+                  const ProfilerHandle& profiler = nullptr) {
         {
             MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "BLAS build");
             get_cmds_blas(cmd, scratch_buffer, profiler);

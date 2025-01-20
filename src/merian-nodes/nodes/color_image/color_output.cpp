@@ -27,12 +27,11 @@ ColorImage::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
 }
 
 void ColorImage::process([[maybe_unused]] GraphRun& run,
-                         const vk::CommandBuffer& cmd,
+                         const CommandBufferHandle& cmd,
                          [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
                          const NodeIO& io) {
     if (needs_run) {
-        cmd.clearColorImage(*io[con_out], io[con_out]->get_current_layout(), color,
-                            all_levels_and_layers());
+        cmd->clear(io[con_out], color);
         needs_run = false;
     }
 }

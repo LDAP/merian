@@ -4,7 +4,7 @@
 
 namespace merian {
 
-class Event : public std::enable_shared_from_this<Event> {
+class Event : public std::enable_shared_from_this<Event>, public Object {
 
   public:
     Event() = delete;

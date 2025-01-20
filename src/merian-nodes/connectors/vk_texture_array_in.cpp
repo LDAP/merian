@@ -39,7 +39,7 @@ void VkTextureArrayIn::get_descriptor_update(
 
 Connector::ConnectorStatusFlags VkTextureArrayIn::on_pre_process(
     [[maybe_unused]] GraphRun& run,
-    [[maybe_unused]] const vk::CommandBuffer& cmd,
+    [[maybe_unused]] const CommandBufferHandle& cmd,
     const GraphResourceHandle& resource,
     [[maybe_unused]] const NodeHandle& node,
     std::vector<vk::ImageMemoryBarrier2>& image_barriers,

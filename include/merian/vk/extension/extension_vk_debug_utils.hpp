@@ -15,7 +15,8 @@ class ExtensionVkDebugUtils : public Extension {
   public:
     // Set assert_message to true to throw if an message with severity error is emitted.
     ExtensionVkDebugUtils(bool assert_message = false,
-                          std::unordered_set<int32_t> ignore_message_ids = {648835635, 767975156})
+                          const std::unordered_set<int32_t>& ignore_message_ids = {648835635,
+                                                                                   767975156})
         : Extension("ExtensionVkDebugUtils"), user_data(ignore_message_ids, assert_message) {
         create_info = {
             {},
@@ -43,8 +44,8 @@ class ExtensionVkDebugUtils : public Extension {
     required_device_extension_names(const vk::PhysicalDevice&) const override {
         return {};
     }
-    void on_instance_created(const vk::Instance&) override;
-    void on_destroy_instance(const vk::Instance&) override;
+    void on_instance_created(const vk::Instance& /*unused*/) override;
+    void on_destroy_instance(const vk::Instance& /*unused*/) override;
     void* pnext_instance_create_info(void* const p_next) override;
 
     // Own methods
@@ -55,7 +56,7 @@ class ExtensionVkDebugUtils : public Extension {
     }
 
     void cmd_begin_label(const vk::CommandBuffer& cmd, const std::string& name) {
-        vk::DebugUtilsLabelEXT label{name.c_str()};
+        const vk::DebugUtilsLabelEXT label{name.c_str()};
         cmd.beginDebugUtilsLabelEXT(label);
     }
 
@@ -64,10 +65,10 @@ class ExtensionVkDebugUtils : public Extension {
     }
 
   private:
-    static VKAPI_ATTR VkBool32 VKAPI_CALL
-    messenger_callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-                       VkDebugUtilsMessageTypeFlagsEXT messageTypes,
-                       VkDebugUtilsMessengerCallbackDataEXT const* pCallbackData,
+    static VKAPI_ATTR vk::Bool32 VKAPI_CALL
+    messenger_callback(vk::DebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+                       vk::DebugUtilsMessageTypeFlagsEXT messageTypes,
+                       vk::DebugUtilsMessengerCallbackDataEXT const* pCallbackData,
                        void* pUserData);
 
   private:
