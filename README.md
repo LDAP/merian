@@ -1,6 +1,6 @@
 # Merian 🎨
 
-~ _A *Vulkan 1.3* development framework._ ~
+~ _A Vulkan development framework._ ~
 
 
 Merian is split into multiple components:
