@@ -29,19 +29,19 @@ class Queue : public std::enable_shared_from_this<Queue> {
     void submit(const vk::ArrayProxy<vk::SubmitInfo>& submit_infos,
                 vk::Fence fence = VK_NULL_HANDLE);
 
-    void submit(const vk::ArrayProxyNoTemporaries<const vk::CommandBuffer>& cmds,
+    void submit(const vk::ArrayProxy<const vk::CommandBuffer>& cmds,
                 const vk::Fence fence = VK_NULL_HANDLE,
-                const vk::ArrayProxyNoTemporaries<vk::Semaphore>& signal_semaphores = {},
-                const vk::ArrayProxyNoTemporaries<vk::Semaphore>& wait_semaphores = {},
-                const vk::ArrayProxyNoTemporaries<vk::PipelineStageFlags>& wait_dst_stage_mask = {},
+                const vk::ArrayProxy<vk::Semaphore>& signal_semaphores = {},
+                const vk::ArrayProxy<vk::Semaphore>& wait_semaphores = {},
+                const vk::ArrayProxy<vk::PipelineStageFlags>& wait_dst_stage_mask = {},
                 const std::optional<VkTimelineSemaphoreSubmitInfo> timeline_semaphore_submit_info =
                     std::nullopt);
 
-    void submit(const vk::ArrayProxyNoTemporaries<const CommandBufferHandle>& cmds,
+    void submit(const vk::ArrayProxy<const CommandBufferHandle>& cmds,
                 const vk::Fence fence = VK_NULL_HANDLE,
-                const vk::ArrayProxyNoTemporaries<vk::Semaphore>& signal_semaphores = {},
-                const vk::ArrayProxyNoTemporaries<vk::Semaphore>& wait_semaphores = {},
-                const vk::ArrayProxyNoTemporaries<vk::PipelineStageFlags>& wait_dst_stage_mask = {},
+                const vk::ArrayProxy<vk::Semaphore>& signal_semaphores = {},
+                const vk::ArrayProxy<vk::Semaphore>& wait_semaphores = {},
+                const vk::ArrayProxy<vk::PipelineStageFlags>& wait_dst_stage_mask = {},
                 const std::optional<VkTimelineSemaphoreSubmitInfo> timeline_semaphore_submit_info =
                     std::nullopt);
 
@@ -52,29 +52,27 @@ class Queue : public std::enable_shared_from_this<Queue> {
                      const vk::Fence fence = VK_NULL_HANDLE);
 
     // Submits all command buffers of the pool, then waits using the fence or wait_idle().
-    void
-    submit_wait(const vk::ArrayProxyNoTemporaries<const vk::CommandBuffer>& cmds,
-                const vk::Fence fence = VK_NULL_HANDLE,
-                const vk::ArrayProxyNoTemporaries<vk::Semaphore>& signal_semaphores = {},
-                const vk::ArrayProxyNoTemporaries<vk::Semaphore>& wait_semaphores = {},
-                const vk::ArrayProxyNoTemporaries<vk::PipelineStageFlags>& wait_dst_stage_mask = {},
-                const std::optional<VkTimelineSemaphoreSubmitInfo> timeline_semaphore_submit_info =
-                    std::nullopt);
+    void submit_wait(const vk::ArrayProxy<const vk::CommandBuffer>& cmds,
+                     const vk::Fence fence = VK_NULL_HANDLE,
+                     const vk::ArrayProxy<vk::Semaphore>& signal_semaphores = {},
+                     const vk::ArrayProxy<vk::Semaphore>& wait_semaphores = {},
+                     const vk::ArrayProxy<vk::PipelineStageFlags>& wait_dst_stage_mask = {},
+                     const std::optional<VkTimelineSemaphoreSubmitInfo>
+                         timeline_semaphore_submit_info = std::nullopt);
 
     // Submits all command buffers of the pool, then waits using the fence or wait_idle().
-    void
-    submit_wait(const vk::ArrayProxyNoTemporaries<const CommandBufferHandle>& cmds,
-                const vk::Fence fence = VK_NULL_HANDLE,
-                const vk::ArrayProxyNoTemporaries<vk::Semaphore>& signal_semaphores = {},
-                const vk::ArrayProxyNoTemporaries<vk::Semaphore>& wait_semaphores = {},
-                const vk::ArrayProxyNoTemporaries<vk::PipelineStageFlags>& wait_dst_stage_mask = {},
-                const std::optional<VkTimelineSemaphoreSubmitInfo> timeline_semaphore_submit_info =
-                    std::nullopt);
+    void submit_wait(const vk::ArrayProxy<const CommandBufferHandle>& cmds,
+                     const vk::Fence fence = VK_NULL_HANDLE,
+                     const vk::ArrayProxy<vk::Semaphore>& signal_semaphores = {},
+                     const vk::ArrayProxy<vk::Semaphore>& wait_semaphores = {},
+                     const vk::ArrayProxy<vk::PipelineStageFlags>& wait_dst_stage_mask = {},
+                     const std::optional<VkTimelineSemaphoreSubmitInfo>
+                         timeline_semaphore_submit_info = std::nullopt);
 
     // ------------------------------------------------------------------
 
     // Utility function that
-    // - Creates a command buffer
+    // - Creates and begins a command buffer
     // - Records commands using the supplied cmd_function
     // - Submits the command buffer
     // - Waits for the execution to finish
@@ -82,7 +80,7 @@ class Queue : public std::enable_shared_from_this<Queue> {
                      const std::function<void(const CommandBufferHandle& cmd)>& cmd_function);
 
     // Utility function that
-    // - Creates a command pool and command buffer
+    // - Creates and begins a command pool and command buffer
     // - Records commands using the supplied cmd_function
     // - Submits the command buffer
     // - Waits for the execution to finish

@@ -139,26 +139,36 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
 
     //--------------------------------------------------------------------------------------------------
 
+    ImageViewHandle create_image_view(const ImageHandle& image,
+                                      const vk::ImageViewCreateInfo& imageViewCreateInfo,
+                                      const std::string& debug_name = {});
+
+    //--------------------------------------------------------------------------------------------------
+
+    // shortcut to create an image view and a texture
     TextureHandle createTexture(const ImageHandle& image,
                                 const vk::ImageViewCreateInfo& imageViewCreateInfo,
                                 const SamplerHandle& sampler,
                                 const std::string& debug_name = {});
 
+    // shortcut to create an image view and a texture
     TextureHandle createTexture(const ImageHandle& image,
                                 const vk::ImageViewCreateInfo& imageViewCreateInfo,
                                 const vk::SamplerCreateInfo& samplerCreateInfo,
                                 const std::string& debug_name = {});
 
+    // shortcut to create an image view and a texture
     // Create a texture with a linear sampler if the view format supports it.
     // With a view to the whole subresource (using image->make_view_create_info()).
     TextureHandle createTexture(const ImageHandle& image, const std::string& debug_name = {});
 
+    // shortcut to create an image view and a texture
     // Create a texture with a linear sampler if the view format supports it.
     TextureHandle createTexture(const ImageHandle& image,
                                 const vk::ImageViewCreateInfo& imageViewCreateInfo,
                                 const std::string& debug_name = {});
 
-    // shortcut to create a texture from RGB8 data.
+    // shortcut to create an image view and a texture from RGB8 data
     // layout: the layout for the image view
     //
     // Important: You are responsible to perform the image transition!

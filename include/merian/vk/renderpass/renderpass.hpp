@@ -25,9 +25,12 @@ class RenderPass : public std::enable_shared_from_this<RenderPass>, public Objec
 
     const vk::RenderPass& operator*() const;
 
+    const uint32_t& get_attachment_count() const;
+
   private:
     const ContextHandle context;
     vk::RenderPass renderpass;
+    const uint32_t attachment_count;
 
   public:
     static RenderPassHandle create(const ContextHandle& context,

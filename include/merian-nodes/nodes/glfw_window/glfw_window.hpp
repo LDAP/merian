@@ -56,8 +56,9 @@ class GLFWWindow : public Node {
 
         if (acquire) {
             const ImageHandle image = acquire->image_view->get_image();
-            const auto bar = image->barrier2(vk::ImageLayout::eTransferDstOptimal);
-            cmd->barrier(bar);
+
+            auto barrier = image->barrier2(vk::ImageLayout::eTransferDstOptimal, true);
+            cmd->barrier(barrier);
 
             if (io.is_connected(image_in)) {
                 const auto& src_image = io[image_in];
@@ -75,8 +76,7 @@ class GLFWWindow : public Node {
                 cmd->clear(image);
             }
 
-            const auto bar2 = image->barrier2(vk::ImageLayout::ePresentSrcKHR);
-            cmd->barrier(bar2);
+            cmd->barrier(image->barrier2(vk::ImageLayout::ePresentSrcKHR));
 
             on_blit_completed(cmd, *acquire);
 

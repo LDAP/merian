@@ -75,8 +75,8 @@ VMAMemoryAllocation::create_aliasing_image(const vk::ImageCreateInfo& image_crea
                            reinterpret_cast<const VkImageCreateInfo*>(&image_create_info),
                            reinterpret_cast<VkImage*>(&image));
 
-    return std::make_shared<Image>(image, shared_from_this(), image_create_info,
-                                   image_create_info.initialLayout);
+    return Image::create(image, shared_from_this(), image_create_info,
+                         image_create_info.initialLayout);
 }
 
 BufferHandle
@@ -89,7 +89,7 @@ VMAMemoryAllocation::create_aliasing_buffer(const vk::BufferCreateInfo& buffer_c
                             reinterpret_cast<const VkBufferCreateInfo*>(&buffer_create_info),
                             reinterpret_cast<VkBuffer*>(&buffer));
 
-    return std::make_shared<Buffer>(buffer, shared_from_this(), buffer_create_info);
+    return Buffer::create(buffer, shared_from_this(), buffer_create_info);
 }
 
 // ------------------------------------------------------------------------------------
@@ -233,7 +233,7 @@ VMAMemoryAllocator::allocate_memory(const vk::MemoryPropertyFlags required_flags
     const std::shared_ptr<VMAMemoryAllocator> allocator =
         static_pointer_cast<VMAMemoryAllocator>(shared_from_this());
     auto memory =
-        std::make_shared<VMAMemoryAllocation>(context, allocator, mapping_type, allocation);
+        std::make_shared<VMAMemoryAllocation>(get_context(), allocator, mapping_type, allocation);
     log_allocation(allocation_info, memory, debug_name);
     return memory;
 }
@@ -266,8 +266,8 @@ BufferHandle VMAMemoryAllocator::create_buffer(const vk::BufferCreateInfo buffer
     const std::shared_ptr<VMAMemoryAllocator> allocator =
         static_pointer_cast<VMAMemoryAllocator>(shared_from_this());
     auto memory =
-        std::make_shared<VMAMemoryAllocation>(context, allocator, mapping_type, allocation);
-    auto buffer_handle = std::make_shared<Buffer>(buffer, memory, buffer_create_info);
+        std::make_shared<VMAMemoryAllocation>(get_context(), allocator, mapping_type, allocation);
+    auto buffer_handle = Buffer::create(buffer, memory, buffer_create_info);
     log_allocation(allocation_info, memory, debug_name);
 
     return buffer_handle;
@@ -291,8 +291,8 @@ ImageHandle VMAMemoryAllocator::create_image(const vk::ImageCreateInfo image_cre
     const std::shared_ptr<VMAMemoryAllocator> allocator =
         static_pointer_cast<VMAMemoryAllocator>(shared_from_this());
     auto memory =
-        std::make_shared<VMAMemoryAllocation>(context, allocator, mapping_type, allocation);
-    auto image_handle = std::make_shared<Image>(image, memory, image_create_info);
+        std::make_shared<VMAMemoryAllocation>(get_context(), allocator, mapping_type, allocation);
+    auto image_handle = Image::create(image, memory, image_create_info);
     log_allocation(allocation_info, memory, debug_name);
 
     return image_handle;

@@ -19,11 +19,11 @@ void Queue::submit(const vk::ArrayProxy<vk::SubmitInfo>& submit_infos, vk::Fence
 }
 
 void Queue::submit(
-    const vk::ArrayProxyNoTemporaries<const vk::CommandBuffer>& cmds,
+    const vk::ArrayProxy<const vk::CommandBuffer>& cmds,
     const vk::Fence fence,
-    const vk::ArrayProxyNoTemporaries<vk::Semaphore>& signal_semaphores,
-    const vk::ArrayProxyNoTemporaries<vk::Semaphore>& wait_semaphores,
-    const vk::ArrayProxyNoTemporaries<vk::PipelineStageFlags>& wait_dst_stage_mask,
+    const vk::ArrayProxy<vk::Semaphore>& signal_semaphores,
+    const vk::ArrayProxy<vk::Semaphore>& wait_semaphores,
+    const vk::ArrayProxy<vk::PipelineStageFlags>& wait_dst_stage_mask,
     const std::optional<VkTimelineSemaphoreSubmitInfo> timeline_semaphore_submit_info) {
 
     const vk::SubmitInfo submit_info{wait_semaphores, wait_dst_stage_mask, cmds, signal_semaphores,
@@ -34,11 +34,11 @@ void Queue::submit(
 }
 
 void Queue::submit(
-    const vk::ArrayProxyNoTemporaries<const CommandBufferHandle>& cmds,
+    const vk::ArrayProxy<const CommandBufferHandle>& cmds,
     const vk::Fence fence,
-    const vk::ArrayProxyNoTemporaries<vk::Semaphore>& signal_semaphores,
-    const vk::ArrayProxyNoTemporaries<vk::Semaphore>& wait_semaphores,
-    const vk::ArrayProxyNoTemporaries<vk::PipelineStageFlags>& wait_dst_stage_mask,
+    const vk::ArrayProxy<vk::Semaphore>& signal_semaphores,
+    const vk::ArrayProxy<vk::Semaphore>& wait_semaphores,
+    const vk::ArrayProxy<vk::PipelineStageFlags>& wait_dst_stage_mask,
     const std::optional<VkTimelineSemaphoreSubmitInfo> timeline_semaphore_submit_info) {
 
     std::vector<vk::CommandBuffer> vk_cmds(cmds.size());
@@ -64,11 +64,11 @@ void Queue::submit_wait(const vk::ArrayProxy<vk::SubmitInfo>& submit_infos, cons
 }
 
 void Queue::submit_wait(
-    const vk::ArrayProxyNoTemporaries<const vk::CommandBuffer>& cmds,
+    const vk::ArrayProxy<const vk::CommandBuffer>& cmds,
     const vk::Fence fence,
-    const vk::ArrayProxyNoTemporaries<vk::Semaphore>& signal_semaphores,
-    const vk::ArrayProxyNoTemporaries<vk::Semaphore>& wait_semaphores,
-    const vk::ArrayProxyNoTemporaries<vk::PipelineStageFlags>& wait_dst_stage_mask,
+    const vk::ArrayProxy<vk::Semaphore>& signal_semaphores,
+    const vk::ArrayProxy<vk::Semaphore>& wait_semaphores,
+    const vk::ArrayProxy<vk::PipelineStageFlags>& wait_dst_stage_mask,
     const std::optional<VkTimelineSemaphoreSubmitInfo> timeline_semaphore_submit_info) {
 
     const vk::SubmitInfo submit_info{wait_semaphores, wait_dst_stage_mask, cmds, signal_semaphores,
@@ -79,11 +79,11 @@ void Queue::submit_wait(
 }
 
 void Queue::submit_wait(
-    const vk::ArrayProxyNoTemporaries<const CommandBufferHandle>& cmds,
+    const vk::ArrayProxy<const CommandBufferHandle>& cmds,
     const vk::Fence fence,
-    const vk::ArrayProxyNoTemporaries<vk::Semaphore>& signal_semaphores,
-    const vk::ArrayProxyNoTemporaries<vk::Semaphore>& wait_semaphores,
-    const vk::ArrayProxyNoTemporaries<vk::PipelineStageFlags>& wait_dst_stage_mask,
+    const vk::ArrayProxy<vk::Semaphore>& signal_semaphores,
+    const vk::ArrayProxy<vk::Semaphore>& wait_semaphores,
+    const vk::ArrayProxy<vk::PipelineStageFlags>& wait_dst_stage_mask,
     const std::optional<VkTimelineSemaphoreSubmitInfo> timeline_semaphore_submit_info) {
 
     std::vector<vk::CommandBuffer> vk_cmds(cmds.size());
@@ -100,6 +100,7 @@ void Queue::submit_wait(
 void Queue::submit_wait(const CommandPoolHandle& cmd_pool,
                         const std::function<void(const CommandBufferHandle& cmd)>& cmd_function) {
     const CommandBufferHandle cmd = std::make_shared<CommandBuffer>(cmd_pool);
+    cmd->begin();
     cmd_function(cmd);
     cmd->end();
     const vk::Fence fence = context->device.createFence({});

@@ -9,6 +9,7 @@ namespace merian {
 class CommandPool : public std::enable_shared_from_this<CommandPool> {
 
   protected:
+    // for Caching Command Pool; does not create a command pool
     CommandPool(const ContextHandle& context);
 
   public:
@@ -52,6 +53,10 @@ class CommandPool : public std::enable_shared_from_this<CommandPool> {
 
     const ContextHandle& get_context() {
         return context;
+    }
+
+    const std::vector<ObjectHandle>& get_objects_in_use() const {
+        return objects_in_use;
     }
 
   private:

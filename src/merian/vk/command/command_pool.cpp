@@ -21,10 +21,12 @@ CommandPool::CommandPool(const ContextHandle& context,
 };
 
 CommandPool::~CommandPool() {
-    SPDLOG_DEBUG("destroy command pool ({})", fmt::ptr(static_cast<VkCommandPool>(pool)));
-    reset();
-
-    context->device.destroyCommandPool(pool);
+    if (pool) {
+        // special case for Cachign Command Pool
+        SPDLOG_DEBUG("destroy command pool ({})", fmt::ptr(static_cast<VkCommandPool>(pool)));
+        reset();
+        context->device.destroyCommandPool(pool);
+    }
 };
 
 uint32_t CommandPool::get_queue_family_index() const noexcept {

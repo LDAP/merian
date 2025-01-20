@@ -32,7 +32,7 @@ class Buffer : public std::enable_shared_from_this<Buffer>, public Resource {
         vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eShaderDeviceAddress |
         vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR;
 
-  public:
+  protected:
     // Creats a Buffer objects that automatically destroys buffer when destructed.
     // The memory is not freed explicitly to let it free itself.
     // It is asserted that the memory represented by `memory` is already bound to `buffer`.
@@ -40,6 +40,7 @@ class Buffer : public std::enable_shared_from_this<Buffer>, public Resource {
            const MemoryAllocationHandle& memory,
            const vk::BufferCreateInfo& create_info);
 
+  public:
     ~Buffer();
 
     // -----------------------------------------------------------
@@ -105,14 +106,16 @@ class Buffer : public std::enable_shared_from_this<Buffer>, public Resource {
 
     void properties(Properties& props);
 
-  protected:
-    virtual void destroy();
-
   private:
     const ContextHandle context;
     const vk::Buffer buffer;
     const MemoryAllocationHandle memory;
     const vk::BufferCreateInfo create_info;
+
+  public:
+    static BufferHandle create(const vk::Buffer& buffer,
+                               const MemoryAllocationHandle& memory,
+                               const vk::BufferCreateInfo& create_info);
 };
 
 class Image;
@@ -125,7 +128,7 @@ using ImageHandle = std::shared_ptr<Image>;
  */
 class Image : public std::enable_shared_from_this<Image>, public Resource {
 
-  public:
+  protected:
     // It is asserted that the memory represented by `memory` is already bound correctly,
     // this is because images are commonly created by memory allocators to optimize memory
     // accesses.
@@ -140,7 +143,8 @@ class Image : public std::enable_shared_from_this<Image>, public Resource {
           const vk::ImageCreateInfo create_info,
           const vk::ImageLayout current_layout = vk::ImageLayout::eUndefined);
 
-    ~Image();
+  public:
+    virtual ~Image();
 
     // -----------------------------------------------------------
 
@@ -192,10 +196,12 @@ class Image : public std::enable_shared_from_this<Image>, public Resource {
     }
 
     // Guess AccessFlags from old and new layout.
-    [[nodiscard]] vk::ImageMemoryBarrier barrier(const vk::ImageLayout new_layout);
+    [[nodiscard]] vk::ImageMemoryBarrier barrier(const vk::ImageLayout new_layout,
+                                                 const bool transition_from_undefined = false);
 
     // Guess AccessFlags2 and PipelineStageFlags2 from old and new layout.
-    [[nodiscard]] vk::ImageMemoryBarrier2 barrier2(const vk::ImageLayout new_layout);
+    [[nodiscard]] vk::ImageMemoryBarrier2 barrier2(const vk::ImageLayout new_layout,
+                                                   const bool transition_from_undefined = false);
 
     // Do not forget submite the barrier, else the internal state does not match the actual
     // state You can use transition_from_undefined when you are not interested in keeping the
@@ -283,16 +289,32 @@ class Image : public std::enable_shared_from_this<Image>, public Resource {
     void properties(Properties& props);
 
   protected:
-    virtual void destroy();
+    vk::Image& get_image() {
+        return image;
+    }
 
   private:
     const ContextHandle context;
-    const vk::Image image = VK_NULL_HANDLE;
+    vk::Image image;
     const MemoryAllocationHandle memory;
     const vk::ImageCreateInfo create_info;
 
     vk::ImageLayout current_layout;
+
+  public:
+    static ImageHandle create(const vk::Image& image,
+                              const MemoryAllocationHandle& memory,
+                              const vk::ImageCreateInfo create_info,
+                              const vk::ImageLayout current_layout = vk::ImageLayout::eUndefined);
+
+    static ImageHandle create(const ContextHandle& context,
+                              const vk::Image& image,
+                              const vk::ImageCreateInfo create_info,
+                              const vk::ImageLayout current_layout = vk::ImageLayout::eUndefined);
 };
+
+class ImageView;
+using ImageViewHandle = std::shared_ptr<ImageView>;
 
 /**
  * @brief An wrapper for vk::ImageViews
@@ -302,11 +324,12 @@ class Image : public std::enable_shared_from_this<Image>, public Resource {
  */
 class ImageView : public std::enable_shared_from_this<ImageView>, public Resource {
 
-  public:
+  protected:
     ImageView(const vk::ImageViewCreateInfo& view_create_info, const ImageHandle& image);
 
     ImageView(const vk::ImageView& view, const ImageHandle& image);
 
+  public:
     ~ImageView();
 
     // -----------------------------------------------------------
@@ -340,9 +363,16 @@ class ImageView : public std::enable_shared_from_this<ImageView>, public Resourc
   private:
     vk::ImageView view;
     const ImageHandle image;
+
+  public:
+    static ImageViewHandle create(const vk::ImageViewCreateInfo& view_create_info,
+                                  const ImageHandle& image);
+
+    static ImageViewHandle create(const vk::ImageView& view, const ImageHandle& image);
 };
 
-using ImageViewHandle = std::shared_ptr<ImageView>;
+class Texture;
+using TextureHandle = std::shared_ptr<Texture>;
 
 /**
  * @brief      A texture is an ImageView with Sampler, i.e. what is needed to create a descriptor.
@@ -351,9 +381,10 @@ using ImageViewHandle = std::shared_ptr<ImageView>;
  *  to keep the internal state valid.
  */
 class Texture : public std::enable_shared_from_this<Texture>, public Resource {
-  public:
+  protected:
     Texture(const ImageViewHandle& view, const SamplerHandle& sampler);
 
+  public:
     ~Texture();
 
     // -----------------------------------------------------------
@@ -397,13 +428,17 @@ class Texture : public std::enable_shared_from_this<Texture>, public Resource {
   private:
     const ImageViewHandle view;
     SamplerHandle sampler;
+
+  public:
+    static TextureHandle create(const ImageViewHandle& view, const SamplerHandle& sampler);
 };
 
-using TextureHandle = std::shared_ptr<Texture>;
+class AccelerationStructure;
+using AccelerationStructureHandle = std::shared_ptr<AccelerationStructure>;
 
 class AccelerationStructure : public std::enable_shared_from_this<AccelerationStructure>,
                               public Resource {
-  public:
+  protected:
     // Creats a AccelerationStructure objects that automatically destroys `as` when destructed.
     // The memory is not freed explicitly to let it free itself.
     // It is asserted that the memory is already bound correctly.
@@ -411,6 +446,7 @@ class AccelerationStructure : public std::enable_shared_from_this<AccelerationSt
                           const BufferHandle& buffer,
                           const vk::AccelerationStructureBuildSizesInfoKHR& size_info);
 
+  public:
     ~AccelerationStructure();
 
     // -----------------------------------------------------------
@@ -496,8 +532,12 @@ class AccelerationStructure : public std::enable_shared_from_this<AccelerationSt
     const vk::AccelerationStructureKHR as;
     const BufferHandle buffer;
     const vk::AccelerationStructureBuildSizesInfoKHR size_info;
-};
 
-using AccelerationStructureHandle = std::shared_ptr<AccelerationStructure>;
+  public:
+    static AccelerationStructureHandle
+    create(const vk::AccelerationStructureKHR& as,
+           const BufferHandle& buffer,
+           const vk::AccelerationStructureBuildSizesInfoKHR& size_info);
+};
 
 } // namespace merian

@@ -65,10 +65,14 @@ vk::SurfaceFormatKHR select_surface_format(const std::vector<vk::SurfaceFormatKH
 SwapchainImage::SwapchainImage(const ContextHandle& context,
                                const vk::Image& image,
                                const vk::ImageCreateInfo create_info)
-    : Image(context, image, create_info, vk::ImageLayout::eUndefined) {}
+    : Image(context,
+            image,
+            create_info,
+            vk::ImageLayout::ePresentSrcKHR /*needed for barriers using bottom of pipe*/) {}
 
-void SwapchainImage::destroy() {
-    // do nothing, swapchain (presentation engine) destroys the image
+SwapchainImage::~SwapchainImage() {
+    // prevent image destruction, swapchain (presentation engine) destroys the image
+    get_image() = VK_NULL_HANDLE;
 }
 
 // -------------------------------------------------------------------------------------
@@ -224,7 +228,7 @@ vk::Extent2D Swapchain::create_swapchain(const uint32_t width, const uint32_t he
              vk::ComponentSwizzle::eA},
             {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1},
         };
-        image_view = std::make_shared<ImageView>(create_info, image);
+        image_view = ImageView::create(create_info, image);
 
         // Semaphore
         semaphore_group.read_semaphore = std::make_shared<BinarySemaphore>(context);

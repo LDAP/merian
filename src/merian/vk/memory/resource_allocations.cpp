@@ -15,7 +15,7 @@ Buffer::Buffer(const vk::Buffer& buffer,
 
 Buffer::~Buffer() {
     SPDLOG_TRACE("destroy buffer ({})", fmt::ptr(static_cast<VkBuffer>(buffer)));
-    destroy();
+    context->device.destroyBuffer(buffer);
 }
 
 vk::DeviceAddress Buffer::get_device_address() {
@@ -71,8 +71,10 @@ void Buffer::properties(Properties& props) {
     }
 }
 
-void Buffer::destroy() {
-    context->device.destroyBuffer(buffer);
+BufferHandle Buffer::create(const vk::Buffer& buffer,
+                            const MemoryAllocationHandle& memory,
+                            const vk::BufferCreateInfo& create_info) {
+    return std::shared_ptr<Buffer>(new Buffer(buffer, memory, create_info));
 }
 
 // --------------------------------------------------------------------------
@@ -92,7 +94,7 @@ Image::Image(const ContextHandle& context,
 
 Image::~Image() {
     SPDLOG_TRACE("destroy image ({})", fmt::ptr(static_cast<VkImage>(image)));
-    destroy();
+    context->device.destroyImage(image);
 }
 
 vk::FormatFeatureFlags Image::format_features() const {
@@ -104,16 +106,20 @@ vk::FormatFeatureFlags Image::format_features() const {
         .linearTilingFeatures;
 }
 
-vk::ImageMemoryBarrier Image::barrier(const vk::ImageLayout new_layout) {
+vk::ImageMemoryBarrier Image::barrier(const vk::ImageLayout new_layout,
+                                      const bool transition_from_undefined) {
     return barrier(new_layout, access_flags_for_image_layout(current_layout),
-                   access_flags_for_image_layout(new_layout));
+                   access_flags_for_image_layout(new_layout), VK_QUEUE_FAMILY_IGNORED,
+                   VK_QUEUE_FAMILY_IGNORED, all_levels_and_layers(), transition_from_undefined);
 }
 
-vk::ImageMemoryBarrier2 Image::barrier2(const vk::ImageLayout new_layout) {
+vk::ImageMemoryBarrier2 Image::barrier2(const vk::ImageLayout new_layout,
+                                        const bool transition_from_undefined) {
     return barrier2(new_layout, access_flags2_for_image_layout(current_layout),
                     access_flags2_for_image_layout(new_layout),
                     pipeline_stage2_for_image_layout(current_layout),
-                    pipeline_stage2_for_image_layout(new_layout));
+                    pipeline_stage2_for_image_layout(new_layout), VK_QUEUE_FAMILY_IGNORED,
+                    VK_QUEUE_FAMILY_IGNORED, all_levels_and_layers(), transition_from_undefined);
 }
 
 // Do not forget submit the barrier, else the internal state does not match the actual state
@@ -189,13 +195,24 @@ void Image::properties(Properties& props) {
     }
 }
 
-void Image::destroy() {
-    context->device.destroyImage(image);
+ImageHandle Image::create(const vk::Image& image,
+                          const MemoryAllocationHandle& memory,
+                          const vk::ImageCreateInfo create_info,
+                          const vk::ImageLayout current_layout) {
+    return std::shared_ptr<Image>(new Image(image, memory, create_info, current_layout));
+}
+
+ImageHandle Image::create(const ContextHandle& context,
+                          const vk::Image& image,
+                          const vk::ImageCreateInfo create_info,
+                          const vk::ImageLayout current_layout) {
+    return std::shared_ptr<Image>(new Image(context, image, create_info, current_layout));
 }
 
 // --------------------------------------------------------------------------
 
-ImageView::ImageView(const vk::ImageViewCreateInfo& view_create_info, const ImageHandle& image) {
+ImageView::ImageView(const vk::ImageViewCreateInfo& view_create_info, const ImageHandle& image)
+    : image(image) {
     assert(image->valid_for_view());
     assert(view_create_info.image == **image);
 
@@ -220,6 +237,15 @@ void ImageView::properties(Properties& props) {
     }
 }
 
+ImageViewHandle ImageView::create(const vk::ImageViewCreateInfo& view_create_info,
+                                  const ImageHandle& image) {
+    return std::shared_ptr<ImageView>(new ImageView(view_create_info, image));
+}
+
+ImageViewHandle ImageView::create(const vk::ImageView& view, const ImageHandle& image) {
+    return std::shared_ptr<ImageView>(new ImageView(view, image));
+}
+
 // --------------------------------------------------------------------------
 
 Texture::Texture(const ImageViewHandle& view, const SamplerHandle& sampler)
@@ -240,6 +266,10 @@ void Texture::properties(Properties& props) {
         view->properties(props);
         props.st_end_child();
     }
+}
+
+TextureHandle Texture::create(const ImageViewHandle& view, const SamplerHandle& sampler) {
+    return std::shared_ptr<Texture>(new Texture(view, sampler));
 }
 
 // --------------------------------------------------------------------------
@@ -272,6 +302,13 @@ void AccelerationStructure::properties(Properties& props) {
         buffer->properties(props);
         props.st_end_child();
     }
+}
+
+AccelerationStructureHandle
+AccelerationStructure::create(const vk::AccelerationStructureKHR& as,
+                              const BufferHandle& buffer,
+                              const vk::AccelerationStructureBuildSizesInfoKHR& size_info) {
+    return std::shared_ptr<AccelerationStructure>(new AccelerationStructure(as, buffer, size_info));
 }
 
 } // namespace merian

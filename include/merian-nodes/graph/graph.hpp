@@ -527,7 +527,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
         const std::shared_ptr<CachingCommandPool>& cmd_cache = in_flight_data.command_buffer_cache;
 
         GraphRun& run = in_flight_data.graph_run;
-        cmd_pool->reset();
+        cmd_cache->reset();
 
         const CommandBufferHandle cmd = cmd_cache->create_and_begin();
 

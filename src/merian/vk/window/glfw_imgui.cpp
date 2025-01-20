@@ -65,7 +65,6 @@ void GLFWImGui::create_render_pass(SwapchainAcquireResult& aquire_result) {
         {}, 1, &attachment_desc, 1, &subpass, 1, &dependency,
     };
 
-
     renderpass = RenderPass::create(context, info);
 }
 
@@ -149,8 +148,9 @@ FramebufferHandle GLFWImGui::new_frame(QueueHandle& queue,
     ImGui::NewFrame();
 
     if (!framebuffers[aquire_result.index]) {
-        framebuffers[aquire_result.index] = Framebuffer::create(
-            context, renderpass, aquire_result.extent.width, aquire_result.extent.height, 1);
+        framebuffers[aquire_result.index] =
+            Framebuffer::create(context, renderpass, aquire_result.extent.width,
+                                aquire_result.extent.height, 1, {*aquire_result.image_view});
     }
 
     FramebufferHandle& framebuffer = framebuffers[aquire_result.index];

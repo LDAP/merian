@@ -38,6 +38,15 @@ CachingCommandPool::CachingCommandPool(const CommandPoolHandle& pool)
 CachingCommandPool::~CachingCommandPool() {}
 
 CommandBufferHandle CachingCommandPool::create(const vk::CommandBufferLevel level) {
+#if SPDLOG_ACTIVE_LEVEL <= SPDLOG_LEVEL_DEBUG
+    if (!inuse_primary_cmds.empty() && cache_primary_cmds.empty() &&
+        pool->get_objects_in_use().empty()) {
+        SPDLOG_DEBUG("warn: if you see this message every frame, then you called "
+                     "CommandPool::reset(), however you should call "
+                     "CachingCommandPool::reset() instead!");
+    }
+#endif
+
     std::vector<CommandBufferHandle>* cached;
     std::vector<CommandBufferHandle>* in_use;
 

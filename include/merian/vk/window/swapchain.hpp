@@ -22,8 +22,7 @@ class SwapchainImage : public Image {
                    const vk::Image& image,
                    const vk::ImageCreateInfo create_info);
 
-  protected:
-    void destroy() override;
+    ~SwapchainImage() override;
 
   private:
 };

@@ -33,7 +33,7 @@ class CommandBuffer {
                   const vk::CommandBufferLevel level = vk::CommandBufferLevel::ePrimary)
         : pool(pool) {
 
-        const vk::CommandBufferAllocateInfo info{*pool, level};
+        const vk::CommandBufferAllocateInfo info{*pool, level, 1};
         check_result(pool->get_context()->device.allocateCommandBuffers(&info, &cmd),
                      "could not allocate command buffer");
 
@@ -459,22 +459,18 @@ class CommandBuffer {
         cmd.pipelineBarrier2(dep_info);
     }
 
-    void barrier(const vk::ArrayProxyNoTemporaries<const vk::MemoryBarrier2>& memory_barriers,
-                 const vk::ArrayProxyNoTemporaries<const vk::BufferMemoryBarrier2>&
-                     buffer_memory_barriers = {},
-                 const vk::ArrayProxyNoTemporaries<const vk::ImageMemoryBarrier2>&
-                     image_memory_barriers = {}) {
+    void barrier(const vk::ArrayProxy<const vk::MemoryBarrier2>& memory_barriers,
+                 const vk::ArrayProxy<const vk::BufferMemoryBarrier2>& buffer_memory_barriers = {},
+                 const vk::ArrayProxy<const vk::ImageMemoryBarrier2>& image_memory_barriers = {}) {
         cmd.pipelineBarrier2(
             vk::DependencyInfo{{}, memory_barriers, buffer_memory_barriers, image_memory_barriers});
     }
 
-    void barrier(
-        const vk::ArrayProxyNoTemporaries<const vk::BufferMemoryBarrier2>& buffer_memory_barriers) {
+    void barrier(const vk::ArrayProxy<const vk::BufferMemoryBarrier2>& buffer_memory_barriers) {
         cmd.pipelineBarrier2(vk::DependencyInfo{{}, {}, buffer_memory_barriers});
     }
 
-    void barrier(
-        const vk::ArrayProxyNoTemporaries<const vk::ImageMemoryBarrier2>& image_memory_barriers) {
+    void barrier(const vk::ArrayProxy<const vk::ImageMemoryBarrier2>& image_memory_barriers) {
         cmd.pipelineBarrier2(vk::DependencyInfo{{}, {}, {}, image_memory_barriers});
     }
 

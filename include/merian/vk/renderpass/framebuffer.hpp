@@ -19,6 +19,7 @@ class Framebuffer : public Object {
                 const std::vector<vk::ImageView>& attachments = {},
                 const vk::FramebufferCreateFlags flags = {})
         : context(context), renderpass(renderpass), extent(width, height) {
+        assert(attachments.size() == renderpass->get_attachment_count());
         vk::FramebufferCreateInfo create_info{flags, *renderpass, attachments,
                                               width, height,      layers};
         framebuffer = context->device.createFramebuffer(create_info);

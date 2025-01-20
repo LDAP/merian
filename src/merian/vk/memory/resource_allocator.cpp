@@ -137,26 +137,32 @@ ImageHandle ResourceAllocator::createImage(const CommandBufferHandle& cmdBuf,
     return resultImage;
 }
 
+ImageViewHandle
+ResourceAllocator::create_image_view(const ImageHandle& image,
+                                     const vk::ImageViewCreateInfo& imageViewCreateInfo,
+                                     const std::string& debug_name) {
+
+    const ImageViewHandle view = ImageView::create(imageViewCreateInfo, image);
+
+#ifndef NDEBUG
+    if (debug_utils) {
+        debug_utils->set_object_name(context->device, **view, debug_name);
+    }
+    SPDLOG_TRACE("created image view {} ({}), for image {}",
+                 fmt::ptr(static_cast<VkImageView>(**view)), debug_name,
+                 fmt::ptr(static_cast<VkImage>(**image)));
+#endif
+
+    return view;
+}
+
 TextureHandle ResourceAllocator::createTexture(const ImageHandle& image,
                                                const vk::ImageViewCreateInfo& view_create_info,
                                                const SamplerHandle& sampler,
                                                [[maybe_unused]] const std::string& debug_name) {
-    assert(view_create_info.image == image->get_image());
+    const ImageViewHandle view = create_image_view(image, view_create_info, debug_name);
 
-    const vk::ImageView view =
-        image->get_memory()->get_context()->device.createImageView(view_create_info);
-    const TextureHandle tex = std::make_shared<Texture>(view, image, sampler);
-
-#ifndef NDEBUG
-    if (debug_utils) {
-        debug_utils->set_object_name(context->device, view, debug_name);
-    }
-    SPDLOG_TRACE("created image view {} ({}), for image {}",
-                 fmt::ptr(static_cast<VkImageView>(view)), debug_name,
-                 fmt::ptr(static_cast<VkImage>(**image)));
-#endif
-
-    return tex;
+    return Texture::create(view, sampler);
 }
 
 TextureHandle ResourceAllocator::createTexture(const ImageHandle& image,
@@ -258,7 +264,7 @@ TextureHandle ResourceAllocator::createTextureFromRGBA8(const CommandBufferHandl
                 vk::Offset3D{int32_t(width >> (i - 1)), int32_t(height >> (i - 1)), 1};
             blit.dstOffsets[1] = vk::Offset3D{int32_t(width >> i), int32_t(height >> i), 1};
             cmd->blit(image, vk::ImageLayout::eTransferSrcOptimal, image,
-                            vk::ImageLayout::eTransferDstOptimal, blit, vk::Filter::eLinear);
+                      vk::ImageLayout::eTransferDstOptimal, blit, vk::Filter::eLinear);
         }
         image->_set_current_layout(vk::ImageLayout::eTransferSrcOptimal);
     }
@@ -296,7 +302,7 @@ AccelerationStructureHandle ResourceAllocator::createAccelerationStructure(
     }
 #endif
 
-    return std::make_shared<AccelerationStructure>(as, buffer, size_info);
+    return AccelerationStructure::create(as, buffer, size_info);
 }
 
 std::shared_ptr<StagingMemoryManager> ResourceAllocator::getStaging() {
