@@ -150,7 +150,7 @@ FramebufferHandle GLFWImGui::new_frame(QueueHandle& queue,
     if (!framebuffers[aquire_result.index]) {
         framebuffers[aquire_result.index] =
             Framebuffer::create(context, renderpass, aquire_result.extent.width,
-                                aquire_result.extent.height, 1, {*aquire_result.image_view});
+                                aquire_result.extent.height, 1, aquire_result.image_view);
     }
 
     FramebufferHandle& framebuffer = framebuffers[aquire_result.index];
