@@ -87,9 +87,9 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
     for (int i = 0; i < 2; i++) {
         ping_pong_res[i]
             .set
-            ->queue_descriptor_write_texture(0, ping_pong_res[i].ping_pong, 0, 1,
+            ->queue_descriptor_write_texture(0, ping_pong_res[i].ping_pong, 0,
                                              vk::ImageLayout::eShaderReadOnlyOptimal)
-            .queue_descriptor_write_texture(1, ping_pong_res[i ^ 1].ping_pong, 0, 1,
+            .queue_descriptor_write_texture(1, ping_pong_res[i ^ 1].ping_pong, 0,
                                             vk::ImageLayout::eGeneral)
             .update();
     }

@@ -29,7 +29,7 @@ void VkTLASIn::get_descriptor_update(const uint32_t binding,
                                      const DescriptorSetHandle& update,
                                      [[maybe_unused]] const ResourceAllocatorHandle& allocator) {
     const auto& res = debugable_ptr_cast<TLASResource>(resource);
-    update->queue_descriptor_write_acceleration_structure(binding, *res->tlas);
+    update->queue_descriptor_write_acceleration_structure(binding, res->tlas);
 }
 
 const AccelerationStructureHandle& VkTLASIn::resource(const GraphResourceHandle& resource) {

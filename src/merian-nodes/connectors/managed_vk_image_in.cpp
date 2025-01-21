@@ -32,13 +32,13 @@ void ManagedVkImageIn::get_descriptor_update(const uint32_t binding,
                                              const ResourceAllocatorHandle& allocator) {
     if (!resource) {
         // the optional connector was not connected
-        update->queue_descriptor_write_texture(binding, allocator->get_dummy_texture(), 0, 1,
+        update->queue_descriptor_write_texture(binding, allocator->get_dummy_texture(), 0,
                                                vk::ImageLayout::eShaderReadOnlyOptimal);
     } else {
         // or vk::ImageLayout::eShaderReadOnlyOptimal instead of required?
         assert(debugable_ptr_cast<ManagedVkImageResource>(resource)->tex && "missing usage flags?");
         update->queue_descriptor_write_texture(
-            binding, *debugable_ptr_cast<ManagedVkImageResource>(resource)->tex, 0, 1,
+            binding, *debugable_ptr_cast<ManagedVkImageResource>(resource)->tex, 0,
             required_layout);
     }
 }

@@ -43,9 +43,20 @@ class DescriptorSet : public std::enable_shared_from_this<DescriptorSet>, public
 
   public:
     // Allocates a DescriptorSet that matches the layout that is attached to the Pool
-    DescriptorSet(const DescriptorPoolHandle& pool) : pool(pool), layout(pool->get_layout()) {
+    DescriptorSet(const DescriptorPoolHandle& pool)
+        : pool(pool), layout(pool->get_layout()),
+          resource_index_for_binding(layout->get_bindings().size(), 0) {
         SPDLOG_DEBUG("allocating DescriptorSet ({})", fmt::ptr(this));
         set = allocate_descriptor_set(*pool->get_context(), *pool, *pool->get_layout());
+
+        const auto& bindings = layout->get_bindings();
+        if (!bindings.empty()) {
+            for (uint32_t i = 1; i < bindings.size(); i++) {
+                resource_index_for_binding[i] =
+                    bindings[i - 1].descriptorCount + resource_index_for_binding[i - 1];
+            }
+            resources.resize(resource_index_for_binding.back() + bindings.back().descriptorCount);
+        }
     }
 
     ~DescriptorSet() {
@@ -94,48 +105,58 @@ class DescriptorSet : public std::enable_shared_from_this<DescriptorSet>, public
                                                  const BufferHandle& buffer,
                                                  const vk::DeviceSize offset = 0,
                                                  const vk::DeviceSize range = VK_WHOLE_SIZE,
-                                                 const uint32_t dst_array_element = 0,
-                                                 const uint32_t descriptor_count = 1) {
-        resources.emplace_back(buffer);
-        return write_descriptor_buffer_type(binding, *buffer, get_type_for_binding(binding), offset,
-                                            range, dst_array_element, descriptor_count);
+                                                 const uint32_t dst_array_element = 0) {
+        write_resources.emplace_back(buffer);
+        write_infos.emplace_back(vk::DescriptorBufferInfo(*buffer, offset, range));
+        writes.emplace_back(vk::WriteDescriptorSet{
+            set,
+            binding,
+            dst_array_element,
+            1,
+            layout->get_type_for_binding(binding),
+        });
+        return *this;
     }
 
     // The type is automatically determined from the set using the binding index.
-    // With access_layout you can overwrite the layout that the image has "when it is accessed using
-    // the descriptor". If std::nullopt the current layout is used.
+    // With access_layout you can overwrite the layout that the image has "when it is accessed
+    // using the descriptor". If std::nullopt the current layout is used.
     DescriptorSet& queue_descriptor_write_texture(
         const uint32_t binding,
         const TextureHandle& texture,
         const uint32_t dst_array_element = 0,
-        const uint32_t descriptor_count = 1,
         const std::optional<vk::ImageLayout> access_layout = std::nullopt) {
-        resources.emplace_back(texture);
-        return write_descriptor_image_type(
-            binding, get_type_for_binding(binding), *texture->get_view(),
-            access_layout.value_or(texture->get_current_layout()), *texture->get_sampler(),
-            dst_array_element, descriptor_count);
+        write_resources.emplace_back(texture);
+        write_infos.emplace_back(
+            vk::DescriptorImageInfo(*texture->get_sampler(), *texture->get_view(),
+                                    access_layout.value_or(texture->get_current_layout())));
+        writes.emplace_back(vk::WriteDescriptorSet{
+            set,
+            binding,
+            dst_array_element,
+            1,
+            layout->get_type_for_binding(binding),
+        });
+
+        return *this;
     }
 
     // Bind `acceleration_structure` at the binding point `binding` of DescriptorSet `set`.
     DescriptorSet& queue_descriptor_write_acceleration_structure(
         const uint32_t binding,
-        const vk::AccelerationStructureKHR& acceleration_structure,
-        const uint32_t dst_array_element = 0,
-        const uint32_t descriptor_count = 1) {
-        write_acceleration_structures.emplace_back(
-            std::make_unique<vk::WriteDescriptorSetAccelerationStructureKHR>(
-                1, &acceleration_structure));
-        vk::WriteDescriptorSet write{set,
-                                     binding,
-                                     dst_array_element,
-                                     descriptor_count,
-                                     vk::DescriptorType::eAccelerationStructureKHR,
-                                     {},
-                                     {},
-                                     {},
-                                     write_acceleration_structures.back().get()};
-        writes.push_back(write);
+        const AccelerationStructureHandle& acceleration_structure,
+        const uint32_t dst_array_element = 0) {
+        write_resources.emplace_back(acceleration_structure);
+        write_infos.emplace_back(
+            vk::WriteDescriptorSetAccelerationStructureKHR(1, *acceleration_structure));
+        writes.emplace_back(vk::WriteDescriptorSet{
+            set,
+            binding,
+            dst_array_element,
+            1,
+            vk::DescriptorType::eAccelerationStructureKHR,
+        });
+
         return *this;
     }
 
@@ -151,94 +172,47 @@ class DescriptorSet : public std::enable_shared_from_this<DescriptorSet>, public
 
     // Updates the vk::DescriptorSet immediately (!) to point to the configured resources.
     //
-    // If you get validation errors or crashes following a call to this method, you likely tried to
-    // update a DescriptorSet that is currently used in an pending or executing command buffer.
+    // If you get validation errors or crashes following a call to this method, you likely tried
+    // to update a DescriptorSet that is currently used in an pending or executing command
+    // buffer.
     void update() {
+        // for now descriptor count is always 1.
+        assert(writes.size() == write_resources.size());
+        assert(writes.size() == write_infos.size());
+
         if (!has_updates()) {
             return;
         }
 
-        assert(writes.size() == write_buffer_infos.size() + write_image_infos.size() +
-                                    write_acceleration_structures.size());
+        for (uint32_t i = 0; i < writes.size(); i++) {
+            vk::WriteDescriptorSet& write = writes[i];
+
+            if (std::holds_alternative<vk::DescriptorBufferInfo>(write_infos[i])) {
+                write.pBufferInfo = &std::get<vk::DescriptorBufferInfo>(write_infos[i]);
+            } else if (std::holds_alternative<vk::DescriptorImageInfo>(write_infos[i])) {
+                write.pImageInfo = &std::get<vk::DescriptorImageInfo>(write_infos[i]);
+            } else if (std::holds_alternative<vk::WriteDescriptorSetAccelerationStructureKHR>(
+                           write_infos[i])) {
+                write.pNext =
+                    &std::get<vk::WriteDescriptorSetAccelerationStructureKHR>(write_infos[i]);
+            } else {
+                assert(false);
+            }
+
+            // For now only descriptorCount 1 is implemented. Otherwise: If the dstBinding has fewer
+            // than descriptorCount array elements remaining starting from dstArrayElement, then the
+            // remainder will be used to update the subsequent binding - dstBinding+1 starting at
+            // array element zero.
+            assert(write.descriptorCount == 1);
+            resources[resource_index_for_binding[write.dstBinding] + write.dstArrayElement] =
+                write_resources[i];
+        }
+
         pool->get_context()->device.updateDescriptorSets(writes, {});
 
         writes.clear();
-        write_buffer_infos.clear();
-        write_image_infos.clear();
-        write_acceleration_structures.clear();
-        resources.clear();
-    }
-
-  private:
-    // Bind `buffer` at the binding point `binding`.
-    // The type is automatically determined from the set using the binding index.
-    DescriptorSet& write_descriptor_buffer(const uint32_t binding,
-                                           const vk::Buffer& buffer,
-                                           const vk::DeviceSize offset = 0,
-                                           const vk::DeviceSize range = VK_WHOLE_SIZE,
-                                           const uint32_t dst_array_element = 0,
-                                           const uint32_t descriptor_count = 1) {
-        return write_descriptor_buffer_type(binding, buffer, get_type_for_binding(binding), offset,
-                                            range, dst_array_element, descriptor_count);
-    }
-
-    // Bind `sampler` at the binding point `binding``.
-    // The type is automatically determined from the set using the binding index.
-    DescriptorSet&
-    write_descriptor_image(const uint32_t binding,
-                           const vk::ImageView& image_view,
-                           const vk::ImageLayout& image_layout = vk::ImageLayout::eGeneral,
-                           const vk::Sampler& sampler = {},
-                           const uint32_t dst_array_element = 0,
-                           const uint32_t descriptor_count = 1) {
-        return write_descriptor_image_type(binding, get_type_for_binding(binding), image_view,
-                                           image_layout, sampler, dst_array_element,
-                                           descriptor_count);
-    }
-
-    // Bind `sampler` at the binding point `binding`.
-    DescriptorSet&
-    write_descriptor_image_type(const uint32_t binding,
-                                const vk::DescriptorType type,
-                                const vk::ImageView& view,
-                                const vk::ImageLayout& image_layout = vk::ImageLayout::eGeneral,
-                                const vk::Sampler& sampler = {},
-                                const uint32_t dst_array_element = 0,
-                                const uint32_t descriptor_count = 1) {
-        write_image_infos.emplace_back(
-            std::make_unique<vk::DescriptorImageInfo>(sampler, view, image_layout));
-        vk::WriteDescriptorSet write{set,
-                                     binding,
-                                     dst_array_element,
-                                     descriptor_count,
-                                     type,
-                                     write_image_infos.back().get()};
-        writes.push_back(write);
-
-        return *this;
-    }
-
-    // Bind `buffer` at the binding point `binding` of DescriptorSet `set`.
-    // The type is automatically determined from the set using the binding index.
-    DescriptorSet&
-    write_descriptor_buffer_type(const uint32_t binding,
-                                 const vk::Buffer& buffer,
-                                 const vk::DescriptorType type = vk::DescriptorType::eStorageBuffer,
-                                 const vk::DeviceSize offset = 0,
-                                 const vk::DeviceSize range = VK_WHOLE_SIZE,
-                                 const uint32_t dst_array_element = 0,
-                                 const uint32_t descriptor_count = 1) {
-        write_buffer_infos.emplace_back(
-            std::make_unique<vk::DescriptorBufferInfo>(buffer, offset, range));
-        vk::WriteDescriptorSet write{set,
-                                     binding,
-                                     dst_array_element,
-                                     descriptor_count,
-                                     type,
-                                     {},
-                                     write_buffer_infos.back().get()};
-        writes.push_back(write);
-        return *this;
+        write_infos.clear();
+        write_resources.clear();
     }
 
   private:
@@ -246,20 +220,21 @@ class DescriptorSet : public std::enable_shared_from_this<DescriptorSet>, public
     const std::shared_ptr<DescriptorSetLayout> layout;
     vk::DescriptorSet set;
 
-    std::vector<ResourceHandle> bound_resources;
+    // Has entry for each array element. Use resource_index_for_binding to access.
+    std::vector<ResourceHandle> resources;
+    std::vector<uint32_t> resource_index_for_binding;
 
     // ---------------------------------------------------------------------
     // Queued Updates
 
+    // all with the same length.
+    // Pointers are set in update() depending on the descriptor type.
     std::vector<vk::WriteDescriptorSet> writes;
-    std::vector<ResourceHandle> resources;
-
-    // vk::WriteDescriptorSet takes pointers. We must ensure that these stay valid until update() ->
-    // use unique ptrs
-    std::vector<std::unique_ptr<vk::DescriptorBufferInfo>> write_buffer_infos;
-    std::vector<std::unique_ptr<vk::DescriptorImageInfo>> write_image_infos;
-    std::vector<std::unique_ptr<vk::WriteDescriptorSetAccelerationStructureKHR>>
-        write_acceleration_structures;
+    std::vector<ResourceHandle> write_resources;
+    std::vector<std::variant<vk::DescriptorBufferInfo,
+                             vk::DescriptorImageInfo,
+                             vk::WriteDescriptorSetAccelerationStructureKHR>>
+        write_infos;
 };
 
 using DescriptorSetHandle = std::shared_ptr<DescriptorSet>;

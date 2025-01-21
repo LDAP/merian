@@ -33,7 +33,7 @@ void VkTextureArrayIn::get_descriptor_update(
     for (auto& pending_update : res->pending_updates) {
         const TextureHandle tex =
             res->textures[pending_update] ? res->textures[pending_update] : res->dummy_texture;
-        update->queue_descriptor_write_texture(binding, tex, pending_update, 1, required_layout);
+        update->queue_descriptor_write_texture(binding, tex, pending_update, required_layout);
     }
 }
 

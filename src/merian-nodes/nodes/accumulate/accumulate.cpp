@@ -90,10 +90,10 @@ Accumulate::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
                                  allocator->get_sampler_pool()->linear_mirrored_repeat());
 
     percentile_set
-        ->queue_descriptor_write_texture(0, percentile_texture, 0, 1, vk::ImageLayout::eGeneral)
+        ->queue_descriptor_write_texture(0, percentile_texture, 0, vk::ImageLayout::eGeneral)
         .update();
     accumulate_set
-        ->queue_descriptor_write_texture(0, percentile_texture, 0, 1,
+        ->queue_descriptor_write_texture(0, percentile_texture, 0,
                                          vk::ImageLayout::eShaderReadOnlyOptimal)
         .update();
 

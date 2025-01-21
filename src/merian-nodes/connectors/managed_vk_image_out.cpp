@@ -36,7 +36,7 @@ void ManagedVkImageOut::get_descriptor_update(
     // VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR or VK_IMAGE_LAYOUT_GENERAL layout in order to access its
     // data in a shader.
     update->queue_descriptor_write_texture(
-        binding, *debugable_ptr_cast<ManagedVkImageResource>(resource)->tex, 0, 1,
+        binding, *debugable_ptr_cast<ManagedVkImageResource>(resource)->tex, 0,
         vk::ImageLayout::eGeneral);
 }
 
