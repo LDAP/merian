@@ -58,8 +58,8 @@ private:
 
     uint32_t skip_interval = 1, skip_counter;
 
-    float max_value = 1.0f;
-    bool auto_find_max = true;
+    float max_value = 1.0f, min_value = 0.0f;
+    bool auto_find_max = true, auto_find_min = true;
     float test_value;
 
     std::vector<float> history;

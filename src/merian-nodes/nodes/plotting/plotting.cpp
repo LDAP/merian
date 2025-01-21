@@ -3,6 +3,7 @@
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
+#include "merian/utils/bitpacking.hpp"
 
 #include "merian-nodes/graph/errors.hpp"
 
@@ -38,7 +39,7 @@ Node::NodeStatusFlags Plotting::properties(Properties& config) {
     }
 
     config.config_uint("Offset", offset, "Offset of the element to plot in byte.");
-    //config.config_enum("Element type", plotting_type, Properties::OptionsStyle::DONT_CARE, "Type of the elements to plot.");
+    config.config_enum("Element type", plotting_type, Properties::OptionsStyle::DONT_CARE, "Type of the elements to plot.");
 
     if (config.config_bool("Log(x)", log_x_axis, "Show plot with a logarithmic x-axis.")) {
         resetHistory();
@@ -50,25 +51,41 @@ Node::NodeStatusFlags Plotting::properties(Properties& config) {
     config.config_bool("Auto find max", auto_find_max, "Whether or not to find max value automatically.");
     config.config_float("Max Value", max_value, "Max value of the plot", 0.001f);
 
+    config.config_bool("Auto find min", auto_find_min, "Whether or not to find min value automatically.");
+    config.config_float("Min Value", min_value, "Min value of the plot", 0.001f);
+
     if (log_x_axis) {
         config.output_plot_line("", history.data(),
-            history.size(), 0, max_value);
+            history.size(), min_value, max_value);
     } else {
         config.output_plot_line("", history.data() + current_history_idx + 1,
-                (history.size() / 2) - 1, 0, max_value);
+                (history.size() / 2) - 1, min_value, max_value);
     }
 
     return {};
 }
 
 float findMaxInHistory(std::vector<float>& history, size_t size, size_t offset) {
-    float max_value = 0;
+    float max_value = 0, min_value = 0;
     for (int i = 0; i < size; i++) {
         if (history[offset + i] > max_value) {
             max_value = history[offset + i];
         }
+
+        if (history[offset + i] < min_value) {
+            min_value = history[offset + i];
+        }
     }
     return max_value;
+}
+
+float getValueAtOffset(const void* data, uint32_t offset, PlottingType data_type) {
+    switch (data_type) {
+        case PlottingType::INT_16: return static_cast<float>(*static_cast<const int16_t*>(data + offset));
+        case PlottingType::INT_32: return static_cast<float>(*static_cast<const int32_t*>(data + offset));
+        case PlottingType::FLOAT_16: return half_to_float(*static_cast<const int16_t*>(data + offset));
+        case PlottingType::FLOAT_32: return *static_cast<const float*>(data + offset);
+    }
 }
 
 void Plotting::process([[maybe_unused]] GraphRun& run,
@@ -78,12 +95,16 @@ void Plotting::process([[maybe_unused]] GraphRun& run,
     if (io[con_src] != nullptr) {
         const uint32_t half_size = history.size() / 2;
 
-        if (auto_find_max) {
-            max_value = findMaxInHistory(history, half_size, current_history_idx);
+        if (auto_find_max || auto_find_min) {
+            auto min_max = std::minmax_element(history.begin() + current_history_idx, history.begin() + current_history_idx + half_size);
+            if (auto_find_min)
+                min_value = *min_max.first;
+            if (auto_find_max)
+                max_value = *min_max.second;
         }
 
         if (!log_x_axis || skip_counter == skip_interval) {
-            float value = *static_cast<const float*>(*io[con_src] + offset);
+            float value = getValueAtOffset(*io[con_src], offset, plotting_type);
             if (log_y_axis) {
                 value = std::log(value);
             }
