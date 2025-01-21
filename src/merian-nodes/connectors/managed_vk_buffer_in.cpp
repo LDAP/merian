@@ -20,17 +20,17 @@ std::optional<vk::DescriptorSetLayoutBinding> ManagedVkBufferIn::get_descriptor_
         return vk::DescriptorSetLayoutBinding{
             0, vk::DescriptorType::eStorageBuffer, 1, stage_flags, nullptr,
         };
-    }          return std::nullopt;
-   
+    }
+    return std::nullopt;
 }
 
 void ManagedVkBufferIn::get_descriptor_update(
     const uint32_t binding,
     const GraphResourceHandle& resource,
-    DescriptorSetUpdate& update,
+    const DescriptorSetHandle& update,
     [[maybe_unused]] const ResourceAllocatorHandle& allocator) {
-    update.write_descriptor_buffer(binding,
-                                   debugable_ptr_cast<ManagedVkBufferResource>(resource)->buffer);
+    update->queue_descriptor_write_buffer(
+        binding, debugable_ptr_cast<ManagedVkBufferResource>(resource)->buffer);
 }
 
 Connector::ConnectorStatusFlags ManagedVkBufferIn::on_pre_process(

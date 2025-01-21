@@ -27,13 +27,13 @@ std::optional<vk::DescriptorSetLayoutBinding> VkTextureArrayIn::get_descriptor_i
 void VkTextureArrayIn::get_descriptor_update(
     const uint32_t binding,
     const GraphResourceHandle& resource,
-    DescriptorSetUpdate& update,
+    const DescriptorSetHandle& update,
     [[maybe_unused]] const ResourceAllocatorHandle& allocator) {
     const auto& res = debugable_ptr_cast<TextureArrayResource>(resource);
     for (auto& pending_update : res->pending_updates) {
         const TextureHandle tex =
             res->textures[pending_update] ? res->textures[pending_update] : res->dummy_texture;
-        update.write_descriptor_texture(binding, tex, pending_update, 1, required_layout);
+        update->queue_descriptor_write_texture(binding, tex, pending_update, 1, required_layout);
     }
 }
 

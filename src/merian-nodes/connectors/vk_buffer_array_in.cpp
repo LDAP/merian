@@ -25,13 +25,13 @@ std::optional<vk::DescriptorSetLayoutBinding> VkBufferArrayIn::get_descriptor_in
 void VkBufferArrayIn::get_descriptor_update(
     const uint32_t binding,
     const GraphResourceHandle& resource,
-    DescriptorSetUpdate& update,
+    const DescriptorSetHandle& update,
     [[maybe_unused]] const ResourceAllocatorHandle& allocator) {
     const auto& res = debugable_ptr_cast<BufferArrayResource>(resource);
     for (auto& pending_update : res->pending_updates) {
         const BufferHandle tex =
             res->buffers[pending_update] ? res->buffers[pending_update] : res->dummy_buffer;
-        update.write_descriptor_buffer(binding, tex, 0, VK_WHOLE_SIZE, pending_update);
+        update->queue_descriptor_write_buffer(binding, tex, 0, VK_WHOLE_SIZE, pending_update);
     }
 }
 

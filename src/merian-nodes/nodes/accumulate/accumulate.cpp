@@ -3,7 +3,6 @@
 #include "accumulate.comp.spv.h"
 #include "calculate_percentiles.comp.spv.h"
 #include "merian/vk/descriptors/descriptor_set_layout_builder.hpp"
-#include "merian/vk/descriptors/descriptor_set_update.hpp"
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
@@ -90,13 +89,13 @@ Accumulate::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
         allocator->createTexture(quartile_image, quartile_image_view_create_info,
                                  allocator->get_sampler_pool()->linear_mirrored_repeat());
 
-    DescriptorSetUpdate(percentile_set)
-        .write_descriptor_texture(0, percentile_texture, 0, 1, vk::ImageLayout::eGeneral)
-        .update(context);
-    DescriptorSetUpdate(accumulate_set)
-        .write_descriptor_texture(0, percentile_texture, 0, 1,
-                                  vk::ImageLayout::eShaderReadOnlyOptimal)
-        .update(context);
+    percentile_set
+        ->queue_descriptor_write_texture(0, percentile_texture, 0, 1, vk::ImageLayout::eGeneral)
+        .update();
+    accumulate_set
+        ->queue_descriptor_write_texture(0, percentile_texture, 0, 1,
+                                         vk::ImageLayout::eShaderReadOnlyOptimal)
+        .update();
 
     auto quartile_pipe_layout = PipelineLayoutBuilder(context)
                                     .add_descriptor_set_layout(graph_layout)

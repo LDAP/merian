@@ -1,7 +1,6 @@
 #include "merian-nodes/nodes/svgf/svgf.hpp"
 #include "config.h"
 #include "merian/vk/descriptors/descriptor_set_layout_builder.hpp"
-#include "merian/vk/descriptors/descriptor_set_update.hpp"
 
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
@@ -86,12 +85,13 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
                                      allocator->get_sampler_pool()->linear_mirrored_repeat());
     }
     for (int i = 0; i < 2; i++) {
-        DescriptorSetUpdate(ping_pong_res[i].set)
-            .write_descriptor_texture(0, ping_pong_res[i].ping_pong, 0, 1,
-                                      vk::ImageLayout::eShaderReadOnlyOptimal)
-            .write_descriptor_texture(1, ping_pong_res[i ^ 1].ping_pong, 0, 1,
-                                      vk::ImageLayout::eGeneral)
-            .update(context);
+        ping_pong_res[i]
+            .set
+            ->queue_descriptor_write_texture(0, ping_pong_res[i].ping_pong, 0, 1,
+                                             vk::ImageLayout::eShaderReadOnlyOptimal)
+            .queue_descriptor_write_texture(1, ping_pong_res[i ^ 1].ping_pong, 0, 1,
+                                            vk::ImageLayout::eGeneral)
+            .update();
     }
 
     {

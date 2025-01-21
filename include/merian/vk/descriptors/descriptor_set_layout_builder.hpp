@@ -55,8 +55,8 @@ namespace merian {
 class DescriptorSetLayoutBuilder {
 
   public:
-    DescriptorSetLayoutBuilder(std::vector<vk::DescriptorSetLayoutBinding> bindings = {}) {
-        add_binding(std::move(bindings));
+    DescriptorSetLayoutBuilder(const std::vector<vk::DescriptorSetLayoutBinding>& bindings = {}) {
+        add_binding(bindings);
     }
 
     // --------------------------------------------------------------------------------------------------------------------

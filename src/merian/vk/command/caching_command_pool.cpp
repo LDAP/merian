@@ -41,8 +41,8 @@ CommandBufferHandle CachingCommandPool::create(const vk::CommandBufferLevel leve
 #if SPDLOG_ACTIVE_LEVEL <= SPDLOG_LEVEL_DEBUG
     if (!inuse_primary_cmds.empty() && cache_primary_cmds.empty() &&
         pool->get_objects_in_use().empty()) {
-        SPDLOG_DEBUG("warn: if you see this message every frame, then you called "
-                     "CommandPool::reset(), however you should call "
+        SPDLOG_DEBUG("warn: if you see this message frequently, then you might have called "
+                     "CommandPool::reset(), however you should have called "
                      "CachingCommandPool::reset() instead!");
     }
 #endif

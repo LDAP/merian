@@ -25,7 +25,7 @@ class VkTextureArrayIn
 
     void get_descriptor_update(const uint32_t binding,
                                const GraphResourceHandle& resource,
-                               DescriptorSetUpdate& update,
+                               const DescriptorSetHandle& update,
                                const ResourceAllocatorHandle& allocator) override;
 
     ConnectorStatusFlags

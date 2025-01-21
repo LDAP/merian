@@ -22,25 +22,24 @@ std::optional<vk::DescriptorSetLayoutBinding> ManagedVkImageIn::get_descriptor_i
     if (stage_flags) {
         return vk::DescriptorSetLayoutBinding{0, vk::DescriptorType::eCombinedImageSampler, 1,
                                               stage_flags, nullptr};
-    } else {
-        return std::nullopt;
     }
+    return std::nullopt;
 }
 
 void ManagedVkImageIn::get_descriptor_update(const uint32_t binding,
                                              const GraphResourceHandle& resource,
-                                             DescriptorSetUpdate& update,
+                                             const DescriptorSetHandle& update,
                                              const ResourceAllocatorHandle& allocator) {
     if (!resource) {
         // the optional connector was not connected
-        update.write_descriptor_texture(binding, allocator->get_dummy_texture(), 0, 1,
-                                        vk::ImageLayout::eShaderReadOnlyOptimal);
+        update->queue_descriptor_write_texture(binding, allocator->get_dummy_texture(), 0, 1,
+                                               vk::ImageLayout::eShaderReadOnlyOptimal);
     } else {
         // or vk::ImageLayout::eShaderReadOnlyOptimal instead of required?
         assert(debugable_ptr_cast<ManagedVkImageResource>(resource)->tex && "missing usage flags?");
-        update.write_descriptor_texture(binding,
-                                        *debugable_ptr_cast<ManagedVkImageResource>(resource)->tex,
-                                        0, 1, required_layout);
+        update->queue_descriptor_write_texture(
+            binding, *debugable_ptr_cast<ManagedVkImageResource>(resource)->tex, 0, 1,
+            required_layout);
     }
 }
 

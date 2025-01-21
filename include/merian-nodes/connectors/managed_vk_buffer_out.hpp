@@ -22,7 +22,7 @@ class ManagedVkBufferOut : public TypedOutputConnector<BufferHandle> {
 
     virtual void get_descriptor_update(const uint32_t binding,
                                        const GraphResourceHandle& resource,
-                                       DescriptorSetUpdate& update,
+                                       const DescriptorSetHandle& update,
                                        const ResourceAllocatorHandle& allocator) override;
 
     virtual ConnectorStatusFlags

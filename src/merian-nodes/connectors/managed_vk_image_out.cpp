@@ -21,24 +21,23 @@ std::optional<vk::DescriptorSetLayoutBinding> ManagedVkImageOut::get_descriptor_
     if (stage_flags) {
         return vk::DescriptorSetLayoutBinding{0, vk::DescriptorType::eStorageImage, 1, stage_flags,
                                               nullptr};
-    } else {
-        return std::nullopt;
     }
+    return std::nullopt;
 }
 
 void ManagedVkImageOut::get_descriptor_update(
     const uint32_t binding,
     const GraphResourceHandle& resource,
-    DescriptorSetUpdate& update,
+    const DescriptorSetHandle& update,
     [[maybe_unused]] const ResourceAllocatorHandle& allocator) {
     // or vk::ImageLayout::eGeneral instead of required?
     assert(debugable_ptr_cast<ManagedVkImageResource>(resource)->tex && "missing usage flags?");
     // From Spec 14.1.1: The image subresources for a storage image must be in the
     // VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR or VK_IMAGE_LAYOUT_GENERAL layout in order to access its
     // data in a shader.
-    update.write_descriptor_texture(binding,
-                                    *debugable_ptr_cast<ManagedVkImageResource>(resource)->tex, 0,
-                                    1, vk::ImageLayout::eGeneral);
+    update->queue_descriptor_write_texture(
+        binding, *debugable_ptr_cast<ManagedVkImageResource>(resource)->tex, 0, 1,
+        vk::ImageLayout::eGeneral);
 }
 
 Connector::ConnectorStatusFlags ManagedVkImageOut::on_pre_process(

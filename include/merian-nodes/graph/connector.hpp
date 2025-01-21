@@ -5,7 +5,7 @@
 #include "graph_run.hpp"
 
 #include "merian/utils/properties.hpp"
-#include "merian/vk/descriptors/descriptor_set_update.hpp"
+#include "merian/vk/descriptors/descriptor_set.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 
 namespace merian_nodes {
@@ -52,7 +52,7 @@ class Connector : public std::enable_shared_from_this<Connector> {
     // Assume that the last updates are persisted and only changes need to be recorded.
     virtual void get_descriptor_update([[maybe_unused]] const uint32_t binding,
                                        [[maybe_unused]] const GraphResourceHandle& resource,
-                                       [[maybe_unused]] DescriptorSetUpdate& update,
+                                       [[maybe_unused]] const DescriptorSetHandle& update,
                                        [[maybe_unused]] const ResourceAllocatorHandle& allocator) {
         throw std::runtime_error{"resource is not accessible using a descriptor"};
     }

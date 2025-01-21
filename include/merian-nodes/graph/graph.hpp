@@ -132,11 +132,7 @@ struct NodeData {
     // A descriptor set for each combination of resources that can occur, due to delayed accesses.
     // Also keep at least RING_SIZE to allow updating descriptor sets while iterations are in
     // flight. Access with iteration % data.descriptor_sets.size() (on prepare descriptor sets)
-    struct PerDescriptorSetInfo {
-        DescriptorSetHandle descriptor_set;
-        std::unique_ptr<DescriptorSetUpdate> update;
-    };
-    std::vector<PerDescriptorSetInfo> descriptor_sets;
+    std::vector<DescriptorSetHandle> descriptor_sets;
     std::vector<NodeIO> resource_maps;
 
     struct NodeStatistics {
@@ -1307,17 +1303,16 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
         auto& descriptor_set = data.descriptor_sets[set_idx];
         {
             // apply descriptor set updates
-            data.statistics.last_descriptor_set_updates = descriptor_set.update->count();
-            if (!descriptor_set.update->empty()) {
+            data.statistics.last_descriptor_set_updates = descriptor_set->update_count();
+            if (descriptor_set->has_updates()) {
                 SPDLOG_TRACE("applying {} descriptor set updates for node {}, set {}",
                              descriptor_set.update->count(), data.name, set_idx);
-                descriptor_set.update->update(context);
-                descriptor_set.update->next();
+                descriptor_set->update();
             }
         }
 
         {
-            node->process(run, cmd, descriptor_set.descriptor_set, data.resource_maps[set_idx]);
+            node->process(run, cmd, descriptor_set, data.resource_maps[set_idx]);
         }
 
         {
@@ -1369,7 +1364,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
             for (auto& set_idx : resource_info.set_indices) {
                 src_output->get_descriptor_update(
                     per_output_info.descriptor_set_binding, resource_info.resource,
-                    *src_data.descriptor_sets[set_idx].update, resource_allocator);
+                    src_data.descriptor_sets[set_idx], resource_allocator);
             }
 
         for (auto& [dst_node, dst_input, set_idx] : resource_info.other_set_indices) {
@@ -1378,7 +1373,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
             if (per_input_info.descriptor_set_binding != NodeData::NO_DESCRIPTOR_BINDING)
                 dst_input->get_descriptor_update(
                     per_input_info.descriptor_set_binding, resource_info.resource,
-                    *dst_data.descriptor_sets[set_idx].update, resource_allocator);
+                    dst_data.descriptor_sets[set_idx], resource_allocator);
         }
     }
 
@@ -1936,12 +1931,8 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
             // --- ALLOCATE SETS and PRECOMUTE RESOURCES for each iteration ---
             for (uint32_t set_idx = 0; set_idx < num_sets; set_idx++) {
                 // allocate
-                const DescriptorSetHandle desc_set =
-                    std::make_shared<DescriptorSet>(dst_data.descriptor_pool);
-                dst_data.descriptor_sets.emplace_back();
-                dst_data.descriptor_sets.back().descriptor_set = desc_set;
-                dst_data.descriptor_sets.back().update =
-                    std::make_unique<DescriptorSetUpdate>(desc_set);
+                dst_data.descriptor_sets.emplace_back(
+                    std::make_shared<DescriptorSet>(dst_data.descriptor_pool));
 
                 // precompute resources for inputs
                 for (auto& [input, per_input_info] : dst_data.input_connections) {
@@ -1953,7 +1944,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                             NodeData::NO_DESCRIPTOR_BINDING) {
                             input->get_descriptor_update(
                                 dst_data.input_connections[input].descriptor_set_binding, nullptr,
-                                *dst_data.descriptor_sets.back().update, resource_allocator);
+                                dst_data.descriptor_sets.back(), resource_allocator);
                         }
                     } else {
                         NodeData& src_data = node_data.at(per_input_info.node);

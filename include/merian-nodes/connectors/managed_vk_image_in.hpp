@@ -30,7 +30,7 @@ class ManagedVkImageIn : public TypedInputConnector<ManagedVkImageOutHandle, Ima
     // Provide a dummy binding in this case so that descriptor sets do not need to change.
     virtual void get_descriptor_update(const uint32_t binding,
                                        const GraphResourceHandle& resource,
-                                       DescriptorSetUpdate& update,
+                                       const DescriptorSetHandle& update,
                                        const ResourceAllocatorHandle& allocator) override;
 
     virtual ConnectorStatusFlags
