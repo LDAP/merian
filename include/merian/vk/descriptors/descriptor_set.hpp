@@ -5,6 +5,7 @@
 #include "merian/vk/memory/resource_allocations.hpp"
 
 #include <memory>
+#include <variant>
 #include <vector>
 #include <vulkan/vulkan.hpp>
 
