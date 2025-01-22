@@ -92,14 +92,14 @@ GraphResourceHandle ManagedVkBufferOut::create_resource(
     const ResourceAllocatorHandle& aliasing_allocator,
     [[maybe_unused]] const uint32_t resoruce_index,
     [[maybe_unused]] const uint32_t ring_size) {
-    vk::BufferUsageFlags usage_flags = create_info.usage;
+    vk::BufferCreateInfo buffer_create_info = create_info;
     vk::PipelineStageFlags2 input_pipeline_stages;
     vk::AccessFlags2 input_access_flags;
 
     if (!inputs.empty()) {
-        for (auto& [input_node, input] : inputs) {
+        for (const auto& [input_node, input] : inputs) {
             const auto& buffer_in = debugable_ptr_cast<ManagedVkBufferIn>(input);
-            usage_flags |= buffer_in->usage_flags;
+            buffer_create_info.usage |= buffer_in->usage_flags;
             input_pipeline_stages |= buffer_in->pipeline_stages;
             input_access_flags |= buffer_in->access_flags;
         }
@@ -110,7 +110,7 @@ GraphResourceHandle ManagedVkBufferOut::create_resource(
     }
 
     ResourceAllocatorHandle alloc = persistent ? allocator : aliasing_allocator;
-    const BufferHandle buffer = alloc->createBuffer(create_info, MemoryMappingType::NONE, name);
+    const BufferHandle buffer = alloc->createBuffer(buffer_create_info, MemoryMappingType::NONE, name);
 
     return std::make_shared<ManagedVkBufferResource>(buffer, input_pipeline_stages,
                                                      input_access_flags);

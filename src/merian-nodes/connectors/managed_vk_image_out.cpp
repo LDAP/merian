@@ -85,7 +85,7 @@ GraphResourceHandle ManagedVkImageOut::create_resource(
     [[maybe_unused]] const uint32_t ring_size) {
     const ResourceAllocatorHandle alloc = persistent ? allocator : aliasing_allocator;
 
-    vk::ImageCreateInfo create_info = this->create_info;
+    vk::ImageCreateInfo image_create_info = create_info;
     vk::PipelineStageFlags2 input_pipeline_stages;
     vk::AccessFlags2 input_access_flags;
 
@@ -93,7 +93,7 @@ GraphResourceHandle ManagedVkImageOut::create_resource(
 
     for (auto& [input_node, input] : inputs) {
         const auto& image_in = debugable_ptr_cast<ManagedVkImageIn>(input);
-        create_info.usage |= image_in->usage_flags;
+        image_create_info.usage |= image_in->usage_flags;
         input_pipeline_stages |= image_in->pipeline_stages;
         input_access_flags |= image_in->access_flags;
 
@@ -110,7 +110,7 @@ GraphResourceHandle ManagedVkImageOut::create_resource(
         }
     }
 
-    const ImageHandle image = alloc->createImage(create_info, MemoryMappingType::NONE, name);
+    const ImageHandle image = alloc->createImage(image_create_info, MemoryMappingType::NONE, name);
     auto res =
         std::make_shared<ManagedVkImageResource>(image, input_pipeline_stages, input_access_flags);
 
