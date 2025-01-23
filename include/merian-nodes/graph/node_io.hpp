@@ -136,13 +136,11 @@ class NodeIO {
     // frame data will be replaced with the new type.
     template <typename T, typename... Args> T& frame_data(Args&&... args) const {
         std::any& data = get_frame_data();
-        try {
-            return std::any_cast<T&>(data);
-        } catch (const std::bad_cast& e) {
-            // bit dirty: if any is empty it raises bad_cast.
+        if (!data.has_value()) {
             data = std::make_any<T>(std::forward<Args>(args)...);
-            return std::any_cast<T&>(data);
         }
+
+        return std::any_cast<T&>(data);
     }
 
     void send_event(const std::string& event_name,
