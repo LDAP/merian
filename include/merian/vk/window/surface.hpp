@@ -10,7 +10,7 @@ namespace merian {
 class Surface : public std::enable_shared_from_this<Surface> {
 
   public:
-    // Manage the supplied surface. The surface is destroyed when this window is destroyed.
+    // Manage the supplied surface.
     Surface(const ContextHandle& context, const vk::SurfaceKHR& surface)
         : context(context), surface(surface) {
         SPDLOG_DEBUG("create surface ({})", fmt::ptr(this));

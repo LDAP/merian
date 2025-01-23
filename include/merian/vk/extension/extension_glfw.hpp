@@ -1,6 +1,7 @@
 #pragma once
 
 #include "merian/vk/extension/extension.hpp"
+#include "merian/vk/window/glfw_window.hpp"
 
 #include <GLFW/glfw3.h>
 #include <spdlog/logger.h>
@@ -45,9 +46,18 @@ class ExtensionGLFW : public Extension {
                              const ExtensionContainer& extension_container,
                              const QueueInfo& queue_info) override;
 
+    void on_context_created(const ContextHandle& context,
+                            const ExtensionContainer& extension_container) override;
+
+    // ----------------------------------------
+
+    GLFWWindowHandle create_window() const;
+
   private:
     int glfw_initialized = GLFW_FALSE;
     int glfw_vulkan_support = GLFW_FALSE;
+
+    WeakContextHandle weak_context;
 };
 
 } // namespace merian

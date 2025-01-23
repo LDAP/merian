@@ -26,6 +26,7 @@ class CommandBuffer;
 using CommandBufferHandle = std::shared_ptr<CommandBuffer>;
 
 using ContextHandle = std::shared_ptr<Context>;
+using WeakContextHandle = std::weak_ptr<Context>;
 class ShaderModule;
 using ShaderModuleHandle = std::shared_ptr<ShaderModule>;
 class ShaderCompiler;

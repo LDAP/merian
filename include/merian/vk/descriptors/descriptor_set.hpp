@@ -203,10 +203,10 @@ class DescriptorSet : public std::enable_shared_from_this<DescriptorSet>, public
             // For now only descriptorCount 1 is implemented. Otherwise: If the dstBinding has fewer
             // than descriptorCount array elements remaining starting from dstArrayElement, then the
             // remainder will be used to update the subsequent binding - dstBinding+1 starting at
-            // array element zero.
+            // array element zero. In this case we'd have multiple infos and resources i guess?
             assert(write.descriptorCount == 1);
             resources[resource_index_for_binding[write.dstBinding] + write.dstArrayElement] =
-                write_resources[i];
+                std::move(write_resources[i]);
         }
 
         pool->get_context()->device.updateDescriptorSets(writes, {});

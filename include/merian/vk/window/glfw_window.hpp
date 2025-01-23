@@ -2,7 +2,6 @@
 
 #include "merian/vk/context.hpp"
 #include "merian/vk/window/window.hpp"
-#include "merian/vk/extension/extension_glfw.hpp"
 
 #include <GLFW/glfw3.h>
 #include <spdlog/spdlog.h>
@@ -11,20 +10,20 @@ namespace merian {
 
 class GLFWWindow : public Window {
   public:
+    friend class ExtensionGLFW;
+
+  private:
     GLFWWindow(const ContextHandle& context,
                int width = 1280,
                int height = 720,
                const char* title = "")
         : context(context) {
-        if (!context->get_extension<ExtensionGLFW>()) {
-            SPDLOG_WARN("ExtensionVkGLFW not found. You have to init GLFW manually!");
-        }
-
         SPDLOG_DEBUG("create window ({})", fmt::ptr(this));
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         window = glfwCreateWindow(width, height, title, nullptr, nullptr);
     }
 
+  public:
     ~GLFWWindow() {
         SPDLOG_DEBUG("destroy window ({})", fmt::ptr(this));
         glfwDestroyWindow(window);

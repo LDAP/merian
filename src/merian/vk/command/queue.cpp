@@ -115,7 +115,12 @@ void Queue::submit_wait(const std::function<void(const CommandBufferHandle& cmd)
 
 vk::Result Queue::present(const vk::PresentInfoKHR& present_info) {
     std::lock_guard<std::mutex> lock_guard(mutex);
-    return queue.presentKHR(&present_info);
+    return queue.presentKHR(present_info);
+}
+
+vk::Result Queue::present(const vk::PresentInfoKHR&& present_info) {
+    std::lock_guard<std::mutex> lock_guard(mutex);
+    return queue.presentKHR(present_info);
 }
 
 void Queue::wait_idle() {

@@ -34,10 +34,10 @@ GLFWImGui::~GLFWImGui() {
     ImGui::SetCurrentContext(current_context);
 }
 
-void GLFWImGui::create_render_pass(SwapchainAcquireResult& aquire_result) {
+void GLFWImGui::create_render_pass(const SwapchainAcquireResult& aquire_result) {
     vk::AttachmentDescription attachment_desc{
         {},
-        aquire_result.surface_format.format,
+        aquire_result.image_view->get_image()->get_format(),
         vk::SampleCountFlagBits::e1,
         vk::AttachmentLoadOp::eLoad,
         vk::AttachmentStoreOp::eStore,
@@ -69,8 +69,8 @@ void GLFWImGui::create_render_pass(SwapchainAcquireResult& aquire_result) {
 }
 
 void GLFWImGui::init_imgui(GLFWwindow* window,
-                           SwapchainAcquireResult& aquire_result,
-                           QueueHandle& queue) {
+                           const SwapchainAcquireResult& aquire_result,
+                           const QueueHandle& queue) {
     assert(renderpass);
 
     ImGuiIO& io = ImGui::GetIO();
@@ -113,28 +113,11 @@ void GLFWImGui::init_imgui(GLFWwindow* window,
 FramebufferHandle GLFWImGui::new_frame(QueueHandle& queue,
                                        const CommandBufferHandle& cmd,
                                        GLFWwindow* window,
-                                       SwapchainAcquireResult& aquire_result) {
+                                       const SwapchainAcquireResult& aquire_result) {
     ImGuiContext* current_context = ImGui::GetCurrentContext();
     ImGui::SetCurrentContext(ctx->get());
 
     if (aquire_result.did_recreate) {
-        const std::vector<FramebufferHandle> old_framebuffers = framebuffers;
-        const RenderPassHandle old_renderpass = renderpass;
-        const ContextHandle context = this->context;
-
-        const std::function<void()> cleanup = [context, old_framebuffers, old_renderpass]() {
-            SPDLOG_DEBUG("destroy framebuffers and renderpass");
-            // TODO: Remove once swapchain images hold a reference onto the swapchain.
-        };
-
-        if (aquire_result.old_swapchain.expired()) {
-            // cleanup now
-            cleanup();
-        } else {
-            // cleanup when swapchain is destroyed
-            aquire_result.old_swapchain.lock()->add_cleanup_function(cleanup);
-        }
-
         framebuffers.assign(aquire_result.num_images, VK_NULL_HANDLE);
         create_render_pass(aquire_result);
     }
@@ -148,9 +131,9 @@ FramebufferHandle GLFWImGui::new_frame(QueueHandle& queue,
     ImGui::NewFrame();
 
     if (!framebuffers[aquire_result.index]) {
-        framebuffers[aquire_result.index] =
-            Framebuffer::create(context, renderpass, aquire_result.extent.width,
-                                aquire_result.extent.height, 1, aquire_result.image_view);
+        framebuffers[aquire_result.index] = Framebuffer::create(
+            context, renderpass, aquire_result.image_view->get_image()->get_extent(),
+            aquire_result.image_view);
     }
 
     FramebufferHandle& framebuffer = framebuffers[aquire_result.index];

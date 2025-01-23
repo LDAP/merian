@@ -1,9 +1,46 @@
 #include "merian/vk/window/swapchain.hpp"
 
-#include "merian/utils/vector.hpp"
 #include "merian/vk/utils/check_result.hpp"
 
 #include <spdlog/spdlog.h>
+
+namespace {
+
+vk::SurfaceFormatKHR select_surface_format(const std::vector<vk::SurfaceFormatKHR>& available,
+                                           const std::vector<vk::SurfaceFormatKHR>& preffered) {
+    if (available.empty())
+        throw std::runtime_error{"no surface format available!"};
+
+    for (const auto& preferred_format : preffered) {
+        for (const auto& available_format : available) {
+            if (available_format.format == preferred_format.format) {
+                return available_format;
+            }
+        }
+    }
+
+    spdlog::warn("preferred surface format not available! using first available format!");
+    return available[0];
+}
+
+vk::Extent2D make_extent2D(const vk::SurfaceCapabilitiesKHR capabilities,
+                           const uint32_t width,
+                           const uint32_t height) {
+    vk::Extent2D extent;
+    if (capabilities.currentExtent.width != UINT32_MAX) {
+        // If the surface size is defined, the image size must match
+        extent = capabilities.currentExtent;
+    } else {
+        extent = vk::Extent2D{(uint32_t)width, (uint32_t)height};
+        extent.width = std::clamp(extent.width, capabilities.minImageExtent.width,
+                                  capabilities.maxImageExtent.width);
+        extent.height = std::clamp(extent.height, capabilities.minImageExtent.height,
+                                   capabilities.maxImageExtent.height);
+    }
+    return extent;
+}
+
+} // namespace
 
 namespace merian {
 
@@ -43,32 +80,17 @@ namespace merian {
     return best;
 }
 
-vk::SurfaceFormatKHR select_surface_format(const std::vector<vk::SurfaceFormatKHR>& available,
-                                           const std::vector<vk::SurfaceFormatKHR>& preffered) {
-    if (available.empty())
-        throw std::runtime_error{"no surface format available!"};
-
-    for (const auto& preferred_format : preffered) {
-        for (const auto& available_format : available) {
-            if (available_format.format == preferred_format.format) {
-                return available_format;
-            }
-        }
-    }
-
-    spdlog::warn("preferred surface format not available! using first available format!");
-    return available[0];
-}
-
 // -------------------------------------------------------------------------------------
 
 SwapchainImage::SwapchainImage(const ContextHandle& context,
                                const vk::Image& image,
-                               const vk::ImageCreateInfo create_info)
+                               const vk::ImageCreateInfo create_info,
+                               const SwapchainHandle& swapchain)
     : Image(context,
             image,
             create_info,
-            vk::ImageLayout::ePresentSrcKHR /*needed for barriers using bottom of pipe*/) {}
+            vk::ImageLayout::ePresentSrcKHR /*needed for barriers using bottom of pipe*/),
+      swapchain(swapchain) {}
 
 SwapchainImage::~SwapchainImage() {
     // prevent image destruction, swapchain (presentation engine) destroys the image
@@ -102,48 +124,53 @@ Swapchain::Swapchain(const SwapchainHandle& swapchain)
     : context(swapchain->context), surface(swapchain->surface),
       preferred_surface_formats(swapchain->preferred_surface_formats),
       preferred_vsync_off_mode(swapchain->preferred_vsync_off_mode),
-      surface_format(swapchain->surface_format), present_mode(swapchain->present_mode),
-      old_swapchain(swapchain) {}
+      present_mode(swapchain->present_mode), surface_format(swapchain->surface_format),
+      old_swapchain(swapchain),
+      old_swapchain_chain_length(
+          swapchain->old_swapchain ? (swapchain->old_swapchain_chain_length + 1) : 1) {}
 
 Swapchain::~Swapchain() {
-    destroy_swapchain();
+    SPDLOG_DEBUG("destroy swapchain ({})", fmt::ptr(static_cast<VkSwapchainKHR>(swapchain)));
+
+    if (!save_to_destoy) {
+        SPDLOG_DEBUG("use device idle to ensure present operations have finished ({})",
+                     fmt::ptr(this));
+
+        // TODO: use
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_EXT_swapchain_maintenance1.html
+        context->device.waitIdle();
+    }
+
+    if (old_swapchain) {
+        // if we can be destoyed every other swapchain in the chain can as well.
+        old_swapchain->save_to_destoy = true;
+    }
+
+    context->device.destroySwapchainKHR(swapchain);
+    swapchain = VK_NULL_HANDLE;
 }
 
 // -------------------------------------------------------------------------------------
 
-vk::Extent2D make_extent2D(const vk::SurfaceCapabilitiesKHR capabilities,
-                           const uint32_t width,
-                           const uint32_t height) {
-    vk::Extent2D extent;
-    if (capabilities.currentExtent.width != UINT32_MAX) {
-        // If the surface size is defined, the image size must match
-        extent = capabilities.currentExtent;
-    } else {
-        extent = vk::Extent2D{(uint32_t)width, (uint32_t)height};
-        extent.width = std::clamp(extent.width, capabilities.minImageExtent.width,
-                                  capabilities.maxImageExtent.width);
-        extent.height = std::clamp(extent.height, capabilities.minImageExtent.height,
-                                   capabilities.maxImageExtent.height);
-    }
-    return extent;
-}
-
 vk::Extent2D Swapchain::create_swapchain(const uint32_t width, const uint32_t height) {
     vk::SwapchainKHR old = VK_NULL_HANDLE;
-    if (old_swapchain.expired()) {
-        SPDLOG_DEBUG("create swapchain");
-    } else {
+
+    if (old_swapchain) {
         SPDLOG_DEBUG("recreate swapchain");
-        old = old_swapchain.lock()->swapchain;
+        old = old_swapchain->swapchain;
+    } else {
+        SPDLOG_DEBUG("create swapchain");
     }
 
-    auto capabilities =
+    const auto capabilities =
         context->physical_device.physical_device.getSurfaceCapabilitiesKHR(*surface);
-    extent = make_extent2D(capabilities, width, height);
 
-    min_images = capabilities.minImageCount + 1; // one extra to own
-    if (capabilities.maxImageCount > 0)          // 0 means no limit
-        min_images = std::min(min_images, capabilities.maxImageCount);
+    info = SwapchainInfo();
+    info->extent = make_extent2D(capabilities, width, height);
+
+    info->min_images = capabilities.minImageCount + 1; // one extra to own
+    if (capabilities.maxImageCount > 0)                // 0 means no limit
+        info->min_images = std::min(info->min_images, capabilities.maxImageCount);
 
     vk::SurfaceTransformFlagBitsKHR pre_transform;
     if (capabilities.supportedTransforms & vk::SurfaceTransformFlagBitsKHR::eIdentity) {
@@ -166,11 +193,11 @@ vk::Extent2D Swapchain::create_swapchain(const uint32_t width, const uint32_t he
         composite = vk::CompositeAlphaFlagBitsKHR::ePostMultiplied;
     }
 
-    vk::ImageCreateInfo image_create_info{
+    info->image_create_info = {
         {},
         vk::ImageType::e2D,
         surface_format.format,
-        vk::Extent3D(extent, 1),
+        vk::Extent3D(info->extent, 1),
         1,
         1,
         vk::SampleCountFlagBits::e1,
@@ -186,15 +213,15 @@ vk::Extent2D Swapchain::create_swapchain(const uint32_t width, const uint32_t he
     vk::SwapchainCreateInfoKHR create_info{
         vk::SwapchainCreateFlagBitsKHR(),
         *surface,
-        min_images,
-        image_create_info.format,
+        info->min_images,
+        info->image_create_info.format,
         surface_format.colorSpace,
-        extent,
-        image_create_info.arrayLayers,
-        image_create_info.usage,
-        image_create_info.sharingMode,
-        image_create_info.queueFamilyIndexCount,
-        image_create_info.pQueueFamilyIndices,
+        info->extent,
+        info->image_create_info.arrayLayers,
+        info->image_create_info.usage,
+        info->image_create_info.sharingMode,
+        info->image_create_info.queueFamilyIndexCount,
+        info->image_create_info.pQueueFamilyIndices,
         pre_transform,
         composite,
         present_mode,
@@ -204,156 +231,125 @@ vk::Extent2D Swapchain::create_swapchain(const uint32_t width, const uint32_t he
 
     swapchain = context->device.createSwapchainKHR(create_info, nullptr);
 
-    std::vector<vk::Image> swapchain_images = context->device.getSwapchainImagesKHR(swapchain);
-    num_images = swapchain_images.size();
+    info->cur_width = width;
+    info->cur_height = height;
+    info->cur_present_mode = present_mode;
+    info->images = context->device.getSwapchainImagesKHR(swapchain);
 
-    image_views.resize(swapchain_images.size());
-    semaphore_groups.resize(swapchain_images.size());
+    sync_groups.resize(info->images.size());
+    image_idx_to_sync_group.resize(info->images.size(), -1u);
 
-    for (std::size_t i = 0; i < swapchain_images.size(); i++) {
-        ImageViewHandle& image_view = image_views[i];
-        SemaphoreGroup& semaphore_group = semaphore_groups[i];
+    for (std::size_t i = 0; i < info->images.size(); i++) {
+        SyncGroup& sync_group = sync_groups[i];
 
-        // Image
-        ImageHandle image =
-            std::make_shared<SwapchainImage>(context, swapchain_images[i], image_create_info);
-
-        // View
-        vk::ImageViewCreateInfo create_info{
-            vk::ImageViewCreateFlagBits(),
-            *image,
-            vk::ImageViewType::e2D,
-            surface_format.format,
-            {vk::ComponentSwizzle::eR, vk::ComponentSwizzle::eG, vk::ComponentSwizzle::eB,
-             vk::ComponentSwizzle::eA},
-            {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1},
-        };
-        image_view = ImageView::create(create_info, image);
-
-        // Semaphore
-        semaphore_group.read_semaphore = std::make_shared<BinarySemaphore>(context);
-        semaphore_group.written_semaphore = std::make_shared<BinarySemaphore>(context);
+        sync_group.read_semaphore = std::make_shared<BinarySemaphore>(context);
+        sync_group.written_semaphore = std::make_shared<BinarySemaphore>(context);
+        sync_group.acquire_finished = Fence::create(context);
     }
 
-    cur_width = width;
-    cur_height = height;
-    cur_present_mode = present_mode;
-    created = true;
+    SPDLOG_DEBUG("created swapchain ({}) {}x{} ({} {} {})",
+                 fmt::ptr(static_cast<VkSwapchainKHR>(swapchain)), info->cur_width,
+                 info->cur_height, vk::to_string(surface_format.format),
+                 vk::to_string(surface_format.colorSpace), vk::to_string(info->cur_present_mode));
 
-    SPDLOG_DEBUG("created swapchain ({}) {}x{} ({} {} {})", fmt::ptr(this), cur_width, cur_height,
-                 vk::to_string(surface_format.format), vk::to_string(surface_format.colorSpace),
-                 vk::to_string(cur_present_mode));
-    return extent;
+    return info->extent;
 }
 
-void Swapchain::destroy_entries() {
-    SPDLOG_DEBUG("destroy image views");
-    image_views.clear();
-
-    SPDLOG_DEBUG("destroy semaphores");
-    semaphore_groups.clear();
-}
-
-void Swapchain::destroy_swapchain() {
-    SPDLOG_DEBUG("destroy swapchain ({})", fmt::ptr(this));
-
-    // TODO: use
-    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_EXT_swapchain_maintenance1.html
-    // to wait for the present operation to signal a fence.
-    // this is not supported on much hardware therefore use queue->wait_idle...
-    // see https://github.com/KhronosGroup/Vulkan-Samples/tree/main/samples/api/swapchain_recreation
-    // Note: even wait idle does not quarantee what we want here but whatever...
-    context->get_queue_GCT()->wait_idle();
-
-    for (const auto& cleanup_function : cleanup_functions) {
-        cleanup_function();
-    }
-
-    if (!swapchain) {
-        SPDLOG_DEBUG("swapchain already destroyed");
-        return;
-    }
-    destroy_entries();
-    context->device.destroySwapchainKHR(swapchain);
-    swapchain = VK_NULL_HANDLE;
-}
-
-std::optional<SwapchainAcquireResult>
-Swapchain::acquire(const std::function<vk::Extent2D()>& framebuffer_extent,
-                   const uint64_t timeout) {
-    const vk::Extent2D extent = framebuffer_extent();
+std::optional<std::pair<uint32_t, Swapchain::SyncGroup>>
+Swapchain::acquire(const vk::Extent2D extent, const uint64_t timeout) {
 
     if (extent.width == 0 || extent.height == 0) {
+        SPDLOG_DEBUG("acquire failed: extent is 0");
         return std::nullopt;
     }
 
-    SwapchainAcquireResult aquire_result;
+    if (!info.has_value() && acquire_count > 0) {
+        throw needs_recreate{"present failed."};
+    }
+
+    assert(!swapchain || info);
 
     if (!swapchain) {
         create_swapchain(extent.width, extent.height);
-    } else if (extent.width != cur_width || extent.height != cur_height) {
+    } else if (extent.width != info->cur_width || extent.height != info->cur_height) {
+        info.reset();
         throw needs_recreate("changed framebuffer size");
-    } else if (present_mode != cur_present_mode) {
+    } else if (present_mode != info->cur_present_mode) {
+        info.reset();
         throw needs_recreate("changed present mode (vsync)");
     }
 
-    const vk::Result result = context->device.acquireNextImageKHR(
-        swapchain, timeout, *current_read_semaphore(), {}, &current_image_idx);
-
-    if (result == vk::Result::eSuccess) {
-        aquire_result.image_view = current_image_view();
-        aquire_result.index = current_image_index();
-        aquire_result.wait_semaphore = current_read_semaphore();
-        aquire_result.signal_semaphore = current_written_semaphore();
-        aquire_result.extent = extent;
-        aquire_result.min_images = min_images;
-        aquire_result.num_images = num_images;
-        aquire_result.surface_format = surface_format;
-        aquire_result.did_recreate = created;
-        aquire_result.old_swapchain = old_swapchain;
-        created = false;
-
-        return aquire_result;
+    const uint32_t sync_index = acquire_count % info->images.size();
+    if (sync_groups[sync_index].acquire_in_progress) {
+        sync_groups[sync_index].acquire_finished->wait();
+        sync_groups[sync_index].acquire_finished->reset();
+        sync_groups[sync_index].acquire_in_progress = false;
     }
 
+    uint32_t image_idx;
+    const vk::Result result = context->device.acquireNextImageKHR(
+        swapchain, timeout, *sync_groups[sync_index].read_semaphore,
+        *sync_groups[sync_index].acquire_finished, &image_idx);
+
     if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR) {
+        info.reset();
         throw needs_recreate(result);
     }
 
+    if (result == vk::Result::eSuccess) {
+        acquire_count++;
+
+        sync_groups[sync_index].acquire_in_progress = true;
+        assert(image_idx_to_sync_group[image_idx] == -1u);
+        image_idx_to_sync_group[image_idx] = sync_index;
+
+        if (old_swapchain) {
+            if (acquire_count > info->images.size()) {
+                SPDLOG_DEBUG("present confirmed. Cleanup old swapchains.");
+                old_swapchain->save_to_destoy = true;
+                old_swapchain.reset();
+            } else if (old_swapchain_chain_length > MAX_OLD_SWAPCHAIN_CHAIN_LENGTH) {
+                SPDLOG_DEBUG("old swapchain chain lenght ({}) exceeds threshold ({}). Waiting and "
+                             "clean up chain.",
+                             old_swapchain_chain_length, MAX_OLD_SWAPCHAIN_CHAIN_LENGTH);
+                old_swapchain.reset();
+                old_swapchain_chain_length = 0;
+            }
+        }
+
+        return std::make_pair(image_idx, sync_groups[sync_index]);
+    }
+
+    if (result == vk::Result::eTimeout || result == vk::Result::eNotReady) {
+        SPDLOG_DEBUG("acquire failed: {}", vk::to_string(result));
+        return std::nullopt;
+    }
+
+    check_result(result, "acquire failed");
     return std::nullopt;
 }
 
-void Swapchain::present(const QueueHandle& queue) {
-    vk::PresentInfoKHR present_info{
-        1,
-        &**current_written_semaphore(), // wait until the user is done writing to the image
-        1,
-        &swapchain,
-        &current_image_idx,
-    };
-    vk::Result result = queue->present(present_info);
+void Swapchain::present(const QueueHandle& queue, const uint32_t image_idx) {
+    assert(image_idx_to_sync_group[image_idx] != -1u);
+    const SyncGroup& sync_group = sync_groups[image_idx_to_sync_group[image_idx]];
+    image_idx_to_sync_group[image_idx] = -1u;
+
+    vk::Result result = queue->present(vk::PresentInfoKHR{
+        **sync_group.written_semaphore,
+        swapchain,
+        image_idx,
+    });
+
     if (result == vk::Result::eSuccess || result == vk::Result::eSuboptimalKHR) {
-        current_semaphore_idx++;
         return;
     }
+
     if (result == vk::Result::eErrorOutOfDateKHR) {
-        // purposefully invalidate
-        cur_height = 0;
-        cur_width = 0;
+        info.reset(); // purposefully invalidate, to signal present failed.
         throw needs_recreate(result);
         return;
     }
     check_result(result, "present failed");
-}
-
-ImageViewHandle Swapchain::image_view(uint32_t idx) const {
-    check_size(image_views, idx);
-    return image_views[idx];
-}
-
-ImageHandle Swapchain::image(uint32_t idx) const {
-    check_size(image_views, idx);
-    return image_views[idx]->get_image();
 }
 
 } // namespace merian

@@ -90,6 +90,8 @@ class Queue : public std::enable_shared_from_this<Queue> {
 
     vk::Result present(const vk::PresentInfoKHR& present_info);
 
+    vk::Result present(const vk::PresentInfoKHR&& present_info);
+
     void wait_idle();
 
     const ContextHandle& get_context() const {

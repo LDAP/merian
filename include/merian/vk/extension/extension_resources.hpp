@@ -34,7 +34,7 @@ class ExtensionResources : public Extension {
     std::shared_ptr<StagingMemoryManager> staging();
 
   private:
-    std::weak_ptr<Context> weak_context;
+    WeakContextHandle weak_context;
 
     // Both filled depending on device features and supported extensions.
     std::vector<const char*> required_extensions;

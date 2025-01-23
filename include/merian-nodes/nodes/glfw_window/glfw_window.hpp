@@ -5,11 +5,10 @@
 #include "merian-nodes/graph/node.hpp"
 
 #include "merian/vk/extension/extension_glfw.hpp"
-#include "merian/vk/utils/barriers.hpp"
 #include "merian/vk/utils/blits.hpp"
-#include "merian/vk/utils/subresource_ranges.hpp"
 #include "merian/vk/window/glfw_window.hpp"
 #include "merian/vk/window/swapchain.hpp"
+#include "merian/vk/window/swapchain_manager.hpp"
 
 namespace merian_nodes {
 
@@ -20,10 +19,13 @@ namespace merian_nodes {
 class GLFWWindow : public Node {
   public:
     GLFWWindow(const ContextHandle& context) : Node() {
-        if (context->get_extension<ExtensionGLFW>()) {
-            window = std::make_shared<merian::GLFWWindow>(context);
-            swapchain = std::make_shared<merian::Swapchain>(context, window->get_surface());
-            vsync = swapchain->vsync_enabled();
+        const auto glfw_ext = context->get_extension<ExtensionGLFW>();
+        if (glfw_ext) {
+            window = glfw_ext->create_window();
+
+            const SwapchainHandle swapchain =
+                std::make_shared<merian::Swapchain>(context, window->get_surface());
+            swapchain_manager.emplace(swapchain);
         }
     }
 
@@ -39,20 +41,8 @@ class GLFWWindow : public Node {
                          const CommandBufferHandle& cmd,
                          [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
                          const NodeIO& io) override {
-        auto& old_swapchains = io.frame_data<std::vector<SwapchainHandle>>();
-        old_swapchains.clear();
-
-        vsync = swapchain->set_vsync(vsync);
-
-        acquire.reset();
-        for (uint32_t tries = 0; !acquire && tries < 2; tries++) {
-            try {
-                acquire = swapchain->acquire(window, 1000L * 1000L /* 1s */);
-            } catch (const Swapchain::needs_recreate& e) {
-                old_swapchains.emplace_back(swapchain);
-                swapchain = std::make_shared<Swapchain>(swapchain);
-            }
-        }
+        const std::optional<SwapchainAcquireResult> acquire =
+            swapchain_manager->acquire(window, 1000L * 1000L /* 1s */);
 
         if (acquire) {
             const ImageHandle image = acquire->image_view->get_image();
@@ -67,11 +57,10 @@ class GLFWWindow : public Node {
                             vk::FormatFeatureFlagBits::eSampledImageFilterLinear
                         ? vk::Filter::eLinear
                         : vk::Filter::eNearest;
-                const vk::Extent3D extent(acquire->extent, 1);
 
                 cmd_blit(mode, cmd, src_image, vk::ImageLayout::eTransferSrcOptimal,
                          src_image->get_extent(), image, vk::ImageLayout::eTransferDstOptimal,
-                         extent, vk::ClearColorValue{}, filter);
+                         image->get_extent(), vk::ClearColorValue{}, filter);
             } else {
                 cmd->clear(image);
             }
@@ -82,10 +71,13 @@ class GLFWWindow : public Node {
 
             run.add_wait_semaphore(acquire->wait_semaphore, vk::PipelineStageFlagBits::eTransfer);
             run.add_signal_semaphore(acquire->signal_semaphore);
-            run.add_submit_callback([&](const QueueHandle& queue, GraphRun& run) {
+
+            uint32_t index = acquire->index;
+            SwapchainHandle swapchain = get_swapchain();
+            run.add_submit_callback([index, swapchain](const QueueHandle& queue, GraphRun& run) {
                 try {
                     Stopwatch present_duration;
-                    swapchain->present(queue);
+                    swapchain->present(queue, index);
                     run.hint_external_wait_time(present_duration.duration());
                 } catch (const Swapchain::needs_recreate& e) {
                     // do nothing and hope for the best
@@ -99,7 +91,7 @@ class GLFWWindow : public Node {
     }
 
     const SwapchainHandle& get_swapchain() {
-        return swapchain;
+        return swapchain_manager->get_swapchain();
     }
 
     NodeStatusFlags properties(Properties& config) override {
@@ -133,20 +125,28 @@ class GLFWWindow : public Node {
                               Properties::OptionsStyle::LIST_BOX);
         mode = (BlitMode)int_mode;
 
+        const SwapchainHandle swapchain = get_swapchain();
+
         // Perform the change in cmd_process, since recreating the swapchain here may interfere
         // with other accesses to the swapchain images.
-        config.config_bool("vsync", vsync, "Enables or disables vsync on the swapchain.");
+        bool vsync = swapchain->vsync_enabled();
+        if (config.config_bool("vsync", vsync, "Enables or disables vsync on the swapchain.")) {
+            swapchain->set_vsync(vsync);
+        }
         config.config_bool("rebuild on recreate", request_rebuild_on_recreate,
                            "requests a graph rebuild if the swapchain was recreated.");
 
-        if (acquire) {
-            config.output_text(fmt::format("surface format: {}\ncolor space: {}\nimage count: "
-                                           "{}\nextent: {}x{}\npresent mode: {}",
-                                           vk::to_string(acquire->surface_format.format),
-                                           vk::to_string(acquire->surface_format.colorSpace),
-                                           acquire->num_images, acquire->extent.width,
-                                           acquire->extent.height,
-                                           vk::to_string(swapchain->get_present_mode())));
+        const std::optional<Swapchain::SwapchainInfo>& swapchain_info =
+            swapchain->get_swapchain_info();
+
+        if (swapchain_info) {
+            config.output_text(fmt::format(
+                "surface format: {}\ncolor space: {}\nimage count: "
+                "{}\nextent: {}x{}\npresent mode: {}",
+                vk::to_string(swapchain->get_surface_format().format),
+                vk::to_string(swapchain->get_surface_format().colorSpace),
+                swapchain_info->images.size(), swapchain_info->extent.width,
+                swapchain_info->extent.height, vk::to_string(swapchain->get_present_mode())));
         }
         return {};
     }
@@ -158,27 +158,27 @@ class GLFWWindow : public Node {
 
     // Set a callback for when the blit of the node input was completed.
     // The image will have vk::ImageLayout::ePresentSrcKHR.
-    void set_on_blit_completed(
-        const std::function<void(const CommandBufferHandle& cmd,
-                                 SwapchainAcquireResult& acquire_result)>& on_blit_completed) {
+    void
+    set_on_blit_completed(const std::function<void(const CommandBufferHandle& cmd,
+                                                   const SwapchainAcquireResult& acquire_result)>&
+                              on_blit_completed) {
         this->on_blit_completed = on_blit_completed;
     }
 
   private:
     GLFWWindowHandle window = nullptr;
+    std::optional<SwapchainManager> swapchain_manager;
 
-    SwapchainHandle swapchain;
-    std::optional<SwapchainAcquireResult> acquire;
     BlitMode mode = FIT;
 
-    std::function<void(const CommandBufferHandle& cmd, SwapchainAcquireResult& acquire_result)>
+    std::function<void(const CommandBufferHandle& cmd,
+                       const SwapchainAcquireResult& acquire_result)>
         on_blit_completed = []([[maybe_unused]] const CommandBufferHandle& cmd,
-                               [[maybe_unused]] SwapchainAcquireResult& acquire_result) {};
+                               [[maybe_unused]] const SwapchainAcquireResult& acquire_result) {};
 
     ManagedVkImageInHandle image_in = ManagedVkImageIn::transfer_src("src", 0, true);
 
     std::array<int, 4> windowed_pos_size;
-    bool vsync;
     bool request_rebuild_on_recreate = false;
 };
 

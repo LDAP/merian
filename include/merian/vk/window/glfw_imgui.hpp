@@ -3,7 +3,8 @@
 #include "merian/vk/renderpass/framebuffer.hpp"
 
 #include "merian/vk/window/imgui_context.hpp"
-#include "merian/vk/window/swapchain.hpp"
+#include "merian/vk/window/swapchain_manager.hpp"
+#include <GLFW/glfw3.h>
 
 namespace merian {
 
@@ -33,14 +34,16 @@ class GLFWImGui {
     FramebufferHandle new_frame(QueueHandle& queue,
                                 const CommandBufferHandle& cmd,
                                 GLFWwindow* window,
-                                SwapchainAcquireResult& aquire_result);
+                                const SwapchainAcquireResult& aquire_result);
 
     // Render the ImGui to the current swapchain image
     void render(const CommandBufferHandle& cmd);
 
   private:
-    void init_imgui(GLFWwindow* window, SwapchainAcquireResult& aquire_result, QueueHandle& queue);
-    void create_render_pass(SwapchainAcquireResult& aquire_result);
+    void init_imgui(GLFWwindow* window,
+                    const SwapchainAcquireResult& aquire_result,
+                    const QueueHandle& queue);
+    void create_render_pass(const SwapchainAcquireResult& aquire_result);
 
   private:
     const ContextHandle context;

@@ -1,4 +1,5 @@
 #include "merian/vk/extension/extension_glfw.hpp"
+#include "merian/vk/window/glfw_window.hpp"
 
 #include <spdlog/spdlog.h>
 
@@ -64,6 +65,17 @@ bool ExtensionGLFW::extension_supported(
     return glfw_vulkan_support == GLFW_TRUE &&
            glfwGetPhysicalDevicePresentationSupport(instance, *physical_device,
                                                     queue_info.queue_family_idx_GCT) == GLFW_TRUE;
+}
+
+void ExtensionGLFW::on_context_created(const ContextHandle& context,
+                                       const ExtensionContainer& /*extension_container*/) {
+    weak_context = context;
+}
+
+GLFWWindowHandle ExtensionGLFW::create_window() const {
+    assert(!weak_context.expired());
+
+    return std::shared_ptr<GLFWWindow>(new GLFWWindow(weak_context.lock()));
 }
 
 } // namespace merian
