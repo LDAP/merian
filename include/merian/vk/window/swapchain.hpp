@@ -59,7 +59,9 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
                              // and needs recreate.
         uint32_t cur_width = 0;
         uint32_t cur_height = 0;
-        vk::PresentModeKHR cur_present_mode;
+
+        vk::PresentModeKHR present_mode;
+        vk::SurfaceFormatKHR surface_format;
     };
 
     /**
@@ -71,7 +73,9 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
               const SurfaceHandle& surface,
               const std::vector<vk::SurfaceFormatKHR>& preferred_surface_formats =
                   {vk::Format::eR8G8B8A8Srgb, vk::Format::eB8G8R8A8Srgb},
-              const vk::PresentModeKHR preferred_vsync_off_mode = vk::PresentModeKHR::eMailbox);
+              const std::vector<vk::PresentModeKHR>& preferred_present_modes = {
+                  vk::PresentModeKHR::eMailbox, vk::PresentModeKHR::eFifoRelaxed,
+                  vk::PresentModeKHR::eFifo});
 
     // Special constructor that recreates the swapchain.
     //
@@ -102,14 +106,6 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
 
     // ---------------------------------------------------------------------------
 
-    vk::SurfaceFormatKHR get_surface_format() {
-        return surface_format;
-    }
-
-    vk::PresentModeKHR get_present_mode() {
-        return present_mode;
-    }
-
     // needs at least one acquire to be valid. Also nullopt after needs_recreate was
     // thrown.
     const std::optional<SwapchainInfo>& get_swapchain_info() {
@@ -120,20 +116,21 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
         return context;
     }
 
-    /* Sets vsync. The swapchain is automatically recreated on next aquire.
-     * Returns if vsync could be enabled.
-     */
-    bool set_vsync(bool state) {
-        if (state != vsync_enabled()) {
-            present_mode = select_present_mode(state);
-        }
-        return vsync_enabled();
-    }
+    const std::vector<vk::PresentModeKHR>& get_supported_present_modes() const;
 
-    // shortcut to check get_present_mode() == vk::PresentModeKHR::eFifo.
-    bool vsync_enabled() const {
-        return present_mode == vk::PresentModeKHR::eFifo;
-    }
+    const std::vector<vk::SurfaceFormatKHR>& get_supported_surface_formats() const;
+
+    // Used for new Swapchains. Triggers a needs_recreate.
+    // returns the actually selected one from supported_present_modes
+    vk::PresentModeKHR set_new_present_mode(const vk::PresentModeKHR desired);
+
+    // Used for new Swapchains. Triggers a needs_recreate.
+    // returns the actually selected one from supported_surface_formats
+    vk::SurfaceFormatKHR set_new_surface_format(const vk::SurfaceFormatKHR desired);
+
+    const vk::PresentModeKHR& get_new_present_mode() const;
+
+    const vk::SurfaceFormatKHR& get_new_surface_format() const;
 
     // ---------------------------------------------------------------------------
 
@@ -146,13 +143,14 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
   private:
     const ContextHandle context;
     const SurfaceHandle surface;
-    const std::vector<vk::SurfaceFormatKHR> preferred_surface_formats;
-    const vk::PresentModeKHR preferred_vsync_off_mode;
+
+    std::vector<vk::PresentModeKHR> supported_present_modes;
+    std::vector<vk::SurfaceFormatKHR> supported_surface_formats;
+
+    vk::SurfaceFormatKHR new_surface_format;
+    vk::PresentModeKHR new_present_mode;
 
     vk::SwapchainKHR swapchain = VK_NULL_HANDLE;
-
-    vk::PresentModeKHR present_mode; // desired: Swapchain may throw needs_recreate to set.
-    vk::SurfaceFormatKHR surface_format;
 
     // ---------------------------------------------------------------------------
 

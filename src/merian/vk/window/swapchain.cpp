@@ -6,20 +6,33 @@
 
 namespace {
 
-vk::SurfaceFormatKHR select_surface_format(const std::vector<vk::SurfaceFormatKHR>& available,
-                                           const std::vector<vk::SurfaceFormatKHR>& preffered) {
-    if (available.empty())
-        throw std::runtime_error{"no surface format available!"};
+vk::PresentModeKHR select_best(const std::vector<vk::PresentModeKHR>& available,
+                               const std::vector<vk::PresentModeKHR>& preffered) {
+    assert(!available.empty());
 
-    for (const auto& preferred_format : preffered) {
-        for (const auto& available_format : available) {
-            if (available_format.format == preferred_format.format) {
-                return available_format;
+    for (const auto& p : preffered) {
+        for (const auto& a : available) {
+            if (p == a) {
+                return a;
             }
         }
     }
 
-    spdlog::warn("preferred surface format not available! using first available format!");
+    return available[0];
+}
+
+vk::SurfaceFormatKHR select_best(const std::vector<vk::SurfaceFormatKHR>& available,
+                                 const std::vector<vk::SurfaceFormatKHR>& preffered) {
+    assert(!available.empty());
+
+    for (const auto& p : preffered) {
+        for (const auto& a : available) {
+            if (p.format == a.format) {
+                return a;
+            }
+        }
+    }
+
     return available[0];
 }
 
@@ -44,42 +57,6 @@ vk::Extent2D make_extent2D(const vk::SurfaceCapabilitiesKHR capabilities,
 
 namespace merian {
 
-// Helper
-// ----------------------------------------------------------------
-
-/*
- * Fifo is like "vsync on". Immediate is like "vsync off".
- * Mailbox is a hybrid between the two (gpu doesnt block if running faater than the display, but
- * screen tearing doesnt happen).
- */
-[[nodiscard]] vk::PresentModeKHR Swapchain::select_present_mode(const bool vsync) {
-    auto present_modes =
-        context->physical_device.physical_device.getSurfacePresentModesKHR(*surface);
-    if (present_modes.size() == 0)
-        throw std::runtime_error("Surface doesn't support any present modes!");
-
-    // Everyone must support FIFO
-    vk::PresentModeKHR best = vk::PresentModeKHR::eFifo;
-
-    if (vsync) {
-        return best;
-    }
-    // Find a faster mode
-    for (const auto& present_mode : present_modes) {
-        if (present_mode == preferred_vsync_off_mode) {
-            return present_mode;
-        }
-        if (present_mode == vk::PresentModeKHR::eImmediate ||
-            present_mode == vk::PresentModeKHR::eMailbox) {
-            best = present_mode;
-        }
-    }
-
-    SPDLOG_DEBUG("vsync disabled but mode {} could not be found! Using {}",
-                 vk::to_string(preferred_vsync_off_mode), vk::to_string(best));
-    return best;
-}
-
 // -------------------------------------------------------------------------------------
 
 SwapchainImage::SwapchainImage(const ContextHandle& context,
@@ -102,30 +79,31 @@ SwapchainImage::~SwapchainImage() {
 Swapchain::Swapchain(const ContextHandle& context,
                      const SurfaceHandle& surface,
                      const std::vector<vk::SurfaceFormatKHR>& preferred_surface_formats,
-                     const vk::PresentModeKHR preferred_vsync_off_mode)
-    : context(context), surface(surface), preferred_surface_formats(preferred_surface_formats),
-      preferred_vsync_off_mode(preferred_vsync_off_mode) {
+                     const std::vector<vk::PresentModeKHR>& preferred_present_modes)
+    : context(context), surface(surface) {
     assert(context);
     assert(surface);
 
-    auto surface_formats = context->physical_device.physical_device.getSurfaceFormatsKHR(*surface);
-    if (surface_formats.size() == 0)
+    supported_surface_formats =
+        context->physical_device.physical_device.getSurfaceFormatsKHR(*surface);
+    if (supported_surface_formats.empty())
         throw std::runtime_error("Surface doesn't support any surface formats!");
 
-    surface_format = select_surface_format(surface_formats, preferred_surface_formats);
-    present_mode = select_present_mode(false);
+    supported_present_modes =
+        context->physical_device.physical_device.getSurfacePresentModesKHR(*surface);
+    if (supported_surface_formats.empty())
+        throw std::runtime_error("Surface doesn't support any present modes!");
 
-    SPDLOG_DEBUG("selected surface format {}, color space {}, present mode {}",
-                 vk::to_string(surface_format.format), vk::to_string(surface_format.colorSpace),
-                 vk::to_string(present_mode));
+    new_surface_format = select_best(supported_surface_formats, preferred_surface_formats);
+    new_present_mode = select_best(supported_present_modes, preferred_present_modes);
 }
 
 Swapchain::Swapchain(const SwapchainHandle& swapchain)
     : context(swapchain->context), surface(swapchain->surface),
-      preferred_surface_formats(swapchain->preferred_surface_formats),
-      preferred_vsync_off_mode(swapchain->preferred_vsync_off_mode),
-      present_mode(swapchain->present_mode), surface_format(swapchain->surface_format),
-      old_swapchain(swapchain),
+      supported_present_modes(swapchain->supported_present_modes),
+      supported_surface_formats(swapchain->supported_surface_formats),
+      new_surface_format(swapchain->new_surface_format),
+      new_present_mode(swapchain->new_present_mode), old_swapchain(swapchain),
       old_swapchain_chain_length(
           swapchain->old_swapchain ? (swapchain->old_swapchain_chain_length + 1) : 1) {}
 
@@ -148,6 +126,38 @@ Swapchain::~Swapchain() {
 
     context->device.destroySwapchainKHR(swapchain);
     swapchain = VK_NULL_HANDLE;
+}
+
+// -------------------------------------------------------------------------------------
+
+const std::vector<vk::PresentModeKHR>& Swapchain::get_supported_present_modes() const {
+    return supported_present_modes;
+}
+
+const std::vector<vk::SurfaceFormatKHR>& Swapchain::get_supported_surface_formats() const {
+    return supported_surface_formats;
+}
+
+// returns the actually selected one from supported_present_modes
+vk::PresentModeKHR Swapchain::set_new_present_mode(const vk::PresentModeKHR desired) {
+    new_present_mode = select_best(supported_present_modes, {desired, new_present_mode});
+
+    return new_present_mode;
+}
+
+// returns the actually selected one from supported_surface_formats
+vk::SurfaceFormatKHR Swapchain::set_new_surface_format(const vk::SurfaceFormatKHR desired) {
+    new_surface_format = select_best(supported_surface_formats, {desired, new_surface_format});
+
+    return new_surface_format;
+}
+
+const vk::PresentModeKHR& Swapchain::get_new_present_mode() const {
+    return new_present_mode;
+}
+
+const vk::SurfaceFormatKHR& Swapchain::get_new_surface_format() const {
+    return new_surface_format;
 }
 
 // -------------------------------------------------------------------------------------
@@ -196,7 +206,7 @@ vk::Extent2D Swapchain::create_swapchain(const uint32_t width, const uint32_t he
     info->image_create_info = {
         {},
         vk::ImageType::e2D,
-        surface_format.format,
+        new_surface_format.format,
         vk::Extent3D(info->extent, 1),
         1,
         1,
@@ -215,7 +225,7 @@ vk::Extent2D Swapchain::create_swapchain(const uint32_t width, const uint32_t he
         *surface,
         info->min_images,
         info->image_create_info.format,
-        surface_format.colorSpace,
+        new_surface_format.colorSpace,
         info->extent,
         info->image_create_info.arrayLayers,
         info->image_create_info.usage,
@@ -224,7 +234,7 @@ vk::Extent2D Swapchain::create_swapchain(const uint32_t width, const uint32_t he
         info->image_create_info.pQueueFamilyIndices,
         pre_transform,
         composite,
-        present_mode,
+        new_present_mode,
         VK_FALSE,
         old,
     };
@@ -233,7 +243,8 @@ vk::Extent2D Swapchain::create_swapchain(const uint32_t width, const uint32_t he
 
     info->cur_width = width;
     info->cur_height = height;
-    info->cur_present_mode = present_mode;
+    info->present_mode = new_present_mode;
+    info->surface_format = new_surface_format;
     info->images = context->device.getSwapchainImagesKHR(swapchain);
 
     sync_groups.resize(info->images.size());
@@ -249,8 +260,8 @@ vk::Extent2D Swapchain::create_swapchain(const uint32_t width, const uint32_t he
 
     SPDLOG_DEBUG("created swapchain ({}) {}x{} ({} {} {})",
                  fmt::ptr(static_cast<VkSwapchainKHR>(swapchain)), info->cur_width,
-                 info->cur_height, vk::to_string(surface_format.format),
-                 vk::to_string(surface_format.colorSpace), vk::to_string(info->cur_present_mode));
+                 info->cur_height, vk::to_string(info->surface_format.format),
+                 vk::to_string(info->surface_format.colorSpace), vk::to_string(info->present_mode));
 
     return info->extent;
 }
@@ -274,9 +285,12 @@ Swapchain::acquire(const vk::Extent2D extent, const uint64_t timeout) {
     } else if (extent.width != info->cur_width || extent.height != info->cur_height) {
         info.reset();
         throw needs_recreate("changed framebuffer size");
-    } else if (present_mode != info->cur_present_mode) {
+    } else if (new_present_mode != info->present_mode) {
         info.reset();
-        throw needs_recreate("changed present mode (vsync)");
+        throw needs_recreate("changed present mode");
+    } else if (new_surface_format != info->surface_format) {
+        info.reset();
+        throw needs_recreate("changed surface format");
     }
 
     const uint32_t sync_index = acquire_count % info->images.size();

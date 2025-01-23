@@ -25,6 +25,7 @@ GLFWImGui::~GLFWImGui() {
 
         ImGui_ImplVulkan_DestroyFontsTexture();
         ImGui_ImplVulkan_Shutdown();
+
         ImGui_ImplGlfw_RestoreCallbacks(window);
         ImGui_ImplGlfw_Shutdown();
 
@@ -68,6 +69,30 @@ void GLFWImGui::create_render_pass(const SwapchainAcquireResult& aquire_result) 
     renderpass = RenderPass::create(context, info);
 }
 
+void GLFWImGui::init_vulkan(const SwapchainAcquireResult& aquire_result, const QueueHandle& queue) {
+    ImGui_ImplVulkan_InitInfo init_info = {};
+    init_info.Instance = context->instance;
+    init_info.PhysicalDevice = context->physical_device.physical_device;
+    init_info.Device = context->device;
+    init_info.QueueFamily = queue->get_queue_family_index();
+    init_info.Queue = queue->get_queue();
+    init_info.PipelineCache = context->pipeline_cache;
+    init_info.DescriptorPool = imgui_pool;
+    init_info.Subpass = 0;
+    init_info.MinImageCount = aquire_result.min_images;
+    init_info.ImageCount = aquire_result.num_images;
+    init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+    init_info.Allocator = VK_NULL_HANDLE;
+    init_info.CheckVkResultFn = nullptr;
+    init_info.RenderPass = **renderpass;
+
+    current_surface_format = aquire_result.image_view->get_image()->get_format();
+
+    ImGui_ImplVulkan_Init(&init_info);
+
+    ImGui_ImplVulkan_CreateFontsTexture();
+}
+
 void GLFWImGui::init_imgui(GLFWwindow* window,
                            const SwapchainAcquireResult& aquire_result,
                            const QueueHandle& queue) {
@@ -85,25 +110,7 @@ void GLFWImGui::init_imgui(GLFWwindow* window,
     imgui_pool = context->device.createDescriptorPool(pool_info);
 
     ImGui_ImplGlfw_InitForVulkan(window, true);
-    ImGui_ImplVulkan_InitInfo init_info = {};
-    init_info.Instance = context->instance;
-    init_info.PhysicalDevice = context->physical_device.physical_device;
-    init_info.Device = context->device;
-    init_info.QueueFamily = queue->get_queue_family_index();
-    init_info.Queue = queue->get_queue();
-    init_info.PipelineCache = context->pipeline_cache;
-    init_info.DescriptorPool = imgui_pool;
-    init_info.Subpass = 0;
-    init_info.MinImageCount = aquire_result.min_images;
-    init_info.ImageCount = aquire_result.num_images;
-    init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-    init_info.Allocator = VK_NULL_HANDLE;
-    init_info.CheckVkResultFn = nullptr;
-    init_info.RenderPass = **renderpass;
-
-    ImGui_ImplVulkan_Init(&init_info);
-
-    ImGui_ImplVulkan_CreateFontsTexture();
+    init_vulkan(aquire_result, queue);
 
     this->window = window;
     imgui_initialized = true;
@@ -124,6 +131,13 @@ FramebufferHandle GLFWImGui::new_frame(QueueHandle& queue,
 
     if (!imgui_initialized) {
         init_imgui(window, aquire_result, queue);
+    } else if (aquire_result.did_recreate &&
+               aquire_result.image_view->get_image()->get_format() != current_surface_format) {
+        // Workaround: needs vulkan backend restart
+        context->device.waitIdle();
+        ImGui_ImplVulkan_DestroyFontsTexture();
+        ImGui_ImplVulkan_Shutdown();
+        init_vulkan(aquire_result, queue);
     }
 
     ImGui_ImplVulkan_NewFrame();

@@ -126,27 +126,48 @@ class GLFWWindow : public Node {
         mode = (BlitMode)int_mode;
 
         const SwapchainHandle swapchain = get_swapchain();
-
-        // Perform the change in cmd_process, since recreating the swapchain here may interfere
-        // with other accesses to the swapchain images.
-        bool vsync = swapchain->vsync_enabled();
-        if (config.config_bool("vsync", vsync, "Enables or disables vsync on the swapchain.")) {
-            swapchain->set_vsync(vsync);
-        }
-        config.config_bool("rebuild on recreate", request_rebuild_on_recreate,
-                           "requests a graph rebuild if the swapchain was recreated.");
-
         const std::optional<Swapchain::SwapchainInfo>& swapchain_info =
             swapchain->get_swapchain_info();
+
+        int selected;
+        std::vector<std::string> str_surface_formats;
+        const auto& surface_formats = swapchain->get_supported_surface_formats();
+        for (uint32_t i = 0; i < surface_formats.size(); i++) {
+            const vk::SurfaceFormatKHR& format = surface_formats[i];
+            str_surface_formats.emplace_back(fmt::format("{}, {}", vk::to_string(format.format),
+                                                         vk::to_string(format.colorSpace)));
+            if (format == swapchain->get_new_surface_format()) {
+                selected = (int)i;
+            }
+        }
+        if (config.config_options("surface format", selected, str_surface_formats)) {
+            swapchain->set_new_surface_format(surface_formats[selected]);
+        }
+
+        std::vector<std::string> str_present_modes;
+        const auto& present_modes = swapchain->get_supported_present_modes();
+        for (uint32_t i = 0; i < present_modes.size(); i++) {
+            const vk::PresentModeKHR& mode = present_modes[i];
+            str_present_modes.emplace_back(fmt::format("{}", vk::to_string(mode)));
+            if (mode == swapchain->get_new_present_mode()) {
+                selected = (int)i;
+            }
+        }
+        if (config.config_options("present mode", selected, str_present_modes)) {
+            swapchain->set_new_present_mode(present_modes[selected]);
+        }
+
+        config.config_bool("rebuild on recreate", request_rebuild_on_recreate,
+                           "requests a graph rebuild if the swapchain was recreated.");
 
         if (swapchain_info) {
             config.output_text(fmt::format(
                 "surface format: {}\ncolor space: {}\nimage count: "
                 "{}\nextent: {}x{}\npresent mode: {}",
-                vk::to_string(swapchain->get_surface_format().format),
-                vk::to_string(swapchain->get_surface_format().colorSpace),
+                vk::to_string(swapchain_info->surface_format.format),
+                vk::to_string(swapchain_info->surface_format.colorSpace),
                 swapchain_info->images.size(), swapchain_info->extent.width,
-                swapchain_info->extent.height, vk::to_string(swapchain->get_present_mode())));
+                swapchain_info->extent.height, vk::to_string(swapchain_info->present_mode)));
         }
         return {};
     }

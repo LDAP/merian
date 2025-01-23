@@ -43,6 +43,9 @@ class GLFWImGui {
     void init_imgui(GLFWwindow* window,
                     const SwapchainAcquireResult& aquire_result,
                     const QueueHandle& queue);
+
+    void init_vulkan(const SwapchainAcquireResult& aquire_result, const QueueHandle& queue);
+
     void create_render_pass(const SwapchainAcquireResult& aquire_result);
 
   private:
@@ -58,6 +61,7 @@ class GLFWImGui {
     vk::DescriptorPool imgui_pool{VK_NULL_HANDLE};
     RenderPassHandle renderpass = nullptr;
     std::vector<FramebufferHandle> framebuffers;
+    vk::SurfaceFormatKHR current_surface_format;
 };
 
 } // namespace merian

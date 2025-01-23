@@ -131,7 +131,7 @@ class SwapchainManager {
                     vk::ImageViewCreateFlagBits(),
                     *image,
                     vk::ImageViewType::e2D,
-                    swapchain->get_surface_format().format,
+                    swapchain_info->surface_format.format,
                     {vk::ComponentSwizzle::eR, vk::ComponentSwizzle::eG, vk::ComponentSwizzle::eB,
                      vk::ComponentSwizzle::eA},
                     {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1},
