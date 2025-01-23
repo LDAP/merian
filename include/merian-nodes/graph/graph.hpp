@@ -856,13 +856,20 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
         }
 
         if (props.st_begin_child("profiler", "Profiler", Properties::ChildFlagBits::FRAMED)) {
+#ifdef MERIAN_PROFILER_ENABLE
             props.config_bool("profiling", profiler_enable);
-            props.st_no_space();
-            props.config_uint("report intervall", profiler_report_intervall_ms,
-                              "Set the time period for the profiler to update in ms. Meaning, "
-                              "averages and deviations are calculated over this this period.");
+#else
+            profiler_enable = false;
+            props.output_text("Profiler disabled at compile-time!\n\n Enable with 'meson configure "
+                              "<builddir> -Dmerian:performance_profiling=true'.");
+#endif
 
             if (profiler_enable) {
+                props.st_no_space();
+                props.config_uint("report intervall", profiler_report_intervall_ms,
+                                  "Set the time period for the profiler to update in ms. Meaning, "
+                                  "averages and deviations are calculated over this this period.");
+
                 if (last_run_report &&
                     props.st_begin_child("run", "Graph Run",
                                          Properties::ChildFlagBits::DEFAULT_OPEN)) {
