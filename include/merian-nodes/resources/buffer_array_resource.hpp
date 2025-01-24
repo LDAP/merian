@@ -13,13 +13,11 @@ class BufferArrayResource : public GraphResource {
 
   public:
     BufferArrayResource(std::vector<merian::BufferHandle>& buffers,
-                        const uint32_t ring_size,
                         const merian::BufferHandle& dummy_buffer,
                         const vk::PipelineStageFlags2 input_stage_flags,
                         const vk::AccessFlags2 input_access_flags)
         : input_stage_flags(input_stage_flags), input_access_flags(input_access_flags),
           buffers(buffers), dummy_buffer(dummy_buffer) {
-        in_flight_buffers.assign(ring_size, std::vector<merian::BufferHandle>(buffers.size()));
 
         for (uint32_t i = 0; i < buffers.size(); i++) {
             current_updates.push_back(i);
@@ -81,8 +79,6 @@ class BufferArrayResource : public GraphResource {
     std::vector<uint32_t> pending_updates;
 
     std::vector<merian::BufferHandle>& buffers;
-    // on_post_process copy here to keep alive
-    std::vector<std::vector<merian::BufferHandle>> in_flight_buffers;
 
     const merian::BufferHandle dummy_buffer;
 };

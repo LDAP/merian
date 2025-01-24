@@ -22,16 +22,12 @@ void AbstractCompute::process(GraphRun& run,
                               const CommandBufferHandle& cmd,
                               const DescriptorSetHandle& descriptor_set,
                               const NodeIO& io) {
-    PipelineHandle& old_pipeline = io.frame_data<PipelineHandle>();
-    old_pipeline.reset();
-
     const auto spec_info = get_specialization_info(io);
     const auto shader = get_shader_module();
 
     if (spec_info && shader &&
         (!pipe || current_spec_info != spec_info || current_shader_module != shader)) {
         SPDLOG_DEBUG("(re)create pipeline");
-        old_pipeline = pipe;
 
         auto pipe_builder = PipelineLayoutBuilder(context);
         if (push_constant_size.has_value()) {

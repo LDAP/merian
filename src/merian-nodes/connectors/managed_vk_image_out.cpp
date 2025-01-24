@@ -91,7 +91,7 @@ GraphResourceHandle ManagedVkImageOut::create_resource(
 
     std::map<std::pair<NodeHandle, uint32_t>, vk::ImageLayout> layouts_per_node;
 
-    for (auto& [input_node, input] : inputs) {
+    for (const auto& [input_node, input] : inputs) {
         const auto& image_in = debugable_ptr_cast<ManagedVkImageIn>(input);
         image_create_info.usage |= image_in->usage_flags;
         input_pipeline_stages |= image_in->pipeline_stages;
@@ -104,10 +104,9 @@ GraphResourceHandle ManagedVkImageOut::create_resource(
                 fmt::format("node has two input descriptors (one is {}) pointing to the "
                             "same underlying resource with different image layouts.",
                             name)};
-        } else {
-            layouts_per_node.try_emplace(std::make_pair(input_node, input->delay),
-                                         image_in->required_layout);
         }
+        layouts_per_node.try_emplace(std::make_pair(input_node, input->delay),
+                                     image_in->required_layout);
     }
 
     const ImageHandle image = alloc->createImage(image_create_info, MemoryMappingType::NONE, name);

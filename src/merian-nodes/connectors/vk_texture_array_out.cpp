@@ -1,7 +1,6 @@
 #include "merian-nodes/connectors/vk_texture_array_out.hpp"
 #include "merian-nodes/connectors/vk_texture_array_in.hpp"
 
-#include "merian-nodes/graph/errors.hpp"
 #include "merian-nodes/graph/node.hpp"
 #include "merian/utils/pointer.hpp"
 
@@ -15,13 +14,13 @@ GraphResourceHandle VkTextureArrayOut::create_resource(
     const ResourceAllocatorHandle& allocator,
     [[maybe_unused]] const ResourceAllocatorHandle& aliasing_allocator,
     [[maybe_unused]] const uint32_t resoruce_index,
-    const uint32_t ring_size) {
+    [[maybe_unused]] const uint32_t ring_size) {
 
     vk::PipelineStageFlags2 input_pipeline_stages;
     vk::AccessFlags2 input_access_flags;
     vk::ImageLayout first_input_layout = vk::ImageLayout::eUndefined;
 
-    for (auto& [input_node, input] : inputs) {
+    for (const auto& [input_node, input] : inputs) {
         const auto& con_in = debugable_ptr_cast<VkTextureArrayIn>(input);
         input_pipeline_stages |= con_in->pipeline_stages;
         input_access_flags |= con_in->access_flags;
@@ -31,9 +30,9 @@ GraphResourceHandle VkTextureArrayOut::create_resource(
         }
     }
 
-    return std::make_shared<TextureArrayResource>(
-        textures, ring_size, allocator->get_dummy_texture(), input_pipeline_stages,
-        input_access_flags, first_input_layout);
+    return std::make_shared<TextureArrayResource>(textures, allocator->get_dummy_texture(),
+                                                  input_pipeline_stages, input_access_flags,
+                                                  first_input_layout);
 }
 
 TextureArrayResource& VkTextureArrayOut::resource(const GraphResourceHandle& resource) {
@@ -59,7 +58,7 @@ Connector::ConnectorStatusFlags VkTextureArrayOut::on_pre_process(
 }
 
 Connector::ConnectorStatusFlags VkTextureArrayOut::on_post_process(
-    GraphRun& run,
+    [[maybe_unused]] GraphRun& run,
     [[maybe_unused]] const CommandBufferHandle& cmd,
     const GraphResourceHandle& resource,
     [[maybe_unused]] const NodeHandle& node,
@@ -74,8 +73,6 @@ Connector::ConnectorStatusFlags VkTextureArrayOut::on_post_process(
         std::swap(res->pending_updates, res->current_updates);
         flags |= NEEDS_DESCRIPTOR_UPDATE;
     }
-
-    res->in_flight_textures[run.get_in_flight_index()] = textures;
 
     return flags;
 }

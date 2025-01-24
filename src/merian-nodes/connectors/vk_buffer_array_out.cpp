@@ -14,7 +14,7 @@ GraphResourceHandle VkBufferArrayOut::create_resource(
     const ResourceAllocatorHandle& allocator,
     [[maybe_unused]] const ResourceAllocatorHandle& aliasing_allocator,
     [[maybe_unused]] const uint32_t resoruce_index,
-    const uint32_t ring_size) {
+    [[maybe_unused]] const uint32_t ring_size) {
 
     vk::PipelineStageFlags2 input_pipeline_stages;
     vk::AccessFlags2 input_access_flags;
@@ -25,7 +25,7 @@ GraphResourceHandle VkBufferArrayOut::create_resource(
         input_access_flags |= con_in->access_flags;
     }
 
-    return std::make_shared<BufferArrayResource>(buffers, ring_size, allocator->get_dummy_buffer(),
+    return std::make_shared<BufferArrayResource>(buffers, allocator->get_dummy_buffer(),
                                                  input_pipeline_stages, input_access_flags);
 }
 
@@ -52,7 +52,7 @@ Connector::ConnectorStatusFlags VkBufferArrayOut::on_pre_process(
 }
 
 Connector::ConnectorStatusFlags VkBufferArrayOut::on_post_process(
-    GraphRun& run,
+    [[maybe_unused]] GraphRun& run,
     [[maybe_unused]] const CommandBufferHandle& cmd,
     const GraphResourceHandle& resource,
     [[maybe_unused]] const NodeHandle& node,
@@ -67,8 +67,6 @@ Connector::ConnectorStatusFlags VkBufferArrayOut::on_post_process(
         std::swap(res->pending_updates, res->current_updates);
         flags |= NEEDS_DESCRIPTOR_UPDATE;
     }
-
-    res->in_flight_buffers[run.get_in_flight_index()] = buffers;
 
     return flags;
 }

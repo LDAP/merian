@@ -11,8 +11,8 @@ class TLASResource : public GraphResource {
     friend class VkTLASOut;
 
   public:
-    TLASResource(const vk::PipelineStageFlags2 read_pipeline_stages, const uint32_t ring_size)
-        : input_pipeline_stages(read_pipeline_stages), in_flight_tlas(ring_size) {}
+    TLASResource(const vk::PipelineStageFlags2 read_pipeline_stages)
+        : input_pipeline_stages(read_pipeline_stages) {}
 
     void properties(merian::Properties& props) override {
         props.output_text(
@@ -25,8 +25,9 @@ class TLASResource : public GraphResource {
         }
     }
 
-    void operator=(const merian::AccelerationStructureHandle& tlas) {
+    TLASResource& operator=(const merian::AccelerationStructureHandle& tlas) {
         this->tlas = tlas;
+        return *this;
     }
 
   public:
@@ -36,8 +37,6 @@ class TLASResource : public GraphResource {
   private:
     merian::AccelerationStructureHandle tlas;
     merian::AccelerationStructureHandle last_tlas;
-
-    std::vector<merian::AccelerationStructureHandle> in_flight_tlas;
 };
 
 using TLASResourceHandle = std::shared_ptr<TLASResource>;

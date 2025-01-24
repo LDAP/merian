@@ -13,14 +13,12 @@ class TextureArrayResource : public GraphResource {
 
   public:
     TextureArrayResource(std::vector<merian::TextureHandle>& textures,
-                         const uint32_t ring_size,
                          const merian::TextureHandle& dummy_texture,
                          const vk::PipelineStageFlags2 input_stage_flags,
                          const vk::AccessFlags2 input_access_flags,
                          const vk::ImageLayout first_input_layout)
         : input_stage_flags(input_stage_flags), input_access_flags(input_access_flags),
           textures(textures), dummy_texture(dummy_texture), first_input_layout(first_input_layout) {
-        in_flight_textures.assign(ring_size, std::vector<merian::TextureHandle>(textures.size()));
 
         for (uint32_t i = 0; i < textures.size(); i++) {
             current_updates.push_back(i);
@@ -84,8 +82,6 @@ class TextureArrayResource : public GraphResource {
     std::vector<uint32_t> pending_updates;
 
     std::vector<merian::TextureHandle>& textures;
-    // on_post_process copy here to keep alive
-    std::vector<std::vector<merian::TextureHandle>> in_flight_textures;
 
     const merian::TextureHandle dummy_texture;
     const vk::ImageLayout first_input_layout;

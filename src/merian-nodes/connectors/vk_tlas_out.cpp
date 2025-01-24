@@ -14,7 +14,7 @@ VkTLASOut::create_resource(const std::vector<std::tuple<NodeHandle, InputConnect
                            [[maybe_unused]] const ResourceAllocatorHandle& allocator,
                            [[maybe_unused]] const ResourceAllocatorHandle& aliasing_allocator,
                            [[maybe_unused]] const uint32_t resoruce_index,
-                           const uint32_t ring_size) {
+                           [[maybe_unused]] const uint32_t ring_size) {
 
     vk::PipelineStageFlags2 read_stages;
 
@@ -23,7 +23,7 @@ VkTLASOut::create_resource(const std::vector<std::tuple<NodeHandle, InputConnect
         read_stages |= con_in->pipeline_stages;
     }
 
-    return std::make_shared<TLASResource>(read_stages, ring_size);
+    return std::make_shared<TLASResource>(read_stages);
 }
 
 TLASResource& VkTLASOut::resource(const GraphResourceHandle& resource) {
@@ -45,7 +45,7 @@ VkTLASOut::on_pre_process([[maybe_unused]] GraphRun& run,
 }
 
 Connector::ConnectorStatusFlags VkTLASOut::on_post_process(
-    GraphRun& run,
+    [[maybe_unused]] GraphRun& run,
     [[maybe_unused]] const CommandBufferHandle& cmd,
     const GraphResourceHandle& resource,
     [[maybe_unused]] const NodeHandle& node,
@@ -68,7 +68,6 @@ Connector::ConnectorStatusFlags VkTLASOut::on_post_process(
     if (res->input_pipeline_stages) {
         buffer_barriers.push_back(res->tlas->tlas_read_barrier2(res->input_pipeline_stages));
     }
-    res->in_flight_tlas[run.get_in_flight_index()] = res->tlas;
 
     return flags;
 }

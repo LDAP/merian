@@ -110,7 +110,8 @@ GraphResourceHandle ManagedVkBufferOut::create_resource(
     }
 
     ResourceAllocatorHandle alloc = persistent ? allocator : aliasing_allocator;
-    const BufferHandle buffer = alloc->createBuffer(buffer_create_info, MemoryMappingType::NONE, name);
+    const BufferHandle buffer =
+        alloc->createBuffer(buffer_create_info, MemoryMappingType::NONE, name);
 
     return std::make_shared<ManagedVkBufferResource>(buffer, input_pipeline_stages,
                                                      input_access_flags);
