@@ -275,7 +275,7 @@ Swapchain::acquire(const vk::Extent2D extent, const uint64_t timeout) {
     }
 
     if (!info.has_value() && acquire_count > 0) {
-        throw needs_recreate{"present failed."};
+        throw needs_recreate{"previous acquire or present failed."};
     }
 
     assert(!swapchain || info);
