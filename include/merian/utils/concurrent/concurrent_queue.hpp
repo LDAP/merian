@@ -14,7 +14,7 @@ template <typename T> class ConcurrentQueue {
 
     ConcurrentQueue(ConcurrentQueue& other) = delete;
 
-    ConcurrentQueue(ConcurrentQueue&& other) {
+    ConcurrentQueue(ConcurrentQueue&& other)  noexcept {
         std::unique_lock lk_other(other.mutex);
         std::unique_lock lk(mutex);
         q = std::move(other.q);
@@ -22,7 +22,7 @@ template <typename T> class ConcurrentQueue {
 
     ConcurrentQueue& operator=(const ConcurrentQueue& src) = delete;
 
-    ConcurrentQueue& operator=(ConcurrentQueue&& src) {
+    ConcurrentQueue& operator=(ConcurrentQueue&& src)  noexcept {
         if (this == &src)
             return *this;
         this->~ConcurrentQueue();
@@ -54,7 +54,6 @@ template <typename T> class ConcurrentQueue {
     void wait_empty() {
         std::unique_lock lk(mutex);
         cv_empty.wait(lk, [&] { return q.empty(); });
-        return;
     }
 
     T pop() {
