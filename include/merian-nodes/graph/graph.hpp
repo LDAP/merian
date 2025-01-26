@@ -883,6 +883,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                         if (cpu_auto) {
                             cpu_max = *std::max_element(cpu_samples, cpu_samples + cpu_count);
                         }
+
                         props.output_plot_line("", cpu_samples, cpu_count, 0, cpu_max);
                         props.config_float("cpu max ms", cpu_max, 0, 1000);
                         props.st_no_space();
@@ -1248,18 +1249,11 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
         if (report) {
             last_run_report = std::move(*report);
 
-            const float cpu_sum = std::transform_reduce(
-                last_run_report.cpu_report.begin(), last_run_report.cpu_report.end(), 0,
-                std::plus<>(), [](auto& report) { return report.duration; });
-            const float gpu_sum = std::transform_reduce(
-                last_run_report.gpu_report.begin(), last_run_report.gpu_report.end(), 0,
-                std::plus<>(), [](auto& report) { return report.duration; });
-
             const uint32_t half_size = cpu_time_history.size() / 2;
             cpu_time_history[time_history_current] =
-                cpu_time_history[time_history_current + half_size] = cpu_sum;
+                cpu_time_history[time_history_current + half_size] = last_run_report.cpu_total();
             gpu_time_history[time_history_current] =
-                gpu_time_history[time_history_current + half_size] = gpu_sum;
+                gpu_time_history[time_history_current + half_size] = last_run_report.gpu_total();
             time_history_current = (time_history_current + 1) % half_size;
         }
 
