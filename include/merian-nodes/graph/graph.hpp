@@ -3,6 +3,7 @@
 #include "errors.hpp"
 #include "graph_run.hpp"
 #include "merian/utils/chrono.hpp"
+#include "merian/utils/ring_buffer.hpp"
 #include "merian/utils/vector.hpp"
 #include "node.hpp"
 #include "resource.hpp"
@@ -222,8 +223,6 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
         run_profiler = std::make_shared<merian::Profiler>(context);
         time_connect_reference = time_reference = std::chrono::high_resolution_clock::now();
         duration_elapsed = 0ns;
-        cpu_time_history.fill(0);
-        gpu_time_history.fill(0);
     }
 
     ~Graph() {
@@ -877,14 +876,14 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                                          Properties::ChildFlagBits::DEFAULT_OPEN)) {
                     if (!last_run_report.cpu_report.empty()) {
                         props.st_separate("CPU");
-                        const uint32_t cpu_count = (cpu_time_history.size() / 2) - 1;
-                        const float* cpu_samples =
-                            cpu_time_history.data() + time_history_current + 1;
+                        const float* cpu_samples = &cpu_time_history[time_history_current + 1];
                         if (cpu_auto) {
-                            cpu_max = *std::max_element(cpu_samples, cpu_samples + cpu_count);
+                            cpu_max = *std::max_element(cpu_samples,
+                                                        cpu_samples + cpu_time_history.size() - 1);
                         }
 
-                        props.output_plot_line("", cpu_samples, cpu_count, 0, cpu_max);
+                        props.output_plot_line("", cpu_samples, cpu_time_history.size() - 1, 0,
+                                               cpu_max);
                         props.config_float("cpu max ms", cpu_max, 0, 1000);
                         props.st_no_space();
                         props.config_bool("cpu auto", cpu_auto);
@@ -893,14 +892,14 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
 
                     if (!last_run_report.gpu_report.empty()) {
                         props.st_separate("GPU");
-                        const uint32_t gpu_count = (gpu_time_history.size() / 2) - 1;
-                        const float* gpu_samples =
-                            gpu_time_history.data() + time_history_current + 1;
+                        const float* gpu_samples = &gpu_time_history[time_history_current + 1];
                         if (gpu_auto) {
-                            gpu_max = *std::max_element(gpu_samples, gpu_samples + gpu_count);
+                            gpu_max = *std::max_element(gpu_samples,
+                                                        gpu_samples + gpu_time_history.size() - 1);
                         }
-                        props.output_plot_line("", gpu_samples, (gpu_time_history.size() / 2) - 1,
-                                               0, gpu_max);
+
+                        props.output_plot_line("", gpu_samples, gpu_time_history.size() - 1, 0,
+                                               gpu_max);
                         props.config_float("gpu max ms", gpu_max, 0, 1000);
                         props.st_no_space();
                         props.config_bool("gpu auto", gpu_auto);
@@ -1248,13 +1247,9 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
 
         if (report) {
             last_run_report = std::move(*report);
-
-            const uint32_t half_size = cpu_time_history.size() / 2;
-            cpu_time_history[time_history_current] =
-                cpu_time_history[time_history_current + half_size] = last_run_report.cpu_total();
-            gpu_time_history[time_history_current] =
-                gpu_time_history[time_history_current + half_size] = last_run_report.gpu_total();
-            time_history_current = (time_history_current + 1) % half_size;
+            cpu_time_history.set(time_history_current, last_run_report.cpu_total());
+            gpu_time_history.set(time_history_current, last_run_report.gpu_total());
+            time_history_current++;
         }
 
         return run_profiler;
@@ -2191,8 +2186,8 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
     Profiler::Report last_build_report;
     Profiler::Report last_run_report;
     // in ms
-    std::array<float, 256> cpu_time_history;
-    std::array<float, 256> gpu_time_history;
+    RingBuffer<float> cpu_time_history{256};
+    RingBuffer<float> gpu_time_history{256};
     float cpu_max = 20, gpu_max = 20;
     bool cpu_auto = true, gpu_auto = true;
     // Always write at cpu_time_history_current and cpu_time_history_current + (size >> 1)
