@@ -239,7 +239,7 @@ void ImageWrite::process(GraphRun& run,
                                        vk::AccessFlagBits::eTransferWrite,
                                        vk::AccessFlagBits::eHostRead));
 
-    TimelineSemaphoreHandle image_ready = std::make_shared<TimelineSemaphore>(context, 0);
+    TimelineSemaphoreHandle image_ready = TimelineSemaphore::create(context, 0);
     run.add_signal_semaphore(image_ready, 1);
 
     // Pause execution if to many tasks are queued to allow the write threads to keep up.
