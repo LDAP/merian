@@ -252,49 +252,49 @@ void ImageWrite::process(GraphRun& run,
     const std::string tmp_filename =
         (path.parent_path() / (".interm_" + path.filename().string())).string();
 
-    const std::function<void()> write_task =
-        ([this, image_ready, linear_image, path, tmp_filename]() {
-            image_ready->wait(1);
-            float* mem = linear_image->get_memory()->map_as<float>();
+    std::function<void()> write_task = ([this, image_ready, linear_image, path, tmp_filename]() {
+        float* mem = linear_image->get_memory()->map_as<float>();
 
-            switch (this->format) {
-            case FORMAT_PNG: {
-                stbi_write_png(tmp_filename.c_str(), linear_image->get_extent().width,
-                               linear_image->get_extent().height, 4, mem,
-                               linear_image->get_extent().width * 4);
-                break;
-            }
-            case FORMAT_JPG: {
-                stbi_write_jpg(tmp_filename.c_str(), linear_image->get_extent().width,
-                               linear_image->get_extent().height, 4, mem, 100);
-                break;
-            }
-            case FORMAT_HDR: {
-                stbi_write_hdr(tmp_filename.c_str(), linear_image->get_extent().width,
-                               linear_image->get_extent().height, 4, mem);
-                break;
-            }
-            default:
-                throw std::runtime_error{"unsupported format."};
-            }
+        switch (this->format) {
+        case FORMAT_PNG: {
+            stbi_write_png(tmp_filename.c_str(), linear_image->get_extent().width,
+                           linear_image->get_extent().height, 4, mem,
+                           linear_image->get_extent().width * 4);
+            break;
+        }
+        case FORMAT_JPG: {
+            stbi_write_jpg(tmp_filename.c_str(), linear_image->get_extent().width,
+                           linear_image->get_extent().height, 4, mem, 100);
+            break;
+        }
+        case FORMAT_HDR: {
+            stbi_write_hdr(tmp_filename.c_str(), linear_image->get_extent().width,
+                           linear_image->get_extent().height, 4, mem);
+            break;
+        }
+        default:
+            throw std::runtime_error{"unsupported format."};
+        }
 
-            try {
-                std::filesystem::rename(tmp_filename, path);
-            } catch (std::filesystem::filesystem_error const&) {
-                SPDLOG_WARN("rename failed! Falling back to copy...");
-                std::filesystem::copy(tmp_filename, path);
-                std::filesystem::remove(tmp_filename);
-            }
+        try {
+            std::filesystem::rename(tmp_filename, path);
+        } catch (std::filesystem::filesystem_error const&) {
+            SPDLOG_WARN("rename failed! Falling back to copy...");
+            std::filesystem::copy(tmp_filename, path);
+            std::filesystem::remove(tmp_filename);
+        }
 
-            linear_image->get_memory()->unmap();
-            std::unique_lock lk(mutex_concurrent);
-            concurrent_tasks--;
-            lk.unlock();
-            cv_concurrent.notify_all();
-            return;
-        });
+        SPDLOG_INFO("wrote image to {}", path.string());
 
-    context->thread_pool.submit(write_task);
+        linear_image->get_memory()->unmap();
+        std::unique_lock lk(mutex_concurrent);
+        concurrent_tasks--;
+        lk.unlock();
+        cv_concurrent.notify_all();
+        return;
+    });
+
+    context->get_dispatcher().submit(image_ready, 1, std::move(write_task));
 
     if (rebuild_after_capture)
         run.request_reconnect();

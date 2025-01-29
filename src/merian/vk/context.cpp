@@ -100,6 +100,8 @@ Version: {}\n\n",
 
     prepare_shader_include_defines();
 
+    dispatcher.start(thread_pool, device);
+
     SPDLOG_INFO("context ready.");
 }
 
@@ -107,9 +109,12 @@ Context::~Context() {
     device.waitIdle();
 
     SPDLOG_DEBUG("destroy context");
+
     for (auto& ext : extensions) {
         ext.second->on_destroy_context();
     }
+
+    dispatcher.shutdown();
 
     SPDLOG_DEBUG("destroy pipeline cache");
     device.destroyPipelineCache(pipeline_cache);
@@ -759,6 +764,10 @@ const std::vector<std::string>& Context::get_default_shader_include_paths() cons
 
 const std::map<std::string, std::string>& Context::get_default_shader_macro_definitions() const {
     return default_shader_macro_definitions;
+}
+
+CPUDispatcher& Context::get_dispatcher() {
+    return dispatcher;
 }
 
 } // namespace merian

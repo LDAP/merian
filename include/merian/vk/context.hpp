@@ -1,7 +1,5 @@
 #pragma once
 
-#include "merian/io/file_loader.hpp"
-#include "merian/utils/concurrent/thread_pool.hpp"
 #include <map>
 #include <spdlog/logger.h>
 
@@ -14,19 +12,22 @@
 
 #include <vulkan/vulkan.hpp>
 
+#include "merian/io/file_loader.hpp"
+#include "merian/utils/concurrent/thread_pool.hpp"
+#include "merian/vk/internal/sync_dispatcher.hpp"
+
 namespace merian {
 
 // cyclic -> forward definition
 class Extension;
 class Context;
+using ContextHandle = std::shared_ptr<Context>;
+using WeakContextHandle = std::weak_ptr<Context>;
 class Queue;
 using QueueHandle = std::shared_ptr<Queue>;
 class CommandPool;
 class CommandBuffer;
 using CommandBufferHandle = std::shared_ptr<CommandBuffer>;
-
-using ContextHandle = std::shared_ptr<Context>;
-using WeakContextHandle = std::weak_ptr<Context>;
 class ShaderModule;
 using ShaderModuleHandle = std::shared_ptr<ShaderModule>;
 class ShaderCompiler;
@@ -205,6 +206,8 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
 
     const std::map<std::string, std::string>& get_default_shader_macro_definitions() const;
 
+    CPUDispatcher& get_dispatcher();
+
   private:
     // in create_instance
 
@@ -269,6 +272,8 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
 
     std::vector<std::string> default_shader_include_paths;
     std::map<std::string, std::string> default_shader_macro_definitions;
+
+    CPUDispatcher dispatcher;
 };
 
 } // namespace merian
