@@ -2,7 +2,7 @@
 
 #include <condition_variable>
 #include <mutex>
-#include <vector>
+#include <queue>
 
 namespace merian {
 
@@ -33,7 +33,7 @@ template <typename T> class ConcurrentQueue {
     void push(const T&& value, const uint64_t max_size = UINT64_MAX) {
         std::unique_lock lk(mutex);
         cv_full.wait(lk, [&] { return q.size() < max_size; });
-        q.emplace_back(std::move(value));
+        q.push(value);
         lk.unlock();
         cv_empty.notify_all();
     }
@@ -41,9 +41,14 @@ template <typename T> class ConcurrentQueue {
     void push(const T& value, const uint64_t max_size = UINT64_MAX) {
         std::unique_lock lk(mutex);
         cv_full.wait(lk, [&] { return q.size() < max_size; });
-        q.push_back(value);
+        q.push(value);
         lk.unlock();
         cv_empty.notify_all();
+    }
+
+    std::size_t size() {
+        std::unique_lock lk(mutex);
+        return q.size();
     }
 
     bool empty() {
@@ -53,21 +58,21 @@ template <typename T> class ConcurrentQueue {
 
     void wait_empty() {
         std::unique_lock lk(mutex);
-        cv_empty.wait(lk, [&] { return q.empty(); });
+        cv_full.wait(lk, [&] { return q.empty(); });
     }
 
     T pop() {
         std::unique_lock lk(mutex);
         cv_empty.wait(lk, [&] { return !q.empty(); });
-        T t = std::move(q.back());
-        q.pop_back();
+        T t = std::move(q.front());
+        q.pop();
         lk.unlock();
         cv_full.notify_all();
-        return std::move(t);
+        return t;
     }
 
   private:
-    std::vector<T> q;
+    std::queue<T> q;
     std::condition_variable cv_empty;
     std::condition_variable cv_full;
     std::mutex mutex;

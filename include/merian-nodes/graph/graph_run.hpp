@@ -1,9 +1,11 @@
 #pragma once
 
 #include "merian/utils/chrono.hpp"
+#include "merian/utils/concurrent/thread_pool.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/sync/semaphore_binary.hpp"
 #include "merian/vk/sync/semaphore_timeline.hpp"
+#include "merian/vk/utils/cpu_queue.hpp"
 #include "merian/vk/utils/profiler.hpp"
 
 #include <cstdint>
@@ -170,6 +172,14 @@ class GraphRun {
         external_wait_time = std::max(external_wait_time, chrono_duration);
     }
 
+    const ThreadPoolHandle& get_thread_pool() const {
+        return thread_pool;
+    }
+
+    const CPUQueueHandle& get_cpu_queue() const {
+        return cpu_queue;
+    }
+
   private:
     void reset(const uint64_t iteration,
                const uint32_t in_flight_index,
@@ -179,7 +189,9 @@ class GraphRun {
                const std::chrono::nanoseconds& time_delta,
                const std::chrono::nanoseconds& elapsed,
                const std::chrono::nanoseconds& elapsed_since_connect,
-               const uint64_t total_iterations) {
+               const uint64_t total_iterations,
+               const ThreadPoolHandle& thread_pool,
+               const CPUQueueHandle& cpu_queue) {
         this->iteration = iteration;
         this->in_flight_index = in_flight_index;
         this->cmd_pool = cmd_pool;
@@ -188,6 +200,8 @@ class GraphRun {
         this->elapsed = elapsed;
         this->elapsed_since_connect = elapsed_since_connect;
         this->total_iteration = total_iterations;
+        this->thread_pool = thread_pool;
+        this->cpu_queue = cpu_queue;
         wait_semaphores.clear();
         wait_stages.clear();
         wait_values.clear();
@@ -223,6 +237,9 @@ class GraphRun {
     std::chrono::nanoseconds time_delta;
     std::chrono::nanoseconds elapsed;
     std::chrono::nanoseconds elapsed_since_connect;
+
+    ThreadPoolHandle thread_pool;
+    CPUQueueHandle cpu_queue;
 };
 
 } // namespace merian_nodes

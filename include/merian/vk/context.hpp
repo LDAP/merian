@@ -1,7 +1,5 @@
 #pragma once
 
-#include "merian/io/file_loader.hpp"
-#include "merian/utils/concurrent/thread_pool.hpp"
 #include <map>
 #include <spdlog/logger.h>
 
@@ -14,23 +12,20 @@
 
 #include <vulkan/vulkan.hpp>
 
+#include "merian/io/file_loader.hpp"
+
 namespace merian {
 
 // cyclic -> forward definition
 class Extension;
 class Context;
+using ContextHandle = std::shared_ptr<Context>;
+using WeakContextHandle = std::weak_ptr<Context>;
 class Queue;
 using QueueHandle = std::shared_ptr<Queue>;
 class CommandPool;
 class CommandBuffer;
 using CommandBufferHandle = std::shared_ptr<CommandBuffer>;
-
-using ContextHandle = std::shared_ptr<Context>;
-using WeakContextHandle = std::weak_ptr<Context>;
-class ShaderModule;
-using ShaderModuleHandle = std::shared_ptr<ShaderModule>;
-class ShaderCompiler;
-using ShaderCompilerHandle = std::shared_ptr<ShaderCompiler>;
 
 struct PhysicalDevice {
     const vk::PhysicalDevice& operator*() const {
@@ -237,14 +232,9 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
     vk::PipelineCache pipeline_cache;
 
     // -----------------
-    // A shared thread pool with default size.
-    ThreadPool thread_pool;
 
     // A shared file_loader for convenience.
     FileLoader file_loader;
-
-    // A shader compiler with default include paths for convenience.
-    ShaderCompilerHandle shader_compiler;
 
   private:
     // in find_queues. Indexes are -1 if no suitable queue was found!
@@ -275,4 +265,3 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
 
 #include "merian/vk/command/command_pool.hpp"
 #include "merian/vk/command/queue.hpp"
-#include "merian/vk/shader/shader_compiler.hpp"

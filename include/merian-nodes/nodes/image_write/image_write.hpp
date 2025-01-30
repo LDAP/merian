@@ -74,11 +74,6 @@ class ImageWrite : public Node {
 
     ManagedVkImageInHandle con_src = ManagedVkImageIn::transfer_src("src");
 
-    uint32_t max_concurrent_tasks = std::thread::hardware_concurrency();
-    uint32_t concurrent_tasks = 0;
-    std::mutex mutex_concurrent;
-    std::condition_variable cv_concurrent;
-
     std::function<void()> callback;
 
     std::string filename_format;

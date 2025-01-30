@@ -3,8 +3,10 @@
 #include "errors.hpp"
 #include "graph_run.hpp"
 #include "merian/utils/chrono.hpp"
+#include "merian/utils/concurrent/thread_pool.hpp"
 #include "merian/utils/ring_buffer.hpp"
 #include "merian/utils/vector.hpp"
+#include "merian/vk/utils/cpu_queue.hpp"
 #include "node.hpp"
 #include "resource.hpp"
 
@@ -14,6 +16,7 @@
 #include "merian/vk/descriptors/descriptor_set_layout_builder.hpp"
 #include "merian/vk/extension/extension_vk_debug_utils.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
+#include "merian/vk/shader/shader_compiler.hpp"
 #include "merian/vk/sync/ring_fences.hpp"
 #include "merian/vk/utils/math.hpp"
 
@@ -211,6 +214,10 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
     Graph(const ContextHandle& context, const ResourceAllocatorHandle& resource_allocator)
         : context(context), resource_allocator(resource_allocator), queue(context->get_queue_GCT()),
           registry(context, resource_allocator), ring_fences(context) {
+
+        thread_pool = std::make_shared<ThreadPool>();
+        cpu_queue = std::make_shared<CPUQueue>(context, thread_pool);
+
         for (uint32_t i = 0; i < ITERATIONS_IN_FLIGHT; i++) {
             InFlightData& in_flight_data = ring_fences.get(i).user_data;
             in_flight_data.command_pool = std::make_shared<CommandPool>(queue);
@@ -488,6 +495,10 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
         // PREPARE RUN: wait for fence, release resources, reset cmd pool
         run_in_progress = true;
 
+        if (flush_thread_pool_at_run_start) {
+            thread_pool->wait_empty();
+        }
+
         // wait for the in-flight processing to finish
         Stopwatch sw_gpu_wait;
         InFlightData& in_flight_data = ring_fences.next_cycle_wait_get();
@@ -562,7 +573,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
 
             run.reset(run_iteration, run_iteration % ITERATIONS_IN_FLIGHT, profiler, cmd_pool,
                       resource_allocator, time_delta, duration_elapsed,
-                      duration_elapsed_since_connect, total_iteration);
+                      duration_elapsed_since_connect, total_iteration, thread_pool, cpu_queue);
 
             // While preprocessing nodes can signalize that they need to reconnect as well
             {
@@ -658,6 +669,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
     void wait() {
         SPDLOG_DEBUG("wait until all in-flight iterations have finished");
         ring_fences.wait_all();
+        cpu_queue->wait_idle();
     }
 
     // removes all nodes and connections from the graph.
@@ -762,6 +774,13 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                 props.output_text("CPU sleep time: {:04f}ms",
                                   to_milliseconds(in_flight_data.cpu_sleep_time));
             }
+
+            props.st_separate();
+            props.config_bool("flush thread pool", flush_thread_pool_at_run_start,
+                              "If enabled, the tasks queue of the thread pool is flushed when a "
+                              "run starts. HIGHLY RECOOMMENDED as it limits memory allocations and "
+                              "prevents the queue to fill up indefinitely.");
+            props.output_text("tasks in queue: {}", thread_pool->queue_size());
 
             props.st_end_child();
         }
@@ -2144,6 +2163,8 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
     std::shared_ptr<ExtensionVkDebugUtils> debug_utils = nullptr;
 
     NodeRegistry registry;
+    ThreadPoolHandle thread_pool;
+    CPUQueueHandle cpu_queue;
 
     // Outside callbacks
     // clang-format off
@@ -2177,6 +2198,8 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
     // across builds. Might be not 0 at begin of run.
     std::chrono::nanoseconds time_delta = 0ns;
     std::chrono::nanoseconds cpu_time = 0ns;
+
+    bool flush_thread_pool_at_run_start = true;
 
     bool low_latency_mode = false;
     std::chrono::duration<double> gpu_wait_time = 0ns;

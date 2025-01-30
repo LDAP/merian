@@ -2,7 +2,6 @@
 #include "merian/utils/pointer.hpp"
 #include "merian/utils/vector.hpp"
 #include "merian/vk/extension/extension.hpp"
-#include "merian/vk/shader/shader_compiler.hpp"
 
 #include <fmt/ranges.h>
 #include <numeric>
@@ -32,8 +31,6 @@ ContextHandle Context::create(const std::vector<std::shared_ptr<Extension>>& ext
     for (auto& ext : context->extensions) {
         ext.second->on_context_created(context, *context);
     }
-
-    context->shader_compiler = ShaderCompiler::get(context);
 
     return context;
 }
@@ -107,6 +104,7 @@ Context::~Context() {
     device.waitIdle();
 
     SPDLOG_DEBUG("destroy context");
+
     for (auto& ext : extensions) {
         ext.second->on_destroy_context();
     }
