@@ -69,7 +69,7 @@ class CPUQueue {
     bool stop = false;
 
     bool signal_wait_idle = false;
-    std::barrier<std::function<void()>> wait_idle_barrier{2, []() {}};
+    std::barrier<void (*)(void) noexcept> wait_idle_barrier{2, []() noexcept {}};
 };
 
 using CPUQueueHandle = std::shared_ptr<CPUQueue>;
