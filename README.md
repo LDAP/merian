@@ -72,7 +72,7 @@ exe = executable(
 
 ```
 
-If Merian is not installed, either clone Merian into the subprojects folder or add a file `subprojects/merian.wrap` with
+To allow meson to find Merian, either clone this repo into the `subprojects` folder or add a file `subprojects/merian.wrap` with
 
 ```ini
 [wrap-git]
