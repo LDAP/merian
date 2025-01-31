@@ -50,9 +50,10 @@ MedianApproxNode::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
 }
 
 void MedianApproxNode::process([[maybe_unused]] GraphRun& run,
-                               const CommandBufferHandle& cmd,
                                [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
                                [[maybe_unused]] const NodeIO& io) {
+    const CommandBufferHandle& cmd = run.get_cmd();
+
     if (!pipe_reduce) {
         auto spec_builder = SpecializationInfoBuilder();
         spec_builder.add_entry(local_size_x, local_size_y, component);

@@ -69,9 +69,9 @@ AutoExposure::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
 }
 
 void AutoExposure::process(GraphRun& run,
-                           const CommandBufferHandle& cmd,
                            const DescriptorSetHandle& descriptor_set,
                            const NodeIO& io) {
+    const CommandBufferHandle& cmd = run.get_cmd();
     if (pc.automatic == VK_TRUE) {
         pc.reset = run.get_iteration() == 0 ? VK_TRUE : VK_FALSE;
         pc.timediff = static_cast<float>(run.get_time_delta());

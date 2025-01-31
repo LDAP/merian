@@ -38,13 +38,13 @@ class GLFWWindow : public Node {
     }
 
     virtual void process(GraphRun& run,
-                         const CommandBufferHandle& cmd,
                          [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
                          const NodeIO& io) override {
         const std::optional<SwapchainAcquireResult> acquire =
             swapchain_manager->acquire(window, 1000L * 1000L /* 1s */);
 
         if (acquire) {
+            const CommandBufferHandle& cmd = run.get_cmd();
             const ImageHandle image = acquire->image_view->get_image();
 
             auto barrier = image->barrier2(vk::ImageLayout::eTransferDstOptimal, true);

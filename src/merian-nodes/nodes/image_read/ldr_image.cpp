@@ -34,7 +34,6 @@ LDRImageRead::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
 }
 
 void LDRImageRead::process([[maybe_unused]] GraphRun& run,
-                           const CommandBufferHandle& cmd,
                            [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
                            const NodeIO& io) {
     if (needs_run) {
@@ -48,7 +47,7 @@ void LDRImageRead::process([[maybe_unused]] GraphRun& run,
                         height, channels);
         }
 
-        run.get_allocator()->getStaging()->cmdToImage(cmd, *io[con_out], {0, 0, 0},
+        run.get_allocator()->getStaging()->cmdToImage(run.get_cmd(), *io[con_out], {0, 0, 0},
                                                       io[con_out]->get_extent(), first_layer(),
                                                       static_cast<long>(width * height) * 4, image);
 

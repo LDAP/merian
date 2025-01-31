@@ -221,7 +221,7 @@ class DeviceASBuilder : public Node {
     DeviceASBuilder(const ContextHandle& context, const ResourceAllocatorHandle& allocator)
         : Node(), context(context), allocator(allocator), as_builder(context, allocator) {}
 
-    std::vector<InputConnectorHandle> describe_inputs() {
+    std::vector<InputConnectorHandle> describe_inputs() override {
         return {
             con_in_instance_info,
             con_in_vtx_buffers,
@@ -230,7 +230,7 @@ class DeviceASBuilder : public Node {
     }
 
     std::vector<OutputConnectorHandle>
-    describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
+    describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) override {
         if (!context->get_extension<ExtensionVkAccelerationStructure>()) {
             throw graph_errors::node_error{
                 "context extension ExtensionVkAccelerationStructure is required."};
@@ -242,9 +242,8 @@ class DeviceASBuilder : public Node {
     }
 
     void process(GraphRun& run,
-                 const CommandBufferHandle& cmd,
                  [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
-                 const NodeIO& io) {
+                 const NodeIO& io) override {
         InFlightData& in_flight_data = io.frame_data<InFlightData>();
         in_flight_data.build_buffers.clear();
         TlasBuildInfo& tlas_build_info = *io[con_in_instance_info];
@@ -308,13 +307,14 @@ class DeviceASBuilder : public Node {
                 Buffer::INSTANCES_BUFFER_USAGE, "DeviceASBuilder Instances",
                 merian::MemoryMappingType::NONE, 16, 1.25)) {
             // old buffer reused -> insert barrier for last iteration
-            cmd->barrier(vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR,
-                         vk::PipelineStageFlagBits::eTransfer,
-                         tlas_build_info.instances_buffer->buffer_barrier(
-                             vk::AccessFlagBits::eShaderRead, vk::AccessFlagBits::eTransferWrite));
+            run.get_cmd()->barrier(
+                vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR,
+                vk::PipelineStageFlagBits::eTransfer,
+                tlas_build_info.instances_buffer->buffer_barrier(
+                    vk::AccessFlagBits::eShaderRead, vk::AccessFlagBits::eTransferWrite));
         }
         // 2.1. Upload instances to GPU and copy to buffer
-        allocator->getStaging()->cmdToBuffer(cmd, *tlas_build_info.instances_buffer, 0,
+        allocator->getStaging()->cmdToBuffer(run.get_cmd(), *tlas_build_info.instances_buffer, 0,
                                              size_of(tlas_build_info.instances),
                                              tlas_build_info.instances.data());
 
@@ -340,10 +340,10 @@ class DeviceASBuilder : public Node {
                                                           tlas_build_info.build_flags);
         }
         tlas_build_info.rebuild = false;
-        cmd->barrier(pre_build_barriers);
+        run.get_cmd()->barrier(pre_build_barriers);
 
         // 4. Run builds (reusing the same scratch buffer)
-        as_builder.get_cmds(cmd, scratch_buffer, run.get_profiler());
+        as_builder.get_cmds(run.get_cmd(), scratch_buffer, run.get_profiler());
 
         // 5. Prevent object destruction
         in_flight_data.build_buffers.emplace_back(scratch_buffer);

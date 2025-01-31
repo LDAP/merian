@@ -30,10 +30,8 @@ class Bloom : public Node {
     NodeStatusFlags on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
                                  const DescriptorSetLayoutHandle& descriptor_set_layout) override;
 
-    void process(GraphRun& run,
-                 const CommandBufferHandle& cmd,
-                 const DescriptorSetHandle& descriptor_set,
-                 const NodeIO& io) override;
+    void
+    process(GraphRun& run, const DescriptorSetHandle& descriptor_set, const NodeIO& io) override;
 
     NodeStatusFlags properties(Properties& config) override;
 

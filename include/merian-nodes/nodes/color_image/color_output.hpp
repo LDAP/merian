@@ -17,10 +17,8 @@ class ColorImage : public Node {
 
     std::vector<OutputConnectorHandle> describe_outputs(const NodeIOLayout& io_layout) override;
 
-    void process(GraphRun& run,
-                 const CommandBufferHandle& cmd,
-                 const DescriptorSetHandle& descriptor_set,
-                 const NodeIO& io) override;
+    void
+    process(GraphRun& run, const DescriptorSetHandle& descriptor_set, const NodeIO& io) override;
 
     NodeStatusFlags properties(Properties& config) override;
 

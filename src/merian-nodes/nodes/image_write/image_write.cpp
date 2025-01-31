@@ -44,7 +44,7 @@ void ImageWrite::record(const std::chrono::nanoseconds& current_graph_time) {
         callback();
 }
 
-ImageWrite::NodeStatusFlags ImageWrite::pre_process(GraphRun& run,
+ImageWrite::NodeStatusFlags ImageWrite::pre_process(const GraphRun& run,
                                                     [[maybe_unused]] const NodeIO& io) {
     // START TRIGGER
     if (!record_enable && (start_stop_record || (int64_t)run.get_iteration() == start_at_run)) {
@@ -89,7 +89,6 @@ ImageWrite::NodeStatusFlags ImageWrite::pre_process(GraphRun& run,
 };
 
 void ImageWrite::process(GraphRun& run,
-                         const CommandBufferHandle& cmd,
                          [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
                          const NodeIO& io) {
 
@@ -97,6 +96,8 @@ void ImageWrite::process(GraphRun& run,
     defer {
         iteration++;
     };
+
+    const CommandBufferHandle& cmd = run.get_cmd();
 
     const std::chrono::nanoseconds system_time_since_record = record_time_point.duration();
     const std::chrono::nanoseconds& graph_time = run.get_elapsed_duration();

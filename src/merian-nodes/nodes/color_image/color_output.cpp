@@ -27,11 +27,10 @@ ColorImage::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
 }
 
 void ColorImage::process([[maybe_unused]] GraphRun& run,
-                         const CommandBufferHandle& cmd,
                          [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
                          const NodeIO& io) {
     if (needs_run) {
-        cmd->clear(io[con_out], color);
+        run.get_cmd()->clear(io[con_out], color);
         needs_run = false;
     }
 }

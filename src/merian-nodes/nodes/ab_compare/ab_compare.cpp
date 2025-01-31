@@ -32,9 +32,9 @@ std::vector<OutputConnectorHandle> ABSplit::describe_outputs(const NodeIOLayout&
 }
 
 void ABSplit::process([[maybe_unused]] GraphRun& run,
-                      const CommandBufferHandle& cmd,
                       [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
                       const NodeIO& io) {
+    const CommandBufferHandle& cmd = run.get_cmd();
     const ImageHandle& a = io[con_in_a];
     const ImageHandle& b = io[con_in_b];
     const ImageHandle& result = io[con_out];
@@ -76,9 +76,9 @@ std::vector<OutputConnectorHandle> ABSideBySide::describe_outputs(const NodeIOLa
 }
 
 void ABSideBySide::process([[maybe_unused]] GraphRun& run,
-                           [[maybe_unused]] const CommandBufferHandle& cmd,
                            [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
                            [[maybe_unused]] const NodeIO& io) {
+    const CommandBufferHandle& cmd = run.get_cmd();
     const ImageHandle& a = io[con_in_a];
     const ImageHandle& b = io[con_in_b];
     const ImageHandle& result = io[con_out];

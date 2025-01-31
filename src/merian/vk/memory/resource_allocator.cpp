@@ -140,7 +140,7 @@ ImageHandle ResourceAllocator::createImage(const CommandBufferHandle& cmdBuf,
 ImageViewHandle
 ResourceAllocator::create_image_view(const ImageHandle& image,
                                      const vk::ImageViewCreateInfo& imageViewCreateInfo,
-                                     const std::string& debug_name) {
+                                     [[maybe_unused]] const std::string& debug_name) {
 
     const ImageViewHandle view = ImageView::create(imageViewCreateInfo, image);
 

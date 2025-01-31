@@ -198,8 +198,6 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
         // Staging set, to release staging buffers and images when the copy
         // to device local memory has finished.
         merian::StagingMemoryManager::SetID staging_set_id{};
-        // The graph run, holds semaphores and such.
-        GraphRun graph_run{ITERATIONS_IN_FLIGHT};
         // Query pools for the profiler
         QueryPoolHandle<vk::QueryType::eTimestamp> profiler_query_pool;
         // Tasks that should be run in the current iteration after acquiring the fence.
@@ -213,10 +211,15 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
   public:
     Graph(const ContextHandle& context, const ResourceAllocatorHandle& resource_allocator)
         : context(context), resource_allocator(resource_allocator), queue(context->get_queue_GCT()),
-          registry(context, resource_allocator), ring_fences(context) {
-
-        thread_pool = std::make_shared<ThreadPool>();
-        cpu_queue = std::make_shared<CPUQueue>(context, thread_pool);
+          registry(context, resource_allocator), ring_fences(context),
+          thread_pool(std::make_shared<ThreadPool>()),
+          cpu_queue(std::make_shared<CPUQueue>(context, thread_pool)),
+          run_profiler(std::make_shared<merian::Profiler>(context)), graph_run(ITERATIONS_IN_FLIGHT,
+                                                                               thread_pool,
+                                                                               cpu_queue,
+                                                                               run_profiler,
+                                                                               resource_allocator,
+                                                                               queue) {
 
         for (uint32_t i = 0; i < ITERATIONS_IN_FLIGHT; i++) {
             InFlightData& in_flight_data = ring_fences.get(i).user_data;
@@ -226,8 +229,8 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
             in_flight_data.profiler_query_pool =
                 std::make_shared<merian::QueryPool<vk::QueryType::eTimestamp>>(context, 512, true);
         }
+
         debug_utils = context->get_extension<ExtensionVkDebugUtils>();
-        run_profiler = std::make_shared<merian::Profiler>(context);
         time_connect_reference = time_reference = std::chrono::high_resolution_clock::now();
         duration_elapsed = 0ns;
     }
@@ -533,15 +536,34 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
         resource_allocator->getStaging()->releaseResourceSet(in_flight_data.staging_set_id);
         const CommandPoolHandle& cmd_pool = in_flight_data.command_pool;
         const std::shared_ptr<CachingCommandPool>& cmd_cache = in_flight_data.command_buffer_cache;
-
-        GraphRun& run = in_flight_data.graph_run;
         cmd_cache->reset();
 
-        const CommandBufferHandle cmd = cmd_cache->create_and_begin();
+        // Compute time stuff
+        assert(time_overwrite < 3);
+        const std::chrono::nanoseconds last_elapsed_ns = duration_elapsed;
+        if (time_overwrite == 1) {
+            const auto delta = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::duration<double>(time_delta_overwrite_ms / 1000.));
+            duration_elapsed += delta;
+            duration_elapsed_since_connect += delta;
+            time_delta_overwrite_ms = 0;
+        } else if (time_overwrite == 2) {
+            const auto delta = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::duration<double>(time_delta_overwrite_ms / 1000.));
+            duration_elapsed += delta;
+            duration_elapsed_since_connect += delta;
+        } else {
+            const auto now = std::chrono::high_resolution_clock::now();
+            duration_elapsed = now - time_reference;
+            duration_elapsed_since_connect = now - time_connect_reference;
+        }
+        time_delta = duration_elapsed - last_elapsed_ns;
 
-        // get profiler and reports
         const ProfilerHandle& profiler = prepare_profiler_for_run(in_flight_data);
         const auto run_start = std::chrono::high_resolution_clock::now();
+        graph_run.begin_run(cmd_cache, run_iteration, total_iteration,
+                            run_iteration % ITERATIONS_IN_FLIGHT, time_delta, duration_elapsed,
+                            duration_elapsed_since_connect);
 
         // CONNECT and PREPROCESS
         do {
@@ -549,31 +571,6 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
             while (needs_reconnect) {
                 connect();
             }
-
-            // Compute time stuff
-            assert(time_overwrite < 3);
-            const std::chrono::nanoseconds last_elapsed_ns = duration_elapsed;
-            if (time_overwrite == 1) {
-                const auto delta = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                    std::chrono::duration<double>(time_delta_overwrite_ms / 1000.));
-                duration_elapsed += delta;
-                duration_elapsed_since_connect += delta;
-                time_delta_overwrite_ms = 0;
-            } else if (time_overwrite == 2) {
-                const auto delta = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                    std::chrono::duration<double>(time_delta_overwrite_ms / 1000.));
-                duration_elapsed += delta;
-                duration_elapsed_since_connect += delta;
-            } else {
-                auto now = std::chrono::high_resolution_clock::now();
-                duration_elapsed = now - time_reference;
-                duration_elapsed_since_connect = now - time_connect_reference;
-            }
-            time_delta = duration_elapsed - last_elapsed_ns;
-
-            run.reset(run_iteration, run_iteration % ITERATIONS_IN_FLIGHT, profiler, cmd_pool,
-                      resource_allocator, time_delta, duration_elapsed,
-                      duration_elapsed_since_connect, total_iteration, thread_pool, cpu_queue);
 
             // While preprocessing nodes can signalize that they need to reconnect as well
             {
@@ -584,7 +581,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                                                                registry.node_name(node)));
                     const uint32_t set_idx = data.set_index(run_iteration);
                     Node::NodeStatusFlags flags =
-                        node->pre_process(run, data.resource_maps[set_idx]);
+                        node->pre_process(graph_run, data.resource_maps[set_idx]);
                     needs_reconnect |= flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT;
                     if ((flags & Node::NodeStatusFlagBits::RESET_IN_FLIGHT_DATA) != 0u) {
                         in_flight_data.in_flight_data[node].reset();
@@ -596,17 +593,17 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
         // RUN
         {
             MERIAN_PROFILE_SCOPE(profiler, "on_run_starting");
-            on_run_starting(run);
+            on_run_starting(graph_run);
         }
         {
-            MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "Run nodes");
+            MERIAN_PROFILE_SCOPE_GPU(profiler, graph_run.get_cmd(), "Run nodes");
             for (auto& node : flat_topology) {
                 NodeData& data = node_data.at(node);
                 if (debug_utils)
-                    debug_utils->cmd_begin_label(*cmd, registry.node_name(node));
+                    debug_utils->cmd_begin_label(*graph_run.get_cmd(), registry.node_name(node));
 
                 try {
-                    run_node(run, cmd, node, data, profiler);
+                    run_node(graph_run, node, data, profiler);
                 } catch (const graph_errors::node_error& e) {
                     data.run_errors.emplace_back(fmt::format("node error: {}", e.what()));
                 } catch (const ShaderCompiler::compilation_failed& e) {
@@ -621,36 +618,30 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                 }
 
                 if (debug_utils)
-                    debug_utils->cmd_end_label(*cmd);
+                    debug_utils->cmd_end_label(*graph_run.get_cmd());
             }
         }
 
         // FINISH RUN: submit
 
         {
-            MERIAN_PROFILE_SCOPE_GPU(profiler, cmd, "on_pre_submit");
-            on_pre_submit(run, cmd);
+            MERIAN_PROFILE_SCOPE_GPU(profiler, graph_run.get_cmd(), "on_pre_submit");
+            on_pre_submit(graph_run);
         }
 
-        cmd->end();
         in_flight_data.staging_set_id = resource_allocator->getStaging()->finalizeResourceSet();
         {
-            MERIAN_PROFILE_SCOPE(profiler, "submit");
-            queue->submit(cmd, ring_fences.reset(), run.get_signal_semaphores(),
-                          run.get_wait_semaphores(), run.get_wait_stages(),
-                          run.get_timeline_semaphore_submit_info());
-        }
-        {
-            MERIAN_PROFILE_SCOPE(profiler, "run::execute_callbacks");
-            run.execute_callbacks(queue);
+
+            MERIAN_PROFILE_SCOPE(profiler, "end run");
+            graph_run.end_run(ring_fences.reset());
         }
         {
             MERIAN_PROFILE_SCOPE(profiler, "on_post_submit");
             on_post_submit();
         }
 
-        external_wait_time = 0.9 * external_wait_time + 0.1 * run.external_wait_time;
-        needs_reconnect |= run.needs_reconnect;
+        external_wait_time = 0.9 * external_wait_time + 0.1 * graph_run.external_wait_time;
+        needs_reconnect |= graph_run.needs_reconnect;
         ++run_iteration;
         ++total_iteration;
         run_in_progress = false;
@@ -1277,13 +1268,12 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
     // Calls connector callbacks, checks resource states and records as well as applies descriptor
     // set updates.
     void run_node(GraphRun& run,
-                  const CommandBufferHandle& cmd,
                   const NodeHandle& node,
                   NodeData& data,
                   [[maybe_unused]] const ProfilerHandle& profiler) {
         const uint32_t set_idx = data.set_index(run_iteration);
 
-        MERIAN_PROFILE_SCOPE_GPU(profiler, cmd,
+        MERIAN_PROFILE_SCOPE_GPU(profiler, run.get_cmd(),
                                  fmt::format("{} ({})", data.identifier, registry.node_name(node)));
 
         std::vector<vk::ImageMemoryBarrier2> image_barriers;
@@ -1299,7 +1289,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
 
                 auto& [resource, resource_index] = per_input_info.precomputed_resources[set_idx];
                 const Connector::ConnectorStatusFlags flags = input->on_pre_process(
-                    run, cmd, resource, node, image_barriers, buffer_barriers);
+                    run, run.get_cmd(), resource, node, image_barriers, buffer_barriers);
                 if ((flags & Connector::ConnectorStatusFlagBits::NEEDS_DESCRIPTOR_UPDATE) != 0u) {
                     NodeData& src_data = node_data.at(per_input_info.node);
                     record_descriptor_updates(src_data, per_input_info.output,
@@ -1313,7 +1303,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
             for (auto& [output, per_output_info] : data.output_connections) {
                 auto& [resource, resource_index] = per_output_info.precomputed_resources[set_idx];
                 const Connector::ConnectorStatusFlags flags = output->on_pre_process(
-                    run, cmd, resource, node, image_barriers, buffer_barriers);
+                    run, run.get_cmd(), resource, node, image_barriers, buffer_barriers);
                 if ((flags & Connector::ConnectorStatusFlagBits::NEEDS_DESCRIPTOR_UPDATE) != 0u) {
                     record_descriptor_updates(data, output, per_output_info, resource_index);
                 }
@@ -1324,7 +1314,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
 
             if (!image_barriers.empty() || !buffer_barriers.empty()) {
                 vk::DependencyInfoKHR dep_info{{}, {}, buffer_barriers, image_barriers};
-                cmd->barrier({}, buffer_barriers, image_barriers);
+                run.get_cmd()->barrier({}, buffer_barriers, image_barriers);
                 image_barriers.clear();
                 buffer_barriers.clear();
             }
@@ -1342,7 +1332,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
         }
 
         {
-            node->process(run, cmd, descriptor_set, data.resource_maps[set_idx]);
+            node->process(run, descriptor_set, data.resource_maps[set_idx]);
         }
 
         {
@@ -1355,7 +1345,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
 
                 auto& [resource, resource_index] = per_input_info.precomputed_resources[set_idx];
                 const Connector::ConnectorStatusFlags flags = input->on_post_process(
-                    run, cmd, resource, node, image_barriers, buffer_barriers);
+                    run, run.get_cmd(), resource, node, image_barriers, buffer_barriers);
                 if ((flags & Connector::ConnectorStatusFlagBits::NEEDS_DESCRIPTOR_UPDATE) != 0u) {
                     NodeData& src_data = node_data.at(per_input_info.node);
                     record_descriptor_updates(src_data, per_input_info.output,
@@ -1369,7 +1359,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
             for (auto& [output, per_output_info] : data.output_connections) {
                 auto& [resource, resource_index] = per_output_info.precomputed_resources[set_idx];
                 const Connector::ConnectorStatusFlags flags = output->on_post_process(
-                    run, cmd, resource, node, image_barriers, buffer_barriers);
+                    run, run.get_cmd(), resource, node, image_barriers, buffer_barriers);
                 if ((flags & Connector::ConnectorStatusFlagBits::NEEDS_DESCRIPTOR_UPDATE) != 0u) {
                     record_descriptor_updates(data, output, per_output_info, resource_index);
                 }
@@ -1379,7 +1369,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
             }
 
             if (!image_barriers.empty() || !buffer_barriers.empty()) {
-                cmd->barrier({}, buffer_barriers, image_barriers);
+                run.get_cmd()->barrier({}, buffer_barriers, image_barriers);
             }
         }
     }
@@ -2143,9 +2133,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
 
     // Set a callback that is executed right before the commands for this run are submitted to
     // the GPU.
-    void set_on_pre_submit(
-        const std::function<void(GraphRun& graph_run, const CommandBufferHandle& cmd)>&
-            on_pre_submit) {
+    void set_on_pre_submit(const std::function<void(GraphRun& graph_run)>& on_pre_submit) {
         this->on_pre_submit = on_pre_submit;
     }
 
@@ -2169,7 +2157,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
     // Outside callbacks
     // clang-format off
     std::function<void(GraphRun& graph_run)>                                on_run_starting = [](GraphRun&) {};
-    std::function<void(GraphRun& graph_run, const CommandBufferHandle& cmd)>  on_pre_submit = [](GraphRun&, const CommandBufferHandle&) {};
+    std::function<void(GraphRun& graph_run)>                                on_pre_submit = [](GraphRun&) {};
     std::function<void()>                                                   on_post_submit = [] {};
     // clang-format on
 
@@ -2245,6 +2233,8 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
     int add_connection_selected_src_output = 0;
     int add_connection_selected_dst = 0;
     int add_connection_selected_dst_input = 0;
+
+    GraphRun graph_run;
 };
 
 } // namespace merian_nodes
