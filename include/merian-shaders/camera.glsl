@@ -4,6 +4,7 @@
 #define _MERIAN_SHADERS_CAMERA_H_
 
 // importance sample the blackman harris pixel filter with 1.5px radius support
+// result from turingbot, no exact solution.
 vec2 pixel_offset_blackman_harris(const vec2 rand) {
   const vec2 res = vec2(cos(rand.y * M_PI * 2.0),
                         sin(rand.y * M_PI * 2.0));
