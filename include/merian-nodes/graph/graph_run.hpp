@@ -5,6 +5,7 @@
 #include "merian/vk/command/caching_command_pool.hpp"
 #include "merian/vk/command/command_buffer.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
+#include "merian/vk/shader/shader_compiler.hpp"
 #include "merian/vk/sync/semaphore_binary.hpp"
 #include "merian/vk/sync/semaphore_timeline.hpp"
 #include "merian/vk/utils/cpu_queue.hpp"
@@ -27,9 +28,17 @@ class GraphRun {
              const CPUQueueHandle& cpu_queue,
              const ProfilerHandle& profiler,
              const ResourceAllocatorHandle& allocator,
-             const QueueHandle& queue)
+             const QueueHandle& queue,
+             const ShaderCompilerHandle& shader_compiler)
         : iterations_in_flight(iterations_in_flight), thread_pool(thread_pool),
-          cpu_queue(cpu_queue), profiler(profiler), allocator(allocator), queue(queue) {}
+          cpu_queue(cpu_queue), profiler(profiler), allocator(allocator), queue(queue),
+          shader_compiler(shader_compiler) {}
+
+    GraphRun(GraphRun& graph_run) = delete;
+    GraphRun(GraphRun&& graph_run) = delete;
+
+    GraphRun& operator=(GraphRun& graph_run) = delete;
+    GraphRun& operator=(GraphRun&& graph_run) = delete;
 
     // Enqueues a wait semaphore for the next submit. Note that during a graph run multiple submits
     // might happen.
@@ -156,6 +165,10 @@ class GraphRun {
         return cpu_queue;
     }
 
+    const ShaderCompilerHandle& get_shader_compiler() const {
+        return shader_compiler;
+    }
+
     // ------------------------------------------------------------------------------------
     // Interact with graph runtime
 
@@ -239,6 +252,7 @@ class GraphRun {
     const ProfilerHandle profiler;
     const ResourceAllocatorHandle allocator;
     const QueueHandle queue;
+    const ShaderCompilerHandle shader_compiler;
 
     std::shared_ptr<CachingCommandPool> cmd_cache = nullptr;
     CommandBufferHandle cmd = nullptr;

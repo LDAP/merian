@@ -214,12 +214,14 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
           registry(context, resource_allocator), ring_fences(context),
           thread_pool(std::make_shared<ThreadPool>()),
           cpu_queue(std::make_shared<CPUQueue>(context, thread_pool)),
-          run_profiler(std::make_shared<merian::Profiler>(context)), graph_run(ITERATIONS_IN_FLIGHT,
-                                                                               thread_pool,
-                                                                               cpu_queue,
-                                                                               run_profiler,
-                                                                               resource_allocator,
-                                                                               queue) {
+          run_profiler(std::make_shared<merian::Profiler>(context)),
+          graph_run(ITERATIONS_IN_FLIGHT,
+                    thread_pool,
+                    cpu_queue,
+                    run_profiler,
+                    resource_allocator,
+                    queue,
+                    ShaderCompiler::get(context)) {
 
         for (uint32_t i = 0; i < ITERATIONS_IN_FLIGHT; i++) {
             InFlightData& in_flight_data = ring_fences.get(i).user_data;
