@@ -276,8 +276,8 @@ class ProfileScopeGPU {
     }
 
   private:
-    const ProfilerHandle profiler;
-    const CommandBufferHandle cmd;
+    const ProfilerHandle& profiler;
+    const CommandBufferHandle& cmd;
 #ifndef NDEBUG
     // Detect overlapping regions
     uint32_t cpu_section_index = 0;

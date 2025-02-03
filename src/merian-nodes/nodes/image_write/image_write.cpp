@@ -240,14 +240,11 @@ void ImageWrite::process(GraphRun& run,
                                        vk::AccessFlagBits::eTransferWrite,
                                        vk::AccessFlagBits::eHostRead));
 
-    TimelineSemaphoreHandle image_ready = TimelineSemaphore::create(context, 0);
-    run.add_signal_semaphore(image_ready, 1);
-
     std::filesystem::create_directories(path.parent_path());
     const std::string tmp_filename =
         (path.parent_path() / (".interm_" + path.filename().string())).string();
 
-    std::function<void()> write_task = ([this, image_ready, linear_image, path, tmp_filename]() {
+    std::function<void()> write_task = ([this, linear_image, path, tmp_filename]() {
         float* mem = linear_image->get_memory()->map_as<float>();
 
         switch (this->format) {
@@ -285,7 +282,7 @@ void ImageWrite::process(GraphRun& run,
         return;
     });
 
-    run.get_cpu_queue()->submit(image_ready, 1, std::move(write_task));
+    run.sync_to_cpu(std::move(write_task));
 
     if (rebuild_after_capture)
         run.request_reconnect();

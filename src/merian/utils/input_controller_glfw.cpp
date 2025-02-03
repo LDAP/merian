@@ -108,7 +108,7 @@ GLFWInputController::~GLFWInputController() {
 }
 
 bool GLFWInputController::request_raw_mouse_input(bool enable) {
-    if (!glfwRawMouseMotionSupported())
+    if (glfwRawMouseMotionSupported() == 0)
         return false;
 
     if (enable) {
@@ -123,7 +123,7 @@ bool GLFWInputController::request_raw_mouse_input(bool enable) {
 
 // Returns true if raw mouse input is enabled.
 bool GLFWInputController::get_raw_mouse_input() {
-    return glfwGetInputMode(*window, GLFW_RAW_MOUSE_MOTION);
+    return glfwGetInputMode(*window, GLFW_RAW_MOUSE_MOTION) != 0;
 }
 
 // Clear all callbacks

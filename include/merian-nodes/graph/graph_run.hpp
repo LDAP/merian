@@ -32,7 +32,14 @@ class GraphRun {
              const ShaderCompilerHandle& shader_compiler)
         : iterations_in_flight(iterations_in_flight), thread_pool(thread_pool),
           cpu_queue(cpu_queue), profiler(profiler), allocator(allocator), queue(queue),
-          shader_compiler(shader_compiler) {}
+          shader_compiler(shader_compiler) {
+
+        semaphores.resize(iterations_in_flight);
+        semaphore_value.assign(iterations_in_flight, 1);
+        for (uint32_t i = 0; i < iterations_in_flight; i++) {
+            semaphores[i] = TimelineSemaphore::create(queue->get_context());
+        }
+    }
 
     GraphRun(GraphRun& graph_run) = delete;
     GraphRun(GraphRun&& graph_run) = delete;
@@ -191,6 +198,66 @@ class GraphRun {
 
     // ------------------------------------------------------------------------------------
 
+    // Queues the callback to be called when the commandbuffer until this point has finished
+    // executing on the GPU. Calling this might trigger a GPU submit but graph is free to delay
+    // execution of the callback until the end of the run.
+    void sync_to_cpu(const std::function<void()>& callback) {
+        add_signal_semaphore(semaphores[get_in_flight_index()],
+                             semaphore_value[get_in_flight_index()]);
+        cpu_queue->submit(semaphores[get_in_flight_index()], semaphore_value[get_in_flight_index()],
+                          callback);
+        semaphore_value[get_in_flight_index()]++;
+    }
+
+    // Queues the callback to be called when the commandbuffer until this point has finished
+    // executing on the GPU. Calling this might trigger a GPU submit but graph is free to delay
+    // execution of the callback until the end of the run.
+    void sync_to_cpu(const std::function<void()>&& callback) {
+        add_signal_semaphore(semaphores[get_in_flight_index()],
+                             semaphore_value[get_in_flight_index()]);
+        cpu_queue->submit(semaphores[get_in_flight_index()], semaphore_value[get_in_flight_index()],
+                          callback);
+        semaphore_value[get_in_flight_index()]++;
+    }
+
+    // Queues the callback to be called when the commandbuffer until this point has finished
+    // executing on the GPU. GPU processing will be automatically continued when this callback
+    // finishes executing.
+    // 
+    // Note: This can only be used if there is no present operation depending on the CPU execution.
+    void sync_to_cpu_and_back(const std::function<void()>& callback) {
+        add_signal_semaphore(semaphores[get_in_flight_index()],
+                             semaphore_value[get_in_flight_index()]);
+        cmd->end();
+        submit();
+        cmd = cmd_cache->create_and_begin();
+        cpu_queue->submit(semaphores[get_in_flight_index()], semaphore_value[get_in_flight_index()],
+                          semaphores[get_in_flight_index()],
+                          semaphore_value[get_in_flight_index()] + 1, callback);
+        add_wait_semaphore(semaphores[get_in_flight_index()], vk::PipelineStageFlagBits::eTopOfPipe,
+                           semaphore_value[get_in_flight_index()] + 1);
+        semaphore_value[get_in_flight_index()] += 2;
+    }
+
+    // Queues the callback to be called when the commandbuffer until this point has finished
+    // executing on the GPU. GPU processing will be automatically continued when this callback
+    // finishes executing.
+    // 
+    // Note: This can only be used if there is no present operation depending on the CPU execution.
+    void sync_to_cpu_and_back(const std::function<void()>&& callback) {
+        add_signal_semaphore(semaphores[get_in_flight_index()],
+                             semaphore_value[get_in_flight_index()]);
+        cmd->end();
+        submit();
+        cmd = cmd_cache->create_and_begin();
+        cpu_queue->submit(semaphores[get_in_flight_index()], semaphore_value[get_in_flight_index()],
+                          semaphores[get_in_flight_index()],
+                          semaphore_value[get_in_flight_index()] + 1, callback);
+        add_wait_semaphore(semaphores[get_in_flight_index()], vk::PipelineStageFlagBits::eTopOfPipe,
+                           semaphore_value[get_in_flight_index()] + 1);
+        semaphore_value[get_in_flight_index()] += 2;
+    }
+
   private:
     void begin_run(const std::shared_ptr<CachingCommandPool>& cmd_cache,
                    const uint64_t iteration,
@@ -256,6 +323,9 @@ class GraphRun {
 
     std::shared_ptr<CachingCommandPool> cmd_cache = nullptr;
     CommandBufferHandle cmd = nullptr;
+
+    std::vector<TimelineSemaphoreHandle> semaphores;
+    std::vector<uint64_t> semaphore_value;
 
     std::vector<vk::Semaphore> wait_semaphores;
     std::vector<uint64_t> wait_values;
