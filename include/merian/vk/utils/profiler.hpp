@@ -237,7 +237,7 @@ class ProfileScope {
     const ProfilerHandle profiler;
 #ifndef NDEBUG
     // Detect overlapping regions
-    uint32_t section_index;
+    uint32_t section_index = 0;
 #endif
 };
 
@@ -280,8 +280,8 @@ class ProfileScopeGPU {
     const CommandBufferHandle cmd;
 #ifndef NDEBUG
     // Detect overlapping regions
-    uint32_t cpu_section_index;
-    uint32_t gpu_section_index;
+    uint32_t cpu_section_index = 0;
+    uint32_t gpu_section_index = 0;
 #endif
 };
 
