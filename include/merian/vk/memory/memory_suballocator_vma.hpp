@@ -9,27 +9,30 @@
 
 namespace merian {
 
-class VMAMemoryAllocator;
+class VMAMemorySubAllocator;
 
-class VMAMemoryAllocation : public MemoryAllocation {
+class VMAMemorySubAllocation : public MemoryAllocation {
   public:
-    VMAMemoryAllocation() = delete;
-    VMAMemoryAllocation(const VMAMemoryAllocation&) = delete;
-    VMAMemoryAllocation(VMAMemoryAllocation&&) = delete;
+    VMAMemorySubAllocation() = delete;
+    VMAMemorySubAllocation(const VMAMemorySubAllocation&) = delete;
+    VMAMemorySubAllocation(VMAMemorySubAllocation&&) = delete;
 
     /**
      * @brief      Constructs a new instance.
      *
      */
-    VMAMemoryAllocation(const ContextHandle& context,
-                        const std::shared_ptr<VMAMemoryAllocator>& allocator,
-                        VmaAllocation allocation)
-        : MemoryAllocation(context), allocator(allocator), m_allocation(allocation) {
-        SPDLOG_TRACE("create VMA allocation ({})", fmt::ptr(this));
+    VMAMemorySubAllocation(const ContextHandle& context,
+                           const std::shared_ptr<VMAMemorySubAllocator>& allocator,
+                           VmaAllocation allocation,
+                           const vk::DeviceSize offset,
+                           const vk::DeviceSize size)
+        : MemoryAllocation(context), allocator(allocator), offset(offset), size(size),
+          m_allocation(allocation) {
+        SPDLOG_TRACE("create VMA suballocation ({})", fmt::ptr(this));
     }
 
     // frees the memory when called
-    ~VMAMemoryAllocation();
+    ~VMAMemorySubAllocation();
 
     // ------------------------------------------------------------------------------------
 
@@ -38,7 +41,7 @@ class VMAMemoryAllocation : public MemoryAllocation {
 
     void flush(const VkDeviceSize offset = 0, const VkDeviceSize size = VK_WHOLE_SIZE) override;
 
-    // You must call unmap the same number of time you call map!
+    // Returns a mapping to the suballocation. The offset is already accounted for.
     void* map() override;
 
     void unmap() override;
@@ -66,31 +69,37 @@ class VMAMemoryAllocation : public MemoryAllocation {
     void properties(Properties& props) override;
 
   private:
-    const std::shared_ptr<VMAMemoryAllocator> allocator;
-    VmaAllocation m_allocation;
+    const std::shared_ptr<VMAMemorySubAllocator> allocator;
+    VmaVirtualAllocation alloc;
 
+    const vk::DeviceSize offset;
+    const vk::DeviceSize size;
+
+    VmaAllocation m_allocation;
     mutable std::mutex allocation_mutex;
     void* mapped_memory = nullptr;
-    uint32_t map_count = 0;
 };
 
-class VMAMemoryAllocator : public MemoryAllocator {
+/**
+ * @brief      A suballocator for buffers that uses the VMA algorithms.
+ */
+class VMAMemorySubAllocator : public MemoryAllocator {
   private:
-    friend class VMAMemoryAllocation;
+    friend class VMAMemorySubAllocation;
 
   public:
-    static std::shared_ptr<VMAMemoryAllocator>
+    static std::shared_ptr<VMAMemorySubAllocator>
     // E.g. supply VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT if you want to use the device
     // address feature
     make_allocator(const ContextHandle& context, const VmaAllocatorCreateFlags flags = {});
 
   private:
-    VMAMemoryAllocator() = delete;
-    explicit VMAMemoryAllocator(const ContextHandle& context,
-                                const VmaAllocatorCreateFlags flags = {});
+    VMAMemorySubAllocator() = delete;
+    explicit VMAMemorySubAllocator(const ContextHandle& context,
+                                   const VmaAllocatorCreateFlags flags = {});
 
   public:
-    ~VMAMemoryAllocator();
+    ~VMAMemorySubAllocator();
 
     // ------------------------------------------------------------------------------------
 

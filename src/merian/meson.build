@@ -24,7 +24,6 @@ merian_src = files(
     'vk/extension/extension_vk_core.cpp',
     'vk/extension/extension_vk_debug_utils.cpp',
     'vk/extension/extension_vk_float_atomics.cpp',
-    'vk/memory/buffer_suballocator.cpp',
     'vk/memory/memory_allocator.cpp',
     'vk/memory/memory_allocator_vma.cpp',
     'vk/memory/resource_allocations.cpp',

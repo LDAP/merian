@@ -1,6 +1,5 @@
 #include "merian/vk/memory/memory_allocator_vma.hpp"
 #include "merian/vk/memory/resource_allocations.hpp"
-#include "merian/vk/utils/check_result.hpp"
 #include <spdlog/spdlog.h>
 
 namespace merian {
@@ -9,13 +8,16 @@ namespace merian {
 
 VMAMemoryAllocation::~VMAMemoryAllocation() {
     SPDLOG_TRACE("destroy VMA allocation ({})", fmt::ptr(this));
-    unmap();
-    free();
-};
 
-// ------------------------------------------------------------------------------------
+    if (map_count != 0) {
+        SPDLOG_WARN(" VMA allocation ({}): unmap() must be called the same number as map()!",
+                    fmt::ptr(this));
 
-void VMAMemoryAllocation::free() {
+        for (uint32_t i = 0; i < map_count; i++) {
+            unmap();
+        }
+    }
+
     std::lock_guard<std::mutex> lock(allocation_mutex);
     assert(m_allocation);
 
@@ -34,30 +36,34 @@ void VMAMemoryAllocation::flush(const VkDeviceSize offset, const VkDeviceSize si
     vmaFlushAllocation(allocator->vma_allocator, m_allocation, offset, size);
 };
 
-// Maps device memory to system memory.
+// Maps device memory to system memory. You must call unmap the same number of time you call map!
 void* VMAMemoryAllocation::map() {
     std::lock_guard<std::mutex> lock(allocation_mutex);
 
-    assert(m_allocation); // freed?
-    assert(mapping_type != MemoryMappingType::NONE);
+    map_count++;
 
     if (mapped_memory != nullptr) {
+        assert(map_count > 1);
         return mapped_memory;
     }
 
-    check_result(vmaMapMemory(allocator->vma_allocator, m_allocation, &mapped_memory),
-                 "mapping memory failed");
+    VulkanException::throw_if_no_success(
+        vmaMapMemory(allocator->vma_allocator, m_allocation, &mapped_memory),
+        "mapping memory failed");
     return mapped_memory;
 };
 
 // Unmap memHandle
 void VMAMemoryAllocation::unmap() {
     std::lock_guard<std::mutex> lock(allocation_mutex);
-    assert(m_allocation);
+    assert(map_count > 0);
 
-    if (mapped_memory == nullptr) {
+    map_count--;
+    if (map_count > 0) {
         return;
     }
+
+    assert(mapped_memory != nullptr);
 
     vmaUnmapMemory(allocator->vma_allocator, m_allocation);
     mapped_memory = nullptr;
@@ -68,7 +74,6 @@ void VMAMemoryAllocation::unmap() {
 ImageHandle
 VMAMemoryAllocation::create_aliasing_image(const vk::ImageCreateInfo& image_create_info) {
     std::lock_guard<std::mutex> lock(allocation_mutex);
-    assert(m_allocation); // freed?
 
     vk::Image image;
     vmaCreateAliasingImage(allocator->vma_allocator, m_allocation,
@@ -82,7 +87,6 @@ VMAMemoryAllocation::create_aliasing_image(const vk::ImageCreateInfo& image_crea
 BufferHandle
 VMAMemoryAllocation::create_aliasing_buffer(const vk::BufferCreateInfo& buffer_create_info) {
     std::lock_guard<std::mutex> lock(allocation_mutex);
-    assert(m_allocation); // freed?
 
     vk::Buffer buffer;
     vmaCreateAliasingBuffer(allocator->vma_allocator, m_allocation,
@@ -100,7 +104,7 @@ MemoryAllocationInfo VMAMemoryAllocation::get_memory_info() const {
     VmaAllocationInfo alloc_info;
     vmaGetAllocationInfo(allocator->vma_allocator, m_allocation, &alloc_info);
     return MemoryAllocationInfo{alloc_info.deviceMemory, alloc_info.offset, alloc_info.size,
-                                alloc_info.pName};
+                                alloc_info.memoryType, alloc_info.pName};
 };
 
 MemoryAllocatorHandle VMAMemoryAllocation::get_allocator() const {
@@ -224,9 +228,8 @@ VMAMemoryAllocator::allocate_memory(const vk::MemoryPropertyFlags required_flags
 
     VmaAllocationInfo allocation_info;
     VmaAllocation allocation;
-    check_result(
-        vmaAllocateMemory(vma_allocator, &mem_reqs, &vma_alloc_info, &allocation, &allocation_info),
-        "could not allocate memory");
+    AllocationFailed::throw_if_no_success(vmaAllocateMemory(
+        vma_allocator, &mem_reqs, &vma_alloc_info, &allocation, &allocation_info));
 
     if (!debug_name.empty())
         set_name(vma_allocator, allocation, debug_name);
@@ -251,14 +254,16 @@ BufferHandle VMAMemoryAllocator::create_buffer(const vk::BufferCreateInfo buffer
     VmaAllocation allocation;
     VmaAllocationInfo allocation_info;
     if (min_alignment.has_value()) {
-        check_result(vmaCreateBufferWithAlignment(vma_allocator, &c_buffer_create_info,
-                                                  &allocation_create_info, min_alignment.value(),
-                                                  &buffer, &allocation, &allocation_info),
-                     "could not allocate memory for buffer. size == 0?");
+        AllocationFailed::throw_if_no_success(
+            vmaCreateBufferWithAlignment(vma_allocator, &c_buffer_create_info,
+                                         &allocation_create_info, min_alignment.value(), &buffer,
+                                         &allocation, &allocation_info),
+            "could not allocate memory for buffer. size == 0?");
     } else {
-        check_result(vmaCreateBuffer(vma_allocator, &c_buffer_create_info, &allocation_create_info,
-                                     &buffer, &allocation, &allocation_info),
-                     "could not allocate memory for buffer. size == 0?");
+        AllocationFailed::throw_if_no_success(vmaCreateBuffer(vma_allocator, &c_buffer_create_info,
+                                                              &allocation_create_info, &buffer,
+                                                              &allocation, &allocation_info),
+                                              "could not allocate memory for buffer. size == 0?");
     }
     if (!debug_name.empty())
         set_name(vma_allocator, allocation, debug_name);
@@ -283,9 +288,10 @@ ImageHandle VMAMemoryAllocator::create_image(const vk::ImageCreateInfo image_cre
     VkImage image;
     VmaAllocation allocation;
     VmaAllocationInfo allocation_info;
-    check_result(vmaCreateImage(vma_allocator, &c_image_create_info, &allocation_create_info,
-                                &image, &allocation, &allocation_info),
-                 "could not allocate memory for image");
+    AllocationFailed::throw_if_no_success(vmaCreateImage(vma_allocator, &c_image_create_info,
+                                                         &allocation_create_info, &image,
+                                                         &allocation, &allocation_info),
+                                          "could not allocate memory for image");
     if (!debug_name.empty())
         set_name(vma_allocator, allocation, debug_name);
     const std::shared_ptr<VMAMemoryAllocator> allocator =

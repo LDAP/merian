@@ -35,6 +35,43 @@ enum class MemoryMappingType {
     HOST_ACCESS_SEQUENTIAL_WRITE
 };
 
+class AllocationFailed : public VulkanException {
+  public:
+    AllocationFailed(const vk::Result result) : merian::VulkanException(result) {}
+
+    AllocationFailed(const VkResult result) : merian::VulkanException(result) {}
+
+    AllocationFailed(const vk::Result result, const std::string& additional_info)
+        : merian::VulkanException(result, additional_info) {}
+
+    AllocationFailed(const VkResult result, const std::string& additional_info)
+        : merian::VulkanException(result, additional_info) {}
+
+    static void throw_if_no_success(const vk::Result result) {
+        if (result != vk::Result::eSuccess) {
+            throw AllocationFailed(result);
+        }
+    }
+
+    static void throw_if_no_success(const VkResult result) {
+        if (result != VK_SUCCESS) {
+            throw AllocationFailed(result);
+        }
+    }
+
+    static void throw_if_no_success(const vk::Result result, const std::string& additional_info) {
+        if (result != vk::Result::eSuccess) {
+            throw AllocationFailed(result, additional_info);
+        }
+    }
+
+    static void throw_if_no_success(const VkResult result, const std::string& additional_info) {
+        if (result != VK_SUCCESS) {
+            throw AllocationFailed(result, additional_info);
+        }
+    }
+};
+
 /**
  * merian::MemAllocator is a Vulkan memory allocator interface extensively used by
  * ResourceAllocator. It provides means to allocate, free, map and unmap pieces of Vulkan device
@@ -57,6 +94,9 @@ class MemoryAllocator : public std::enable_shared_from_this<MemoryAllocator> {
 
   public:
     // Direct highly discouraged. Use create_buffer and create_image instead.
+    //
+    // Might throw AllocationFailed. The result OutOfDeviceMemory signalizes that there is not
+    // enough memory.
     virtual MemoryAllocationHandle
     allocate_memory(const vk::MemoryPropertyFlags required_flags,
                     const vk::MemoryRequirements& requirements,
@@ -66,12 +106,16 @@ class MemoryAllocator : public std::enable_shared_from_this<MemoryAllocator> {
                     const bool dedicated = false,
                     const float dedicated_priority = 1.0) = 0;
 
+    // Might throw AllocationFailed. The result OutOfDeviceMemory signalizes that there is not
+    // enough memory.
     virtual BufferHandle
     create_buffer(const vk::BufferCreateInfo buffer_create_info,
                   const MemoryMappingType mapping_type = MemoryMappingType::NONE,
                   const std::string& debug_name = {},
                   const std::optional<vk::DeviceSize> min_alignment = std::nullopt) = 0;
 
+    // Might throw AllocationFailed. The result OutOfDeviceMemory signalizes that there is not
+    // enough memory.
     virtual ImageHandle create_image(const vk::ImageCreateInfo image_create_info,
                                      const MemoryMappingType mapping_type = MemoryMappingType::NONE,
                                      const std::string& debug_name = {}) = 0;
@@ -91,19 +135,24 @@ struct MemoryAllocationInfo {
     MemoryAllocationInfo(const vk::DeviceMemory memory,
                          const vk::DeviceSize offset,
                          const vk::DeviceSize size,
+                         const uint32_t memory_type_index,
                          const char* name)
-        : memory(memory), offset(offset), size(size), name(name) {}
+        : memory(memory), offset(offset), size(size), memory_type_index(memory_type_index),
+          name(name) {}
 
     const vk::DeviceMemory memory;
     const vk::DeviceSize offset;
     const vk::DeviceSize size;
+    // Index into VkPhysicalDeviceMemoryProperties.memoryTypes
+    const uint32_t memory_type_index;
     const char* name;
 };
 
 inline std::string format_as(const MemoryAllocationInfo& alloc_info) {
-    return fmt::format("DeviceMemory: {}\nOffset: {}\nSize: {}\nName: {}",
+    return fmt::format("DeviceMemory: {}\nOffset: {}\nSize: {}\nMemory Type Index: {}\nName: {}",
                        fmt::ptr(static_cast<VkDeviceMemory>(alloc_info.memory)),
                        format_size(alloc_info.offset), format_size(alloc_info.size),
+                       alloc_info.memory_type_index,
                        (alloc_info.name != nullptr) ? alloc_info.name : "<unknown>");
 }
 
