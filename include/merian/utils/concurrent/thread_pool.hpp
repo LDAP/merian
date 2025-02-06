@@ -2,6 +2,7 @@
 
 #include "merian/utils/concurrent/concurrent_queue.hpp"
 
+#include <barrier>
 #include <future>
 #include <optional>
 #include <thread>
@@ -19,22 +20,7 @@ class ThreadPool {
 
     ThreadPool(ThreadPool& other) = delete;
 
-    ThreadPool(ThreadPool&& other) noexcept {
-        tasks = std::move(other.tasks);
-
-        for (uint32_t i = threads.size(); i < other.threads.size(); i++) {
-            threads.emplace_back([&] {
-                while (true) {
-                    const std::optional<std::function<void()>> task = tasks.pop();
-                    if (task) {
-                        task.value()();
-                    } else {
-                        return;
-                    }
-                }
-            });
-        }
-    }
+    ThreadPool(ThreadPool&& other) noexcept;
 
     ThreadPool& operator=(const ThreadPool& src) = delete;
 
@@ -79,6 +65,8 @@ class ThreadPool {
   private:
     std::vector<std::thread> threads;
     ConcurrentQueue<std::optional<std::function<void()>>> tasks;
+
+    std::barrier<void (*)(void) noexcept> wait_idle_barrier;
 };
 
 using ThreadPoolHandle = std::shared_ptr<ThreadPool>;
