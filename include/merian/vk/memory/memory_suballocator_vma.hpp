@@ -3,15 +3,18 @@
 #include "merian/vk/memory/memory_allocator.hpp"
 
 #include <cstdio>
-#include <optional>
 #include <spdlog/spdlog.h>
 #include <vk_mem_alloc.h>
 
 namespace merian {
 
 class VMAMemorySubAllocator;
+using VMAMemorySubAllocatorHandle = std::shared_ptr<VMAMemorySubAllocator>;
 
 class VMAMemorySubAllocation : public MemoryAllocation {
+  private:
+    friend class VMAMemorySubAllocator;
+
   public:
     VMAMemorySubAllocation() = delete;
     VMAMemorySubAllocation(const VMAMemorySubAllocation&) = delete;
@@ -23,15 +26,10 @@ class VMAMemorySubAllocation : public MemoryAllocation {
      */
     VMAMemorySubAllocation(const ContextHandle& context,
                            const std::shared_ptr<VMAMemorySubAllocator>& allocator,
-                           VmaAllocation allocation,
+                           VmaVirtualAllocation allocation,
                            const vk::DeviceSize offset,
-                           const vk::DeviceSize size)
-        : MemoryAllocation(context), allocator(allocator), offset(offset), size(size),
-          m_allocation(allocation) {
-        SPDLOG_TRACE("create VMA suballocation ({})", fmt::ptr(this));
-    }
+                           const vk::DeviceSize size);
 
-    // frees the memory when called
     ~VMAMemorySubAllocation();
 
     // ------------------------------------------------------------------------------------
@@ -54,30 +52,39 @@ class VMAMemorySubAllocation : public MemoryAllocation {
 
     // ------------------------------------------------------------------------------------
 
-    ImageHandle create_aliasing_image(const vk::ImageCreateInfo& image_create_info) override;
+    ImageHandle create_aliasing_image(const vk::ImageCreateInfo& image_create_info,
+                                      const vk::DeviceSize allocation_offset = 0ul) override;
 
-    BufferHandle create_aliasing_buffer(const vk::BufferCreateInfo& buffer_create_info) override;
+    BufferHandle create_aliasing_buffer(const vk::BufferCreateInfo& buffer_create_info,
+                                        const vk::DeviceSize allocation_offset = 0ul) override;
+
+    void bind_to_image(const ImageHandle& image,
+                       const vk::DeviceSize allocation_offset = 0ul) override;
+
+    void bind_to_buffer(const BufferHandle& buffer,
+                        const vk::DeviceSize allocation_offset = 0ul) override;
 
     // ------------------------------------------------------------------------------------
 
     MemoryAllocatorHandle get_allocator() const override;
 
-    VmaAllocation get_allocation() const {
-        return m_allocation;
-    }
+    const VMAMemorySubAllocatorHandle& get_suballocator() const;
+
+    const vk::DeviceSize& get_size() const;
+
+    // offset into the get_suballocator()->get_base_buffer()
+    const vk::DeviceSize& get_offset() const;
 
     void properties(Properties& props) override;
 
   private:
     const std::shared_ptr<VMAMemorySubAllocator> allocator;
-    VmaVirtualAllocation alloc;
+    VmaVirtualAllocation allocation;
 
     const vk::DeviceSize offset;
     const vk::DeviceSize size;
 
-    VmaAllocation m_allocation;
-    mutable std::mutex allocation_mutex;
-    void* mapped_memory = nullptr;
+    std::string name;
 };
 
 /**
@@ -86,17 +93,10 @@ class VMAMemorySubAllocation : public MemoryAllocation {
 class VMAMemorySubAllocator : public MemoryAllocator {
   private:
     friend class VMAMemorySubAllocation;
+    friend class StagingMemoryManager;
 
-  public:
-    static std::shared_ptr<VMAMemorySubAllocator>
-    // E.g. supply VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT if you want to use the device
-    // address feature
-    make_allocator(const ContextHandle& context, const VmaAllocatorCreateFlags flags = {});
-
-  private:
     VMAMemorySubAllocator() = delete;
-    explicit VMAMemorySubAllocator(const ContextHandle& context,
-                                   const VmaAllocatorCreateFlags flags = {});
+    explicit VMAMemorySubAllocator(const BufferHandle& buffer);
 
   public:
     ~VMAMemorySubAllocator();
@@ -112,20 +112,25 @@ class VMAMemorySubAllocator : public MemoryAllocator {
                     const bool dedicated = false,
                     const float dedicated_priority = 1.0) override;
 
-    BufferHandle
-    create_buffer(const vk::BufferCreateInfo buffer_create_info,
-                  const MemoryMappingType mapping_type = MemoryMappingType::NONE,
-                  const std::string& debug_name = {},
-                  const std::optional<vk::DeviceSize> min_alignment = std::nullopt) override;
-
-    ImageHandle create_image(const vk::ImageCreateInfo image_create_info,
-                             const MemoryMappingType mapping_type = MemoryMappingType::NONE,
-                             const std::string& debug_name = {}) override;
-
     // ------------------------------------------------------------------------------------
 
+    // Returns the buffer from which this allocator allocates from.
+    const BufferHandle& get_base_buffer() const;
+
+    // Returns the VMA block for the virtual allocator.
+    // You should never use this directly.
+    const VmaVirtualBlock& get_vma_block() const;
+
   private:
-    VmaAllocator vma_allocator;
+    const BufferHandle buffer;
+    const MemoryAllocationInfo buffer_info;
+    vk::MemoryPropertyFlags buffer_flags;
+    vk::DeviceSize buffer_alignment;
+
+    VmaVirtualBlock block;
+
+  public:
+    static std::shared_ptr<VMAMemorySubAllocator> create(const BufferHandle& buffer);
 };
 
 } // namespace merian

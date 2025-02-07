@@ -13,12 +13,20 @@ Buffer::Buffer(const vk::Buffer& buffer,
                const vk::BufferCreateInfo& create_info)
     : context(memory->get_context()), buffer(buffer), memory(memory), create_info(create_info) {}
 
+Buffer::Buffer(const ContextHandle& context, const vk::BufferCreateInfo& create_info)
+    : context(context), buffer(context->device.createBuffer(create_info)),
+      create_info(create_info) {}
+
 Buffer::~Buffer() {
     SPDLOG_TRACE("destroy buffer ({})", fmt::ptr(static_cast<VkBuffer>(buffer)));
     context->device.destroyBuffer(buffer);
 }
 
-vk::DeviceAddress Buffer::get_device_address() {
+vk::MemoryRequirements Buffer::get_memory_requirements() const {
+    return context->device.getBufferMemoryRequirements(buffer);
+}
+
+vk::DeviceAddress Buffer::get_device_address() const {
     assert(create_info.usage | vk::BufferUsageFlagBits::eShaderDeviceAddress);
     return context->device.getBufferAddress(get_buffer_device_address_info());
 }
@@ -56,7 +64,7 @@ vk::BufferMemoryBarrier2 Buffer::buffer_barrier2(const vk::PipelineStageFlags2 s
             nullptr};
 }
 
-BufferHandle Buffer::create_aliasing_buffer() {
+BufferHandle Buffer::create_aliasing_buffer() const {
     assert(memory && "buffer is not bound to memory, cannot create aliasing buffer.");
     return memory->create_aliasing_buffer(create_info);
 }
@@ -77,6 +85,10 @@ BufferHandle Buffer::create(const vk::Buffer& buffer,
     return std::shared_ptr<Buffer>(new Buffer(buffer, memory, create_info));
 }
 
+BufferHandle Buffer::create(const ContextHandle& context, const vk::BufferCreateInfo& create_info) {
+    return std::shared_ptr<Buffer>(new Buffer(context, create_info));
+}
+
 // --------------------------------------------------------------------------
 
 Image::Image(const vk::Image& image,
@@ -92,9 +104,17 @@ Image::Image(const ContextHandle& context,
              const vk::ImageLayout current_layout)
     : context(context), image(image), create_info(create_info), current_layout(current_layout) {}
 
+Image::Image(const ContextHandle& context, const vk::ImageCreateInfo create_info)
+    : context(context), image(context->device.createImage(create_info)), create_info(create_info),
+      current_layout(create_info.initialLayout) {}
+
 Image::~Image() {
     SPDLOG_TRACE("destroy image ({})", fmt::ptr(static_cast<VkImage>(image)));
     context->device.destroyImage(image);
+}
+
+vk::MemoryRequirements Image::get_memory_requirements() const {
+    return context->device.getImageMemoryRequirements(image);
 }
 
 vk::FormatFeatureFlags Image::format_features() const {
@@ -207,6 +227,10 @@ ImageHandle Image::create(const ContextHandle& context,
                           const vk::ImageCreateInfo create_info,
                           const vk::ImageLayout current_layout) {
     return std::shared_ptr<Image>(new Image(context, image, create_info, current_layout));
+}
+
+ImageHandle Image::create(const ContextHandle& context, const vk::ImageCreateInfo create_info) {
+    return std::shared_ptr<Image>(new Image(context, create_info));
 }
 
 // --------------------------------------------------------------------------

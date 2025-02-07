@@ -1,252 +1,204 @@
 #include "merian/vk/memory/staging_memory_manager.hpp"
-#include "merian/vk/command/command_buffer.hpp"
 #include <spdlog/spdlog.h>
 
 namespace merian {
 
-StagingMemoryManager::StagingMemoryManager(const ContextHandle context,
-                                           const std::shared_ptr<MemoryAllocator> memAllocator,
-                                           const vk::DeviceSize stagingBlockSize)
-    : context(context), memAllocator(memAllocator) {
-    m_subToDevice.init(
-        memAllocator.get(), stagingBlockSize, vk::BufferUsageFlagBits::eTransferSrc,
-        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, true);
-    m_subFromDevice.init(
-        memAllocator.get(), stagingBlockSize, vk::BufferUsageFlagBits::eTransferDst,
-        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent |
-            vk::MemoryPropertyFlagBits::eHostCached,
-        true);
+StagingMemoryManager::StagingMemoryManager(const MemoryAllocatorHandle& memory_allocator,
+                                           const vk::DeviceSize block_size)
+    : context(memory_allocator->get_context()), allocator(memory_allocator),
+      block_size(block_size) {}
 
-    m_freeStagingIndex = INVALID_ID_INDEX;
-    m_stagingIndex = newStagingIndex();
+StagingMemoryManager::~StagingMemoryManager() {}
 
-    setFreeUnusedOnRelease(true);
+// -------------------------------------------------------------------------
+
+MemoryAllocationHandle StagingMemoryManager::get_upload_staging_space(
+    const vk::DeviceSize size, BufferHandle& upload_buffer, vk::DeviceSize& upload_buffer_offset) {
+
+    // TODO: Use memory pool / Suballocator to prevent creating a new buffer for each upload
+
+    upload_buffer = allocator->create_buffer(
+        vk::BufferCreateInfo{{}, size, vk::BufferUsageFlagBits::eTransferSrc},
+        MemoryMappingType::HOST_ACCESS_SEQUENTIAL_WRITE, "staging upload buffer");
+    upload_buffer_offset = 0;
+
+    return upload_buffer->get_memory();
 }
 
-StagingMemoryManager::~StagingMemoryManager() {
-    free(false);
+MemoryAllocationHandle
+StagingMemoryManager::get_download_staging_space(const vk::DeviceSize size,
+                                                 BufferHandle& download_buffer,
+                                                 vk::DeviceSize& download_buffer_offset) {
 
-    m_subFromDevice.deinit();
-    m_subToDevice.deinit();
+    // TODO: Use memory pool / Suballocator to prevent creating a new buffer for each download
 
-    m_sets.clear();
+    download_buffer = allocator->create_buffer(
+        vk::BufferCreateInfo{{}, size, vk::BufferUsageFlagBits::eTransferDst},
+        MemoryMappingType::HOST_ACCESS_RANDOM, "staging download buffer");
+    download_buffer_offset = 0;
+
+    return download_buffer->get_memory();
 }
 
-bool StagingMemoryManager::fitsInAllocated(vk::DeviceSize size, bool toDevice /*= true*/) const {
-    return toDevice ? m_subToDevice.fitsInAllocated(size) : m_subFromDevice.fitsInAllocated(size);
+// -------------------------------------------------------------------------
+
+void StagingMemoryManager::cmd_to_device(const CommandBufferHandle& cmd,
+                                         const ImageHandle& image,
+                                         const void* data,
+                                         const vk::ImageSubresourceLayers& subresource,
+                                         const vk::Offset3D offset,
+                                         const std::optional<vk::Extent3D> optional_extent) {}
+
+template <class T>
+void StagingMemoryManager::cmd_to_device(const CommandBufferHandle& cmd,
+                                         const ImageHandle& image,
+                                         const std::vector<T>& data,
+                                         const vk::ImageSubresourceLayers& subresource,
+                                         const vk::Offset3D offset,
+                                         const std::optional<vk::Extent3D> optional_extent) {}
+
+MemoryAllocationHandle
+StagingMemoryManager::cmd_from_device(const CommandBufferHandle& cmd,
+                                      const ImageHandle& image,
+                                      const vk::ImageSubresourceLayers& subresource,
+                                      const vk::Offset3D offset,
+                                      const std::optional<vk::Extent3D> optional_extent) {}
+
+// -------------------------------------------------------------------------
+
+void StagingMemoryManager::cmd_to_device(const CommandBufferHandle& cmd,
+                                         const BufferHandle& buffer,
+                                         const void* data,
+                                         const vk::DeviceSize offset,
+                                         const std::optional<vk::DeviceSize> optional_size) {
+
+    assert(offset < buffer->get_size());
+    assert(!optional_size || *optional_size <= buffer->get_size());
+    assert(!optional_size || *optional_size + offset <= buffer->get_size());
+    assert(data);
+
+    const vk::DeviceSize size = optional_size.value_or(buffer->get_size() - offset);
+
+    BufferHandle upload_buffer;
+    vk::DeviceSize upload_buffer_offset;
+    const MemoryAllocationHandle memory =
+        get_upload_staging_space(size, upload_buffer, upload_buffer_offset);
+
+    SPDLOG_DEBUG("uploading {} of data to staging buffer", format_size(size));
+    memcpy(memory->map(), data, size);
+    memory->unmap();
+
+    const vk::BufferCopy copy{upload_buffer_offset, offset, size};
+    cmd->copy(upload_buffer, buffer, copy);
 }
 
-void* StagingMemoryManager::cmdToImage(const CommandBufferHandle& cmd,
-                                       vk::Image image,
-                                       const vk::Offset3D& offset,
-                                       const vk::Extent3D& extent,
-                                       const vk::ImageSubresourceLayers& subresource,
-                                       vk::DeviceSize size,
-                                       const void* data,
-                                       vk::ImageLayout layout) {
-    if (!image)
-        return nullptr;
+MemoryAllocationHandle
+StagingMemoryManager::cmd_from_device(const CommandBufferHandle& cmd,
+                                      const BufferHandle& buffer,
+                                      const vk::DeviceSize offset,
+                                      const std::optional<vk::DeviceSize> optional_size) {
+    assert(offset < buffer->get_size());
+    assert(!optional_size || *optional_size < buffer->get_size());
+    assert(!optional_size || offset + *optional_size < buffer->get_size());
 
-    vk::Buffer srcBuffer;
-    vk::DeviceSize srcOffset;
+    const vk::DeviceSize size = optional_size.value_or(buffer->get_size() - offset);
 
-    void* mapping = getStagingSpace(size, srcBuffer, srcOffset, true);
+    BufferHandle download_buffer;
+    vk::DeviceSize download_buffer_offset;
+    const MemoryAllocationHandle memory =
+        get_download_staging_space(size, download_buffer, download_buffer_offset);
 
-    assert(mapping);
+    vk::BufferCopy copy{offset, download_buffer_offset, size};
+    cmd->copy(buffer, download_buffer, copy);
 
-    if (data) {
-        memcpy(mapping, data, size);
-    }
-
-    vk::BufferImageCopy cpy{srcOffset, 0, 0, subresource, offset, extent};
-    cmd->get_command_buffer().copyBufferToImage(srcBuffer, image, layout, {cpy});
-
-    return data ? nullptr : mapping;
+    return memory;
 }
 
-void* StagingMemoryManager::cmdToBuffer(const CommandBufferHandle& cmd,
-                                        vk::Buffer buffer,
-                                        vk::DeviceSize offset,
-                                        vk::DeviceSize size,
-                                        const void* data) {
-    if (!size || !buffer) {
-        return nullptr;
-    }
+// -------------------------------------------------------------------------
 
-    vk::Buffer srcBuffer;
-    vk::DeviceSize srcOffset;
+// void* StagingMemoryManager::cmdToImage(const CommandBufferHandle& cmd,
+//                                        vk::Image image,
+//                                        const vk::Offset3D& offset,
+//                                        const vk::Extent3D& extent,
+//                                        const vk::ImageSubresourceLayers& subresource,
+//                                        vk::DeviceSize size,
+//                                        const void* data,
+//                                        vk::ImageLayout layout) {
+//     if (!image)
+//         return nullptr;
 
-    void* mapping = getStagingSpace(size, srcBuffer, srcOffset, true);
+//     vk::Buffer srcBuffer;
+//     vk::DeviceSize srcOffset;
 
-    assert(mapping);
+//     void* mapping = getStagingSpace(size, srcBuffer, srcOffset, true);
 
-    if (data) {
-        memcpy(mapping, data, size);
-    }
+//     assert(mapping);
 
-    vk::BufferCopy cpy{srcOffset, offset, size};
-    cmd->get_command_buffer().copyBuffer(srcBuffer, buffer, {cpy});
+//     if (data) {
+//         memcpy(mapping, data, size);
+//     }
 
-    return data ? nullptr : (void*)mapping;
-}
+//     vk::BufferImageCopy cpy{srcOffset, 0, 0, subresource, offset, extent};
+//     cmd->get_command_buffer().copyBufferToImage(srcBuffer, image, layout, {cpy});
 
-const void* StagingMemoryManager::cmdFromBuffer(const CommandBufferHandle& cmd,
-                                                vk::Buffer buffer,
-                                                vk::DeviceSize offset,
-                                                vk::DeviceSize size) {
-    vk::Buffer dstBuffer;
-    vk::DeviceSize dstOffset;
-    void* mapping = getStagingSpace(size, dstBuffer, dstOffset, false);
+//     return data ? nullptr : mapping;
+// }
 
-    vk::BufferCopy cpy{offset, dstOffset, size};
-    cmd->get_command_buffer().copyBuffer(buffer, dstBuffer, {cpy});
+// void* StagingMemoryManager::cmdToBuffer(const CommandBufferHandle& cmd,
+//                                         vk::Buffer buffer,
+//                                         vk::DeviceSize offset,
+//                                         vk::DeviceSize size,
+//                                         const void* data) {
+//     if (!size || !buffer) {
+//         return nullptr;
+//     }
 
-    return mapping;
-}
+//     vk::Buffer srcBuffer;
+//     vk::DeviceSize srcOffset;
 
-const void* StagingMemoryManager::cmdFromImage(const CommandBufferHandle& cmd,
-                                               vk::Image image,
-                                               const vk::Offset3D& offset,
-                                               const vk::Extent3D& extent,
-                                               const vk::ImageSubresourceLayers& subresource,
-                                               vk::DeviceSize size,
-                                               vk::ImageLayout layout) {
-    vk::Buffer dstBuffer;
-    vk::DeviceSize dstOffset;
-    void* mapping = getStagingSpace(size, dstBuffer, dstOffset, false);
+//     void* mapping = getStagingSpace(size, srcBuffer, srcOffset, true);
 
-    vk::BufferImageCopy cpy{dstOffset, 0, 0, subresource, offset, extent};
-    cmd->get_command_buffer().copyImageToBuffer(image, layout, dstBuffer, {cpy});
+//     assert(mapping);
 
-    return mapping;
-}
+//     if (data) {
+//         memcpy(mapping, data, size);
+//     }
 
-void StagingMemoryManager::finalizeResources(vk::Fence fence) {
-    if (m_sets[m_stagingIndex].entries.empty())
-        return;
+//     vk::BufferCopy cpy{srcOffset, offset, size};
+//     cmd->get_command_buffer().copyBuffer(srcBuffer, buffer, {cpy});
 
-    m_sets[m_stagingIndex].fence = fence;
-    m_sets[m_stagingIndex].manualSet = false;
-    m_stagingIndex = newStagingIndex();
-}
+//     return data ? nullptr : (void*)mapping;
+// }
 
-StagingMemoryManager::SetID StagingMemoryManager::finalizeResourceSet() {
-    SetID setID;
+// const void* StagingMemoryManager::cmdFromBuffer(const CommandBufferHandle& cmd,
+//                                                 vk::Buffer buffer,
+//                                                 vk::DeviceSize offset,
+//                                                 vk::DeviceSize size) {
+//     vk::Buffer dstBuffer;
+//     vk::DeviceSize dstOffset;
+//     void* mapping = getStagingSpace(size, dstBuffer, dstOffset, false);
 
-    if (m_sets[m_stagingIndex].entries.empty())
-        return setID;
+//     vk::BufferCopy cpy{offset, dstOffset, size};
+//     cmd->get_command_buffer().copyBuffer(buffer, dstBuffer, {cpy});
 
-    setID.index = m_stagingIndex;
+//     return mapping;
+// }
 
-    m_sets[m_stagingIndex].fence = nullptr;
-    m_sets[m_stagingIndex].manualSet = true;
-    m_stagingIndex = newStagingIndex();
+// const void* StagingMemoryManager::cmdFromImage(const CommandBufferHandle& cmd,
+//                                                vk::Image image,
+//                                                const vk::Offset3D& offset,
+//                                                const vk::Extent3D& extent,
+//                                                const vk::ImageSubresourceLayers& subresource,
+//                                                vk::DeviceSize size,
+//                                                vk::ImageLayout layout) {
+//     vk::Buffer dstBuffer;
+//     vk::DeviceSize dstOffset;
+//     void* mapping = getStagingSpace(size, dstBuffer, dstOffset, false);
 
-    return setID;
-}
+//     vk::BufferImageCopy cpy{dstOffset, 0, 0, subresource, offset, extent};
+//     cmd->get_command_buffer().copyImageToBuffer(image, layout, dstBuffer, {cpy});
 
-void* StagingMemoryManager::getStagingSpace(vk::DeviceSize size,
-                                            vk::Buffer& buffer,
-                                            vk::DeviceSize& offset,
-                                            bool toDevice) {
-    assert(m_sets[m_stagingIndex].index == m_stagingIndex &&
-           "illegal index, did you forget finalizeResources");
-
-    BufferSubAllocator::Handle handle =
-        toDevice ? m_subToDevice.subAllocate(size) : m_subFromDevice.subAllocate(size);
-    assert(handle);
-
-    BufferSubAllocator::Binding info =
-        toDevice ? m_subToDevice.getSubBinding(handle) : m_subFromDevice.getSubBinding(handle);
-    buffer = info.buffer;
-    offset = info.offset;
-
-    // append used space to current staging set list
-    m_sets[m_stagingIndex].entries.push_back({handle, toDevice});
-
-    return toDevice ? m_subToDevice.getSubMapping(handle) : m_subFromDevice.getSubMapping(handle);
-}
-
-void StagingMemoryManager::releaseResources(uint32_t stagingID) {
-    if (stagingID == INVALID_ID_INDEX)
-        return;
-
-    SPDLOG_TRACE("releseing resources for staging id", stagingID);
-
-    StagingSet& set = m_sets[stagingID];
-    assert(set.index == stagingID);
-
-    // free used allocation ranges
-    for (auto& itentry : set.entries) {
-        if (itentry.toDevice) {
-            m_subToDevice.subFree(itentry.handle);
-        } else {
-            m_subFromDevice.subFree(itentry.handle);
-        }
-    }
-    set.entries.clear();
-
-    // update the set.index with the current head of the free list
-    // pop its old value
-    m_freeStagingIndex = setIndexValue(set.index, m_freeStagingIndex);
-}
-
-void StagingMemoryManager::releaseResources() {
-    SPDLOG_DEBUG("releseing resources");
-
-    for (auto& itset : m_sets) {
-        if (!itset.entries.empty() && !itset.manualSet &&
-            (!itset.fence || vkGetFenceStatus(context->device, itset.fence) == VK_SUCCESS)) {
-            releaseResources(itset.index);
-            itset.fence = VK_NULL_HANDLE;
-            itset.manualSet = false;
-        }
-    }
-    // special case for ease of use if there is only one
-    if (m_stagingIndex == 0 && m_freeStagingIndex == 0) {
-        m_freeStagingIndex = setIndexValue(m_sets[0].index, 0);
-    }
-}
-
-float StagingMemoryManager::getUtilization(vk::DeviceSize& allocatedSize,
-                                           vk::DeviceSize& usedSize) const {
-    vk::DeviceSize aSize = 0;
-    vk::DeviceSize uSize = 0;
-    m_subFromDevice.getUtilization(aSize, uSize);
-
-    allocatedSize = aSize;
-    usedSize = uSize;
-    m_subToDevice.getUtilization(aSize, uSize);
-    allocatedSize += aSize;
-    usedSize += uSize;
-
-    return float(double(usedSize) / double(allocatedSize));
-}
-
-void StagingMemoryManager::free(bool unusedOnly) {
-    m_subToDevice.free(unusedOnly);
-    m_subFromDevice.free(unusedOnly);
-}
-
-uint32_t StagingMemoryManager::newStagingIndex() {
-    // find free slot
-    if (m_freeStagingIndex != INVALID_ID_INDEX) {
-        uint32_t newIndex = m_freeStagingIndex;
-        // this updates the free link-list
-        m_freeStagingIndex = setIndexValue(m_sets[newIndex].index, newIndex);
-        assert(m_sets[newIndex].index == newIndex);
-        return m_sets[newIndex].index;
-    }
-
-    // otherwise push to end
-    uint32_t newIndex = (uint32_t)m_sets.size();
-
-    StagingSet info;
-    info.index = newIndex;
-    m_sets.push_back(info);
-
-    assert(m_sets[newIndex].index == newIndex);
-    return newIndex;
-}
+//     return mapping;
+// }
 
 } // namespace merian

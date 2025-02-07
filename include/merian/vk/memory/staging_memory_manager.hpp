@@ -1,144 +1,110 @@
 #pragma once
 
 #include "merian/vk/context.hpp"
-#include "merian/vk/memory/memory_allocator.hpp"
 
-#include "merian/vk/utils/check_result.hpp"
-#include "vk_mem_alloc.h"
-
-#include <map>
+#include "merian/vk/memory/memory_suballocator_vma.hpp"
 
 namespace merian {
 
 class StagingMemoryManager : public std::enable_shared_from_this<StagingMemoryManager> {
   public:
-    class Allocation {
-
-      public:
-        Allocation(const BufferHandle& buffer) : buffer(buffer) {
-            VmaVirtualBlockCreateInfo block_create_info = {};
-            block_create_info.size = buffer->get_size();
-            check_result(vmaCreateVirtualBlock(&block_create_info, &block),
-                         "could not create virtual allocation.");
-        }
-
-        ~Allocation() {
-            vmaClearVirtualBlock(block);
-            vmaDestroyVirtualBlock(block);
-        }
-
-      private:
-        BufferHandle buffer;
-        VmaVirtualBlock block;
-    };
-
-    class StagingSet {
-        friend StagingMemoryManager;
-
-      private:
-        // vk::DeviceSize: estimated free size, random counter to prevent map collisions
-        std::map<std::pair<vk::DeviceSize, uint64_t>, Allocation> allocations_to_gpu;
-        std::map<std::pair<vk::DeviceSize, uint64_t>, Allocation> allocations_from_gpu;
-    };
-
     StagingMemoryManager(StagingMemoryManager const&) = delete;
     StagingMemoryManager& operator=(StagingMemoryManager const&) = delete;
     StagingMemoryManager() = delete;
     StagingMemoryManager(const MemoryAllocatorHandle& memory_allocator,
-                         const vk::DeviceSize stagingBlockSize = (vk::DeviceSize(128) * 1024 *
-                                                                  1024));
+                         const vk::DeviceSize block_size = (vk::DeviceSize(128) * 1024 * 1024));
 
     ~StagingMemoryManager();
 
     // -------------------------------------------------------------------------
-    
-    // Start a new staging set. Call this at the 
-    void new_staging_set();
+
+  private:
+    MemoryAllocationHandle get_upload_staging_space(const vk::DeviceSize size,
+                                                    BufferHandle& upload_buffer,
+                                                    vk::DeviceSize& buffer_offset);
+
+    MemoryAllocationHandle get_download_staging_space(const vk::DeviceSize size,
+                                                      BufferHandle& download_buffer,
+                                                      vk::DeviceSize& buffer_offset);
 
     // -------------------------------------------------------------------------
 
-    // if data != nullptr memcpies to mapping and returns nullptr
-    // otherwise returns temporary mapping
-    void* cmdToImage(const CommandBufferHandle& cmd,
-                     vk::Image image,
-                     const vk::Offset3D& offset,
-                     const vk::Extent3D& extent,
-                     const vk::ImageSubresourceLayers& subresource,
-                     vk::DeviceSize size,
-                     const void* data,
-                     vk::ImageLayout layout = vk::ImageLayout::eTransferDstOptimal);
+  public:
+    /* You must make sure that "data" matches extent and format. Extent defaults to
+     * image->get_extent() - offset. Size is computed from offset, extent and format by default.*/
+    void cmd_to_device(const CommandBufferHandle& cmd,
+                       const ImageHandle& image,
+                       const void* data,
+                       const vk::ImageSubresourceLayers& subresource = first_layer(),
+                       const vk::Offset3D offset = {},
+                       const std::optional<vk::Extent3D> optional_extent = std::nullopt);
 
+    /* You must make sure that "data" matches extent and format. Extent defaults to
+     * image->get_extent() - offset. */
     template <class T>
-    T* cmdToImageT(const CommandBufferHandle& cmd,
-                   vk::Image image,
-                   const vk::Offset3D& offset,
-                   const vk::Extent3D& extent,
-                   const vk::ImageSubresourceLayers& subresource,
-                   vk::DeviceSize size,
-                   const void* data,
-                   vk::ImageLayout layout = vk::ImageLayout::eTransferDstOptimal) {
-        return (T*)cmdToImage(cmd, image, offset, extent, subresource, size, data, layout);
+    void cmd_to_device(const CommandBufferHandle& cmd,
+                       const ImageHandle& image,
+                       const std::vector<T>& data,
+                       const vk::ImageSubresourceLayers& subresource = first_layer(),
+                       const vk::Offset3D offset = {},
+                       const std::optional<vk::Extent3D> optional_extent = std::nullopt);
+
+    /* Extent defaults to image->get_extent() - offset. */
+    MemoryAllocationHandle
+    cmd_from_device(const CommandBufferHandle& cmd,
+                    const ImageHandle& image,
+                    const vk::ImageSubresourceLayers& subresource = first_layer(),
+                    const vk::Offset3D offset = {},
+                    const std::optional<vk::Extent3D> optional_extent = std::nullopt);
+
+    // -------------------------------------------------------------------------
+
+    /* You must make sure that "data" matches the buffer size. Copies [data, data + size) to
+     * buffer::get_buffer_address + offset. Size defaults to buffer->get_size() - offset. */
+    void cmd_to_device(const CommandBufferHandle& cmd,
+                       const BufferHandle& buffer,
+                       const void* data,
+                       const vk::DeviceSize offset = 0ul,
+                       const std::optional<vk::DeviceSize> optional_size = std::nullopt);
+
+    /* You must make sure that "data" matches the buffer size. Copies [data, data + data.get_size())
+     * to buffer::get_buffer_address + offset. Size defaults to data.size() * sizeof(T).*/
+    template <class T>
+    void cmd_to_device(const CommandBufferHandle& cmd,
+                       const BufferHandle& buffer,
+                       const std::vector<T>& data,
+                       const vk::DeviceSize offset = 0ul) {
+        assert(offset < buffer->get_size());
+        const vk::DeviceSize size = data.size() * sizeof(T);
+        assert(buffer->get_size() >= size);
+        assert(offset + size <= buffer->get_size());
+
+        BufferHandle upload_buffer;
+        vk::DeviceSize buffer_offset;
+        const MemoryAllocationHandle memory =
+            get_upload_staging_space(size, upload_buffer, buffer_offset);
+
+        SPDLOG_DEBUG("uploading {} of data to staging buffer", format_size(size));
+        memcpy(memory->map(), data, size);
+        memory->unmap();
+
+        const vk::BufferCopy copy{buffer_offset, offset, size};
+        cmd->copy(upload_buffer, buffer, copy);
     }
 
-    // pointer can be used after cmd execution but only valid until associated resources haven't
-    // been released
-    const void* cmdFromImage(const CommandBufferHandle& cmd,
-                             vk::Image image,
-                             const vk::Offset3D& offset,
-                             const vk::Extent3D& extent,
-                             const vk::ImageSubresourceLayers& subresource,
-                             vk::DeviceSize size,
-                             vk::ImageLayout layout = vk::ImageLayout::eTransferSrcOptimal);
-
-    template <class T>
-    const T* cmdFromImageT(const CommandBufferHandle& cmd,
-                           vk::Image image,
-                           const vk::Offset3D& offset,
-                           const vk::Extent3D& extent,
-                           const vk::ImageSubresourceLayers& subresource,
-                           vk::DeviceSize size,
-                           vk::ImageLayout layout = vk::ImageLayout::eTransferSrcOptimal) {
-        return (const T*)cmdFromImage(cmd, image, offset, extent, subresource, size, layout);
-    }
-
-    // if data != nullptr memcpies to mapping and returns nullptr
-    // otherwise returns temporary mapping (valid until appropriate release)
-    void* cmdToBuffer(const CommandBufferHandle& cmd,
-                      vk::Buffer buffer,
-                      vk::DeviceSize offset,
-                      vk::DeviceSize size,
-                      const void* data);
-
-    template <class T>
-    T* cmdToBufferT(const CommandBufferHandle& cmd,
-                    vk::Buffer buffer,
-                    vk::DeviceSize offset,
-                    vk::DeviceSize size) {
-        return (T*)cmdToBuffer(cmd, buffer, offset, size, nullptr);
-    }
-
-    // pointer can be used after cmd execution but only valid until associated resources haven't
-    // been released
-    const void* cmdFromBuffer(const CommandBufferHandle& cmd,
-                              vk::Buffer buffer,
-                              vk::DeviceSize offset,
-                              vk::DeviceSize size);
-
-    template <class T>
-    const T* cmdFromBufferT(const CommandBufferHandle& cmd,
-                            vk::Buffer buffer,
-                            vk::DeviceSize offset,
-                            vk::DeviceSize size) {
-        return (const T*)cmdFromBuffer(cmd, buffer, offset, size);
-    }
+    /* size defaults to buffer->get_size() - offset. */
+    MemoryAllocationHandle
+    cmd_from_device(const CommandBufferHandle& cmd,
+                    const BufferHandle& buffer,
+                    const vk::DeviceSize offset = 0,
+                    const std::optional<vk::DeviceSize> optional_size = std::nullopt);
 
     // -------------------------------------------------------------------------
 
   private:
     const ContextHandle context;
     const MemoryAllocatorHandle allocator;
-
-    StagingSet current_staging_set;
+    const vk::DeviceSize block_size;
 };
 
 using StagingMemoryManagerHandle = std::shared_ptr<StagingMemoryManager>;

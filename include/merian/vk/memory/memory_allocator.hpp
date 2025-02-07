@@ -87,12 +87,22 @@ class AllocationFailed : public VulkanException {
  */
 class MemoryAllocator : public std::enable_shared_from_this<MemoryAllocator> {
   public:
-    MemoryAllocator(const ContextHandle& context) : context(context) {}
+    MemoryAllocator(const ContextHandle& context);
 
     // Make sure the dtor is virtual
-    virtual ~MemoryAllocator() = default;
+    virtual ~MemoryAllocator();
 
   public:
+    // Used to get memory requirements for create infos. Attemps to get the requirements without
+    // actually creating the image.
+    vk::MemoryRequirements
+    get_image_memory_requirements(const vk::ImageCreateInfo& image_create_info);
+
+    // Used to get memory requirements for create infos. Attemps to get the requirements without
+    // actually creating the image.
+    vk::MemoryRequirements
+    get_buffer_memory_requirements(const vk::BufferCreateInfo& buffer_create_info);
+
     // Direct highly discouraged. Use create_buffer and create_image instead.
     //
     // Might throw AllocationFailed. The result OutOfDeviceMemory signalizes that there is not
@@ -112,13 +122,13 @@ class MemoryAllocator : public std::enable_shared_from_this<MemoryAllocator> {
     create_buffer(const vk::BufferCreateInfo buffer_create_info,
                   const MemoryMappingType mapping_type = MemoryMappingType::NONE,
                   const std::string& debug_name = {},
-                  const std::optional<vk::DeviceSize> min_alignment = std::nullopt) = 0;
+                  const std::optional<vk::DeviceSize> min_alignment = std::nullopt);
 
     // Might throw AllocationFailed. The result OutOfDeviceMemory signalizes that there is not
     // enough memory.
     virtual ImageHandle create_image(const vk::ImageCreateInfo image_create_info,
                                      const MemoryMappingType mapping_type = MemoryMappingType::NONE,
-                                     const std::string& debug_name = {}) = 0;
+                                     const std::string& debug_name = {});
 
     // ------------------------------------------------------------------------------------
 
@@ -129,6 +139,7 @@ class MemoryAllocator : public std::enable_shared_from_this<MemoryAllocator> {
 
   private:
     const ContextHandle context;
+    bool supports_memory_requirements_without_object;
 };
 
 struct MemoryAllocationInfo {
@@ -208,16 +219,26 @@ class MemoryAllocation : public std::enable_shared_from_this<MemoryAllocation> {
     // ------------------------------------------------------------------------------------
 
     // Creates an image that points to this memory
-    virtual ImageHandle
-    create_aliasing_image([[maybe_unused]] const vk::ImageCreateInfo& image_create_info) {
-        throw std::runtime_error{"create aliasing images is unsupported for this memory type"};
+    virtual ImageHandle create_aliasing_image(const vk::ImageCreateInfo& image_create_info,
+                                              const vk::DeviceSize allocation_offset = 0ul) {
+        const ImageHandle image = Image::create(context, image_create_info);
+        bind_to_image(image, allocation_offset);
+        return image;
     }
 
     // Creates a buffer that points to this memory
-    virtual BufferHandle
-    create_aliasing_buffer([[maybe_unused]] const vk::BufferCreateInfo& buffer_create_info) {
-        throw std::runtime_error{"create aliasing images is unsupported for this memory type"};
+    virtual BufferHandle create_aliasing_buffer(const vk::BufferCreateInfo& buffer_create_info,
+                                                const vk::DeviceSize allocation_offset = 0ul) {
+        const BufferHandle buffer = Buffer::create(context, buffer_create_info);
+        bind_to_buffer(buffer, allocation_offset);
+        return buffer;
     }
+
+    virtual void bind_to_image(const ImageHandle& image,
+                               const vk::DeviceSize allocation_offset = 0ul) = 0;
+
+    virtual void bind_to_buffer(const BufferHandle& buffer,
+                                const vk::DeviceSize allocation_offset = 0ul) = 0;
 
     // ------------------------------------------------------------------------------------
 

@@ -40,6 +40,8 @@ class Buffer : public std::enable_shared_from_this<Buffer>, public Resource {
            const MemoryAllocationHandle& memory,
            const vk::BufferCreateInfo& create_info);
 
+    Buffer(const ContextHandle& context, const vk::BufferCreateInfo& create_info);
+
   public:
     ~Buffer();
 
@@ -81,9 +83,11 @@ class Buffer : public std::enable_shared_from_this<Buffer>, public Resource {
         return vk::BufferDeviceAddressInfo{buffer};
     }
 
-    vk::DeviceAddress get_device_address();
+    vk::MemoryRequirements get_memory_requirements() const;
 
-    BufferHandle create_aliasing_buffer();
+    vk::DeviceAddress get_device_address() const;
+
+    BufferHandle create_aliasing_buffer() const;
 
     // Return a suitable vk::BufferMemoryBarrier.
     [[nodiscard]] vk::BufferMemoryBarrier
@@ -104,17 +108,25 @@ class Buffer : public std::enable_shared_from_this<Buffer>, public Resource {
 
     // -----------------------------------------------------------
 
+    // Use only by memory allocators to set after memory was bound to this resource.
+    void _set_memory_allocation(const MemoryAllocationHandle& allocation) {
+        this->memory = allocation;
+    }
+
     void properties(Properties& props);
 
   private:
     const ContextHandle context;
     const vk::Buffer buffer;
-    const MemoryAllocationHandle memory;
+    MemoryAllocationHandle memory;
     const vk::BufferCreateInfo create_info;
 
   public:
     static BufferHandle create(const vk::Buffer& buffer,
                                const MemoryAllocationHandle& memory,
+                               const vk::BufferCreateInfo& create_info);
+
+    static BufferHandle create(const ContextHandle& context,
                                const vk::BufferCreateInfo& create_info);
 };
 
@@ -142,6 +154,9 @@ class Image : public std::enable_shared_from_this<Image>, public Resource {
           const vk::Image& image,
           const vk::ImageCreateInfo create_info,
           const vk::ImageLayout current_layout = vk::ImageLayout::eUndefined);
+
+    // Create an image that is not bound to memory.
+    Image(const ContextHandle& context, const vk::ImageCreateInfo create_info);
 
   public:
     virtual ~Image();
@@ -195,6 +210,11 @@ class Image : public std::enable_shared_from_this<Image>, public Resource {
         current_layout = new_layout;
     }
 
+    // Use only by memory allocators to set after memory was bound to this resource.
+    void _set_memory_allocation(const MemoryAllocationHandle& allocation) {
+        this->memory = allocation;
+    }
+
     // Guess AccessFlags from old and new layout.
     [[nodiscard]] vk::ImageMemoryBarrier barrier(const vk::ImageLayout new_layout,
                                                  const bool transition_from_undefined = false);
@@ -225,24 +245,6 @@ class Image : public std::enable_shared_from_this<Image>, public Resource {
              const uint32_t dst_queue_family_index = VK_QUEUE_FAMILY_IGNORED,
              const vk::ImageSubresourceRange subresource_range = all_levels_and_layers(),
              const bool transition_from_undefined = false);
-
-    // If extent and range are not supplied the whole image is copied.
-    // Layouts are automatically determined from get_current_layout()
-    void cmd_copy_to(
-        const vk::CommandBuffer& cmd,
-        const ImageHandle& dst_image,
-        const std::optional<vk::Extent3D> extent = std::nullopt,
-        const vk::Offset3D src_offset = {},
-        const vk::Offset3D dst_offset = {},
-        const std::optional<vk::ImageSubresourceLayers> opt_src_subresource = std::nullopt,
-        const std::optional<vk::ImageSubresourceLayers> opt_dst_subresource = std::nullopt) {
-        vk::ImageSubresourceLayers src_subresource = opt_src_subresource.value_or(first_layer());
-        vk::ImageSubresourceLayers dst_subresource = opt_dst_subresource.value_or(first_layer());
-        vk::ImageCopy copy{src_subresource, src_offset, dst_subresource, dst_offset,
-                           extent.value_or(this->get_extent())};
-
-        cmd.copyImage(image, current_layout, *dst_image, dst_image->get_current_layout(), {copy});
-    }
 
     // Convenience method to create a view info.
     // By default all levels and layers are accessed and if array layers > 1 a array view is used.
@@ -275,6 +277,8 @@ class Image : public std::enable_shared_from_this<Image>, public Resource {
         return view_info;
     }
 
+    vk::MemoryRequirements get_memory_requirements() const;
+
     vk::FormatFeatureFlags format_features() const;
 
     // Test if the image has been created with a usage value containing at least one of the usages
@@ -296,7 +300,7 @@ class Image : public std::enable_shared_from_this<Image>, public Resource {
   private:
     const ContextHandle context;
     vk::Image image;
-    const MemoryAllocationHandle memory;
+    MemoryAllocationHandle memory;
     const vk::ImageCreateInfo create_info;
 
     vk::ImageLayout current_layout;
@@ -311,6 +315,8 @@ class Image : public std::enable_shared_from_this<Image>, public Resource {
                               const vk::Image& image,
                               const vk::ImageCreateInfo create_info,
                               const vk::ImageLayout current_layout = vk::ImageLayout::eUndefined);
+
+    static ImageHandle create(const ContextHandle& context, const vk::ImageCreateInfo create_info);
 };
 
 class ImageView;

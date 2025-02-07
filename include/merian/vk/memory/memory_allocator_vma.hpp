@@ -10,6 +10,7 @@
 namespace merian {
 
 class VMAMemoryAllocator;
+using VMAMemoryAllocatorHandle = std::shared_ptr<VMAMemoryAllocator>;
 
 class VMAMemoryAllocation : public MemoryAllocation {
   public:
@@ -51,9 +52,17 @@ class VMAMemoryAllocation : public MemoryAllocation {
 
     // ------------------------------------------------------------------------------------
 
-    ImageHandle create_aliasing_image(const vk::ImageCreateInfo& image_create_info) override;
+    ImageHandle create_aliasing_image(const vk::ImageCreateInfo& image_create_info,
+                                      const vk::DeviceSize allocation_offset = 0ul) override;
 
-    BufferHandle create_aliasing_buffer(const vk::BufferCreateInfo& buffer_create_info) override;
+    BufferHandle create_aliasing_buffer(const vk::BufferCreateInfo& buffer_create_info,
+                                        const vk::DeviceSize allocation_offset = 0ul) override;
+
+    void bind_to_image(const ImageHandle& image,
+                       const vk::DeviceSize allocation_offset = 0ul) override;
+
+    void bind_to_buffer(const BufferHandle& buffer,
+                        const vk::DeviceSize allocation_offset = 0ul) override;
 
     // ------------------------------------------------------------------------------------
 
@@ -78,13 +87,6 @@ class VMAMemoryAllocator : public MemoryAllocator {
   private:
     friend class VMAMemoryAllocation;
 
-  public:
-    static std::shared_ptr<VMAMemoryAllocator>
-    // E.g. supply VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT if you want to use the device
-    // address feature
-    make_allocator(const ContextHandle& context, const VmaAllocatorCreateFlags flags = {});
-
-  private:
     VMAMemoryAllocator() = delete;
     explicit VMAMemoryAllocator(const ContextHandle& context,
                                 const VmaAllocatorCreateFlags flags = {});
@@ -117,6 +119,12 @@ class VMAMemoryAllocator : public MemoryAllocator {
 
   private:
     VmaAllocator vma_allocator;
+
+  public:
+    // E.g. supply VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT if you want to use the device
+    // address feature
+    static std::shared_ptr<VMAMemoryAllocator> create(const ContextHandle& context,
+                                                      const VmaAllocatorCreateFlags flags = {});
 };
 
 } // namespace merian
