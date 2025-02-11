@@ -178,6 +178,19 @@ bool JSONLoadProperties::config_uint(
         value = o.back()[id].template get<uint32_t>();
     return old_value != value;
 }
+bool JSONLoadProperties::config_uint(const std::string& id, uint64_t& value, const std::string&) {
+    const uint64_t old_value = value;
+    if (o.back().contains(id))
+        value = o.back()[id].template get<uint64_t>();
+    return old_value != value;
+}
+bool JSONLoadProperties::config_uint(
+    const std::string& id, uint64_t& value, const uint64_t&, const uint64_t&, const std::string&) {
+    const uint64_t old_value = value;
+    if (o.back().contains(id))
+        value = o.back()[id].template get<uint64_t>();
+    return old_value != value;
+}
 bool JSONLoadProperties::config_float3(const std::string& id, float value[3], const std::string&) {
     const float old_value[3] = {value[0], value[1], value[2]};
     if (o.back().contains(id))

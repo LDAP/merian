@@ -141,6 +141,15 @@ bool JSONDumpProperties::config_uint(
     current()[id] = value;
     return false;
 }
+bool JSONDumpProperties::config_uint(const std::string& id, uint64_t& value, const std::string&) {
+    current()[id] = value;
+    return false;
+}
+bool JSONDumpProperties::config_uint(
+    const std::string& id, uint64_t& value, const uint64_t&, const uint64_t&, const std::string&) {
+    current()[id] = value;
+    return false;
+}
 bool JSONDumpProperties::config_float3(const std::string& id, float value[3], const std::string&) {
     current()[id] = dump_vec3(*merian::as_vec3(value));
     return false;

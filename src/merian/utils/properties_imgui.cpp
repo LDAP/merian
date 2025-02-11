@@ -152,6 +152,21 @@ bool ImGuiProperties::config_uint(const std::string& id,
     tooltip(desc);
     return value_changed;
 }
+bool ImGuiProperties::config_uint(const std::string& id, uint64_t& value, const std::string& desc) {
+    const bool value_changed = ImGui::DragScalar(id.c_str(), ImGuiDataType_U64, &value);
+    tooltip(desc);
+    return value_changed;
+}
+bool ImGuiProperties::config_uint(const std::string& id,
+                                  uint64_t& value,
+                                  const uint64_t& min,
+                                  const uint64_t& max,
+                                  const std::string& desc) {
+    const bool value_changed =
+        ImGui::SliderScalar(id.c_str(), ImGuiDataType_U64, &value, &min, &max);
+    tooltip(desc);
+    return value_changed;
+}
 bool ImGuiProperties::config_float3(const std::string& id,
                                     float value[3],
                                     const std::string& desc) {

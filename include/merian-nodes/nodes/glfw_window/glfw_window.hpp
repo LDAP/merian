@@ -41,7 +41,7 @@ class GLFWWindow : public Node {
                          [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
                          const NodeIO& io) override {
         const std::optional<SwapchainAcquireResult> acquire =
-            swapchain_manager->acquire(window, 1000L * 1000L /* 1s */);
+            swapchain_manager->acquire(window, acquire_timeout_ns);
 
         if (acquire) {
             const CommandBufferHandle& cmd = run.get_cmd();
@@ -160,6 +160,8 @@ class GLFWWindow : public Node {
         config.config_bool("rebuild on recreate", request_rebuild_on_recreate,
                            "requests a graph rebuild if the swapchain was recreated.");
 
+        config.config_uint("acquire timeout", acquire_timeout_ns, "in nanoseconds");
+
         if (swapchain_info) {
             config.output_text(fmt::format(
                 "surface format: {}\ncolor space: {}\nimage count: "
@@ -201,6 +203,7 @@ class GLFWWindow : public Node {
 
     std::array<int, 4> windowed_pos_size;
     bool request_rebuild_on_recreate = false;
+    uint64_t acquire_timeout_ns = 1000L * 1000L * 100L; // .1s
 };
 
 } // namespace merian_nodes
