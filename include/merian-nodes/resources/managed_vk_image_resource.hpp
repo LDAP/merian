@@ -21,7 +21,6 @@ class ManagedVkImageResource : public GraphResource {
         image->properties(props);
     }
 
-  private:
     const merian::ImageHandle image;
     std::optional<merian::TextureHandle> tex;
 

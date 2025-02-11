@@ -1,122 +1,79 @@
-#pragma once
-
-#include "merian-nodes/graph/connector_output.hpp"
-#include "merian-nodes/resources/managed_vk_image_resource.hpp"
+#ifndef MANAGED_VK_IMAGE_OUT_HPP
+#define MANAGED_VK_IMAGE_OUT_HPP
+#include "vk_image_out.hpp"
 
 namespace merian_nodes {
-
 class ManagedVkImageOut;
 using ManagedVkImageOutHandle = std::shared_ptr<ManagedVkImageOut>;
 
-// Output a Vulkan image that is allocated and managed by the graph.
-// Note that it only supplies a descriptor if stage_flags contains at least one bit.
-class ManagedVkImageOut : public TypedOutputConnector<ImageHandle> {
-  public:
-    ManagedVkImageOut(const std::string& name,
-                      const vk::AccessFlags2& access_flags,
-                      const vk::PipelineStageFlags2& pipeline_stages,
-                      const vk::ImageLayout& required_layout,
-                      const vk::ShaderStageFlags& stage_flags,
-                      const vk::ImageCreateInfo& create_info,
-                      const bool persistent = false);
+class ManagedVkImageOut : public VkImageOut {
+public:
+  ManagedVkImageOut(const std::string& name,
+                    const vk::AccessFlags2& access_flags,
+                    const vk::PipelineStageFlags2& pipeline_stages,
+                    const vk::ImageLayout& required_layout,
+                    const vk::ShaderStageFlags& stage_flags,
+                    const vk::ImageCreateInfo& create_info,
+                    const bool persistent = false);
 
-    virtual std::optional<vk::DescriptorSetLayoutBinding> get_descriptor_info() const override;
+  static ManagedVkImageOutHandle compute_write(const std::string& name,
+                                               const vk::Format format,
+                                               const vk::Extent3D extent,
+                                               const bool persistent = false);
 
-    virtual void get_descriptor_update(const uint32_t binding,
-                                       const GraphResourceHandle& resource,
-                                       const DescriptorSetHandle& update,
-                                       const ResourceAllocatorHandle& allocator) override;
+  static ManagedVkImageOutHandle compute_fragment_write(const std::string& name,
+                                                        const vk::Format format,
+                                                        const vk::Extent3D extent,
+                                                        const bool persistent = false);
 
-    virtual ConnectorStatusFlags
-    on_pre_process(GraphRun& run,
-                   const CommandBufferHandle& cmd,
-                   const GraphResourceHandle& resource,
-                   const NodeHandle& node,
-                   std::vector<vk::ImageMemoryBarrier2>& image_barriers,
-                   std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) override;
+  static ManagedVkImageOutHandle compute_write(const std::string& name,
+                                               const vk::Format format,
+                                               const uint32_t width,
+                                               const uint32_t height,
+                                               const uint32_t depth = 1,
+                                               const bool persistent = false);
 
-    virtual ConnectorStatusFlags
-    on_post_process(GraphRun& run,
-                    const CommandBufferHandle& cmd,
-                    const GraphResourceHandle& resource,
-                    const NodeHandle& node,
-                    std::vector<vk::ImageMemoryBarrier2>& image_barriers,
-                    std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) override;
+  static ManagedVkImageOutHandle compute_fragment_write(const std::string& name,
+                                                        const vk::Format format,
+                                                        const uint32_t width,
+                                                        const uint32_t height,
+                                                        const uint32_t depth = 1,
+                                                        const bool persistent = false);
 
-    virtual GraphResourceHandle
-    create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
-                    const ResourceAllocatorHandle& allocator,
-                    const ResourceAllocatorHandle& aliasing_allocator,
-                    const uint32_t resoruce_index,
-                    const uint32_t ring_size) override;
+  static ManagedVkImageOutHandle
+  compute_read_write_transfer_dst(const std::string& name,
+                                  const vk::Format format,
+                                  const vk::Extent3D extent,
+                                  const vk::ImageLayout layout = vk::ImageLayout::eGeneral,
+                                  const bool persistent = false);
 
-    virtual ImageHandle resource(const GraphResourceHandle& resource) override;
+  static ManagedVkImageOutHandle
+  compute_read_write_transfer_dst(const std::string& name,
+                                  const vk::Format format,
+                                  const uint32_t width,
+                                  const uint32_t height,
+                                  const uint32_t depth = 1,
+                                  const vk::ImageLayout layout = vk::ImageLayout::eGeneral,
+                                  const bool persistent = false);
 
-  public:
-    static ManagedVkImageOutHandle compute_write(const std::string& name,
-                                                 const vk::Format format,
-                                                 const vk::Extent3D extent,
-                                                 const bool persistent = false);
+  static ManagedVkImageOutHandle compute_read_write(const std::string& name,
+                                                    const vk::Format format,
+                                                    const vk::Extent3D extent,
+                                                    const bool persistent = false);
 
-    static ManagedVkImageOutHandle compute_fragment_write(const std::string& name,
-                                                          const vk::Format format,
-                                                          const vk::Extent3D extent,
-                                                          const bool persistent = false);
+  static ManagedVkImageOutHandle transfer_write(const std::string& name,
+                                                const vk::Format format,
+                                                const vk::Extent3D extent,
+                                                const bool persistent = false);
 
-    static ManagedVkImageOutHandle compute_write(const std::string& name,
-                                                 const vk::Format format,
-                                                 const uint32_t width,
-                                                 const uint32_t height,
-                                                 const uint32_t depth = 1,
-                                                 const bool persistent = false);
-
-    static ManagedVkImageOutHandle compute_fragment_write(const std::string& name,
-                                                          const vk::Format format,
-                                                          const uint32_t width,
-                                                          const uint32_t height,
-                                                          const uint32_t depth = 1,
-                                                          const bool persistent = false);
-
-    static ManagedVkImageOutHandle
-    compute_read_write_transfer_dst(const std::string& name,
-                                    const vk::Format format,
-                                    const vk::Extent3D extent,
-                                    const vk::ImageLayout layout = vk::ImageLayout::eGeneral,
-                                    const bool persistent = false);
-
-    static ManagedVkImageOutHandle
-    compute_read_write_transfer_dst(const std::string& name,
-                                    const vk::Format format,
-                                    const uint32_t width,
-                                    const uint32_t height,
-                                    const uint32_t depth = 1,
-                                    const vk::ImageLayout layout = vk::ImageLayout::eGeneral,
-                                    const bool persistent = false);
-
-    static ManagedVkImageOutHandle compute_read_write(const std::string& name,
-                                                      const vk::Format format,
-                                                      const vk::Extent3D extent,
-                                                      const bool persistent = false);
-
-    static ManagedVkImageOutHandle transfer_write(const std::string& name,
-                                                  const vk::Format format,
-                                                  const vk::Extent3D extent,
-                                                  const bool persistent = false);
-
-    static ManagedVkImageOutHandle transfer_write(const std::string& name,
-                                                  const vk::Format format,
-                                                  const uint32_t width,
-                                                  const uint32_t height,
-                                                  const uint32_t depth = 1,
-                                                  const bool persistent = false);
-
-  public:
-    const vk::AccessFlags2 access_flags;
-    const vk::PipelineStageFlags2 pipeline_stages;
-    const vk::ImageLayout required_layout;
-    const vk::ShaderStageFlags stage_flags;
-    const vk::ImageCreateInfo create_info;
-    const bool persistent;
+  static ManagedVkImageOutHandle transfer_write(const std::string& name,
+                                                const vk::Format format,
+                                                const uint32_t width,
+                                                const uint32_t height,
+                                                const uint32_t depth = 1,
+                                                const bool persistent = false);
 };
+} // namespace merian-nodes
 
-} // namespace merian_nodes
+
+#endif //MANAGED_VK_IMAGE_OUT_HPP

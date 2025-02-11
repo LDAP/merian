@@ -52,7 +52,6 @@ class ManagedVkImageIn : public TypedInputConnector<ManagedVkImageOutHandle, Ima
     static ManagedVkImageInHandle
     transfer_src(const std::string& name, const uint32_t delay = 0, const bool optional = false);
 
-  private:
     const vk::AccessFlags2 access_flags;
     const vk::PipelineStageFlags2 pipeline_stages;
     const vk::ImageLayout required_layout;
