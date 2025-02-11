@@ -16,6 +16,59 @@
 
 namespace merian {
 
+class MerianException : public std::runtime_error {
+  public:
+    MerianException(const std::string& reason) : std::runtime_error(reason) {}
+};
+
+class VulkanException : public MerianException {
+  public:
+    VulkanException(const vk::Result result)
+        : MerianException(fmt::format("call failed with {}", vk::to_string(result))),
+          result(result) {}
+
+    VulkanException(const VkResult result) : merian::VulkanException(vk::Result(result)) {}
+
+    VulkanException(const vk::Result result, const std::string& additional_info)
+        : MerianException(
+              fmt::format("call failed with {}. {}", vk::to_string(result), additional_info)),
+          result(result) {}
+
+    VulkanException(const VkResult result, const std::string& additional_info)
+        : merian::VulkanException(vk::Result(result), additional_info) {}
+
+    const vk::Result& get_result() const {
+        return result;
+    }
+
+    static void throw_if_no_success(const vk::Result result) {
+        if (result != vk::Result::eSuccess) {
+            throw VulkanException(result);
+        }
+    }
+
+    static void throw_if_no_success(const VkResult result) {
+        if (result != VK_SUCCESS) {
+            throw VulkanException(result);
+        }
+    }
+
+    static void throw_if_no_success(const vk::Result result, const std::string& additional_info) {
+        if (result != vk::Result::eSuccess) {
+            throw VulkanException(result, additional_info);
+        }
+    }
+
+    static void throw_if_no_success(const VkResult result, const std::string& additional_info) {
+        if (result != VK_SUCCESS) {
+            throw VulkanException(result, additional_info);
+        }
+    }
+
+  private:
+    vk::Result result;
+};
+
 // cyclic -> forward definition
 class Extension;
 class Context;

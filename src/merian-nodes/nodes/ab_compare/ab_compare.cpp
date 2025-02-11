@@ -91,11 +91,11 @@ void ABSideBySide::process([[maybe_unused]] GraphRun& run,
 
     // manual blit since we need offset by half result extent...
     vk::ImageBlit region{merian::first_layer(), {}, merian::first_layer(), {}};
-    region.srcOffsets[1] = extent_to_offset(b->get_extent());
+    region.srcOffsets[1] = to_offset(b->get_extent());
 
     std::tie(region.dstOffsets[0], region.dstOffsets[1]) =
         fit(region.srcOffsets[0], region.srcOffsets[1], {(int32_t)half_result_extent.width, 0, 0},
-            extent_to_offset(result->get_extent()));
+            to_offset(result->get_extent()));
 
     cmd->blit(b, b->get_current_layout(), result, result->get_current_layout(), region);
 }

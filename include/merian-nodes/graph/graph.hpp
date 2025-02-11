@@ -195,9 +195,6 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
         // setup later (multi-threaded, multi-queues,...).
         CommandPoolHandle command_pool;
         std::shared_ptr<CachingCommandPool> command_buffer_cache;
-        // Staging set, to release staging buffers and images when the copy
-        // to device local memory has finished.
-        merian::StagingMemoryManager::SetID staging_set_id{};
         // Query pools for the profiler
         QueryPoolHandle<vk::QueryType::eTimestamp> profiler_query_pool;
         // Tasks that should be run in the current iteration after acquiring the fence.
@@ -534,8 +531,6 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
             std::this_thread::sleep_for(in_flight_data.cpu_sleep_time);
         }
 
-        // now we can release the resources from staging space and reset the command pool
-        resource_allocator->getStaging()->releaseResourceSet(in_flight_data.staging_set_id);
         const CommandPoolHandle& cmd_pool = in_flight_data.command_pool;
         const std::shared_ptr<CachingCommandPool>& cmd_cache = in_flight_data.command_buffer_cache;
         cmd_cache->reset();
@@ -631,7 +626,6 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
             on_pre_submit(graph_run);
         }
 
-        in_flight_data.staging_set_id = resource_allocator->getStaging()->finalizeResourceSet();
         {
 
             MERIAN_PROFILE_SCOPE(profiler, "end run");
