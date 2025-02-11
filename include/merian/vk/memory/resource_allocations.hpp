@@ -317,6 +317,10 @@ class Image : public std::enable_shared_from_this<Image>, public Resource {
                               const vk::ImageLayout current_layout = vk::ImageLayout::eUndefined);
 
     static ImageHandle create(const ContextHandle& context, const vk::ImageCreateInfo create_info);
+
+    // Returns the size in bytes for a pixel of this format. Supported are only non-block compressed
+    // formats.
+    static vk::DeviceSize format_size(const vk::Format format);
 };
 
 class ImageView;

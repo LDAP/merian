@@ -2,7 +2,9 @@
 
 #include "merian/vk/context.hpp"
 
+#include "merian/vk/command/command_buffer.hpp"
 #include "merian/vk/memory/memory_suballocator_vma.hpp"
+#include "merian/vk/utils/math.hpp"
 
 namespace merian {
 
@@ -47,7 +49,17 @@ class StagingMemoryManager : public std::enable_shared_from_this<StagingMemoryMa
                        const std::vector<T>& data,
                        const vk::ImageSubresourceLayers& subresource = first_layer(),
                        const vk::Offset3D offset = {},
-                       const std::optional<vk::Extent3D> optional_extent = std::nullopt);
+                       const std::optional<vk::Extent3D> optional_extent = std::nullopt) {
+#ifndef NDEBUG
+        const vk::Extent3D extent =
+            optional_extent.value_or(to_extent(image->get_extent() - offset));
+        const vk::DeviceSize size = static_cast<vk::DeviceSize>(extent.width) * extent.height *
+                                    extent.depth * Image::format_size(image->get_format());
+        assert(data.size() * sizeof(T) >= size);
+#endif
+
+        cmd_to_device(cmd, image, data.data(), subresource, offset, optional_extent);
+    }
 
     /* Extent defaults to image->get_extent() - offset. */
     MemoryAllocationHandle
@@ -74,22 +86,9 @@ class StagingMemoryManager : public std::enable_shared_from_this<StagingMemoryMa
                        const BufferHandle& buffer,
                        const std::vector<T>& data,
                        const vk::DeviceSize offset = 0ul) {
-        assert(offset < buffer->get_size());
         const vk::DeviceSize size = data.size() * sizeof(T);
-        assert(buffer->get_size() >= size);
-        assert(offset + size <= buffer->get_size());
 
-        BufferHandle upload_buffer;
-        vk::DeviceSize buffer_offset;
-        const MemoryAllocationHandle memory =
-            get_upload_staging_space(size, upload_buffer, buffer_offset);
-
-        SPDLOG_DEBUG("uploading {} of data to staging buffer", format_size(size));
-        memcpy(memory->map(), data, size);
-        memory->unmap();
-
-        const vk::BufferCopy copy{buffer_offset, offset, size};
-        cmd->copy(upload_buffer, buffer, copy);
+        cmd_to_device(cmd, buffer, data.data(), offset, size);
     }
 
     /* size defaults to buffer->get_size() - offset. */

@@ -316,6 +316,5 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
 
 } // namespace merian
 
-#include "merian/vk/command/command_buffer.hpp"
 #include "merian/vk/command/command_pool.hpp"
 #include "merian/vk/command/queue.hpp"

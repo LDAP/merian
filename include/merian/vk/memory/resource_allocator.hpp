@@ -131,7 +131,6 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
     //
     // Important: You are responsible to insert a barrier for the upload.
     ImageHandle createImage(const CommandBufferHandle& cmdBuf,
-                            const size_t size_,
                             const void* data_,
                             const vk::ImageCreateInfo& info_,
                             const MemoryMappingType mapping_type = MemoryMappingType::NONE,

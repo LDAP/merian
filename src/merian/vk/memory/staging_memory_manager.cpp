@@ -47,22 +47,53 @@ void StagingMemoryManager::cmd_to_device(const CommandBufferHandle& cmd,
                                          const void* data,
                                          const vk::ImageSubresourceLayers& subresource,
                                          const vk::Offset3D offset,
-                                         const std::optional<vk::Extent3D> optional_extent) {}
+                                         const std::optional<vk::Extent3D> optional_extent) {
+    assert(data);
+    assert(offset < image->get_extent());
+    assert(!optional_extent || *optional_extent <= image->get_extent());
+    assert(!optional_extent || *optional_extent + offset <= image->get_extent());
 
-template <class T>
-void StagingMemoryManager::cmd_to_device(const CommandBufferHandle& cmd,
-                                         const ImageHandle& image,
-                                         const std::vector<T>& data,
-                                         const vk::ImageSubresourceLayers& subresource,
-                                         const vk::Offset3D offset,
-                                         const std::optional<vk::Extent3D> optional_extent) {}
+    const vk::Extent3D extent = optional_extent.value_or(to_extent(image->get_extent() - offset));
+    const vk::DeviceSize size = static_cast<vk::DeviceSize>(extent.width) * extent.height *
+                                extent.depth * Image::format_size(image->get_format());
+
+    BufferHandle upload_buffer;
+    vk::DeviceSize upload_buffer_offset;
+    const MemoryAllocationHandle memory =
+        get_upload_staging_space(size, upload_buffer, upload_buffer_offset);
+
+    SPDLOG_TRACE("uploading {} of data to staging buffer", format_size(size));
+    memcpy(memory->map(), data, size);
+    memory->unmap();
+
+    const vk::BufferImageCopy copy{upload_buffer_offset, 0, 0, subresource, offset, extent};
+    cmd->copy(upload_buffer, image, copy);
+}
 
 MemoryAllocationHandle
 StagingMemoryManager::cmd_from_device(const CommandBufferHandle& cmd,
                                       const ImageHandle& image,
                                       const vk::ImageSubresourceLayers& subresource,
                                       const vk::Offset3D offset,
-                                      const std::optional<vk::Extent3D> optional_extent) {}
+                                      const std::optional<vk::Extent3D> optional_extent) {
+    assert(offset < image->get_extent());
+    assert(!optional_extent || *optional_extent <= image->get_extent());
+    assert(!optional_extent || *optional_extent + offset <= image->get_extent());
+
+    const vk::Extent3D extent = optional_extent.value_or(to_extent(image->get_extent() - offset));
+    const vk::DeviceSize size = static_cast<vk::DeviceSize>(extent.width) * extent.height *
+                                extent.depth * Image::format_size(image->get_format());
+
+    BufferHandle download_buffer;
+    vk::DeviceSize download_buffer_offset;
+    const MemoryAllocationHandle memory =
+        get_download_staging_space(size, download_buffer, download_buffer_offset);
+
+    vk::BufferImageCopy copy{download_buffer_offset, 0, 0, subresource, offset, extent};
+    cmd->copy(image, download_buffer, copy);
+
+    return memory;
+}
 
 // -------------------------------------------------------------------------
 
@@ -84,7 +115,7 @@ void StagingMemoryManager::cmd_to_device(const CommandBufferHandle& cmd,
     const MemoryAllocationHandle memory =
         get_upload_staging_space(size, upload_buffer, upload_buffer_offset);
 
-    SPDLOG_DEBUG("uploading {} of data to staging buffer", format_size(size));
+    SPDLOG_TRACE("uploading {} of data to staging buffer", format_size(size));
     memcpy(memory->map(), data, size);
     memory->unmap();
 

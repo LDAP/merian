@@ -69,8 +69,8 @@ BufferHandle ResourceAllocator::createBuffer(const CommandBufferHandle& cmdBuf,
     BufferHandle resultBuffer =
         createBuffer(size_, usage_, mapping_type, debug_name, min_alignment);
 
-    if (data_) {
-        m_staging->cmdToBuffer(cmdBuf, *resultBuffer, 0, size_, data_);
+    if (data_ != nullptr) {
+        m_staging->cmd_to_device(cmdBuf, resultBuffer, data_);
     }
 
     return resultBuffer;
@@ -113,28 +113,24 @@ ImageHandle ResourceAllocator::createImage(const vk::ImageCreateInfo& info_,
 }
 
 ImageHandle ResourceAllocator::createImage(const CommandBufferHandle& cmdBuf,
-                                           const size_t size_,
                                            const void* data_,
                                            const vk::ImageCreateInfo& info_,
                                            const MemoryMappingType mapping_type,
                                            const std::string& debug_name) {
     assert(data_);
 
-    const ImageHandle resultImage = createImage(info_, mapping_type, debug_name);
-    // Copy buffer to image
-    vk::ImageSubresourceRange subresourceRange{vk::ImageAspectFlagBits::eColor, 0, info_.mipLevels,
-                                               0, 1};
+    const ImageHandle result_image = createImage(info_, mapping_type, debug_name);
 
     // doing these transitions per copy is not efficient, should do in bulk for many images
     cmdBuf->barrier(vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eTransfer,
-                    resultImage->barrier(vk::ImageLayout::eTransferDstOptimal, {},
-                                         vk::AccessFlagBits::eTransferWrite,
-                                         VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
-                                         all_levels_and_layers(), true));
+                    result_image->barrier(vk::ImageLayout::eTransferDstOptimal, {},
+                                          vk::AccessFlagBits::eTransferWrite,
+                                          VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
+                                          all_levels_and_layers(), true));
 
-    m_staging->cmdToImage(cmdBuf, *resultImage, {}, info_.extent, first_layer(), size_, data_);
+    m_staging->cmd_to_device(cmdBuf, result_image, data_);
 
-    return resultImage;
+    return result_image;
 }
 
 ImageViewHandle
@@ -233,8 +229,7 @@ TextureHandle ResourceAllocator::createTextureFromRGBA8(const CommandBufferHandl
     };
     // transfers all levels to TransferDstOptimal
     const merian::ImageHandle image =
-        createImage(cmd, width * height * sizeof(uint32_t), data, tex_image_info,
-                    MemoryMappingType::NONE, debug_name);
+        createImage(cmd, data, tex_image_info, MemoryMappingType::NONE, debug_name);
 
     if (generate_mipmaps) {
         for (uint32_t i = 1; i <= mip_levels; i++) {

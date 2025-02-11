@@ -135,7 +135,7 @@ void ImageWrite::process(GraphRun& run,
 
     // CHECK PATH
     const ImageHandle src = io[con_src];
-    vk::Extent3D scaled = max(multiply(src->get_extent(), scale), {1, 1, 1});
+    vk::Extent3D scaled = max(src->get_extent() * scale, {1, 1, 1});
     fmt::dynamic_format_arg_store<fmt::format_context> arg_store;
     get_format_args([&](const auto& arg) { arg_store.push_back(arg); }, src->get_extent(), scaled,
                     run.get_iteration(), graph_time_since_record, graph_time,

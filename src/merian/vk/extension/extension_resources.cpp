@@ -87,7 +87,7 @@ std::shared_ptr<SamplerPool> ExtensionResources::sampler_pool() {
 std::shared_ptr<StagingMemoryManager> ExtensionResources::staging() {
     if (_staging.expired()) {
         assert(!weak_context.expired());
-        auto ptr = std::make_shared<StagingMemoryManager>(weak_context.lock(), memory_allocator());
+        auto ptr = std::make_shared<StagingMemoryManager>(memory_allocator());
         _staging = ptr;
         return ptr;
     }
