@@ -73,6 +73,4 @@ ShaderCompiler::ShaderCompiler(const ContextHandle& context,
     generate_debug_info = Context::IS_DEBUG_BUILD;
 }
 
-ShaderCompiler::~ShaderCompiler(){};
-
 } // namespace merian

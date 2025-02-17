@@ -29,7 +29,7 @@ class ShadercCompiler : public ShaderCompiler {
   private:
     const uint32_t vk_api_version;
 #ifdef MERIAN_SHADERC_FOUND
-    shaderc::Compiler shader_compiler;
+    shaderc::Compiler shader_compiler{};
 #endif
 };
 
