@@ -43,13 +43,6 @@ class VkImageOut : public TypedOutputConnector<ImageHandle> {
                     std::vector<vk::ImageMemoryBarrier2>& image_barriers,
                     std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) override;
 
-    virtual GraphResourceHandle
-    create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
-                    const ResourceAllocatorHandle& allocator,
-                    const ResourceAllocatorHandle& aliasing_allocator,
-                    const uint32_t resoruce_index,
-                    const uint32_t ring_size) override;
-
     virtual ImageHandle resource(const GraphResourceHandle& resource) override;
 
     const vk::AccessFlags2 access_flags;

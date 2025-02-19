@@ -16,6 +16,13 @@ public:
                     const vk::ImageCreateInfo& create_info,
                     const bool persistent = false);
 
+  virtual GraphResourceHandle
+  create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
+                  const ResourceAllocatorHandle& allocator,
+                  const ResourceAllocatorHandle& aliasing_allocator,
+                  const uint32_t resource_index,
+                  const uint32_t ring_size) override;
+
   static ManagedVkImageOutHandle compute_write(const std::string& name,
                                                const vk::Format format,
                                                const vk::Extent3D extent,
