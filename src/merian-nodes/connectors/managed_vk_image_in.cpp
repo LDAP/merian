@@ -35,6 +35,7 @@ void ManagedVkImageIn::get_descriptor_update(const uint32_t binding,
         update->queue_descriptor_write_texture(binding, allocator->get_dummy_texture(), 0,
                                                vk::ImageLayout::eShaderReadOnlyOptimal);
     } else {
+        // TODO work of pending updates (myb only in image in)
         // or vk::ImageLayout::eShaderReadOnlyOptimal instead of required?
         assert(debugable_ptr_cast<ManagedVkImageResource>(resource)->tex && "missing usage flags?");
         update->queue_descriptor_write_texture(
@@ -50,6 +51,7 @@ Connector::ConnectorStatusFlags ManagedVkImageIn::on_pre_process(
     [[maybe_unused]] const NodeHandle& node,
     std::vector<vk::ImageMemoryBarrier2>& image_barriers,
     [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {
+    // TODO updates and barriers for all elements
     auto res = debugable_ptr_cast<ManagedVkImageResource>(resource);
 
     if (res->last_used_as_output) {
@@ -87,8 +89,8 @@ void ManagedVkImageIn::on_connect_output(const OutputConnectorHandle& output) {
     }
 }
 
-ImageHandle ManagedVkImageIn::resource(const GraphResourceHandle& resource) {
-    return debugable_ptr_cast<ManagedVkImageResource>(resource)->image;
+ImageArrayResource& ManagedVkImageIn::resource(const GraphResourceHandle& resource) {
+    return *debugable_ptr_cast<ImageArrayResource>(resource);
 }
 
 std::shared_ptr<ManagedVkImageIn>

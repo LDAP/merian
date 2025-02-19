@@ -93,7 +93,7 @@ void AutoExposure::process(GraphRun& run,
         cmd->bind(histogram);
         cmd->bind_descriptor_set(histogram, descriptor_set);
         cmd->push_constant(histogram, pc);
-        cmd->dispatch(io[con_out]->get_extent(), LOCAL_SIZE_X, LOCAL_SIZE_Y);
+        cmd->dispatch(io[con_out].get(0)->get_extent(), LOCAL_SIZE_X, LOCAL_SIZE_Y);
 
         bar = io[con_hist]->buffer_barrier(vk::AccessFlagBits::eShaderRead |
                                                vk::AccessFlagBits::eShaderWrite,
@@ -116,7 +116,7 @@ void AutoExposure::process(GraphRun& run,
     cmd->bind(exposure);
     cmd->bind_descriptor_set(exposure, descriptor_set);
     cmd->push_constant(exposure, pc);
-    cmd->dispatch(io[con_out]->get_extent(), LOCAL_SIZE_X, LOCAL_SIZE_Y);
+    cmd->dispatch(io[con_out].get(0)->get_extent(), LOCAL_SIZE_X, LOCAL_SIZE_Y);
 }
 
 AutoExposure::NodeStatusFlags AutoExposure::properties(Properties& config) {

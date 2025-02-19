@@ -70,10 +70,10 @@ void MeanToBuffer::process([[maybe_unused]] GraphRun& run,
                            const CommandBufferHandle& cmd,
                            const DescriptorSetHandle& descriptor_set,
                            const NodeIO& io) {
-    const auto group_count_x = (io[con_src]->get_extent().width + local_size_x - 1) / local_size_x;
-    const auto group_count_y = (io[con_src]->get_extent().height + local_size_y - 1) / local_size_y;
+    const auto group_count_x = (io[con_src].get(0)->get_extent().width + local_size_x - 1) / local_size_x;
+    const auto group_count_y = (io[con_src].get(0)->get_extent().height + local_size_y - 1) / local_size_y;
 
-    pc.divisor = io[con_src]->get_extent().width * io[con_src]->get_extent().height;
+    pc.divisor = io[con_src].get(0)->get_extent().width * io[con_src].get(0)->get_extent().height;
 
     {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "image to buffer");

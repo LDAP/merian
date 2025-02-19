@@ -53,13 +53,13 @@ class GLFWWindow : public Node {
             if (io.is_connected(image_in)) {
                 const auto& src_image = io[image_in];
                 const vk::Filter filter =
-                    src_image->format_features() &
+                    src_image.get(0)->format_features() &
                             vk::FormatFeatureFlagBits::eSampledImageFilterLinear
                         ? vk::Filter::eLinear
                         : vk::Filter::eNearest;
 
-                cmd_blit(mode, cmd, src_image, vk::ImageLayout::eTransferSrcOptimal,
-                         src_image->get_extent(), image, vk::ImageLayout::eTransferDstOptimal,
+                cmd_blit(mode, cmd, src_image.get(0), vk::ImageLayout::eTransferSrcOptimal,
+                         src_image.get(0)->get_extent(), image, vk::ImageLayout::eTransferDstOptimal,
                          image->get_extent(), vk::ClearColorValue{}, filter);
             } else {
                 cmd->clear(image);

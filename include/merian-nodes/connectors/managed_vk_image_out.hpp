@@ -14,7 +14,9 @@ public:
                     const vk::ImageLayout& required_layout,
                     const vk::ShaderStageFlags& stage_flags,
                     const vk::ImageCreateInfo& create_info,
-                    const bool persistent = false);
+                    const bool persistent = false,
+                    const uint32_t image_count = 1
+                    );
 
   virtual GraphResourceHandle
   create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,

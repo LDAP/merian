@@ -42,15 +42,15 @@ void HDRImageRead::process([[maybe_unused]] GraphRun& run,
         if (image == nullptr) {
             image = stbi_loadf(filename.string().c_str(), &width, &height, &channels, 4);
             assert(image);
-            assert(width == (int)io[con_out]->get_extent().width &&
-                   height == (int)io[con_out]->get_extent().height);
+            assert(width == (int)io[con_out].get(0)->get_extent().width &&
+                   height == (int)io[con_out].get(0)->get_extent().height);
 
             SPDLOG_INFO("Loaded image from {} ({}x{}, {} channels)", filename.string(), width,
                         height, channels);
         }
 
         run.get_allocator()->getStaging()->cmdToImage(
-            cmd, *io[con_out], {0, 0, 0}, io[con_out]->get_extent(), first_layer(),
+            cmd, *io[con_out].get(0), {0, 0, 0}, io[con_out].get(0)->get_extent(), first_layer(),
             static_cast<long>(width * height) * 4 * sizeof(float), image);
 
         if (!keep_on_host) {

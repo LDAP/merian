@@ -30,12 +30,13 @@ void VkImageOut::get_descriptor_update(
     const DescriptorSetHandle& update,
     [[maybe_unused]] const ResourceAllocatorHandle& allocator) {
     // or vk::ImageLayout::eGeneral instead of required?
-    assert(debugable_ptr_cast<ManagedVkImageResource>(resource)->tex && "missing usage flags?");
+    // TODO work of pending updates (myb only in image in)
+    assert(debugable_ptr_cast<ImageArrayResource>(resource)->textures[0] && "missing usage flags?");
     // From Spec 14.1.1: The image subresources for a storage image must be in the
     // VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR or VK_IMAGE_LAYOUT_GENERAL layout in order to access its
     // data in a shader.
     update->queue_descriptor_write_texture(
-        binding, *debugable_ptr_cast<ManagedVkImageResource>(resource)->tex, 0,
+        binding, *debugable_ptr_cast<ImageArrayResource>(resource)->textures[0], 0,
         vk::ImageLayout::eGeneral);
 }
 
@@ -47,6 +48,7 @@ Connector::ConnectorStatusFlags VkImageOut::on_pre_process(
     std::vector<vk::ImageMemoryBarrier2>& image_barriers,
     [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {
     Connector::ConnectorStatusFlags flags{};
+    // TODO updates and barriers for all elements
     const auto& res = debugable_ptr_cast<ManagedVkImageResource>(resource);
     if (res->needs_descriptor_update) {
         flags |= NEEDS_DESCRIPTOR_UPDATE;
@@ -76,8 +78,8 @@ Connector::ConnectorStatusFlags VkImageOut::on_post_process(
     return {};
 }
 
-ImageHandle VkImageOut::resource(const GraphResourceHandle& resource) {
-    return debugable_ptr_cast<ManagedVkImageResource>(resource)->image;
+ImageArrayResource& VkImageOut::resource(const GraphResourceHandle& resource) {
+    return *debugable_ptr_cast<ImageArrayResource>(resource);
 }
 
 

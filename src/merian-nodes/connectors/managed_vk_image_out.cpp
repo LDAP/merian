@@ -12,8 +12,11 @@ ManagedVkImageOut::ManagedVkImageOut(const std::string& name,
                                      const vk::ImageLayout& required_layout,
                                      const vk::ShaderStageFlags& stage_flags,
                                      const vk::ImageCreateInfo& create_info,
-                                     const bool persistent)
-    : VkImageOut(name, access_flags, pipeline_stages, required_layout, stage_flags, create_info, persistent) {}
+                                     const bool persistent,
+                                     const uint32_t image_count)
+    : VkImageOut(name, access_flags, pipeline_stages, required_layout, stage_flags, create_info, persistent) {
+    images.resize(image_count);
+}
 
 GraphResourceHandle ManagedVkImageOut::create_resource(
     const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
@@ -26,6 +29,7 @@ GraphResourceHandle ManagedVkImageOut::create_resource(
     vk::ImageCreateInfo image_create_info = create_info;
     vk::PipelineStageFlags2 input_pipeline_stages;
     vk::AccessFlags2 input_access_flags;
+    vk::ImageLayout first_input_layout = vk::ImageLayout::eUndefined;
 
     std::map<std::pair<NodeHandle, uint32_t>, vk::ImageLayout> layouts_per_node;
 
@@ -34,6 +38,10 @@ GraphResourceHandle ManagedVkImageOut::create_resource(
         image_create_info.usage |= image_in->usage_flags;
         input_pipeline_stages |= image_in->pipeline_stages;
         input_access_flags |= image_in->access_flags;
+
+        if (first_input_layout == vk::ImageLayout::eUndefined) {
+            first_input_layout = image_in->required_layout;
+        }
 
         if (layouts_per_node.contains(std::make_pair(input_node, input->delay)) &&
             layouts_per_node.at(std::make_pair(input_node, input->delay)) !=
@@ -47,12 +55,18 @@ GraphResourceHandle ManagedVkImageOut::create_resource(
                                      image_in->required_layout);
     }
 
-    const ImageHandle image = alloc->createImage(image_create_info, MemoryMappingType::NONE, name);
-    auto res =
-        std::make_shared<ManagedVkImageResource>(image, input_pipeline_stages, input_access_flags);
+    for (auto & image : images) {
+        image = alloc->createImage(image_create_info, MemoryMappingType::NONE, name);
+    }
 
-    if (image->valid_for_view()) {
-        res->tex = allocator->createTexture(image, image->make_view_create_info(), name);
+    auto res = std::make_shared<ImageArrayResource>(images, allocator->get_dummy_texture()->get_image(),
+                                              input_pipeline_stages, input_access_flags,
+                                              first_input_layout);
+
+    for (uint32_t i = 0; i < res->images.size(); i++) {
+        if (images[i]->valid_for_view()) {
+            res->textures[i] = allocator->createTexture(images[i], images[i]->make_view_create_info(), name);
+        }
     }
 
     return res;

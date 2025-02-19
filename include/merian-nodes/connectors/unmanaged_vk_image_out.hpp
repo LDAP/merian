@@ -22,7 +22,6 @@ public:
   static UnmanagedVkImageOutHandle create(const std::string& name, const uint32_t array_size);
 
 private:
-  std::vector<ImageHandle> images;
 };
 
 } // namespace merain_nodes

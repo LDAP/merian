@@ -10,6 +10,8 @@ namespace merian_nodes {
 class ImageArrayResource : public GraphResource {
     friend class VkImageOut;
     friend class VkImageIn;
+    friend class ManagedVkImageOut;
+    friend class UnmanagedVkImageOut;
 
   public:
     ImageArrayResource(std::vector<merian::ImageHandle>& images,
@@ -19,6 +21,8 @@ class ImageArrayResource : public GraphResource {
                          const vk::ImageLayout first_input_layout)
         : input_stage_flags(input_stage_flags), input_access_flags(input_access_flags),
           images(images), dummy_image(dummy_image), first_input_layout(first_input_layout) {
+
+        textures.resize(images.size());
 
         for (uint32_t i = 0; i < images.size(); i++) {
             current_updates.push_back(i);
@@ -69,19 +73,19 @@ class ImageArrayResource : public GraphResource {
         }
     }
 
-  public:
+  private:
     // combined pipeline stage flags of all inputs
     const vk::PipelineStageFlags2 input_stage_flags;
     // combined access flags of all inputs
     const vk::AccessFlags2 input_access_flags;
 
-  private:
     // the updates to "textures" are recorded here.
     std::vector<uint32_t> current_updates;
     // then flushed to here to wait for the graph to apply descriptor updates.
     std::vector<uint32_t> pending_updates;
 
     std::vector<merian::ImageHandle>& images;
+    std::vector<std::optional<merian::TextureHandle>> textures;
 
     const merian::ImageHandle dummy_image;
     const vk::ImageLayout first_input_layout;
