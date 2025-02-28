@@ -531,7 +531,6 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
             std::this_thread::sleep_for(in_flight_data.cpu_sleep_time);
         }
 
-        const CommandPoolHandle& cmd_pool = in_flight_data.command_pool;
         const std::shared_ptr<CachingCommandPool>& cmd_cache = in_flight_data.command_buffer_cache;
         cmd_cache->reset();
 
@@ -579,7 +578,10 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                     const uint32_t set_idx = data.set_index(run_iteration);
                     Node::NodeStatusFlags flags =
                         node->pre_process(graph_run, data.resource_maps[set_idx]);
-                    needs_reconnect |= flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT;
+                    if ((flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT) != 0u) {
+                        SPDLOG_DEBUG("node {} requested reconnect in pre_process", data.identifier);
+                        request_reconnect();
+                    }
                     if ((flags & Node::NodeStatusFlagBits::RESET_IN_FLIGHT_DATA) != 0u) {
                         in_flight_data.in_flight_data[node].reset();
                     }
@@ -986,7 +988,10 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                     if (props.st_begin_child("properties", "Properties",
                                              Properties::ChildFlagBits::DEFAULT_OPEN)) {
                         const Node::NodeStatusFlags flags = node->properties(props);
-                        needs_reconnect |= flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT;
+                        if ((flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT) != 0u) {
+                            SPDLOG_DEBUG("node {} requested reconnect", data.identifier);
+                            request_reconnect();
+                        }
                         props.st_end_child();
                     }
                     if (props.st_begin_child("stats", "Statistics")) {
@@ -1293,6 +1298,8 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                                               resource_index);
                 }
                 if ((flags & Connector::ConnectorStatusFlagBits::NEEDS_RECONNECT) != 0u) {
+                    SPDLOG_DEBUG("input connector {} at node {} requested reconnect.", input->name,
+                                 data.identifier);
                     request_reconnect();
                 }
             }
@@ -1304,6 +1311,8 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                     record_descriptor_updates(data, output, per_output_info, resource_index);
                 }
                 if ((flags & Connector::ConnectorStatusFlagBits::NEEDS_RECONNECT) != 0u) {
+                    SPDLOG_DEBUG("output connector {} at node {} requested reconnect.",
+                                 output->name, data.identifier);
                     request_reconnect();
                 }
             }
@@ -1329,6 +1338,12 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
 
         {
             node->process(run, descriptor_set, data.resource_maps[set_idx]);
+#ifndef NDEBUG
+            if (run.needs_reconnect && !get_needs_reconnect()) {
+                SPDLOG_DEBUG("node {} requested reconnect in process", data.identifier);
+                request_reconnect();
+            }
+#endif
         }
 
         {
@@ -1349,6 +1364,8 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                                               resource_index);
                 }
                 if ((flags & Connector::ConnectorStatusFlagBits::NEEDS_RECONNECT) != 0u) {
+                    SPDLOG_DEBUG("input connector {} at node {} requested reconnect.", input->name,
+                                 data.identifier);
                     request_reconnect();
                 }
             }
@@ -1360,6 +1377,8 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                     record_descriptor_updates(data, output, per_output_info, resource_index);
                 }
                 if ((flags & Connector::ConnectorStatusFlagBits::NEEDS_RECONNECT) != 0u) {
+                    SPDLOG_DEBUG("output connector {} at node {} requested reconnect.",
+                                 output->name, data.identifier);
                     request_reconnect();
                 }
             }
