@@ -275,6 +275,7 @@ class GraphRun {
         this->elapsed_since_connect = elapsed_since_connect;
 
         external_wait_time = 0ns;
+        needs_reconnect = false;
 
         cmd = cmd_cache->create_and_begin();
     }
