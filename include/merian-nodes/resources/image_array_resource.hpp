@@ -9,7 +9,6 @@ namespace merian_nodes {
 
 class ImageArrayResource : public GraphResource {
     friend class VkImageOut;
-    friend class VkImageIn;
     friend class ManagedVkImageOut;
     friend class UnmanagedVkImageOut;
 
@@ -73,7 +72,14 @@ class ImageArrayResource : public GraphResource {
         }
     }
 
-  private:
+    std::vector<merian::ImageHandle>& images;
+    std::vector<std::optional<merian::TextureHandle>> textures;
+    bool last_used_as_output = true;
+
+    // for barrier insertions
+    vk::PipelineStageFlags2 current_stage_flags = vk::PipelineStageFlagBits2::eTopOfPipe;
+    vk::AccessFlags2 current_access_flags{};
+
     // combined pipeline stage flags of all inputs
     const vk::PipelineStageFlags2 input_stage_flags;
     // combined access flags of all inputs
@@ -83,9 +89,6 @@ class ImageArrayResource : public GraphResource {
     std::vector<uint32_t> current_updates;
     // then flushed to here to wait for the graph to apply descriptor updates.
     std::vector<uint32_t> pending_updates;
-
-    std::vector<merian::ImageHandle>& images;
-    std::vector<std::optional<merian::TextureHandle>> textures;
 
     const merian::ImageHandle dummy_image;
     const vk::ImageLayout first_input_layout;

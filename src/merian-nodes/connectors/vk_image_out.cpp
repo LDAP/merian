@@ -30,41 +30,22 @@ void VkImageOut::get_descriptor_update(
     const DescriptorSetHandle& update,
     [[maybe_unused]] const ResourceAllocatorHandle& allocator) {
     // or vk::ImageLayout::eGeneral instead of required?
-    // TODO work of pending updates (myb only in image in)
-    assert(debugable_ptr_cast<ImageArrayResource>(resource)->textures[0] && "missing usage flags?");
+    if (!resource) {
+        // the optional connector was not connected
+        update->queue_descriptor_write_texture(binding, allocator->get_dummy_texture(), 0,
+                                               vk::ImageLayout::eShaderReadOnlyOptimal);
+    } else {
+        const auto& res = debugable_ptr_cast<ImageArrayResource>(resource);
+        for (auto& pending_update : res->pending_updates) {
+            const TextureHandle tex =
+                res->textures[pending_update].has_value() ? res->textures[pending_update].value() : allocator->get_dummy_texture();
+            update->queue_descriptor_write_texture(binding, tex, pending_update, vk::ImageLayout::eGeneral);
+        }
+    }
     // From Spec 14.1.1: The image subresources for a storage image must be in the
     // VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR or VK_IMAGE_LAYOUT_GENERAL layout in order to access its
     // data in a shader.
-    update->queue_descriptor_write_texture(
-        binding, *debugable_ptr_cast<ImageArrayResource>(resource)->textures[0], 0,
-        vk::ImageLayout::eGeneral);
-}
 
-Connector::ConnectorStatusFlags VkImageOut::on_pre_process(
-    [[maybe_unused]] GraphRun& run,
-    [[maybe_unused]] const CommandBufferHandle& cmd,
-    const GraphResourceHandle& resource,
-    [[maybe_unused]] const NodeHandle& node,
-    std::vector<vk::ImageMemoryBarrier2>& image_barriers,
-    [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {
-    Connector::ConnectorStatusFlags flags{};
-    // TODO updates and barriers for all elements
-    const auto& res = debugable_ptr_cast<ManagedVkImageResource>(resource);
-    if (res->needs_descriptor_update) {
-        flags |= NEEDS_DESCRIPTOR_UPDATE;
-        res->needs_descriptor_update = false;
-    }
-
-    vk::ImageMemoryBarrier2 img_bar =
-        res->image->barrier2(required_layout, res->current_access_flags, access_flags,
-                             res->current_stage_flags, pipeline_stages, VK_QUEUE_FAMILY_IGNORED,
-                             VK_QUEUE_FAMILY_IGNORED, all_levels_and_layers(), !persistent);
-
-    image_barriers.push_back(img_bar);
-    res->current_stage_flags = pipeline_stages;
-    res->current_access_flags = access_flags;
-
-    return flags;
 }
 
 Connector::ConnectorStatusFlags VkImageOut::on_post_process(
@@ -74,7 +55,7 @@ Connector::ConnectorStatusFlags VkImageOut::on_post_process(
     [[maybe_unused]] const NodeHandle& node,
     [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
     [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {
-    debugable_ptr_cast<ManagedVkImageResource>(resource)->last_used_as_output = true;
+    debugable_ptr_cast<ImageArrayResource>(resource)->last_used_as_output = true;
     return {};
 }
 

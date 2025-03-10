@@ -30,14 +30,6 @@ class VkImageOut : public TypedOutputConnector<ImageArrayResource&> {
                                        const ResourceAllocatorHandle& allocator) override;
 
     virtual ConnectorStatusFlags
-    on_pre_process(GraphRun& run,
-                   const CommandBufferHandle& cmd,
-                   const GraphResourceHandle& resource,
-                   const NodeHandle& node,
-                   std::vector<vk::ImageMemoryBarrier2>& image_barriers,
-                   std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) override;
-
-    virtual ConnectorStatusFlags
     on_post_process(GraphRun& run,
                     const CommandBufferHandle& cmd,
                     const GraphResourceHandle& resource,

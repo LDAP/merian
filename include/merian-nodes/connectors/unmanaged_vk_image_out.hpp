@@ -19,6 +19,14 @@ public:
                 const uint32_t resource_index,
                 const uint32_t ring_size) override;
 
+  virtual ConnectorStatusFlags
+  on_pre_process(GraphRun& run,
+               const CommandBufferHandle& cmd,
+               const GraphResourceHandle& resource,
+               const NodeHandle& node,
+               std::vector<vk::ImageMemoryBarrier2>& image_barriers,
+               std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) override;
+
   static UnmanagedVkImageOutHandle create(const std::string& name, const uint32_t array_size);
 
 private:

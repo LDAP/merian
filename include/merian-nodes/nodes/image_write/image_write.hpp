@@ -1,6 +1,6 @@
 #pragma once
 
-#include "merian-nodes/connectors/managed_vk_image_in.hpp"
+#include "merian-nodes/connectors/vk_image_in.hpp"
 #include "merian-nodes/graph/node.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 
@@ -72,7 +72,7 @@ class ImageWrite : public Node {
     const ContextHandle context;
     const ResourceAllocatorHandle allocator;
 
-    ManagedVkImageInHandle con_src = ManagedVkImageIn::transfer_src("src");
+    ManagedVkImageInHandle con_src = VkImageIn::transfer_src("src");
 
     uint32_t max_concurrent_tasks = std::thread::hardware_concurrency();
     uint32_t concurrent_tasks = 0;

@@ -3,7 +3,7 @@
 //
 
 #include <merian-nodes/connectors/unmanaged_vk_image_out.hpp>
-#include <merian-nodes/connectors/managed_vk_image_in.hpp>
+#include <merian-nodes/connectors/vk_image_in.hpp>
 #include <merian-nodes/resources/image_array_resource.hpp>
 #include <merian/utils/pointer.hpp>
 
@@ -21,7 +21,7 @@ GraphResourceHandle UnmanagedVkImageOut::create_resource(
     vk::ImageLayout first_input_layout = vk::ImageLayout::eUndefined;
 
     for (const auto& [input_node, input] : inputs) {
-        const auto& con_in = debugable_ptr_cast<ManagedVkImageIn>(input);
+        const auto& con_in = debugable_ptr_cast<VkImageIn>(input);
         input_pipeline_stages |= con_in->pipeline_stages;
         input_access_flags |= con_in->access_flags;
 
@@ -33,6 +33,30 @@ GraphResourceHandle UnmanagedVkImageOut::create_resource(
     return std::make_shared<ImageArrayResource>(images, allocator->get_dummy_texture()->get_image(),
                                                   input_pipeline_stages, input_access_flags,
                                                   first_input_layout);
+}
+
+Connector::ConnectorStatusFlags UnmanagedVkImageOut::on_pre_process(
+    [[maybe_unused]] GraphRun& run,
+    [[maybe_unused]] const CommandBufferHandle& cmd,
+    const GraphResourceHandle& resource,
+    [[maybe_unused]] const NodeHandle& node,
+    std::vector<vk::ImageMemoryBarrier2>& image_barriers,
+    [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {
+
+    auto res = debugable_ptr_cast<ImageArrayResource>(resource);
+
+    for (auto& image : res->images) {
+        vk::ImageMemoryBarrier2 img_bar =
+        image->barrier2(required_layout, res->current_access_flags, access_flags,
+                             res->current_stage_flags, pipeline_stages, VK_QUEUE_FAMILY_IGNORED,
+                             VK_QUEUE_FAMILY_IGNORED, all_levels_and_layers(), !persistent);
+        image_barriers.push_back(img_bar);
+    }
+
+    res->current_stage_flags = pipeline_stages;
+    res->current_access_flags = access_flags;
+
+    return {};
 }
 
 } // namespace merian_nodes

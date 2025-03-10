@@ -1,7 +1,7 @@
 #include "merian-nodes/connectors/managed_vk_buffer_out.hpp"
 
 #include <merian-nodes/connectors/managed_vk_image_out.hpp>
-#include "merian-nodes/connectors/managed_vk_image_in.hpp"
+#include "merian-nodes/connectors/vk_image_in.hpp"
 #include "merian-nodes/graph/errors.hpp"
 #include <merian/utils/pointer.hpp>
 
@@ -34,7 +34,7 @@ GraphResourceHandle ManagedVkImageOut::create_resource(
     std::map<std::pair<NodeHandle, uint32_t>, vk::ImageLayout> layouts_per_node;
 
     for (const auto& [input_node, input] : inputs) {
-        const auto& image_in = debugable_ptr_cast<ManagedVkImageIn>(input);
+        const auto& image_in = debugable_ptr_cast<VkImageIn>(input);
         image_create_info.usage |= image_in->usage_flags;
         input_pipeline_stages |= image_in->pipeline_stages;
         input_access_flags |= image_in->access_flags;
@@ -70,6 +70,37 @@ GraphResourceHandle ManagedVkImageOut::create_resource(
     }
 
     return res;
+}
+
+Connector::ConnectorStatusFlags ManagedVkImageOut::on_pre_process(
+    [[maybe_unused]] GraphRun& run,
+    [[maybe_unused]] const CommandBufferHandle& cmd,
+    const GraphResourceHandle& resource,
+    [[maybe_unused]] const NodeHandle& node,
+    std::vector<vk::ImageMemoryBarrier2>& image_barriers,
+    [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {
+
+    auto res = debugable_ptr_cast<ImageArrayResource>(resource);
+
+    for (auto& image : res->images) {
+        vk::ImageMemoryBarrier2 img_bar =
+        image->barrier2(required_layout, res->current_access_flags, access_flags,
+                             res->current_stage_flags, pipeline_stages, VK_QUEUE_FAMILY_IGNORED,
+                             VK_QUEUE_FAMILY_IGNORED, all_levels_and_layers(), !persistent);
+        image_barriers.push_back(img_bar);
+    }
+
+    res->current_stage_flags = pipeline_stages;
+    res->current_access_flags = access_flags;
+
+    Connector::ConnectorStatusFlags flags{};
+    if (!res->current_updates.empty()) {
+        res->pending_updates.clear();
+        std::swap(res->pending_updates, res->current_updates);
+        return NEEDS_DESCRIPTOR_UPDATE;
+    }
+
+    return flags;
 }
 
 std::shared_ptr<ManagedVkImageOut> ManagedVkImageOut::compute_write(const std::string& name,
