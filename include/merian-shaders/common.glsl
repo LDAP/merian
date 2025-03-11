@@ -68,4 +68,14 @@ float x_over_expm1(const float x) {
     return x / y;
 }
 
+// retains the sign when computing pow()
+float signpow(const float a, const float x) {
+    return pow(abs(a), x) * sign(a);
+}
+
+// cube root
+float cbrt(const float a) {
+    return signpow(a, 0.333333333333);
+}
+
 #endif // _MERIAN_SHADERS_COMMON_H_
