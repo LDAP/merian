@@ -7,7 +7,7 @@
 namespace merian_nodes {
 
 class VkImageIn;
-using ManagedVkImageInHandle = std::shared_ptr<VkImageIn>;
+using VkImageInHandle = std::shared_ptr<VkImageIn>;
 
 // Input a Vulkan image that is allocated and managed by the graph.
 // Note that it only supplies a descriptor if stage_flags contains at least one bit.
@@ -46,10 +46,10 @@ class VkImageIn : public TypedInputConnector<ManagedVkImageOutHandle, ImageArray
     virtual ImageArrayResource& resource(const GraphResourceHandle& resource) override;
 
   public:
-    static ManagedVkImageInHandle
+    static VkImageInHandle
     compute_read(const std::string& name, const uint32_t delay = 0, const bool optional = false);
 
-    static ManagedVkImageInHandle
+    static VkImageInHandle
     transfer_src(const std::string& name, const uint32_t delay = 0, const bool optional = false);
 
     const vk::AccessFlags2 access_flags;

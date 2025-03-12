@@ -42,7 +42,7 @@ class FXAA : public AbstractCompute {
     SpecializationInfoHandle spec_info;
     ShaderModuleHandle shader;
 
-    ManagedVkImageInHandle con_src = VkImageIn::compute_read("src");
+    VkImageInHandle con_src = VkImageIn::compute_read("src");
 };
 
 } // namespace merian_nodes

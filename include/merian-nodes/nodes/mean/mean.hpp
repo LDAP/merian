@@ -43,7 +43,7 @@ class MeanToBuffer : public Node {
   private:
     const ContextHandle context;
 
-    ManagedVkImageInHandle con_src = VkImageIn::compute_read("src");
+    VkImageInHandle con_src = VkImageIn::compute_read("src");
     ManagedVkBufferOutHandle con_mean;
 
     PushConstant pc;

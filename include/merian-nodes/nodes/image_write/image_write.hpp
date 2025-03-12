@@ -72,7 +72,7 @@ class ImageWrite : public Node {
     const ContextHandle context;
     const ResourceAllocatorHandle allocator;
 
-    ManagedVkImageInHandle con_src = VkImageIn::transfer_src("src");
+    VkImageInHandle con_src = VkImageIn::transfer_src("src");
 
     uint32_t max_concurrent_tasks = std::thread::hardware_concurrency();
     uint32_t concurrent_tasks = 0;

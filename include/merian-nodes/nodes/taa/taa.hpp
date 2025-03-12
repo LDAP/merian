@@ -42,8 +42,8 @@ class TAA : public AbstractCompute {
     ShaderModuleHandle shader;
     SpecializationInfoHandle spec_info;
 
-    ManagedVkImageInHandle con_src = VkImageIn::compute_read("src");
-    ManagedVkImageInHandle con_mv = VkImageIn::compute_read("mv", 0, true);
+    VkImageInHandle con_src = VkImageIn::compute_read("src");
+    VkImageInHandle con_mv = VkImageIn::compute_read("mv", 0, true);
 
     PushConstant pc;
     uint32_t width{};

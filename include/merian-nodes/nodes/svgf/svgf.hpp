@@ -1,6 +1,6 @@
 #pragma once
 
-#include "merian-nodes/connectors/managed_vk_buffer_in.hpp"
+#include "merian-nodes/connectors/vk_buffer_in.hpp"
 #include "merian-nodes/connectors/vk_image_in.hpp"
 #include "merian-nodes/graph/node.hpp"
 
@@ -66,13 +66,13 @@ class SVGF : public Node {
     static constexpr uint32_t local_size_x = 32;
     static constexpr uint32_t local_size_y = 32;
 
-    ManagedVkImageInHandle con_prev_out = VkImageIn::compute_read("prev_out", 1);
-    ManagedVkImageInHandle con_irr = VkImageIn::compute_read("irr");
-    ManagedVkImageInHandle con_moments = VkImageIn::compute_read("moments");
-    ManagedVkImageInHandle con_albedo = VkImageIn::compute_read("albedo");
-    ManagedVkImageInHandle con_mv = VkImageIn::compute_read("mv", 0, true);
-    ManagedVkBufferInHandle con_gbuffer = ManagedVkBufferIn::compute_read("gbuffer");
-    ManagedVkBufferInHandle con_prev_gbuffer = ManagedVkBufferIn::compute_read("prev_gbuffer", 1);
+    VkImageInHandle con_prev_out = VkImageIn::compute_read("prev_out", 1);
+    VkImageInHandle con_irr = VkImageIn::compute_read("irr");
+    VkImageInHandle con_moments = VkImageIn::compute_read("moments");
+    VkImageInHandle con_albedo = VkImageIn::compute_read("albedo");
+    VkImageInHandle con_mv = VkImageIn::compute_read("mv", 0, true);
+    VkBufferInHandle con_gbuffer = VkBufferIn::compute_read("gbuffer");
+    VkBufferInHandle con_prev_gbuffer = VkBufferIn::compute_read("prev_gbuffer", 1);
 
     ShaderModuleHandle variance_estimate_module;
     ShaderModuleHandle filter_module;

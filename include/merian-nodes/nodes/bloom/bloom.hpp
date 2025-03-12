@@ -40,7 +40,7 @@ class Bloom : public Node {
   private:
     const ContextHandle context;
 
-    ManagedVkImageInHandle con_src = VkImageIn::compute_read("src");
+    VkImageInHandle con_src = VkImageIn::compute_read("src");
     ManagedVkImageOutHandle con_out;
     ManagedVkImageOutHandle con_interm;
 

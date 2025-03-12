@@ -1,6 +1,6 @@
 #pragma once
 
-#include "merian-nodes/connectors/managed_vk_buffer_in.hpp"
+#include "merian-nodes/connectors/vk_buffer_in.hpp"
 #include "merian-nodes/connectors/vk_image_in.hpp"
 
 #include "merian-nodes/graph/node.hpp"
@@ -76,14 +76,14 @@ class Accumulate : public Node {
     static constexpr uint32_t FILTER_LOCAL_SIZE_Y = 16;
 
     // Graph IO
-    ManagedVkImageInHandle con_prev_accum = VkImageIn::compute_read("prev_accum", 1);
-    ManagedVkImageInHandle con_prev_moments = VkImageIn::compute_read("prev_moments", 1);
-    ManagedVkImageInHandle con_irr_in = VkImageIn::compute_read("irr");
-    ManagedVkImageInHandle con_mv = VkImageIn::compute_read("mv", 0, true);
-    ManagedVkImageInHandle con_moments_in = VkImageIn::compute_read("moments_in");
+    VkImageInHandle con_prev_accum = VkImageIn::compute_read("prev_accum", 1);
+    VkImageInHandle con_prev_moments = VkImageIn::compute_read("prev_moments", 1);
+    VkImageInHandle con_irr_in = VkImageIn::compute_read("irr");
+    VkImageInHandle con_mv = VkImageIn::compute_read("mv", 0, true);
+    VkImageInHandle con_moments_in = VkImageIn::compute_read("moments_in");
 
-    ManagedVkBufferInHandle con_gbuf = ManagedVkBufferIn::compute_read("gbuf");
-    ManagedVkBufferInHandle con_prev_gbuf = ManagedVkBufferIn::compute_read("prev_gbuf", 1);
+    VkBufferInHandle con_gbuf = VkBufferIn::compute_read("gbuf");
+    VkBufferInHandle con_prev_gbuf = VkBufferIn::compute_read("prev_gbuf", 1);
 
     ManagedVkImageOutHandle con_irr_out;
     ManagedVkImageOutHandle con_moments_out;

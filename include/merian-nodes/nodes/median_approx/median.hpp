@@ -42,7 +42,7 @@ class MedianApproxNode : public Node {
     const ContextHandle context;
     int component;
 
-    ManagedVkImageInHandle con_src = VkImageIn::compute_read("src");
+    VkImageInHandle con_src = VkImageIn::compute_read("src");
     ManagedVkBufferOutHandle con_median;
     ManagedVkBufferOutHandle con_histogram;
 

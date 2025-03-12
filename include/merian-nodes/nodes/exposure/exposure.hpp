@@ -60,7 +60,7 @@ class AutoExposure : public Node {
   private:
     const ContextHandle context;
 
-    ManagedVkImageInHandle con_src = VkImageIn::compute_read("src");
+    VkImageInHandle con_src = VkImageIn::compute_read("src");
 
     ManagedVkImageOutHandle con_out;
     ManagedVkBufferOutHandle con_hist;

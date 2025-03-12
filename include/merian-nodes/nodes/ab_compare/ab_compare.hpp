@@ -22,8 +22,8 @@ class AbstractABCompare : public Node {
     const std::optional<vk::Format> output_format;
     const std::optional<vk::Extent2D> output_extent;
 
-    const ManagedVkImageInHandle con_in_a = VkImageIn::transfer_src("a");
-    const ManagedVkImageInHandle con_in_b = VkImageIn::transfer_src("b");
+    const VkImageInHandle con_in_a = VkImageIn::transfer_src("a");
+    const VkImageInHandle con_in_b = VkImageIn::transfer_src("b");
 };
 
 class ABSplit : public AbstractABCompare {

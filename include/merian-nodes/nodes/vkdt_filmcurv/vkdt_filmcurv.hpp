@@ -42,7 +42,7 @@ class VKDTFilmcurv : public AbstractCompute {
   private:
     const std::optional<vk::Format> output_format;
 
-    ManagedVkImageInHandle con_src = VkImageIn::compute_read("src");
+    VkImageInHandle con_src = VkImageIn::compute_read("src");
     vk::Extent3D extent;
 
     ShaderModuleHandle shader;

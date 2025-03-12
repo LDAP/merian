@@ -37,7 +37,7 @@ class Add : public AbstractCompute {
     SpecializationInfoHandle spec_info;
 
     static constexpr uint32_t number_inputs = 10;
-    std::vector<ManagedVkImageInHandle> input_connectors;
+    std::vector<VkImageInHandle> input_connectors;
 };
 
 } // namespace merian_nodes
