@@ -9,6 +9,10 @@
 
 namespace merian_nodes {
 
+UnmanagedVkImageOut::UnmanagedVkImageOut(const std::string& name, const uint32_t image_count)
+ : VkImageOut(name, false, image_count) {}
+
+
 GraphResourceHandle UnmanagedVkImageOut::create_resource(
     [[maybe_unused]] const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
     const ResourceAllocatorHandle& allocator,
@@ -44,19 +48,19 @@ Connector::ConnectorStatusFlags UnmanagedVkImageOut::on_pre_process(
     [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {
 
     auto res = debugable_ptr_cast<ImageArrayResource>(resource);
-
-    for (auto& image : res->images) {
-        vk::ImageMemoryBarrier2 img_bar =
-        image->barrier2(required_layout, res->current_access_flags, access_flags,
-                             res->current_stage_flags, pipeline_stages, VK_QUEUE_FAMILY_IGNORED,
-                             VK_QUEUE_FAMILY_IGNORED, all_levels_and_layers(), !persistent);
-        image_barriers.push_back(img_bar);
+    if (!res->current_updates.empty()) {
+        res->pending_updates.clear();
+        std::swap(res->pending_updates, res->current_updates);
+        return NEEDS_DESCRIPTOR_UPDATE;
     }
-
-    res->current_stage_flags = pipeline_stages;
-    res->current_access_flags = access_flags;
 
     return {};
 }
+
+UnmanagedVkImageOutHandle UnmanagedVkImageOut::create(const std::string& name,
+                                                      const uint32_t array_size) {
+    return std::make_shared<UnmanagedVkImageOut>(name, array_size);
+}
+
 
 } // namespace merian_nodes

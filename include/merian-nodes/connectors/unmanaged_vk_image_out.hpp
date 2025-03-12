@@ -10,7 +10,7 @@ using UnmanagedVkImageOutHandle = std::shared_ptr<UnmanagedVkImageOut>;
 
 class UnmanagedVkImageOut : public VkImageOut {
 public:
-  UnmanagedVkImageOut(const std::string& name, const uint32_t array_size);
+  UnmanagedVkImageOut(const std::string& name, const uint32_t image_count);
 
   virtual GraphResourceHandle
   create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,

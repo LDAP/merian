@@ -18,6 +18,13 @@ public:
                     const uint32_t image_count = 1
                     );
 
+  std::optional<vk::DescriptorSetLayoutBinding> get_descriptor_info() const override;
+
+  void get_descriptor_update(const uint32_t binding,
+                                     const GraphResourceHandle& resource,
+                                     const DescriptorSetHandle& update,
+                                     const ResourceAllocatorHandle& allocator) override;
+
   virtual GraphResourceHandle
   create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
                   const ResourceAllocatorHandle& allocator,
@@ -32,6 +39,13 @@ public:
                const NodeHandle& node,
                std::vector<vk::ImageMemoryBarrier2>& image_barriers,
                std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) override;
+
+  const vk::AccessFlags2 access_flags;
+  const vk::PipelineStageFlags2 pipeline_stages;
+  const vk::ImageLayout required_layout;
+  const vk::ShaderStageFlags stage_flags;
+  const vk::ImageCreateInfo create_info;
+  const bool persistent;
 
   static ManagedVkImageOutHandle compute_write(const std::string& name,
                                                const vk::Format format,

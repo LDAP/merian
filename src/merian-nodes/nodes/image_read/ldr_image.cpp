@@ -40,15 +40,15 @@ void LDRImageRead::process([[maybe_unused]] GraphRun& run,
         if (image == nullptr) {
             image = stbi_load(filename.string().c_str(), &width, &height, &channels, 4);
             assert(image);
-            assert(width == (int)io[con_out]->get_extent().width &&
-                   height == (int)io[con_out]->get_extent().height &&
-                   1 == (int)io[con_out]->get_extent().depth);
+            assert(width == (int)io[con_out].get(0)->get_extent().width &&
+                   height == (int)io[con_out].get(0)->get_extent().height &&
+                   1 == (int)io[con_out].get(0)->get_extent().depth);
 
             SPDLOG_INFO("Loaded image from {} ({}x{}, {} channels)", filename.string(), width,
                         height, channels);
         }
 
-        run.get_allocator()->getStaging()->cmd_to_device(run.get_cmd(), io[con_out], image);
+        run.get_allocator()->getStaging()->cmd_to_device(run.get_cmd(), io[con_out].get(0), image);
 
         if (!keep_on_host) {
             stbi_image_free(image);

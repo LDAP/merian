@@ -34,7 +34,7 @@ class ImageArrayResource : public GraphResource {
              const merian::CommandBufferHandle& cmd,
              const vk::AccessFlags2 prior_access_flags,
              const vk::PipelineStageFlags2 prior_pipeline_stages) {
-        assert(index < textures.size());
+        assert(index < images.size());
 
         if (images[index] != image) {
             images[index] = image;
@@ -49,6 +49,17 @@ class ImageArrayResource : public GraphResource {
 
             cmd->barrier(img_bar);
         }
+    }
+
+    void set(const uint32_t index,
+             const merian::TextureHandle& tex,
+             const merian::CommandBufferHandle& cmd,
+             const vk::AccessFlags2 prior_access_flags,
+             const vk::PipelineStageFlags2 prior_pipeline_stages) {
+        assert(index < textures.size());
+
+        textures[index] = tex;
+        set(index, tex->get_image(), cmd, prior_access_flags, prior_pipeline_stages);
     }
 
     const merian::ImageHandle& get(const uint32_t index) const {
