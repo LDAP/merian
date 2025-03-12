@@ -38,13 +38,15 @@ class GLFWWindow : public Node {
     }
 
     virtual void process(GraphRun& run,
-                         const CommandBufferHandle& cmd,
                          [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
                          const NodeIO& io) override {
+        assert(swapchain_manager);
+
         const std::optional<SwapchainAcquireResult> acquire =
-            swapchain_manager->acquire(window, 1000L * 1000L /* 1s */);
+            swapchain_manager->acquire(window, acquire_timeout_ns);
 
         if (acquire) {
+            const CommandBufferHandle& cmd = run.get_cmd();
             const ImageHandle image = acquire->image_view->get_image();
 
             auto barrier = image->barrier2(vk::ImageLayout::eTransferDstOptimal, true);
@@ -91,6 +93,7 @@ class GLFWWindow : public Node {
     }
 
     const SwapchainHandle& get_swapchain() {
+        assert(swapchain_manager && "ExtensionVkGLFW not avaliable");
         return swapchain_manager->get_swapchain();
     }
 
@@ -125,42 +128,47 @@ class GLFWWindow : public Node {
                               Properties::OptionsStyle::LIST_BOX);
         mode = (BlitMode)int_mode;
 
-        const SwapchainHandle swapchain = get_swapchain();
-        const std::optional<Swapchain::SwapchainInfo>& swapchain_info =
-            swapchain->get_swapchain_info();
+        if (swapchain_manager) {
+            const SwapchainHandle swapchain = get_swapchain();
 
-        int selected;
-        std::vector<std::string> str_surface_formats;
-        const auto& surface_formats = swapchain->get_supported_surface_formats();
-        for (uint32_t i = 0; i < surface_formats.size(); i++) {
-            const vk::SurfaceFormatKHR& format = surface_formats[i];
-            str_surface_formats.emplace_back(fmt::format("{}, {}", vk::to_string(format.format),
-                                                         vk::to_string(format.colorSpace)));
-            if (format == swapchain->get_new_surface_format()) {
-                selected = (int)i;
+            int selected;
+            std::vector<std::string> str_surface_formats;
+            const auto& surface_formats = swapchain->get_supported_surface_formats();
+            for (uint32_t i = 0; i < surface_formats.size(); i++) {
+                const vk::SurfaceFormatKHR& format = surface_formats[i];
+                str_surface_formats.emplace_back(fmt::format("{}, {}", vk::to_string(format.format),
+                                                             vk::to_string(format.colorSpace)));
+                if (format == swapchain->get_new_surface_format()) {
+                    selected = (int)i;
+                }
             }
-        }
-        if (config.config_options("surface format", selected, str_surface_formats)) {
-            swapchain->set_new_surface_format(surface_formats[selected]);
-        }
+            if (config.config_options("surface format", selected, str_surface_formats)) {
+                swapchain->set_new_surface_format(surface_formats[selected]);
+            }
 
-        std::vector<std::string> str_present_modes;
-        const auto& present_modes = swapchain->get_supported_present_modes();
-        for (uint32_t i = 0; i < present_modes.size(); i++) {
-            const vk::PresentModeKHR& mode = present_modes[i];
-            str_present_modes.emplace_back(fmt::format("{}", vk::to_string(mode)));
-            if (mode == swapchain->get_new_present_mode()) {
-                selected = (int)i;
+            std::vector<std::string> str_present_modes;
+            const auto& present_modes = swapchain->get_supported_present_modes();
+            for (uint32_t i = 0; i < present_modes.size(); i++) {
+                const vk::PresentModeKHR& mode = present_modes[i];
+                str_present_modes.emplace_back(fmt::format("{}", vk::to_string(mode)));
+                if (mode == swapchain->get_new_present_mode()) {
+                    selected = (int)i;
+                }
             }
-        }
-        if (config.config_options("present mode", selected, str_present_modes)) {
-            swapchain->set_new_present_mode(present_modes[selected]);
+            if (config.config_options("present mode", selected, str_present_modes)) {
+                swapchain->set_new_present_mode(present_modes[selected]);
+            }
         }
 
         config.config_bool("rebuild on recreate", request_rebuild_on_recreate,
                            "requests a graph rebuild if the swapchain was recreated.");
 
-        if (swapchain_info) {
+        config.config_uint("acquire timeout", acquire_timeout_ns, "in nanoseconds");
+
+        if (swapchain_manager) {
+            const std::optional<Swapchain::SwapchainInfo>& swapchain_info =
+                get_swapchain()->get_swapchain_info();
+
             config.output_text(fmt::format(
                 "surface format: {}\ncolor space: {}\nimage count: "
                 "{}\nextent: {}x{}\npresent mode: {}",
@@ -188,7 +196,7 @@ class GLFWWindow : public Node {
 
   private:
     GLFWWindowHandle window = nullptr;
-    std::optional<SwapchainManager> swapchain_manager;
+    std::optional<SwapchainManager> swapchain_manager = std::nullopt;
 
     BlitMode mode = FIT;
 
@@ -201,6 +209,7 @@ class GLFWWindow : public Node {
 
     std::array<int, 4> windowed_pos_size;
     bool request_rebuild_on_recreate = false;
+    uint64_t acquire_timeout_ns = 1000L * 1000L * 100L; // .1s
 };
 
 } // namespace merian_nodes

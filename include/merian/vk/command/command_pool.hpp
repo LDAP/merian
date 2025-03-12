@@ -45,7 +45,7 @@ class CommandPool : public std::enable_shared_from_this<CommandPool> {
     // Resets the command pool and releases objects attached to this pool.
     virtual void reset();
 
-    void keep_until_pool_reset(const ObjectHandle& object) {
+    virtual void keep_until_pool_reset(const ObjectHandle& object) {
         objects_in_use.emplace_back(object);
     }
 

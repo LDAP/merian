@@ -26,8 +26,8 @@ inline void cmd_blit_stretch(const CommandBufferHandle& cmd,
     }
 
     vk::ImageBlit region{first_layer(), {}, first_layer(), {{}}};
-    region.srcOffsets[1] = extent_to_offset(src_extent);
-    region.dstOffsets[1] = extent_to_offset(dst_extent);
+    region.srcOffsets[1] = to_offset(src_extent);
+    region.dstOffsets[1] = to_offset(dst_extent);
     cmd->blit(src_image, src_layout, dst_image, dst_layout, region, filter);
 }
 
@@ -52,10 +52,10 @@ inline void cmd_blit_fit(const CommandBufferHandle& cmd,
     }
 
     vk::ImageBlit region{first_layer(), {}, first_layer(), {}};
-    region.srcOffsets[1] = extent_to_offset(src_extent);
+    region.srcOffsets[1] = to_offset(src_extent);
 
     std::tie(region.dstOffsets[0], region.dstOffsets[1]) =
-        fit(region.srcOffsets[0], region.srcOffsets[1], {}, extent_to_offset(dst_extent));
+        fit(region.srcOffsets[0], region.srcOffsets[1], {}, to_offset(dst_extent));
 
     cmd->blit(src_image, src_layout, dst_image, dst_layout, region, filter);
 }
@@ -81,10 +81,10 @@ inline void cmd_blit_fill(const CommandBufferHandle& cmd,
     }
 
     vk::ImageBlit region{first_layer(), {}, first_layer(), {}};
-    region.dstOffsets[1] = extent_to_offset(dst_extent);
+    region.dstOffsets[1] = to_offset(dst_extent);
 
     std::tie(region.srcOffsets[0], region.srcOffsets[1]) =
-        fit(region.dstOffsets[0], region.dstOffsets[1], {}, extent_to_offset(src_extent));
+        fit(region.dstOffsets[0], region.dstOffsets[1], {}, to_offset(src_extent));
 
     cmd->blit(src_image, src_layout, dst_image, dst_layout, region, filter);
 }

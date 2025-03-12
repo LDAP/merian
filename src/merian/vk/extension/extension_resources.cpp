@@ -19,16 +19,16 @@ void ExtensionResources::on_context_initializing(const ExtensionContainer& exten
 
 void ExtensionResources::on_physical_device_selected(const PhysicalDevice& physical_device) {
     for (const auto& extension : physical_device.physical_device_extension_properties) {
-        if (strcmp(extension.extensionName, "VK_KHR_maintenance4") == 0) {
-            required_extensions.push_back("VK_KHR_maintenance4");
+        if (strcmp(extension.extensionName, VK_KHR_MAINTENANCE_4_EXTENSION_NAME) == 0) {
+            required_extensions.push_back(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
             flags |= VMA_ALLOCATOR_CREATE_KHR_MAINTENANCE4_BIT;
         }
-        if (strcmp(extension.extensionName, "VK_KHR_maintenance5") == 0) {
-            required_extensions.push_back("VK_KHR_maintenance5");
+        if (strcmp(extension.extensionName, VK_KHR_MAINTENANCE_5_EXTENSION_NAME) == 0) {
+            required_extensions.push_back(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
             flags |= VMA_ALLOCATOR_CREATE_KHR_MAINTENANCE5_BIT;
         }
-        if (strcmp(extension.extensionName, "VK_KHR_buffer_device_address") == 0) {
-            required_extensions.push_back("VK_KHR_buffer_device_address");
+        if (strcmp(extension.extensionName, VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME) == 0) {
+            required_extensions.push_back(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
         }
     }
 }
@@ -59,7 +59,7 @@ void ExtensionResources::on_destroy_context() {}
 std::shared_ptr<MemoryAllocator> ExtensionResources::memory_allocator() {
     if (_memory_allocator.expired()) {
         assert(!weak_context.expired());
-        auto ptr = VMAMemoryAllocator::make_allocator(weak_context.lock(), flags);
+        auto ptr = VMAMemoryAllocator::create(weak_context.lock(), flags);
         _memory_allocator = ptr;
         return ptr;
     }
@@ -87,7 +87,7 @@ std::shared_ptr<SamplerPool> ExtensionResources::sampler_pool() {
 std::shared_ptr<StagingMemoryManager> ExtensionResources::staging() {
     if (_staging.expired()) {
         assert(!weak_context.expired());
-        auto ptr = std::make_shared<StagingMemoryManager>(weak_context.lock(), memory_allocator());
+        auto ptr = std::make_shared<StagingMemoryManager>(memory_allocator());
         _staging = ptr;
         return ptr;
     }

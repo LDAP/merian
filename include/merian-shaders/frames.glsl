@@ -27,6 +27,7 @@ mat3x3 make_frame_naive(const vec3 z) {
     return mat3(du, normalize(cross(du, z)), z);
 }
 
+// needs orthonormal frame
 vec3 world_to_frame(const mat3x3 frame, const vec3 v) {
     return vec3(dot(frame[0], v), dot(frame[1], v), dot(frame[2], v));
 }

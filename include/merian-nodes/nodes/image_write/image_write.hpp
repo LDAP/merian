@@ -27,12 +27,10 @@ class ImageWrite : public Node {
 
     virtual std::vector<InputConnectorHandle> describe_inputs() override;
 
-    virtual NodeStatusFlags pre_process(GraphRun& run, const NodeIO& io) override;
+    virtual NodeStatusFlags pre_process(const GraphRun& run, const NodeIO& io) override;
 
-    virtual void process(GraphRun& run,
-                         const CommandBufferHandle& cmd,
-                         const DescriptorSetHandle& descriptor_set,
-                         const NodeIO& io) override;
+    virtual void
+    process(GraphRun& run, const DescriptorSetHandle& descriptor_set, const NodeIO& io) override;
 
     virtual NodeStatusFlags properties(Properties& config) override;
 
@@ -73,11 +71,6 @@ class ImageWrite : public Node {
     const ResourceAllocatorHandle allocator;
 
     VkImageInHandle con_src = VkImageIn::transfer_src("src");
-
-    uint32_t max_concurrent_tasks = std::thread::hardware_concurrency();
-    uint32_t concurrent_tasks = 0;
-    std::mutex mutex_concurrent;
-    std::condition_variable cv_concurrent;
 
     std::function<void()> callback;
 

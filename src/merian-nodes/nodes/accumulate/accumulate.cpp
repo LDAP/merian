@@ -128,9 +128,9 @@ Accumulate::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
 }
 
 void Accumulate::process(GraphRun& run,
-                         const CommandBufferHandle& cmd,
                          const DescriptorSetHandle& descriptor_set,
                          [[maybe_unused]] const NodeIO& io) {
+    const CommandBufferHandle& cmd = run.get_cmd();
     accumulate_pc.iteration = run.get_total_iteration();
 
     if (accumulate_pc.firefly_filter_enable == VK_TRUE ||

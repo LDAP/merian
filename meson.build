@@ -33,8 +33,6 @@ if get_option('performance_profiling')
   global_args += ['-DMERIAN_PROFILER_ENABLE']
 endif
 
-add_project_arguments(global_args, language: 'cpp')
-
 commit = run_command('git', 'rev-parse', 'HEAD', check: true)
 version_split = meson.project_version().split('.')
 add_project_arguments('-DMERIAN_VERSION="@0@ (@1@)"'.format(meson.project_version(), commit.stdout().strip()), language : 'cpp')
@@ -100,6 +98,9 @@ if not shaderc.found() and get_option('shaderc').enabled()
         ],
     )
 endif
+if shaderc.found()
+    global_args += ['-DMERIAN_SHADERC_FOUND']
+endif
 
 project_root = meson.current_source_dir()
 inc_dirs = [
@@ -144,6 +145,8 @@ shader_generator = generator(
 )
 
 
+add_project_arguments(global_args, language: 'cpp')
+
 subdir('src/merian')
 subdir('src/merian-nodes')
 
@@ -157,11 +160,12 @@ merian_dep = declare_dependency(
         glm,
         imgui,
         nlohmann_json,
+        shaderc,
         spdlog,
         tol,
         vma,
-        vulkanheaders,
         vulkan,
+        vulkanheaders,
     ]
 )
 

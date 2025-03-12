@@ -13,12 +13,20 @@ Buffer::Buffer(const vk::Buffer& buffer,
                const vk::BufferCreateInfo& create_info)
     : context(memory->get_context()), buffer(buffer), memory(memory), create_info(create_info) {}
 
+Buffer::Buffer(const ContextHandle& context, const vk::BufferCreateInfo& create_info)
+    : context(context), buffer(context->device.createBuffer(create_info)),
+      create_info(create_info) {}
+
 Buffer::~Buffer() {
     SPDLOG_TRACE("destroy buffer ({})", fmt::ptr(static_cast<VkBuffer>(buffer)));
     context->device.destroyBuffer(buffer);
 }
 
-vk::DeviceAddress Buffer::get_device_address() {
+vk::MemoryRequirements Buffer::get_memory_requirements() const {
+    return context->device.getBufferMemoryRequirements(buffer);
+}
+
+vk::DeviceAddress Buffer::get_device_address() const {
     assert(create_info.usage | vk::BufferUsageFlagBits::eShaderDeviceAddress);
     return context->device.getBufferAddress(get_buffer_device_address_info());
 }
@@ -56,7 +64,7 @@ vk::BufferMemoryBarrier2 Buffer::buffer_barrier2(const vk::PipelineStageFlags2 s
             nullptr};
 }
 
-BufferHandle Buffer::create_aliasing_buffer() {
+BufferHandle Buffer::create_aliasing_buffer() const {
     assert(memory && "buffer is not bound to memory, cannot create aliasing buffer.");
     return memory->create_aliasing_buffer(create_info);
 }
@@ -77,6 +85,10 @@ BufferHandle Buffer::create(const vk::Buffer& buffer,
     return std::shared_ptr<Buffer>(new Buffer(buffer, memory, create_info));
 }
 
+BufferHandle Buffer::create(const ContextHandle& context, const vk::BufferCreateInfo& create_info) {
+    return std::shared_ptr<Buffer>(new Buffer(context, create_info));
+}
+
 // --------------------------------------------------------------------------
 
 Image::Image(const vk::Image& image,
@@ -92,9 +104,17 @@ Image::Image(const ContextHandle& context,
              const vk::ImageLayout current_layout)
     : context(context), image(image), create_info(create_info), current_layout(current_layout) {}
 
+Image::Image(const ContextHandle& context, const vk::ImageCreateInfo create_info)
+    : context(context), image(context->device.createImage(create_info)), create_info(create_info),
+      current_layout(create_info.initialLayout) {}
+
 Image::~Image() {
     SPDLOG_TRACE("destroy image ({})", fmt::ptr(static_cast<VkImage>(image)));
     context->device.destroyImage(image);
+}
+
+vk::MemoryRequirements Image::get_memory_requirements() const {
+    return context->device.getImageMemoryRequirements(image);
 }
 
 vk::FormatFeatureFlags Image::format_features() const {
@@ -207,6 +227,174 @@ ImageHandle Image::create(const ContextHandle& context,
                           const vk::ImageCreateInfo create_info,
                           const vk::ImageLayout current_layout) {
     return std::shared_ptr<Image>(new Image(context, image, create_info, current_layout));
+}
+
+ImageHandle Image::create(const ContextHandle& context, const vk::ImageCreateInfo create_info) {
+    return std::shared_ptr<Image>(new Image(context, create_info));
+}
+
+vk::DeviceSize Image::format_size(const vk::Format format) {
+    switch (format) {
+    case vk::Format::eR4G4UnormPack8:
+        return 1;
+    case vk::Format::eR4G4B4A4UnormPack16:
+    case vk::Format::eB4G4R4A4UnormPack16:
+    case vk::Format::eR5G6B5UnormPack16:
+    case vk::Format::eB5G6R5UnormPack16:
+    case vk::Format::eR5G5B5A1UnormPack16:
+    case vk::Format::eB5G5R5A1UnormPack16:
+    case vk::Format::eA1R5G5B5UnormPack16:
+        return 2;
+    case vk::Format::eR8Unorm:
+    case vk::Format::eR8Snorm:
+    case vk::Format::eR8Uscaled:
+    case vk::Format::eR8Sscaled:
+    case vk::Format::eR8Uint:
+    case vk::Format::eR8Sint:
+    case vk::Format::eR8Srgb:
+        return 1;
+    case vk::Format::eR8G8Unorm:
+    case vk::Format::eR8G8Snorm:
+    case vk::Format::eR8G8Uscaled:
+    case vk::Format::eR8G8Sscaled:
+    case vk::Format::eR8G8Uint:
+    case vk::Format::eR8G8Sint:
+    case vk::Format::eR8G8Srgb:
+        return 2;
+    case vk::Format::eR8G8B8Unorm:
+    case vk::Format::eR8G8B8Snorm:
+    case vk::Format::eR8G8B8Uscaled:
+    case vk::Format::eR8G8B8Sscaled:
+    case vk::Format::eR8G8B8Uint:
+    case vk::Format::eR8G8B8Sint:
+    case vk::Format::eR8G8B8Srgb:
+    case vk::Format::eB8G8R8Unorm:
+    case vk::Format::eB8G8R8Snorm:
+    case vk::Format::eB8G8R8Uscaled:
+    case vk::Format::eB8G8R8Sscaled:
+    case vk::Format::eB8G8R8Uint:
+    case vk::Format::eB8G8R8Sint:
+    case vk::Format::eB8G8R8Srgb:
+        return 3;
+    case vk::Format::eR8G8B8A8Unorm:
+    case vk::Format::eR8G8B8A8Snorm:
+    case vk::Format::eR8G8B8A8Uscaled:
+    case vk::Format::eR8G8B8A8Sscaled:
+    case vk::Format::eR8G8B8A8Uint:
+    case vk::Format::eR8G8B8A8Sint:
+    case vk::Format::eR8G8B8A8Srgb:
+    case vk::Format::eB8G8R8A8Unorm:
+    case vk::Format::eB8G8R8A8Snorm:
+    case vk::Format::eB8G8R8A8Uscaled:
+    case vk::Format::eB8G8R8A8Sscaled:
+    case vk::Format::eB8G8R8A8Uint:
+    case vk::Format::eB8G8R8A8Sint:
+    case vk::Format::eB8G8R8A8Srgb:
+        return 4;
+    case vk::Format::eA8B8G8R8UnormPack32:
+    case vk::Format::eA8B8G8R8SnormPack32:
+    case vk::Format::eA8B8G8R8UscaledPack32:
+    case vk::Format::eA8B8G8R8SscaledPack32:
+    case vk::Format::eA8B8G8R8UintPack32:
+    case vk::Format::eA8B8G8R8SintPack32:
+    case vk::Format::eA8B8G8R8SrgbPack32:
+    case vk::Format::eA2R10G10B10UnormPack32:
+    case vk::Format::eA2R10G10B10SnormPack32:
+    case vk::Format::eA2R10G10B10UscaledPack32:
+    case vk::Format::eA2R10G10B10SscaledPack32:
+    case vk::Format::eA2R10G10B10UintPack32:
+    case vk::Format::eA2R10G10B10SintPack32:
+    case vk::Format::eA2B10G10R10UnormPack32:
+    case vk::Format::eA2B10G10R10SnormPack32:
+    case vk::Format::eA2B10G10R10UscaledPack32:
+    case vk::Format::eA2B10G10R10SscaledPack32:
+    case vk::Format::eA2B10G10R10UintPack32:
+    case vk::Format::eA2B10G10R10SintPack32:
+        return 4;
+    case vk::Format::eR16Unorm:
+    case vk::Format::eR16Snorm:
+    case vk::Format::eR16Uscaled:
+    case vk::Format::eR16Sscaled:
+    case vk::Format::eR16Uint:
+    case vk::Format::eR16Sint:
+    case vk::Format::eR16Sfloat:
+        return 2;
+    case vk::Format::eR16G16Unorm:
+    case vk::Format::eR16G16Snorm:
+    case vk::Format::eR16G16Uscaled:
+    case vk::Format::eR16G16Sscaled:
+    case vk::Format::eR16G16Uint:
+    case vk::Format::eR16G16Sint:
+    case vk::Format::eR16G16Sfloat:
+        return 4;
+    case vk::Format::eR16G16B16Unorm:
+    case vk::Format::eR16G16B16Snorm:
+    case vk::Format::eR16G16B16Uscaled:
+    case vk::Format::eR16G16B16Sscaled:
+    case vk::Format::eR16G16B16Uint:
+    case vk::Format::eR16G16B16Sint:
+    case vk::Format::eR16G16B16Sfloat:
+        return 6;
+    case vk::Format::eR16G16B16A16Unorm:
+    case vk::Format::eR16G16B16A16Snorm:
+    case vk::Format::eR16G16B16A16Uscaled:
+    case vk::Format::eR16G16B16A16Sscaled:
+    case vk::Format::eR16G16B16A16Uint:
+    case vk::Format::eR16G16B16A16Sint:
+    case vk::Format::eR16G16B16A16Sfloat:
+        return 8;
+    case vk::Format::eR32Uint:
+    case vk::Format::eR32Sint:
+    case vk::Format::eR32Sfloat:
+        return 4;
+    case vk::Format::eR32G32Uint:
+    case vk::Format::eR32G32Sint:
+    case vk::Format::eR32G32Sfloat:
+        return 8;
+    case vk::Format::eR32G32B32Uint:
+    case vk::Format::eR32G32B32Sint:
+    case vk::Format::eR32G32B32Sfloat:
+        return 12;
+    case vk::Format::eR32G32B32A32Uint:
+    case vk::Format::eR32G32B32A32Sint:
+    case vk::Format::eR32G32B32A32Sfloat:
+        return 16;
+    case vk::Format::eR64Uint:
+    case vk::Format::eR64Sint:
+    case vk::Format::eR64Sfloat:
+        return 8;
+    case vk::Format::eR64G64Uint:
+    case vk::Format::eR64G64Sint:
+    case vk::Format::eR64G64Sfloat:
+        return 16;
+    case vk::Format::eR64G64B64Uint:
+    case vk::Format::eR64G64B64Sint:
+    case vk::Format::eR64G64B64Sfloat:
+        return 24;
+    case vk::Format::eR64G64B64A64Uint:
+    case vk::Format::eR64G64B64A64Sint:
+    case vk::Format::eR64G64B64A64Sfloat:
+        return 32;
+    case vk::Format::eB10G11R11UfloatPack32:
+    case vk::Format::eE5B9G9R9UfloatPack32:
+        return 4;
+    case vk::Format::eD16Unorm:
+        return 2;
+    case vk::Format::eX8D24UnormPack32:
+        return 4;
+    case vk::Format::eD32Sfloat:
+        return 4;
+    case vk::Format::eS8Uint:
+        return 1;
+    case vk::Format::eD16UnormS8Uint:
+        return 3;
+    case vk::Format::eD24UnormS8Uint:
+        return 4;
+    case vk::Format::eD32SfloatS8Uint:
+        return 5;
+    default:
+        throw std::runtime_error{"unsupported"};
+    }
 }
 
 // --------------------------------------------------------------------------

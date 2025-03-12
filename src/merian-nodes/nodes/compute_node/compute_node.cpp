@@ -19,7 +19,6 @@ AbstractCompute::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
 }
 
 void AbstractCompute::process(GraphRun& run,
-                              const CommandBufferHandle& cmd,
                               const DescriptorSetHandle& descriptor_set,
                               const NodeIO& io) {
     const auto spec_info = get_specialization_info(io);
@@ -43,6 +42,7 @@ void AbstractCompute::process(GraphRun& run,
     }
 
     if (pipe) {
+        const CommandBufferHandle& cmd = run.get_cmd();
         cmd->bind(pipe);
         cmd->bind_descriptor_set(pipe, descriptor_set);
         if (push_constant_size.has_value())

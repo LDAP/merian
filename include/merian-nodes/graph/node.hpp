@@ -89,7 +89,7 @@ class Node : public std::enable_shared_from_this<Node> {
     // update resources in process(...) the descriptor set will reflect the changes one iteration
     // later.
     [[nodiscard]]
-    virtual NodeStatusFlags pre_process([[maybe_unused]] GraphRun& run,
+    virtual NodeStatusFlags pre_process([[maybe_unused]] const GraphRun& run,
                                         [[maybe_unused]] const NodeIO& io) {
         return {};
     }
@@ -106,7 +106,6 @@ class Node : public std::enable_shared_from_this<Node> {
     // You can throw node_error and compilation_failed here. The graph then attemps to finish the
     // run and rebuild, however this is not supported and not recommened.
     virtual void process([[maybe_unused]] GraphRun& run,
-                         [[maybe_unused]] const CommandBufferHandle& cmd,
                          [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
                          [[maybe_unused]] const NodeIO& io) {}
 

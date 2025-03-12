@@ -32,12 +32,12 @@ std::vector<OutputConnectorHandle> ABSplit::describe_outputs(const NodeIOLayout&
 }
 
 void ABSplit::process([[maybe_unused]] GraphRun& run,
-                      const CommandBufferHandle& cmd,
                       [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
                       const NodeIO& io) {
-    const ImageHandle& a = io[con_in_a].get(0);
-    const ImageHandle& b = io[con_in_b].get(0);
-    const ImageHandle& result = io[con_out].get(0);
+    const CommandBufferHandle& cmd = run.get_cmd();
+    const ImageHandle& a = io[con_in_a];
+    const ImageHandle& b = io[con_in_b];
+    const ImageHandle& result = io[con_out];
 
     cmd_blit_fit(cmd, b, vk::ImageLayout::eTransferSrcOptimal, b->get_extent(), result,
                  vk::ImageLayout::eTransferDstOptimal, result->get_extent());
@@ -76,12 +76,12 @@ std::vector<OutputConnectorHandle> ABSideBySide::describe_outputs(const NodeIOLa
 }
 
 void ABSideBySide::process([[maybe_unused]] GraphRun& run,
-                           [[maybe_unused]] const CommandBufferHandle& cmd,
                            [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
                            [[maybe_unused]] const NodeIO& io) {
-    const ImageHandle& a = io[con_in_a].get(0);
-    const ImageHandle& b = io[con_in_b].get(0);
-    const ImageHandle& result = io[con_out].get(0);
+    const CommandBufferHandle& cmd = run.get_cmd();
+    const ImageHandle& a = io[con_in_a];
+    const ImageHandle& b = io[con_in_b];
+    const ImageHandle& result = io[con_out];
 
     vk::Extent3D half_result_extent = result->get_extent();
     half_result_extent.width /= 2;
@@ -91,11 +91,11 @@ void ABSideBySide::process([[maybe_unused]] GraphRun& run,
 
     // manual blit since we need offset by half result extent...
     vk::ImageBlit region{merian::first_layer(), {}, merian::first_layer(), {}};
-    region.srcOffsets[1] = extent_to_offset(b->get_extent());
+    region.srcOffsets[1] = to_offset(b->get_extent());
 
     std::tie(region.dstOffsets[0], region.dstOffsets[1]) =
         fit(region.srcOffsets[0], region.srcOffsets[1], {(int32_t)half_result_extent.width, 0, 0},
-            extent_to_offset(result->get_extent()));
+            to_offset(result->get_extent()));
 
     cmd->blit(b, b->get_current_layout(), result, result->get_current_layout(), region);
 }

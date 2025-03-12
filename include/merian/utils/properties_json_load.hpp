@@ -76,6 +76,13 @@ class JSONLoadProperties : public Properties {
                              const uint32_t& max = std::numeric_limits<uint32_t>::max(),
                              const std::string& desc = "") override;
     virtual bool
+    config_uint(const std::string& id, uint64_t& value, const std::string& desc = "") override;
+    virtual bool config_uint(const std::string& id,
+                             uint64_t& value,
+                             const uint64_t& min = std::numeric_limits<uint64_t>::min(),
+                             const uint64_t& max = std::numeric_limits<uint64_t>::max(),
+                             const std::string& desc = "") override;
+    virtual bool
     config_float3(const std::string& id, float value[3], const std::string& desc = "") override;
     virtual bool
     config_bool(const std::string& id, bool& value, const std::string& desc = "") override;

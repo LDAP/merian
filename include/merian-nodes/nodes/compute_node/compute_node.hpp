@@ -47,7 +47,6 @@ class AbstractCompute : public Node {
                  const DescriptorSetLayoutHandle& descriptor_set_layout) override final;
 
     virtual void process(GraphRun& run,
-                         const CommandBufferHandle& cmd,
                          const DescriptorSetHandle& descriptor_set,
                          const NodeIO& io) override final;
 

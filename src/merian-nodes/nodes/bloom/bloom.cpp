@@ -54,9 +54,9 @@ Bloom::NodeStatusFlags Bloom::on_connected([[maybe_unused]] const NodeIOLayout& 
 }
 
 void Bloom::process([[maybe_unused]] GraphRun& run,
-                    const CommandBufferHandle& cmd,
                     const DescriptorSetHandle& descriptor_set,
                     const NodeIO& io) {
+    const CommandBufferHandle& cmd = run.get_cmd();
     cmd->bind(separate);
     cmd->bind_descriptor_set(separate, descriptor_set);
     cmd->push_constant(separate, pc);

@@ -148,10 +148,11 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
     return {};
 }
 
-void SVGF::process([[maybe_unused]] GraphRun& run,
-                   [[maybe_unused]] const CommandBufferHandle& cmd,
+void SVGF::process(GraphRun& run,
                    const DescriptorSetHandle& descriptor_set,
-                   [[maybe_unused]] const NodeIO& io) {
+                   const NodeIO& io) {
+    const CommandBufferHandle& cmd = run.get_cmd();
+
     // PREPARE (VARIANCE ESTIMATE)
     {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "estimate variance");

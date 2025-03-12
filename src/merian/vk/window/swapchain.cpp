@@ -253,8 +253,8 @@ vk::Extent2D Swapchain::create_swapchain(const uint32_t width, const uint32_t he
     for (std::size_t i = 0; i < info->images.size(); i++) {
         SyncGroup& sync_group = sync_groups[i];
 
-        sync_group.read_semaphore = std::make_shared<BinarySemaphore>(context);
-        sync_group.written_semaphore = std::make_shared<BinarySemaphore>(context);
+        sync_group.read_semaphore = BinarySemaphore::create(context);
+        sync_group.written_semaphore = BinarySemaphore::create(context);
         sync_group.acquire_finished = Fence::create(context);
     }
 

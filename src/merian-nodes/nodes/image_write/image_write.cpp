@@ -44,7 +44,7 @@ void ImageWrite::record(const std::chrono::nanoseconds& current_graph_time) {
         callback();
 }
 
-ImageWrite::NodeStatusFlags ImageWrite::pre_process(GraphRun& run,
+ImageWrite::NodeStatusFlags ImageWrite::pre_process(const GraphRun& run,
                                                     [[maybe_unused]] const NodeIO& io) {
     // START TRIGGER
     if (!record_enable && (start_stop_record || (int64_t)run.get_iteration() == start_at_run)) {
@@ -89,7 +89,6 @@ ImageWrite::NodeStatusFlags ImageWrite::pre_process(GraphRun& run,
 };
 
 void ImageWrite::process(GraphRun& run,
-                         const CommandBufferHandle& cmd,
                          [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
                          const NodeIO& io) {
 
@@ -97,6 +96,8 @@ void ImageWrite::process(GraphRun& run,
     defer {
         iteration++;
     };
+
+    const CommandBufferHandle& cmd = run.get_cmd();
 
     const std::chrono::nanoseconds system_time_since_record = record_time_point.duration();
     const std::chrono::nanoseconds& graph_time = run.get_elapsed_duration();
@@ -133,8 +134,8 @@ void ImageWrite::process(GraphRun& run,
     last_frame_time_millis = time_millis;
 
     // CHECK PATH
-    const ImageHandle src = io[con_src].get(0);
-    vk::Extent3D scaled = max(multiply(src->get_extent(), scale), {1, 1, 1});
+    const ImageHandle src = io[con_src];
+    vk::Extent3D scaled = max(src->get_extent() * scale, {1, 1, 1});
     fmt::dynamic_format_arg_store<fmt::format_context> arg_store;
     get_format_args([&](const auto& arg) { arg_store.push_back(arg); }, src->get_extent(), scaled,
                     run.get_iteration(), graph_time_since_record, graph_time,
@@ -239,62 +240,49 @@ void ImageWrite::process(GraphRun& run,
                                        vk::AccessFlagBits::eTransferWrite,
                                        vk::AccessFlagBits::eHostRead));
 
-    TimelineSemaphoreHandle image_ready = std::make_shared<TimelineSemaphore>(context, 0);
-    run.add_signal_semaphore(image_ready, 1);
-
-    // Pause execution if to many tasks are queued to allow the write threads to keep up.
-    std::unique_lock lk(mutex_concurrent);
-    cv_concurrent.wait(lk, [&] { return concurrent_tasks < max_concurrent_tasks; });
-    concurrent_tasks++;
-    lk.unlock();
-
     std::filesystem::create_directories(path.parent_path());
     const std::string tmp_filename =
         (path.parent_path() / (".interm_" + path.filename().string())).string();
 
-    const std::function<void()> write_task =
-        ([this, image_ready, linear_image, path, tmp_filename]() {
-            image_ready->wait(1);
-            float* mem = linear_image->get_memory()->map_as<float>();
+    std::function<void()> write_task = ([this, linear_image, path, tmp_filename]() {
+        float* mem = linear_image->get_memory()->map_as<float>();
 
-            switch (this->format) {
-            case FORMAT_PNG: {
-                stbi_write_png(tmp_filename.c_str(), linear_image->get_extent().width,
-                               linear_image->get_extent().height, 4, mem,
-                               linear_image->get_extent().width * 4);
-                break;
-            }
-            case FORMAT_JPG: {
-                stbi_write_jpg(tmp_filename.c_str(), linear_image->get_extent().width,
-                               linear_image->get_extent().height, 4, mem, 100);
-                break;
-            }
-            case FORMAT_HDR: {
-                stbi_write_hdr(tmp_filename.c_str(), linear_image->get_extent().width,
-                               linear_image->get_extent().height, 4, mem);
-                break;
-            }
-            default:
-                throw std::runtime_error{"unsupported format."};
-            }
+        switch (this->format) {
+        case FORMAT_PNG: {
+            stbi_write_png(tmp_filename.c_str(), linear_image->get_extent().width,
+                           linear_image->get_extent().height, 4, mem,
+                           linear_image->get_extent().width * 4);
+            break;
+        }
+        case FORMAT_JPG: {
+            stbi_write_jpg(tmp_filename.c_str(), linear_image->get_extent().width,
+                           linear_image->get_extent().height, 4, mem, 100);
+            break;
+        }
+        case FORMAT_HDR: {
+            stbi_write_hdr(tmp_filename.c_str(), linear_image->get_extent().width,
+                           linear_image->get_extent().height, 4, mem);
+            break;
+        }
+        default:
+            throw std::runtime_error{"unsupported format."};
+        }
 
-            try {
-                std::filesystem::rename(tmp_filename, path);
-            } catch (std::filesystem::filesystem_error const&) {
-                SPDLOG_WARN("rename failed! Falling back to copy...");
-                std::filesystem::copy(tmp_filename, path);
-                std::filesystem::remove(tmp_filename);
-            }
+        try {
+            std::filesystem::rename(tmp_filename, path);
+        } catch (std::filesystem::filesystem_error const&) {
+            SPDLOG_WARN("rename failed! Falling back to copy...");
+            std::filesystem::copy(tmp_filename, path);
+            std::filesystem::remove(tmp_filename);
+        }
 
-            linear_image->get_memory()->unmap();
-            std::unique_lock lk(mutex_concurrent);
-            concurrent_tasks--;
-            lk.unlock();
-            cv_concurrent.notify_all();
-            return;
-        });
+        SPDLOG_INFO("wrote image to {}", path.string());
 
-    context->thread_pool.submit(write_task);
+        linear_image->get_memory()->unmap();
+        return;
+    });
+
+    run.sync_to_cpu(std::move(write_task));
 
     if (rebuild_after_capture)
         run.request_reconnect();
@@ -371,9 +359,6 @@ ImageWrite::NodeStatusFlags ImageWrite::properties([[maybe_unused]] Properties& 
     }
     config.st_separate();
     if (config.st_begin_child("advanced", "Advanced")) {
-        config.config_uint("concurrency", max_concurrent_tasks, 1,
-                           std::thread::hardware_concurrency(),
-                           "Limit the maximum concurrency. Might be necessary with low memory.");
         config.config_percent("scale", scale);
         config.st_separate();
 

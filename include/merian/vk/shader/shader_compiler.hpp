@@ -71,7 +71,7 @@ class ShaderCompiler {
                    const std::vector<std::string>& user_include_paths = {},
                    const std::map<std::string, std::string>& user_macro_definitions = {});
 
-    virtual ~ShaderCompiler() = 0;
+    virtual ~ShaderCompiler() = default;
 
     // ------------------------------------------------
 

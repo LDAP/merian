@@ -2,6 +2,7 @@
 
 #include "merian/utils/concurrent/concurrent_queue.hpp"
 
+#include <barrier>
 #include <future>
 #include <optional>
 #include <thread>
@@ -19,26 +20,11 @@ class ThreadPool {
 
     ThreadPool(ThreadPool& other) = delete;
 
-    ThreadPool(ThreadPool&& other) {
-        tasks = std::move(other.tasks);
-
-        for (uint32_t i = threads.size(); i < other.threads.size(); i++) {
-            threads.emplace_back([&] {
-                while (true) {
-                    const std::optional<std::function<void()>> task = tasks.pop();
-                    if (task) {
-                        task.value()();
-                    } else {
-                        return;
-                    }
-                }
-            });
-        }
-    }
+    ThreadPool(ThreadPool&& other) noexcept;
 
     ThreadPool& operator=(const ThreadPool& src) = delete;
 
-    ThreadPool& operator=(ThreadPool&& src) {
+    ThreadPool& operator=(ThreadPool&& src) noexcept {
         if (this == &src)
             return *this;
         this->~ThreadPool();
@@ -46,6 +32,7 @@ class ThreadPool {
         return *this;
     }
 
+    // Number of threads in this thread pool.
     uint32_t size();
 
     template <typename T> std::future<T> submit(const std::function<T()>& function) {
@@ -64,9 +51,24 @@ class ThreadPool {
         return future;
     }
 
+    // returns the number of enqueued tasks. Note that the tasks currently being worked on aren't
+    // counted.
+    std::size_t queue_size();
+
+    // waits until all to this point submitted tasks are finished.
+    void wait_idle();
+
+    // waits until the task queue is empty. Note that threads might still work on their last item.
+    // To ensure all threads are idling use wait_idle().
+    void wait_empty();
+
   private:
     std::vector<std::thread> threads;
     ConcurrentQueue<std::optional<std::function<void()>>> tasks;
+
+    std::barrier<void (*)(void) noexcept> wait_idle_barrier;
 };
+
+using ThreadPoolHandle = std::shared_ptr<ThreadPool>;
 
 } // namespace merian
