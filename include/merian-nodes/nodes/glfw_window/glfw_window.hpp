@@ -169,14 +169,17 @@ class GLFWWindow : public Node {
             const std::optional<Swapchain::SwapchainInfo>& swapchain_info =
                 get_swapchain()->get_swapchain_info();
 
-            config.output_text(fmt::format(
-                "surface format: {}\ncolor space: {}\nimage count: "
-                "{}\nextent: {}x{}\npresent mode: {}",
-                vk::to_string(swapchain_info->surface_format.format),
-                vk::to_string(swapchain_info->surface_format.colorSpace),
-                swapchain_info->images.size(), swapchain_info->extent.width,
-                swapchain_info->extent.height, vk::to_string(swapchain_info->present_mode)));
+            if (swapchain_info) {
+                config.output_text(fmt::format(
+                    "surface format: {}\ncolor space: {}\nimage count: "
+                    "{}\nextent: {}x{}\npresent mode: {}",
+                    vk::to_string(swapchain_info->surface_format.format),
+                    vk::to_string(swapchain_info->surface_format.colorSpace),
+                    swapchain_info->images.size(), swapchain_info->extent.width,
+                    swapchain_info->extent.height, vk::to_string(swapchain_info->present_mode)));
+            }
         }
+
         return {};
     }
 
