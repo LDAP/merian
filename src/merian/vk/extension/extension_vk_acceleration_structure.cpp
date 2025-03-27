@@ -63,7 +63,7 @@ void* ExtensionVkAccelerationStructure::pnext_device_create_info(void* const p_n
 }
 
 const uint32_t& ExtensionVkAccelerationStructure::min_scratch_alignment() const {
-    assert(supported_acceleration_structure_features.accelerationStructure == VK_TURE);
+    assert(supported_acceleration_structure_features.accelerationStructure == VK_TRUE);
     return acceleration_structure_properties.minAccelerationStructureScratchOffsetAlignment;
 }
 
