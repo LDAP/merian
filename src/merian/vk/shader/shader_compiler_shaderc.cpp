@@ -29,18 +29,20 @@ class FileIncluder final : public shaderc::CompileOptions::IncluderInterface {
             }
             break;
         }
-        default:
-            throw ShaderCompiler::compilation_failed("unknown include type");
+        default: { // do nothing to trigger error.
+        }
         }
 
-        if (!full_path) {
-            throw ShaderCompiler::compilation_failed(fmt::format(
-                "Failed to find include: {} -> {}", requesting_source, requested_source));
+        ShadercIncludeInformation* incl_info;
+
+        if (full_path) {
+            incl_info = new ShadercIncludeInformation(*full_path);
+        } else {
+            SPDLOG_WARN("Failed to find include: {} -> {}", requesting_source, requested_source);
+            incl_info = new ShadercIncludeInformation();
         }
 
-        ShadercIncludeInformation* incl_info = new ShadercIncludeInformation(*full_path);
         incl_info->include_result.user_data = incl_info;
-
         return &incl_info->include_result;
     }
 
@@ -64,6 +66,14 @@ class FileIncluder final : public shaderc::CompileOptions::IncluderInterface {
             include_result.source_name_length = this->full_path.size();
             include_result.content = content.c_str();
             include_result.content_length = content.size();
+        }
+
+        // failed
+        ShadercIncludeInformation() {
+            include_result.source_name = "";
+            include_result.source_name_length = 0;
+            include_result.content = "";
+            include_result.content_length = 0;
         }
 
         const std::string full_path;
