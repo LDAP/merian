@@ -30,7 +30,7 @@ void ColorImage::process([[maybe_unused]] GraphRun& run,
                          [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
                          const NodeIO& io) {
     if (needs_run) {
-        run.get_cmd()->clear(io[con_out], color);
+        run.get_cmd()->clear(io[con_out].get(0), color);
         needs_run = false;
     }
 }

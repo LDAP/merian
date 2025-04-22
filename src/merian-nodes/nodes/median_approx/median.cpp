@@ -73,7 +73,7 @@ void MedianApproxNode::process([[maybe_unused]] GraphRun& run,
     cmd->bind(pipe_histogram);
     cmd->bind_descriptor_set(pipe_histogram, descriptor_set);
     cmd->push_constant(pipe_histogram, pc);
-    cmd->dispatch(io[con_src]->get_extent(), local_size_x, local_size_y);
+    cmd->dispatch(io[con_src].get(0)->get_extent(), local_size_x, local_size_y);
 
     bar = io[con_histogram]->buffer_barrier(vk::AccessFlagBits::eShaderRead |
                                                 vk::AccessFlagBits::eShaderWrite,

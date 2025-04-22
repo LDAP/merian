@@ -6,16 +6,16 @@
 
 namespace merian_nodes {
 
-class ManagedVkBufferIn;
-using ManagedVkBufferInHandle = std::shared_ptr<ManagedVkBufferIn>;
+class VkBufferIn;
+using VkBufferInHandle = std::shared_ptr<VkBufferIn>;
 
 // Input a Vulkan buffer that is allocated and managed by the graph.
 // Note that it only supplies a descriptor if stage_flags contains at least one bit.
-class ManagedVkBufferIn : public TypedInputConnector<ManagedVkBufferOutHandle, BufferHandle> {
+class VkBufferIn : public TypedInputConnector<ManagedVkBufferOutHandle, BufferHandle> {
     friend class ManagedVkBufferOut;
 
   public:
-    ManagedVkBufferIn(const std::string& name,
+    VkBufferIn(const std::string& name,
                       const vk::AccessFlags2& access_flags,
                       const vk::PipelineStageFlags2& pipeline_stages,
                       const vk::BufferUsageFlags& usage_flags,
@@ -42,9 +42,9 @@ class ManagedVkBufferIn : public TypedInputConnector<ManagedVkBufferOutHandle, B
                    std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) override;
 
   public:
-    static ManagedVkBufferInHandle compute_read(const std::string& name, const uint32_t delay = 0);
+    static VkBufferInHandle compute_read(const std::string& name, const uint32_t delay = 0);
 
-    static ManagedVkBufferInHandle transfer_src(const std::string& name, const uint32_t delay = 0);
+    static VkBufferInHandle transfer_src(const std::string& name, const uint32_t delay = 0);
 
   private:
     const vk::AccessFlags2 access_flags;

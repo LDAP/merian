@@ -1,6 +1,6 @@
 #include "merian-nodes/connectors/managed_vk_buffer_out.hpp"
 
-#include "merian-nodes/connectors/managed_vk_buffer_in.hpp"
+#include "merian-nodes/connectors/vk_buffer_in.hpp"
 #include "merian-nodes/graph/errors.hpp"
 #include "merian-nodes/resources/managed_vk_buffer_resource.hpp"
 
@@ -13,10 +13,10 @@ ManagedVkBufferOut::ManagedVkBufferOut(const std::string& name,
                                        const vk::PipelineStageFlags2& pipeline_stages,
                                        const vk::ShaderStageFlags& stage_flags,
                                        const vk::BufferCreateInfo& create_info,
+                                       const uint32_t array_size,
                                        const bool persistent)
-    : TypedOutputConnector(name, !persistent), access_flags(access_flags),
-      pipeline_stages(pipeline_stages), stage_flags(stage_flags), create_info(create_info),
-      persistent(persistent) {}
+    : VkBufferOut(name, array_size, persistent), access_flags(access_flags),
+      pipeline_stages(pipeline_stages), stage_flags(stage_flags), create_info(create_info), persistent(persistent) {}
 
 std::optional<vk::DescriptorSetLayoutBinding> ManagedVkBufferOut::get_descriptor_info() const {
     if (stage_flags) {
@@ -98,7 +98,7 @@ GraphResourceHandle ManagedVkBufferOut::create_resource(
 
     if (!inputs.empty()) {
         for (const auto& [input_node, input] : inputs) {
-            const auto& buffer_in = debugable_ptr_cast<ManagedVkBufferIn>(input);
+            const auto& buffer_in = debugable_ptr_cast<VkBufferIn>(input);
             buffer_create_info.usage |= buffer_in->usage_flags;
             input_pipeline_stages |= buffer_in->pipeline_stages;
             input_access_flags |= buffer_in->access_flags;
@@ -125,7 +125,7 @@ std::shared_ptr<ManagedVkBufferOut> ManagedVkBufferOut::compute_write(
     const std::string& name, const vk::BufferCreateInfo& create_info, const bool persistent) {
     return std::make_shared<ManagedVkBufferOut>(
         name, vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
-        vk::PipelineStageFlagBits2::eComputeShader, vk::ShaderStageFlagBits::eCompute, create_info,
+        vk::PipelineStageFlagBits2::eComputeShader, vk::ShaderStageFlagBits::eCompute, create_info, 1,
         persistent);
 }
 
@@ -133,7 +133,7 @@ std::shared_ptr<ManagedVkBufferOut> ManagedVkBufferOut::transfer_write(
     const std::string& name, const vk::BufferCreateInfo& create_info, const bool persistent) {
     return std::make_shared<ManagedVkBufferOut>(name, vk::AccessFlagBits2::eTransferWrite,
                                                 vk::PipelineStageFlagBits2::eAllTransfer,
-                                                vk::ShaderStageFlags(), create_info, persistent);
+                                                vk::ShaderStageFlags(), create_info, 1, persistent);
 }
 
 } // namespace merian_nodes

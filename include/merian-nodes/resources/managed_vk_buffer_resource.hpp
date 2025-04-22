@@ -7,7 +7,7 @@
 namespace merian_nodes {
 
 class ManagedVkBufferResource : public GraphResource {
-    friend class ManagedVkBufferIn;
+    friend class VkBufferIn;
     friend class ManagedVkBufferOut;
 
   public:

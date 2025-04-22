@@ -60,10 +60,10 @@ void Bloom::process([[maybe_unused]] GraphRun& run,
     cmd->bind(separate);
     cmd->bind_descriptor_set(separate, descriptor_set);
     cmd->push_constant(separate, pc);
-    cmd->dispatch(io[con_out]->get_extent(), local_size_x, local_size_y);
+    cmd->dispatch(io[con_out].get(0)->get_extent(), local_size_x, local_size_y);
 
     const auto bar =
-        io[con_interm]->barrier(vk::ImageLayout::eGeneral, vk::AccessFlagBits::eShaderWrite,
+        io[con_interm].get(0)->barrier(vk::ImageLayout::eGeneral, vk::AccessFlagBits::eShaderWrite,
                                 vk::AccessFlagBits::eShaderRead);
     cmd->barrier(vk::PipelineStageFlagBits::eComputeShader,
                  vk::PipelineStageFlagBits::eComputeShader, bar);
@@ -71,7 +71,7 @@ void Bloom::process([[maybe_unused]] GraphRun& run,
     cmd->bind(composite);
     cmd->bind_descriptor_set(composite, descriptor_set);
     cmd->push_constant(composite, pc);
-    cmd->dispatch(io[con_out]->get_extent(), local_size_x, local_size_y);
+    cmd->dispatch(io[con_out].get(0)->get_extent(), local_size_x, local_size_y);
 }
 
 Bloom::NodeStatusFlags Bloom::properties(Properties& config) {

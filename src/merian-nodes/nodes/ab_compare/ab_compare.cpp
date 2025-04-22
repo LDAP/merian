@@ -35,9 +35,9 @@ void ABSplit::process([[maybe_unused]] GraphRun& run,
                       [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
                       const NodeIO& io) {
     const CommandBufferHandle& cmd = run.get_cmd();
-    const ImageHandle& a = io[con_in_a];
-    const ImageHandle& b = io[con_in_b];
-    const ImageHandle& result = io[con_out];
+    const ImageHandle& a = io[con_in_a].get(0);
+    const ImageHandle& b = io[con_in_b].get(0);
+    const ImageHandle& result = io[con_out].get(0);
 
     cmd_blit_fit(cmd, b, vk::ImageLayout::eTransferSrcOptimal, b->get_extent(), result,
                  vk::ImageLayout::eTransferDstOptimal, result->get_extent());
@@ -79,9 +79,9 @@ void ABSideBySide::process([[maybe_unused]] GraphRun& run,
                            [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
                            [[maybe_unused]] const NodeIO& io) {
     const CommandBufferHandle& cmd = run.get_cmd();
-    const ImageHandle& a = io[con_in_a];
-    const ImageHandle& b = io[con_in_b];
-    const ImageHandle& result = io[con_out];
+    const ImageHandle& a = io[con_in_a].get(0);
+    const ImageHandle& b = io[con_in_b].get(0);
+    const ImageHandle& result = io[con_out].get(0);
 
     vk::Extent3D half_result_extent = result->get_extent();
     half_result_extent.width /= 2;

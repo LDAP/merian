@@ -1,6 +1,6 @@
 #pragma once
 
-#include "merian-nodes/connectors/managed_vk_image_in.hpp"
+#include "merian-nodes/connectors/vk_image_in.hpp"
 #include "merian-nodes/graph/errors.hpp"
 #include "merian-nodes/graph/node.hpp"
 
@@ -55,13 +55,13 @@ class GLFWWindow : public Node {
             if (io.is_connected(image_in)) {
                 const auto& src_image = io[image_in];
                 const vk::Filter filter =
-                    src_image->format_features() &
+                    src_image.get(0)->format_features() &
                             vk::FormatFeatureFlagBits::eSampledImageFilterLinear
                         ? vk::Filter::eLinear
                         : vk::Filter::eNearest;
 
-                cmd_blit(mode, cmd, src_image, vk::ImageLayout::eTransferSrcOptimal,
-                         src_image->get_extent(), image, vk::ImageLayout::eTransferDstOptimal,
+                cmd_blit(mode, cmd, src_image.get(0), vk::ImageLayout::eTransferSrcOptimal,
+                         src_image.get(0)->get_extent(), image, vk::ImageLayout::eTransferDstOptimal,
                          image->get_extent(), vk::ClearColorValue{}, filter);
             } else {
                 cmd->clear(image);
@@ -208,7 +208,7 @@ class GLFWWindow : public Node {
         on_blit_completed = []([[maybe_unused]] const CommandBufferHandle& cmd,
                                [[maybe_unused]] const SwapchainAcquireResult& acquire_result) {};
 
-    ManagedVkImageInHandle image_in = ManagedVkImageIn::transfer_src("src", 0, true);
+    VkImageInHandle image_in = VkImageIn::transfer_src("src", 0, true);
 
     std::array<int, 4> windowed_pos_size;
     bool request_rebuild_on_recreate = false;

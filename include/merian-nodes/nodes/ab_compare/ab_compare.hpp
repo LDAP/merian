@@ -1,6 +1,6 @@
 #pragma once
 
-#include "merian-nodes/connectors/managed_vk_image_in.hpp"
+#include "merian-nodes/connectors/vk_image_in.hpp"
 #include "merian-nodes/connectors/managed_vk_image_out.hpp"
 #include "merian-nodes/graph/node.hpp"
 
@@ -22,8 +22,8 @@ class AbstractABCompare : public Node {
     const std::optional<vk::Format> output_format;
     const std::optional<vk::Extent2D> output_extent;
 
-    const ManagedVkImageInHandle con_in_a = ManagedVkImageIn::transfer_src("a");
-    const ManagedVkImageInHandle con_in_b = ManagedVkImageIn::transfer_src("b");
+    const VkImageInHandle con_in_a = VkImageIn::transfer_src("a");
+    const VkImageInHandle con_in_b = VkImageIn::transfer_src("b");
 };
 
 class ABSplit : public AbstractABCompare {

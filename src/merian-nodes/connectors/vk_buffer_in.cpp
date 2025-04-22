@@ -1,4 +1,4 @@
-#include "merian-nodes/connectors/managed_vk_buffer_in.hpp"
+#include "merian-nodes/connectors/vk_buffer_in.hpp"
 
 #include "merian-nodes/graph/errors.hpp"
 #include "merian-nodes/resources/managed_vk_buffer_resource.hpp"
@@ -6,7 +6,7 @@
 
 namespace merian_nodes {
 
-ManagedVkBufferIn::ManagedVkBufferIn(const std::string& name,
+VkBufferIn::VkBufferIn(const std::string& name,
                                      const vk::AccessFlags2& access_flags,
                                      const vk::PipelineStageFlags2& pipeline_stages,
                                      const vk::BufferUsageFlags& usage_flags,
@@ -15,7 +15,7 @@ ManagedVkBufferIn::ManagedVkBufferIn(const std::string& name,
     : TypedInputConnector(name, delay), access_flags(access_flags),
       pipeline_stages(pipeline_stages), usage_flags(usage_flags), stage_flags(stage_flags) {}
 
-std::optional<vk::DescriptorSetLayoutBinding> ManagedVkBufferIn::get_descriptor_info() const {
+std::optional<vk::DescriptorSetLayoutBinding> VkBufferIn::get_descriptor_info() const {
     if (stage_flags) {
         return vk::DescriptorSetLayoutBinding{
             0, vk::DescriptorType::eStorageBuffer, 1, stage_flags, nullptr,
@@ -24,7 +24,7 @@ std::optional<vk::DescriptorSetLayoutBinding> ManagedVkBufferIn::get_descriptor_
     return std::nullopt;
 }
 
-void ManagedVkBufferIn::get_descriptor_update(
+void VkBufferIn::get_descriptor_update(
     const uint32_t binding,
     const GraphResourceHandle& resource,
     const DescriptorSetHandle& update,
@@ -33,7 +33,7 @@ void ManagedVkBufferIn::get_descriptor_update(
         binding, debugable_ptr_cast<ManagedVkBufferResource>(resource)->buffer);
 }
 
-Connector::ConnectorStatusFlags ManagedVkBufferIn::on_pre_process(
+Connector::ConnectorStatusFlags VkBufferIn::on_pre_process(
     [[maybe_unused]] GraphRun& run,
     [[maybe_unused]] const CommandBufferHandle& cmd,
     const GraphResourceHandle& resource,
@@ -51,7 +51,7 @@ Connector::ConnectorStatusFlags ManagedVkBufferIn::on_pre_process(
     return flags;
 }
 
-void ManagedVkBufferIn::on_connect_output(const OutputConnectorHandle& output) {
+void VkBufferIn::on_connect_output(const OutputConnectorHandle& output) {
     auto casted_output = std::dynamic_pointer_cast<ManagedVkBufferOut>(output);
     if (!casted_output) {
         throw graph_errors::invalid_connection{
@@ -59,20 +59,20 @@ void ManagedVkBufferIn::on_connect_output(const OutputConnectorHandle& output) {
     }
 }
 
-BufferHandle ManagedVkBufferIn::resource(const GraphResourceHandle& resource) {
+BufferHandle VkBufferIn::resource(const GraphResourceHandle& resource) {
     return debugable_ptr_cast<ManagedVkBufferResource>(resource)->buffer;
 }
 
-std::shared_ptr<ManagedVkBufferIn> ManagedVkBufferIn::compute_read(const std::string& name,
+std::shared_ptr<VkBufferIn> VkBufferIn::compute_read(const std::string& name,
                                                                    const uint32_t delay) {
-    return std::make_shared<ManagedVkBufferIn>(
+    return std::make_shared<VkBufferIn>(
         name, vk::AccessFlagBits2::eShaderRead, vk::PipelineStageFlagBits2::eComputeShader,
         vk::BufferUsageFlagBits::eStorageBuffer, vk::ShaderStageFlagBits::eCompute, delay);
 }
 
-std::shared_ptr<ManagedVkBufferIn> ManagedVkBufferIn::transfer_src(const std::string& name,
+std::shared_ptr<VkBufferIn> VkBufferIn::transfer_src(const std::string& name,
                                                                    const uint32_t delay) {
-    return std::make_shared<ManagedVkBufferIn>(
+    return std::make_shared<VkBufferIn>(
         name, vk::AccessFlagBits2::eTransferRead, vk::PipelineStageFlagBits2::eAllTransfer,
         vk::BufferUsageFlagBits::eTransferSrc, vk::ShaderStageFlags(), delay);
 }
