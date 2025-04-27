@@ -4,6 +4,7 @@
 
 #include <mutex>
 #include <optional>
+#include <limits>
 
 #include <vulkan/vulkan.hpp>
 
@@ -56,8 +57,9 @@ void Queue::submit_wait(const vk::ArrayProxy<vk::SubmitInfo>& submit_infos, cons
     submit(submit_infos, fence);
 
     if (fence) {
-        check_result(context->device.waitForFences(fence, VK_TRUE, ~0ULL),
-                     "failed waiting for fence");
+        check_result(
+            context->device.waitForFences(fence, VK_TRUE, std::numeric_limits<uint64_t>::max()),
+            "failed waiting for fence");
     } else {
         wait_idle();
     }

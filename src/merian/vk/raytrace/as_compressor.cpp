@@ -36,7 +36,9 @@ ASCompressor::compact(const ContextHandle& context,
     queue->submit(cmd, fence);
 
     // TODO: Can this be done without waiting?
-    check_result(context->device.waitForFences(fence, VK_TRUE, ~0), "failed waiting for fences");
+    check_result(
+        context->device.waitForFences(fence, VK_TRUE, std::numeric_limits<uint64_t>::max()),
+        "failed waiting for fences");
     pool->reset();
     context->device.resetFences(fence);
     cmd->begin();
@@ -72,7 +74,9 @@ ASCompressor::compact(const ContextHandle& context,
     queue->submit(cmd, fence);
 
     // TODO: Can this be done without waiting?
-    check_result(context->device.waitForFences(fence, VK_TRUE, ~0), "failed waiting for fences");
+    check_result(
+        context->device.waitForFences(fence, VK_TRUE, std::numeric_limits<uint64_t>::max()),
+        "failed waiting for fences");
     context->device.destroyFence(fence);
     return result;
 }

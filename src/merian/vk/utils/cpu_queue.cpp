@@ -5,6 +5,8 @@
 
 #include <spdlog/spdlog.h>
 
+#include <limits>
+
 namespace merian {
 
 CPUQueue::CPUQueue(const ContextHandle& context, const ThreadPoolHandle& thread_pool)
@@ -63,7 +65,8 @@ CPUQueue::CPUQueue(const ContextHandle& context, const ThreadPoolHandle& thread_
             wait_info_any.setValues(waiting_values);
 
             SPDLOG_TRACE("dispatcher thread waiting for {} semaphores", waiting_semaphores.size());
-            check_result(this->context->device.waitSemaphores(wait_info_any, ~0ul),
+            check_result(this->context->device.waitSemaphores(wait_info_any,
+                                                              std::numeric_limits<uint64_t>::max()),
                          "failed waiting for semaphores in SyncDispatcher");
             SPDLOG_TRACE("dispatcher thread woke up");
 
