@@ -52,6 +52,7 @@ class ASBuilder {
         vk::AccelerationStructureBuildGeometryInfoKHR build_info;
         uint32_t instance_count;
         vk::AccelerationStructureGeometryKHR geometry;
+        AccelerationStructureHandle tlas;
     };
 
   public:

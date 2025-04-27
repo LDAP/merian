@@ -86,6 +86,8 @@ class StagingMemoryManager : public std::enable_shared_from_this<StagingMemoryMa
                        const BufferHandle& buffer,
                        const std::vector<T>& data,
                        const vk::DeviceSize offset = 0ul) {
+        if (data.empty())
+            return;
         const vk::DeviceSize size = data.size() * sizeof(T);
 
         cmd_to_device(cmd, buffer, data.data(), offset, size);

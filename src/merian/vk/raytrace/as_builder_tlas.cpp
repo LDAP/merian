@@ -28,7 +28,7 @@ ASBuilder::queue_build(const uint32_t instance_count,
 
     build_info.dstAccelerationStructure = *tlas;
 
-    pending_tlas_builds.emplace_back(build_info, instance_count, top_as_geometry);
+    pending_tlas_builds.emplace_back(build_info, instance_count, top_as_geometry, tlas);
 
     return tlas;
 }
@@ -51,7 +51,7 @@ void ASBuilder::queue_update(
     pending_min_scratch_buffer =
         std::max(pending_min_scratch_buffer, src_as->get_size_info().updateScratchSize);
 
-    pending_tlas_builds.emplace_back(build_info, instance_count, top_as_geometry);
+    pending_tlas_builds.emplace_back(build_info, instance_count, top_as_geometry, src_as);
 }
 
 void ASBuilder::queue_build(const uint32_t instance_count,
@@ -71,7 +71,7 @@ void ASBuilder::queue_build(const uint32_t instance_count,
     pending_min_scratch_buffer =
         std::max(pending_min_scratch_buffer, src_as->get_size_info().buildScratchSize);
 
-    pending_tlas_builds.emplace_back(build_info, instance_count, top_as_geometry);
+    pending_tlas_builds.emplace_back(build_info, instance_count, top_as_geometry, src_as);
 }
 
 void ASBuilder::get_cmds_tlas(const CommandBufferHandle& cmd,
@@ -105,6 +105,7 @@ void ASBuilder::get_cmds_tlas(const CommandBufferHandle& cmd,
 
         cmd->get_command_buffer().buildAccelerationStructuresKHR(
             pending_tlas_builds[pending_idx].build_info, &build_offset_info);
+        cmd->keep_until_pool_reset(pending_tlas_builds[pending_idx].tlas);
         cmd->barrier(vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR,
                      vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR, scratch_barrier);
     }
