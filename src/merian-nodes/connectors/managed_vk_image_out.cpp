@@ -84,6 +84,9 @@ GraphResourceHandle ManagedVkImageOut::create_resource(
                 }
         layouts_per_node.try_emplace(std::make_pair(input_node, input->delay),
                                      image_in->required_layout);
+
+        // TODO check if this is right here
+        image_in->array_size = images.size();
     }
 
     for (auto & image : images) {

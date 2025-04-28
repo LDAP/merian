@@ -5,6 +5,8 @@
 
 namespace merian_nodes {
 
+constexpr uint32_t MIN_DESCRIPTOR_COUNT = 1;
+
 VkImageIn::VkImageIn(const std::string& name,
                                    const vk::AccessFlags2 access_flags,
                                    const vk::PipelineStageFlags2 pipeline_stages,
@@ -19,7 +21,7 @@ VkImageIn::VkImageIn(const std::string& name,
 
 std::optional<vk::DescriptorSetLayoutBinding> VkImageIn::get_descriptor_info() const {
     if (stage_flags) {
-        return vk::DescriptorSetLayoutBinding{0, vk::DescriptorType::eCombinedImageSampler, 1,
+        return vk::DescriptorSetLayoutBinding{0, vk::DescriptorType::eCombinedImageSampler, std::max(MIN_DESCRIPTOR_COUNT, array_size),
                                               stage_flags, nullptr};
     }
     return std::nullopt;
@@ -53,14 +55,18 @@ Connector::ConnectorStatusFlags VkImageIn::on_pre_process(
     auto res = debugable_ptr_cast<ImageArrayResource>(resource);
 
     for (auto& image : res->images) {
+        if (!image) {
+            continue;
+        }
+
         if (res->last_used_as_output) {
-            vk::ImageMemoryBarrier2 img_bar =image->barrier2(
-                required_layout, res->current_access_flags, res->input_access_flags,
-                res->current_stage_flags, res->input_stage_flags);
-            image_barriers.push_back(img_bar);
-            res->current_stage_flags = res->input_stage_flags;
-            res->current_access_flags = res->input_access_flags;
-            res->last_used_as_output = false;
+			vk::ImageMemoryBarrier2 img_bar =image->barrier2(
+            	required_layout, res->current_access_flags, res->input_access_flags,
+            	res->current_stage_flags, res->input_stage_flags);
+        	image_barriers.push_back(img_bar);
+     	    res->current_stage_flags = res->input_stage_flags;
+     	    res->current_access_flags = res->input_access_flags;
+       		res->last_used_as_output = false;
         } else {
             // No barrier required, if no transition required
             if (required_layout != image->get_current_layout()) {

@@ -32,6 +32,9 @@ GraphResourceHandle UnmanagedVkImageOut::create_resource(
         if (first_input_layout == vk::ImageLayout::eUndefined) {
             first_input_layout = con_in->required_layout;
         }
+
+        // TODO check if this is right here
+        con_in->array_size = images.size();
     }
 
     return std::make_shared<ImageArrayResource>(images, allocator->get_dummy_texture()->get_image(),
