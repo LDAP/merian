@@ -557,9 +557,6 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
 
         const ProfilerHandle& profiler = prepare_profiler_for_run(in_flight_data);
         const auto run_start = std::chrono::high_resolution_clock::now();
-        graph_run.begin_run(cmd_cache, run_iteration, total_iteration,
-                            run_iteration % ITERATIONS_IN_FLIGHT, time_delta, duration_elapsed,
-                            duration_elapsed_since_connect);
 
         // CONNECT and PREPROCESS
         do {
@@ -567,6 +564,10 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
             while (needs_reconnect) {
                 connect();
             }
+
+            graph_run.begin_run(cmd_cache, run_iteration, total_iteration,
+                                run_iteration % ITERATIONS_IN_FLIGHT, time_delta, duration_elapsed,
+                                duration_elapsed_since_connect);
 
             // While preprocessing nodes can signalize that they need to reconnect as well
             {
