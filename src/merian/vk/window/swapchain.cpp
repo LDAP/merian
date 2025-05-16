@@ -247,14 +247,13 @@ vk::Extent2D Swapchain::create_swapchain(const uint32_t width, const uint32_t he
     info->surface_format = new_surface_format;
     info->images = context->device.getSwapchainImagesKHR(swapchain);
 
-    read_semaphores.resize(info->images.size());
-    written_semaphores.resize(info->images.size());
-    number_acquires.resize(info->images.size());
+    sync_groups.resize(info->images.size());
 
     for (std::size_t i = 0; i < info->images.size(); i++) {
-        read_semaphores[i] = BinarySemaphore::create(context);
-        written_semaphores[i] = BinarySemaphore::create(context);
+        sync_groups[i].read_semaphore = BinarySemaphore::create(context);
+        sync_groups[i].written_semaphore = BinarySemaphore::create(context);
     }
+    spare_read_semaphore = BinarySemaphore::create(context);
 
     SPDLOG_DEBUG("created swapchain ({}) {}x{} ({} {} {})",
                  fmt::ptr(static_cast<VkSwapchainKHR>(swapchain)), info->cur_width,
@@ -291,10 +290,10 @@ Swapchain::acquire(const vk::Extent2D extent, const uint64_t timeout) {
         throw needs_recreate("changed surface format");
     }
 
-    const uint32_t read_acquire_index = acquire_count % info->images.size();
     uint32_t image_idx;
     const vk::Result result = context->device.acquireNextImageKHR(
-        swapchain, timeout, *read_semaphores[read_acquire_index], VK_NULL_HANDLE, &image_idx);
+        swapchain, timeout, *spare_read_semaphore, VK_NULL_HANDLE, &image_idx);
+    std::swap(spare_read_semaphore, sync_groups[image_idx].read_semaphore);
 
     if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR) {
         info.reset();
@@ -305,9 +304,9 @@ Swapchain::acquire(const vk::Extent2D extent, const uint64_t timeout) {
         acquire_count++;
 
         if (old_swapchain) {
-            number_acquires[image_idx]++;
+            sync_groups[image_idx].number_acquires++;
 
-            if (number_acquires[image_idx] > 1) {
+            if (sync_groups[image_idx].number_acquires > 1) {
                 SPDLOG_DEBUG("present confirmed. Cleanup old swapchains.");
                 old_swapchain->save_to_destoy = true;
                 old_swapchain.reset();
@@ -320,8 +319,7 @@ Swapchain::acquire(const vk::Extent2D extent, const uint64_t timeout) {
             }
         }
 
-        return std::make_pair(image_idx, SyncGroup{read_semaphores[read_acquire_index],
-                                                   written_semaphores[image_idx]});
+        return std::make_pair(image_idx, sync_groups[image_idx]);
     }
 
     if (result == vk::Result::eTimeout || result == vk::Result::eNotReady) {
@@ -335,7 +333,7 @@ Swapchain::acquire(const vk::Extent2D extent, const uint64_t timeout) {
 
 void Swapchain::present(const QueueHandle& queue, const uint32_t image_idx) {
     vk::Result result = queue->present(vk::PresentInfoKHR{
-        **written_semaphores[image_idx],
+        **sync_groups[image_idx].written_semaphore,
         swapchain,
         image_idx,
     });
