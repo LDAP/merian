@@ -37,8 +37,6 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
         // be aware semaphore index may not match active image index!
         BinarySemaphoreHandle read_semaphore;
         BinarySemaphoreHandle written_semaphore;
-        FenceHandle acquire_finished;
-        bool acquire_in_progress = false;
     };
 
     class needs_recreate : public std::runtime_error {
@@ -172,9 +170,15 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
     bool save_to_destoy = false;
     // ---------------------------------------------------------------------------
 
-    // uint32_t current_sync_group_index = 0;  // = acquire_count % num_images;
-    std::vector<SyncGroup> sync_groups;
-    std::vector<uint32_t> image_idx_to_sync_group;
+    // Semaphore that is signaled by the presentation engine when the aquired image is ready.
+    // access with acquire_index
+    std::vector<BinarySemaphoreHandle> read_semaphores;
+    // Semaphore that must be signaled by the user when they finished writing to the acquired image.
+    // access with image_idx
+    std::vector<BinarySemaphoreHandle> written_semaphores;
+    // Helper to detect if an aquire has finished on a swapchain
+    // access with image_idx
+    std::vector<uint64_t> number_acquires;
 };
 
 } // namespace merian
