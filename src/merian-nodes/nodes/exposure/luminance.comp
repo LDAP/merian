@@ -37,11 +37,13 @@ void main() {
             const float ev = ev_100_from_average(average_l, 100, params.K);
             max_luminance = ev_100_to_max_luminance(ev, 100, params.q);
 
-            float last_max_luminance = params.reset == 1 ? max_luminance : luminance[0];
-            if (isnan(last_max_luminance) || isinf(last_max_luminance)) last_max_luminance = max_luminance;
+            if (params.reset != 1) {
+                float last_max_luminance = luminance[0];
+                if (isnan(last_max_luminance) || isinf(last_max_luminance)) last_max_luminance = max_luminance;
 
-            const float tau = -params.timediff * (max_luminance > last_max_luminance ? params.speed_up : params.speed_down);
-            max_luminance = last_max_luminance + (max_luminance - last_max_luminance) * (1 - exp(tau));
+                const float tau = -params.timediff * (max_luminance > last_max_luminance ? params.speed_up : params.speed_down);
+                max_luminance = last_max_luminance + (max_luminance - last_max_luminance) * (1 - exp(tau));
+            }
         }
     }
 
