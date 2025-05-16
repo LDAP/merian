@@ -470,6 +470,9 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                             ring_fences.get(i).user_data.in_flight_data.at(node).reset();
                         }
                     }
+                    if ((flags & Node::NodeStatusFlagBits::REMOVE_NODE) != 0u) {
+                        remove_node(data.identifier);
+                    }
                 }
             }
         }
@@ -585,6 +588,9 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                     }
                     if ((flags & Node::NodeStatusFlagBits::RESET_IN_FLIGHT_DATA) != 0u) {
                         in_flight_data.in_flight_data[node].reset();
+                    }
+                    if ((flags & Node::NodeStatusFlagBits::REMOVE_NODE) != 0u) {
+                        remove_node(data.identifier);
                     }
                 }
             }
@@ -992,6 +998,9 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                         if ((flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT) != 0u) {
                             SPDLOG_DEBUG("node {} requested reconnect", data.identifier);
                             request_reconnect();
+                        }
+                        if ((flags & Node::NodeStatusFlagBits::REMOVE_NODE) != 0u) {
+                            remove_node(data.identifier);
                         }
                         props.st_end_child();
                     }

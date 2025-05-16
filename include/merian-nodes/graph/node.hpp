@@ -24,6 +24,8 @@ class Node : public std::enable_shared_from_this<Node> {
         // In on_connected: Resets frame data of EVERY frame in flight.
         // In pre_process: Resets frame data of the next run ONLY.
         RESET_IN_FLIGHT_DATA = 0b10,
+        // removes the node from the graph
+        REMOVE_NODE = 0b100,
     };
 
   public:

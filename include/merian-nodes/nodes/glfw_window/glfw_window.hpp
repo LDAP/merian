@@ -9,6 +9,7 @@
 #include "merian/vk/window/glfw_window.hpp"
 #include "merian/vk/window/swapchain.hpp"
 #include "merian/vk/window/swapchain_manager.hpp"
+#include <csignal>
 
 namespace merian_nodes {
 
@@ -35,6 +36,16 @@ class GLFWWindow : public Node {
         }
 
         return {image_in};
+    }
+
+    virtual NodeStatusFlags pre_process([[maybe_unused]] const GraphRun& run,
+                                        [[maybe_unused]] const NodeIO& io) override {
+
+        if (on_should_close_remove_node && window && window->should_close()) {
+            return NodeStatusFlagBits::REMOVE_NODE;
+        }
+
+        return {};
     }
 
     virtual void process(GraphRun& run,
@@ -89,6 +100,15 @@ class GLFWWindow : public Node {
 
             if (request_rebuild_on_recreate && acquire->did_recreate)
                 run.request_reconnect();
+        }
+
+        if (window && window->should_close()) {
+            if (on_should_close_sigint) {
+                raise(SIGINT);
+            }
+            if (on_should_close_sigterm) {
+                raise(SIGTERM);
+            }
         }
     }
 
@@ -165,6 +185,14 @@ class GLFWWindow : public Node {
 
         config.config_uint("acquire timeout", acquire_timeout_ns, "in nanoseconds");
 
+        if (config.st_begin_child("on_should_close_actions", "On should_close()")) {
+            config.config_bool("send sigint", on_should_close_sigint);
+            config.config_bool("send sigterm", on_should_close_sigterm);
+            config.config_bool("remove node", on_should_close_remove_node);
+
+            config.st_end_child();
+        }
+
         if (swapchain_manager) {
             const std::optional<Swapchain::SwapchainInfo>& swapchain_info =
                 get_swapchain()->get_swapchain_info();
@@ -213,6 +241,10 @@ class GLFWWindow : public Node {
     std::array<int, 4> windowed_pos_size;
     bool request_rebuild_on_recreate = false;
     uint64_t acquire_timeout_ns = 1000L * 1000L * 100L; // .1s
+
+    bool on_should_close_sigint = false;
+    bool on_should_close_sigterm = false;
+    bool on_should_close_remove_node = true;
 };
 
 } // namespace merian_nodes
