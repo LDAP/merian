@@ -11,7 +11,7 @@ using ManagedVkImageInHandle = std::shared_ptr<ManagedVkImageIn>;
 
 // Input a Vulkan image that is allocated and managed by the graph.
 // Note that it only supplies a descriptor if stage_flags contains at least one bit.
-class ManagedVkImageIn : public TypedInputConnector<ManagedVkImageOutHandle, ImageHandle> {
+class ManagedVkImageIn : public TypedInputConnector<ManagedVkImageOutHandle, ImageArrayResource&> {
     friend class ManagedVkImageOut;
 
   public:
@@ -43,7 +43,7 @@ class ManagedVkImageIn : public TypedInputConnector<ManagedVkImageOutHandle, Ima
 
     void on_connect_output(const OutputConnectorHandle& output) override;
 
-    virtual ImageHandle resource(const GraphResourceHandle& resource) override;
+    virtual ImageArrayResource& resource(const GraphResourceHandle& resource) override;
 
   public:
     static ManagedVkImageInHandle

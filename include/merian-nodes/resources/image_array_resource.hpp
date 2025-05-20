@@ -34,7 +34,7 @@ class ImageArrayResource : public GraphResource {
         }
     }
 
-    merian::ImageHandle operator->() {
+    merian::ImageHandle operator->() const {
       assert(!images.empty());
       return images[0];
     }

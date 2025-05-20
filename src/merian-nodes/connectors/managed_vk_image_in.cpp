@@ -36,9 +36,10 @@ void ManagedVkImageIn::get_descriptor_update(const uint32_t binding,
                                                vk::ImageLayout::eShaderReadOnlyOptimal);
     } else {
         // or vk::ImageLayout::eShaderReadOnlyOptimal instead of required?
-        assert(debugable_ptr_cast<ManagedVkImageResource>(resource)->tex && "missing usage flags?");
+        const auto& res = debugable_ptr_cast<ImageArrayResource>(resource);
+        assert(res->textures[0] && "missing usage flags?");
         update->queue_descriptor_write_texture(
-            binding, *debugable_ptr_cast<ManagedVkImageResource>(resource)->tex, 0,
+            binding, *res->textures[0], 0,
             required_layout);
     }
 }
@@ -50,10 +51,10 @@ Connector::ConnectorStatusFlags ManagedVkImageIn::on_pre_process(
     [[maybe_unused]] const NodeHandle& node,
     std::vector<vk::ImageMemoryBarrier2>& image_barriers,
     [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {
-    auto res = debugable_ptr_cast<ManagedVkImageResource>(resource);
+    auto res = debugable_ptr_cast<ImageArrayResource>(resource);
 
     if (res->last_used_as_output) {
-        vk::ImageMemoryBarrier2 img_bar = res->image->barrier2(
+        vk::ImageMemoryBarrier2 img_bar = res->images[0]->barrier2(
             required_layout, res->current_access_flags, res->input_access_flags,
             res->current_stage_flags, res->input_stage_flags);
         image_barriers.push_back(img_bar);
@@ -62,8 +63,8 @@ Connector::ConnectorStatusFlags ManagedVkImageIn::on_pre_process(
         res->last_used_as_output = false;
     } else {
         // No barrier required, if no transition required
-        if (required_layout != res->image->get_current_layout()) {
-            vk::ImageMemoryBarrier2 img_bar = res->image->barrier2(
+        if (required_layout != res->images[0]->get_current_layout()) {
+            vk::ImageMemoryBarrier2 img_bar = res->images[0]->barrier2(
                 required_layout, res->current_access_flags, res->current_access_flags,
                 res->current_stage_flags, res->current_stage_flags);
             image_barriers.push_back(img_bar);
@@ -87,8 +88,8 @@ void ManagedVkImageIn::on_connect_output(const OutputConnectorHandle& output) {
     }
 }
 
-ImageHandle ManagedVkImageIn::resource(const GraphResourceHandle& resource) {
-    return debugable_ptr_cast<ManagedVkImageResource>(resource)->image;
+ImageArrayResource& ManagedVkImageIn::resource(const GraphResourceHandle& resource) {
+    return *debugable_ptr_cast<ImageArrayResource>(resource);
 }
 
 std::shared_ptr<ManagedVkImageIn>
