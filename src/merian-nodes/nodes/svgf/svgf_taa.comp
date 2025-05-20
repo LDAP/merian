@@ -47,14 +47,12 @@ main()
     return;
   }
   if (DEBUG == 3) {
-    const GBuffer gbuf = gbuffer[gbuffer_index(ipos, imageSize(img_out))];
-    const vec3 normal = geo_decode_normal(gbuf.enc_normal);
+    const vec3 normal = gbuffer_get_normal_pixel(gbuffer, ipos);
     imageStore(img_out, ipos, vec4(normal, 1));
     return;
   }
   if (DEBUG == 4) {
-    const GBuffer gbuf = gbuffer[gbuffer_index(ipos, imageSize(img_out))];
-    imageStore(img_out, ipos, vec4(gbuf.linear_z / 1000));
+    imageStore(img_out, ipos, vec4(gbuffer_get_linear_z_pixel(gbuffer, ipos) / 1000));
     return;
   }
   if (DEBUG == 5) {
@@ -62,8 +60,7 @@ main()
     return;
   }
   if (DEBUG == 6) {
-    const GBuffer gbuf = gbuffer[gbuffer_index(ipos, imageSize(img_out))];
-    imageStore(img_out, ipos, vec4(gbuf.grad_z, 0, 0));
+    imageStore(img_out, ipos, vec4(gbuffer_get_grad_z_pixel(gbuffer, ipos), 0, 0));
     return;
   }
   if (DEBUG == 7) {

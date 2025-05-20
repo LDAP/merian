@@ -1,5 +1,6 @@
 #pragma once
 
+#include "merian-nodes/connectors/connector_utils.hpp"
 #include "merian-nodes/connectors/managed_vk_buffer_in.hpp"
 #include "merian-nodes/connectors/managed_vk_image_in.hpp"
 
@@ -80,8 +81,8 @@ class Accumulate : public Node {
     ManagedVkImageInHandle con_mv = ManagedVkImageIn::compute_read("mv", 0, true);
     ManagedVkImageInHandle con_moments_in = ManagedVkImageIn::compute_read("moments_in");
 
-    ManagedVkBufferInHandle con_gbuf = ManagedVkBufferIn::compute_read("gbuf");
-    ManagedVkBufferInHandle con_prev_gbuf = ManagedVkBufferIn::compute_read("prev_gbuf", 1);
+    GBufferInHandle con_gbuf = merian_nodes::GBufferIn::compute_read("gbuffer");
+    GBufferInHandle con_prev_gbuf = merian_nodes::GBufferIn::compute_read("prev_gbuffer", 1);
 
     ManagedVkImageOutHandle con_irr_out;
     ManagedVkImageOutHandle con_moments_out;

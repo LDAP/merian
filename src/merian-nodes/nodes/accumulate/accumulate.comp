@@ -53,10 +53,13 @@ void get_prev_nearest(const ivec2 prev_ipos,
   if(any(greaterThanEqual(prev_ipos, textureSize(img_prev_accum, 0))) || any(lessThan(prev_ipos, ivec2(0))))
     return;
 
-  const GBuffer prev_gbuf = prev_gbuffer[gbuffer_index(prev_ipos, imageSize(img_accum))];
-  const vec3 prev_normal = geo_decode_normal(prev_gbuf.enc_normal);
-  const float w = reprojection_weight(normal, prev_normal, pc.normal_reject_cos,
-                        linear_z, vel_z, prev_gbuf.linear_z, pc.z_reject_percent);
+  const float w = reprojection_weight(normal,
+                                      gbuffer_get_normal_pixel(prev_gbuffer, prev_ipos),
+                                      pc.normal_reject_cos,
+                                      linear_z,
+                                      vel_z,
+                                      gbuffer_get_linear_z_pixel(prev_gbuffer, prev_ipos),
+                                      pc.z_reject_percent);
 
   prev_irr_histlen = w * texelFetch(img_prev_accum, prev_ipos, 0);
   prev_moments     = w * texelFetch(img_prev_moments, prev_ipos, 0).rg;
@@ -82,13 +85,10 @@ void get_prev_bilinear(const vec2 prev_pos,
       if(any(greaterThanEqual(tc, textureSize(img_prev_accum, 0))) || any(lessThan(tc, ivec2(0))))
         continue;
 
-      const GBuffer prev_gbuf = prev_gbuffer[gbuffer_index(tc, imageSize(img_accum))];
-      const vec3 prev_normal = geo_decode_normal(prev_gbuf.enc_normal);
-
       // Bilinear interpolation weight
       const float w = (xx == 0 ? (1.0 - inter_w.x) : inter_w.x) * (yy == 0 ? (1.0 - inter_w.y) : inter_w.y)
-                * reprojection_weight(normal, prev_normal, pc.normal_reject_cos,
-                        linear_z, vel_z, prev_gbuf.linear_z, pc.z_reject_percent);
+                * reprojection_weight(normal, gbuffer_get_normal_pixel(prev_gbuffer, tc), pc.normal_reject_cos,
+                        linear_z, vel_z, gbuffer_get_linear_z_pixel(prev_gbuffer, tc), pc.z_reject_percent);
 
       prev_irr_histlen        += w * texelFetch(img_prev_accum, tc, 0);
       prev_moments            += w * texelFetch(img_prev_moments, tc, 0).rg;
@@ -115,10 +115,8 @@ void get_prev_extended_search(const vec2 prev_pos,
     if(any(greaterThanEqual(tc, textureSize(img_prev_accum, 0))) || any(lessThan(tc, ivec2(0))))
       continue;
 
-    const GBuffer prev_gbuf = prev_gbuffer[gbuffer_index(tc, imageSize(img_accum))];
-    const vec3 prev_normal = geo_decode_normal(prev_gbuf.enc_normal);
-    const float w = reprojection_weight(normal, prev_normal, pc.normal_reject_cos * 0.8,
-                      linear_z, vel_z, offset, grad_z, prev_gbuf.linear_z, pc.z_reject_percent * 2.);
+    const float w = reprojection_weight(normal, gbuffer_get_normal_pixel(prev_gbuffer, tc), pc.normal_reject_cos * 0.8,
+                      linear_z, vel_z, offset, grad_z, gbuffer_get_linear_z_pixel(prev_gbuffer, tc), pc.z_reject_percent * 2.);
 
     prev_irr_histlen        += w * texelFetch(img_prev_accum, tc, 0);
     prev_moments            += w * texelFetch(img_prev_moments, tc, 0).rg;
@@ -190,31 +188,30 @@ void main() {
 
   // ACCUMULATE
   {
-    const GBuffer gbuf = gbuffer[gbuffer_index(ipos, imageSize(img_accum))];
-    const vec3 normal = geo_decode_normal(gbuf.enc_normal);
+    const GBuffer gbuf = gbuffer_load_pixel(gbuffer, ipos);
 
     if (FILTER_MODE == FILTER_MODE_NEAREST) {
       get_prev_nearest(ivec2(round(prev_pos)),
-                       gbuf.linear_z,
-                       gbuf.vel_z,
-                       normal,
+                       gbuffer_get_linear_z(gbuf),
+                       gbuffer_get_vel_z(gbuf),
+                       gbuffer_get_normal(gbuf),
                        prev_irr_histlen,
                        prev_moments,
                        sum_w);
     } else if (FILTER_MODE == FILTER_MODE_BILINEAR) {
       get_prev_bilinear(prev_pos,
-                        gbuf.linear_z,
-                        gbuf.vel_z,
-                        normal,
+                        gbuffer_get_linear_z(gbuf),
+                        gbuffer_get_vel_z(gbuf),
+                        gbuffer_get_normal(gbuf),
                         prev_irr_histlen,
                         prev_moments,
                         sum_w);
     } else if (FILTER_MODE == FILTER_MODE_STOCHASTIC_BILINEAR) {
       uint rng_state = pcg3d16(uvec3(ipos, pc.iteration));
       get_prev_nearest(reproject_pixel_stochastic(prev_pos, XorShift32(rng_state)),
-                       gbuf.linear_z,
-                       gbuf.vel_z,
-                       normal,
+                       gbuffer_get_linear_z(gbuf),
+                       gbuffer_get_vel_z(gbuf),
+                       gbuffer_get_normal(gbuf),
                        prev_irr_histlen,
                        prev_moments,
                        sum_w);
@@ -228,10 +225,10 @@ void main() {
         sum_w            = 0.0;
 
         get_prev_extended_search(prev_pos,
-                                 gbuf.linear_z,
-                                 gbuf.vel_z,
-                                 gbuf.grad_z,
-                                 normal,
+                                 gbuffer_get_linear_z(gbuf),
+                                 gbuffer_get_vel_z(gbuf),
+                                 gbuffer_get_grad_z(gbuf),
+                                 gbuffer_get_normal(gbuf),
                                  prev_irr_histlen,
                                  prev_moments,
                                  sum_w);

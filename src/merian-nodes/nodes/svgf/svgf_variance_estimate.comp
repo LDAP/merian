@@ -52,13 +52,13 @@ void main() {
 
   vec2 center_grad_z;
   {
-    const GBuffer gbuf = gbuffer[gbuffer_index(ipos, imageSize(img_filter_in))];
+    const GBuffer gbuf = gbuffer_load_pixel(gbuffer, ipos);
 
     shared_moments[shared_idx]  = texelFetch(img_moments, ipos, 0).rg;
     shared_irr[shared_idx]      = texelFetch(img_irr, ipos, 0);
-    shared_normal[shared_idx]   = geo_decode_normal(gbuf.enc_normal);
-    shared_z[shared_idx]        = gbuf.linear_z;
-    center_grad_z               = gbuf.grad_z;
+    shared_normal[shared_idx]   = gbuffer_get_normal(gbuf);
+    shared_z[shared_idx]        = gbuffer_get_linear_z(gbuf);
+    center_grad_z               = gbuffer_get_grad_z(gbuf);
   }
   barrier();
 

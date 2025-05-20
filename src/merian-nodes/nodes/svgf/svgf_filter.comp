@@ -27,8 +27,7 @@ ivec2 ipos;
 vec3 filter_irr;
 float filter_var;
 float filter_w;
-GBuffer c_gbuf;
-vec3 c_n;
+DecodedGBuffer c_gbuf;
 float c_l;
 float sigma_l;
 
@@ -61,17 +60,15 @@ float get_sigma_l(float center, ivec2 ipos) {
 void tap(const ivec2 offset,
          const float kernel_weight) {
   const vec4  p_irr_var   = texelFetch(img_filter_in, ipos + offset, 0); 
-  const GBuffer p_gbuf   = gbuffer[gbuffer_index((ipos + offset), imageSize(img_filter_out))]; 
-  const vec3  p_n         = geo_decode_normal(p_gbuf.enc_normal);
   const float p_l         = yuv_luminance(p_irr_var.rgb);
 
   const float w_l = abs(p_l - c_l) / (sigma_l + 1e-10);
   
-  float w_z = exp(-10 * abs(c_gbuf.linear_z + dot(vec2(c_gbuf.grad_z), offset) - p_gbuf.linear_z) / params.param_z);
+  float w_z = exp(-10 * abs(c_gbuf.linear_z + dot(vec2(c_gbuf.grad_z), offset) - gbuffer_get_linear_z_pixel(gbuffer, ipos + offset)) / params.param_z);
   w_z = mix(w_z, 1.0, z_bias_depth_mix);
 
   // was: pow(max(0, dot(p_n, c_n)), params.param_n); 
-  float w_n = smoothstep(params.param_n, 1.0, dot(p_n, c_n));
+  float w_n = smoothstep(params.param_n, 1.0, dot(gbuffer_get_normal_pixel(gbuffer, ipos + offset), c_gbuf.normal));
   w_n = mix(w_n, 1.0, z_bias_normals_mix);
 
   const float w = exp(-w_l * w_l) * w_z * w_n * kernel_weight; 
@@ -86,8 +83,7 @@ main() {
   ipos = ivec2(gl_GlobalInvocationID);
   if (any(greaterThanEqual(ipos, imageSize(img_filter_out)))) return;
 
-  c_gbuf = gbuffer[gbuffer_index(ipos, imageSize(img_filter_out))];
-  c_n = geo_decode_normal(c_gbuf.enc_normal);
+  c_gbuf = gbuffer_get_decoded_pixel(gbuffer, ipos);
   const vec4 filter_in = texelFetch(img_filter_in, ipos, 0);
   c_l = yuv_luminance(filter_in.rgb);
 

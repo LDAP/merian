@@ -1,5 +1,6 @@
 #pragma once
 
+#include "merian-nodes/connectors/connector_utils.hpp"
 #include "merian-nodes/connectors/managed_vk_buffer_in.hpp"
 #include "merian-nodes/connectors/managed_vk_image_in.hpp"
 #include "merian-nodes/graph/node.hpp"
@@ -48,9 +49,8 @@ class SVGF : public Node {
     NodeStatusFlags on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
                                  const DescriptorSetLayoutHandle& descriptor_set_layout) override;
 
-    void process(GraphRun& run,
-                 const DescriptorSetHandle& descriptor_set,
-                 const NodeIO& io) override;
+    void
+    process(GraphRun& run, const DescriptorSetHandle& descriptor_set, const NodeIO& io) override;
 
     NodeStatusFlags properties(Properties& config) override;
 
@@ -70,8 +70,8 @@ class SVGF : public Node {
     ManagedVkImageInHandle con_moments = ManagedVkImageIn::compute_read("moments");
     ManagedVkImageInHandle con_albedo = ManagedVkImageIn::compute_read("albedo");
     ManagedVkImageInHandle con_mv = ManagedVkImageIn::compute_read("mv", 0, true);
-    ManagedVkBufferInHandle con_gbuffer = ManagedVkBufferIn::compute_read("gbuffer");
-    ManagedVkBufferInHandle con_prev_gbuffer = ManagedVkBufferIn::compute_read("prev_gbuffer", 1);
+    GBufferInHandle con_gbuffer = merian_nodes::GBufferIn::compute_read("gbuffer");
+    GBufferInHandle con_prev_gbuffer = merian_nodes::GBufferIn::compute_read("prev_gbuffer", 1);
 
     ShaderModuleHandle variance_estimate_module;
     ShaderModuleHandle filter_module;

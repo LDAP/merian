@@ -39,6 +39,7 @@ class SamplerPool : public std::enable_shared_from_this<SamplerPool> {
         const vk::Filter mag_filter = vk::Filter::eNearest,
         const vk::Filter min_filter = vk::Filter::eLinear,
         const vk::SamplerAddressMode address_mode = vk::SamplerAddressMode::eRepeat,
+        const vk::SamplerMipmapMode mipmap_mode = vk::SamplerMipmapMode::eLinear,
         const bool anisotropy = true);
 
     SamplerHandle linear_mirrored_repeat();

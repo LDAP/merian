@@ -148,9 +148,7 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
     return {};
 }
 
-void SVGF::process(GraphRun& run,
-                   const DescriptorSetHandle& descriptor_set,
-                   const NodeIO& io) {
+void SVGF::process(GraphRun& run, const DescriptorSetHandle& descriptor_set, const NodeIO& /*io*/) {
     const CommandBufferHandle& cmd = run.get_cmd();
 
     // PREPARE (VARIANCE ESTIMATE)
