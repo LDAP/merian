@@ -1,7 +1,7 @@
 #pragma once
 
 #include "merian-nodes/graph/connector_output.hpp"
-#include "merian-nodes/resources/managed_vk_image_resource.hpp"
+#include "merian-nodes/resources/image_array_resource.hpp"
 
 namespace merian_nodes {
 
@@ -10,7 +10,7 @@ using ManagedVkImageOutHandle = std::shared_ptr<ManagedVkImageOut>;
 
 // Output a Vulkan image that is allocated and managed by the graph.
 // Note that it only supplies a descriptor if stage_flags contains at least one bit.
-class ManagedVkImageOut : public TypedOutputConnector<ImageHandle> {
+class ManagedVkImageOut : public TypedOutputConnector<ImageArrayResource&> {
   public:
     ManagedVkImageOut(const std::string& name,
                       const vk::AccessFlags2& access_flags,
@@ -18,7 +18,8 @@ class ManagedVkImageOut : public TypedOutputConnector<ImageHandle> {
                       const vk::ImageLayout& required_layout,
                       const vk::ShaderStageFlags& stage_flags,
                       const vk::ImageCreateInfo& create_info,
-                      const bool persistent = false);
+                      const bool persistent = false,
+                      const uint32_t array_size = 1);
 
     virtual std::optional<vk::DescriptorSetLayoutBinding> get_descriptor_info() const override;
 
@@ -50,7 +51,7 @@ class ManagedVkImageOut : public TypedOutputConnector<ImageHandle> {
                     const uint32_t resoruce_index,
                     const uint32_t ring_size) override;
 
-    virtual ImageHandle resource(const GraphResourceHandle& resource) override;
+    virtual ImageArrayResource& resource(const GraphResourceHandle& resource) override;
 
   public:
     static ManagedVkImageOutHandle compute_write(const std::string& name,
@@ -111,6 +112,8 @@ class ManagedVkImageOut : public TypedOutputConnector<ImageHandle> {
                                                   const bool persistent = false);
 
   public:
+    std::vector<merian::ImageHandle> images;
+
     const vk::AccessFlags2 access_flags;
     const vk::PipelineStageFlags2 pipeline_stages;
     const vk::ImageLayout required_layout;

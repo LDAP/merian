@@ -12,10 +12,11 @@ ManagedVkImageOut::ManagedVkImageOut(const std::string& name,
                                      const vk::ImageLayout& required_layout,
                                      const vk::ShaderStageFlags& stage_flags,
                                      const vk::ImageCreateInfo& create_info,
-                                     const bool persistent)
+                                     const bool persistent,
+                                     const uint32_t array_size)
     : TypedOutputConnector(name, !persistent), access_flags(access_flags),
       pipeline_stages(pipeline_stages), required_layout(required_layout), stage_flags(stage_flags),
-      create_info(create_info), persistent(persistent) {}
+      create_info(create_info), persistent(persistent), images(array_size) {}
 
 std::optional<vk::DescriptorSetLayoutBinding> ManagedVkImageOut::get_descriptor_info() const {
     if (stage_flags) {
@@ -31,12 +32,15 @@ void ManagedVkImageOut::get_descriptor_update(
     const DescriptorSetHandle& update,
     [[maybe_unused]] const ResourceAllocatorHandle& allocator) {
     // or vk::ImageLayout::eGeneral instead of required?
-    assert(debugable_ptr_cast<ManagedVkImageResource>(resource)->tex && "missing usage flags?");
+
+    const auto& res = debugable_ptr_cast<ImageArrayResource>(resource);
+    assert(res->textures[0] && "missing usage flags?");
+
     // From Spec 14.1.1: The image subresources for a storage image must be in the
     // VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR or VK_IMAGE_LAYOUT_GENERAL layout in order to access its
     // data in a shader.
     update->queue_descriptor_write_texture(
-        binding, *debugable_ptr_cast<ManagedVkImageResource>(resource)->tex, 0,
+        binding, *res->textures[0], 0,
         vk::ImageLayout::eGeneral);
 }
 
@@ -48,14 +52,14 @@ Connector::ConnectorStatusFlags ManagedVkImageOut::on_pre_process(
     std::vector<vk::ImageMemoryBarrier2>& image_barriers,
     [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {
     Connector::ConnectorStatusFlags flags{};
-    const auto& res = debugable_ptr_cast<ManagedVkImageResource>(resource);
+    const auto& res = debugable_ptr_cast<ImageArrayResource>(resource);
     if (res->needs_descriptor_update) {
         flags |= NEEDS_DESCRIPTOR_UPDATE;
         res->needs_descriptor_update = false;
     }
 
     vk::ImageMemoryBarrier2 img_bar =
-        res->image->barrier2(required_layout, res->current_access_flags, access_flags,
+        res->images[0]->barrier2(required_layout, res->current_access_flags, access_flags,
                              res->current_stage_flags, pipeline_stages, VK_QUEUE_FAMILY_IGNORED,
                              VK_QUEUE_FAMILY_IGNORED, all_levels_and_layers(), !persistent);
 
@@ -73,7 +77,7 @@ Connector::ConnectorStatusFlags ManagedVkImageOut::on_post_process(
     [[maybe_unused]] const NodeHandle& node,
     [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
     [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {
-    debugable_ptr_cast<ManagedVkImageResource>(resource)->last_used_as_output = true;
+    debugable_ptr_cast<ImageArrayResource>(resource)->last_used_as_output = true;
     return {};
 }
 
@@ -109,19 +113,19 @@ GraphResourceHandle ManagedVkImageOut::create_resource(
                                      image_in->required_layout);
     }
 
-    const ImageHandle image = alloc->createImage(image_create_info, MemoryMappingType::NONE, name);
+    images[0] = alloc->createImage(image_create_info, MemoryMappingType::NONE, name);
     auto res =
-        std::make_shared<ManagedVkImageResource>(image, input_pipeline_stages, input_access_flags);
+        std::make_shared<ImageArrayResource>(images, input_pipeline_stages, input_access_flags);
 
-    if (image->valid_for_view()) {
-        res->tex = allocator->createTexture(image, image->make_view_create_info(), name);
+    if (images[0]->valid_for_view()) {
+        res->textures[0] = allocator->createTexture(images[0], images[0]->make_view_create_info(), name);
     }
 
     return res;
 }
 
-ImageHandle ManagedVkImageOut::resource(const GraphResourceHandle& resource) {
-    return debugable_ptr_cast<ManagedVkImageResource>(resource)->image;
+ImageArrayResource& ManagedVkImageOut::resource(const GraphResourceHandle& resource) {
+    return *debugable_ptr_cast<ImageArrayResource>(resource);
 }
 
 std::shared_ptr<ManagedVkImageOut> ManagedVkImageOut::compute_write(const std::string& name,
