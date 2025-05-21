@@ -53,6 +53,8 @@ class ManagedVkImageOut : public TypedOutputConnector<ImageArrayResource&> {
 
     virtual ImageArrayResource& resource(const GraphResourceHandle& resource) override;
 
+    uint32_t array_size() const;
+
   public:
     static ManagedVkImageOutHandle compute_write(const std::string& name,
                                                  const vk::Format format,

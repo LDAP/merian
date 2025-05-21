@@ -58,6 +58,8 @@ class ManagedVkImageIn : public TypedInputConnector<ManagedVkImageOutHandle, Ima
     const vk::ImageLayout required_layout;
     const vk::ImageUsageFlags usage_flags;
     const vk::ShaderStageFlags stage_flags;
+
+    uint32_t array_size = 1;
 };
 
 } // namespace merian_nodes

@@ -20,7 +20,7 @@ ManagedVkImageOut::ManagedVkImageOut(const std::string& name,
 
 std::optional<vk::DescriptorSetLayoutBinding> ManagedVkImageOut::get_descriptor_info() const {
     if (stage_flags) {
-        return vk::DescriptorSetLayoutBinding{0, vk::DescriptorType::eStorageImage, 1, stage_flags,
+        return vk::DescriptorSetLayoutBinding{0, vk::DescriptorType::eStorageImage, array_size(), stage_flags,
                                               nullptr};
     }
     return std::nullopt;
@@ -34,14 +34,16 @@ void ManagedVkImageOut::get_descriptor_update(
     // or vk::ImageLayout::eGeneral instead of required?
 
     const auto& res = debugable_ptr_cast<ImageArrayResource>(resource);
-    assert(res->textures[0] && "missing usage flags?");
+    for (auto& update_idx : res->pending_updates) {
+        assert(res->textures[update_idx] && "missing usage flags?");
 
-    // From Spec 14.1.1: The image subresources for a storage image must be in the
-    // VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR or VK_IMAGE_LAYOUT_GENERAL layout in order to access its
-    // data in a shader.
-    update->queue_descriptor_write_texture(
-        binding, *res->textures[0], 0,
-        vk::ImageLayout::eGeneral);
+        // From Spec 14.1.1: The image subresources for a storage image must be in the
+        // VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR or VK_IMAGE_LAYOUT_GENERAL layout in order to access its
+        // data in a shader.
+        update->queue_descriptor_write_texture(
+            binding, *res->textures[update_idx], update_idx,
+            vk::ImageLayout::eGeneral);
+    }
 }
 
 Connector::ConnectorStatusFlags ManagedVkImageOut::on_pre_process(
@@ -53,17 +55,21 @@ Connector::ConnectorStatusFlags ManagedVkImageOut::on_pre_process(
     [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {
     Connector::ConnectorStatusFlags flags{};
     const auto& res = debugable_ptr_cast<ImageArrayResource>(resource);
-    if (res->needs_descriptor_update) {
+
+    if (!res->current_updates.empty()) {
+        res->pending_updates.clear();
+        std::swap(res->current_updates, res->pending_updates);  
         flags |= NEEDS_DESCRIPTOR_UPDATE;
-        res->needs_descriptor_update = false;
     }
 
-    vk::ImageMemoryBarrier2 img_bar =
-        res->images[0]->barrier2(required_layout, res->current_access_flags, access_flags,
+    for (const auto& image : res->images) {
+        vk::ImageMemoryBarrier2 img_bar =
+        image->barrier2(required_layout, res->current_access_flags, access_flags,
                              res->current_stage_flags, pipeline_stages, VK_QUEUE_FAMILY_IGNORED,
                              VK_QUEUE_FAMILY_IGNORED, all_levels_and_layers(), !persistent);
+        image_barriers.push_back(img_bar);
+    }
 
-    image_barriers.push_back(img_bar);
     res->current_stage_flags = pipeline_stages;
     res->current_access_flags = access_flags;
 
@@ -113,12 +119,16 @@ GraphResourceHandle ManagedVkImageOut::create_resource(
                                      image_in->required_layout);
     }
 
-    images[0] = alloc->createImage(image_create_info, MemoryMappingType::NONE, name);
+    for (uint32_t i = 0; i < array_size(); i++) {
+        images[i] = alloc->createImage(image_create_info, MemoryMappingType::NONE, name);
+    }
     auto res =
         std::make_shared<ImageArrayResource>(images, input_pipeline_stages, input_access_flags);
 
-    if (images[0]->valid_for_view()) {
-        res->textures[0] = allocator->createTexture(images[0], images[0]->make_view_create_info(), name);
+    for (uint32_t i = 0; i < array_size(); i++) {
+        if (images[i]->valid_for_view()) {
+           res->textures[i] = allocator->createTexture(images[i], images[i]->make_view_create_info(), name);
+        }
     }
 
     return res;
@@ -126,6 +136,10 @@ GraphResourceHandle ManagedVkImageOut::create_resource(
 
 ImageArrayResource& ManagedVkImageOut::resource(const GraphResourceHandle& resource) {
     return *debugable_ptr_cast<ImageArrayResource>(resource);
+}
+
+uint32_t ManagedVkImageOut::array_size() const {
+    return images.size();
 }
 
 std::shared_ptr<ManagedVkImageOut> ManagedVkImageOut::compute_write(const std::string& name,

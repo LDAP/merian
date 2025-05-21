@@ -20,7 +20,7 @@ ManagedVkImageIn::ManagedVkImageIn(const std::string& name,
 
 std::optional<vk::DescriptorSetLayoutBinding> ManagedVkImageIn::get_descriptor_info() const {
     if (stage_flags) {
-        return vk::DescriptorSetLayoutBinding{0, vk::DescriptorType::eCombinedImageSampler, 1,
+        return vk::DescriptorSetLayoutBinding{0, vk::DescriptorType::eCombinedImageSampler, array_size,
                                               stage_flags, nullptr};
     }
     return std::nullopt;
@@ -37,10 +37,12 @@ void ManagedVkImageIn::get_descriptor_update(const uint32_t binding,
     } else {
         // or vk::ImageLayout::eShaderReadOnlyOptimal instead of required?
         const auto& res = debugable_ptr_cast<ImageArrayResource>(resource);
-        assert(res->textures[0] && "missing usage flags?");
-        update->queue_descriptor_write_texture(
-            binding, *res->textures[0], 0,
-            required_layout);
+        for (auto& update_idx : res->pending_updates) {
+            assert(res->textures[update_idx] && "missing usage flags?");
+            update->queue_descriptor_write_texture(
+                binding, *res->textures[update_idx], update_idx,
+                required_layout);
+        }
     }
 }
 
@@ -54,27 +56,32 @@ Connector::ConnectorStatusFlags ManagedVkImageIn::on_pre_process(
     auto res = debugable_ptr_cast<ImageArrayResource>(resource);
 
     if (res->last_used_as_output) {
-        vk::ImageMemoryBarrier2 img_bar = res->images[0]->barrier2(
-            required_layout, res->current_access_flags, res->input_access_flags,
-            res->current_stage_flags, res->input_stage_flags);
-        image_barriers.push_back(img_bar);
+        for (const auto& image : res->images) {
+            vk::ImageMemoryBarrier2 img_bar = image->barrier2(
+                required_layout, res->current_access_flags, res->input_access_flags,
+                res->current_stage_flags, res->input_stage_flags);
+            image_barriers.push_back(img_bar);
+        }
         res->current_stage_flags = res->input_stage_flags;
         res->current_access_flags = res->input_access_flags;
         res->last_used_as_output = false;
     } else {
-        // No barrier required, if no transition required
-        if (required_layout != res->images[0]->get_current_layout()) {
-            vk::ImageMemoryBarrier2 img_bar = res->images[0]->barrier2(
-                required_layout, res->current_access_flags, res->current_access_flags,
-                res->current_stage_flags, res->current_stage_flags);
-            image_barriers.push_back(img_bar);
+        for (const auto& image : res->images) {
+            // No barrier required, if no transition required
+            if (required_layout != image->get_current_layout()) {
+                vk::ImageMemoryBarrier2 img_bar = image->barrier2(
+                    required_layout, res->current_access_flags, res->current_access_flags,
+                    res->current_stage_flags, res->current_stage_flags);
+                image_barriers.push_back(img_bar);
+            }
         }
     }
 
     Connector::ConnectorStatusFlags flags{};
-    if (res->needs_descriptor_update) {
+    if (!res->current_updates.empty()) {
+        res->pending_updates.clear();
+        std::swap(res->current_updates, res->pending_updates);
         flags |= NEEDS_DESCRIPTOR_UPDATE;
-        res->needs_descriptor_update = false;
     }
 
     return flags;
@@ -86,6 +93,7 @@ void ManagedVkImageIn::on_connect_output(const OutputConnectorHandle& output) {
         throw graph_errors::invalid_connection{
             fmt::format("ManagedVkImageIn {} cannot recive from {}.", name, output->name)};
     }
+    array_size = casted_output->array_size();
 }
 
 ImageArrayResource& ManagedVkImageIn::resource(const GraphResourceHandle& resource) {

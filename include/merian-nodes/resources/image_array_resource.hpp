@@ -15,14 +15,17 @@ class ImageArrayResource : public GraphResource {
                            const vk::PipelineStageFlags2& input_stage_flags,
                            const vk::AccessFlags2& input_access_flags)
         : images(images), textures(images.size()), input_stage_flags(input_stage_flags),
-          input_access_flags(input_access_flags), first_input_layout(vk::ImageLayout::eUndefined) {}
+          input_access_flags(input_access_flags), first_input_layout(vk::ImageLayout::eUndefined) {
+            for (uint32_t i = 0; i < images.size(); i++) {
+              current_updates.push_back(i);
+            }
+          }
 
     void properties(merian::Properties& props) override {
         props.output_text(
         fmt::format("Array size: {}\nCurrent updates: {}\nPending updates: {}\nInput access "
                       "flags: {}\nInput pipeline stages: {}\nInput first layout: {}",
-                     // images.size(), current_updates.size(), pending_updates.size(), // TODO print update counts
-                      images.size(), 0, 0,
+                      images.size(), current_updates.size(), pending_updates.size(),
                       vk::to_string(input_access_flags), vk::to_string(input_stage_flags),
                       vk::to_string(first_input_layout)));
         for (uint32_t i = 0; i < images.size(); i++) {
@@ -52,7 +55,11 @@ class ImageArrayResource : public GraphResource {
     vk::PipelineStageFlags2 current_stage_flags = vk::PipelineStageFlagBits2::eTopOfPipe;
     vk::AccessFlags2 current_access_flags{};
 
-    bool needs_descriptor_update = true;
+    // the updates to "textures" are recorded here.
+    std::vector<uint32_t> current_updates;
+    // then flushed to here to wait for the graph to apply descriptor updates.
+    std::vector<uint32_t> pending_updates;
+
     bool last_used_as_output = true;
 
     // combined pipeline stage flags of all inputs
