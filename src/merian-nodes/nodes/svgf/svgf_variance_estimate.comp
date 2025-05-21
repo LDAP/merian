@@ -14,7 +14,7 @@
 
 layout (constant_id = 2) const int SVGF_ITERATIONS = 0;
 
-layout(set = 1, binding = 0) uniform sampler2D unused; // needed to match the filter layout
+layout(set = 1, binding = 0) uniform sampler2D img_filter_unused; // unused needed to match the filter layout
 layout(set = 1, binding = 1) uniform writeonly restrict image2D img_filter_in;
 
 layout(push_constant, std140) uniform push_t {
@@ -28,7 +28,7 @@ layout(push_constant, std140) uniform push_t {
 
 // update VE_SHARED_MEMORY_PER_PIXEL if you change anything here!
 shared vec2 shared_moments[SHARED_SIZE];
-shared vec4 shared_irr[SHARED_SIZE];
+shared vec3 shared_irr[SHARED_SIZE];
 shared vec3 shared_normal[SHARED_SIZE];
 shared float shared_z[SHARED_SIZE];
 
@@ -50,16 +50,22 @@ void main() {
 
   // Load all necessary information into shared memory
 
-  vec2 center_grad_z;
-  {
-    const GBuffer gbuf = gbuffer_load_pixel(gbuffer, ipos);
+  f16vec2 center_grad_z;
+  vec4 irr_histlen;
+  vec2 moments;
 
-    shared_moments[shared_idx]  = texelFetch(img_moments, ipos, 0).rg;
-    shared_irr[shared_idx]      = texelFetch(img_irr, ipos, 0);
+  do {
+    const GBuffer gbuf = gbuffer_load_pixel(gbuffer, ipos);
+    irr_histlen = texelFetch(img_irr, ipos, 0);
+    moments = texelFetch(img_moments, ipos, 0).rg;
+
+    shared_moments[shared_idx]  = moments;
+    shared_irr[shared_idx]      = irr_histlen.rgb;
     shared_normal[shared_idx]   = gbuffer_get_normal(gbuf);
     shared_z[shared_idx]        = gbuffer_get_linear_z(gbuf);
     center_grad_z               = gbuffer_get_grad_z(gbuf);
-  }
+  } while (false);
+
   barrier();
 
   if (any(greaterThanEqual(ipos, imageSize(img_filter_in))) || !IS_ON_TILE)
@@ -70,8 +76,6 @@ void main() {
   #define center_normal shared_normal[shared_idx]
   #define center_linear_z shared_z[shared_idx]
 
-  vec4 irr_histlen = center_irr_histlen;
-  vec2 moments = center_moments;
   float sum_w = 1.0;
 
   const float kernel[] = {1., 2. / 3., 1. / 6.};
@@ -90,7 +94,7 @@ void main() {
         w *= smoothstep(params.normal_reject_cos, 1.0, dot(center_normal, shared_normal[SHARED_INDEX(p.x, p.y)]));
         // Weight neighbors with similar depth
         // w *= 1.0 - smoothstep(0.0, params.depth_reject_percent * max(gbuf.linear_z, neigh_gbuf.linear_z), abs(gbuf.linear_z - neigh_gbuf.linear_z));
-        w *= exp(-10 * abs(center_linear_z + dot(center_grad_z, vec2(xx, yy)) - shared_z[SHARED_INDEX(p.x, p.y)]) / params.depth_accept);
+        w *= exp(-10 * abs(center_linear_z + dot(center_grad_z, f16vec2(xx, yy)) - shared_z[SHARED_INDEX(p.x, p.y)]) / params.depth_accept);
         // smoothing kernel
         w *= kernel[abs(xx)] * kernel[abs(yy)];
         // Weight lower with increasing history
