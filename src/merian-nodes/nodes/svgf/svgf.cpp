@@ -1,5 +1,6 @@
 #include "merian-nodes/nodes/svgf/svgf.hpp"
 #include "config.h"
+#include "merian/utils/math.hpp"
 #include "merian/vk/descriptors/descriptor_set_layout_builder.hpp"
 
 #include "merian/vk/pipeline/pipeline_compute.hpp"
@@ -63,7 +64,9 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
                                          const DescriptorSetLayoutHandle& graph_layout) {
     if (!ping_pong_layout) {
         ping_pong_layout = DescriptorSetLayoutBuilder()
-                               .add_binding_combined_sampler()
+                               .add_binding_combined_sampler() // irradiance
+                               .add_binding_storage_image()
+                               .add_binding_combined_sampler() // gbuffer
                                .add_binding_storage_image()
                                .build_layout(context);
     }
@@ -71,18 +74,28 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
 
     // Ping pong textures
     irr_create_info.usage |= vk::ImageUsageFlagBits::eSampled;
+    uint32_t padding_multiple = 1 << (std::max(svgf_iterations, 1) - 1);
+    irr_create_info.extent.width = round_up(irr_create_info.extent.width, padding_multiple);
+    irr_create_info.extent.height = round_up(irr_create_info.extent.height, padding_multiple);
+
     for (int i = 0; i < 2; i++) {
         if (!ping_pong_res[i].set)
             ping_pong_res[i].set = std::make_shared<DescriptorSet>(filter_pool);
 
+        // irradiance
         ImageHandle tmp_irr_image = allocator->createImage(irr_create_info, MemoryMappingType::NONE,
                                                            fmt::format("SVGF ping pong: {}", i));
-        vk::ImageViewCreateInfo create_image_view{
-            {}, *tmp_irr_image,         vk::ImageViewType::e2D, tmp_irr_image->get_format(),
-            {}, first_level_and_layer()};
         ping_pong_res[i].ping_pong =
-            allocator->createTexture(tmp_irr_image, create_image_view,
+            allocator->createTexture(tmp_irr_image, tmp_irr_image->make_view_create_info(),
                                      allocator->get_sampler_pool()->linear_mirrored_repeat());
+
+        // gbuffer
+        vk::ImageCreateInfo gbuf_create_info = irr_create_info;
+        gbuf_create_info.format = vk::Format::eR32G32B32A32Uint;
+        ImageHandle tmp_gbuf_image = allocator->createImage(gbuf_create_info);
+        ping_pong_res[i].gbuf_ping_pong =
+            allocator->createTexture(tmp_gbuf_image, tmp_gbuf_image->make_view_create_info(),
+                                     allocator->get_sampler_pool()->nearest_mirrored_repeat());
     }
     for (int i = 0; i < 2; i++) {
         ping_pong_res[i]
@@ -90,6 +103,10 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
             ->queue_descriptor_write_texture(0, ping_pong_res[i].ping_pong, 0,
                                              vk::ImageLayout::eShaderReadOnlyOptimal)
             .queue_descriptor_write_texture(1, ping_pong_res[i ^ 1].ping_pong, 0,
+                                            vk::ImageLayout::eGeneral)
+            .queue_descriptor_write_texture(2, ping_pong_res[i].gbuf_ping_pong, 0,
+                                            vk::ImageLayout::eShaderReadOnlyOptimal)
+            .queue_descriptor_write_texture(3, ping_pong_res[i ^ 1].gbuf_ping_pong, 0,
                                             vk::ImageLayout::eGeneral)
             .update();
     }
@@ -125,11 +142,11 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
             for (int i = 0; i < svgf_iterations; i++) {
                 auto spec_builder = SpecializationInfoBuilder();
                 int gap = 1 << i;
-                spec_builder.add_entry(local_size_x, local_size_y, gap, filter_variance,
-                                       filter_type, i);
-                SpecializationInfoHandle taa_spec = spec_builder.build();
-                filters[i] =
-                    std::make_shared<ComputePipeline>(filter_pipe_layout, filter_module, taa_spec);
+                spec_builder.add_entry(local_size_x, local_size_y, gap, filter_type, i,
+                                       svgf_iterations - 1);
+                SpecializationInfoHandle filter_spec = spec_builder.build();
+                filters[i] = std::make_shared<ComputePipeline>(filter_pipe_layout, filter_module,
+                                                               filter_spec);
             }
         }
         {
@@ -159,8 +176,12 @@ void SVGF::process(GraphRun& run, const DescriptorSetHandle& descriptor_set, con
             vk::ImageLayout::eGeneral, vk::AccessFlagBits::eShaderRead,
             vk::AccessFlagBits::eShaderWrite, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
             all_levels_and_layers(), true);
+        auto gbuf_bar = ping_pong_res[0].gbuf_ping_pong->get_image()->barrier(
+            vk::ImageLayout::eGeneral, vk::AccessFlagBits::eShaderRead,
+            vk::AccessFlagBits::eShaderWrite, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
+            all_levels_and_layers(), true);
         cmd->barrier(vk::PipelineStageFlagBits::eComputeShader,
-                     vk::PipelineStageFlagBits::eComputeShader, bar);
+                     vk::PipelineStageFlagBits::eComputeShader, {bar, gbuf_bar});
 
         // run kernel
         cmd->bind(variance_estimate);
@@ -177,8 +198,12 @@ void SVGF::process(GraphRun& run, const DescriptorSetHandle& descriptor_set, con
             vk::ImageLayout::eShaderReadOnlyOptimal, vk::AccessFlagBits::eShaderWrite,
             vk::AccessFlagBits::eShaderRead, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
             all_levels_and_layers());
+        gbuf_bar = ping_pong_res[0].gbuf_ping_pong->get_image()->barrier(
+            vk::ImageLayout::eShaderReadOnlyOptimal, vk::AccessFlagBits::eShaderWrite,
+            vk::AccessFlagBits::eShaderRead, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
+            all_levels_and_layers());
         cmd->barrier(vk::PipelineStageFlagBits::eComputeShader,
-                     vk::PipelineStageFlagBits::eComputeShader, bar);
+                     vk::PipelineStageFlagBits::eComputeShader, {bar, gbuf_bar});
     }
 
     // FILTER
@@ -192,8 +217,12 @@ void SVGF::process(GraphRun& run, const DescriptorSetHandle& descriptor_set, con
             vk::ImageLayout::eGeneral, vk::AccessFlagBits::eShaderRead,
             vk::AccessFlagBits::eShaderWrite, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
             all_levels_and_layers(), true);
+        auto gbuf_bar = write_res.gbuf_ping_pong->get_image()->barrier(
+            vk::ImageLayout::eGeneral, vk::AccessFlagBits::eShaderRead,
+            vk::AccessFlagBits::eShaderWrite, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
+            all_levels_and_layers(), true);
         cmd->barrier(vk::PipelineStageFlagBits::eComputeShader,
-                     vk::PipelineStageFlagBits::eComputeShader, bar);
+                     vk::PipelineStageFlagBits::eComputeShader, {bar, gbuf_bar});
 
         // run filter
         cmd->bind(filters[i]);
@@ -206,8 +235,12 @@ void SVGF::process(GraphRun& run, const DescriptorSetHandle& descriptor_set, con
             vk::ImageLayout::eShaderReadOnlyOptimal, vk::AccessFlagBits::eShaderWrite,
             vk::AccessFlagBits::eShaderRead, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
             all_levels_and_layers());
+        gbuf_bar = write_res.gbuf_ping_pong->get_image()->barrier(
+            vk::ImageLayout::eShaderReadOnlyOptimal, vk::AccessFlagBits::eShaderWrite,
+            vk::AccessFlagBits::eShaderRead, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
+            all_levels_and_layers());
         cmd->barrier(vk::PipelineStageFlagBits::eComputeShader,
-                     vk::PipelineStageFlagBits::eComputeShader, bar);
+                     vk::PipelineStageFlagBits::eComputeShader, {bar, gbuf_bar});
 
         read_set = write_res.set;
     }
@@ -252,8 +285,6 @@ SVGF::NodeStatusFlags SVGF::properties(Properties& config) {
     needs_rebuild |=
         config.config_options("filter type", filter_type, {"atrous", "box", "subsampled"},
                               Properties::OptionsStyle::COMBO);
-    needs_rebuild |= config.config_bool("filter variance", filter_variance,
-                                        "Filter variance with a 3x3 gaussian");
 
     config.st_separate("TAA");
     config.config_float(

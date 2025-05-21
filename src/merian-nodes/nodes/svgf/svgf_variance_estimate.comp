@@ -16,6 +16,8 @@ layout (constant_id = 2) const int SVGF_ITERATIONS = 0;
 
 layout(set = 1, binding = 0) uniform sampler2D img_filter_unused; // unused needed to match the filter layout
 layout(set = 1, binding = 1) uniform writeonly restrict image2D img_filter_in;
+layout(set = 1, binding = 2) uniform usampler2D img_gbuf_unused;   // unused needed to match the filter layout
+layout(set = 1, binding = 3) uniform writeonly uimage2D img_gbuf_in;
 
 layout(push_constant, std140) uniform push_t {
     float normal_reject_cos;
@@ -43,7 +45,7 @@ void main() {
   const uint shared_idx = SHARED_INDEX(gl_LocalInvocationID.x, gl_LocalInvocationID.y);
 
   if (SVGF_ITERATIONS == 0) {
-    if (all(lessThan(ipos, imageSize(img_filter_in))) && IS_ON_TILE)
+    if (all(lessThan(ipos, textureSize(img_irr, 0))) && IS_ON_TILE)
       imageStore(img_filter_in, ipos, vec4(texelFetch(img_irr, ipos, 0).rgb, 0));
     return;
   }
@@ -55,9 +57,16 @@ void main() {
   vec2 moments;
 
   do {
-    const GBuffer gbuf = gbuffer_load_pixel(gbuffer, ipos);
-    irr_histlen = texelFetch(img_irr, ipos, 0);
-    moments = texelFetch(img_moments, ipos, 0).rg;
+    GBuffer gbuf;
+    if (all(lessThan(ipos, textureSize(img_irr, 0)))) {
+      gbuf = gbuffer_load_pixel(gbuffer, ipos);
+      irr_histlen = texelFetch(img_irr, ipos, 0);
+      moments = texelFetch(img_moments, ipos, 0).rg;
+    } else {
+      gbuf = gbuffer_new();
+      irr_histlen = vec4(0);
+      moments = vec2(2);
+    }
 
     shared_moments[shared_idx]  = moments;
     shared_irr[shared_idx]      = irr_histlen.rgb;
@@ -116,6 +125,15 @@ void main() {
   variance = mix(center_variance, variance, alpha);
   irr_histlen.rgb = mix(center_irr_histlen.rgb, irr_histlen.rgb, alpha);
 
-  imageStore(img_filter_in, ipos, vec4(irr_histlen.rgb, variance));
+  if (all(lessThan(ipos, textureSize(img_irr, 0)))) {
+    imageStore(img_filter_in, ipos, vec4(irr_histlen.rgb, variance));
+    imageStore(img_gbuf_in, ipos, uvec4(geo_encode_normal(center_normal),
+                                        floatBitsToUint(center_linear_z),
+                                        packFloat2x16(center_grad_z),
+                                        0));
+  } else {
+    imageStore(img_filter_in, ipos, vec4(0));
+    imageStore(img_gbuf_in, ipos, uvec4(0));
+  }
 }
 

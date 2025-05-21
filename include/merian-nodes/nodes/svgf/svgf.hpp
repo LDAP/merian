@@ -62,8 +62,8 @@ class SVGF : public Node {
     // depends on available shared memory
     const uint32_t variance_estimate_local_size_x;
     const uint32_t variance_estimate_local_size_y;
-    static constexpr uint32_t local_size_x = 32;
-    static constexpr uint32_t local_size_y = 32;
+    static constexpr uint32_t local_size_x = 16;
+    static constexpr uint32_t local_size_y = 16;
 
     ManagedVkImageInHandle con_prev_out = ManagedVkImageIn::compute_read("prev_out", 1);
     ManagedVkImageInHandle con_irr = ManagedVkImageIn::compute_read("irr");
@@ -96,12 +96,12 @@ class SVGF : public Node {
     DescriptorPoolHandle filter_pool;
     struct EAWRes {
         TextureHandle ping_pong;
+        TextureHandle gbuf_ping_pong;
         // Set reads from this resources and writes to i ^ 1
         DescriptorSetHandle set;
     };
     std::array<EAWRes, 2> ping_pong_res; // Ping pong sets
 
-    VkBool32 filter_variance = false;
     int filter_type = 0;
 
     int taa_debug = 0;
