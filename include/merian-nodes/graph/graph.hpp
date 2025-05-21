@@ -11,6 +11,7 @@
 #include "resource.hpp"
 
 #include "merian-nodes/graph/node_registry.hpp"
+#include "merian/utils/math.hpp"
 #include "merian/vk/command/caching_command_pool.hpp"
 #include "merian/vk/context.hpp"
 #include "merian/vk/descriptors/descriptor_set_layout_builder.hpp"
@@ -18,7 +19,6 @@
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/shader/shader_compiler.hpp"
 #include "merian/vk/sync/ring_fences.hpp"
-#include "merian/vk/utils/math.hpp"
 
 #include <cstdint>
 #include <queue>
