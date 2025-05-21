@@ -1,6 +1,3 @@
-#include "merian-shaders/image_buffer.glsl.h"
-#include "merian-shaders/types.glsl.h"
-
 #ifndef _MERIAN_SHADERS_GBUFFER_H_
 #define _MERIAN_SHADERS_GBUFFER_H_
 
