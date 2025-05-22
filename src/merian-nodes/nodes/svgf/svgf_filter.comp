@@ -21,7 +21,8 @@ layout (constant_id = 5) const int LAST_ITERATION = 0;
 // the reference implementation does that but it looks better without
 // #define FILTER_VARIANCE
 
-#define KALEIDOSCOPE
+// #define KALEIDOSCOPE
+// #define KALEIDOSCOPE_USE_SHMEM
 
 layout(push_constant, std140) uniform push_t {
     float param_z;
@@ -80,6 +81,8 @@ float get_sigma_l(float center, ivec2 ipos) {
 
 // --------------------------------------------------------------
 // Reiners Kaladoscope SVGF
+
+#ifdef KALEIDOSCOPE_USE_SHMEM
 
 #define SHARED_HEIGHT 20
 #define SHARED_WIDTH 20
@@ -211,6 +214,8 @@ void shmem_load_halo() {
     // Note: no work for subgroup gl_SubgroupID == 5
 }
 
+#endif // KALEIDOSCOPE_USE_SHMEM
+
 // --------------------------------------------------------------
 
 
@@ -218,11 +223,17 @@ void tap(in ivec2 offset,
          const float kernel_weight) {
 
 #ifdef KALEIDOSCOPE
-  vec4  p_irr_var; vec4 _gbuf;
-  shmem_read(ipos_shared + offset, _gbuf, p_irr_var);
-  const float p_l         = yuv_luminance(p_irr_var.rgb);
-  const vec3  p_n         = _gbuf.xyz;
-  const float p_z         = _gbuf.w;
+  
+  #ifdef KALEIDOSCOPE_USE_SHMEM
+    vec4  p_irr_var; vec4 _gbuf;
+    shmem_read(ipos_shared + offset, _gbuf, p_irr_var);
+    const vec3  p_n         = _gbuf.xyz;
+    const float p_z         = _gbuf.w;
+  #else
+    const vec4  p_irr_var   = texelFetch(img_filter_in, ipos + offset, 0); 
+    const vec3  p_n         = geo_decode_normal(texelFetch(img_gbuf_in, ipos + offset, 0).x);
+    const float p_z         = uintBitsToFloat(texelFetch(img_gbuf_in, ipos + offset, 0).y);
+  #endif
 
   offset *= GAP;
 #else
@@ -231,10 +242,9 @@ void tap(in ivec2 offset,
   const vec4  p_irr_var   = texelFetch(img_filter_in, ipos + offset, 0); 
   const vec3  p_n         = geo_decode_normal(texelFetch(img_gbuf_in, ipos + offset, 0).x);
   const float p_z         = uintBitsToFloat(texelFetch(img_gbuf_in, ipos + offset, 0).y);
-
-  const float p_l         = yuv_luminance(p_irr_var.rgb);
 #endif
 
+  const float p_l         = yuv_luminance(p_irr_var.rgb);
   const float w_l = abs(p_l - c_l) / (sigma_l + 1e-10);
 
   float w_z = exp(-10 * abs(c_z + dot(c_grad_z, offset) - p_z) / params.param_z);
@@ -255,31 +265,41 @@ void
 main() {
 
 #ifdef KALEIDOSCOPE
-  compute_bank_pattern();
-  ipos = ivec2(thread_geometry.GlobalInvocationID);
-  ipos_shared = ivec2(thread_geometry.LocalInvocationID.x + 2,thread_geometry.LocalInvocationID.y + 2);
+  #ifdef KALEIDOSCOPE_USE_SHMEM
+    compute_bank_pattern();
+    ipos = ivec2(thread_geometry.GlobalInvocationID);
+    ipos_shared = ivec2(thread_geometry.LocalInvocationID.x + 2,thread_geometry.LocalInvocationID.y + 2);
 
-  const uvec3 c_gbuf = texelFetch(img_gbuf_in, ipos, 0).rgb;
-  const vec4 filter_in = texelFetch(img_filter_in, ipos, 0);
+    const uvec3 c_gbuf = texelFetch(img_gbuf_in, ipos, 0).rgb;
+    const vec4 filter_in = texelFetch(img_filter_in, ipos, 0);
 
-  c_n = geo_decode_normal(c_gbuf.x);
-  c_z = uintBitsToFloat(c_gbuf.y);
-  c_grad_z = unpackFloat2x16(c_gbuf.z);
+    c_n = geo_decode_normal(c_gbuf.x);
+    c_z = uintBitsToFloat(c_gbuf.y);
+    c_grad_z = unpackFloat2x16(c_gbuf.z);
 
-  shmem_write(ipos_shared, filter_in, c_n, c_z);
-  shmem_load_halo();
-  barrier();
+    shmem_write(ipos_shared, filter_in, c_n, c_z);
+    shmem_load_halo();
+    barrier();
 
-  // resprect padded size
-  if (any(greaterThanEqual(ipos, imageSize(img_filter_out)))) return;
-#else
+    if (any(greaterThanEqual(ipos, imageSize(img_filter_out)))) return;
+  #else // NO KALEIDOSCOPE_SHMEM
+    ipos = ivec2(gl_GlobalInvocationID);
+    if (any(greaterThanEqual(ipos, imageSize(img_filter_out)))) return;
+
+    const uvec3 c_gbuf = texelFetch(img_gbuf_in, ipos, 0).rgb;
+    c_n = geo_decode_normal(c_gbuf.x);
+    c_z = uintBitsToFloat(c_gbuf.y);
+    c_grad_z = unpackFloat2x16(c_gbuf.z);
+    const vec4 filter_in = texelFetch(img_filter_in, ipos, 0);
+  #endif
+#else // NO KALEIDOSCOPE:
   ipos = ivec2(gl_GlobalInvocationID);
   if (any(greaterThanEqual(ipos, imageSize(img_out)))) return;
-  const uvec3 c_gbuf = texelFetch(img_gbuf_in, ipos, 0).rgb;
 
-  c_n = geo_decode_normal(c_gbuf.x);
-  c_z = uintBitsToFloat(c_gbuf.y);
-  c_grad_z = unpackFloat2x16(c_gbuf.z);
+  const GBuffer c_gbuf = gbuffer_load_pixel(gbuffer, ipos);
+  c_n = gbuffer_get_normal(c_gbuf);
+  c_z = gbuffer_get_linear_z(c_gbuf);
+  c_grad_z = gbuffer_get_grad_z(c_gbuf);;
   const vec4 filter_in = texelFetch(img_filter_in, ipos, 0);
 #endif
 
@@ -368,7 +388,7 @@ main() {
   if (ITERATION != LAST_ITERATION) {
     ivec2 hid = ipos / 2;
     ivec2 odd = ipos & 1;
-    ivec2 viewport_size_half = imageSize(img_filter_out)/2;
+    ivec2 viewport_size_half = imageSize(img_filter_out) / 2;
   
     if (ITERATION == 0) {  
       if(odd.x > 0) {
@@ -407,9 +427,8 @@ main() {
   }
 
   imageStore(img_filter_out, ipos, vec4(filter_irr, filter_var));
-#else
+#else // NO KALEIDOSCOPE:
   imageStore(img_filter_out, ipos, vec4(filter_irr, filter_var));
-  imageStore(img_gbuf_out, ipos, uvec4(c_gbuf, 0));
 #endif
 }
 

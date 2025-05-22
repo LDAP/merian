@@ -74,9 +74,11 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
 
     // Ping pong textures
     irr_create_info.usage |= vk::ImageUsageFlagBits::eSampled;
-    uint32_t padding_multiple = 1 << (std::max(svgf_iterations, 1) - 1);
+    const uint32_t padding_multiple = 1 << (std::max(svgf_iterations, 1) - 1);
     irr_create_info.extent.width = round_up(irr_create_info.extent.width, padding_multiple);
     irr_create_info.extent.height = round_up(irr_create_info.extent.height, padding_multiple);
+
+    SPDLOG_DEBUG("SVGF padding to {} -> ({} x {})", padding_multiple, irr_create_info.extent.width, irr_create_info.extent.height);
 
     for (int i = 0; i < 2; i++) {
         if (!ping_pong_res[i].set)
