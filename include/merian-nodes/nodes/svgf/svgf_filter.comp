@@ -21,8 +21,12 @@ layout (constant_id = 5) const int LAST_ITERATION = 0;
 // the reference implementation does that but it looks better without
 // #define FILTER_VARIANCE
 
+// defined by compiler:
 // #define KALEIDOSCOPE
 // #define KALEIDOSCOPE_USE_SHMEM
+
+// two variants to reconstruct 
+#define KALEIDOSCOPE_USE_MIRRORING 1
 
 layout(push_constant, std140) uniform push_t {
     float param_z;
@@ -391,16 +395,18 @@ main() {
     ivec2 hid = ipos / 2;
     ivec2 odd = ipos & 1;
     ivec2 viewport_size_half = imageSize(img_filter_out) / 2;
-  
-    if (ITERATION == 0) {  
-      if(odd.x > 0) {
-         hid.x = viewport_size_half.x - hid.x - 1;
+    
+    #ifdef KALEIDOSCOPE_USE_MIRRORING
+      if (ITERATION == 0) {  
+        if(odd.x > 0) {
+           hid.x = viewport_size_half.x - hid.x - 1;
+        }
+        if(odd.y > 0) {
+           hid.y = viewport_size_half.y - hid.y - 1;
+        }
       }
-      if(odd.y > 0) {
-         hid.y = viewport_size_half.y - hid.y - 1;
-      }
-    }
-  
+    #endif
+
     ipos = hid + odd*(viewport_size_half);
     imageStore(img_gbuf_out, ipos, uvec4(c_gbuf, 0));
   } else {
@@ -410,22 +416,42 @@ main() {
     ivec2 sizew = viewport_size / wcnt; // size of an input subimage
     ivec2 o = ipos / sizew; // offset of the pixels subimage
     ivec2 wid = ipos - sizew*o; // local coordinate of the pixel within the subimage
-    ipos = o + wid*wcnt;
-  
-    // code above already restored the default layout, revert mirroring
-    // recompute quadrants
-    ivec2 hid = ipos / 2;
-    ivec2 odd = ipos & 1;
-    ivec2 viewport_size_half = imageSize(img_filter_out)/2;
-    // flip the quadrants
-    if(odd.x > 0) {
-      hid.x = viewport_size_half.x - hid.x - 1;
-    }
-    if(odd.y > 0) {
-      hid.y = viewport_size_half.y - hid.y - 1;
-    }
-    // reinterleave the quadrants
-    ipos = hid * 2 + odd; 
+    
+    #if defined(KALEIDOSCOPE_USE_MIRRORING) && KALEIDOSCOPE_USE_MIRRORING == 0
+      // normalize the coordinate system and subimage identifier of all subimages at uneven positions
+      // alternatively, reverse all uneven pixels after 'normal' interleaving, see below!
+      ivec2 odd = o & 1;
+      if(odd.x > 0) {
+         wid.x = sizew.x - wid.x - 1;
+         o.x = wcnt - o.x;
+      }
+      if(odd.y > 0) {
+         wid.y = sizew.y - wid.y - 1;
+         o.y = wcnt - o.y;
+      }
+    #endif
+
+    ipos = o + wid * wcnt;
+
+    #if defined(KALEIDOSCOPE_USE_MIRRORING) && KALEIDOSCOPE_USE_MIRRORING == 1
+      if (ITERATION != 0 /* skip if we're doing exactly one iteration */) {
+        // code above already restored the default layout, revert mirroring
+        // recompute quadrants
+        ivec2 hid = ipos / 2;
+        ivec2 odd = ipos & 1;
+        ivec2 viewport_size_half = imageSize(img_filter_out)/2;
+        // flip the quadrants
+        if(odd.x > 0) {
+          hid.x = viewport_size_half.x - hid.x - 1;
+        }
+        if(odd.y > 0) {
+          hid.y = viewport_size_half.y - hid.y - 1;
+        }
+        // reinterleave the quadrants
+        ipos = hid * 2 + odd;
+      }
+    #endif
+
   }
 
   imageStore(img_filter_out, ipos, filter_irr_var);
