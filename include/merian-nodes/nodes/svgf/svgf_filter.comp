@@ -4,9 +4,11 @@
 #extension GL_KHR_shader_subgroup_basic : enable
 #extension GL_EXT_shared_memory_block : enable
 
+#include "config.h"
 #include "svgf_graph_layout.glsl"
 #include "merian-shaders/color/colors_yuv.glsl"
 #include "merian-shaders/normal_encode.glsl"
+#include "merian-shaders/textures.glsl"
 
 layout(set = 1, binding = 0) uniform sampler2D img_filter_in;
 layout(set = 1, binding = 1) uniform writeonly restrict image2D img_filter_out;
@@ -25,8 +27,8 @@ layout (constant_id = 5) const int LAST_ITERATION = 0;
 // #define KALEIDOSCOPE
 // #define KALEIDOSCOPE_USE_SHMEM
 
-// two variants to reconstruct 
-#define KALEIDOSCOPE_USE_MIRRORING 1
+// commet to disable; two variants to reconstruct (0, 1) reiner recommends using 1
+// #define KALEIDOSCOPE_USE_MIRRORING 1
 
 layout(push_constant, std140) uniform push_t {
     float param_z;
@@ -86,139 +88,30 @@ float get_sigma_l(float center, ivec2 ipos) {
 
 #endif // FILTER_VARIANCE
 
-// --------------------------------------------------------------
-// Reiners Kaladoscope SVGF
+
 #ifdef KALEIDOSCOPE
 #ifdef KALEIDOSCOPE_USE_SHMEM
 
-#define SHARED_HEIGHT 20
-#define SHARED_WIDTH 20
-#define WORKGROUP_X 16
-#define WORKGROUP_Y 16
+#define WORKGROUP_SIZE_X gl_WorkGroupSize.x
+#define WORKGROUP_SIZE_Y gl_WorkGroupSize.y
 
-layout(std430, row_major) shared f32vec4[SHARED_HEIGHT][SHARED_WIDTH] SHARED_TILE_u32vec4_A;
-layout(std430, row_major) shared f32vec4[SHARED_HEIGHT][SHARED_WIDTH] SHARED_TILE_u32vec4_B;
+#define SHARED_SIZE_X (WORKGROUP_SIZE_X + FILTER_HALO_SIZE * 2)
+#define SHARED_SIZE_Y (WORKGROUP_SIZE_Y + FILTER_HALO_SIZE * 2)
 
+// remember to update config.h if anything is changed here!
+// FILTER_SHARED_MEMORY_PER_PIXEL = 2 * 4 * 4
+// total shared size: SHARED_SIZE_X * SHARED_SIZE_Y * FILTER_SHARED_MEMORY_PER_PIXEL
+layout(std430, row_major) shared f32vec4[SHARED_SIZE_Y][SHARED_SIZE_X] SHARED_TILE_u32vec4_A; // (irr, var)
+layout(std430, row_major) shared f32vec4[SHARED_SIZE_Y][SHARED_SIZE_X] SHARED_TILE_u32vec4_B; // (normal, linear_z)
 
-struct bank_pattern {
-    uint tile_width;
-    uint tile_height;
-    uint tiles_per_row;
-    uvec2 tile_local_id;
-    uvec2 tile_id;
-    uvec2 tile_offset;
-    uvec2 LocalInvocationID;
-    uvec2 workgroup_offset;
-    uvec2 GlobalInvocationID;
-} thread_geometry;
-
-// reshapes subgroups to cover the workgroup shape.
-#define BANK_PATTERN_GENERATE(_MACRO_GCD) void compute_bank_pattern(/* for 32bit accesses! */) {\
-    const int SHARED_WIDTH_GCD = _MACRO_GCD;\
-    thread_geometry.tile_width = SHARED_WIDTH_GCD;\
-    thread_geometry.tile_height = 32 / thread_geometry.tile_width;\
-    thread_geometry.tiles_per_row = WORKGROUP_X / thread_geometry.tile_width;\
-    \
-    /* both are guranteed to be a power of two since it has to divide 32, so this is most likely converted to bitwise ops by the compiler */ \
-    thread_geometry.tile_local_id.x = gl_SubgroupInvocationID % thread_geometry.tile_width; /* gl_SubgroupInvocationID & 0b11 */ \
-    thread_geometry.tile_local_id.y = gl_SubgroupInvocationID / thread_geometry.tile_width; /* gl_SubgroupInvocationID >> 2 */ \
-\
-    thread_geometry.tile_id.x = gl_SubgroupID % thread_geometry.tiles_per_row;\
-    thread_geometry.tile_id.y = gl_SubgroupID / thread_geometry.tiles_per_row;\
-    thread_geometry.tile_offset.y = thread_geometry.tile_id.y * thread_geometry.tile_height;\
-    thread_geometry.tile_offset.x = thread_geometry.tile_id.x * thread_geometry.tile_width;\
-\
-    thread_geometry.LocalInvocationID = thread_geometry.tile_offset + thread_geometry.tile_local_id;\
-    thread_geometry.workgroup_offset = gl_WorkGroupSize.xy * gl_WorkGroupID.xy;\
-    thread_geometry.GlobalInvocationID = thread_geometry.workgroup_offset + thread_geometry.LocalInvocationID;\
-}
-
-// workgroup 16x16 with filter radius 2 (creates the thread and shared memory layout shown in figure 1, right)
-BANK_PATTERN_GENERATE(4);
-
-void shmem_read(ivec2 pos, out vec4 gbuf, out vec4 irrfilter) {
+void shmem_read(const ivec2 pos, out vec4 gbuf, out vec4 irrfilter) {
   irrfilter = SHARED_TILE_u32vec4_A[pos.y][pos.x];
   gbuf = SHARED_TILE_u32vec4_B[pos.y][pos.x];
 }
 
-void shmem_write(ivec2 pos, vec4 irrfilter, vec3 n, float z) {
-  // Note: while obviously lossy, repacking non-linear data in a linear (or otherwise cheaper, encoded) format may result in further speedups!
+void shmem_write(const ivec2 pos, const vec4 irrfilter, const vec3 n, const float z) {
   SHARED_TILE_u32vec4_A[pos.y][pos.x] = irrfilter;
-  SHARED_TILE_u32vec4_B[pos.y][pos.x] = vec4(n,z);
-}
-
-void shmem_forward(ivec2 ipos_shared, ivec2 ipos_global) {
-  const uvec4 gbuf = texelFetch(img_gbuf_in, ipos_global, 0);
-  const vec4 irrfilter = texelFetch(img_filter_in, ipos_global, 0);
-  const vec3  n         = geo_decode_normal(gbuf.x);
-  const float z         = uintBitsToFloat(gbuf.y);
-  // Note: converting to yCoCg here can reduce arithmetic overhead further!
-  //const float l         = yuv_luminance(irrfilter.rgb);
-  shmem_write(ipos_shared, irrfilter,n,z);
-}
-
-void shmem_load_halo() {
-    // five subgroups to fetch top and bottom halo regions, each subgroup tile split in the middle along the y axis
-    // this is two shared mem writes for vec4, one phase for vec2, and "half phase" for vec1
-    if(gl_SubgroupID < 5) {
-        // separate the top and bottom rows. looks as follows for each subgroup:
-        // array([[ 0,  0,  0,  0],
-        //       [ 0,  0,  0,  0],
-        //       [ 8,  8,  8,  8],
-        //       [ 8,  8,  8,  8],
-        //       [16, 16, 16, 16],
-        //       [16, 16, 16, 16],
-        //       [24, 24, 24, 24],
-        //       [24, 24, 24, 24]])
-        int halfspaces = int(gl_SubgroupInvocationID & 0xF8);
-
-        if(halfspaces < 16) { // only the lower halfwarp of the first 5 subgroups enters this branch
-            // 16 and 0 are both divisible by the bank pattern height, so adding halfspaces as an offset to the
-            // invocation indices maintains the bank-conflict-freeness of the subgroup
-            ivec2 halo_pos_shared = ivec2(
-            gl_SubgroupID * thread_geometry.tile_width + thread_geometry.tile_local_id.x, // `gl_SubgroupID * thread_geometry.tile_width` just linearize the thread_geometry.tile_id
-            thread_geometry.tile_local_id.y + halfspaces*2
-            );
-
-            ivec2 halo_pos_global = ivec2(thread_geometry.workgroup_offset) - 2 + halo_pos_shared;
-
-            //tap_t neighbour;
-            //read(halo_pos_global, neighbour);
-            //SHARED_TILE_f32vec4[halo_pos_shared.y][halo_pos_shared.x] = neighbour.outColor * neighbour.inBounds;
-            shmem_forward(halo_pos_shared, halo_pos_global);
-        }
-    } else if((gl_SubgroupID & 0x2) > 0) {
-        // the remaining subgroups for this test were `[5,6,7]`, which in binary is `"101", "110", "111"`
-        // so 6 and 7 enter this branch
-        // we could just select two by testing for one of the bits, but we hardcode two variants of the code
-
-        // separate the left and right columns. looks as follows for each subgroup:
-        // [[0, 0, 2, 2],
-        //  [0, 0, 2, 2],
-        //  [0, 0, 2, 2],
-        //  [0, 0, 2, 2],
-        //  [0, 0, 2, 2],
-        //  [0, 0, 2, 2],
-        //  [0, 0, 2, 2],
-        //  [0, 0, 2, 2]]
-        int halfspaces = int(gl_SubgroupInvocationID & 0x2);
-
-        ivec2 halo_pos_shared = ivec2(
-        thread_geometry.tile_local_id.x + (halfspaces*8 /* 8 is half workgroup width, the product should just be the workgroup width */),
-        thread_geometry.tile_local_id.y + 2 + thread_geometry.tile_height * (gl_SubgroupID & 0x1)
-        /* is just the shortest expression i could find to arange the 5th and 6th subgroup above each other with an offset of FilterRadiusSpatial.
-            What we want is a value of FilterRadiusSpatial for the 6th, and FilterRadiusSpatial + thread_geometry.tile_height for the 7th */
-        );
-
-        ivec2 halo_pos_global = ivec2(thread_geometry.workgroup_offset) - 2 + halo_pos_shared;
-
-        shmem_forward(halo_pos_shared, halo_pos_global);
-        //tap_t neighbour;
-        //read(halo_pos_global, neighbour);
-        //SHARED_TILE_f32vec4[halo_pos_shared.y][halo_pos_shared.x] = neighbour.outColor * neighbour.inBounds;
-    }
-
-    // Note: no work for subgroup gl_SubgroupID == 5
+  SHARED_TILE_u32vec4_B[pos.y][pos.x] = vec4(n, z);
 }
 
 #endif // KALEIDOSCOPE_USE_SHMEM
@@ -274,19 +167,79 @@ main() {
 
 #ifdef KALEIDOSCOPE
   #ifdef KALEIDOSCOPE_USE_SHMEM
-    compute_bank_pattern();
-    ipos = ivec2(thread_geometry.GlobalInvocationID);
-    ipos_shared = ivec2(thread_geometry.LocalInvocationID.x + 2,thread_geometry.LocalInvocationID.y + 2);
 
-    const uvec3 c_gbuf = texelFetch(img_gbuf_in, ipos, 0).rgb;
+    ipos = ivec2(gl_GlobalInvocationID);
+    ipos_shared = ivec2(gl_LocalInvocationID) + FILTER_HALO_SIZE;
+
+    // compute_bank_pattern();
+    // ipos = ivec2(thread_geometry.GlobalInvocationID);
+    // ipos_shared = ivec2(thread_geometry.LocalInvocationID.x + 2,thread_geometry.LocalInvocationID.y + 2);
+
     filter_irr_var = texelFetch(img_filter_in, ipos, 0);
-
+    const uvec3 c_gbuf = texelFetch(img_gbuf_in, ipos, 0).rgb;
     c_n = geo_decode_normal(c_gbuf.x);
     c_z = uintBitsToFloat(c_gbuf.y);
     c_grad_z = unpackFloat2x16(c_gbuf.z);
 
-    shmem_write(ipos_shared, filter_irr_var, c_n, c_z);
-    shmem_load_halo();
+    {
+      // center
+      shmem_write(ipos_shared, filter_irr_var, c_n, c_z);
+    }
+    {
+      // halo
+      // |TL| TC |TR|
+      // |L | C  |R |
+      // |BL| BC |BR|
+
+      ivec2 global_read;
+      ivec2 shared_write;
+
+      const uint split_size = FILTER_HALO_SIZE * (FILTER_HALO_SIZE + WORKGROUP_SIZE_X);
+      const uint split_size_half = split_size / FILTER_HALO_SIZE;
+      const ivec2 global_tile_offset = ivec2(gl_WorkGroupSize.xy * gl_WorkGroupID.xy) - FILTER_HALO_SIZE;
+
+      if (gl_LocalInvocationIndex < 1 * split_size) {
+        // load top (TL, TC)
+        const uint index = gl_LocalInvocationIndex - 0 * split_size;
+        const ivec2 lid = ivec2(index % split_size_half, index / split_size_half);
+        const ivec2 local_tile_offset = ivec2(0);
+        global_read = global_tile_offset + local_tile_offset + lid;
+        shared_write = local_tile_offset + lid;
+      } else if (gl_LocalInvocationIndex < 2 * split_size) {
+        // load right (TR, R) 
+        const uint index = gl_LocalInvocationIndex - 1 * split_size;
+        const ivec2 lid = ivec2(index / split_size_half, index % split_size_half);
+        const ivec2 local_tile_offset = ivec2(FILTER_HALO_SIZE + WORKGROUP_SIZE_X, 0);
+        global_read = global_tile_offset + local_tile_offset + lid;
+        shared_write = local_tile_offset + lid;
+      } else if (gl_LocalInvocationIndex < 3 * split_size) {
+        // load bottom (BR, BC)
+        const uint index = gl_LocalInvocationIndex - 2 * split_size;
+        const ivec2 lid = ivec2(index % split_size_half, index / split_size_half);
+        const ivec2 local_tile_offset = ivec2(FILTER_HALO_SIZE, FILTER_HALO_SIZE + WORKGROUP_SIZE_X);
+        global_read = global_tile_offset + local_tile_offset + lid;
+        shared_write = local_tile_offset + lid;
+      } else if (gl_LocalInvocationIndex < 4 * split_size) {
+        // load left (BL, L)
+        const uint index = gl_LocalInvocationIndex - 3 * split_size;
+        const ivec2 lid = ivec2(index / split_size_half, index % split_size_half);
+        const ivec2 local_tile_offset = ivec2(0, FILTER_HALO_SIZE);
+        global_read = global_tile_offset + local_tile_offset + lid;
+        shared_write = local_tile_offset + lid;
+      }
+
+
+      if (gl_LocalInvocationIndex < 4 * split_size) {
+          global_read = merian_tex_mirror_repeat(global_read, textureSize(img_filter_in, 0));
+
+          const uvec3 p_gbuf = texelFetch(img_gbuf_in, global_read, 0).rgb;
+          shmem_write(shared_write, texelFetch(img_filter_in, global_read, 0),
+                                    geo_decode_normal(p_gbuf.x),
+                                    uintBitsToFloat(p_gbuf.y));
+          //shmem_write(shared_write, vec4(DEBUG_COLOR, 0), vec3(1,0,0), 10.);
+      }
+    }
+    
     barrier();
 
     if (any(greaterThanEqual(ipos, imageSize(img_filter_out)))) return;
@@ -294,21 +247,21 @@ main() {
     ipos = ivec2(gl_GlobalInvocationID);
     if (any(greaterThanEqual(ipos, imageSize(img_filter_out)))) return;
 
+    filter_irr_var = texelFetch(img_filter_in, ipos, 0);
     const uvec3 c_gbuf = texelFetch(img_gbuf_in, ipos, 0).rgb;
     c_n = geo_decode_normal(c_gbuf.x);
     c_z = uintBitsToFloat(c_gbuf.y);
     c_grad_z = unpackFloat2x16(c_gbuf.z);
-    filter_irr_var = texelFetch(img_filter_in, ipos, 0);
   #endif
 #else // NO KALEIDOSCOPE:
   ipos = ivec2(gl_GlobalInvocationID);
   if (any(greaterThanEqual(ipos, imageSize(img_out)))) return;
 
+  filter_irr_var = texelFetch(img_filter_in, ipos, 0);
   const GBuffer c_gbuf = gbuffer_load_pixel(gbuffer, ipos);
   c_n = gbuffer_get_normal(c_gbuf);
   c_z = gbuffer_get_linear_z(c_gbuf);
   c_grad_z = gbuffer_get_grad_z(c_gbuf);;
-  filter_irr_var = texelFetch(img_filter_in, ipos, 0);
 #endif
 
 
@@ -390,6 +343,8 @@ main() {
     filter_irr_var.a   /= filter_w * filter_w;
   }
 
+// --------------------------------------------------------------
+// Reiners Kaladoscope SVGF
 #ifdef KALEIDOSCOPE
   if (ITERATION != LAST_ITERATION) {
     ivec2 hid = ipos / 2;

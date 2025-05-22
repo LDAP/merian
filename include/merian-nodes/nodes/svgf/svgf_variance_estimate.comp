@@ -27,8 +27,6 @@ layout(push_constant, std140) uniform push_t {
     float spatial_bias;
 } params;
 
-// #define KALEIDOSCOPE
-
 #define SHARED_SIZE (gl_WorkGroupSize.x * gl_WorkGroupSize.y)
 
 // update VE_SHARED_MEMORY_PER_PIXEL if you change anything here!
@@ -60,8 +58,13 @@ void main() {
   vec2 moments;
 
   do {
+
+#ifdef KALEIDOSCOPE
     // fill in padding with valid information
     const ivec2 mirror_repeat_ipos = merian_tex_mirror_repeat(ipos, textureSize(img_irr, 0));
+#else
+    #define mirror_repeat_ipos ipos
+#endif
 
     const GBuffer gbuf = gbuffer_load_pixel(gbuffer, mirror_repeat_ipos);
     irr_histlen = texelFetch(img_irr, mirror_repeat_ipos, 0);

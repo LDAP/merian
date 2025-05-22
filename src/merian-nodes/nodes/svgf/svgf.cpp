@@ -12,11 +12,7 @@ namespace merian_nodes {
 SVGF::SVGF(const ContextHandle& context,
            const ResourceAllocatorHandle& allocator,
            const std::optional<vk::Format> output_format)
-    : Node(), context(context), allocator(allocator), output_format(output_format),
-      variance_estimate_local_size_x(
-          workgroup_size_for_shared_memory(context, VE_SHARED_MEMORY_PER_PIXEL)),
-      variance_estimate_local_size_y(
-          workgroup_size_for_shared_memory(context, VE_SHARED_MEMORY_PER_PIXEL)) {}
+    : Node(), context(context), allocator(allocator), output_format(output_format) {}
 
 SVGF::~SVGF() {}
 
@@ -27,19 +23,27 @@ std::vector<InputConnectorHandle> SVGF::describe_inputs() {
 }
 
 std::vector<OutputConnectorHandle> SVGF::describe_outputs(const NodeIOLayout& io_layout) {
-    // clang-format off
     irr_create_info = io_layout[con_irr]->create_info;
     if (output_format)
         irr_create_info.format = output_format.value();
 
-    return {
-            ManagedVkImageOut::compute_write("out", irr_create_info.format, irr_create_info.extent),
-    };
-    // clang-format on
+    con_out =
+        ManagedVkImageOut::compute_write("out", irr_create_info.format, irr_create_info.extent);
+
+    return {con_out};
 }
 
 SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
                                          const DescriptorSetLayoutHandle& graph_layout) {
+    variance_estimate_local_size =
+        workgroup_size_for_shared_memory(context, VE_SHARED_MEMORY_PER_PIXEL);
+    if (kaleidoscope && kaleidoscope_use_shmem) {
+        filter_local_size = workgroup_size_for_shared_memory_with_halo(
+            context, FILTER_SHARED_MEMORY_PER_PIXEL, FILTER_HALO_SIZE, 32, 16);
+    } else {
+        filter_local_size = 32;
+    }
+
     if (!ping_pong_layout) {
         ping_pong_layout = DescriptorSetLayoutBuilder()
                                .add_binding_combined_sampler() // irradiance
@@ -53,7 +57,8 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
     // Ping pong textures
     irr_create_info.usage |= vk::ImageUsageFlagBits::eSampled;
     if (kaleidoscope) {
-        const uint32_t padding_multiple = 1 << (std::max(svgf_iterations, 1) - 1);
+        const uint32_t padding_multiple =
+            std::max((uint32_t)1 << (std::max(svgf_iterations, 1) - 1), filter_local_size);
         irr_create_info.extent.width = round_up(irr_create_info.extent.width, padding_multiple);
         irr_create_info.extent.height = round_up(irr_create_info.extent.height, padding_multiple);
         SPDLOG_DEBUG("SVGF padding to {} -> ({} x {})", padding_multiple,
@@ -131,7 +136,7 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
 
         {
             auto spec_builder = SpecializationInfoBuilder();
-            spec_builder.add_entry(variance_estimate_local_size_x, variance_estimate_local_size_y,
+            spec_builder.add_entry(variance_estimate_local_size, variance_estimate_local_size,
                                    svgf_iterations);
             SpecializationInfoHandle variance_estimate_spec = spec_builder.build();
             variance_estimate = std::make_shared<ComputePipeline>(
@@ -143,7 +148,7 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
             for (int i = 0; i < svgf_iterations; i++) {
                 auto spec_builder = SpecializationInfoBuilder();
                 int gap = 1 << i;
-                spec_builder.add_entry(local_size_x, local_size_y, gap, filter_type, i,
+                spec_builder.add_entry(filter_local_size, filter_local_size, gap, filter_type, i,
                                        svgf_iterations - 1);
                 SpecializationInfoHandle filter_spec = spec_builder.build();
                 filters[i] = std::make_shared<ComputePipeline>(filter_pipe_layout, filter_module,
@@ -152,7 +157,7 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
         }
         {
             auto spec_builder = SpecializationInfoBuilder();
-            spec_builder.add_entry(local_size_x, local_size_y, taa_debug, taa_filter_prev,
+            spec_builder.add_entry(taa_local_size, taa_local_size, taa_debug, taa_filter_prev,
                                    taa_clamping, taa_mv_sampling,
                                    enable_mv && io_layout.is_connected(con_mv));
             SpecializationInfoHandle taa_spec = spec_builder.build();
@@ -160,13 +165,10 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
         }
     }
 
-    group_count_x = (irr_create_info.extent.width + local_size_x - 1) / local_size_x;
-    group_count_y = (irr_create_info.extent.height + local_size_y - 1) / local_size_y;
-
     return {};
 }
 
-void SVGF::process(GraphRun& run, const DescriptorSetHandle& descriptor_set, const NodeIO& /*io*/) {
+void SVGF::process(GraphRun& run, const DescriptorSetHandle& descriptor_set, const NodeIO& io) {
     const CommandBufferHandle& cmd = run.get_cmd();
 
     // PREPARE (VARIANCE ESTIMATE)
@@ -191,8 +193,8 @@ void SVGF::process(GraphRun& run, const DescriptorSetHandle& descriptor_set, con
         cmd->push_constant(variance_estimate, variance_estimate_pc);
         // run more workgroups to prevent special cases in shader
         cmd->dispatch(irr_create_info.extent,
-                      variance_estimate_local_size_x - (2 * VE_SPATIAL_RADIUS),
-                      variance_estimate_local_size_y - (2 * VE_SPATIAL_RADIUS));
+                      variance_estimate_local_size - (2 * VE_SPATIAL_RADIUS),
+                      variance_estimate_local_size - (2 * VE_SPATIAL_RADIUS));
 
         // make sure writes are visible
         bar = ping_pong_res[0].ping_pong->get_image()->barrier(
@@ -230,7 +232,7 @@ void SVGF::process(GraphRun& run, const DescriptorSetHandle& descriptor_set, con
         cmd->bind_descriptor_set(filters[i], descriptor_set, 0);
         cmd->bind_descriptor_set(filters[i], read_set, 1);
         cmd->push_constant(filters[i], filter_pc);
-        cmd->dispatch(group_count_x, group_count_y, 1);
+        cmd->dispatch(irr_create_info.extent, filter_local_size, filter_local_size);
 
         bar = write_res.ping_pong->get_image()->barrier(
             vk::ImageLayout::eShaderReadOnlyOptimal, vk::AccessFlagBits::eShaderWrite,
@@ -253,7 +255,7 @@ void SVGF::process(GraphRun& run, const DescriptorSetHandle& descriptor_set, con
         cmd->bind_descriptor_set(taa, descriptor_set, 0);
         cmd->bind_descriptor_set(taa, read_set, 1);
         cmd->push_constant(taa, taa_pc);
-        cmd->dispatch(group_count_x, group_count_y, 1);
+        cmd->dispatch(io[con_out]->get_extent(), taa_local_size, taa_local_size);
     }
 }
 
@@ -314,6 +316,10 @@ SVGF::NodeStatusFlags SVGF::properties(Properties& config) {
     needs_rebuild |= config.config_options("debug", taa_debug,
                                            {"none", "irradiance", "variance", "normal", "depth",
                                             "albedo", "grad z", "irradiance nan/inf", "mv"});
+
+    config.st_separate();
+    config.output_text("local size variance estimate: {}\nlocal size filter: {}",
+                       variance_estimate_local_size, filter_local_size);
 
     if (needs_rebuild) {
         return NEEDS_RECONNECT;

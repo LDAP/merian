@@ -60,10 +60,10 @@ class SVGF : public Node {
     const std::optional<vk::Format> output_format;
 
     // depends on available shared memory
-    const uint32_t variance_estimate_local_size_x;
-    const uint32_t variance_estimate_local_size_y;
-    static constexpr uint32_t local_size_x = 32;
-    static constexpr uint32_t local_size_y = 32;
+    uint32_t variance_estimate_local_size;
+    uint32_t filter_local_size;
+
+    const uint32_t taa_local_size = 32;
 
     ManagedVkImageInHandle con_prev_out = ManagedVkImageIn::compute_read("prev_out", 1);
     ManagedVkImageInHandle con_irr = ManagedVkImageIn::compute_read("irr");
@@ -72,6 +72,8 @@ class SVGF : public Node {
     ManagedVkImageInHandle con_mv = ManagedVkImageIn::compute_read("mv", 0, true);
     GBufferInHandle con_gbuffer = merian_nodes::GBufferIn::compute_read("gbuffer");
     GBufferInHandle con_prev_gbuffer = merian_nodes::GBufferIn::compute_read("prev_gbuffer", 1);
+
+    ManagedVkImageOutHandle con_out;
 
     ShaderModuleHandle variance_estimate_module;
     ShaderModuleHandle filter_module;
@@ -86,9 +88,6 @@ class SVGF : public Node {
     PipelineHandle variance_estimate;
     std::vector<PipelineHandle> filters;
     PipelineHandle taa;
-
-    uint32_t group_count_x;
-    uint32_t group_count_y;
 
     int svgf_iterations = 0;
 

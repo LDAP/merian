@@ -27,6 +27,27 @@ workgroup_size_for_shared_memory(const ContextHandle& context,
                                          required_shared_memory_bytes_per_invocation)};
 }
 
+inline uint32_t workgroup_size_for_shared_memory_with_halo(
+    const ContextHandle& context,
+    const uint32_t required_shared_memory_bytes_per_invocation,
+    const uint32_t halo_size,
+    const uint32_t max_workgroup_size = 32,
+    const uint32_t min_workgroup_size = 8) {
+    for (uint32_t workgroup_size = max_workgroup_size; workgroup_size >= min_workgroup_size;
+         workgroup_size /= 2) {
+        if ((workgroup_size + halo_size * 2) * (workgroup_size + halo_size * 2) *
+                required_shared_memory_bytes_per_invocation <=
+            context->physical_device.get_physical_device_limits().maxComputeSharedMemorySize) {
+            return workgroup_size;
+        }
+    }
+
+    throw std::runtime_error{
+        fmt::format("not enough shared memory for workgroup size of {} with halo of size {}, where "
+                    "each invocation requires {} bytes.",
+                    min_workgroup_size, halo_size, required_shared_memory_bytes_per_invocation)};
+}
+
 inline vk::TransformMatrixKHR transform_identity() noexcept {
     vk::TransformMatrixKHR transform;
     transform.matrix[0][0] = transform.matrix[1][1] = transform.matrix[2][2] = 1.0f;
