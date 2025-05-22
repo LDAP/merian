@@ -1,5 +1,5 @@
 #include "merian-nodes/nodes/svgf/svgf.hpp"
-#include "config.h"
+#include "merian-nodes/nodes/svgf/config.h"
 #include "merian/utils/math.hpp"
 #include "merian/vk/descriptors/descriptor_set_layout_builder.hpp"
 
@@ -7,38 +7,16 @@
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 
-#include "svgf_filter.comp.spv.h"
-#include "svgf_taa.comp.spv.h"
-#include "svgf_variance_estimate.comp.spv.h"
-
 namespace merian_nodes {
-
-uint32_t get_ve_local_size(const ContextHandle& context) {
-    if (32 * 32 * VE_SHARED_MEMORY_PER_PIXEL <=
-        context->physical_device.get_physical_device_limits().maxComputeSharedMemorySize) {
-        return 32;
-    }
-    if (16 * 16 * VE_SHARED_MEMORY_PER_PIXEL <=
-        context->physical_device.get_physical_device_limits().maxComputeSharedMemorySize) {
-        return 16;
-    }
-    throw std::runtime_error{"SVGF: Not enough shared memory for spatial variance estimate."};
-}
 
 SVGF::SVGF(const ContextHandle& context,
            const ResourceAllocatorHandle& allocator,
            const std::optional<vk::Format> output_format)
     : Node(), context(context), allocator(allocator), output_format(output_format),
-      variance_estimate_local_size_x(get_ve_local_size(context)),
-      variance_estimate_local_size_y(get_ve_local_size(context)) {
-    variance_estimate_module =
-        std::make_shared<ShaderModule>(context, merian_svgf_variance_estimate_comp_spv_size(),
-                                       merian_svgf_variance_estimate_comp_spv());
-    filter_module = std::make_shared<ShaderModule>(context, merian_svgf_filter_comp_spv_size(),
-                                                   merian_svgf_filter_comp_spv());
-    taa_module = std::make_shared<ShaderModule>(context, merian_svgf_taa_comp_spv_size(),
-                                                merian_svgf_taa_comp_spv());
-}
+      variance_estimate_local_size_x(
+          workgroup_size_for_shared_memory(context, VE_SHARED_MEMORY_PER_PIXEL)),
+      variance_estimate_local_size_y(
+          workgroup_size_for_shared_memory(context, VE_SHARED_MEMORY_PER_PIXEL)) {}
 
 SVGF::~SVGF() {}
 
@@ -74,11 +52,13 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
 
     // Ping pong textures
     irr_create_info.usage |= vk::ImageUsageFlagBits::eSampled;
-    const uint32_t padding_multiple = 1 << (std::max(svgf_iterations, 1) - 1);
-    irr_create_info.extent.width = round_up(irr_create_info.extent.width, padding_multiple);
-    irr_create_info.extent.height = round_up(irr_create_info.extent.height, padding_multiple);
-
-    SPDLOG_DEBUG("SVGF padding to {} -> ({} x {})", padding_multiple, irr_create_info.extent.width, irr_create_info.extent.height);
+    if (kaleidoscope) {
+        const uint32_t padding_multiple = 1 << (std::max(svgf_iterations, 1) - 1);
+        irr_create_info.extent.width = round_up(irr_create_info.extent.width, padding_multiple);
+        irr_create_info.extent.height = round_up(irr_create_info.extent.height, padding_multiple);
+        SPDLOG_DEBUG("SVGF padding to {} -> ({} x {})", padding_multiple,
+                     irr_create_info.extent.width, irr_create_info.extent.height);
+    }
 
     for (int i = 0; i < 2; i++) {
         if (!ping_pong_res[i].set)
@@ -114,6 +94,25 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
     }
 
     {
+        const ShaderCompilerHandle compiler = ShaderCompiler::get(context);
+
+        std::map<std::string, std::string> additional_defines;
+        if (kaleidoscope) {
+            additional_defines["KALEIDOSCOPE"] = "1";
+            if (kaleidoscope_use_shmem) {
+                additional_defines["KALEIDOSCOPE_USE_SHMEM"] = "1";
+            }
+        }
+
+        variance_estimate_module = compiler->find_compile_glsl_to_shadermodule(
+            context, "merian-nodes/nodes/svgf/svgf_variance_estimate.comp", std::nullopt, {},
+            additional_defines);
+        filter_module = compiler->find_compile_glsl_to_shadermodule(
+            context, "merian-nodes/nodes/svgf/svgf_filter.comp", std::nullopt, {},
+            additional_defines);
+        taa_module = compiler->find_compile_glsl_to_shadermodule(
+            context, "merian-nodes/nodes/svgf/svgf_taa.comp", std::nullopt, {}, additional_defines);
+
         auto variance_estimate_pipe_layout = PipelineLayoutBuilder(context)
                                                  .add_descriptor_set_layout(graph_layout)
                                                  .add_descriptor_set_layout(ping_pong_layout)
@@ -287,6 +286,10 @@ SVGF::NodeStatusFlags SVGF::properties(Properties& config) {
     needs_rebuild |=
         config.config_options("filter type", filter_type, {"atrous", "box", "subsampled"},
                               Properties::OptionsStyle::COMBO);
+
+    needs_rebuild |= config.config_bool("kaleidoscope", kaleidoscope);
+    needs_rebuild |= config.config_bool("kaleidoscope: shmem", kaleidoscope_use_shmem,
+                                        "use shared memory for kaleidoscope");
 
     config.st_separate("TAA");
     config.config_float(

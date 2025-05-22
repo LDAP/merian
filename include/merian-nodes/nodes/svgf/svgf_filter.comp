@@ -11,7 +11,7 @@
 layout(set = 1, binding = 0) uniform sampler2D img_filter_in;
 layout(set = 1, binding = 1) uniform writeonly restrict image2D img_filter_out;
 layout(set = 1, binding = 2) uniform usampler2D img_gbuf_in;
-layout(set = 1, binding = 3) uniform writeonly uimage2D img_gbuf_out;
+layout(set = 1, binding = 3) uniform writeonly restrict uimage2D img_gbuf_out;
 
 layout (constant_id = 2) const int GAP = 1;
 layout (constant_id = 3) const int FILTER_TYPE = 0;
@@ -40,8 +40,7 @@ ivec2 ipos;
   ivec2 ipos_shared;
 #endif // KALEIDOSCOPE_USE_SHMEM
 
-vec3 filter_irr;
-float filter_var;
+vec4 filter_irr_var;
 float filter_w;
 
 vec2 c_grad_z;
@@ -261,9 +260,9 @@ void tap(in ivec2 offset,
 
   const float w = exp(-w_l * w_l) * w_z * w_n * kernel_weight; 
 
-  filter_irr += p_irr_var.rgb * w; 
-  filter_var += p_irr_var.a * w * w; 
-  filter_w   += w; 
+  filter_irr_var.rgb += p_irr_var.rgb * w; 
+  filter_irr_var.a   += p_irr_var.a * w * w; 
+  filter_w           += w; 
 }
 
 void
@@ -276,18 +275,18 @@ main() {
     ipos_shared = ivec2(thread_geometry.LocalInvocationID.x + 2,thread_geometry.LocalInvocationID.y + 2);
 
     const uvec3 c_gbuf = texelFetch(img_gbuf_in, ipos, 0).rgb;
-    const vec4 filter_in = texelFetch(img_filter_in, ipos, 0);
+    filter_irr_var = texelFetch(img_filter_in, ipos, 0);
 
     c_n = geo_decode_normal(c_gbuf.x);
     c_z = uintBitsToFloat(c_gbuf.y);
     c_grad_z = unpackFloat2x16(c_gbuf.z);
 
-    shmem_write(ipos_shared, filter_in, c_n, c_z);
+    shmem_write(ipos_shared, filter_irr_var, c_n, c_z);
     shmem_load_halo();
     barrier();
 
     if (any(greaterThanEqual(ipos, imageSize(img_filter_out)))) return;
-  #else // NO KALEIDOSCOPE_SHMEM
+  #else // NO KALEIDOSCOPE_SHMEM:
     ipos = ivec2(gl_GlobalInvocationID);
     if (any(greaterThanEqual(ipos, imageSize(img_filter_out)))) return;
 
@@ -295,7 +294,7 @@ main() {
     c_n = geo_decode_normal(c_gbuf.x);
     c_z = uintBitsToFloat(c_gbuf.y);
     c_grad_z = unpackFloat2x16(c_gbuf.z);
-    const vec4 filter_in = texelFetch(img_filter_in, ipos, 0);
+    filter_irr_var = texelFetch(img_filter_in, ipos, 0);
   #endif
 #else // NO KALEIDOSCOPE:
   ipos = ivec2(gl_GlobalInvocationID);
@@ -305,11 +304,11 @@ main() {
   c_n = gbuffer_get_normal(c_gbuf);
   c_z = gbuffer_get_linear_z(c_gbuf);
   c_grad_z = gbuffer_get_grad_z(c_gbuf);;
-  const vec4 filter_in = texelFetch(img_filter_in, ipos, 0);
+  filter_irr_var = texelFetch(img_filter_in, ipos, 0);
 #endif
 
 
-  c_l = yuv_luminance(filter_in.rgb);
+  c_l = yuv_luminance(filter_irr_var.rgb);
 
   if (params.z_bias_normals > 0)
     z_bias_normals_mix = smoothstep(0, params.z_bias_normals, c_z);
@@ -324,13 +323,11 @@ main() {
 
 
 #ifdef FILTER_VARIANCE
-    sigma_l = get_sigma_l(filter_in.a, ipos) * params.param_l;
+    sigma_l = get_sigma_l(filter_irr_var.a, ipos) * params.param_l;
 #else
-    sigma_l = sqrt(filter_in.a) * params.param_l;
+    sigma_l = sqrt(filter_irr_var.a) * params.param_l;
 #endif
 
-  filter_irr = filter_in.rgb;
-  filter_var = filter_in.a;
   filter_w = 1.0;
 
   if (c_z > 0) {
@@ -385,8 +382,8 @@ main() {
       }
     }
 
-    filter_irr /= filter_w;
-    filter_var /= filter_w * filter_w;
+    filter_irr_var.rgb /= filter_w;
+    filter_irr_var.a   /= filter_w * filter_w;
   }
 
 #ifdef KALEIDOSCOPE
@@ -431,9 +428,9 @@ main() {
     ipos = hid * 2 + odd; 
   }
 
-  imageStore(img_filter_out, ipos, vec4(filter_irr, filter_var));
+  imageStore(img_filter_out, ipos, filter_irr_var);
 #else // NO KALEIDOSCOPE:
-  imageStore(img_filter_out, ipos, vec4(filter_irr, filter_var));
+  imageStore(img_filter_out, ipos, filter_irr_var);
 #endif
 }
 

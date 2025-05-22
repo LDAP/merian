@@ -18,7 +18,7 @@ layout (constant_id = 2) const int SVGF_ITERATIONS = 0;
 layout(set = 1, binding = 0) uniform sampler2D img_filter_unused; // unused needed to match the filter layout
 layout(set = 1, binding = 1) uniform writeonly restrict image2D img_filter_in;
 layout(set = 1, binding = 2) uniform usampler2D img_gbuf_unused;   // unused needed to match the filter layout
-layout(set = 1, binding = 3) uniform writeonly uimage2D img_gbuf_in;
+layout(set = 1, binding = 3) uniform writeonly restrict uimage2D img_gbuf_in;
 
 layout(push_constant, std140) uniform push_t {
     float normal_reject_cos;
@@ -26,6 +26,8 @@ layout(push_constant, std140) uniform push_t {
     float spatial_falloff;
     float spatial_bias;
 } params;
+
+// #define KALEIDOSCOPE
 
 #define SHARED_SIZE (gl_WorkGroupSize.x * gl_WorkGroupSize.y)
 
@@ -123,9 +125,11 @@ void main() {
   irr_histlen.rgb = mix(center_irr_histlen.rgb, irr_histlen.rgb, alpha);
 
   imageStore(img_filter_in, ipos, vec4(irr_histlen.rgb, variance));
+#ifdef KALEIDOSCOPE
   imageStore(img_gbuf_in, ipos, uvec4(geo_encode_normal(center_normal),
                                       floatBitsToUint(center_linear_z),
                                       packFloat2x16(center_grad_z),
                                       0));
+#endif
 }
 

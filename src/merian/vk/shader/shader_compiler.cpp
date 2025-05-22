@@ -31,34 +31,39 @@ class DummyShaderCompiler : public ShaderCompiler {
     }
 };
 
-ShaderCompilerHandle
-ShaderCompiler::get(const ContextHandle& context,
-                    const std::vector<std::string>& user_include_paths,
-                    const std::map<std::string, std::string>& user_macro_definitions) {
-    ShaderCompilerHandle shaderc =
-        std::make_shared<ShadercCompiler>(context, user_include_paths, user_macro_definitions);
+static WeakShaderCompilerHandle cached_compiler;
+
+ShaderCompilerHandle ShaderCompiler::get(const ContextHandle& context) {
+    if (!cached_compiler.expired()) {
+        return cached_compiler.lock();
+    }
+
+    ShaderCompilerHandle shaderc = std::make_shared<ShadercCompiler>(context);
     if (shaderc->available()) {
         SPDLOG_DEBUG("using shipped shaderc as default compiler");
+        cached_compiler = shaderc;
         return shaderc;
     }
 
-    ShaderCompilerHandle glslang_validator = std::make_shared<SystemGlslangValidatorCompiler>(
-        context, user_include_paths, user_macro_definitions);
+    ShaderCompilerHandle glslang_validator =
+        std::make_shared<SystemGlslangValidatorCompiler>(context);
     if (glslang_validator->available()) {
         SPDLOG_DEBUG("using installed glslangValidator as default compiler");
+        cached_compiler = glslang_validator;
         return glslang_validator;
     }
 
-    ShaderCompilerHandle glslc =
-        std::make_shared<SystemGlslcCompiler>(context, user_include_paths, user_macro_definitions);
+    ShaderCompilerHandle glslc = std::make_shared<SystemGlslcCompiler>(context);
     if (glslc->available()) {
         SPDLOG_DEBUG("using installed glslc as default compiler");
+        cached_compiler = glslc;
         return glslc;
     }
 
     SPDLOG_WARN("no shader compiler available");
-    return std::make_shared<DummyShaderCompiler>(context, user_include_paths,
-                                                 user_macro_definitions);
+    ShaderCompilerHandle dummy = std::make_shared<DummyShaderCompiler>(context);
+    cached_compiler = dummy;
+    return dummy;
 }
 
 ShaderCompiler::ShaderCompiler(const ContextHandle& context,

@@ -2,10 +2,30 @@
 
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/glm.hpp"
+#include "merian/vk/context.hpp"
 #include <spdlog/spdlog.h>
 #include <vulkan/vulkan.hpp>
 
 namespace merian {
+
+inline uint32_t
+workgroup_size_for_shared_memory(const ContextHandle& context,
+                                 const uint32_t required_shared_memory_bytes_per_invocation,
+                                 const uint32_t max_workgroup_size = 32,
+                                 const uint32_t min_workgroup_size = 8) {
+    for (uint32_t workgroup_size = max_workgroup_size; workgroup_size >= min_workgroup_size;
+         workgroup_size /= 2) {
+        if (workgroup_size * workgroup_size * required_shared_memory_bytes_per_invocation <=
+            context->physical_device.get_physical_device_limits().maxComputeSharedMemorySize) {
+            return workgroup_size;
+        }
+    }
+
+    throw std::runtime_error{fmt::format("not enough shared memory for workgroup size of {}, where "
+                                         "each invocation requires {} bytes.",
+                                         min_workgroup_size,
+                                         required_shared_memory_bytes_per_invocation)};
+}
 
 inline vk::TransformMatrixKHR transform_identity() noexcept {
     vk::TransformMatrixKHR transform;

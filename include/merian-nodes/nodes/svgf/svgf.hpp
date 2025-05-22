@@ -62,8 +62,8 @@ class SVGF : public Node {
     // depends on available shared memory
     const uint32_t variance_estimate_local_size_x;
     const uint32_t variance_estimate_local_size_y;
-    static constexpr uint32_t local_size_x = 16;
-    static constexpr uint32_t local_size_y = 16;
+    static constexpr uint32_t local_size_x = 32;
+    static constexpr uint32_t local_size_y = 32;
 
     ManagedVkImageInHandle con_prev_out = ManagedVkImageIn::compute_read("prev_out", 1);
     ManagedVkImageInHandle con_irr = ManagedVkImageIn::compute_read("irr");
@@ -105,10 +105,13 @@ class SVGF : public Node {
     int filter_type = 0;
 
     int taa_debug = 0;
-    int taa_filter_prev = false;
+    int taa_filter_prev = 0;
     int taa_clamping = 0;
     int taa_mv_sampling = 0;
     bool enable_mv = true;
+
+    bool kaleidoscope = false;
+    bool kaleidoscope_use_shmem = false;
 };
 
 } // namespace merian_nodes

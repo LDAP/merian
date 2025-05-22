@@ -16,6 +16,7 @@ namespace merian {
 // Include paths for the merian-nodes library and context extensions must be automatically added.
 class ShaderCompiler;
 using ShaderCompilerHandle = std::shared_ptr<ShaderCompiler>;
+using WeakShaderCompilerHandle = std::weak_ptr<ShaderCompiler>;
 
 class ShaderCompiler {
   public:
@@ -63,9 +64,7 @@ class ShaderCompiler {
   public:
     // Returns any of the available shader compilers. Returns a stub compiler if none is available.
     static ShaderCompilerHandle
-    get(const ContextHandle& context,
-        const std::vector<std::string>& user_include_paths = {},
-        const std::map<std::string, std::string>& user_macro_definitions = {});
+    get(const ContextHandle& context);
 
     ShaderCompiler(const ContextHandle& context,
                    const std::vector<std::string>& user_include_paths = {},
