@@ -35,7 +35,11 @@ layout(push_constant, std140) uniform push_t {
 // --------------------------------------------------------------
 
 ivec2 ipos;
-ivec2 ipos_shared;
+
+#ifdef KALEIDOSCOPE_USE_SHMEM
+  ivec2 ipos_shared;
+#endif // KALEIDOSCOPE_USE_SHMEM
+
 vec3 filter_irr;
 float filter_var;
 float filter_w;
@@ -81,7 +85,7 @@ float get_sigma_l(float center, ivec2 ipos) {
 
 // --------------------------------------------------------------
 // Reiners Kaladoscope SVGF
-
+#ifdef KALEIDOSCOPE
 #ifdef KALEIDOSCOPE_USE_SHMEM
 
 #define SHARED_HEIGHT 20
@@ -215,6 +219,7 @@ void shmem_load_halo() {
 }
 
 #endif // KALEIDOSCOPE_USE_SHMEM
+#endif // KALEIDOSCOPE
 
 // --------------------------------------------------------------
 
@@ -240,8 +245,8 @@ void tap(in ivec2 offset,
   offset *= GAP;
 
   const vec4  p_irr_var   = texelFetch(img_filter_in, ipos + offset, 0); 
-  const vec3  p_n         = geo_decode_normal(texelFetch(img_gbuf_in, ipos + offset, 0).x);
-  const float p_z         = uintBitsToFloat(texelFetch(img_gbuf_in, ipos + offset, 0).y);
+  const vec3  p_n         = gbuffer_get_normal_pixel(gbuffer, ipos + offset);
+  const float p_z         = gbuffer_get_linear_z_pixel(gbuffer, ipos + offset);
 #endif
 
   const float p_l         = yuv_luminance(p_irr_var.rgb);
