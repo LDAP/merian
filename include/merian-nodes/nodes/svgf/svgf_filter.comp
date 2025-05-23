@@ -123,7 +123,6 @@ void tap(in ivec2 offset,
          const float kernel_weight) {
 
 #ifdef KALEIDOSCOPE
-  
   #ifdef KALEIDOSCOPE_USE_SHMEM
     vec4  p_irr_var; vec4 _gbuf;
     shmem_read(ipos_shared + offset, _gbuf, p_irr_var);
@@ -134,11 +133,9 @@ void tap(in ivec2 offset,
     const vec3  p_n         = geo_decode_normal(texelFetch(img_gbuf_in, ipos + offset, 0).x);
     const float p_z         = uintBitsToFloat(texelFetch(img_gbuf_in, ipos + offset, 0).y);
   #endif
-
   offset *= GAP;
 #else
   offset *= GAP;
-
   const vec4  p_irr_var   = texelFetch(img_filter_in, ipos + offset, 0); 
   const vec3  p_n         = gbuffer_get_normal_pixel(gbuffer, ipos + offset);
   const float p_z         = gbuffer_get_linear_z_pixel(gbuffer, ipos + offset);
