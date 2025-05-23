@@ -254,6 +254,9 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id,
 
     physical_device.physical_device = std::get<0>(matches.back());
 
+    physical_device.physical_device_subgroup_properties.pNext =
+        &physical_device.physical_device_subgroup_size_control_properties;
+    // ^
     physical_device.physical_device_properties.pNext =
         &physical_device.physical_device_subgroup_properties;
     // ^

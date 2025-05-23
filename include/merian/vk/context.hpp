@@ -103,6 +103,7 @@ struct PhysicalDevice {
     vk::PhysicalDeviceFeatures2 physical_device_features;
     vk::PhysicalDeviceMemoryProperties2 physical_device_memory_properties;
     vk::PhysicalDeviceSubgroupProperties physical_device_subgroup_properties;
+    vk::PhysicalDeviceSubgroupSizeControlProperties physical_device_subgroup_size_control_properties;
     std::vector<vk::ExtensionProperties> physical_device_extension_properties;
 };
 

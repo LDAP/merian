@@ -11,7 +11,8 @@ class ComputePipeline : public Pipeline {
     ComputePipeline(const PipelineLayoutHandle& pipeline_layout,
                     const ShaderStageCreateInfo& shader_stage_create_info,
                     const vk::PipelineCreateFlags flags = {},
-                    const PipelineHandle& base_pipeline = {})
+                    const PipelineHandle& base_pipeline = {},
+                    const void* pNext = nullptr)
         : Pipeline(pipeline_layout->get_context(), pipeline_layout),
           shader_module(shader_stage_create_info.shader_module), base_pipeline(base_pipeline) {
         SPDLOG_DEBUG("create ComputePipeline ({})", fmt::ptr(this));
@@ -22,6 +23,7 @@ class ComputePipeline : public Pipeline {
             *pipeline_layout,
             base_pipeline ? base_pipeline->get_pipeline() : nullptr,
             0,
+            pNext,
         };
         // Hm. This is a bug in the API there should not be .value
         pipeline = context->device.createComputePipeline(context->pipeline_cache, info).value;
@@ -33,12 +35,14 @@ class ComputePipeline : public Pipeline {
         const SpecializationInfoHandle& specialization_info = MERIAN_SPECIALIZATION_INFO_NONE,
         const char* shader_module_entry_point = "main",
         const vk::PipelineCreateFlags flags = {},
-        const PipelineHandle& base_pipeline = {})
+        const PipelineHandle& base_pipeline = {},
+        const void* pNext = nullptr)
         : ComputePipeline(pipeline_layout,
                           ShaderStageCreateInfo{
                               shader_module, specialization_info, shader_module_entry_point, {}},
                           flags,
-                          base_pipeline) {}
+                          base_pipeline,
+                          pNext) {}
 
     ~ComputePipeline() {
         SPDLOG_DEBUG("destroy ComputePipeline ({})", fmt::ptr(this));
