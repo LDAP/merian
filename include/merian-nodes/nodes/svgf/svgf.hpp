@@ -100,7 +100,7 @@ class SVGF : public Node {
     };
     std::array<EAWRes, 2> ping_pong_res; // Ping pong sets
 
-    int filter_type = 0;
+    int filter_type = 2;
 
     int taa_debug = 0;
     int taa_filter_prev = 0;

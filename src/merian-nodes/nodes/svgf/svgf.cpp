@@ -292,9 +292,11 @@ SVGF::NodeStatusFlags SVGF::properties(Properties& config) {
                         "z-dependent rejection: increase to reject more. Disable with <= 0.");
     config.config_float("z-bias depth", filter_pc.z_bias_depth,
                         "z-dependent rejection: increase to reject more. Disable with <= 0.");
-    needs_rebuild |=
-        config.config_options("filter type", filter_type, {"atrous", "box", "subsampled"},
-                              Properties::OptionsStyle::COMBO);
+    if (config.config_options("filter type", filter_type, {"atrous", "box", "subsampled"},
+                              Properties::OptionsStyle::COMBO)) {
+        needs_rebuild = true;
+        kaleidoscope = filter_type == 0;
+    }
 
     needs_rebuild |= config.config_bool("kaleidoscope", kaleidoscope);
     needs_rebuild |= config.config_bool("kaleidoscope: shmem", kaleidoscope_use_shmem,

@@ -322,7 +322,7 @@ main() {
   }
 
 // --------------------------------------------------------------
-// Reiners Kaladoscope SVGF
+// Reiners Kaleidoscope-SVGF Swizzle
 #ifdef KALEIDOSCOPE
   if (ITERATION != LAST_ITERATION) {
     ivec2 hid = ipos / 2;
