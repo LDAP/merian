@@ -102,6 +102,12 @@ float get_sigma_l(float center, ivec2 ipos) {
 layout(std430, row_major) shared f32vec4[SHARED_SIZE_Y][SHARED_SIZE_X] SHARED_TILE_u32vec4_A; // (irr, var)
 layout(std430, row_major) shared f32vec4[SHARED_SIZE_Y][SHARED_SIZE_X] SHARED_TILE_u32vec4_B; // (normal, linear_z)
 
+void shmem_read(const ivec2 pos, out vec3 n, out float z, out vec4 irrfilter) {
+  irrfilter = SHARED_TILE_u32vec4_A[pos.y][pos.x];
+  n = SHARED_TILE_u32vec4_B[pos.y][pos.x].rgb;
+  z = SHARED_TILE_u32vec4_B[pos.y][pos.x].a;
+}
+
 void shmem_read(const ivec2 pos, out vec4 gbuf, out vec4 irrfilter) {
   irrfilter = SHARED_TILE_u32vec4_A[pos.y][pos.x];
   gbuf = SHARED_TILE_u32vec4_B[pos.y][pos.x];
@@ -123,41 +129,40 @@ void shmem_write(const ivec2 pos, const vec4 irrfilter, const vec3 n, const floa
   #define tap(offset, weight) _tap(offset * GAP, weight)
 #endif
 
-void _tap(in ivec2 offset, const float kernel_weight) {
+void _tap(const ivec2 offset, const float kernel_weight) {
 
 #ifdef KALEIDOSCOPE
   #ifdef KALEIDOSCOPE_USE_SHMEM
-    vec4  p_irr_var; vec4 _gbuf;
-    shmem_read(ipos_shared + offset, _gbuf, p_irr_var);
-    const vec3  p_n         = _gbuf.xyz;
-    const float p_z         = _gbuf.w;
+    vec4  p_irr_var; vec3 p_n; float p_z;
+    shmem_read(ipos_shared + offset, p_n, p_z, p_irr_var);
   #else
     const vec4  p_irr_var   = texelFetch(img_filter_in, ipos + offset, 0); 
     const vec3  p_n         = geo_decode_normal(texelFetch(img_gbuf_in, ipos + offset, 0).x);
     const float p_z         = uintBitsToFloat(texelFetch(img_gbuf_in, ipos + offset, 0).y);
   #endif
-  offset *= GAP;
+
+  #define grad_offset (offset * GAP)
 #else
   const vec4  p_irr_var   = texelFetch(img_filter_in, ipos + offset, 0); 
   const vec3  p_n         = gbuffer_get_normal_pixel(gbuffer, ipos + offset);
   const float p_z         = gbuffer_get_linear_z_pixel(gbuffer, ipos + offset);
+  #define grad_offset offset
 #endif
 
   const float p_l         = yuv_luminance(p_irr_var.rgb);
-  const float w_l = abs(p_l - c_l) / (sigma_l + 1e-10);
 
-  float w_z = exp(-10 * abs(c_z + dot(c_grad_z, offset) - p_z) / params.param_z);
-  w_z = mix(w_z, 1.0, z_bias_depth_mix);
-
+  const float w_l = abs(p_l - c_l) / sigma_l;
+  const float w_z = exp(-10 * abs(c_z + dot(c_grad_z, grad_offset) - p_z) / params.param_z);
+  const float w_n = smoothstep(params.param_n, 1.0, dot(p_n, c_n));
   // was: pow(max(0, dot(p_n, c_n)), params.param_n); 
-  float w_n = smoothstep(params.param_n, 1.0, dot(p_n, c_n));
-  w_n = mix(w_n, 1.0, z_bias_normals_mix);
 
-  const float w = exp(-w_l * w_l) * w_z * w_n * kernel_weight;
+  const float w = exp(-w_l * w_l) * mix(w_z, 1.0, z_bias_depth_mix) * mix(w_n, 1.0, z_bias_normals_mix) * kernel_weight;
 
   filter_irr_var.rgb += p_irr_var.rgb * w; 
   filter_irr_var.a   += p_irr_var.a * w * w; 
-  filter_w           += w; 
+  filter_w           += w;
+
+  #undef grad_offset
 }
 
 void
@@ -263,14 +268,14 @@ main() {
 
 
 #ifdef FILTER_VARIANCE
-    sigma_l = get_sigma_l(filter_irr_var.a, ipos) * params.param_l;
+    sigma_l = get_sigma_l(filter_irr_var.a, ipos) * params.param_l + 1e-10;
 #else
-    sigma_l = sqrt(filter_irr_var.a) * params.param_l;
+    sigma_l = sqrt(filter_irr_var.a) * params.param_l + 1e-10;
 #endif
 
-  filter_w = 1.0;
 
   if (c_z > 0) {
+    filter_w = 1.0;
 
 #if FILTER_TYPE == 0
     // atrous
