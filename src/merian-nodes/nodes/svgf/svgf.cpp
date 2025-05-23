@@ -106,7 +106,9 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
     {
         const ShaderCompilerHandle compiler = ShaderCompiler::get(context);
 
-        std::map<std::string, std::string> additional_defines;
+        std::map<std::string, std::string> additional_defines = {
+            {"FILTER_TYPE", std::to_string(filter_type)}};
+
         if (kaleidoscope) {
             additional_defines["KALEIDOSCOPE"] = "1";
             if (kaleidoscope_use_shmem) {
@@ -153,7 +155,7 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
             for (int i = 0; i < svgf_iterations; i++) {
                 auto spec_builder = SpecializationInfoBuilder();
                 int gap = 1 << i;
-                spec_builder.add_entry(filter_local_size, filter_local_size, gap, filter_type, i,
+                spec_builder.add_entry(filter_local_size, filter_local_size, gap, i,
                                        svgf_iterations - 1);
                 SpecializationInfoHandle filter_spec = spec_builder.build();
                 filters[i] = std::make_shared<ComputePipeline>(filter_pipe_layout, filter_module,

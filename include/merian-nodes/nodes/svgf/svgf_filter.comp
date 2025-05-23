@@ -15,9 +15,8 @@ layout(set = 1, binding = 2) uniform usampler2D img_gbuf_in;
 layout(set = 1, binding = 3) uniform writeonly restrict uimage2D img_gbuf_out;
 
 layout (constant_id = 2) const int GAP = 1;
-layout (constant_id = 3) const int FILTER_TYPE = 0;
-layout (constant_id = 4) const int ITERATION = 0;
-layout (constant_id = 5) const int LAST_ITERATION = 0;
+layout (constant_id = 3) const int ITERATION = 0;
+layout (constant_id = 4) const int LAST_ITERATION = 0;
 
 // the reference implementation does that but it looks better without
 // #define FILTER_VARIANCE
@@ -118,9 +117,13 @@ void shmem_write(const ivec2 pos, const vec4 irrfilter, const vec3 n, const floa
 
 // --------------------------------------------------------------
 
+#ifdef KALEIDOSCOPE
+  #define tap(offset, weight) _tap(offset, weight)
+#else
+  #define tap(offset, weight) _tap(offset * GAP, weight)
+#endif
 
-void tap(in ivec2 offset,
-         const float kernel_weight) {
+void _tap(in ivec2 offset, const float kernel_weight) {
 
 #ifdef KALEIDOSCOPE
   #ifdef KALEIDOSCOPE_USE_SHMEM
@@ -135,7 +138,6 @@ void tap(in ivec2 offset,
   #endif
   offset *= GAP;
 #else
-  offset *= GAP;
   const vec4  p_irr_var   = texelFetch(img_filter_in, ipos + offset, 0); 
   const vec3  p_n         = gbuffer_get_normal_pixel(gbuffer, ipos + offset);
   const float p_z         = gbuffer_get_linear_z_pixel(gbuffer, ipos + offset);
@@ -151,7 +153,7 @@ void tap(in ivec2 offset,
   float w_n = smoothstep(params.param_n, 1.0, dot(p_n, c_n));
   w_n = mix(w_n, 1.0, z_bias_normals_mix);
 
-  const float w = exp(-w_l * w_l) * w_z * w_n * kernel_weight; 
+  const float w = exp(-w_l * w_l) * w_z * w_n * kernel_weight;
 
   filter_irr_var.rgb += p_irr_var.rgb * w; 
   filter_irr_var.a   += p_irr_var.a * w * w; 
@@ -270,55 +272,45 @@ main() {
 
   if (c_z > 0) {
 
-    switch (FILTER_TYPE) {
-      case 0: {
-        // atrous
-        const float kernel[] = {1., 2. / 3., 1. / 6.};
-        [[unroll]]
-        for (int j = -2; j <= 2; j++) {
-          [[unroll]]
-          for (int i = -2; i <= 2; i++) {
-            if (i != 0 || j != 0) {
-              const float weight = kernel[abs(i)] * kernel[abs(j)];
-              tap(ivec2(i,  j), weight);
-            }
-          }
+#if FILTER_TYPE == 0
+    // atrous
+    const float kernel[] = {1., 2. / 3., 1. / 6.};
+    [[unroll]]
+    for (int j = -2; j <= 2; j++) {
+      [[unroll]]
+      for (int i = -2; i <= 2; i++) {
+        if (i != 0 || j != 0) {
+          const float weight = kernel[abs(i)] * kernel[abs(j)];
+          tap(ivec2(i,  j), weight);
         }
-        break;
-      }
-
-      case 1: {
-        // box3
-        const int r = 1;
-        [[unroll]]
-        for (int yy = -r; yy <= r; yy++) {
-          [[unroll]]
-          for (int xx = -r; xx <= r; xx++) {
-            if (xx != 0 || yy != 0) {
-              tap(ivec2(xx, yy), 1.0);
-            }
-          }
-        }
-        break;
-      }
-
-      case 2: {
-        // subsampled
-        if ((ITERATION & 1) == 0) {
-          tap(ivec2(-2,  0), 1.0);
-          tap(ivec2( 2,  0), 1.0);
-        } else {
-          tap(ivec2( 0, -2), 1.0);
-          tap(ivec2( 0,  2), 1.0);
-        }
-
-        tap(ivec2(-1,  1), 1.0);
-        tap(ivec2( 1,  1), 1.0);
-        tap(ivec2(-1, -1), 1.0);
-        tap(ivec2( 1, -1), 1.0);
-        break;
       }
     }
+#elif FILTER_TYPE == 1
+    // box3
+    const int r = 1;
+    [[unroll]]
+    for (int yy = -r; yy <= r; yy++) {
+      [[unroll]]
+      for (int xx = -r; xx <= r; xx++) {
+        if (xx != 0 || yy != 0) {
+          tap(ivec2(xx, yy), 1.0);
+        }
+      }
+    }
+#elif FILTER_TYPE == 2
+    // subsampled
+    if ((ITERATION & 1) == 0) {
+      tap(ivec2(-2,  0), 1.0);
+      tap(ivec2( 2,  0), 1.0);
+    } else {
+      tap(ivec2( 0, -2), 1.0);
+      tap(ivec2( 0,  2), 1.0);
+    }
+    tap(ivec2(-1,  1), 1.0);
+    tap(ivec2( 1,  1), 1.0);
+    tap(ivec2(-1, -1), 1.0);
+    tap(ivec2( 1, -1), 1.0);
+#endif
 
     filter_irr_var.rgb /= filter_w;
     filter_irr_var.a   /= filter_w * filter_w;
