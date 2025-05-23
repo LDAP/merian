@@ -57,35 +57,35 @@ void main() {
   vec4 irr_histlen;
   vec2 moments;
 
-  do {
+  #define center_irr_histlen shared_irr[shared_idx]
+  #define center_moments shared_moments[shared_idx]
+  #define center_normal shared_normal[shared_idx]
+  #define center_linear_z shared_z[shared_idx]
 
-#ifdef KALEIDOSCOPE
-    // fill in padding with valid information
-    const ivec2 mirror_repeat_ipos = merian_tex_mirror_repeat(ipos, textureSize(img_irr, 0));
-#else
-    #define mirror_repeat_ipos ipos
-#endif
+  // fill in padding and halo with valid information
+  const ivec2 mirror_repeat_ipos = merian_tex_mirror_repeat(ipos, textureSize(img_irr, 0));
 
-    const GBuffer gbuf = gbuffer_load_pixel(gbuffer, mirror_repeat_ipos);
-    irr_histlen = texelFetch(img_irr, mirror_repeat_ipos, 0);
-    moments = texelFetch(img_moments, mirror_repeat_ipos, 0).rg;
+  const GBuffer gbuf = gbuffer_load_pixel(gbuffer, mirror_repeat_ipos);
+  irr_histlen = texelFetch(img_irr, mirror_repeat_ipos, 0);
+  moments = texelFetch(img_moments, mirror_repeat_ipos, 0).rg;
 
-    shared_moments[shared_idx]  = moments;
-    shared_irr[shared_idx]      = irr_histlen.rgb;
-    shared_normal[shared_idx]   = gbuffer_get_normal(gbuf);
-    shared_z[shared_idx]        = gbuffer_get_linear_z(gbuf);
-    center_grad_z               = gbuffer_get_grad_z(gbuf);
-  } while (false);
+  center_moments          = moments;
+  center_irr_histlen      = irr_histlen.rgb;
+  center_normal           = gbuffer_get_normal(gbuf);
+  center_linear_z         = gbuffer_get_linear_z(gbuf);
+  center_grad_z           = gbuffer_get_grad_z(gbuf);
 
   barrier();
 
   if (any(greaterThanEqual(ipos, imageSize(img_filter_in))) || !IS_ON_TILE)
     return;
 
-  #define center_irr_histlen shared_irr[shared_idx]
-  #define center_moments shared_moments[shared_idx]
-  #define center_normal shared_normal[shared_idx]
-  #define center_linear_z shared_z[shared_idx]
+#ifdef KALEIDOSCOPE
+  imageStore(img_gbuf_in, ipos, uvec4(geo_encode_normal(center_normal),
+                                      floatBitsToUint(center_linear_z),
+                                      packFloat2x16(center_grad_z),
+                                      0));
+#endif
 
   float sum_w = 1.0;
 
@@ -125,14 +125,8 @@ void main() {
   const float center_variance = max(0.0, center_moments.y - center_moments.x * center_moments.x);
   const float alpha = clamp(params.spatial_bias / pow(irr_histlen.a, params.spatial_falloff), 0, 1);
   variance = mix(center_variance, variance, alpha);
-  irr_histlen.rgb = mix(center_irr_histlen.rgb, irr_histlen.rgb, alpha);
+  irr_histlen.rgb = mix(center_irr_histlen, irr_histlen.rgb, alpha);
 
   imageStore(img_filter_in, ipos, vec4(irr_histlen.rgb, variance));
-#ifdef KALEIDOSCOPE
-  imageStore(img_gbuf_in, ipos, uvec4(geo_encode_normal(center_normal),
-                                      floatBitsToUint(center_linear_z),
-                                      packFloat2x16(center_grad_z),
-                                      0));
-#endif
 }
 

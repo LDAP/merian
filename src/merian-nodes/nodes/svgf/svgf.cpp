@@ -78,6 +78,11 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
 
         // gbuffer
         vk::ImageCreateInfo gbuf_create_info = irr_create_info;
+        if (!kaleidoscope) {
+            // keep to prevent special cases but reduce to single pixel...
+            gbuf_create_info.extent.width = 1;
+            gbuf_create_info.extent.height = 1;
+        }
         gbuf_create_info.format = vk::Format::eR32G32B32A32Uint;
         ImageHandle tmp_gbuf_image = allocator->createImage(gbuf_create_info);
         ping_pong_res[i].gbuf_ping_pong =

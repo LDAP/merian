@@ -1,7 +1,6 @@
 #pragma once
 
 #include "merian-nodes/connectors/connector_utils.hpp"
-#include "merian-nodes/connectors/managed_vk_buffer_in.hpp"
 #include "merian-nodes/connectors/managed_vk_image_in.hpp"
 #include "merian-nodes/graph/node.hpp"
 
@@ -110,7 +109,7 @@ class SVGF : public Node {
     bool enable_mv = true;
 
     bool kaleidoscope = false;
-    bool kaleidoscope_use_shmem = false;
+    bool kaleidoscope_use_shmem = true;
 };
 
 } // namespace merian_nodes

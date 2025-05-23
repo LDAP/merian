@@ -180,15 +180,14 @@ main() {
     {
       // center
       shmem_write(ipos_shared, filter_irr_var, c_n, c_z);
-    }
-    {
+
       // halo
       // |TL| TC |TR|
       // |L | C  |R |
       // |BL| BC |BR|
 
-      ivec2 global_read;
-      ivec2 shared_write;
+      ivec2 local_tile_offset;
+      ivec2 lid;
 
       const uint split_size = FILTER_HALO_SIZE * (FILTER_HALO_SIZE + WORKGROUP_SIZE_X);
       const uint split_size_half = split_size / FILTER_HALO_SIZE;
@@ -197,42 +196,32 @@ main() {
       if (gl_LocalInvocationIndex < 1 * split_size) {
         // load top (TL, TC)
         const uint index = gl_LocalInvocationIndex - 0 * split_size;
-        const ivec2 lid = ivec2(index % split_size_half, index / split_size_half);
-        const ivec2 local_tile_offset = ivec2(0);
-        global_read = global_tile_offset + local_tile_offset + lid;
-        shared_write = local_tile_offset + lid;
+        lid = ivec2(index % split_size_half, index / split_size_half);
+        local_tile_offset = ivec2(0);
       } else if (gl_LocalInvocationIndex < 2 * split_size) {
         // load right (TR, R) 
         const uint index = gl_LocalInvocationIndex - 1 * split_size;
-        const ivec2 lid = ivec2(index / split_size_half, index % split_size_half);
-        const ivec2 local_tile_offset = ivec2(FILTER_HALO_SIZE + WORKGROUP_SIZE_X, 0);
-        global_read = global_tile_offset + local_tile_offset + lid;
-        shared_write = local_tile_offset + lid;
+        lid = ivec2(index / split_size_half, index % split_size_half);
+        local_tile_offset = ivec2(FILTER_HALO_SIZE + WORKGROUP_SIZE_X, 0);
       } else if (gl_LocalInvocationIndex < 3 * split_size) {
         // load bottom (BR, BC)
         const uint index = gl_LocalInvocationIndex - 2 * split_size;
-        const ivec2 lid = ivec2(index % split_size_half, index / split_size_half);
-        const ivec2 local_tile_offset = ivec2(FILTER_HALO_SIZE, FILTER_HALO_SIZE + WORKGROUP_SIZE_X);
-        global_read = global_tile_offset + local_tile_offset + lid;
-        shared_write = local_tile_offset + lid;
+        lid = ivec2(index % split_size_half, index / split_size_half);
+        local_tile_offset = ivec2(FILTER_HALO_SIZE, FILTER_HALO_SIZE + WORKGROUP_SIZE_X);
       } else if (gl_LocalInvocationIndex < 4 * split_size) {
         // load left (BL, L)
         const uint index = gl_LocalInvocationIndex - 3 * split_size;
-        const ivec2 lid = ivec2(index / split_size_half, index % split_size_half);
-        const ivec2 local_tile_offset = ivec2(0, FILTER_HALO_SIZE);
-        global_read = global_tile_offset + local_tile_offset + lid;
-        shared_write = local_tile_offset + lid;
+        lid = ivec2(index / split_size_half, index % split_size_half);
+        local_tile_offset = ivec2(0, FILTER_HALO_SIZE);
       }
 
-
       if (gl_LocalInvocationIndex < 4 * split_size) {
-          global_read = merian_tex_mirror_repeat(global_read, textureSize(img_filter_in, 0));
+          const ivec2 global_read = merian_tex_mirror_repeat(global_tile_offset + local_tile_offset + lid, textureSize(img_filter_in, 0));
 
           const uvec3 p_gbuf = texelFetch(img_gbuf_in, global_read, 0).rgb;
-          shmem_write(shared_write, texelFetch(img_filter_in, global_read, 0),
-                                    geo_decode_normal(p_gbuf.x),
-                                    uintBitsToFloat(p_gbuf.y));
-          //shmem_write(shared_write, vec4(DEBUG_COLOR, 0), vec3(1,0,0), 10.);
+          shmem_write(local_tile_offset + lid, texelFetch(img_filter_in, global_read, 0),
+                                               geo_decode_normal(p_gbuf.x),
+                                               uintBitsToFloat(p_gbuf.y));
       }
     }
     
