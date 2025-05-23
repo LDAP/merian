@@ -27,7 +27,7 @@ layout (constant_id = 5) const int LAST_ITERATION = 0;
 // #define KALEIDOSCOPE
 // #define KALEIDOSCOPE_USE_SHMEM
 
-// commet to disable; two variants to reconstruct (0, 1) reiner recommends using 1
+// commet to disable; two variants to reconstruct (0, 1) Reiner recommends using 1
 // #define KALEIDOSCOPE_USE_MIRRORING 1
 
 layout(push_constant, std140) uniform push_t {
@@ -397,10 +397,8 @@ main() {
     #endif
 
   }
+#endif
 
   imageStore(img_filter_out, ipos, filter_irr_var);
-#else // NO KALEIDOSCOPE:
-  imageStore(img_filter_out, ipos, filter_irr_var);
-#endif
 }
 
