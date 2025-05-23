@@ -208,9 +208,8 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
   public:
     Graph(const ContextHandle& context, const ResourceAllocatorHandle& resource_allocator)
         : context(context), resource_allocator(resource_allocator), queue(context->get_queue_GCT()),
-          registry(context, resource_allocator), ring_fences(context),
-          thread_pool(std::make_shared<ThreadPool>()),
-          cpu_queue(std::make_shared<CPUQueue>(context, thread_pool)),
+          registry(context, resource_allocator), thread_pool(std::make_shared<ThreadPool>()),
+          cpu_queue(std::make_shared<CPUQueue>(context, thread_pool)), ring_fences(context),
           run_profiler(std::make_shared<merian::Profiler>(context)),
           graph_run(ITERATIONS_IN_FLIGHT,
                     thread_pool,

@@ -64,6 +64,10 @@ class FileLoader {
     // can be relative to any previously added search path.
     void add_search_path(const std::filesystem::path& path);
 
+    void add_search_path(const std::vector<std::filesystem::path>& path);
+
+    void add_search_path(const std::vector<std::string>& path);
+
     bool remove_search_path(const std::filesystem::path& path);
 
     // Search in parents of cwd

@@ -125,7 +125,8 @@ class ExtensionVkCore : public Extension {
 
                             // VK 1.3
 
-                            "vk13/robustImageAccess", "vk13/synchronization2", "vk13/maintenance4"
+                            "vk13/robustImageAccess", "vk13/synchronization2", "vk13/maintenance4",
+                            "vk13/subgroupSizeControl"
 
                         },
                     const std::vector<const char*>& device_extensions = {},

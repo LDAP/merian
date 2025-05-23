@@ -1,9 +1,11 @@
 #version 460
 #extension GL_GOOGLE_include_directive    : enable
 #extension GL_EXT_control_flow_attributes : enable
+#extension GL_EXT_shared_memory_block : enable
 
 #include "svgf_graph_layout.glsl"
 #include "merian-shaders/normal_encode.glsl"
+#include "merian-shaders/textures.glsl"
 #include "merian-shaders/color/colors_yuv.glsl"
 #include "config.h"
 
@@ -16,6 +18,8 @@ layout (constant_id = 2) const int SVGF_ITERATIONS = 0;
 
 layout(set = 1, binding = 0) uniform sampler2D img_filter_unused; // unused needed to match the filter layout
 layout(set = 1, binding = 1) uniform writeonly restrict image2D img_filter_in;
+layout(set = 1, binding = 2) uniform usampler2D img_gbuf_unused;   // unused needed to match the filter layout
+layout(set = 1, binding = 3) uniform writeonly restrict uimage2D img_gbuf_in;
 
 layout(push_constant, std140) uniform push_t {
     float normal_reject_cos;
@@ -24,15 +28,11 @@ layout(push_constant, std140) uniform push_t {
     float spatial_bias;
 } params;
 
-#define SHARED_SIZE (gl_WorkGroupSize.x * gl_WorkGroupSize.y)
-
 // update VE_SHARED_MEMORY_PER_PIXEL if you change anything here!
-shared vec2 shared_moments[SHARED_SIZE];
-shared vec3 shared_irr[SHARED_SIZE];
-shared vec3 shared_normal[SHARED_SIZE];
-shared float shared_z[SHARED_SIZE];
-
-#define SHARED_INDEX(X, Y) ((Y) * gl_WorkGroupSize.x + X)
+layout(std430, row_major) shared vec2 shared_moments[gl_WorkGroupSize.y][gl_WorkGroupSize.x];
+layout(std430, row_major) shared vec3 shared_irr[gl_WorkGroupSize.y][gl_WorkGroupSize.x];
+layout(std430, row_major) shared vec3 shared_normal[gl_WorkGroupSize.y][gl_WorkGroupSize.x];
+layout(std430, row_major) shared float shared_z[gl_WorkGroupSize.y][gl_WorkGroupSize.x];
 
 #define IS_ON_TILE (all(greaterThanEqual(gl_LocalInvocationID.xy, ivec2(VE_SPATIAL_RADIUS))) && all(lessThan(gl_LocalInvocationID.xy, gl_WorkGroupSize.xy - VE_SPATIAL_RADIUS)))
 #define TILE_ID (ivec2(gl_LocalInvocationID.xy) - VE_SPATIAL_RADIUS)
@@ -40,7 +40,6 @@ shared float shared_z[SHARED_SIZE];
 
 void main() {
   const ivec2 ipos = ivec2(gl_WorkGroupID.xy * TILE_SIZE) + TILE_ID;
-  const uint shared_idx = SHARED_INDEX(gl_LocalInvocationID.x, gl_LocalInvocationID.y);
 
   if (SVGF_ITERATIONS == 0) {
     if (all(lessThan(ipos, imageSize(img_filter_in))) && IS_ON_TILE)
@@ -54,27 +53,35 @@ void main() {
   vec4 irr_histlen;
   vec2 moments;
 
-  do {
-    const GBuffer gbuf = gbuffer_load_pixel(gbuffer, ipos);
-    irr_histlen = texelFetch(img_irr, ipos, 0);
-    moments = texelFetch(img_moments, ipos, 0).rg;
+  #define center_irr_histlen shared_irr[gl_LocalInvocationID.y][gl_LocalInvocationID.x]
+  #define center_moments shared_moments[gl_LocalInvocationID.y][gl_LocalInvocationID.x]
+  #define center_normal shared_normal[gl_LocalInvocationID.y][gl_LocalInvocationID.x]
+  #define center_linear_z shared_z[gl_LocalInvocationID.y][gl_LocalInvocationID.x]
 
-    shared_moments[shared_idx]  = moments;
-    shared_irr[shared_idx]      = irr_histlen.rgb;
-    shared_normal[shared_idx]   = gbuffer_get_normal(gbuf);
-    shared_z[shared_idx]        = gbuffer_get_linear_z(gbuf);
-    center_grad_z               = gbuffer_get_grad_z(gbuf);
-  } while (false);
+  // fill in padding and halo with valid information
+  const ivec2 mirror_repeat_ipos = merian_tex_mirror_repeat(ipos, textureSize(img_irr, 0));
+
+  const GBuffer gbuf = gbuffer_load_pixel(gbuffer, mirror_repeat_ipos);
+  irr_histlen = texelFetch(img_irr, mirror_repeat_ipos, 0);
+  moments = texelFetch(img_moments, mirror_repeat_ipos, 0).rg;
+
+  center_moments          = moments;
+  center_irr_histlen      = irr_histlen.rgb;
+  center_normal           = gbuffer_get_normal(gbuf);
+  center_linear_z         = gbuffer_get_linear_z(gbuf);
+  center_grad_z           = gbuffer_get_grad_z(gbuf);
 
   barrier();
 
   if (any(greaterThanEqual(ipos, imageSize(img_filter_in))) || !IS_ON_TILE)
     return;
 
-  #define center_irr_histlen shared_irr[shared_idx]
-  #define center_moments shared_moments[shared_idx]
-  #define center_normal shared_normal[shared_idx]
-  #define center_linear_z shared_z[shared_idx]
+#ifdef KALEIDOSCOPE
+  imageStore(img_gbuf_in, ipos, uvec4(geo_encode_normal(center_normal),
+                                      floatBitsToUint(center_linear_z),
+                                      packFloat2x16(center_grad_z),
+                                      0));
+#endif
 
   float sum_w = 1.0;
 
@@ -89,20 +96,19 @@ void main() {
       if(xx != 0 || yy != 0) { // added already
         const ivec2 p = ivec2(gl_LocalInvocationID.xy) + ivec2(xx, yy);
 
-        float w = 1.0;
+        // smoothing kernel
+        float w = kernel[abs(xx)] * kernel[abs(yy)];
         // Weight neighbors with similar normals
-        w *= smoothstep(params.normal_reject_cos, 1.0, dot(center_normal, shared_normal[SHARED_INDEX(p.x, p.y)]));
+        w *= smoothstep(params.normal_reject_cos, 1.0, dot(center_normal, shared_normal[p.y][p.x]));
         // Weight neighbors with similar depth
         // w *= 1.0 - smoothstep(0.0, params.depth_reject_percent * max(gbuf.linear_z, neigh_gbuf.linear_z), abs(gbuf.linear_z - neigh_gbuf.linear_z));
-        w *= exp(-10 * abs(center_linear_z + dot(center_grad_z, f16vec2(xx, yy)) - shared_z[SHARED_INDEX(p.x, p.y)]) / params.depth_accept);
-        // smoothing kernel
-        w *= kernel[abs(xx)] * kernel[abs(yy)];
+        w *= exp(-10 * abs(center_linear_z + dot(center_grad_z, f16vec2(xx, yy)) - shared_z[p.y][p.x]) / params.depth_accept);
         // Weight lower with increasing history
         //w *= 1.0 - irr_histlen.a / params.spatial_threshold;
 
         sum_w           += w;
-        irr_histlen.rgb += w * shared_irr[SHARED_INDEX(p.x, p.y)].rgb;
-        moments         += w * shared_moments[SHARED_INDEX(p.x, p.y)].rg;
+        irr_histlen.rgb += w * shared_irr[p.y][p.x];
+        moments         += w * shared_moments[p.y][p.x];
       }
     }
   }
@@ -114,7 +120,7 @@ void main() {
   const float center_variance = max(0.0, center_moments.y - center_moments.x * center_moments.x);
   const float alpha = clamp(params.spatial_bias / pow(irr_histlen.a, params.spatial_falloff), 0, 1);
   variance = mix(center_variance, variance, alpha);
-  irr_histlen.rgb = mix(center_irr_histlen.rgb, irr_histlen.rgb, alpha);
+  irr_histlen.rgb = mix(center_irr_histlen, irr_histlen.rgb, alpha);
 
   imageStore(img_filter_in, ipos, vec4(irr_histlen.rgb, variance));
 }

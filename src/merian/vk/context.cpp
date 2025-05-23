@@ -60,9 +60,6 @@ Version: {}\n\n",
                  VK_API_VERSION_MINOR(VK_HEADER_VERSION_COMPLETE),
                  VK_API_VERSION_PATCH(VK_HEADER_VERSION_COMPLETE));
 
-    // add common folders to file loader
-    file_loader.add_search_path(MERIAN_INSTALL_DATA_DIR);
-
     // Init dynamic loader
     VULKAN_HPP_DEFAULT_DISPATCHER.init();
 
@@ -96,6 +93,10 @@ Version: {}\n\n",
     create_device_and_queues(preffered_number_compute_queues);
 
     prepare_shader_include_defines();
+
+    // add common folders to file loader
+    file_loader.add_search_path(MERIAN_INSTALL_DATA_DIR);
+    file_loader.add_search_path(default_shader_include_paths);
 
     SPDLOG_INFO("context ready.");
 }
@@ -253,6 +254,9 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id,
 
     physical_device.physical_device = std::get<0>(matches.back());
 
+    physical_device.physical_device_subgroup_properties.pNext =
+        &physical_device.physical_device_subgroup_size_control_properties;
+    // ^
     physical_device.physical_device_properties.pNext =
         &physical_device.physical_device_subgroup_properties;
     // ^

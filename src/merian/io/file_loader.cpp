@@ -2,6 +2,7 @@
 #include "merian/utils/string.hpp"
 
 #include <filesystem>
+#include <fmt/ranges.h>
 #include <fstream>
 #include <optional>
 #include <spdlog/spdlog.h>
@@ -69,7 +70,16 @@ FileLoader::find_file(const std::filesystem::path& path) const {
             return std::filesystem::weakly_canonical(full_path);
     }
 
-    SPDLOG_DEBUG("file {} not found in search paths", path.string());
+#if SPDLOG_ACTIVE_LEVEL <= SPDLOG_LEVEL_DEBUG
+    std::vector<std::string> str_search_paths;
+    str_search_paths.reserve(search_paths.size());
+    for (const auto& search_path : search_paths) {
+        str_search_paths.emplace_back(search_path.string());
+    }
+    SPDLOG_DEBUG("file {} not found in search paths [{}]", path.string(),
+                 fmt::join(str_search_paths, ", "));
+#endif
+
     return std::nullopt;
 }
 
@@ -109,6 +119,18 @@ void FileLoader::add_search_path(const std::filesystem::path& path) {
     }
     search_paths.insert(*resolved);
     SPDLOG_DEBUG("added search path {}", resolved->string());
+}
+
+void FileLoader::add_search_path(const std::vector<std::filesystem::path>& paths) {
+    for (const std::filesystem::path& path : paths) {
+        add_search_path(path);
+    }
+}
+
+void FileLoader::add_search_path(const std::vector<std::string>& paths) {
+    for (const std::string& path : paths) {
+        add_search_path(path);
+    }
 }
 
 bool FileLoader::remove_search_path(const std::filesystem::path& path) {

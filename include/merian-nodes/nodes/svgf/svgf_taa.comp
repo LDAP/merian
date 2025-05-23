@@ -8,6 +8,8 @@
 
 layout(set = 1, binding = 0) uniform sampler2D img_filter_result;
 layout(set = 1, binding = 1) uniform sampler2D img_filter_unused; // unused needed to match the filter layout
+layout(set = 1, binding = 2) uniform usampler2D img_gbuf_result;
+layout(set = 1, binding = 3) uniform usampler2D img_gbuf_unused;  // unused needed to match the filter layout
 
 layout (constant_id = 2) const int DEBUG = 0;
 layout (constant_id = 3) const int FILTER_PREV = 0;

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "merian-nodes/connectors/connector_utils.hpp"
-#include "merian-nodes/connectors/managed_vk_buffer_in.hpp"
 #include "merian-nodes/connectors/managed_vk_image_in.hpp"
 #include "merian-nodes/graph/node.hpp"
 
@@ -60,10 +59,10 @@ class SVGF : public Node {
     const std::optional<vk::Format> output_format;
 
     // depends on available shared memory
-    const uint32_t variance_estimate_local_size_x;
-    const uint32_t variance_estimate_local_size_y;
-    static constexpr uint32_t local_size_x = 32;
-    static constexpr uint32_t local_size_y = 32;
+    uint32_t variance_estimate_local_size;
+    uint32_t filter_local_size;
+
+    const uint32_t taa_local_size = 32;
 
     ManagedVkImageInHandle con_prev_out = ManagedVkImageIn::compute_read("prev_out", 1);
     ManagedVkImageInHandle con_irr = ManagedVkImageIn::compute_read("irr");
@@ -72,6 +71,8 @@ class SVGF : public Node {
     ManagedVkImageInHandle con_mv = ManagedVkImageIn::compute_read("mv", 0, true);
     GBufferInHandle con_gbuffer = merian_nodes::GBufferIn::compute_read("gbuffer");
     GBufferInHandle con_prev_gbuffer = merian_nodes::GBufferIn::compute_read("prev_gbuffer", 1);
+
+    ManagedVkImageOutHandle con_out;
 
     ShaderModuleHandle variance_estimate_module;
     ShaderModuleHandle filter_module;
@@ -87,28 +88,28 @@ class SVGF : public Node {
     std::vector<PipelineHandle> filters;
     PipelineHandle taa;
 
-    uint32_t group_count_x;
-    uint32_t group_count_y;
-
     int svgf_iterations = 0;
 
     DescriptorSetLayoutHandle ping_pong_layout;
     DescriptorPoolHandle filter_pool;
     struct EAWRes {
         TextureHandle ping_pong;
+        TextureHandle gbuf_ping_pong;
         // Set reads from this resources and writes to i ^ 1
         DescriptorSetHandle set;
     };
     std::array<EAWRes, 2> ping_pong_res; // Ping pong sets
 
-    VkBool32 filter_variance = false;
-    int filter_type = 0;
+    int filter_type = 2;
 
     int taa_debug = 0;
-    int taa_filter_prev = false;
+    int taa_filter_prev = 0;
     int taa_clamping = 0;
     int taa_mv_sampling = 0;
     bool enable_mv = true;
+
+    bool kaleidoscope = false;
+    bool kaleidoscope_use_shmem = true;
 };
 
 } // namespace merian_nodes
