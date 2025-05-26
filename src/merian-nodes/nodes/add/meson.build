@@ -1,5 +1,4 @@
 shaders = [
-    'add.comp',
 ]
 
 foreach s : shaders

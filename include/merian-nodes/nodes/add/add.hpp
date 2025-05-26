@@ -36,7 +36,7 @@ class Add : public AbstractCompute {
     ShaderModuleHandle shader;
     SpecializationInfoHandle spec_info;
 
-    static constexpr uint32_t number_inputs = 10;
+    uint32_t number_inputs = 2;
     std::vector<ManagedVkImageInHandle> input_connectors;
 };
 

@@ -1,5 +1,4 @@
 #include "merian-nodes/nodes/add/add.hpp"
-#include "add.comp.spv.h"
 
 #include "merian-nodes/graph/errors.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
@@ -8,10 +7,7 @@
 namespace merian_nodes {
 
 Add::Add(const ContextHandle& context, const std::optional<vk::Format>& output_format)
-    : AbstractCompute(context), output_format(output_format) {
-    shader =
-        std::make_shared<ShaderModule>(context, merian_add_comp_spv_size(), merian_add_comp_spv());
-}
+    : AbstractCompute(context), output_format(output_format) {}
 
 Add::~Add() {}
 
@@ -54,6 +50,62 @@ std::vector<OutputConnectorHandle> Add::describe_outputs(const NodeIOLayout& io_
     }
 
     spec_info = spec_builder.build();
+
+    // -------------------------------------------------------
+
+    std::string source = R"(
+#version 460
+#extension GL_GOOGLE_include_directive    : enable
+
+layout(local_size_x_id = 0, local_size_y_id = 1, local_size_z = 1) in;
+
+)";
+
+    uint32_t binding_index = 0;
+    for (const auto& input : input_connectors) {
+        if (io_layout.is_connected(input)) {
+            source.append(fmt::format("layout(set = 0, binding = {}) uniform sampler2D img_{:02};\n",
+                                      binding_index, binding_index));
+        }
+        binding_index++;
+    }
+
+    source.append(
+        fmt::format("layout(set = 0, binding = {}) uniform writeonly restrict image2D img_output;\n",
+                    binding_index));
+
+    source.append(R"(
+void main() {
+    const ivec2 ipos = ivec2(gl_GlobalInvocationID);
+    if (any(greaterThanEqual(ipos, imageSize(img_output)))) return;
+
+    const vec4 result =
+)");
+
+    binding_index = 0;
+    for (const auto& input : input_connectors) {
+        if (io_layout.is_connected(input)) {
+            source.append(fmt::format("texelFetch(img_{:02}, ipos, 0) +", binding_index));
+        }
+        binding_index++;
+    }
+
+    source.pop_back();
+    source.pop_back();
+    source.append(";");
+
+    source.append(R"(
+
+    imageStore(img_output, ipos, result);
+}
+)");
+
+    const auto& shader_compiler = ShaderCompiler::get(context);
+    shader = shader_compiler->compile_glsl_to_shadermodule(context, source, "<memory>add.comp",
+                                                           vk::ShaderStageFlagBits::eCompute);
+
+    // -------------------------------------------------------
+
     return {
         ManagedVkImageOut::compute_write("out", format, extent),
     };
@@ -79,8 +131,14 @@ ShaderModuleHandle Add::get_shader_module() {
 }
 
 Add::NodeStatusFlags Add::properties(Properties& props) {
+    bool needs_reconnect = false;
+
+    needs_reconnect |= props.config_uint("number inputs", number_inputs, "");
     props.output_text("output extent: {}x{}x{}", extent.width, extent.height, extent.depth);
 
+    if (needs_reconnect) {
+        return NodeStatusFlagBits::NEEDS_RECONNECT;
+    }
     return {};
 }
 
