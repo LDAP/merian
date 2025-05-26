@@ -98,7 +98,13 @@ struct PhysicalDevice {
     }
 
     vk::PhysicalDevice physical_device;
+
     vk::PhysicalDeviceProperties2 physical_device_properties;
+    vk::PhysicalDeviceVulkan11Properties physical_device_11_properties;
+    vk::PhysicalDeviceVulkan12Properties physical_device_12_properties;
+    vk::PhysicalDeviceVulkan13Properties physical_device_13_properties;
+    vk::PhysicalDeviceVulkan14Properties physical_device_14_properties;
+
     // all supported features. Must be enabled with ExtensionVkCore.
     vk::PhysicalDeviceFeatures2 physical_device_features;
     vk::PhysicalDeviceMemoryProperties2 physical_device_memory_properties;

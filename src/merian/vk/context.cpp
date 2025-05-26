@@ -257,8 +257,20 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id,
     physical_device.physical_device_subgroup_properties.pNext =
         &physical_device.physical_device_subgroup_size_control_properties;
     // ^
-    physical_device.physical_device_properties.pNext =
+    physical_device.physical_device_14_properties.pNext =
         &physical_device.physical_device_subgroup_properties;
+    // ^
+    physical_device.physical_device_13_properties.pNext =
+        &physical_device.physical_device_14_properties;
+    // ^
+    physical_device.physical_device_12_properties.pNext =
+        &physical_device.physical_device_13_properties;
+    // ^
+    physical_device.physical_device_11_properties.pNext =
+        &physical_device.physical_device_12_properties;
+    // ^
+    physical_device.physical_device_properties.pNext =
+        &physical_device.physical_device_11_properties;
     // ^
     physical_device.physical_device.getProperties2(&physical_device.physical_device_properties);
     SPDLOG_INFO("selected physical device {}, vendor id: {}, device id: {}",
