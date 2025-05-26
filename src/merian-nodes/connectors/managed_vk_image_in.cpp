@@ -99,6 +99,15 @@ ManagedVkImageIn::compute_read(const std::string& name, const uint32_t delay, co
         vk::ShaderStageFlagBits::eCompute, delay, optional);
 }
 
+std::shared_ptr<ManagedVkImageIn> ManagedVkImageIn::fragment_read(const std::string& name,
+                                                                  const uint32_t delay,
+                                                                  const bool optional) {
+    return std::make_shared<ManagedVkImageIn>(
+        name, vk::AccessFlagBits2::eShaderRead, vk::PipelineStageFlagBits2::eFragmentShader,
+        vk::ImageLayout::eShaderReadOnlyOptimal, vk::ImageUsageFlagBits::eSampled,
+        vk::ShaderStageFlagBits::eFragment, delay, optional);
+}
+
 std::shared_ptr<ManagedVkImageIn>
 ManagedVkImageIn::transfer_src(const std::string& name, const uint32_t delay, const bool optional) {
     return std::make_shared<ManagedVkImageIn>(

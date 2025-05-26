@@ -8,7 +8,7 @@ class RenderpassBuilder {
   public:
     using AttachmentHandle = uint32_t;
     using SubpassHandle = uint32_t;
-    static const AttachmentHandle NULL_ATTACHMENT_HANDLE = ~0;
+    static constexpr AttachmentHandle NULL_ATTACHMENT_HANDLE = ~0;
 
     RenderpassBuilder(
         vk::PipelineBindPoint first_subpass_pipeline_bind_point = vk::PipelineBindPoint::eGraphics,

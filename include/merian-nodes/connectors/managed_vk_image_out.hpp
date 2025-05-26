@@ -58,10 +58,21 @@ class ManagedVkImageOut : public TypedOutputConnector<ImageHandle> {
                                                  const vk::Extent3D extent,
                                                  const bool persistent = false);
 
+    // uses the eGeneral Layout
     static ManagedVkImageOutHandle compute_fragment_write(const std::string& name,
                                                           const vk::Format format,
                                                           const vk::Extent3D extent,
                                                           const bool persistent = false);
+
+    static ManagedVkImageOutHandle fragment_write(const std::string& name,
+                                                  const vk::Format format,
+                                                  const vk::Extent3D extent,
+                                                  const bool persistent = false);
+
+    static ManagedVkImageOutHandle color_attachment(const std::string& name,
+                                                    const vk::Format format,
+                                                    const vk::Extent3D extent,
+                                                    const bool persistent = false);
 
     static ManagedVkImageOutHandle compute_write(const std::string& name,
                                                  const vk::Format format,

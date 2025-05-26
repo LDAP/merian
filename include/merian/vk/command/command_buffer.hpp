@@ -92,7 +92,7 @@ class CommandBuffer {
     void
     begin_render_pass(const FramebufferHandle& framebuffer,
                       const vk::Rect2D& render_area,
-                      const vk::ArrayProxyNoTemporaries<const vk::ClearValue>& clear_values = {},
+                      const vk::ArrayProxy<const vk::ClearValue>& clear_values = {},
                       const vk::SubpassContents subpass_contents = vk::SubpassContents::eInline) {
         vk::RenderPassBeginInfo begin_info{*framebuffer->get_renderpass(), *framebuffer,
                                            render_area, clear_values};
@@ -102,7 +102,7 @@ class CommandBuffer {
 
     void
     begin_render_pass(const FramebufferHandle& framebuffer,
-                      const vk::ArrayProxyNoTemporaries<const vk::ClearValue>& clear_values = {},
+                      const vk::ArrayProxy<const vk::ClearValue>& clear_values = {},
                       const vk::SubpassContents subpass_contents = vk::SubpassContents::eInline) {
         begin_render_pass(framebuffer, vk::Rect2D{{}, framebuffer->get_extent()}, clear_values,
                           subpass_contents);

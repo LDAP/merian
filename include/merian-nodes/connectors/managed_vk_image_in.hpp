@@ -50,6 +50,9 @@ class ManagedVkImageIn : public TypedInputConnector<ManagedVkImageOutHandle, Ima
     compute_read(const std::string& name, const uint32_t delay = 0, const bool optional = false);
 
     static ManagedVkImageInHandle
+    fragment_read(const std::string& name, const uint32_t delay = 0, const bool optional = false);
+
+    static ManagedVkImageInHandle
     transfer_src(const std::string& name, const uint32_t delay = 0, const bool optional = false);
 
   private:
