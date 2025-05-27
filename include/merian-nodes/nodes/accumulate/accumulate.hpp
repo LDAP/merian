@@ -75,17 +75,17 @@ class Accumulate : public Node {
     static constexpr uint32_t FILTER_LOCAL_SIZE_Y = 16;
 
     // Graph IO
-    ManagedVkImageInHandle con_prev_accum = ManagedVkImageIn::compute_read("prev_accum", 1);
-    ManagedVkImageInHandle con_prev_moments = ManagedVkImageIn::compute_read("prev_moments", 1);
-    ManagedVkImageInHandle con_irr_in = ManagedVkImageIn::compute_read("irr");
-    ManagedVkImageInHandle con_mv = ManagedVkImageIn::compute_read("mv", 0, true);
-    ManagedVkImageInHandle con_moments_in = ManagedVkImageIn::compute_read("moments_in");
-
+    ManagedVkImageInHandle con_src = ManagedVkImageIn::compute_read("src");
     GBufferInHandle con_gbuf = merian_nodes::GBufferIn::compute_read("gbuffer");
-    GBufferInHandle con_prev_gbuf = merian_nodes::GBufferIn::compute_read("prev_gbuffer", 1);
+    ManagedVkImageInHandle con_mv = ManagedVkImageIn::compute_read("mv", 0, true);
 
-    ManagedVkImageOutHandle con_irr_out;
-    ManagedVkImageOutHandle con_moments_out;
+    ManagedVkImageInHandle con_prev_out = ManagedVkImageIn::compute_read("prev_out", 1);
+    GBufferInHandle con_prev_gbuf = merian_nodes::GBufferIn::compute_read("prev_gbuffer", 1);
+    ManagedVkImageInHandle con_prev_history = ManagedVkImageIn::compute_read("prev_history", 1);
+
+
+    ManagedVkImageOutHandle con_out;
+    ManagedVkImageOutHandle con_history;
 
     vk::ImageCreateInfo irr_create_info;
 

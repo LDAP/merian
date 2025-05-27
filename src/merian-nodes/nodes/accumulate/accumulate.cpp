@@ -24,20 +24,17 @@ Accumulate::~Accumulate() {}
 
 std::vector<InputConnectorHandle> Accumulate::describe_inputs() {
     return {
-        con_prev_accum, con_prev_moments, con_irr_in,    con_mv,
-        con_moments_in, con_gbuf,         con_prev_gbuf,
+        con_src, con_gbuf, con_mv, con_prev_out, con_prev_gbuf, con_prev_history,
     };
 }
 
 std::vector<OutputConnectorHandle> Accumulate::describe_outputs(const NodeIOLayout& io_layout) {
 
-    irr_create_info = io_layout[con_irr_in]->create_info;
-    const auto moments_create_info = io_layout[con_moments_in]->create_info;
-
-    con_irr_out = ManagedVkImageOut::compute_write(
-        "out_irr", format.value_or(irr_create_info.format), irr_create_info.extent);
-    con_moments_out = ManagedVkImageOut::compute_write("out_moments", moments_create_info.format,
-                                                       moments_create_info.extent);
+    irr_create_info = io_layout[con_src]->create_info;
+    con_out = ManagedVkImageOut::compute_write("out", format.value_or(irr_create_info.format),
+                                               irr_create_info.extent);
+    con_history =
+        ManagedVkImageOut::compute_write("history", vk::Format::eR32Sfloat, irr_create_info.extent);
 
     io_layout.register_event_listener(clear_event_listener_pattern,
                                       [this](const GraphEvent::Info&, const GraphEvent::Data&) {
@@ -46,8 +43,8 @@ std::vector<OutputConnectorHandle> Accumulate::describe_outputs(const NodeIOLayo
                                       });
 
     return {
-        con_irr_out,
-        con_moments_out,
+        con_out,
+        con_history,
 
     };
 }
@@ -78,6 +75,7 @@ Accumulate::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
         (irr_create_info.extent.height + FILTER_LOCAL_SIZE_Y - 1) / FILTER_LOCAL_SIZE_Y;
 
     vk::ImageCreateInfo quartile_image_create_info = irr_create_info;
+    quartile_image_create_info.format = vk::Format::eR16G16B16A16Sfloat;
     quartile_image_create_info.usage |= vk::ImageUsageFlagBits::eSampled;
     quartile_image_create_info.setExtent({percentile_group_count_x, percentile_group_count_y, 1});
     const ImageHandle quartile_image = allocator->createImage(
@@ -200,8 +198,8 @@ Accumulate::NodeStatusFlags Accumulate::properties(Properties& config) {
     accumulate_pc.normal_reject_cos = glm::cos(angle);
     config.config_percent("depth threshold", accumulate_pc.depth_reject_percent,
                           "Reject points with depths farther apart (relative to the max)");
-    needs_rebuild |= config.config_options("filter mode", filter_mode,
-                                           {"nearest", "bilinear", "stochastic bilinear"});
+    needs_rebuild |=
+        config.config_options("filter mode", filter_mode, {"nearest", "stochastic bilinear"});
     needs_rebuild |= config.config_bool(
         "extended search", extended_search,
         "search randomly in a 4x4 radius with weakened rejection thresholds for valid "

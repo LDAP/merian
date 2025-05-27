@@ -6,8 +6,7 @@
 #include "merian-shaders/interpolate.glsl"
 
 #define FILTER_MODE_NEAREST 0
-#define FILTER_MODE_BILINEAR 1
-#define FILTER_MODE_STOCHASTIC_BILINEAR 2
+#define FILTER_MODE_STOCHASTIC_BILINEAR 1
 
 layout(constant_id = 2) const uint WG_ROUNDED_IRR_SIZE_X = 1;
 layout(constant_id = 3) const uint WG_ROUNDED_IRR_SIZE_Y = 1;
@@ -43,102 +42,21 @@ layout(push_constant, std140) uniform pc_t {
 #include "merian-shaders/random.glsl"
 #include "merian-shaders/color/colors_yuv.glsl"
 
-void get_prev_nearest(const ivec2 prev_ipos,
-                      const float linear_z,
-                      const float vel_z,
-                      const vec3 normal,
-                      inout vec4 prev_irr_histlen,
-                      inout vec2 prev_moments,
-                      inout float sum_w) {
-  if(any(greaterThanEqual(prev_ipos, textureSize(img_prev_accum, 0))) || any(lessThan(prev_ipos, ivec2(0))))
-    return;
-
-  const float w = reprojection_weight(normal,
-                                      gbuffer_get_normal_pixel(prev_gbuffer, prev_ipos),
-                                      pc.normal_reject_cos,
-                                      linear_z,
-                                      vel_z,
-                                      gbuffer_get_linear_z_pixel(prev_gbuffer, prev_ipos),
-                                      pc.z_reject_percent);
-
-  prev_irr_histlen = w * texelFetch(img_prev_accum, prev_ipos, 0);
-  prev_moments     = w * texelFetch(img_prev_moments, prev_ipos, 0).rg;
-  sum_w            = w;
-}
-
-void get_prev_bilinear(const vec2 prev_pos,
-                       const float linear_z,
-                       const float vel_z,
-                       const vec3 normal,
-                       inout vec4 prev_irr_histlen,
-                       inout vec2 prev_moments,
-                       inout float sum_w) {
-  const ivec2 prev_ipos = ivec2(floor(prev_pos));
-  // bilinear interpolation weight
-  const vec2 inter_w = fract(prev_pos);
-
-  [[unroll]]
-  for(int yy = 0; yy <= 1; yy++) {
-    [[unroll]]
-    for(int xx = 0; xx <= 1; xx++) {
-      const ivec2 tc = prev_ipos + ivec2(xx, yy);
-      if(any(greaterThanEqual(tc, textureSize(img_prev_accum, 0))) || any(lessThan(tc, ivec2(0))))
-        continue;
-
-      // Bilinear interpolation weight
-      const float w = (xx == 0 ? (1.0 - inter_w.x) : inter_w.x) * (yy == 0 ? (1.0 - inter_w.y) : inter_w.y)
-                * reprojection_weight(normal, gbuffer_get_normal_pixel(prev_gbuffer, tc), pc.normal_reject_cos,
-                        linear_z, vel_z, gbuffer_get_linear_z_pixel(prev_gbuffer, tc), pc.z_reject_percent);
-
-      prev_irr_histlen        += w * texelFetch(img_prev_accum, tc, 0);
-      prev_moments            += w * texelFetch(img_prev_moments, tc, 0).rg;
-      sum_w                   += w;
-    }
-  }
-}
-
-void get_prev_extended_search(const vec2 prev_pos,
-                              const float linear_z,
-                              const float vel_z,
-                              const vec2 grad_z,
-                              const vec3 normal,
-                              inout vec4 prev_irr_histlen,
-                              inout vec2 prev_moments,
-                              inout float sum_w) {
-  const ivec2 prev_ipos = ivec2(round(prev_pos));
-  uint rng_state = pcg3d16(uvec3(pc.iteration, prev_ipos));
-
-  [[unroll]]
-  for(int i = 0; i <= 9; i++) {
-    const ivec2 offset = ivec2(round(XorShift32Vec2(rng_state) * 4)) - 2;
-    const ivec2 tc = prev_ipos + offset;
-    if(any(greaterThanEqual(tc, textureSize(img_prev_accum, 0))) || any(lessThan(tc, ivec2(0))))
-      continue;
-
-    const float w = reprojection_weight(normal, gbuffer_get_normal_pixel(prev_gbuffer, tc), pc.normal_reject_cos * 0.8,
-                      linear_z, vel_z, offset, grad_z, gbuffer_get_linear_z_pixel(prev_gbuffer, tc), pc.z_reject_percent * 2.);
-
-    prev_irr_histlen        += w * texelFetch(img_prev_accum, tc, 0);
-    prev_moments            += w * texelFetch(img_prev_moments, tc, 0).rg;
-    sum_w                   += w;
-  }
-}
-
 
 void main() {
   const ivec2 ipos = ivec2(gl_GlobalInvocationID);
-  if (any(greaterThanEqual(ipos, imageSize(img_accum)))) return;
+  if (any(greaterThanEqual(ipos, imageSize(img_out)))) return;
 
-  vec3 irr = texelFetch(img_irr, ipos, 0).rgb;
-  float samples = texelFetch(img_irr, ipos, 0).a;
-  vec2 moments = texelFetch(img_moments, ipos, 0).rg;
-  vec4 percentiles;
+  vec4 src = texelFetch(img_src, ipos, 0); // contains second moment in a
 
-  if (pc.firefly_filter_enable != 0 || pc.adaptive_alpha_reduction > 0.0) {
+
+  f16vec4 percentiles;
+  if (pc.firefly_filter_enable != 0 || (pc.adaptive_alpha_reduction > 0.0 && pc.clear != 1 && pc.accum_alpha != 0)) {
     const uvec2 rounded_size = uvec2(WG_ROUNDED_IRR_SIZE_X, WG_ROUNDED_IRR_SIZE_Y);
-    percentiles = texture(img_quartiles, (vec2(ipos) + 0.5) / rounded_size);
+    percentiles = f16vec4(texture(img_quartiles, (vec2(ipos) + 0.5) / rounded_size));
   }
-  
+
+
   // FIREFLY CLAMPING/SUPPRESSION
   {
     float max_l = pc.firefly_hard_clamp;
@@ -146,126 +64,154 @@ void main() {
       max_l = min(max_l, pc.firefly_bias + percentiles.y + pc.firefly_ipr_factor * (percentiles.y - percentiles.x));
     }
 
-    if (moments.x /* = yuv_luminance(irr)*/ > max_l) {
-      const float factor = max_l / moments.x;
-      irr *= factor;
-      moments *= vec2(factor, factor * factor);
+    const float l = yuv_luminance(src.rgb);
+    if (l > max_l) {
+      const float factor = max_l / l;
+      src.rgb *= factor;
+      src.a   *= factor * factor;
     }
   }
 
+  // CLEAR SHORTCUT
   if (pc.clear == 1 || pc.accum_alpha == 0) {
-    imageStore(img_accum, ipos, vec4(irr, 1));
-    imageStore(img_moments_accum, ipos, vec4(moments,  0, 0));
+    imageStore(img_out, ipos, src);
+    imageStore(img_history, ipos, uvec4(1, 0, 0, 0));
     return;
   }
 
-  vec2 prev_pos;
-  float max_history;
+  // REPROJECT
+  ivec2 prev_ipos;
+  float max_history = pc.accum_max_hist;
+  uint rng_state = pcg3d16(uvec3(ipos, pc.iteration));
   if (USE_MOTION_VECTORS) {
     const vec2 mv = texelFetch(img_mv, ipos, 0).rg;
+    vec2 prev_pos = ipos + mv;
 
-    // REPROJECTION
-    prev_pos = ipos + mv;
-    max_history = pc.accum_max_hist;
     if (REUSE_BORDER) {
       // Attemp to reuse information at the image border.
       // This results in minor smearing but looks a lot better than
       // noise / SVGF blotches.
-      if (reprojection_intersect_border(prev_pos, mv, imageSize(img_accum) - 1)) {
+      if (reprojection_intersect_border(prev_pos, mv, imageSize(img_out) - 1)) {
         // reset history to converge faster
         max_history = 2.0;
       }
     }
+
+    if (FILTER_MODE == FILTER_MODE_STOCHASTIC_BILINEAR) {
+      prev_ipos = reproject_pixel_stochastic(prev_pos, XorShift32(rng_state));
+    } else {
+      // FILTER_MODE == FILTER_MODE_NEAREST
+      prev_ipos = ivec2(round(prev_pos));
+    }
   } else {
-    prev_pos = ipos;
+    prev_ipos = ipos;
     max_history = pc.accum_max_hist;
   }
-  
 
-  vec4 prev_irr_histlen = vec4(0);
-  vec2 prev_moments     = vec2(0);
-  float sum_w           = 0.0;
-
-  // ACCUMULATE
+  // GET CURRENT PIXEL INFO
+  vec3 normal;
+  f16vec2 grad_z;
+  float linear_z;
+  float vel_z;
   {
     const GBuffer gbuf = gbuffer_load_pixel(gbuffer, ipos);
 
-    if (FILTER_MODE == FILTER_MODE_NEAREST) {
-      get_prev_nearest(ivec2(round(prev_pos)),
-                       gbuffer_get_linear_z(gbuf),
-                       gbuffer_get_vel_z(gbuf),
-                       gbuffer_get_normal(gbuf),
-                       prev_irr_histlen,
-                       prev_moments,
-                       sum_w);
-    } else if (FILTER_MODE == FILTER_MODE_BILINEAR) {
-      get_prev_bilinear(prev_pos,
-                        gbuffer_get_linear_z(gbuf),
-                        gbuffer_get_vel_z(gbuf),
-                        gbuffer_get_normal(gbuf),
-                        prev_irr_histlen,
-                        prev_moments,
-                        sum_w);
-    } else if (FILTER_MODE == FILTER_MODE_STOCHASTIC_BILINEAR) {
-      uint rng_state = pcg3d16(uvec3(ipos, pc.iteration));
-      get_prev_nearest(reproject_pixel_stochastic(prev_pos, XorShift32(rng_state)),
-                       gbuffer_get_linear_z(gbuf),
-                       gbuffer_get_vel_z(gbuf),
-                       gbuffer_get_normal(gbuf),
-                       prev_irr_histlen,
-                       prev_moments,
-                       sum_w);
-    }
+    normal = gbuffer_get_normal(gbuf);
+    grad_z = gbuffer_get_grad_z(gbuf);
+    linear_z = gbuffer_get_linear_z(gbuf);
+    vel_z = gbuffer_get_vel_z(gbuf);
+  }
 
-    if (EXTENDED_SEARCH) {
-      if (sum_w <= 0.01) {
-        // only if data is not already reliable
-        prev_irr_histlen = vec4(0);
-        prev_moments     = vec2(0);
-        sum_w            = 0.0;
 
-        get_prev_extended_search(prev_pos,
-                                 gbuffer_get_linear_z(gbuf),
-                                 gbuffer_get_vel_z(gbuf),
-                                 gbuffer_get_grad_z(gbuf),
-                                 gbuffer_get_normal(gbuf),
-                                 prev_irr_histlen,
-                                 prev_moments,
-                                 sum_w);
-      }
+  // GET PREVIOUS PIXEL
+  float prev_history = 0.0;
+  vec4 prev_out = vec4(0);
+
+  bool found = false;
+  if (all(lessThan(prev_ipos, textureSize(img_src, 0))) &&
+      all(greaterThanEqual(prev_ipos, ivec2(0)))) {
+
+    
+    const GBuffer prev_gbuf = gbuffer_load_pixel(prev_gbuffer, prev_ipos);
+    found = reprojection_valid(normal,
+                            gbuffer_get_normal(prev_gbuf),
+                            pc.normal_reject_cos,
+                            linear_z,
+                            vel_z,
+                            gbuffer_get_linear_z(prev_gbuf),
+                            pc.z_reject_percent);
+
+    if (found) {
+      prev_history = texelFetch(img_prev_history, prev_ipos, 0).r;
+      prev_out = texelFetch(img_prev_out, prev_ipos, 0);
     }
   }
 
-  if (sum_w > 0.001 // make sure the prev values are somewhat reliable
-      && !any(isnan(prev_irr_histlen))
-      && !any(isinf(prev_irr_histlen))
-      && !any(isnan(prev_moments))
-      && !any(isinf(prev_moments))) {
-    prev_irr_histlen /= sum_w;
-    prev_moments     /= sum_w;
+
+  if (EXTENDED_SEARCH) {
+    if (!found) {
+
+      float sum_w = 0.0;
+
+      [[unroll]]
+      for(int i = 0; i <= 9; i++) {
+        const ivec2 offset = ivec2(round(XorShift32Vec2(rng_state) * 4)) - 2;
+        const ivec2 tc = prev_ipos + offset;
+
+        if(any(greaterThanEqual(tc, textureSize(img_src, 0))) || any(lessThan(tc, ivec2(0))))
+          continue;
+
+        const GBuffer prev_gbuf = gbuffer_load_pixel(prev_gbuffer, tc);
+
+        const float w = reprojection_weight(normal,
+                                            gbuffer_get_normal(prev_gbuf),
+                                            pc.normal_reject_cos * 0.8,
+                                            linear_z,
+                                            vel_z,
+                                            offset,
+                                            grad_z,
+                                            gbuffer_get_linear_z(prev_gbuf),
+                                            pc.z_reject_percent * 2.);
+
+        if (w > 0.0001) {
+          prev_history += w * texelFetch(img_prev_history, tc, 0).r;
+          prev_out     += w * texelFetch(img_prev_out, tc, 0);
+          sum_w        += w;
+        }
+      }
+
+      if (sum_w > 0.001) {
+        found = true;
+        prev_out /= sum_w;
+        prev_history /= sum_w;
+      }
+
+    }
+  }
+
+
+  if (found && !any(isnan(prev_out)) && !any(isinf(prev_out))) {
 
     if (pc.adaptive_alpha_reduction > 0.0) {
       const float ipr = pc.adaptive_alpha_ipr_factor * (percentiles.w - percentiles.z);
-      float adaptive_alpha = (1.0 - pc.adaptive_alpha_reduction * linearstep(percentiles.w, percentiles.w + ipr, prev_moments.x));
-      adaptive_alpha      *= (1.0 - pc.adaptive_alpha_reduction * (1.0 - linearstep(percentiles.z - ipr, percentiles.z, prev_moments.x)));
+      const float prev_l = yuv_luminance(prev_out.rgb);
+      float adaptive_alpha = (1.0 - pc.adaptive_alpha_reduction * linearstep(percentiles.w, percentiles.w + ipr, prev_l));
+      adaptive_alpha      *= (1.0 - pc.adaptive_alpha_reduction * (1.0 - linearstep(percentiles.z - ipr, percentiles.z, prev_l)));
 
       // update history length to match reduced alpha:
-      prev_irr_histlen.a = min(1.0 / (1.0 - adaptive_alpha) - 1, prev_irr_histlen.a);
+      max_history = min(1.0 / (1.0 - adaptive_alpha), max_history);
     }
 
-    float alpha = min(pc.accum_alpha, prev_irr_histlen.a / (prev_irr_histlen.a + samples));
-    prev_irr_histlen.a = min(prev_irr_histlen.a + samples, max_history);
+    const float new_history = min(prev_history + 1, max_history);
+    const float alpha = max(1. - pc.accum_alpha, 1. / new_history);
 
-    irr     = mix(irr, prev_irr_histlen.rgb, alpha);
-    moments = mix(moments,         prev_moments, alpha);
+    const vec4 result = mix(prev_out, src , alpha);
 
-    imageStore(img_accum, ipos, vec4(irr, prev_irr_histlen.a));
-    imageStore(img_moments_accum, ipos, vec4(moments, 0, 0));
+    imageStore(img_out, ipos, result);
+    imageStore(img_history, ipos, uvec4(new_history, 0, 0, 0));
   } else {
-    imageStore(img_accum, ipos, vec4(irr, 1));
-    imageStore(img_moments_accum, ipos, vec4(moments, 0, 0));
+    imageStore(img_out, ipos, src);
+    imageStore(img_history, ipos, uvec4(1, 0, 0, 0));
   }
-
-
   
 } 

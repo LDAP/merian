@@ -29,8 +29,7 @@ layout(push_constant, std140) uniform push_t {
 } params;
 
 // update VE_SHARED_MEMORY_PER_PIXEL if you change anything here!
-layout(std430, row_major) shared vec2 shared_moments[gl_WorkGroupSize.y][gl_WorkGroupSize.x];
-layout(std430, row_major) shared vec3 shared_irr[gl_WorkGroupSize.y][gl_WorkGroupSize.x];
+layout(std430, row_major) shared vec4 shared_irr_moments[gl_WorkGroupSize.y][gl_WorkGroupSize.x];
 layout(std430, row_major) shared vec3 shared_normal[gl_WorkGroupSize.y][gl_WorkGroupSize.x];
 layout(std430, row_major) shared float shared_z[gl_WorkGroupSize.y][gl_WorkGroupSize.x];
 
@@ -49,12 +48,10 @@ void main() {
 
   // Load all necessary information into shared memory
 
-  f16vec2 center_grad_z;
-  vec4 irr_histlen;
-  vec2 moments;
+  vec2 center_grad_z;
+  vec4 irr_moments;
 
-  #define center_irr_histlen shared_irr[gl_LocalInvocationID.y][gl_LocalInvocationID.x]
-  #define center_moments shared_moments[gl_LocalInvocationID.y][gl_LocalInvocationID.x]
+  #define center_irr_moments shared_irr_moments[gl_LocalInvocationID.y][gl_LocalInvocationID.x]
   #define center_normal shared_normal[gl_LocalInvocationID.y][gl_LocalInvocationID.x]
   #define center_linear_z shared_z[gl_LocalInvocationID.y][gl_LocalInvocationID.x]
 
@@ -62,11 +59,9 @@ void main() {
   const ivec2 mirror_repeat_ipos = merian_tex_mirror_repeat(ipos, textureSize(img_irr, 0));
 
   const GBuffer gbuf = gbuffer_load_pixel(gbuffer, mirror_repeat_ipos);
-  irr_histlen = texelFetch(img_irr, mirror_repeat_ipos, 0);
-  moments = texelFetch(img_moments, mirror_repeat_ipos, 0).rg;
+  irr_moments = texelFetch(img_irr, mirror_repeat_ipos, 0);
 
-  center_moments          = moments;
-  center_irr_histlen      = irr_histlen.rgb;
+  center_irr_moments      = irr_moments;
   center_normal           = gbuffer_get_normal(gbuf);
   center_linear_z         = gbuffer_get_linear_z(gbuf);
   center_grad_z           = gbuffer_get_grad_z(gbuf);
@@ -102,26 +97,26 @@ void main() {
         w *= smoothstep(params.normal_reject_cos, 1.0, dot(center_normal, shared_normal[p.y][p.x]));
         // Weight neighbors with similar depth
         // w *= 1.0 - smoothstep(0.0, params.depth_reject_percent * max(gbuf.linear_z, neigh_gbuf.linear_z), abs(gbuf.linear_z - neigh_gbuf.linear_z));
-        w *= exp(-10 * abs(center_linear_z + dot(center_grad_z, f16vec2(xx, yy)) - shared_z[p.y][p.x]) / params.depth_accept);
+        w *= exp(-10 * abs(center_linear_z + dot(center_grad_z, vec2(xx, yy)) - shared_z[p.y][p.x]) / params.depth_accept);
         // Weight lower with increasing history
-        //w *= 1.0 - irr_histlen.a / params.spatial_threshold;
+        //w *= 1.0 - irr_moments.a / params.spatial_threshold;
 
-        sum_w           += w;
-        irr_histlen.rgb += w * shared_irr[p.y][p.x];
-        moments         += w * shared_moments[p.y][p.x];
+        sum_w       += w;
+        irr_moments += w * shared_irr_moments[p.y][p.x];
       }
     }
   }
 
-  irr_histlen.rgb /= sum_w;
-  moments         /= sum_w;
+  irr_moments /= sum_w;
 
-  float variance = max(0.0, moments.y - moments.x * moments.x);
-  const float center_variance = max(0.0, center_moments.y - center_moments.x * center_moments.x);
-  const float alpha = clamp(params.spatial_bias / pow(irr_histlen.a, params.spatial_falloff), 0, 1);
-  variance = mix(center_variance, variance, alpha);
-  irr_histlen.rgb = mix(center_irr_histlen, irr_histlen.rgb, alpha);
+  const float history = texelFetch(img_history, mirror_repeat_ipos, 0).r;
+  const float alpha = clamp(params.spatial_bias / pow(history, params.spatial_falloff), 0, 1);
 
-  imageStore(img_filter_in, ipos, vec4(irr_histlen.rgb, variance));
+  irr_moments = mix(center_irr_moments, irr_moments, alpha);
+
+
+  const float lum = yuv_luminance(irr_moments.rgb);
+  const float variance = max(0.0, irr_moments.a - lum * lum);
+  imageStore(img_filter_in, ipos, vec4(irr_moments.rgb, variance));
 }
 

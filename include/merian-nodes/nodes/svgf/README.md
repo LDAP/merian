@@ -20,8 +20,8 @@ But modifies the original code in that:
 |--------|--------------|-------------------------------------------------------------|-------|
 | Image  | prev_out     | feedback last `out`                                         | 1     |
 |        |
-| Image  | irr          | (accumulated) noisy irradiance, history length in `a`       | no    |
-| Image  | moments      | first and second moment in `rg`                             | no    |
+| Image  | src          | (accumulated) noisy irradiance, second moment in `a`        | no    |
+| Image  | history      | (accumulated) history length as float in `r`                | no    |
 |        |
 | Image  | albedo       | the demodulated albedo                                      | no    |
 | Image  | mv           | motion vectors in `r` and `g` channel                       | no    |

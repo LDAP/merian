@@ -17,20 +17,20 @@ layout(push_constant, std140) uniform params_t {
 
 #define WORKGROUP_SIZE (gl_WorkGroupSize.x * gl_WorkGroupSize.y)
 #define LOCAL_INDEX gl_LocalInvocationIndex
-shared float sort[WORKGROUP_SIZE];
+shared float16_t sort[WORKGROUP_SIZE];
 
 void main() {
-  const ivec2 pixel = min(ivec2(gl_GlobalInvocationID), textureSize(img_moments, 0));
+  const ivec2 pixel = min(ivec2(gl_GlobalInvocationID), textureSize(img_src, 0));
 
   // Sort luminance using odd even sort
-  sort[LOCAL_INDEX] = texelFetch(img_moments, pixel, 0).r;
+  sort[LOCAL_INDEX] = float16_t(yuv_luminance(texelFetch(img_src, pixel, 0).rgb));
   barrier();
 
   if (LOCAL_INDEX < WORKGROUP_SIZE - 1) {
     for (int i = 0; i < WORKGROUP_SIZE / 2; i++) {
       if (LOCAL_INDEX % 2 == 0) {
         if (sort[LOCAL_INDEX] > sort[LOCAL_INDEX + 1]) {
-          const float tmp = sort[LOCAL_INDEX];
+          const float16_t tmp = sort[LOCAL_INDEX];
           sort[LOCAL_INDEX] = sort[LOCAL_INDEX + 1];
           sort[LOCAL_INDEX + 1] = tmp;
         }
@@ -39,7 +39,7 @@ void main() {
 
       if (LOCAL_INDEX % 2 == 1) {
         if (sort[LOCAL_INDEX] > sort[LOCAL_INDEX + 1]) {
-          const float tmp = sort[LOCAL_INDEX];
+          const float16_t tmp = sort[LOCAL_INDEX];
           sort[LOCAL_INDEX] = sort[LOCAL_INDEX + 1];
           sort[LOCAL_INDEX + 1] = tmp;
         }
@@ -50,10 +50,10 @@ void main() {
 
 
   if (LOCAL_INDEX == 0) {
-    const float firefly_lower = sort[uint(clamp(round(pc.firefly_percentile_lower * WORKGROUP_SIZE), 0, WORKGROUP_SIZE - 1))];
-    const float firefly_upper = sort[uint(clamp(round(pc.firefly_percentile_upper * WORKGROUP_SIZE), 0, WORKGROUP_SIZE - 1))];
-    const float adaptive_alpha_lower = sort[uint(clamp(round(pc.adaptive_alpha_percentile_lower * WORKGROUP_SIZE), 0, WORKGROUP_SIZE - 1))];
-    const float adaptive_alpha_upper = sort[uint(clamp(round(pc.adaptive_alpha_percentile_upper * WORKGROUP_SIZE), 0, WORKGROUP_SIZE - 1))];
-    imageStore(img_quartiles, ivec2(gl_WorkGroupID.xy), vec4(firefly_lower, firefly_upper, adaptive_alpha_lower, adaptive_alpha_upper));
+    const float16_t firefly_lower = sort[uint(clamp(round(pc.firefly_percentile_lower * WORKGROUP_SIZE), 0, WORKGROUP_SIZE - 1))];
+    const float16_t firefly_upper = sort[uint(clamp(round(pc.firefly_percentile_upper * WORKGROUP_SIZE), 0, WORKGROUP_SIZE - 1))];
+    const float16_t adaptive_alpha_lower = sort[uint(clamp(round(pc.adaptive_alpha_percentile_lower * WORKGROUP_SIZE), 0, WORKGROUP_SIZE - 1))];
+    const float16_t adaptive_alpha_upper = sort[uint(clamp(round(pc.adaptive_alpha_percentile_upper * WORKGROUP_SIZE), 0, WORKGROUP_SIZE - 1))];
+    imageStore(img_quartiles, ivec2(gl_WorkGroupID.xy), f16vec4(firefly_lower, firefly_upper, adaptive_alpha_lower, adaptive_alpha_upper));
   }
 }

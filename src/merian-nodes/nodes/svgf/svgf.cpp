@@ -18,12 +18,12 @@ SVGF::~SVGF() {}
 
 std::vector<InputConnectorHandle> SVGF::describe_inputs() {
     return {
-        con_prev_out, con_irr, con_moments, con_albedo, con_mv, con_gbuffer, con_prev_gbuffer,
+        con_prev_out, con_src, con_history, con_albedo, con_mv, con_gbuffer, con_prev_gbuffer,
     };
 }
 
 std::vector<OutputConnectorHandle> SVGF::describe_outputs(const NodeIOLayout& io_layout) {
-    irr_create_info = io_layout[con_irr]->create_info;
+    irr_create_info = io_layout[con_src]->create_info;
     if (output_format)
         irr_create_info.format = output_format.value();
 

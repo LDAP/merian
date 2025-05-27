@@ -65,8 +65,8 @@ class SVGF : public Node {
     const uint32_t taa_local_size = 32;
 
     ManagedVkImageInHandle con_prev_out = ManagedVkImageIn::compute_read("prev_out", 1);
-    ManagedVkImageInHandle con_irr = ManagedVkImageIn::compute_read("irr");
-    ManagedVkImageInHandle con_moments = ManagedVkImageIn::compute_read("moments");
+    ManagedVkImageInHandle con_src = ManagedVkImageIn::compute_read("src");
+    ManagedVkImageInHandle con_history = ManagedVkImageIn::compute_read("history");
     ManagedVkImageInHandle con_albedo = ManagedVkImageIn::compute_read("albedo");
     ManagedVkImageInHandle con_mv = ManagedVkImageIn::compute_read("mv", 0, true);
     GBufferInHandle con_gbuffer = merian_nodes::GBufferIn::compute_read("gbuffer");

@@ -18,23 +18,19 @@ Inputs:
 
 | Type       | Input name   | Description                                                                            | Delay |
 |------------|--------------|----------------------------------------------------------------------------------------|-------|
-| VkImageIn  | prev_accum   | feedback last `accum`                                                                  | 1     |
-| VkImageIn  | prev_moments | feedback last `moments`                                                                | 1     |
-|            |              |                                                                                        |       |
-| VkImageIn  | irr          | irradiance input (irradiance in `rgb`, sample count in `a`!)                           | no    |
-|            |              |                                                                                        |       |
-| VkImageIn  | mv           | motion vectors in `r` and `g` channel                                                  | no    |
-| VkImageIn  | moments_in   | moments in `r` and `g` channel                                                         | no    |
-|            |              |                                                                                        |       |
+| VkImageIn  | src          | irradiance in `rgb`, second moment `a`                                                 | no    |
 | VkBufferIn | gbuffer      | GBuffer (see `gbuffer.glsl.h`)                                                         | no    |
+| VkImageIn  | mv           | motion vectors in `r` and `g` channel                                                  | no    |
+| VkImageIn  | prev_out     | feedback last `out`                                                                  | 1     |
 | VkBufferIn | prev_gbuf    | previous GBuffer                                                                       | 1     |
+| VkImageIn  | prev_history | feedback last `history`                                                                | 1     |
 
 Outputs:
 
 | Type       | Output name   | Description                                                 | Format/Resolution           | Persistent |
 |------------|---------------|-------------------------------------------------------------|-----------------------------|------------|
-| VkImageOut | out_irr       | exp average of irradiance in `rgb`, history length in `a`   | user defined or like irr    | no         |
-| VkImageOut | out_moments   | exp average of moments in `rg`                              | like moments_in             | no         |
+| VkImageOut | out           | exp average of irradiance in `rgb`, second moment in `a`    | user defined or like irr    | no         |
+| VkImageOut | history       | history length in `r`                                       | R32Sfloa                    | no         |
 
 Events:
 
