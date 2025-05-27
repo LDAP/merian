@@ -50,10 +50,10 @@ void main() {
   vec4 src = texelFetch(img_src, ipos, 0); // contains second moment in a
 
 
-  f16vec4 percentiles;
+  vec4 percentiles;
   if (pc.firefly_filter_enable != 0 || (pc.adaptive_alpha_reduction > 0.0 && pc.clear != 1 && pc.accum_alpha != 0)) {
     const uvec2 rounded_size = uvec2(WG_ROUNDED_IRR_SIZE_X, WG_ROUNDED_IRR_SIZE_Y);
-    percentiles = f16vec4(texture(img_quartiles, (vec2(ipos) + 0.5) / rounded_size));
+    percentiles = texture(img_quartiles, (vec2(ipos) + 0.5) / rounded_size);
   }
 
 

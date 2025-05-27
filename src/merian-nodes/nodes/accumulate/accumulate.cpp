@@ -75,7 +75,7 @@ Accumulate::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
         (irr_create_info.extent.height + FILTER_LOCAL_SIZE_Y - 1) / FILTER_LOCAL_SIZE_Y;
 
     vk::ImageCreateInfo quartile_image_create_info = irr_create_info;
-    quartile_image_create_info.format = vk::Format::eR16G16B16A16Sfloat;
+    quartile_image_create_info.format = vk::Format::eR32G32B32A32Sfloat;
     quartile_image_create_info.usage |= vk::ImageUsageFlagBits::eSampled;
     quartile_image_create_info.setExtent({percentile_group_count_x, percentile_group_count_y, 1});
     const ImageHandle quartile_image = allocator->createImage(
