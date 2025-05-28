@@ -69,7 +69,7 @@ vec3 tonemap_aces_approx(const vec3 rgb, const float a, const float b, const flo
 
 // Lottes 2016, "Advanced Techniques and Optimization of HDR Color Pipelines" (AMD)
 // https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK/blob/d7531ae47d8b36a5d4025663e731a47a38be882f/framework/cauldron/framework/inc/shaders/tonemapping/tonemappers.hlsl#L21
-vec3 tonemap_lottes(const vec3 rgb, const float contrast, const float shoulder, const float hdrMax, const float midIn, const float midOut) {
+vec3 tonemap_lottes(vec3 rgb, const float contrast, const float shoulder, const float hdrMax, const float midIn, const float midOut) {
     const float b = -((-pow(midIn, contrast) + (midOut*(pow(hdrMax, contrast*shoulder)*pow(midIn, contrast) -
             pow(hdrMax, contrast)*pow(midIn, contrast*shoulder)*midOut)) /
             (pow(hdrMax, contrast*shoulder)*midOut - pow(midIn, contrast*shoulder)*midOut)) /
@@ -77,6 +77,7 @@ vec3 tonemap_lottes(const vec3 rgb, const float contrast, const float shoulder, 
     const float c = (pow(hdrMax, contrast*shoulder)*pow(midIn, contrast) - pow(hdrMax, contrast)*pow(midIn, contrast*shoulder)*midOut) /
            (pow(hdrMax, contrast*shoulder)*midOut - pow(midIn, contrast*shoulder)*midOut);
 
+    rgb = min(rgb, vec3(hdrMax)); // fix for shoulder > 1
     float peak = max(rgb.r, max(rgb.g, rgb.b));
 
     peak = max(1e-7f, peak);
