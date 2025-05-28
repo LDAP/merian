@@ -61,6 +61,7 @@ void main() {
   {
     const GBuffer gbuf = gbuffer_load_pixel(gbuffer, mirror_repeat_ipos);
     irr_moments = texelFetch(img_irr, mirror_repeat_ipos, 0);
+    irr_moments.rgb = rgb_to_yuv(irr_moments.rgb);
 
     center_irr_moments      = irr_moments;
     center_normal           = gbuffer_get_normal(gbuf);
@@ -116,9 +117,7 @@ void main() {
 
   irr_moments = mix(center_irr_moments, irr_moments, alpha);
 
-
-  const float lum = yuv_luminance(irr_moments.rgb);
-  const float variance = max(0.0, irr_moments.a - lum * lum);
+  const float variance = max(0.0, irr_moments.a - irr_moments.r * irr_moments.r);
   imageStore(img_filter_in, ipos, vec4(irr_moments.rgb, variance));
 }
 

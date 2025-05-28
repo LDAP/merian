@@ -149,9 +149,7 @@ void _tap(const ivec2 offset, const float kernel_weight) {
   #define grad_offset offset
 #endif
 
-  const float p_l         = yuv_luminance(p_irr_var.rgb);
-
-  const float w_l = abs(p_l - c_l) / sigma_l;
+  const float w_l = abs(p_irr_var.r - c_l) * sigma_l;  // we use yuv in irr, so r is luminance
   const float w_z = exp(-10 * abs(c_z + dot(c_grad_z, grad_offset) - p_z) / params.param_z);
   const float w_n = smoothstep(params.param_n, 1.0, dot(p_n, c_n));
   // was: pow(max(0, dot(p_n, c_n)), params.param_n); 
@@ -253,7 +251,7 @@ main() {
 #endif
 
 
-  c_l = yuv_luminance(filter_irr_var.rgb);
+  c_l = filter_irr_var.r;
 
   if (params.z_bias_normals > 0)
     z_bias_normals_mix = smoothstep(0, params.z_bias_normals, c_z);
@@ -268,9 +266,9 @@ main() {
 
 
 #ifdef FILTER_VARIANCE
-    sigma_l = get_sigma_l(filter_irr_var.a, ipos) * params.param_l + 1e-10;
+    sigma_l = 1. / (get_sigma_l(filter_irr_var.a, ipos) * params.param_l + 1e-10);
 #else
-    sigma_l = sqrt(filter_irr_var.a) * params.param_l + 1e-10;
+    sigma_l = 1. / (sqrt(filter_irr_var.a) * params.param_l + 1e-10);
 #endif
 
 
@@ -319,6 +317,10 @@ main() {
 
     filter_irr_var.rgb /= filter_w;
     filter_irr_var.a   /= filter_w * filter_w;
+  }
+
+  if (ITERATION == LAST_ITERATION) {
+    filter_irr_var.rgb = yuv_to_rgb(filter_irr_var.rgb);
   }
 
 // --------------------------------------------------------------
