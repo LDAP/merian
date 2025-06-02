@@ -35,11 +35,11 @@ std::vector<OutputConnectorHandle> SVGF::describe_outputs(const NodeIOLayout& io
 
 SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
                                          const DescriptorSetLayoutHandle& graph_layout) {
-    variance_estimate_local_size =
-        workgroup_size_for_shared_memory(context, VE_SHARED_MEMORY_PER_PIXEL);
+    variance_estimate_local_size = workgroup_size_for_shared_memory_with_halo(
+        context, VE_SHARED_MEMORY_PER_PIXEL, SVGF_VE_HALO_RADIUS, 32, 16);
     if (kaleidoscope && kaleidoscope_use_shmem) {
         filter_local_size = workgroup_size_for_shared_memory_with_halo(
-            context, FILTER_SHARED_MEMORY_PER_PIXEL, FILTER_HALO_SIZE, 32, 16);
+            context, FILTER_SHARED_MEMORY_PER_PIXEL, SVGF_FILTER_HALO_RADIUS, 32, 16);
     } else {
         filter_local_size = 32;
     }
@@ -197,11 +197,11 @@ void SVGF::process(GraphRun& run, const DescriptorSetHandle& descriptor_set, con
         cmd->bind(variance_estimate);
         cmd->bind_descriptor_set(variance_estimate, descriptor_set, 0);
         cmd->bind_descriptor_set(variance_estimate, ping_pong_res[1].set, 1);
-        cmd->push_constant(variance_estimate, variance_estimate_pc);
-        // run more workgroups to prevent special cases in shader
-        cmd->dispatch(irr_create_info.extent,
-                      variance_estimate_local_size - (2 * VE_SPATIAL_RADIUS),
-                      variance_estimate_local_size - (2 * VE_SPATIAL_RADIUS));
+        VarianceEstimatePushConstant precomputed_variance_estimate_pc = variance_estimate_pc;
+        precomputed_variance_estimate_pc.depth_accept = -10.0f / precomputed_variance_estimate_pc.depth_accept;
+        cmd->push_constant(variance_estimate, precomputed_variance_estimate_pc);
+        cmd->dispatch(irr_create_info.extent, variance_estimate_local_size,
+                      variance_estimate_local_size);
 
         // make sure writes are visible
         bar = ping_pong_res[0].ping_pong->get_image()->barrier(
@@ -238,7 +238,9 @@ void SVGF::process(GraphRun& run, const DescriptorSetHandle& descriptor_set, con
         cmd->bind(filters[i]);
         cmd->bind_descriptor_set(filters[i], descriptor_set, 0);
         cmd->bind_descriptor_set(filters[i], read_set, 1);
-        cmd->push_constant(filters[i], filter_pc);
+        FilterPushConstant precomputed_filter_pc = filter_pc;
+        precomputed_filter_pc.param_z = -10.0f / precomputed_filter_pc.param_z;
+        cmd->push_constant(filters[i], precomputed_filter_pc);
         cmd->dispatch(irr_create_info.extent, filter_local_size, filter_local_size);
 
         bar = write_res.ping_pong->get_image()->barrier(

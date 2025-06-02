@@ -7,6 +7,7 @@
 #include "merian-shaders/normal_encode.glsl"
 #include "merian-shaders/textures.glsl"
 #include "merian-shaders/color/colors_yuv.glsl"
+#include "merian-shaders/shared_memory.glsl"
 #include "config.h"
 
 /*
@@ -23,55 +24,72 @@ layout(set = 1, binding = 3) uniform writeonly restrict uimage2D img_gbuf_in;
 
 layout(push_constant, std140) uniform push_t {
     float normal_reject_cos;
-    float depth_accept;
+    float depth_accept; /* -10 / depth_accept precomputed */
     float spatial_falloff;
     float spatial_bias;
 } params;
 
 // update VE_SHARED_MEMORY_PER_PIXEL if you change anything here!
-layout(std430, row_major) shared vec4 shared_irr_moments[gl_WorkGroupSize.y][gl_WorkGroupSize.x];
-layout(std430, row_major) shared vec3 shared_normal[gl_WorkGroupSize.y][gl_WorkGroupSize.x];
-layout(std430, row_major) shared float shared_z[gl_WorkGroupSize.y][gl_WorkGroupSize.x];
-
-#define IS_ON_TILE (all(greaterThanEqual(gl_LocalInvocationID.xy, ivec2(VE_SPATIAL_RADIUS))) && all(lessThan(gl_LocalInvocationID.xy, gl_WorkGroupSize.xy - VE_SPATIAL_RADIUS)))
-#define TILE_ID (ivec2(gl_LocalInvocationID.xy) - VE_SPATIAL_RADIUS)
-#define TILE_SIZE (gl_WorkGroupSize.xy - 2 * VE_SPATIAL_RADIUS)
+#define SHARED_SIZE_X (gl_WorkGroupSize.x + SVGF_VE_HALO_RADIUS * 2)
+#define SHARED_SIZE_Y (gl_WorkGroupSize.y + SVGF_VE_HALO_RADIUS * 2)
+layout(std430, row_major) shared vec4 shared_irr_moments[SHARED_SIZE_Y][SHARED_SIZE_X];
+layout(std430, row_major) shared vec3 shared_normal[SHARED_SIZE_Y][SHARED_SIZE_X];
+layout(std430, row_major) shared float shared_z[SHARED_SIZE_Y][SHARED_SIZE_X];
 
 void main() {
-  const ivec2 ipos = ivec2(gl_WorkGroupID.xy * TILE_SIZE) + TILE_ID;
+  const ivec2 ipos = ivec2(gl_GlobalInvocationID);
 
   if (SVGF_ITERATIONS == 0) {
-    if (all(lessThan(ipos, imageSize(img_filter_in))) && IS_ON_TILE)
+    if (all(lessThan(ipos, imageSize(img_filter_in))))
       imageStore(img_filter_in, ipos, vec4(texelFetch(img_irr, ipos, 0).rgb, 0));
     return;
   }
+
+  const ivec2 shared_pos = ivec2(gl_LocalInvocationID.xy) + SVGF_VE_HALO_RADIUS;
 
   // Load all necessary information into shared memory
 
   f16vec2 center_grad_z;
   vec4 irr_moments;
 
-  #define center_irr_moments shared_irr_moments[gl_LocalInvocationID.y][gl_LocalInvocationID.x]
-  #define center_normal shared_normal[gl_LocalInvocationID.y][gl_LocalInvocationID.x]
-  #define center_linear_z shared_z[gl_LocalInvocationID.y][gl_LocalInvocationID.x]
+  #define center_irr_moments shared_irr_moments[shared_pos.y][shared_pos.x]
+  #define center_normal shared_normal[shared_pos.y][shared_pos.x]
+  #define center_linear_z shared_z[shared_pos.y][shared_pos.x]
 
   // fill in padding and halo with valid information
   const ivec2 mirror_repeat_ipos = merian_tex_mirror_repeat(ipos, textureSize(img_irr, 0));
 
   {
-    const GBuffer gbuf = gbuffer_load_pixel(gbuffer, mirror_repeat_ipos);
-    irr_moments = texelFetch(img_irr, mirror_repeat_ipos, 0);
-    irr_moments.rgb = rgb_to_yuv(irr_moments.rgb);
+    {
+      // center
+      {
+        const GBuffer gbuf = gbuffer_load_pixel(gbuffer, mirror_repeat_ipos);
+        irr_moments = texelFetch(img_irr, mirror_repeat_ipos, 0);
+        irr_moments.rgb = rgb_to_yuv(irr_moments.rgb);
 
-    center_irr_moments      = irr_moments;
-    center_normal           = gbuffer_get_normal(gbuf);
-    center_linear_z         = gbuffer_get_linear_z(gbuf);
-    center_grad_z           = gbuffer_get_grad_z(gbuf);
+        center_irr_moments      = irr_moments;
+        center_normal           = gbuffer_get_normal(gbuf);
+        center_linear_z         = gbuffer_get_linear_z(gbuf);
+        center_grad_z           = gbuffer_get_grad_z(gbuf);
+      }
 
-    barrier();
+      // halo
+      ivec2 shared_index; ivec2 global_index;
+      if (load_halo_index(SVGF_VE_HALO_RADIUS, gl_WorkGroupSize.xy, shared_index, global_index)) {
+        const ivec2 halo_mirror_repeat_ipos = merian_tex_mirror_repeat(global_index, textureSize(img_irr, 0));
+        const GBuffer gbuf = gbuffer_load_pixel(gbuffer, halo_mirror_repeat_ipos);
 
-    if (any(greaterThanEqual(ipos, imageSize(img_filter_in))) || !IS_ON_TILE)
-    return;
+        shared_irr_moments[shared_index.y][shared_index.x] = texelFetch(img_irr, halo_mirror_repeat_ipos, 0);
+        shared_normal[shared_index.y][shared_index.x]      = gbuffer_get_normal(gbuf);
+        shared_z[shared_index.y][shared_index.x]           = gbuffer_get_linear_z(gbuf);
+      }
+
+      barrier();
+    }
+
+
+    if (any(greaterThanEqual(ipos, imageSize(img_filter_in))))
+      return;
 
     #ifdef KALEIDOSCOPE
     imageStore(img_gbuf_in, ipos, uvec4(geo_encode_normal(center_normal),
@@ -88,11 +106,11 @@ void main() {
   // spatial filtering when variance is 0 leads to unnecessary filtering of surfaces which variance is really 0
   // however it prevents black trails.
   [[unroll]]
-  for(int yy = -VE_SPATIAL_RADIUS; yy <= VE_SPATIAL_RADIUS; yy++) {
+  for(int yy = -SVGF_VE_HALO_RADIUS; yy <= SVGF_VE_HALO_RADIUS; yy++) {
     [[unroll]]
-    for(int xx = -VE_SPATIAL_RADIUS; xx <= VE_SPATIAL_RADIUS; xx++) {
+    for(int xx = -SVGF_VE_HALO_RADIUS; xx <= SVGF_VE_HALO_RADIUS; xx++) {
       if(xx != 0 || yy != 0) { // added already
-        const ivec2 p = ivec2(gl_LocalInvocationID.xy) + ivec2(xx, yy);
+        const ivec2 p = ivec2(shared_pos.xy) + ivec2(xx, yy);
 
         // smoothing kernel
         float w = kernel[abs(xx)] * kernel[abs(yy)];
@@ -100,7 +118,7 @@ void main() {
         w *= smoothstep(params.normal_reject_cos, 1.0, dot(center_normal, shared_normal[p.y][p.x]));
         // Weight neighbors with similar depth
         // w *= 1.0 - smoothstep(0.0, params.depth_reject_percent * max(gbuf.linear_z, neigh_gbuf.linear_z), abs(gbuf.linear_z - neigh_gbuf.linear_z));
-        w *= exp(-10 * abs(center_linear_z + dot(vec2(center_grad_z), vec2(xx, yy)) - shared_z[p.y][p.x]) / params.depth_accept);
+        w *= exp(params.depth_accept * abs(center_linear_z + dot(vec2(center_grad_z), vec2(xx, yy)) - shared_z[p.y][p.x]));
         // Weight lower with increasing history
         //w *= 1.0 - irr_moments.a / params.spatial_threshold;
 

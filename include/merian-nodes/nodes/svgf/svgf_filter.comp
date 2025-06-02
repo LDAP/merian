@@ -8,6 +8,7 @@
 #include "merian-shaders/color/colors_yuv.glsl"
 #include "merian-shaders/normal_encode.glsl"
 #include "merian-shaders/textures.glsl"
+#include "merian-shaders/shared_memory.glsl"
 
 layout(set = 1, binding = 0) uniform sampler2D img_filter_in;
 layout(set = 1, binding = 1) uniform writeonly restrict image2D img_filter_out;
@@ -29,7 +30,7 @@ layout (constant_id = 4) const int LAST_ITERATION = 0;
 // #define KALEIDOSCOPE_USE_MIRRORING 1
 
 layout(push_constant, std140) uniform push_t {
-    float param_z;
+    float param_z; /* -10 / param_z precomputed */
     float param_n;
     float param_l;
     float z_bias_normals;
@@ -93,8 +94,8 @@ float get_sigma_l(float center, ivec2 ipos) {
 #define WORKGROUP_SIZE_X gl_WorkGroupSize.x
 #define WORKGROUP_SIZE_Y gl_WorkGroupSize.y
 
-#define SHARED_SIZE_X (WORKGROUP_SIZE_X + FILTER_HALO_SIZE * 2)
-#define SHARED_SIZE_Y (WORKGROUP_SIZE_Y + FILTER_HALO_SIZE * 2)
+#define SHARED_SIZE_X (WORKGROUP_SIZE_X + SVGF_FILTER_HALO_RADIUS * 2)
+#define SHARED_SIZE_Y (WORKGROUP_SIZE_Y + SVGF_FILTER_HALO_RADIUS * 2)
 
 // remember to update config.h if anything is changed here!
 // FILTER_SHARED_MEMORY_PER_PIXEL = 2 * 4 * 4
@@ -150,15 +151,14 @@ void _tap(const ivec2 offset, const float kernel_weight) {
 #endif
 
   const float w_l = abs(p_irr_var.r - c_l) * sigma_l;  // we use yuv in irr, so r is luminance
-  const float w_z = exp(-10 * abs(c_z + dot(c_grad_z, grad_offset) - p_z) / params.param_z);
+  const float w_z = exp(params.param_z * abs(c_z + dot(c_grad_z, grad_offset) - p_z));
   const float w_n = smoothstep(params.param_n, 1.0, dot(p_n, c_n));
   // was: pow(max(0, dot(p_n, c_n)), params.param_n); 
 
   const float w = exp(-w_l * w_l) * mix(w_z, 1.0, z_bias_depth_mix) * mix(w_n, 1.0, z_bias_normals_mix) * kernel_weight;
 
-  filter_irr_var.rgb += p_irr_var.rgb * w; 
-  filter_irr_var.a   += p_irr_var.a * w * w; 
-  filter_w           += w;
+  filter_irr_var += p_irr_var * vec4(w, w, w, w * w); 
+  filter_w       += w;
 
   #undef grad_offset
 }
@@ -170,7 +170,7 @@ main() {
   #ifdef KALEIDOSCOPE_USE_SHMEM
 
     ipos = ivec2(gl_GlobalInvocationID);
-    ipos_shared = ivec2(gl_LocalInvocationID) + FILTER_HALO_SIZE;
+    ipos_shared = ivec2(gl_LocalInvocationID) + SVGF_FILTER_HALO_RADIUS;
 
     filter_irr_var = texelFetch(img_filter_in, ipos, 0);
     const uvec3 c_gbuf = texelFetch(img_gbuf_in, ipos, 0).rgb;
@@ -181,52 +181,17 @@ main() {
     {
       // center
       shmem_write(ipos_shared, filter_irr_var, c_n, c_z);
-
       // halo
-      // |TL| TC |TR|
-      // |L | C  |R |
-      // |BL| BC |BR|
-
-      ivec2 local_tile_offset;
-      ivec2 lid;
-
-      const uint split_size = FILTER_HALO_SIZE * (FILTER_HALO_SIZE + WORKGROUP_SIZE_X);
-      const uint split_size_half = split_size / FILTER_HALO_SIZE;
-      const ivec2 global_tile_offset = ivec2(gl_WorkGroupSize.xy * gl_WorkGroupID.xy) - FILTER_HALO_SIZE;
-
-      if (gl_LocalInvocationIndex < 1 * split_size) {
-        // load top (TL, TC)
-        const uint index = gl_LocalInvocationIndex - 0 * split_size;
-        lid = ivec2(index % split_size_half, index / split_size_half);
-        local_tile_offset = ivec2(0);
-      } else if (gl_LocalInvocationIndex < 2 * split_size) {
-        // load right (TR, R) 
-        const uint index = gl_LocalInvocationIndex - 1 * split_size;
-        lid = ivec2(index / split_size_half, index % split_size_half);
-        local_tile_offset = ivec2(FILTER_HALO_SIZE + WORKGROUP_SIZE_X, 0);
-      } else if (gl_LocalInvocationIndex < 3 * split_size) {
-        // load bottom (BR, BC)
-        const uint index = gl_LocalInvocationIndex - 2 * split_size;
-        lid = ivec2(index % split_size_half, index / split_size_half);
-        local_tile_offset = ivec2(FILTER_HALO_SIZE, FILTER_HALO_SIZE + WORKGROUP_SIZE_X);
-      } else if (gl_LocalInvocationIndex < 4 * split_size) {
-        // load left (BL, L)
-        const uint index = gl_LocalInvocationIndex - 3 * split_size;
-        lid = ivec2(index / split_size_half, index % split_size_half);
-        local_tile_offset = ivec2(0, FILTER_HALO_SIZE);
-      }
-
-      if (gl_LocalInvocationIndex < 4 * split_size) {
-          const ivec2 global_read = merian_tex_mirror_repeat(global_tile_offset + local_tile_offset + lid, textureSize(img_filter_in, 0));
-
-          const uvec3 p_gbuf = texelFetch(img_gbuf_in, global_read, 0).rgb;
-          shmem_write(local_tile_offset + lid, texelFetch(img_filter_in, global_read, 0),
-                                               geo_decode_normal(p_gbuf.x),
-                                               uintBitsToFloat(p_gbuf.y));
+      ivec2 shared_index; ivec2 global_index;
+      if (load_halo_index(SVGF_FILTER_HALO_RADIUS, gl_WorkGroupSize.xy, shared_index, global_index)) {
+        const ivec2 global_read = merian_tex_mirror_repeat(global_index, textureSize(img_filter_in, 0));
+        const uvec3 p_gbuf = texelFetch(img_gbuf_in, global_read, 0).rgb;
+        shmem_write(shared_index, texelFetch(img_filter_in, global_read, 0),
+                    geo_decode_normal(p_gbuf.x),
+                    uintBitsToFloat(p_gbuf.y));
+        barrier();
       }
     }
-    
-    barrier();
 
     if (any(greaterThanEqual(ipos, imageSize(img_filter_out)))) return;
   #else // NO KALEIDOSCOPE_SHMEM:
