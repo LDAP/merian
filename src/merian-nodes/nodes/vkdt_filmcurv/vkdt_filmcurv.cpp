@@ -29,8 +29,10 @@ std::vector<InputConnectorHandle> VKDTFilmcurv::describe_inputs() {
 
 std::vector<OutputConnectorHandle>
 VKDTFilmcurv::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
-    extent = io_layout[con_src]->create_info.extent;
-    const vk::Format format = output_format.value_or(io_layout[con_src]->create_info.format);
+    const vk::ImageCreateInfo create_info = io_layout[con_src]->get_create_info();
+
+    extent = create_info.extent;
+    const vk::Format format = output_format.value_or(create_info.format);
 
     return {
         ManagedVkImageOut::compute_write("out", format, extent),

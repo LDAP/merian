@@ -31,8 +31,8 @@ std::vector<InputConnectorHandle> Accumulate::describe_inputs() {
 
 std::vector<OutputConnectorHandle> Accumulate::describe_outputs(const NodeIOLayout& io_layout) {
 
-    irr_create_info = io_layout[con_irr_in]->create_info;
-    const auto moments_create_info = io_layout[con_moments_in]->create_info;
+    irr_create_info = io_layout[con_irr_in]->get_create_info();
+    const auto moments_create_info = io_layout[con_moments_in]->get_create_info();
 
     con_irr_out = ManagedVkImageOut::compute_write(
         "out_irr", format.value_or(irr_create_info.format), irr_create_info.extent);

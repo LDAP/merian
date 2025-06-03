@@ -49,7 +49,7 @@ std::vector<InputConnectorHandle> SVGF::describe_inputs() {
 
 std::vector<OutputConnectorHandle> SVGF::describe_outputs(const NodeIOLayout& io_layout) {
     // clang-format off
-    irr_create_info = io_layout[con_irr]->create_info;
+    irr_create_info = io_layout[con_irr]->get_create_info();
     if (output_format)
         irr_create_info.format = output_format.value();
 

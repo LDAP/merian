@@ -16,12 +16,23 @@ class VkImageOut : public TypedOutputConnector<ImageArrayResource&> {
                       const bool persistent = false,
                       const uint32_t array_size = 1);
 
+    VkImageOut(const std::string& name,
+                      const vk::ImageCreateInfo create_info,
+                      const bool persistent = false,
+                      const uint32_t array_size = 1);
+
     virtual ImageArrayResource& resource(const GraphResourceHandle& resource) override;
 
     uint32_t array_size() const;
+
+    vk::ImageCreateInfo get_create_info() const;
   public:
     std::vector<merian::ImageHandle> images;
     const bool persistent;
+
+  protected:
+
+    std::optional<const vk::ImageCreateInfo> create_info;
 };
 
 } // namespace merian_nodes

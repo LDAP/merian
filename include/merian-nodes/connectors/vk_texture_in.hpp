@@ -10,7 +10,6 @@ namespace merian_nodes {
 class VkTextureIn;
 using VkTextureInHandle = std::shared_ptr<VkTextureIn>;
 
-// Input a Vulkan image that is allocated and managed by the graph.
 // Note that it only supplies a descriptor if stage_flags contains at least one bit.
 class VkTextureIn : public TypedInputConnector<ManagedVkImageOutHandle, ImageArrayResource&> {
     friend class ManagedVkImageOut;

@@ -115,7 +115,6 @@ class ManagedVkImageOut : public VkImageOut {
     const vk::PipelineStageFlags2 pipeline_stages;
     const vk::ImageLayout required_layout;
     const vk::ShaderStageFlags stage_flags;
-    const vk::ImageCreateInfo create_info;
 };
 
 } // namespace merian_nodes

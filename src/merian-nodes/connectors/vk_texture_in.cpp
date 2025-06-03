@@ -2,7 +2,6 @@
 
 #include "merian-nodes/graph/errors.hpp"
 #include "merian-nodes/graph/node.hpp"
-#include "merian-nodes/resources/managed_vk_image_resource.hpp"
 
 namespace merian_nodes {
 

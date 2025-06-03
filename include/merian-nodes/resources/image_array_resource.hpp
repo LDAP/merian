@@ -7,9 +7,9 @@ namespace merian_nodes {
 
 class ImageArrayResource : public GraphResource {
     friend class VkTextureIn;
+    friend class VkImageIn;
     friend class UnmanagedVkImageOut;
     friend class ManagedVkImageOut;
-    friend class VkTextureArrayOut;
 
   public:
     ImageArrayResource(std::vector<merian::ImageHandle>& images,
@@ -36,9 +36,24 @@ class ImageArrayResource : public GraphResource {
             current_updates.push_back(index);
         }
 
-        if (tex && first_input_layout != vk::ImageLayout::eUndefined &&
-            (prior_access_flags || tex->get_image()->get_current_layout() != first_input_layout)) {
-            const vk::ImageMemoryBarrier2 img_bar = tex->get_image()->barrier2(
+        set(index, tex->get_image(), cmd, prior_access_flags, prior_pipeline_stages);
+    }
+
+    void set(const uint32_t index,
+             const merian::ImageHandle& image,
+             const merian::CommandBufferHandle& cmd,
+             const vk::AccessFlags2 prior_access_flags,
+             const vk::PipelineStageFlags2 prior_pipeline_stages) {
+        assert(index < textures.size());
+
+        if (images[index] != image) {
+            images[index] = image;
+            current_updates.push_back(index);
+        }
+
+        if (first_input_layout != vk::ImageLayout::eUndefined &&
+            (prior_access_flags || image->get_current_layout() != first_input_layout)) {
+            const vk::ImageMemoryBarrier2 img_bar = image->barrier2(
                 first_input_layout, prior_access_flags, input_access_flags, prior_pipeline_stages,
                 input_stage_flags);
 
@@ -46,10 +61,15 @@ class ImageArrayResource : public GraphResource {
         }
     }
 
-    const merian::TextureHandle& get(const uint32_t index) const {
+    const merian::TextureHandle& get_texture(const uint32_t index) const {
         assert(index < textures.size());
         assert(textures[index].has_value());
         return textures[index].value();
+    }
+
+    const merian::ImageHandle& get_image(const uint32_t index) const {
+        assert(index < images.size());
+        return images[index];
     }
 
     void properties(merian::Properties& props) override {

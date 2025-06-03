@@ -24,8 +24,9 @@ std::vector<InputConnectorHandle> Bloom::describe_inputs() {
 }
 
 std::vector<OutputConnectorHandle> Bloom::describe_outputs(const NodeIOLayout& io_layout) {
-    const vk::Format format = io_layout[con_src]->create_info.format;
-    const vk::Extent3D extent = io_layout[con_src]->create_info.extent;
+    const vk::ImageCreateInfo create_info = io_layout[con_src]->get_create_info();
+    const vk::Format format = create_info.format;
+    const vk::Extent3D extent = create_info.extent;
 
     con_out = ManagedVkImageOut::compute_write("out", format, extent);
     con_interm =
