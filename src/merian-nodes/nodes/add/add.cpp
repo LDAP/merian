@@ -20,7 +20,7 @@ std::vector<InputConnectorHandle> Add::describe_inputs() {
         input_connectors.clear();
         for (uint32_t i = 0; i < number_inputs; i++) {
             input_connectors.emplace_back(
-                ManagedVkImageIn::compute_read(fmt::format("input_{}", i), 0, true));
+                VkTextureIn::compute_read(fmt::format("input_{}", i), 0, true));
         }
     }
 

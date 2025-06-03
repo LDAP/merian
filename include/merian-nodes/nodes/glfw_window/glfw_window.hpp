@@ -1,6 +1,6 @@
 #pragma once
 
-#include "merian-nodes/connectors/managed_vk_image_in.hpp"
+#include "merian-nodes/connectors/vk_texture_in.hpp"
 #include "merian-nodes/graph/errors.hpp"
 #include "merian-nodes/graph/node.hpp"
 
@@ -236,7 +236,7 @@ class GLFWWindow : public Node {
         on_blit_completed = []([[maybe_unused]] const CommandBufferHandle& cmd,
                                [[maybe_unused]] const SwapchainAcquireResult& acquire_result) {};
 
-    ManagedVkImageInHandle image_in = ManagedVkImageIn::transfer_src("src", 0, true);
+    VkTextureInHandle image_in = VkTextureIn::transfer_src("src", 0, true);
 
     std::array<int, 4> windowed_pos_size;
     bool request_rebuild_on_recreate = false;

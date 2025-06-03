@@ -1,5 +1,6 @@
 #pragma once
 
+#include "merian-nodes/connectors/vk_image_out.hpp"
 #include "merian-nodes/graph/connector_output.hpp"
 #include "merian-nodes/resources/image_array_resource.hpp"
 
@@ -10,7 +11,7 @@ using ManagedVkImageOutHandle = std::shared_ptr<ManagedVkImageOut>;
 
 // Output a Vulkan image that is allocated and managed by the graph.
 // Note that it only supplies a descriptor if stage_flags contains at least one bit.
-class ManagedVkImageOut : public TypedOutputConnector<ImageArrayResource&> {
+class ManagedVkImageOut : public VkImageOut {
   public:
     ManagedVkImageOut(const std::string& name,
                       const vk::AccessFlags2& access_flags,
@@ -50,10 +51,6 @@ class ManagedVkImageOut : public TypedOutputConnector<ImageArrayResource&> {
                     const ResourceAllocatorHandle& aliasing_allocator,
                     const uint32_t resoruce_index,
                     const uint32_t ring_size) override;
-
-    virtual ImageArrayResource& resource(const GraphResourceHandle& resource) override;
-
-    uint32_t array_size() const;
 
   public:
     static ManagedVkImageOutHandle compute_write(const std::string& name,
@@ -114,14 +111,11 @@ class ManagedVkImageOut : public TypedOutputConnector<ImageArrayResource&> {
                                                   const bool persistent = false);
 
   public:
-    std::vector<merian::ImageHandle> images;
-
     const vk::AccessFlags2 access_flags;
     const vk::PipelineStageFlags2 pipeline_stages;
     const vk::ImageLayout required_layout;
     const vk::ShaderStageFlags stage_flags;
     const vk::ImageCreateInfo create_info;
-    const bool persistent;
 };
 
 } // namespace merian_nodes

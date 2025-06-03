@@ -1,6 +1,6 @@
 #include "merian-nodes/connectors/managed_vk_image_out.hpp"
 
-#include "merian-nodes/connectors/managed_vk_image_in.hpp"
+#include "merian-nodes/connectors/vk_texture_in.hpp"
 #include "merian-nodes/graph/errors.hpp"
 #include "merian-nodes/graph/node.hpp"
 
@@ -14,9 +14,9 @@ ManagedVkImageOut::ManagedVkImageOut(const std::string& name,
                                      const vk::ImageCreateInfo& create_info,
                                      const bool persistent,
                                      const uint32_t array_size)
-    : TypedOutputConnector(name, !persistent), access_flags(access_flags),
+    : VkImageOut(name, persistent, array_size), access_flags(access_flags),
       pipeline_stages(pipeline_stages), required_layout(required_layout), stage_flags(stage_flags),
-      create_info(create_info), persistent(persistent), images(array_size) {}
+      create_info(create_info) {}
 
 std::optional<vk::DescriptorSetLayoutBinding> ManagedVkImageOut::get_descriptor_info() const {
     if (stage_flags) {
@@ -24,7 +24,7 @@ std::optional<vk::DescriptorSetLayoutBinding> ManagedVkImageOut::get_descriptor_
                                               nullptr};
     }
     return std::nullopt;
-}
+} 
 
 void ManagedVkImageOut::get_descriptor_update(
     const uint32_t binding,
@@ -102,7 +102,7 @@ GraphResourceHandle ManagedVkImageOut::create_resource(
     std::map<std::pair<NodeHandle, uint32_t>, vk::ImageLayout> layouts_per_node;
 
     for (const auto& [input_node, input] : inputs) {
-        const auto& image_in = debugable_ptr_cast<ManagedVkImageIn>(input);
+        const auto& image_in = debugable_ptr_cast<VkTextureIn>(input);
         image_create_info.usage |= image_in->usage_flags;
         input_pipeline_stages |= image_in->pipeline_stages;
         input_access_flags |= image_in->access_flags;
@@ -132,14 +132,6 @@ GraphResourceHandle ManagedVkImageOut::create_resource(
     }
 
     return res;
-}
-
-ImageArrayResource& ManagedVkImageOut::resource(const GraphResourceHandle& resource) {
-    return *debugable_ptr_cast<ImageArrayResource>(resource);
-}
-
-uint32_t ManagedVkImageOut::array_size() const {
-    return images.size();
 }
 
 std::shared_ptr<ManagedVkImageOut> ManagedVkImageOut::compute_write(const std::string& name,

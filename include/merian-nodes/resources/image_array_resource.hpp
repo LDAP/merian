@@ -7,7 +7,7 @@
 namespace merian_nodes {
 
 class ImageArrayResource : public GraphResource {
-    friend class ManagedVkImageIn;
+    friend class VkTextureIn;
     friend class ManagedVkImageOut;
 
   public:

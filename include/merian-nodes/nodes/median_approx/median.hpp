@@ -1,7 +1,7 @@
 #pragma once
 
 #include "merian-nodes/connectors/managed_vk_buffer_out.hpp"
-#include "merian-nodes/connectors/managed_vk_image_in.hpp"
+#include "merian-nodes/connectors/vk_texture_in.hpp"
 #include "merian-nodes/graph/node.hpp"
 
 #include "merian/vk/pipeline/pipeline.hpp"
@@ -40,7 +40,7 @@ class MedianApproxNode : public Node {
     const ContextHandle context;
     int component;
 
-    ManagedVkImageInHandle con_src = ManagedVkImageIn::compute_read("src");
+    VkTextureInHandle con_src = VkTextureIn::compute_read("src");
     ManagedVkBufferOutHandle con_median;
     ManagedVkBufferOutHandle con_histogram;
 

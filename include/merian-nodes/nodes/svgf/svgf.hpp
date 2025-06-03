@@ -1,7 +1,7 @@
 #pragma once
 
 #include "merian-nodes/connectors/managed_vk_buffer_in.hpp"
-#include "merian-nodes/connectors/managed_vk_image_in.hpp"
+#include "merian-nodes/connectors/vk_texture_in.hpp"
 #include "merian-nodes/graph/node.hpp"
 
 #include "merian/vk/memory/resource_allocator.hpp"
@@ -65,11 +65,11 @@ class SVGF : public Node {
     static constexpr uint32_t local_size_x = 32;
     static constexpr uint32_t local_size_y = 32;
 
-    ManagedVkImageInHandle con_prev_out = ManagedVkImageIn::compute_read("prev_out", 1);
-    ManagedVkImageInHandle con_irr = ManagedVkImageIn::compute_read("irr");
-    ManagedVkImageInHandle con_moments = ManagedVkImageIn::compute_read("moments");
-    ManagedVkImageInHandle con_albedo = ManagedVkImageIn::compute_read("albedo");
-    ManagedVkImageInHandle con_mv = ManagedVkImageIn::compute_read("mv", 0, true);
+    VkTextureInHandle con_prev_out = VkTextureIn::compute_read("prev_out", 1);
+    VkTextureInHandle con_irr = VkTextureIn::compute_read("irr");
+    VkTextureInHandle con_moments = VkTextureIn::compute_read("moments");
+    VkTextureInHandle con_albedo = VkTextureIn::compute_read("albedo");
+    VkTextureInHandle con_mv = VkTextureIn::compute_read("mv", 0, true);
     ManagedVkBufferInHandle con_gbuffer = ManagedVkBufferIn::compute_read("gbuffer");
     ManagedVkBufferInHandle con_prev_gbuffer = ManagedVkBufferIn::compute_read("prev_gbuffer", 1);
 

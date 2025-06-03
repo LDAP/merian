@@ -20,7 +20,7 @@ TAA::TAA(const ContextHandle& context) : AbstractCompute(context, sizeof(PushCon
 std::vector<InputConnectorHandle> TAA::describe_inputs() {
     return {
         con_src,
-        ManagedVkImageIn::compute_read("prev_src", 1),
+        VkTextureIn::compute_read("prev_src", 1),
         con_mv,
     };
 }
