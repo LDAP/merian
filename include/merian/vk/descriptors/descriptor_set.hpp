@@ -122,6 +122,29 @@ class DescriptorSet : public std::enable_shared_from_this<DescriptorSet>, public
     // The type is automatically determined from the set using the binding index.
     // With access_layout you can overwrite the layout that the image has "when it is accessed
     // using the descriptor". If std::nullopt the current layout is used.
+    DescriptorSet& queue_descriptor_write_image(
+        const uint32_t binding,
+        const ImageViewHandle& image_view,
+        const uint32_t dst_array_element = 0,
+        const std::optional<vk::ImageLayout> access_layout = std::nullopt) {
+        write_resources.emplace_back(image_view->get_image());
+        write_infos.emplace_back(
+            vk::DescriptorImageInfo(VK_NULL_HANDLE, *image_view,
+                                    access_layout.value_or(image_view->get_image()->get_current_layout())));
+        writes.emplace_back(vk::WriteDescriptorSet{
+            set,
+            binding,
+            dst_array_element,
+            1,
+            layout->get_type_for_binding(binding),
+        });
+
+        return *this;
+    }
+
+    // The type is automatically determined from the set using the binding index.
+    // With access_layout you can overwrite the layout that the image has "when it is accessed
+    // using the descriptor". If std::nullopt the current layout is used.
     DescriptorSet& queue_descriptor_write_texture(
         const uint32_t binding,
         const TextureHandle& texture,

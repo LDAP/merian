@@ -7,6 +7,7 @@ merian_nodes_src += files(
     'unmanaged_vk_image_out.cpp',   
     'vk_buffer_array_in.cpp',
     'vk_buffer_array_out.cpp',
+    'vk_image_in.cpp',
     'vk_image_out.cpp',
     'vk_texture_in.cpp',
     'vk_tlas_in.cpp',

@@ -7,16 +7,16 @@
 
 namespace merian_nodes {
 
-class VkTextureIn;
-using VkTextureInHandle = std::shared_ptr<VkTextureIn>;
+class VkImageIn;
+using VkImageInHandle = std::shared_ptr<VkImageIn>;
 
 // Note that it only supplies a descriptor if stage_flags contains at least one bit.
-class VkTextureIn : public TypedInputConnector<VkImageOutHandle, ImageArrayResource&> {
+class VkImageIn : public TypedInputConnector<VkImageOutHandle, ImageArrayResource&> {
     friend class ManagedVkImageOut;
     friend class UnmanagedVkImageOut;
 
   public:
-    VkTextureIn(const std::string& name,
+    VkImageIn(const std::string& name,
                      const vk::AccessFlags2 access_flags,
                      const vk::PipelineStageFlags2 pipeline_stages,
                      const vk::ImageLayout required_layout,
@@ -46,13 +46,6 @@ class VkTextureIn : public TypedInputConnector<VkImageOutHandle, ImageArrayResou
 
     virtual ImageArrayResource& resource(const GraphResourceHandle& resource) override;
 
-  public:
-    static VkTextureInHandle
-    compute_read(const std::string& name, const uint32_t delay = 0, const bool optional = false);
-
-    static VkTextureInHandle
-    transfer_src(const std::string& name, const uint32_t delay = 0, const bool optional = false);
-
   private:
     const vk::AccessFlags2 access_flags;
     const vk::PipelineStageFlags2 pipeline_stages;
@@ -61,6 +54,7 @@ class VkTextureIn : public TypedInputConnector<VkImageOutHandle, ImageArrayResou
     const vk::ShaderStageFlags stage_flags;
 
     uint32_t array_size = 1;
+    std::vector<ImageViewHandle> image_views;
 };
 
 } // namespace merian_nodes

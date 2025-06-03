@@ -1,11 +1,11 @@
-#include "merian-nodes/connectors/vk_texture_in.hpp"
+#include "merian-nodes/connectors/vk_image_in.hpp"
 
 #include "merian-nodes/graph/errors.hpp"
 #include "merian-nodes/graph/node.hpp"
 
 namespace merian_nodes {
 
-VkTextureIn::VkTextureIn(const std::string& name,
+VkImageIn::VkImageIn(const std::string& name,
                                    const vk::AccessFlags2 access_flags,
                                    const vk::PipelineStageFlags2 pipeline_stages,
                                    const vk::ImageLayout required_layout,
@@ -17,35 +17,37 @@ VkTextureIn::VkTextureIn(const std::string& name,
       pipeline_stages(pipeline_stages), required_layout(required_layout), usage_flags(usage_flags),
       stage_flags(stage_flags) {}
 
-std::optional<vk::DescriptorSetLayoutBinding> VkTextureIn::get_descriptor_info() const {
+std::optional<vk::DescriptorSetLayoutBinding> VkImageIn::get_descriptor_info() const {
     if (stage_flags) {
-        return vk::DescriptorSetLayoutBinding{0, vk::DescriptorType::eCombinedImageSampler, array_size,
+        return vk::DescriptorSetLayoutBinding{0, vk::DescriptorType::eStorageImage, array_size,
                                               stage_flags, nullptr};
     }
     return std::nullopt;
 }
 
-void VkTextureIn::get_descriptor_update(const uint32_t binding,
+void VkImageIn::get_descriptor_update(const uint32_t binding,
                                              const GraphResourceHandle& resource,
                                              const DescriptorSetHandle& update,
                                              const ResourceAllocatorHandle& allocator) {
     if (!resource) {
         // the optional connector was not connected
-        update->queue_descriptor_write_texture(binding, allocator->get_dummy_texture(), 0,
+        update->queue_descriptor_write_image(binding, allocator->get_dummy_texture()->get_view(), 0,
                                                vk::ImageLayout::eShaderReadOnlyOptimal);
     } else {
         // or vk::ImageLayout::eShaderReadOnlyOptimal instead of required?
+        image_views.clear();
         const auto& res = debugable_ptr_cast<ImageArrayResource>(resource);
         for (auto& update_idx : res->pending_updates) {
-            const TextureHandle tex = res->textures[update_idx] ? res->textures[update_idx].value() : allocator->get_dummy_texture();
-            update->queue_descriptor_write_texture(
-                binding, tex, update_idx,
+            ImageViewHandle view = ImageView::create(res->get_image(update_idx)->make_view_create_info(), res->get_image(update_idx));
+            image_views.push_back(view);
+            update->queue_descriptor_write_image(
+                binding, view, update_idx,
                 required_layout);
         }
     }
 }
 
-Connector::ConnectorStatusFlags VkTextureIn::on_pre_process(
+Connector::ConnectorStatusFlags VkImageIn::on_pre_process(
     [[maybe_unused]] GraphRun& run,
     [[maybe_unused]] const CommandBufferHandle& cmd,
     const GraphResourceHandle& resource,
@@ -94,33 +96,17 @@ Connector::ConnectorStatusFlags VkTextureIn::on_pre_process(
     return flags;
 }
 
-void VkTextureIn::on_connect_output(const OutputConnectorHandle& output) {
+void VkImageIn::on_connect_output(const OutputConnectorHandle& output) {
     auto casted_output = std::dynamic_pointer_cast<VkImageOut>(output);
     if (!casted_output) {
         throw graph_errors::invalid_connection{
-            fmt::format("VkTextureIn {} cannot recive from {}.", name, output->name)};
+            fmt::format("VkImageIn {} cannot recive from {}.", name, output->name)};
     }
     array_size = casted_output->array_size();
 }
 
-ImageArrayResource& VkTextureIn::resource(const GraphResourceHandle& resource) {
+ImageArrayResource& VkImageIn::resource(const GraphResourceHandle& resource) {
     return *debugable_ptr_cast<ImageArrayResource>(resource);
-}
-
-std::shared_ptr<VkTextureIn>
-VkTextureIn::compute_read(const std::string& name, const uint32_t delay, const bool optional) {
-    return std::make_shared<VkTextureIn>(
-        name, vk::AccessFlagBits2::eShaderRead, vk::PipelineStageFlagBits2::eComputeShader,
-        vk::ImageLayout::eShaderReadOnlyOptimal, vk::ImageUsageFlagBits::eSampled,
-        vk::ShaderStageFlagBits::eCompute, delay, optional);
-}
-
-std::shared_ptr<VkTextureIn>
-VkTextureIn::transfer_src(const std::string& name, const uint32_t delay, const bool optional) {
-    return std::make_shared<VkTextureIn>(
-        name, vk::AccessFlagBits2::eTransferRead, vk::PipelineStageFlagBits2::eAllTransfer,
-        vk::ImageLayout::eTransferSrcOptimal, vk::ImageUsageFlagBits::eTransferSrc,
-        vk::ShaderStageFlags(), delay, optional);
 }
 
 } // namespace merian_nodes
