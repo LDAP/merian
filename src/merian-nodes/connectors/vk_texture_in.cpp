@@ -57,6 +57,10 @@ Connector::ConnectorStatusFlags VkTextureIn::on_pre_process(
 
     if (res->last_used_as_output) {
         for (const auto& image : res->images) {
+            if (!image) {
+                continue;
+            }
+
             vk::ImageMemoryBarrier2 img_bar = image->barrier2(
                 required_layout, res->current_access_flags, res->input_access_flags,
                 res->current_stage_flags, res->input_stage_flags);
@@ -67,6 +71,10 @@ Connector::ConnectorStatusFlags VkTextureIn::on_pre_process(
         res->last_used_as_output = false;
     } else {
         for (const auto& image : res->images) {
+            if (!image) {
+                continue;
+            }
+
             // No barrier required, if no transition required
             if (required_layout != image->get_current_layout()) {
                 vk::ImageMemoryBarrier2 img_bar = image->barrier2(

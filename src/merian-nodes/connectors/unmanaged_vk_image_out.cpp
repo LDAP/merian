@@ -1,15 +1,14 @@
-#include "merian-nodes/connectors/vk_texture_array_out.hpp"
-#include "merian-nodes/connectors/vk_texture_array_in.hpp"
+ #include "merian-nodes/connectors/unmanaged_vk_image_out.hpp"
 
 #include "merian-nodes/graph/node.hpp"
 #include "merian/utils/pointer.hpp"
 
 namespace merian_nodes {
 
-VkTextureArrayOut::VkTextureArrayOut(const std::string& name, const uint32_t array_size)
-    : TypedOutputConnector(name, false), textures(array_size) {}
+UnmanagedVkImageOut::UnmanagedVkImageOut(const std::string& name, const uint32_t array_size)
+    : VkImageOut(name, false, array_size) {}
 
-GraphResourceHandle VkTextureArrayOut::create_resource(
+GraphResourceHandle UnmanagedVkImageOut::create_resource(
     [[maybe_unused]] const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
     const ResourceAllocatorHandle& allocator,
     [[maybe_unused]] const ResourceAllocatorHandle& aliasing_allocator,
@@ -21,7 +20,7 @@ GraphResourceHandle VkTextureArrayOut::create_resource(
     vk::ImageLayout first_input_layout = vk::ImageLayout::eUndefined;
 
     for (const auto& [input_node, input] : inputs) {
-        const auto& con_in = debugable_ptr_cast<VkTextureArrayIn>(input);
+        const auto& con_in = debugable_ptr_cast<VkTextureIn>(input);
         input_pipeline_stages |= con_in->pipeline_stages;
         input_access_flags |= con_in->access_flags;
 
@@ -30,16 +29,11 @@ GraphResourceHandle VkTextureArrayOut::create_resource(
         }
     }
 
-    return std::make_shared<TextureArrayResource>(textures, allocator->get_dummy_texture(),
-                                                  input_pipeline_stages, input_access_flags,
+    return std::make_shared<ImageArrayResource>(images, input_pipeline_stages, input_access_flags,
                                                   first_input_layout);
 }
 
-TextureArrayResource& VkTextureArrayOut::resource(const GraphResourceHandle& resource) {
-    return *debugable_ptr_cast<TextureArrayResource>(resource);
-}
-
-Connector::ConnectorStatusFlags VkTextureArrayOut::on_pre_process(
+Connector::ConnectorStatusFlags UnmanagedVkImageOut::on_pre_process(
     [[maybe_unused]] GraphRun& run,
     [[maybe_unused]] const CommandBufferHandle& cmd,
     const GraphResourceHandle& resource,
@@ -47,7 +41,7 @@ Connector::ConnectorStatusFlags VkTextureArrayOut::on_pre_process(
     [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
     [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {
 
-    const auto& res = debugable_ptr_cast<TextureArrayResource>(resource);
+    const auto& res = debugable_ptr_cast<ImageArrayResource>(resource);
     if (!res->current_updates.empty()) {
         res->pending_updates.clear();
         std::swap(res->pending_updates, res->current_updates);
@@ -57,7 +51,7 @@ Connector::ConnectorStatusFlags VkTextureArrayOut::on_pre_process(
     return {};
 }
 
-Connector::ConnectorStatusFlags VkTextureArrayOut::on_post_process(
+Connector::ConnectorStatusFlags UnmanagedVkImageOut::on_post_process(
     [[maybe_unused]] GraphRun& run,
     [[maybe_unused]] const CommandBufferHandle& cmd,
     const GraphResourceHandle& resource,
@@ -65,7 +59,7 @@ Connector::ConnectorStatusFlags VkTextureArrayOut::on_post_process(
     [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
     [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {
 
-    const auto& res = debugable_ptr_cast<TextureArrayResource>(resource);
+    const auto& res = debugable_ptr_cast<ImageArrayResource>(resource);
 
     Connector::ConnectorStatusFlags flags{};
     if (!res->current_updates.empty()) {
@@ -77,13 +71,9 @@ Connector::ConnectorStatusFlags VkTextureArrayOut::on_post_process(
     return flags;
 }
 
-VkTextureArrayOutHandle VkTextureArrayOut::create(const std::string& name,
+UnmanagedVkImageOutHandle UnmanagedVkImageOut::create(const std::string& name,
                                                   const uint32_t array_size) {
-    return std::make_shared<VkTextureArrayOut>(name, array_size);
-}
-
-uint32_t VkTextureArrayOut::array_size() const {
-    return textures.size();
+    return std::make_shared<UnmanagedVkImageOut>(name, array_size);
 }
 
 } // namespace merian_nodes

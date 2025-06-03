@@ -1,6 +1,7 @@
 #pragma once
 
 #include "managed_vk_image_out.hpp"
+#include "unmanaged_vk_image_out.hpp"
 
 #include "merian-nodes/graph/connector_input.hpp"
 
@@ -13,6 +14,7 @@ using VkTextureInHandle = std::shared_ptr<VkTextureIn>;
 // Note that it only supplies a descriptor if stage_flags contains at least one bit.
 class VkTextureIn : public TypedInputConnector<ManagedVkImageOutHandle, ImageArrayResource&> {
     friend class ManagedVkImageOut;
+    friend class UnmanagedVkImageOut;
 
   public:
     VkTextureIn(const std::string& name,
