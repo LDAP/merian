@@ -60,10 +60,10 @@ struct NodeData {
 
     // User disabled
     bool disable{};
-    // Errors during build
+    // Errors during build / connect
     std::vector<std::string> errors{};
-    // Errors during run - triggers rebuild and gets build error
-    std::vector<std::string> run_errors{};
+    // Errors in on_connected and while run.
+    std::vector<std::string> errors_queued{};
 
     // Cache input connectors (node->describe_inputs())
     // (on start_nodes added and checked for name conflicts)
@@ -461,16 +461,29 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                             const GraphEvent::Listener& listener) {
                             register_event_listener_for_connect(event_pattern, listener);
                         });
-                    const Node::NodeStatusFlags flags =
-                        node->on_connected(io_layout, data.descriptor_set_layout);
-                    needs_reconnect |= flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT;
-                    if ((flags & Node::NodeStatusFlagBits::RESET_IN_FLIGHT_DATA) != 0u) {
-                        for (uint32_t i = 0; i < ITERATIONS_IN_FLIGHT; i++) {
-                            ring_fences.get(i).user_data.in_flight_data.at(node).reset();
+                    try {
+                        const Node::NodeStatusFlags flags =
+                            node->on_connected(io_layout, data.descriptor_set_layout);
+                        needs_reconnect |= flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT;
+                        if ((flags & Node::NodeStatusFlagBits::RESET_IN_FLIGHT_DATA) != 0u) {
+                            for (uint32_t i = 0; i < ITERATIONS_IN_FLIGHT; i++) {
+                                ring_fences.get(i).user_data.in_flight_data.at(node).reset();
+                            }
                         }
+                        if ((flags & Node::NodeStatusFlagBits::REMOVE_NODE) != 0u) {
+                            remove_node(data.identifier);
+                        }
+                    } catch (const graph_errors::node_error& e) {
+                        data.errors_queued.emplace_back(fmt::format("node error: {}", e.what()));
+                    } catch (const ShaderCompiler::compilation_failed& e) {
+                        data.errors_queued.emplace_back(
+                            fmt::format("compilation failed: {}", e.what()));
                     }
-                    if ((flags & Node::NodeStatusFlagBits::REMOVE_NODE) != 0u) {
-                        remove_node(data.identifier);
+                    if (!data.errors_queued.empty()) {
+                        SPDLOG_ERROR("on_connected on node '{}' failed:\n - {}", data.identifier,
+                                     fmt::join(data.errors_queued, "\n   - "));
+                        request_reconnect();
+                        SPDLOG_ERROR("emergency reconnect.");
                     }
                 }
             }
@@ -610,14 +623,13 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                 try {
                     run_node(graph_run, node, data, profiler);
                 } catch (const graph_errors::node_error& e) {
-                    data.run_errors.emplace_back(fmt::format("node error: {}", e.what()));
+                    data.errors_queued.emplace_back(fmt::format("node error: {}", e.what()));
                 } catch (const ShaderCompiler::compilation_failed& e) {
-                    data.run_errors.emplace_back(fmt::format("compilation failed: {}", e.what()));
+                    data.errors_queued.emplace_back(fmt::format("compilation failed: {}", e.what()));
                 }
-                if (!data.run_errors.empty()) {
+                if (!data.errors_queued.empty()) {
                     SPDLOG_ERROR("executing node '{}' failed:\n - {}", data.identifier,
-                                 fmt::join(data.run_errors, "\n   - "));
-
+                                 fmt::join(data.errors_queued, "\n   - "));
                     request_reconnect();
                     SPDLOG_ERROR("emergency reconnect.");
                 }
@@ -1659,10 +1671,10 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                 to_erase.push_back(node);
                 continue;
             }
-            if (!data.run_errors.empty()) {
-                SPDLOG_DEBUG("node {} ({}) has run errors, converting to build errors.");
-                move_all(data.errors, data.run_errors);
-                data.run_errors.clear();
+            if (!data.errors_queued.empty()) {
+                SPDLOG_DEBUG("node {} ({}) has queued errors.");
+                move_all(data.errors, data.errors_queued);
+                data.errors_queued.clear();
             }
             if (!data.errors.empty()) {
                 SPDLOG_DEBUG("node {} ({}) is erroneous, skipping...", data.identifier,
