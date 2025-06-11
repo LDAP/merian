@@ -5,7 +5,8 @@ Denoiser for real-time ray tracing.
 Follows the implementation of:
 
 - Schied, Kaplanyan, Chaitanya, Burgess, Dachsbacher, and Lefohn: *Spatiotemporal Variance-Guided Filtering: Real-Time Reconstruction for Path-Traced Global Illumination*, HPG 2017.
-- Christoph Schied, Christoph Peters, Carsten Dachsbacher: *Gradient Estimation for Real-Time Adaptive Temporal Filtering*
+- Christoph Schied, Christoph Peters and Carsten Dachsbacher: *Gradient Estimation for Real-Time Adaptive Temporal Filtering*
+- Reiner Dolp, Johannes Hanika and Carsten Dachsbacher: *A Fast GPU Schedule For À-Trous Wavelet-Based Denoisers*
 
 But modifies the original code in that:
 

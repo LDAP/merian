@@ -13,7 +13,6 @@ Calculates accumulated irradiance and the first two moments.
 The implementation of the "firefly filter" and "adaptive alpha reduction" follow
 > Lucas Alber. (2024), Markov Chain Path Guiding for Real-Time Global Illumination and Single-Scattering, MSc Thesis, Karlsruhe Institute of Technology.
 
-
 Inputs:
 
 | Type       | Input name   | Description                                                                            | Delay |
@@ -30,7 +29,7 @@ Outputs:
 | Type       | Output name   | Description                                                 | Format/Resolution           | Persistent |
 |------------|---------------|-------------------------------------------------------------|-----------------------------|------------|
 | VkImageOut | out           | exp average of irradiance in `rgb`, second moment in `a`    | user defined or like irr    | no         |
-| VkImageOut | history       | history length in `r`                                       | R32Sfloa                    | no         |
+| VkImageOut | history       | history length in `r`                                       | R32Sfloat                   | no         |
 
 Events:
 
