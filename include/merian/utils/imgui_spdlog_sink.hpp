@@ -36,6 +36,7 @@ public:
     std::vector<LogLine> log_lines;
     std::size_t log_line_write_index = 0;
 
+    bool needs_scroll = false;
     bool auto_scoll = true;
     bool wrap = false;
     spdlog::level::level_enum log_level = spdlog::level::trace;

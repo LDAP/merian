@@ -14,6 +14,8 @@ void ImguiSpdlogSink::sink_it_(const spdlog::details::log_msg& msg) {
     formatter_->format(msg, line.buf);
     line.level = msg.level;
 
+    needs_scroll |= msg.level >= log_level;
+
     log_line_write_index++;
     if (log_line_write_index == log_lines.size()) {
         log_line_write_index = 0;
@@ -34,6 +36,7 @@ void ImguiSpdlogSink::imgui_draw_log() {
             if (ImGui::Selectable(
                     spdlog::level::to_string_view(spdlog::level::level_enum(l)).data(),
                     l == log_level)) {
+                needs_scroll = true;
                 log_level = spdlog::level::level_enum(l);
             }
         }
@@ -60,8 +63,10 @@ void ImguiSpdlogSink::imgui_draw_log() {
         }
     }
 
-    if (auto_scoll && ImGui::GetScrollY() >= ImGui::GetScrollMaxY())
+    if (auto_scoll && needs_scroll) {
         ImGui::SetScrollHereY(1.0f);
+        needs_scroll = false;
+    }
 
     ImGui::EndChild();
 }
