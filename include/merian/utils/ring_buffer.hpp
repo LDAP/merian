@@ -17,11 +17,11 @@ template <typename T> class RingBuffer {
 
     RingBuffer(const std::size_t size) : ring_size(size), buffer(size * 2) {}
 
-    const std::size_t& size() {
+    const std::size_t& size() const {
         return ring_size;
     }
 
-    const T& operator[](const std::size_t index) {
+    const T& operator[](const std::size_t index) const {
         return buffer[index % ring_size];
     }
 

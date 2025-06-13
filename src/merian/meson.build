@@ -6,6 +6,7 @@ merian_src = files(
     'utils/camera/camera.cpp',
     'utils/camera/camera_animator.cpp',
     'utils/concurrent/thread_pool.cpp',
+    'utils/imgui_spdlog_sink.cpp',
     'utils/input_controller_dummy.cpp',
     'utils/input_controller_glfw.cpp',
     'utils/normal_encoding.cpp',
