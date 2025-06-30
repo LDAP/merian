@@ -1183,7 +1183,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
             config.output_text(fmt::format("{}", data.descriptor_set_layout));
             config.st_end_child();
         }
-        if (!data.output_connections.empty() && config.st_begin_child("outputs", "Outputs")) {
+        if (!needs_reconnect && !data.output_connections.empty() && config.st_begin_child("outputs", "Outputs")) {
             for (auto& [output, per_output_info] : data.output_connections) {
                 if (config.st_begin_child(output->name, output->name)) {
                     std::vector<std::string> receivers;
@@ -1226,7 +1226,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
             }
             config.st_end_child();
         }
-        if (!data.input_connectors.empty() && config.st_begin_child("inputs", "Inputs")) {
+        if (!needs_reconnect && !data.input_connectors.empty() && config.st_begin_child("inputs", "Inputs")) {
             for (const auto& input : data.input_connectors) {
                 if (config.st_begin_child(input->name, input->name)) {
                     config.st_separate("Input Properties");
