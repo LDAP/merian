@@ -1,0 +1,11 @@
+[wrap-git]
+directory = tinybvh
+
+url = https://github.com/jbikker/tinybvh
+revision = 0f7b407777c52b123d093b6e83d4c2c5d8371daf
+depth = 1
+
+patch_directory = tinybvh
+
+[provide]
+tinybvh = tinybvh_dep

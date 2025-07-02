@@ -65,6 +65,7 @@ imgui = dependency('imgui', version: ['>=1.90.9'], fallback: ['imgui', 'imgui_de
 nlohmann_json = dependency('nlohmann_json', version: ['>=3.11.3'], fallback: ['nlohmann_json', 'nlohmann_json_dep'])
 vma = dependency('VulkanMemoryAllocator', version: ['>=3.1.0'], fallback: ['VulkanMemoryAllocator', 'VulkanMemoryAllocator_dep'])
 stb = dependency('stb', fallback: ['stb', 'stb_dep'], default_options : ['stb_libraries=[\'stb_image\', \'stb_image_write\']'])
+tinybvh = dependency('tinybvh', fallback: ['tinybvh', 'tinybvh_dep'])
 sdl2 = dependency('sdl2', required: false)
 if not sdl2.found()
     # Workaround because SDL2 ships Vulkan which conflicts
@@ -162,6 +163,7 @@ merian_dep = declare_dependency(
         nlohmann_json,
         shaderc,
         spdlog,
+        tinybvh,
         tol,
         vma,
         vulkan,
