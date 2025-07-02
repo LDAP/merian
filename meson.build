@@ -1,7 +1,7 @@
 project(
     'merian',
     ['cpp', 'c'],
-    version : '1.0.0',
+    version : run_command(['git', 'describe', '--tags', '--abbrev=0']).stdout().strip(),
     default_options : [
         'warning_level=3',
         'cpp_std=c++20',
