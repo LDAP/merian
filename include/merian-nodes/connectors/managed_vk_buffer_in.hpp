@@ -11,7 +11,7 @@ using ManagedVkBufferInHandle = std::shared_ptr<ManagedVkBufferIn>;
 
 // Input a Vulkan buffer that is allocated and managed by the graph.
 // Note that it only supplies a descriptor if stage_flags contains at least one bit.
-class ManagedVkBufferIn : public TypedInputConnector<ManagedVkBufferOutHandle, BufferHandle> {
+class ManagedVkBufferIn : public TypedInputConnector<ManagedVkBufferOutHandle, BufferArrayResource&> {
     friend class ManagedVkBufferOut;
 
   public:
@@ -31,7 +31,7 @@ class ManagedVkBufferIn : public TypedInputConnector<ManagedVkBufferOutHandle, B
 
     virtual void on_connect_output(const OutputConnectorHandle& output) override;
 
-    virtual BufferHandle resource(const GraphResourceHandle& resource) override;
+    virtual BufferArrayResource& resource(const GraphResourceHandle& resource) override;
 
     virtual ConnectorStatusFlags
     on_pre_process(GraphRun& run,
@@ -47,6 +47,8 @@ class ManagedVkBufferIn : public TypedInputConnector<ManagedVkBufferOutHandle, B
     static ManagedVkBufferInHandle transfer_src(const std::string& name, const uint32_t delay = 0);
 
   private:
+    uint32_t array_size;
+
     const vk::AccessFlags2 access_flags;
     const vk::PipelineStageFlags2 pipeline_stages;
     const vk::BufferUsageFlags usage_flags;

@@ -10,6 +10,8 @@ namespace merian_nodes {
 class BufferArrayResource : public GraphResource {
     friend class VkBufferArrayOut;
     friend class VkBufferArrayIn;
+    friend class ManagedVkBufferOut;
+    friend class ManagedVkBufferIn;
 
   public:
     BufferArrayResource(std::vector<merian::BufferHandle>& buffers,
@@ -64,6 +66,21 @@ class BufferArrayResource : public GraphResource {
                 props.st_end_child();
             }
         }
+    }
+
+    merian::BufferHandle operator->() const {
+      assert(!buffers.empty());
+      return buffers[0];
+    }
+
+    operator merian::BufferHandle() const {
+      assert(!buffers.empty());
+      return buffers[0];
+    }
+
+    merian::Buffer& operator*() const {
+        assert(!buffers.empty());
+        return *buffers[0];
     }
 
   public:

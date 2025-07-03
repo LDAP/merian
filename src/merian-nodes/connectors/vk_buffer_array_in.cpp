@@ -20,7 +20,7 @@ std::optional<vk::DescriptorSetLayoutBinding> VkBufferArrayIn::get_descriptor_in
         return vk::DescriptorSetLayoutBinding{0, vk::DescriptorType::eStorageBuffer, array_size,
                                               stage_flags, nullptr};
     return std::nullopt;
-}
+} 
 
 void VkBufferArrayIn::get_descriptor_update(
     const uint32_t binding,
