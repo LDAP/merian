@@ -56,8 +56,16 @@ class GraphPrototype {
     // Creates a graph structure from merian::Properties
     static void from_properties(merian::Properties& properties) {}
 
+    static void from_file(const std::string& path) {}
+
+    static void from_file(const std::filesystem::path& path) {}
+
     // Dumps the graph structure to merian::Properties
     void to_properties(merian::Properties& properties) {}
+
+    void to_file(const std::string& path) {}
+
+    void to_file(const std::filesystem::path& path) {}
 
   private:
     struct PerNodeInfo {
