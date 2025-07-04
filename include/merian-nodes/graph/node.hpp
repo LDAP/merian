@@ -6,7 +6,6 @@
 #include "node_io.hpp"
 
 #include "merian/utils/properties.hpp"
-#include "merian/vk/command/command_buffer.hpp"
 #include "merian/vk/descriptors/descriptor_set.hpp"
 #include "merian/vk/descriptors/descriptor_set_layout.hpp"
 
