@@ -3,6 +3,8 @@
 #include "connector_input.hpp"
 #include "connector_output.hpp"
 #include "graph_run.hpp"
+#include "merian/utils/properties_json_dump.hpp"
+#include "merian/utils/properties_json_load.hpp"
 #include "node_io.hpp"
 
 #include "merian/utils/properties.hpp"
@@ -104,8 +106,8 @@ class Node : public std::enable_shared_from_this<Node> {
     // You can provide data that that is required for the current run by setting the io map
     // in_flight_data. The pointer is persisted and supplied again after (graph ring size - 1) runs.
     //
-    // You can throw node_error and compilation_failed here. The graph then attemps to finish the
-    // run and rebuild, however this is not supported and not recommened.
+    // You can throw node_error and compilation_failed here. The graph then attempts to finish the
+    // run and rebuild, however this is not supported and not recommended.
     virtual void process([[maybe_unused]] GraphRun& run,
                          [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
                          [[maybe_unused]] const NodeIO& io) {}
@@ -119,8 +121,18 @@ class Node : public std::enable_shared_from_this<Node> {
     // Normally this method is called by the graph configuration(), if you want to call it directly
     // you need to handle the NodeStatusFlags accordingly.
     [[nodiscard]]
-    virtual NodeStatusFlags properties([[maybe_unused]] Properties& config) {
+    virtual NodeStatusFlags properties([[maybe_unused]] Properties& props) {
         return {};
+    }
+
+    virtual nlohmann::json dump_config() {
+        merian::JSONDumpProperties props;
+        std::ignore = properties(props);
+        return props.get();
+    }
+
+    virtual void load_config(const nlohmann::json& json) {
+        merian::JSONLoadProperties props(json);
     }
 };
 

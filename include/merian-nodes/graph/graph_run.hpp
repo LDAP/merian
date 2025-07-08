@@ -20,7 +20,7 @@ using namespace std::literals::chrono_literals;
 
 // Manages data of a single graph run.
 class GraphRun {
-    template <uint32_t> friend class Graph;
+    friend class Graph;
 
   public:
     GraphRun(const uint32_t iterations_in_flight,

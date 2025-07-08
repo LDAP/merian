@@ -15,6 +15,10 @@ class JSONLoadProperties : public Properties {
 
     JSONLoadProperties(const std::string& json_string);
 
+    JSONLoadProperties(const nlohmann::json& json);
+
+    JSONLoadProperties(const nlohmann::json&& json);
+
     virtual ~JSONLoadProperties() override;
 
     virtual bool st_begin_child(const std::string& id,

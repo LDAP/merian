@@ -1,18 +1,17 @@
 #pragma once
 
-#include "merian/utils/hash.hpp"
 #include "merian/utils/properties.hpp"
-
-#include <unordered_set>
+#include "merian/utils/properties_json_dump.hpp"
+#include "merian/utils/properties_json_load.hpp"
 
 namespace merian_nodes {
 
 // Describes the structure (nodes, connections) of a Graph and the configuration of the nodes. The
 // GraphBuilder can take this description and build the runable graph from it.
-class GraphPrototype {
+class GraphDescription {
   public:
-    // Empty prototype
-    GraphPrototype() {}
+    // Empty graph
+    GraphDescription() {}
 
     // -----------------------------------------------------------------
     // -----------------------------------------------------------------
@@ -53,31 +52,54 @@ class GraphPrototype {
 
     // -----------------------------------------------------------------
 
-    // Creates a graph structure from merian::Properties
-    static void from_properties(merian::Properties& properties) {}
+    // Creates a graph description from merian::Properties
+    static GraphDescription from_properties(merian::Properties& properties) {}
 
-    static void from_file(const std::string& path) {}
+    static GraphDescription from_file(const std::filesystem::path& path) {
+        merian::JSONLoadProperties props(path);
+        return from_properties(props);
+    }
 
-    static void from_file(const std::filesystem::path& path) {}
+    static GraphDescription from_file(const std::string& s_path) {
+        std::filesystem::path path = s_path;
+        return from_file(path);
+    }
 
-    // Dumps the graph structure to merian::Properties
+    // Dumps the graph description to merian::Properties
     void to_properties(merian::Properties& properties) {}
 
-    void to_file(const std::string& path) {}
+    void to_file(const std::filesystem::path& path) {
+        merian::JSONDumpProperties props(path);
+        to_properties(props);
+    }
 
-    void to_file(const std::filesystem::path& path) {}
+    void to_file(const std::string& s_path) {
+        std::filesystem::path path = s_path;
+        to_file(path);
+    }
 
   private:
     struct PerNodeInfo {
         const std::string node_type;
 
-        nlohmann::json config;
+        // ---------------------------------------------
+        
+        bool disabled = false;
+
+        // Can be used to enforce a certain linearization of the graph.
+        // Note, the driver might still move things around as the order is not enforced via barriers
+        // by default.
+        uint32_t linearization_order = 0;
+
+        // ---------------------------------------------
+
+        nlohmann::json config{};
 
         // (output_connector_name -> dst_node -> dst_input)
-        std::map<std::string, std::map<std::string, std::string>> outgoing_connections;
+        std::map<std::string, std::map<std::string, std::string>> outgoing_connections{};
 
-        // (input connector name -> (src_node, src_output_name))
-        std::unordered_map<std::string, std::pair<std::string, std::string>> incoming_connections;
+        // (input connector name -> src_node -> src_output_name)
+        std::unordered_map<std::string, std::map<std::string, std::string>> incoming_connections{};
     };
 
     // (identifier -> per_node_info)
