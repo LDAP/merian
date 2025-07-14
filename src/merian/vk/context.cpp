@@ -273,10 +273,12 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id,
         &physical_device.physical_device_11_properties;
     // ^
     physical_device.physical_device.getProperties2(&physical_device.physical_device_properties);
-    SPDLOG_INFO("selected physical device {}, vendor id: {}, device id: {}",
+    SPDLOG_INFO("selected physical device {}, vendor id: {}, device id: {}, driver: {}, {}",
                 physical_device.physical_device_properties.properties.deviceName.data(),
                 physical_device.physical_device_properties.properties.vendorID,
-                physical_device.physical_device_properties.properties.deviceID);
+                physical_device.physical_device_properties.properties.deviceID,
+                vk::to_string(physical_device.physical_device_12_properties.driverID),
+                physical_device.physical_device_12_properties.driverInfo.data());
 
     void* extension_features_pnext = nullptr;
     for (auto& ext : extensions) {

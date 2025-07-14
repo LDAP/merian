@@ -23,9 +23,11 @@ class ExtensionVkRayTracingPositionFetch : public Extension {
                              const ExtensionContainer& /*unused*/,
                              const QueueInfo& /*unused*/) override {
         if (physical_device.physical_device_12_properties.driverID ==
-            vk::DriverId::eAmdOpenSource) {
-            SPDLOG_WARN("detected AMD open-source driver. ExtensionVkRayTracingPositionFetch is "
-                        "broken (last checked: 2025/05/26) - disabling!");
+                vk::DriverId::eAmdOpenSource ||
+            physical_device.physical_device_12_properties.driverID ==
+                vk::DriverId::eAmdProprietary) {
+            SPDLOG_WARN("detected AMDVLK driver. ExtensionVkRayTracingPositionFetch is "
+                        "broken (last checked: 2025/07/14) - disabling!");
             return false;
         }
 
