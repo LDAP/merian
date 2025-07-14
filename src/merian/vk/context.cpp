@@ -95,7 +95,8 @@ Version: {}\n\n",
     prepare_shader_include_defines();
 
     // add common folders to file loader
-    file_loader.add_search_path(MERIAN_INSTALL_DATA_DIR);
+    file_loader.add_search_path(FileLoader::install_datadir() / MERIAN_PROJECT_NAME);
+    file_loader.add_search_path(FileLoader::install_datadir());
     file_loader.add_search_path(default_shader_include_paths);
 
     SPDLOG_INFO("context ready.");
@@ -496,7 +497,7 @@ void Context::prepare_shader_include_defines() {
     const std::filesystem::path development_headers =
         std::filesystem::path(MERIAN_DEVELOPMENT_INCLUDE_DIR);
     const std::filesystem::path installed_headers =
-        std::filesystem::path(MERIAN_INSTALL_INCLUDE_DIR);
+        std::filesystem::path(FileLoader::install_includedir());
 
     if (FileLoader::exists(development_headers / "merian-shaders")) {
         SPDLOG_DEBUG("found merian-shaders development headers headers at {}",
@@ -511,7 +512,7 @@ void Context::prepare_shader_include_defines() {
         SPDLOG_DEBUG("found merian-shaders at {}", headers->parent_path().string());
         default_shader_include_paths.emplace_back(headers->parent_path().string());
     } else {
-        SPDLOG_ERROR("merian-shaders header not found! Shader compilers might not work correctly");
+        SPDLOG_ERROR("merian-shaders header not found! Shader compilers will not work correctly");
     }
 
     // add macro definitions from context extensions and enabled instance and device extensions.

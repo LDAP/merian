@@ -42,8 +42,8 @@ add_project_arguments('-DMERIAN_VERSION_PATCH=@0@'.format(version_split[2]), lan
 add_project_arguments('-DMERIAN_PROJECT_NAME="@0@"'.format(meson.project_name()), language : 'cpp')
 
 add_project_arguments('-DMERIAN_INSTALL_PREFIX="@0@"'.format(get_option('prefix')), language : 'cpp')
-add_project_arguments('-DMERIAN_INSTALL_INCLUDE_DIR="@0@"'.format(join_paths(get_option('prefix'), get_option('includedir'))), language : 'cpp')
-add_project_arguments('-DMERIAN_INSTALL_DATA_DIR="@0@"'.format(join_paths(get_option('prefix'), get_option('datadir'), meson.project_name())), language : 'cpp')
+add_project_arguments('-DMERIAN_INCLUDE_DIR_NAME="@0@"'.format(get_option('includedir')), language : 'cpp')
+add_project_arguments('-DMERIAN_DATA_DIR_NAME="@0@"'.format(get_option('datadir')), language : 'cpp')
 add_project_arguments('-DMERIAN_DEVELOPMENT_INCLUDE_DIR="@0@"'.format(join_paths(meson.current_source_dir(), 'include')), language : 'cpp')
 
 # Dependencies

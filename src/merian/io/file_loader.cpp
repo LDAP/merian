@@ -33,6 +33,26 @@ std::string FileLoader::load_file(const std::filesystem::path& path) {
     return result;
 }
 
+std::filesystem::path FileLoader::install_prefix() {
+    const std::filesystem::path test_file =
+        std::filesystem::path(MERIAN_INCLUDE_DIR_NAME) / std::filesystem::path(MERIAN_PROJECT_NAME);
+
+    std::filesystem::path prefix = std::filesystem::path(MERIAN_INSTALL_PREFIX);
+    if (FileLoader::exists(prefix / test_file)) {
+        return prefix;
+    }
+
+    return std::filesystem::current_path();
+}
+
+std::filesystem::path FileLoader::install_includedir() {
+    return install_prefix() / std::filesystem::path(MERIAN_INCLUDE_DIR_NAME);
+}
+
+std::filesystem::path FileLoader::install_datadir() {
+    return install_prefix() / std::filesystem::path(MERIAN_DATA_DIR_NAME);
+}
+
 // returns empty path if not found.
 std::optional<std::filesystem::path>
 FileLoader::search_cwd_parents(const std::filesystem::path& path) {

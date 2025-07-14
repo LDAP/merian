@@ -42,6 +42,15 @@ class FileLoader {
 
     static std::optional<std::filesystem::path>
     search_cwd_parents(const std::filesystem::path& path);
+    
+    // Returns the installed prefix or cwd if not installed
+    static std::filesystem::path install_prefix();
+
+    // Returns prefix / includedir
+    static std::filesystem::path install_includedir();
+
+    // Returns prefix / datadir
+    static std::filesystem::path install_datadir();
 
   public:
     FileLoader(const std::set<std::filesystem::path>& search_paths = {"./"})
