@@ -40,17 +40,25 @@ class FileLoader {
 
     static std::string load_file(const std::filesystem::path& path);
 
+    // searches 'start' and all its parents for 'test'. If base / test exists, the path to base is returned
+    // and it is guaranteed, that base / test exists.
+    static std::optional<std::filesystem::path> search_parents(const std::filesystem::path& start,
+                                                               const std::filesystem::path& test);
+
     static std::optional<std::filesystem::path>
     search_cwd_parents(const std::filesystem::path& path);
-    
-    // Returns the installed prefix or cwd if not installed
-    static std::filesystem::path install_prefix();
 
-    // Returns prefix / includedir
-    static std::filesystem::path install_includedir();
+    // Attempts to detect a prefix path (like install_prefix) if not installed but packaged.
+    static std::optional<std::filesystem::path> portable_prefix();
 
-    // Returns prefix / datadir
-    static std::filesystem::path install_datadir();
+    // Returns the installed prefix or nullopt if not installed.
+    static std::optional<std::filesystem::path> install_prefix();
+
+    // prefix / includedir_name contains application headers (and shaders)
+    static std::filesystem::path install_includedir_name();
+
+    // prefix / datadir contains application resources
+    static std::filesystem::path install_datadir_name();
 
   public:
     FileLoader(const std::set<std::filesystem::path>& search_paths = {"./"})

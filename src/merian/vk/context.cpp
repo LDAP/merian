@@ -1,5 +1,6 @@
 #include "merian/vk/context.hpp"
 #include "merian/utils/pointer.hpp"
+#include "merian/utils/stopwatch.hpp"
 #include "merian/utils/vector.hpp"
 #include "merian/vk/extension/extension.hpp"
 
@@ -46,6 +47,8 @@ Context::Context(const std::vector<std::shared_ptr<Extension>>& desired_extensio
                  const std::string& filter_device_name)
     : application_name(application_name), vk_api_version(vk_api_version),
       application_vk_version(application_vk_version) {
+    merian::Stopwatch sw;
+
     SPDLOG_INFO("\n\n\
 __  __ ___ ___ ___   _   _  _ \n\
 |  \\/  | __| _ \\_ _| /_\\ | \\| |\n\
@@ -93,13 +96,21 @@ Version: {}\n\n",
     create_device_and_queues(preffered_number_compute_queues);
 
     prepare_shader_include_defines();
-
-    // add common folders to file loader
-    file_loader.add_search_path(FileLoader::install_datadir() / MERIAN_PROJECT_NAME);
-    file_loader.add_search_path(FileLoader::install_datadir());
+    // add those first => prefer development headers.
     file_loader.add_search_path(default_shader_include_paths);
 
-    SPDLOG_INFO("context ready.");
+    // add common folders to file loader
+    if (const auto portable_prefix = FileLoader::portable_prefix(); portable_prefix) {
+        file_loader.add_search_path(*portable_prefix);
+    }
+    if (const auto install_prefix = FileLoader::install_prefix(); install_prefix) {
+        file_loader.add_search_path(*install_prefix);
+    }
+    file_loader.add_search_path(FileLoader::install_datadir_name());
+    file_loader.add_search_path(FileLoader::install_datadir_name() / MERIAN_PROJECT_NAME);
+    file_loader.add_search_path(FileLoader::install_includedir_name());
+
+    SPDLOG_INFO("context ready. (took: {})", format_duration(sw.nanos()));
 }
 
 Context::~Context() {
@@ -497,7 +508,7 @@ void Context::prepare_shader_include_defines() {
     const std::filesystem::path development_headers =
         std::filesystem::path(MERIAN_DEVELOPMENT_INCLUDE_DIR);
     const std::filesystem::path installed_headers =
-        std::filesystem::path(FileLoader::install_includedir());
+        std::filesystem::path(FileLoader::install_includedir_name());
 
     if (FileLoader::exists(development_headers / "merian-shaders")) {
         SPDLOG_DEBUG("found merian-shaders development headers headers at {}",

@@ -33,40 +33,60 @@ std::string FileLoader::load_file(const std::filesystem::path& path) {
     return result;
 }
 
-std::filesystem::path FileLoader::install_prefix() {
+std::optional<std::filesystem::path> FileLoader::portable_prefix() {
     const std::filesystem::path test_file =
         std::filesystem::path(MERIAN_INCLUDE_DIR_NAME) / std::filesystem::path(MERIAN_PROJECT_NAME);
 
-    std::filesystem::path prefix = std::filesystem::path(MERIAN_INSTALL_PREFIX);
-    if (FileLoader::exists(prefix / test_file)) {
+    std::optional<std::filesystem::path> portable_prefix =
+        search_parents(std::filesystem::current_path(), test_file);
+
+    return portable_prefix;
+}
+
+std::optional<std::filesystem::path> FileLoader::install_prefix() {
+    const std::filesystem::path test_file =
+        install_includedir_name() / std::filesystem::path(MERIAN_PROJECT_NAME);
+
+    std::filesystem::path prefix(MERIAN_INSTALL_PREFIX);
+    if (exists(prefix / test_file)) {
         return prefix;
     }
-
-    return std::filesystem::current_path();
+    return std::nullopt;
 }
 
-std::filesystem::path FileLoader::install_includedir() {
-    return install_prefix() / std::filesystem::path(MERIAN_INCLUDE_DIR_NAME);
+std::filesystem::path FileLoader::install_includedir_name() {
+    return std::filesystem::path(MERIAN_INCLUDE_DIR_NAME);
 }
 
-std::filesystem::path FileLoader::install_datadir() {
-    return install_prefix() / std::filesystem::path(MERIAN_DATA_DIR_NAME);
+std::filesystem::path FileLoader::install_datadir_name() {
+    return std::filesystem::path(MERIAN_DATA_DIR_NAME);
 }
 
-// returns empty path if not found.
-std::optional<std::filesystem::path>
-FileLoader::search_cwd_parents(const std::filesystem::path& path) {
-    std::filesystem::path current = std::filesystem::current_path();
+std::optional<std::filesystem::path> FileLoader::search_parents(const std::filesystem::path& start,
+                                                                const std::filesystem::path& test) {
+    std::filesystem::path current = start;
     while (true) {
-        const std::filesystem::path full_path = current / path;
-        if (exists(full_path)) {
-            return std::filesystem::weakly_canonical(full_path);
+        const std::filesystem::path full_test_path = current / test;
+        if (exists(full_test_path)) {
+            return std::filesystem::weakly_canonical(current);
         }
         if (current.parent_path() == current) {
             break;
         }
         current = current.parent_path();
     };
+
+    return std::nullopt;
+}
+
+// returns empty path if not found.
+std::optional<std::filesystem::path>
+FileLoader::search_cwd_parents(const std::filesystem::path& path) {
+    const std::optional<std::filesystem::path> base =
+        search_parents(std::filesystem::current_path(), path);
+    if (base) {
+        return std::filesystem::weakly_canonical(*base / path);
+    }
 
     return std::nullopt;
 }
@@ -81,7 +101,7 @@ FileLoader::find_file(const std::filesystem::path& path) const {
     if (enable_search_cwd_parents && path.is_relative()) {
         const auto match_in_parents = search_cwd_parents(path);
         if (match_in_parents) {
-            return *match_in_parents;
+            return match_in_parents;
         }
     }
     for (const auto& search_path : search_paths) {
@@ -134,11 +154,14 @@ FileLoader::find_and_load_file(const std::filesystem::path& filename,
 
 void FileLoader::add_search_path(const std::filesystem::path& path) {
     auto resolved = find_file(path);
-    if (!resolved) {
-        resolved = std::filesystem::weakly_canonical(path);
+    if (resolved) {
+        search_paths.insert(*resolved);
+        SPDLOG_DEBUG("added search path {}", resolved->string());
+        return;
     }
-    search_paths.insert(*resolved);
-    SPDLOG_DEBUG("added search path {}", resolved->string());
+
+    SPDLOG_DEBUG("path {} could not be found in search path and was not added as new search path.",
+                 path.string());
 }
 
 void FileLoader::add_search_path(const std::vector<std::filesystem::path>& paths) {
