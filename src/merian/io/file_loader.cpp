@@ -8,6 +8,21 @@
 #include <spdlog/spdlog.h>
 #include <string>
 
+#if defined(__APPLE__)
+#include <libproc.h>
+#endif
+
+#if defined(_WIN32)
+#include <direct.h>
+#include <io.h>
+#include <shlobj.h>
+#endif
+
+#if defined(__FreeBSD__)
+#include <sys/sysctl.h>
+#include <sys/types.h>
+#endif
+
 namespace merian {
 
 bool FileLoader::exists(const std::filesystem::path& path,
@@ -33,13 +48,40 @@ std::string FileLoader::load_file(const std::filesystem::path& path) {
     return result;
 }
 
+std::filesystem::path FileLoader::binary_path() {
+#ifdef __linux__
+    return std::filesystem::canonical("/proc/self/exe");
+#elif defined(__FreeBSD__)
+    std::array<char, 1024> path;
+    size_t len_procpath = path.size();
+    int mib_procpath[] = {CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, -1};
+    sysctl(mib_procpath, 4, path.data(), &len_procpath, NULL, 0);
+    return std::filesystem::canonical(path.data());
+#elif defined(_WIN32)
+    char* path;
+    _get_pgmptr(&path);
+    return std::filesystem::canonical(path);
+#elif defined(__APPLE__)
+    pid_t pid = getpid();
+    std::array<char, 1024> path;
+    proc_pidpath(pid, path.data(), path.size());
+    return std::filesystem::canonical(path.data());
+#else
+#error "binary_path not implemented for this target system"
+#endif
+}
+
 std::optional<std::filesystem::path> FileLoader::portable_prefix() {
     const std::filesystem::path test_file =
         std::filesystem::path(MERIAN_INCLUDE_DIR_NAME) / std::filesystem::path(MERIAN_PROJECT_NAME);
 
     std::optional<std::filesystem::path> portable_prefix =
-        search_parents(std::filesystem::current_path(), test_file);
+        search_parents(binary_path().parent_path(), test_file);
+    if (portable_prefix) {
+        return portable_prefix;
+    }
 
+    portable_prefix = search_parents(std::filesystem::current_path(), test_file);
     return portable_prefix;
 }
 

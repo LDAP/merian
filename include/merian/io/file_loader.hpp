@@ -48,6 +48,11 @@ class FileLoader {
     static std::optional<std::filesystem::path>
     search_cwd_parents(const std::filesystem::path& path);
 
+    // ----------------------------------------------
+
+    // Attempts to locate the currently used binary
+    static std::filesystem::path binary_path();
+
     // Attempts to detect a prefix path (like install_prefix) if not installed but packaged.
     static std::optional<std::filesystem::path> portable_prefix();
 
