@@ -135,8 +135,11 @@ FileLoader::search_cwd_parents(const std::filesystem::path& path) {
 
 // Searches the file in cwd and search paths and returns the full
 // path to the file. If the filename is relative parents are searched if configured.
+//
+// Additional search paths are preferred.
 std::optional<std::filesystem::path>
-FileLoader::find_file(const std::filesystem::path& path) const {
+FileLoader::find_file(const std::filesystem::path& path,
+                      const vk::ArrayProxy<std::filesystem::path>& additional_search_paths) const {
     if (exists(path)) {
         return std::filesystem::weakly_canonical(path);
     }
@@ -146,10 +149,19 @@ FileLoader::find_file(const std::filesystem::path& path) const {
             return match_in_parents;
         }
     }
-    for (const auto& search_path : search_paths) {
-        const std::filesystem::path full_path = search_path / path;
+
+    for (const auto& search_path : additional_search_paths) {
+        std::filesystem::path full_path = std::filesystem::weakly_canonical(
+            (std::filesystem::is_directory(search_path) ? search_path : search_path.parent_path()) /
+            path);
         if (exists(full_path))
-            return std::filesystem::weakly_canonical(full_path);
+            return full_path;
+    }
+
+    for (const auto& search_path : search_paths) {
+        std::filesystem::path full_path = std::filesystem::weakly_canonical(search_path / path);
+        if (exists(full_path))
+            return full_path;
     }
 
 #if SPDLOG_ACTIVE_LEVEL <= SPDLOG_LEVEL_DEBUG
@@ -163,15 +175,6 @@ FileLoader::find_file(const std::filesystem::path& path) const {
 #endif
 
     return std::nullopt;
-}
-
-std::optional<std::filesystem::path>
-FileLoader::find_file(const std::filesystem::path& filename,
-                      const std::filesystem::path& relative_to_file_or_directory) const {
-    const std::filesystem::path relative_to = std::filesystem::is_directory(filename)
-                                                  ? relative_to_file_or_directory
-                                                  : relative_to_file_or_directory.parent_path();
-    return find_file(relative_to / filename);
 }
 
 std::optional<std::string>

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "merian/utils/string.hpp"
+#include "vulkan/vulkan.hpp"
 #include <filesystem>
 #include <fstream>
 #include <optional>
@@ -40,8 +41,8 @@ class FileLoader {
 
     static std::string load_file(const std::filesystem::path& path);
 
-    // searches 'start' and all its parents for 'test'. If base / test exists, the path to base is returned
-    // and it is guaranteed, that base / test exists.
+    // searches 'start' and all its parents for 'test'. If base / test exists, the path to base is
+    // returned and it is guaranteed, that base / test exists.
     static std::optional<std::filesystem::path> search_parents(const std::filesystem::path& start,
                                                                const std::filesystem::path& test);
 
@@ -70,11 +71,9 @@ class FileLoader {
         : search_paths(search_paths) {}
 
     // Searches the file in cwd and search paths and returns the full path to the file
-    std::optional<std::filesystem::path> find_file(const std::filesystem::path& path) const;
-
     std::optional<std::filesystem::path>
-    find_file(const std::filesystem::path& filename,
-              const std::filesystem::path& relative_to_file_or_directory) const;
+    find_file(const std::filesystem::path& path,
+              const vk::ArrayProxy<std::filesystem::path>& additional_search_paths = {}) const;
 
     std::optional<std::string> find_and_load_file(const std::filesystem::path& filename) const;
 
