@@ -1,7 +1,7 @@
 project(
     'merian',
     ['cpp', 'c'],
-    version : run_command(['git', 'describe', '--tags', '--abbrev=0'], check: true).stdout().strip(),
+    version : '1.0.0',
     default_options : [
         'warning_level=3',
         'cpp_std=c++20',
@@ -9,6 +9,11 @@ project(
     ],
     meson_version: '>=1.5.0',
 )
+
+git_tag_version = run_command(['git', 'describe', '--tags', '--abbrev=0'], check: false).stdout().strip()
+if git_tag_version != meson.project_version()
+    warning('Git tag @0@ does not match project version @1@'.format(git_tag_version, meson.project_version()))
+endif
 
 cmake = import('cmake')
 
