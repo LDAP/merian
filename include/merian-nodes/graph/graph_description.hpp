@@ -1,13 +1,14 @@
 #pragma once
 
-#include "merian/utils/properties.hpp"
-#include "merian/utils/properties_json_dump.hpp"
+#include "merian/io/file_loader.hpp"
 #include "merian/utils/properties_json_load.hpp"
+
+#include <fstream>
 
 namespace merian_nodes {
 
-// Describes the structure (nodes, connections) of a Graph and the configuration of the nodes. The
-// GraphBuilder can take this description and build the runable graph from it.
+// Intermediate representation of a Graph which describes its structure (nodes, connections) and the
+// configuration of the nodes. This representation is used to load an store graphs.
 class GraphDescription {
   public:
     // Empty graph
@@ -45,6 +46,8 @@ class GraphDescription {
         nodes.at(identifier).config = config;
     }
 
+    // -----------------------------------------------------------------
+
     const nlohmann::json& get_node_config(const std::string& identifier) const {
         assert(nodes.contains(identifier));
         return nodes.at(identifier).config;
@@ -52,38 +55,71 @@ class GraphDescription {
 
     // -----------------------------------------------------------------
 
-    // Creates a graph description from merian::Properties
-    static GraphDescription from_properties(merian::Properties& properties) {}
-
     static GraphDescription from_file(const std::filesystem::path& path) {
-        merian::JSONLoadProperties props(path);
-        return from_properties(props);
+        assert(merian::FileLoader::exists(path));
+        std::ifstream i(path.string());
+        nlohmann::json json;
+        i >> json;
+
+        return from_json(json);
     }
 
-    static GraphDescription from_file(const std::string& s_path) {
-        std::filesystem::path path = s_path;
-        return from_file(path);
+    static GraphDescription from_json(const nlohmann::json& json) {
+        GraphDescription description;
+        if (!json.contains(SCHEMA_VERSION_KEY)) {
+            parse_graph_v1(json, description);
+        }
+
+        int schema_version = json[SCHEMA_VERSION_KEY].get<int>();
+        if (schema_version == 2) {
+            parse_graph_v2(json, description);
+        } else {
+            throw std::runtime_error{fmt::format("schema version {} unsupported.", schema_version)};
+        }
+
+        return description;
     }
 
-    // Dumps the graph description to merian::Properties
-    void to_properties(merian::Properties& properties) {}
+    // -----------------------------------------------------------------
 
     void to_file(const std::filesystem::path& path) {
-        merian::JSONDumpProperties props(path);
-        to_properties(props);
+        std::ofstream file(path.string());
+        file << std::setw(4) << to_json() << '\n';
     }
 
-    void to_file(const std::string& s_path) {
-        std::filesystem::path path = s_path;
-        to_file(path);
+    nlohmann::json to_json() {
+        // merian::JSONDumpProperties props;
+        // to_properties(props);
+
+        // return props.get();
     }
 
   private:
+    static void parse_graph_v1(const nlohmann::json& json, GraphDescription& description) {
+        merian::JSONLoadProperties props(json);
+        // ...
+    }
+
+    static void parse_graph_v2(const nlohmann::json& json, GraphDescription& description) {
+        merian::JSONLoadProperties props(json);
+        // ...
+    }
+
+  private:
+    static constexpr int SCHEMA_VERSION = 2;
+    static constexpr std::string SCHEMA_VERSION_KEY = "schema_version";
+
+    struct PerOutputInfo {
+        // (dst_node -> dst_input)
+        std::map<std::string, std::string> target;
+        bool is_graph_output = false;
+    };
+
     struct PerNodeInfo {
         const std::string node_type;
 
         // ---------------------------------------------
-        
+
         bool disabled = false;
 
         // Can be used to enforce a certain linearization of the graph.
@@ -95,8 +131,8 @@ class GraphDescription {
 
         nlohmann::json config{};
 
-        // (output_connector_name -> dst_node -> dst_input)
-        std::map<std::string, std::map<std::string, std::string>> outgoing_connections{};
+        // (output_connector_name -> output_info)
+        std::map<std::string, PerOutputInfo> outgoing_connections{};
 
         // (input connector name -> src_node -> src_output_name)
         std::unordered_map<std::string, std::map<std::string, std::string>> incoming_connections{};

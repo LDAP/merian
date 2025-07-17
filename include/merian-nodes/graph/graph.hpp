@@ -26,23 +26,21 @@ class Graph : public Node {
      * @param[in]  description  The graph structure and config.
      * @param[in]  auto_repair  Updates the description, for example if illegal connections are
      * detected
-     * @param[in]  allow_partial_build  Allows nodes to be disabled if they're not connected to
-     * continue with the build
      *
      * @throws invalid_connection if there is an illegal connection present in the description and
      * auto_repair is false
      * @throws connection_missing if there is an connection missing and allow_partial_build is false
      * @throws build_error for everything else that prevents a graph build
      */
-    void build(GraphDescription& description,
-               const bool auto_repair = true,
-               const bool allow_partial_build = true) {}
+    void build(GraphDescription& description, const bool auto_repair = true) {}
 
   public:
+    // All unconnected node inputs
     std::vector<InputConnectorHandle> describe_inputs() override {
         return {};
     }
 
+    // All outputs that are marked as graph_output
     std::vector<OutputConnectorHandle>
     describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) override {
         return {};
@@ -84,9 +82,7 @@ class Graph : public Node {
     // composed in a bigger graph.
     bool runnable{true};
 
-    struct NodeData {
-
-    };
+    struct NodeData {};
 
     // the layers of the graph. Each layer is independent of the layer before.
     std::vector<std::vector<NodeData>> graph;

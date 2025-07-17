@@ -55,7 +55,7 @@ JSONDumpProperties::~JSONDumpProperties() {
 
     if (filename) {
         std::ofstream file(filename.value().string());
-        file << std::setw(4) << current() << std::endl;
+        file << std::setw(4) << current() << '\n';
     }
 }
 
