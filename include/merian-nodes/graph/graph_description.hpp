@@ -68,6 +68,7 @@ class GraphDescription {
         GraphDescription description;
         if (!json.contains(SCHEMA_VERSION_KEY)) {
             parse_graph_v1(json, description);
+            return description;
         }
 
         int schema_version = json[SCHEMA_VERSION_KEY].get<int>();
@@ -101,7 +102,7 @@ class GraphDescription {
     }
 
     static void parse_graph_v2(const nlohmann::json& json, GraphDescription& description) {
-        merian::JSONLoadProperties props(json);
+        // merian::JSONLoadProperties props(json);
         // ...
     }
 
