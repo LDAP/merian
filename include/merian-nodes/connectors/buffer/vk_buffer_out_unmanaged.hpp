@@ -1,12 +1,12 @@
 #pragma once
 
-#include "merian-nodes/graph/connector_output.hpp"
+#include "merian-nodes/connectors/buffer/vk_buffer_out.hpp"
 #include "merian-nodes/resources/buffer_array_resource.hpp"
 
 namespace merian_nodes {
 
-class VkBufferArrayOut;
-using VkBufferArrayOutHandle = std::shared_ptr<VkBufferArrayOut>;
+class UnmanagedVkBufferOut;
+using UnmanagedVkBufferOutHandle = std::shared_ptr<UnmanagedVkBufferOut>;
 
 // Output an array of buffers to use in a shader.
 //
@@ -14,12 +14,13 @@ using VkBufferArrayOutHandle = std::shared_ptr<VkBufferArrayOut>;
 // set all descriptor slots to a dummy buffer (ResourceAllocator::get_dummy_buffer()) if not set.
 //
 // The output keeps the buffers alive for all in-flight iterations.
-class VkBufferArrayOut : public TypedOutputConnector<BufferArrayResource&> {
-    friend class VkBufferArrayIn;
+class UnmanagedVkBufferOut : public VkBufferOut, public AccessibleConnector<BufferArrayResource&> {
 
   public:
     // No descriptor binding is created.
-    VkBufferArrayOut(const std::string& name, const uint32_t array_size);
+    UnmanagedVkBufferOut(const std::string& name,
+                         const uint32_t array_size,
+                         const vk::BufferUsageFlags buffer_usage_flags);
 
     GraphResourceHandle
     create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
@@ -46,13 +47,13 @@ class VkBufferArrayOut : public TypedOutputConnector<BufferArrayResource&> {
                     std::vector<vk::ImageMemoryBarrier2>& image_barriers,
                     std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) override;
 
-    uint32_t array_size() const;
-
   public:
-    static VkBufferArrayOutHandle create(const std::string& name, const uint32_t array_size);
+    static UnmanagedVkBufferOutHandle create(const std::string& name,
+                                         const uint32_t array_size,
+                                         const vk::BufferUsageFlags buffer_usage_flags);
 
   private:
-    std::vector<merian::BufferHandle> buffers;
+    const vk::BufferUsageFlags buffer_usage_flags;
 };
 
 } // namespace merian_nodes

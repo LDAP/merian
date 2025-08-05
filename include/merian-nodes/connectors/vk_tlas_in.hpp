@@ -11,7 +11,9 @@ class VkTLASIn;
 using VkTLASInHandle = std::shared_ptr<VkTLASIn>;
 
 // Input a TLAS.
-class VkTLASIn : public TypedInputConnector<VkTLASOutHandle, const AccelerationStructureHandle&> {
+class VkTLASIn : public InputConnector,
+                 public OutputAccessibleInputConnector<VkTLASOutHandle>,
+                 public AccessibleConnector<const AccelerationStructureHandle&> {
     friend class VkTLASOut;
 
   public:

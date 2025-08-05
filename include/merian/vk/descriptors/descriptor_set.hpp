@@ -1,5 +1,6 @@
 #pragma once
 
+#include "merian/utils/pointer.hpp"
 #include "merian/vk/descriptors/descriptor_pool.hpp"
 #include "merian/vk/descriptors/descriptor_set_layout.hpp"
 #include "merian/vk/memory/resource_allocations.hpp"
@@ -93,8 +94,19 @@ class DescriptorSet : public std::enable_shared_from_this<DescriptorSet>, public
         return layout;
     }
 
-    const vk::DescriptorType& get_type_for_binding(uint32_t binding) const {
+    const vk::DescriptorType& get_type_for_binding(const uint32_t binding) const {
+        assert(binding < layout->get_bindings().size());
         return layout->get_bindings()[binding].descriptorType;
+    }
+
+    template <class ResourceType>
+    const ResourceType& get_resource(const uint32_t binding, const uint32_t array_element) {
+        assert(binding < resource_index_for_binding.size());
+        assert(array_element < layout->get_bindings()[binding].descriptorCount);
+
+        const ResourceHandle& resource =
+            resources[resource_index_for_binding[binding] + array_element];
+        return debugable_ptr_cast<ResourceType>(resource);
     }
 
     // ---------------------------------------------------------------------
@@ -122,6 +134,29 @@ class DescriptorSet : public std::enable_shared_from_this<DescriptorSet>, public
     // The type is automatically determined from the set using the binding index.
     // With access_layout you can overwrite the layout that the image has "when it is accessed
     // using the descriptor". If std::nullopt the current layout is used.
+    DescriptorSet& queue_descriptor_write_image(
+        const uint32_t binding,
+        const ImageViewHandle& image_view,
+        const uint32_t dst_array_element = 0,
+        const std::optional<vk::ImageLayout> access_layout = std::nullopt) {
+        write_resources.emplace_back(image_view);
+        write_infos.emplace_back(vk::DescriptorImageInfo(
+            VK_NULL_HANDLE, *image_view,
+            access_layout.value_or(image_view->get_image()->get_current_layout())));
+        writes.emplace_back(vk::WriteDescriptorSet{
+            set,
+            binding,
+            dst_array_element,
+            1,
+            layout->get_type_for_binding(binding),
+        });
+
+        return *this;
+    }
+
+    // The type is automatically determined from the set using the binding index.
+    // With access_layout you can overwrite the layout that the image has "when it is accessed
+    // using the descriptor". If std::nullopt the current layout is used.
     DescriptorSet& queue_descriptor_write_texture(
         const uint32_t binding,
         const TextureHandle& texture,
@@ -140,6 +175,20 @@ class DescriptorSet : public std::enable_shared_from_this<DescriptorSet>, public
         });
 
         return *this;
+    }
+
+    // The type is automatically determined from the set using the binding index.
+    // With access_layout you can overwrite the layout that the image has "when it is accessed
+    // using the descriptor". If std::nullopt the current layout is used.
+    DescriptorSet& queue_descriptor_write_texture(
+        const uint32_t binding,
+        const ImageViewHandle& view,
+        const SamplerHandle& sampler,
+        const uint32_t dst_array_element = 0,
+        const std::optional<vk::ImageLayout> access_layout = std::nullopt) {
+
+        return queue_descriptor_write_texture(binding, Texture::create(view, sampler),
+                                              dst_array_element, access_layout);
     }
 
     // Bind `acceleration_structure` at the binding point `binding` of DescriptorSet `set`.

@@ -1,6 +1,6 @@
 #include "merian-nodes/nodes/shadertoy/shadertoy.hpp"
 
-#include "merian-nodes/connectors/managed_vk_image_out.hpp"
+#include "merian-nodes/connectors/image/vk_image_out_managed.hpp"
 #include "merian-nodes/graph/errors.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 

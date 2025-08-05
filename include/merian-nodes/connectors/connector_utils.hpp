@@ -1,12 +1,12 @@
 #pragma once
 
-#include "merian-nodes/connectors/managed_vk_image_in.hpp"
-#include "merian-nodes/connectors/managed_vk_image_out.hpp"
+#include "merian-nodes/connectors/image/vk_image_in_sampled.hpp"
+#include "merian-nodes/connectors/image/vk_image_out_managed.hpp"
 
 namespace merian_nodes {
 
 using GBufferOutHandle = ManagedVkImageOutHandle;
-using GBufferInHandle = ManagedVkImageInHandle;
+using GBufferInHandle = VkSampledImageInHandle;
 
 class GBufferOut {
   public:
@@ -21,7 +21,7 @@ class GBufferIn {
   public:
     static GBufferInHandle
     compute_read(const std::string& name, const uint32_t delay = 0, const bool optional = false) {
-        return merian_nodes::ManagedVkImageIn::compute_read(name, delay, optional);
+        return merian_nodes::VkSampledImageIn::compute_read(name, delay, optional);
     }
 };
 

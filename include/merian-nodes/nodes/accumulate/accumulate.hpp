@@ -1,8 +1,7 @@
 #pragma once
 
 #include "merian-nodes/connectors/connector_utils.hpp"
-#include "merian-nodes/connectors/managed_vk_buffer_in.hpp"
-#include "merian-nodes/connectors/managed_vk_image_in.hpp"
+#include "merian-nodes/connectors/image/vk_image_in_sampled.hpp"
 
 #include "merian-nodes/graph/node.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
@@ -75,14 +74,13 @@ class Accumulate : public Node {
     static constexpr uint32_t FILTER_LOCAL_SIZE_Y = 16;
 
     // Graph IO
-    ManagedVkImageInHandle con_src = ManagedVkImageIn::compute_read("src");
+    VkSampledImageInHandle con_src = VkSampledImageIn::compute_read("src");
     GBufferInHandle con_gbuf = merian_nodes::GBufferIn::compute_read("gbuffer");
-    ManagedVkImageInHandle con_mv = ManagedVkImageIn::compute_read("mv", 0, true);
+    VkSampledImageInHandle con_mv = VkSampledImageIn::compute_read("mv", 0, true);
 
-    ManagedVkImageInHandle con_prev_out = ManagedVkImageIn::compute_read("prev_out", 1);
+    VkSampledImageInHandle con_prev_out = VkSampledImageIn::compute_read("prev_out", 1);
     GBufferInHandle con_prev_gbuf = merian_nodes::GBufferIn::compute_read("prev_gbuffer", 1);
-    ManagedVkImageInHandle con_prev_history = ManagedVkImageIn::compute_read("prev_history", 1);
-
+    VkSampledImageInHandle con_prev_history = VkSampledImageIn::compute_read("prev_history", 1);
 
     ManagedVkImageOutHandle con_out;
     ManagedVkImageOutHandle con_history;

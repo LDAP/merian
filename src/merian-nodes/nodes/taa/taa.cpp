@@ -1,7 +1,9 @@
 #include "merian-nodes/nodes/taa/taa.hpp"
 
-#include "config.h"
+#include "merian-nodes/connectors/image/vk_image_out_managed.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
+
+#include "config.h"
 #include "taa.comp.spv.h"
 
 namespace merian_nodes {
@@ -20,20 +22,20 @@ TAA::TAA(const ContextHandle& context) : AbstractCompute(context, sizeof(PushCon
 std::vector<InputConnectorHandle> TAA::describe_inputs() {
     return {
         con_src,
-        ManagedVkImageIn::compute_read("prev_src", 1),
+        VkSampledImageIn::compute_read("prev_src", 1),
         con_mv,
     };
 }
 
 std::vector<OutputConnectorHandle>
 TAA::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
-    width = io_layout[con_src]->create_info.extent.width;
-    height = io_layout[con_src]->create_info.extent.height;
+    const vk::ImageCreateInfo create_info = io_layout[con_src]->get_create_info();
+    width = create_info.extent.width;
+    height = create_info.extent.height;
 
     pc.enable_mv = static_cast<VkBool32>(io_layout.is_connected(con_mv));
     return {
-        ManagedVkImageOut::compute_write("out", io_layout[con_src]->create_info.format, width,
-                                         height),
+        ManagedVkImageOut::compute_write("out", create_info.format, width, height),
     };
 }
 

@@ -8,29 +8,30 @@
 namespace merian_nodes {
 
 class BufferArrayResource : public GraphResource {
-    friend class VkBufferArrayOut;
-    friend class VkBufferArrayIn;
+    friend class VkBufferIn;
+    friend class ManagedVkBufferOut;
+    friend class UnmanagedVkBufferOut;
 
   public:
-    BufferArrayResource(std::vector<merian::BufferHandle>& buffers,
-                        const merian::BufferHandle& dummy_buffer,
+    BufferArrayResource(const uint32_t array_size,
+                        const vk::BufferUsageFlags buffer_usage_flags,
                         const vk::PipelineStageFlags2 input_stage_flags,
                         const vk::AccessFlags2 input_access_flags)
-        : input_stage_flags(input_stage_flags), input_access_flags(input_access_flags),
-          buffers(buffers), dummy_buffer(dummy_buffer) {
+        : buffer_usage_flags(buffer_usage_flags), input_stage_flags(input_stage_flags),
+          input_access_flags(input_access_flags), buffers(array_size) {
 
         for (uint32_t i = 0; i < buffers.size(); i++) {
             current_updates.push_back(i);
         }
     }
 
-    // Automatically inserts barrier, can be nullptr to reset to dummy buffer.
     void set(const uint32_t index,
              const merian::BufferHandle& buffer,
              const merian::CommandBufferHandle& cmd,
              const vk::AccessFlags2 prior_access_flags,
              const vk::PipelineStageFlags2 prior_pipeline_stages) {
         assert(index < buffers.size());
+        assert((buffer->get_usage_flags() & buffer_usage_flags) == buffer_usage_flags);
 
         if (buffers[index] != buffer) {
             buffers[index] = buffer;
@@ -66,7 +67,23 @@ class BufferArrayResource : public GraphResource {
         }
     }
 
+    merian::BufferHandle operator->() const {
+        assert(!buffers.empty());
+        return buffers[0];
+    }
+
+    operator merian::BufferHandle() const {
+        assert(!buffers.empty());
+        return buffers[0];
+    }
+
+    merian::Buffer& operator*() const {
+        assert(!buffers.empty());
+        return *buffers[0];
+    }
+
   public:
+    const vk::BufferUsageFlags buffer_usage_flags;
     // combined pipeline stage flags of all inputs
     const vk::PipelineStageFlags2 input_stage_flags;
     // combined access flags of all inputs
@@ -78,9 +95,7 @@ class BufferArrayResource : public GraphResource {
     // then flushed to here to wait for the graph to apply descriptor updates.
     std::vector<uint32_t> pending_updates;
 
-    std::vector<merian::BufferHandle>& buffers;
-
-    const merian::BufferHandle dummy_buffer;
+    std::vector<merian::BufferHandle> buffers;
 };
 
 } // namespace merian_nodes

@@ -13,7 +13,9 @@ class AnyIn;
 using AnyInHandle = std::shared_ptr<AnyIn>;
 
 // Receive information from HostAnyOuts.
-class AnyIn : public TypedInputConnector<AnyOutHandle, const std::any&> {
+class AnyIn : public InputConnector,
+              public OutputAccessibleInputConnector<AnyOutHandle>,
+              public AccessibleConnector<const std::any&> {
 
   public:
     AnyIn(const std::string& name, const uint32_t delay);

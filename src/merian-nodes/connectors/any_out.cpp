@@ -6,7 +6,7 @@
 namespace merian_nodes {
 
 AnyOut::AnyOut(const std::string& name, const bool persistent)
-    : TypedOutputConnector(name, !persistent), persistent(persistent) {}
+    : OutputConnector(name, !persistent), persistent(persistent) {}
 
 GraphResourceHandle
 AnyOut::create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,

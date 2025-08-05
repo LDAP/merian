@@ -8,8 +8,7 @@
 
 namespace merian_nodes {
 
-AnyIn::AnyIn(const std::string& name, const uint32_t delay)
-    : TypedInputConnector<AnyOutHandle, const std::any&>(name, delay) {}
+AnyIn::AnyIn(const std::string& name, const uint32_t delay) : InputConnector(name, delay) {}
 
 const std::any& AnyIn::resource(const GraphResourceHandle& resource) {
     return debugable_ptr_cast<AnyResource>(resource)->any;

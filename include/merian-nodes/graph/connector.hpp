@@ -103,4 +103,22 @@ class Connector : public std::enable_shared_from_this<Connector> {
 
 using ConnectorHandle = std::shared_ptr<Connector>;
 
+/**
+ * @brief      Mixin for connector which allow some access to the underlying resource.
+ *
+ * @tparam     ResourceAccessType  defines how nodes can access the underlying resource of this
+ * connector. If the type is void, access is not possible.
+ */
+template <typename ResourceAccessType = void> class AccessibleConnector {
+  public:
+    AccessibleConnector() {}
+
+    using resource_access_type = ResourceAccessType;
+
+    virtual ResourceAccessType resource(const GraphResourceHandle& resource) = 0;
+};
+
+template <typename ResourceType, typename ResourceAccessType = void>
+using AccessibleConnectorHandle = std::shared_ptr<AccessibleConnector<ResourceAccessType>>;
+
 } // namespace merian_nodes

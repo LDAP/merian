@@ -19,12 +19,20 @@ ResourceAllocator::ResourceAllocator(const ContextHandle& context,
     const uint32_t missing_rgba = merian::uint32_from_rgba(1, 0, 1, 1);
     const std::vector<uint32_t> data = {missing_rgba, missing_rgba, missing_rgba, missing_rgba};
     context->get_queue_GCT()->submit_wait([&](const CommandBufferHandle& cmd) {
+        const ImageHandle dummy_storage_image =
+            createImageFromRGBA8(cmd, data.data(), 2, 2, vk::ImageUsageFlagBits::eStorage, false, 1,
+                                 "ResourceAllocator::dummy_storage_image");
+        dummy_storage_image_view = ImageView::create(dummy_storage_image);
+
+        const auto img_transition = dummy_storage_image->barrier2(vk::ImageLayout::eGeneral);
         dummy_texture =
             createTextureFromRGBA8(cmd, data.data(), 2, 2, vk::Filter::eNearest,
                                    vk::Filter::eNearest, true, "ResourceAllocator::dummy_texture");
-        const auto img_transition =
+        const auto tex_transition =
             dummy_texture->get_image()->barrier2(vk::ImageLayout::eShaderReadOnlyOptimal);
-        cmd->barrier(img_transition);
+
+        cmd->barrier({img_transition, tex_transition});
+
         dummy_buffer = createBuffer(cmd, data.size() * sizeof(uint32_t),
                                     vk::BufferUsageFlagBits::eStorageBuffer, data.data(),
                                     MemoryMappingType::NONE, "ResourceAllocator::dummy_buffer");
@@ -133,6 +141,38 @@ ImageHandle ResourceAllocator::createImage(const CommandBufferHandle& cmdBuf,
     return result_image;
 }
 
+ImageHandle ResourceAllocator::createImageFromRGBA8(const CommandBufferHandle& cmd,
+                                                    const uint32_t* data,
+                                                    const uint32_t width,
+                                                    const uint32_t height,
+                                                    const vk::ImageUsageFlags usage,
+                                                    const bool isSRGB,
+                                                    const uint32_t mip_levels,
+                                                    const std::string& debug_name) {
+    const vk::ImageCreateInfo tex_image_info{
+        {},
+        vk::ImageType::e2D,
+        isSRGB ? vk::Format::eR8G8B8A8Srgb : vk::Format::eR8G8B8A8Unorm,
+        {width, height, 1},
+        mip_levels,
+        1,
+        vk::SampleCountFlagBits::e1,
+        vk::ImageTiling::eOptimal,
+        usage | vk::ImageUsageFlagBits::eTransferDst,
+        vk::SharingMode::eExclusive,
+        {},
+        {},
+        vk::ImageLayout::eUndefined,
+    };
+
+    // transfers all levels to TransferDstOptimal
+    return createImage(cmd, data, tex_image_info, MemoryMappingType::NONE, debug_name);
+}
+
+const ImageViewHandle& ResourceAllocator::get_dummy_storage_image_view() const {
+    return dummy_storage_image_view;
+}
+
 ImageViewHandle
 ResourceAllocator::create_image_view(const ImageHandle& image,
                                      const vk::ImageViewCreateInfo& imageViewCreateInfo,
@@ -205,31 +245,14 @@ TextureHandle ResourceAllocator::createTextureFromRGBA8(const CommandBufferHandl
                                                         const std::string& debug_name,
                                                         const bool generate_mipmaps) {
     uint32_t mip_levels = 1;
-    vk::ImageUsageFlags usage_flags =
-        vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled;
+    vk::ImageUsageFlags usage_flags = vk::ImageUsageFlagBits::eSampled;
     if (generate_mipmaps) {
         mip_levels = static_cast<uint32_t>(floor(log2(std::max(width, height))) + 1);
-        usage_flags |= vk::ImageUsageFlagBits::eTransferSrc;
+        usage_flags |= vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst;
     }
 
-    const vk::ImageCreateInfo tex_image_info{
-        {},
-        vk::ImageType::e2D,
-        isSRGB ? vk::Format::eR8G8B8A8Srgb : vk::Format::eR8G8B8A8Unorm,
-        {width, height, 1},
-        mip_levels,
-        1,
-        vk::SampleCountFlagBits::e1,
-        vk::ImageTiling::eOptimal,
-        usage_flags,
-        vk::SharingMode::eExclusive,
-        {},
-        {},
-        vk::ImageLayout::eUndefined,
-    };
-    // transfers all levels to TransferDstOptimal
     const merian::ImageHandle image =
-        createImage(cmd, data, tex_image_info, MemoryMappingType::NONE, debug_name);
+        createImageFromRGBA8(cmd, data, width, height, usage_flags, isSRGB, mip_levels, debug_name);
 
     if (generate_mipmaps) {
         for (uint32_t i = 1; i <= mip_levels; i++) {

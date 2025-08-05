@@ -24,7 +24,7 @@ std::vector<InputConnectorHandle> MeanToBuffer::describe_inputs() {
 }
 
 std::vector<OutputConnectorHandle> MeanToBuffer::describe_outputs(const NodeIOLayout& io_layout) {
-    vk::Extent3D extent = io_layout[con_src]->create_info.extent;
+    vk::Extent3D extent = io_layout[con_src]->get_create_info().extent;
 
     const auto group_count_x = (extent.width + local_size_x - 1) / local_size_x;
     const auto group_count_y = (extent.height + local_size_y - 1) / local_size_y;

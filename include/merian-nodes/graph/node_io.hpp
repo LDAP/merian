@@ -35,11 +35,9 @@ class NodeIOLayout {
     // Behavior undefined if an optional input connector is not connected.
     template <
         typename T,
-        typename ResourceAccessType = T::resource_access_type,
         typename OutputConnectorType = T::output_connector_type,
-        std::enable_if_t<
-            std::is_base_of_v<TypedInputConnector<OutputConnectorType, ResourceAccessType>, T>,
-            bool> = true>
+        std::enable_if_t<std::is_base_of_v<OutputAccessibleInputConnector<OutputConnectorType>, T>,
+                         bool> = true>
     OutputConnectorType operator[](const std::shared_ptr<T>& input_connector) const {
         assert(io_layout(input_connector) && "optional input connector is not connected");
         return input_connector->output_connector(io_layout(input_connector));
@@ -93,13 +91,11 @@ class NodeIO {
           send_event_f(send_event_f) {}
 
     // Behavior undefined if an optional input connector is not connected.
-    template <
-        typename T,
-        typename ResourceAccessType = T::resource_access_type,
-        typename OutputConnectorType = T::output_connector_type,
-        std::enable_if_t<
-            std::is_base_of_v<TypedInputConnector<OutputConnectorType, ResourceAccessType>, T>,
-            bool> = true>
+    template <typename T,
+              typename ResourceAccessType = T::resource_access_type,
+              std::enable_if_t<std::is_base_of_v<AccessibleConnector<ResourceAccessType>, T> &&
+                                   std::is_base_of_v<InputConnector, T>,
+                               bool> = true>
     ResourceAccessType operator[](const std::shared_ptr<T>& input_connector) const {
         assert(input_connector && "input connector cannot be null");
         assert((input_connector->optional || resource_for_input_connector(input_connector)) &&
@@ -112,7 +108,8 @@ class NodeIO {
 
     template <typename T,
               typename ResourceAccessType = T::resource_access_type,
-              std::enable_if_t<std::is_base_of_v<TypedOutputConnector<ResourceAccessType>, T>,
+              std::enable_if_t<std::is_base_of_v<AccessibleConnector<ResourceAccessType>, T> &&
+                                   std::is_base_of_v<OutputConnector, T>,
                                bool> = true>
     ResourceAccessType operator[](const std::shared_ptr<T>& output_connector) const {
         return output_connector->resource(resource_for_output_connector(output_connector));

@@ -12,12 +12,12 @@ using SpecialStaticInHandle = std::shared_ptr<SpecialStaticIn<ValueType>>;
 
 // See corresponsing output.
 template <typename ValueType>
-class SpecialStaticIn
-    : public TypedInputConnector<SpecialStaticOutHandle<ValueType>, const ValueType&> {
+class SpecialStaticIn : public InputConnector,
+                        public OutputAccessibleInputConnector<SpecialStaticOutHandle<ValueType>>,
+                        public AccessibleConnector<const ValueType&> {
   public:
     SpecialStaticIn(const std::string& name, const bool optional = false)
-        : TypedInputConnector<SpecialStaticOutHandle<ValueType>, const ValueType&>(
-              name, 0, optional) {}
+        : InputConnector(name, 0, optional) {}
 
     const ValueType& resource([[maybe_unused]] const GraphResourceHandle& resource) override {
         return debugable_ptr_cast<SpecialStaticOut<ValueType>>(resource)->connector_value;

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "merian-nodes/connectors/managed_vk_image_in.hpp"
+#include "merian-nodes/connectors/image/vk_image_in_sampled.hpp"
 #include "merian-nodes/nodes/compute_node/compute_node.hpp"
 
 namespace merian_nodes {
@@ -37,7 +37,7 @@ class Add : public AbstractCompute {
     SpecializationInfoHandle spec_info;
 
     uint32_t number_inputs = 10;
-    std::vector<ManagedVkImageInHandle> input_connectors;
+    std::vector<VkSampledImageInHandle> input_connectors;
 };
 
 } // namespace merian_nodes

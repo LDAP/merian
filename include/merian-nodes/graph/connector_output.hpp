@@ -9,7 +9,7 @@ namespace merian_nodes {
 class InputConnector;
 using InputConnectorHandle = std::shared_ptr<InputConnector>;
 
-// Do not inherit from this class, inherit from TypedOutputConnector instead.
+// The base class for all output connectors.
 class OutputConnector : public Connector {
   public:
     OutputConnector(const std::string& name, const bool supports_delay)
@@ -50,24 +50,5 @@ class OutputConnector : public Connector {
 };
 
 using OutputConnectorHandle = std::shared_ptr<OutputConnector>;
-
-/**
- * @brief      The base class for all output connectors.
- *
- * @tparam     ResourceAccessType  defines how nodes can access the underlying resource of this
- * connector. If the type is void, access is not possible.
- */
-template <typename ResourceAccessType = void> class TypedOutputConnector : public OutputConnector {
-  public:
-    TypedOutputConnector(const std::string& name, const bool supports_delay)
-        : OutputConnector(name, supports_delay) {}
-
-    using resource_access_type = ResourceAccessType;
-
-    virtual ResourceAccessType resource(const GraphResourceHandle& resource) = 0;
-};
-
-template <typename ResourceType, typename ResourceAccessType = void>
-using TypedOutputConnectorHandle = std::shared_ptr<TypedOutputConnector<ResourceAccessType>>;
 
 } // namespace merian_nodes

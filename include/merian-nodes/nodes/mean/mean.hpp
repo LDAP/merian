@@ -1,7 +1,7 @@
 #pragma once
 
-#include "merian-nodes/connectors/managed_vk_buffer_out.hpp"
-#include "merian-nodes/connectors/managed_vk_image_in.hpp"
+#include "merian-nodes/connectors/buffer/vk_buffer_out_managed.hpp"
+#include "merian-nodes/connectors/image/vk_image_in_sampled.hpp"
 #include "merian-nodes/graph/node.hpp"
 
 #include "merian/vk/pipeline/pipeline.hpp"
@@ -41,7 +41,7 @@ class MeanToBuffer : public Node {
   private:
     const ContextHandle context;
 
-    ManagedVkImageInHandle con_src = ManagedVkImageIn::compute_read("src");
+    VkSampledImageInHandle con_src = VkSampledImageIn::compute_read("src");
     ManagedVkBufferOutHandle con_mean;
 
     PushConstant pc;

@@ -14,11 +14,12 @@ template <typename T> using PtrInHandle = std::shared_ptr<PtrIn<T>>;
 
 // Transfer information between nodes on the host using shared_ptr.
 template <typename T>
-class PtrIn : public TypedInputConnector<PtrOutHandle<T>, const std::shared_ptr<T>&> {
+class PtrIn : public InputConnector,
+              public OutputAccessibleInputConnector<PtrOutHandle<T>>,
+              public AccessibleConnector<const std::shared_ptr<T>&> {
 
   public:
-    PtrIn(const std::string& name, const uint32_t delay)
-        : TypedInputConnector<PtrOutHandle<T>, const std::shared_ptr<T>&>(name, delay) {}
+    PtrIn(const std::string& name, const uint32_t delay) : InputConnector(name, delay) {}
 
     void on_connect_output(const OutputConnectorHandle& output) override {
         auto casted_output = std::dynamic_pointer_cast<PtrOut<T>>(output);

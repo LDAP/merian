@@ -10,13 +10,15 @@ template <typename ValueType>
 using SpecialStaticOutHandle = std::shared_ptr<SpecialStaticOut<ValueType>>;
 
 // Stores a static value in the output connector.
-// Makes it possible to access it directly in the describe_outputs() of a reciving node and enforces
+// Makes it possible to access it directly in the describe_outputs() of a receiving node and enforces
 // a graph rebuild if the value has to change.
 template <typename ValueType>
-class SpecialStaticOut : public TypedOutputConnector<const ValueType&>, public GraphResource {
+class SpecialStaticOut : public OutputConnector,
+                         public AccessibleConnector<const ValueType&>,
+                         public GraphResource {
   public:
     SpecialStaticOut(const std::string& name, const ValueType& value)
-        : TypedOutputConnector<const ValueType&>(name, false), connector_value(value) {}
+        : OutputConnector(name, false), connector_value(value) {}
 
     using ResourceType = SpecialStaticOut<ValueType>;
 

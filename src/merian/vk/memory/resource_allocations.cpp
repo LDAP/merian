@@ -182,7 +182,7 @@ vk::ImageMemoryBarrier2 Image::barrier2(const vk::ImageLayout new_layout,
     return barrier;
 }
 
-bool Image::valid_for_view() {
+bool Image::valid_for_view(const vk::ImageUsageFlags usage_flags) {
     static const vk::ImageUsageFlags VALID_IMAGE_USAGE_FOR_IMAGE_VIEWS =
         vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eStorage |
         vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eDepthStencilAttachment |
@@ -195,7 +195,11 @@ bool Image::valid_for_view() {
 #endif
         vk::ImageUsageFlagBits::eSampleWeightQCOM | vk::ImageUsageFlagBits::eSampleBlockMatchQCOM;
 
-    return static_cast<bool>(create_info.usage & VALID_IMAGE_USAGE_FOR_IMAGE_VIEWS);
+    return static_cast<bool>(usage_flags & VALID_IMAGE_USAGE_FOR_IMAGE_VIEWS);
+}
+
+bool Image::valid_for_view() {
+    return valid_for_view(create_info.usage);
 }
 
 ImageHandle Image::create_aliasing_image() {
@@ -428,6 +432,10 @@ void ImageView::properties(Properties& props) {
 ImageViewHandle ImageView::create(const vk::ImageViewCreateInfo& view_create_info,
                                   const ImageHandle& image) {
     return std::shared_ptr<ImageView>(new ImageView(view_create_info, image));
+}
+
+ImageViewHandle ImageView::create(const ImageHandle& image) {
+    return create(image->make_view_create_info(), image);
 }
 
 ImageViewHandle ImageView::create(const vk::ImageView& view, const ImageHandle& image) {

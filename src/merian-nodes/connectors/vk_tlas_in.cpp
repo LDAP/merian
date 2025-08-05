@@ -6,7 +6,7 @@ namespace merian_nodes {
 VkTLASIn::VkTLASIn(const std::string& name,
                    const vk::ShaderStageFlags stage_flags,
                    const vk::PipelineStageFlags2 pipeline_stages)
-    : TypedInputConnector(name, 0), stage_flags(stage_flags), pipeline_stages(pipeline_stages) {
+    : InputConnector(name, 0), stage_flags(stage_flags), pipeline_stages(pipeline_stages) {
     assert(stage_flags);
     assert(pipeline_stages);
 }

@@ -1,7 +1,8 @@
 #pragma once
 
-#include "merian-nodes/graph/connector_output.hpp"
-#include "merian-nodes/resources/managed_vk_image_resource.hpp"
+#include "vk_image_out.hpp"
+
+#include "merian-nodes/resources/image_array_resource.hpp"
 
 namespace merian_nodes {
 
@@ -10,7 +11,7 @@ using ManagedVkImageOutHandle = std::shared_ptr<ManagedVkImageOut>;
 
 // Output a Vulkan image that is allocated and managed by the graph.
 // Note that it only supplies a descriptor if stage_flags contains at least one bit.
-class ManagedVkImageOut : public TypedOutputConnector<ImageHandle> {
+class ManagedVkImageOut : public VkImageOut, public AccessibleConnector<const ImageArrayResource&> {
   public:
     ManagedVkImageOut(const std::string& name,
                       const vk::AccessFlags2& access_flags,
@@ -18,16 +19,19 @@ class ManagedVkImageOut : public TypedOutputConnector<ImageHandle> {
                       const vk::ImageLayout& required_layout,
                       const vk::ShaderStageFlags& stage_flags,
                       const vk::ImageCreateInfo& create_info,
-                      const bool persistent = false);
+                      const bool persistent = false,
+                      const uint32_t array_size = 1);
 
-    virtual std::optional<vk::DescriptorSetLayoutBinding> get_descriptor_info() const override;
+    std::optional<vk::DescriptorSetLayoutBinding> get_descriptor_info() const override;
 
-    virtual void get_descriptor_update(const uint32_t binding,
-                                       const GraphResourceHandle& resource,
-                                       const DescriptorSetHandle& update,
-                                       const ResourceAllocatorHandle& allocator) override;
+    void get_descriptor_update(const uint32_t binding,
+                               const GraphResourceHandle& resource,
+                               const DescriptorSetHandle& update,
+                               const ResourceAllocatorHandle& allocator) override;
 
-    virtual ConnectorStatusFlags
+    const ImageArrayResource& resource(const GraphResourceHandle& resource) override;
+
+    ConnectorStatusFlags
     on_pre_process(GraphRun& run,
                    const CommandBufferHandle& cmd,
                    const GraphResourceHandle& resource,
@@ -35,7 +39,7 @@ class ManagedVkImageOut : public TypedOutputConnector<ImageHandle> {
                    std::vector<vk::ImageMemoryBarrier2>& image_barriers,
                    std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) override;
 
-    virtual ConnectorStatusFlags
+    ConnectorStatusFlags
     on_post_process(GraphRun& run,
                     const CommandBufferHandle& cmd,
                     const GraphResourceHandle& resource,
@@ -43,14 +47,14 @@ class ManagedVkImageOut : public TypedOutputConnector<ImageHandle> {
                     std::vector<vk::ImageMemoryBarrier2>& image_barriers,
                     std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) override;
 
-    virtual GraphResourceHandle
+    GraphResourceHandle
     create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
                     const ResourceAllocatorHandle& allocator,
                     const ResourceAllocatorHandle& aliasing_allocator,
                     const uint32_t resoruce_index,
                     const uint32_t ring_size) override;
 
-    virtual ImageHandle resource(const GraphResourceHandle& resource) override;
+    vk::ImageCreateInfo get_create_info() const override;
 
   public:
     static ManagedVkImageOutHandle compute_write(const std::string& name,
@@ -126,8 +130,8 @@ class ManagedVkImageOut : public TypedOutputConnector<ImageHandle> {
     const vk::PipelineStageFlags2 pipeline_stages;
     const vk::ImageLayout required_layout;
     const vk::ShaderStageFlags stage_flags;
+
     const vk::ImageCreateInfo create_info;
-    const bool persistent;
 };
 
 } // namespace merian_nodes

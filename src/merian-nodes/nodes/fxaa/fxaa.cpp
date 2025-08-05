@@ -1,5 +1,6 @@
 #include "merian-nodes/nodes/fxaa/fxaa.hpp"
 
+#include "merian-nodes/connectors/image/vk_image_out_managed.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 
 #include "fxaa.comp.spv.h"
@@ -22,10 +23,12 @@ std::vector<InputConnectorHandle> FXAA::describe_inputs() {
 
 std::vector<OutputConnectorHandle>
 FXAA::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
-    extent = io_layout[con_src]->create_info.extent;
+    const vk::ImageCreateInfo create_info = io_layout[con_src]->get_create_info();
+
+    extent = create_info.extent;
 
     return {
-        ManagedVkImageOut::compute_write("out", io_layout[con_src]->create_info.format, extent),
+        ManagedVkImageOut::compute_write("out", create_info.format, extent),
     };
 }
 

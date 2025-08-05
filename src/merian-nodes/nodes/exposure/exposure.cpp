@@ -21,14 +21,15 @@ AutoExposure::AutoExposure(const ContextHandle& context) : Node(), context(conte
 }
 
 AutoExposure::~AutoExposure() {}
-
+ 
 std::vector<InputConnectorHandle> AutoExposure::describe_inputs() {
     return {con_src};
 }
 
 std::vector<OutputConnectorHandle> AutoExposure::describe_outputs(const NodeIOLayout& io_layout) {
-    const vk::Format format = io_layout[con_src]->create_info.format;
-    const vk::Extent3D extent = io_layout[con_src]->create_info.extent;
+    const vk::ImageCreateInfo create_info = io_layout[con_src]->get_create_info();
+    const vk::Format format = create_info.format;
+    const vk::Extent3D extent = create_info.extent;
 
     con_out = ManagedVkImageOut::compute_write("out", format, extent);
     con_hist = std::make_shared<ManagedVkBufferOut>(

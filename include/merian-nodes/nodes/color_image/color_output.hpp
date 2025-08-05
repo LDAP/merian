@@ -1,6 +1,6 @@
 #pragma once
 
-#include "merian-nodes/connectors/managed_vk_image_out.hpp"
+#include "merian-nodes/connectors/image/vk_image_out_managed.hpp"
 #include "merian-nodes/connectors/special_static_in.hpp"
 #include "merian-nodes/graph/node.hpp"
 

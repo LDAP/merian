@@ -72,6 +72,10 @@ class Buffer : public std::enable_shared_from_this<Buffer>, public Resource {
         return context;
     }
 
+    const vk::BufferUsageFlags& get_usage_flags() const {
+        return create_info.usage;
+    }
+
     // -----------------------------------------------------------
 
     vk::DescriptorBufferInfo get_descriptor_info(const vk::DeviceSize offset = 0,
@@ -306,6 +310,8 @@ class Image : public std::enable_shared_from_this<Image>, public Resource {
     vk::ImageLayout current_layout;
 
   public:
+    static bool valid_for_view(const vk::ImageUsageFlags usage_flags);
+
     static ImageHandle create(const vk::Image& image,
                               const MemoryAllocationHandle& memory,
                               const vk::ImageCreateInfo create_info,
@@ -377,6 +383,8 @@ class ImageView : public std::enable_shared_from_this<ImageView>, public Resourc
   public:
     static ImageViewHandle create(const vk::ImageViewCreateInfo& view_create_info,
                                   const ImageHandle& image);
+
+    static ImageViewHandle create(const ImageHandle& image);
 
     static ImageViewHandle create(const vk::ImageView& view, const ImageHandle& image);
 };

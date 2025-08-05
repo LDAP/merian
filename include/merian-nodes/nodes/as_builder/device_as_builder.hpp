@@ -1,7 +1,7 @@
 #pragma once
 
 #include "merian-nodes/connectors/ptr_in.hpp"
-#include "merian-nodes/connectors/vk_buffer_array_in.hpp"
+#include "merian-nodes/connectors/buffer/vk_buffer_in.hpp"
 #include "merian-nodes/connectors/vk_tlas_out.hpp"
 #include "merian-nodes/graph/errors.hpp"
 #include "merian-nodes/graph/node.hpp"
@@ -363,8 +363,8 @@ class DeviceASBuilder : public Node {
     PtrInHandle<TlasBuildInfo> con_in_instance_info = PtrIn<TlasBuildInfo>::create("tlas_info");
 
     // todo: Add those as optional inputs somehow to ensure proper synchronization.
-    VkBufferArrayInHandle con_in_vtx_buffers = VkBufferArrayIn::acceleration_structure_read("vtx");
-    VkBufferArrayInHandle con_in_idx_buffers = VkBufferArrayIn::acceleration_structure_read("idx");
+    VkBufferInHandle con_in_vtx_buffers = VkBufferIn::acceleration_structure_read("vtx");
+    VkBufferInHandle con_in_idx_buffers = VkBufferIn::acceleration_structure_read("idx");
 
     VkTLASOutHandle con_out_tlas = VkTLASOut::create("tlas");
     // clang-format on

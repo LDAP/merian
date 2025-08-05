@@ -7,7 +7,7 @@
 
 namespace merian_nodes {
 
-VkTLASOut::VkTLASOut(const std::string& name) : TypedOutputConnector(name, true) {}
+VkTLASOut::VkTLASOut(const std::string& name) : OutputConnector(name, true) {}
 
 GraphResourceHandle
 VkTLASOut::create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,

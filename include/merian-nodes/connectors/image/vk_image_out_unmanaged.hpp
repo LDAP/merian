@@ -1,12 +1,13 @@
 #pragma once
 
-#include "merian-nodes/graph/connector_output.hpp"
-#include "merian-nodes/resources/texture_array_resource.hpp"
+#include "vk_image_out.hpp"
+
+#include "merian-nodes/resources/image_array_resource.hpp"
 
 namespace merian_nodes {
 
-class VkTextureArrayOut;
-using VkTextureArrayOutHandle = std::shared_ptr<VkTextureArrayOut>;
+class UnmanagedVkImageOut;
+using UnmanagedVkImageOutHandle = std::shared_ptr<UnmanagedVkImageOut>;
 
 // Output an array of textures.
 //
@@ -14,12 +15,13 @@ using VkTextureArrayOutHandle = std::shared_ptr<VkTextureArrayOut>;
 // set all descriptor slots to a dummy texture (ResourceAllocator::get_dummy_texture()) if not set.
 //
 // The output keeps the textures alive for all in-flight iterations.
-class VkTextureArrayOut : public TypedOutputConnector<TextureArrayResource&> {
-    friend class VkTextureArrayIn;
+class UnmanagedVkImageOut : public VkImageOut, public AccessibleConnector<ImageArrayResource&> {
 
   public:
     // No descriptor binding is created.
-    VkTextureArrayOut(const std::string& name, const uint32_t array_size);
+    UnmanagedVkImageOut(const std::string& name,
+                        const uint32_t array_size,
+                        const vk::ImageUsageFlags image_usage_flags);
 
     GraphResourceHandle
     create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
@@ -28,7 +30,7 @@ class VkTextureArrayOut : public TypedOutputConnector<TextureArrayResource&> {
                     const uint32_t resoruce_index,
                     const uint32_t ring_size) override;
 
-    TextureArrayResource& resource(const GraphResourceHandle& resource) override;
+    ImageArrayResource& resource(const GraphResourceHandle& resource) override;
 
     ConnectorStatusFlags
     on_pre_process(GraphRun& run,
@@ -46,13 +48,13 @@ class VkTextureArrayOut : public TypedOutputConnector<TextureArrayResource&> {
                     std::vector<vk::ImageMemoryBarrier2>& image_barriers,
                     std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) override;
 
-    uint32_t array_size() const;
-
   public:
-    static VkTextureArrayOutHandle create(const std::string& name, const uint32_t array_size);
+    static UnmanagedVkImageOutHandle create(const std::string& name,
+                                            const uint32_t array_size,
+                                            const vk::ImageUsageFlags image_usage_flags);
 
   private:
-    std::vector<merian::TextureHandle> textures;
+    const vk::ImageUsageFlags image_usage_flags;
 };
 
 } // namespace merian_nodes

@@ -14,11 +14,12 @@ template <typename T> class PtrOut;
 template <typename T> using PtrOutHandle = std::shared_ptr<PtrOut<T>>;
 
 // Transfer information between nodes on the host using shared_ptr.
-template <typename T> class PtrOut : public TypedOutputConnector<std::shared_ptr<T>&> {
+template <typename T>
+class PtrOut : public OutputConnector, public AccessibleConnector<std::shared_ptr<T>&> {
 
   public:
     PtrOut(const std::string& name, const bool persistent)
-        : TypedOutputConnector<std::shared_ptr<T>&>(name, !persistent), persistent(persistent) {}
+        : OutputConnector(name, !persistent), persistent(persistent) {}
 
     GraphResourceHandle
     create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,

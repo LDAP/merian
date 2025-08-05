@@ -1,5 +1,7 @@
 #include "merian-nodes/nodes/add/add.hpp"
 
+#include "merian-nodes/connectors/image/vk_image_out_managed.hpp"
+
 #include "merian-nodes/graph/errors.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 #include "merian/vk/utils/math.hpp"
@@ -16,7 +18,7 @@ std::vector<InputConnectorHandle> Add::describe_inputs() {
         input_connectors.clear();
         for (uint32_t i = 0; i < number_inputs; i++) {
             input_connectors.emplace_back(
-                ManagedVkImageIn::compute_read(fmt::format("input_{}", i), 0, true));
+                VkSampledImageIn::compute_read(fmt::format("input_{}", i), 0, true));
         }
     }
 
@@ -38,9 +40,10 @@ std::vector<OutputConnectorHandle> Add::describe_outputs(const NodeIOLayout& io_
     for (const auto& input : input_connectors) {
         if (io_layout.is_connected(input)) {
             at_least_one_input_connected = true;
+            const vk::ImageCreateInfo create_info = io_layout[input]->get_create_info();
             if (format == vk::Format::eUndefined)
-                format = io_layout[input]->create_info.format;
-            extent = min(extent, io_layout[input]->create_info.extent);
+                format = create_info.format;
+            extent = min(extent, create_info.extent);
         }
         spec_builder.add_entry(io_layout.is_connected(input));
     }
@@ -64,15 +67,16 @@ layout(local_size_x_id = 0, local_size_y_id = 1, local_size_z = 1) in;
     uint32_t binding_index = 0;
     for (const auto& input : input_connectors) {
         if (io_layout.is_connected(input)) {
-            source.append(fmt::format("layout(set = 0, binding = {}) uniform sampler2D img_{:02};\n",
-                                      binding_index, binding_index));
+            source.append(
+                fmt::format("layout(set = 0, binding = {}) uniform sampler2D img_{:02};\n",
+                            binding_index, binding_index));
         }
         binding_index++;
     }
 
-    source.append(
-        fmt::format("layout(set = 0, binding = {}) uniform writeonly restrict image2D img_output;\n",
-                    binding_index));
+    source.append(fmt::format(
+        "layout(set = 0, binding = {}) uniform writeonly restrict image2D img_output;\n",
+        binding_index));
 
     source.append(R"(
 void main() {

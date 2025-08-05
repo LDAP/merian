@@ -6,7 +6,7 @@
 
 namespace merian_nodes {
 
-// Do not inherit from this class, inherit from TypedInputConnector instead.
+// The base class for all input connectors.
 class InputConnector : public Connector {
 
   public:
@@ -31,7 +31,7 @@ class InputConnector : public Connector {
 using InputConnectorHandle = std::shared_ptr<InputConnector>;
 
 /**
- * @brief      The base class for all input connectors.
+ * @brief      Mixin for input connectors that allows accessing the connected output.
  *
  * For optional inputs only the descriptor related methods are called to provide a dummy
  * binding.
@@ -40,16 +40,11 @@ using InputConnectorHandle = std::shared_ptr<InputConnector>;
  * @tparam     ResourceAccessType  defines how nodes can access the underlying resource of this
  * connector. If the type is void, access is not possible.
  */
-template <typename OutputConnectorType, typename ResourceAccessType = void>
-class TypedInputConnector : public InputConnector {
+template <typename OutputConnectorType> class OutputAccessibleInputConnector {
   public:
-    using resource_access_type = ResourceAccessType;
     using output_connector_type = OutputConnectorType;
 
-    TypedInputConnector(const std::string& name, const uint32_t delay, const bool optional = false)
-        : InputConnector(name, delay, optional) {}
-
-    virtual ResourceAccessType resource(const GraphResourceHandle& resource) = 0;
+    OutputAccessibleInputConnector() {}
 
     virtual OutputConnectorType output_connector(const OutputConnectorHandle& output) const {
         return debugable_ptr_cast<typename OutputConnectorType::element_type>(output);
@@ -57,7 +52,7 @@ class TypedInputConnector : public InputConnector {
 };
 
 template <typename OutputConnectorType, typename ResourceAccessType = void>
-using TypedInputConnectorHandle =
-    std::shared_ptr<TypedInputConnector<OutputConnectorType, ResourceAccessType>>;
+using OutputAccessibleInputConnectorHandle =
+    std::shared_ptr<OutputAccessibleInputConnector<OutputConnectorType>>;
 
 } // namespace merian_nodes

@@ -21,7 +21,7 @@ using VkTLASOutHandle = std::shared_ptr<VkTLASOut>;
 // Note, that you are responsible to insert read->build barriers manually since the connector is
 // unable to detect if a TLAS is reused or not. You can get the read stages using
 // io[connector].read_pipeline_stages.
-class VkTLASOut : public TypedOutputConnector<TLASResource&> {
+class VkTLASOut : public OutputConnector, public AccessibleConnector<TLASResource&> {
     friend class VkTLASIn;
 
   public:

@@ -11,7 +11,7 @@ class AnyOut;
 using AnyOutHandle = std::shared_ptr<AnyOut>;
 
 // Transfer information between nodes on the host using shared_ptr.
-class AnyOut : public TypedOutputConnector<std::any&> {
+class AnyOut : public OutputConnector, public AccessibleConnector<std::any&> {
 
   public:
     AnyOut(const std::string& name, const bool persistent);

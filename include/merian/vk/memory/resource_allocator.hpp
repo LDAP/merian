@@ -136,6 +136,18 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
                             const MemoryMappingType mapping_type = MemoryMappingType::NONE,
                             const std::string& debug_name = {});
 
+    ImageHandle createImageFromRGBA8(const CommandBufferHandle& cmd,
+                                     const uint32_t* data,
+                                     const uint32_t width,
+                                     const uint32_t height,
+                                     const vk::ImageUsageFlags usage,
+                                     const bool isSRGB = true,
+                                     const uint32_t mip_levels = 1,
+                                     const std::string& debug_name = {});
+
+    // Returns a dummy 4x4 image with the "missing texture" color (1,0,1,1).
+    const ImageViewHandle& get_dummy_storage_image_view() const;
+
     //--------------------------------------------------------------------------------------------------
 
     ImageViewHandle create_image_view(const ImageHandle& image,
@@ -210,6 +222,7 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
     const SamplerPoolHandle m_samplerPool;
     const std::shared_ptr<ExtensionVkDebugUtils> debug_utils;
 
+    ImageViewHandle dummy_storage_image_view;
     TextureHandle dummy_texture;
     BufferHandle dummy_buffer;
 };

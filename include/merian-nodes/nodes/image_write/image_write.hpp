@@ -1,6 +1,6 @@
 #pragma once
 
-#include "merian-nodes/connectors/managed_vk_image_in.hpp"
+#include "merian-nodes/connectors/image/vk_image_in_sampled.hpp"
 #include "merian-nodes/graph/node.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 
@@ -70,7 +70,7 @@ class ImageWrite : public Node {
     const ContextHandle context;
     const ResourceAllocatorHandle allocator;
 
-    ManagedVkImageInHandle con_src = ManagedVkImageIn::transfer_src("src");
+    VkImageInHandle con_src = VkImageIn::transfer_src("src");
 
     std::function<void()> callback;
 
