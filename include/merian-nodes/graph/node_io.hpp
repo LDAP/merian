@@ -84,11 +84,14 @@ class NodeIO {
            const std::function<bool(const OutputConnectorHandle&)>& output_is_connected,
            const std::function<std::any&()>& get_frame_data,
            const std::function<void(
-               const std::string& event_name, const GraphEvent::Data&, const bool)>& send_event_f)
+               const std::string& event_name, const GraphEvent::Data&, const bool)>& send_event_f,
+           const std::function<uint32_t(const InputConnectorHandle&)> binding_for_input_connector,
+           const std::function<uint32_t(const OutputConnectorHandle&)> binding_for_output_connector)
         : resource_for_input_connector(resource_for_input_connector),
           resource_for_output_connector(resource_for_output_connector),
           output_is_connected(output_is_connected), get_frame_data(get_frame_data),
-          send_event_f(send_event_f) {}
+          send_event_f(send_event_f), binding_for_input_connector(binding_for_input_connector),
+          binding_for_output_connector(binding_for_output_connector) {}
 
     // Behavior undefined if an optional input connector is not connected.
     template <typename T,
@@ -146,6 +149,18 @@ class NodeIO {
         send_event_f(event_name, data, notify_all);
     }
 
+    uint32_t get_binding(const InputConnectorHandle& input_connector) {
+        const uint32_t binding = binding_for_input_connector(input_connector);
+        assert(binding != DescriptorSet::NO_DESCRIPTOR_BINDING);
+        return binding;
+    }
+
+    uint32_t get_binding(const OutputConnectorHandle& output_connector) {
+        const uint32_t binding = binding_for_output_connector(output_connector);
+        assert(binding != DescriptorSet::NO_DESCRIPTOR_BINDING);
+        return binding;
+    }
+
   private:
     const std::function<GraphResourceHandle(const InputConnectorHandle&)>
         resource_for_input_connector;
@@ -158,5 +173,9 @@ class NodeIO {
 
     const std::function<void(const std::string& event_name, const GraphEvent::Data&, const bool)>
         send_event_f;
+
+    const std::function<uint32_t(const InputConnectorHandle&)> binding_for_input_connector;
+
+    const std::function<uint32_t(const OutputConnectorHandle&)> binding_for_output_connector;
 };
 } // namespace merian_nodes

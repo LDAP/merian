@@ -67,6 +67,10 @@ class BufferArrayResource : public GraphResource {
         }
     }
 
+    uint32_t get_array_size() const {
+        return buffers.size();
+    }
+
     merian::BufferHandle operator->() const {
         assert(!buffers.empty());
         return buffers[0];

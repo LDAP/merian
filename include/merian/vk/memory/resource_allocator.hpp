@@ -191,7 +191,8 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
                                          const vk::Filter min_filter,
                                          const bool isSRGB = true,
                                          const std::string& debug_name = {},
-                                         const bool generate_mipmaps = false);
+                                         const bool generate_mipmaps = false,
+                                         const vk::ImageUsageFlags additional_usage_flags = {});
 
     // Returns a dummy 4x4 texture with the "missing texture" color (1,0,1,1).
     const TextureHandle& get_dummy_texture() const;

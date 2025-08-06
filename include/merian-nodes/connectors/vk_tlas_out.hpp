@@ -32,7 +32,7 @@ class VkTLASOut : public OutputConnector, public AccessibleConnector<TLASResourc
     create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
                     const ResourceAllocatorHandle& allocator,
                     const ResourceAllocatorHandle& aliasing_allocator,
-                    const uint32_t resoruce_index,
+                    const uint32_t resource_index,
                     const uint32_t ring_size) override;
 
     TLASResource& resource(const GraphResourceHandle& resource) override;

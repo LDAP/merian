@@ -243,9 +243,10 @@ TextureHandle ResourceAllocator::createTextureFromRGBA8(const CommandBufferHandl
                                                         const vk::Filter min_filter,
                                                         const bool isSRGB,
                                                         const std::string& debug_name,
-                                                        const bool generate_mipmaps) {
+                                                        const bool generate_mipmaps,
+                                                        const vk::ImageUsageFlags additional_usage_flags) {
     uint32_t mip_levels = 1;
-    vk::ImageUsageFlags usage_flags = vk::ImageUsageFlagBits::eSampled;
+    vk::ImageUsageFlags usage_flags = vk::ImageUsageFlagBits::eSampled | additional_usage_flags;
     if (generate_mipmaps) {
         mip_levels = static_cast<uint32_t>(floor(log2(std::max(width, height))) + 1);
         usage_flags |= vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst;

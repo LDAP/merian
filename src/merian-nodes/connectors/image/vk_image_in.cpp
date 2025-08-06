@@ -27,7 +27,8 @@ VkImageIn::on_pre_process([[maybe_unused]] GraphRun& run,
     auto res = debugable_ptr_cast<ImageArrayResource>(resource);
 
     if (res->last_used_as_output) {
-        for (const auto& image : res->images) {
+        for (uint32_t i = 0; i < get_array_size(); i++) {
+            const auto& image = res->get_image(i);
             if (!image) {
                 continue;
             }
@@ -41,7 +42,8 @@ VkImageIn::on_pre_process([[maybe_unused]] GraphRun& run,
         res->current_access_flags = res->input_access_flags;
         res->last_used_as_output = false;
     } else {
-        for (const auto& image : res->images) {
+        for (uint32_t i = 0; i < get_array_size(); i++) {
+            const auto& image = res->get_image(i);
             if (!image) {
                 continue;
             }

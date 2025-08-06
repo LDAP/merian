@@ -61,29 +61,10 @@ Connector::ConnectorStatusFlags UnmanagedVkBufferOut::on_pre_process(
     return {};
 }
 
-Connector::ConnectorStatusFlags UnmanagedVkBufferOut::on_post_process(
-    [[maybe_unused]] GraphRun& run,
-    [[maybe_unused]] const CommandBufferHandle& cmd,
-    const GraphResourceHandle& resource,
-    [[maybe_unused]] const NodeHandle& node,
-    [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
-    [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {
-
-    const auto& res = debugable_ptr_cast<BufferArrayResource>(resource);
-
-    Connector::ConnectorStatusFlags flags{};
-    if (!res->current_updates.empty()) {
-        res->pending_updates.clear();
-        std::swap(res->pending_updates, res->current_updates);
-        flags |= NEEDS_DESCRIPTOR_UPDATE;
-    }
-
-    return flags;
-}
-
-UnmanagedVkBufferOutHandle UnmanagedVkBufferOut::create(const std::string& name,
-                                                    const uint32_t array_size,
-                                                    const vk::BufferUsageFlags buffer_usage_flags) {
+UnmanagedVkBufferOutHandle
+UnmanagedVkBufferOut::create(const std::string& name,
+                             const uint32_t array_size,
+                             const vk::BufferUsageFlags buffer_usage_flags) {
     return std::make_shared<UnmanagedVkBufferOut>(name, array_size, buffer_usage_flags);
 }
 

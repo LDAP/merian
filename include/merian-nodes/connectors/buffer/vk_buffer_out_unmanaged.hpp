@@ -26,7 +26,7 @@ class UnmanagedVkBufferOut : public VkBufferOut, public AccessibleConnector<Buff
     create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
                     const ResourceAllocatorHandle& allocator,
                     const ResourceAllocatorHandle& aliasing_allocator,
-                    const uint32_t resoruce_index,
+                    const uint32_t resource_index,
                     const uint32_t ring_size) override;
 
     BufferArrayResource& resource(const GraphResourceHandle& resource) override;
@@ -39,18 +39,10 @@ class UnmanagedVkBufferOut : public VkBufferOut, public AccessibleConnector<Buff
                    std::vector<vk::ImageMemoryBarrier2>& image_barriers,
                    std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) override;
 
-    ConnectorStatusFlags
-    on_post_process(GraphRun& run,
-                    const CommandBufferHandle& cmd,
-                    const GraphResourceHandle& resource,
-                    const NodeHandle& node,
-                    std::vector<vk::ImageMemoryBarrier2>& image_barriers,
-                    std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) override;
-
   public:
     static UnmanagedVkBufferOutHandle create(const std::string& name,
-                                         const uint32_t array_size,
-                                         const vk::BufferUsageFlags buffer_usage_flags);
+                                             const uint32_t array_size,
+                                             const vk::BufferUsageFlags buffer_usage_flags);
 
   private:
     const vk::BufferUsageFlags buffer_usage_flags;

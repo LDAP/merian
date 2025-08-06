@@ -49,8 +49,6 @@ struct OutgoingNodeConnection {
 
 // Data that is stored for every node that is present in the graph.
 struct NodeData {
-    static const uint32_t NO_DESCRIPTOR_BINDING = -1u;
-
     NodeData(const std::string& identifier) : identifier(identifier) {}
 
     // A unique name that identifies this node (user configurable).
@@ -91,7 +89,8 @@ struct NodeData {
         NodeHandle node{};
         OutputConnectorHandle output{};
 
-        uint32_t descriptor_set_binding{NO_DESCRIPTOR_BINDING}; // (on prepare_descriptor_sets)
+        uint32_t descriptor_set_binding{
+            DescriptorSet::NO_DESCRIPTOR_BINDING}; // (on prepare_descriptor_sets)
         // precomputed such that (iteration % precomputed_resources.size()) is the index of the
         // resource that must be used in the iteration. Matches the descriptor_sets array below.
         // (resource handle, resource index the resources array of the corresponding output)
@@ -118,7 +117,8 @@ struct NodeData {
         // (max_delay + 1) resources
         std::vector<PerResourceInfo> resources;
         std::vector<std::tuple<NodeHandle, InputConnectorHandle>> inputs;
-        uint32_t descriptor_set_binding{NO_DESCRIPTOR_BINDING}; // (on prepare_descriptor_sets)
+        uint32_t descriptor_set_binding{
+            DescriptorSet::NO_DESCRIPTOR_BINDING}; // (on prepare_descriptor_sets)
         // precomputed such that (iteration % precomputed_resources.size()) is the index of the
         // resource that must be used in the iteration. Matches the descriptor_sets array below.
         // (resource handle, resource index the resources array)
@@ -625,7 +625,8 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                 } catch (const graph_errors::node_error& e) {
                     data.errors_queued.emplace_back(fmt::format("node error: {}", e.what()));
                 } catch (const ShaderCompiler::compilation_failed& e) {
-                    data.errors_queued.emplace_back(fmt::format("compilation failed: {}", e.what()));
+                    data.errors_queued.emplace_back(
+                        fmt::format("compilation failed: {}", e.what()));
                 }
                 if (!data.errors_queued.empty()) {
                     SPDLOG_ERROR("executing node '{}' failed:\n - {}", data.identifier,
@@ -1183,7 +1184,8 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
             config.output_text(fmt::format("{}", data.descriptor_set_layout));
             config.st_end_child();
         }
-        if (!needs_reconnect && !data.output_connections.empty() && config.st_begin_child("outputs", "Outputs")) {
+        if (!needs_reconnect && !data.output_connections.empty() &&
+            config.st_begin_child("outputs", "Outputs")) {
             for (auto& [output, per_output_info] : data.output_connections) {
                 if (config.st_begin_child(output->name, output->name)) {
                     std::vector<std::string> receivers;
@@ -1204,7 +1206,8 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                     config.output_text(fmt::format(
                         "Descriptor set binding: {}\n# Resources: {:02}\nResource index: "
                         "{}\nSending to: [{}]",
-                        per_output_info.descriptor_set_binding == NodeData::NO_DESCRIPTOR_BINDING
+                        per_output_info.descriptor_set_binding ==
+                                DescriptorSet::NO_DESCRIPTOR_BINDING
                             ? "none"
                             : std::to_string(per_output_info.descriptor_set_binding),
                         per_output_info.resources.size(), current_resource_index,
@@ -1226,7 +1229,8 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
             }
             config.st_end_child();
         }
-        if (!needs_reconnect && !data.input_connectors.empty() && config.st_begin_child("inputs", "Inputs")) {
+        if (!needs_reconnect && !data.input_connectors.empty() &&
+            config.st_begin_child("inputs", "Inputs")) {
             for (const auto& input : data.input_connectors) {
                 if (config.st_begin_child(input->name, input->name)) {
                     config.st_separate("Input Properties");
@@ -1236,7 +1240,8 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                         auto& per_input_info = data.input_connections.at(input);
                         config.output_text(fmt::format(
                             "Descriptor set binding: {}",
-                            per_input_info.descriptor_set_binding == NodeData::NO_DESCRIPTOR_BINDING
+                            per_input_info.descriptor_set_binding ==
+                                    DescriptorSet::NO_DESCRIPTOR_BINDING
                                 ? "None"
                                 : std::to_string(per_input_info.descriptor_set_binding)));
                         if (per_input_info.output) {
@@ -1416,7 +1421,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                                    const uint32_t resource_index) {
         NodeData::PerResourceInfo& resource_info = per_output_info.resources[resource_index];
 
-        if (per_output_info.descriptor_set_binding != NodeData::NO_DESCRIPTOR_BINDING)
+        if (per_output_info.descriptor_set_binding != DescriptorSet::NO_DESCRIPTOR_BINDING)
             for (auto& set_idx : resource_info.set_indices) {
                 src_output->get_descriptor_update(
                     per_output_info.descriptor_set_binding, resource_info.resource,
@@ -1426,7 +1431,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
         for (auto& [dst_node, dst_input, set_idx] : resource_info.other_set_indices) {
             NodeData& dst_data = node_data.at(dst_node);
             NodeData::PerInputInfo& per_input_info = dst_data.input_connections[dst_input];
-            if (per_input_info.descriptor_set_binding != NodeData::NO_DESCRIPTOR_BINDING)
+            if (per_input_info.descriptor_set_binding != DescriptorSet::NO_DESCRIPTOR_BINDING)
                 dst_input->get_descriptor_update(
                     per_input_info.descriptor_set_binding, resource_info.resource,
                     dst_data.descriptor_sets[set_idx], resource_allocator);
@@ -1997,7 +2002,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                         per_input_info.precomputed_resources.emplace_back(nullptr, -1ul);
                         // apply desc update for optional input here
                         if (dst_data.input_connections[input].descriptor_set_binding !=
-                            NodeData::NO_DESCRIPTOR_BINDING) {
+                            DescriptorSet::NO_DESCRIPTOR_BINDING) {
                             input->get_descriptor_update(
                                 dst_data.input_connections[input].descriptor_set_binding, nullptr,
                                 dst_data.descriptor_sets.back(), resource_allocator);
@@ -2048,6 +2053,12 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                         send_event(GraphEvent::Info{dst_node, registry.node_name(dst_node),
                                                     dst_data.identifier, event_name},
                                    data, notify_all);
+                    },
+                    [&, set_idx](const InputConnectorHandle& connector) {
+                        return dst_data.input_connections[connector].descriptor_set_binding;
+                    },
+                    [&, set_idx](const OutputConnectorHandle& connector) {
+                        return dst_data.output_connections[connector].descriptor_set_binding;
                     });
             }
         }

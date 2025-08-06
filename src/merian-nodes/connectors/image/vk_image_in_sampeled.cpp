@@ -43,20 +43,21 @@ void VkSampledImageIn::get_descriptor_update(const uint32_t binding,
     }
 
     const auto& res = debugable_ptr_cast<ImageArrayResource>(resource);
-    assert(res->textures.has_value());
 
     for (auto& update_idx : res->pending_updates) {
-        TextureHandle tex;
-        if (overwrite_sampler) {
-            tex =
-                Texture::create(res->textures.value()[update_idx]->get_view(), *overwrite_sampler);
+        TextureHandle tex = res->get_texture(update_idx);
+        if (tex) {
+            if (overwrite_sampler) {
+                tex = Texture::create(tex->get_view(), *overwrite_sampler);
+            }
+            update->queue_descriptor_write_texture(binding, tex, update_idx,
+                                                   vk::ImageLayout::eShaderReadOnlyOptimal);
         } else {
-            tex = res->textures.value()[update_idx];
-            assert(tex);
-        }
 
-        update->queue_descriptor_write_texture(binding, tex, update_idx,
-                                               vk::ImageLayout::eShaderReadOnlyOptimal);
+            update->queue_descriptor_write_texture(binding, allocator->get_dummy_texture(),
+                                                   update_idx,
+                                                   vk::ImageLayout::eShaderReadOnlyOptimal);
+        }
     }
 }
 

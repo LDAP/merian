@@ -44,6 +44,8 @@ inline vk::DescriptorSet allocate_descriptor_set(const vk::Device& device,
 class DescriptorSet : public std::enable_shared_from_this<DescriptorSet>, public Object {
 
   public:
+    static const uint32_t NO_DESCRIPTOR_BINDING = -1u;
+
     // Allocates a DescriptorSet that matches the layout that is attached to the Pool
     DescriptorSet(const DescriptorPoolHandle& pool)
         : pool(pool), layout(pool->get_layout()),

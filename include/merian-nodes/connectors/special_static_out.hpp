@@ -26,7 +26,7 @@ class SpecialStaticOut : public OutputConnector,
         [[maybe_unused]] const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
         [[maybe_unused]] const ResourceAllocatorHandle& allocator,
         [[maybe_unused]] const ResourceAllocatorHandle& aliasing_allocator,
-        [[maybe_unused]] const uint32_t resoruce_index,
+        [[maybe_unused]] const uint32_t resource_index,
         [[maybe_unused]] const uint32_t ring_size) override {
 
         if (has_new) {

@@ -126,6 +126,8 @@ class Buffer : public std::enable_shared_from_this<Buffer>, public Resource {
     const vk::BufferCreateInfo create_info;
 
   public:
+    static inline const BufferHandle EMPTY = nullptr;
+
     static BufferHandle create(const vk::Buffer& buffer,
                                const MemoryAllocationHandle& memory,
                                const vk::BufferCreateInfo& create_info);
@@ -310,6 +312,8 @@ class Image : public std::enable_shared_from_this<Image>, public Resource {
     vk::ImageLayout current_layout;
 
   public:
+    static inline const ImageHandle EMPTY = nullptr;
+
     static bool valid_for_view(const vk::ImageUsageFlags usage_flags);
 
     static ImageHandle create(const vk::Image& image,
@@ -381,6 +385,8 @@ class ImageView : public std::enable_shared_from_this<ImageView>, public Resourc
     const ImageHandle image;
 
   public:
+    static inline const ImageViewHandle EMPTY = nullptr;
+
     static ImageViewHandle create(const vk::ImageViewCreateInfo& view_create_info,
                                   const ImageHandle& image);
 
@@ -448,6 +454,8 @@ class Texture : public std::enable_shared_from_this<Texture>, public Resource {
     SamplerHandle sampler;
 
   public:
+    static inline const TextureHandle EMPTY = nullptr;
+
     static TextureHandle create(const ImageViewHandle& view, const SamplerHandle& sampler);
 };
 

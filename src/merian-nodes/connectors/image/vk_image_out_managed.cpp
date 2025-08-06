@@ -3,6 +3,7 @@
 #include "merian-nodes/connectors/image/vk_image_in.hpp"
 #include "merian-nodes/graph/errors.hpp"
 #include "merian-nodes/graph/node.hpp"
+#include "merian-nodes/resources/image_array_resource_managed.hpp"
 
 namespace merian_nodes {
 
@@ -38,7 +39,7 @@ void ManagedVkImageOut::get_descriptor_update(
     [[maybe_unused]] const ResourceAllocatorHandle& allocator) {
     // or vk::ImageLayout::eGeneral instead of required?
 
-    const auto& res = debugable_ptr_cast<ImageArrayResource>(resource);
+    const auto& res = debugable_ptr_cast<ManagedImageArrayResource>(resource);
     assert(res->textures.has_value());
 
     for (auto& update_idx : res->pending_updates) {
@@ -62,7 +63,7 @@ Connector::ConnectorStatusFlags ManagedVkImageOut::on_pre_process(
     std::vector<vk::ImageMemoryBarrier2>& image_barriers,
     [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {
     Connector::ConnectorStatusFlags flags{};
-    const auto& res = debugable_ptr_cast<ImageArrayResource>(resource);
+    const auto& res = debugable_ptr_cast<ManagedImageArrayResource>(resource);
 
     if (!res->current_updates.empty()) {
         res->pending_updates.clear();
@@ -99,7 +100,7 @@ GraphResourceHandle ManagedVkImageOut::create_resource(
     const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
     [[maybe_unused]] const ResourceAllocatorHandle& allocator,
     const ResourceAllocatorHandle& aliasing_allocator,
-    [[maybe_unused]] const uint32_t resoruce_index,
+    [[maybe_unused]] const uint32_t resource_index,
     [[maybe_unused]] const uint32_t ring_size) {
     const ResourceAllocatorHandle alloc = persistent ? allocator : aliasing_allocator;
 
@@ -127,14 +128,16 @@ GraphResourceHandle ManagedVkImageOut::create_resource(
                                      image_in->get_required_layout());
     }
 
-    const auto res = std::make_shared<ImageArrayResource>(
-        array_size(), image_create_info.usage, input_pipeline_stages, input_access_flags);
+    const auto res = std::make_shared<ManagedImageArrayResource>(
+        array_size(), input_pipeline_stages, input_access_flags);
 
     for (uint32_t i = 0; i < array_size(); i++) {
         res->images[i] = alloc->createImage(image_create_info, MemoryMappingType::NONE, name);
     }
 
-    if (res->textures.has_value()) {
+    if (merian::Image::valid_for_view(image_create_info.usage)) {
+        res->textures.emplace(array_size());
+
         for (uint32_t i = 0; i < array_size(); i++) {
             res->textures.value()[i] = allocator->createTexture(
                 res->images[i], res->images[i]->make_view_create_info(), name);

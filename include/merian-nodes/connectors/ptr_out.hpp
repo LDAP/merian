@@ -25,7 +25,7 @@ class PtrOut : public OutputConnector, public AccessibleConnector<std::shared_pt
     create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
                     [[maybe_unused]] const ResourceAllocatorHandle& allocator,
                     [[maybe_unused]] const ResourceAllocatorHandle& aliasing_allocator,
-                    [[maybe_unused]] const uint32_t resoruce_index,
+                    [[maybe_unused]] const uint32_t resource_index,
                     [[maybe_unused]] const uint32_t ring_size) override {
         return std::make_shared<PtrResource<T>>(persistent ? -1 : (int32_t)inputs.size());
     }

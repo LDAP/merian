@@ -13,7 +13,7 @@ GraphResourceHandle
 VkTLASOut::create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
                            [[maybe_unused]] const ResourceAllocatorHandle& allocator,
                            [[maybe_unused]] const ResourceAllocatorHandle& aliasing_allocator,
-                           [[maybe_unused]] const uint32_t resoruce_index,
+                           [[maybe_unused]] const uint32_t resource_index,
                            [[maybe_unused]] const uint32_t ring_size) {
 
     vk::PipelineStageFlags2 read_stages;

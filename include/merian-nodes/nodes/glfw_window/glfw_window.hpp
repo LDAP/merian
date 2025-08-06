@@ -1,6 +1,6 @@
 #pragma once
 
-#include "merian-nodes/connectors/image/vk_image_in_sampled.hpp"
+#include "merian-nodes/connectors/image/vk_image_in.hpp"
 #include "merian-nodes/graph/errors.hpp"
 #include "merian-nodes/graph/node.hpp"
 
@@ -63,8 +63,16 @@ class GLFWWindow : public Node {
             auto barrier = image->barrier2(vk::ImageLayout::eTransferDstOptimal, true);
             cmd->barrier(barrier);
 
+            ImageHandle src_image;
             if (io.is_connected(image_in)) {
-                const auto& src_image = io[image_in];
+                current_src_array_size = io[image_in].get_array_size();
+                src_array_element = std::min(src_array_element, current_src_array_size - 1);
+                src_image = io[image_in].get_image(src_array_element);
+            } else {
+                current_src_array_size = 0;
+            }
+
+            if (src_image) {
                 const vk::Filter filter =
                     src_image->format_features() &
                             vk::FormatFeatureFlagBits::eSampledImageFilterLinear
@@ -118,6 +126,11 @@ class GLFWWindow : public Node {
     }
 
     NodeStatusFlags properties(Properties& config) override {
+        if (current_src_array_size > 0) {
+            config.config_uint("source array element", src_array_element, 0,
+                               current_src_array_size - 1);
+        }
+
         GLFWmonitor* monitor = window ? glfwGetWindowMonitor(*window) : nullptr;
         int fullscreen = static_cast<int>(monitor != nullptr);
         const int old_fullscreen = fullscreen;
@@ -226,6 +239,9 @@ class GLFWWindow : public Node {
     }
 
   private:
+    uint32_t src_array_element = 0;
+    uint32_t current_src_array_size = 1;
+
     GLFWWindowHandle window = nullptr;
     std::optional<SwapchainManager> swapchain_manager = std::nullopt;
 
