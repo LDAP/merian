@@ -36,10 +36,10 @@ GraphResourceHandle UnmanagedVkImageOut::create_resource(
     }
 
     if (images.empty()) {
-        images.resize(array_size());
+        images.resize(get_array_size());
 
         if (merian::Image::valid_for_view(all_usage_flags)) {
-            textures.emplace(array_size());
+            textures.emplace(get_array_size());
         }
     } else {
         for (const auto& image : images) {

@@ -2,6 +2,7 @@
 
 #include "merian-nodes/connectors/buffer/vk_buffer_in.hpp"
 
+#include "merian-nodes/resources/buffer_array_resource_managed.hpp"
 #include "merian/utils/pointer.hpp"
 
 namespace merian_nodes {
@@ -20,7 +21,7 @@ ManagedVkBufferOut::ManagedVkBufferOut(const std::string& name,
 std::optional<vk::DescriptorSetLayoutBinding> ManagedVkBufferOut::get_descriptor_info() const {
     if (stage_flags) {
         return vk::DescriptorSetLayoutBinding{
-            0, vk::DescriptorType::eStorageBuffer, array_size(), stage_flags, nullptr,
+            0, vk::DescriptorType::eStorageBuffer, get_array_size(), stage_flags, nullptr,
         };
     }
     return std::nullopt;
@@ -32,12 +33,11 @@ void ManagedVkBufferOut::get_descriptor_update(
     const DescriptorSetHandle& update,
     [[maybe_unused]] const ResourceAllocatorHandle& allocator) {
 
-    const auto& res = debugable_ptr_cast<BufferArrayResource>(resource);
+    const auto& res = debugable_ptr_cast<ManagedBufferArrayResource>(resource);
     for (auto& pending_update : res->pending_updates) {
         assert(pending_update < res->buffers.size());
-
-        const BufferHandle buffer = res->buffers[pending_update] ? res->buffers[pending_update]
-                                                                 : allocator->get_dummy_buffer();
+        const BufferHandle& buffer = res->buffers[pending_update];
+        assert(buffer);
         update->queue_descriptor_write_buffer(binding, buffer, 0, VK_WHOLE_SIZE, pending_update);
     }
 }
@@ -49,11 +49,11 @@ Connector::ConnectorStatusFlags ManagedVkBufferOut::on_pre_process(
     [[maybe_unused]] const NodeHandle& node,
     [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
     std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {
-    const auto& res = debugable_ptr_cast<BufferArrayResource>(resource);
+    const auto& res = debugable_ptr_cast<ManagedBufferArrayResource>(resource);
 
-    assert(array_size() == res->buffers.size());
+    assert(get_array_size() == res->buffers.size());
 
-    for (uint32_t i = 0; i < array_size(); i++) {
+    for (uint32_t i = 0; i < get_array_size(); i++) {
         vk::BufferMemoryBarrier2 buffer_bar{
             res->input_stage_flags,  res->input_access_flags, pipeline_stages,  access_flags,
             VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, *res->buffers[i], 0,
@@ -79,9 +79,9 @@ Connector::ConnectorStatusFlags ManagedVkBufferOut::on_post_process(
     [[maybe_unused]] const NodeHandle& node,
     [[maybe_unused]] std::vector<vk::ImageMemoryBarrier2>& image_barriers,
     std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {
-    const auto& res = debugable_ptr_cast<BufferArrayResource>(resource);
+    const auto& res = debugable_ptr_cast<ManagedBufferArrayResource>(resource);
 
-    for (uint32_t i = 0; i < array_size(); i++) {
+    for (uint32_t i = 0; i < get_array_size(); i++) {
         vk::BufferMemoryBarrier2 buffer_bar{
             pipeline_stages,         access_flags,
             res->input_stage_flags,  res->input_access_flags,
@@ -99,7 +99,7 @@ GraphResourceHandle ManagedVkBufferOut::create_resource(
     const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
     const ResourceAllocatorHandle& allocator,
     const ResourceAllocatorHandle& aliasing_allocator,
-    [[maybe_unused]] const uint32_t resoruce_index,
+    [[maybe_unused]] const uint32_t resource_index,
     [[maybe_unused]] const uint32_t ring_size) {
     vk::BufferCreateInfo buffer_create_info = create_info;
     vk::PipelineStageFlags2 input_pipeline_stages;
@@ -120,10 +120,10 @@ GraphResourceHandle ManagedVkBufferOut::create_resource(
 
     ResourceAllocatorHandle alloc = persistent ? allocator : aliasing_allocator;
 
-    std::shared_ptr<BufferArrayResource> res = std::make_shared<BufferArrayResource>(
-        array_size(), buffer_create_info.usage, input_pipeline_stages, input_access_flags);
+    std::shared_ptr<ManagedBufferArrayResource> res = std::make_shared<ManagedBufferArrayResource>(
+        get_array_size(), buffer_create_info.usage, input_pipeline_stages, input_access_flags);
 
-    for (uint32_t i = 0; i < array_size(); i++) {
+    for (uint32_t i = 0; i < get_array_size(); i++) {
         res->buffers[i] = alloc->createBuffer(buffer_create_info, MemoryMappingType::NONE, name);
     }
 

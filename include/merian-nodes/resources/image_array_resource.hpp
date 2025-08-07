@@ -64,11 +64,21 @@ class ImageArrayResource : public GraphResource {
     }
 
     merian::ImageHandle operator->() const {
-        return get_image(0);
+        const merian::ImageHandle& image = get_image(0);
+        assert(image);
+        return image;
     }
 
-    operator merian::ImageHandle() const {
-        return get_image(0);
+    operator const merian::ImageHandle&() const {
+        const merian::ImageHandle& image = get_image(0);
+        assert(image);
+        return image;
+    }
+
+    merian::Image& operator*() const {
+        const merian::ImageHandle& image = get_image(0);
+        assert(image);
+        return *image;
     }
 
   protected:

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "merian-nodes/connectors/buffer/vk_buffer_out.hpp"
-#include "merian-nodes/resources/buffer_array_resource.hpp"
+#include "merian-nodes/resources/buffer_array_resource_unmanaged.hpp"
 
 namespace merian_nodes {
 
@@ -14,7 +14,8 @@ using UnmanagedVkBufferOutHandle = std::shared_ptr<UnmanagedVkBufferOut>;
 // set all descriptor slots to a dummy buffer (ResourceAllocator::get_dummy_buffer()) if not set.
 //
 // The output keeps the buffers alive for all in-flight iterations.
-class UnmanagedVkBufferOut : public VkBufferOut, public AccessibleConnector<BufferArrayResource&> {
+class UnmanagedVkBufferOut : public VkBufferOut,
+                             public AccessibleConnector<UnmanagedBufferArrayResource&> {
 
   public:
     // No descriptor binding is created.
@@ -29,7 +30,7 @@ class UnmanagedVkBufferOut : public VkBufferOut, public AccessibleConnector<Buff
                     const uint32_t resource_index,
                     const uint32_t ring_size) override;
 
-    BufferArrayResource& resource(const GraphResourceHandle& resource) override;
+    UnmanagedBufferArrayResource& resource(const GraphResourceHandle& resource) override;
 
     ConnectorStatusFlags
     on_pre_process(GraphRun& run,
@@ -46,6 +47,8 @@ class UnmanagedVkBufferOut : public VkBufferOut, public AccessibleConnector<Buff
 
   private:
     const vk::BufferUsageFlags buffer_usage_flags;
+
+    std::vector<merian::BufferHandle> buffers;
 };
 
 } // namespace merian_nodes

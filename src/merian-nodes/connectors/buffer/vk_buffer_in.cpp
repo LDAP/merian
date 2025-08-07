@@ -41,9 +41,14 @@ void VkBufferIn::get_descriptor_update(const uint32_t binding,
 
     const auto& res = debugable_ptr_cast<BufferArrayResource>(resource);
     for (auto& pending_update : res->pending_updates) {
-        const BufferHandle buffer = res->buffers[pending_update];
-        assert(buffer);
-        update->queue_descriptor_write_buffer(binding, buffer, 0, VK_WHOLE_SIZE, pending_update);
+        const BufferHandle buffer = res->get_buffer(pending_update);
+        if (buffer) {
+            update->queue_descriptor_write_buffer(binding, buffer, 0, VK_WHOLE_SIZE,
+                                                  pending_update);
+        } else {
+            update->queue_descriptor_write_buffer(binding, allocator->get_dummy_buffer(), 0,
+                                                  VK_WHOLE_SIZE, pending_update);
+        }
     }
 }
 
@@ -58,7 +63,7 @@ void VkBufferIn::on_connect_output(const OutputConnectorHandle& output) {
             fmt::format("VkBufferIn {} cannot recive from {}.", name, output->name)};
     }
 
-    array_size = casted_output->array_size();
+    array_size = casted_output->get_array_size();
 }
 
 Connector::ConnectorStatusFlags VkBufferIn::on_pre_process(

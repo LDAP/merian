@@ -26,7 +26,7 @@ ManagedVkImageOut::ManagedVkImageOut(const std::string& name,
 
 std::optional<vk::DescriptorSetLayoutBinding> ManagedVkImageOut::get_descriptor_info() const {
     if (stage_flags) {
-        return vk::DescriptorSetLayoutBinding{0, vk::DescriptorType::eStorageImage, array_size(),
+        return vk::DescriptorSetLayoutBinding{0, vk::DescriptorType::eStorageImage, get_array_size(),
                                               stage_flags, nullptr};
     }
     return std::nullopt;
@@ -129,16 +129,16 @@ GraphResourceHandle ManagedVkImageOut::create_resource(
     }
 
     const auto res = std::make_shared<ManagedImageArrayResource>(
-        array_size(), input_pipeline_stages, input_access_flags);
+        get_array_size(), input_pipeline_stages, input_access_flags);
 
-    for (uint32_t i = 0; i < array_size(); i++) {
+    for (uint32_t i = 0; i < get_array_size(); i++) {
         res->images[i] = alloc->createImage(image_create_info, MemoryMappingType::NONE, name);
     }
 
     if (merian::Image::valid_for_view(image_create_info.usage)) {
-        res->textures.emplace(array_size());
+        res->textures.emplace(get_array_size());
 
-        for (uint32_t i = 0; i < array_size(); i++) {
+        for (uint32_t i = 0; i < get_array_size(); i++) {
             res->textures.value()[i] = allocator->createTexture(
                 res->images[i], res->images[i]->make_view_create_info(), name);
         }

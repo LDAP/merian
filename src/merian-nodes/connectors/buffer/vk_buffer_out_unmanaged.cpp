@@ -1,6 +1,7 @@
 #include "merian-nodes/connectors/buffer/vk_buffer_out_unmanaged.hpp"
 #include "merian-nodes/connectors/buffer/vk_buffer_in.hpp"
 
+#include "merian-nodes/graph/errors.hpp"
 #include "merian-nodes/graph/node.hpp"
 #include "merian/utils/pointer.hpp"
 
@@ -13,9 +14,9 @@ UnmanagedVkBufferOut::UnmanagedVkBufferOut(const std::string& name,
 
 GraphResourceHandle UnmanagedVkBufferOut::create_resource(
     [[maybe_unused]] const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
-    const ResourceAllocatorHandle& allocator,
+    const ResourceAllocatorHandle& /*allocator*/,
     [[maybe_unused]] const ResourceAllocatorHandle& aliasing_allocator,
-    [[maybe_unused]] const uint32_t resoruce_index,
+    [[maybe_unused]] const uint32_t resource_index,
     [[maybe_unused]] const uint32_t ring_size) {
 
     vk::BufferUsageFlags all_buffer_usage_flags = buffer_usage_flags;
@@ -29,18 +30,26 @@ GraphResourceHandle UnmanagedVkBufferOut::create_resource(
         input_access_flags |= con_in->get_access_flags();
     }
 
-    const auto res = std::make_shared<BufferArrayResource>(
-        array_size(), all_buffer_usage_flags, input_pipeline_stages, input_access_flags);
-
-    for (uint32_t i = 0; i < res->buffers.size(); i++) {
-        res->buffers[i] = allocator->get_dummy_buffer();
+    if (buffers.empty()) {
+        buffers.resize(get_array_size());
+    } else {
+        for (const auto& buffer : buffers) {
+            if (buffer &&
+                (buffer->get_usage_flags() & all_buffer_usage_flags) != all_buffer_usage_flags) {
+                throw graph_errors::invalid_connection{fmt::format(
+                    "buffers set for the unmanaged output connector {} are missing some "
+                    "usage flags for the new inputs.",
+                    name)};
+            }
+        }
     }
 
-    return res;
+    return std::make_shared<UnmanagedBufferArrayResource>(
+        get_array_size(), all_buffer_usage_flags, input_pipeline_stages, input_access_flags, buffers);
 }
 
-BufferArrayResource& UnmanagedVkBufferOut::resource(const GraphResourceHandle& resource) {
-    return *debugable_ptr_cast<BufferArrayResource>(resource);
+UnmanagedBufferArrayResource& UnmanagedVkBufferOut::resource(const GraphResourceHandle& resource) {
+    return *debugable_ptr_cast<UnmanagedBufferArrayResource>(resource);
 }
 
 Connector::ConnectorStatusFlags UnmanagedVkBufferOut::on_pre_process(

@@ -78,7 +78,7 @@ void VkImageIn::on_connect_output(const OutputConnectorHandle& output) {
                         name, output->name)};
     }
 
-    array_size = casted_output->array_size();
+    array_size = casted_output->get_array_size();
 }
 
 const ImageArrayResource& VkImageIn::resource(const GraphResourceHandle& resource) {

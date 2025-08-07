@@ -5,10 +5,10 @@
 namespace merian_nodes {
 
 VkBufferOut::VkBufferOut(const std::string& name, const bool persistent, const uint32_t array_size)
-    : OutputConnector(name, !persistent), persistent(persistent), m_array_size(array_size) {}
+    : OutputConnector(name, !persistent), persistent(persistent), array_size(array_size) {}
 
-uint32_t VkBufferOut::array_size() const {
-    return m_array_size;
+uint32_t VkBufferOut::get_array_size() const {
+    return array_size;
 }
 
 vk::BufferCreateInfo VkBufferOut::get_create_info() const {
