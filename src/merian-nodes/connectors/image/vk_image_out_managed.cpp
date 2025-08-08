@@ -26,8 +26,8 @@ ManagedVkImageOut::ManagedVkImageOut(const std::string& name,
 
 std::optional<vk::DescriptorSetLayoutBinding> ManagedVkImageOut::get_descriptor_info() const {
     if (stage_flags) {
-        return vk::DescriptorSetLayoutBinding{0, vk::DescriptorType::eStorageImage, get_array_size(),
-                                              stage_flags, nullptr};
+        return vk::DescriptorSetLayoutBinding{0, vk::DescriptorType::eStorageImage,
+                                              get_array_size(), stage_flags, nullptr};
     }
     return std::nullopt;
 }
@@ -104,7 +104,7 @@ GraphResourceHandle ManagedVkImageOut::create_resource(
     [[maybe_unused]] const uint32_t ring_size) {
     const ResourceAllocatorHandle alloc = persistent ? allocator : aliasing_allocator;
 
-    vk::ImageCreateInfo image_create_info = get_create_info();
+    vk::ImageCreateInfo image_create_info = create_info;
     vk::PipelineStageFlags2 input_pipeline_stages;
     vk::AccessFlags2 input_access_flags;
 
@@ -147,7 +147,8 @@ GraphResourceHandle ManagedVkImageOut::create_resource(
     return res;
 }
 
-vk::ImageCreateInfo ManagedVkImageOut::get_create_info() const {
+std::optional<vk::ImageCreateInfo>
+ManagedVkImageOut::get_create_info(const uint32_t /*index*/) const {
     return create_info;
 }
 

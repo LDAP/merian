@@ -15,8 +15,10 @@ class VkImageOut : public OutputConnector {
 
     uint32_t get_array_size() const;
 
-    // Throws invalid_connection if create infos were not supplied.
-    virtual vk::ImageCreateInfo get_create_info() const;
+    virtual std::optional<vk::ImageCreateInfo> get_create_info(const uint32_t index = 0) const;
+
+    // Throws node_error if create infos were not supplied.
+    vk::ImageCreateInfo get_create_info_or_throw(const uint32_t index = 0) const;
 
   public:
     const bool persistent;

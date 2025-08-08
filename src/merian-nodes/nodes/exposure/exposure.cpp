@@ -27,7 +27,7 @@ std::vector<InputConnectorHandle> AutoExposure::describe_inputs() {
 }
 
 std::vector<OutputConnectorHandle> AutoExposure::describe_outputs(const NodeIOLayout& io_layout) {
-    const vk::ImageCreateInfo create_info = io_layout[con_src]->get_create_info();
+    const vk::ImageCreateInfo create_info = io_layout[con_src]->get_create_info_or_throw();
     const vk::Format format = create_info.format;
     const vk::Extent3D extent = create_info.extent;
 

@@ -23,7 +23,7 @@ std::vector<InputConnectorHandle> FXAA::describe_inputs() {
 
 std::vector<OutputConnectorHandle>
 FXAA::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
-    const vk::ImageCreateInfo create_info = io_layout[con_src]->get_create_info();
+    const vk::ImageCreateInfo create_info = io_layout[con_src]->get_create_info_or_throw();
 
     extent = create_info.extent;
 

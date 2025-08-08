@@ -11,9 +11,18 @@ uint32_t VkBufferOut::get_array_size() const {
     return array_size;
 }
 
-vk::BufferCreateInfo VkBufferOut::get_create_info() const {
-    throw graph_errors::invalid_connection{fmt::format(
-        "This VkBufferOut connector {} does not supply create infos for its buffers.", name)};
+std::optional<vk::BufferCreateInfo> VkBufferOut::get_create_info(const uint32_t /*index*/) const {
+    return std::nullopt;
+}
+
+// Throws node_error if create infos were not supplied.
+vk::BufferCreateInfo VkBufferOut::get_create_info_or_throw(const uint32_t index) const {
+    std::optional<vk::BufferCreateInfo> optional_infos = get_create_info(index);
+    if (!optional_infos.has_value()) {
+        throw graph_errors::node_error{
+            fmt::format("create infos were not provided by connector {}", name)};
+    }
+    return *optional_infos;
 }
 
 } // namespace merian_nodes

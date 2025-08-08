@@ -40,7 +40,7 @@ std::vector<OutputConnectorHandle> Add::describe_outputs(const NodeIOLayout& io_
     for (const auto& input : input_connectors) {
         if (io_layout.is_connected(input)) {
             at_least_one_input_connected = true;
-            const vk::ImageCreateInfo create_info = io_layout[input]->get_create_info();
+            const vk::ImageCreateInfo create_info = io_layout[input]->get_create_info_or_throw();
             if (format == vk::Format::eUndefined)
                 format = create_info.format;
             extent = min(extent, create_info.extent);

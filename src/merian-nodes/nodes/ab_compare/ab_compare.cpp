@@ -20,7 +20,7 @@ ABSplit::ABSplit(const std::optional<vk::Format> output_format,
     : AbstractABCompare(output_format, output_extent) {}
 
 std::vector<OutputConnectorHandle> ABSplit::describe_outputs(const NodeIOLayout& io_layout) {
-    const vk::ImageCreateInfo create_info = io_layout[con_in_a]->get_create_info();
+    const vk::ImageCreateInfo create_info = io_layout[con_in_a]->get_create_info_or_throw();
 
     vk::Format format =
         output_format.has_value() ? output_format.value() : create_info.format;
@@ -59,7 +59,7 @@ ABSideBySide::ABSideBySide(const std::optional<vk::Format> output_format,
     : AbstractABCompare(output_format, output_extent) {}
 
 std::vector<OutputConnectorHandle> ABSideBySide::describe_outputs(const NodeIOLayout& io_layout) {
-    const vk::ImageCreateInfo create_info = io_layout[con_in_a]->get_create_info();
+    const vk::ImageCreateInfo create_info = io_layout[con_in_a]->get_create_info_or_throw();
 
     vk::Format format =
         output_format.has_value() ? output_format.value() : create_info.format;

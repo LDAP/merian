@@ -1,5 +1,4 @@
 #include "merian-nodes/connectors/image/vk_image_out.hpp"
-
 #include "merian-nodes/graph/errors.hpp"
 
 namespace merian_nodes {
@@ -11,9 +10,18 @@ uint32_t VkImageOut::get_array_size() const {
     return array_size;
 }
 
-vk::ImageCreateInfo VkImageOut::get_create_info() const {
-    throw graph_errors::invalid_connection{fmt::format(
-        "This VkImageOut connector {} does not supply create infos for its images.", name)};
+std::optional<vk::ImageCreateInfo> VkImageOut::get_create_info(const uint32_t /*index*/) const {
+    return std::nullopt;
+}
+
+// Throws node_error if create infos were not supplied.
+vk::ImageCreateInfo VkImageOut::get_create_info_or_throw(const uint32_t index) const {
+    std::optional<vk::ImageCreateInfo> optional_infos = get_create_info(index);
+    if (!optional_infos.has_value()) {
+        throw graph_errors::node_error{
+            fmt::format("create infos were not provided by connector {}", name)};
+    }
+    return *optional_infos;
 }
 
 } // namespace merian_nodes

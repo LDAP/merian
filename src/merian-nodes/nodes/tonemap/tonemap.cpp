@@ -30,7 +30,7 @@ std::vector<InputConnectorHandle> Tonemap::describe_inputs() {
 
 std::vector<OutputConnectorHandle>
 Tonemap::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
-    const vk::ImageCreateInfo create_info = io_layout[con_src]->get_create_info();
+    const vk::ImageCreateInfo create_info = io_layout[con_src]->get_create_info_or_throw();
 
     extent = create_info.extent;
     const vk::Format format = output_format.value_or(create_info.format);

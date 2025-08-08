@@ -29,7 +29,7 @@ std::vector<InputConnectorHandle> TAA::describe_inputs() {
 
 std::vector<OutputConnectorHandle>
 TAA::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
-    const vk::ImageCreateInfo create_info = io_layout[con_src]->get_create_info();
+    const vk::ImageCreateInfo create_info = io_layout[con_src]->get_create_info_or_throw();
     width = create_info.extent.width;
     height = create_info.extent.height;
 

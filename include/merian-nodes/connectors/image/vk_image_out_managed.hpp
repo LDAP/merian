@@ -54,7 +54,7 @@ class ManagedVkImageOut : public VkImageOut, public AccessibleConnector<const Im
                     const uint32_t resource_index,
                     const uint32_t ring_size) override;
 
-    vk::ImageCreateInfo get_create_info() const override;
+    virtual std::optional<vk::ImageCreateInfo> get_create_info(const uint32_t index = 0) const override;
 
   public:
     static ManagedVkImageOutHandle compute_write(const std::string& name,
