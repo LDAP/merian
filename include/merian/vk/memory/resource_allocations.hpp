@@ -453,11 +453,18 @@ class Texture : public std::enable_shared_from_this<Texture>, public Resource {
     static TextureHandle create(const ImageViewHandle& view, const SamplerHandle& sampler);
 };
 
+class AbstractAccelerationStructure;
+using AbstractAccelerationStructureHandle = std::shared_ptr<AbstractAccelerationStructure>;
+
+class AbstractAccelerationStructure
+    : public std::enable_shared_from_this<AbstractAccelerationStructure>,
+      public Resource {};
+
 class AccelerationStructure;
 using AccelerationStructureHandle = std::shared_ptr<AccelerationStructure>;
 
-class AccelerationStructure : public std::enable_shared_from_this<AccelerationStructure>,
-                              public Resource {
+class AccelerationStructure : public AbstractAccelerationStructure {
+
   protected:
     // Creats a AccelerationStructure objects that automatically destroys `as` when destructed.
     // The memory is not freed explicitly to let it free itself.
@@ -483,16 +490,16 @@ class AccelerationStructure : public std::enable_shared_from_this<AccelerationSt
         return as;
     }
 
-    const BufferHandle& get_buffer() const {
-        return buffer;
-    }
-
     const vk::AccelerationStructureKHR& get_acceleration_structure() const {
         return as;
     }
 
     const vk::AccelerationStructureBuildSizesInfoKHR& get_size_info() const {
         return size_info;
+    }
+
+    const BufferHandle& get_buffer() const {
+        return buffer;
     }
 
     // -----------------------------------------------------------
@@ -544,20 +551,18 @@ class AccelerationStructure : public std::enable_shared_from_this<AccelerationSt
                                       vk::AccessFlagBits::eAccelerationStructureWriteKHR);
     }
 
-    // -----------------------------------------------------------
-
     void properties(Properties& props);
-
-  private:
-    const vk::AccelerationStructureKHR as;
-    const BufferHandle buffer;
-    const vk::AccelerationStructureBuildSizesInfoKHR size_info;
 
   public:
     static AccelerationStructureHandle
     create(const vk::AccelerationStructureKHR& as,
            const BufferHandle& buffer,
            const vk::AccelerationStructureBuildSizesInfoKHR& size_info);
+
+  private:
+    const vk::AccelerationStructureKHR as;
+    const BufferHandle buffer;
+    const vk::AccelerationStructureBuildSizesInfoKHR size_info;
 };
 
 } // namespace merian
