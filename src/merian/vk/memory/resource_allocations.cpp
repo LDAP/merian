@@ -497,9 +497,10 @@ void HWAccelerationStructure::properties(Properties& props) {
 
 HWAccelerationStructureHandle
 HWAccelerationStructure::create(const vk::AccelerationStructureKHR& as,
-                              const BufferHandle& buffer,
-                              const vk::AccelerationStructureBuildSizesInfoKHR& size_info) {
-    return std::shared_ptr<HWAccelerationStructure>(new HWAccelerationStructure(as, buffer, size_info));
+                                const BufferHandle& buffer,
+                                const vk::AccelerationStructureBuildSizesInfoKHR& size_info) {
+    return std::shared_ptr<HWAccelerationStructure>(
+        new HWAccelerationStructure(as, buffer, size_info));
 }
 
 } // namespace merian

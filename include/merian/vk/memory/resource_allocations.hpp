@@ -453,7 +453,7 @@ class Texture : public std::enable_shared_from_this<Texture>, public Resource {
     static TextureHandle create(const ImageViewHandle& view, const SamplerHandle& sampler);
 };
 
-enum class AccelerationStructureOptimization { NONE, PREFER_FAST_TRACE, PREFER_FAST_BUILD };
+// enum class AccelerationStructureOptimization { NONE, PREFER_FAST_TRACE, PREFER_FAST_BUILD };
 
 class AccelerationStructure;
 using AccelerationStructureHandle = std::shared_ptr<AccelerationStructure>;
@@ -461,15 +461,11 @@ using AccelerationStructureHandle = std::shared_ptr<AccelerationStructure>;
 class AccelerationStructure : public std::enable_shared_from_this<AccelerationStructure>,
                               public Resource {
 
-    virtual bool is_update_allowed() const = 0;
+    // virtual bool is_update_allowed() const = 0;
 
-    virtual bool is_compaction_allowed() const = 0;
+    // virtual bool is_compaction_allowed() const = 0;
 
-    virtual AccelerationStructureOptimization get_optimization() const = 0;
-
-    void build(const BufferHandle& vertices);
-
-    void build(const BufferHandle& vertices, const vk::Format vertex_format = vk::Format::eR32G32B32Sfloat);
+    // virtual AccelerationStructureOptimization get_optimization() const = 0;
 };
 
 class TinyBVHGPUAccelerationStructure;
@@ -520,6 +516,13 @@ class HWAccelerationStructure : public AccelerationStructure {
     const BufferHandle& get_buffer() const {
         return buffer;
     }
+
+    // -----------------------------------------------------------
+
+    void build(const BufferHandle& vertices);
+
+    void build(const BufferHandle& vertices,
+               const vk::Format vertex_format = vk::Format::eR32G32B32Sfloat);
 
     // -----------------------------------------------------------
 
