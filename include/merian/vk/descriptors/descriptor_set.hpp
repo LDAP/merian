@@ -196,7 +196,7 @@ class DescriptorSet : public std::enable_shared_from_this<DescriptorSet>, public
     // Bind `acceleration_structure` at the binding point `binding` of DescriptorSet `set`.
     DescriptorSet& queue_descriptor_write_acceleration_structure(
         const uint32_t binding,
-        const AccelerationStructureHandle& acceleration_structure,
+        const HWAccelerationStructureHandle& acceleration_structure,
         const uint32_t dst_array_element = 0) {
         write_resources.emplace_back(acceleration_structure);
         write_infos.emplace_back(

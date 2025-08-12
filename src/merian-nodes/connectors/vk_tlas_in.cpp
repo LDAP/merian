@@ -32,7 +32,7 @@ void VkTLASIn::get_descriptor_update(const uint32_t binding,
     update->queue_descriptor_write_acceleration_structure(binding, res->tlas);
 }
 
-const AccelerationStructureHandle& VkTLASIn::resource(const GraphResourceHandle& resource) {
+const HWAccelerationStructureHandle& VkTLASIn::resource(const GraphResourceHandle& resource) {
     return debugable_ptr_cast<TLASResource>(resource)->tlas;
 }
 

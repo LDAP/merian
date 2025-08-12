@@ -43,7 +43,7 @@ class ASBuilder {
   private:
     struct PendingBLAS {
         // src/dstAccelerationStructures and scratchData.deviceAddress are left empty until build
-        AccelerationStructureHandle blas;
+        HWAccelerationStructureHandle blas;
         vk::AccelerationStructureBuildGeometryInfoKHR build_info;
         const vk::AccelerationStructureBuildRangeInfoKHR* range_info;
     };
@@ -52,7 +52,7 @@ class ASBuilder {
         vk::AccelerationStructureBuildGeometryInfoKHR build_info;
         uint32_t instance_count;
         vk::AccelerationStructureGeometryKHR geometry;
-        AccelerationStructureHandle tlas;
+        HWAccelerationStructureHandle tlas;
     };
 
   public:
@@ -75,7 +75,7 @@ class ASBuilder {
     // You must wait until after calling get_cmds() to free the geometry and range_info (pointers
     // need to remain valid)!
     [[nodiscard]]
-    AccelerationStructureHandle
+    HWAccelerationStructureHandle
     queue_build(const std::vector<vk::AccelerationStructureGeometryKHR>& geometry,
                 const std::vector<vk::AccelerationStructureBuildRangeInfoKHR>& range_info,
                 const vk::BuildAccelerationStructureFlagsKHR build_flags =
@@ -87,7 +87,7 @@ class ASBuilder {
     // You must wait until after calling get_cmds() to free the geometry and range_info (pointers
     // need to remain valid)!
     [[nodiscard]]
-    AccelerationStructureHandle
+    HWAccelerationStructureHandle
     queue_build(const vk::AccelerationStructureGeometryKHR* geometry,
                 const vk::AccelerationStructureBuildRangeInfoKHR* range_info,
                 const vk::BuildAccelerationStructureFlagsKHR build_flags =
@@ -103,7 +103,7 @@ class ASBuilder {
     // need to remain valid)!
     void queue_build(const std::vector<vk::AccelerationStructureGeometryKHR>& geometry,
                      const std::vector<vk::AccelerationStructureBuildRangeInfoKHR>& range_info,
-                     const AccelerationStructureHandle& as,
+                     const HWAccelerationStructureHandle& as,
                      const vk::BuildAccelerationStructureFlagsKHR build_flags);
 
     // Enqueues a BLAS to be (re)build with the next get_cmds().
@@ -115,7 +115,7 @@ class ASBuilder {
     // need to remain valid)!
     void queue_build(const vk::AccelerationStructureGeometryKHR* geometry,
                      const vk::AccelerationStructureBuildRangeInfoKHR* range_info,
-                     const AccelerationStructureHandle& as,
+                     const HWAccelerationStructureHandle& as,
                      const vk::BuildAccelerationStructureFlagsKHR build_flags,
                      const uint32_t geometry_count = 1);
 
@@ -129,7 +129,7 @@ class ASBuilder {
     // need to remain valid)!
     void queue_update(const std::vector<vk::AccelerationStructureGeometryKHR>& geometry,
                       const std::vector<vk::AccelerationStructureBuildRangeInfoKHR>& range_info,
-                      const AccelerationStructureHandle& as,
+                      const HWAccelerationStructureHandle& as,
                       const vk::BuildAccelerationStructureFlagsKHR build_flags);
 
     // Enqueues a BLAS to be updated with the next get_cmds().
@@ -142,7 +142,7 @@ class ASBuilder {
     // need to remain valid)!
     void queue_update(const vk::AccelerationStructureGeometryKHR* geometry,
                       const vk::AccelerationStructureBuildRangeInfoKHR* range_info,
-                      const AccelerationStructureHandle& as,
+                      const HWAccelerationStructureHandle& as,
                       const vk::BuildAccelerationStructureFlagsKHR build_flags,
                       const uint32_t geometry_count = 1);
 
@@ -151,7 +151,7 @@ class ASBuilder {
 
     // Build a TLAS from instances that are stored on the device.
     [[nodiscard]]
-    AccelerationStructureHandle
+    HWAccelerationStructureHandle
     queue_build(const uint32_t instance_count,
                 const BufferHandle& instances,
                 const vk::BuildAccelerationStructureFlagsKHR flags =
@@ -164,7 +164,7 @@ class ASBuilder {
 
     // Build a TLAS from instances that are stored on the device.
     [[nodiscard]]
-    AccelerationStructureHandle
+    HWAccelerationStructureHandle
     queue_build(const uint32_t instance_count,
                 const vk::AccelerationStructureGeometryInstancesDataKHR& instances_data,
                 const vk::BuildAccelerationStructureFlagsKHR flags =
@@ -173,7 +173,7 @@ class ASBuilder {
     // Update a TLAS from instances that are stored on the device.
     void queue_update(const uint32_t instance_count,
                       const BufferHandle& instances,
-                      const AccelerationStructureHandle& src_as,
+                      const HWAccelerationStructureHandle& src_as,
                       const vk::BuildAccelerationStructureFlagsKHR flags =
                           vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace) {
         // Note: For some reason using a host buffer here kills the GPU (without layer error) :/
@@ -188,7 +188,7 @@ class ASBuilder {
     // `as` was last built.
     void queue_build(const uint32_t instance_count,
                      const BufferHandle& instances,
-                     const AccelerationStructureHandle& src_as,
+                     const HWAccelerationStructureHandle& src_as,
                      const vk::BuildAccelerationStructureFlagsKHR flags =
                          vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace) {
         // Note: For some reason using a host buffer here kills the GPU (without layer error) :/
@@ -203,7 +203,7 @@ class ASBuilder {
     // `as` was last built.
     void queue_build(const uint32_t instance_count,
                      const vk::AccelerationStructureGeometryInstancesDataKHR& instances_data,
-                     const AccelerationStructureHandle& src_as,
+                     const HWAccelerationStructureHandle& src_as,
                      const vk::BuildAccelerationStructureFlagsKHR flags);
 
     // Update a TLAS from instances that are stored on the device.
@@ -212,7 +212,7 @@ class ASBuilder {
     // performance.
     void queue_update(const uint32_t instance_count,
                       const vk::AccelerationStructureGeometryInstancesDataKHR& instances_data,
-                      const AccelerationStructureHandle& src_as,
+                      const HWAccelerationStructureHandle& src_as,
                       const vk::BuildAccelerationStructureFlagsKHR flags =
                           vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace);
 

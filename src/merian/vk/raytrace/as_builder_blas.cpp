@@ -5,7 +5,7 @@
 
 namespace merian {
 
-AccelerationStructureHandle
+HWAccelerationStructureHandle
 ASBuilder::queue_build(const std::vector<vk::AccelerationStructureGeometryKHR>& geometry,
                        const std::vector<vk::AccelerationStructureBuildRangeInfoKHR>& range_info,
                        const vk::BuildAccelerationStructureFlagsKHR build_flags) {
@@ -13,7 +13,7 @@ ASBuilder::queue_build(const std::vector<vk::AccelerationStructureGeometryKHR>& 
     return queue_build(geometry.data(), range_info.data(), build_flags, geometry.size());
 }
 
-AccelerationStructureHandle
+HWAccelerationStructureHandle
 ASBuilder::queue_build(const vk::AccelerationStructureGeometryKHR* geometry,
                        const vk::AccelerationStructureBuildRangeInfoKHR* range_info,
                        const vk::BuildAccelerationStructureFlagsKHR build_flags,
@@ -43,7 +43,7 @@ ASBuilder::queue_build(const vk::AccelerationStructureGeometryKHR* geometry,
 
     // 2. Create the AS with the aquired info
     //--------------------------------------------
-    const AccelerationStructureHandle as = allocator->createAccelerationStructure(
+    const HWAccelerationStructureHandle as = allocator->createAccelerationStructure(
         vk::AccelerationStructureTypeKHR::eBottomLevel, size_info);
 
     // 3. Enqueue the build with the new AS as target
@@ -56,7 +56,7 @@ ASBuilder::queue_build(const vk::AccelerationStructureGeometryKHR* geometry,
 void ASBuilder::queue_build(
     const std::vector<vk::AccelerationStructureGeometryKHR>& geometry,
     const std::vector<vk::AccelerationStructureBuildRangeInfoKHR>& range_info,
-    const AccelerationStructureHandle& as,
+    const HWAccelerationStructureHandle& as,
     const vk::BuildAccelerationStructureFlagsKHR build_flags) {
     assert(geometry.size() == range_info.size());
     queue_build(geometry.data(), range_info.data(), as, build_flags, geometry.size());
@@ -64,7 +64,7 @@ void ASBuilder::queue_build(
 
 void ASBuilder::queue_build(const vk::AccelerationStructureGeometryKHR* geometry,
                             const vk::AccelerationStructureBuildRangeInfoKHR* range_info,
-                            const AccelerationStructureHandle& as,
+                            const HWAccelerationStructureHandle& as,
                             const vk::BuildAccelerationStructureFlagsKHR build_flags,
                             const uint32_t geometry_count) {
     vk::AccelerationStructureBuildGeometryInfoKHR build_info{
@@ -84,14 +84,14 @@ void ASBuilder::queue_build(const vk::AccelerationStructureGeometryKHR* geometry
 void ASBuilder::queue_update(
     const std::vector<vk::AccelerationStructureGeometryKHR>& geometry,
     const std::vector<vk::AccelerationStructureBuildRangeInfoKHR>& range_info,
-    const AccelerationStructureHandle& as,
+    const HWAccelerationStructureHandle& as,
     const vk::BuildAccelerationStructureFlagsKHR build_flags) {
     queue_update(geometry.data(), range_info.data(), as, build_flags);
 }
 
 void ASBuilder::queue_update(const vk::AccelerationStructureGeometryKHR* geometry,
                              const vk::AccelerationStructureBuildRangeInfoKHR* range_info,
-                             const AccelerationStructureHandle& as,
+                             const HWAccelerationStructureHandle& as,
                              const vk::BuildAccelerationStructureFlagsKHR build_flags,
                              const uint32_t geometry_count) {
     vk::AccelerationStructureBuildGeometryInfoKHR build_info{

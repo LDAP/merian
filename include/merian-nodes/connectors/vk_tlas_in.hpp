@@ -13,7 +13,7 @@ using VkTLASInHandle = std::shared_ptr<VkTLASIn>;
 // Input a TLAS.
 class VkTLASIn : public InputConnector,
                  public OutputAccessibleInputConnector<VkTLASOutHandle>,
-                 public AccessibleConnector<const AccelerationStructureHandle&> {
+                 public AccessibleConnector<const HWAccelerationStructureHandle&> {
     friend class VkTLASOut;
 
   public:
@@ -30,7 +30,7 @@ class VkTLASIn : public InputConnector,
                                const DescriptorSetHandle& update,
                                const ResourceAllocatorHandle& allocator) override;
 
-    const AccelerationStructureHandle& resource(const GraphResourceHandle& resource) override;
+    const HWAccelerationStructureHandle& resource(const GraphResourceHandle& resource) override;
 
   public:
     // Creates an output that has to set the TLAS and can it read in a shader.

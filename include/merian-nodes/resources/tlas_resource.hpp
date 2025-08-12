@@ -25,7 +25,7 @@ class TLASResource : public GraphResource {
         }
     }
 
-    TLASResource& operator=(const merian::AccelerationStructureHandle& tlas) {
+    TLASResource& operator=(const merian::HWAccelerationStructureHandle& tlas) {
         this->tlas = tlas;
         return *this;
     }
@@ -35,8 +35,8 @@ class TLASResource : public GraphResource {
     const vk::PipelineStageFlags2 input_pipeline_stages;
 
   private:
-    merian::AccelerationStructureHandle tlas;
-    merian::AccelerationStructureHandle last_tlas;
+    merian::HWAccelerationStructureHandle tlas;
+    merian::HWAccelerationStructureHandle last_tlas;
 };
 
 using TLASResourceHandle = std::shared_ptr<TLASResource>;

@@ -199,7 +199,7 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
 
     //--------------------------------------------------------------------------------------------------
 
-    AccelerationStructureHandle
+    HWAccelerationStructureHandle
     createAccelerationStructure(const vk::AccelerationStructureTypeKHR type,
                                 const vk::AccelerationStructureBuildSizesInfoKHR& size_info,
                                 const std::string& debug_name = {});

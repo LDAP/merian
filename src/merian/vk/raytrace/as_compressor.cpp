@@ -5,12 +5,12 @@
 namespace merian {
 
 // You must ensure proper synchronization with the build
-std::vector<AccelerationStructureHandle>
+std::vector<HWAccelerationStructureHandle>
 ASCompressor::compact(const ContextHandle& context,
                       const ResourceAllocatorHandle& allocator,
                       const CommandPoolHandle& pool,
                       const QueueHandle& queue,
-                      const std::vector<AccelerationStructureHandle>& ass,
+                      const std::vector<HWAccelerationStructureHandle>& ass,
                       const EventHandle& build_wait_event,
                       const vk::AccelerationStructureTypeKHR type) {
     // vk::QueryPoolCreateInfo qpci{{},
@@ -46,7 +46,7 @@ ASCompressor::compact(const ContextHandle& context,
     std::vector<vk::DeviceSize> compact_sizes =
         query_pool->get_query_pool_results<vk::DeviceSize>(vk::QueryResultFlagBits::eWait);
 
-    std::vector<AccelerationStructureHandle> result(ass.size());
+    std::vector<HWAccelerationStructureHandle> result(ass.size());
     for (uint32_t i = 0; i < ass.size(); i++) {
 
         auto size_info = ass[i]->get_size_info();

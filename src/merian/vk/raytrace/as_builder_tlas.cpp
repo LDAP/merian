@@ -3,7 +3,7 @@
 
 namespace merian {
 
-AccelerationStructureHandle
+HWAccelerationStructureHandle
 ASBuilder::queue_build(const uint32_t instance_count,
                        const vk::AccelerationStructureGeometryInstancesDataKHR& instances_data,
                        const vk::BuildAccelerationStructureFlagsKHR flags) {
@@ -21,7 +21,7 @@ ASBuilder::queue_build(const uint32_t instance_count,
         context->device.getAccelerationStructureBuildSizesKHR(
             vk::AccelerationStructureBuildTypeKHR::eDevice, build_info, instance_count);
 
-    AccelerationStructureHandle tlas = allocator->createAccelerationStructure(
+    HWAccelerationStructureHandle tlas = allocator->createAccelerationStructure(
         vk::AccelerationStructureTypeKHR::eTopLevel, size_info);
 
     pending_min_scratch_buffer = std::max(pending_min_scratch_buffer, size_info.buildScratchSize);
@@ -36,7 +36,7 @@ ASBuilder::queue_build(const uint32_t instance_count,
 void ASBuilder::queue_update(
     const uint32_t instance_count,
     const vk::AccelerationStructureGeometryInstancesDataKHR& instances_data,
-    const AccelerationStructureHandle& src_as,
+    const HWAccelerationStructureHandle& src_as,
     const vk::BuildAccelerationStructureFlagsKHR flags) {
     vk::AccelerationStructureGeometryKHR top_as_geometry{vk::GeometryTypeKHR::eInstances,
                                                          {instances_data}};
@@ -56,7 +56,7 @@ void ASBuilder::queue_update(
 
 void ASBuilder::queue_build(const uint32_t instance_count,
                             const vk::AccelerationStructureGeometryInstancesDataKHR& instances_data,
-                            const AccelerationStructureHandle& src_as,
+                            const HWAccelerationStructureHandle& src_as,
                             const vk::BuildAccelerationStructureFlagsKHR flags) {
     vk::AccelerationStructureGeometryKHR top_as_geometry{vk::GeometryTypeKHR::eInstances,
                                                          {instances_data}};

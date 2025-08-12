@@ -149,7 +149,7 @@ class DeviceASBuilder : public Node {
         std::vector<BufferHandle> idx_buffers;
 
         // After the build stored here for rebuilds / updates
-        AccelerationStructureHandle blas;
+        HWAccelerationStructureHandle blas;
         bool update = false;
         bool rebuild = false;
     };
@@ -205,7 +205,7 @@ class DeviceASBuilder : public Node {
         std::vector<std::shared_ptr<BlasBuildInfo>> blases;
 
         // After the build stored here for rebuilds / updates
-        AccelerationStructureHandle tlas;
+        HWAccelerationStructureHandle tlas;
         BufferHandle instances_buffer;
 
         bool rebuild = false;
@@ -213,7 +213,7 @@ class DeviceASBuilder : public Node {
 
   private:
     struct InFlightData {
-        std::vector<AccelerationStructureHandle> blases;
+        std::vector<HWAccelerationStructureHandle> blases;
         std::vector<BufferHandle> build_buffers;
     };
 

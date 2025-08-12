@@ -465,7 +465,7 @@ TextureHandle Texture::create(const ImageViewHandle& view, const SamplerHandle& 
 
 // --------------------------------------------------------------------------
 
-AccelerationStructure::AccelerationStructure(
+HWAccelerationStructure::HWAccelerationStructure(
     const vk::AccelerationStructureKHR& as,
     const BufferHandle& buffer,
     const vk::AccelerationStructureBuildSizesInfoKHR& size_info)
@@ -473,18 +473,18 @@ AccelerationStructure::AccelerationStructure(
     SPDLOG_TRACE("create acceleration structure ({})", fmt::ptr(this));
 }
 
-AccelerationStructure::~AccelerationStructure() {
+HWAccelerationStructure::~HWAccelerationStructure() {
     SPDLOG_TRACE("destroy acceleration structure ({})", fmt::ptr(this));
     buffer->get_memory()->get_context()->device.destroyAccelerationStructureKHR(as);
 }
 
-vk::DeviceAddress AccelerationStructure::get_acceleration_structure_device_address() {
+vk::DeviceAddress HWAccelerationStructure::get_acceleration_structure_device_address() {
     vk::AccelerationStructureDeviceAddressInfoKHR address_info{as};
     return buffer->get_memory()->get_context()->device.getAccelerationStructureAddressKHR(
         address_info);
 }
 
-void AccelerationStructure::properties(Properties& props) {
+void HWAccelerationStructure::properties(Properties& props) {
     props.output_text(fmt::format("Size: {}\nBuild scratch size: {}\nUpdate scratch size: {}",
                                   format_size(size_info.accelerationStructureSize),
                                   format_size(size_info.buildScratchSize),
@@ -495,11 +495,11 @@ void AccelerationStructure::properties(Properties& props) {
     }
 }
 
-AccelerationStructureHandle
-AccelerationStructure::create(const vk::AccelerationStructureKHR& as,
+HWAccelerationStructureHandle
+HWAccelerationStructure::create(const vk::AccelerationStructureKHR& as,
                               const BufferHandle& buffer,
                               const vk::AccelerationStructureBuildSizesInfoKHR& size_info) {
-    return std::shared_ptr<AccelerationStructure>(new AccelerationStructure(as, buffer, size_info));
+    return std::shared_ptr<HWAccelerationStructure>(new HWAccelerationStructure(as, buffer, size_info));
 }
 
 } // namespace merian

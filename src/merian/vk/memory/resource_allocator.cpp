@@ -298,7 +298,7 @@ const TextureHandle& ResourceAllocator::get_dummy_texture() const {
     return dummy_texture;
 }
 
-AccelerationStructureHandle ResourceAllocator::createAccelerationStructure(
+HWAccelerationStructureHandle ResourceAllocator::createAccelerationStructure(
     const vk::AccelerationStructureTypeKHR type,
     const vk::AccelerationStructureBuildSizesInfoKHR& size_info,
     const std::string& debug_name) {
@@ -321,7 +321,7 @@ AccelerationStructureHandle ResourceAllocator::createAccelerationStructure(
     }
 #endif
 
-    return AccelerationStructure::create(as, buffer, size_info);
+    return HWAccelerationStructure::create(as, buffer, size_info);
 }
 
 std::shared_ptr<StagingMemoryManager> ResourceAllocator::getStaging() {

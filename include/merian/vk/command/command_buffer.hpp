@@ -373,8 +373,8 @@ class CommandBuffer {
     // ------------------------------------------------------------
     // ACCELERATION STRUCTURE
 
-    void copy_acceleration_structure(const AccelerationStructureHandle& src,
-                                     const AccelerationStructureHandle& dst,
+    void copy_acceleration_structure(const HWAccelerationStructureHandle& src,
+                                     const HWAccelerationStructureHandle& dst,
                                      const vk::CopyAccelerationStructureModeKHR mode =
                                          vk::CopyAccelerationStructureModeKHR::eClone) {
         cmd.copyAccelerationStructureKHR(vk::CopyAccelerationStructureInfoKHR{*src, *dst, mode});
@@ -418,7 +418,7 @@ class CommandBuffer {
 
     void write_acceleration_structures_properties(
         const QueryPoolHandle<vk::QueryType::eAccelerationStructureCompactedSizeKHR>& query_pool,
-        const vk::ArrayProxy<const AccelerationStructureHandle> ass,
+        const vk::ArrayProxy<const HWAccelerationStructureHandle> ass,
         uint32_t first_query = 0) {
 
         std::vector<vk::AccelerationStructureKHR> acc_structures(ass.size());

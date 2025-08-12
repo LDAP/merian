@@ -453,28 +453,47 @@ class Texture : public std::enable_shared_from_this<Texture>, public Resource {
     static TextureHandle create(const ImageViewHandle& view, const SamplerHandle& sampler);
 };
 
-class AbstractAccelerationStructure;
-using AbstractAccelerationStructureHandle = std::shared_ptr<AbstractAccelerationStructure>;
-
-class AbstractAccelerationStructure
-    : public std::enable_shared_from_this<AbstractAccelerationStructure>,
-      public Resource {};
+enum class AccelerationStructureOptimization { NONE, PREFER_FAST_TRACE, PREFER_FAST_BUILD };
 
 class AccelerationStructure;
 using AccelerationStructureHandle = std::shared_ptr<AccelerationStructure>;
 
-class AccelerationStructure : public AbstractAccelerationStructure {
+class AccelerationStructure : public std::enable_shared_from_this<AccelerationStructure>,
+                              public Resource {
+
+    virtual bool is_update_allowed() const = 0;
+
+    virtual bool is_compaction_allowed() const = 0;
+
+    virtual AccelerationStructureOptimization get_optimization() const = 0;
+
+    void build(const BufferHandle& vertices);
+
+    void build(const BufferHandle& vertices, const vk::Format vertex_format = vk::Format::eR32G32B32Sfloat);
+};
+
+class TinyBVHGPUAccelerationStructure;
+using TinyBVHGPUAccelerationStructureHandle = std::shared_ptr<TinyBVHGPUAccelerationStructure>;
+
+class TinyBVHGPUAccelerationStructure : public AccelerationStructure {
+    TinyBVHGPUAccelerationStructure() {}
+};
+
+class HWAccelerationStructure;
+using HWAccelerationStructureHandle = std::shared_ptr<HWAccelerationStructure>;
+
+class HWAccelerationStructure : public AccelerationStructure {
 
   protected:
     // Creats a AccelerationStructure objects that automatically destroys `as` when destructed.
     // The memory is not freed explicitly to let it free itself.
     // It is asserted that the memory is already bound correctly.
-    AccelerationStructure(const vk::AccelerationStructureKHR& as,
-                          const BufferHandle& buffer,
-                          const vk::AccelerationStructureBuildSizesInfoKHR& size_info);
+    HWAccelerationStructure(const vk::AccelerationStructureKHR& as,
+                            const BufferHandle& buffer,
+                            const vk::AccelerationStructureBuildSizesInfoKHR& size_info);
 
   public:
-    ~AccelerationStructure();
+    ~HWAccelerationStructure();
 
     // -----------------------------------------------------------
 
@@ -554,7 +573,7 @@ class AccelerationStructure : public AbstractAccelerationStructure {
     void properties(Properties& props);
 
   public:
-    static AccelerationStructureHandle
+    static HWAccelerationStructureHandle
     create(const vk::AccelerationStructureKHR& as,
            const BufferHandle& buffer,
            const vk::AccelerationStructureBuildSizesInfoKHR& size_info);

@@ -27,12 +27,12 @@ class ASCompressor {
 
   public:
     // You must ensure proper synchronization with the build
-    static std::vector<AccelerationStructureHandle>
+    static std::vector<HWAccelerationStructureHandle>
     compact(const ContextHandle& context,
             const ResourceAllocatorHandle& allocator,
             const CommandPoolHandle& pool,
             const QueueHandle& queue,
-            const std::vector<AccelerationStructureHandle>& ass,
+            const std::vector<HWAccelerationStructureHandle>& ass,
             const EventHandle& wait_event,
             const vk::AccelerationStructureTypeKHR type =
                 vk::AccelerationStructureTypeKHR::eBottomLevel);
