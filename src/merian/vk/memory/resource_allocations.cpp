@@ -452,11 +452,6 @@ Texture::Texture(const ImageViewHandle& view, const SamplerHandle& sampler)
 
 Texture::~Texture() {}
 
-void Texture::set_sampler(const SamplerHandle& sampler) {
-    assert(sampler);
-    this->sampler = sampler;
-}
-
 void Texture::properties(Properties& props) {
     if (props.st_begin_child("image_view_info", "Image View")) {
         view->properties(props);

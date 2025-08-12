@@ -439,12 +439,6 @@ class Texture : public std::enable_shared_from_this<Texture>, public Resource {
         return view->get_image()->get_current_layout();
     }
 
-    vk::DescriptorImageInfo get_descriptor_info() const {
-        return vk::DescriptorImageInfo{*sampler, *view, get_image()->get_current_layout()};
-    }
-
-    void set_sampler(const SamplerHandle& sampler);
-
     // -----------------------------------------------------------
 
     void properties(Properties& props);
