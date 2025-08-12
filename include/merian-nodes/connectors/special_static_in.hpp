@@ -20,7 +20,7 @@ class SpecialStaticIn : public InputConnector,
         : InputConnector(name, 0, optional) {}
 
     const ValueType& resource([[maybe_unused]] const GraphResourceHandle& resource) override {
-        return debugable_ptr_cast<SpecialStaticOut<ValueType>>(resource)->connector_value;
+        return debugable_ptr_cast<SpecialStaticOut<ValueType>>(resource)->value();
     }
 
     void on_connect_output(const OutputConnectorHandle& output) override {

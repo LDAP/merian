@@ -10,8 +10,8 @@ template <typename ValueType>
 using SpecialStaticOutHandle = std::shared_ptr<SpecialStaticOut<ValueType>>;
 
 // Stores a static value in the output connector.
-// Makes it possible to access it directly in the describe_outputs() of a receiving node and enforces
-// a graph rebuild if the value has to change.
+// Makes it possible to access it directly in the describe_outputs() of a receiving node and
+// enforces a graph rebuild if the value has to change.
 template <typename ValueType>
 class SpecialStaticOut : public OutputConnector,
                          public AccessibleConnector<const ValueType&>,
@@ -71,8 +71,9 @@ class SpecialStaticOut : public OutputConnector,
     }
 
     // Setting the value results in a graph rebuild
-    void operator=(const ValueType& new_value) {
+    SpecialStaticOut& operator=(const ValueType& new_value) {
         set(new_value);
+        return *this;
     }
 
     // Calling this method results in a graph rebuild
@@ -87,10 +88,8 @@ class SpecialStaticOut : public OutputConnector,
         return std::make_shared<SpecialStaticOut<ValueType>>(name, value);
     }
 
-  public:
-    ValueType connector_value;
-
   private:
+    ValueType connector_value;
     ValueType new_connector_value;
     bool has_new = false;
 };
