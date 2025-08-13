@@ -1,10 +1,10 @@
 merian_src = files(
     'io/file_loader.cpp',
     'io/tinyobj.cpp',
+    'scene/camera/camera.cpp',
+    'scene/camera/camera_animator.cpp',
     'utils/audio/audio_device.cpp',
     'utils/audio/sdl_audio_device.cpp',
-    'utils/camera/camera.cpp',
-    'utils/camera/camera_animator.cpp',
     'utils/concurrent/thread_pool.cpp',
     'utils/imgui_spdlog_sink.cpp',
     'utils/input_controller_dummy.cpp',

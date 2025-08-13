@@ -1,4 +1,7 @@
-#include "merian/utils/camera/camera_animator.hpp"
+#include "merian/scene/camera/camera_animator.hpp"
+#include "merian/utils/chrono.hpp"
+#include "glm/glm.hpp"
+#include "merian/utils/interpolation.hpp"
 
 namespace merian {
 
@@ -10,10 +13,9 @@ void CameraAnimator::update(const chrono_clock::time_point now) {
         return;
     }
 
-    uint64_t elapsed_millis =
-        std::chrono::duration<double, std::milli>(now - animation_start_time.value()).count();
+    const double elapsed_millis = to_milliseconds(now - animation_start_time.value());
     // in [0, 1]
-    float t = elapsed_millis / animation_duration_ms;
+    const double t = elapsed_millis / animation_duration_ms;
 
     if (t >= 1) {
         // animation is done
@@ -29,7 +31,7 @@ void CameraAnimator::update(const chrono_clock::time_point now) {
     float interpolated_fov =
         glm::mix(animation_start.get_field_of_view(), animation_end.get_field_of_view(), smoothed);
     glm::vec3 interpolated_center =
-        glm::mix(animation_start.get_center(), animation_end.get_center(), smoothed);
+        glm::mix(animation_start.get_target(), animation_end.get_target(), smoothed);
     glm::vec3 interpolated_up =
         glm::mix(animation_start.get_up(), animation_end.get_up(), smoothed);
     glm::vec3 interpolated_eye =
@@ -65,12 +67,13 @@ bool CameraAnimator::is_animating() {
 }
 
 void CameraAnimator::calculate_eye_animation_bezier_points() {
-    const glm::vec3 p0 = animation_start.get_eye();
-    const glm::vec3 p2 = animation_end.get_eye();
-    glm::vec3 p1, pc;
+    const glm::vec3 p0 = animation_start.get_position();
+    const glm::vec3 p2 = animation_end.get_position();
+    glm::vec3 p1;
+    glm::vec3 pc;
 
     // point of interest
-    const glm::vec3 pi = (animation_end.get_center() + animation_start.get_center()) * 0.5f;
+    const glm::vec3 pi = (animation_end.get_target() + animation_start.get_target()) * 0.5f;
 
     const glm::vec3 p02 = (p0 + p2) * 0.5f;                          // mid p0-p2
     const float radius = (length(p0 - pi) + length(p2 - pi)) * 0.5f; // Radius for p1

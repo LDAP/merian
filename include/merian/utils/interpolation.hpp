@@ -1,24 +1,27 @@
 #pragma once
 
-#include "glm/glm.hpp"
+#include <concepts>
+
 namespace merian {
 
 // Variation of smoothstep from Ken Perlin
-inline double smootherstep(double x) {
+template <typename T>
+    requires std::floating_point<T>
+inline T smootherstep(T x) {
     return x * x * x * (x * (x * 6.0f - 15.0f) + 10.0f);
 }
 
-template<typename T>
-inline T evaluate_bezier(float t, const T& p0, const T& p1, const T& p2) {
+template <typename P>
+inline P evaluate_bezier(const float t, const P& p0, const P& p1, const P& p2) {
     const float u = 1.f - t;
     const float tt = t * t;
     const float uu = u * u;
 
-    T p{0};
+    P p{0};
 
-    p = uu * p0; // first term
-    p += 2 * u * t * p1;       // second term
-    p += tt * p2;              // third term
+    p = uu * p0;         // first term
+    p += 2 * u * t * p1; // second term
+    p += tt * p2;        // third term
 
     return p;
 }

@@ -18,15 +18,24 @@ class Camera {
     template <typename T> static bool has_changed(const T current_id, T& check_id) {
         if (check_id == current_id) {
             return false;
-        } else {
-            check_id = current_id;
-            return true;
         }
+
+        check_id = current_id;
+        return true;
     }
 
   public:
-    Camera(const glm::vec3& eye = glm::vec3(0),
-           const glm::vec3& center = glm::vec3(1, 0, 0),
+    /**
+     * @param[in]  position       The position of the camera
+     * @param[in]  target         The position the camera is looking at
+     * @param[in]  up             The worlds upward direction
+     * @param[in]  field_of_view  The field of view
+     * @param[in]  aspect_ratio   The aspect ratio of the camera
+     * @param[in]  near_plane     The near plane
+     * @param[in]  far_plane      The far plane
+     */
+    Camera(const glm::vec3& position = glm::vec3(0),
+           const glm::vec3& target = glm::vec3(1, 0, 0),
            const glm::vec3& up = glm::vec3(0, 0, 1),
            const float field_of_view = 60.f,
            const float aspect_ratio = 1.f,
@@ -43,6 +52,14 @@ class Camera {
 
     glm::mat4 get_view_projection_matrix() noexcept;
 
+    const glm::vec3& get_position() const noexcept;
+
+    const glm::vec3& get_target() const noexcept;
+
+    const glm::vec3& get_up() const noexcept;
+
+    glm::vec3 get_forward() const noexcept;
+
     // -----------------------------------------------------------------------------
 
     // Convenience method that checks if the camera changed
@@ -53,25 +70,22 @@ class Camera {
 
     // -----------------------------------------------------------------------------
 
-    void look_at(const glm::vec3& eye, const glm::vec3& center, const glm::vec3& up) noexcept;
+    void look_at(const glm::vec3& position, const glm::vec3& target, const glm::vec3& up) noexcept;
 
-    void look_at(const glm::vec3& eye,
-                 const glm::vec3& center,
+    void look_at(const glm::vec3& position,
+                 const glm::vec3& target,
                  const glm::vec3& up,
                  const float field_of_view) noexcept;
 
-    void set_eye(const glm::vec3& eye) noexcept;
+    void set_position(const glm::vec3& position) noexcept;
 
-    void set_center(const glm::vec3& center) noexcept;
+    void set_target(const glm::vec3& target) noexcept;
+
+    // sets the target to position + forward
+    void set_forward(const glm::vec3& forward) noexcept;
 
     // this method normalizes up for you
     void set_up(const glm::vec3& up) noexcept;
-
-    const glm::vec3& get_eye() const noexcept;
-
-    const glm::vec3& get_center() const noexcept;
-
-    const glm::vec3& get_up() const noexcept;
 
     // -----------------------------------------------------------------------------
 
@@ -115,7 +129,7 @@ class Camera {
     // certain point. 2 * pi equals a full turn.
     void rotate(const float d_phi, const float d_theta);
 
-    // Orbit around the "center" horizontally (phi) or vertically (theta).
+    // Orbit around the "target" horizontally (phi) or vertically (theta).
     //  * pi equals a full turn.
     void orbit(const float d_phi, const float d_theta);
 
@@ -123,11 +137,11 @@ class Camera {
     // VIEW
     //-------------------------------------------------
 
-    glm::vec3 eye;    // Position of the camera
-    glm::vec3 center; // Position where the camera is looking at
-    glm::vec3 up;     // Normalized(!) up vector where the camera is oriented
+    glm::vec3 position; // Position of the camera
+    glm::vec3 target;   // Position where the camera is looking at
+    glm::vec3 up;       // Normalized(!) up vector where the camera is oriented
 
-    // Increase whenever eye, center or up changes
+    // Increase whenever position, target or up changes
     uint32_t view_change_id = 0;
 
     // Cache
