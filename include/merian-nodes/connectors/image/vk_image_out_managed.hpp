@@ -18,9 +18,8 @@ class ManagedVkImageOut : public VkImageOut, public AccessibleConnector<const Im
                       const vk::PipelineStageFlags2& pipeline_stages,
                       const vk::ImageLayout& required_layout,
                       const vk::ShaderStageFlags& stage_flags,
-                      const vk::ImageCreateInfo& create_info,
-                      const bool persistent = false,
-                      const uint32_t array_size = 1);
+                      const vk::ArrayProxy<vk::ImageCreateInfo>& create_info,
+                      const bool persistent = false);
 
     std::optional<vk::DescriptorSetLayoutBinding> get_descriptor_info() const override;
 
@@ -54,9 +53,18 @@ class ManagedVkImageOut : public VkImageOut, public AccessibleConnector<const Im
                     const uint32_t resource_index,
                     const uint32_t ring_size) override;
 
-    virtual std::optional<vk::ImageCreateInfo> get_create_info(const uint32_t index = 0) const override;
+    virtual std::optional<vk::ImageCreateInfo>
+    get_create_info(const uint32_t index = 0) const override;
 
   public:
+    static ManagedVkImageOutHandle create(const std::string& name,
+                                          const vk::AccessFlags2& access_flags,
+                                          const vk::PipelineStageFlags2& pipeline_stages,
+                                          const vk::ImageLayout& required_layout,
+                                          const vk::ShaderStageFlags& stage_flags,
+                                          const vk::ArrayProxy<vk::ImageCreateInfo>& create_info,
+                                          const bool persistent = false);
+
     static ManagedVkImageOutHandle compute_write(const std::string& name,
                                                  const vk::Format format,
                                                  const vk::Extent3D extent,
@@ -131,7 +139,8 @@ class ManagedVkImageOut : public VkImageOut, public AccessibleConnector<const Im
     const vk::ImageLayout required_layout;
     const vk::ShaderStageFlags stage_flags;
 
-    const vk::ImageCreateInfo create_info;
+  private:
+    const std::vector<vk::ImageCreateInfo> create_infos;
 };
 
 } // namespace merian_nodes

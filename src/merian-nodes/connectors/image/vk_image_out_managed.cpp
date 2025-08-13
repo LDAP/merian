@@ -12,16 +12,22 @@ ManagedVkImageOut::ManagedVkImageOut(const std::string& name,
                                      const vk::PipelineStageFlags2& pipeline_stages,
                                      const vk::ImageLayout& required_layout,
                                      const vk::ShaderStageFlags& stage_flags,
-                                     const vk::ImageCreateInfo& create_info,
-                                     const bool persistent,
-                                     const uint32_t array_size)
-    : VkImageOut(name, persistent, array_size), access_flags(access_flags),
+                                     const vk::ArrayProxy<vk::ImageCreateInfo>& create_info,
+                                     const bool persistent)
+    : VkImageOut(name, persistent, create_info.size()), access_flags(access_flags),
       pipeline_stages(pipeline_stages), required_layout(required_layout), stage_flags(stage_flags),
-      create_info(create_info) {
+      create_infos(create_info.begin(), create_info.end()) {
 
-    assert((!stage_flags || Image::valid_for_view(create_info.usage)) &&
-           "if you supply stage flags the usage flags must also contain a usage that signalizes "
-           "use in a shader (use as view).");
+    assert(!create_info.empty());
+
+#ifndef NDEBUG
+    for (uint32_t i = 0; i < create_infos.size(); i++) {
+        assert(
+            (!stage_flags || Image::valid_for_view(create_infos[i].usage)) &&
+            "if you supply stage flags the usage flags must also contain a usage that signalizes "
+            "use in a shader (use as view).");
+    }
+#endif
 }
 
 std::optional<vk::DescriptorSetLayoutBinding> ManagedVkImageOut::get_descriptor_info() const {
@@ -104,7 +110,7 @@ GraphResourceHandle ManagedVkImageOut::create_resource(
     [[maybe_unused]] const uint32_t ring_size) {
     const ResourceAllocatorHandle alloc = persistent ? allocator : aliasing_allocator;
 
-    vk::ImageCreateInfo image_create_info = create_info;
+    vk::ImageUsageFlags all_input_usage_flags;
     vk::PipelineStageFlags2 input_pipeline_stages;
     vk::AccessFlags2 input_access_flags;
 
@@ -112,7 +118,7 @@ GraphResourceHandle ManagedVkImageOut::create_resource(
 
     for (const auto& [input_node, input] : inputs) {
         const auto& image_in = debugable_ptr_cast<VkImageIn>(input);
-        image_create_info.usage |= image_in->get_usage_flags();
+        all_input_usage_flags |= image_in->get_usage_flags();
         input_pipeline_stages |= image_in->get_pipeline_stages();
         input_access_flags |= image_in->get_access_flags();
 
@@ -131,11 +137,18 @@ GraphResourceHandle ManagedVkImageOut::create_resource(
     const auto res = std::make_shared<ManagedImageArrayResource>(
         get_array_size(), input_pipeline_stages, input_access_flags);
 
+    assert(get_array_size() == create_infos.size());
     for (uint32_t i = 0; i < get_array_size(); i++) {
-        res->images[i] = alloc->createImage(image_create_info, MemoryMappingType::NONE, name);
+        vk::ImageCreateInfo create_info = create_infos[i];
+        create_info.usage |= all_input_usage_flags;
+        res->images[i] = alloc->createImage(create_info, MemoryMappingType::NONE, name);
     }
 
-    if (merian::Image::valid_for_view(image_create_info.usage)) {
+    // we assert in constructor that if this is true for one, it is true for everyone!
+    const bool needs_view =
+        merian::Image::valid_for_view(all_input_usage_flags | get_create_info()->usage);
+
+    if (needs_view) {
         res->textures.emplace(get_array_size());
 
         for (uint32_t i = 0; i < get_array_size(); i++) {
@@ -147,15 +160,27 @@ GraphResourceHandle ManagedVkImageOut::create_resource(
     return res;
 }
 
-std::optional<vk::ImageCreateInfo>
-ManagedVkImageOut::get_create_info(const uint32_t /*index*/) const {
-    return create_info;
+std::optional<vk::ImageCreateInfo> ManagedVkImageOut::get_create_info(const uint32_t index) const {
+    assert(index < create_infos.size());
+    return create_infos[index];
 }
 
-std::shared_ptr<ManagedVkImageOut> ManagedVkImageOut::compute_write(const std::string& name,
-                                                                    const vk::Format format,
-                                                                    const vk::Extent3D extent,
-                                                                    const bool persistent) {
+ManagedVkImageOutHandle
+ManagedVkImageOut::create(const std::string& name,
+                          const vk::AccessFlags2& access_flags,
+                          const vk::PipelineStageFlags2& pipeline_stages,
+                          const vk::ImageLayout& required_layout,
+                          const vk::ShaderStageFlags& stage_flags,
+                          const vk::ArrayProxy<vk::ImageCreateInfo>& create_info,
+                          const bool persistent) {
+    return std::make_shared<ManagedVkImageOut>(name, access_flags, pipeline_stages, required_layout,
+                                               stage_flags, create_info, persistent);
+}
+
+ManagedVkImageOutHandle ManagedVkImageOut::compute_write(const std::string& name,
+                                                         const vk::Format format,
+                                                         const vk::Extent3D extent,
+                                                         const bool persistent) {
     const vk::ImageCreateInfo create_info{
         {},
         extent.depth == 1 ? vk::ImageType::e2D : vk::ImageType::e3D,
@@ -177,20 +202,19 @@ std::shared_ptr<ManagedVkImageOut> ManagedVkImageOut::compute_write(const std::s
         vk::ImageLayout::eGeneral, vk::ShaderStageFlagBits::eCompute, create_info, persistent);
 }
 
-std::shared_ptr<ManagedVkImageOut> ManagedVkImageOut::compute_write(const std::string& name,
-                                                                    const vk::Format format,
-                                                                    const uint32_t width,
-                                                                    const uint32_t height,
-                                                                    const uint32_t depth,
-                                                                    const bool persistent) {
+ManagedVkImageOutHandle ManagedVkImageOut::compute_write(const std::string& name,
+                                                         const vk::Format format,
+                                                         const uint32_t width,
+                                                         const uint32_t height,
+                                                         const uint32_t depth,
+                                                         const bool persistent) {
     return compute_write(name, format, {width, height, depth}, persistent);
 }
 
-std::shared_ptr<ManagedVkImageOut>
-ManagedVkImageOut::compute_fragment_write(const std::string& name,
-                                          const vk::Format format,
-                                          const vk::Extent3D extent,
-                                          const bool persistent) {
+ManagedVkImageOutHandle ManagedVkImageOut::compute_fragment_write(const std::string& name,
+                                                                  const vk::Format format,
+                                                                  const vk::Extent3D extent,
+                                                                  const bool persistent) {
     const vk::ImageCreateInfo create_info{
         {},
         extent.depth == 1 ? vk::ImageType::e2D : vk::ImageType::e3D,
@@ -266,20 +290,19 @@ ManagedVkImageOutHandle ManagedVkImageOut::color_attachment(const std::string& n
                                                vk::ShaderStageFlags{}, create_info, persistent);
 }
 
-std::shared_ptr<ManagedVkImageOut>
-ManagedVkImageOut::compute_fragment_write(const std::string& name,
-                                          const vk::Format format,
-                                          const uint32_t width,
-                                          const uint32_t height,
-                                          const uint32_t depth,
-                                          const bool persistent) {
+ManagedVkImageOutHandle ManagedVkImageOut::compute_fragment_write(const std::string& name,
+                                                                  const vk::Format format,
+                                                                  const uint32_t width,
+                                                                  const uint32_t height,
+                                                                  const uint32_t depth,
+                                                                  const bool persistent) {
     return compute_fragment_write(name, format, {width, height, depth}, persistent);
 }
 
-std::shared_ptr<ManagedVkImageOut> ManagedVkImageOut::compute_read_write(const std::string& name,
-                                                                         const vk::Format format,
-                                                                         const vk::Extent3D extent,
-                                                                         const bool persistent) {
+ManagedVkImageOutHandle ManagedVkImageOut::compute_read_write(const std::string& name,
+                                                              const vk::Format format,
+                                                              const vk::Extent3D extent,
+                                                              const bool persistent) {
     const vk::ImageCreateInfo create_info{
         {},
         extent.depth == 1 ? vk::ImageType::e2D : vk::ImageType::e3D,
@@ -302,7 +325,7 @@ std::shared_ptr<ManagedVkImageOut> ManagedVkImageOut::compute_read_write(const s
         vk::ShaderStageFlagBits::eCompute, create_info, persistent);
 }
 
-std::shared_ptr<ManagedVkImageOut>
+ManagedVkImageOutHandle
 ManagedVkImageOut::compute_read_write_transfer_dst(const std::string& name,
                                                    const vk::Format format,
                                                    const vk::Extent3D extent,
@@ -333,7 +356,7 @@ ManagedVkImageOut::compute_read_write_transfer_dst(const std::string& name,
         vk::ShaderStageFlagBits::eCompute, create_info, persistent);
 }
 
-std::shared_ptr<ManagedVkImageOut>
+ManagedVkImageOutHandle
 ManagedVkImageOut::compute_read_write_transfer_dst(const std::string& name,
                                                    const vk::Format format,
                                                    const uint32_t width,
@@ -345,10 +368,10 @@ ManagedVkImageOut::compute_read_write_transfer_dst(const std::string& name,
                                            persistent);
 }
 
-std::shared_ptr<ManagedVkImageOut> ManagedVkImageOut::transfer_write(const std::string& name,
-                                                                     const vk::Format format,
-                                                                     const vk::Extent3D extent,
-                                                                     const bool persistent) {
+ManagedVkImageOutHandle ManagedVkImageOut::transfer_write(const std::string& name,
+                                                          const vk::Format format,
+                                                          const vk::Extent3D extent,
+                                                          const bool persistent) {
     const vk::ImageCreateInfo create_info{
         {},
         extent.depth == 1 ? vk::ImageType::e2D : vk::ImageType::e3D,
@@ -370,12 +393,12 @@ std::shared_ptr<ManagedVkImageOut> ManagedVkImageOut::transfer_write(const std::
         vk::ImageLayout::eTransferDstOptimal, vk::ShaderStageFlags(), create_info, persistent);
 }
 
-std::shared_ptr<ManagedVkImageOut> ManagedVkImageOut::transfer_write(const std::string& name,
-                                                                     const vk::Format format,
-                                                                     const uint32_t width,
-                                                                     const uint32_t height,
-                                                                     const uint32_t depth,
-                                                                     const bool persistent) {
+ManagedVkImageOutHandle ManagedVkImageOut::transfer_write(const std::string& name,
+                                                          const vk::Format format,
+                                                          const uint32_t width,
+                                                          const uint32_t height,
+                                                          const uint32_t depth,
+                                                          const bool persistent) {
     return transfer_write(name, format, {width, height, depth}, persistent);
 }
 

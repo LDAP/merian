@@ -30,10 +30,10 @@ class ImageArrayResource : public GraphResource {
     }
 
     // can be nullptr
-    virtual const merian::ImageHandle& get_image(const uint32_t index) const = 0;
+    virtual const merian::ImageHandle& get_image(const uint32_t index = 0) const = 0;
 
     // can be nullptr
-    virtual const merian::TextureHandle& get_texture(const uint32_t index) const = 0;
+    virtual const merian::TextureHandle& get_texture(const uint32_t index = 0) const = 0;
 
     uint32_t get_array_size() const {
         return array_size;
