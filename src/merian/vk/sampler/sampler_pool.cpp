@@ -72,41 +72,42 @@ SamplerHandle SamplerPool::acquire_sampler(const vk::SamplerCreateInfo& createIn
     }
 }
 
-SamplerHandle SamplerPool::for_filter_and_address_mode(const vk::Filter mag_filter,
+SamplerHandle SamplerPool::acquire_sampler(const vk::Filter mag_filter,
                                                        const vk::Filter min_filter,
-                                                       const vk::SamplerAddressMode address_mode,
+                                                       const vk::SamplerAddressMode address_mode_u,
+                                                       const vk::SamplerAddressMode address_mode_v,
+                                                       const vk::SamplerAddressMode address_mode_w,
                                                        const vk::SamplerMipmapMode mipmap_mode,
-                                                       const bool anisotropy) {
+                                                       const bool anisotropy,
+                                                       const vk::BorderColor border_color) {
     const vk::SamplerCreateInfo info{
         {},
         mag_filter,
         min_filter,
         mipmap_mode,
-        address_mode,
-        address_mode,
-        address_mode,
+        address_mode_u,
+        address_mode_v,
+        address_mode_w,
         {},
-        anisotropy,
+        anisotropy ? VK_TRUE : VK_FALSE,
         context->physical_device.get_physical_device_limits().maxSamplerAnisotropy,
-        false,
+        VK_FALSE,
         {},
         0.0f,
         VK_LOD_CLAMP_NONE,
-        vk::BorderColor::eIntTransparentBlack,
-        false};
+        border_color,
+        VK_FALSE};
     return acquire_sampler(info);
 }
 
-SamplerHandle SamplerPool::linear_mirrored_repeat() {
-    return for_filter_and_address_mode(vk::Filter::eLinear, vk::Filter::eLinear,
-                                       vk::SamplerAddressMode::eMirroredRepeat,
-                                       vk::SamplerMipmapMode::eLinear);
-}
-
-SamplerHandle SamplerPool::nearest_mirrored_repeat() {
-    return for_filter_and_address_mode(vk::Filter::eNearest, vk::Filter::eNearest,
-                                       vk::SamplerAddressMode::eMirroredRepeat,
-                                       vk::SamplerMipmapMode::eNearest);
+SamplerHandle SamplerPool::for_filter_and_address_mode(const vk::Filter mag_filter,
+                                                       const vk::Filter min_filter,
+                                                       const vk::SamplerAddressMode address_mode,
+                                                       const vk::SamplerMipmapMode mipmap_mode,
+                                                       const bool anisotropy,
+                                                       const vk::BorderColor border_color) {
+    return acquire_sampler(mag_filter, min_filter, address_mode, address_mode,
+                                       address_mode, mipmap_mode, anisotropy, border_color);
 }
 
 SamplerHandle SamplerPool::linear_repeat() {
@@ -115,10 +116,46 @@ SamplerHandle SamplerPool::linear_repeat() {
                                        vk::SamplerMipmapMode::eLinear);
 }
 
+SamplerHandle SamplerPool::linear_mirrored_repeat() {
+    return for_filter_and_address_mode(vk::Filter::eLinear, vk::Filter::eLinear,
+                                       vk::SamplerAddressMode::eMirroredRepeat,
+                                       vk::SamplerMipmapMode::eLinear);
+}
+
+SamplerHandle SamplerPool::linear_clamp_to_edge() {
+    return for_filter_and_address_mode(vk::Filter::eLinear, vk::Filter::eLinear,
+                                       vk::SamplerAddressMode::eClampToEdge,
+                                       vk::SamplerMipmapMode::eLinear);
+}
+
+SamplerHandle SamplerPool::linear_clamp_to_border(const vk::BorderColor border_color) {
+    return for_filter_and_address_mode(vk::Filter::eLinear, vk::Filter::eLinear,
+                                       vk::SamplerAddressMode::eClampToBorder,
+                                       vk::SamplerMipmapMode::eLinear, true, border_color);
+}
+
+SamplerHandle SamplerPool::nearest_mirrored_repeat() {
+    return for_filter_and_address_mode(vk::Filter::eNearest, vk::Filter::eNearest,
+                                       vk::SamplerAddressMode::eMirroredRepeat,
+                                       vk::SamplerMipmapMode::eNearest);
+}
+
 SamplerHandle SamplerPool::nearest_repeat() {
     return for_filter_and_address_mode(vk::Filter::eNearest, vk::Filter::eNearest,
                                        vk::SamplerAddressMode::eRepeat,
                                        vk::SamplerMipmapMode::eNearest);
+}
+
+SamplerHandle SamplerPool::nearest_clamp_to_edge() {
+    return for_filter_and_address_mode(vk::Filter::eNearest, vk::Filter::eNearest,
+                                       vk::SamplerAddressMode::eClampToEdge,
+                                       vk::SamplerMipmapMode::eNearest);
+}
+
+SamplerHandle SamplerPool::nearest_clamp_to_border(const vk::BorderColor border_color) {
+    return for_filter_and_address_mode(vk::Filter::eNearest, vk::Filter::eNearest,
+                                       vk::SamplerAddressMode::eClampToBorder,
+                                       vk::SamplerMipmapMode::eNearest, true, border_color);
 }
 
 } // namespace merian

@@ -35,20 +35,39 @@ class SamplerPool : public std::enable_shared_from_this<SamplerPool> {
      */
     SamplerHandle acquire_sampler(const vk::SamplerCreateInfo& createInfo);
 
+    SamplerHandle acquire_sampler(
+        const vk::Filter mag_filter = vk::Filter::eNearest,
+        const vk::Filter min_filter = vk::Filter::eLinear,
+        const vk::SamplerAddressMode address_mode_u = vk::SamplerAddressMode::eRepeat,
+        const vk::SamplerAddressMode address_mode_v = vk::SamplerAddressMode::eRepeat,
+        const vk::SamplerAddressMode address_mode_w = vk::SamplerAddressMode::eRepeat,
+        const vk::SamplerMipmapMode mipmap_mode = vk::SamplerMipmapMode::eLinear,
+        const bool anisotropy = true,
+        const vk::BorderColor border_color = vk::BorderColor::eIntTransparentBlack);
+
     SamplerHandle for_filter_and_address_mode(
         const vk::Filter mag_filter = vk::Filter::eNearest,
         const vk::Filter min_filter = vk::Filter::eLinear,
         const vk::SamplerAddressMode address_mode = vk::SamplerAddressMode::eRepeat,
         const vk::SamplerMipmapMode mipmap_mode = vk::SamplerMipmapMode::eLinear,
-        const bool anisotropy = true);
-
-    SamplerHandle linear_mirrored_repeat();
-
-    SamplerHandle nearest_mirrored_repeat();
+        const bool anisotropy = true,
+        const vk::BorderColor border_color = vk::BorderColor::eIntTransparentBlack);
 
     SamplerHandle linear_repeat();
 
+    SamplerHandle linear_mirrored_repeat();
+
+    SamplerHandle linear_clamp_to_edge();
+
+    SamplerHandle linear_clamp_to_border(const vk::BorderColor border_color);
+
     SamplerHandle nearest_repeat();
+
+    SamplerHandle nearest_mirrored_repeat();
+
+    SamplerHandle nearest_clamp_to_edge();
+
+    SamplerHandle nearest_clamp_to_border(const vk::BorderColor border_color);
 
   private:
     struct SamplerState {

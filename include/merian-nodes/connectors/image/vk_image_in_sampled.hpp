@@ -31,7 +31,10 @@ class VkSampledImageIn : public VkImageIn {
 
   public:
     static VkSampledImageInHandle
-    compute_read(const std::string& name, const uint32_t delay = 0, const bool optional = false);
+    compute_read(const std::string& name,
+                 const uint32_t delay = 0,
+                 const bool optional = false,
+                 const std::optional<SamplerHandle>& overwrite_sampler = std::nullopt);
 
     static VkSampledImageInHandle
     fragment_read(const std::string& name, const uint32_t delay = 0, const bool optional = false);
