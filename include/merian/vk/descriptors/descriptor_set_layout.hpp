@@ -1,10 +1,10 @@
 #pragma once
 
 #include "merian/vk/context.hpp"
+#include <fmt/ranges.h>
 #include <spdlog/spdlog.h>
 #include <vector>
 #include <vulkan/vulkan.hpp>
-#include <fmt/ranges.h>
 
 namespace merian {
 

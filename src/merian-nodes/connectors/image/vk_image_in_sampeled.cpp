@@ -62,10 +62,14 @@ void VkSampledImageIn::get_descriptor_update(const uint32_t binding,
 }
 
 std::shared_ptr<VkSampledImageIn>
-VkSampledImageIn::compute_read(const std::string& name, const uint32_t delay, const bool optional) {
+VkSampledImageIn::compute_read(const std::string& name,
+                               const uint32_t delay,
+                               const bool optional,
+                               const std::optional<SamplerHandle>& overwrite_sampler) {
     return std::make_shared<VkSampledImageIn>(
         name, vk::AccessFlagBits2::eShaderRead, vk::PipelineStageFlagBits2::eComputeShader,
-        vk::ImageUsageFlagBits::eSampled, vk::ShaderStageFlagBits::eCompute, delay, optional);
+        vk::ImageUsageFlagBits::eSampled, vk::ShaderStageFlagBits::eCompute, delay, optional,
+        overwrite_sampler);
 }
 
 std::shared_ptr<VkSampledImageIn> VkSampledImageIn::fragment_read(const std::string& name,

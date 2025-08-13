@@ -43,6 +43,29 @@ inline vk::DescriptorSet allocate_descriptor_set(const vk::Device& device,
 // The DescriptorSet holds references to the resources that are bound to it.
 class DescriptorSet : public std::enable_shared_from_this<DescriptorSet>, public Object {
 
+  private:
+    using DescriptorInfo = std::variant<vk::DescriptorBufferInfo,
+                                        vk::DescriptorImageInfo,
+                                        vk::WriteDescriptorSetAccelerationStructureKHR>;
+
+    static vk::WriteDescriptorSet& set_descriptor_info(vk::WriteDescriptorSet& write,
+                                                       const DescriptorInfo& info) {
+        if (std::holds_alternative<vk::DescriptorBufferInfo>(info)) {
+            write.pBufferInfo = &std::get<vk::DescriptorBufferInfo>(info);
+        } else if (std::holds_alternative<vk::DescriptorImageInfo>(info)) {
+            write.pImageInfo = &std::get<vk::DescriptorImageInfo>(info);
+        } else if (std::holds_alternative<vk::WriteDescriptorSetAccelerationStructureKHR>(info)) {
+            write.pNext = &std::get<vk::WriteDescriptorSetAccelerationStructureKHR>(info);
+        } else {
+            assert(false);
+        }
+
+        return write;
+    }
+
+    using BindableResourceHandle =
+        std::variant<TextureHandle, BufferHandle, ImageViewHandle, AccelerationStructureHandle>;
+
   public:
     static const uint32_t NO_DESCRIPTOR_BINDING = -1u;
 
@@ -101,14 +124,51 @@ class DescriptorSet : public std::enable_shared_from_this<DescriptorSet>, public
         return layout->get_bindings()[binding].descriptorType;
     }
 
-    template <class ResourceType>
-    const ResourceType& get_resource(const uint32_t binding, const uint32_t array_element) {
-        assert(binding < resource_index_for_binding.size());
-        assert(array_element < layout->get_bindings()[binding].descriptorCount);
+    const BufferHandle& get_buffer_at(const uint32_t binding,
+                                      const uint32_t array_element = 0) const {
+        const BindableResourceHandle& resource = get_bindable_resource_at(binding, array_element);
+        if (std::holds_alternative<BufferHandle>(resource)) {
+            return std::get<BufferHandle>(resource);
+        }
 
-        const ResourceHandle& resource =
-            resources[resource_index_for_binding[binding] + array_element];
-        return debugable_ptr_cast<ResourceType>(resource);
+        throw std::runtime_error{
+            fmt::format("no buffer at binding {} (array element {})", binding, array_element)};
+    }
+
+    const ImageViewHandle& get_view_at(const uint32_t binding,
+                                       const uint32_t array_element = 0) const {
+        const BindableResourceHandle& resource = get_bindable_resource_at(binding, array_element);
+        if (std::holds_alternative<ImageViewHandle>(resource)) {
+            return std::get<ImageViewHandle>(resource);
+        }
+        if (std::holds_alternative<TextureHandle>(resource)) {
+            return std::get<TextureHandle>(resource)->get_view();
+        }
+
+        throw std::runtime_error{
+            fmt::format("no view at binding {} (array element {})", binding, array_element)};
+    }
+
+    const TextureHandle& get_texture_at(const uint32_t binding,
+                                        const uint32_t array_element = 0) const {
+        const BindableResourceHandle& resource = get_bindable_resource_at(binding, array_element);
+        if (std::holds_alternative<TextureHandle>(resource)) {
+            return std::get<TextureHandle>(resource);
+        }
+
+        throw std::runtime_error{
+            fmt::format("no texture at binding {} (array element {})", binding, array_element)};
+    }
+
+    const AccelerationStructureHandle&
+    get_acceleration_structure_at(const uint32_t binding, const uint32_t array_element = 0) const {
+        const BindableResourceHandle& resource = get_bindable_resource_at(binding, array_element);
+        if (std::holds_alternative<AccelerationStructureHandle>(resource)) {
+            return std::get<AccelerationStructureHandle>(resource);
+        }
+
+        throw std::runtime_error{fmt::format(
+            "no acceleration_structure at binding {} (array element {})", binding, array_element)};
     }
 
     // ---------------------------------------------------------------------
@@ -122,7 +182,7 @@ class DescriptorSet : public std::enable_shared_from_this<DescriptorSet>, public
                                                  const vk::DeviceSize range = VK_WHOLE_SIZE,
                                                  const uint32_t dst_array_element = 0) {
         write_resources.emplace_back(buffer);
-        write_infos.emplace_back(vk::DescriptorBufferInfo(*buffer, offset, range));
+        write_infos.emplace_back(buffer->get_descriptor_info(offset, range));
         writes.emplace_back(vk::WriteDescriptorSet{
             set,
             binding,
@@ -142,9 +202,7 @@ class DescriptorSet : public std::enable_shared_from_this<DescriptorSet>, public
         const uint32_t dst_array_element = 0,
         const std::optional<vk::ImageLayout> access_layout = std::nullopt) {
         write_resources.emplace_back(image_view);
-        write_infos.emplace_back(vk::DescriptorImageInfo(
-            VK_NULL_HANDLE, *image_view,
-            access_layout.value_or(image_view->get_image()->get_current_layout())));
+        write_infos.emplace_back(image_view->get_descriptor_info(access_layout));
         writes.emplace_back(vk::WriteDescriptorSet{
             set,
             binding,
@@ -165,9 +223,7 @@ class DescriptorSet : public std::enable_shared_from_this<DescriptorSet>, public
         const uint32_t dst_array_element = 0,
         const std::optional<vk::ImageLayout> access_layout = std::nullopt) {
         write_resources.emplace_back(texture);
-        write_infos.emplace_back(
-            vk::DescriptorImageInfo(*texture->get_sampler(), *texture->get_view(),
-                                    access_layout.value_or(texture->get_current_layout())));
+        write_infos.emplace_back(texture->get_descriptor_info(access_layout));
         writes.emplace_back(vk::WriteDescriptorSet{
             set,
             binding,
@@ -199,8 +255,7 @@ class DescriptorSet : public std::enable_shared_from_this<DescriptorSet>, public
         const AccelerationStructureHandle& acceleration_structure,
         const uint32_t dst_array_element = 0) {
         write_resources.emplace_back(acceleration_structure);
-        write_infos.emplace_back(
-            vk::WriteDescriptorSetAccelerationStructureKHR(1, *acceleration_structure));
+        write_infos.emplace_back(acceleration_structure->get_descriptor_info());
         writes.emplace_back(vk::WriteDescriptorSet{
             set,
             binding,
@@ -238,23 +293,13 @@ class DescriptorSet : public std::enable_shared_from_this<DescriptorSet>, public
 
         for (uint32_t i = 0; i < writes.size(); i++) {
             vk::WriteDescriptorSet& write = writes[i];
+            set_descriptor_info(write, write_infos[i]);
 
-            if (std::holds_alternative<vk::DescriptorBufferInfo>(write_infos[i])) {
-                write.pBufferInfo = &std::get<vk::DescriptorBufferInfo>(write_infos[i]);
-            } else if (std::holds_alternative<vk::DescriptorImageInfo>(write_infos[i])) {
-                write.pImageInfo = &std::get<vk::DescriptorImageInfo>(write_infos[i]);
-            } else if (std::holds_alternative<vk::WriteDescriptorSetAccelerationStructureKHR>(
-                           write_infos[i])) {
-                write.pNext =
-                    &std::get<vk::WriteDescriptorSetAccelerationStructureKHR>(write_infos[i]);
-            } else {
-                assert(false);
-            }
-
-            // For now only descriptorCount 1 is implemented. Otherwise: If the dstBinding has fewer
-            // than descriptorCount array elements remaining starting from dstArrayElement, then the
-            // remainder will be used to update the subsequent binding - dstBinding+1 starting at
-            // array element zero. In this case we'd have multiple infos and resources i guess?
+            // For now only descriptorCount 1 is implemented. Otherwise: If the dstBinding has
+            // fewer than descriptorCount array elements remaining starting from
+            // dstArrayElement, then the remainder will be used to update the subsequent binding
+            // - dstBinding+1 starting at array element zero. In this case we'd have multiple
+            // infos and resources i guess?
             assert(write.descriptorCount == 1);
             resources[resource_index_for_binding[write.dstBinding] + write.dstArrayElement] =
                 std::move(write_resources[i]);
@@ -268,12 +313,20 @@ class DescriptorSet : public std::enable_shared_from_this<DescriptorSet>, public
     }
 
   private:
-    const std::shared_ptr<DescriptorPool> pool;
-    const std::shared_ptr<DescriptorSetLayout> layout;
+    const BindableResourceHandle& get_bindable_resource_at(const uint32_t binding,
+                                                           const uint32_t array_element = 0) const {
+        assert(binding < resource_index_for_binding.size());
+        assert(array_element < layout->get_bindings()[binding].descriptorCount);
+        return resources[resource_index_for_binding[binding] + array_element];
+    }
+
+  private:
+    const DescriptorPoolHandle pool;
+    const DescriptorSetLayoutHandle layout;
     vk::DescriptorSet set;
 
     // Has entry for each array element. Use resource_index_for_binding to access.
-    std::vector<ResourceHandle> resources;
+    std::vector<BindableResourceHandle> resources;
     std::vector<uint32_t> resource_index_for_binding;
 
     // ---------------------------------------------------------------------
@@ -282,7 +335,7 @@ class DescriptorSet : public std::enable_shared_from_this<DescriptorSet>, public
     // all with the same length.
     // Pointers are set in update() depending on the descriptor type.
     std::vector<vk::WriteDescriptorSet> writes;
-    std::vector<ResourceHandle> write_resources;
+    std::vector<BindableResourceHandle> write_resources;
     std::vector<std::variant<vk::DescriptorBufferInfo,
                              vk::DescriptorImageInfo,
                              vk::WriteDescriptorSetAccelerationStructureKHR>>

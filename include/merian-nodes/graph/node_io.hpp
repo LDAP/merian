@@ -149,13 +149,13 @@ class NodeIO {
         send_event_f(event_name, data, notify_all);
     }
 
-    uint32_t get_binding(const InputConnectorHandle& input_connector) {
+    uint32_t get_binding(const InputConnectorHandle& input_connector) const {
         const uint32_t binding = binding_for_input_connector(input_connector);
         assert(binding != DescriptorSet::NO_DESCRIPTOR_BINDING);
         return binding;
     }
 
-    uint32_t get_binding(const OutputConnectorHandle& output_connector) {
+    uint32_t get_binding(const OutputConnectorHandle& output_connector) const {
         const uint32_t binding = binding_for_output_connector(output_connector);
         assert(binding != DescriptorSet::NO_DESCRIPTOR_BINDING);
         return binding;

@@ -46,8 +46,8 @@ void ManagedVkImageOut::get_descriptor_update(
         // From Spec 14.1.1: The image subresources for a storage image must be in the
         // VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR or VK_IMAGE_LAYOUT_GENERAL layout in order to access
         // its data in a shader.
-        update->queue_descriptor_write_texture(binding, res->textures.value()[update_idx],
-                                               update_idx, vk::ImageLayout::eGeneral);
+        update->queue_descriptor_write_image(binding, res->textures.value()[update_idx]->get_view(),
+                                             update_idx, vk::ImageLayout::eGeneral);
     }
 }
 

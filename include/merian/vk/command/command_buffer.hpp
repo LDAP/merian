@@ -268,8 +268,10 @@ class CommandBuffer {
     }
 
     template <typename... T>
-    std::enable_if_t<
-        (std::disjunction_v<std::is_same<BufferHandle, T>, std::is_same<TextureHandle, T>> && ...)>
+    std::enable_if_t<(std::disjunction_v<std::is_same<BufferHandle, T>,
+                                         std::is_same<TextureHandle, T>,
+                                         std::is_same<ImageViewHandle, T>> &&
+                      ...)>
     push_descriptor_set(const PipelineHandle& pipeline, const uint32_t set, const T&... resources) {
         // need this recursive call else the Image and Buffer descriptor info is deallocated from
         // stack and we need the addresses.
@@ -278,8 +280,10 @@ class CommandBuffer {
     }
 
     template <typename... T>
-    std::enable_if_t<
-        (std::disjunction_v<std::is_same<BufferHandle, T>, std::is_same<TextureHandle, T>> && ...)>
+    std::enable_if_t<(std::disjunction_v<std::is_same<BufferHandle, T>,
+                                         std::is_same<TextureHandle, T>,
+                                         std::is_same<ImageViewHandle, T>> &&
+                      ...)>
     push_descriptor_set(const PipelineHandle& pipeline, const T&... resources) {
         // need this recursive call else the Image and Buffer descriptor info is deallocated from
         // stack and we need the addresses.

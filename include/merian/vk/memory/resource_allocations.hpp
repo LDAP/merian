@@ -33,7 +33,7 @@ class Buffer : public std::enable_shared_from_this<Buffer>, public Resource {
         vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR;
 
   protected:
-    // Creats a Buffer objects that automatically destroys buffer when destructed.
+    // Creates a Buffer objects that automatically destroys buffer when destructed.
     // The memory is not freed explicitly to let it free itself.
     // It is asserted that the memory represented by `memory` is already bound to `buffer`.
     Buffer(const vk::Buffer& buffer,
@@ -366,6 +366,12 @@ class ImageView : public std::enable_shared_from_this<ImageView>, public Resourc
         return view;
     }
 
+    vk::DescriptorImageInfo
+    get_descriptor_info(const std::optional<vk::ImageLayout> access_layout = std::nullopt) const {
+        return vk::DescriptorImageInfo{VK_NULL_HANDLE, view,
+                                       access_layout.value_or(get_image()->get_current_layout())};
+    }
+
     // -----------------------------------------------------------
 
     operator const vk::Image&() const {
@@ -439,6 +445,12 @@ class Texture : public std::enable_shared_from_this<Texture>, public Resource {
         return view->get_image()->get_current_layout();
     }
 
+    vk::DescriptorImageInfo
+    get_descriptor_info(const std::optional<vk::ImageLayout> access_layout = std::nullopt) const {
+        return vk::DescriptorImageInfo{*sampler, *view,
+                                       access_layout.value_or(get_image()->get_current_layout())};
+    }
+
     // -----------------------------------------------------------
 
     void properties(Properties& props);
@@ -493,6 +505,10 @@ class AccelerationStructure : public std::enable_shared_from_this<AccelerationSt
 
     const vk::AccelerationStructureBuildSizesInfoKHR& get_size_info() const {
         return size_info;
+    }
+
+    vk::WriteDescriptorSetAccelerationStructureKHR get_descriptor_info() const {
+        return vk::WriteDescriptorSetAccelerationStructureKHR(1, &as);
     }
 
     // -----------------------------------------------------------
