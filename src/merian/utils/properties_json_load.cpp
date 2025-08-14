@@ -56,6 +56,14 @@ JSONLoadProperties::JSONLoadProperties(const std::filesystem::path& filename) : 
     }
 }
 
+JSONLoadProperties::JSONLoadProperties(const nlohmann::json& json) : o(1) {
+    o[0] = json;
+}
+
+JSONLoadProperties::JSONLoadProperties(const nlohmann::json&& json) : o(1) {
+    o[0] = json;
+}
+
 JSONLoadProperties::~JSONLoadProperties() {}
 
 bool JSONLoadProperties::st_begin_child(const std::string& id,

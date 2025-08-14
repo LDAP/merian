@@ -5,17 +5,17 @@
 
 namespace merian_nodes {
 
-class Add : public AbstractCompute {
+class Reduce : public AbstractCompute {
 
   private:
     static constexpr uint32_t local_size_x = 32;
     static constexpr uint32_t local_size_y = 32;
 
   public:
-    Add(const ContextHandle& context,
-        const std::optional<vk::Format>& output_format = std::nullopt);
+    Reduce(const ContextHandle& context,
+           const std::optional<vk::Format>& output_format = std::nullopt);
 
-    ~Add();
+    ~Reduce();
 
     std::vector<InputConnectorHandle> describe_inputs() override;
 
@@ -32,6 +32,12 @@ class Add : public AbstractCompute {
 
   private:
     const std::optional<vk::Format> output_format;
+
+    std::string source;
+
+    std::string initial_value = "vec4(0)";
+    std::string reduction = "accumulator + current_value";
+
     vk::Extent3D extent;
     ShaderModuleHandle shader;
     SpecializationInfoHandle spec_info;

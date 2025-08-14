@@ -1,6 +1,6 @@
-### `AddNode`
+### `ReduceInputs`
 
-Adds the two input images together.
+Reduce the multiple images together.
 
 Inputs:
 
@@ -14,4 +14,4 @@ Outputs:
 
 | Type       | Input name | Description         | Format/Resolution                                                               | Persistent |
 |------------|------------|---------------------|---------------------------------------------------------------------------------|------------|
-| VkImageOut | out        | sum of inputs       | format: user defined, equal to `a`, equal to `a`, resolution: min of all images | no         |
+| VkImageOut | out        | reduced inputs      | format: user defined, or equal to `a`, resolution: min of all images            | no         |

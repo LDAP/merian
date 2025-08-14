@@ -3,16 +3,19 @@
 #include "connector_input.hpp"
 #include "connector_output.hpp"
 #include "graph_run.hpp"
+#include "merian/utils/properties_json_dump.hpp"
+#include "merian/utils/properties_json_load.hpp"
 #include "node_io.hpp"
 
 #include "merian/utils/properties.hpp"
-#include "merian/vk/command/command_buffer.hpp"
 #include "merian/vk/descriptors/descriptor_set.hpp"
 #include "merian/vk/descriptors/descriptor_set_layout.hpp"
 
 #include <memory>
 
 namespace merian_nodes {
+
+class GraphInfo {};
 
 class Node : public std::enable_shared_from_this<Node> {
   public:
@@ -32,6 +35,24 @@ class Node : public std::enable_shared_from_this<Node> {
     Node() {}
 
     virtual ~Node() {}
+
+    // -----------------------------------------------------------
+
+    // This might be called at any time of the graph lifecycle. Must be consistent with dump_config.
+    virtual NodeStatusFlags load_config(const nlohmann::json& json) {
+        merian::JSONLoadProperties props(json);
+        std::ignore = properties(props);
+        return {};
+    }
+
+    // This might be called at any time of the graph lifecycle. Must be consistent with load_config.
+    virtual nlohmann::json dump_config() {
+        merian::JSONDumpProperties props;
+        std::ignore = properties(props);
+        return props.get();
+    }
+
+    // -----------------------------------------------------------
 
     // Called each time the graph attempts to connect nodes.
     // If you need to access the resources directly, you need to maintain a copy of the InputHandle.
@@ -105,8 +126,8 @@ class Node : public std::enable_shared_from_this<Node> {
     // You can provide data that that is required for the current run by setting the io map
     // in_flight_data. The pointer is persisted and supplied again after (graph ring size - 1) runs.
     //
-    // You can throw node_error and compilation_failed here. The graph then attemps to finish the
-    // run and rebuild, however this is not supported and not recommened.
+    // You can throw node_error and compilation_failed here. The graph then attempts to finish the
+    // run and rebuild, however this is not supported and not recommended.
     virtual void process([[maybe_unused]] GraphRun& run,
                          [[maybe_unused]] const DescriptorSetHandle& descriptor_set,
                          [[maybe_unused]] const NodeIO& io) {}
@@ -120,7 +141,7 @@ class Node : public std::enable_shared_from_this<Node> {
     // Normally this method is called by the graph configuration(), if you want to call it directly
     // you need to handle the NodeStatusFlags accordingly.
     [[nodiscard]]
-    virtual NodeStatusFlags properties([[maybe_unused]] Properties& config) {
+    virtual NodeStatusFlags properties([[maybe_unused]] Properties& props) {
         return {};
     }
 };

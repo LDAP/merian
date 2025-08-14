@@ -7,9 +7,9 @@
 namespace merian_nodes {
 
 VKDTFilmcurv::VKDTFilmcurv(const ContextHandle& context,
-                           const std::optional<Options> options,
+                           const std::optional<VKDTFilmcurvePushConstant> options,
                            const std::optional<vk::Format> output_format)
-    : AbstractCompute(context, sizeof(Options)), output_format(output_format) {
+    : TypedPCAbstractCompute(context), output_format(output_format) {
     if (options) {
         pc = options.value();
     }
@@ -45,9 +45,10 @@ VKDTFilmcurv::get_specialization_info([[maybe_unused]] const NodeIO& io) noexcep
     return spec_info;
 }
 
-const void* VKDTFilmcurv::get_push_constant([[maybe_unused]] GraphRun& run,
-                                            [[maybe_unused]] const NodeIO& io) {
-    return &pc;
+const VKDTFilmcurvePushConstant&
+VKDTFilmcurv::get_typed_push_constant([[maybe_unused]] GraphRun& run,
+                                      [[maybe_unused]] const NodeIO& io) {
+    return pc;
 }
 
 std::tuple<uint32_t, uint32_t, uint32_t>

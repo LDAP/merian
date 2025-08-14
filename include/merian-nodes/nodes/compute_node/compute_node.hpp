@@ -62,4 +62,18 @@ class AbstractCompute : public Node {
     PipelineHandle pipe;
 };
 
+template <class PushConstant> class TypedPCAbstractCompute : public AbstractCompute {
+  public:
+    TypedPCAbstractCompute(const ContextHandle& context)
+        : AbstractCompute(context, sizeof(PushConstant)) {}
+
+    virtual const void* get_push_constant([[maybe_unused]] GraphRun& run,
+                                          [[maybe_unused]] const NodeIO& io) final {
+        return &get_typed_push_constant(run, io);
+    }
+
+    virtual const PushConstant& get_typed_push_constant([[maybe_unused]] GraphRun& run,
+                                                        [[maybe_unused]] const NodeIO& io) = 0;
+};
+
 } // namespace merian_nodes

@@ -106,16 +106,20 @@ class JSONDumpProperties : public Properties {
 
     nlohmann::json get() const {
         assert(o.size() == 1 && "Missing st_end_child?");
-        return o.back().second;
+        return current();
     }
 
     std::string string() const {
         assert(o.size() == 1 && "Missing st_end_child?");
-        return o.back().second.dump();
+        return current().dump();
     }
 
   private:
     nlohmann::json& current() {
+        return o.back().second;
+    }
+
+    const nlohmann::json& current() const {
         return o.back().second;
     }
 
