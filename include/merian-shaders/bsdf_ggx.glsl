@@ -5,10 +5,10 @@
 #ifndef _MERIAN_SHADERS_BSDF_GGX_H_
 #define _MERIAN_SHADERS_BSDF_GGX_H_
 
-#include "merian-shaders/common.glsl"
-#include "merian-shaders/fresnel.glsl"
-#include "merian-shaders/bsdf_diffuse.glsl"
-#include "merian-shaders/frames.glsl"
+#include "common.glsl"
+#include "fresnel.glsl"
+#include "bsdf_diffuse.glsl"
+#include "frames.glsl"
 
 // -----------------------------------------------------------------
 

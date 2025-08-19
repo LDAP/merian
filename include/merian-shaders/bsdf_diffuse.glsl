@@ -1,9 +1,7 @@
-#version 460
-
 #extension GL_GOOGLE_include_directive : require
 
-#include "merian-shaders/sampling.glsl"
-#include "merian-shaders/frames.glsl"
+#include "sampling.glsl"
+#include "frames.glsl"
 
 #ifndef _MERIAN_SHADERS_BSDF_DIFFUSE_H_
 #define _MERIAN_SHADERS_BSDF_DIFFUSE_H_

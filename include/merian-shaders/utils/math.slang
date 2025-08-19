@@ -9,7 +9,7 @@
 
 namespace merian {
 
-float square(const float x) {
+T pow2<T : IFloat>(const T x) {
     return x * x;
 }
 
