@@ -1,3 +1,7 @@
+#version 460
+
+#extension GL_GOOGLE_include_directive : require
+
 #include "merian-shaders/color/colors_yuv.glsl"
 #include "merian-shaders/color/colors_srgb.glsl"
 #include "merian-shaders/common.glsl"

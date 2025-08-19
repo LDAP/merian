@@ -1,3 +1,7 @@
+#version 460
+
+#extension GL_GOOGLE_include_directive : require
+
 #include "merian-shaders/cubemap.glsl"
 
 #ifndef _MERIAN_SHADERS_GRID_H_

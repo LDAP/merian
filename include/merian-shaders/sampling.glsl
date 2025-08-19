@@ -1,5 +1,9 @@
-#include "merian-shaders/common.glsl"
-#include "merian-shaders/random.glsl"
+#version 460
+
+#extension GL_GOOGLE_include_directive: require
+
+#include "common.glsl"
+#include "random.glsl"
 
 #ifndef _MERIAN_SHADERS_SAMPLING_H_
 #define _MERIAN_SHADERS_SAMPLING_H_

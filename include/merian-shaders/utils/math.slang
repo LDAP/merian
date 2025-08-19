@@ -1,30 +1,21 @@
 #pragma once
 
-#define MERIAN_PI 3.14159265358979323846
-#define MERIAN_TWO_PI 6.283185307179586
-#define MERIAN_FOUR_PI 12.566370614359172
-#define MERIAN_INV_PI 0.3183098861837907
-#define MERIAN_INV_TWO_PI 0.15915494309189535
-#define MERIAN_INV_FOUR_PI 0.07957747154594767
-#define MERIAN_INV_SQRT_TWO_PI 0.3989422804014327
-
-#define MERIAN_FLT_EPSILON 1.192092896e-07F
-
-// returns 1/x if x > 0 else 1.
-#define MERIAN_SAFE_RECIPROCAL(x) (x > 0. ? 1. / x : 1.0)
-
-#define MERIAN_SQUARE(x) ((x) * (x))
-
-#define MERIAN_WORKGROUP_INDEX                                                                     \
-    (gl_WorkGroupID.x + gl_WorkGroupID.y * gl_NumWorkGroups.x + gl_WorkGroupID.z * gl_NumWorkGroups.x * gl_NumWorkGroups.y)
-
-#define MERIAN_GLOBAL_INVOCATION_INDEX                                                             \
-    (MERIAN_WORKGROUP_INDEX * gl_WorkGroupSize.x * gl_WorkGroupSize.y * gl_WorkGroupSize.z + gl_LocalInvocationIndex)
+// #define MERIAN_WORKGROUP_INDEX                                                                     \
+//     (gl_WorkGroupID.x + gl_WorkGroupID.y * gl_NumWorkGroups.x + gl_WorkGroupID.z * gl_NumWorkGroups.x * gl_NumWorkGroups.y)
+//
+// #define MERIAN_GLOBAL_INVOCATION_INDEX \
+//     (MERIAN_WORKGROUP_INDEX * gl_WorkGroupSize.x * gl_WorkGroupSize.y * gl_WorkGroupSize.z +
+//     gl_LocalInvocationIndex)
 
 namespace merian {
 
-float square(float x) {
+float square(const float x) {
     return x * x;
+}
+
+// returns 1/x if x > 0 else 1.
+float safe_reciprocal(const float x) {
+    return (x > 0. ? 1. / x : 1.0);
 }
 
 bool relative_distance_greather_than(float3 center, float3 p1, float3 p2, float threshold) {
@@ -82,7 +73,7 @@ float signpow(float a, float x) {
 
 // cube root
 float cbrt(float a) {
-    return signpow(a, 0.3333333432674407958984375f);
+    return signpow(a, 1. / 3);
 }
 
 }

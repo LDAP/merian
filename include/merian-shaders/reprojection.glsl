@@ -1,3 +1,8 @@
+#version 460
+
+#extension GL_GOOGLE_include_directive : require
+
+
 #ifndef _MERIAN_SHADERS_REPROJECTION
 #define _MERIAN_SHADERS_REPROJECTION
 

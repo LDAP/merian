@@ -1,3 +1,7 @@
+#version 460
+
+#extension GL_GOOGLE_include_directive : require
+
 #include "merian-shaders/sampling.glsl"
 #include "merian-shaders/frames.glsl"
 

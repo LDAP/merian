@@ -1,4 +1,3 @@
-#version 460
 
 #ifndef _MERIAN_SHADERS_COMMON_H_
 #define _MERIAN_SHADERS_COMMON_H_
