@@ -1,3 +1,9 @@
+
+
+#version 460
+
+#extension GL_GOOGLE_include_directive : require
+
 #ifndef _MERIAN_SHADERS_COLORS_SRGB_H_
 #define _MERIAN_SHADERS_COLORS_SRGB_H_
 

@@ -1,8 +1,9 @@
 #version 460
 
 #extension GL_GOOGLE_include_directive : require
+#extension GL_EXT_shader_explicit_arithmetic_types : require
 
-#include "merian-shaders/cubemap.glsl"
+#include "cubemap.glsl"
 
 #ifndef _MERIAN_SHADERS_GRID_H_
 #define _MERIAN_SHADERS_GRID_H_

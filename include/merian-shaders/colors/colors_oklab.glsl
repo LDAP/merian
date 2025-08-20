@@ -1,7 +1,11 @@
+
+
+#extension GL_GOOGLE_include_directive : require
+
 #ifndef _MERIAN_SHADERS_COLORS_OKLAB_H_
 #define _MERIAN_SHADERS_COLORS_OKLAB_H_
 
-#include "merian-shaders/common.glsl"
+#include "../common.glsl"
 
 // Adapted from
 // https://gist.github.com/akella/059d9877b90f966c9181ffa2bc5ffd65

@@ -62,8 +62,15 @@ struct VonMisesFisher3<bool centered> : Distribution<float3> {
     Conditional<float3, centered> c_mu;
 
     __init(float kappa, float3 mu) {
+        static_assert(!centered, "distribution cannot be centered.");
+
         this.kappa = kappa;
         this.c_mu = mu;
+    }
+
+    __init(float kappa) {
+        this.kappa = kappa;
+        this.c_mu = float3(0, 0, 1);
     }
 
     float pdf(const float3 s) {

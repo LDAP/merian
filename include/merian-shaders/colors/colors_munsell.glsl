@@ -1,4 +1,8 @@
-#include "merian-shaders/common.glsl"
+#version 460
+
+#extension GL_GOOGLE_include_directive : require
+
+#include "../common.glsl"
 
 #ifndef _MERIAN_SHADERS_COLORS_MUNSELL_H_
 #define _MERIAN_SHADERS_COLORS_MUNSELL_H_

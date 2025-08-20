@@ -2,7 +2,7 @@
 
 #extension GL_GOOGLE_include_directive : require
 
-#include "merian-shaders/common.glsl"
+#include "common.glsl"
 
 #ifndef _MERIAN_SHADERS_CAMERA_H_
 #define _MERIAN_SHADERS_CAMERA_H_
@@ -53,6 +53,7 @@ vec2 get_camera_pixel(const vec3 ray_dir, const vec2 resolution,
   );
   vec3 uv = inverse(m) * ray_dir;
   uv.rg /= uv.b;
+  inverse(mat4(1));
   return ((uv.rg + 1.) * resolution - 1) / 2.;
 }
 

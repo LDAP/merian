@@ -1,7 +1,11 @@
+#version 460
+
+#extension GL_GOOGLE_include_directive : require
+
 #ifndef _MERIAN_SHADERS_COLORS_OKLCH_H_
 #define _MERIAN_SHADERS_COLORS_OKLCH_H_
 
-#include "merian-shaders/color/colors_oklab.glsl"
+#include "colors_oklab.glsl"
 
 // h in range 0, 2pi
 vec3 oklch_to_rgb(const vec3 lch) {

@@ -9,7 +9,7 @@ namespace merian {
  *  cos_theta: widoth, cosine of angle between microfacet normal (h) and light
  *  direction (wi).
  */
-T fresnel_schlick<T : IFloat>(float cos_theta, T F0, T F90) {
+T fresnel_schlick<T : IFloat>(const float cos_theta, const T F0, const T F90) {
     return (F0) + (F90 - F0) * T(pow(max(1. - (cos_theta), 0), 5.));
 }
 
@@ -19,7 +19,7 @@ T fresnel_schlick<T : IFloat>(float cos_theta, T F0, T F90) {
  *  cos_theta: widoth, cosine of angle between microfacet normal (h) and light
  *  direction (wi).
  */
-T fresnel_schlick<T : IFloat>(float cos_theta, T F0) {
+T fresnel_schlick<T : IFloat>(const float cos_theta, const T F0) {
     return fresnel_schlick(cos_theta, F0, T(1.));
 }
 
