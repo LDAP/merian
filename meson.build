@@ -102,6 +102,7 @@ endif
 if shaderc.found()
     global_args += ['-DMERIAN_SHADERC_FOUND']
 endif
+slang = dependency('slang', version: ['>=2025.14.3'], fallback: ['slang', 'slang_dep'])
 
 project_root = meson.current_source_dir()
 inc_dirs = [
@@ -162,6 +163,7 @@ merian_dep = declare_dependency(
         imgui,
         nlohmann_json,
         shaderc,
+        slang,
         spdlog,
         tinybvh,
         tol,
