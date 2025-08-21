@@ -55,7 +55,6 @@ with tarfile.open(src, 'r:gz') as z:
 '''
 run_command(python, '-c', extract_script, download_path, extract_dir, check: true)
 
-# Step 3: declare dependency
 slang_inc = include_directories('include')
 
 cc = meson.get_compiler('cpp')
