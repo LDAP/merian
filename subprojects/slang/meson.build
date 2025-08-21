@@ -2,6 +2,7 @@ project('slang',
         'cpp',
         version: '2025.14.3')
 
+fs = import('fs')
 python = import('python').find_installation()
 
 slang_zip_format = 'slang-@0@-@1@-@2@.zip'
@@ -27,7 +28,6 @@ slang_url = slang_url_format.format(meson.project_version()) + slang_zip
 download_path = meson.current_build_dir() / slang_zip
 extract_dir = meson.current_source_dir()
 
-message('downloading slang')
 download_script = '''
 import sys, urllib.request, pathlib
 url, out = sys.argv[1], pathlib.Path(sys.argv[2])
@@ -38,9 +38,14 @@ if not out.exists():
 else:
     print(f"{out} already exists, skipping download")
 '''
-run_command(python, '-c', download_script, slang_url, download_path, check: true)
+if not fs.exists(download_path)
+  message('downloading slang from @0@'.format(slang_url))
+  run_command(python, '-c', download_script, slang_url, download_path, check: true)
+else
+  message('skipping download and using @0@'.format(download_path))
+endif
 
-message('extracting slang')
+message('extracting slang to @0@'.format(extract_dir))
 extract_script = '''
 import sys, zipfile, pathlib
 src, dst = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
@@ -53,7 +58,7 @@ run_command(python, '-c', extract_script, download_path, extract_dir, check: tru
 # Step 3: declare dependency
 slang_inc = include_directories('include')
 
-cc = meson.get_compiler('c')
+cc = meson.get_compiler('cpp')
 search_path = meson.current_source_dir() / 'lib'
 
 deps = [
