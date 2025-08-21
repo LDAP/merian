@@ -10,7 +10,7 @@ namespace merian {
 // https://gist.github.com/akella/059d9877b90f966c9181ffa2bc5ffd65
 
 // converts from linear RGB
-float3 rgb_to_oklab(float3 c) {
+public float3 rgb_to_oklab(float3 c) {
     float l = 0.4122214708 * c.r + 0.5363325363 * c.g + 0.0514459929 * c.b;
     float m = 0.2119034982 * c.r + 0.6806995451 * c.g + 0.1073969566 * c.b;
     float s = 0.0883024619 * c.r + 0.2817188376 * c.g + 0.6299787005 * c.b;
@@ -25,7 +25,7 @@ float3 rgb_to_oklab(float3 c) {
 }
 
 // converts to linear RGB
-float3 oklab_to_rgb(float3 c) {
+public float3 oklab_to_rgb(float3 c) {
     float l_ = c.r + 0.3963377774 * c.g + 0.2158037573 * c.b;
     float m_ = c.r - 0.1055613458 * c.g - 0.0638541728 * c.b;
     float s_ = c.r - 0.0894841775 * c.g - 1.2914855480 * c.b;

@@ -158,7 +158,7 @@ static const uint munsell_lut[840] = {
     764882160u, 753151042u,  741878580u,  723790319u,  702621876u,  682043142u,  653075635u
 };
 
-float xy_to_monotone_hue_angle(float2 xy) {
+public float xy_to_monotone_hue_angle(float2 xy) {
     // the colours in the chart go clockwise, the angle will go counter clockwise, hence the sign.
     // also we subtract the angle of hue index==0 so the output will start at zero and grow
     // monotonically. this is required for the binary search to work correctly.
@@ -173,14 +173,14 @@ float2 munsell_lookup(inout int hue_idx, inout int chroma_idx) {
 }
 
 // compute which side of a line v0--v1 the point p lies
-float munsell_side(float2 v0, inout float2 v1, inout float2 p) {
+public float munsell_side(float2 v0, inout float2 v1, inout float2 p) {
     v1 -= v0;
     p -= v0;
     return (v1.x * p.y) - (v1.y * p.x);
 }
 
 // forward method, interpolate same two triangles as the other direction
-float2 munsell_to_xy(float2 mhc) {
+public float2 munsell_to_xy(float2 mhc) {
     float hm = mhc.x * 40.0f;
     float cm = max(mhc.y, 0.0f) * 21.0f;
     int hidxm = int(hm);
@@ -213,7 +213,7 @@ float2 munsell_to_xy(float2 mhc) {
 // inversion method
 // convert xy to polar around illuminant (C)
 // find matching munsell box and interpolate the corners
-float2 munsell_from_xy(float2 xy) {
+public float2 xy_to_munsell(float2 xy) {
     int hidxm = 0;
     int hidxM = 40;
     int cidxm = 0;

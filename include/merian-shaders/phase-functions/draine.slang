@@ -1,8 +1,10 @@
+#pragma once
 
-#extension GL_GOOGLE_include_directive : require
+#include "merian-shaders/utils/math-constants.slangh"
 
-#ifndef _MERIAN_SHADERS_PHASE_DRAINE_H_
-#define _MERIAN_SHADERS_PHASE_DRAINE_H_
+import "merian-shaders/utils/frame.slang";
+
+namespace merian {
 
 /*
  * SPDX-FileCopyrightText: Copyright (c) <2023> NVIDIA CORPORATION & AFFILIATES. All rights reserved.
@@ -42,7 +44,7 @@
 //   u = dot(prev_dir, next_dir)
 float phase_draine_eval(const float u, const float g, const float a)
 {
-    return ((1 - g*g)*(1 + a*u*u))/(4.*(1 + (a*(1 + 2*g*g))/3.) * M_PI * pow(1 + g*g - 2*g*u,1.5));
+    return ((1 - g*g)*(1 + a*u*u))/(4.*(1 + (a*(1 + 2*g*g))/3.) * MERIAN_PI * pow(1 + g*g - 2*g*u,1.5));
 }
 
 // sample: (sample an exact deflection cosine)
@@ -70,10 +72,10 @@ float phase_draine_sample(const float xi, const float g, const float a)
     return (1 + g2 - pow(-0.5 * sqrt(T5) + sqrt(6 * (1 + g2) - (8 * T3) / (a * (-1 + g2) * sqrt(T5)) - T6) / 2., 2)) / (2. * g);
 }
 
-vec3 phase_draine_sample(const vec2 xi, const vec3 wi, const float g, const float a) {
+float3 phase_draine_sample(const float2 xi, const float3 wi, const float g, const float a) {
     const float deflection_cos = phase_draine_sample(xi.x, g, a);
     const float z2 = sqrt(1.0 - deflection_cos * deflection_cos);
-    return make_frame(wi) * vec3(z2 * cos(TWO_PI * xi.y), z2 * sin(TWO_PI * xi.y), deflection_cos);
+    return mul(float3(z2 * cos(MERIAN_TWO_PI * xi.y), z2 * sin(MERIAN_TWO_PI * xi.y), deflection_cos), make_frame(wi));
 }
 
-#endif
+}

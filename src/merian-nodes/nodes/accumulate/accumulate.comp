@@ -40,7 +40,7 @@ layout(push_constant, std140) uniform pc_t {
 #include "merian-shaders/reprojection.glsl"
 #include "merian-shaders/hash.glsl"
 #include "merian-shaders/random.glsl"
-#include "merian-shaders/color/colors_yuv.glsl"
+#include "merian-shaders/colors/colors_yuv.glsl"
 
 
 void main() {

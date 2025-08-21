@@ -199,4 +199,37 @@ float4x4 inverse(float4x4 m) {
     return ret;
 }
 
+// Returns the Moore-Penrose inverse also known as the pseudoinverse A+ = (A^TA)^-1 * A^T.
+// A+ * b is the solution that minimizes || Ax - b ||.
+//
+// For A = (v(2) - v(0), v(1) - v(0)) this is also the worldspace derivative of the barycentric
+// coordinates. n = cross(A[0], A[1])
+float3x2 pseudoinverse(const float2x3 A, float3 n) {
+    // const mat3x2 A_T = transpose(A);
+    // return inverse(A_T * A) * A_T;
+
+    // this is a more efficient solution of the above:
+    n /= dot(n, n);
+    return transpose(float2x3(float3(cross(A[1], n)), float3(cross(n, A[0]))));
+}
+
+float3x2 pseudoinverse(const float2x3 A) {
+    return pseudoinverse(A, cross(A[0], A[1]));
+}
+
+void pseudoinverse(float3 du, float3 dv, float3 cross_dudv, out float3 du_dx, out float3 dv_dx) {
+    float3 nt = cross_dudv / dot(cross_dudv, cross_dudv).xxx;
+    du_dx = cross(dv, nt);
+    dv_dx = cross(nt, du);
+}
+
+// du = v(2) - v(0), dv = v(1) - v(0)
+void pseudoinverse(float3 du, float3 dv, out float3 du_dx, out float3 dv_dx) {
+    float3 param;
+    float3 param_1;
+    pseudoinverse(du, dv, cross(du, dv), param, param_1);
+    du_dx = param;
+    dv_dx = param_1;
+}
+
 }

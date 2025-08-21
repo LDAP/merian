@@ -1,4 +1,3 @@
-#version 460
 
 #extension GL_GOOGLE_include_directive : require
 
@@ -10,7 +9,9 @@ float phase_rayleigh(const float cos_theta) {
 }
 
 // Compute the amount of rayleigh for a certain wavelength
-#define rayleigh_scattering(wavelength) (1 / pow(wavelength, 4))
+float rayleigh_scattering(const float wavelength) {
+    return (1 / pow(wavelength, 4));
+    } 
 
 // normalized scattering amount for wavelengths 700, 530, 440
 #define rayleigh_sun vec3(0.13962466, 0.42486486, 0.89442429)

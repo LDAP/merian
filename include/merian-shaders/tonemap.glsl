@@ -1,10 +1,9 @@
-#version 460
 
 #extension GL_GOOGLE_include_directive : require
 
-#include "merian-shaders/color/colors_yuv.glsl"
-#include "merian-shaders/color/colors_srgb.glsl"
-#include "merian-shaders/common.glsl"
+#include "colors/colors_yuv.glsl"
+#include "colors/colors_srgb.glsl"
+#include "common.glsl"
 
 #ifndef _MERIAN_SHADERS_TONEMAP_H_
 #define _MERIAN_SHADERS_TONEMAP_H_

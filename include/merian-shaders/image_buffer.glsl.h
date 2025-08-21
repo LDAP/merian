@@ -12,7 +12,7 @@
 // computes the buffer size (element count) needed to store the image
 #define image_to_buffer_size(width, height) (image_to_buffer_dimension_for_block_size(width) * image_to_buffer_dimension_for_block_size(height))
 // only valid in C
-#define image_to_buffer_size_bytes(width, height) (image_to_buffer_size(width, height) * sizeof(merian_nodes::GBuffer))
+#define image_to_buffer_size_bytes(width, height, Type) (image_to_buffer_size(width, height) * sizeof(Type))
 
 // z-Curve for better memory locality
 #define image_to_buffer_block_index(ipos, resolution) (((ipos).x >> image_to_buffer_block_size_power) + (((resolution).x + image_to_buffer_block_size_minus_one) >> image_to_buffer_block_size_power) * ((ipos).y >> image_to_buffer_block_size_power))

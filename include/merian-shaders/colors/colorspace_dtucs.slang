@@ -14,19 +14,19 @@ namespace merian {
  * From darktable, licensed under MIT licence.
  */
 
-float Y_to_dt_UCS_L_star(float Y) {
+public float Y_to_dt_UCS_L_star(float Y) {
     // WARNING: L_star needs to be < 2.098883786377, meaning Y needs to be < 3.875766378407574e+19
     float Y_hat = pow(Y, 0.631651341915130615234375f);
     return (2.0988838672637939453125f * Y_hat) / (Y_hat + 1.12426769733428955078125f);
 }
 
-float dt_UCS_L_star_to_Y(float L_star) {
+public float dt_UCS_L_star_to_Y(float L_star) {
     // WARNING: L_star needs to be < 2.098883786377, meaning Y needs to be < 3.875766378407574e+19
     return pow((1.12426769733428955078125f * L_star) / (2.0988838672637939453125f - L_star),
                1.58315181732177734375f);
 }
 
-float2 xy_to_dt_UCS_UV(float2 xy) {
+public float2 xy_to_dt_UCS_UV(float2 xy) {
     float3 uvd = mul(float3(xy, 1.0f),
                      float3x3(float3(-0.783941002840055, 0.745273540913283, 0.318707282433486),
                               float3(0.277512987809202, -0.205375866083878, 2.16743692732158),
@@ -47,7 +47,7 @@ float2 xy_to_dt_UCS_UV(float2 xy) {
 //    * cz = 1 for standard pre-print proofing conditions with average surround and n = 20 %
 //            (background = middle grey, white = perfect diffuse white)
 //  range : xy in [0; 1], Y normalized for perfect diffuse white = 1
-float3 xyY_to_dt_UCS_JCH(float3 xyY, float L_white) {
+public float3 xyY_to_dt_UCS_JCH(float3 xyY, float L_white) {
     float2 param = xyY.xy;
     float2 UV_star_prime = xy_to_dt_UCS_UV(param);
     float L_star = Y_to_dt_UCS_L_star(xyY.z);
@@ -65,7 +65,7 @@ float3 xyY_to_dt_UCS_JCH(float3 xyY, float L_white) {
 //    * cz = 1 for standard pre-print proofing conditions with average surround and n = 20 %
 //            (background = middle grey, white = perfect diffuse white)
 //  range : xy in [0; 1], Y normalized for perfect diffuse white = 1
-float3 dt_UCS_JCH_to_xyY(float3 JCH, float L_white) {
+public float3 dt_UCS_JCH_to_xyY(float3 JCH, float L_white) {
     float L_star = JCH.x * L_white;
     float M =
         pow((JCH.y * L_white) / (15.93299388885498046875f * pow(L_star, 0.6523997783660888671875f)),
@@ -83,7 +83,7 @@ float3 dt_UCS_JCH_to_xyY(float3 JCH, float L_white) {
     return float3(xyD.xy / xyD.z.xx, dt_UCS_L_star_to_Y(L_star));
 }
 
-float3 dt_UCS_JCH_to_HSB(float3 JCH) {
+public float3 dt_UCS_JCH_to_HSB(float3 JCH) {
     float3 HSB;
     HSB.z = JCH.x * (pow(JCH.y, 1.33654224872589111328125f) + 1.0f);
     float _218;
@@ -95,16 +95,16 @@ float3 dt_UCS_JCH_to_HSB(float3 JCH) {
     return float3(JCH.z, _218, HSB.z);
 }
 
-float3 dt_UCS_HSB_to_JCH(float3 HSB) {
+public float3 dt_UCS_HSB_to_JCH(float3 HSB) {
     return float3(HSB.z / (pow(HSB.y * HSB.z, 1.33654224872589111328125f) + 1.0f), HSB.y * HSB.z,
                   HSB.x);
 }
 
-float3 dt_UCS_JCH_to_HCB(float3 JCH) {
+public float3 dt_UCS_JCH_to_HCB(float3 JCH) {
     return float3(JCH.zy, JCH.x * (pow(JCH.y, 1.33654224872589111328125f) + 1.0f));
 }
 
-float3 dt_UCS_HCB_to_JCH(float3 HCB) {
+public float3 dt_UCS_HCB_to_JCH(float3 HCB) {
     return float3(HCB.z / (pow(HCB.y, 1.33654224872589111328125f) + 1.0f), HCB.yx);
 }
 

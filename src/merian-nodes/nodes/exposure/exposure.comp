@@ -3,7 +3,7 @@
 
 #include "layout.glsl"
 #include "merian-shaders/camera.glsl"
-#include "merian-shaders/color/colors_yuv.glsl"
+#include "merian-shaders/colors/colors_yuv.glsl"
 
 void main() {
   const ivec2 ipos = ivec2(gl_GlobalInvocationID);

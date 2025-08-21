@@ -3,7 +3,7 @@
 
 #include "graph_layout.glsl"
 
-#include "merian-shaders/color/colors_yuv.glsl"
+#include "merian-shaders/colors/colors_yuv.glsl"
 
 layout(set = 1, binding = 0) uniform writeonly restrict image2D img_quartiles;
 

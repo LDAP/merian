@@ -1,20 +1,24 @@
 
-#version 460
-
 #extension GL_GOOGLE_include_directive : require
 
-#include "merian-shaders/sampling.glsl"
-#include "merian-shaders/frames.glsl"
+#include "sampling.glsl"
+#include "frames.glsl"
 
 #ifndef _MERIAN_SHADERS_PHASE_ISOTROPIC_H_
 #define _MERIAN_SHADERS_PHASE_ISOTROPIC_H_
 
-#define phase_isotropic_sample(random) sample_sphere(random)
+vec3 phase_isotropic_sample(vec2 random) {
+    return sample_sphere(random);
+}
 
 // solid angle
-#define phase_isotropic_pdf() (INV_PI / 4)
+float phase_isotropic_pdf() {
+    return (INV_PI / 4);
+}
 
 // solid angle
-#define phase_isotropic_eval() vec3(INV_PI / 4)
+vec3 phase_isotropic_eval() {
+    return vec3(INV_PI / 4);
+}
 
 #endif

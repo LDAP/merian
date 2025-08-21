@@ -5,7 +5,7 @@
 
 #include "config.h"
 #include "svgf_graph_layout.glsl"
-#include "merian-shaders/color/colors_yuv.glsl"
+#include "merian-shaders/colors/colors_yuv.glsl"
 #include "merian-shaders/normal_encode.glsl"
 #include "merian-shaders/textures.glsl"
 #include "merian-shaders/shared_memory.glsl"

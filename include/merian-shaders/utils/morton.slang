@@ -1,14 +1,12 @@
+#pragma once
 
-#extension GL_GOOGLE_include_directive : require
+import "merian-shaders/utils/bit-twiddling.slang";
 
-#ifndef _MERIAN_SHADERS_MORTON_H_
-#define _MERIAN_SHADERS_MORTON_H_
-
-#include "bit_twiddling.glsl"
+namespace merian {
 
 // Works only if width is power of two
 // https://fgiesen.wordpress.com/2022/09/09/morton-codes-addendum/
-uint morton_encode2d(in uvec2 p) {
+uint morton_encode2d(in uint2 p) {
     p.x = p.x & 0x0000ffff;                    // p.x = ---- ---- ---- ---- fedc ba98 7654 3210
     p.x = (p.x ^ (p.x <<  8)) & 0x00ff00ff;    // p.x = ---- ---- fedc ba98 ---- ---- 7654 3210
     p.x = (p.x ^ (p.x <<  4)) & 0x0f0f0f0f;    // p.x = ---- fedc ---- ba98 ---- 7654 ---- 3210
@@ -24,14 +22,13 @@ uint morton_encode2d(in uvec2 p) {
     return p.x | (p.y << 1);
 }
 
-uint morton_encode2d(const uvec2 p, in uint width, in uint height) {
+uint morton_encode2d(const uint2 p, in uint width, in uint height) {
     width = next_power_of_two(width);
     height = next_power_of_two(height);
-    const uint msb = min(findMSB(width), findMSB(height));
+    const uint msb = min(firstbithigh(width), firstbithigh(height));
     const uint zorder_mask = (1 << (msb << 1)) - 1;
     // right side is linear part
     return (morton_encode2d(p) & zorder_mask) | (((p.x | p.y) << msb) & (~zorder_mask));
 }
 
-
-#endif // _MERIAN_SHADERS_MORTON_H_
+}
