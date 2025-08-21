@@ -5,7 +5,7 @@ project('slang',
 fs = import('fs')
 python = import('python').find_installation()
 
-slang_zip_format = 'slang-@0@-@1@-@2@.zip'
+slang_zip_format = 'slang-@0@-@1@-@2@.tar.gz'
 slang_url_format = 'https://github.com/shader-slang/slang/releases/download/v@0@/'
 
 if host_machine.system() == 'windows'
@@ -47,10 +47,10 @@ endif
 
 message('extracting slang to @0@'.format(extract_dir))
 extract_script = '''
-import sys, zipfile, pathlib
+import sys, tarfile, pathlib
 src, dst = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
 dst.mkdir(parents=True, exist_ok=True)
-with zipfile.ZipFile(src, 'r') as z:
+with tarfile.open(src, 'r:gz') as z:
     z.extractall(dst)
 '''
 run_command(python, '-c', extract_script, download_path, extract_dir, check: true)
@@ -59,16 +59,21 @@ run_command(python, '-c', extract_script, download_path, extract_dir, check: tru
 slang_inc = include_directories('include')
 
 cc = meson.get_compiler('cpp')
-search_path = meson.current_source_dir() / 'lib'
+lib_search_path = meson.current_source_dir() / 'lib'
 
 deps = [
-  cc.find_library('gfx', dirs: search_path),
-  cc.find_library('slang', dirs: search_path),
-  cc.find_library('slang-glslang', dirs: search_path),
-  cc.find_library('slang-glsl-module', dirs: search_path),
-  cc.find_library('slang-llvm', dirs: search_path),
-  cc.find_library('slang-rt', dirs: search_path),
+  cc.find_library('gfx', dirs: lib_search_path),
+  cc.find_library('slang', dirs: lib_search_path),
+  cc.find_library('slang-glslang', dirs: lib_search_path),
+  cc.find_library('slang-glsl-module', dirs: lib_search_path),
+  cc.find_library('slang-llvm', dirs: lib_search_path),
+  cc.find_library('slang-rt', dirs: lib_search_path),
 ]
+
+exe_search_path = meson.current_source_dir() / 'bin'
+slangc = find_program('slangc', dirs: exe_search_path)
+slangd = find_program('slangd', dirs: exe_search_path)
+slangi = find_program('slangi', dirs: exe_search_path)
 
 slang_dep = declare_dependency(
   include_directories: slang_inc,
