@@ -58,14 +58,20 @@ run_command(python, '-c', extract_script, download_path, extract_dir, check: tru
 slang_inc = include_directories('include')
 
 cc = meson.get_compiler('cpp')
-lib_search_path = meson.current_source_dir() / 'lib'
+lib_search_path = [
+  meson.current_source_dir() / 'lib',
+  meson.current_source_dir() / 'bin'
+]
+
+install_subdir('bin', install_dir: get_option('bindir'), strip_directory: true)
+install_subdir('lib', install_dir: get_option('libdir'), strip_directory: true)
 
 deps = [
   cc.find_library('gfx', dirs: lib_search_path),
   cc.find_library('slang', dirs: lib_search_path),
   cc.find_library('slang-glslang', dirs: lib_search_path),
   cc.find_library('slang-glsl-module', dirs: lib_search_path),
-  cc.find_library('slang-llvm', dirs: lib_search_path),
+  cc.find_library('slang-llvm', dirs: lib_search_path, required: false), # does not exist in the aarch64 package
   cc.find_library('slang-rt', dirs: lib_search_path),
 ]
 
@@ -76,5 +82,5 @@ slangi = find_program('slangi', dirs: exe_search_path)
 
 slang_dep = declare_dependency(
   include_directories: slang_inc,
-  dependencies: deps
+  dependencies: deps,
 )
