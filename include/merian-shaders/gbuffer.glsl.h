@@ -17,7 +17,7 @@ namespace merian_nodes {
 
 // u32vec4(
 //    .x = encoded normal of pixel
-//    .y = linear distance from camera to pixel,
+//    .y = linear distance from camera to surface,
 //    .z = dlinear_z / dipos in depth / pixel,
 //    .w = camera velocity in ray direction
 // )

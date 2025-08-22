@@ -2,13 +2,15 @@
 
 #include "merian-shaders/utils/math-constants.slangh"
 
-import "merian-shaders/utils/frame.slang";
+import "merian-shaders/utils/sampling.slang";
+
+__exported import merian_shaders.phase_functions.phase_function;
 
 namespace merian {
 
 /*
- * SPDX-FileCopyrightText: Copyright (c) <2023> NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-License-Identifier: MIT
+ * SPDX-FileCopyrightText: Copyright (c) <2023> NVIDIA CORPORATION & AFFILIATES. All rights
+ * reserved. SPDX-License-Identifier: MIT
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -29,6 +31,8 @@ namespace merian {
  * DEALINGS IN THE SOFTWARE.
  */
 
+// Draine Sampling from Supplemental of:
+//
 // [Jendersie and d'Eon 2023]
 //   An Approximate Mie Scattering Function for Fog and Cloud Rendering
 //   SIGGRAPH 2023 Talks
@@ -38,44 +42,86 @@ namespace merian {
 //   g = HG shape parameter
 //   a = "alpha" shape parameter
 
-// Warning: these functions don't special case isotropic scattering and can numerically fail for certain inputs
+// Warning: these functions don't special case isotropic scattering and can numerically fail for
+// certain inputs
 
-// eval:
-//   u = dot(prev_dir, next_dir)
-float phase_draine_eval(const float u, const float g, const float a)
-{
-    return ((1 - g*g)*(1 + a*u*u))/(4.*(1 + (a*(1 + 2*g*g))/3.) * MERIAN_PI * pow(1 + g*g - 2*g*u,1.5));
-}
+struct DrainePhaseFunction : PhaseFunction {
 
-// sample: (sample an exact deflection cosine)
-//   xi = a uniform random real in [0,1]
-float phase_draine_sample(const float xi, const float g, const float a)
-{
-    const float g2 = g * g;
-    const float g3 = g * g2;
-    const float g4 = g2 * g2;
-    const float g6 = g2 * g4;
-    const float pgp1_2 = (1 + g2) * (1 + g2);
-    const float T1 = (-1 + g2) * (4 * g2 + a * pgp1_2);
-    const float T1a = -a + a * g4;
-    const float T1a3 = T1a * T1a * T1a;
-    const float T2 = -1296 * (-1 + g2) * (a - a * g2) * (T1a) * (4 * g2 + a * pgp1_2);
-    const float T3 = 3 * g2 * (1 + g * (-1 + 2 * xi)) + a * (2 + g2 + g3 * (1 + 2 * g2) * (-1 + 2 * xi));
-    const float T4a = 432 * T1a3 + T2 + 432 * (a - a * g2) * T3 * T3;
-    const float T4b = -144 * a * g2 + 288 * a * g4 - 144 * a * g6;
-    const float T4b3 = T4b * T4b * T4b;
-    const float T4 = T4a + sqrt(-4 * T4b3 + T4a * T4a);
-    const float T4p3 = pow(T4, 1.0 / 3.0);
-    const float T6 = (2 * T1a + (48 * pow(2, 1.0 / 3.0) *
-        (-(a * g2) + 2 * a * g4 - a * g6)) / T4p3 + T4p3 / (3. * pow(2, 1.0 / 3.0))) / (a - a * g2);
-    const float T5 = 6 * (1 + g2) + T6;
-    return (1 + g2 - pow(-0.5 * sqrt(T5) + sqrt(6 * (1 + g2) - (8 * T3) / (a * (-1 + g2) * sqrt(T5)) - T6) / 2., 2)) / (2. * g);
-}
+    // eval:
+    //   u = dot(prev_dir, next_dir) = dot(-wi, wo)
+    static float eval(const float u, const float g, const float a) {
+        return ((1 - g * g) * (1 + a * u * u)) / (4. * (1 + (a * (1 + 2 * g * g)) / 3.) *
+                                                  MERIAN_PI * pow(1 + g * g - 2 * g * u, 1.5));
+    }
 
-float3 phase_draine_sample(const float2 xi, const float3 wi, const float g, const float a) {
-    const float deflection_cos = phase_draine_sample(xi.x, g, a);
-    const float z2 = sqrt(1.0 - deflection_cos * deflection_cos);
-    return mul(float3(z2 * cos(MERIAN_TWO_PI * xi.y), z2 * sin(MERIAN_TWO_PI * xi.y), deflection_cos), make_frame(wi));
+    // Sample an exact deflection cosine, i.e. dot(prev_dir, next_dir) = dot(-wi, wo)
+    //   xi = a uniform random real in [0,1]
+    static float sample(const float xi, const float g, const float a) {
+        const float g2 = g * g;
+        const float g3 = g * g2;
+        const float g4 = g2 * g2;
+        const float g6 = g2 * g4;
+        const float pgp1_2 = (1 + g2) * (1 + g2);
+        const float T1 = (-1 + g2) * (4 * g2 + a * pgp1_2);
+        const float T1a = -a + a * g4;
+        const float T1a3 = T1a * T1a * T1a;
+        const float T2 = -1296 * (-1 + g2) * (a - a * g2) * (T1a) * (4 * g2 + a * pgp1_2);
+        const float T3 =
+            3 * g2 * (1 + g * (-1 + 2 * xi)) + a * (2 + g2 + g3 * (1 + 2 * g2) * (-1 + 2 * xi));
+        const float T4a = 432 * T1a3 + T2 + 432 * (a - a * g2) * T3 * T3;
+        const float T4b = -144 * a * g2 + 288 * a * g4 - 144 * a * g6;
+        const float T4b3 = T4b * T4b * T4b;
+        const float T4 = T4a + sqrt(-4 * T4b3 + T4a * T4a);
+        const float T4p3 = pow(T4, 1.0 / 3.0);
+        const float T6 =
+            (2 * T1a + (48 * pow(2, 1.0 / 3.0) * (-(a * g2) + 2 * a * g4 - a * g6)) / T4p3 +
+             T4p3 / (3. * pow(2, 1.0 / 3.0))) /
+            (a - a * g2);
+        const float T5 = 6 * (1 + g2) + T6;
+        return (1 + g2 -
+                pow(-0.5 * sqrt(T5) +
+                        sqrt(6 * (1 + g2) - (8 * T3) / (a * (-1 + g2) * sqrt(T5)) - T6) / 2.,
+                    2)) /
+               (2. * g);
+    }
+
+    // wi points away from the sampling point, i.e -wi is the particle direction.
+    static float3 sample(inout RandomGenerator rng, const float3 wi, const float g, const float a) {
+        const float deflection_cos = sample(rng.next_float(), g, a);
+        return sample_cone2(wi, deflection_cos, rng.next_float());
+    }
+
+    // --------------------------------------------
+
+    float g; // HG shape / anisotropy parameter
+    float a; // alpha" shape parameter
+
+    __init(const float g, const float a) {
+        this.g = g;
+        this.a = a;
+    }
+
+    // cos_theta = dot(prev_dir, new_dir) = dot(-wi, wo)
+    float eval(float cos_theta) {
+        return eval(cos_theta, g, a);
+    }
+
+    float3 eval(const float3 wi, const float3 wo, inout RandomGenerator rng) {
+        return eval(dot(-wi, wo));
+    }
+
+    Optional<float3> sample(const float3 wi, inout RandomGenerator rng) {
+        return sample(rng, wi, g, a);
+    }
+
+    override Optional<PhaseFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
+        const float wo = sample(rng, wi, g, a);
+        return PhaseFunctionSample(wo, pdf(wi, wo), 1.0f);
+    }
+
+    float pdf(const float3 wi, const float3 wo) {
+        return eval(dot(-wi, wo));
+    }
 }
 
 }

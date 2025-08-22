@@ -1,11 +1,6 @@
 import merian_shaders.utils.textures;
 import merian_shaders.colors.colorspaces;
 
-[vk::constant_id(0)]
-const int workgroup_size_x = 1;
-[vk::constant_id(1)]
-const int workgroup_size_y = 1;
-
 struct PushConstant {
     float firefly_percentile_lower : packoffset(c0);
     float firefly_percentile_upper : packoffset(c0.y);
@@ -16,19 +11,9 @@ struct PushConstant {
 [vk::push_constant]
 ConstantBuffer<PushConstant> pc;
 
-[vk::binding(0)]
-Sampler2D<float4> img_src;
-
-[vk::binding(0, 1)]
-RWTexture2D<float4> img_quartiles;
+#include "graph_layout.slangh"
 
 groupshared float sort[workgroup_size_x * workgroup_size_y];
-
-uint2 spvTextureSize(Texture2D<float4> Tex, uint Level, out uint Param) {
-    uint2 ret;
-    Tex.GetDimensions(Level, ret.x, ret.y, Param);
-    return ret;
-}
 
 [numthreads(workgroup_size_x, workgroup_size_y, 1)]
 void main(uint3 gl_WorkGroupID: SV_GroupID,

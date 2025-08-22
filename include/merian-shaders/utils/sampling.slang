@@ -1,6 +1,7 @@
 #include "math-constants.slangh"
 
 import "merian-shaders/utils/random.slang";
+import "merian-shaders/utils/frame.slang";
 
 namespace merian {
 
@@ -41,6 +42,36 @@ float2 sample_normal_box_muller(float mean, float sigma, float2 random) {
     return (float2(cos(MERIAN_TWO_PI * random.y), sin(MERIAN_TWO_PI * random.y)) *
             (sigma * sqrt((-2.0f) * log(1.0f - random.x)))) +
            mean.xx;
+}
+
+/**
+ * This samples a vector on the cone around w with angle cos_theta.
+ *
+ * i.e for a paricle traveling in direction w, cos_theta is the deflection.
+ */
+float3 sample_cone(const float3 w, const float cos_theta, const float xi) {
+    const float sin_theta = sqrt(max(0., 1.0 - cos_theta * cos_theta));
+
+    float3 tangent, bitangent;
+    make_frame(w, tangent, bitangent);
+
+    const float phi = MERIAN_TWO_PI * xi;
+    return tangent * sin_theta * cos(phi) + bitangent * sin_theta * sin(phi) + w * cos_theta;
+}
+
+/**
+ * This samples a vector on the cone around -w with angle cos_theta.
+ *
+ * i.e for a particle coming from direction w, cos_theta is the deflection (from -w).
+ */
+float3 sample_cone2(const float3 w, const float cos_theta, const float xi) {
+    const float sin_theta = sqrt(max(0., 1.0 - cos_theta * cos_theta));
+
+    float3 tangent, bitangent;
+    make_frame(w, tangent, bitangent);
+
+    const float phi = MERIAN_TWO_PI * xi;
+    return tangent * sin_theta * cos(phi) + bitangent * sin_theta * sin(phi) - w * cos_theta;
 }
 
 float sample_normal_marsaglia(float mean,
