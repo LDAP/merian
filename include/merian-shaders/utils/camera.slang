@@ -36,12 +36,11 @@ float3 get_camera_ray_dir(
 
 float2 get_camera_pixel(
     float3 ray_dir, float2 resolution, float3 up, float3 forward, float fov_tan_alpha_half) {
-    float3x3 m = float3x3(cross(forward, up),                    // right
-                          ((-up) * resolution.y) / resolution.x, // up (normalized for aspect)
-                          forward / fov_tan_alpha_half);
-    float3 uv = mul(ray_dir, inverse(m));
+    const float3x3 m_ortho = float3x3(cross(forward, up), up, forward);
+    float3 scale_inv = float3(1.0, -resolution.x / resolution.y, fov_tan_alpha_half);
+    float3 uv = scale_inv * mul(m_ortho, ray_dir);
     uv.rg /= uv.b;
-    return ((uv.xy + 1.0f) * resolution - 1.0f.xx) / 2.0f;
+    return ((uv.rg + 1.) * resolution - 1) / 2.;
 }
 
 float ev_100(float aperature, float shutter_time, float iso) {

@@ -1,4 +1,4 @@
-float3x2 pseudoinverse(float2x3 A, inout float3 n)
+float3x2 pseudoinverse(float2x3 A, float3 n)
 {
     n /= dot(n, n).xxx;
     return transpose(float2x3(float3(cross(A[1], n)), float3(cross(n, A[0]))));

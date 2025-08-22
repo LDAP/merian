@@ -57,11 +57,11 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 }
 )";
 
-class ShadertoyInjectCompiler : public ShaderCompiler {
+class ShadertoyInjectCompiler : public GLSLShaderCompiler {
   public:
     ShadertoyInjectCompiler(const ContextHandle& context,
-                            const ShaderCompilerHandle& forwarding_compiler)
-        : ShaderCompiler(context), forwarding_compiler(forwarding_compiler) {}
+                            const GLSLShaderCompilerHandle& forwarding_compiler)
+        : GLSLShaderCompiler(context), forwarding_compiler(forwarding_compiler) {}
 
     ~ShadertoyInjectCompiler() {}
 
@@ -83,13 +83,13 @@ class ShadertoyInjectCompiler : public ShaderCompiler {
     }
 
   private:
-    const ShaderCompilerHandle forwarding_compiler;
+    const GLSLShaderCompilerHandle forwarding_compiler;
 };
 
 Shadertoy::Shadertoy(const ContextHandle& context)
     : AbstractCompute(context, sizeof(PushConstant)), shader_glsl(default_shader) {
 
-    ShaderCompilerHandle forwarding_compiler = ShaderCompiler::get(context);
+    GLSLShaderCompilerHandle forwarding_compiler = GLSLShaderCompiler::get(context);
 
     if (!forwarding_compiler->available()) {
         return;
@@ -163,7 +163,7 @@ ShaderModuleHandle Shadertoy::get_shader_module() {
         try {
             shader = reloader->get_shader(resolved_shader_path, vk::ShaderStageFlagBits::eCompute);
             error.reset();
-        } catch (const ShaderCompiler::compilation_failed& e) {
+        } catch (const GLSLShaderCompiler::compilation_failed& e) {
             error = e;
         }
     }
@@ -224,7 +224,7 @@ AbstractCompute::NodeStatusFlags Shadertoy::properties(Properties& config) {
             shader = compiler->compile_glsl_to_shadermodule(
                 context, shader_glsl, "<memory>Shadertoy.comp", vk::ShaderStageFlagBits::eCompute);
             error.reset();
-        } catch (const ShaderCompiler::compilation_failed& e) {
+        } catch (const GLSLShaderCompiler::compilation_failed& e) {
             error = e;
         }
     }

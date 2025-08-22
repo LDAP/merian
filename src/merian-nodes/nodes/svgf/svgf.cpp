@@ -104,7 +104,7 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
     }
 
     {
-        const ShaderCompilerHandle compiler = ShaderCompiler::get(context);
+        const GLSLShaderCompilerHandle compiler = GLSLShaderCompiler::get(context);
 
         std::map<std::string, std::string> additional_defines = {
             {"FILTER_TYPE", std::to_string(filter_type)}};

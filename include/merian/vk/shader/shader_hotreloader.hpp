@@ -1,6 +1,6 @@
 #pragma once
 
-#include "merian/vk/shader/shader_compiler.hpp"
+#include "merian/vk/shader/glsl_shader_compiler.hpp"
 #include "merian/vk/shader/shader_module.hpp"
 
 namespace merian {
@@ -10,7 +10,7 @@ namespace merian {
  */
 class HotReloader {
   public:
-    HotReloader(const ContextHandle& context, const ShaderCompilerHandle& compiler)
+    HotReloader(const ContextHandle& context, const GLSLShaderCompilerHandle& compiler)
         : context(context), compiler(compiler) {}
 
     // Compiles the shader at the specified path and returns a ShaderModule.
@@ -26,12 +26,12 @@ class HotReloader {
 
   private:
     const ContextHandle context;
-    const ShaderCompilerHandle compiler;
+    const GLSLShaderCompilerHandle compiler;
 
     struct per_path {
         ShaderModuleHandle shader;
         std::filesystem::file_time_type last_write_time;
-        std::optional<ShaderCompiler::compilation_failed> error;
+        std::optional<GLSLShaderCompiler::compilation_failed> error;
     };
     std::unordered_map<std::filesystem::path, per_path> shaders;
 };

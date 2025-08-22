@@ -1,15 +1,15 @@
 #pragma once
 
-#include "merian/vk/shader/shader_compiler.hpp"
+#include "merian/vk/shader/glsl_shader_compiler.hpp"
 #include <map>
 
-#ifdef MERIAN_SHADERC_FOUND
+#ifdef MERIAN_SHADERC_AVAILABLE
 #include <shaderc/shaderc.hpp>
 #endif
 
 namespace merian {
 
-class ShadercCompiler : public ShaderCompiler {
+class ShadercCompiler : public GLSLShaderCompiler {
   public:
     ShadercCompiler(const ContextHandle& context,
                     const std::vector<std::string>& include_paths = {},
@@ -28,7 +28,7 @@ class ShadercCompiler : public ShaderCompiler {
 
   private:
     const uint32_t vk_api_version;
-#ifdef MERIAN_SHADERC_FOUND
+#ifdef MERIAN_SHADERC_AVAILABLE
     shaderc::Compiler shader_compiler{};
 #endif
 };

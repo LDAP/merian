@@ -1,7 +1,7 @@
 #!/bin/env python3
 
 """
-Compiles a GLSL shader "filename.ext" and
+Compiles a GLSL "filename.ext" or Slang shader "filename.slang" and
 outputs a file "filename.ext.spv.c" that contains
 
 - an array uint32_t filename_ext_spv[].
@@ -19,6 +19,7 @@ import re
 import subprocess
 import tempfile
 from pathlib import Path
+from typing import List
 
 
 def to_int_array(b_array: bytes):
@@ -30,41 +31,63 @@ def to_int_array(b_array: bytes):
     return result
 
 
-def compile_shader(glslc_path, input_path, glslc_args, optimize) -> bytes:
+def compile_glsl_shader(args, user_compiler_args: List[str]) -> bytes:
+    compiler_args = user_compiler_args.copy()
+    if args.depfile:
+        compiler_args += ["--depfile", args.depfile]
+    compiler_args += ["--target-env", "vulkan1.3", "-V"]
+
     with tempfile.TemporaryDirectory() as tempdir:
         shader = Path(tempdir) / "shader.spv"
-        glslc_command = [glslc_path, "-V"] + glslc_args + ["-o", shader, input_path]
+        glslc_command = (
+            [args.glslc_path] + compiler_args + ["-o", shader, args.shader_path]
+        )
         subprocess.check_call(glslc_command)
-
-        if optimize:
-            spirv_opt_command = [
-                "spirv-opt",
-                "--scalar-block-layout",
-                "-O",
-                "-o",
-                shader,
-                shader,
-            ]
-            subprocess.check_call(spirv_opt_command)
 
         with open(shader, "rb") as f:
             return f.read()
 
 
+def compile_slang_shader(args, user_compiler_args) -> bytes:
+    compiler_args = user_compiler_args.copy()
+    if args.depfile:
+        compiler_args += ["-depfile", args.depfile]
+
+    with tempfile.TemporaryDirectory() as tempdir:
+        shader = Path(tempdir) / "shader.spv"
+        glslc_command = (
+            [args.slangc_path]
+            + compiler_args
+            + [args.shader_path, "-target", "spirv", "-o", shader]
+        )
+        subprocess.check_call(glslc_command)
+
+        with open(shader, "rb") as f:
+            return f.read()
+
+
+def compile_shader(args, compiler_args) -> bytes:
+    if args.shader_path.suffix == ".slang":
+        return compile_slang_shader(args, compiler_args)
+    else:
+        return compile_glsl_shader(args, compiler_args)
+
+
 def main():
     parser = argparse.ArgumentParser("compile_shader.py")
-    parser.add_argument("--optimize", action="store_true")
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--name")
     parser.add_argument("--prefix", default="merian")
     parser.add_argument("--glslc_path", default="glslangValidator")
+    parser.add_argument("--slangc_path", default="slangc")
+    parser.add_argument("--depfile", type=Path, required=False)
     parser.add_argument("shader_path", type=Path)
     parser.add_argument("header_path", type=Path)
     parser.add_argument("implementation_path", type=Path)
-    args, glslc_args = parser.parse_known_args()
+    args, compiler_args = parser.parse_known_args()
     if args.debug:
         print(args)
-        print(f"glslc args: {glslc_args}")
+        print(f"compiler args: {compiler_args}")
         print(f"cwd {os.getcwd()}")
 
     shader_name = re.sub(
@@ -95,9 +118,8 @@ uint32_t {prefix}_{shader_name}_spv_size(void);
         if args.debug:
             print(f"wrote header to {args.header_path}")
 
-    spv = compile_shader(
-        args.glslc_path, args.shader_path, glslc_args, args.optimize
-    )
+    spv = compile_shader(args, compiler_args)
+
     implementation = """\
 #include "stdint.h"
 
@@ -124,14 +146,15 @@ uint32_t {prefix}_{shader_name}_spv_size(void) {{
         if args.debug:
             print(f"wrote implementation to {args.implementation_path}")
 
-    if "--depfile" in glslc_args:
-        depfile_path = glslc_args[glslc_args.index("--depfile") + 1]
+    if args.depfile:
         if args.debug:
-            print(f"fixup depfile {depfile_path}")
-        with open(depfile_path, "r") as f:
+            print(f"fixup depfile {args.depfile}")
+        with open(args.depfile, "r") as f:
             depfile = f.read()
-        depfile = re.sub("^(.*):(?![\\\\/])", args.implementation_path.name + ":", depfile)
-        with open(depfile_path, "w") as f:
+        depfile = re.sub(
+            "^(.*):(?![\\\\/])", args.implementation_path.name + ":", depfile
+        )
+        with open(args.depfile, "w") as f:
             f.write(depfile)
 
 

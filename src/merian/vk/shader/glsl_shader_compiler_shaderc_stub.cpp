@@ -1,4 +1,4 @@
-#include "merian/vk/shader/shader_compiler_shaderc.hpp"
+#include "merian/vk/shader/glsl_shader_compiler_shaderc.hpp"
 
 #include <map>
 

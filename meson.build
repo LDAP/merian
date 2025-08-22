@@ -100,7 +100,7 @@ if not shaderc.found() and get_option('shaderc').enabled()
     )
 endif
 if shaderc.found()
-    global_args += ['-DMERIAN_SHADERC_FOUND']
+    global_args += ['-DMERIAN_SHADERC_AVAILABLE']
 endif
 slang = dependency('slang', version: ['>=2025.14.3'], fallback: ['slang', 'slang_dep'])
 
@@ -127,14 +127,22 @@ else
     shader_generator_deps = [glslc_tgt]
 endif
 
-spv_compile_script = [meson.project_source_root() + '/scripts/compile_shader.py', '--glslc_path', glslc_path]
-glslc_args = ['--target-env', 'vulkan1.3']
-glslc_args += ['-I' + meson.project_source_root()]
-glslc_args += ['-I' + join_paths(project_root, 'src')]
-glslc_args += ['-I' + join_paths(project_root, 'include')]
-glslc_args += ['--depfile', '@DEPFILE@']
+slangc = find_program('slangc', required: false)
+if not slangc.found()
+    slangc = subproject('slang').get_variable('slangc')
+endif
+
+spv_compile_script = [
+    meson.project_source_root() + '/scripts/compile_shader.py',
+    '--glslc_path', glslc_path,
+    '--slangc_path', slangc.full_path()
+]
+spv_compiler_args = ['-I' + meson.project_source_root()]
+spv_compiler_args += ['-I' + join_paths(project_root, 'src')]
+spv_compiler_args += ['-I' + join_paths(project_root, 'include')]
+spv_compiler_args += ['--depfile', '@DEPFILE@']
 if get_option('buildtype').startswith('debug')
-    glslc_args += ['-g']
+    spv_compiler_args += ['-g']
 endif
 
 py = import('python').find_installation('python3') 
@@ -142,7 +150,7 @@ shader_generator = generator(
     py,
     output: ['@PLAINNAME@.spv.h', '@PLAINNAME@.spv.c'],
     depfile: '@PLAINNAME@.d',
-    arguments: spv_compile_script + ['@INPUT@', '@OUTPUT0@', '@OUTPUT1@'] + glslc_args + ['@EXTRA_ARGS@'],
+    arguments: spv_compile_script + ['@INPUT@', '@OUTPUT0@', '@OUTPUT1@'] + spv_compiler_args + ['@EXTRA_ARGS@'],
     depends: shader_generator_deps
 )
 

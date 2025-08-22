@@ -217,7 +217,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                     run_profiler,
                     resource_allocator,
                     queue,
-                    ShaderCompiler::get(context)) {
+                    GLSLShaderCompiler::get(context)) {
 
         for (uint32_t i = 0; i < ITERATIONS_IN_FLIGHT; i++) {
             InFlightData& in_flight_data = ring_fences.get(i).user_data;
@@ -475,7 +475,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                         }
                     } catch (const graph_errors::node_error& e) {
                         data.errors_queued.emplace_back(fmt::format("node error: {}", e.what()));
-                    } catch (const ShaderCompiler::compilation_failed& e) {
+                    } catch (const GLSLShaderCompiler::compilation_failed& e) {
                         data.errors_queued.emplace_back(
                             fmt::format("compilation failed: {}", e.what()));
                     }
@@ -624,7 +624,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                     run_node(graph_run, node, data, profiler);
                 } catch (const graph_errors::node_error& e) {
                     data.errors_queued.emplace_back(fmt::format("node error: {}", e.what()));
-                } catch (const ShaderCompiler::compilation_failed& e) {
+                } catch (const GLSLShaderCompiler::compilation_failed& e) {
                     data.errors_queued.emplace_back(
                         fmt::format("compilation failed: {}", e.what()));
                 }
@@ -1468,7 +1468,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                 data.input_connectors = node->describe_inputs();
             } catch (const graph_errors::node_error& e) {
                 data.errors.emplace_back(fmt::format("node error: {}", e.what()));
-            } catch (const ShaderCompiler::compilation_failed& e) {
+            } catch (const GLSLShaderCompiler::compilation_failed& e) {
                 data.errors.emplace_back(fmt::format("compilation failed: {}", e.what()));
             }
             for (const InputConnectorHandle& input : data.input_connectors) {
@@ -1554,7 +1554,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                 }));
         } catch (const graph_errors::node_error& e) {
             data.errors.emplace_back(fmt::format("node error: {}", e.what()));
-        } catch (const ShaderCompiler::compilation_failed& e) {
+        } catch (const GLSLShaderCompiler::compilation_failed& e) {
             data.errors.emplace_back(fmt::format("compilation failed: {}", e.what()));
         }
 

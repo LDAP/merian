@@ -6,6 +6,11 @@ import "merian-shaders/bsdfs/bsdf.slang";
 import "merian-shaders/utils/math.slang";
 import "merian-shaders/utils/fresnel.slang";
 
+[shader("compute")]
+void dummyMain() {
+    return;
+}
+
 namespace merian {
 
 /**

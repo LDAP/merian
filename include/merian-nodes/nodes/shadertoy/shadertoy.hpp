@@ -44,7 +44,7 @@ class Shadertoy : public AbstractCompute {
 
   private:
     // none if shader compiler is not available.
-    ShaderCompilerHandle compiler = nullptr;
+    GLSLShaderCompilerHandle compiler = nullptr;
     // none if shader compiler is not available.
     std::unique_ptr<HotReloader> reloader = nullptr;
 
@@ -57,7 +57,7 @@ class Shadertoy : public AbstractCompute {
 
     ShaderModuleHandle shader;
     SpecializationInfoHandle spec_info;
-    std::optional<ShaderCompiler::compilation_failed> error;
+    std::optional<GLSLShaderCompiler::compilation_failed> error;
 
     PushConstant constant;
 };

@@ -1,7 +1,7 @@
 #include "merian-nodes/nodes/accumulate/accumulate.hpp"
 
 #include "accumulate.comp.spv.h"
-#include "calculate_percentiles.comp.spv.h"
+#include "calculate_percentiles.slang.spv.h"
 #include "merian/vk/descriptors/descriptor_set_layout_builder.hpp"
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
@@ -14,8 +14,8 @@ Accumulate::Accumulate(const ContextHandle& context,
                        const std::optional<vk::Format> format)
     : Node(), context(context), allocator(allocator), format(format) {
     percentile_module =
-        std::make_shared<ShaderModule>(context, merian_calculate_percentiles_comp_spv_size(),
-                                       merian_calculate_percentiles_comp_spv());
+        std::make_shared<ShaderModule>(context, merian_calculate_percentiles_slang_spv_size(),
+                                       merian_calculate_percentiles_slang_spv());
     accumulate_module = std::make_shared<ShaderModule>(context, merian_accumulate_comp_spv_size(),
                                                        merian_accumulate_comp_spv());
 }

@@ -14,8 +14,8 @@ option('loglevel',
 option(
     'shaderc',
     type: 'feature',
-    value: 'auto',
-    description: 'Enable support for shaderc, used for hot reloading'
+    value: 'enabled',
+    description: 'Enable support for shaderc.'
 )
 option(
     'tinygltf',

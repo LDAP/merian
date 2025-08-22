@@ -1,12 +1,12 @@
 #pragma once
 
-#include "merian/vk/shader/shader_compiler.hpp"
+#include "merian/vk/shader/glsl_shader_compiler.hpp"
 #include <map>
 
 namespace merian {
 
 // Uses shaderc executable to compile shaders.
-class SystemGlslcCompiler : public ShaderCompiler {
+class SystemGlslcCompiler : public GLSLShaderCompiler {
   public:
     // Include paths for the merian-nodes library are automatically added
     SystemGlslcCompiler(const ContextHandle& context,

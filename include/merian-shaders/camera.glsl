@@ -44,14 +44,10 @@ vec3 get_camera_ray_dir(const vec2 pixel, const vec2 resolution,
 // expects up, forward to be normalized
 vec2 get_camera_pixel(const vec3 ray_dir, const vec2 resolution,
                       const vec3 up, const vec3 forward, const float fov_tan_alpha_half) {
-  const mat3x3 m = mat3x3(
-    cross(forward, up),                 // right
-    -up * resolution.y / resolution.x,  // up (normalized for aspect)
-    forward / fov_tan_alpha_half
-  );
-  vec3 uv = inverse(m) * ray_dir;
+  const mat3x3 m_ortho = mat3x3(cross(forward, up), up, forward);
+  vec3 scale_inv = vec3(1.0, -resolution.x / resolution.y, fov_tan_alpha_half);
+  vec3 uv = scale_inv * (ray_dir * m_ortho);
   uv.rg /= uv.b;
-  inverse(mat4(1));
   return ((uv.rg + 1.) * resolution - 1) / 2.;
 }
 

@@ -74,7 +74,7 @@ bool reprojection_valid(float3 curr_normal,
 //
 // Returns true if prev pos was outside the image borders.
 // prev_pos = pos + mv
-bool reprojection_intersect_border(inout float2 prev_pos, float2 mv, float2 image_size_minus_one) {
+bool reprojection_intersect_border(float2 prev_pos, float2 mv, float2 image_size_minus_one) {
     float2 _136 = round(prev_pos);
     bool _138 = any(bool2(_136.x > image_size_minus_one.x, _136.y > image_size_minus_one.y));
     bool _146;

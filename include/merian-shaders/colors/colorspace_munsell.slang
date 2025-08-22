@@ -32,8 +32,8 @@ THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace merian {
 
 // was inlined by the compiler
-// static const int munsell_hdim = 40;
-// static const int munsell_cdim = 21;
+static const int munsell_hdim = 40;
+static const int munsell_cdim = 21;
 
 static const uint munsell_lut[840] = {
     893596928u, 888485006u,  882914332u,  877278059u,  871117480u,  860434938u,  850145621u,
@@ -166,14 +166,14 @@ public float xy_to_monotone_hue_angle(float2 xy) {
     return fmod(2.0 * MERIAN_PI - 2.52 - atan2(xy.y - ill.y, xy.x - ill.x), 2.0 * MERIAN_PI);
 }
 
-float2 munsell_lookup(inout int hue_idx, inout int chroma_idx) {
+float2 munsell_lookup(int hue_idx, int chroma_idx) {
     hue_idx = ((hue_idx % 40) + 40) % 40;
     chroma_idx = clamp(chroma_idx, 0, 20);
     return unpackHalf2x16ToFloat(munsell_lut[(21 * hue_idx) + chroma_idx]);
 }
 
 // compute which side of a line v0--v1 the point p lies
-public float munsell_side(float2 v0, inout float2 v1, inout float2 p) {
+public float munsell_side(float2 v0, float2 v1, float2 p) {
     v1 -= v0;
     p -= v0;
     return (v1.x * p.y) - (v1.y * p.x);
@@ -214,150 +214,81 @@ public float2 munsell_to_xy(float2 mhc) {
 // convert xy to polar around illuminant (C)
 // find matching munsell box and interpolate the corners
 public float2 xy_to_munsell(float2 xy) {
-    int hidxm = 0;
-    int hidxM = 40;
-    int cidxm = 0;
-    int cidxM = 20;
-    float2 param = xy;
-    float theta = xy_to_monotone_hue_angle(param);
-    float rad2 = dot(xy - float2(0.312709987163543701171875f, 0.3290199935436248779296875f),
-                     xy - float2(0.312709987163543701171875f, 0.3290199935436248779296875f));
-    for (int i = 0; i < 6; i++) {
+    int hidxm = 0, hidxM = munsell_hdim;
+    int cidxm = 0, cidxM = munsell_cdim - 1;
+    const float2 ill = float2(0.31271, 0.32902); // now adapted to D65, not C (0.31006, 0.31616);
+    const float theta = xy_to_monotone_hue_angle(xy);
+    const float rad2 = dot(xy - ill, xy - ill);
+    // while(true)
+    for (int i = 0; i < 6; i++) { // quad tree refinement step using midpoint
         int hidx = (hidxm + hidxM) / 2;
         int cidx = (cidxm + cidxM) / 2;
-        int param_1 = hidx;
-        int param_2 = cidx;
-        float2 _1172 = munsell_lookup(param_1, param_2);
-        float2 res = _1172;
-        float2 param_3 = res;
-        float th = xy_to_monotone_hue_angle(param_3);
-        float r2 = dot(res - float2(0.312709987163543701171875f, 0.3290199935436248779296875f),
-                       res - float2(0.312709987163543701171875f, 0.3290199935436248779296875f));
-        if (th <= theta) {
+        float2 res = munsell_lookup(hidx, cidx);
+        float th = xy_to_monotone_hue_angle(res);
+        float r2 = dot(res - ill, res - ill);
+        if (th <= theta)
             hidxm = hidx;
-        } else {
+        else
             hidxM = hidx;
-        }
-        if (r2 <= rad2) {
+        if (r2 <= rad2)
             cidxm = cidx;
-        } else {
+        else
             cidxM = cidx;
-        }
-        bool _1199 = hidxM <= (hidxm + 1);
-        bool _1206;
-        if (_1199) {
-            _1206 = cidxM <= (cidxm + 1);
-        } else {
-            _1206 = _1199;
-        }
-        if (_1206) {
+        if (hidxM <= hidxm + 1 && cidxM <= cidxm + 1) // reached last level/resolution limit
             break;
-        }
     }
-    float u2;
-    float u0;
-    float u1;
-    float u3;
-    for (int i_1 = 0; i_1 < 6; i_1++) {
-        int param_4 = hidxm;
-        int param_5 = cidxm + 1;
-        float2 _1221 = munsell_lookup(param_4, param_5);
-        float2 res3 = _1221;
-        int param_6 = hidxm + 1;
-        int param_7 = cidxm + 1;
-        float2 _1226 = munsell_lookup(param_6, param_7);
-        float2 res2 = _1226;
-        int param_8 = hidxm;
-        int param_9 = cidxm;
-        float2 _1229 = munsell_lookup(param_8, param_9);
-        float2 res0 = _1229;
-        int param_10 = hidxm + 1;
-        int param_11 = cidxm;
-        float2 _1233 = munsell_lookup(param_10, param_11);
-        float2 res1 = _1233;
-        float2 param_12 = res0;
-        float2 param_13 = res1;
-        float2 param_14 = xy;
-        float _1236 = munsell_side(param_12, param_13, param_14);
-        float s0 = _1236;
-        float2 param_15 = res1;
-        float2 param_16 = res2;
-        float2 param_17 = xy;
-        float _1239 = munsell_side(param_15, param_16, param_17);
-        float s1 = _1239;
-        float2 param_18 = res2;
-        float2 param_19 = res3;
-        float2 param_20 = xy;
-        float _1242 = munsell_side(param_18, param_19, param_20);
-        float s2 = _1242;
-        float2 param_21 = res3;
-        float2 param_22 = res0;
-        float2 param_23 = xy;
-        float _1245 = munsell_side(param_21, param_22, param_23);
-        float s3 = _1245;
-        if ((s0 < 0.0f) && (cidxm > 0)) {
+
+    // now we reached the leaf level and may have found our quad.
+    // unfortunately the quad tree is just very approximate, so maybe
+    // we'll be outside the quad. in this case, we'll walk the grid
+    // a bit until we find a containing quad.
+    // while(true)
+    for (int i = 0; i < 6; i++) {
+        float2 res0, res1, res2, res3;
+        // this polygon winds ccw:
+        res3 = munsell_lookup(hidxm, cidxm + 1);
+        res2 = munsell_lookup(hidxm + 1, cidxm + 1);
+        res0 = munsell_lookup(hidxm, cidxm);
+        res1 = munsell_lookup(hidxm + 1, cidxm);
+        // these are all positive if xy is inside the polygon
+        float s0 = munsell_side(res0, res1, xy), s1 = munsell_side(res1, res2, xy);
+        float s2 = munsell_side(res2, res3, xy), s3 = munsell_side(res3, res0, xy);
+        // step to next cells
+        if (s0 < 0 && cidxm > 0)
             cidxm--;
-        } else {
-            if ((s0 < 0.0f) && (cidxm == 0)) {
-                hidxm = (((hidxm + 20) % 40) + 40) % 40;
-            } else {
-                if ((s2 < 0.0f) && (cidxm < 19)) {
-                    cidxm++;
-                }
-            }
-        }
-        if (s1 < 0.0f) {
+        else if (s0 < 0 && cidxm == 0)
+            hidxm = ((hidxm + munsell_hdim / 2) % munsell_hdim + munsell_hdim) %
+                    munsell_hdim; // other side of white
+        else if (s2 < 0 && cidxm < munsell_cdim - 2)
+            cidxm++;
+        if (s1 < 0)
             hidxm++;
-        } else {
-            if (s3 < 0.0f) {
-                hidxm--;
-            }
-        }
-        bool _1298 = ((s0 >= 0.0f) && (s1 >= 0.0f)) && (s3 >= 0.0f);
-        bool _1306;
-        if (_1298) {
-            _1306 = (s2 >= 0.0f) || (cidxm >= 19);
-        } else {
-            _1306 = _1298;
-        }
-        if (_1306) {
-            float2 param_24 = res0;
-            float2 param_25 = res1;
-            float2 param_26 = res2;
-            float _1312 = munsell_side(param_24, param_25, param_26);
-            float t0 = _1312;
-            float2 param_27 = res2;
-            float2 param_28 = res3;
-            float2 param_29 = res0;
-            float _1316 = munsell_side(param_27, param_28, param_29);
-            float t1 = _1316;
-            bool _1318 = cidxm > 0;
-            bool _1326;
-            if (_1318) {
-                _1326 = (s0 + s1) <= t0;
-            } else {
-                _1326 = _1318;
-            }
-            if (_1326) {
+        else if (s3 < 0)
+            hidxm--;
+        if (s0 >= 0 && s1 >= 0 && s3 >= 0 &&
+            (s2 >= 0 || cidxm >= munsell_cdim - 2)) {  // yay we're inside our quad!
+            float t0 = munsell_side(res0, res1, res2); // size of triangle 0
+            float t1 = munsell_side(res2, res3, res0); // size of triangle 1
+            float u0, u1, u2, u3;
+            if (cidxm > 0 && s0 + s1 <= t0) { // triangle 0
                 u2 = s0 / t0;
                 u0 = s1 / t0;
-                u1 = (1.0f - u0) - u2;
-                u3 = 0.0f;
-            } else {
+                u1 = 1.0 - u0 - u2;
+                u3 = 0.0;
+            } else { // triangle 1
                 u2 = s3 / t1;
                 u0 = s2 / t1;
-                u3 = (1.0f - u0) - u2;
-                u1 = 0.0f;
+                u3 = 1.0 - u0 - u2;
+                u1 = 0.0;
             }
-            float hi = (((u0 * float(hidxm)) + (u1 * (float(hidxm) + 1.0f))) +
-                        (u2 * (float(hidxm) + 1.0f))) +
-                       (u3 * float(hidxm));
-            float ci =
-                (((u0 * float(cidxm)) + (u1 * float(cidxm))) + (u2 * (float(cidxm) + 1.0f))) +
-                (u3 * (float(cidxm) + 1.0f));
-            return float2(hi / 40.0f, max(0.0f, ci / 21.0f));
+            // now interpolate grid corner coordinates via these barycentrics:
+            float hi = u0 * hidxm + u1 * (hidxm + 1.0) + u2 * (hidxm + 1.0) + u3 * hidxm;
+            float ci = u0 * cidxm + u1 * cidxm + u2 * (cidxm + 1.0) + u3 * (cidxm + 1.0);
+            return float2(hi / munsell_hdim, max(0, ci / munsell_cdim));
         }
     }
+
+    return 0.0f;
 }
 
 }

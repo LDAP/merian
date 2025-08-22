@@ -5,7 +5,7 @@
 #include "merian/vk/command/caching_command_pool.hpp"
 #include "merian/vk/command/command_buffer.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
-#include "merian/vk/shader/shader_compiler.hpp"
+#include "merian/vk/shader/glsl_shader_compiler.hpp"
 #include "merian/vk/sync/semaphore_binary.hpp"
 #include "merian/vk/sync/semaphore_timeline.hpp"
 #include "merian/vk/utils/cpu_queue.hpp"
@@ -29,7 +29,7 @@ class GraphRun {
              const ProfilerHandle& profiler,
              const ResourceAllocatorHandle& allocator,
              const QueueHandle& queue,
-             const ShaderCompilerHandle& shader_compiler)
+             const GLSLShaderCompilerHandle& shader_compiler)
         : iterations_in_flight(iterations_in_flight), thread_pool(thread_pool),
           cpu_queue(cpu_queue), profiler(profiler), allocator(allocator), queue(queue),
           shader_compiler(shader_compiler) {
@@ -172,7 +172,7 @@ class GraphRun {
         return cpu_queue;
     }
 
-    const ShaderCompilerHandle& get_shader_compiler() const {
+    const GLSLShaderCompilerHandle& get_shader_compiler() const {
         return shader_compiler;
     }
 
@@ -223,7 +223,7 @@ class GraphRun {
     // Queues the callback to be called when the commandbuffer until this point has finished
     // executing on the GPU. GPU processing will be automatically continued when this callback
     // finishes executing.
-    // 
+    //
     // Note: This can only be used if there is no present operation depending on the CPU execution.
     void sync_to_cpu_and_back(const std::function<void()>& callback) {
         add_signal_semaphore(semaphores[get_in_flight_index()],
@@ -242,7 +242,7 @@ class GraphRun {
     // Queues the callback to be called when the commandbuffer until this point has finished
     // executing on the GPU. GPU processing will be automatically continued when this callback
     // finishes executing.
-    // 
+    //
     // Note: This can only be used if there is no present operation depending on the CPU execution.
     void sync_to_cpu_and_back(const std::function<void()>&& callback) {
         add_signal_semaphore(semaphores[get_in_flight_index()],
@@ -320,7 +320,7 @@ class GraphRun {
     const ProfilerHandle profiler;
     const ResourceAllocatorHandle allocator;
     const QueueHandle queue;
-    const ShaderCompilerHandle shader_compiler;
+    const GLSLShaderCompilerHandle shader_compiler;
 
     std::shared_ptr<CachingCommandPool> cmd_cache = nullptr;
     CommandBufferHandle cmd = nullptr;

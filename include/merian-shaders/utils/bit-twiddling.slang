@@ -2,7 +2,7 @@
 
 namespace merian {
 
-uint next_power_of_two(inout uint v) {
+uint next_power_of_two(uint v) {
     v--;
     v |= (v >> uint(1));
     v |= (v >> uint(2));

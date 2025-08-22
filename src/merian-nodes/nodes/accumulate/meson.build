@@ -1,6 +1,6 @@
 shaders = [
     'accumulate.comp',
-    'calculate_percentiles.comp',
+    'calculate_percentiles.slang',
 ]
 
 foreach s : shaders

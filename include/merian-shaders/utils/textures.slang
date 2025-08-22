@@ -2,7 +2,14 @@
 
 namespace merian {
 
-uint2 textureSize(Texture2D<float4> Tex, uint Level) {
+uint2 texture_size(Texture2D<float4> Tex, uint Level) {
+    uint2 ret;
+    uint dummy;
+    Tex.GetDimensions(Level, ret.x, ret.y, dummy);
+    return ret;
+}
+
+uint2 texture_size(Sampler2D<float4> Tex, uint Level) {
     uint2 ret;
     uint dummy;
     Tex.GetDimensions(Level, ret.x, ret.y, dummy);
@@ -15,7 +22,7 @@ uint2 textureSize(Texture2D<float4> Tex, uint Level) {
 // Samples a texture with Catmull-Rom filtering, using 9 texture fetches instead of 16.
 // See http://vec3.ca/bicubic-filtering-in-fewer-taps/ for more details
 float4 catmull_rom(Sampler2D<float4> tex, float2 uv) {
-    float2 texSize = float2(textureSize(tex.__getTexture(), uint(0)));
+    float2 texSize = float2(texture_size(tex, uint(0)));
 
     // We're going to sample a a 4x4 grid of texels surrounding the target UV coordinate. We'll do
     // this by rounding down the sample location to get the exact center of our "starting" texel.
@@ -66,7 +73,7 @@ float4 catmull_rom(Sampler2D<float4> tex, float2 uv) {
 
 // texel_coord in pixels
 float4 texelFetchClamp(int2 texel_coord, Texture2D<float4> tex) {
-    int2 coord = clamp(texel_coord, int2(0, 0), int2(textureSize(tex, uint(0))) - int2(1, 1));
+    int2 coord = clamp(texel_coord, int2(0, 0), int2(texture_size(tex, uint(0))) - int2(1, 1));
     return tex.Load(int3(coord, 0));
 }
 
@@ -108,7 +115,7 @@ int2 texturewarp_repeat(int2 ipos, int2 tex_size) {
 
 // mirror(a) returns a if a ≥ 0, and −(1 + a) otherwise
 int2 mirror(int2 ipos) {
-    select(ipos < 0, -(1 + ipos), ipos);
+    return select(ipos < 0, -(1 + ipos), ipos);
 }
 
 int2 texturewarp_mirror_repeat(int2 ipos, int2 tex_size) {

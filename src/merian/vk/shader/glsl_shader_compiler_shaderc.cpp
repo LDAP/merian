@@ -1,4 +1,4 @@
-#include "merian/vk/shader/shader_compiler_shaderc.hpp"
+#include "merian/vk/shader/glsl_shader_compiler_shaderc.hpp"
 
 #include <map>
 
@@ -111,14 +111,14 @@ shaderc_shader_kind_for_stage_flag_bit(const vk::ShaderStageFlagBits shader_kind
     case vk::ShaderStageFlagBits::eIntersectionKHR:
         return shaderc_shader_kind::shaderc_intersection_shader;
     default:
-        throw ShaderCompiler::compilation_failed("shader kind not supported");
+        throw GLSLShaderCompiler::compilation_failed("shader kind not supported");
     }
 }
 
 ShadercCompiler::ShadercCompiler(const ContextHandle& context,
                                  const std::vector<std::string>& user_include_paths,
                                  const std::map<std::string, std::string>& user_macro_definitions)
-    : ShaderCompiler(context, user_include_paths, user_macro_definitions),
+    : GLSLShaderCompiler(context, user_include_paths, user_macro_definitions),
       vk_api_version(context->vk_api_version) {}
 
 ShadercCompiler::~ShadercCompiler() {}
@@ -171,7 +171,7 @@ std::vector<uint32_t> ShadercCompiler::compile_glsl(
     const auto preprocess_result =
         shader_compiler.PreprocessGlsl(source, kind, source_name.c_str(), compile_options);
     if (preprocess_result.GetCompilationStatus() != shaderc_compilation_status_success) {
-        throw ShaderCompiler::compilation_failed{preprocess_result.GetErrorMessage()};
+        throw compilation_failed{preprocess_result.GetErrorMessage()};
     }
 
     SPDLOG_DEBUG("compile and assemble {}", source_name);
@@ -179,7 +179,7 @@ std::vector<uint32_t> ShadercCompiler::compile_glsl(
         preprocess_result.begin(), preprocess_result.end() - preprocess_result.begin(), kind,
         source_name.data(), compile_options);
     if (binary_result.GetCompilationStatus() != shaderc_compilation_status_success) {
-        throw ShaderCompiler::compilation_failed{binary_result.GetErrorMessage()};
+        throw compilation_failed{binary_result.GetErrorMessage()};
     }
 
     return std::vector<uint32_t>(binary_result.begin(), binary_result.end());
