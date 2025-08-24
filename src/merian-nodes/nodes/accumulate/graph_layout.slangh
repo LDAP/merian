@@ -4,10 +4,17 @@
 
 // layout(local_size_x_id = 0, local_size_y_id = 1, local_size_z = 1) in;
 
+import merian_shaders.gbuffer;
+
 [vk::constant_id(0)]
 const int workgroup_size_x = 1;
 [vk::constant_id(1)]
 const int workgroup_size_y = 1;
+
+[vk::binding(0)]
+Sampler2D<float4> img_src;
+[vk::binding(1)]
+Sampler2D<float4> img_src;
 
 // layout(set = 0, binding = 0) uniform sampler2D img_src;
 // MAKE_GBUFFER_READONLY_LAYOUT(set = 0, binding = 1, gbuffer);
@@ -24,8 +31,7 @@ const int workgroup_size_y = 1;
 
 
 
-[vk::binding(0)]
-Sampler2D<float4> img_src;
+
 
 [vk::binding(0, 1)]
 RWTexture2D<float4> img_quartiles;
