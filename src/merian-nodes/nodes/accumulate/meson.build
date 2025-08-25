@@ -1,5 +1,5 @@
 shaders = [
-    'accumulate.comp',
+    'accumulate.slang',
     'calculate_percentiles.slang',
 ]
 

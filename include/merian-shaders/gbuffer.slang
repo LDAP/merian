@@ -4,8 +4,8 @@ import merian_shaders.utils.encoding;
 
 namespace merian {
 
-typealias GBufferBindingType = Texture2D<uint4>;
-typealias RWGBufferBindingType = RWTexture2D<uint4>;
+typealias GBufferBinding = Texture2D<uint4>;
+typealias RWGBufferBinding = RWTexture2D<uint4>;
 
 struct CompressedGBuffer {
     uint _encoded_normal;
@@ -36,12 +36,12 @@ struct CompressedGBuffer {
 }
 
 struct GBuffer {
-    static CompressedGBuffer load_compressed(GBufferBindingType gbuffer_binding,
+    static CompressedGBuffer load_compressed(GBufferBinding gbuffer_binding,
                                              const uint2 pixel) {
         return reinterpret<CompressedGBuffer>(gbuffer_binding.Load(uint3(pixel, 0)));
     }
 
-    static GBuffer load(GBufferBindingType gbuffer_binding, const uint2 pixel) {
+    static GBuffer load(GBufferBinding gbuffer_binding, const uint2 pixel) {
         return GBuffer(reinterpret<CompressedGBuffer>(gbuffer_binding.Load(uint3(pixel, 0))));
     }
 

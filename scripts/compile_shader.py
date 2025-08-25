@@ -33,6 +33,14 @@ def to_int_array(b_array: bytes):
 
 def compile_glsl_shader(args, user_compiler_args: List[str]) -> bytes:
     compiler_args = user_compiler_args.copy()
+    has_optimization_arg = False
+    has_debug_arg = False
+    for arg in compiler_args:
+        has_optimization_arg = has_optimization_arg or arg.startswith("-O")
+        has_debug_arg = has_debug_arg or arg.startswith("-g")
+    if not has_debug_arg and not has_optimization_arg:
+        compiler_args.append("-O2")
+
     if args.depfile:
         compiler_args += ["--depfile", args.depfile]
     compiler_args += ["--target-env", "vulkan1.3", "-V"]

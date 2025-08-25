@@ -2,26 +2,35 @@ import merian_shaders.utils.textures;
 import merian_shaders.colors.colorspaces;
 
 struct PushConstant {
-    float firefly_percentile_lower : packoffset(c0);
-    float firefly_percentile_upper : packoffset(c0.y);
-    float adaptive_alpha_percentile_lower : packoffset(c0.z);
-    float adaptive_alpha_percentile_upper : packoffset(c0.w);
+    float firefly_percentile_lower;
+    float firefly_percentile_upper;
+    float adaptive_alpha_percentile_lower;
+    float adaptive_alpha_percentile_upper;
 };
 
 [vk::push_constant]
 ConstantBuffer<PushConstant> pc;
 
+[vk::constant_id(0)]
+const int workgroup_size_x = 1;
+[vk::constant_id(1)]
+const int workgroup_size_y = 1;
+
 #include "graph_layout.slangh"
+
+[vk::binding(0, 1)]
+RWTexture2D<float4> img_quartiles;
 
 groupshared float sort[workgroup_size_x * workgroup_size_y];
 
 [numthreads(workgroup_size_x, workgroup_size_y, 1)]
+[shader("compute")]
 void main(uint3 gl_WorkGroupID: SV_GroupID,
           uint3 gl_GlobalInvocationID: SV_DispatchThreadID,
           uint group_index: SV_GroupIndex) {
 
     const int workgroup_size = workgroup_size_x * workgroup_size_y;
-    int2 pixel = min(gl_GlobalInvocationID.xy, merian::texture_size(img_src, 0));
+    int2 pixel = min(gl_GlobalInvocationID.xy, int2(merian::texture_dimensions(img_src)) - 1);
 
     // Sort luminance using odd even sort
     sort[group_index] = merian::yuv_luminance(img_src.Load(int3(pixel, 0)).rgb);

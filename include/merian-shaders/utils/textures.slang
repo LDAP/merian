@@ -2,18 +2,72 @@
 
 namespace merian {
 
-uint2 texture_size(Texture2D<float4> Tex, uint Level) {
-    uint2 ret;
+uint2 texture_dimensions<T : ITexelElement,
+                         int sampleCount,
+                         int access,
+                         bool isCombined,
+                         int format>(
+    const _Texture<T, __Shape2D, 0, 0, sampleCount, access, 0, isCombined, format> tex,
+    const int level) {
+    uint2 dims;
     uint dummy;
-    Tex.GetDimensions(Level, ret.x, ret.y, dummy);
-    return ret;
+    tex.GetDimensions(level, dims.x, dims.y, dummy);
+    return dims;
 }
 
-uint2 texture_size(Sampler2D<float4> Tex, uint Level) {
-    uint2 ret;
+uint2 texture_dimensions<T : ITexelElement,
+                         int sampleCount,
+                         int access,
+                         bool isCombined,
+                         int format>(
+    const _Texture<T, __Shape2D, 0, 0, sampleCount, access, 0, isCombined, format> tex) {
+    uint2 dims;
+    tex.GetDimensions(dims.x, dims.y);
+    return dims;
+}
+
+bool is_on_texture<T : ITexelElement, int sampleCount, int access, bool isCombined, int format>(
+    const int2 pixel,
+    const _Texture<T, __Shape2D, 0, 0, sampleCount, access, 0, isCombined, format> tex,
+    const int level) {
+    if (any(pixel < 0))
+        return false;
+    uint2 dims;
     uint dummy;
-    Tex.GetDimensions(Level, ret.x, ret.y, dummy);
-    return ret;
+    tex.GetDimensions(level, dims.x, dims.y, dummy);
+    return all(pixel < dims);
+}
+
+bool is_on_texture<T : ITexelElement, int sampleCount, int access, bool isCombined, int format>(
+    const int2 pixel,
+    const _Texture<T, __Shape2D, 0, 0, sampleCount, access, 0, isCombined, format> tex) {
+    if (any(pixel < 0))
+        return false;
+    uint2 dims;
+    tex.GetDimensions(dims.x, dims.y);
+    return all(pixel < dims);
+}
+
+bool not_on_texture<T : ITexelElement, int sampleCount, int access, bool isCombined, int format>(
+    const int2 pixel,
+    const _Texture<T, __Shape2D, 0, 0, sampleCount, access, 0, isCombined, format> tex,
+    const int level) {
+    if (any(pixel < 0))
+        return true;
+    uint2 dims;
+    uint dummy;
+    tex.GetDimensions(level, dims.x, dims.y, dummy);
+    return any(pixel >= dims);
+}
+
+bool not_on_texture<T : ITexelElement, int sampleCount, int access, bool isCombined, int format>(
+    const int2 pixel,
+    const _Texture<T, __Shape2D, 0, 0, sampleCount, access, 0, isCombined, format> tex) {
+    if (any(pixel < 0))
+        return true;
+    uint2 dims;
+    tex.GetDimensions(dims.x, dims.y);
+    return any(pixel >= dims);
 }
 
 // Adapted for Vulkan from https://gist.github.com/TheRealMJP/c83b8c0f46b63f3a88a5986f4fa982b1
@@ -22,7 +76,7 @@ uint2 texture_size(Sampler2D<float4> Tex, uint Level) {
 // Samples a texture with Catmull-Rom filtering, using 9 texture fetches instead of 16.
 // See http://vec3.ca/bicubic-filtering-in-fewer-taps/ for more details
 float4 catmull_rom(Sampler2D<float4> tex, float2 uv) {
-    float2 texSize = float2(texture_size(tex, uint(0)));
+    float2 texSize = float2(texture_dimensions(tex, uint(0)));
 
     // We're going to sample a a 4x4 grid of texels surrounding the target UV coordinate. We'll do
     // this by rounding down the sample location to get the exact center of our "starting" texel.
@@ -73,7 +127,8 @@ float4 catmull_rom(Sampler2D<float4> tex, float2 uv) {
 
 // texel_coord in pixels
 float4 texelFetchClamp(int2 texel_coord, Texture2D<float4> tex) {
-    int2 coord = clamp(texel_coord, int2(0, 0), int2(texture_size(tex, uint(0))) - int2(1, 1));
+    int2 coord =
+        clamp(texel_coord, int2(0, 0), int2(texture_dimensions(tex, uint(0))) - int2(1, 1));
     return tex.Load(int3(coord, 0));
 }
 
