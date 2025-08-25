@@ -36,13 +36,28 @@ struct CompressedGBuffer {
 }
 
 struct GBuffer {
-    static CompressedGBuffer load_compressed(GBufferBinding gbuffer_binding,
-                                             const uint2 pixel) {
+    static CompressedGBuffer load_compressed(GBufferBinding gbuffer_binding, const uint2 pixel) {
         return reinterpret<CompressedGBuffer>(gbuffer_binding.Load(uint3(pixel, 0)));
     }
 
     static GBuffer load(GBufferBinding gbuffer_binding, const uint2 pixel) {
         return GBuffer(reinterpret<CompressedGBuffer>(gbuffer_binding.Load(uint3(pixel, 0))));
+    }
+
+    static float3 load_and_decompress_normal(GBufferBinding gbuffer_binding, const uint2 pixel) {
+        return merian::decode_normal(gbuffer_binding.Load(uint3(pixel, 0)).r);
+    }
+
+    static float load_and_decompress_linear_z(GBufferBinding gbuffer_binding, const uint2 pixel) {
+        return gbuffer_binding.Load(uint3(pixel, 0)).g;
+    }
+
+    static half2 load_and_decompress_grad_z(GBufferBinding gbuffer_binding, const uint2 pixel) {
+        return unpackHalf2x16ToHalf(gbuffer_binding.Load(uint3(pixel, 0)).b);
+    }
+
+    static float load_and_decompress_delta_z(GBufferBinding gbuffer_binding, const uint2 pixel) {
+        return gbuffer_binding.Load(uint3(pixel, 0)).a;
     }
 
     // ------------------------------
