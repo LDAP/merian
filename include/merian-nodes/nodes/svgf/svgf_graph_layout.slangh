@@ -1,0 +1,25 @@
+[vk::constant_id(0)]
+const int workgroup_size_x = 1;
+[vk::constant_id(1)]
+const int workgroup_size_y = 1;
+
+import merian_shaders.gbuffer;
+
+using merian;
+
+[vk::binding(0)]
+Sampler2D<float4> img_prev_out;
+[vk::binding(1)]
+Sampler2D<float4> img_irr;
+[vk::binding(2)]
+Sampler2D<float4> img_history;
+[vk::binding(3)]
+Sampler2D<float4> img_albedo;
+[vk::binding(4)]
+Sampler2D<float4> img_mv;
+[vk::binding(5)]
+GBufferBinding gbuffer;
+[vk::binding(6)]
+GBufferBinding prev_gbuffer;
+[vk::binding(7)]
+RWTexture2D<float4> img_out;
