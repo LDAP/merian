@@ -5,7 +5,7 @@ namespace merian {
 uint2 texture_dimensions<T : ITexelElement,
                          int sampleCount,
                          int access,
-                         bool isCombined,
+                         int isCombined,
                          int format>(
     const _Texture<T, __Shape2D, 0, 0, sampleCount, access, 0, isCombined, format> tex,
     const int level) {
@@ -18,7 +18,7 @@ uint2 texture_dimensions<T : ITexelElement,
 uint2 texture_dimensions<T : ITexelElement,
                          int sampleCount,
                          int access,
-                         bool isCombined,
+                         int isCombined,
                          int format>(
     const _Texture<T, __Shape2D, 0, 0, sampleCount, access, 0, isCombined, format> tex) {
     uint2 dims;
@@ -26,7 +26,7 @@ uint2 texture_dimensions<T : ITexelElement,
     return dims;
 }
 
-bool is_on_texture<T : ITexelElement, int sampleCount, int access, bool isCombined, int format>(
+bool is_on_texture<T : ITexelElement, int sampleCount, int access, int isCombined, int format>(
     const int2 pixel,
     const _Texture<T, __Shape2D, 0, 0, sampleCount, access, 0, isCombined, format> tex,
     const int level) {
@@ -38,7 +38,7 @@ bool is_on_texture<T : ITexelElement, int sampleCount, int access, bool isCombin
     return all(pixel < dims);
 }
 
-bool is_on_texture<T : ITexelElement, int sampleCount, int access, bool isCombined, int format>(
+bool is_on_texture<T : ITexelElement, int sampleCount, int access, int isCombined, int format>(
     const int2 pixel,
     const _Texture<T, __Shape2D, 0, 0, sampleCount, access, 0, isCombined, format> tex) {
     if (any(pixel < 0))
@@ -48,7 +48,7 @@ bool is_on_texture<T : ITexelElement, int sampleCount, int access, bool isCombin
     return all(pixel < dims);
 }
 
-bool not_on_texture<T : ITexelElement, int sampleCount, int access, bool isCombined, int format>(
+bool not_on_texture<T : ITexelElement, int sampleCount, int access, int isCombined, int format>(
     const int2 pixel,
     const _Texture<T, __Shape2D, 0, 0, sampleCount, access, 0, isCombined, format> tex,
     const int level) {
@@ -60,7 +60,7 @@ bool not_on_texture<T : ITexelElement, int sampleCount, int access, bool isCombi
     return any(pixel >= dims);
 }
 
-bool not_on_texture<T : ITexelElement, int sampleCount, int access, bool isCombined, int format>(
+bool not_on_texture<T : ITexelElement, int sampleCount, int access, int isCombined, int format>(
     const int2 pixel,
     const _Texture<T, __Shape2D, 0, 0, sampleCount, access, 0, isCombined, format> tex) {
     if (any(pixel < 0))
@@ -126,7 +126,8 @@ float4 catmull_rom(Sampler2D<float4> tex, float2 uv) {
 }
 
 // texel_coord in pixels
-float4 texelFetchClamp(int2 texel_coord, Texture2D<float4> tex) {
+T texelFetchClamp<T : ITexelElement, int sampleCount, int isCombined, int format>(
+    int2 texel_coord, _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, isCombined, format> tex) {
     int2 coord =
         clamp(texel_coord, int2(0, 0), int2(texture_dimensions(tex, uint(0))) - int2(1, 1));
     return tex.Load(int3(coord, 0));
@@ -144,14 +145,17 @@ float4 texelFetchClamp(int2 texel_coord, Texture2D<float4> tex) {
 // - (here:) Magnitude Dilation: take the velocity with the largest magnitude in a neighborhood
 // - (also possible:) Depth Dilation: take the velocity that corresponds to the pixel with the
 // nearest depth in a neighborhood
-float2 sample_motion_vector(Texture2D<float4> img, int2 center_pixel, int radius) {
+float2 sample_motion_vector<int sampleCount, int isCombined, int format>(
+    _Texture<float4, __Shape2D, 0, 0, sampleCount, 0, 0, isCombined, format> tex,
+    int2 center_pixel,
+    int radius) {
     // find longest motion vector, transform into texture space
     // access pixes position of the current fragment with ivec2(gl_FragCoord.xy)
 
     float2 longest = float2(0.0f);
     for (int j = -radius; j <= radius; j++) {
         for (int i = -radius; i <= radius; i++) {
-            float2 mv = texelFetchClamp(center_pixel + int2(j, i), img).xy;
+            float2 mv = texelFetchClamp(center_pixel + int2(j, i), tex).xy;
             if (length(mv) > length(longest)) {
                 longest = mv;
             }

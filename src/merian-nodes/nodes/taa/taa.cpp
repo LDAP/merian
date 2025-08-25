@@ -4,13 +4,13 @@
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 
 #include "config.h"
-#include "taa.comp.spv.h"
+#include "taa.slang.spv.h"
 
 namespace merian_nodes {
 
 TAA::TAA(const ContextHandle& context) : AbstractCompute(context, sizeof(PushConstant)) {
-    shader =
-        std::make_shared<ShaderModule>(context, merian_taa_comp_spv_size(), merian_taa_comp_spv());
+    shader = std::make_shared<ShaderModule>(context, merian_taa_slang_spv_size(),
+                                            merian_taa_slang_spv());
     pc.temporal_alpha = 0.;
     pc.clamp_method = MERIAN_NODES_TAA_CLAMP_MIN_MAX;
 

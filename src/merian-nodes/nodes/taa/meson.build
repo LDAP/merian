@@ -1,5 +1,5 @@
 shaders = [
-    'taa.comp',      
+    'taa.slang',      
 ]
 
 foreach s : shaders
