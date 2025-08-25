@@ -1,7 +1,7 @@
 shaders = [
-    'exposure.comp',
-    'histogram.comp',
-    'luminance.comp',
+    'exposure.slang',
+    'histogram.slang',
+    'luminance.slang',
 ]
 
 foreach s : shaders

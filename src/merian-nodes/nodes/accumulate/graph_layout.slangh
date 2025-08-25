@@ -11,16 +11,16 @@ Sampler2D<float4> img_src;
 [vk::binding(1)]
 merian::GBufferBinding gbuffer;
 [vk::binding(2)]
-Sampler2D<float4> img_mv;
+Sampler2D<float2> img_mv;
 [vk::binding(3)]
 Sampler2D<float4> img_prev_out;
 [vk::binding(4)]
 merian::GBufferBinding prev_gbuffer;
 [vk::binding(5)]
-Sampler2D<float4> img_prev_history;
+Sampler2D<float> img_prev_history;
 
 [vk::binding(6)]
 RWTexture2D<float4> img_out;
 [vk::binding(7)]
-RWTexture2D<float4> img_history;
+RWTexture2D<float> img_history;
 

@@ -1,6 +1,6 @@
 shaders = [
-    'bloom_separate.comp',
-    'bloom_composite.comp',
+    'bloom_separate.slang',
+    'bloom_composite.slang',
 ]
 # included_files = files(
 #     'layout.glsl',

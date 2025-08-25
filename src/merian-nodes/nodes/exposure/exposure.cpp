@@ -4,24 +4,24 @@
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 
-#include "exposure.comp.spv.h"
-#include "histogram.comp.spv.h"
-#include "luminance.comp.spv.h"
+#include "exposure.slang.spv.h"
+#include "histogram.slang.spv.h"
+#include "luminance.slang.spv.h"
 
 namespace merian_nodes {
 
 AutoExposure::AutoExposure(const ContextHandle& context) : Node(), context(context) {
 
-    histogram_module = std::make_shared<ShaderModule>(context, merian_histogram_comp_spv_size(),
-                                                      merian_histogram_comp_spv());
-    luminance_module = std::make_shared<ShaderModule>(context, merian_luminance_comp_spv_size(),
-                                                      merian_luminance_comp_spv());
-    exposure_module = std::make_shared<ShaderModule>(context, merian_exposure_comp_spv_size(),
-                                                     merian_exposure_comp_spv());
+    histogram_module = std::make_shared<ShaderModule>(context, merian_histogram_slang_spv_size(),
+                                                      merian_histogram_slang_spv());
+    luminance_module = std::make_shared<ShaderModule>(context, merian_luminance_slang_spv_size(),
+                                                      merian_luminance_slang_spv());
+    exposure_module = std::make_shared<ShaderModule>(context, merian_exposure_slang_spv_size(),
+                                                     merian_exposure_slang_spv());
 }
 
 AutoExposure::~AutoExposure() {}
- 
+
 std::vector<InputConnectorHandle> AutoExposure::describe_inputs() {
     return {con_src};
 }

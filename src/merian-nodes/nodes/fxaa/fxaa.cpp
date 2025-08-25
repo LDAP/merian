@@ -3,7 +3,7 @@
 #include "merian-nodes/connectors/image/vk_image_out_managed.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 
-#include "fxaa.comp.spv.h"
+#include "fxaa.slang.spv.h"
 
 namespace merian_nodes {
 
@@ -11,8 +11,8 @@ FXAA::FXAA(const ContextHandle& context) : AbstractCompute(context, sizeof(PushC
     auto spec_builder = SpecializationInfoBuilder();
     spec_builder.add_entry(local_size_x, local_size_y);
     spec_info = spec_builder.build();
-    shader = std::make_shared<ShaderModule>(context, merian_fxaa_comp_spv_size(),
-                                            merian_fxaa_comp_spv());
+    shader = std::make_shared<ShaderModule>(context, merian_fxaa_slang_spv_size(),
+                                            merian_fxaa_slang_spv());
 }
 
 std::vector<InputConnectorHandle> FXAA::describe_inputs() {

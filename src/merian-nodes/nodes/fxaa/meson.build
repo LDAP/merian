@@ -1,5 +1,5 @@
 shaders = [
-    'fxaa.comp',
+    'fxaa.slang',
 ]
 
 foreach s : shaders

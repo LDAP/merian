@@ -4,17 +4,17 @@
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 
-#include "bloom_composite.comp.spv.h"
-#include "bloom_separate.comp.spv.h"
+#include "bloom_composite.slang.spv.h"
+#include "bloom_separate.slang.spv.h"
 
 namespace merian_nodes {
 
 Bloom::Bloom(const ContextHandle& context) : Node(), context(context) {
 
-    separate_module = std::make_shared<ShaderModule>(context, merian_bloom_separate_comp_spv_size(),
-                                                     merian_bloom_separate_comp_spv());
+    separate_module = std::make_shared<ShaderModule>(
+        context, merian_bloom_separate_slang_spv_size(), merian_bloom_separate_slang_spv());
     composite_module = std::make_shared<ShaderModule>(
-        context, merian_bloom_composite_comp_spv_size(), merian_bloom_composite_comp_spv());
+        context, merian_bloom_composite_slang_spv_size(), merian_bloom_composite_slang_spv());
 }
 
 Bloom::~Bloom() {}

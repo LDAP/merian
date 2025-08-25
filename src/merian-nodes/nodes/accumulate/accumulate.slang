@@ -89,7 +89,7 @@ void main(uint3 ipos: SV_DispatchThreadID) {
     // CLEAR SHORTCUT
     if (pc.clear == 1 || pc.accum_alpha == 0) {
         img_out.Store(ipos.xy, src);
-        img_history.Store(ipos.xy, uint4(1, 0, 0, 0));
+        img_history.Store(ipos.xy, 1);
         return;
     }
 
@@ -98,7 +98,7 @@ void main(uint3 ipos: SV_DispatchThreadID) {
     float max_history = pc.accum_max_hist;
     RandomGenerator rng = XorShift32(pcg3d16(uint3(ipos.xy, pc.iteration)));
     if (USE_MOTION_VECTORS) {
-        const float2 mv = img_mv.Load(ipos).xy;
+        const float2 mv = img_mv.Load(ipos);
         float2 prev_pos = ipos.xy + mv;
 
         if (REUSE_BORDER) {
@@ -198,9 +198,9 @@ void main(uint3 ipos: SV_DispatchThreadID) {
         const float4 result = lerp(prev_out, src, alpha);
 
         img_out.Store(ipos.xy, result);
-        img_history.Store(ipos.xy, float4(new_history, 0, 0, 0));
+        img_history.Store(ipos.xy, new_history);
     } else {
         img_out.Store(ipos.xy, src);
-        img_history.Store(ipos.xy, float4(1, 0, 0, 0));
+        img_history.Store(ipos.xy, 1);
     }
 }
