@@ -9,22 +9,8 @@
 namespace merian {
 
 // Include paths for the merian-nodes library are automatically added
-SystemGlslangValidatorCompiler::SystemGlslangValidatorCompiler(
-    const ContextHandle& context,
-    const std::vector<std::string>& user_include_paths,
-    const std::map<std::string, std::string>& user_macro_definitions)
-    : GLSLShaderCompiler(context, user_include_paths, user_macro_definitions),
-      compiler_executable(subprocess::find_program("glslangValidator")) {
-    if (context->vk_api_version == VK_API_VERSION_1_0) {
-        target_env_arg = "vulkan1.0";
-    } else if (context->vk_api_version == VK_API_VERSION_1_1) {
-        target_env_arg = "vulkan1.1";
-    } else if (context->vk_api_version == VK_API_VERSION_1_2) {
-        target_env_arg = "vulkan1.2";
-    } else {
-        target_env_arg = "vulkan1.3";
-    }
-}
+SystemGlslangValidatorCompiler::SystemGlslangValidatorCompiler()
+    : GLSLShaderCompiler(), compiler_executable(subprocess::find_program("glslangValidator")) {}
 
 SystemGlslangValidatorCompiler::~SystemGlslangValidatorCompiler() {}
 
@@ -32,8 +18,7 @@ std::vector<uint32_t> SystemGlslangValidatorCompiler::compile_glsl(
     const std::string& source,
     const std::string& source_name,
     const vk::ShaderStageFlagBits shader_kind,
-    const std::vector<std::string>& additional_include_paths,
-    const std::map<std::string, std::string>& additional_macro_definitions) const {
+    const CompilationSessionDescription& compilation_session_description) const {
     if (compiler_executable.empty()) {
         throw compilation_failed{"compiler not available"};
     }
@@ -41,7 +26,15 @@ std::vector<uint32_t> SystemGlslangValidatorCompiler::compile_glsl(
     std::vector<std::string> command = {compiler_executable};
 
     command.emplace_back("--target-env");
-    command.emplace_back(target_env_arg);
+    if (compilation_session_description.get_target_vk_api_version() == VK_API_VERSION_1_0) {
+        command.emplace_back("vulkan1.0");
+    } else if (compilation_session_description.get_target_vk_api_version() == VK_API_VERSION_1_1) {
+        command.emplace_back("vulkan1.1");
+    } else if (compilation_session_description.get_target_vk_api_version() == VK_API_VERSION_1_2) {
+        command.emplace_back("vulkan1.2");
+    } else {
+        command.emplace_back("vulkan1.3");
+    }
 
     command.emplace_back("--stdin");
 
@@ -58,20 +51,14 @@ std::vector<uint32_t> SystemGlslangValidatorCompiler::compile_glsl(
         const std::filesystem::path parent_path = source_path.parent_path();
         command.emplace_back(fmt::format("-I{}", parent_path.string()));
     }
-    for (const auto& inc_dir : get_include_paths()) {
+    for (const auto& inc_dir : compilation_session_description.get_include_paths()) {
         command.emplace_back(fmt::format("-I{}", inc_dir));
     }
-    for (const auto& inc_dir : additional_include_paths) {
-        command.emplace_back(fmt::format("-I{}", inc_dir));
-    }
-    for (const auto& [key, value] : get_macro_definitions()) {
-        command.emplace_back(fmt::format("-D{}={}", key, value));
-    }
-    for (const auto& [key, value] : additional_macro_definitions) {
+    for (const auto& [key, value] : compilation_session_description.get_preprocessor_defines()) {
         command.emplace_back(fmt::format("-D{}={}", key, value));
     }
 
-    if (generate_debug_info_enabled()) {
+    if (compilation_session_description.should_generate_debug_info()) {
         command.emplace_back("-g");
     }
 

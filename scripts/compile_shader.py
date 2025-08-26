@@ -33,13 +33,6 @@ def to_int_array(b_array: bytes):
 
 def compile_glsl_shader(args, user_compiler_args: List[str]) -> bytes:
     compiler_args = user_compiler_args.copy()
-    has_optimization_arg = False
-    has_debug_arg = False
-    for arg in compiler_args:
-        has_optimization_arg = has_optimization_arg or arg.startswith("-O")
-        has_debug_arg = has_debug_arg or arg.startswith("-g")
-    if not has_debug_arg and not has_optimization_arg:
-        compiler_args.append("-O2")
 
     if args.depfile:
         compiler_args += ["--depfile", args.depfile]
@@ -58,6 +51,13 @@ def compile_glsl_shader(args, user_compiler_args: List[str]) -> bytes:
 
 def compile_slang_shader(args, user_compiler_args) -> bytes:
     compiler_args = user_compiler_args.copy()
+
+    has_optimization_arg = False
+    for arg in compiler_args:
+        has_optimization_arg = has_optimization_arg or arg.startswith("-O")
+    if not has_optimization_arg and args.optimization.isnumeric():
+        compiler_args.append(f"-O{args.optimization}")
+
     if args.depfile:
         compiler_args += ["-depfile", args.depfile]
 
@@ -88,6 +88,7 @@ def main():
     parser.add_argument("--prefix", default="merian")
     parser.add_argument("--glslc_path", default="glslangValidator")
     parser.add_argument("--slangc_path", default="slangc")
+    parser.add_argument("--optimization", default="1")
     parser.add_argument("--depfile", type=Path, required=False)
     parser.add_argument("shader_path", type=Path)
     parser.add_argument("header_path", type=Path)

@@ -1,7 +1,5 @@
 #include "merian/vk/shader/glsl_shader_compiler_shaderc.hpp"
 
-#include <map>
-
 namespace merian {
 
 class FileIncluder final : public shaderc::CompileOptions::IncluderInterface {
@@ -115,11 +113,7 @@ shaderc_shader_kind_for_stage_flag_bit(const vk::ShaderStageFlagBits shader_kind
     }
 }
 
-ShadercCompiler::ShadercCompiler(const ContextHandle& context,
-                                 const std::vector<std::string>& user_include_paths,
-                                 const std::map<std::string, std::string>& user_macro_definitions)
-    : GLSLShaderCompiler(context, user_include_paths, user_macro_definitions),
-      vk_api_version(context->vk_api_version) {}
+ShadercCompiler::ShadercCompiler() : GLSLShaderCompiler() {}
 
 ShadercCompiler::~ShadercCompiler() {}
 
@@ -127,44 +121,42 @@ std::vector<uint32_t> ShadercCompiler::compile_glsl(
     const std::string& source,
     const std::string& source_name,
     const vk::ShaderStageFlagBits shader_kind,
-    const std::vector<std::string>& additional_include_paths,
-    const std::map<std::string, std::string>& additional_macro_definitions) const {
+    const CompilationSessionDescription& compilation_session_description) const {
     const shaderc_shader_kind kind = shaderc_shader_kind_for_stage_flag_bit(shader_kind);
 
     shaderc::CompileOptions compile_options;
-    if (generate_debug_info_enabled())
+    if (compilation_session_description.should_generate_debug_info())
         compile_options.SetGenerateDebugInfo();
 
-    for (const auto& [key, value] : get_macro_definitions()) {
-        compile_options.AddMacroDefinition(key, value);
-    }
-    for (const auto& [key, value] : additional_macro_definitions) {
+    for (const auto& [key, value] : compilation_session_description.get_preprocessor_defines()) {
         compile_options.AddMacroDefinition(key, value);
     }
 
     auto includer = std::make_unique<FileIncluder>();
-    for (const auto& include_path : get_include_paths()) {
-        includer->get_file_loader().add_search_path(include_path);
-    }
-    for (const auto& include_path : additional_include_paths) {
+    for (const auto& include_path : compilation_session_description.get_include_paths()) {
         includer->get_file_loader().add_search_path(include_path);
     }
     compile_options.SetIncluder(std::move(includer));
-    compile_options.SetOptimizationLevel(
-        shaderc_optimization_level::shaderc_optimization_level_performance);
+    if (compilation_session_description.get_optimization_level() > 0) {
+        compile_options.SetOptimizationLevel(
+            shaderc_optimization_level::shaderc_optimization_level_performance);
+    }
 
-    if (vk_api_version == VK_API_VERSION_1_0) {
+    if (compilation_session_description.get_target_vk_api_version() == VK_API_VERSION_1_0) {
         compile_options.SetTargetEnvironment(shaderc_target_env_vulkan,
                                              shaderc_env_version_vulkan_1_0);
-    } else if (vk_api_version == VK_API_VERSION_1_1) {
+    } else if (compilation_session_description.get_target_vk_api_version() == VK_API_VERSION_1_1) {
         compile_options.SetTargetEnvironment(shaderc_target_env_vulkan,
                                              shaderc_env_version_vulkan_1_1);
-    } else if (vk_api_version == VK_API_VERSION_1_2) {
+    } else if (compilation_session_description.get_target_vk_api_version() == VK_API_VERSION_1_2) {
         compile_options.SetTargetEnvironment(shaderc_target_env_vulkan,
                                              shaderc_env_version_vulkan_1_2);
-    } else {
+    } else if (compilation_session_description.get_target_vk_api_version() == VK_API_VERSION_1_3) {
         compile_options.SetTargetEnvironment(shaderc_target_env_vulkan,
                                              shaderc_env_version_vulkan_1_3);
+    } else {
+        compile_options.SetTargetEnvironment(shaderc_target_env_vulkan,
+                                             shaderc_env_version_vulkan_1_4);
     }
 
     SPDLOG_DEBUG("preprocess {}", source_name);

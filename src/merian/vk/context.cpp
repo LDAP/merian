@@ -513,15 +513,18 @@ void Context::prepare_shader_include_defines() {
     if (FileLoader::exists(development_headers / "merian-shaders")) {
         SPDLOG_DEBUG("found merian-shaders development headers headers at {}",
                      development_headers.string());
-        default_shader_include_paths.emplace_back(development_headers.string());
+        default_shader_include_paths.emplace_back(
+            std::filesystem::weakly_canonical(development_headers.string()));
     } else if (FileLoader::exists(installed_headers / "merian-shaders")) {
         SPDLOG_DEBUG("found merian-shaders installed at {}", installed_headers.string());
-        default_shader_include_paths.emplace_back(installed_headers.string());
+        default_shader_include_paths.emplace_back(
+            std::filesystem::weakly_canonical(installed_headers.string()));
     } else if (const std::optional<std::filesystem::path> headers =
                    FileLoader::search_cwd_parents("include/merian-shaders");
                headers.has_value()) {
         SPDLOG_DEBUG("found merian-shaders at {}", headers->parent_path().string());
-        default_shader_include_paths.emplace_back(headers->parent_path().string());
+        default_shader_include_paths.emplace_back(
+            std::filesystem::weakly_canonical(headers->parent_path().string()));
     } else {
         SPDLOG_ERROR("merian-shaders header not found! Shader compilers will not work correctly");
     }
@@ -781,7 +784,7 @@ const std::vector<const char*>& Context::get_enabled_instance_extensions() const
     return instance_extension_names;
 }
 
-const std::vector<std::string>& Context::get_default_shader_include_paths() const {
+const std::vector<std::filesystem::path>& Context::get_default_shader_include_paths() const {
     return default_shader_include_paths;
 }
 

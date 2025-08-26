@@ -27,6 +27,8 @@ global_args = [
     '-DVULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1',
     # Vulkan uses [0, 1] for depth instead of [-1, 1] like OpenGL
     '-DGLM_FORCE_DEPTH_ZERO_TO_ONE',
+    # Guides the default optimization of the runtime shader compiler 
+    '-DMERIAN_BUILD_OPTIMIZATION=@0@'.format(get_option('optimization')),
 ]
 
 if get_option('performance_profiling')
@@ -45,6 +47,7 @@ add_project_arguments('-DMERIAN_INSTALL_PREFIX="@0@"'.format(get_option('prefix'
 add_project_arguments('-DMERIAN_INCLUDE_DIR_NAME="@0@"'.format(get_option('includedir')), language : 'cpp')
 add_project_arguments('-DMERIAN_DATA_DIR_NAME="@0@"'.format(get_option('datadir')), language : 'cpp')
 add_project_arguments('-DMERIAN_DEVELOPMENT_INCLUDE_DIR="@0@"'.format(join_paths(meson.current_source_dir(), 'include')), language : 'cpp')
+
 
 # Dependencies
 fmt = dependency('fmt', version : ['>=10.0.0'], fallback : ['fmt', 'fmt_dep'])
@@ -135,7 +138,8 @@ endif
 spv_compile_script = [
     meson.project_source_root() + '/scripts/compile_shader.py',
     '--glslc_path', glslc_path,
-    '--slangc_path', slangc.full_path()
+    '--slangc_path', slangc.full_path(),
+    '--optimization', get_option('optimization')
 ]
 spv_compiler_args = ['-I' + meson.project_source_root()]
 spv_compiler_args += ['-I' + join_paths(project_root, 'src')]

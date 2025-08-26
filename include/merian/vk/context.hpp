@@ -109,7 +109,8 @@ struct PhysicalDevice {
     vk::PhysicalDeviceFeatures2 physical_device_features;
     vk::PhysicalDeviceMemoryProperties2 physical_device_memory_properties;
     vk::PhysicalDeviceSubgroupProperties physical_device_subgroup_properties;
-    vk::PhysicalDeviceSubgroupSizeControlProperties physical_device_subgroup_size_control_properties;
+    vk::PhysicalDeviceSubgroupSizeControlProperties
+        physical_device_subgroup_size_control_properties;
     std::vector<vk::ExtensionProperties> physical_device_extension_properties;
 };
 
@@ -153,6 +154,22 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
     static constexpr bool IS_DEBUG_BUILD = false;
 #else
     static constexpr bool IS_DEBUG_BUILD = true;
+#endif
+
+#ifdef MERIAN_BUILD_OPTIMIZATION
+#if MERIAN_BUILD_OPTIMIZATION == 0
+    static constexpr uint32_t BUILD_OPTIMIZATION_LEVEL = 0;
+#elif MERIAN_BUILD_OPTIMIZATION == 1
+    static constexpr uint32_t BUILD_OPTIMIZATION_LEVEL = 1;
+#elif MERIAN_BUILD_OPTIMIZATION == 2
+    static constexpr uint32_t BUILD_OPTIMIZATION_LEVEL = 2;
+#elif MERIAN_BUILD_OPTIMIZATION == 3
+    static constexpr uint32_t BUILD_OPTIMIZATION_LEVEL = 3;
+#else
+    static constexpr uint32_t BUILD_OPTIMIZATION_LEVEL = 1;
+#endif
+#else
+    static constexpr uint32_t BUILD_OPTIMIZATION_LEVEL = 1;
 #endif
 
     /**
@@ -256,7 +273,8 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
 
     const std::vector<const char*>& get_enabled_instance_extensions() const;
 
-    const std::vector<std::string>& get_default_shader_include_paths() const;
+    // weakly canonical paths
+    const std::vector<std::filesystem::path>& get_default_shader_include_paths() const;
 
     const std::map<std::string, std::string>& get_default_shader_macro_definitions() const;
 
@@ -317,7 +335,7 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
     // Convenience command pool for compute (can be nullptr in very rare occasions)
     std::weak_ptr<CommandPool> cmd_pool_C;
 
-    std::vector<std::string> default_shader_include_paths;
+    std::vector<std::filesystem::path> default_shader_include_paths;
     std::map<std::string, std::string> default_shader_macro_definitions;
 };
 
