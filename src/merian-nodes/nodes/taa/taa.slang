@@ -31,6 +31,7 @@ struct PushConstant {
     int enable_mv;
 }
 
+[vk::push_constant]
 ConstantBuffer<PushConstant> params;
 
 float4 merge_frames(const float4 current_color,

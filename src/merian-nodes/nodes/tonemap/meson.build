@@ -1,5 +1,5 @@
 shaders = [
-    'tonemap.comp',
+    'tonemap.slang',
 ]
 
 foreach s : shaders

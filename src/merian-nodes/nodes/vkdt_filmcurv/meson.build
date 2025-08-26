@@ -1,5 +1,5 @@
 shaders = [
-    'vkdt_filmcurv.comp',      
+    'vkdt_filmcurv.slang',      
 ]
 
 foreach s : shaders
