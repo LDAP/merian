@@ -60,6 +60,8 @@ class Shadertoy : public AbstractCompute {
     std::optional<GLSLShaderCompiler::compilation_failed> error;
 
     PushConstant constant;
+
+    CompilationSessionDescription compilation_session_description;
 };
 
 } // namespace merian_nodes

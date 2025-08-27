@@ -18,18 +18,18 @@ std::vector<uint32_t> SystemGlslcCompiler::compile_glsl(
     const std::string& source,
     const std::string& source_name,
     const vk::ShaderStageFlagBits shader_kind,
-    const CompilationSessionDescription& compilation_session_descriptions) const {
+    const CompilationSessionDescription& compilation_session_description) const {
     if (compiler_executable.empty()) {
         throw compilation_failed{"compiler not available"};
     }
 
     std::vector<std::string> command = {compiler_executable};
 
-    if (compilation_session_descriptions.get_target_vk_api_version() == VK_API_VERSION_1_0) {
+    if (compilation_session_description.get_target_vk_api_version() == VK_API_VERSION_1_0) {
         command.emplace_back("--target-env=vulkan1.0");
-    } else if (compilation_session_descriptions.get_target_vk_api_version() == VK_API_VERSION_1_1) {
+    } else if (compilation_session_description.get_target_vk_api_version() == VK_API_VERSION_1_1) {
         command.emplace_back("--target-env=vulkan1.1");
-    } else if (compilation_session_descriptions.get_target_vk_api_version() == VK_API_VERSION_1_2) {
+    } else if (compilation_session_description.get_target_vk_api_version() == VK_API_VERSION_1_2) {
         command.emplace_back("--target-env=vulkan1.2");
     } else {
         command.emplace_back("--target-env=vulkan1.3");
@@ -49,20 +49,22 @@ std::vector<uint32_t> SystemGlslcCompiler::compile_glsl(
         command.emplace_back("-I");
         command.emplace_back(parent_path.string());
     }
-    for (const auto& inc_dir : compilation_session_descriptions.get_include_paths()) {
+    for (const auto& inc_dir : compilation_session_description.get_include_paths()) {
         command.emplace_back("-I");
-        command.emplace_back(inc_dir);
+        command.emplace_back(inc_dir.string());
     }
-    for (const auto& [key, value] : compilation_session_descriptions.get_preprocessor_defines()) {
+    for (const auto& [key, value] : compilation_session_description.get_preprocessor_defines()) {
         command.emplace_back(fmt::format("-D{}={}", key, value));
     }
 
-    if (compilation_session_descriptions.should_generate_debug_info()) {
+    if (compilation_session_description.should_generate_debug_info()) {
         command.emplace_back("-g");
     }
 
     // turn on optimization
-    command.emplace_back("-O");
+    if (compilation_session_description.get_optimization_level() > 0) {
+        command.emplace_back("-O");
+    }
 
     command.emplace_back("-");
 

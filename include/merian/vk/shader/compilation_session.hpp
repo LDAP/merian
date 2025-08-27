@@ -38,8 +38,6 @@ inline CompilationTarget spirv_target_for_vulkan_api_version(const uint32_t vulk
 
 class CompilationSessionDescription {
   public:
-    CompilationSessionDescription() {}
-
     CompilationSessionDescription(
         const std::vector<std::filesystem::path>& include_paths = {},
         const std::map<std::string, std::string>& preprocessor_defines = {},
@@ -77,12 +75,24 @@ class CompilationSessionDescription {
         return remove_canonical_include_path(std::filesystem::weakly_canonical(path));
     }
 
-    void set_processor_define(const std::string& key, const std::string& value) {
+    void set_preprocessor_define(const std::string& key, const std::string& value) {
         preprocessor_defines.emplace(key, value);
     }
 
+    std::string& operator[](const std::string& key) {
+        return preprocessor_defines[key];
+    }
+
+    std::string& operator[](const std::string&& key) {
+        return preprocessor_defines[key];
+    }
+
+    void set_preprocessor_defines(const std::map<std::string, std::string>& key_value_map) {
+        preprocessor_defines.insert(key_value_map.begin(), key_value_map.end());
+    }
+
     // Returns true if a define was unset
-    bool unset_processor_define(const std::string& key) {
+    bool unset_preprocessor_define(const std::string& key) {
         return preprocessor_defines.erase(key) > 0;
     }
 

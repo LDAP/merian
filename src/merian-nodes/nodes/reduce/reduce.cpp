@@ -103,9 +103,11 @@ void main() {
 }
 )");
 
-    const auto& shader_compiler = GLSLShaderCompiler::get(context);
+    const auto& shader_compiler = GLSLShaderCompiler::get();
+    CompilationSessionDescription compilation_session_desc(context);
     shader = shader_compiler->compile_glsl_to_shadermodule(context, source, "<memory>add.comp",
-                                                           vk::ShaderStageFlagBits::eCompute);
+                                                           vk::ShaderStageFlagBits::eCompute,
+                                                           compilation_session_desc);
 
     // -------------------------------------------------------
 

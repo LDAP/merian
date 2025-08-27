@@ -52,7 +52,7 @@ std::vector<uint32_t> SystemGlslangValidatorCompiler::compile_glsl(
         command.emplace_back(fmt::format("-I{}", parent_path.string()));
     }
     for (const auto& inc_dir : compilation_session_description.get_include_paths()) {
-        command.emplace_back(fmt::format("-I{}", inc_dir));
+        command.emplace_back(fmt::format("-I{}", inc_dir.string()));
     }
     for (const auto& [key, value] : compilation_session_description.get_preprocessor_defines()) {
         command.emplace_back(fmt::format("-D{}={}", key, value));

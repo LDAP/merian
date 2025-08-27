@@ -59,23 +59,20 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 
 class ShadertoyInjectCompiler : public GLSLShaderCompiler {
   public:
-    ShadertoyInjectCompiler(const ContextHandle& context,
-                            const GLSLShaderCompilerHandle& forwarding_compiler)
-        : GLSLShaderCompiler(context), forwarding_compiler(forwarding_compiler) {}
+    ShadertoyInjectCompiler(const GLSLShaderCompilerHandle& forwarding_compiler)
+        : GLSLShaderCompiler(), forwarding_compiler(forwarding_compiler) {}
 
     ~ShadertoyInjectCompiler() {}
 
-    std::vector<uint32_t>
-    compile_glsl(const std::string& source,
-                 const std::string& source_name,
-                 const vk::ShaderStageFlagBits shader_kind,
-                 const std::vector<std::string>& additional_include_paths = {},
-                 const std::map<std::string, std::string>& additional_macro_definitions = {})
-        const final override {
+    std::vector<uint32_t> compile_glsl(
+        const std::string& source,
+        const std::string& source_name,
+        const vk::ShaderStageFlagBits shader_kind,
+        const CompilationSessionDescription& compilation_session_description) const final override {
         SPDLOG_INFO("(re-)compiling {}", source_name);
         return forwarding_compiler->compile_glsl(shadertoy_pre + source + shadertoy_post,
-                                                 source_name, shader_kind, additional_include_paths,
-                                                 additional_macro_definitions);
+                                                 source_name, shader_kind,
+                                                 compilation_session_description);
     }
 
     bool available() const override {
@@ -87,18 +84,20 @@ class ShadertoyInjectCompiler : public GLSLShaderCompiler {
 };
 
 Shadertoy::Shadertoy(const ContextHandle& context)
-    : AbstractCompute(context, sizeof(PushConstant)), shader_glsl(default_shader) {
+    : AbstractCompute(context, sizeof(PushConstant)), shader_glsl(default_shader),
+      compilation_session_description(context) {
 
-    GLSLShaderCompilerHandle forwarding_compiler = GLSLShaderCompiler::get(context);
+    GLSLShaderCompilerHandle forwarding_compiler = GLSLShaderCompiler::get();
 
     if (!forwarding_compiler->available()) {
         return;
     }
 
-    compiler = std::make_shared<ShadertoyInjectCompiler>(context, forwarding_compiler);
-    reloader = std::make_unique<HotReloader>(context, compiler);
+    compiler = std::make_shared<ShadertoyInjectCompiler>(forwarding_compiler);
+    reloader = std::make_unique<HotReloader>(context, compilation_session_description, compiler);
     shader = compiler->compile_glsl_to_shadermodule(context, shader_glsl, "<memory>Shadertoy.comp",
-                                                    vk::ShaderStageFlagBits::eCompute);
+                                                    vk::ShaderStageFlagBits::eCompute,
+                                                    compilation_session_description);
 
     auto spec_builder = SpecializationInfoBuilder();
     spec_builder.add_entry(local_size_x, local_size_y);
@@ -222,7 +221,8 @@ AbstractCompute::NodeStatusFlags Shadertoy::properties(Properties& config) {
     if (compiler && needs_compile) {
         try {
             shader = compiler->compile_glsl_to_shadermodule(
-                context, shader_glsl, "<memory>Shadertoy.comp", vk::ShaderStageFlagBits::eCompute);
+                context, shader_glsl, "<memory>Shadertoy.comp", vk::ShaderStageFlagBits::eCompute,
+                compilation_session_description);
             error.reset();
         } catch (const GLSLShaderCompiler::compilation_failed& e) {
             error = e;

@@ -7,6 +7,8 @@ namespace merian {
 ShaderModuleHandle
 HotReloader::get_shader(const std::filesystem::path& path,
                         const std::optional<vk::ShaderStageFlagBits> shader_kind) {
+    assert(compiler->available());
+
     std::optional<std::filesystem::path> canonical = std::filesystem::weakly_canonical(path);
     if (!canonical) {
         throw ShaderCompiler::compilation_failed{fmt::format("file not found {}", path.string())};
@@ -32,8 +34,8 @@ HotReloader::get_shader(const std::filesystem::path& path,
         // and over again.
         path_info.last_write_time = last_write_time;
         try {
-            path_info.shader =
-                compiler->compile_glsl_to_shadermodule(context, *canonical, shader_kind);
+            path_info.shader = compiler->compile_glsl_to_shadermodule(
+                context, *canonical, compilation_session_desc, shader_kind);
             path_info.error.reset();
         } catch (const ShaderCompiler::compilation_failed& e) {
             path_info.shader = nullptr;

@@ -217,7 +217,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                     run_profiler,
                     resource_allocator,
                     queue,
-                    GLSLShaderCompiler::get(context)) {
+                    GLSLShaderCompiler::get()) {
 
         for (uint32_t i = 0; i < ITERATIONS_IN_FLIGHT; i++) {
             InFlightData& in_flight_data = ring_fences.get(i).user_data;
@@ -618,7 +618,8 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
             for (auto& node : flat_topology) {
                 NodeData& data = node_data.at(node);
                 if (debug_utils)
-                    debug_utils->cmd_begin_label(*graph_run.get_cmd(), registry.node_type_name(node));
+                    debug_utils->cmd_begin_label(*graph_run.get_cmd(),
+                                                 registry.node_type_name(node));
 
                 try {
                     run_node(graph_run, node, data, profiler);
@@ -1167,8 +1168,8 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
         assert(out_it != src_data.desired_outgoing_connections.end());
         src_data.desired_outgoing_connections.erase(out_it);
         SPDLOG_DEBUG("removed connection {}, {} ({}) -> {}, {} ({})", src_output,
-                     src_data.identifier, registry.node_type_name(src), dst_input, dst_data.identifier,
-                     registry.node_type_name(dst));
+                     src_data.identifier, registry.node_type_name(src), dst_input,
+                     dst_data.identifier, registry.node_type_name(dst));
 
         needs_reconnect = true;
         return true;
@@ -1300,8 +1301,9 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                   [[maybe_unused]] const ProfilerHandle& profiler) {
         const uint32_t set_idx = data.set_index(run_iteration);
 
-        MERIAN_PROFILE_SCOPE_GPU(profiler, run.get_cmd(),
-                                 fmt::format("{} ({})", data.identifier, registry.node_type_name(node)));
+        MERIAN_PROFILE_SCOPE_GPU(
+            profiler, run.get_cmd(),
+            fmt::format("{} ({})", data.identifier, registry.node_type_name(node)));
 
         std::vector<vk::ImageMemoryBarrier2> image_barriers;
         std::vector<vk::BufferMemoryBarrier2> buffer_barriers;
@@ -1489,8 +1491,8 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                     SPDLOG_WARN("node {} has errors and connection {}, {} ({}) -> {}, {} ({}) "
                                 "cannot be validated.",
                                 dst_data.identifier, connection.src_output, data.identifier,
-                                registry.node_type_name(node), connection.dst_input, dst_data.identifier,
-                                registry.node_type_name(connection.dst));
+                                registry.node_type_name(node), connection.dst_input,
+                                dst_data.identifier, registry.node_type_name(connection.dst));
                     continue;
                 }
                 if (!dst_data.input_connector_for_name.contains(connection.dst_input)) {
@@ -1636,8 +1638,8 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                              "connector {} on node {} ({}) with delay {}, however the output "
                              "connector does not support delay. Removing connection.",
                              dst_input->name, dst_data.identifier,
-                             registry.node_type_name(connection.dst), src_output->name, data.identifier,
-                             registry.node_type_name(node), dst_input->delay);
+                             registry.node_type_name(connection.dst), src_output->name,
+                             data.identifier, registry.node_type_name(node), dst_input->delay);
                 remove_connection(node, connection.dst, connection.dst_input);
                 return false;
             }
@@ -1785,7 +1787,8 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
 
                 {
                     assert(!data.disable && data.errors.empty());
-                    SPDLOG_DEBUG("connecting {} ({})", data.identifier, registry.node_type_name(node));
+                    SPDLOG_DEBUG("connecting {} ({})", data.identifier,
+                                 registry.node_type_name(node));
 
                     // 1. Get node output connectors and check for name conflicts
                     cache_node_output_connectors(node, data);

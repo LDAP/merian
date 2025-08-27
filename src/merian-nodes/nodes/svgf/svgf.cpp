@@ -104,26 +104,24 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
     }
 
     {
-        const GLSLShaderCompilerHandle compiler = GLSLShaderCompiler::get(context);
-
-        std::map<std::string, std::string> additional_defines = {
-            {"FILTER_TYPE", std::to_string(filter_type)}};
-
+        const GLSLShaderCompilerHandle compiler = GLSLShaderCompiler::get();
+        CompilationSessionDescription compilation_session_desc(context);
+        compilation_session_desc.set_preprocessor_define("FILTER_TYPE",
+                                                         std::to_string(filter_type));
         if (kaleidoscope) {
-            additional_defines["KALEIDOSCOPE"] = "1";
+            compilation_session_desc.set_preprocessor_define("KALEIDOSCOPE", "1");
             if (kaleidoscope_use_shmem) {
-                additional_defines["KALEIDOSCOPE_USE_SHMEM"] = "1";
+                compilation_session_desc.set_preprocessor_define("KALEIDOSCOPE_USE_SHMEM", "1");
             }
         }
 
         variance_estimate_module = compiler->find_compile_glsl_to_shadermodule(
-            context, "merian-nodes/nodes/svgf/svgf_variance_estimate.comp", std::nullopt, {},
-            additional_defines);
+            context, "merian-nodes/nodes/svgf/svgf_variance_estimate.comp",
+            compilation_session_desc);
         filter_module = compiler->find_compile_glsl_to_shadermodule(
-            context, "merian-nodes/nodes/svgf/svgf_filter.comp", std::nullopt, {},
-            additional_defines);
+            context, "merian-nodes/nodes/svgf/svgf_filter.comp", compilation_session_desc);
         taa_module = compiler->find_compile_glsl_to_shadermodule(
-            context, "merian-nodes/nodes/svgf/svgf_taa.comp", std::nullopt, {}, additional_defines);
+            context, "merian-nodes/nodes/svgf/svgf_taa.comp", compilation_session_desc);
 
         auto variance_estimate_pipe_layout = PipelineLayoutBuilder(context)
                                                  .add_descriptor_set_layout(graph_layout)
@@ -198,7 +196,8 @@ void SVGF::process(GraphRun& run, const DescriptorSetHandle& descriptor_set, con
         cmd->bind_descriptor_set(variance_estimate, descriptor_set, 0);
         cmd->bind_descriptor_set(variance_estimate, ping_pong_res[1].set, 1);
         VarianceEstimatePushConstant precomputed_variance_estimate_pc = variance_estimate_pc;
-        precomputed_variance_estimate_pc.depth_accept = -10.0f / precomputed_variance_estimate_pc.depth_accept;
+        precomputed_variance_estimate_pc.depth_accept =
+            -10.0f / precomputed_variance_estimate_pc.depth_accept;
         cmd->push_constant(variance_estimate, precomputed_variance_estimate_pc);
         cmd->dispatch(irr_create_info.extent, variance_estimate_local_size,
                       variance_estimate_local_size);
