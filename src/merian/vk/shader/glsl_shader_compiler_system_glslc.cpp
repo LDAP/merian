@@ -53,7 +53,7 @@ std::vector<uint32_t> SystemGlslcCompiler::compile_glsl(
         command.emplace_back("-I");
         command.emplace_back(inc_dir.string());
     }
-    for (const auto& [key, value] : compilation_session_description.get_preprocessor_defines()) {
+    for (const auto& [key, value] : compilation_session_description.get_preprocessor_macros()) {
         command.emplace_back(fmt::format("-D{}={}", key, value));
     }
 

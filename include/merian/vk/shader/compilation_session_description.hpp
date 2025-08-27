@@ -40,18 +40,18 @@ class CompilationSessionDescription {
   public:
     CompilationSessionDescription(
         const std::vector<std::filesystem::path>& include_paths = {},
-        const std::map<std::string, std::string>& preprocessor_defines = {},
+        const std::map<std::string, std::string>& preprocessor_macros = {},
         const bool generate_debug_info = Context::IS_DEBUG_BUILD,
         const uint32_t optimization_level = Context::BUILD_OPTIMIZATION_LEVEL,
         const CompilationTarget target = CompilationTarget::SPIRV_1_6,
         const uint32_t target_vk_api_version = VK_API_VERSION_1_4)
-        : include_paths(include_paths), preprocessor_defines(preprocessor_defines),
+        : include_paths(include_paths), preprocessor_macros(preprocessor_macros),
           debug_info(generate_debug_info), optimization_level(optimization_level), target(target),
           target_vk_api_version(target_vk_api_version) {}
 
     CompilationSessionDescription(const ContextHandle& context)
         : include_paths(context->get_default_shader_include_paths()),
-          preprocessor_defines(context->get_default_shader_macro_definitions()),
+          preprocessor_macros(context->get_default_shader_macro_definitions()),
           debug_info(Context::IS_DEBUG_BUILD),
           optimization_level(Context::BUILD_OPTIMIZATION_LEVEL),
           target(spirv_target_for_vulkan_api_version(context->vk_api_version)),
@@ -75,25 +75,25 @@ class CompilationSessionDescription {
         return remove_canonical_include_path(std::filesystem::weakly_canonical(path));
     }
 
-    void set_preprocessor_define(const std::string& key, const std::string& value) {
-        preprocessor_defines.emplace(key, value);
+    void set_preprocessor_macro(const std::string& key, const std::string& value) {
+        preprocessor_macros.emplace(key, value);
     }
 
     std::string& operator[](const std::string& key) {
-        return preprocessor_defines[key];
+        return preprocessor_macros[key];
     }
 
     std::string& operator[](const std::string&& key) {
-        return preprocessor_defines[key];
+        return preprocessor_macros[key];
     }
 
-    void set_preprocessor_defines(const std::map<std::string, std::string>& key_value_map) {
-        preprocessor_defines.insert(key_value_map.begin(), key_value_map.end());
+    void set_preprocessor_macros(const std::map<std::string, std::string>& key_value_map) {
+        preprocessor_macros.insert(key_value_map.begin(), key_value_map.end());
     }
 
     // Returns true if a define was unset
-    bool unset_preprocessor_define(const std::string& key) {
-        return preprocessor_defines.erase(key) > 0;
+    bool unset_preprocessor_macro(const std::string& key) {
+        return preprocessor_macros.erase(key) > 0;
     }
 
     void set_geneate_debug_info(const bool enable) {
@@ -119,8 +119,8 @@ class CompilationSessionDescription {
         return include_paths;
     }
 
-    const std::map<std::string, std::string>& get_preprocessor_defines() const {
-        return preprocessor_defines;
+    const std::map<std::string, std::string>& get_preprocessor_macros() const {
+        return preprocessor_macros;
     }
 
     const bool& should_generate_debug_info() const {
@@ -131,7 +131,7 @@ class CompilationSessionDescription {
         return optimization_level;
     }
 
-    const CompilationTarget& get_target() {
+    const CompilationTarget& get_target() const {
         return target;
     }
 
@@ -157,7 +157,7 @@ class CompilationSessionDescription {
 
   private:
     std::vector<std::filesystem::path> include_paths;
-    std::map<std::string, std::string> preprocessor_defines;
+    std::map<std::string, std::string> preprocessor_macros;
     bool debug_info;
     uint32_t optimization_level;
     CompilationTarget target;

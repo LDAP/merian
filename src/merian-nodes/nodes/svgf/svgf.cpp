@@ -106,12 +106,12 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
     {
         const GLSLShaderCompilerHandle compiler = GLSLShaderCompiler::get();
         CompilationSessionDescription compilation_session_desc(context);
-        compilation_session_desc.set_preprocessor_define("FILTER_TYPE",
+        compilation_session_desc.set_preprocessor_macro("FILTER_TYPE",
                                                          std::to_string(filter_type));
         if (kaleidoscope) {
-            compilation_session_desc.set_preprocessor_define("KALEIDOSCOPE", "1");
+            compilation_session_desc.set_preprocessor_macro("KALEIDOSCOPE", "1");
             if (kaleidoscope_use_shmem) {
-                compilation_session_desc.set_preprocessor_define("KALEIDOSCOPE_USE_SHMEM", "1");
+                compilation_session_desc.set_preprocessor_macro("KALEIDOSCOPE_USE_SHMEM", "1");
             }
         }
 

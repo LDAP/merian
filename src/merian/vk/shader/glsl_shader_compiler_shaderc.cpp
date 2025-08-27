@@ -128,7 +128,7 @@ std::vector<uint32_t> ShadercCompiler::compile_glsl(
     if (compilation_session_description.should_generate_debug_info())
         compile_options.SetGenerateDebugInfo();
 
-    for (const auto& [key, value] : compilation_session_description.get_preprocessor_defines()) {
+    for (const auto& [key, value] : compilation_session_description.get_preprocessor_macros()) {
         compile_options.AddMacroDefinition(key, value);
     }
 

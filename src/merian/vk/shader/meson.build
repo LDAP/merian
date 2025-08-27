@@ -7,7 +7,7 @@ merian_src += files(
     'glsl_shader_compiler_system_glslc.cpp',
     'shader_compiler.cpp',
     'shader_module.cpp',
-    'slang_global_context.cpp',
+    'slang_global_session.cpp',
 )
 
 if shaderc.found()

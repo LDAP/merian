@@ -5,6 +5,6 @@
 
 namespace merian {
 
-Slang::ComPtr<slang::IGlobalSession> get_global_session();
+Slang::ComPtr<slang::IGlobalSession> get_global_slang_session();
 
 }
