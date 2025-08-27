@@ -1,7 +1,7 @@
 #pragma once
 
 #include "merian/io/file_loader.hpp"
-#include "merian/vk/shader/compilation_session.hpp"
+#include "merian/vk/shader/compilation_session_description.hpp"
 #include "merian/vk/shader/shader_compiler.hpp"
 #include "merian/vk/shader/shader_module.hpp"
 
