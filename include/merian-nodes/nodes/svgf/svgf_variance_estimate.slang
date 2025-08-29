@@ -1,141 +1,153 @@
-#version 460
-#extension GL_GOOGLE_include_directive    : enable
-#extension GL_EXT_control_flow_attributes : enable
-#extension GL_EXT_shared_memory_block : enable
 
-#include "svgf_graph_layout.glsl"
-#include "merian-shaders/normal_encode.glsl"
-#include "merian-shaders/textures.glsl"
-#include "merian-shaders/colors/colors_yuv.glsl"
-#include "merian-shaders/shared_memory.glsl"
 #include "config.h"
+#include "svgf_graph_layout.slangh"
+
+import merian_shaders.utils.textures;
+import merian_shaders.utils.shared_memory;
+import merian_shaders.colors.colorspaces;
+
+using merian;
 
 /*
  * Reads the accumulated irradiance and the moments, estimates the variance,
  * and prepares the filter input `img_filter_in`.
  */
 
-layout (constant_id = 2) const int SVGF_ITERATIONS = 0;
+[vk::constant_id(2)]
+const int SVGF_ITERATIONS = 0;
 
-layout(set = 1, binding = 0) uniform sampler2D img_filter_unused; // unused needed to match the filter layout
-layout(set = 1, binding = 1) uniform writeonly restrict image2D img_filter_in;
-layout(set = 1, binding = 2) uniform usampler2D img_gbuf_unused;   // unused needed to match the filter layout
-layout(set = 1, binding = 3) uniform writeonly restrict uimage2D img_gbuf_in;
+[vk::binding(0, 1)]
+Sampler2D<float4> img_filter_unused; // unused needed to match the filter layout
+[vk::binding(1, 1)]
+RWTexture2D<float4> img_filter_in;
+[vk::binding(2, 1)]
+Sampler2D<uint4> img_gbuf_unused; // unused needed to match the filter layout
+[vk::binding(3, 1)]
+RWTexture2D<uint4> img_gbuf_in;
 
-layout(push_constant, std140) uniform push_t {
+struct PushConstant {
     float normal_reject_cos;
     float depth_accept; /* -10 / depth_accept precomputed */
     float spatial_falloff;
     float spatial_bias;
-} params;
+};
+
+[vk::push_constant]
+ConstantBuffer<PushConstant> params;
 
 // update VE_SHARED_MEMORY_PER_PIXEL if you change anything here!
-#define SHARED_SIZE_X (gl_WorkGroupSize.x + SVGF_VE_HALO_RADIUS * 2)
-#define SHARED_SIZE_Y (gl_WorkGroupSize.y + SVGF_VE_HALO_RADIUS * 2)
-layout(std430, row_major) shared vec4 shared_irr_moments[SHARED_SIZE_Y][SHARED_SIZE_X];
-layout(std430, row_major) shared vec3 shared_normal[SHARED_SIZE_Y][SHARED_SIZE_X];
-layout(std430, row_major) shared float shared_z[SHARED_SIZE_Y][SHARED_SIZE_X];
+#define SHARED_SIZE_X (workgroup_size_x + SVGF_VE_HALO_RADIUS * 2)
+#define SHARED_SIZE_Y (workgroup_size_y + SVGF_VE_HALO_RADIUS * 2)
 
-void main() {
-  const ivec2 ipos = ivec2(gl_GlobalInvocationID);
+row_major groupshared float4 shared_irr_moments[SHARED_SIZE_Y][SHARED_SIZE_X];
+row_major groupshared float3 shared_normal[SHARED_SIZE_Y][SHARED_SIZE_X];
+row_major groupshared float shared_z[SHARED_SIZE_Y][SHARED_SIZE_X];
 
-  if (SVGF_ITERATIONS == 0) {
-    if (all(lessThan(ipos, imageSize(img_filter_in))))
-      imageStore(img_filter_in, ipos, vec4(texelFetch(img_irr, ipos, 0).rgb, 0));
-    return;
-  }
+[numthreads(workgroup_size_x, workgroup_size_y, 1)]
+[shader("compute")]
+void main(const int2 ipos: SV_DispatchThreadID, int2 gl_LocalInvocationID: SV_GroupThreadID) {
+    if (SVGF_ITERATIONS == 0) {
+        if (is_on_texture(ipos, img_filter_in))
+            img_filter_in.Store(ipos, float4(img_irr.Load(uint3(ipos, 0)).rgb, 0));
+        return;
+    }
 
-  const ivec2 shared_pos = ivec2(gl_LocalInvocationID.xy) + SVGF_VE_HALO_RADIUS;
+    const int2 shared_pos = gl_LocalInvocationID + SVGF_VE_HALO_RADIUS;
 
-  // Load all necessary information into shared memory
+    // Load all necessary information into shared memory
 
-  f16vec2 center_grad_z;
-  vec4 irr_moments;
+    half2 center_grad_z;
+    float4 irr_moments;
 
-  #define center_irr_moments shared_irr_moments[shared_pos.y][shared_pos.x]
-  #define center_normal shared_normal[shared_pos.y][shared_pos.x]
-  #define center_linear_z shared_z[shared_pos.y][shared_pos.x]
+#define center_irr_moments shared_irr_moments[shared_pos.y][shared_pos.x]
+#define center_normal shared_normal[shared_pos.y][shared_pos.x]
+#define center_linear_z shared_z[shared_pos.y][shared_pos.x]
 
-  // fill in padding and halo with valid information
-  const ivec2 mirror_repeat_ipos = merian_tex_mirror_repeat(ipos, textureSize(img_irr, 0));
+    // fill in padding and halo with valid information
+    const int2 mirror_repeat_ipos = texturewrap_mirror_repeat(ipos, texture_dimensions(img_irr, 0));
 
-  {
     {
-      // center
-      {
-        const GBuffer gbuf = gbuffer_load_pixel(gbuffer, mirror_repeat_ipos);
-        irr_moments = texelFetch(img_irr, mirror_repeat_ipos, 0);
-        irr_moments.rgb = rgb_to_yuv(irr_moments.rgb);
+        {
+            // center
+            {
+                const GBuffer gbuf = GBuffer::load(gbuffer, mirror_repeat_ipos);
+                irr_moments = img_irr.Load(uint3(mirror_repeat_ipos, 0));
+                irr_moments.rgb = rgb_to_yuv(irr_moments.rgb);
 
-        center_irr_moments      = irr_moments;
-        center_normal           = gbuffer_get_normal(gbuf);
-        center_linear_z         = gbuffer_get_linear_z(gbuf);
-        center_grad_z           = gbuffer_get_grad_z(gbuf);
-      }
+                center_irr_moments = irr_moments;
+                center_normal = gbuf.get_normal();
+                center_linear_z = gbuf.get_linear_z();
+                center_grad_z = gbuf.get_grad_z();
+            }
 
-      // halo
-      ivec2 shared_index; ivec2 global_index;
-      if (load_halo_index(SVGF_VE_HALO_RADIUS, gl_WorkGroupSize.xy, shared_index, global_index)) {
-        const ivec2 halo_mirror_repeat_ipos = merian_tex_mirror_repeat(global_index, textureSize(img_irr, 0));
-        const GBuffer gbuf = gbuffer_load_pixel(gbuffer, halo_mirror_repeat_ipos);
+            // halo
+            int2 shared_index;
+            int2 global_index;
+            if (load_halo_index(SVGF_VE_HALO_RADIUS, WorkgroupSize().xy, shared_index,
+                                global_index)) {
+                const int2 halo_mirror_repeat_ipos =
+                    texturewrap_mirror_repeat(global_index, texture_dimensions(img_irr, 0));
+                const GBuffer gbuf = GBuffer::load(gbuffer, halo_mirror_repeat_ipos);
 
-        shared_irr_moments[shared_index.y][shared_index.x] = texelFetch(img_irr, halo_mirror_repeat_ipos, 0);
-        shared_normal[shared_index.y][shared_index.x]      = gbuffer_get_normal(gbuf);
-        shared_z[shared_index.y][shared_index.x]           = gbuffer_get_linear_z(gbuf);
-      }
+                shared_irr_moments[shared_index.y][shared_index.x] =
+                    img_irr.Load(uint3(halo_mirror_repeat_ipos, 0));
+                shared_normal[shared_index.y][shared_index.x] = gbuf.get_normal();
+                shared_z[shared_index.y][shared_index.x] = gbuf.get_linear_z();
+            }
 
-      barrier();
+            GroupMemoryBarrierWithGroupSync();
+        }
+
+        if (not_on_texture(ipos, img_filter_in))
+            return;
+
+#ifdef KALEIDOSCOPE
+        img_gbuf_in.Store(ipos, uint4(encode_normal(center_normal), asuint(center_linear_z),
+                                      packHalf2x16(center_grad_z), 0));
+#endif
     }
 
+    float sum_w = 1.0;
 
-    if (any(greaterThanEqual(ipos, imageSize(img_filter_in))))
-      return;
+    const float kernel[] = { 1., 2. / 3., 1. / 6. };
 
-    #ifdef KALEIDOSCOPE
-    imageStore(img_gbuf_in, ipos, uvec4(geo_encode_normal(center_normal),
-                                        floatBitsToUint(center_linear_z),
-                                        packFloat2x16(center_grad_z),
-                                        0));
-    #endif
-  }
+    // spatial filtering when variance is 0 leads to unnecessary filtering of surfaces which
+    // variance is really 0 however it prevents black trails.
+    [unroll]
+    for (int yy = -SVGF_VE_HALO_RADIUS; yy <= SVGF_VE_HALO_RADIUS; yy++) {
+        [unroll]
+        for (int xx = -SVGF_VE_HALO_RADIUS; xx <= SVGF_VE_HALO_RADIUS; xx++) {
+            if (xx != 0 || yy != 0) { // added already
+                const int2 p = int2(shared_pos.xy) + int2(xx, yy);
 
-  float sum_w = 1.0;
+                // smoothing kernel
+                float w = kernel[abs(xx)] * kernel[abs(yy)];
+                // Weight neighbors with similar normals
+                w *= smoothstep(params.normal_reject_cos, 1.0,
+                                dot(center_normal, shared_normal[p.y][p.x]));
+                // Weight neighbors with similar depth
+                // w *= 1.0 - smoothstep(0.0, params.depth_reject_percent * max(gbuf.linear_z,
+                // neigh_gbuf.linear_z), abs(gbuf.linear_z - neigh_gbuf.linear_z));
+                w *= exp(params.depth_accept *
+                         abs(center_linear_z + dot(float2(center_grad_z), float2(xx, yy)) -
+                             shared_z[p.y][p.x]));
+                // Weight lower with increasing history
+                // w *= 1.0 - irr_moments.a / params.spatial_threshold;
 
-  const float kernel[] = {1., 2. / 3., 1. / 6.};
-
-  // spatial filtering when variance is 0 leads to unnecessary filtering of surfaces which variance is really 0
-  // however it prevents black trails.
-  [[unroll]]
-  for(int yy = -SVGF_VE_HALO_RADIUS; yy <= SVGF_VE_HALO_RADIUS; yy++) {
-    [[unroll]]
-    for(int xx = -SVGF_VE_HALO_RADIUS; xx <= SVGF_VE_HALO_RADIUS; xx++) {
-      if(xx != 0 || yy != 0) { // added already
-        const ivec2 p = ivec2(shared_pos.xy) + ivec2(xx, yy);
-
-        // smoothing kernel
-        float w = kernel[abs(xx)] * kernel[abs(yy)];
-        // Weight neighbors with similar normals
-        w *= smoothstep(params.normal_reject_cos, 1.0, dot(center_normal, shared_normal[p.y][p.x]));
-        // Weight neighbors with similar depth
-        // w *= 1.0 - smoothstep(0.0, params.depth_reject_percent * max(gbuf.linear_z, neigh_gbuf.linear_z), abs(gbuf.linear_z - neigh_gbuf.linear_z));
-        w *= exp(params.depth_accept * abs(center_linear_z + dot(vec2(center_grad_z), vec2(xx, yy)) - shared_z[p.y][p.x]));
-        // Weight lower with increasing history
-        //w *= 1.0 - irr_moments.a / params.spatial_threshold;
-
-        sum_w       += w;
-        irr_moments += w * shared_irr_moments[p.y][p.x];
-      }
+                sum_w += w;
+                irr_moments += w * shared_irr_moments[p.y][p.x];
+            }
+        }
     }
-  }
 
-  irr_moments /= sum_w;
+    irr_moments /= sum_w;
 
-  const float history = texelFetch(img_history, mirror_repeat_ipos, 0).r;
-  const float alpha = clamp(params.spatial_bias / pow(history, params.spatial_falloff), 0, 1);
+    const float history = img_history.Load(uint3(mirror_repeat_ipos, 0)).r;
+    const float alpha = clamp(params.spatial_bias / pow(history, params.spatial_falloff), 0, 1);
 
-  irr_moments = mix(center_irr_moments, irr_moments, alpha);
+    irr_moments = lerp(center_irr_moments, irr_moments, alpha);
 
-  const float variance = max(0.0, irr_moments.a - irr_moments.r * irr_moments.r);
-  imageStore(img_filter_in, ipos, vec4(irr_moments.rgb, variance));
+    const float variance = max(0.0, irr_moments.a - irr_moments.r * irr_moments.r);
+    img_filter_in.Store(ipos, float4(irr_moments.rgb, variance));
 }
 

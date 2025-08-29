@@ -198,7 +198,7 @@ void main(int2 gl_GlobalInvocationID: SV_DispatchThreadID,
         if (load_halo_index(SVGF_FILTER_HALO_RADIUS, WorkgroupSize().xy, shared_index,
                             global_index)) {
             const int2 global_read =
-                texturewarp_mirror_repeat(global_index, texture_dimensions(img_filter_in, 0));
+                texturewrap_mirror_repeat(global_index, texture_dimensions(img_filter_in, 0));
             const uint3 p_gbuf = img_gbuf_in.Load(int3(global_read, 0)).rgb;
             shmem_write(shared_index, img_filter_in.Load(int3(global_read, 0)),
                         decode_normal(p_gbuf.x), asfloat(p_gbuf.y));
@@ -255,9 +255,9 @@ void main(int2 gl_GlobalInvocationID: SV_DispatchThreadID,
 #if FILTER_TYPE == 0
         // atrous
         const float kernel[] = { 1., 2. / 3., 1. / 6. };
-        [[unroll]]
+        [unroll]
         for (int j = -2; j <= 2; j++) {
-            [[unroll]]
+            [unroll]
             for (int i = -2; i <= 2; i++) {
                 if (i != 0 || j != 0) {
                     const float weight = kernel[abs(i)] * kernel[abs(j)];
@@ -268,9 +268,9 @@ void main(int2 gl_GlobalInvocationID: SV_DispatchThreadID,
 #elif FILTER_TYPE == 1
         // box3
         const int r = 1;
-        [[unroll]]
+        [unroll]
         for (int yy = -r; yy <= r; yy++) {
-            [[unroll]]
+            [unroll]
             for (int xx = -r; xx <= r; xx++) {
                 if (xx != 0 || yy != 0) {
                     tap(int2(xx, yy), 1.0);

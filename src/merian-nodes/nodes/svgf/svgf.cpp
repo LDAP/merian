@@ -122,10 +122,8 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
             context, "merian-nodes/nodes/svgf/svgf_filter.slang");
         taa_module = slang_session.load_module_from_path_and_compile_to_shadermodule(
             context, "merian-nodes/nodes/svgf/svgf_taa.slang");
-
-        variance_estimate_module = compiler->find_compile_glsl_to_shadermodule(
-            context, "merian-nodes/nodes/svgf/svgf_variance_estimate.comp",
-            compilation_session_desc);
+        variance_estimate_module = slang_session.load_module_from_path_and_compile_to_shadermodule(
+            context, "merian-nodes/nodes/svgf/svgf_variance_estimate.slang");
 
         auto variance_estimate_pipe_layout = PipelineLayoutBuilder(context)
                                                  .add_descriptor_set_layout(graph_layout)

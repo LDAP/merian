@@ -164,11 +164,11 @@ float2 sample_motion_vector<int sampleCount, int isCombined, int format>(
     return longest;
 }
 
-int2 texturewarp_clamp(int2 ipos, int2 tex_size) {
+int2 texturewrap_clamp(int2 ipos, int2 tex_size) {
     return clamp(ipos, int2(0, 0), tex_size - 1);
 }
 
-int2 texturewarp_repeat(int2 ipos, int2 tex_size) {
+int2 texturewrap_repeat(int2 ipos, int2 tex_size) {
     return ipos % tex_size;
 }
 
@@ -177,7 +177,7 @@ int2 mirror(int2 ipos) {
     return select(ipos < 0, -(1 + ipos), ipos);
 }
 
-int2 texturewarp_mirror_repeat(int2 ipos, int2 tex_size) {
+int2 texturewrap_mirror_repeat(int2 ipos, int2 tex_size) {
     return tex_size - 1 - mirror(ipos % (tex_size * 2) - tex_size);
 }
 
