@@ -2,6 +2,7 @@
 
 #include "merian/vk/shader/compilation_session_description.hpp"
 #include "merian/vk/shader/shader_compiler.hpp"
+#include "merian/vk/shader/shader_module.hpp"
 #include "merian/vk/shader/slang_global_session.hpp"
 
 #include "slang-com-ptr.h"
@@ -65,17 +66,26 @@ class SlangSession {
 
         std::vector<const char*> search_paths;
         search_paths.reserve(compilation_session_description.get_preprocessor_macros().size());
-        for (const auto& search_path : compilation_session_description.get_include_paths()) {
+        for (const auto& search_path :
+             compilation_session_description.get_search_path_file_loader()) {
             search_paths.emplace_back(search_path.c_str());
         }
         slang_session_desc.searchPaths = search_paths.data();
         slang_session_desc.searchPathCount = (SlangInt)search_paths.size();
-        file_loader.add_search_path(compilation_session_description.get_include_paths());
+        file_loader = compilation_session_description.get_search_path_file_loader();
 
-        std::array<slang::CompilerOptionEntry, 1> options = {
+        std::array<slang::CompilerOptionEntry, 2> options = {
             {
-                {slang::CompilerOptionName::EmitSpirvDirectly,
-                 {slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr}},
+                {
+                    slang::CompilerOptionName::EmitSpirvDirectly,
+                    {slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr},
+                },
+                {
+                    slang::CompilerOptionName::Optimization,
+                    {slang::CompilerOptionValueKind::Int,
+                     static_cast<int32_t>(compilation_session_description.get_optimization_level()),
+                     0, nullptr, nullptr},
+                },
             },
         };
         slang_session_desc.compilerOptionEntries = options.data();
@@ -111,7 +121,7 @@ class SlangSession {
 
         if (!source) {
             throw ShaderCompiler::compilation_failed(
-                fmt::format("Compiling module {} from {} failed: Not found", name, path));
+                fmt::format("Compiling module {} from {} failed: Not found", name, path.string()));
         }
 
         return load_module_from_source(name, *source, path);
@@ -135,7 +145,8 @@ class SlangSession {
         }
 
         if (diagnostics_blob != nullptr) {
-            SPDLOG_DEBUG("Slang compiling module {} ({}). Diagnostics: {}", name, path,
+            SPDLOG_DEBUG("Slang compiling module {} ({}). Diagnostics: {}", name,
+                         path.has_value() ? path->string() : "no path",
                          diagnostics_as_string(diagnostics_blob));
         }
 
@@ -147,6 +158,17 @@ class SlangSession {
         Slang::ComPtr<slang::IEntryPoint> entry_point;
         module->findEntryPointByName(name.c_str(), entry_point.writeRef());
         return entry_point;
+    }
+
+    Slang::ComPtr<slang::IEntryPoint> get_defined_entry_point(Slang::ComPtr<slang::IModule>& module,
+                                                              const uint32_t index = 0) {
+        Slang::ComPtr<slang::IEntryPoint> entry_point;
+        module->getDefinedEntryPoint((SlangInt32)index, entry_point.writeRef());
+        return entry_point;
+    }
+
+    uint32_t get_defined_entry_point_count(Slang::ComPtr<slang::IModule>& module) {
+        return (uint32_t)module->getDefinedEntryPointCount();
     }
 
     // throws compilaiton failed if not found
@@ -167,6 +189,27 @@ class SlangSession {
 
         SlangResult result = session->createCompositeComponentType(
             components.data(), components.size(), composed.writeRef(), diagnostics_blob.writeRef());
+
+        if (SLANG_FAILED(result)) {
+            throw ShaderCompiler::compilation_failed(diagnostics_as_string(diagnostics_blob));
+        }
+
+        if (diagnostics_blob != nullptr) {
+            SPDLOG_DEBUG("Slang composing components. Diagnostics: {}",
+                         diagnostics_as_string(diagnostics_blob));
+        }
+
+        return composed;
+    }
+
+    Slang::ComPtr<slang::IComponentType>
+    compose(const vk::ArrayProxy<Slang::ComPtr<slang::IComponentType>>& components) {
+        Slang::ComPtr<slang::IComponentType> composed;
+        Slang::ComPtr<slang::IBlob> diagnostics_blob;
+
+        SlangResult result = session->createCompositeComponentType(
+            (slang::IComponentType**)components.data(), components.size(), composed.writeRef(),
+            diagnostics_blob.writeRef());
 
         if (SLANG_FAILED(result)) {
             throw ShaderCompiler::compilation_failed(diagnostics_as_string(diagnostics_blob));
@@ -205,7 +248,7 @@ class SlangSession {
         Slang::ComPtr<slang::IBlob> diagnostics_blob;
 
         SlangResult result =
-            linked_programm->getEntryPointCode(0, // entryPointIndex
+            linked_programm->getEntryPointCode(entrypoint_index,
                                                0, // targetIndex, currently only one supported
                                                compiled.writeRef(), diagnostics_blob.writeRef());
 
@@ -242,6 +285,116 @@ class SlangSession {
         }
 
         return compiled;
+    }
+
+    // This compiles all entrypoints. You can skip compose and directly link the module. This will
+    // compile all entrypoints.
+    ShaderModuleHandle
+    compile_to_shadermodule(const ContextHandle& context,
+                            const Slang::ComPtr<slang::IComponentType>& linked_programm) {
+        Slang::ComPtr<slang::IBlob> compiled;
+        Slang::ComPtr<slang::IBlob> diagnostics_blob;
+
+        SlangResult result =
+            linked_programm->getTargetCode(0, // targetIndex, currently only one supported,
+                                           compiled.writeRef(), diagnostics_blob.writeRef());
+
+        if (SLANG_FAILED(result)) {
+            throw ShaderCompiler::compilation_failed(diagnostics_as_string(diagnostics_blob));
+        }
+
+        if (diagnostics_blob != nullptr) {
+            SPDLOG_DEBUG("Slang compiling. Diagnostics: {}",
+                         diagnostics_as_string(diagnostics_blob));
+        }
+
+        auto* layout = linked_programm->getLayout();
+        std::vector<ShaderModule::EntryPointInfo> entrypoints;
+        entrypoints.reserve(layout->getEntryPointCount());
+        for (uint32_t i = 0; i < layout->getEntryPointCount(); i++) {
+            auto* entry_point = layout->getEntryPointByIndex(i);
+            entrypoints.emplace_back(ShaderModule::EntryPointInfo(
+                entry_point->getName(), vk_stage_for_slang_stage(entry_point->getStage())));
+        }
+
+        return ShaderModule::create(context, compiled->getBufferPointer(),
+                                    compiled->getBufferSize(), entrypoints);
+    }
+
+    // -----------------------------------------------------
+
+    // Shortcut for load_module_from_path + link + compile.
+    Slang::ComPtr<slang::IBlob> load_module_from_path_and_compile(
+        const std::filesystem::path& path,
+        const std::optional<std::string>& relative_to = std::nullopt) {
+        return load_module_from_path_and_compile(path.stem(), path, relative_to);
+    }
+
+    // Shortcut for load_module_from_path + link + compile.
+    Slang::ComPtr<slang::IBlob> load_module_from_path_and_compile(
+        const std::string& name,
+        const std::filesystem::path& path,
+        const std::optional<std::filesystem::path>& relative_to = std::nullopt) {
+        Slang::ComPtr<slang::IComponentType> module;
+        module.attach(load_module_from_path(name, path, relative_to).detach());
+        return compile(link(module));
+    }
+
+    // Shortcut for load_module_from_source + link + compile.
+    Slang::ComPtr<slang::IBlob>
+    load_module_from_source_and_compile(const std::string& name,
+                                        const std::string& source,
+                                        const std::optional<std::filesystem::path>& path) {
+        Slang::ComPtr<slang::IComponentType> module;
+        module.attach(load_module_from_source(name, source, path).detach());
+        return compile(link(module));
+    }
+
+    // Shortcut for load_module_from_path + link + compile.
+    ShaderModuleHandle load_module_from_path_and_compile_to_shadermodule(
+        const ContextHandle& context,
+        const std::filesystem::path& path,
+        const std::optional<std::string>& relative_to = std::nullopt) {
+        return load_module_from_path_and_compile_to_shadermodule(context, path.stem(), path,
+                                                                 relative_to);
+    }
+
+    // Shortcut for load_module_from_path + link + compile.
+    ShaderModuleHandle load_module_from_path_and_compile_to_shadermodule(
+        const ContextHandle& context,
+        const std::string& name,
+        const std::filesystem::path& path,
+        const std::optional<std::filesystem::path>& relative_to = std::nullopt) {
+        Slang::ComPtr<slang::IModule> module = load_module_from_path(name, path, relative_to);
+
+        std::vector<Slang::ComPtr<slang::IComponentType>> composite(
+            get_defined_entry_point_count(module) + 1);
+        composite[0] = module.get();
+        for (uint32_t i = 0; i < get_defined_entry_point_count(module); i++) {
+            composite[i + 1] = get_defined_entry_point(module, i);
+        }
+
+        Slang::ComPtr<slang::IComponentType> linked = link(compose(composite));
+        return compile_to_shadermodule(context, linked);
+    }
+
+    // Shortcut for load_module_from_source + link + compile.
+    ShaderModuleHandle load_module_from_source_and_compile_to_shadermodule(
+        const ContextHandle& context,
+        const std::string& name,
+        const std::string& source,
+        const std::optional<std::filesystem::path>& path) {
+        Slang::ComPtr<slang::IModule> module = load_module_from_source(name, source, path);
+
+        std::vector<Slang::ComPtr<slang::IComponentType>> composite(
+            get_defined_entry_point_count(module) + 1);
+        composite[0] = module.get();
+        for (uint32_t i = 0; i < get_defined_entry_point_count(module); i++) {
+            composite[i + 1] = get_defined_entry_point(module, i);
+        }
+
+        Slang::ComPtr<slang::IComponentType> linked = link(compose(composite));
+        return compile_to_shadermodule(context, linked);
     }
 
   private:

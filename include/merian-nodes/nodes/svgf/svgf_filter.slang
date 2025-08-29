@@ -1,13 +1,13 @@
 #include "config.h"
 #include "svgf_graph_layout.slangh"
 
-[vk::binding(0)]
+[vk::binding(0, 1)]
 Sampler2D<float4> img_filter_in;
-[vk::binding(1)]
+[vk::binding(1, 1)]
 RWTexture2D<float4> img_filter_out;
-[vk::binding(2)]
+[vk::binding(2, 1)]
 Sampler2D<uint4> img_gbuf_in;
-[vk::binding(3)]
+[vk::binding(3, 1)]
 RWTexture2D<uint4> img_gbuf_out;
 
 [vk::constant_id(2)]
@@ -34,9 +34,12 @@ struct PushConstant {
     float z_bias_normals;
     float z_bias_depth;
 }
+[vk::push_constant]
 ConstantBuffer<PushConstant> params;
 
 import merian_shaders.utils.textures;
+import merian_shaders.utils.shared_memory;
+import merian_shaders.colors.colorspaces;
 
 using merian;
 
@@ -76,7 +79,7 @@ float get_sigma_l(float center, int2 ipos) {
         for (int xx = -r; xx <= r; xx++) {
             if (xx != 0 || yy != 0) {
                 const int2 p = ipos + int2(xx, yy);
-                const float v = texelFetch(img_filter_in, p, 0).a;
+                const float v = img_filter_in.Load(int3(p, 0)).a;
                 const float w = gaussian_kernel[xx + 1][yy + 1];
                 sum += v * w;
             }
@@ -106,20 +109,20 @@ row_major groupshared float4[SHARED_SIZE_Y][SHARED_SIZE_X] SHARED_TILE_u32vec4_A
 // (normal, linear_z)
 row_major groupshared float4[SHARED_SIZE_Y][SHARED_SIZE_X] SHARED_TILE_u32vec4_B;
 
-void shmem_read(const int2 pos, out vec3 n, out float z, out vec4 irrfilter) {
+void shmem_read(const int2 pos, out float3 n, out float z, out float4 irrfilter) {
     irrfilter = SHARED_TILE_u32vec4_A[pos.y][pos.x];
     n = SHARED_TILE_u32vec4_B[pos.y][pos.x].rgb;
     z = SHARED_TILE_u32vec4_B[pos.y][pos.x].a;
 }
 
-void shmem_read(const int2 pos, out vec4 gbuf, out vec4 irrfilter) {
+void shmem_read(const int2 pos, out float4 gbuf, out float4 irrfilter) {
     irrfilter = SHARED_TILE_u32vec4_A[pos.y][pos.x];
     gbuf = SHARED_TILE_u32vec4_B[pos.y][pos.x];
 }
 
-void shmem_write(const int2 pos, const vec4 irrfilter, const vec3 n, const float z) {
+void shmem_write(const int2 pos, const float4 irrfilter, const float3 n, const float z) {
     SHARED_TILE_u32vec4_A[pos.y][pos.x] = irrfilter;
-    SHARED_TILE_u32vec4_B[pos.y][pos.x] = vec4(n, z);
+    SHARED_TILE_u32vec4_B[pos.y][pos.x] = float4(n, z);
 }
 
 #endif // KALEIDOSCOPE_USE_SHMEM
@@ -143,7 +146,7 @@ void _tap(const int2 offset, const float kernel_weight) {
     shmem_read(ipos_shared + offset, p_n, p_z, p_irr_var);
 #else
     const float4 p_irr_var = img_filter_in.Load(int3(ipos + offset, 0));
-    const float3 p_n = decode_normal(texelFetch(img_gbuf_in, ipos + offset, 0).x);
+    const float3 p_n = decode_normal(img_gbuf_in.Load(int3(ipos + offset, 0)).x);
     const float p_z = asfloat(img_gbuf_in.Load(int3(ipos + offset, 0)).y);
 #endif
 
@@ -169,7 +172,10 @@ void _tap(const int2 offset, const float kernel_weight) {
 #undef grad_offset
 }
 
-void main(int2 gl_GlobalInvocationID: SV_DispatchThreadID) {
+[numthreads(workgroup_size_x, workgroup_size_y, 1)]
+[shader("compute")]
+void main(int2 gl_GlobalInvocationID: SV_DispatchThreadID,
+          int2 gl_LocalInvocationID: SV_GroupThreadID) {
 
 #ifdef KALEIDOSCOPE
 #ifdef KALEIDOSCOPE_USE_SHMEM
@@ -177,11 +183,11 @@ void main(int2 gl_GlobalInvocationID: SV_DispatchThreadID) {
     ipos = int2(gl_GlobalInvocationID);
     ipos_shared = int2(gl_LocalInvocationID) + SVGF_FILTER_HALO_RADIUS;
 
-    filter_irr_var = texelFetch(img_filter_in, ipos, 0);
-    const uint3 c_gbuf = texelFetch(img_gbuf_in, ipos, 0).rgb;
-    c_n = geo_decode_normal(c_gbuf.x);
-    c_z = uintBitsToFloat(c_gbuf.y);
-    c_grad_z = unpackFloat2x16(c_gbuf.z);
+    filter_irr_var = img_filter_in.Load(int3(ipos, 0));
+    const uint3 c_gbuf = img_gbuf_in.Load(int3(ipos, 0)).rgb;
+    c_n = decode_normal(c_gbuf.x);
+    c_z = asfloat(c_gbuf.y);
+    c_grad_z = unpackHalf2x16ToFloat(c_gbuf.z);
 
     {
         // center
@@ -189,40 +195,40 @@ void main(int2 gl_GlobalInvocationID: SV_DispatchThreadID) {
         // halo
         int2 shared_index;
         int2 global_index;
-        if (load_halo_index(SVGF_FILTER_HALO_RADIUS, gl_WorkGroupSize.xy, shared_index,
+        if (load_halo_index(SVGF_FILTER_HALO_RADIUS, WorkgroupSize().xy, shared_index,
                             global_index)) {
             const int2 global_read =
-                merian_tex_mirror_repeat(global_index, textureSize(img_filter_in, 0));
-            const uint3 p_gbuf = texelFetch(img_gbuf_in, global_read, 0).rgb;
-            shmem_write(shared_index, texelFetch(img_filter_in, global_read, 0),
-                        geo_decode_normal(p_gbuf.x), uintBitsToFloat(p_gbuf.y));
-            barrier();
+                texturewarp_mirror_repeat(global_index, texture_dimensions(img_filter_in, 0));
+            const uint3 p_gbuf = img_gbuf_in.Load(int3(global_read, 0)).rgb;
+            shmem_write(shared_index, img_filter_in.Load(int3(global_read, 0)),
+                        decode_normal(p_gbuf.x), asfloat(p_gbuf.y));
         }
+        GroupMemoryBarrierWithGroupSync();
     }
 
-    if (not_on_texture(ipos, img_out))
+    if (not_on_texture(ipos, img_filter_out))
         return;
 #else // NO KALEIDOSCOPE_SHMEM:
     ipos = int2(gl_GlobalInvocationID);
-    if (not_on_texture(ipos, img_out))
+    if (not_on_texture(ipos, img_filter_out))
         return;
 
-    filter_irr_var = texelFetch(img_filter_in, ipos, 0);
-    const uint3 c_gbuf = texelFetch(img_gbuf_in, ipos, 0).rgb;
-    c_n = geo_decode_normal(c_gbuf.x);
-    c_z = uintBitsToFloat(c_gbuf.y);
-    c_grad_z = unpackFloat2x16(c_gbuf.z);
+    filter_irr_var = img_filter_in.Load(int3(ipos, 0));
+    const uint3 c_gbuf = img_gbuf_in.Load(uint3(ipos, 0)).rgb;
+    c_n = decode_normal(c_gbuf.x);
+    c_z = asfloat(c_gbuf.y);
+    c_grad_z = unpackHalf2x16ToFloat(c_gbuf.z);
 #endif
 #else // NO KALEIDOSCOPE:
     ipos = int2(gl_GlobalInvocationID);
-    if (not_on_texture(ipos, img_out))
+    if (not_on_texture(ipos, img_filter_out))
         return;
 
-    filter_irr_var = texelFetch(img_filter_in, ipos, 0);
-    const GBuffer c_gbuf = gbuffer_load_pixel(gbuffer, ipos);
-    c_n = gbuffer_get_normal(c_gbuf);
-    c_z = gbuffer_get_linear_z(c_gbuf);
-    c_grad_z = gbuffer_get_grad_z(c_gbuf);
+    filter_irr_var = img_filter_in.Load(int3(ipos, 0));
+    const CompressedGBuffer c_gbuf = GBuffer.load_compressed(gbuffer, ipos);
+    c_n = c_gbuf.decompress_normal();
+    c_z = c_gbuf.decompress_linear_z();
+    c_grad_z = c_gbuf.decompress_grad_z();
 #endif
 
     c_l = filter_irr_var.r;
@@ -300,7 +306,7 @@ void main(int2 gl_GlobalInvocationID: SV_DispatchThreadID) {
     if (ITERATION != LAST_ITERATION) {
         int2 hid = ipos / 2;
         int2 odd = ipos & 1;
-        int2 viewport_size_half = imageSize(img_filter_out) / 2;
+        int2 viewport_size_half = texture_dimensions(img_filter_out) / 2;
 
 #ifdef KALEIDOSCOPE_USE_MIRRORING
         if (ITERATION == 0) {
@@ -314,9 +320,9 @@ void main(int2 gl_GlobalInvocationID: SV_DispatchThreadID) {
 #endif
 
         ipos = hid + odd * (viewport_size_half);
-        imageStore(img_gbuf_out, ipos, uvec4(c_gbuf, 0));
+        img_gbuf_out.Store(ipos, uint4(c_gbuf, 0));
     } else {
-        int2 viewport_size = imageSize(img_filter_out);
+        int2 viewport_size = texture_dimensions(img_filter_out);
         int32_t wcnt = 1 << ITERATION;
         int2 sizew = viewport_size / wcnt;
         int2 o = ipos / sizew;
@@ -340,7 +346,7 @@ void main(int2 gl_GlobalInvocationID: SV_DispatchThreadID) {
         if (ITERATION != 0 /* skip if we're doing exactly one iteration */) {
             int2 hid = ipos / 2;
             int2 odd = ipos & 1;
-            int2 viewport_size_half = imageSize(img_filter_out) / 2;
+            int2 viewport_size_half = texture_dimensions(img_filter_out) / 2;
             if (odd.x > 0) {
                 hid.x = viewport_size_half.x - hid.x - 1;
             }
@@ -353,6 +359,6 @@ void main(int2 gl_GlobalInvocationID: SV_DispatchThreadID) {
     }
 #endif
 
-    imageStore(img_filter_out, ipos, filter_irr_var);
+    img_filter_out.Store(ipos, filter_irr_var);
 }
 

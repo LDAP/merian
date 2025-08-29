@@ -94,8 +94,10 @@ class GLSLShaderCompiler : public ShaderCompiler {
         const CompilationSessionDescription& compilation_session_description,
         const std::optional<vk::ShaderStageFlagBits> optional_shader_kind = std::nullopt) const {
         const vk::ShaderStageFlagBits shader_kind = optional_shader_kind.value_or(guess_kind(path));
-        return std::make_shared<ShaderModule>(
-            context, compile_glsl(path, compilation_session_description, shader_kind), shader_kind);
+        std::vector<uint32_t> spv =
+            compile_glsl(path, compilation_session_description, shader_kind);
+        return ShaderModule::create(context, spv,
+                                    ShaderModule::EntryPointInfo("main", shader_kind));
     }
 
     // uses the file_loader provided from context.
@@ -112,9 +114,10 @@ class GLSLShaderCompiler : public ShaderCompiler {
 
         const vk::ShaderStageFlagBits shader_kind =
             optional_shader_kind.value_or(guess_kind(*resolved));
-        return std::make_shared<ShaderModule>(
-            context, compile_glsl(*resolved, compilation_session_description, shader_kind),
-            shader_kind);
+        std::vector<uint32_t> spv =
+            compile_glsl(*resolved, compilation_session_description, shader_kind);
+        return ShaderModule::create(context, spv,
+                                    ShaderModule::EntryPointInfo("main", shader_kind));
     }
 
     ShaderModuleHandle compile_glsl_to_shadermodule(
@@ -123,10 +126,10 @@ class GLSLShaderCompiler : public ShaderCompiler {
         const std::string& source_name,
         const vk::ShaderStageFlagBits shader_kind,
         const CompilationSessionDescription& compilation_session_description) const {
-        return std::make_shared<ShaderModule>(
-            context,
-            compile_glsl(source, source_name, shader_kind, compilation_session_description),
-            shader_kind);
+        std::vector<uint32_t> spv =
+            compile_glsl(source, source_name, shader_kind, compilation_session_description);
+        return ShaderModule::create(context, spv,
+                                    ShaderModule::EntryPointInfo("main", shader_kind));
     }
 
   private:

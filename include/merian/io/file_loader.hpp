@@ -94,6 +94,15 @@ class FileLoader {
     // Search in parents of cwd
     void set_cwd_search_parents(const bool search_parents);
 
+    // iterate over seach paths
+    auto begin() const {
+        return search_paths.begin();
+    }
+
+    auto end() const {
+        return search_paths.end();
+    }
+
   private:
     std::set<std::filesystem::path> search_paths;
     bool enable_search_cwd_parents = true;

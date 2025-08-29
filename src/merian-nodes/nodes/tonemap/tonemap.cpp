@@ -9,8 +9,9 @@ namespace merian_nodes {
 
 Tonemap::Tonemap(const ContextHandle& context, const std::optional<vk::Format> output_format)
     : AbstractCompute(context, sizeof(PushConstant)), output_format(output_format) {
-    shader = std::make_shared<ShaderModule>(context, merian_tonemap_slang_spv_size(),
-                                            merian_tonemap_slang_spv());
+    shader = ShaderModule::create(
+        context, merian_tonemap_slang_spv(), merian_tonemap_slang_spv_size(),
+        ShaderModule::EntryPointInfo("main", vk::ShaderStageFlagBits::eCompute));
     make_spec_info();
 }
 

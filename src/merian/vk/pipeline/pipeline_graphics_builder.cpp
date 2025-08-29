@@ -301,28 +301,32 @@ GraphicsPipelineBuilder& GraphicsPipelineBuilder::dyanmic_state_add(const vk::Dy
 
 GraphicsPipelineBuilder&
 GraphicsPipelineBuilder::set_vertex_shader(const ShaderStageCreateInfo& vertex_shader) {
-    assert(vertex_shader.shader_module->get_stage_flags() == vk::ShaderStageFlagBits::eVertex);
+    assert(vertex_shader.shader_module->get_stage_flags(vertex_shader.entry_point) ==
+           vk::ShaderStageFlagBits::eVertex);
     this->vertex_shader.emplace(vertex_shader);
     return *this;
 }
 
 GraphicsPipelineBuilder&
 GraphicsPipelineBuilder::set_geometry_shader(const ShaderStageCreateInfo& geometry_shader) {
-    assert(geometry_shader.shader_module->get_stage_flags() == vk::ShaderStageFlagBits::eGeometry);
+    assert(geometry_shader.shader_module->get_stage_flags(geometry_shader.entry_point) ==
+           vk::ShaderStageFlagBits::eGeometry);
     this->geometry_shader.emplace(geometry_shader);
     return *this;
 }
 
 GraphicsPipelineBuilder&
 GraphicsPipelineBuilder::set_mesh_shader(const ShaderStageCreateInfo& mesh_shader) {
-    assert(mesh_shader.shader_module->get_stage_flags() == vk::ShaderStageFlagBits::eMeshEXT);
+    assert(mesh_shader.shader_module->get_stage_flags(mesh_shader.entry_point) ==
+           vk::ShaderStageFlagBits::eMeshEXT);
     this->mesh_shader.emplace(mesh_shader);
     return *this;
 }
 
 GraphicsPipelineBuilder&
 GraphicsPipelineBuilder::set_fragment_shader(const ShaderStageCreateInfo& fragment_shader) {
-    assert(fragment_shader.shader_module->get_stage_flags() == vk::ShaderStageFlagBits::eFragment);
+    assert(fragment_shader.shader_module->get_stage_flags(fragment_shader.entry_point) ==
+           vk::ShaderStageFlagBits::eFragment);
     this->fragment_shader.emplace(fragment_shader);
     return *this;
 }
@@ -330,9 +334,11 @@ GraphicsPipelineBuilder::set_fragment_shader(const ShaderStageCreateInfo& fragme
 GraphicsPipelineBuilder& GraphicsPipelineBuilder::set_tessellation_shader(
     const ShaderStageCreateInfo& tessellation_control_shader,
     const ShaderStageCreateInfo& tessellation_evaluation_shader) {
-    assert(tessellation_control_shader.shader_module->get_stage_flags() ==
+    assert(tessellation_control_shader.shader_module->get_stage_flags(
+               tessellation_control_shader.entry_point) ==
            vk::ShaderStageFlagBits::eTessellationControl);
-    assert(tessellation_evaluation_shader.shader_module->get_stage_flags() ==
+    assert(tessellation_evaluation_shader.shader_module->get_stage_flags(
+               tessellation_evaluation_shader.entry_point) ==
            vk::ShaderStageFlagBits::eTessellationEvaluation);
 
     this->tessellation_control_shader.emplace(tessellation_control_shader);

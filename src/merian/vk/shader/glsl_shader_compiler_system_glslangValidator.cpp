@@ -51,7 +51,7 @@ std::vector<uint32_t> SystemGlslangValidatorCompiler::compile_glsl(
         const std::filesystem::path parent_path = source_path.parent_path();
         command.emplace_back(fmt::format("-I{}", parent_path.string()));
     }
-    for (const auto& inc_dir : compilation_session_description.get_include_paths()) {
+    for (const auto& inc_dir : compilation_session_description.get_search_path_file_loader()) {
         command.emplace_back(fmt::format("-I{}", inc_dir.string()));
     }
     for (const auto& [key, value] : compilation_session_description.get_preprocessor_macros()) {

@@ -6,6 +6,7 @@
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
+#include "merian/vk/shader/slang_session.hpp"
 
 namespace merian_nodes {
 
@@ -106,22 +107,25 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
     {
         const GLSLShaderCompilerHandle compiler = GLSLShaderCompiler::get();
         CompilationSessionDescription compilation_session_desc(context);
-        compilation_session_desc.set_preprocessor_macro("FILTER_TYPE",
-                                                         std::to_string(filter_type));
+        compilation_session_desc.set_preprocessor_macro("FILTER_TYPE", std::to_string(filter_type));
         if (kaleidoscope) {
             compilation_session_desc.set_preprocessor_macro("KALEIDOSCOPE", "1");
             if (kaleidoscope_use_shmem) {
                 compilation_session_desc.set_preprocessor_macro("KALEIDOSCOPE_USE_SHMEM", "1");
             }
         }
+        compilation_session_desc.add_search_path("merian-nodes/nodes/svgf");
+
+        merian::SlangSession slang_session(compilation_session_desc);
+
+        filter_module = slang_session.load_module_from_path_and_compile_to_shadermodule(
+            context, "merian-nodes/nodes/svgf/svgf_filter.slang");
+        taa_module = slang_session.load_module_from_path_and_compile_to_shadermodule(
+            context, "merian-nodes/nodes/svgf/svgf_taa.slang");
 
         variance_estimate_module = compiler->find_compile_glsl_to_shadermodule(
             context, "merian-nodes/nodes/svgf/svgf_variance_estimate.comp",
             compilation_session_desc);
-        filter_module = compiler->find_compile_glsl_to_shadermodule(
-            context, "merian-nodes/nodes/svgf/svgf_filter.comp", compilation_session_desc);
-        taa_module = compiler->find_compile_glsl_to_shadermodule(
-            context, "merian-nodes/nodes/svgf/svgf_taa.comp", compilation_session_desc);
 
         auto variance_estimate_pipe_layout = PipelineLayoutBuilder(context)
                                                  .add_descriptor_set_layout(graph_layout)

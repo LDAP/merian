@@ -9,8 +9,9 @@
 namespace merian_nodes {
 
 TAA::TAA(const ContextHandle& context) : AbstractCompute(context, sizeof(PushConstant)) {
-    shader = std::make_shared<ShaderModule>(context, merian_taa_slang_spv_size(),
-                                            merian_taa_slang_spv());
+    shader = ShaderModule::create(
+        context, merian_taa_slang_spv(), merian_taa_slang_spv_size(),
+        ShaderModule::EntryPointInfo("main", vk::ShaderStageFlagBits::eCompute));
     pc.temporal_alpha = 0.;
     pc.clamp_method = MERIAN_NODES_TAA_CLAMP_MIN_MAX;
 

@@ -12,12 +12,15 @@ namespace merian_nodes {
 
 AutoExposure::AutoExposure(const ContextHandle& context) : Node(), context(context) {
 
-    histogram_module = std::make_shared<ShaderModule>(context, merian_histogram_slang_spv_size(),
-                                                      merian_histogram_slang_spv());
-    luminance_module = std::make_shared<ShaderModule>(context, merian_luminance_slang_spv_size(),
-                                                      merian_luminance_slang_spv());
-    exposure_module = std::make_shared<ShaderModule>(context, merian_exposure_slang_spv_size(),
-                                                     merian_exposure_slang_spv());
+    histogram_module = ShaderModule::create(
+        context, merian_histogram_slang_spv(), merian_histogram_slang_spv_size(),
+        ShaderModule::EntryPointInfo("main", vk::ShaderStageFlagBits::eCompute));
+    luminance_module = ShaderModule::create(
+        context, merian_luminance_slang_spv(), merian_luminance_slang_spv_size(),
+        ShaderModule::EntryPointInfo("main", vk::ShaderStageFlagBits::eCompute));
+    exposure_module = ShaderModule::create(
+        context, merian_exposure_slang_spv(), merian_exposure_slang_spv_size(),
+        ShaderModule::EntryPointInfo("main", vk::ShaderStageFlagBits::eCompute));
 }
 
 AutoExposure::~AutoExposure() {}

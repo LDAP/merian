@@ -39,40 +39,35 @@ inline CompilationTarget spirv_target_for_vulkan_api_version(const uint32_t vulk
 class CompilationSessionDescription {
   public:
     CompilationSessionDescription(
-        const std::vector<std::filesystem::path>& include_paths = {},
+        const std::vector<std::filesystem::path>& search_paths = {},
         const std::map<std::string, std::string>& preprocessor_macros = {},
         const bool generate_debug_info = Context::IS_DEBUG_BUILD,
         const uint32_t optimization_level = Context::BUILD_OPTIMIZATION_LEVEL,
         const CompilationTarget target = CompilationTarget::SPIRV_1_6,
         const uint32_t target_vk_api_version = VK_API_VERSION_1_4)
-        : include_paths(include_paths), preprocessor_macros(preprocessor_macros),
-          debug_info(generate_debug_info), optimization_level(optimization_level), target(target),
-          target_vk_api_version(target_vk_api_version) {}
+        : preprocessor_macros(preprocessor_macros), debug_info(generate_debug_info),
+          optimization_level(optimization_level), target(target),
+          target_vk_api_version(target_vk_api_version) {
+        file_loader.add_search_path(search_paths);
+    }
 
     CompilationSessionDescription(const ContextHandle& context)
-        : include_paths(context->get_default_shader_include_paths()),
-          preprocessor_macros(context->get_default_shader_macro_definitions()),
+        : preprocessor_macros(context->get_default_shader_macro_definitions()),
           debug_info(Context::IS_DEBUG_BUILD),
           optimization_level(Context::BUILD_OPTIMIZATION_LEVEL),
           target(spirv_target_for_vulkan_api_version(context->vk_api_version)),
-          target_vk_api_version(context->vk_api_version) {}
+          target_vk_api_version(context->vk_api_version) {
+        file_loader.add_search_path(context->get_default_shader_include_paths());
+    }
 
     // -------------------------------------------------
 
-    void add_include_path(const std::filesystem::path& path) {
-        include_paths.emplace_back(std::filesystem::weakly_canonical(path));
-    }
-
-    void add_include_path(const std::string& path) {
-        include_paths.emplace_back(std::filesystem::weakly_canonical(path));
+    void add_search_path(const std::filesystem::path& path) {
+        file_loader.add_search_path(path);
     }
 
     bool remove_include_path(const std::filesystem::path& path) {
-        return remove_canonical_include_path(std::filesystem::weakly_canonical(path));
-    }
-
-    bool remove_include_path(const std::string& path) {
-        return remove_canonical_include_path(std::filesystem::weakly_canonical(path));
+        return file_loader.remove_search_path(path);
     }
 
     void set_preprocessor_macro(const std::string& key, const std::string& value) {
@@ -115,10 +110,6 @@ class CompilationSessionDescription {
 
     // -------------------------------------------------
 
-    const std::vector<std::filesystem::path>& get_include_paths() const {
-        return include_paths;
-    }
-
     const std::map<std::string, std::string>& get_preprocessor_macros() const {
         return preprocessor_macros;
     }
@@ -139,24 +130,13 @@ class CompilationSessionDescription {
         return target_vk_api_version;
     }
 
-  private:
-    bool remove_canonical_include_path(const std::filesystem::path& canonical) {
-        bool removed = false;
-        for (uint32_t i = 0; i < include_paths.size();) {
-            if (include_paths[i] == canonical) {
-                std::swap(include_paths.back(), include_paths[i]);
-                include_paths.pop_back();
-                removed = true;
-            } else {
-                i++;
-            }
-        }
-
-        return removed;
+    const FileLoader& get_search_path_file_loader() const {
+        return file_loader;
     }
 
   private:
-    std::vector<std::filesystem::path> include_paths;
+    FileLoader file_loader; // for seach path management
+
     std::map<std::string, std::string> preprocessor_macros;
     bool debug_info;
     uint32_t optimization_level;

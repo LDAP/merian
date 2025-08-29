@@ -11,10 +11,12 @@ namespace merian_nodes {
 
 MeanToBuffer::MeanToBuffer(const ContextHandle& context) : Node(), context(context) {
 
-    image_to_buffer_shader = std::make_shared<ShaderModule>(
-        context, merian_image_to_buffer_comp_spv_size(), merian_image_to_buffer_comp_spv());
-    reduce_buffer_shader = std::make_shared<ShaderModule>(
-        context, merian_reduce_buffer_comp_spv_size(), merian_reduce_buffer_comp_spv());
+    image_to_buffer_shader = ShaderModule::create(
+        context, merian_image_to_buffer_comp_spv(), merian_image_to_buffer_comp_spv_size(),
+        ShaderModule::EntryPointInfo("main", vk::ShaderStageFlagBits::eCompute));
+    reduce_buffer_shader = ShaderModule::create(
+        context, merian_reduce_buffer_comp_spv(), merian_reduce_buffer_comp_spv_size(),
+        ShaderModule::EntryPointInfo("main", vk::ShaderStageFlagBits::eCompute));
 }
 
 MeanToBuffer::~MeanToBuffer() {}

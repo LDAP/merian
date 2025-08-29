@@ -1,11 +1,8 @@
 #pragma once
 
-#include "merian/io/file_loader.hpp"
 #include "merian/vk/context.hpp"
 #include "merian/vk/object.hpp"
 #include "merian/vk/pipeline/specialization_info.hpp"
-
-#include <optional>
 
 namespace merian {
 
@@ -21,33 +18,41 @@ class ShaderStageCreateInfo;
  */
 class ShaderModule : public std::enable_shared_from_this<ShaderModule>, public Object {
   public:
-    ShaderModule() = delete;
+    class EntryPointInfo {
+      public:
+        EntryPointInfo(const std::string& name, const vk::ShaderStageFlagBits stage_flags)
+            : name(name), stage_flags(stage_flags) {}
 
-    ShaderModule(const ContextHandle& context,
-                 const std::string& spv_filename,
-                 const vk::ShaderStageFlagBits stage_flags = vk::ShaderStageFlagBits::eCompute,
-                 const std::optional<FileLoader>& file_loader = std::nullopt);
+        const std::string& get_name() const {
+            return name;
+        }
 
-    ShaderModule(const ContextHandle& context,
-                 const vk::ShaderModuleCreateInfo& info,
-                 const vk::ShaderStageFlagBits stage_flags = vk::ShaderStageFlagBits::eCompute);
-    ShaderModule(const ContextHandle& context,
-                 const std::size_t spv_size,
-                 const uint32_t spv[],
-                 const vk::ShaderStageFlagBits stage_flags = vk::ShaderStageFlagBits::eCompute);
+        vk::ShaderStageFlagBits get_stage_flags() const {
+            return stage_flags;
+        }
 
-    ShaderModule(const ContextHandle& context,
-                 const std::vector<uint32_t>& spv,
-                 const vk::ShaderStageFlagBits stage_flags = vk::ShaderStageFlagBits::eCompute);
-
-    ~ShaderModule();
+      private:
+        const std::string name;
+        const vk::ShaderStageFlagBits stage_flags;
+    };
 
   public:
+    ShaderModule() = delete;
+
+  private:
+    ShaderModule(const ContextHandle& context,
+                 const vk::ShaderModuleCreateInfo& info,
+                 const vk::ArrayProxy<EntryPointInfo>& entrypoints);
+
+  public:
+    ~ShaderModule();
+
     operator const vk::ShaderModule&() const;
 
     const vk::ShaderModule& get_shader_module() const;
 
-    vk::ShaderStageFlagBits get_stage_flags() const;
+    // may throw invalid argument if the entry point does not exist
+    vk::ShaderStageFlagBits get_stage_flags(const std::string& entry_point_name) const;
 
     operator ShaderStageCreateInfo();
 
@@ -61,9 +66,27 @@ class ShaderModule : public std::enable_shared_from_this<ShaderModule>, public O
     // and instance count 1.
     static ShaderModuleHandle fullscreen_triangle(const ContextHandle& context);
 
+    static ShaderModuleHandle create(const ContextHandle& context,
+                                     const vk::ShaderModuleCreateInfo& info,
+                                     const vk::ArrayProxy<EntryPointInfo>& entrypoints);
+
+    static ShaderModuleHandle create(const ContextHandle& context,
+                                     const uint32_t spv[],
+                                     const std::size_t spv_size,
+                                     const vk::ArrayProxy<EntryPointInfo>& entrypoints);
+
+    static ShaderModuleHandle create(const ContextHandle& context,
+                                     const std::vector<uint32_t>& spv,
+                                     const vk::ArrayProxy<EntryPointInfo>& entrypoints);
+
+    static ShaderModuleHandle create(const ContextHandle& context,
+                                     const void* spv,
+                                     const std::size_t spv_size,
+                                     const vk::ArrayProxy<EntryPointInfo>& entrypoints);
+
   private:
     const ContextHandle context;
-    const vk::ShaderStageFlagBits stage_flags;
+    std::map<std::string, EntryPointInfo> entry_points;
 
     vk::ShaderModule shader_module;
 };

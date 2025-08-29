@@ -4,7 +4,7 @@ namespace merian {
 
 class FileIncluder final : public shaderc::CompileOptions::IncluderInterface {
   public:
-    FileIncluder() = default;
+    FileIncluder(const FileLoader& file_loader) : file_loader(file_loader) {}
 
     shaderc_include_result* GetInclude(const char* requested_source,
                                        shaderc_include_type type,
@@ -48,7 +48,7 @@ class FileIncluder final : public shaderc::CompileOptions::IncluderInterface {
     }
 
     // the file loader to resolve includes
-    FileLoader& get_file_loader() {
+    const FileLoader& get_file_loader() {
         return file_loader;
     }
 
@@ -76,7 +76,7 @@ class FileIncluder final : public shaderc::CompileOptions::IncluderInterface {
         shaderc_include_result include_result;
     };
 
-    FileLoader file_loader;
+    const FileLoader& file_loader;
 };
 
 static shaderc_shader_kind
@@ -132,10 +132,8 @@ std::vector<uint32_t> ShadercCompiler::compile_glsl(
         compile_options.AddMacroDefinition(key, value);
     }
 
-    auto includer = std::make_unique<FileIncluder>();
-    for (const auto& include_path : compilation_session_description.get_include_paths()) {
-        includer->get_file_loader().add_search_path(include_path);
-    }
+    auto includer = std::make_unique<FileIncluder>(
+        compilation_session_description.get_search_path_file_loader());
     compile_options.SetIncluder(std::move(includer));
     if (compilation_session_description.get_optimization_level() > 0) {
         compile_options.SetOptimizationLevel(

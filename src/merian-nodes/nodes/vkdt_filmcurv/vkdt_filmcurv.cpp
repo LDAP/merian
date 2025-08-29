@@ -18,8 +18,9 @@ VKDTFilmcurv::VKDTFilmcurv(const ContextHandle& context,
     spec_builder.add_entry(local_size_x, local_size_y);
     spec_info = spec_builder.build();
 
-    shader = std::make_shared<ShaderModule>(context, merian_vkdt_filmcurv_slang_spv_size(),
-                                            merian_vkdt_filmcurv_slang_spv());
+    shader = ShaderModule::create(
+        context, merian_vkdt_filmcurv_slang_spv(), merian_vkdt_filmcurv_slang_spv_size(),
+        ShaderModule::EntryPointInfo("main", vk::ShaderStageFlagBits::eCompute));
 }
 
 std::vector<InputConnectorHandle> VKDTFilmcurv::describe_inputs() {

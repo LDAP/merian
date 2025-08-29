@@ -10,11 +10,12 @@
 namespace merian_nodes {
 
 Bloom::Bloom(const ContextHandle& context) : Node(), context(context) {
-
-    separate_module = std::make_shared<ShaderModule>(
-        context, merian_bloom_separate_slang_spv_size(), merian_bloom_separate_slang_spv());
-    composite_module = std::make_shared<ShaderModule>(
-        context, merian_bloom_composite_slang_spv_size(), merian_bloom_composite_slang_spv());
+    separate_module = ShaderModule::create(
+        context, merian_bloom_separate_slang_spv(), merian_bloom_separate_slang_spv_size(),
+        ShaderModule::EntryPointInfo("main", vk::ShaderStageFlagBits::eCompute));
+    composite_module = ShaderModule::create(
+        context, merian_bloom_composite_slang_spv(), merian_bloom_composite_slang_spv_size(),
+        ShaderModule::EntryPointInfo("main", vk::ShaderStageFlagBits::eCompute));
 }
 
 Bloom::~Bloom() {}

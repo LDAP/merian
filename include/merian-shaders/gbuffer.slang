@@ -49,7 +49,7 @@ struct GBuffer {
     }
 
     static float load_and_decompress_linear_z(GBufferBinding gbuffer_binding, const uint2 pixel) {
-        return gbuffer_binding.Load(uint3(pixel, 0)).g;
+        return asfloat(gbuffer_binding.Load(uint3(pixel, 0)).g);
     }
 
     static half2 load_and_decompress_grad_z(GBufferBinding gbuffer_binding, const uint2 pixel) {
@@ -57,7 +57,7 @@ struct GBuffer {
     }
 
     static float load_and_decompress_delta_z(GBufferBinding gbuffer_binding, const uint2 pixel) {
-        return gbuffer_binding.Load(uint3(pixel, 0)).a;
+        return asfloat(gbuffer_binding.Load(uint3(pixel, 0)).a);
     }
 
     // ------------------------------

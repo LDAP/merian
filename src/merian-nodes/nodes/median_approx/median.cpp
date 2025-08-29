@@ -11,10 +11,12 @@ namespace merian_nodes {
 
 MedianApproxNode::MedianApproxNode(const ContextHandle& context) : Node(), context(context) {
 
-    histogram = std::make_shared<ShaderModule>(context, merian_median_histogram_comp_spv_size(),
-                                               merian_median_histogram_comp_spv());
-    reduce = std::make_shared<ShaderModule>(context, merian_median_reduce_comp_spv_size(),
-                                            merian_median_reduce_comp_spv());
+    histogram = ShaderModule::create(
+        context, merian_median_histogram_comp_spv(), merian_median_histogram_comp_spv_size(),
+        ShaderModule::EntryPointInfo("main", vk::ShaderStageFlagBits::eCompute));
+    reduce = ShaderModule::create(
+        context, merian_median_reduce_comp_spv(), merian_median_reduce_comp_spv_size(),
+        ShaderModule::EntryPointInfo("main", vk::ShaderStageFlagBits::eCompute));
 }
 
 MedianApproxNode::~MedianApproxNode() {}

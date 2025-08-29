@@ -49,7 +49,7 @@ std::vector<uint32_t> SystemGlslcCompiler::compile_glsl(
         command.emplace_back("-I");
         command.emplace_back(parent_path.string());
     }
-    for (const auto& inc_dir : compilation_session_description.get_include_paths()) {
+    for (const auto& inc_dir : compilation_session_description.get_search_path_file_loader()) {
         command.emplace_back("-I");
         command.emplace_back(inc_dir.string());
     }

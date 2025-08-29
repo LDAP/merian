@@ -11,8 +11,9 @@ FXAA::FXAA(const ContextHandle& context) : AbstractCompute(context, sizeof(PushC
     auto spec_builder = SpecializationInfoBuilder();
     spec_builder.add_entry(local_size_x, local_size_y);
     spec_info = spec_builder.build();
-    shader = std::make_shared<ShaderModule>(context, merian_fxaa_slang_spv_size(),
-                                            merian_fxaa_slang_spv());
+    shader = ShaderModule::create(
+        context, merian_fxaa_slang_spv(), merian_fxaa_slang_spv_size(),
+        ShaderModule::EntryPointInfo("main", vk::ShaderStageFlagBits::eCompute));
 }
 
 std::vector<InputConnectorHandle> FXAA::describe_inputs() {

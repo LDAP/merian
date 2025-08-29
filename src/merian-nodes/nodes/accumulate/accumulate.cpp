@@ -13,11 +13,13 @@ Accumulate::Accumulate(const ContextHandle& context,
                        const ResourceAllocatorHandle& allocator,
                        const std::optional<vk::Format> format)
     : Node(), context(context), allocator(allocator), format(format) {
-    percentile_module =
-        std::make_shared<ShaderModule>(context, merian_calculate_percentiles_slang_spv_size(),
-                                       merian_calculate_percentiles_slang_spv());
-    accumulate_module = std::make_shared<ShaderModule>(context, merian_accumulate_slang_spv_size(),
-                                                       merian_accumulate_slang_spv());
+    percentile_module = ShaderModule::create(
+        context, merian_calculate_percentiles_slang_spv(),
+        merian_calculate_percentiles_slang_spv_size(),
+        ShaderModule::EntryPointInfo("main", vk::ShaderStageFlagBits::eCompute));
+    accumulate_module = ShaderModule::create(
+        context, merian_accumulate_slang_spv(), merian_accumulate_slang_spv_size(),
+        ShaderModule::EntryPointInfo("main", vk::ShaderStageFlagBits::eCompute));
 }
 
 Accumulate::~Accumulate() {}
