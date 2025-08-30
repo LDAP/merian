@@ -40,8 +40,7 @@ ConstantBuffer<PushConstant> params;
 #define SHARED_SIZE_Y (workgroup_size_y + SVGF_VE_HALO_RADIUS * 2)
 
 row_major groupshared float4 shared_irr_moments[SHARED_SIZE_Y][SHARED_SIZE_X];
-row_major groupshared float3 shared_normal[SHARED_SIZE_Y][SHARED_SIZE_X];
-row_major groupshared float shared_z[SHARED_SIZE_Y][SHARED_SIZE_X];
+row_major groupshared float4 shared_normal_z[SHARED_SIZE_Y][SHARED_SIZE_X];
 
 [numthreads(workgroup_size_x, workgroup_size_y, 1)]
 [shader("compute")]
@@ -60,8 +59,9 @@ void main(const int2 ipos: SV_DispatchThreadID, int2 gl_LocalInvocationID: SV_Gr
     float4 irr_moments;
 
 #define center_irr_moments shared_irr_moments[shared_pos.y][shared_pos.x]
-#define center_normal shared_normal[shared_pos.y][shared_pos.x]
-#define center_linear_z shared_z[shared_pos.y][shared_pos.x]
+#define center_normal shared_normal_z[shared_pos.y][shared_pos.x].rgb
+#define center_linear_z shared_normal_z[shared_pos.y][shared_pos.x].a
+#define center_normal_z shared_normal_z[shared_pos.y][shared_pos.x]
 
     // fill in padding and halo with valid information
     const int2 mirror_repeat_ipos = texturewrap_mirror_repeat(ipos, texture_dimensions(img_irr, 0));
@@ -75,8 +75,7 @@ void main(const int2 ipos: SV_DispatchThreadID, int2 gl_LocalInvocationID: SV_Gr
                 irr_moments.rgb = rgb_to_yuv(irr_moments.rgb);
 
                 center_irr_moments = irr_moments;
-                center_normal = gbuf.get_normal();
-                center_linear_z = gbuf.get_linear_z();
+                center_normal_z = float4(gbuf.get_normal(), gbuf.get_linear_z());
                 center_grad_z = gbuf.get_grad_z();
             }
 
@@ -91,8 +90,8 @@ void main(const int2 ipos: SV_DispatchThreadID, int2 gl_LocalInvocationID: SV_Gr
 
                 shared_irr_moments[shared_index.y][shared_index.x] =
                     img_irr.Load(uint3(halo_mirror_repeat_ipos, 0));
-                shared_normal[shared_index.y][shared_index.x] = gbuf.get_normal();
-                shared_z[shared_index.y][shared_index.x] = gbuf.get_linear_z();
+                shared_normal_z[shared_index.y][shared_index.x] =
+                    float4(gbuf.get_normal(), gbuf.get_linear_z());
             }
 
             GroupMemoryBarrierWithGroupSync();
@@ -124,13 +123,13 @@ void main(const int2 ipos: SV_DispatchThreadID, int2 gl_LocalInvocationID: SV_Gr
                 float w = kernel[abs(xx)] * kernel[abs(yy)];
                 // Weight neighbors with similar normals
                 w *= smoothstep(params.normal_reject_cos, 1.0,
-                                dot(center_normal, shared_normal[p.y][p.x]));
+                                dot(center_normal, shared_normal_z[p.y][p.x].rgb));
                 // Weight neighbors with similar depth
                 // w *= 1.0 - smoothstep(0.0, params.depth_reject_percent * max(gbuf.linear_z,
                 // neigh_gbuf.linear_z), abs(gbuf.linear_z - neigh_gbuf.linear_z));
                 w *= exp(params.depth_accept *
                          abs(center_linear_z + dot(float2(center_grad_z), float2(xx, yy)) -
-                             shared_z[p.y][p.x]));
+                             shared_normal_z[p.y][p.x].a));
                 // Weight lower with increasing history
                 // w *= 1.0 - irr_moments.a / params.spatial_threshold;
 
@@ -143,7 +142,7 @@ void main(const int2 ipos: SV_DispatchThreadID, int2 gl_LocalInvocationID: SV_Gr
     irr_moments /= sum_w;
 
     const float history = img_history.Load(uint3(mirror_repeat_ipos, 0)).r;
-    const float alpha = clamp(params.spatial_bias / pow(history, params.spatial_falloff), 0, 1);
+    const float alpha = saturate(params.spatial_bias / pow(history, params.spatial_falloff));
 
     irr_moments = lerp(center_irr_moments, irr_moments, alpha);
 
