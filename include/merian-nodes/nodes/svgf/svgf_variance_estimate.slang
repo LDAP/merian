@@ -44,14 +44,18 @@ row_major groupshared float4 shared_normal_z[SHARED_SIZE_Y][SHARED_SIZE_X];
 
 [numthreads(workgroup_size_x, workgroup_size_y, 1)]
 [shader("compute")]
-void main(const int2 ipos: SV_DispatchThreadID, int2 gl_LocalInvocationID: SV_GroupThreadID) {
+void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
+          const int2 group_thread_id: SV_GroupThreadID,
+          const uint group_index: SV_GroupIndex,
+          const uint2 group_id: SV_GroupID) {
     if (SVGF_ITERATIONS == 0) {
-        if (is_on_texture(ipos, img_filter_in))
-            img_filter_in.Store(ipos, float4(img_irr.Load(uint3(ipos, 0)).rgb, 0));
+        if (is_on_texture(dispatch_thread_id, img_filter_in))
+            img_filter_in.Store(dispatch_thread_id,
+                                float4(img_irr.Load(uint3(dispatch_thread_id, 0)).rgb, 0));
         return;
     }
 
-    const int2 shared_pos = gl_LocalInvocationID + SVGF_VE_HALO_RADIUS;
+    const int2 shared_pos = group_thread_id + SVGF_VE_HALO_RADIUS;
 
     // Load all necessary information into shared memory
 
@@ -64,7 +68,8 @@ void main(const int2 ipos: SV_DispatchThreadID, int2 gl_LocalInvocationID: SV_Gr
 #define center_normal_z shared_normal_z[shared_pos.y][shared_pos.x]
 
     // fill in padding and halo with valid information
-    const int2 mirror_repeat_ipos = texturewrap_mirror_repeat(ipos, texture_dimensions(img_irr, 0));
+    const int2 mirror_repeat_ipos =
+        texturewrap_mirror_repeat(dispatch_thread_id, texture_dimensions(img_irr, 0));
 
     {
         {
@@ -82,8 +87,8 @@ void main(const int2 ipos: SV_DispatchThreadID, int2 gl_LocalInvocationID: SV_Gr
             // halo
             int2 shared_index;
             int2 global_index;
-            if (load_halo_index(SVGF_VE_HALO_RADIUS, WorkgroupSize().xy, shared_index,
-                                global_index)) {
+            if (load_halo_index(SVGF_VE_HALO_RADIUS, WorkgroupSize().xy, group_id, group_index,
+                                shared_index, global_index)) {
                 const int2 halo_mirror_repeat_ipos =
                     texturewrap_mirror_repeat(global_index, texture_dimensions(img_irr, 0));
                 const GBuffer gbuf = GBuffer::load(gbuffer, halo_mirror_repeat_ipos);
@@ -97,12 +102,13 @@ void main(const int2 ipos: SV_DispatchThreadID, int2 gl_LocalInvocationID: SV_Gr
             GroupMemoryBarrierWithGroupSync();
         }
 
-        if (not_on_texture(ipos, img_filter_in))
+        if (not_on_texture(dispatch_thread_id, img_filter_in))
             return;
 
 #ifdef KALEIDOSCOPE
-        img_gbuf_in.Store(ipos, uint4(encode_normal(center_normal), asuint(center_linear_z),
-                                      packHalf2x16(center_grad_z), 0));
+        img_gbuf_in.Store(dispatch_thread_id,
+                          uint4(encode_normal(center_normal), asuint(center_linear_z),
+                                packHalf2x16(center_grad_z), 0));
 #endif
     }
 
@@ -147,6 +153,6 @@ void main(const int2 ipos: SV_DispatchThreadID, int2 gl_LocalInvocationID: SV_Gr
     irr_moments = lerp(center_irr_moments, irr_moments, alpha);
 
     const float variance = max(0.0, irr_moments.a - irr_moments.r * irr_moments.r);
-    img_filter_in.Store(ipos, float4(irr_moments.rgb, variance));
+    img_filter_in.Store(dispatch_thread_id, float4(irr_moments.rgb, variance));
 }
 

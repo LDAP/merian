@@ -174,14 +174,16 @@ void _tap(const int2 offset, const float kernel_weight) {
 
 [numthreads(workgroup_size_x, workgroup_size_y, 1)]
 [shader("compute")]
-void main(int2 gl_GlobalInvocationID: SV_DispatchThreadID,
-          int2 gl_LocalInvocationID: SV_GroupThreadID) {
+void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
+          const int2 group_thread_id: SV_GroupThreadID,
+          const uint group_index: SV_GroupIndex,
+          const uint2 group_id: SV_GroupID) {
 
 #ifdef KALEIDOSCOPE
 #ifdef KALEIDOSCOPE_USE_SHMEM
 
-    ipos = int2(gl_GlobalInvocationID);
-    ipos_shared = int2(gl_LocalInvocationID) + SVGF_FILTER_HALO_RADIUS;
+    ipos = int2(dispatch_thread_id);
+    ipos_shared = int2(group_thread_id) + SVGF_FILTER_HALO_RADIUS;
 
     filter_irr_var = img_filter_in.Load(int3(ipos, 0));
     const uint3 c_gbuf = img_gbuf_in.Load(int3(ipos, 0)).rgb;
@@ -195,8 +197,8 @@ void main(int2 gl_GlobalInvocationID: SV_DispatchThreadID,
         // halo
         int2 shared_index;
         int2 global_index;
-        if (load_halo_index(SVGF_FILTER_HALO_RADIUS, WorkgroupSize().xy, shared_index,
-                            global_index)) {
+        if (load_halo_index(SVGF_FILTER_HALO_RADIUS, WorkgroupSize().xy, group_id, group_index,
+                            shared_index, global_index)) {
             const int2 global_read =
                 texturewrap_mirror_repeat(global_index, texture_dimensions(img_filter_in, 0));
             const uint3 p_gbuf = img_gbuf_in.Load(int3(global_read, 0)).rgb;
@@ -209,7 +211,7 @@ void main(int2 gl_GlobalInvocationID: SV_DispatchThreadID,
     if (not_on_texture(ipos, img_filter_out))
         return;
 #else // NO KALEIDOSCOPE_SHMEM:
-    ipos = int2(gl_GlobalInvocationID);
+    ipos = int2(dispatch_thread_id);
     if (not_on_texture(ipos, img_filter_out))
         return;
 
@@ -220,7 +222,7 @@ void main(int2 gl_GlobalInvocationID: SV_DispatchThreadID,
     c_grad_z = unpackHalf2x16ToFloat(c_gbuf.z);
 #endif
 #else // NO KALEIDOSCOPE:
-    ipos = int2(gl_GlobalInvocationID);
+    ipos = int2(dispatch_thread_id);
     if (not_on_texture(ipos, img_filter_out))
         return;
 
