@@ -44,10 +44,13 @@ float3 frame_to_world(const float3x3 frame, const float3 v) {
 
 struct Frame {
     // a orthonormal basis
-    float3x3 basis;
+    // row 0: normalized shading tangent
+    // row 1: normalized shading bitangent
+    // row 2: normalized shading normal
+    float3x3 basis; 
 
-    __init(float3 z) {
-        basis = make_frame(z);
+    __init(const float3 n) {
+        basis = make_frame(n);
     }
 
     float3 to_frame(const float3 v) {

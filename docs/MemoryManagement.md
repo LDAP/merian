@@ -58,36 +58,4 @@ int main() {
 
 ### Staging memory
 
-The `ResourceAllocator` uses a `StagingMemoryManager` for up and downloads to and from device local storage.
-This staging area must be released periodically.
-Therefore, you must call `finalizeResources()` start a new resource set and `releaseResources()` to release
-resources for finished transfers.
-
-Since transfers are asynchronous you must ensure that the transfers have been finished.
-The `StagingMemoryManager` provides two methods for this: A fence that can be supplied when finalizing
-or a resource set ID can be retrieved to free the resources manually.
-
-Example:
-
-```c++
-struct FrameData {
-    merian::StagingMemoryManager::SetID staging_set_id{};
-};
-
-// ensures that we can release the resources
-auto ring_fences = make_shared<merian::RingFences<3, FrameData>>(context);
-
-while (!glfwWindowShouldClose(*window)) {
-    auto frame_data = ring_fences->wait_and_get();
-    // Releases the resources for this ring-iteration.
-    // We are sure that these have been transfered, since we submitted using the fence.
-    alloc->getStaging()->releaseResourceSet(frame_data.user_data.staging_set_id);
-
-    // allocate resources, issue uploads, downloads...
-
-    // Finalize the resource set for this frame and start a new set for the next frame
-    frame_data.user_data.staging_set_id = alloc->getStaging()->finalizeResourceSet();
-    // Submit using the fence from our RingFences.
-    queue->submit(..., frame_data.fence);
-}
-```
+The `ResourceAllocator` uses a `StagingMemoryManager` for up and downloads to and from device local storage. The staging memory manager automatically releases stating memory when the command buffer pool resets and releases all resources.
