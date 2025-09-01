@@ -135,7 +135,7 @@ class CompilationSessionDescription {
     }
 
   private:
-    FileLoader file_loader; // for seach path management
+    FileLoader file_loader; // for search path management
 
     std::map<std::string, std::string> preprocessor_macros;
     bool debug_info;

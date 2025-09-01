@@ -8,7 +8,7 @@ namespace merian {
 class ComputePipeline : public Pipeline {
   private:
     ComputePipeline(const PipelineLayoutHandle& pipeline_layout,
-                    const EntryPointHandle& entry_point,
+                    const SpecializedEntryPointHandle& entry_point,
                     const vk::PipelineCreateFlags flags = {},
                     const PipelineHandle& base_pipeline = {},
                     const void* pNext = nullptr)
@@ -40,7 +40,7 @@ class ComputePipeline : public Pipeline {
     // ---------------------------------------------------------------------------
 
     static PipelineHandle create(const PipelineLayoutHandle& pipeline_layout,
-                                 const EntryPointHandle& entry_point,
+                                 const SpecializedEntryPointHandle& entry_point,
                                  const vk::PipelineCreateFlags flags = {},
                                  const PipelineHandle& base_pipeline = {},
                                  const void* pNext = nullptr) {

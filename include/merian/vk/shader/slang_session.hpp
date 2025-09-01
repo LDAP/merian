@@ -11,6 +11,7 @@
 
 namespace merian {
 
+// A wrapper around a slang session.
 class SlangSession {
   public:
     SlangSession(const CompilationSessionDescription& compilation_session_description) {

@@ -300,36 +300,36 @@ GraphicsPipelineBuilder& GraphicsPipelineBuilder::dyanmic_state_add(const vk::Dy
 // --- Shader Modules ---
 
 GraphicsPipelineBuilder&
-GraphicsPipelineBuilder::set_vertex_shader(const EntryPointHandle& vertex_shader) {
+GraphicsPipelineBuilder::set_vertex_shader(const SpecializedEntryPointHandle& vertex_shader) {
     assert(vertex_shader->get_stage() == vk::ShaderStageFlagBits::eVertex);
     this->vertex_shader.emplace(vertex_shader);
     return *this;
 }
 
 GraphicsPipelineBuilder&
-GraphicsPipelineBuilder::set_geometry_shader(const EntryPointHandle& geometry_shader) {
+GraphicsPipelineBuilder::set_geometry_shader(const SpecializedEntryPointHandle& geometry_shader) {
     assert(geometry_shader->get_stage() == vk::ShaderStageFlagBits::eGeometry);
     this->geometry_shader.emplace(geometry_shader);
     return *this;
 }
 
 GraphicsPipelineBuilder&
-GraphicsPipelineBuilder::set_mesh_shader(const EntryPointHandle& mesh_shader) {
+GraphicsPipelineBuilder::set_mesh_shader(const SpecializedEntryPointHandle& mesh_shader) {
     assert(mesh_shader->get_stage() == vk::ShaderStageFlagBits::eMeshEXT);
     this->mesh_shader.emplace(mesh_shader);
     return *this;
 }
 
 GraphicsPipelineBuilder&
-GraphicsPipelineBuilder::set_fragment_shader(const EntryPointHandle& fragment_shader) {
+GraphicsPipelineBuilder::set_fragment_shader(const SpecializedEntryPointHandle& fragment_shader) {
     assert(fragment_shader->get_stage() == vk::ShaderStageFlagBits::eFragment);
     this->fragment_shader.emplace(fragment_shader);
     return *this;
 }
 
 GraphicsPipelineBuilder& GraphicsPipelineBuilder::set_tessellation_shader(
-    const EntryPointHandle& tessellation_control_shader,
-    const EntryPointHandle& tessellation_evaluation_shader) {
+    const SpecializedEntryPointHandle& tessellation_control_shader,
+    const SpecializedEntryPointHandle& tessellation_evaluation_shader) {
     assert(tessellation_control_shader->get_stage() ==
            vk::ShaderStageFlagBits::eTessellationControl);
     assert(tessellation_evaluation_shader->get_stage() ==
