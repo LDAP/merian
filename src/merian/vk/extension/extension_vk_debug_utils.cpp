@@ -99,8 +99,12 @@ VKAPI_ATTR vk::Bool32 VKAPI_CALL ExtensionVkDebugUtils::messenger_callback(
 }
 
 void* ExtensionVkDebugUtils::pnext_instance_create_info(void* p_next) {
-    this->create_info.setPNext(p_next);
-    return &this->create_info;
+    validation_features.setEnabledValidationFeatures(validation_feature_enables);
+
+    create_info.setPNext(p_next);
+    validation_features.setPNext(&create_info);
+
+    return &validation_features;
 }
 
 void ExtensionVkDebugUtils::on_instance_created(const vk::Instance& instance) {

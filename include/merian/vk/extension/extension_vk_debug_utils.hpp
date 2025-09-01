@@ -20,7 +20,7 @@ class ExtensionVkDebugUtils : public Extension {
         : Extension("ExtensionVkDebugUtils"), user_data(ignore_message_ids, assert_message) {
         create_info = {
             {},
-            SEVERITY::eWarning | SEVERITY::eError,
+            SEVERITY::eError | SEVERITY::eWarning | SEVERITY::eInfo | SEVERITY::eVerbose,
             MESSAGE::eGeneral | MESSAGE::ePerformance | MESSAGE::eValidation,
             &ExtensionVkDebugUtils::messenger_callback,
             &this->user_data,
@@ -81,6 +81,11 @@ class ExtensionVkDebugUtils : public Extension {
 
     vk::DebugUtilsMessengerCreateInfoEXT create_info;
     vk::DebugUtilsMessengerEXT messenger = VK_NULL_HANDLE;
+
+    std::vector<vk::ValidationFeatureEnableEXT> validation_feature_enables = {
+        vk::ValidationFeatureEnableEXT::eDebugPrintf,
+    };
+    vk::ValidationFeaturesEXT validation_features;
 };
 
 } // namespace merian
