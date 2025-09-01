@@ -21,12 +21,10 @@ class Reduce : public AbstractCompute {
 
     std::vector<OutputConnectorHandle> describe_outputs(const NodeIOLayout& io_layout) override;
 
-    SpecializationInfoHandle get_specialization_info(const NodeIO& io) noexcept override;
-
     std::tuple<uint32_t, uint32_t, uint32_t>
     get_group_count(const merian_nodes::NodeIO& io) const noexcept override;
 
-    ShaderModuleHandle get_shader_module() override;
+    EntryPointHandle get_entry_point() override;
 
     NodeStatusFlags properties(Properties& props) override;
 
@@ -39,8 +37,7 @@ class Reduce : public AbstractCompute {
     std::string reduction = "accumulator + current_value";
 
     vk::Extent3D extent;
-    ShaderModuleHandle shader;
-    SpecializationInfoHandle spec_info;
+    EntryPointHandle shader;
 
     uint32_t number_inputs = 10;
     std::vector<VkSampledImageInHandle> input_connectors;

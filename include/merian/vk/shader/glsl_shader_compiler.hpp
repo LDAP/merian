@@ -2,6 +2,7 @@
 
 #include "merian/io/file_loader.hpp"
 #include "merian/vk/shader/compilation_session_description.hpp"
+#include "merian/vk/shader/entry_point.hpp"
 #include "merian/vk/shader/shader_compiler.hpp"
 #include "merian/vk/shader/shader_module.hpp"
 
@@ -96,8 +97,7 @@ class GLSLShaderCompiler : public ShaderCompiler {
         const vk::ShaderStageFlagBits shader_kind = optional_shader_kind.value_or(guess_kind(path));
         std::vector<uint32_t> spv =
             compile_glsl(path, compilation_session_description, shader_kind);
-        return ShaderModule::create(context, spv,
-                                    ShaderModule::EntryPointInfo("main", shader_kind));
+        return ShaderModule::create(context, spv);
     }
 
     // uses the file_loader provided from context.
@@ -116,8 +116,29 @@ class GLSLShaderCompiler : public ShaderCompiler {
             optional_shader_kind.value_or(guess_kind(*resolved));
         std::vector<uint32_t> spv =
             compile_glsl(*resolved, compilation_session_description, shader_kind);
-        return ShaderModule::create(context, spv,
-                                    ShaderModule::EntryPointInfo("main", shader_kind));
+        return ShaderModule::create(context, spv);
+    }
+
+    // uses the file_loader provided from context.
+    EntryPointHandle find_compile_glsl_to_entry_point(
+        const ContextHandle& context,
+        const std::filesystem::path& path,
+        const CompilationSessionDescription& compilation_session_description,
+        const std::string& entry_point_name = "main",
+        const std::optional<vk::ShaderStageFlagBits> optional_shader_kind = std::nullopt) const {
+
+        const std::optional<std::filesystem::path> resolved = context->file_loader.find_file(path);
+        if (!resolved) {
+            throw compilation_failed{fmt::format("file {} not found", path.string())};
+        }
+
+        const vk::ShaderStageFlagBits shader_kind =
+            optional_shader_kind.value_or(guess_kind(*resolved));
+        std::vector<uint32_t> spv =
+            compile_glsl(*resolved, compilation_session_description, shader_kind);
+        ShaderModuleHandle shader_module = ShaderModule::create(context, spv);
+
+        return EntryPoint::create(entry_point_name, shader_kind, shader_module);
     }
 
     ShaderModuleHandle compile_glsl_to_shadermodule(
@@ -128,8 +149,7 @@ class GLSLShaderCompiler : public ShaderCompiler {
         const CompilationSessionDescription& compilation_session_description) const {
         std::vector<uint32_t> spv =
             compile_glsl(source, source_name, shader_kind, compilation_session_description);
-        return ShaderModule::create(context, spv,
-                                    ShaderModule::EntryPointInfo("main", shader_kind));
+        return ShaderModule::create(context, spv);
     }
 
   private:

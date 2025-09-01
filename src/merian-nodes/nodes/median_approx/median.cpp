@@ -11,12 +11,12 @@ namespace merian_nodes {
 
 MedianApproxNode::MedianApproxNode(const ContextHandle& context) : Node(), context(context) {
 
-    histogram = ShaderModule::create(
-        context, merian_median_histogram_comp_spv(), merian_median_histogram_comp_spv_size(),
-        ShaderModule::EntryPointInfo("main", vk::ShaderStageFlagBits::eCompute));
-    reduce = ShaderModule::create(
-        context, merian_median_reduce_comp_spv(), merian_median_reduce_comp_spv_size(),
-        ShaderModule::EntryPointInfo("main", vk::ShaderStageFlagBits::eCompute));
+    histogram = EntryPoint::create(context, merian_median_histogram_comp_spv(),
+                                   merian_median_histogram_comp_spv_size(), "main",
+                                   vk::ShaderStageFlagBits::eCompute);
+    reduce = EntryPoint::create(context, merian_median_reduce_comp_spv(),
+                                merian_median_reduce_comp_spv_size(), "main",
+                                vk::ShaderStageFlagBits::eCompute);
 }
 
 MedianApproxNode::~MedianApproxNode() {}
@@ -61,8 +61,8 @@ void MedianApproxNode::process([[maybe_unused]] GraphRun& run,
         spec_builder.add_entry(local_size_x, local_size_y, component);
         SpecializationInfoHandle spec = spec_builder.build();
 
-        pipe_histogram = std::make_shared<ComputePipeline>(pipe_layout, histogram, spec);
-        pipe_reduce = std::make_shared<ComputePipeline>(pipe_layout, reduce, spec);
+        pipe_histogram = ComputePipeline::create(pipe_layout, histogram, spec);
+        pipe_reduce = ComputePipeline::create(pipe_layout, reduce, spec);
     }
 
     cmd->fill(io[con_histogram], 0);

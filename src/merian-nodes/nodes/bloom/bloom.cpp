@@ -10,12 +10,12 @@
 namespace merian_nodes {
 
 Bloom::Bloom(const ContextHandle& context) : Node(), context(context) {
-    separate_module = ShaderModule::create(
-        context, merian_bloom_separate_slang_spv(), merian_bloom_separate_slang_spv_size(),
-        ShaderModule::EntryPointInfo("main", vk::ShaderStageFlagBits::eCompute));
-    composite_module = ShaderModule::create(
-        context, merian_bloom_composite_slang_spv(), merian_bloom_composite_slang_spv_size(),
-        ShaderModule::EntryPointInfo("main", vk::ShaderStageFlagBits::eCompute));
+    separate_module = EntryPoint::create(context, merian_bloom_separate_slang_spv(),
+                                         merian_bloom_separate_slang_spv_size(), "main",
+                                         vk::ShaderStageFlagBits::eCompute);
+    composite_module = EntryPoint::create(context, merian_bloom_composite_slang_spv(),
+                                          merian_bloom_composite_slang_spv_size(), "main",
+                                          vk::ShaderStageFlagBits::eCompute);
 }
 
 Bloom::~Bloom() {}
@@ -49,8 +49,8 @@ Bloom::NodeStatusFlags Bloom::on_connected([[maybe_unused]] const NodeIOLayout& 
     spec_builder.add_entry(local_size_x, local_size_y, mode);
     SpecializationInfoHandle spec = spec_builder.build();
 
-    separate = std::make_shared<ComputePipeline>(pipe_layout, separate_module, spec);
-    composite = std::make_shared<ComputePipeline>(pipe_layout, composite_module, spec);
+    separate = ComputePipeline::create(pipe_layout, separate_module, spec);
+    composite = ComputePipeline::create(pipe_layout, composite_module, spec);
 
     return {};
 }

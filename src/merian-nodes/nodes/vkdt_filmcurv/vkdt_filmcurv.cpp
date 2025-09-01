@@ -18,9 +18,9 @@ VKDTFilmcurv::VKDTFilmcurv(const ContextHandle& context,
     spec_builder.add_entry(local_size_x, local_size_y);
     spec_info = spec_builder.build();
 
-    shader = ShaderModule::create(
-        context, merian_vkdt_filmcurv_slang_spv(), merian_vkdt_filmcurv_slang_spv_size(),
-        ShaderModule::EntryPointInfo("main", vk::ShaderStageFlagBits::eCompute));
+    shader = EntryPoint::create(context, merian_vkdt_filmcurv_slang_spv(),
+                                merian_vkdt_filmcurv_slang_spv_size(), "main",
+                                vk::ShaderStageFlagBits::eCompute, spec_info);
 }
 
 std::vector<InputConnectorHandle> VKDTFilmcurv::describe_inputs() {
@@ -41,11 +41,6 @@ VKDTFilmcurv::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
     };
 }
 
-SpecializationInfoHandle
-VKDTFilmcurv::get_specialization_info([[maybe_unused]] const NodeIO& io) noexcept {
-    return spec_info;
-}
-
 const VKDTFilmcurvePushConstant&
 VKDTFilmcurv::get_typed_push_constant([[maybe_unused]] GraphRun& run,
                                       [[maybe_unused]] const NodeIO& io) {
@@ -58,7 +53,7 @@ VKDTFilmcurv::get_group_count([[maybe_unused]] const NodeIO& io) const noexcept 
             (extent.height + local_size_y - 1) / local_size_y, 1};
 }
 
-ShaderModuleHandle VKDTFilmcurv::get_shader_module() {
+EntryPointHandle VKDTFilmcurv::get_entry_point() {
     return shader;
 }
 

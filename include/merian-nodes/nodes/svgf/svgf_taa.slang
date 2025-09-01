@@ -75,8 +75,8 @@ void main(const int2 ipos: SV_DispatchThreadID) {
         return;
     }
     if (DEBUG == 7) {
-        img_out.Store(ipos,
-                      float4(any(isnan(filter_result.rgb)), any(isinf(filter_result.rgb)), 0, 0));
+        img_out.Store(ipos, float4(float(any(isnan(filter_result.rgb))),
+                                   float(any(isinf(filter_result.rgb))), 0, 0));
         return;
     }
     if (DEBUG == 8) {

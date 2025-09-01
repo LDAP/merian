@@ -21,11 +21,9 @@ AbstractCompute::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
 void AbstractCompute::process(GraphRun& run,
                               const DescriptorSetHandle& descriptor_set,
                               const NodeIO& io) {
-    const auto spec_info = get_specialization_info(io);
-    const auto shader = get_shader_module();
+    const auto shader = get_entry_point();
 
-    if (spec_info && shader &&
-        (!pipe || current_spec_info != spec_info || current_shader_module != shader)) {
+    if (shader && (!pipe || current_shader_module != shader)) {
         SPDLOG_DEBUG("(re)create pipeline");
 
         auto pipe_builder = PipelineLayoutBuilder(context);
@@ -35,9 +33,8 @@ void AbstractCompute::process(GraphRun& run,
 
         PipelineLayoutHandle pipe_layout =
             pipe_builder.add_descriptor_set_layout(descriptor_set_layout).build_pipeline_layout();
-        pipe = std::make_shared<ComputePipeline>(pipe_layout, shader, spec_info);
+        pipe = ComputePipeline::create(pipe_layout, shader);
 
-        current_spec_info = spec_info;
         current_shader_module = shader;
     }
 

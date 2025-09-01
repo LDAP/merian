@@ -2,6 +2,7 @@ merian_src += shader_generator.process('fullscreen_triangle.vert',
                                        preserve_path_from: meson.current_source_dir())
 
 merian_src += files(
+    'entry_point.cpp',
     'glsl_shader_compiler.cpp',
     'glsl_shader_compiler_system_glslangValidator.cpp',
     'glsl_shader_compiler_system_glslc.cpp',

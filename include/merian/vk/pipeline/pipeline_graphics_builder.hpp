@@ -1,5 +1,6 @@
 #pragma once
 
+#include "merian/vk/shader/entry_point.hpp"
 #include "pipeline_graphics.hpp"
 
 #include "merian/vk/shader/shader_module.hpp"
@@ -183,17 +184,17 @@ class GraphicsPipelineBuilder {
 
     // --- Shader Modules ---
 
-    GraphicsPipelineBuilder& set_vertex_shader(const ShaderStageCreateInfo& vertex_shader);
+    GraphicsPipelineBuilder& set_vertex_shader(const EntryPointHandle& vertex_shader);
 
-    GraphicsPipelineBuilder& set_geometry_shader(const ShaderStageCreateInfo& geometry_shader);
+    GraphicsPipelineBuilder& set_geometry_shader(const EntryPointHandle& geometry_shader);
 
-    GraphicsPipelineBuilder& set_mesh_shader(const ShaderStageCreateInfo& mesh_shader);
+    GraphicsPipelineBuilder& set_mesh_shader(const EntryPointHandle& mesh_shader);
 
-    GraphicsPipelineBuilder& set_fragment_shader(const ShaderStageCreateInfo& fragment_shader);
+    GraphicsPipelineBuilder& set_fragment_shader(const EntryPointHandle& fragment_shader);
 
     GraphicsPipelineBuilder&
-    set_tessellation_shader(const ShaderStageCreateInfo& tessellation_control_shader,
-                            const ShaderStageCreateInfo& tessellation_evaluation_shader);
+    set_tessellation_shader(const EntryPointHandle& tessellation_control_shader,
+                            const EntryPointHandle& tessellation_evaluation_shader);
 
     // --- Build ---
 
@@ -204,12 +205,12 @@ class GraphicsPipelineBuilder {
 
   private:
     // Shaders
-    std::optional<ShaderStageCreateInfo> vertex_shader = std::nullopt;
-    std::optional<ShaderStageCreateInfo> geometry_shader = std::nullopt;
-    std::optional<ShaderStageCreateInfo> mesh_shader = std::nullopt;
-    std::optional<ShaderStageCreateInfo> fragment_shader = std::nullopt;
-    std::optional<ShaderStageCreateInfo> tessellation_control_shader = std::nullopt;
-    std::optional<ShaderStageCreateInfo> tessellation_evaluation_shader = std::nullopt;
+    std::optional<EntryPointHandle> vertex_shader = std::nullopt;
+    std::optional<EntryPointHandle> geometry_shader = std::nullopt;
+    std::optional<EntryPointHandle> mesh_shader = std::nullopt;
+    std::optional<EntryPointHandle> fragment_shader = std::nullopt;
+    std::optional<EntryPointHandle> tessellation_control_shader = std::nullopt;
+    std::optional<EntryPointHandle> tessellation_evaluation_shader = std::nullopt;
 
     // Vertex Input State
     vk::PipelineVertexInputStateCreateFlags vertex_input_create_flags;

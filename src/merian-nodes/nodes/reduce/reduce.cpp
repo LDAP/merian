@@ -57,7 +57,7 @@ std::vector<OutputConnectorHandle> Reduce::describe_outputs(const NodeIOLayout& 
         throw graph_errors::node_error{"at least one input must be connected."};
     }
 
-    spec_info = spec_builder.build();
+    SpecializationInfoHandle spec_info = spec_builder.build();
 
     // -------------------------------------------------------
 
@@ -105,20 +105,17 @@ void main() {
 
     const auto& shader_compiler = GLSLShaderCompiler::get();
     CompilationSessionDescription compilation_session_desc(context);
-    shader = shader_compiler->compile_glsl_to_shadermodule(context, source, "<memory>add.comp",
-                                                           vk::ShaderStageFlagBits::eCompute,
-                                                           compilation_session_desc);
+    shader = EntryPoint::create("main", vk::ShaderStageFlagBits::eCompute,
+                                shader_compiler->compile_glsl_to_shadermodule(
+                                    context, source, "<memory>add.comp",
+                                    vk::ShaderStageFlagBits::eCompute, compilation_session_desc),
+                                spec_info);
 
     // -------------------------------------------------------
 
     return {
         ManagedVkImageOut::compute_write("out", format, extent),
     };
-}
-
-SpecializationInfoHandle
-Reduce::get_specialization_info([[maybe_unused]] const NodeIO& io) noexcept {
-    return spec_info;
 }
 
 // const void* ReduceInputsNode::get_push_constant([[maybe_unused]] GraphRun& run, [[maybe_unused]]
@@ -132,7 +129,7 @@ Reduce::get_group_count([[maybe_unused]] const merian_nodes::NodeIO& io) const n
             (extent.height + local_size_y - 1) / local_size_y, 1};
 };
 
-ShaderModuleHandle Reduce::get_shader_module() {
+EntryPointHandle Reduce::get_entry_point() {
     return shader;
 }
 

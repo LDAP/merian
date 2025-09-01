@@ -11,9 +11,8 @@ FXAA::FXAA(const ContextHandle& context) : AbstractCompute(context, sizeof(PushC
     auto spec_builder = SpecializationInfoBuilder();
     spec_builder.add_entry(local_size_x, local_size_y);
     spec_info = spec_builder.build();
-    shader = ShaderModule::create(
-        context, merian_fxaa_slang_spv(), merian_fxaa_slang_spv_size(),
-        ShaderModule::EntryPointInfo("main", vk::ShaderStageFlagBits::eCompute));
+    shader = EntryPoint::create(context, merian_fxaa_slang_spv(), merian_fxaa_slang_spv_size(),
+                                "main", vk::ShaderStageFlagBits::eCompute, spec_info);
 }
 
 std::vector<InputConnectorHandle> FXAA::describe_inputs() {
@@ -33,10 +32,6 @@ FXAA::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
     };
 }
 
-SpecializationInfoHandle FXAA::get_specialization_info([[maybe_unused]] const NodeIO& io) noexcept {
-    return spec_info;
-}
-
 const void* FXAA::get_push_constant([[maybe_unused]] GraphRun& run,
                                     [[maybe_unused]] const NodeIO& io) {
     return &pc;
@@ -48,7 +43,7 @@ FXAA::get_group_count([[maybe_unused]] const NodeIO& io) const noexcept {
             (extent.height + local_size_y - 1) / local_size_y, 1};
 }
 
-ShaderModuleHandle FXAA::get_shader_module() {
+EntryPointHandle FXAA::get_entry_point() {
     return shader;
 }
 

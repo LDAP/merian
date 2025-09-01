@@ -6,8 +6,7 @@
 #include "merian-nodes/graph/node.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
-#include "merian/vk/shader/shader_module.hpp"
-
+#include "merian/vk/shader/entry_point.hpp"
 #include <optional>
 
 namespace merian_nodes {
@@ -94,8 +93,8 @@ class Accumulate : public Node {
 
     TextureHandle percentile_texture;
 
-    ShaderModuleHandle percentile_module;
-    ShaderModuleHandle accumulate_module;
+    EntryPointHandle percentile_module;
+    EntryPointHandle accumulate_module;
 
     FilterPushConstant accumulate_pc;
     QuartilePushConstant percentile_pc;

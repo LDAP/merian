@@ -5,7 +5,7 @@
 #include "merian-nodes/graph/node.hpp"
 
 #include "merian/vk/pipeline/pipeline.hpp"
-#include "merian/vk/shader/shader_module.hpp"
+#include "merian/vk/shader/entry_point.hpp"
 
 namespace merian_nodes {
 
@@ -46,8 +46,8 @@ class MeanToBuffer : public Node {
 
     PushConstant pc;
 
-    ShaderModuleHandle image_to_buffer_shader;
-    ShaderModuleHandle reduce_buffer_shader;
+    EntryPointHandle image_to_buffer_shader;
+    EntryPointHandle reduce_buffer_shader;
 
     PipelineHandle image_to_buffer;
     PipelineHandle reduce_buffer;

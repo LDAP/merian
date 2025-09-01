@@ -9,15 +9,14 @@
 namespace merian_nodes {
 
 TAA::TAA(const ContextHandle& context) : AbstractCompute(context, sizeof(PushConstant)) {
-    shader = ShaderModule::create(
-        context, merian_taa_slang_spv(), merian_taa_slang_spv_size(),
-        ShaderModule::EntryPointInfo("main", vk::ShaderStageFlagBits::eCompute));
-    pc.temporal_alpha = 0.;
-    pc.clamp_method = MERIAN_NODES_TAA_CLAMP_MIN_MAX;
-
     auto spec_builder = SpecializationInfoBuilder();
     spec_builder.add_entry(local_size_x, local_size_y, inverse_motion);
     spec_info = spec_builder.build();
+
+    shader = EntryPoint::create(context, merian_taa_slang_spv(), merian_taa_slang_spv_size(),
+                                "main", vk::ShaderStageFlagBits::eCompute, spec_info);
+    pc.temporal_alpha = 0.;
+    pc.clamp_method = MERIAN_NODES_TAA_CLAMP_MIN_MAX;
 }
 
 std::vector<InputConnectorHandle> TAA::describe_inputs() {
@@ -40,10 +39,6 @@ TAA::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
     };
 }
 
-SpecializationInfoHandle TAA::get_specialization_info([[maybe_unused]] const NodeIO& io) noexcept {
-    return spec_info;
-}
-
 const void* TAA::get_push_constant([[maybe_unused]] GraphRun& run,
                                    [[maybe_unused]] const NodeIO& io) {
     return &pc;
@@ -55,7 +50,7 @@ TAA::get_group_count([[maybe_unused]] const NodeIO& io) const noexcept {
             1};
 }
 
-ShaderModuleHandle TAA::get_shader_module() {
+EntryPointHandle TAA::get_entry_point() {
     return shader;
 }
 

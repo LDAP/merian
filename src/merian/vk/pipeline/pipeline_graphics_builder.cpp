@@ -300,45 +300,39 @@ GraphicsPipelineBuilder& GraphicsPipelineBuilder::dyanmic_state_add(const vk::Dy
 // --- Shader Modules ---
 
 GraphicsPipelineBuilder&
-GraphicsPipelineBuilder::set_vertex_shader(const ShaderStageCreateInfo& vertex_shader) {
-    assert(vertex_shader.shader_module->get_stage_flags(vertex_shader.entry_point) ==
-           vk::ShaderStageFlagBits::eVertex);
+GraphicsPipelineBuilder::set_vertex_shader(const EntryPointHandle& vertex_shader) {
+    assert(vertex_shader->get_stage() == vk::ShaderStageFlagBits::eVertex);
     this->vertex_shader.emplace(vertex_shader);
     return *this;
 }
 
 GraphicsPipelineBuilder&
-GraphicsPipelineBuilder::set_geometry_shader(const ShaderStageCreateInfo& geometry_shader) {
-    assert(geometry_shader.shader_module->get_stage_flags(geometry_shader.entry_point) ==
-           vk::ShaderStageFlagBits::eGeometry);
+GraphicsPipelineBuilder::set_geometry_shader(const EntryPointHandle& geometry_shader) {
+    assert(geometry_shader->get_stage() == vk::ShaderStageFlagBits::eGeometry);
     this->geometry_shader.emplace(geometry_shader);
     return *this;
 }
 
 GraphicsPipelineBuilder&
-GraphicsPipelineBuilder::set_mesh_shader(const ShaderStageCreateInfo& mesh_shader) {
-    assert(mesh_shader.shader_module->get_stage_flags(mesh_shader.entry_point) ==
-           vk::ShaderStageFlagBits::eMeshEXT);
+GraphicsPipelineBuilder::set_mesh_shader(const EntryPointHandle& mesh_shader) {
+    assert(mesh_shader->get_stage() == vk::ShaderStageFlagBits::eMeshEXT);
     this->mesh_shader.emplace(mesh_shader);
     return *this;
 }
 
 GraphicsPipelineBuilder&
-GraphicsPipelineBuilder::set_fragment_shader(const ShaderStageCreateInfo& fragment_shader) {
-    assert(fragment_shader.shader_module->get_stage_flags(fragment_shader.entry_point) ==
-           vk::ShaderStageFlagBits::eFragment);
+GraphicsPipelineBuilder::set_fragment_shader(const EntryPointHandle& fragment_shader) {
+    assert(fragment_shader->get_stage() == vk::ShaderStageFlagBits::eFragment);
     this->fragment_shader.emplace(fragment_shader);
     return *this;
 }
 
 GraphicsPipelineBuilder& GraphicsPipelineBuilder::set_tessellation_shader(
-    const ShaderStageCreateInfo& tessellation_control_shader,
-    const ShaderStageCreateInfo& tessellation_evaluation_shader) {
-    assert(tessellation_control_shader.shader_module->get_stage_flags(
-               tessellation_control_shader.entry_point) ==
+    const EntryPointHandle& tessellation_control_shader,
+    const EntryPointHandle& tessellation_evaluation_shader) {
+    assert(tessellation_control_shader->get_stage() ==
            vk::ShaderStageFlagBits::eTessellationControl);
-    assert(tessellation_evaluation_shader.shader_module->get_stage_flags(
-               tessellation_evaluation_shader.entry_point) ==
+    assert(tessellation_evaluation_shader->get_stage() ==
            vk::ShaderStageFlagBits::eTessellationEvaluation);
 
     this->tessellation_control_shader.emplace(tessellation_control_shader);
@@ -370,22 +364,22 @@ GraphicsPipelineBuilder::build(const PipelineLayoutHandle& pipeline_layout,
 
     std::vector<vk::PipelineShaderStageCreateInfo> stages;
     if (vertex_shader) {
-        stages.emplace_back(*vertex_shader);
+        stages.emplace_back(vertex_shader.value()->get_shader_stage_create_info());
     }
     if (geometry_shader) {
-        stages.emplace_back(*geometry_shader);
+        stages.emplace_back(geometry_shader.value()->get_shader_stage_create_info());
     }
     if (mesh_shader) {
-        stages.emplace_back(*mesh_shader);
+        stages.emplace_back(mesh_shader.value()->get_shader_stage_create_info());
     }
     if (fragment_shader) {
-        stages.emplace_back(*fragment_shader);
+        stages.emplace_back(fragment_shader.value()->get_shader_stage_create_info());
     }
     assert((tessellation_control_shader && tessellation_evaluation_shader) ||
            (!tessellation_control_shader && !tessellation_evaluation_shader));
     if (tessellation_control_shader) {
-        stages.emplace_back(*tessellation_control_shader);
-        stages.emplace_back(*tessellation_evaluation_shader);
+        stages.emplace_back(tessellation_control_shader.value()->get_shader_stage_create_info());
+        stages.emplace_back(tessellation_evaluation_shader.value()->get_shader_stage_create_info());
     }
 
     return std::make_shared<GraphicsPipeline>(

@@ -118,11 +118,11 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
 
         merian::SlangSession slang_session(compilation_session_desc);
 
-        filter_module = slang_session.load_module_from_path_and_compile_to_shadermodule(
+        filter_module = slang_session.load_module_from_path_and_compile_entry_point(
             context, "merian-nodes/nodes/svgf/svgf_filter.slang");
-        taa_module = slang_session.load_module_from_path_and_compile_to_shadermodule(
+        taa_module = slang_session.load_module_from_path_and_compile_entry_point(
             context, "merian-nodes/nodes/svgf/svgf_taa.slang");
-        variance_estimate_module = slang_session.load_module_from_path_and_compile_to_shadermodule(
+        variance_estimate_module = slang_session.load_module_from_path_and_compile_entry_point(
             context, "merian-nodes/nodes/svgf/svgf_variance_estimate.slang");
 
         auto variance_estimate_pipe_layout = PipelineLayoutBuilder(context)
@@ -146,7 +146,7 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
             spec_builder.add_entry(variance_estimate_local_size, variance_estimate_local_size,
                                    svgf_iterations);
             SpecializationInfoHandle variance_estimate_spec = spec_builder.build();
-            variance_estimate = std::make_shared<ComputePipeline>(
+            variance_estimate = ComputePipeline::create(
                 variance_estimate_pipe_layout, variance_estimate_module, variance_estimate_spec);
         }
         {
@@ -158,7 +158,7 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
                 spec_builder.add_entry(filter_local_size, filter_local_size, gap, i,
                                        svgf_iterations - 1);
                 SpecializationInfoHandle filter_spec = spec_builder.build();
-                filters[i] = std::make_shared<ComputePipeline>(filter_pipe_layout, filter_module,
+                filters[i] = ComputePipeline::create(filter_pipe_layout, filter_module,
                                                                filter_spec);
             }
         }
@@ -168,7 +168,7 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
                                    taa_clamping, taa_mv_sampling,
                                    enable_mv && io_layout.is_connected(con_mv));
             SpecializationInfoHandle taa_spec = spec_builder.build();
-            taa = std::make_shared<ComputePipeline>(taa_pipe_layout, taa_module, taa_spec);
+            taa = ComputePipeline::create(taa_pipe_layout, taa_module, taa_spec);
         }
     }
 

@@ -27,15 +27,13 @@ class VKDTFilmcurv : public TypedPCAbstractCompute<VKDTFilmcurvePushConstant> {
 
     std::vector<OutputConnectorHandle> describe_outputs(const NodeIOLayout& io_layout) override;
 
-    SpecializationInfoHandle get_specialization_info(const NodeIO& io) noexcept override;
-
     const VKDTFilmcurvePushConstant& get_typed_push_constant(GraphRun& run,
                                                              const NodeIO& io) override;
 
     std::tuple<uint32_t, uint32_t, uint32_t>
     get_group_count(const NodeIO& io) const noexcept override;
 
-    ShaderModuleHandle get_shader_module() override;
+    EntryPointHandle get_entry_point() override;
 
     NodeStatusFlags properties(Properties& config) override;
 
@@ -45,7 +43,7 @@ class VKDTFilmcurv : public TypedPCAbstractCompute<VKDTFilmcurvePushConstant> {
     VkSampledImageInHandle con_src = VkSampledImageIn::compute_read("src");
     vk::Extent3D extent;
 
-    ShaderModuleHandle shader;
+    EntryPointHandle shader;
     SpecializationInfoHandle spec_info;
 
     VKDTFilmcurvePushConstant pc;

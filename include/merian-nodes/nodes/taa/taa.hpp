@@ -25,21 +25,19 @@ class TAA : public AbstractCompute {
 
     std::vector<OutputConnectorHandle> describe_outputs(const NodeIOLayout& io_layout) override;
 
-    SpecializationInfoHandle get_specialization_info(const NodeIO& io) noexcept override;
-
     const void* get_push_constant([[maybe_unused]] GraphRun& run,
                                   [[maybe_unused]] const NodeIO& io) override;
 
     std::tuple<uint32_t, uint32_t, uint32_t>
     get_group_count([[maybe_unused]] const NodeIO& io) const noexcept override;
 
-    ShaderModuleHandle get_shader_module() override;
+    EntryPointHandle get_entry_point() override;
 
     NodeStatusFlags properties(Properties& config) override;
 
   private:
     const bool inverse_motion = false;
-    ShaderModuleHandle shader;
+    EntryPointHandle shader;
     SpecializationInfoHandle spec_info;
 
     VkSampledImageInHandle con_src = VkSampledImageIn::compute_read("src");

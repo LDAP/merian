@@ -12,15 +12,15 @@ namespace merian_nodes {
 
 AutoExposure::AutoExposure(const ContextHandle& context) : Node(), context(context) {
 
-    histogram_module = ShaderModule::create(
-        context, merian_histogram_slang_spv(), merian_histogram_slang_spv_size(),
-        ShaderModule::EntryPointInfo("main", vk::ShaderStageFlagBits::eCompute));
-    luminance_module = ShaderModule::create(
-        context, merian_luminance_slang_spv(), merian_luminance_slang_spv_size(),
-        ShaderModule::EntryPointInfo("main", vk::ShaderStageFlagBits::eCompute));
-    exposure_module = ShaderModule::create(
-        context, merian_exposure_slang_spv(), merian_exposure_slang_spv_size(),
-        ShaderModule::EntryPointInfo("main", vk::ShaderStageFlagBits::eCompute));
+    histogram_module =
+        EntryPoint::create(context, merian_histogram_slang_spv(), merian_histogram_slang_spv_size(),
+                           "main", vk::ShaderStageFlagBits::eCompute);
+    luminance_module =
+        EntryPoint::create(context, merian_luminance_slang_spv(), merian_luminance_slang_spv_size(),
+                           "main", vk::ShaderStageFlagBits::eCompute);
+    exposure_module =
+        EntryPoint::create(context, merian_exposure_slang_spv(), merian_exposure_slang_spv_size(),
+                           "main", vk::ShaderStageFlagBits::eCompute);
 }
 
 AutoExposure::~AutoExposure() {}
@@ -64,9 +64,9 @@ AutoExposure::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
         spec_builder.add_entry(LOCAL_SIZE_X, LOCAL_SIZE_Y);
         SpecializationInfoHandle spec = spec_builder.build();
 
-        histogram = std::make_shared<ComputePipeline>(pipe_layout, histogram_module, spec);
-        luminance = std::make_shared<ComputePipeline>(pipe_layout, luminance_module, spec);
-        exposure = std::make_shared<ComputePipeline>(pipe_layout, exposure_module, spec);
+        histogram = ComputePipeline::create(pipe_layout, histogram_module, spec);
+        luminance = ComputePipeline::create(pipe_layout, luminance_module, spec);
+        exposure = ComputePipeline::create(pipe_layout, exposure_module, spec);
     }
 
     return {};

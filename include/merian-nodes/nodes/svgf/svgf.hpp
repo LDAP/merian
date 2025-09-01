@@ -6,7 +6,7 @@
 
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
-#include "merian/vk/shader/shader_module.hpp"
+#include "merian/vk/shader/entry_point.hpp"
 
 #include <optional>
 
@@ -74,9 +74,9 @@ class SVGF : public Node {
 
     ManagedVkImageOutHandle con_out;
 
-    ShaderModuleHandle variance_estimate_module;
-    ShaderModuleHandle filter_module;
-    ShaderModuleHandle taa_module;
+    EntryPointHandle variance_estimate_module;
+    EntryPointHandle filter_module;
+    EntryPointHandle taa_module;
 
     VarianceEstimatePushConstant variance_estimate_pc;
     FilterPushConstant filter_pc;

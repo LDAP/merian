@@ -31,14 +31,12 @@ class Shadertoy : public AbstractCompute {
 
     std::vector<OutputConnectorHandle> describe_outputs(const NodeIOLayout& io_layout) override;
 
-    SpecializationInfoHandle get_specialization_info(const NodeIO& io) noexcept override;
-
     const void* get_push_constant(GraphRun& run, const NodeIO& io) override;
 
     std::tuple<uint32_t, uint32_t, uint32_t>
     get_group_count(const NodeIO& io) const noexcept override;
 
-    ShaderModuleHandle get_shader_module() override;
+    EntryPointHandle get_entry_point() override;
 
     NodeStatusFlags properties(Properties& config) override;
 
@@ -55,8 +53,8 @@ class Shadertoy : public AbstractCompute {
 
     vk::Extent3D extent = {1920, 1080, 1};
 
-    ShaderModuleHandle shader;
     SpecializationInfoHandle spec_info;
+    EntryPointHandle shader;
     std::optional<GLSLShaderCompiler::compilation_failed> error;
 
     PushConstant constant;

@@ -6,7 +6,7 @@
 #include "merian-nodes/graph/node.hpp"
 
 #include "merian/vk/pipeline/pipeline.hpp"
-#include "merian/vk/shader/shader_module.hpp"
+#include "merian/vk/shader/entry_point.hpp"
 
 namespace merian_nodes {
 
@@ -46,8 +46,8 @@ class Bloom : public Node {
 
     PushConstant pc;
 
-    ShaderModuleHandle separate_module;
-    ShaderModuleHandle composite_module;
+    EntryPointHandle separate_module;
+    EntryPointHandle composite_module;
 
     PipelineHandle separate;
     PipelineHandle composite;

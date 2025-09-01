@@ -5,7 +5,7 @@
 #include "merian-nodes/graph/node.hpp"
 
 #include "merian/vk/pipeline/pipeline.hpp"
-#include "merian/vk/shader/shader_module.hpp"
+#include "merian/vk/shader/entry_point.hpp"
 
 namespace merian_nodes {
 
@@ -46,8 +46,8 @@ class MedianApproxNode : public Node {
 
     PushConstant pc;
 
-    ShaderModuleHandle histogram;
-    ShaderModuleHandle reduce;
+    EntryPointHandle histogram;
+    EntryPointHandle reduce;
 
     PipelineLayoutHandle pipe_layout;
 

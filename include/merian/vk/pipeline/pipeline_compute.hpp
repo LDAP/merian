@@ -1,25 +1,27 @@
 #pragma once
 
 #include "merian/vk/pipeline/pipeline.hpp"
-#include "merian/vk/shader/shader_module.hpp"
+#include "merian/vk/shader/entry_point.hpp"
 
 namespace merian {
 
 class ComputePipeline : public Pipeline {
-
-  public:
+  private:
     ComputePipeline(const PipelineLayoutHandle& pipeline_layout,
-                    const ShaderStageCreateInfo& shader_stage_create_info,
+                    const EntryPointHandle& entry_point,
                     const vk::PipelineCreateFlags flags = {},
                     const PipelineHandle& base_pipeline = {},
                     const void* pNext = nullptr)
-        : Pipeline(pipeline_layout->get_context(), pipeline_layout),
-          shader_module(shader_stage_create_info.shader_module), base_pipeline(base_pipeline) {
+        : Pipeline(pipeline_layout->get_context(), pipeline_layout), entry_point(entry_point),
+          base_pipeline(base_pipeline) {
+
+        assert(entry_point->get_stage() == vk::ShaderStageFlagBits::eCompute);
+
         SPDLOG_DEBUG("create ComputePipeline ({})", fmt::ptr(this));
 
         const vk::ComputePipelineCreateInfo info{
             flags,
-            shader_stage_create_info,
+            entry_point->get_shader_stage_create_info(),
             *pipeline_layout,
             base_pipeline ? base_pipeline->get_pipeline() : nullptr,
             0,
@@ -29,24 +31,33 @@ class ComputePipeline : public Pipeline {
         pipeline = context->device.createComputePipeline(context->pipeline_cache, info).value;
     }
 
-    ComputePipeline(
-        const PipelineLayoutHandle& pipeline_layout,
-        const ShaderModuleHandle& shader_module,
-        const SpecializationInfoHandle& specialization_info = MERIAN_SPECIALIZATION_INFO_NONE,
-        const char* shader_module_entry_point = "main",
-        const vk::PipelineCreateFlags flags = {},
-        const PipelineHandle& base_pipeline = {},
-        const void* pNext = nullptr)
-        : ComputePipeline(pipeline_layout,
-                          ShaderStageCreateInfo{
-                              shader_module, specialization_info, shader_module_entry_point, {}},
-                          flags,
-                          base_pipeline,
-                          pNext) {}
-
+  public:
     ~ComputePipeline() {
         SPDLOG_DEBUG("destroy ComputePipeline ({})", fmt::ptr(this));
         context->device.destroyPipeline(pipeline);
+    }
+
+    // ---------------------------------------------------------------------------
+
+    static PipelineHandle create(const PipelineLayoutHandle& pipeline_layout,
+                                 const EntryPointHandle& entry_point,
+                                 const vk::PipelineCreateFlags flags = {},
+                                 const PipelineHandle& base_pipeline = {},
+                                 const void* pNext = nullptr) {
+        return PipelineHandle(
+            new ComputePipeline(pipeline_layout, entry_point, flags, base_pipeline, pNext));
+    }
+
+    // shortcurt for create(..., entry_point.specialize(spec_info),...)
+    static PipelineHandle create(const PipelineLayoutHandle& pipeline_layout,
+                                 const EntryPointHandle& unspecialized_entry_point,
+                                 const SpecializationInfoHandle& specialization_info,
+                                 const vk::PipelineCreateFlags flags = {},
+                                 const PipelineHandle& base_pipeline = {},
+                                 const void* pNext = nullptr) {
+        return PipelineHandle(new ComputePipeline(
+            pipeline_layout, unspecialized_entry_point->specialize(specialization_info), flags,
+            base_pipeline, pNext));
     }
 
     // Overrides
@@ -58,12 +69,12 @@ class ComputePipeline : public Pipeline {
 
     // ---------------------------------------------------------------------------
 
-    const std::shared_ptr<ShaderModule>& get_module() const {
-        return shader_module;
+    const EntryPointHandle& get_entry_point() const {
+        return entry_point;
     }
 
   private:
-    const std::shared_ptr<ShaderModule> shader_module;
+    const EntryPointHandle entry_point;
     const std::shared_ptr<Pipeline> base_pipeline;
 };
 

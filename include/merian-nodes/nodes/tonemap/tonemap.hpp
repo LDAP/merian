@@ -31,14 +31,12 @@ class Tonemap : public AbstractCompute {
 
     std::vector<OutputConnectorHandle> describe_outputs(const NodeIOLayout& io_layout) override;
 
-    SpecializationInfoHandle get_specialization_info(const NodeIO& io) noexcept override;
-
     const void* get_push_constant(GraphRun& run, const NodeIO& io) override;
 
     std::tuple<uint32_t, uint32_t, uint32_t>
     get_group_count(const NodeIO& io) const noexcept override;
 
-    ShaderModuleHandle get_shader_module() override;
+    EntryPointHandle get_entry_point() override;
 
     NodeStatusFlags properties(Properties& config) override;
 
@@ -51,7 +49,7 @@ class Tonemap : public AbstractCompute {
 
     vk::Extent3D extent;
     PushConstant pc;
-    ShaderModuleHandle shader;
+    EntryPointHandle shader;
     SpecializationInfoHandle spec_info;
 
     int32_t tonemap = 0;

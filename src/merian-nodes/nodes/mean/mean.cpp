@@ -11,12 +11,12 @@ namespace merian_nodes {
 
 MeanToBuffer::MeanToBuffer(const ContextHandle& context) : Node(), context(context) {
 
-    image_to_buffer_shader = ShaderModule::create(
-        context, merian_image_to_buffer_comp_spv(), merian_image_to_buffer_comp_spv_size(),
-        ShaderModule::EntryPointInfo("main", vk::ShaderStageFlagBits::eCompute));
-    reduce_buffer_shader = ShaderModule::create(
-        context, merian_reduce_buffer_comp_spv(), merian_reduce_buffer_comp_spv_size(),
-        ShaderModule::EntryPointInfo("main", vk::ShaderStageFlagBits::eCompute));
+    image_to_buffer_shader = EntryPoint::create(context, merian_image_to_buffer_comp_spv(),
+                                                merian_image_to_buffer_comp_spv_size(), "main",
+                                                vk::ShaderStageFlagBits::eCompute);
+    reduce_buffer_shader = EntryPoint::create(context, merian_reduce_buffer_comp_spv(),
+                                              merian_reduce_buffer_comp_spv_size(), "main",
+                                              vk::ShaderStageFlagBits::eCompute);
 }
 
 MeanToBuffer::~MeanToBuffer() {}
@@ -54,15 +54,14 @@ MeanToBuffer::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
             local_size_x, local_size_y,
             context->physical_device.physical_device_subgroup_properties.subgroupSize);
         SpecializationInfoHandle spec = image_to_buffer_spec_builder.build();
-        image_to_buffer =
-            std::make_shared<ComputePipeline>(pipe_layout, image_to_buffer_shader, spec);
+        image_to_buffer = ComputePipeline::create(pipe_layout, image_to_buffer_shader, spec);
 
         auto reduce_buffer_spec_builder = SpecializationInfoBuilder();
         reduce_buffer_spec_builder.add_entry(
             local_size_x * local_size_y, 1,
             context->physical_device.physical_device_subgroup_properties.subgroupSize);
         spec = reduce_buffer_spec_builder.build();
-        reduce_buffer = std::make_shared<ComputePipeline>(pipe_layout, reduce_buffer_shader, spec);
+        reduce_buffer = ComputePipeline::create(pipe_layout, reduce_buffer_shader, spec);
     }
 
     return {};

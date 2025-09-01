@@ -13,13 +13,12 @@ Accumulate::Accumulate(const ContextHandle& context,
                        const ResourceAllocatorHandle& allocator,
                        const std::optional<vk::Format> format)
     : Node(), context(context), allocator(allocator), format(format) {
-    percentile_module = ShaderModule::create(
-        context, merian_calculate_percentiles_slang_spv(),
-        merian_calculate_percentiles_slang_spv_size(),
-        ShaderModule::EntryPointInfo("main", vk::ShaderStageFlagBits::eCompute));
-    accumulate_module = ShaderModule::create(
-        context, merian_accumulate_slang_spv(), merian_accumulate_slang_spv_size(),
-        ShaderModule::EntryPointInfo("main", vk::ShaderStageFlagBits::eCompute));
+    percentile_module = EntryPoint::create(context, merian_calculate_percentiles_slang_spv(),
+                                           merian_calculate_percentiles_slang_spv_size(), "main",
+                                           vk::ShaderStageFlagBits::eCompute);
+    accumulate_module = EntryPoint::create(context, merian_accumulate_slang_spv(),
+                                           merian_accumulate_slang_spv_size(), "main",
+                                           vk::ShaderStageFlagBits::eCompute);
 }
 
 Accumulate::~Accumulate() {}
@@ -107,7 +106,7 @@ Accumulate::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
     quartile_spec_builder.add_entry(PERCENTILE_LOCAL_SIZE_X, PERCENTILE_LOCAL_SIZE_Y);
     auto quartile_spec = quartile_spec_builder.build();
     calculate_percentiles =
-        std::make_shared<ComputePipeline>(quartile_pipe_layout, percentile_module, quartile_spec);
+        ComputePipeline::create(quartile_pipe_layout, percentile_module, quartile_spec);
 
     auto accum_pipe_layout = PipelineLayoutBuilder(context)
                                  .add_descriptor_set_layout(graph_layout)
@@ -122,7 +121,7 @@ Accumulate::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
                                  enable_mv && io_layout.is_connected(con_mv));
     const auto accum_spec = accum_spec_builder.build();
     accumulate =
-        std::make_shared<ComputePipeline>(accum_pipe_layout, accumulate_module, accum_spec);
+        ComputePipeline::create(accum_pipe_layout, accumulate_module, accum_spec);
 
     return {};
 }

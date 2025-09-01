@@ -2,8 +2,7 @@
 
 #include "merian-nodes/graph/node.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
-#include "merian/vk/pipeline/specialization_info.hpp"
-#include "merian/vk/shader/shader_module.hpp"
+#include "merian/vk/shader/entry_point.hpp"
 
 #include <optional>
 
@@ -19,13 +18,6 @@ class AbstractCompute : public Node {
 
     virtual ~AbstractCompute() {}
 
-    // Return a SpecializationInfoHandle if you want to add specialization constants
-    // In every run (rebuilds the pipeline if handle changed.)
-    virtual SpecializationInfoHandle
-    get_specialization_info([[maybe_unused]] const NodeIO& io) noexcept {
-        return MERIAN_SPECIALIZATION_INFO_NONE;
-    }
-
     // Return a pointer to your push constant if push_constant_size is not std::nullop
     // In every run (rebuilds the pipeline if handle changed.)
     virtual const void* get_push_constant([[maybe_unused]] GraphRun& run,
@@ -40,7 +32,7 @@ class AbstractCompute : public Node {
     get_group_count(const NodeIO& io) const noexcept = 0;
 
     // In every run (rebuilds the pipeline if handle changed.)
-    virtual ShaderModuleHandle get_shader_module() = 0;
+    virtual EntryPointHandle get_entry_point() = 0;
 
     virtual NodeStatusFlags
     on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
@@ -55,8 +47,7 @@ class AbstractCompute : public Node {
     const std::optional<uint32_t> push_constant_size;
 
   private:
-    SpecializationInfoHandle current_spec_info;
-    ShaderModuleHandle current_shader_module;
+    EntryPointHandle current_shader_module;
 
     DescriptorSetLayoutHandle descriptor_set_layout;
     PipelineHandle pipe;

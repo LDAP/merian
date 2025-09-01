@@ -9,9 +9,6 @@ namespace merian_nodes {
 
 Tonemap::Tonemap(const ContextHandle& context, const std::optional<vk::Format> output_format)
     : AbstractCompute(context, sizeof(PushConstant)), output_format(output_format) {
-    shader = ShaderModule::create(
-        context, merian_tonemap_slang_spv(), merian_tonemap_slang_spv_size(),
-        ShaderModule::EntryPointInfo("main", vk::ShaderStageFlagBits::eCompute));
     make_spec_info();
 }
 
@@ -21,6 +18,10 @@ void Tonemap::make_spec_info() {
     auto spec_builder = SpecializationInfoBuilder();
     spec_builder.add_entry(local_size_x, local_size_y, tonemap, alpha_mode, clamp_output);
     spec_info = spec_builder.build();
+
+    shader =
+        EntryPoint::create(context, merian_tonemap_slang_spv(), merian_tonemap_slang_spv_size(),
+                           "main", vk::ShaderStageFlagBits::eCompute, spec_info);
 }
 
 std::vector<InputConnectorHandle> Tonemap::describe_inputs() {
@@ -41,11 +42,6 @@ Tonemap::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
     };
 }
 
-SpecializationInfoHandle
-Tonemap::get_specialization_info([[maybe_unused]] const NodeIO& io) noexcept {
-    return spec_info;
-}
-
 const void* Tonemap::get_push_constant([[maybe_unused]] GraphRun& run,
                                        [[maybe_unused]] const NodeIO& io) {
     return &pc;
@@ -57,7 +53,7 @@ Tonemap::get_group_count([[maybe_unused]] const NodeIO& io) const noexcept {
             (extent.height + local_size_y - 1) / local_size_y, 1};
 };
 
-ShaderModuleHandle Tonemap::get_shader_module() {
+EntryPointHandle Tonemap::get_entry_point() {
     return shader;
 }
 

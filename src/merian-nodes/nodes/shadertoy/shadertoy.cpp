@@ -95,13 +95,17 @@ Shadertoy::Shadertoy(const ContextHandle& context)
 
     compiler = std::make_shared<ShadertoyInjectCompiler>(forwarding_compiler);
     reloader = std::make_unique<HotReloader>(context, compilation_session_description, compiler);
-    shader = compiler->compile_glsl_to_shadermodule(context, shader_glsl, "<memory>Shadertoy.comp",
-                                                    vk::ShaderStageFlagBits::eCompute,
-                                                    compilation_session_description);
 
     auto spec_builder = SpecializationInfoBuilder();
     spec_builder.add_entry(local_size_x, local_size_y);
     spec_info = spec_builder.build();
+
+    shader =
+        EntryPoint::create("main", vk::ShaderStageFlagBits::eCompute,
+                           compiler->compile_glsl_to_shadermodule(
+                               context, shader_glsl, "<memory>Shadertoy.comp",
+                               vk::ShaderStageFlagBits::eCompute, compilation_session_description),
+                           spec_info);
 }
 
 std::vector<OutputConnectorHandle>
@@ -128,11 +132,6 @@ Shadertoy::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
     return {ManagedVkImageOut::compute_write("out", vk::Format::eR8G8B8A8Unorm, extent)};
 }
 
-SpecializationInfoHandle
-Shadertoy::get_specialization_info([[maybe_unused]] const NodeIO& io) noexcept {
-    return spec_info;
-}
-
 const void* Shadertoy::get_push_constant([[maybe_unused]] GraphRun& run,
                                          [[maybe_unused]] const NodeIO& io) {
     constant.iTimeDelta = static_cast<float>(run.get_time_delta());
@@ -157,10 +156,15 @@ Shadertoy::get_group_count([[maybe_unused]] const NodeIO& io) const noexcept {
             (extent.height + local_size_y - 1) / local_size_y, 1};
 };
 
-ShaderModuleHandle Shadertoy::get_shader_module() {
+EntryPointHandle Shadertoy::get_entry_point() {
     if (shader_source_selector == 1) {
         try {
-            shader = reloader->get_shader(resolved_shader_path, vk::ShaderStageFlagBits::eCompute);
+            ShaderModuleHandle shader_module =
+                reloader->get_shader(resolved_shader_path, vk::ShaderStageFlagBits::eCompute);
+            if (shader_module != shader->get_shader_module()) {
+                shader = EntryPoint::create("main", vk::ShaderStageFlagBits::eCompute,
+                                            shader_module, spec_info);
+            }
             error.reset();
         } catch (const GLSLShaderCompiler::compilation_failed& e) {
             error = e;
@@ -220,9 +224,11 @@ AbstractCompute::NodeStatusFlags Shadertoy::properties(Properties& config) {
 
     if (compiler && needs_compile) {
         try {
-            shader = compiler->compile_glsl_to_shadermodule(
+            ShaderModuleHandle shader_module = compiler->compile_glsl_to_shadermodule(
                 context, shader_glsl, "<memory>Shadertoy.comp", vk::ShaderStageFlagBits::eCompute,
                 compilation_session_description);
+            shader = EntryPoint::create("main", vk::ShaderStageFlagBits::eCompute, shader_module,
+                                        spec_info);
             error.reset();
         } catch (const GLSLShaderCompiler::compilation_failed& e) {
             error = e;

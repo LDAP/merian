@@ -39,8 +39,7 @@ class SpecializationInfo {
 
   public:
     ~SpecializationInfo() {
-        if (data)
-            delete[](data);
+        delete[] (data);
     }
 
   public:
@@ -52,7 +51,7 @@ class SpecializationInfo {
         return &info;
     }
 
-    const vk::SpecializationInfo get() const {
+    const vk::SpecializationInfo& get() const {
         return info;
     }
 

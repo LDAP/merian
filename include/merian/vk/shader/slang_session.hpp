@@ -1,6 +1,7 @@
 #pragma once
 
 #include "merian/vk/shader/compilation_session_description.hpp"
+#include "merian/vk/shader/entry_point.hpp"
 #include "merian/vk/shader/shader_compiler.hpp"
 #include "merian/vk/shader/shader_module.hpp"
 #include "merian/vk/shader/slang_global_session.hpp"
@@ -171,7 +172,7 @@ class SlangSession {
         return (uint32_t)module->getDefinedEntryPointCount();
     }
 
-    // throws compilaiton failed if not found
+    // throws compilation failed if not found
     Slang::ComPtr<slang::IEntryPoint>
     find_entry_point_or_fail(Slang::ComPtr<slang::IModule>& module, const std::string& name) {
         Slang::ComPtr<slang::IEntryPoint> entry_point = find_entry_point(module, name);
@@ -182,6 +183,64 @@ class SlangSession {
         return entry_point;
     }
 
+    Slang::ComPtr<slang::ITypeConformance> create_type_conformance(slang::TypeReflection* type,
+                                                                   slang::TypeReflection* interface,
+                                                                   int64_t& id) {
+        Slang::ComPtr<slang::ITypeConformance> type_conformance;
+        Slang::ComPtr<slang::IBlob> diagnostics_blob;
+
+        SlangResult result = session->createTypeConformanceComponentType(
+            type, interface, type_conformance.writeRef(), id, diagnostics_blob.writeRef());
+
+        if (SLANG_FAILED(result)) {
+            // type does not conform to interface.
+            throw ShaderCompiler::compilation_failed(diagnostics_as_string(diagnostics_blob));
+        }
+
+        if (diagnostics_blob != nullptr) {
+            SPDLOG_DEBUG("Slang creating type conformance failed. Diagnostics: {}",
+                         diagnostics_as_string(diagnostics_blob));
+        }
+
+        return type_conformance;
+    }
+
+    Slang::ComPtr<slang::ITypeConformance>
+    create_type_conformance(const Slang::ComPtr<slang::IComponentType>& type_component,
+                            const std::string& type_name,
+                            const Slang::ComPtr<slang::IComponentType>& interface_component,
+                            const std::string& interface_type_name,
+                            int64_t& id) {
+        slang::TypeReflection* type =
+            type_component->getLayout()->findTypeByName(type_name.c_str());
+        slang::TypeReflection* interface =
+            interface_component->getLayout()->findTypeByName(interface_type_name.c_str());
+
+        if (type == nullptr) {
+            throw ShaderCompiler::compilation_failed{
+                fmt::format("{} not found in in type component", type_name)};
+        }
+
+        if (interface == nullptr) {
+            throw ShaderCompiler::compilation_failed{
+                fmt::format("{} not found in in interface component", interface_type_name)};
+        }
+
+        return create_type_conformance(type, interface, id);
+    }
+
+    // Creates a type conformance. Assumes that the type and interface are known to component.
+    // "id" is the preffered id that is used for the createDynamicObject<>(id, ...) method in Slang
+    // or -1 if the compiler should choose one.
+    Slang::ComPtr<slang::ITypeConformance>
+    create_type_conformance(const Slang::ComPtr<slang::IComponentType>& component,
+                            const std::string& type_name,
+                            const std::string& interface_type_name,
+                            int64_t& id) {
+        return create_type_conformance(component, type_name, component, interface_type_name, id);
+    }
+
+    // Compose modules, entry points and type conformances to a (linkable) component.
     Slang::ComPtr<slang::IComponentType>
     compose(const vk::ArrayProxy<slang::IComponentType*>& components) {
         Slang::ComPtr<slang::IComponentType> composed;
@@ -223,6 +282,19 @@ class SlangSession {
         return composed;
     }
 
+    // creates a composite of the module with all its entrypoints.
+    Slang::ComPtr<slang::IComponentType>
+    compose_all_entrypoints(Slang::ComPtr<slang::IModule>& module) {
+        std::vector<Slang::ComPtr<slang::IComponentType>> composite(
+            get_defined_entry_point_count(module) + 1);
+        composite[0] = module.get();
+        for (uint32_t i = 0; i < get_defined_entry_point_count(module); i++) {
+            composite[i + 1] = get_defined_entry_point(module, i);
+        }
+
+        return compose(composite);
+    }
+
     Slang::ComPtr<slang::IComponentType>
     link(const Slang::ComPtr<slang::IComponentType>& composed_programm) {
         Slang::ComPtr<slang::IComponentType> linked;
@@ -243,7 +315,7 @@ class SlangSession {
     }
 
     Slang::ComPtr<slang::IBlob> compile(const Slang::ComPtr<slang::IComponentType>& linked_programm,
-                                        uint32_t entrypoint_index) {
+                                        const uint32_t entrypoint_index) {
         Slang::ComPtr<slang::IBlob> compiled;
         Slang::ComPtr<slang::IBlob> diagnostics_blob;
 
@@ -265,7 +337,7 @@ class SlangSession {
     }
 
     // This compiles all entrypoints. You can skip compose and directly link the module. This will
-    // compile all entrypoints.
+    // compile all entrypoints in the linked composite.
     Slang::ComPtr<slang::IBlob>
     compile(const Slang::ComPtr<slang::IComponentType>& linked_programm) {
         Slang::ComPtr<slang::IBlob> compiled;
@@ -287,8 +359,8 @@ class SlangSession {
         return compiled;
     }
 
-    // This compiles all entrypoints. You can skip compose and directly link the module. This will
-    // compile all entrypoints.
+    // This compiles all entrypoints in the linked programm. You can skip compose and directly link
+    // the module.
     ShaderModuleHandle
     compile_to_shadermodule(const ContextHandle& context,
                             const Slang::ComPtr<slang::IComponentType>& linked_programm) {
@@ -308,17 +380,55 @@ class SlangSession {
                          diagnostics_as_string(diagnostics_blob));
         }
 
-        auto* layout = linked_programm->getLayout();
-        std::vector<ShaderModule::EntryPointInfo> entrypoints;
-        entrypoints.reserve(layout->getEntryPointCount());
-        for (uint32_t i = 0; i < layout->getEntryPointCount(); i++) {
-            auto* entry_point = layout->getEntryPointByIndex(i);
-            entrypoints.emplace_back(ShaderModule::EntryPointInfo(
-                entry_point->getName(), vk_stage_for_slang_stage(entry_point->getStage())));
+        return ShaderModule::create(context, compiled->getBufferPointer(),
+                                    compiled->getBufferSize());
+    }
+
+    EntryPointHandle
+    compile_entry_point(const ContextHandle& context,
+                        const Slang::ComPtr<slang::IComponentType>& linked_programm,
+                        const int64_t& entry_point_index = 0) {
+        Slang::ComPtr<slang::IBlob> compiled;
+        Slang::ComPtr<slang::IBlob> diagnostics_blob;
+
+        slang::EntryPointReflection* entry_point =
+            linked_programm->getLayout()->getEntryPointByIndex(entry_point_index);
+        if (entry_point == nullptr) {
+            throw ShaderCompiler::compilation_failed{
+                fmt::format("entry point with index {} does not exist", entry_point_index)};
         }
 
-        return ShaderModule::create(context, compiled->getBufferPointer(),
-                                    compiled->getBufferSize(), entrypoints);
+        SlangResult result = linked_programm->getEntryPointCode(
+            entry_point_index, 0, // targetIndex, currently only one supported,
+            compiled.writeRef(), diagnostics_blob.writeRef());
+
+        if (SLANG_FAILED(result)) {
+            throw ShaderCompiler::compilation_failed(diagnostics_as_string(diagnostics_blob));
+        }
+
+        if (diagnostics_blob != nullptr) {
+            SPDLOG_DEBUG("Slang compiling. Diagnostics: {}",
+                         diagnostics_as_string(diagnostics_blob));
+        }
+
+        return EntryPoint::create(
+            entry_point->getName(), vk_stage_for_slang_stage(entry_point->getStage()),
+            ShaderModule::create(context, compiled->getBufferPointer(), compiled->getBufferSize()));
+    }
+
+    EntryPointHandle compile_entry_point(const ContextHandle& context,
+                                         const Slang::ComPtr<slang::IComponentType>& linked_program,
+                                         const std::string& entry_point_name = "main") {
+        slang::ProgramLayout* layout = linked_program->getLayout();
+
+        for (uint32_t i = 0; i < layout->getEntryPointCount(); i++) {
+            if (entry_point_name == layout->getEntryPointByIndex(i)->getName()) {
+                return compile_entry_point(context, linked_program, i);
+            }
+        }
+
+        throw ShaderCompiler::compilation_failed{
+            fmt::format("entry point with name {} does not exist", entry_point_name)};
     }
 
     // -----------------------------------------------------
@@ -350,51 +460,39 @@ class SlangSession {
         return compile(link(module));
     }
 
-    // Shortcut for load_module_from_path + link + compile.
-    ShaderModuleHandle load_module_from_path_and_compile_to_shadermodule(
+    // Shortcut for load_module_from_path + compose_all_entrypoints + link + compile.
+    EntryPointHandle load_module_from_path_and_compile_entry_point(
         const ContextHandle& context,
         const std::filesystem::path& path,
+        const std::string& entry_point_name = "main",
         const std::optional<std::string>& relative_to = std::nullopt) {
-        return load_module_from_path_and_compile_to_shadermodule(context, path.stem(), path,
-                                                                 relative_to);
+        return load_module_from_path_and_compile_entry_point(context, path.stem(), path,
+                                                             entry_point_name, relative_to);
     }
 
-    // Shortcut for load_module_from_path + link + compile.
-    ShaderModuleHandle load_module_from_path_and_compile_to_shadermodule(
+    // Shortcut for load_module_from_path + compose_all_entrypoints + link + compile.
+    EntryPointHandle load_module_from_path_and_compile_entry_point(
         const ContextHandle& context,
         const std::string& name,
         const std::filesystem::path& path,
+        const std::string& entry_point_name = "main",
         const std::optional<std::filesystem::path>& relative_to = std::nullopt) {
         Slang::ComPtr<slang::IModule> module = load_module_from_path(name, path, relative_to);
-
-        std::vector<Slang::ComPtr<slang::IComponentType>> composite(
-            get_defined_entry_point_count(module) + 1);
-        composite[0] = module.get();
-        for (uint32_t i = 0; i < get_defined_entry_point_count(module); i++) {
-            composite[i + 1] = get_defined_entry_point(module, i);
-        }
-
-        Slang::ComPtr<slang::IComponentType> linked = link(compose(composite));
-        return compile_to_shadermodule(context, linked);
+        return compile_entry_point(context, link(compose_all_entrypoints(module)),
+                                   entry_point_name);
     }
 
-    // Shortcut for load_module_from_source + link + compile.
-    ShaderModuleHandle load_module_from_source_and_compile_to_shadermodule(
+    // Shortcut for load_module_from_source + compose_all_entrypoints + link + compile.
+    EntryPointHandle load_module_from_source_and_compile_entry_point(
         const ContextHandle& context,
         const std::string& name,
         const std::string& source,
-        const std::optional<std::filesystem::path>& path) {
+        const std::string& entry_point_name = "main",
+        const std::optional<std::filesystem::path>& path = std::nullopt) {
         Slang::ComPtr<slang::IModule> module = load_module_from_source(name, source, path);
 
-        std::vector<Slang::ComPtr<slang::IComponentType>> composite(
-            get_defined_entry_point_count(module) + 1);
-        composite[0] = module.get();
-        for (uint32_t i = 0; i < get_defined_entry_point_count(module); i++) {
-            composite[i + 1] = get_defined_entry_point(module, i);
-        }
-
-        Slang::ComPtr<slang::IComponentType> linked = link(compose(composite));
-        return compile_to_shadermodule(context, linked);
+        return compile_entry_point(context, link(compose_all_entrypoints(module)),
+                                   entry_point_name);
     }
 
   private:

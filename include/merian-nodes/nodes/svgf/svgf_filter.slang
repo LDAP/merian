@@ -251,7 +251,7 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
     sigma_l = 1. / (sqrt(filter_irr_var.a) * params.param_l + 1e-10);
 #endif
 
-    if (c_z > 0) {
+    if (c_z > 0 && filter_irr_var.a > .0) {
         filter_w = 1.0;
 
 #if FILTER_TYPE == 0
