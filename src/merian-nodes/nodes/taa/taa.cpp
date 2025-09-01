@@ -50,7 +50,7 @@ TAA::get_group_count([[maybe_unused]] const NodeIO& io) const noexcept {
             1};
 }
 
-EntryPointHandle TAA::get_entry_point() {
+SpecializedEntryPointHandle TAA::get_entry_point() {
     return shader;
 }
 

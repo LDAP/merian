@@ -11,7 +11,7 @@ using EntryPointHandle = std::shared_ptr<EntryPoint>;
 class SpecializedEntryPoint;
 using SpecializedEntryPointHandle = std::shared_ptr<SpecializedEntryPoint>;
 
-class EntryPoint : std::enable_shared_from_this<EntryPoint> {
+class EntryPoint : public std::enable_shared_from_this<EntryPoint> {
 
   public:
     virtual const std::string& get_name() const = 0;

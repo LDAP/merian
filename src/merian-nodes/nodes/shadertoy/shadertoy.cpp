@@ -156,7 +156,7 @@ Shadertoy::get_group_count([[maybe_unused]] const NodeIO& io) const noexcept {
             (extent.height + local_size_y - 1) / local_size_y, 1};
 };
 
-EntryPointHandle Shadertoy::get_entry_point() {
+SpecializedEntryPointHandle Shadertoy::get_entry_point() {
     if (shader_source_selector == 1) {
         try {
             ShaderModuleHandle shader_module =

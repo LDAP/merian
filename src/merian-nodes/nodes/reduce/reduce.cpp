@@ -129,7 +129,7 @@ Reduce::get_group_count([[maybe_unused]] const merian_nodes::NodeIO& io) const n
             (extent.height + local_size_y - 1) / local_size_y, 1};
 };
 
-EntryPointHandle Reduce::get_entry_point() {
+SpecializedEntryPointHandle Reduce::get_entry_point() {
     return shader;
 }
 

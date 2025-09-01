@@ -36,7 +36,7 @@ class Shadertoy : public AbstractCompute {
     std::tuple<uint32_t, uint32_t, uint32_t>
     get_group_count(const NodeIO& io) const noexcept override;
 
-    EntryPointHandle get_entry_point() override;
+    SpecializedEntryPointHandle get_entry_point() override;
 
     NodeStatusFlags properties(Properties& config) override;
 
@@ -54,7 +54,7 @@ class Shadertoy : public AbstractCompute {
     vk::Extent3D extent = {1920, 1080, 1};
 
     SpecializationInfoHandle spec_info;
-    EntryPointHandle shader;
+    SpecializedEntryPointHandle shader;
     std::optional<GLSLShaderCompiler::compilation_failed> error;
 
     PushConstant constant;

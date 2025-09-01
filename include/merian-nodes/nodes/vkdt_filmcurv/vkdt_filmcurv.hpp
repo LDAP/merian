@@ -33,7 +33,7 @@ class VKDTFilmcurv : public TypedPCAbstractCompute<VKDTFilmcurvePushConstant> {
     std::tuple<uint32_t, uint32_t, uint32_t>
     get_group_count(const NodeIO& io) const noexcept override;
 
-    EntryPointHandle get_entry_point() override;
+    SpecializedEntryPointHandle get_entry_point() override;
 
     NodeStatusFlags properties(Properties& config) override;
 
@@ -43,7 +43,7 @@ class VKDTFilmcurv : public TypedPCAbstractCompute<VKDTFilmcurvePushConstant> {
     VkSampledImageInHandle con_src = VkSampledImageIn::compute_read("src");
     vk::Extent3D extent;
 
-    EntryPointHandle shader;
+    SpecializedEntryPointHandle shader;
     SpecializationInfoHandle spec_info;
 
     VKDTFilmcurvePushConstant pc;
