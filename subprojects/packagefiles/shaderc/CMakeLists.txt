@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 3.17.2)
+cmake_minimum_required(VERSION 3.22.1)
 
 project(shaderc)
 enable_testing()
@@ -49,6 +49,16 @@ if(${SHADERC_ENABLE_EXAMPLES})
   message(STATUS "Configuring Shaderc to build examples.")
 else()
   message(STATUS "Configuring Shaderc to avoid building examples.")
+endif()
+
+option(SHADERC_SKIP_EXECUTABLES "Skip building executables." ${SHADERC_SKIP_EXECUTABLES})
+if(NOT ${SHADERC_SKIP_EXECUTABLES})
+  set(SHADERC_ENABLE_EXECUTABLES ON)
+endif()
+if (${SHADERC_ENABLE_EXECUTABLES})
+  message(STATUS "Configuring Shaderc to build executables.")
+else()
+  message(STATUS "Configuring Shaderc to avoid building executables.")
 endif()
 
 option(SHADERC_SKIP_COPYRIGHT_CHECK "Skip copyright check" ${SHADERC_SKIP_COPYRIGHT_CHECK})
@@ -109,7 +119,7 @@ add_custom_target(add-copyright
 if(MSVC)
   option(SHADERC_ENABLE_SHARED_CRT
           "Use the shared CRT instead of the static CRT"
-          OFF)
+      OFF)
   if (SHADERC_ENABLE_SHARED_CRT)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
   else()

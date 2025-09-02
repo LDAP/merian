@@ -2,7 +2,7 @@
 directory = shaderc
 
 url = https://github.com/google/shaderc
-revision = v2024.3
+revision = v2025.3
 depth = 1
 method = cmake
 clone-recursive = true
