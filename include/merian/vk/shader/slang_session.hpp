@@ -98,6 +98,10 @@ class SlangSession {
     }
 
   public:
+    const ShaderCompileContextHandle& get_compile_context() {
+        return shader_compile_context;
+    }
+
     // The path can be used as path-based import statement the
     // module. The name is the stem (final part without its suffix) of this path. If the source path
     // should not be the same as the path for path-based includes use "source_path".
@@ -446,6 +450,7 @@ class SlangSession {
     // -----------------------------------------------------
 
     // Shortcut for load_module_from_path + compose_all_entrypoints + link + compile.
+    // Should be only used for very simple cases otherwise use the SlangComposition class.
     EntryPointHandle load_module_from_path_and_compile_entry_point(
         const ContextHandle& context,
         const std::filesystem::path& path,
@@ -456,6 +461,7 @@ class SlangSession {
     }
 
     // Shortcut for load_module_from_path + compose_all_entrypoints + link + compile.
+    // Should be only used for very simple cases otherwise use the SlangComposition class.
     EntryPointHandle load_module_from_path_and_compile_entry_point(
         const ContextHandle& context,
         const std::string& name,
@@ -468,6 +474,7 @@ class SlangSession {
     }
 
     // Shortcut for load_module_from_source + compose_all_entrypoints + link + compile.
+    // Should be only used for very simple cases otherwise use the SlangComposition class.
     EntryPointHandle load_module_from_source_and_compile_entry_point(
         const ContextHandle& context,
         const std::string& name,

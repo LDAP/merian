@@ -15,7 +15,7 @@ using SlangCompositionHandle = std::shared_ptr<SlangComposition>;
 // A slang composition used a single slang session for compilation.
 class SlangComposition {
   private:
-    SlangComposition(const ShaderCompileContextHandle& compile_context);
+    SlangComposition(const SlangSessionHandle& session);
 
   public:
     class SlangModule {
@@ -163,7 +163,7 @@ class SlangComposition {
     Slang::ComPtr<slang::IComponentType> get_composite();
 
   public:
-    static SlangCompositionHandle create(const ShaderCompileContextHandle& compile_context);
+    static SlangCompositionHandle create(const SlangSessionHandle& session);
 
   private:
     void load_module(SlangModule& module);
@@ -173,7 +173,7 @@ class SlangComposition {
     void compose();
 
   private:
-    ShaderCompileContextHandle compile_context;
+    SlangSessionHandle session;
 
     std::map<std::string, SlangModule> modules;
     // interface name -> type name -> dynamic dispach id
@@ -183,8 +183,6 @@ class SlangComposition {
 
     // can be nullptr if something changed.
     Slang::ComPtr<slang::IComponentType> composite;
-
-    SlangSessionHandle session;
 };
 
 } // namespace merian

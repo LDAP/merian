@@ -2,10 +2,7 @@
 
 namespace merian {
 
-SlangComposition::SlangComposition(const ShaderCompileContextHandle& compile_context)
-    : compile_context(compile_context) {
-    session = SlangSession::create(compile_context);
-}
+SlangComposition::SlangComposition(const SlangSessionHandle& session) : session(session) {}
 
 void SlangComposition::add_module(const SlangModule& module, const bool with_entry_points) {
     SlangModule& added_module = modules.emplace(module.name, module).first->second;
@@ -73,13 +70,14 @@ Slang::ComPtr<slang::IComponentType> SlangComposition::get_composite() {
     return composite;
 }
 
-SlangCompositionHandle SlangComposition::create(const ShaderCompileContextHandle& compile_context) {
-    return SlangCompositionHandle(new SlangComposition(compile_context));
+SlangCompositionHandle SlangComposition::create(const SlangSessionHandle& session) {
+    return SlangCompositionHandle(new SlangComposition(session));
 }
 
 void SlangComposition::load_module(SlangModule& module) {
     module.module = session->load_module_from_source(
-        module.get_name(), module.get_source(compile_context->get_search_path_file_loader()),
+        module.get_name(),
+        module.get_source(session->get_compile_context()->get_search_path_file_loader()),
         module.get_import_path());
 }
 
