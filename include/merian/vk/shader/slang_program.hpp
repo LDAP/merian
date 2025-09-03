@@ -1,7 +1,7 @@
 #pragma once
 
 #include "merian/vk/shader/shader_module.hpp"
-#include "merian/vk/shader/slang_session.hpp"
+#include "merian/vk/shader/slang_composition.hpp"
 
 #include "slang-com-ptr.h"
 #include "slang.h"
@@ -15,10 +15,13 @@ class SlangProgram;
 using SlangProgramHandle = std::shared_ptr<SlangProgram>;
 
 /**
- * @brief      Represents a slang program with all its entry points. In Vulkan this compiles to a
+ * @brief      Represents a slang program with all its entry points. This is created from a slang
+ * composition that is fully linked and all dependencies are satisfied. In Vulkan this compiles to a
  * SPIRV shader module.
  */
 class SlangProgram : public std::enable_shared_from_this<SlangProgram> {
+  protected:
+    SlangProgram(const SlangCompositionHandle& composition);
 
   public:
     ShaderModuleHandle get_shader_module(const ContextHandle& context);
@@ -27,13 +30,23 @@ class SlangProgram : public std::enable_shared_from_this<SlangProgram> {
 
     const Slang::ComPtr<slang::IComponentType>& get_program() const;
 
+    uint64_t get_entry_point_index(const std::string& entry_point_name) const;
+
     SlangEntryPointHandle get_entry_point_by_index(const uint64_t entry_point_index = 0);
 
     SlangEntryPointHandle get_entry_point_by_name(const std::string& entry_point_name = "main");
 
+    const SlangCompositionHandle& get_composition();
+
+  public:
+    static SlangProgramHandle create(const SlangCompositionHandle& composition);
+
   private:
-    const SlangSessionHandle session;
-    const Slang::ComPtr<slang::IComponentType> program;
+    const SlangCompositionHandle composition;
+
+    // should be always updated together from composition
+    Slang::ComPtr<slang::IComponentType> program; // linked composition
+    SlangSessionHandle session;
 
     // lazyly compiled
     ShaderModuleHandle shader_module{nullptr};

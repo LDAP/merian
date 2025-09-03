@@ -18,10 +18,7 @@ using SlangEntryPointHandle = std::shared_ptr<SlangEntryPoint>;
 class SlangEntryPoint : public EntryPoint {
 
   protected:
-    SlangEntryPoint(const SlangProgramHandle& program, const uint64_t entry_point_index)
-        : program(program), entry_point_index(entry_point_index) {
-        assert(entry_point_index < program->get_program_reflection()->getEntryPointCount());
-    }
+    SlangEntryPoint(const SlangProgramHandle& program, const uint64_t entry_point_index);
 
   public:
     virtual const char* get_name() const override;
@@ -37,6 +34,9 @@ class SlangEntryPoint : public EntryPoint {
   public:
     static SlangEntryPointHandle create(const SlangProgramHandle& program,
                                         const uint64_t entry_point_index);
+
+    static SlangEntryPointHandle create(const SlangProgramHandle& program,
+                                        const std::string& entry_point_name);
 
   private:
     const SlangProgramHandle program;

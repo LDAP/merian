@@ -38,8 +38,6 @@ merian_src = files(
     'vk/renderpass/renderpass.cpp',
     'vk/renderpass/renderpass_builder.cpp',
     'vk/sampler/sampler_pool.cpp',
-    'vk/shader/shader_compiler.cpp',
-    'vk/shader/shader_hotreloader.cpp',
     'vk/sync/semaphore_timeline.cpp',
     'vk/utils/barriers.cpp',
     'vk/utils/cpu_queue.cpp',

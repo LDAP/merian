@@ -3,6 +3,12 @@
 
 namespace merian {
 
+SlangEntryPoint::SlangEntryPoint(const SlangProgramHandle& program,
+                                 const uint64_t entry_point_index)
+    : program(program), entry_point_index(entry_point_index) {
+    assert(entry_point_index < program->get_program_reflection()->getEntryPointCount());
+}
+
 const char* SlangEntryPoint::get_name() const {
     return get_entry_point_reflection()->getName();
 }
@@ -26,6 +32,11 @@ const SlangProgramHandle& SlangEntryPoint::get_program() const {
 SlangEntryPointHandle SlangEntryPoint::create(const SlangProgramHandle& program,
                                               const uint64_t entry_point_index) {
     return SlangEntryPointHandle(new SlangEntryPoint(program, entry_point_index));
+}
+
+SlangEntryPointHandle SlangEntryPoint::create(const SlangProgramHandle& program,
+                                              const std::string& entry_point_name) {
+    return create(program, program->get_entry_point_index(entry_point_name));
 }
 
 } // namespace merian

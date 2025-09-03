@@ -144,7 +144,6 @@ class ShaderCompileContext {
     }
 
   private:
-    const ContextHandle context;
     FileLoader file_loader; // for search path management
 
     std::map<std::string, std::string> preprocessor_macros;

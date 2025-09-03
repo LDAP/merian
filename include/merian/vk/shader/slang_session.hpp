@@ -19,10 +19,6 @@ class SlangSession {
   protected:
     SlangSession(const ShaderCompileContextHandle& shader_compile_context)
         : shader_compile_context(shader_compile_context) {
-        recreate_session();
-    }
-
-    void recreate_session() {
         const auto global_session = get_global_slang_session();
 
         slang::SessionDesc slang_session_desc = {};
@@ -102,28 +98,30 @@ class SlangSession {
     }
 
   public:
-    // Loads a module from this path. The path can be used as path-based import statement the
-    // module. The name is the stem (final part without its suffix) of this path.
+    // The path can be used as path-based import statement the
+    // module. The name is the stem (final part without its suffix) of this path. If the source path
+    // should not be the same as the path for path-based includes use "source_path".
     //
     // Note: The returned module is only valid as long as this session is valid
     Slang::ComPtr<slang::IModule>
     load_module_from_path(const std::filesystem::path& path,
-                          const std::optional<std::string>& relative_to = std::nullopt) {
-        return load_module_from_path(path.stem(), path, relative_to);
+                          const std::optional<std::filesystem::path>& source_path = std::nullopt) {
+        return load_module_from_path(path.stem(), path, source_path);
     }
 
-    // Loads a module from this path. The path can be used as path-based import statement the
-    // module.
+    // The path can be used as path-based import statement the
+    // module. The name is the stem (final part without its suffix) of this path. If the source path
+    // should not be the same as the path for path-based includes use "source_path".
     //
     // Note: The returned module is only valid as long as this session is valid
     Slang::ComPtr<slang::IModule>
     load_module_from_path(const std::string& name,
                           const std::filesystem::path& path,
-                          const std::optional<std::filesystem::path>& relative_to = std::nullopt) {
+                          const std::optional<std::filesystem::path>& source_path = std::nullopt) {
         std::optional<std::string> source;
-        if (relative_to) {
+        if (source_path) {
             source = shader_compile_context->get_search_path_file_loader().find_and_load_file(
-                path, relative_to.value());
+                source_path.value());
         } else {
             source = shader_compile_context->get_search_path_file_loader().find_and_load_file(path);
         }
@@ -162,26 +160,26 @@ class SlangSession {
         return module;
     }
 
-    Slang::ComPtr<slang::IEntryPoint> find_entry_point(Slang::ComPtr<slang::IModule>& module,
-                                                       const std::string& name) {
+    static Slang::ComPtr<slang::IEntryPoint> find_entry_point(Slang::ComPtr<slang::IModule>& module,
+                                                              const std::string& name) {
         Slang::ComPtr<slang::IEntryPoint> entry_point;
         module->findEntryPointByName(name.c_str(), entry_point.writeRef());
         return entry_point;
     }
 
-    Slang::ComPtr<slang::IEntryPoint> get_defined_entry_point(Slang::ComPtr<slang::IModule>& module,
-                                                              const uint32_t index = 0) {
+    static Slang::ComPtr<slang::IEntryPoint>
+    get_defined_entry_point(Slang::ComPtr<slang::IModule>& module, const uint32_t index = 0) {
         Slang::ComPtr<slang::IEntryPoint> entry_point;
         module->getDefinedEntryPoint((SlangInt32)index, entry_point.writeRef());
         return entry_point;
     }
 
-    uint32_t get_defined_entry_point_count(Slang::ComPtr<slang::IModule>& module) {
+    static uint32_t get_defined_entry_point_count(Slang::ComPtr<slang::IModule>& module) {
         return (uint32_t)module->getDefinedEntryPointCount();
     }
 
     // throws compilation failed if not found
-    Slang::ComPtr<slang::IEntryPoint>
+    static Slang::ComPtr<slang::IEntryPoint>
     find_entry_point_or_fail(Slang::ComPtr<slang::IModule>& module, const std::string& name) {
         Slang::ComPtr<slang::IEntryPoint> entry_point = find_entry_point(module, name);
         if (entry_point == nullptr) {
@@ -303,7 +301,7 @@ class SlangSession {
         return compose(composite);
     }
 
-    Slang::ComPtr<slang::IComponentType>
+    static Slang::ComPtr<slang::IComponentType>
     link(const Slang::ComPtr<slang::IComponentType>& composed_programm) {
         Slang::ComPtr<slang::IComponentType> linked;
         Slang::ComPtr<slang::IBlob> diagnostics_blob;
@@ -322,8 +320,9 @@ class SlangSession {
         return linked;
     }
 
-    Slang::ComPtr<slang::IBlob> compile(const Slang::ComPtr<slang::IComponentType>& linked_programm,
-                                        const uint32_t entrypoint_index) {
+    static Slang::ComPtr<slang::IBlob>
+    compile(const Slang::ComPtr<slang::IComponentType>& linked_programm,
+            const uint32_t entrypoint_index) {
         Slang::ComPtr<slang::IBlob> compiled;
         Slang::ComPtr<slang::IBlob> diagnostics_blob;
 
@@ -346,7 +345,7 @@ class SlangSession {
 
     // This compiles all entrypoints. You can skip compose and directly link the module. This will
     // compile all entrypoints in the linked composite.
-    Slang::ComPtr<slang::IBlob>
+    static Slang::ComPtr<slang::IBlob>
     compile(const Slang::ComPtr<slang::IComponentType>& linked_programm) {
         Slang::ComPtr<slang::IBlob> compiled;
         Slang::ComPtr<slang::IBlob> diagnostics_blob;
@@ -369,7 +368,9 @@ class SlangSession {
 
     // This compiles all entrypoints in the linked programm. You can skip compose and directly link
     // the module.
-    ShaderModuleHandle
+    //
+    // Should only be used for very simple shader. Otherwise use the SlangComposition class.
+    static ShaderModuleHandle
     compile_to_shadermodule(const ContextHandle& context,
                             const Slang::ComPtr<slang::IComponentType>& linked_programm) {
         Slang::ComPtr<slang::IBlob> compiled;
@@ -392,7 +393,8 @@ class SlangSession {
                                     compiled->getBufferSize());
     }
 
-    EntryPointHandle
+    // Should only be used for very simple shader. Otherwise use the SlangComposition class.
+    static EntryPointHandle
     compile_entry_point(const ContextHandle& context,
                         const Slang::ComPtr<slang::IComponentType>& linked_programm,
                         const int64_t& entry_point_index = 0) {
@@ -424,9 +426,11 @@ class SlangSession {
             ShaderModule::create(context, compiled->getBufferPointer(), compiled->getBufferSize()));
     }
 
-    EntryPointHandle compile_entry_point(const ContextHandle& context,
-                                         const Slang::ComPtr<slang::IComponentType>& linked_program,
-                                         const std::string& entry_point_name = "main") {
+    // Should only be used for very simple shader. Otherwise use the SlangComposition class.
+    static EntryPointHandle
+    compile_entry_point(const ContextHandle& context,
+                        const Slang::ComPtr<slang::IComponentType>& linked_program,
+                        const std::string& entry_point_name = "main") {
         slang::ProgramLayout* layout = linked_program->getLayout();
 
         for (uint32_t i = 0; i < layout->getEntryPointCount(); i++) {
@@ -440,33 +444,6 @@ class SlangSession {
     }
 
     // -----------------------------------------------------
-
-    // Shortcut for load_module_from_path + link + compile.
-    Slang::ComPtr<slang::IBlob> load_module_from_path_and_compile(
-        const std::filesystem::path& path,
-        const std::optional<std::string>& relative_to = std::nullopt) {
-        return load_module_from_path_and_compile(path.stem(), path, relative_to);
-    }
-
-    // Shortcut for load_module_from_path + link + compile.
-    Slang::ComPtr<slang::IBlob> load_module_from_path_and_compile(
-        const std::string& name,
-        const std::filesystem::path& path,
-        const std::optional<std::filesystem::path>& relative_to = std::nullopt) {
-        Slang::ComPtr<slang::IComponentType> module;
-        module.attach(load_module_from_path(name, path, relative_to).detach());
-        return compile(link(module));
-    }
-
-    // Shortcut for load_module_from_source + link + compile.
-    Slang::ComPtr<slang::IBlob>
-    load_module_from_source_and_compile(const std::string& name,
-                                        const std::string& source,
-                                        const std::optional<std::filesystem::path>& path) {
-        Slang::ComPtr<slang::IComponentType> module;
-        module.attach(load_module_from_source(name, source, path).detach());
-        return compile(link(module));
-    }
 
     // Shortcut for load_module_from_path + compose_all_entrypoints + link + compile.
     EntryPointHandle load_module_from_path_and_compile_entry_point(
