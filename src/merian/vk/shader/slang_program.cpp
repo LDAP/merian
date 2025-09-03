@@ -3,11 +3,13 @@
 
 namespace merian {
 
-SlangProgram::SlangProgram(const SlangCompositionHandle& composition) : composition(composition) {}
+SlangProgram::SlangProgram(const SlangCompositionHandle& composition) : composition(composition) {
+    program = merian::SlangSession::link(composition->get_composite());
+}
 
 ShaderModuleHandle SlangProgram::get_shader_module(const ContextHandle& context) {
     if (!shader_module) {
-        shader_module = session->compile_to_shadermodule(context, program);
+        shader_module = merian::SlangSession::compile_to_shadermodule(context, program);
     }
 
     return shader_module;

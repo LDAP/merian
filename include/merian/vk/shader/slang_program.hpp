@@ -44,9 +44,7 @@ class SlangProgram : public std::enable_shared_from_this<SlangProgram> {
   private:
     const SlangCompositionHandle composition;
 
-    // should be always updated together from composition
     Slang::ComPtr<slang::IComponentType> program; // linked composition
-    SlangSessionHandle session;
 
     // lazyly compiled
     ShaderModuleHandle shader_module{nullptr};
