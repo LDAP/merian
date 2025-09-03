@@ -36,22 +36,24 @@ inline CompilationTarget spirv_target_for_vulkan_api_version(const uint32_t vulk
     }
 }
 
-class CompilationSessionDescription {
-  public:
-    CompilationSessionDescription(
-        const std::vector<std::filesystem::path>& search_paths = {},
-        const std::map<std::string, std::string>& preprocessor_macros = {},
-        const bool generate_debug_info = Context::IS_DEBUG_BUILD,
-        const uint32_t optimization_level = Context::BUILD_OPTIMIZATION_LEVEL,
-        const CompilationTarget target = CompilationTarget::SPIRV_1_6,
-        const uint32_t target_vk_api_version = VK_API_VERSION_1_4)
+class ShaderCompileContext;
+using ShaderCompileContextHandle = std::shared_ptr<ShaderCompileContext>;
+
+class ShaderCompileContext {
+  protected:
+    ShaderCompileContext(const std::vector<std::filesystem::path>& search_paths = {},
+                         const std::map<std::string, std::string>& preprocessor_macros = {},
+                         const bool generate_debug_info = Context::IS_DEBUG_BUILD,
+                         const uint32_t optimization_level = Context::BUILD_OPTIMIZATION_LEVEL,
+                         const CompilationTarget target = CompilationTarget::SPIRV_1_6,
+                         const uint32_t target_vk_api_version = VK_API_VERSION_1_4)
         : preprocessor_macros(preprocessor_macros), debug_info(generate_debug_info),
           optimization_level(optimization_level), target(target),
           target_vk_api_version(target_vk_api_version) {
         file_loader.add_search_path(search_paths);
     }
 
-    CompilationSessionDescription(const ContextHandle& context)
+    ShaderCompileContext(const ContextHandle& context)
         : preprocessor_macros(context->get_default_shader_macro_definitions()),
           debug_info(Context::IS_DEBUG_BUILD),
           optimization_level(Context::BUILD_OPTIMIZATION_LEVEL),
@@ -60,6 +62,7 @@ class CompilationSessionDescription {
         file_loader.add_search_path(context->get_default_shader_include_paths());
     }
 
+  public:
     // -------------------------------------------------
 
     void add_search_path(const std::filesystem::path& path) {
@@ -134,7 +137,14 @@ class CompilationSessionDescription {
         return file_loader;
     }
 
+    // -------------------------------------------------
+
+    static ShaderCompileContextHandle create(const ContextHandle& context) {
+        return ShaderCompileContextHandle(new ShaderCompileContext(context));
+    }
+
   private:
+    const ContextHandle context;
     FileLoader file_loader; // for search path management
 
     std::map<std::string, std::string> preprocessor_macros;

@@ -16,7 +16,7 @@ class SystemGlslcCompiler : public GLSLShaderCompiler {
         const std::string& source,
         const std::string& source_name,
         const vk::ShaderStageFlagBits shader_kind,
-        const CompilationSessionDescription& compilation_session_description) const override;
+        const ShaderCompileContextHandle& shader_compile_context) const override;
 
     bool available() const override;
 

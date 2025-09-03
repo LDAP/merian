@@ -121,35 +121,35 @@ std::vector<uint32_t> ShadercCompiler::compile_glsl(
     const std::string& source,
     const std::string& source_name,
     const vk::ShaderStageFlagBits shader_kind,
-    const CompilationSessionDescription& compilation_session_description) const {
+    const ShaderCompileContextHandle& shader_compile_context) const {
     const shaderc_shader_kind kind = shaderc_shader_kind_for_stage_flag_bit(shader_kind);
 
     shaderc::CompileOptions compile_options;
-    if (compilation_session_description.should_generate_debug_info())
+    if (shader_compile_context->should_generate_debug_info())
         compile_options.SetGenerateDebugInfo();
 
-    for (const auto& [key, value] : compilation_session_description.get_preprocessor_macros()) {
+    for (const auto& [key, value] : shader_compile_context->get_preprocessor_macros()) {
         compile_options.AddMacroDefinition(key, value);
     }
 
     auto includer = std::make_unique<FileIncluder>(
-        compilation_session_description.get_search_path_file_loader());
+        shader_compile_context->get_search_path_file_loader());
     compile_options.SetIncluder(std::move(includer));
-    if (compilation_session_description.get_optimization_level() > 0) {
+    if (shader_compile_context->get_optimization_level() > 0) {
         compile_options.SetOptimizationLevel(
             shaderc_optimization_level::shaderc_optimization_level_performance);
     }
 
-    if (compilation_session_description.get_target_vk_api_version() == VK_API_VERSION_1_0) {
+    if (shader_compile_context->get_target_vk_api_version() == VK_API_VERSION_1_0) {
         compile_options.SetTargetEnvironment(shaderc_target_env_vulkan,
                                              shaderc_env_version_vulkan_1_0);
-    } else if (compilation_session_description.get_target_vk_api_version() == VK_API_VERSION_1_1) {
+    } else if (shader_compile_context->get_target_vk_api_version() == VK_API_VERSION_1_1) {
         compile_options.SetTargetEnvironment(shaderc_target_env_vulkan,
                                              shaderc_env_version_vulkan_1_1);
-    } else if (compilation_session_description.get_target_vk_api_version() == VK_API_VERSION_1_2) {
+    } else if (shader_compile_context->get_target_vk_api_version() == VK_API_VERSION_1_2) {
         compile_options.SetTargetEnvironment(shaderc_target_env_vulkan,
                                              shaderc_env_version_vulkan_1_2);
-    } else if (compilation_session_description.get_target_vk_api_version() == VK_API_VERSION_1_3) {
+    } else if (shader_compile_context->get_target_vk_api_version() == VK_API_VERSION_1_3) {
         compile_options.SetTargetEnvironment(shaderc_target_env_vulkan,
                                              shaderc_env_version_vulkan_1_3);
     } else {

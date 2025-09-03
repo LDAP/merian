@@ -35,7 +35,7 @@ HotReloader::get_shader(const std::filesystem::path& path,
         path_info.last_write_time = last_write_time;
         try {
             path_info.shader = compiler->compile_glsl_to_shadermodule(
-                context, *canonical, compilation_session_desc, shader_kind);
+                context, *canonical, shader_compile_context, shader_kind);
             path_info.error.reset();
         } catch (const ShaderCompiler::compilation_failed& e) {
             path_info.shader = nullptr;

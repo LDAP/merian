@@ -104,7 +104,7 @@ void main() {
 )");
 
     const auto& shader_compiler = GLSLShaderCompiler::get();
-    CompilationSessionDescription compilation_session_desc(context);
+    ShaderCompileContextHandle compilation_session_desc = ShaderCompileContext::create(context);
     shader = EntryPoint::create("main", vk::ShaderStageFlagBits::eCompute,
                                 shader_compiler->compile_glsl_to_shadermodule(
                                     context, source, "<memory>add.comp",
@@ -129,7 +129,7 @@ Reduce::get_group_count([[maybe_unused]] const merian_nodes::NodeIO& io) const n
             (extent.height + local_size_y - 1) / local_size_y, 1};
 };
 
-SpecializedEntryPointHandle Reduce::get_entry_point() {
+VulkanEntryPointHandle Reduce::get_entry_point() {
     return shader;
 }
 

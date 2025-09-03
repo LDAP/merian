@@ -7,6 +7,11 @@ ShaderModule::ShaderModule(const ContextHandle& context, const vk::ShaderModuleC
     shader_module = context->device.createShaderModule(info);
 }
 
+ShaderModule::ShaderModule(const ContextHandle& context,
+                           const uint32_t spv[],
+                           const std::size_t spv_size_bytes)
+    : merian::ShaderModule(context, vk::ShaderModuleCreateInfo{{}, spv_size_bytes, spv}) {}
+
 ShaderModule::~ShaderModule() {
     SPDLOG_DEBUG("destroy shader module ({})", fmt::ptr(this));
     context->device.destroyShaderModule(shader_module);

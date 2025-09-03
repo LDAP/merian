@@ -11,9 +11,9 @@ namespace merian {
 class HotReloader {
   public:
     HotReloader(const ContextHandle& context,
-                const CompilationSessionDescription& compilation_session_desc,
+                const ShaderCompileContextHandle& shader_compile_context,
                 const std::optional<GLSLShaderCompilerHandle>& compiler = std::nullopt)
-        : context(context), compilation_session_desc(compilation_session_desc),
+        : context(context), shader_compile_context(shader_compile_context),
           compiler(compiler.value_or(GLSLShaderCompiler::get())) {}
 
     // Compiles the shader at the specified path and returns a ShaderModule.
@@ -29,7 +29,7 @@ class HotReloader {
 
   private:
     const ContextHandle context;
-    const CompilationSessionDescription compilation_session_desc;
+    const ShaderCompileContextHandle shader_compile_context;
     const GLSLShaderCompilerHandle compiler;
 
     struct per_path {

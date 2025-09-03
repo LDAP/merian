@@ -184,19 +184,19 @@ class GraphicsPipelineBuilder {
 
     // --- Shader Modules ---
 
-    GraphicsPipelineBuilder& set_vertex_shader(const SpecializedEntryPointHandle& vertex_shader);
+    GraphicsPipelineBuilder& set_vertex_shader(const VulkanEntryPointHandle& vertex_shader);
 
     GraphicsPipelineBuilder&
-    set_geometry_shader(const SpecializedEntryPointHandle& geometry_shader);
+    set_geometry_shader(const VulkanEntryPointHandle& geometry_shader);
 
-    GraphicsPipelineBuilder& set_mesh_shader(const SpecializedEntryPointHandle& mesh_shader);
-
-    GraphicsPipelineBuilder&
-    set_fragment_shader(const SpecializedEntryPointHandle& fragment_shader);
+    GraphicsPipelineBuilder& set_mesh_shader(const VulkanEntryPointHandle& mesh_shader);
 
     GraphicsPipelineBuilder&
-    set_tessellation_shader(const SpecializedEntryPointHandle& tessellation_control_shader,
-                            const SpecializedEntryPointHandle& tessellation_evaluation_shader);
+    set_fragment_shader(const VulkanEntryPointHandle& fragment_shader);
+
+    GraphicsPipelineBuilder&
+    set_tessellation_shader(const VulkanEntryPointHandle& tessellation_control_shader,
+                            const VulkanEntryPointHandle& tessellation_evaluation_shader);
 
     // --- Build ---
 
@@ -207,12 +207,12 @@ class GraphicsPipelineBuilder {
 
   private:
     // Shaders
-    std::optional<SpecializedEntryPointHandle> vertex_shader = std::nullopt;
-    std::optional<SpecializedEntryPointHandle> geometry_shader = std::nullopt;
-    std::optional<SpecializedEntryPointHandle> mesh_shader = std::nullopt;
-    std::optional<SpecializedEntryPointHandle> fragment_shader = std::nullopt;
-    std::optional<SpecializedEntryPointHandle> tessellation_control_shader = std::nullopt;
-    std::optional<SpecializedEntryPointHandle> tessellation_evaluation_shader = std::nullopt;
+    std::optional<VulkanEntryPointHandle> vertex_shader = std::nullopt;
+    std::optional<VulkanEntryPointHandle> geometry_shader = std::nullopt;
+    std::optional<VulkanEntryPointHandle> mesh_shader = std::nullopt;
+    std::optional<VulkanEntryPointHandle> fragment_shader = std::nullopt;
+    std::optional<VulkanEntryPointHandle> tessellation_control_shader = std::nullopt;
+    std::optional<VulkanEntryPointHandle> tessellation_evaluation_shader = std::nullopt;
 
     // Vertex Input State
     vk::PipelineVertexInputStateCreateFlags vertex_input_create_flags;

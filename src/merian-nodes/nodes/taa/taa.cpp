@@ -50,7 +50,7 @@ TAA::get_group_count([[maybe_unused]] const NodeIO& io) const noexcept {
             1};
 }
 
-SpecializedEntryPointHandle TAA::get_entry_point() {
+VulkanEntryPointHandle TAA::get_entry_point() {
     return shader;
 }
 

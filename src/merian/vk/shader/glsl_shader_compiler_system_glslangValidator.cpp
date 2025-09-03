@@ -18,7 +18,7 @@ std::vector<uint32_t> SystemGlslangValidatorCompiler::compile_glsl(
     const std::string& source,
     const std::string& source_name,
     const vk::ShaderStageFlagBits shader_kind,
-    const CompilationSessionDescription& compilation_session_description) const {
+    const ShaderCompileContextHandle& shader_compile_context) const {
     if (compiler_executable.empty()) {
         throw compilation_failed{"compiler not available"};
     }
@@ -26,11 +26,11 @@ std::vector<uint32_t> SystemGlslangValidatorCompiler::compile_glsl(
     std::vector<std::string> command = {compiler_executable};
 
     command.emplace_back("--target-env");
-    if (compilation_session_description.get_target_vk_api_version() == VK_API_VERSION_1_0) {
+    if (shader_compile_context->get_target_vk_api_version() == VK_API_VERSION_1_0) {
         command.emplace_back("vulkan1.0");
-    } else if (compilation_session_description.get_target_vk_api_version() == VK_API_VERSION_1_1) {
+    } else if (shader_compile_context->get_target_vk_api_version() == VK_API_VERSION_1_1) {
         command.emplace_back("vulkan1.1");
-    } else if (compilation_session_description.get_target_vk_api_version() == VK_API_VERSION_1_2) {
+    } else if (shader_compile_context->get_target_vk_api_version() == VK_API_VERSION_1_2) {
         command.emplace_back("vulkan1.2");
     } else {
         command.emplace_back("vulkan1.3");
@@ -51,14 +51,14 @@ std::vector<uint32_t> SystemGlslangValidatorCompiler::compile_glsl(
         const std::filesystem::path parent_path = source_path.parent_path();
         command.emplace_back(fmt::format("-I{}", parent_path.string()));
     }
-    for (const auto& inc_dir : compilation_session_description.get_search_path_file_loader()) {
+    for (const auto& inc_dir : shader_compile_context->get_search_path_file_loader()) {
         command.emplace_back(fmt::format("-I{}", inc_dir.string()));
     }
-    for (const auto& [key, value] : compilation_session_description.get_preprocessor_macros()) {
+    for (const auto& [key, value] : shader_compile_context->get_preprocessor_macros()) {
         command.emplace_back(fmt::format("-D{}={}", key, value));
     }
 
-    if (compilation_session_description.should_generate_debug_info()) {
+    if (shader_compile_context->should_generate_debug_info()) {
         command.emplace_back("-g");
     }
 

@@ -31,13 +31,13 @@ class TAA : public AbstractCompute {
     std::tuple<uint32_t, uint32_t, uint32_t>
     get_group_count([[maybe_unused]] const NodeIO& io) const noexcept override;
 
-    SpecializedEntryPointHandle get_entry_point() override;
+    VulkanEntryPointHandle get_entry_point() override;
 
     NodeStatusFlags properties(Properties& config) override;
 
   private:
     const bool inverse_motion = false;
-    SpecializedEntryPointHandle shader;
+    VulkanEntryPointHandle shader;
     SpecializationInfoHandle spec_info;
 
     VkSampledImageInHandle con_src = VkSampledImageIn::compute_read("src");

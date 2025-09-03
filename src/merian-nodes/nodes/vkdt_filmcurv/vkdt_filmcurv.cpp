@@ -53,7 +53,7 @@ VKDTFilmcurv::get_group_count([[maybe_unused]] const NodeIO& io) const noexcept 
             (extent.height + local_size_y - 1) / local_size_y, 1};
 }
 
-SpecializedEntryPointHandle VKDTFilmcurv::get_entry_point() {
+VulkanEntryPointHandle VKDTFilmcurv::get_entry_point() {
     return shader;
 }
 

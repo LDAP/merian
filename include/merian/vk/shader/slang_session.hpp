@@ -1,7 +1,7 @@
 #pragma once
 
-#include "merian/vk/shader/compilation_session_description.hpp"
 #include "merian/vk/shader/entry_point.hpp"
+#include "merian/vk/shader/shader_compile_context.hpp"
 #include "merian/vk/shader/shader_compiler.hpp"
 #include "merian/vk/shader/shader_module.hpp"
 #include "merian/vk/shader/slang_global_session.hpp"
@@ -11,16 +11,24 @@
 
 namespace merian {
 
+class SlangSession;
+using SlangSessionHandle = std::shared_ptr<SlangSession>;
+
 // A wrapper around a slang session.
 class SlangSession {
-  public:
-    SlangSession(const CompilationSessionDescription& compilation_session_description) {
+  protected:
+    SlangSession(const ShaderCompileContextHandle& shader_compile_context)
+        : shader_compile_context(shader_compile_context) {
+        recreate_session();
+    }
+
+    void recreate_session() {
         const auto global_session = get_global_slang_session();
 
         slang::SessionDesc slang_session_desc = {};
 
         slang::TargetDesc target_desc = {};
-        switch (compilation_session_description.get_target()) {
+        switch (shader_compile_context->get_target()) {
         case CompilationTarget::SPIRV_1_0:
             target_desc.format = SLANG_SPIRV;
             target_desc.profile = global_session->findProfile("spirv_1_0");
@@ -57,24 +65,21 @@ class SlangSession {
         slang_session_desc.targetCount = 1;
 
         std::vector<slang::PreprocessorMacroDesc> preprocessor_macros;
-        preprocessor_macros.reserve(
-            compilation_session_description.get_preprocessor_macros().size());
+        preprocessor_macros.reserve(shader_compile_context->get_preprocessor_macros().size());
 
-        for (const auto& macro : compilation_session_description.get_preprocessor_macros()) {
+        for (const auto& macro : shader_compile_context->get_preprocessor_macros()) {
             preprocessor_macros.emplace_back(macro.first.c_str(), macro.second.c_str());
         }
         slang_session_desc.preprocessorMacros = preprocessor_macros.data();
         slang_session_desc.preprocessorMacroCount = (SlangInt)preprocessor_macros.size();
 
         std::vector<const char*> search_paths;
-        search_paths.reserve(compilation_session_description.get_preprocessor_macros().size());
-        for (const auto& search_path :
-             compilation_session_description.get_search_path_file_loader()) {
+        search_paths.reserve(shader_compile_context->get_preprocessor_macros().size());
+        for (const auto& search_path : shader_compile_context->get_search_path_file_loader()) {
             search_paths.emplace_back(search_path.c_str());
         }
         slang_session_desc.searchPaths = search_paths.data();
         slang_session_desc.searchPathCount = (SlangInt)search_paths.size();
-        file_loader = compilation_session_description.get_search_path_file_loader();
 
         std::array<slang::CompilerOptionEntry, 2> options = {
             {
@@ -85,17 +90,18 @@ class SlangSession {
                 {
                     slang::CompilerOptionName::Optimization,
                     {slang::CompilerOptionValueKind::Int,
-                     static_cast<int32_t>(compilation_session_description.get_optimization_level()),
-                     0, nullptr, nullptr},
+                     static_cast<int32_t>(shader_compile_context->get_optimization_level()), 0,
+                     nullptr, nullptr},
                 },
             },
         };
         slang_session_desc.compilerOptionEntries = options.data();
         slang_session_desc.compilerOptionEntryCount = options.size();
 
-        get_global_slang_session()->createSession(slang_session_desc, session.writeRef());
+        global_session->createSession(slang_session_desc, session.writeRef());
     }
 
+  public:
     // Loads a module from this path. The path can be used as path-based import statement the
     // module. The name is the stem (final part without its suffix) of this path.
     //
@@ -116,9 +122,10 @@ class SlangSession {
                           const std::optional<std::filesystem::path>& relative_to = std::nullopt) {
         std::optional<std::string> source;
         if (relative_to) {
-            source = file_loader.find_and_load_file(path, relative_to.value());
+            source = shader_compile_context->get_search_path_file_loader().find_and_load_file(
+                path, relative_to.value());
         } else {
-            source = file_loader.find_and_load_file(path);
+            source = shader_compile_context->get_search_path_file_loader().find_and_load_file(path);
         }
 
         if (!source) {
@@ -496,6 +503,11 @@ class SlangSession {
                                    entry_point_name);
     }
 
+  public:
+    static SlangSessionHandle create(const ShaderCompileContextHandle& shader_compile_context) {
+        return SlangSessionHandle(new SlangSession(shader_compile_context));
+    }
+
   private:
     static std::string diagnostics_as_string(Slang::ComPtr<slang::IBlob>& diagnostics_blob) {
         if (diagnostics_blob == nullptr) {
@@ -505,8 +517,9 @@ class SlangSession {
     }
 
   private:
+    const ShaderCompileContextHandle shader_compile_context;
+
     Slang::ComPtr<slang::ISession> session;
-    FileLoader file_loader;
 };
 
 } // namespace merian

@@ -14,11 +14,11 @@ class ShadercCompiler : public GLSLShaderCompiler {
 
     ~ShadercCompiler();
 
-    std::vector<uint32_t> compile_glsl(
-        const std::string& source,
-        const std::string& source_name,
-        const vk::ShaderStageFlagBits shader_kind,
-        const CompilationSessionDescription& compilation_session_description) const override;
+    std::vector<uint32_t>
+    compile_glsl(const std::string& source,
+                 const std::string& source_name,
+                 const vk::ShaderStageFlagBits shader_kind,
+                 const ShaderCompileContextHandle& shader_compile_context) const override;
 
     bool available() const override;
 

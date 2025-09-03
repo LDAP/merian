@@ -80,7 +80,7 @@ if not sdl2.found()
         compile_args : sdl2_subp.get_variable('c_args')
     )
 endif
-shaderc = dependency('shaderc', version: ['>=2023.8.1'], required: false)
+shaderc = dependency('shaderc', version: ['>=2025.3'], required: false)
 if not shaderc.found() and get_option('shaderc').enabled()
     shaderc_options = cmake.subproject_options()
     shaderc_options.add_cmake_defines({'SHADERC_SKIP_TESTS': true})

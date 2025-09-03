@@ -36,7 +36,7 @@ class Tonemap : public AbstractCompute {
     std::tuple<uint32_t, uint32_t, uint32_t>
     get_group_count(const NodeIO& io) const noexcept override;
 
-    SpecializedEntryPointHandle get_entry_point() override;
+    VulkanEntryPointHandle get_entry_point() override;
 
     NodeStatusFlags properties(Properties& config) override;
 
@@ -49,7 +49,7 @@ class Tonemap : public AbstractCompute {
 
     vk::Extent3D extent;
     PushConstant pc;
-    SpecializedEntryPointHandle shader;
+    VulkanEntryPointHandle shader;
     SpecializationInfoHandle spec_info;
 
     int32_t tonemap = 0;

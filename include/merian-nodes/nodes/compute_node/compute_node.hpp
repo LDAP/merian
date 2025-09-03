@@ -32,7 +32,7 @@ class AbstractCompute : public Node {
     get_group_count(const NodeIO& io) const noexcept = 0;
 
     // In every run (rebuilds the pipeline if handle changed.)
-    virtual SpecializedEntryPointHandle get_entry_point() = 0;
+    virtual VulkanEntryPointHandle get_entry_point() = 0;
 
     virtual NodeStatusFlags
     on_connected([[maybe_unused]] const NodeIOLayout& io_layout,

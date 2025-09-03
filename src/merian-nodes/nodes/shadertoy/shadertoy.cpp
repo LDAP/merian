@@ -64,15 +64,14 @@ class ShadertoyInjectCompiler : public GLSLShaderCompiler {
 
     ~ShadertoyInjectCompiler() {}
 
-    std::vector<uint32_t> compile_glsl(
-        const std::string& source,
-        const std::string& source_name,
-        const vk::ShaderStageFlagBits shader_kind,
-        const CompilationSessionDescription& compilation_session_description) const final override {
+    std::vector<uint32_t>
+    compile_glsl(const std::string& source,
+                 const std::string& source_name,
+                 const vk::ShaderStageFlagBits shader_kind,
+                 const ShaderCompileContextHandle& shader_compile_context) const final override {
         SPDLOG_INFO("(re-)compiling {}", source_name);
         return forwarding_compiler->compile_glsl(shadertoy_pre + source + shadertoy_post,
-                                                 source_name, shader_kind,
-                                                 compilation_session_description);
+                                                 source_name, shader_kind, shader_compile_context);
     }
 
     bool available() const override {
@@ -85,7 +84,7 @@ class ShadertoyInjectCompiler : public GLSLShaderCompiler {
 
 Shadertoy::Shadertoy(const ContextHandle& context)
     : AbstractCompute(context, sizeof(PushConstant)), shader_glsl(default_shader),
-      compilation_session_description(context) {
+      compile_context(ShaderCompileContext::create(context)) {
 
     GLSLShaderCompilerHandle forwarding_compiler = GLSLShaderCompiler::get();
 
@@ -94,18 +93,17 @@ Shadertoy::Shadertoy(const ContextHandle& context)
     }
 
     compiler = std::make_shared<ShadertoyInjectCompiler>(forwarding_compiler);
-    reloader = std::make_unique<HotReloader>(context, compilation_session_description, compiler);
+    reloader = std::make_unique<HotReloader>(context, compile_context, compiler);
 
     auto spec_builder = SpecializationInfoBuilder();
     spec_builder.add_entry(local_size_x, local_size_y);
     spec_info = spec_builder.build();
 
-    shader =
-        EntryPoint::create("main", vk::ShaderStageFlagBits::eCompute,
-                           compiler->compile_glsl_to_shadermodule(
-                               context, shader_glsl, "<memory>Shadertoy.comp",
-                               vk::ShaderStageFlagBits::eCompute, compilation_session_description),
-                           spec_info);
+    shader = EntryPoint::create(
+        "main", vk::ShaderStageFlagBits::eCompute,
+        compiler->compile_glsl_to_shadermodule(context, shader_glsl, "<memory>Shadertoy.comp",
+                                               vk::ShaderStageFlagBits::eCompute, compile_context),
+        spec_info);
 }
 
 std::vector<OutputConnectorHandle>
@@ -156,12 +154,12 @@ Shadertoy::get_group_count([[maybe_unused]] const NodeIO& io) const noexcept {
             (extent.height + local_size_y - 1) / local_size_y, 1};
 };
 
-SpecializedEntryPointHandle Shadertoy::get_entry_point() {
+VulkanEntryPointHandle Shadertoy::get_entry_point() {
     if (shader_source_selector == 1) {
         try {
             ShaderModuleHandle shader_module =
                 reloader->get_shader(resolved_shader_path, vk::ShaderStageFlagBits::eCompute);
-            if (shader_module != shader->get_shader_module()) {
+            if (shader_module != shader->vulkan_shader_module(context)) {
                 shader = EntryPoint::create("main", vk::ShaderStageFlagBits::eCompute,
                                             shader_module, spec_info);
             }
@@ -226,7 +224,7 @@ AbstractCompute::NodeStatusFlags Shadertoy::properties(Properties& config) {
         try {
             ShaderModuleHandle shader_module = compiler->compile_glsl_to_shadermodule(
                 context, shader_glsl, "<memory>Shadertoy.comp", vk::ShaderStageFlagBits::eCompute,
-                compilation_session_description);
+                compile_context);
             shader = EntryPoint::create("main", vk::ShaderStageFlagBits::eCompute, shader_module,
                                         spec_info);
             error.reset();

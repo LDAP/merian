@@ -18,8 +18,12 @@ class ShaderModule : public std::enable_shared_from_this<ShaderModule>, public O
   public:
     ShaderModule() = delete;
 
-  private:
+  protected:
     ShaderModule(const ContextHandle& context, const vk::ShaderModuleCreateInfo& info);
+
+    ShaderModule(const ContextHandle& context,
+                 const uint32_t spv[],
+                 const std::size_t spv_size_bytes);
 
   public:
     ~ShaderModule();
@@ -33,13 +37,13 @@ class ShaderModule : public std::enable_shared_from_this<ShaderModule>, public O
                                      const vk::ShaderModuleCreateInfo& info);
 
     static ShaderModuleHandle
-    create(const ContextHandle& context, const uint32_t spv[], const std::size_t spv_size);
+    create(const ContextHandle& context, const uint32_t spv[], const std::size_t spv_size_bytes);
 
     static ShaderModuleHandle create(const ContextHandle& context,
                                      const std::vector<uint32_t>& spv);
 
     static ShaderModuleHandle
-    create(const ContextHandle& context, const void* spv, const std::size_t spv_size);
+    create(const ContextHandle& context, const void* spv, const std::size_t spv_size_bytes);
 
   private:
     const ContextHandle context;

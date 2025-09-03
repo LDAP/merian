@@ -24,7 +24,7 @@ class Reduce : public AbstractCompute {
     std::tuple<uint32_t, uint32_t, uint32_t>
     get_group_count(const merian_nodes::NodeIO& io) const noexcept override;
 
-    SpecializedEntryPointHandle get_entry_point() override;
+    VulkanEntryPointHandle get_entry_point() override;
 
     NodeStatusFlags properties(Properties& props) override;
 
@@ -37,7 +37,7 @@ class Reduce : public AbstractCompute {
     std::string reduction = "accumulator + current_value";
 
     vk::Extent3D extent;
-    SpecializedEntryPointHandle shader;
+    VulkanEntryPointHandle shader;
 
     uint32_t number_inputs = 10;
     std::vector<VkSampledImageInHandle> input_connectors;

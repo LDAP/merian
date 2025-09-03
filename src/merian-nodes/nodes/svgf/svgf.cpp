@@ -106,23 +106,25 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
 
     {
         const GLSLShaderCompilerHandle compiler = GLSLShaderCompiler::get();
-        CompilationSessionDescription compilation_session_desc(context);
-        compilation_session_desc.set_preprocessor_macro("FILTER_TYPE", std::to_string(filter_type));
+        ShaderCompileContextHandle compilation_session_desc = ShaderCompileContext::create(context);
+        compilation_session_desc->set_preprocessor_macro("FILTER_TYPE",
+                                                         std::to_string(filter_type));
         if (kaleidoscope) {
-            compilation_session_desc.set_preprocessor_macro("KALEIDOSCOPE", "1");
+            compilation_session_desc->set_preprocessor_macro("KALEIDOSCOPE", "1");
             if (kaleidoscope_use_shmem) {
-                compilation_session_desc.set_preprocessor_macro("KALEIDOSCOPE_USE_SHMEM", "1");
+                compilation_session_desc->set_preprocessor_macro("KALEIDOSCOPE_USE_SHMEM", "1");
             }
         }
-        compilation_session_desc.add_search_path("merian-nodes/nodes/svgf");
+        compilation_session_desc->add_search_path("merian-nodes/nodes/svgf");
 
-        merian::SlangSession slang_session(compilation_session_desc);
+        merian::SlangSessionHandle slang_session =
+            merian::SlangSession::create(compilation_session_desc);
 
-        filter_module = slang_session.load_module_from_path_and_compile_entry_point(
+        filter_module = slang_session->load_module_from_path_and_compile_entry_point(
             context, "merian-nodes/nodes/svgf/svgf_filter.slang");
-        taa_module = slang_session.load_module_from_path_and_compile_entry_point(
+        taa_module = slang_session->load_module_from_path_and_compile_entry_point(
             context, "merian-nodes/nodes/svgf/svgf_taa.slang");
-        variance_estimate_module = slang_session.load_module_from_path_and_compile_entry_point(
+        variance_estimate_module = slang_session->load_module_from_path_and_compile_entry_point(
             context, "merian-nodes/nodes/svgf/svgf_variance_estimate.slang");
 
         auto variance_estimate_pipe_layout = PipelineLayoutBuilder(context)
@@ -158,8 +160,8 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
                 spec_builder.add_entry(filter_local_size, filter_local_size, gap, i,
                                        svgf_iterations - 1);
                 SpecializationInfoHandle filter_spec = spec_builder.build();
-                filters[i] = ComputePipeline::create(filter_pipe_layout, filter_module,
-                                                               filter_spec);
+                filters[i] =
+                    ComputePipeline::create(filter_pipe_layout, filter_module, filter_spec);
             }
         }
         {

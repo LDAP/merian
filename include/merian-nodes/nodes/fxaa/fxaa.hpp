@@ -30,7 +30,7 @@ class FXAA : public AbstractCompute {
     std::tuple<uint32_t, uint32_t, uint32_t>
     get_group_count(const NodeIO& io) const noexcept override;
 
-    SpecializedEntryPointHandle get_entry_point() override;
+    VulkanEntryPointHandle get_entry_point() override;
 
     NodeStatusFlags properties(Properties& config) override;
 
@@ -38,7 +38,7 @@ class FXAA : public AbstractCompute {
     vk::Extent3D extent;
     PushConstant pc;
     SpecializationInfoHandle spec_info;
-    SpecializedEntryPointHandle shader;
+    VulkanEntryPointHandle shader;
 
     VkSampledImageInHandle con_src = VkSampledImageIn::compute_read("src");
 };

@@ -69,8 +69,8 @@ install_subdir('lib', install_dir: get_option('libdir'), strip_directory: true)
 deps = [
   cc.find_library('gfx', dirs: lib_search_path),
   cc.find_library('slang', dirs: lib_search_path),
-  cc.find_library('slang-glslang', dirs: lib_search_path),
-  cc.find_library('slang-glsl-module', dirs: lib_search_path),
+  cc.find_library('slang-glslang', dirs: lib_search_path, required: false),
+  cc.find_library('slang-glsl-module', dirs: lib_search_path, required: false),
   cc.find_library('slang-llvm', dirs: lib_search_path, required: false), # does not exist in the aarch64 package
   cc.find_library('slang-rt', dirs: lib_search_path),
 ]

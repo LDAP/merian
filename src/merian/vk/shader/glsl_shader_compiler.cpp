@@ -12,11 +12,11 @@ class DummyGLSLShaderCompiler : public GLSLShaderCompiler {
 
     ~DummyGLSLShaderCompiler() {}
 
-    std::vector<uint32_t> compile_glsl([[maybe_unused]] const std::string& source,
-                                       [[maybe_unused]] const std::string& source_name,
-                                       [[maybe_unused]] const vk::ShaderStageFlagBits shader_kind,
-                                       [[maybe_unused]] const CompilationSessionDescription&
-                                           compilation_session_description) const override {
+    std::vector<uint32_t> compile_glsl(
+        [[maybe_unused]] const std::string& source,
+        [[maybe_unused]] const std::string& source_name,
+        [[maybe_unused]] const vk::ShaderStageFlagBits shader_kind,
+        [[maybe_unused]] const ShaderCompileContextHandle& shader_compile_context) const override {
         throw compilation_failed{"compiler not available"};
     }
 
