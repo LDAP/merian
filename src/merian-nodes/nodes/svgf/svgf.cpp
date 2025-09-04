@@ -6,10 +6,7 @@
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
-#include "merian/vk/shader/slang_composition.hpp"
 #include "merian/vk/shader/slang_entry_point.hpp"
-#include "merian/vk/shader/slang_program.hpp"
-#include "merian/vk/shader/slang_session.hpp"
 
 namespace merian_nodes {
 
