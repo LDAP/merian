@@ -7,18 +7,13 @@
 
 namespace merian {
 
-class SlangShaderModule;
-using SlangShaderModuleHandle = std::shared_ptr<SlangShaderModule>;
+class SlangProgramEntryPoint;
+using SlangProgramEntryPointHandle = std::shared_ptr<SlangProgramEntryPoint>;
 
-class SlangShaderModule : public ShaderModule {};
-
-class SlangEntryPoint;
-using SlangEntryPointHandle = std::shared_ptr<SlangEntryPoint>;
-
-class SlangEntryPoint : public EntryPoint {
+class SlangProgramEntryPoint : public EntryPoint {
 
   protected:
-    SlangEntryPoint(const SlangProgramHandle& program, const uint64_t entry_point_index);
+    SlangProgramEntryPoint(const SlangProgramHandle& program, const uint64_t entry_point_index);
 
   public:
     virtual const char* get_name() const override;
@@ -32,11 +27,15 @@ class SlangEntryPoint : public EntryPoint {
     const SlangProgramHandle& get_program() const;
 
   public:
-    static SlangEntryPointHandle create(const SlangProgramHandle& program,
-                                        const uint64_t entry_point_index);
+    static SlangProgramEntryPointHandle create(const SlangProgramHandle& program,
+                                               const uint64_t entry_point_index = 0);
 
-    static SlangEntryPointHandle create(const SlangProgramHandle& program,
-                                        const std::string& entry_point_name);
+    static SlangProgramEntryPointHandle create(const SlangProgramHandle& program,
+                                               const std::string& entry_point_name = "main");
+
+    static SlangProgramEntryPointHandle create(const ShaderCompileContextHandle& compile_context,
+                                               const std::filesystem::path& module_path,
+                                               const std::string& entry_point_name = "main");
 
   private:
     const SlangProgramHandle program;

@@ -13,6 +13,7 @@ merian_src += files(
     'slang_entry_point.cpp',
     'slang_global_session.cpp',
     'slang_program.cpp',
+    'slang_session.cpp',
 )
 
 if shaderc.found()

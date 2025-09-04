@@ -6,6 +6,9 @@
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
+#include "merian/vk/shader/slang_composition.hpp"
+#include "merian/vk/shader/slang_entry_point.hpp"
+#include "merian/vk/shader/slang_program.hpp"
 #include "merian/vk/shader/slang_session.hpp"
 
 namespace merian_nodes {
@@ -117,15 +120,11 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
         }
         compilation_session_desc->add_search_path("merian-nodes/nodes/svgf");
 
-        merian::SlangSessionHandle slang_session =
-            merian::SlangSession::create(compilation_session_desc);
-
-        filter_module = slang_session->load_module_from_path_and_compile_entry_point(
-            context, "merian-nodes/nodes/svgf/svgf_filter.slang");
-        taa_module = slang_session->load_module_from_path_and_compile_entry_point(
-            context, "merian-nodes/nodes/svgf/svgf_taa.slang");
-        variance_estimate_module = slang_session->load_module_from_path_and_compile_entry_point(
-            context, "merian-nodes/nodes/svgf/svgf_variance_estimate.slang");
+        filter_module =
+            SlangProgramEntryPoint::create(compilation_session_desc, "svgf_filter.slang");
+        variance_estimate_module = SlangProgramEntryPoint::create(compilation_session_desc,
+                                                                  "svgf_variance_estimate.slang");
+        taa_module = SlangProgramEntryPoint::create(compilation_session_desc, "svgf_taa.slang");
 
         auto variance_estimate_pipe_layout = PipelineLayoutBuilder(context)
                                                  .add_descriptor_set_layout(graph_layout)

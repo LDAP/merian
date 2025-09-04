@@ -1,10 +1,13 @@
 #include "merian/vk/shader/slang_program.hpp"
-#include "merian/vk/shader/slang_entry_point.hpp"
 
 namespace merian {
 
-SlangProgram::SlangProgram(const SlangCompositionHandle& composition) : composition(composition) {
-    program = merian::SlangSession::link(composition->get_composite());
+SlangProgram::SlangProgram(const ShaderCompileContextHandle& compile_context,
+                           const SlangCompositionHandle& composition)
+    : compile_context(compile_context), composition(composition) {
+
+    session = SlangSession::get_or_create(compile_context);
+    program = merian::SlangSession::link(session->compose(composition));
 }
 
 ShaderModuleHandle SlangProgram::get_shader_module(const ContextHandle& context) {
@@ -27,7 +30,7 @@ uint64_t SlangProgram::get_entry_point_index(const std::string& entry_point_name
     for (uint64_t entry_point_index = 0;
          entry_point_index < get_program_reflection()->getEntryPointCount(); entry_point_index++) {
         if (entry_point_name ==
-            get_program_reflection()->getEntryPointByIndex(entry_point_index)->getName()) {
+            get_program_reflection()->getEntryPointByIndex(entry_point_index)->getNameOverride()) {
             return entry_point_index;
         }
     }
@@ -36,20 +39,21 @@ uint64_t SlangProgram::get_entry_point_index(const std::string& entry_point_name
         fmt::format("no entry point with name {} in program", entry_point_name)};
 }
 
-SlangEntryPointHandle SlangProgram::get_entry_point_by_index(const uint64_t entry_point_index) {
-    return SlangEntryPoint::create(shared_from_this(), entry_point_index);
-}
-
-SlangEntryPointHandle SlangProgram::get_entry_point_by_name(const std::string& entry_point_name) {
-    return get_entry_point_by_index(get_entry_point_index(entry_point_name));
-}
-
 const SlangCompositionHandle& SlangProgram::get_composition() {
     return composition;
 }
 
-SlangProgramHandle SlangProgram::create(const SlangCompositionHandle& composition) {
-    return SlangProgramHandle(new SlangProgram(composition));
+SlangProgramHandle SlangProgram::create(const ShaderCompileContextHandle& compile_context,
+                                        const SlangCompositionHandle& composition) {
+    return SlangProgramHandle(new SlangProgram(compile_context, composition));
+}
+
+SlangProgramHandle SlangProgram::create(const ShaderCompileContextHandle& compile_context,
+                                        const std::filesystem::path& path,
+                                        const bool with_entry_points) {
+    const SlangCompositionHandle comp = SlangComposition::create();
+    comp->add_module_from_path(path, with_entry_points);
+    return create(compile_context, comp);
 }
 
 } // namespace merian

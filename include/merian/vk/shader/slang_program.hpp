@@ -1,15 +1,14 @@
 #pragma once
 
+#include "merian/vk/shader/shader_compile_context.hpp"
 #include "merian/vk/shader/shader_module.hpp"
 #include "merian/vk/shader/slang_composition.hpp"
+#include "merian/vk/shader/slang_session.hpp"
 
 #include "slang-com-ptr.h"
 #include "slang.h"
 
 namespace merian {
-
-class SlangEntryPoint;
-using SlangEntryPointHandle = std::shared_ptr<SlangEntryPoint>;
 
 class SlangProgram;
 using SlangProgramHandle = std::shared_ptr<SlangProgram>;
@@ -21,7 +20,8 @@ using SlangProgramHandle = std::shared_ptr<SlangProgram>;
  */
 class SlangProgram : public std::enable_shared_from_this<SlangProgram> {
   protected:
-    SlangProgram(const SlangCompositionHandle& composition);
+    SlangProgram(const ShaderCompileContextHandle& compile_context,
+                 const SlangCompositionHandle& composition);
 
   public:
     ShaderModuleHandle get_shader_module(const ContextHandle& context);
@@ -32,18 +32,22 @@ class SlangProgram : public std::enable_shared_from_this<SlangProgram> {
 
     uint64_t get_entry_point_index(const std::string& entry_point_name) const;
 
-    SlangEntryPointHandle get_entry_point_by_index(const uint64_t entry_point_index = 0);
-
-    SlangEntryPointHandle get_entry_point_by_name(const std::string& entry_point_name = "main");
-
     const SlangCompositionHandle& get_composition();
 
   public:
-    static SlangProgramHandle create(const SlangCompositionHandle& composition);
+    static SlangProgramHandle create(const ShaderCompileContextHandle& compile_context,
+                                     const SlangCompositionHandle& composition);
+
+    // creates a program from a module.
+    static SlangProgramHandle create(const ShaderCompileContextHandle& compile_context,
+                                     const std::filesystem::path& path,
+                                     const bool with_entry_points = true);
 
   private:
+    const ShaderCompileContextHandle compile_context;
     const SlangCompositionHandle composition;
 
+    SlangSessionHandle session;
     Slang::ComPtr<slang::IComponentType> program; // linked composition
 
     // lazyly compiled

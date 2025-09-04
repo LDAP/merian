@@ -4,10 +4,12 @@
 #include "merian/vk/shader/shader_compile_context.hpp"
 #include "merian/vk/shader/shader_compiler.hpp"
 #include "merian/vk/shader/shader_module.hpp"
+#include "merian/vk/shader/slang_composition.hpp"
 #include "merian/vk/shader/slang_global_session.hpp"
 
 #include "slang-com-ptr.h"
 #include "slang.h"
+#include <ranges>
 
 namespace merian {
 
@@ -292,6 +294,97 @@ class SlangSession {
         return composed;
     }
 
+    Slang::ComPtr<slang::IComponentType> compose(const SlangCompositionHandle& composition) {
+        std::vector<slang::IComponentType*> components;
+        components.reserve(
+            std::max(composition->modules.size() + composition->compositions.size(),
+                     1 + composition->type_conformances.size() + composition->entry_points.size()));
+
+        std::set<SlangComposition::EntryPoint> additional_entry_points;
+        for (auto& [_, module] : composition->modules) {
+            auto it = slang_module_cache.find(module.get_name());
+            if (it == slang_module_cache.end()) {
+                it = slang_module_cache
+                         .emplace(module.get_name(),
+                                  load_module_from_source(
+                                      module.get_name(),
+                                      module.get_source(
+                                          get_compile_context()->get_search_path_file_loader()),
+                                      module.get_import_path()))
+                         .first;
+            }
+
+            components.emplace_back(it->second);
+
+            if (module.get_with_entry_points()) {
+                for (uint32_t entry_point_index = 0;
+                     entry_point_index <
+                     merian::SlangSession::get_defined_entry_point_count(it->second);
+                     entry_point_index++) {
+                    Slang::ComPtr<slang::IEntryPoint> entry_point =
+                        merian::SlangSession::get_defined_entry_point(it->second,
+                                                                      entry_point_index);
+                    const char* name = entry_point->getFunctionReflection()->getName();
+                    auto rename_it = module.get_entry_point_map().find(name);
+                    if (rename_it == module.get_entry_point_map().end()) {
+                        additional_entry_points.insert(
+                            SlangComposition::EntryPoint(name, module.get_name()));
+                    } else {
+                        additional_entry_points.insert(SlangComposition::EntryPoint(
+                            name, module.get_name(), rename_it->second));
+                    }
+                }
+            }
+        }
+
+        for (const auto& composition : composition->compositions) {
+            auto it = composition_cache.find(composition);
+            if (it == composition_cache.end()) {
+                it = composition_cache.emplace(composition, compose(composition)).first;
+            }
+            components.emplace_back(it->second);
+        }
+
+        Slang::ComPtr<slang::IComponentType> composed_modules = compose(components);
+        components.clear();
+        components.emplace_back(composed_modules);
+
+        for (auto& [type_conformance, c_id] : composition->type_conformances) {
+            auto it = type_conformance_cache.find(type_conformance);
+            if (it == type_conformance_cache.end()) {
+                int64_t id = c_id;
+                it = type_conformance_cache
+                         .emplace(type_conformance,
+                                  create_type_conformance(
+                                      composed_modules, type_conformance.get_type_name(),
+                                      type_conformance.get_interface_name(), id))
+                         .first;
+            }
+            components.emplace_back(it->second);
+        }
+
+        for (const auto& ep :
+             std::views::join(std::array{std::views::all(composition->entry_points),
+                                         std::views::all(additional_entry_points)})) {
+            auto it = entry_point_cache.find(ep);
+            if (it == entry_point_cache.end()) {
+                auto& module = slang_module_cache.at(ep.get_module());
+
+                it = entry_point_cache
+                         .emplace(ep, std::make_pair(merian::SlangSession::find_entry_point_or_fail(
+                                                         module, ep.get_defined_name()),
+                                                     nullptr))
+                         .first;
+
+                it->second.first->renameEntryPoint(ep.get_export_name().c_str(),
+                                                   it->second.second.writeRef());
+            }
+            components.push_back(it->second.second);
+        }
+
+        return compose(components);
+    }
+
     // creates a composite of the module with all its entrypoints.
     Slang::ComPtr<slang::IComponentType>
     compose_all_entrypoints(Slang::ComPtr<slang::IModule>& module) {
@@ -426,7 +519,7 @@ class SlangSession {
         }
 
         return EntryPoint::create(
-            entry_point->getName(), vk_stage_for_slang_stage(entry_point->getStage()),
+            entry_point->getNameOverride(), vk_stage_for_slang_stage(entry_point->getStage()),
             ShaderModule::create(context, compiled->getBufferPointer(), compiled->getBufferSize()));
     }
 
@@ -438,7 +531,7 @@ class SlangSession {
         slang::ProgramLayout* layout = linked_program->getLayout();
 
         for (uint32_t i = 0; i < layout->getEntryPointCount(); i++) {
-            if (entry_point_name == layout->getEntryPointByIndex(i)->getName()) {
+            if (entry_point_name == layout->getEntryPointByIndex(i)->getNameOverride()) {
                 return compile_entry_point(context, linked_program, i);
             }
         }
@@ -488,9 +581,11 @@ class SlangSession {
     }
 
   public:
-    static SlangSessionHandle create(const ShaderCompileContextHandle& shader_compile_context) {
-        return SlangSessionHandle(new SlangSession(shader_compile_context));
-    }
+    static SlangSessionHandle create(const ShaderCompileContextHandle& shader_compile_context);
+
+    // returns a cached session for the context or creates one if none is avaiable.
+    static SlangSessionHandle
+    get_or_create(const ShaderCompileContextHandle& shader_compile_context);
 
   private:
     static std::string diagnostics_as_string(Slang::ComPtr<slang::IBlob>& diagnostics_blob) {
@@ -502,8 +597,16 @@ class SlangSession {
 
   private:
     const ShaderCompileContextHandle shader_compile_context;
-
     Slang::ComPtr<slang::ISession> session;
+
+    // -> entry_point, renamed
+    std::map<SlangComposition::EntryPoint,
+             std::pair<Slang::ComPtr<slang::IEntryPoint>, Slang::ComPtr<slang::IComponentType>>>
+        entry_point_cache;
+    std::map<std::string, Slang::ComPtr<slang::IModule>> slang_module_cache;
+    std::map<SlangComposition::TypeConformance, Slang::ComPtr<slang::IComponentType>>
+        type_conformance_cache;
+    std::map<SlangCompositionHandle, Slang::ComPtr<slang::IComponentType>> composition_cache;
 };
 
 } // namespace merian
