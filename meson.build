@@ -185,4 +185,6 @@ merian_dep = declare_dependency(
     ]
 )
 
+subdir('test')
+
 install_subdir('include', install_dir: get_option('includedir'), strip_directory: true)
