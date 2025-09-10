@@ -112,7 +112,7 @@ class SlangSession {
     Slang::ComPtr<slang::IModule>
     load_module_from_path(const std::filesystem::path& path,
                           const std::optional<std::filesystem::path>& source_path = std::nullopt) {
-        return load_module_from_path(path.stem(), path, source_path);
+        return load_module_from_path(path.stem().string(), path, source_path);
     }
 
     // The path can be used as path-based import statement the
@@ -550,7 +550,7 @@ class SlangSession {
         const std::filesystem::path& path,
         const std::string& entry_point_name = "main",
         const std::optional<std::string>& relative_to = std::nullopt) {
-        return load_module_from_path_and_compile_entry_point(context, path.stem(), path,
+        return load_module_from_path_and_compile_entry_point(context, path.stem().string(), path,
                                                              entry_point_name, relative_to);
     }
 
