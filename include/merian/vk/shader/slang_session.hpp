@@ -150,7 +150,8 @@ class SlangSession {
                             const std::optional<std::filesystem::path>& path) {
         Slang::ComPtr<slang::IBlob> diagnostics_blob;
         Slang::ComPtr<slang::IModule> module;
-        module = session->loadModuleFromSourceString(name.c_str(), path ? path->c_str() : nullptr,
+        module = session->loadModuleFromSourceString(name.c_str(),
+                                                     path ? path->string().c_str() : nullptr,
                                                      source.c_str(), diagnostics_blob.writeRef());
 
         if (module == nullptr) {
