@@ -82,7 +82,7 @@ class SlangComposition : public std::enable_shared_from_this<SlangComposition> {
                   const std::map<std::string, std::string>& entry_point_renames = {}) {
             SlangModule sm;
 
-            sm.name = path.stem();
+            sm.name = path.stem().string();
             sm.import_path = path.string();
             sm.source_path = path;
             sm.with_entry_points = with_entry_points;
