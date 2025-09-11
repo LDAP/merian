@@ -7,11 +7,16 @@ TEST(MathTest, Addition) {
     std::shared_ptr<merian_nodes::SlangTester> test_compiler = std::make_shared<merian_nodes::SlangTester>();
 
     merian::ShaderCompileContextHandle compilation_session_desc = merian::ShaderCompileContext::create();
+    SPDLOG_DEBUG("added search path");
 
-    compilation_session_desc->add_search_path("merian-nodes/nodes/svgf");
+    compilation_session_desc->add_search_path("/home/oschdi/Projects/merian-shadertoy/subprojects/merian/include/merian-shaders/utils");
 
-    merian::EntryPointHandle module =
-    merian::SlangProgramEntryPoint::create(compilation_session_desc, "svgf_filter.slang");
+    merian::SlangSessionHandle session = merian::SlangSession::create(compilation_session_desc);
+    merian::SlangComposition::SlangModule slang_module = merian::SlangComposition::SlangModule::from_path("encoding.slang", false);
+    Slang::ComPtr<slang::IModule> module = session->load_module_from_source(
+        slang_module.get_name(),
+        slang_module.get_source(compilation_session_desc->get_search_path_file_loader()),
+        slang_module.get_import_path());
     EXPECT_EQ(2 + 2, 4);
 }
 

@@ -143,6 +143,10 @@ class ShaderCompileContext {
         return ShaderCompileContextHandle(new ShaderCompileContext(context));
     }
 
+    static ShaderCompileContextHandle create() {
+        return ShaderCompileContextHandle(new ShaderCompileContext());
+    }
+
   private:
     FileLoader file_loader; // for search path management
 

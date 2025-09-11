@@ -154,7 +154,7 @@ std::vector<uint32_t> ShadercCompiler::compile_glsl(
                                              shaderc_env_version_vulkan_1_3);
     } else {
         compile_options.SetTargetEnvironment(shaderc_target_env_vulkan,
-                                             shaderc_env_version_vulkan_1_4);
+                                             shaderc_env_version_vulkan_1_3);
     }
 
     SPDLOG_DEBUG("preprocess {}", source_name);
