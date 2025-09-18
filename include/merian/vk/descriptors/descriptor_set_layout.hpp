@@ -1,6 +1,7 @@
 #pragma once
 
 #include "merian/vk/context.hpp"
+#include "merian/vk/extension/extension_vk_descriptor_buffer.hpp"
 #include <fmt/ranges.h>
 #include <spdlog/spdlog.h>
 #include <vector>
@@ -43,6 +44,21 @@ class DescriptorSetLayout : public std::enable_shared_from_this<DescriptorSetLay
 
     vk::DescriptorType get_type_for_binding(uint32_t binding) const {
         return bindings[binding].descriptorType;
+    }
+
+    // size in bytes for a descriptor buffer.
+    vk::DeviceSize get_layout_size() {
+        assert(context->get_extension<ExtensionVkDescriptorBuffer>());
+        return context->device.getDescriptorSetLayoutSizeEXT(layout);
+    }
+
+    vk::DeviceSize get_layout_binding_offset(const uint32_t binding,
+                                             const uint32_t array_element = 0) {
+        assert(context->get_extension<ExtensionVkDescriptorBuffer>());
+        return context->device.getDescriptorSetLayoutBindingOffsetEXT(layout, binding) +
+               (array_element *
+                context->get_extension<ExtensionVkDescriptorBuffer>()->descriptor_size_for_type(
+                    get_type_for_binding(binding)));
     }
 
   private:

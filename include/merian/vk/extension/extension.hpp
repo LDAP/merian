@@ -95,11 +95,18 @@ class Extension {
         return all_extensions_supported;
     }
 
-    /* Called after the physical device was select and before extensions are checked for
-     * compativility and check_support is called.*/
-    virtual void on_physical_device_selected(const PhysicalDevice& /*unused*/) {}
+    /* Append a structure to pNext of a getProperties2() call. This can be used to determine
+     * extension support.
+     *
+     * If a struct should be appended, set pNext of your struct to the supplied pointer,
+     * then return a pointer to your struct.
+     * If nothing should be appended, return the supplied pointer.
+     */
+    virtual void* pnext_get_properties_2(void* const p_next) {
+        return p_next;
+    }
 
-    /* Append a structure to pNext of a getFeatures() call. This can be used to determine extension
+    /* Append a structure to pNext of a getFeatures2() call. This can be used to determine extension
      * support.
      *
      * If a struct should be appended, set pNext of your struct to the supplied pointer,
@@ -110,8 +117,12 @@ class Extension {
         return p_next;
     }
 
+    /* Called after the physical device was select and before extensions are checked for
+     * compatibility and check_support is called.*/
+    virtual void on_physical_device_selected(const PhysicalDevice& /*unused*/) {}
+
     /* E.g. to dismiss a queue that does not support present-to-surface. Similar to
-     * accpet_physical_device, the context attemps to select a graphics queue that is accepted by
+     * accpet_physical_device, the context attempt to select a graphics queue that is accepted by
      * most extensions.
      */
     virtual bool accept_graphics_queue([[maybe_unused]] const vk::Instance& instance,
@@ -120,7 +131,7 @@ class Extension {
         return true;
     }
 
-    /* Custom check for compatibility after the physical device is ready and queue family indeces
+    /* Custom check for compatibility after the physical device is ready and queue family indices
      * are determined. At this time the structs wired up in pnext_get_features_2 is valid, you can
      * use those to check if features are available.
      *

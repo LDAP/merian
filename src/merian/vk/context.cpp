@@ -266,6 +266,13 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id,
 
     physical_device.physical_device = std::get<0>(matches.back());
 
+    void* extension_properties_pnext = nullptr;
+    for (auto& ext : extensions) {
+        extension_properties_pnext = ext.second->pnext_get_properties_2(extension_properties_pnext);
+    }
+    physical_device.physical_device_subgroup_size_control_properties.pNext =
+        extension_properties_pnext;
+    // ^
     physical_device.physical_device_subgroup_properties.pNext =
         &physical_device.physical_device_subgroup_size_control_properties;
     // ^

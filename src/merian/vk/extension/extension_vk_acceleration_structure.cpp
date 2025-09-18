@@ -20,11 +20,9 @@ std::vector<const char*> ExtensionVkAccelerationStructure::required_device_exten
 
 // LIFECYCLE
 
-void ExtensionVkAccelerationStructure::on_physical_device_selected(
-    const PhysicalDevice& pd_container) {
-    vk::PhysicalDeviceProperties2KHR props2;
-    props2.pNext = &acceleration_structure_properties;
-    pd_container.physical_device.getProperties2(&props2);
+void* ExtensionVkAccelerationStructure::pnext_get_properties_2(void* const p_next) {
+    acceleration_structure_properties.pNext = p_next;
+    return &acceleration_structure_properties;
 }
 
 void* ExtensionVkAccelerationStructure::pnext_get_features_2(void* const p_next) {
@@ -41,16 +39,17 @@ bool ExtensionVkAccelerationStructure::extension_supported(const vk::Instance& /
     MERIAN_EXT_ENABLE_IF_REQUESTED(accelerationStructure, supported_acceleration_structure_features,
                                    enabled_acceleration_structure_features, required_features,
                                    optional_features);
-    MERIAN_EXT_ENABLE_IF_REQUESTED(accelerationStructureCaptureReplay, supported_acceleration_structure_features,
-                                   enabled_acceleration_structure_features, required_features,
-                                   optional_features);
-    MERIAN_EXT_ENABLE_IF_REQUESTED(accelerationStructureIndirectBuild, supported_acceleration_structure_features,
-                                   enabled_acceleration_structure_features, required_features,
-                                   optional_features);
-    MERIAN_EXT_ENABLE_IF_REQUESTED(accelerationStructureHostCommands, supported_acceleration_structure_features,
-                                   enabled_acceleration_structure_features, required_features,
-                                   optional_features);
-    MERIAN_EXT_ENABLE_IF_REQUESTED(descriptorBindingAccelerationStructureUpdateAfterBind, supported_acceleration_structure_features,
+    MERIAN_EXT_ENABLE_IF_REQUESTED(
+        accelerationStructureCaptureReplay, supported_acceleration_structure_features,
+        enabled_acceleration_structure_features, required_features, optional_features);
+    MERIAN_EXT_ENABLE_IF_REQUESTED(
+        accelerationStructureIndirectBuild, supported_acceleration_structure_features,
+        enabled_acceleration_structure_features, required_features, optional_features);
+    MERIAN_EXT_ENABLE_IF_REQUESTED(
+        accelerationStructureHostCommands, supported_acceleration_structure_features,
+        enabled_acceleration_structure_features, required_features, optional_features);
+    MERIAN_EXT_ENABLE_IF_REQUESTED(descriptorBindingAccelerationStructureUpdateAfterBind,
+                                   supported_acceleration_structure_features,
                                    enabled_acceleration_structure_features, required_features,
                                    optional_features);
 

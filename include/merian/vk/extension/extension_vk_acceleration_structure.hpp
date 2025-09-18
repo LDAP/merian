@@ -26,7 +26,7 @@ class ExtensionVkAccelerationStructure : public Extension {
 
     // LIFECYCLE
 
-    void on_physical_device_selected(const PhysicalDevice& pd_container) override;
+    void* pnext_get_properties_2(void* const p_next) override;
 
     void* pnext_get_features_2(void* const p_next) override;
 
