@@ -1,7 +1,7 @@
 #pragma once
 
 #include "merian/vk/pipeline/specialization_info.hpp"
-#include "merian/vk/shader/shader_module.hpp"
+#include "merian/shader/shader_module.hpp"
 
 namespace merian {
 

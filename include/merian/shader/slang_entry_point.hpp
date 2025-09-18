@@ -1,7 +1,7 @@
 #pragma once
 
-#include "merian/vk/shader/entry_point.hpp"
-#include "merian/vk/shader/slang_program.hpp"
+#include "merian/shader/entry_point.hpp"
+#include "merian/shader/slang_program.hpp"
 
 #include "slang.h"
 

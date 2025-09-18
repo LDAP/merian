@@ -1,16 +1,16 @@
 #pragma once
 
-#include "merian/vk/shader/glsl_shader_compiler.hpp"
+#include "merian/shader/glsl_shader_compiler.hpp"
 
 namespace merian {
 
-// Uses glslangValidator executable to compile shaders.
-class SystemGlslangValidatorCompiler : public GLSLShaderCompiler {
+// Uses shaderc executable to compile shaders.
+class SystemGlslcCompiler : public GLSLShaderCompiler {
   public:
     // Include paths for the merian-nodes library are automatically added
-    SystemGlslangValidatorCompiler();
+    SystemGlslcCompiler();
 
-    ~SystemGlslangValidatorCompiler();
+    ~SystemGlslcCompiler();
 
     std::vector<uint32_t> compile_glsl(
         const std::string& source,

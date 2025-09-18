@@ -1,4 +1,4 @@
-#include "merian/vk/shader/entry_point.hpp"
+#include "merian/shader/entry_point.hpp"
 
 #include "fullscreen_triangle.vert.spv.h"
 

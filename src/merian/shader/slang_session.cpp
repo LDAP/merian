@@ -1,4 +1,4 @@
-#include "merian/vk/shader/slang_session.hpp"
+#include "merian/shader/slang_session.hpp"
 
 namespace merian {
 

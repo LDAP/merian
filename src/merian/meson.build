@@ -48,7 +48,7 @@ merian_src = files(
     'vk/window/swapchain.cpp',
 )
 
-subdir('vk/shader')
+subdir('shader')
 
 merian_lib = static_library(
     'merian',

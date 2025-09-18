@@ -1,9 +1,9 @@
 #pragma once
 
-#include "merian/vk/shader/entry_point.hpp"
+#include "merian/shader/entry_point.hpp"
 #include "pipeline_graphics.hpp"
 
-#include "merian/vk/shader/shader_module.hpp"
+#include "merian/shader/shader_module.hpp"
 
 namespace merian {
 

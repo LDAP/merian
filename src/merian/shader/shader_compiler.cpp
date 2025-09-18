@@ -1,4 +1,4 @@
-#include "merian/vk/shader/shader_compiler.hpp"
+#include "merian/shader/shader_compiler.hpp"
 
 namespace merian {
 

@@ -2,7 +2,7 @@
 
 #include "merian/io/file_loader.hpp"
 #include "merian/utils/hash.hpp"
-#include "merian/vk/shader/shader_compiler.hpp"
+#include "merian/shader/shader_compiler.hpp"
 
 #include "slang-com-ptr.h"
 #include "slang.h"

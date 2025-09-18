@@ -17,7 +17,7 @@
 #include "merian/vk/descriptors/descriptor_set_layout_builder.hpp"
 #include "merian/vk/extension/extension_vk_debug_utils.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
-#include "merian/vk/shader/shader_compiler.hpp"
+#include "merian/shader/shader_compiler.hpp"
 #include "merian/vk/sync/ring_fences.hpp"
 
 #include <cstdint>

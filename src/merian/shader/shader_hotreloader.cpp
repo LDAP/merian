@@ -1,4 +1,4 @@
-#include "merian/vk/shader/shader_hotreloader.hpp"
+#include "merian/shader/shader_hotreloader.hpp"
 
 #include <chrono>
 

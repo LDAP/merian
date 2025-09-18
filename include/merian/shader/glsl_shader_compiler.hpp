@@ -1,10 +1,10 @@
 #pragma once
 
 #include "merian/io/file_loader.hpp"
-#include "merian/vk/shader/entry_point.hpp"
-#include "merian/vk/shader/shader_compile_context.hpp"
-#include "merian/vk/shader/shader_compiler.hpp"
-#include "merian/vk/shader/shader_module.hpp"
+#include "merian/shader/entry_point.hpp"
+#include "merian/shader/shader_compile_context.hpp"
+#include "merian/shader/shader_compiler.hpp"
+#include "merian/shader/shader_module.hpp"
 
 #include <cstdint>
 #include <filesystem>

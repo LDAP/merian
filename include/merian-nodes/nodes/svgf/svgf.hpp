@@ -6,7 +6,7 @@
 
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
-#include "merian/vk/shader/entry_point.hpp"
+#include "merian/shader/entry_point.hpp"
 
 #include <optional>
 

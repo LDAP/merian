@@ -1,5 +1,5 @@
-#include "merian/vk/shader/slang_entry_point.hpp"
-#include "merian/vk/shader/slang_global_session.hpp"
+#include "merian/shader/slang_entry_point.hpp"
+#include "merian/shader/slang_global_session.hpp"
 
 namespace merian {
 

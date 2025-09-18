@@ -5,7 +5,7 @@
 #include "merian/vk/command/caching_command_pool.hpp"
 #include "merian/vk/command/command_buffer.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
-#include "merian/vk/shader/glsl_shader_compiler.hpp"
+#include "merian/shader/glsl_shader_compiler.hpp"
 #include "merian/vk/sync/semaphore_binary.hpp"
 #include "merian/vk/sync/semaphore_timeline.hpp"
 #include "merian/vk/utils/cpu_queue.hpp"

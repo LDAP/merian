@@ -1,9 +1,9 @@
 #pragma once
 
-#include "merian/vk/shader/shader_compile_context.hpp"
-#include "merian/vk/shader/shader_module.hpp"
-#include "merian/vk/shader/slang_composition.hpp"
-#include "merian/vk/shader/slang_session.hpp"
+#include "merian/shader/shader_compile_context.hpp"
+#include "merian/shader/shader_module.hpp"
+#include "merian/shader/slang_composition.hpp"
+#include "merian/shader/slang_session.hpp"
 
 #include "slang-com-ptr.h"
 #include "slang.h"

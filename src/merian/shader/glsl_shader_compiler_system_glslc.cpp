@@ -1,4 +1,4 @@
-#include "merian/vk/shader/glsl_shader_compiler_system_glslc.hpp"
+#include "merian/shader/glsl_shader_compiler_system_glslc.hpp"
 
 #include "subprocess/ProcessBuilder.hpp"
 #include "subprocess/basic_types.hpp"

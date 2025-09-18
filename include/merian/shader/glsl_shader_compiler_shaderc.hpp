@@ -1,6 +1,6 @@
 #pragma once
 
-#include "merian/vk/shader/glsl_shader_compiler.hpp"
+#include "merian/shader/glsl_shader_compiler.hpp"
 
 #ifdef MERIAN_SHADERC_AVAILABLE
 #include <shaderc/shaderc.hpp>

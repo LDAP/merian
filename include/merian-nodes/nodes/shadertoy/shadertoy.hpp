@@ -4,9 +4,9 @@
 
 #include "merian-nodes/nodes/compute_node/compute_node.hpp"
 
-#include "merian/vk/shader/shader_compiler.hpp"
-#include "merian/vk/shader/shader_hotreloader.hpp"
-#include "merian/vk/shader/shader_module.hpp"
+#include "merian/shader/shader_compiler.hpp"
+#include "merian/shader/shader_hotreloader.hpp"
+#include "merian/shader/shader_module.hpp"
 
 namespace merian_nodes {
 
