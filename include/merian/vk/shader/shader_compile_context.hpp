@@ -16,6 +16,8 @@ enum class CompilationTarget {
     SPIRV_1_4,
     SPIRV_1_5,
     SPIRV_1_6,
+    HOST_HOST_CALLABLE,
+    SHADER_HOST_CALLABLE,
 };
 
 inline CompilationTarget spirv_target_for_vulkan_api_version(const uint32_t vulkan_api_version) {
@@ -143,8 +145,12 @@ class ShaderCompileContext {
         return ShaderCompileContextHandle(new ShaderCompileContext(context));
     }
 
-    static ShaderCompileContextHandle create() {
-        return ShaderCompileContextHandle(new ShaderCompileContext());
+    static ShaderCompileContextHandle createTestContext() {
+        return ShaderCompileContextHandle(new ShaderCompileContext({}, {},
+            Context::IS_DEBUG_BUILD,
+            Context::BUILD_OPTIMIZATION_LEVEL,
+            CompilationTarget::HOST_HOST_CALLABLE
+        ));
     }
 
   private:

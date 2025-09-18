@@ -55,6 +55,11 @@ class SlangSession {
             target_desc.format = SLANG_SPIRV;
             target_desc.profile = global_session->findProfile("spirv_1_6");
             break;
+        case CompilationTarget::HOST_HOST_CALLABLE:
+            target_desc.format = SLANG_HOST_HOST_CALLABLE;
+            break;
+        case CompilationTarget::SHADER_HOST_CALLABLE:
+            target_desc.format = SLANG_SHADER_HOST_CALLABLE;
         default:
             throw std::runtime_error{"Target not supported"};
         }
@@ -79,7 +84,7 @@ class SlangSession {
         slang_session_desc.searchPaths = search_paths.data();
         slang_session_desc.searchPathCount = (SlangInt)search_paths.size();
 
-        std::array<slang::CompilerOptionEntry, 2> options = {
+        std::array<slang::CompilerOptionEntry, 3> options = {
             {
                 {
                     slang::CompilerOptionName::EmitSpirvDirectly,
@@ -587,7 +592,6 @@ class SlangSession {
     static SlangSessionHandle
     get_or_create(const ShaderCompileContextHandle& shader_compile_context);
 
-  private:
     static std::string diagnostics_as_string(Slang::ComPtr<slang::IBlob>& diagnostics_blob) {
         if (diagnostics_blob == nullptr) {
             return {};
