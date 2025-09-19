@@ -107,11 +107,6 @@ class DescriptorBuffer : public DescriptorContainer {
     // all with the same length.
     // Pointers are set in update() depending on the descriptor type.
     std::vector<vk::WriteDescriptorSet> writes;
-    std::vector<BindableResourceHandle> write_resources;
-    std::vector<std::variant<vk::DescriptorBufferInfo,
-                             vk::DescriptorImageInfo,
-                             vk::WriteDescriptorSetAccelerationStructureKHR>>
-        write_infos;
 };
 
 } // namespace merian

@@ -8,6 +8,8 @@
 
 namespace merian {
 
+Resource::~Resource() {}
+
 Buffer::Buffer(const vk::Buffer& buffer,
                const MemoryAllocationHandle& memory,
                const vk::BufferCreateInfo& create_info)

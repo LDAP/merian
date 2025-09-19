@@ -13,7 +13,10 @@
 
 namespace merian {
 
-class Resource : public Object {};
+class Resource : public Object {
+  public:
+    virtual ~Resource();
+};
 using ResourceHandle = std::shared_ptr<Resource>;
 
 // Forward def

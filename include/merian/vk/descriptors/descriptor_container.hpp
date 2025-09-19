@@ -1,5 +1,6 @@
 #pragma once
 
+#include "merian/utils/pointer.hpp"
 #include "merian/vk/descriptors/descriptor_set_layout.hpp"
 #include "merian/vk/memory/resource_allocations.hpp"
 
@@ -18,24 +19,6 @@ class DescriptorContainer : public std::enable_shared_from_this<DescriptorContai
     using DescriptorInfo = std::variant<vk::DescriptorBufferInfo,
                                         vk::DescriptorImageInfo,
                                         vk::WriteDescriptorSetAccelerationStructureKHR>;
-
-    static vk::WriteDescriptorSet& set_descriptor_info(vk::WriteDescriptorSet& write,
-                                                       const DescriptorInfo& info) {
-        if (std::holds_alternative<vk::DescriptorBufferInfo>(info)) {
-            write.pBufferInfo = &std::get<vk::DescriptorBufferInfo>(info);
-        } else if (std::holds_alternative<vk::DescriptorImageInfo>(info)) {
-            write.pImageInfo = &std::get<vk::DescriptorImageInfo>(info);
-        } else if (std::holds_alternative<vk::WriteDescriptorSetAccelerationStructureKHR>(info)) {
-            write.pNext = &std::get<vk::WriteDescriptorSetAccelerationStructureKHR>(info);
-        } else {
-            assert(false);
-        }
-
-        return write;
-    }
-
-    using BindableResourceHandle =
-        std::variant<TextureHandle, BufferHandle, ImageViewHandle, AccelerationStructureHandle>;
 
   public:
     static const uint32_t NO_DESCRIPTOR_BINDING = -1u;
@@ -65,47 +48,53 @@ class DescriptorContainer : public std::enable_shared_from_this<DescriptorContai
         return layout;
     }
 
-    const BufferHandle& get_buffer_at(const uint32_t binding,
-                                      const uint32_t array_element = 0) const {
-        const BindableResourceHandle& resource = get_bindable_resource_at(binding, array_element);
-        if (std::holds_alternative<BufferHandle>(resource)) {
-            return std::get<BufferHandle>(resource);
+    BufferHandle get_buffer_at(const uint32_t binding, const uint32_t array_element = 0) const {
+        const std::shared_ptr<Resource>& resource =
+            get_bindable_resource_at(binding, array_element);
+
+        if (BufferHandle buffer = std::dynamic_pointer_cast<Buffer>(resource); buffer) {
+            return buffer;
         }
 
         throw std::runtime_error{
             fmt::format("no buffer at binding {} (array element {})", binding, array_element)};
     }
 
-    const ImageViewHandle& get_view_at(const uint32_t binding,
-                                       const uint32_t array_element = 0) const {
-        const BindableResourceHandle& resource = get_bindable_resource_at(binding, array_element);
-        if (std::holds_alternative<ImageViewHandle>(resource)) {
-            return std::get<ImageViewHandle>(resource);
+    ImageViewHandle get_view_at(const uint32_t binding, const uint32_t array_element = 0) const {
+        const std::shared_ptr<Resource>& resource =
+            get_bindable_resource_at(binding, array_element);
+
+        if (ImageViewHandle image_view = std::dynamic_pointer_cast<ImageView>(resource);
+            image_view) {
+            return image_view;
         }
-        if (std::holds_alternative<TextureHandle>(resource)) {
-            return std::get<TextureHandle>(resource)->get_view();
+        if (TextureHandle texture = std::dynamic_pointer_cast<Texture>(resource); texture) {
+            return texture->get_view();
         }
 
         throw std::runtime_error{
             fmt::format("no view at binding {} (array element {})", binding, array_element)};
     }
 
-    const TextureHandle& get_texture_at(const uint32_t binding,
-                                        const uint32_t array_element = 0) const {
-        const BindableResourceHandle& resource = get_bindable_resource_at(binding, array_element);
-        if (std::holds_alternative<TextureHandle>(resource)) {
-            return std::get<TextureHandle>(resource);
+    TextureHandle get_texture_at(const uint32_t binding, const uint32_t array_element = 0) const {
+        const std::shared_ptr<Resource>& resource =
+            get_bindable_resource_at(binding, array_element);
+        if (TextureHandle texture = std::dynamic_pointer_cast<Texture>(resource); texture) {
+            return texture;
         }
 
         throw std::runtime_error{
             fmt::format("no texture at binding {} (array element {})", binding, array_element)};
     }
 
-    const AccelerationStructureHandle&
+    AccelerationStructureHandle
     get_acceleration_structure_at(const uint32_t binding, const uint32_t array_element = 0) const {
-        const BindableResourceHandle& resource = get_bindable_resource_at(binding, array_element);
-        if (std::holds_alternative<AccelerationStructureHandle>(resource)) {
-            return std::get<AccelerationStructureHandle>(resource);
+        const std::shared_ptr<Resource>& resource =
+            get_bindable_resource_at(binding, array_element);
+        if (AccelerationStructureHandle as =
+                std::dynamic_pointer_cast<AccelerationStructure>(resource);
+            as) {
+            return as;
         }
 
         throw std::runtime_error{fmt::format(
@@ -119,18 +108,23 @@ class DescriptorContainer : public std::enable_shared_from_this<DescriptorContai
                                                        const vk::DeviceSize offset = 0,
                                                        const vk::DeviceSize range = VK_WHOLE_SIZE,
                                                        const uint32_t dst_array_element = 0) {
+        assert(buffer);
+
         const uint32_t index = resource_index_for_binding[binding] + dst_array_element;
-        write_resources[index] = buffer;
         write_infos[index] = buffer->get_descriptor_info(offset, range);
-        queue_write(vk::WriteDescriptorSet{
-            VK_NULL_HANDLE,
-            binding,
-            dst_array_element,
-            1,
-            get_layout()->get_type_for_binding(binding),
-            VK_NULL_HANDLE,
-            &std::get<vk::DescriptorBufferInfo>(write_infos[index]),
-        });
+        if (!write_resources[index]) {
+            // minimize writes (and allow move in apply_update_for)
+            queue_write(vk::WriteDescriptorSet{
+                VK_NULL_HANDLE,
+                binding,
+                dst_array_element,
+                1,
+                get_layout()->get_type_for_binding(binding),
+                VK_NULL_HANDLE,
+                &std::get<vk::DescriptorBufferInfo>(write_infos[index]),
+            });
+        }
+        write_resources[index] = buffer;
         return *this;
     }
 
@@ -139,17 +133,22 @@ class DescriptorContainer : public std::enable_shared_from_this<DescriptorContai
         const ImageViewHandle& image_view,
         const uint32_t dst_array_element = 0,
         const std::optional<vk::ImageLayout> access_layout = std::nullopt) {
+        assert(image_view);
+
         const uint32_t index = resource_index_for_binding[binding] + dst_array_element;
-        write_resources[index] = image_view;
         write_infos[index] = image_view->get_descriptor_info(access_layout);
-        queue_write(vk::WriteDescriptorSet{
-            VK_NULL_HANDLE,
-            binding,
-            dst_array_element,
-            1,
-            get_layout()->get_type_for_binding(binding),
-            &std::get<vk::DescriptorImageInfo>(write_infos[index]),
-        });
+        if (!write_resources[index]) {
+            // minimize writes (and allow move in apply_update_for)
+            queue_write(vk::WriteDescriptorSet{
+                VK_NULL_HANDLE,
+                binding,
+                dst_array_element,
+                1,
+                get_layout()->get_type_for_binding(binding),
+                &std::get<vk::DescriptorImageInfo>(write_infos[index]),
+            });
+        }
+        write_resources[index] = image_view;
 
         return *this;
     }
@@ -159,17 +158,22 @@ class DescriptorContainer : public std::enable_shared_from_this<DescriptorContai
         const TextureHandle& texture,
         const uint32_t dst_array_element = 0,
         const std::optional<vk::ImageLayout> access_layout = std::nullopt) {
+        assert(texture);
+
         const uint32_t index = resource_index_for_binding[binding] + dst_array_element;
-        write_resources[index] = texture;
         write_infos[index] = texture->get_descriptor_info(access_layout);
-        queue_write(vk::WriteDescriptorSet{
-            VK_NULL_HANDLE,
-            binding,
-            dst_array_element,
-            1,
-            get_layout()->get_type_for_binding(binding),
-            &std::get<vk::DescriptorImageInfo>(write_infos[index]),
-        });
+        if (!write_resources[index]) {
+            // minimize writes (and allow move in apply_update_for)
+            queue_write(vk::WriteDescriptorSet{
+                VK_NULL_HANDLE,
+                binding,
+                dst_array_element,
+                1,
+                get_layout()->get_type_for_binding(binding),
+                &std::get<vk::DescriptorImageInfo>(write_infos[index]),
+            });
+        }
+        write_resources[index] = texture;
 
         return *this;
     }
@@ -180,6 +184,9 @@ class DescriptorContainer : public std::enable_shared_from_this<DescriptorContai
         const SamplerHandle& sampler,
         const uint32_t dst_array_element = 0,
         const std::optional<vk::ImageLayout> access_layout = std::nullopt) {
+        assert(view);
+        assert(sampler);
+
         return queue_descriptor_write_texture(binding, Texture::create(view, sampler),
                                               dst_array_element, access_layout);
     }
@@ -189,20 +196,25 @@ class DescriptorContainer : public std::enable_shared_from_this<DescriptorContai
         const uint32_t binding,
         const AccelerationStructureHandle& acceleration_structure,
         const uint32_t dst_array_element = 0) {
+        assert(acceleration_structure);
+
         const uint32_t index = resource_index_for_binding[binding] + dst_array_element;
-        write_resources[index] = acceleration_structure;
         write_infos[index] = acceleration_structure->get_descriptor_info();
-        queue_write(vk::WriteDescriptorSet{
-            VK_NULL_HANDLE,
-            binding,
-            dst_array_element,
-            1,
-            vk::DescriptorType::eAccelerationStructureKHR,
-            VK_NULL_HANDLE,
-            VK_NULL_HANDLE,
-            VK_NULL_HANDLE,
-            &std::get<vk::WriteDescriptorSetAccelerationStructureKHR>(write_infos[index]),
-        });
+        if (!write_resources[index]) {
+            // minimize writes (and allow move in apply_update_for)
+            queue_write(vk::WriteDescriptorSet{
+                VK_NULL_HANDLE,
+                binding,
+                dst_array_element,
+                1,
+                vk::DescriptorType::eAccelerationStructureKHR,
+                VK_NULL_HANDLE,
+                VK_NULL_HANDLE,
+                VK_NULL_HANDLE,
+                &std::get<vk::WriteDescriptorSetAccelerationStructureKHR>(write_infos[index]),
+            });
+        }
+        write_resources[index] = acceleration_structure;
 
         return *this;
     }
@@ -228,8 +240,8 @@ class DescriptorContainer : public std::enable_shared_from_this<DescriptorContai
   protected:
     virtual void queue_write(vk::WriteDescriptorSet&& write) = 0;
 
-    const BindableResourceHandle& get_bindable_resource_at(const uint32_t binding,
-                                                           const uint32_t array_element = 0) const {
+    const std::shared_ptr<Resource>&
+    get_bindable_resource_at(const uint32_t binding, const uint32_t array_element = 0) const {
         assert(binding < resource_index_for_binding.size());
         assert(array_element < layout->get_bindings()[binding].descriptorCount);
 
@@ -243,6 +255,8 @@ class DescriptorContainer : public std::enable_shared_from_this<DescriptorContai
         const uint32_t index = resource_index_for_binding[binding] + array_element;
         assert(index < resources.size());
         assert(index < write_resources.size());
+        assert(write_resources[index]);
+
         resources[index] = std::move(write_resources[index]);
     }
 
@@ -253,9 +267,9 @@ class DescriptorContainer : public std::enable_shared_from_this<DescriptorContai
     std::vector<uint32_t> resource_index_for_binding;
 
     // Has entry for each array element. Use resource_index_for_binding to access.
-    std::vector<BindableResourceHandle> resources;
+    std::vector<std::shared_ptr<Resource>> resources;
     // Has entry for each array element. Use resource_index_for_binding to access.
-    std::vector<BindableResourceHandle> write_resources;
+    std::vector<std::shared_ptr<Resource>> write_resources;
     // Has entry for each array element. Use resource_index_for_binding to access.
     std::vector<std::variant<vk::DescriptorBufferInfo,
                              vk::DescriptorImageInfo,
