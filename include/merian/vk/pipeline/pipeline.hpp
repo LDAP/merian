@@ -7,13 +7,13 @@
 
 namespace merian {
 
-class Pipeline : public std::enable_shared_from_this<Pipeline>, public Object  {
+class Pipeline : public std::enable_shared_from_this<Pipeline>, public Object {
 
   public:
     Pipeline(const ContextHandle& context, const std::shared_ptr<PipelineLayout>& pipeline_layout)
         : context(context), pipeline_layout(pipeline_layout) {}
 
-    virtual ~Pipeline(){};
+    virtual ~Pipeline() {};
 
     // ---------------------------------------------------------------------------
 
@@ -21,11 +21,11 @@ class Pipeline : public std::enable_shared_from_this<Pipeline>, public Object  {
         return pipeline;
     }
 
-    const vk::Pipeline& get_pipeline() {
+    const vk::Pipeline& get_pipeline() const {
         return pipeline;
     }
 
-    const std::shared_ptr<PipelineLayout>& get_layout() {
+    const std::shared_ptr<PipelineLayout>& get_layout() const {
         return pipeline_layout;
     }
 

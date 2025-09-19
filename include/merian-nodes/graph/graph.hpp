@@ -11,13 +11,13 @@
 #include "resource.hpp"
 
 #include "merian-nodes/graph/node_registry.hpp"
+#include "merian/shader/shader_compiler.hpp"
 #include "merian/utils/math.hpp"
 #include "merian/vk/command/caching_command_pool.hpp"
 #include "merian/vk/context.hpp"
 #include "merian/vk/descriptors/descriptor_set_layout_builder.hpp"
 #include "merian/vk/extension/extension_vk_debug_utils.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
-#include "merian/shader/shader_compiler.hpp"
 #include "merian/vk/sync/ring_fences.hpp"
 
 #include <cstdint>
@@ -1996,7 +1996,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
             for (uint32_t set_idx = 0; set_idx < num_sets; set_idx++) {
                 // allocate
                 dst_data.descriptor_sets.emplace_back(
-                    std::make_shared<DescriptorSet>(dst_data.descriptor_pool));
+                    DescriptorSet::create(dst_data.descriptor_pool));
 
                 // precompute resources for inputs
                 for (auto& [input, per_input_info] : dst_data.input_connections) {

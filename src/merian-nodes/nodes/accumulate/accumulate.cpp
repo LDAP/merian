@@ -62,8 +62,8 @@ Accumulate::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
         percentile_desc_pool = std::make_shared<DescriptorPool>(percentile_desc_layout);
         accumulate_desc_pool = std::make_shared<DescriptorPool>(accumulate_desc_layout);
 
-        percentile_set = std::make_shared<DescriptorSet>(percentile_desc_pool);
-        accumulate_set = std::make_shared<DescriptorSet>(accumulate_desc_pool);
+        percentile_set = DescriptorSet::create(percentile_desc_pool);
+        accumulate_set = DescriptorSet::create(accumulate_desc_pool);
     }
 
     percentile_group_count_x =
@@ -120,8 +120,7 @@ Accumulate::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
                                  wg_rounded_irr_size_y, filter_mode, extended_search, reuse_border,
                                  enable_mv && io_layout.is_connected(con_mv));
     const auto accum_spec = accum_spec_builder.build();
-    accumulate =
-        ComputePipeline::create(accum_pipe_layout, accumulate_module, accum_spec);
+    accumulate = ComputePipeline::create(accum_pipe_layout, accumulate_module, accum_spec);
 
     return {};
 }
@@ -143,8 +142,7 @@ void Accumulate::process(GraphRun& run,
                      vk::PipelineStageFlagBits::eComputeShader, bar);
 
         cmd->bind(calculate_percentiles);
-        cmd->bind_descriptor_set(calculate_percentiles, descriptor_set, 0);
-        cmd->bind_descriptor_set(calculate_percentiles, percentile_set, 1);
+        cmd->bind_descriptor_set(calculate_percentiles, descriptor_set, percentile_set);
         cmd->push_constant(calculate_percentiles, percentile_pc);
         cmd->dispatch(percentile_group_count_x, percentile_group_count_y, 1);
     }
@@ -167,8 +165,7 @@ void Accumulate::process(GraphRun& run,
 
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "accumulate");
         cmd->bind(accumulate);
-        cmd->bind_descriptor_set(accumulate, descriptor_set, 0);
-        cmd->bind_descriptor_set(accumulate, accumulate_set, 1);
+        cmd->bind_descriptor_set(accumulate, descriptor_set, accumulate_set);
         cmd->push_constant(accumulate, accumulate_pc);
         cmd->dispatch(filter_group_count_x, filter_group_count_y);
     }

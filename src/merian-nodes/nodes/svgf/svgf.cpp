@@ -3,10 +3,10 @@
 #include "merian/utils/math.hpp"
 #include "merian/vk/descriptors/descriptor_set_layout_builder.hpp"
 
+#include "merian/shader/slang_entry_point.hpp"
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
-#include "merian/shader/slang_entry_point.hpp"
 
 namespace merian_nodes {
 
@@ -68,7 +68,7 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
 
     for (int i = 0; i < 2; i++) {
         if (!ping_pong_res[i].set)
-            ping_pong_res[i].set = std::make_shared<DescriptorSet>(filter_pool);
+            ping_pong_res[i].set = DescriptorSet::create(filter_pool);
 
         // irradiance
         ImageHandle tmp_irr_image = allocator->createImage(irr_create_info, MemoryMappingType::NONE,
@@ -193,8 +193,7 @@ void SVGF::process(GraphRun& run, const DescriptorSetHandle& descriptor_set, con
 
         // run kernel
         cmd->bind(variance_estimate);
-        cmd->bind_descriptor_set(variance_estimate, descriptor_set, 0);
-        cmd->bind_descriptor_set(variance_estimate, ping_pong_res[1].set, 1);
+        cmd->bind_descriptor_set(variance_estimate, descriptor_set, ping_pong_res[1].set);
         VarianceEstimatePushConstant precomputed_variance_estimate_pc = variance_estimate_pc;
         precomputed_variance_estimate_pc.depth_accept =
             -10.0f / precomputed_variance_estimate_pc.depth_accept;
@@ -235,8 +234,7 @@ void SVGF::process(GraphRun& run, const DescriptorSetHandle& descriptor_set, con
 
         // run filter
         cmd->bind(filters[i]);
-        cmd->bind_descriptor_set(filters[i], descriptor_set, 0);
-        cmd->bind_descriptor_set(filters[i], read_set, 1);
+        cmd->bind_descriptor_set(filters[i], descriptor_set, read_set);
         FilterPushConstant precomputed_filter_pc = filter_pc;
         precomputed_filter_pc.param_z = -10.0f / precomputed_filter_pc.param_z;
         cmd->push_constant(filters[i], precomputed_filter_pc);
@@ -260,8 +258,7 @@ void SVGF::process(GraphRun& run, const DescriptorSetHandle& descriptor_set, con
     {
         MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "taa");
         cmd->bind(taa);
-        cmd->bind_descriptor_set(taa, descriptor_set, 0);
-        cmd->bind_descriptor_set(taa, read_set, 1);
+        cmd->bind_descriptor_set(taa, descriptor_set, read_set);
         cmd->push_constant(taa, taa_pc);
         cmd->dispatch(io[con_out]->get_extent(), taa_local_size, taa_local_size);
     }

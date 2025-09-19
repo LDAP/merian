@@ -49,6 +49,10 @@ class CommandPool : public std::enable_shared_from_this<CommandPool> {
         objects_in_use.emplace_back(object);
     }
 
+    virtual void keep_until_pool_reset(ObjectHandle&& object) {
+        objects_in_use.emplace_back(std::move(object));
+    }
+
     // ------------------------------------------------------------
 
     const ContextHandle& get_context() {
