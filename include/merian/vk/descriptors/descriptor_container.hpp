@@ -248,6 +248,7 @@ class DescriptorContainer : public std::enable_shared_from_this<DescriptorContai
         return resources[resource_index_for_binding[binding] + array_element];
     }
 
+    // this can be called exactly ONCE for a queued update.
     void apply_update_for(const uint32_t binding, const uint32_t array_element = 0) {
         assert(binding < resource_index_for_binding.size());
         assert(array_element < layout->get_bindings()[binding].descriptorCount);
