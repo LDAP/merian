@@ -1,6 +1,5 @@
 #pragma once
 
-#include "merian/utils/pointer.hpp"
 #include "merian/vk/descriptors/descriptor_set_layout.hpp"
 #include "merian/vk/memory/resource_allocations.hpp"
 
@@ -23,21 +22,10 @@ class DescriptorContainer : public std::enable_shared_from_this<DescriptorContai
   public:
     static const uint32_t NO_DESCRIPTOR_BINDING = -1u;
 
-    DescriptorContainer(const DescriptorSetLayoutHandle& layout)
-        : layout(layout), resource_index_for_binding(layout->get_bindings().size(), 0) {
-
-        const auto& bindings = layout->get_bindings();
-        if (!bindings.empty()) {
-            for (uint32_t i = 1; i < bindings.size(); i++) {
-                resource_index_for_binding[i] =
-                    bindings[i - 1].descriptorCount + resource_index_for_binding[i - 1];
-            }
-            descriptor_count = resource_index_for_binding.back() + bindings.back().descriptorCount;
-
-            resources.resize(descriptor_count);
-            write_resources.resize(descriptor_count);
-            write_infos.resize(descriptor_count);
-        }
+    DescriptorContainer(const DescriptorSetLayoutHandle& layout) : layout(layout) {
+        resources.resize(layout->get_descriptor_count());
+        write_resources.resize(layout->get_descriptor_count());
+        write_infos.resize(layout->get_descriptor_count());
     }
 
     virtual ~DescriptorContainer();
@@ -110,9 +98,11 @@ class DescriptorContainer : public std::enable_shared_from_this<DescriptorContai
                                                        const uint32_t dst_array_element = 0) {
         assert(buffer);
 
-        const uint32_t index = resource_index_for_binding[binding] + dst_array_element;
+        const uint32_t index = layout->get_binding_offset(binding, dst_array_element);
+        const bool needs_queue = write_resources[index] == nullptr;
         write_infos[index] = buffer->get_descriptor_info(offset, range);
-        if (!write_resources[index]) {
+        write_resources[index] = buffer;
+        if (needs_queue) {
             // minimize writes (and allow move in apply_update_for)
             queue_write(vk::WriteDescriptorSet{
                 VK_NULL_HANDLE,
@@ -124,7 +114,6 @@ class DescriptorContainer : public std::enable_shared_from_this<DescriptorContai
                 &std::get<vk::DescriptorBufferInfo>(write_infos[index]),
             });
         }
-        write_resources[index] = buffer;
         return *this;
     }
 
@@ -135,9 +124,11 @@ class DescriptorContainer : public std::enable_shared_from_this<DescriptorContai
         const std::optional<vk::ImageLayout> access_layout = std::nullopt) {
         assert(image_view);
 
-        const uint32_t index = resource_index_for_binding[binding] + dst_array_element;
+        const uint32_t index = layout->get_binding_offset(binding, dst_array_element);
+        const bool needs_queue = write_resources[index] == nullptr;
         write_infos[index] = image_view->get_descriptor_info(access_layout);
-        if (!write_resources[index]) {
+        write_resources[index] = image_view;
+        if (needs_queue) {
             // minimize writes (and allow move in apply_update_for)
             queue_write(vk::WriteDescriptorSet{
                 VK_NULL_HANDLE,
@@ -148,7 +139,6 @@ class DescriptorContainer : public std::enable_shared_from_this<DescriptorContai
                 &std::get<vk::DescriptorImageInfo>(write_infos[index]),
             });
         }
-        write_resources[index] = image_view;
 
         return *this;
     }
@@ -160,9 +150,11 @@ class DescriptorContainer : public std::enable_shared_from_this<DescriptorContai
         const std::optional<vk::ImageLayout> access_layout = std::nullopt) {
         assert(texture);
 
-        const uint32_t index = resource_index_for_binding[binding] + dst_array_element;
+        const uint32_t index = layout->get_binding_offset(binding, dst_array_element);
+        const bool needs_queue = write_resources[index] == nullptr;
         write_infos[index] = texture->get_descriptor_info(access_layout);
-        if (!write_resources[index]) {
+        write_resources[index] = texture;
+        if (needs_queue) {
             // minimize writes (and allow move in apply_update_for)
             queue_write(vk::WriteDescriptorSet{
                 VK_NULL_HANDLE,
@@ -173,7 +165,6 @@ class DescriptorContainer : public std::enable_shared_from_this<DescriptorContai
                 &std::get<vk::DescriptorImageInfo>(write_infos[index]),
             });
         }
-        write_resources[index] = texture;
 
         return *this;
     }
@@ -198,9 +189,11 @@ class DescriptorContainer : public std::enable_shared_from_this<DescriptorContai
         const uint32_t dst_array_element = 0) {
         assert(acceleration_structure);
 
-        const uint32_t index = resource_index_for_binding[binding] + dst_array_element;
+        const uint32_t index = layout->get_binding_offset(binding, dst_array_element);
+        const bool needs_queue = write_resources[index] == nullptr;
         write_infos[index] = acceleration_structure->get_descriptor_info();
-        if (!write_resources[index]) {
+        write_resources[index] = acceleration_structure;
+        if (needs_queue) {
             // minimize writes (and allow move in apply_update_for)
             queue_write(vk::WriteDescriptorSet{
                 VK_NULL_HANDLE,
@@ -214,16 +207,11 @@ class DescriptorContainer : public std::enable_shared_from_this<DescriptorContai
                 &std::get<vk::WriteDescriptorSetAccelerationStructureKHR>(write_infos[index]),
             });
         }
-        write_resources[index] = acceleration_structure;
 
         return *this;
     }
 
     // --------------------------------------
-
-    uint32_t get_descriptor_count() const noexcept {
-        return descriptor_count;
-    }
 
     virtual uint32_t update_count() const noexcept = 0;
 
@@ -242,30 +230,21 @@ class DescriptorContainer : public std::enable_shared_from_this<DescriptorContai
 
     const std::shared_ptr<Resource>&
     get_bindable_resource_at(const uint32_t binding, const uint32_t array_element = 0) const {
-        assert(binding < resource_index_for_binding.size());
-        assert(array_element < layout->get_bindings()[binding].descriptorCount);
-
-        return resources[resource_index_for_binding[binding] + array_element];
+        return resources[layout->get_binding_offset(binding, array_element)];
     }
 
     // this can be called exactly ONCE for a queued update.
     void apply_update_for(const uint32_t binding, const uint32_t array_element = 0) {
-        assert(binding < resource_index_for_binding.size());
-        assert(array_element < layout->get_bindings()[binding].descriptorCount);
-
-        const uint32_t index = resource_index_for_binding[binding] + array_element;
+        const uint32_t index = layout->get_binding_offset(binding, array_element);
         assert(index < resources.size());
         assert(index < write_resources.size());
-        assert(write_resources[index]);
+        assert(write_resources[index] && "this can be called exactly ONCE for a queued update");
 
         resources[index] = std::move(write_resources[index]);
     }
 
   private:
     const DescriptorSetLayoutHandle layout;
-    uint32_t descriptor_count = 0;
-
-    std::vector<uint32_t> resource_index_for_binding;
 
     // Has entry for each array element. Use resource_index_for_binding to access.
     std::vector<std::shared_ptr<Resource>> resources;

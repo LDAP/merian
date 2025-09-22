@@ -1,6 +1,7 @@
 #pragma once
 
 #include "merian/vk/descriptors/descriptor_container.hpp"
+#include "merian/vk/extension/extension_vk_descriptor_buffer.hpp"
 #include "merian/vk/memory/memory_allocator.hpp"
 
 #include <vector>
@@ -21,16 +22,30 @@ class DescriptorBuffer : public DescriptorContainer {
     // Allocates a DescriptorBuffer that matches the layout that is attached to the Pool
     DescriptorBuffer(const DescriptorSetLayoutHandle& layout,
                      const MemoryAllocatorHandle& allocator)
-        : DescriptorContainer(layout) {
-        ext_descriptor_buffer =
+        : DescriptorContainer(layout), context(layout->get_context()) {
+        const auto ext_descriptor_buffer =
             allocator->get_context()->get_extension<ExtensionVkDescriptorBuffer>();
         assert(ext_descriptor_buffer);
 
         const vk::BufferCreateInfo create_info{
-            vk::BufferCreateFlags{}, layout->get_layout_size(),
+            vk::BufferCreateFlags{}, get_size(),
             vk::BufferUsageFlagBits::eResourceDescriptorBufferEXT |
-                vk::BufferUsageFlagBits::eSamplerDescriptorBufferEXT};
-        buffer = allocator->create_buffer(create_info, MemoryMappingType::HOST_ACCESS_RANDOM);
+                vk::BufferUsageFlagBits::eSamplerDescriptorBufferEXT |
+                vk::BufferUsageFlagBits::eShaderDeviceAddress};
+        buffer =
+            allocator->create_buffer(create_info, MemoryMappingType::HOST_ACCESS_SEQUENTIAL_WRITE);
+
+        binding_infos.resize(layout->get_bindings().size());
+        for (uint32_t i = 0; i < layout->get_bindings().size(); i++) {
+            auto& binding_info = binding_infos[i];
+
+            binding_info.size =
+                ext_descriptor_buffer->descriptor_size_for_type(layout->get_type_for_binding(i));
+            binding_info.offset =
+                context->device.getDescriptorSetLayoutBindingOffsetEXT(*get_layout(), i);
+
+            max_binding_size = std::max(max_binding_size, binding_info.size);
+        }
     }
 
     ~DescriptorBuffer() {}
@@ -39,6 +54,17 @@ class DescriptorBuffer : public DescriptorContainer {
 
     const BufferHandle& get_buffer() const {
         return buffer;
+    }
+
+    // size in bytes for a descriptor buffer.
+    vk::DeviceSize get_size() {
+        return context->device.getDescriptorSetLayoutSizeEXT(*get_layout());
+    }
+
+    vk::DeviceSize get_layout_binding_offset(const uint32_t binding,
+                                             const uint32_t array_element = 0) {
+        assert(binding < binding_infos.size());
+        return binding_infos[binding].offset + (array_element * binding_infos[binding].size);
     }
 
     // ---------------------------------------------------------------------
@@ -52,38 +78,9 @@ class DescriptorBuffer : public DescriptorContainer {
         return !writes.empty();
     }
 
-    void update() override {
-        vk::DescriptorAddressInfoEXT();
-        // // for now descriptor count is always 1.
-        // assert(writes.size() == write_resources.size());
-        // assert(writes.size() == write_infos.size());
+    void update() override;
 
-        // if (!has_updates()) {
-        //     return;
-        // }
-
-        // for (uint32_t i = 0; i < writes.size(); i++) {
-        //     vk::WriteDescriptorBuffer& write = writes[i];
-        //     set_descriptor_info(write, write_infos[i]);
-
-        //     // For now only descriptorCount 1 is implemented. Otherwise: If the dstBinding has
-        //     // fewer than descriptorCount array elements remaining starting from
-        //     // dstArrayElement, then the remainder will be used to update the subsequent binding
-        //     // - dstBinding+1 starting at array element zero. In this case we'd have multiple
-        //     // infos and resources i guess?
-        //     assert(write.descriptorCount == 1);
-        //     set_bindable_resource(std::move(write_resources[i]), write.dstBinding,
-        //                           write.dstArrayElement);
-        // }
-
-        // pool->get_context()->device.updateDescriptorBuffers(writes, {});
-
-        // writes.clear();
-        // write_infos.clear();
-        // write_resources.clear();
-    }
-
-    void update(const CommandBufferHandle& /*cmd*/) override {}
+    void update(const CommandBufferHandle& cmd) override;
 
   protected:
     virtual void queue_write(vk::WriteDescriptorSet&& write) override {
@@ -97,15 +94,17 @@ class DescriptorBuffer : public DescriptorContainer {
     }
 
   private:
+    const ContextHandle context;
+
     BufferHandle buffer;
 
-    std::shared_ptr<ExtensionVkDescriptorBuffer> ext_descriptor_buffer;
+    struct BindingInfo {
+        vk::DeviceSize size;
+        vk::DeviceSize offset;
+    };
 
-    // ---------------------------------------------------------------------
-    // Queued Updates
-
-    // all with the same length.
-    // Pointers are set in update() depending on the descriptor type.
+    std::vector<BindingInfo> binding_infos;
+    vk::DeviceSize max_binding_size = 0;
     std::vector<vk::WriteDescriptorSet> writes;
 };
 

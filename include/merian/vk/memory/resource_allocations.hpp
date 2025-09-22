@@ -86,6 +86,14 @@ class Buffer : public std::enable_shared_from_this<Buffer>, public Resource {
         return vk::DescriptorBufferInfo{buffer, offset, range};
     }
 
+    vk::DescriptorAddressInfoEXT
+    get_descriptor_address_info(const vk::DeviceSize offset = 0,
+                                const vk::DeviceSize range = VK_WHOLE_SIZE) const {
+        assert(offset < get_size());
+        return vk::DescriptorAddressInfoEXT{get_device_address() + offset,
+                                            range == VK_WHOLE_SIZE ? get_size() - offset : range};
+    }
+
     vk::BufferDeviceAddressInfo get_buffer_device_address_info() const {
         return vk::BufferDeviceAddressInfo{buffer};
     }
@@ -517,7 +525,7 @@ class AccelerationStructure : public std::enable_shared_from_this<AccelerationSt
     // -----------------------------------------------------------
 
     // E.g. needed for accelerationStructureReference in VkAccelerationStructureInstanceKHR
-    vk::DeviceAddress get_acceleration_structure_device_address();
+    vk::DeviceAddress get_acceleration_structure_device_address() const;
 
     // A barrier to insert between tlas builds and tlas usage.
     vk::BufferMemoryBarrier2 tlas_read_barrier2(const vk::PipelineStageFlags2 read_stages) const {

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "merian/vk/context.hpp"
-#include "merian/vk/extension/extension_vk_descriptor_buffer.hpp"
 #include <fmt/ranges.h>
 #include <spdlog/spdlog.h>
 #include <vector>
@@ -15,10 +14,17 @@ class DescriptorSetLayout : public std::enable_shared_from_this<DescriptorSetLay
     DescriptorSetLayout(const ContextHandle& context,
                         const std::vector<vk::DescriptorSetLayoutBinding>& bindings,
                         const vk::DescriptorSetLayoutCreateFlags flags = {})
-        : context(context), bindings(bindings) {
+        : context(context), bindings(bindings), binding_offsets(bindings.size(), 0) {
         vk::DescriptorSetLayoutCreateInfo info{flags, bindings};
         SPDLOG_DEBUG("create DescriptorSetLayout ({})", fmt::ptr(this));
         layout = context->device.createDescriptorSetLayout(info);
+
+        if (!bindings.empty()) {
+            for (uint32_t i = 1; i < bindings.size(); i++) {
+                binding_offsets[i] = bindings[i - 1].descriptorCount + binding_offsets[i - 1];
+            }
+            descriptor_count = binding_offsets.back() + bindings.back().descriptorCount;
+        }
     }
 
     ~DescriptorSetLayout() {
@@ -46,25 +52,24 @@ class DescriptorSetLayout : public std::enable_shared_from_this<DescriptorSetLay
         return bindings[binding].descriptorType;
     }
 
-    // size in bytes for a descriptor buffer.
-    vk::DeviceSize get_layout_size() {
-        assert(context->get_extension<ExtensionVkDescriptorBuffer>());
-        return context->device.getDescriptorSetLayoutSizeEXT(layout);
+    uint32_t get_descriptor_count() const noexcept {
+        return descriptor_count;
     }
 
-    vk::DeviceSize get_layout_binding_offset(const uint32_t binding,
-                                             const uint32_t array_element = 0) {
-        assert(context->get_extension<ExtensionVkDescriptorBuffer>());
-        return context->device.getDescriptorSetLayoutBindingOffsetEXT(layout, binding) +
-               (array_element *
-                context->get_extension<ExtensionVkDescriptorBuffer>()->descriptor_size_for_type(
-                    get_type_for_binding(binding)));
+    // returns the offset into an array where all bindings are linearized.
+    uint32_t get_binding_offset(const uint32_t binding, const uint32_t array_element = 0) const {
+        assert(binding < binding_offsets.size());
+        assert(array_element < bindings[binding].descriptorCount);
+        return binding_offsets[binding] + array_element;
     }
 
   private:
     const ContextHandle context;
     const std::vector<vk::DescriptorSetLayoutBinding> bindings;
     vk::DescriptorSetLayout layout;
+
+    uint32_t descriptor_count = 0;
+    std::vector<uint32_t> binding_offsets;
 };
 using DescriptorSetLayoutHandle = std::shared_ptr<DescriptorSetLayout>;
 

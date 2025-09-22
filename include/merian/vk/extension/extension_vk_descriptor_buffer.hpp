@@ -1,5 +1,6 @@
 #pragma once
 
+#include "merian/vk/descriptors/descriptor_set_layout.hpp"
 #include "merian/vk/extension/extension.hpp"
 
 namespace merian {

@@ -49,7 +49,7 @@ class DescriptorSet : public DescriptorContainer {
         set = allocate_descriptor_set(*pool->get_context(), *pool, *pool->get_layout());
         SPDLOG_DEBUG("allocated DescriptorSet ({})", fmt::ptr(static_cast<VkDescriptorSet>(set)));
 
-        writes.reserve(get_descriptor_count());
+        writes.reserve(get_layout()->get_descriptor_count());
     }
 
     ~DescriptorSet() {

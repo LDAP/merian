@@ -480,7 +480,7 @@ AccelerationStructure::~AccelerationStructure() {
     buffer->get_memory()->get_context()->device.destroyAccelerationStructureKHR(as);
 }
 
-vk::DeviceAddress AccelerationStructure::get_acceleration_structure_device_address() {
+vk::DeviceAddress AccelerationStructure::get_acceleration_structure_device_address() const {
     vk::AccelerationStructureDeviceAddressInfoKHR address_info{as};
     return buffer->get_memory()->get_context()->device.getAccelerationStructureAddressKHR(
         address_info);

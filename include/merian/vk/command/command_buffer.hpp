@@ -133,6 +133,25 @@ class CommandBuffer : public std::enable_shared_from_this<CommandBuffer> {
         keep_until_pool_reset(buffer);
     }
 
+    template <typename DataType>
+    void update(const BufferHandle& dst_buffer,
+                const vk::DeviceSize dst_offset,
+                const vk::ArrayProxy<DataType>& data) {
+        cmd.updateBuffer(*dst_buffer, dst_offset, data);
+    }
+
+    template <typename DataType>
+    void update(const BufferHandle& dst_buffer, const vk::ArrayProxy<DataType>& data) {
+        cmd.updateBuffer(*dst_buffer, 0, data);
+    }
+
+    void update(const BufferHandle& dst_buffer,
+                const vk::DeviceSize dst_offset,
+                const std::size_t size,
+                const void* data) {
+        cmd.updateBuffer(*dst_buffer, dst_offset, size, data);
+    }
+
     // ------------------------------------------------------------
     // IMAGE
 
