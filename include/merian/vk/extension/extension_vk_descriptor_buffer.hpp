@@ -1,6 +1,5 @@
 #pragma once
 
-#include "merian/vk/descriptors/descriptor_set_layout.hpp"
 #include "merian/vk/extension/extension.hpp"
 
 namespace merian {
@@ -13,6 +12,26 @@ class ExtensionVkDescriptorBuffer : public Extension {
     std::vector<const char*>
     required_device_extension_names(const vk::PhysicalDevice& /*unused*/) const override {
         return {VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME};
+    }
+
+    void* pnext_get_features_2(void* const p_next) override {
+        supported.setPNext(p_next);
+        return &supported;
+    }
+
+    bool extension_supported(const vk::Instance& /*unused*/,
+                             const PhysicalDevice& /*unused*/,
+                             const ExtensionContainer& /*unused*/,
+                             const QueueInfo& /*unused*/) override {
+        return supported.descriptorBuffer != 0u;
+    }
+
+    void* pnext_device_create_info(void* const p_next) override {
+        enabled.descriptorBuffer = supported.descriptorBuffer;
+        enabled.descriptorBufferPushDescriptors = supported.descriptorBufferPushDescriptors;
+
+        enabled.pNext = p_next;
+        return &enabled;
     }
 
     void* pnext_get_properties_2(void* const p_next) override {
@@ -63,6 +82,8 @@ class ExtensionVkDescriptorBuffer : public Extension {
 
   private:
     vk::PhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_properties;
+    vk::PhysicalDeviceDescriptorBufferFeaturesEXT supported;
+    vk::PhysicalDeviceDescriptorBufferFeaturesEXT enabled;
 };
 
 } // namespace merian

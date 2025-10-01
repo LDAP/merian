@@ -304,7 +304,8 @@ class CommandBuffer : public std::enable_shared_from_this<CommandBuffer> {
                                     const uint32_t first_set,
                                     const T&... descriptor_buffers) {
         bind_descriptor_buffers(descriptor_buffers...);
-        set_descriptor_buffer_offsets(pipeline, first_set, std::index_sequence_for<T...>{});
+        set_descriptor_buffer_offsets(pipeline, first_set,
+                                      std::make_integer_sequence<uint32_t, sizeof...(T)>{});
     }
 
     void push_descriptor_set(const PipelineHandle& pipeline,

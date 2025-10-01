@@ -48,12 +48,11 @@ class DescriptorBuffer : public DescriptorContainer {
             max_binding_size = std::max(max_binding_size, binding_info.size);
         }
 
+        queued_writes.reserve(layout->get_descriptor_count());
         scratch = new std::byte[max_binding_size];
     }
 
-    ~DescriptorBuffer() {
-        delete[] scratch;
-    }
+    ~DescriptorBuffer();
 
     // ---------------------------------------------------------------------
 
@@ -76,11 +75,11 @@ class DescriptorBuffer : public DescriptorContainer {
     // Updates
 
     uint32_t update_count() const noexcept override {
-        return writes.size();
+        return queued_writes.size();
     }
 
     bool has_updates() const noexcept override {
-        return !writes.empty();
+        return !queued_writes.empty();
     }
 
     void update() override;
@@ -89,7 +88,7 @@ class DescriptorBuffer : public DescriptorContainer {
 
   protected:
     virtual void queue_write(vk::WriteDescriptorSet&& write) override {
-        writes.emplace_back(write);
+        queued_writes.emplace_back(write);
     }
 
   private:
@@ -115,7 +114,7 @@ class DescriptorBuffer : public DescriptorContainer {
 
     std::vector<BindingInfo> binding_infos;
     std::byte* scratch;
-    std::vector<vk::WriteDescriptorSet> writes;
+    std::vector<vk::WriteDescriptorSet> queued_writes;
 };
 
 } // namespace merian

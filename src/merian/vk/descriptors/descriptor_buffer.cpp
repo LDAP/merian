@@ -46,13 +46,17 @@ void DescriptorBuffer::make_desc_get_info(vk::DescriptorGetInfoEXT& desc_get_inf
     }
 }
 
+DescriptorBuffer::~DescriptorBuffer() {
+    delete[] scratch;
+}
+
 void DescriptorBuffer::update() {
 
     std::byte* gpu_buffer = buffer->get_memory()->map_as<std::byte>();
 
-    for (uint32_t i = 0; i < writes.size(); i++) {
+    for (uint32_t i = 0; i < queued_writes.size(); i++) {
 
-        vk::WriteDescriptorSet& write = writes[i];
+        vk::WriteDescriptorSet& write = queued_writes[i];
         assert(write.descriptorCount == 1);
 
         // we need to access the new resource below.
@@ -71,7 +75,7 @@ void DescriptorBuffer::update() {
     }
 
     buffer->get_memory()->unmap();
-    writes.clear();
+    queued_writes.clear();
     // we get a implicit host -> device sync on the next queue submit.
 }
 
@@ -80,9 +84,9 @@ void DescriptorBuffer::update(const CommandBufferHandle& cmd) {
                                          vk::AccessFlagBits2::eDescriptorBufferReadEXT,
                                          vk::AccessFlagBits2::eTransferWrite));
 
-    for (uint32_t i = 0; i < writes.size(); i++) {
+    for (uint32_t i = 0; i < queued_writes.size(); i++) {
 
-        vk::WriteDescriptorSet& write = writes[i];
+        vk::WriteDescriptorSet& write = queued_writes[i];
         assert(write.descriptorCount == 1);
 
         // we need to access the new resource below.
@@ -100,7 +104,7 @@ void DescriptorBuffer::update(const CommandBufferHandle& cmd) {
         context->device.getDescriptorEXT(&desc_get_info, size, scratch);
         cmd->update(buffer, offset, size, scratch);
     }
-    writes.clear();
+    queued_writes.clear();
 
     cmd->barrier(buffer->buffer_barrier2(vk::PipelineStageFlagBits2::eTransfer, all_shaders2,
                                          vk::AccessFlagBits2::eTransferWrite,

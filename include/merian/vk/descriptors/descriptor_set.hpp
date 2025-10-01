@@ -49,7 +49,7 @@ class DescriptorSet : public DescriptorContainer {
         set = allocate_descriptor_set(*pool->get_context(), *pool, *pool->get_layout());
         SPDLOG_DEBUG("allocated DescriptorSet ({})", fmt::ptr(static_cast<VkDescriptorSet>(set)));
 
-        writes.reserve(get_layout()->get_descriptor_count());
+        queued_writes.reserve(get_layout()->get_descriptor_count());
     }
 
     ~DescriptorSet() {
@@ -81,11 +81,11 @@ class DescriptorSet : public DescriptorContainer {
     // Updates
 
     uint32_t update_count() const noexcept override {
-        return writes.size();
+        return queued_writes.size();
     }
 
     bool has_updates() const noexcept override {
-        return !writes.empty();
+        return !queued_writes.empty();
     }
 
     void update() override {
@@ -93,8 +93,8 @@ class DescriptorSet : public DescriptorContainer {
             return;
         }
 
-        for (uint32_t i = 0; i < writes.size(); i++) {
-            vk::WriteDescriptorSet& write = writes[i];
+        for (uint32_t i = 0; i < queued_writes.size(); i++) {
+            vk::WriteDescriptorSet& write = queued_writes[i];
 
             // For now only descriptorCount 1 is implemented. Otherwise: If the dstBinding has
             // fewer than descriptorCount array elements remaining starting from
@@ -105,15 +105,15 @@ class DescriptorSet : public DescriptorContainer {
             apply_update_for(write.dstBinding, write.dstArrayElement);
         }
 
-        pool->get_context()->device.updateDescriptorSets(writes, {});
+        pool->get_context()->device.updateDescriptorSets(queued_writes, {});
 
-        writes.clear();
+        queued_writes.clear();
     }
 
   protected:
     virtual void queue_write(vk::WriteDescriptorSet&& write) override {
-        writes.emplace_back(write);
-        writes.back().dstSet = set;
+        queued_writes.emplace_back(write);
+        queued_writes.back().dstSet = set;
     }
 
   public:
@@ -128,7 +128,7 @@ class DescriptorSet : public DescriptorContainer {
     // ---------------------------------------------------------------------
     // Queued Updates
 
-    std::vector<vk::WriteDescriptorSet> writes;
+    std::vector<vk::WriteDescriptorSet> queued_writes;
 };
 
 } // namespace merian
