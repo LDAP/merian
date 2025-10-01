@@ -221,10 +221,6 @@ class DescriptorContainer : public std::enable_shared_from_this<DescriptorContai
         throw std::runtime_error{"update on the CPU timeline not supported."};
     }
 
-    virtual void update(const CommandBufferHandle& /*cmd*/) {
-        throw std::runtime_error{"update on the GPU timeline not supported."};
-    }
-
   protected:
     virtual void queue_write(vk::WriteDescriptorSet&& write) = 0;
 

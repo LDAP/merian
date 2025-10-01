@@ -36,6 +36,7 @@ class DescriptorBuffer : public DescriptorContainer {
             allocator->create_buffer(create_info, MemoryMappingType::HOST_ACCESS_SEQUENTIAL_WRITE);
 
         binding_infos.resize(layout->get_bindings().size());
+        vk::DeviceSize max_binding_size = 0;
         for (uint32_t i = 0; i < layout->get_bindings().size(); i++) {
             auto& binding_info = binding_infos[i];
 
@@ -46,9 +47,13 @@ class DescriptorBuffer : public DescriptorContainer {
 
             max_binding_size = std::max(max_binding_size, binding_info.size);
         }
+
+        scratch = new std::byte[max_binding_size];
     }
 
-    ~DescriptorBuffer() {}
+    ~DescriptorBuffer() {
+        delete[] scratch;
+    }
 
     // ---------------------------------------------------------------------
 
@@ -80,12 +85,17 @@ class DescriptorBuffer : public DescriptorContainer {
 
     void update() override;
 
-    void update(const CommandBufferHandle& cmd) override;
+    void update(const CommandBufferHandle& cmd);
 
   protected:
     virtual void queue_write(vk::WriteDescriptorSet&& write) override {
         writes.emplace_back(write);
     }
+
+  private:
+    void make_desc_get_info(vk::DescriptorGetInfoEXT& desc_get_info,
+                            vk::DescriptorAddressInfoEXT& info,
+                            const vk::WriteDescriptorSet& write);
 
   public:
     static DescriptorBufferHandle create(const DescriptorSetLayoutHandle& layout,
@@ -104,7 +114,7 @@ class DescriptorBuffer : public DescriptorContainer {
     };
 
     std::vector<BindingInfo> binding_infos;
-    vk::DeviceSize max_binding_size = 0;
+    std::byte* scratch;
     std::vector<vk::WriteDescriptorSet> writes;
 };
 

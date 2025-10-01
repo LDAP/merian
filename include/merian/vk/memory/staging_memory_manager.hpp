@@ -9,7 +9,11 @@
 namespace merian {
 
 class StagingMemoryManager : public std::enable_shared_from_this<StagingMemoryManager> {
+
   public:
+    // use vkCmdUpdateBuffer for sizes smaller than that
+    static const vk::DeviceSize CMD_UPDATE_BUFFER_THRESHOLD = 65536;
+
     StagingMemoryManager(StagingMemoryManager const&) = delete;
     StagingMemoryManager& operator=(StagingMemoryManager const&) = delete;
     StagingMemoryManager() = delete;

@@ -110,17 +110,23 @@ void StagingMemoryManager::cmd_to_device(const CommandBufferHandle& cmd,
 
     const vk::DeviceSize size = optional_size.value_or(buffer->get_size() - offset);
 
-    BufferHandle upload_buffer;
-    vk::DeviceSize upload_buffer_offset;
-    const MemoryAllocationHandle memory =
-        get_upload_staging_space(size, upload_buffer, upload_buffer_offset);
+    if (size <= CMD_UPDATE_BUFFER_THRESHOLD && size % 4 == 0 && offset % 4 == 0) {
+        // Requirements for vkCmdUpdateBuffer are met.
+        cmd->update(buffer, offset, size, data);
+        SPDLOG_TRACE("uploading {} of data to buffer using vkCmdUpdateBuffer", format_size(size));
+    } else {
+        BufferHandle upload_buffer;
+        vk::DeviceSize upload_buffer_offset;
+        const MemoryAllocationHandle memory =
+            get_upload_staging_space(size, upload_buffer, upload_buffer_offset);
 
-    SPDLOG_TRACE("uploading {} of data to staging buffer", format_size(size));
-    memcpy(memory->map(), data, size);
-    memory->unmap();
+        SPDLOG_TRACE("uploading {} of data to staging buffer", format_size(size));
+        memcpy(memory->map(), data, size);
+        memory->unmap();
 
-    const vk::BufferCopy copy{upload_buffer_offset, offset, size};
-    cmd->copy(upload_buffer, buffer, copy);
+        const vk::BufferCopy copy{upload_buffer_offset, offset, size};
+        cmd->copy(upload_buffer, buffer, copy);
+    }
 }
 
 MemoryAllocationHandle
@@ -144,92 +150,5 @@ StagingMemoryManager::cmd_from_device(const CommandBufferHandle& cmd,
 
     return memory;
 }
-
-// -------------------------------------------------------------------------
-
-// void* StagingMemoryManager::cmdToImage(const CommandBufferHandle& cmd,
-//                                        vk::Image image,
-//                                        const vk::Offset3D& offset,
-//                                        const vk::Extent3D& extent,
-//                                        const vk::ImageSubresourceLayers& subresource,
-//                                        vk::DeviceSize size,
-//                                        const void* data,
-//                                        vk::ImageLayout layout) {
-//     if (!image)
-//         return nullptr;
-
-//     vk::Buffer srcBuffer;
-//     vk::DeviceSize srcOffset;
-
-//     void* mapping = getStagingSpace(size, srcBuffer, srcOffset, true);
-
-//     assert(mapping);
-
-//     if (data) {
-//         memcpy(mapping, data, size);
-//     }
-
-//     vk::BufferImageCopy cpy{srcOffset, 0, 0, subresource, offset, extent};
-//     cmd->get_command_buffer().copyBufferToImage(srcBuffer, image, layout, {cpy});
-
-//     return data ? nullptr : mapping;
-// }
-
-// void* StagingMemoryManager::cmdToBuffer(const CommandBufferHandle& cmd,
-//                                         vk::Buffer buffer,
-//                                         vk::DeviceSize offset,
-//                                         vk::DeviceSize size,
-//                                         const void* data) {
-//     if (!size || !buffer) {
-//         return nullptr;
-//     }
-
-//     vk::Buffer srcBuffer;
-//     vk::DeviceSize srcOffset;
-
-//     void* mapping = getStagingSpace(size, srcBuffer, srcOffset, true);
-
-//     assert(mapping);
-
-//     if (data) {
-//         memcpy(mapping, data, size);
-//     }
-
-//     vk::BufferCopy cpy{srcOffset, offset, size};
-//     cmd->get_command_buffer().copyBuffer(srcBuffer, buffer, {cpy});
-
-//     return data ? nullptr : (void*)mapping;
-// }
-
-// const void* StagingMemoryManager::cmdFromBuffer(const CommandBufferHandle& cmd,
-//                                                 vk::Buffer buffer,
-//                                                 vk::DeviceSize offset,
-//                                                 vk::DeviceSize size) {
-//     vk::Buffer dstBuffer;
-//     vk::DeviceSize dstOffset;
-//     void* mapping = getStagingSpace(size, dstBuffer, dstOffset, false);
-
-//     vk::BufferCopy cpy{offset, dstOffset, size};
-//     cmd->get_command_buffer().copyBuffer(buffer, dstBuffer, {cpy});
-
-//     return mapping;
-// }
-
-// const void* StagingMemoryManager::cmdFromImage(const CommandBufferHandle& cmd,
-//                                                vk::Image image,
-//                                                const vk::Offset3D& offset,
-//                                                const vk::Extent3D& extent,
-//                                                const vk::ImageSubresourceLayers& subresource,
-//                                                vk::DeviceSize size,
-//                                                vk::ImageLayout layout) {
-//     vk::Buffer dstBuffer;
-//     vk::DeviceSize dstOffset;
-//     void* mapping = getStagingSpace(size, dstBuffer, dstOffset, false);
-
-//     vk::BufferImageCopy cpy{dstOffset, 0, 0, subresource, offset, extent};
-//     cmd->get_command_buffer().copyImageToBuffer(image, layout, dstBuffer, {cpy});
-
-//     return mapping;
-// }
 
 } // namespace merian
