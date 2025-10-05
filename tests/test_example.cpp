@@ -43,11 +43,12 @@ TEST(MathTest, Addition) {
     components.push_back(entry_point);
 
     ComPtr<slang::IComponentType> composition = session->compose(components);
+    ComPtr<slang::IComponentType> program = session->link(composition);
 
     ComPtr<ISlangSharedLibrary> sharedLibrary;
     {
         ComPtr<slang::IBlob> diagnostics_blob;
-        SlangResult result = composition->getEntryPointHostCallable(
+        SlangResult result = program->getEntryPointHostCallable(
             0,
             0,
             sharedLibrary.writeRef(),
