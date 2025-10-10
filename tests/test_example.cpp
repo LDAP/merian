@@ -1,65 +1,24 @@
 #include "../include/merian/vk/shader/slang_entry_point.hpp"
+#include "merian/vk/shader/slang_shared_library.hpp"
+#include "slang-com-helper.h"
+#include "slang.h"
+#include <slang-com-ptr.h>
 
+#include <glm/vec3.hpp>
 #include <gtest/gtest.h>
 
 using namespace merian;
-using namespace Slang;
 
-TEST(MathTest, Addition) {
+TEST(MathTest, StackingVectors) {
     spdlog::set_level(spdlog::level::debug);
+    SlangSharedLibraryHandle library = SlangSharedLibrary::create(
+        "/home/oschdi/Projects/merian-shadertoy/subprojects/merian/tests/test.slang");
 
-    merian::ShaderCompileContextHandle compilation_session_desc = merian::ShaderCompileContext::createTestContext();
+    typedef glm::uvec3 (*Func)(uint32_t, uint32_t, uint32_t);
+    const auto func = library->getFunctionByName<Func>("stack_to_vec");
 
-    compilation_session_desc->add_search_path("/home/oschdi/Projects/merian-shadertoy/subprojects/merian/include/merian-shaders");
-    compilation_session_desc->add_search_path("/home/oschdi/Projects/merian-shadertoy/subprojects/merian/tests");
-    compilation_session_desc->add_search_path("/home/oschdi/Projects/merian-shadertoy/subprojects/merian/include/merian-shaders/utils");
-
-    SlangSessionHandle session = merian::SlangSession::create(compilation_session_desc);
-
-    // TODO allow SlandComposition to add Entry Points that are later found by findAndCheckEntryPoint()
-    /*SlangCompositionHandle composition = SlangComposition::create();
-    composition->add_module_from_path("exposure.slang", true);
-    ComPtr<slang::IComponentType> composedProgram = session->compose(composition);*/
-
-    SlangComposition::SlangModule slang_module = SlangComposition::SlangModule::from_path("hash.slang", false);
-    auto module = session->load_module_from_source(
-                                      slang_module.get_name(),
-                                      slang_module.get_source(compilation_session_desc->get_search_path_file_loader()),
-                                    slang_module.get_import_path());
-
-    ComPtr<slang::IEntryPoint> entry_point;
-    {
-        ComPtr<slang::IBlob> diagnostics_blob;
-        module->findAndCheckEntryPoint("merian.pcg3d", SLANG_STAGE_CALLABLE, entry_point.writeRef(), diagnostics_blob.writeRef());
-        if (diagnostics_blob != nullptr) {
-            SPDLOG_INFO("Slang find entry point. Diagnostics: {}",
-                         merian::SlangSession::diagnostics_as_string(diagnostics_blob));
-        }
-        SPDLOG_INFO("Found and validated entry point {}", entry_point->getFunctionReflection()->getName());
-    }
-
-    std::vector<slang::IComponentType*> components;
-    components.push_back(module);
-    components.push_back(entry_point);
-
-    ComPtr<slang::IComponentType> composition = session->compose(components);
-    ComPtr<slang::IComponentType> program = session->link(composition);
-
-    ComPtr<ISlangSharedLibrary> sharedLibrary;
-    {
-        ComPtr<slang::IBlob> diagnostics_blob;
-        SlangResult result = program->getEntryPointHostCallable(
-            0,
-            0,
-            sharedLibrary.writeRef(),
-            diagnostics_blob.writeRef());
-        if (diagnostics_blob != nullptr) {
-            SPDLOG_DEBUG("Slang composing components. Diagnostics: {}",
-                         merian::SlangSession::diagnostics_as_string(diagnostics_blob));
-        }
-    }
-
-    EXPECT_EQ(2 + 2, 4);
+    glm::uvec3 result = func(1, 2, 3);
+    EXPECT_EQ(result, glm::uvec3(1, 2, 3));
 }
 
 int main(int argc, char **argv) {
