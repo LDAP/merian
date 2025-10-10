@@ -162,11 +162,12 @@ shader_generator = generator(
 add_project_arguments(global_args, language: 'cpp')
 
 subdir('src/merian')
+subdir('src/merian-shaders')
 subdir('src/merian-nodes')
 
 merian_dep = declare_dependency(
     compile_args: global_args,
-    link_with : [merian_lib, merian_nodes_lib],
+    link_with : [merian_lib, merian_shaders_lib, merian_nodes_lib],
     include_directories : inc_dirs,
     dependencies : [
         fmt,

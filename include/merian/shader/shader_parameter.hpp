@@ -10,34 +10,35 @@
 
 namespace merian {
 
-// Points to a parameter in a shader
-class ShaderParameter {
+// Points to a position in a shader. Positions can be structs, fields (ordinary data, opaque data),
+// array (elemenets).
+class ShaderCursor {
   public:
     // --------------------------------------------------------------------
 
-    ShaderParameter field(const std::string& name) {
+    ShaderCursor field(const std::string& name) {
         return field(type_layout->findFieldIndexByName(name.c_str()));
     }
 
-    ShaderParameter field(const uint32_t index) {
+    ShaderCursor field(const uint32_t index) {
         assert(index < type_layout->getFieldCount());
 
         slang::VariableLayoutReflection* field = type_layout->getFieldByIndex(index);
 
-        ShaderParameter result = *this;
+        ShaderCursor result = *this;
         result.type_layout = field->getTypeLayout();
-        result.offset.byte_offset += field->getOffset();
+        result.offset.uniform_byte_offset += field->getOffset();
         result.offset.binding_range_offset += type_layout->getFieldBindingRangeOffset(index);
 
         return result;
     }
 
-    ShaderParameter element(const uint32_t index) {
+    ShaderCursor element(const uint32_t index) {
         slang::TypeLayoutReflection* element_type_layout = type_layout->getElementTypeLayout();
 
-        ShaderParameter result = *this;
+        ShaderCursor result = *this;
         result.type_layout = element_type_layout;
-        result.offset.byte_offset += index * element_type_layout->getStride();
+        result.offset.uniform_byte_offset += index * element_type_layout->getStride();
 
         result.offset.binding_array_index *= type_layout->getElementCount();
         result.offset.binding_array_index += index;
@@ -45,67 +46,71 @@ class ShaderParameter {
         return result;
     }
 
-    ShaderParameter operator[](const std::string& name) {
+    ShaderCursor operator[](const std::string& name) {
         return field(name);
     }
 
-    ShaderParameter operator[](const uint32_t index) {
+    ShaderCursor operator[](const uint32_t index) {
         return element(index);
     }
 
+    // ShaderCursor dereference() {
+
+    // }
+
     // --------------------------------------------------------------------
 
-    ShaderParameter& write(const ImageHandle& image) {
+    ShaderCursor& write(const ImageHandle& image) {
         parameter_block->write(offset, image);
         return *this;
     }
 
-    ShaderParameter& write(const BufferHandle& buffer) {
+    ShaderCursor& write(const BufferHandle& buffer) {
         parameter_block->write(offset, buffer);
         return *this;
     }
 
-    ShaderParameter& write(const TextureHandle& texture) {
+    ShaderCursor& write(const TextureHandle& texture) {
         parameter_block->write(offset, texture);
         return *this;
     }
 
-    ShaderParameter& write(const SamplerHandle& sampler) {
+    ShaderCursor& write(const SamplerHandle& sampler) {
         parameter_block->write(offset, sampler);
         return *this;
     }
 
-    ShaderParameter& write(const void* data, std::size_t size) {
+    ShaderCursor& write(const void* data, std::size_t size) {
         parameter_block->write(offset, data, size);
         return *this;
     }
 
-    template <class T> ShaderParameter& write(const T& data) {
+    template <class T> ShaderCursor& write(const T& data) {
         write(&data, sizeof(T));
         return *this;
     }
 
-    ShaderParameter& operator=(const ImageHandle& image) {
+    ShaderCursor& operator=(const ImageHandle& image) {
         parameter_block->write(offset, image);
         return *this;
     }
 
-    ShaderParameter& operator=(const BufferHandle& buffer) {
+    ShaderCursor& operator=(const BufferHandle& buffer) {
         parameter_block->write(offset, buffer);
         return *this;
     }
 
-    ShaderParameter& operator=(const TextureHandle& texture) {
+    ShaderCursor& operator=(const TextureHandle& texture) {
         parameter_block->write(offset, texture);
         return *this;
     }
 
-    ShaderParameter& operator=(const SamplerHandle& sampler) {
+    ShaderCursor& operator=(const SamplerHandle& sampler) {
         parameter_block->write(offset, sampler);
         return *this;
     }
 
-    template <class T> ShaderParameter& operator=(const T& data) {
+    template <class T> ShaderCursor& operator=(const T& data) {
         write(&data, sizeof(T));
         return *this;
     }
