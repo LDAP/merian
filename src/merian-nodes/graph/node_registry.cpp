@@ -15,6 +15,7 @@
 #include "merian-nodes/nodes/median_approx/median.hpp"
 #include "merian-nodes/nodes/reduce/reduce.hpp"
 #include "merian-nodes/nodes/shadertoy/shadertoy.hpp"
+#include "merian-nodes/nodes/slang_compute/slang_compute.hpp"
 #include "merian-nodes/nodes/svgf/svgf.hpp"
 #include "merian-nodes/nodes/taa/taa.hpp"
 #include "merian-nodes/nodes/tonemap/tonemap.hpp"
@@ -72,6 +73,9 @@ NodeRegistry::NodeRegistry(const ContextHandle& context, const ResourceAllocator
     register_node_type<Shadertoy>(
         NodeTypeInfo{"Shadertoy", "Execute Shadertoy-like shaders (Limited implementation).",
                      [=]() { return std::make_shared<Shadertoy>(context); }});
+    register_node_type<SlangCompute>(
+        NodeTypeInfo{"Slang Compute", "Execute Slang shaders with automatic layout reflection.",
+                     [=]() { return std::make_shared<SlangCompute>(context); }});
     register_node_type<SVGF>(
         NodeTypeInfo{"Denoiser (SVGF)", "Spatiotemporal Variance-Guided Filtering.",
                      [=]() { return std::make_shared<SVGF>(context, allocator); }});
