@@ -38,17 +38,17 @@ class JSONLoadProperties : public Properties {
                                   const float scale_max) override;
 
     virtual bool
-    config_color(const std::string& id, glm::vec3& color, const std::string& desc = "") override;
+    config_color(const std::string& id, float3& color, const std::string& desc = "") override;
     virtual bool
-    config_color(const std::string& id, glm::vec4& color, const std::string& desc = "") override;
+    config_color(const std::string& id, float4& color, const std::string& desc = "") override;
     virtual bool
-    config_vec(const std::string& id, glm::vec3& value, const std::string& desc = "") override;
+    config_vec(const std::string& id, float3& value, const std::string& desc = "") override;
     virtual bool
-    config_vec(const std::string& id, glm::vec4& value, const std::string& desc = "") override;
+    config_vec(const std::string& id, float4& value, const std::string& desc = "") override;
     virtual bool
-    config_vec(const std::string& id, glm::uvec3& value, const std::string& desc = "") override;
+    config_vec(const std::string& id, uint3& value, const std::string& desc = "") override;
     virtual bool
-    config_vec(const std::string& id, glm::uvec4& value, const std::string& desc = "") override;
+    config_vec(const std::string& id, uint4& value, const std::string& desc = "") override;
     virtual bool config_angle(const std::string& id,
                               float& angle,
                               const std::string& desc = "",

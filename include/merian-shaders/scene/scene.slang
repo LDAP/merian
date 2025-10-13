@@ -1,5 +1,6 @@
 #pragma once
 
+__exported import merian_shaders.scene.camera;
 __exported import merian_shaders.scene.material_system;
 __exported import merian_shaders.scene.acceleration_structure;
 
@@ -47,6 +48,8 @@ struct Scene {
     StructuredBuffer<PrevVertexData> prev_vertex_buffers[merian_scene_prev_vertex_buffers_count];
 
     ParameterBlock<MaterialSystem> material_system;
+
+    Camera camera;
 
     // -----------------------------------------
 

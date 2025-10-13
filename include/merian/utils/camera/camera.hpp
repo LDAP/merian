@@ -1,9 +1,6 @@
 #pragma once
 
-#include "glm/ext/matrix_clip_space.hpp"
-#include "glm/ext/matrix_transform.hpp"
-#include "merian/vk/utils/math.hpp"
-#include <glm/glm.hpp>
+#include "merian/utils/vector_matrix.hpp"
 
 namespace merian {
 
@@ -18,30 +15,27 @@ class Camera {
     template <typename T> static bool has_changed(const T current_id, T& check_id) {
         if (check_id == current_id) {
             return false;
-        } else {
-            check_id = current_id;
-            return true;
         }
+        check_id = current_id;
+        return true;
     }
 
   public:
-    Camera(const glm::vec3& eye = glm::vec3(0),
-           const glm::vec3& center = glm::vec3(1, 0, 0),
-           const glm::vec3& up = glm::vec3(0, 0, 1),
+    Camera(const float3& eye = float3(0),
+           const float3& center = float3(1, 0, 0),
+           const float3& up = float3(0, 0, 1),
            const float field_of_view = 60.f,
            const float aspect_ratio = 1.f,
            const float near_plane = 0.1f,
            const float far_plane = 1000.f);
 
-    bool operator==(const Camera&) const = default;
-
     // -----------------------------------------------------------------------------
 
-    const glm::mat4& get_view_matrix() noexcept;
+    const float4x4& get_view_matrix() noexcept;
 
-    const glm::mat4& get_projection_matrix() noexcept;
+    const float4x4& get_projection_matrix() noexcept;
 
-    glm::mat4 get_view_projection_matrix() noexcept;
+    float4x4 get_view_projection_matrix() noexcept;
 
     // -----------------------------------------------------------------------------
 
@@ -53,25 +47,27 @@ class Camera {
 
     // -----------------------------------------------------------------------------
 
-    void look_at(const glm::vec3& eye, const glm::vec3& center, const glm::vec3& up) noexcept;
+    void look_at(const float3& eye,
+                 const float3& center,
+                 const float3& up) noexcept;
 
-    void look_at(const glm::vec3& eye,
-                 const glm::vec3& center,
-                 const glm::vec3& up,
+    void look_at(const float3& eye,
+                 const float3& center,
+                 const float3& up,
                  const float field_of_view) noexcept;
 
-    void set_eye(const glm::vec3& eye) noexcept;
+    void set_eye(const float3& eye) noexcept;
 
-    void set_center(const glm::vec3& center) noexcept;
+    void set_center(const float3& center) noexcept;
 
     // this method normalizes up for you
-    void set_up(const glm::vec3& up) noexcept;
+    void set_up(const float3& up) noexcept;
 
-    const glm::vec3& get_eye() const noexcept;
+    const float3& get_eye() const noexcept;
 
-    const glm::vec3& get_center() const noexcept;
+    const float3& get_center() const noexcept;
 
-    const glm::vec3& get_up() const noexcept;
+    const float3& get_up() const noexcept;
 
     // -----------------------------------------------------------------------------
 
@@ -96,8 +92,9 @@ class Camera {
 
     // Fitting the camera position and interest to see the bounding box
     // tight: Fit bounding box exactly, not tight: fit bounding sphere
-    void
-    look_at_bounding_box(const glm::vec3& box_min, const glm::vec3& box_max, bool tight = false);
+    void look_at_bounding_box(const float3& box_min,
+                              const float3& box_max,
+                              bool tight = false);
 
     // Move your camera left-right (truck), up-down (pedestal) or in-out (dolly) according to
     // world-space coordinates, while the rotation stays the same. Note: dolly and truck requires a
@@ -123,9 +120,9 @@ class Camera {
     // VIEW
     //-------------------------------------------------
 
-    glm::vec3 eye;    // Position of the camera
-    glm::vec3 center; // Position where the camera is looking at
-    glm::vec3 up;     // Normalized(!) up vector where the camera is oriented
+    float3 eye;    // Position of the camera
+    float3 center; // Position where the camera is looking at
+    float3 up;     // Normalized(!) up vector where the camera is oriented
 
     // Increase whenever eye, center or up changes
     uint32_t view_change_id = 0;
@@ -133,7 +130,7 @@ class Camera {
     // Cache
 
     // Do not use diectly
-    glm::mat4 view_cache;
+    float4x4 view_cache;
     uint32_t view_change_id_cache = 0;
 
     // PROJECTION
@@ -150,7 +147,7 @@ class Camera {
     // Cache
 
     // Do not use diectly
-    glm::mat4 projection_cache;
+    float4x4 projection_cache;
     uint32_t projection_change_id_cache = 0;
 };
 

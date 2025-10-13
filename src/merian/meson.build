@@ -58,7 +58,7 @@ merian_lib = static_library(
     dependencies: [
         fmt,
         glfw,
-        glm,
+        hlslpp,
         imgui,
         nlohmann_json,
         sdl2,

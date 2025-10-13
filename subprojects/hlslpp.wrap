@@ -1,0 +1,11 @@
+[wrap-git]
+directory = hlslpp
+
+url = https://github.com/redorav/hlslpp
+revision = 3.7
+depth = 1
+
+patch_directory = hlslpp
+
+[provide]
+hlslpp = glslang_dep

@@ -15,7 +15,7 @@ json encode_float(float f) {
         return f;
 }
 
-json dump_vec3(glm::vec3& v) {
+json dump_vec3(float3& v) {
     json j;
     for (int i = 0; i < 3; i++) {
         j.push_back(encode_float(v[i]));
@@ -23,7 +23,7 @@ json dump_vec3(glm::vec3& v) {
     return j;
 }
 
-json dump_vec4(glm::vec4& v) {
+json dump_vec4(float4& v) {
     json j;
     for (int i = 0; i < 4; i++) {
         j.push_back(encode_float(v[i]));
@@ -31,7 +31,7 @@ json dump_vec4(glm::vec4& v) {
     return j;
 }
 
-json dump_vec3(glm::uvec3& v) {
+json dump_vec3(uint3& v) {
     json j;
     for (int i = 0; i < 3; i++) {
         j.push_back(v[i]);
@@ -39,7 +39,7 @@ json dump_vec3(glm::uvec3& v) {
     return j;
 }
 
-json dump_vec4(glm::uvec4& v) {
+json dump_vec4(uint4& v) {
     json j;
     for (int i = 0; i < 4; i++) {
         j.push_back(v[i]);
@@ -78,27 +78,27 @@ void JSONDumpProperties::output_text(const std::string&) {}
 void JSONDumpProperties::output_plot_line(
     const std::string&, const float*, const uint32_t, const float, const float) {}
 
-bool JSONDumpProperties::config_color(const std::string& id, glm::vec3& color, const std::string&) {
+bool JSONDumpProperties::config_color(const std::string& id, float3& color, const std::string&) {
     current()[id] = dump_vec3(color);
     return false;
 }
-bool JSONDumpProperties::config_color(const std::string& id, glm::vec4& color, const std::string&) {
+bool JSONDumpProperties::config_color(const std::string& id, float4& color, const std::string&) {
     current()[id] = dump_vec4(color);
     return false;
 }
-bool JSONDumpProperties::config_vec(const std::string& id, glm::vec3& value, const std::string&) {
+bool JSONDumpProperties::config_vec(const std::string& id, float3& value, const std::string&) {
     current()[id] = dump_vec3(value);
     return false;
 }
-bool JSONDumpProperties::config_vec(const std::string& id, glm::vec4& value, const std::string&) {
+bool JSONDumpProperties::config_vec(const std::string& id, float4& value, const std::string&) {
     current()[id] = dump_vec4(value);
     return false;
 }
-bool JSONDumpProperties::config_vec(const std::string& id, glm::uvec3& value, const std::string&) {
+bool JSONDumpProperties::config_vec(const std::string& id, uint3& value, const std::string&) {
     current()[id] = dump_vec3(value);
     return false;
 }
-bool JSONDumpProperties::config_vec(const std::string& id, glm::uvec4& value, const std::string&) {
+bool JSONDumpProperties::config_vec(const std::string& id, uint4& value, const std::string&) {
     current()[id] = dump_vec4(value);
     return false;
 }
@@ -151,7 +151,8 @@ bool JSONDumpProperties::config_uint(
     return false;
 }
 bool JSONDumpProperties::config_float3(const std::string& id, float value[3], const std::string&) {
-    current()[id] = dump_vec3(*merian::as_vec3(value));
+    float3 v = load_float3(value);
+    current()[id] = dump_vec3(v);
     return false;
 }
 bool JSONDumpProperties::config_bool(const std::string& id, bool& value, const std::string&) {

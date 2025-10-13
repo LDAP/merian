@@ -1,5 +1,6 @@
 #pragma once
 
+#if __has_include("glm/glm.hpp")
 #include "glm/glm.hpp"
 
 namespace merian {
@@ -40,3 +41,5 @@ inline glm::uvec4* as_uvec4(uint32_t v[4]) {
 }
 
 } // namespace merian
+
+#endif

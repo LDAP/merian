@@ -13,7 +13,7 @@ struct MaterialHeader {
 
 struct MaterialSystem {
     uint material_count;
-    StructuredBuffer<MaterialData> materialData;
+    StructuredBuffer<MaterialData> materials;
 
     ParameterBlock<TextureManager> texture_manager;
 

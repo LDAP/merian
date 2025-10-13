@@ -8,6 +8,8 @@
 #include <algorithm>
 #include <stdexcept>
 
+#include "hlsl++/vector_uint_type.h"
+
 namespace merian {
 
 void tooltip(const std::string& tooltip) {
@@ -55,40 +57,32 @@ void ImGuiProperties::output_plot_line(const std::string& label,
                      {0, ImGui::GetFontSize() * 5});
 }
 
-bool ImGuiProperties::config_color(const std::string& id,
-                                   glm::vec3& color,
-                                   const std::string& desc) {
+bool ImGuiProperties::config_color(const std::string& id, float3& color, const std::string& desc) {
     const bool value_changed = ImGui::ColorEdit3(id.c_str(), &color.x);
     tooltip(desc);
     return value_changed;
 }
-bool ImGuiProperties::config_color(const std::string& id,
-                                   glm::vec4& color,
-                                   const std::string& desc) {
+bool ImGuiProperties::config_color(const std::string& id, float4& color, const std::string& desc) {
     const bool value_changed = ImGui::ColorEdit4(id.c_str(), &color.x);
     tooltip(desc);
     return value_changed;
 }
-bool ImGuiProperties::config_vec(const std::string& id, glm::vec3& value, const std::string& desc) {
+bool ImGuiProperties::config_vec(const std::string& id, float3& value, const std::string& desc) {
     const bool value_changed = ImGui::InputFloat3(id.c_str(), &value.x);
     tooltip(desc);
     return value_changed;
 }
-bool ImGuiProperties::config_vec(const std::string& id, glm::vec4& value, const std::string& desc) {
+bool ImGuiProperties::config_vec(const std::string& id, float4& value, const std::string& desc) {
     const bool value_changed = ImGui::InputFloat4(id.c_str(), &value.x);
     tooltip(desc);
     return value_changed;
 }
-bool ImGuiProperties::config_vec(const std::string& id,
-                                 glm::uvec3& value,
-                                 const std::string& desc) {
+bool ImGuiProperties::config_vec(const std::string& id, uint3& value, const std::string& desc) {
     const bool value_changed = ImGui::InputScalarN(id.c_str(), ImGuiDataType_U32, &value.x, 3);
     tooltip(desc);
     return value_changed;
 }
-bool ImGuiProperties::config_vec(const std::string& id,
-                                 glm::uvec4& value,
-                                 const std::string& desc) {
+bool ImGuiProperties::config_vec(const std::string& id, uint4& value, const std::string& desc) {
     const bool value_changed = ImGui::InputScalarN(id.c_str(), ImGuiDataType_U32, &value.x, 4);
     tooltip(desc);
     return value_changed;

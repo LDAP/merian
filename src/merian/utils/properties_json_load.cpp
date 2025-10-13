@@ -1,5 +1,4 @@
 #include "merian/utils/properties_json_load.hpp"
-#include "merian/utils/glm.hpp"
 
 #include <fstream>
 
@@ -15,28 +14,28 @@ float decode_float(json& j) {
     return j.template get<float>();
 }
 
-void load_vec3(json& j, glm::vec3& v) {
+void load_vec3(json& j, float3& v) {
     json::iterator it = j.begin();
     for (int i = 0; i < 3; i++, it++) {
         v[i] = decode_float(*it);
     }
 }
 
-void load_vec4(json& j, glm::vec4& v) {
+void load_vec4(json& j, float4& v) {
     json::iterator it = j.begin();
     for (int i = 0; i < 4; i++, it++) {
         v[i] = decode_float(*it);
     }
 }
 
-void load_vec3(json& j, glm::uvec3& v) {
+void load_vec3(json& j, uint3& v) {
     json::iterator it = j.begin();
     for (int i = 0; i < 3; i++, it++) {
         v[i] = *it;
     }
 }
 
-void load_vec4(json& j, glm::uvec4& v) {
+void load_vec4(json& j, uint4& v) {
     json::iterator it = j.begin();
     for (int i = 0; i < 4; i++, it++) {
         v[i] = *it;
@@ -95,41 +94,41 @@ void JSONLoadProperties::output_text(const std::string&) {}
 void JSONLoadProperties::output_plot_line(
     const std::string&, const float*, const uint32_t, const float, const float) {}
 
-bool JSONLoadProperties::config_color(const std::string& id, glm::vec3& color, const std::string&) {
-    const glm::vec3 old_color = color;
+bool JSONLoadProperties::config_color(const std::string& id, float3& color, const std::string&) {
+    const float3 old_color = color;
     if (o.back().contains(id))
         load_vec3(o.back()[id], color);
-    return old_color != color;
+    return any(old_color != color);
 }
-bool JSONLoadProperties::config_color(const std::string& id, glm::vec4& color, const std::string&) {
-    const glm::vec4 old_color = color;
+bool JSONLoadProperties::config_color(const std::string& id, float4& color, const std::string&) {
+    const float4 old_color = color;
     if (o.back().contains(id))
         load_vec4(o.back()[id], color);
-    return old_color != color;
+    return any(old_color != color);
 }
-bool JSONLoadProperties::config_vec(const std::string& id, glm::vec3& value, const std::string&) {
-    const glm::vec3 old_value = value;
+bool JSONLoadProperties::config_vec(const std::string& id, float3& value, const std::string&) {
+    const float3 old_value = value;
     if (o.back().contains(id))
         load_vec3(o.back()[id], value);
-    return old_value != value;
+    return any(old_value != value);
 }
-bool JSONLoadProperties::config_vec(const std::string& id, glm::vec4& value, const std::string&) {
-    const glm::vec4 old_value = value;
+bool JSONLoadProperties::config_vec(const std::string& id, float4& value, const std::string&) {
+    const float4 old_value = value;
     if (o.back().contains(id))
         load_vec4(o.back()[id], value);
-    return old_value != value;
+    return any(old_value != value);
 }
-bool JSONLoadProperties::config_vec(const std::string& id, glm::uvec3& value, const std::string&) {
-    const glm::uvec3 old_value = value;
+bool JSONLoadProperties::config_vec(const std::string& id, uint3& value, const std::string&) {
+    const uint3 old_value = value;
     if (o.back().contains(id))
         load_vec3(o.back()[id], value);
-    return old_value != value;
+    return any(old_value != value);
 }
-bool JSONLoadProperties::config_vec(const std::string& id, glm::uvec4& value, const std::string&) {
-    const glm::uvec4 old_value = value;
+bool JSONLoadProperties::config_vec(const std::string& id, uint4& value, const std::string&) {
+    const uint4 old_value = value;
     if (o.back().contains(id))
         load_vec4(o.back()[id], value);
-    return old_value != value;
+    return any(old_value != value);
 }
 bool JSONLoadProperties::config_angle(
     const std::string& id, float& angle, const std::string&, const float, const float) {
@@ -200,10 +199,13 @@ bool JSONLoadProperties::config_uint(
     return old_value != value;
 }
 bool JSONLoadProperties::config_float3(const std::string& id, float value[3], const std::string&) {
-    const float old_value[3] = {value[0], value[1], value[2]};
-    if (o.back().contains(id))
-        load_vec3(o.back()[id], *merian::as_vec3(value));
-    return old_value[0] != value[0] || old_value[1] != value[1] || old_value[2] != value[2];
+    float3 v = load_float3(value);
+    const float3 old_v = v;
+    if (o.back().contains(id)) {
+        load_vec3(o.back()[id], v);
+    }
+    store(v, value);
+    return any(v != old_v);
 }
 bool JSONLoadProperties::config_bool(const std::string& id, bool& value, const std::string&) {
     const bool old_value = value;

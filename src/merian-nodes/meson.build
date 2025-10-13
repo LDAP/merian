@@ -10,7 +10,7 @@ merian_nodes_lib = static_library(
     dependencies: [
         fmt,
         glfw,
-        glm,
+        hlslpp,
         nlohmann_json,
         slang,
         spdlog,

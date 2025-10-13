@@ -1,9 +1,11 @@
 #pragma once
 
-#include "glm/glm.hpp"
 #include "merian/utils/enums.hpp"
+#include "merian/utils/vector_matrix.hpp"
+
 #include "nlohmann/json.hpp"
 
+#include <cfloat>
 #include <fmt/format.h>
 #include <string>
 #include <vector>
@@ -33,7 +35,7 @@ class Properties {
 
     using ChildFlags = uint32_t;
 
-    virtual ~Properties(){};
+    virtual ~Properties() {};
 
     // Structure
 
@@ -76,22 +78,22 @@ class Properties {
 
     // Returns true if the value changed.
     virtual bool
-    config_color(const std::string& id, glm::vec3& color, const std::string& desc = "") = 0;
+    config_color(const std::string& id, float3& color, const std::string& desc = "") = 0;
     // Returns true if the value changed.
     virtual bool
-    config_color(const std::string& id, glm::vec4& color, const std::string& desc = "") = 0;
+    config_color(const std::string& id, float4& color, const std::string& desc = "") = 0;
     // Returns true if the value changed.
     virtual bool
-    config_vec(const std::string& id, glm::vec3& value, const std::string& desc = "") = 0;
+    config_vec(const std::string& id, float3& value, const std::string& desc = "") = 0;
     // Returns true if the value changed.
     virtual bool
-    config_vec(const std::string& id, glm::vec4& value, const std::string& desc = "") = 0;
+    config_vec(const std::string& id, float4& value, const std::string& desc = "") = 0;
     // Returns true if the value changed.
     virtual bool
-    config_vec(const std::string& id, glm::uvec3& value, const std::string& desc = "") = 0;
+    config_vec(const std::string& id, uint3& value, const std::string& desc = "") = 0;
     // Returns true if the value changed.
     virtual bool
-    config_vec(const std::string& id, glm::uvec4& value, const std::string& desc = "") = 0;
+    config_vec(const std::string& id, uint4& value, const std::string& desc = "") = 0;
     // Returns true if the value changed.
     virtual bool config_angle(const std::string& id,
                               float& angle,
@@ -130,7 +132,7 @@ class Properties {
                              const uint32_t& min = std::numeric_limits<uint32_t>::min(),
                              const uint32_t& max = std::numeric_limits<uint32_t>::max(),
                              const std::string& desc = "") = 0;
-     // Returns true if the value changed.
+    // Returns true if the value changed.
     virtual bool
     config_uint(const std::string& id, uint64_t& value, const std::string& desc = "") = 0;
     // Returns true if the value changed.

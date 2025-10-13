@@ -1,8 +1,8 @@
 #pragma once
 
-#include "glm/ext/matrix_transform.hpp"
-#include "glm/glm.hpp"
+#include "merian/utils/vector_matrix.hpp"
 #include "merian/vk/context.hpp"
+
 #include <spdlog/spdlog.h>
 #include <vulkan/vulkan.hpp>
 
@@ -208,32 +208,32 @@ inline std::pair<vk::Offset3D, vk::Offset3D> fit(const vk::Offset3D& src_lower,
 
 // Rotate "pos" around "origin". right-left (phi), up-down(theta).
 // Keeps the up direction valid.
-inline void rotate_around(glm::vec3& pos,
-                          const glm::vec3& origin,
-                          const glm::vec3& up,
+inline void rotate_around(float3& pos,
+                          const float3& origin,
+                          const float3& up,
                           const float d_phi,
                           const float d_theta) noexcept {
-    const glm::vec3 origin_to_pos(pos - origin);
-    const glm::vec3 normalized_origin_to_pos = glm::normalize(origin_to_pos);
+    const float3 origin_to_pos(pos - origin);
+    const float3 normalized_origin_to_pos = normalize(origin_to_pos);
 
     // left-right, around axis up
-    const glm::mat4 rot_phi = glm::rotate(glm::identity<glm::mat4>(), -d_phi, up);
+    const float3x3 rot_phi = float3x3::rotation_axis(up, -d_phi);
 
     // up-down, around axis x
-    const glm::vec3 x = glm::normalize(glm::cross(up, normalized_origin_to_pos));
-    const glm::mat4 rot_theta = glm::rotate(glm::identity<glm::mat4>(), -d_theta, x);
+    const float3 x = normalize(cross(up, normalized_origin_to_pos));
+    const float3x3 rot_theta = float3x3::rotation_axis(x, -d_theta);
 
-    glm::vec3 rotated = rot_theta * glm::vec4(origin_to_pos, 0);
+    float3 rotated = mul(rot_theta, float3(origin_to_pos));
 
-    if (glm::dot(x, glm::cross(up, rotated)) <= 0) {
+    if (dot(x, cross(up, rotated)).x <= 0.f) {
         // only rotate left-right
-        rotated = glm::normalize(rot_phi * glm::vec4(origin_to_pos, 0));
+        rotated = normalize(mul(rot_phi, float3(origin_to_pos)));
     } else {
         // additionally rotate up-down
-        rotated = glm::normalize(rot_phi * glm::vec4(rotated, 0));
+        rotated = normalize(mul(rot_phi, float3(rotated)));
     }
 
-    pos = origin + rotated * glm::length(origin_to_pos);
+    pos = origin + rotated * length(origin_to_pos);
 }
 
 } // namespace merian

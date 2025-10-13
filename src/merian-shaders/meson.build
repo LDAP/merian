@@ -5,7 +5,7 @@ merian_shaders_lib = static_library(
     merian_shaders_src,
     dependencies: [
         fmt,
-        glm,
+        hlslpp,
         slang,
         spdlog,
         stb,

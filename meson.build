@@ -61,7 +61,7 @@ vulkan = vulkan.partial_dependency(compile_args: true, link_args: true, links: t
 vulkanheaders = subproject('vulkanheaders').get_variable('vulkanheaders_dep')
 glfw = dependency('glfw3', version: ['>=3.4.0'], fallback: ['glfw', 'glfw_dep'])
 subprocess = dependency('subprocess', version: ['>=0.4.0'], fallback: ['subprocess', 'subprocess_dep'])
-glm = dependency('glm', fallback : ['glm', 'glm_dep'], version: ['>=0.9.9.8'])
+hlslpp = dependency('hlslpp', fallback : ['hlslpp', 'hlslpp_dep'], version: ['>=3.7'])
 tol = dependency('tinyobjloader', fallback : ['tinyobjloader', 'tinyobjloader_dep'])
 tgltf = dependency('tinygltf', required: get_option('tinygltf'), fallback: ['tinygltf', 'tinygltf_dep'])
 imgui = dependency('imgui', version: ['>=1.90.9'], fallback: ['imgui', 'imgui_dep'], static: true)
@@ -172,7 +172,7 @@ merian_dep = declare_dependency(
     dependencies : [
         fmt,
         glfw,
-        glm,
+        hlslpp,
         imgui,
         nlohmann_json,
         shaderc,

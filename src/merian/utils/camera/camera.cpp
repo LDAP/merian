@@ -1,15 +1,19 @@
 #include "merian/utils/camera/camera.hpp"
 
+#include "merian/vk/utils/math.hpp"
+
+#include <cassert>
+
 namespace merian {
 
-Camera::Camera(const glm::vec3& eye,
-               const glm::vec3& center,
-               const glm::vec3& up,
+Camera::Camera(const float3& eye,
+               const float3& center,
+               const float3& up,
                const float field_of_view,
                const float aspect_ratio,
                const float near_plane,
                const float far_plane)
-    : eye(eye), center(center), up(glm::normalize(up)), field_of_view(field_of_view),
+    : eye(eye), center(center), up(normalize(up)), field_of_view(field_of_view),
       aspect_ratio(aspect_ratio), near_plane(near_plane), far_plane(far_plane) {
 
     assert(field_of_view < 179.99);
@@ -23,22 +27,23 @@ Camera::Camera(const glm::vec3& eye,
 
 // -----------------------------------------------------------------------------
 
-const glm::mat4& Camera::get_view_matrix() noexcept {
+const float4x4& Camera::get_view_matrix() noexcept {
     if (has_changed(view_change_id, view_change_id_cache)) {
-        view_cache = glm::lookAt(eye, center, up);
+        view_cache = float4x4::look_at(eye, center, up);
     }
     return view_cache;
 }
 
-const glm::mat4& Camera::get_projection_matrix() noexcept {
-    if (has_changed(projection_change_id, projection_change_id_cache)) {
-        projection_cache = glm::perspective(field_of_view, aspect_ratio, near_plane, far_plane);
-    }
+const float4x4& Camera::get_projection_matrix() noexcept {
+    // if (has_changed(projection_change_id, projection_change_id_cache)) {
+    //     projection_cache = float4x4::perspective(projection(frustum()))//
+    //     glm::perspective(field_of_view, aspect_ratio, near_plane, far_plane);
+    // }
     return projection_cache;
 }
 
-glm::mat4 Camera::get_view_projection_matrix() noexcept {
-    return get_projection_matrix() * get_view_matrix();
+float4x4 Camera::get_view_projection_matrix() noexcept {
+    return mul(get_projection_matrix(), get_view_matrix());
 }
 
 // -----------------------------------------------------------------------------
@@ -53,49 +58,49 @@ uint64_t Camera::get_change_id() const noexcept {
 
 // -----------------------------------------------------------------------------
 
-void Camera::look_at(const glm::vec3& eye, const glm::vec3& center, const glm::vec3& up) noexcept {
+void Camera::look_at(const float3& eye, const float3& center, const float3& up) noexcept {
     this->eye = eye;
     this->center = center;
-    this->up = glm::normalize(up);
+    this->up = normalize(up);
     view_change_id++;
 }
 
-void Camera::look_at(const glm::vec3& eye,
-                     const glm::vec3& center,
-                     const glm::vec3& up,
+void Camera::look_at(const float3& eye,
+                     const float3& center,
+                     const float3& up,
                      const float field_of_view) noexcept {
     this->eye = eye;
     this->center = center;
-    this->up = glm::normalize(up);
+    this->up = normalize(up);
     this->field_of_view = field_of_view;
     view_change_id++;
     projection_change_id++;
 }
 
-void Camera::set_eye(const glm::vec3& eye) noexcept {
+void Camera::set_eye(const float3& eye) noexcept {
     this->eye = eye;
     view_change_id++;
 }
 
-void Camera::set_center(const glm::vec3& center) noexcept {
+void Camera::set_center(const float3& center) noexcept {
     this->center = center;
     view_change_id++;
 }
 
-void Camera::set_up(const glm::vec3& up) noexcept {
-    this->up = glm::normalize(up);
+void Camera::set_up(const float3& up) noexcept {
+    this->up = normalize(up);
     view_change_id++;
 }
 
-const glm::vec3& Camera::get_eye() const noexcept {
+const float3& Camera::get_eye() const noexcept {
     return eye;
 }
 
-const glm::vec3& Camera::get_center() const noexcept {
+const float3& Camera::get_center() const noexcept {
     return center;
 }
 
-const glm::vec3& Camera::get_up() const noexcept {
+const float3& Camera::get_up() const noexcept {
     return up;
 }
 
@@ -153,9 +158,9 @@ float Camera::get_field_of_view() const noexcept {
 // High level operations
 // -----------------------------------------------------------------------------
 
-void Camera::look_at_bounding_box(const glm::vec3& box_min, const glm::vec3& box_max, bool tight) {
-    const glm::vec3 bb_half_dimensions = (box_max - box_min) * .5f;
-    const glm::vec3 bb_center = box_min + bb_half_dimensions;
+void Camera::look_at_bounding_box(const float3& box_min, const float3& box_max, bool tight) {
+    const float3 bb_half_dimensions = (box_max - box_min) * .5f;
+    const float3 bb_center = box_min + bb_half_dimensions;
 
     float offset = 0;
     float yfov = field_of_view;
@@ -163,35 +168,33 @@ void Camera::look_at_bounding_box(const glm::vec3& box_min, const glm::vec3& box
 
     if (!tight) {
         // Using the bounding sphere
-        float radius = glm::length(bb_half_dimensions);
+        float radius = length(bb_half_dimensions);
         if (aspect_ratio > 1.f)
-            offset = radius / sin(glm::radians(yfov * 0.5f));
+            offset = radius / sin(radians(float1(yfov * 0.5f)));
         else
-            offset = radius / sin(glm::radians(xfov * 0.5f));
+            offset = radius / sin(radians(float1(xfov * 0.5f)));
     } else {
         // keep only rotation
-        glm::mat3 mView = glm::lookAt(eye, bb_center, up);
+        float4x4 view = float4x4::look_at(eye, bb_center, up);
 
         for (int i = 0; i < 8; i++) {
-            glm::vec3 vct(i & 1 ? bb_half_dimensions.x : -bb_half_dimensions.x,
-                          i & 2 ? bb_half_dimensions.y : -bb_half_dimensions.y,
-                          i & 4 ? bb_half_dimensions.z : -bb_half_dimensions.z);
-            vct = mView * vct;
+            float4 vct(i & 1 ? bb_half_dimensions.x : -bb_half_dimensions.x,
+                       i & 2 ? bb_half_dimensions.y : -bb_half_dimensions.y,
+                       i & 4 ? bb_half_dimensions.z : -bb_half_dimensions.z, 0.f);
+            vct = mul(view, vct);
 
             if (vct.z < 0) // Take only points in front of the center
             {
                 // Keep the largest offset to see that vertex
-                offset = std::max(glm::abs(vct.y) / glm::tan(glm::radians(yfov * 0.5f)) +
-                                      glm::abs(vct.z),
-                                  offset);
-                offset = std::max(glm::abs(vct.x) / glm::tan(glm::radians(xfov * 0.5f)) +
-                                      glm::abs(vct.z),
-                                  offset);
+                offset = std::max(abs(vct.y) / tan(radians(float1(yfov * 0.5f))) + abs(vct.z),
+                                  float1(offset));
+                offset = std::max(abs(vct.x) / tan(radians(float1(xfov * 0.5f))) + abs(vct.z),
+                                  float1(offset));
             }
         }
     }
 
-    auto view_direction = glm::normalize(eye - center);
+    auto view_direction = normalize(eye - center);
     auto new_eye = bb_center + view_direction * offset;
 
     // updates all matrices and change id
@@ -202,15 +205,15 @@ void Camera::move(const float dx, const float dup, const float dz) {
     eye += dup * up;
     center += dup * up;
 
-    glm::vec3 z = eye - center;
-    if (glm::length(z) < 1e-5)
+    float3 z = eye - center;
+    if (length(z) < float1(1e-5))
         return;
-    z = glm::normalize(z);
+    z = normalize(z);
 
-    const glm::vec3 x = glm::normalize(glm::cross(up, z));
-    const glm::vec3 in = glm::normalize(glm::cross(x, up));
+    const float3 x = normalize(cross(up, z));
+    const float3 in = normalize(cross(x, up));
 
-    const glm::vec3 d = dx * x + dz * in;
+    const float3 d = dx * x + dz * in;
     eye += d;
     center += d;
 
@@ -218,15 +221,15 @@ void Camera::move(const float dx, const float dup, const float dz) {
 }
 
 void Camera::fly(const float dx, const float dy, const float dz) {
-    glm::vec3 z = eye - center;
-    if (glm::length(z) < 1e-5)
+    float3 z = eye - center;
+    if (length(z) < float1(1e-5))
         return;
-    z = glm::normalize(z);
+    z = normalize(z);
 
-    const glm::vec3 x = glm::normalize(glm::cross(up, z));
-    const glm::vec3 y = glm::normalize(glm::cross(z, x));
+    const float3 x = normalize(cross(up, z));
+    const float3 y = normalize(cross(z, x));
 
-    const glm::vec3 d = dx * x + dy * y + dz * z;
+    const float3 d = dx * x + dy * y + dz * z;
     eye += d;
     center += d;
 
