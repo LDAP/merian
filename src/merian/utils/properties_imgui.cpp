@@ -8,8 +8,6 @@
 #include <algorithm>
 #include <stdexcept>
 
-#include "hlsl++/vector_uint_type.h"
-
 namespace merian {
 
 void tooltip(const std::string& tooltip) {
@@ -57,36 +55,58 @@ void ImGuiProperties::output_plot_line(const std::string& label,
                      {0, ImGui::GetFontSize() * 5});
 }
 
-bool ImGuiProperties::config_color(const std::string& id, float3& color, const std::string& desc) {
-    const bool value_changed = ImGui::ColorEdit3(id.c_str(), &color.x);
+bool ImGuiProperties::config_float(const std::string& id,
+                                   float* value,
+                                   const std::string& desc,
+                                   const int components) {
+    const bool value_changed =
+        ImGui::InputScalarN(id.c_str(), ImGuiDataType_Float, value, components);
     tooltip(desc);
     return value_changed;
 }
-bool ImGuiProperties::config_color(const std::string& id, float4& color, const std::string& desc) {
-    const bool value_changed = ImGui::ColorEdit4(id.c_str(), &color.x);
+bool ImGuiProperties::config_int(const std::string& id,
+                                 int32_t* value,
+                                 const std::string& desc,
+                                 const int components) {
+    const bool value_changed =
+        ImGui::InputScalarN(id.c_str(), ImGuiDataType_S32, value, components);
     tooltip(desc);
     return value_changed;
 }
-bool ImGuiProperties::config_vec(const std::string& id, float3& value, const std::string& desc) {
-    const bool value_changed = ImGui::InputFloat3(id.c_str(), &value.x);
+bool ImGuiProperties::config_uint(const std::string& id,
+                                  uint32_t* value,
+                                  const std::string& desc,
+                                  const int components) {
+    const bool value_changed =
+        ImGui::InputScalarN(id.c_str(), ImGuiDataType_U32, value, components);
     tooltip(desc);
     return value_changed;
 }
-bool ImGuiProperties::config_vec(const std::string& id, float4& value, const std::string& desc) {
-    const bool value_changed = ImGui::InputFloat4(id.c_str(), &value.x);
+bool ImGuiProperties::config_uint64(const std::string& id,
+                                    uint64_t* value,
+                                    const std::string& desc,
+                                    const int components) {
+    const bool value_changed =
+        ImGui::InputScalarN(id.c_str(), ImGuiDataType_U64, value, components);
     tooltip(desc);
     return value_changed;
 }
-bool ImGuiProperties::config_vec(const std::string& id, uint3& value, const std::string& desc) {
-    const bool value_changed = ImGui::InputScalarN(id.c_str(), ImGuiDataType_U32, &value.x, 3);
+
+bool ImGuiProperties::config_color3(const std::string& id,
+                                    float color[3],
+                                    const std::string& desc) {
+    const bool value_changed = ImGui::ColorEdit3(id.c_str(), color);
     tooltip(desc);
     return value_changed;
 }
-bool ImGuiProperties::config_vec(const std::string& id, uint4& value, const std::string& desc) {
-    const bool value_changed = ImGui::InputScalarN(id.c_str(), ImGuiDataType_U32, &value.x, 4);
+bool ImGuiProperties::config_color4(const std::string& id,
+                                    float color[4],
+                                    const std::string& desc) {
+    const bool value_changed = ImGui::ColorEdit4(id.c_str(), color);
     tooltip(desc);
     return value_changed;
 }
+
 bool ImGuiProperties::config_angle(const std::string& id,
                                    float& angle,
                                    const std::string& desc,
@@ -120,19 +140,9 @@ bool ImGuiProperties::config_float(const std::string& id,
     tooltip(desc);
     return value_changed;
 }
-bool ImGuiProperties::config_int(const std::string& id, int& value, const std::string& desc) {
-    const bool value_changed = ImGui::DragInt(id.c_str(), &value);
-    tooltip(desc);
-    return value_changed;
-}
 bool ImGuiProperties::config_int(
     const std::string& id, int& value, const int& min, const int& max, const std::string& desc) {
     const bool value_changed = ImGui::SliderInt(id.c_str(), &value, min, max);
-    tooltip(desc);
-    return value_changed;
-}
-bool ImGuiProperties::config_uint(const std::string& id, uint32_t& value, const std::string& desc) {
-    const bool value_changed = ImGui::DragScalar(id.c_str(), ImGuiDataType_U32, &value);
     tooltip(desc);
     return value_changed;
 }
@@ -146,25 +156,13 @@ bool ImGuiProperties::config_uint(const std::string& id,
     tooltip(desc);
     return value_changed;
 }
-bool ImGuiProperties::config_uint(const std::string& id, uint64_t& value, const std::string& desc) {
-    const bool value_changed = ImGui::DragScalar(id.c_str(), ImGuiDataType_U64, &value);
-    tooltip(desc);
-    return value_changed;
-}
-bool ImGuiProperties::config_uint(const std::string& id,
-                                  uint64_t& value,
-                                  const uint64_t& min,
-                                  const uint64_t& max,
-                                  const std::string& desc) {
+bool ImGuiProperties::config_uint64(const std::string& id,
+                                    uint64_t& value,
+                                    const uint64_t& min,
+                                    const uint64_t& max,
+                                    const std::string& desc) {
     const bool value_changed =
         ImGui::SliderScalar(id.c_str(), ImGuiDataType_U64, &value, &min, &max);
-    tooltip(desc);
-    return value_changed;
-}
-bool ImGuiProperties::config_float3(const std::string& id,
-                                    float value[3],
-                                    const std::string& desc) {
-    const bool value_changed = ImGui::InputFloat3(id.c_str(), value);
     tooltip(desc);
     return value_changed;
 }

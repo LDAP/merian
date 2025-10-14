@@ -1,6 +1,5 @@
 #pragma once
 
-#include "glm/glm.hpp"
 #include "merian/utils/camera/camera_animator.hpp"
 #include "merian/vk/window/glfw_window.hpp"
 #include <memory>
@@ -39,7 +38,7 @@ class GLFWCameraController {
 
         // WASD, SHIFT, SPACE
 
-        glm::vec3 move(0);
+        float3 move(0);
 
         if (glfwGetKey(*window, GLFW_KEY_W) == GLFW_PRESS)
             move.z += time_diff * movement_speed;
@@ -54,7 +53,7 @@ class GLFWCameraController {
         if (glfwGetKey(*window, GLFW_KEY_SPACE) == GLFW_PRESS)
             move.y += time_diff * movement_speed;
 
-        if (glm::length(move) > 1e-7)
+        if (length(move).x > 1e-7)
             camera.fly(move.x, move.y, -move.z);
 
         // MOUSE
@@ -78,9 +77,9 @@ class GLFWCameraController {
                 mouse_last_x = mouse_x;
                 mouse_last_y = mouse_y;
 
-                glm::vec2 rot(mouse_x_diff * mouse_sensitivity * MOUSE_SENS_MULTIPLIER,
+                float2 rot(mouse_x_diff * mouse_sensitivity * MOUSE_SENS_MULTIPLIER,
                               - mouse_y_diff * mouse_sensitivity * MOUSE_SENS_MULTIPLIER);
-                if (glm::length(rot) > 1e-7)
+                if (length(rot).x > 1e-7)
                     camera.rotate(rot.x, rot.y);
             }
         }

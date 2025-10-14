@@ -1,7 +1,6 @@
 #pragma once
 
 #include "merian/utils/camera/camera.hpp"
-#include "merian/utils/interpolation.hpp"
 
 #include <chrono>
 #include <optional>
@@ -45,7 +44,7 @@ class CameraAnimator {
     Camera animation_start;
     Camera animation_end;
     // Animate eye using bezier for consistent animation
-    glm::mat3 eye_animation_bezier_points;
+    float3x3 eye_animation_bezier_points;
     std::optional<chrono_clock::time_point> animation_start_time;
 
     double animation_duration_ms;

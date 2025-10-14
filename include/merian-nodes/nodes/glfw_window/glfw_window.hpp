@@ -196,7 +196,7 @@ class GLFWWindow : public Node {
         config.config_bool("rebuild on recreate", request_rebuild_on_recreate,
                            "requests a graph rebuild if the swapchain was recreated.");
 
-        config.config_uint("acquire timeout", acquire_timeout_ns, "in nanoseconds");
+        config.config_uint64("acquire timeout", acquire_timeout_ns, "in nanoseconds");
 
         if (config.st_begin_child("on_should_close_actions", "On should_close()")) {
             config.config_bool("send sigint", on_should_close_sigint);

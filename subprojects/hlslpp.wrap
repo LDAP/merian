@@ -2,7 +2,7 @@
 directory = hlslpp
 
 url = https://github.com/redorav/hlslpp
-revision = 3.7
+revision = 81a35cff4b3acea792f44ab50cee86cdbf9c567a
 depth = 1
 
 patch_directory = hlslpp

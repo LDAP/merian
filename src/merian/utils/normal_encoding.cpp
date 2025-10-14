@@ -24,7 +24,7 @@ uint32_t encode_normal(float vec[3]) noexcept {
     return result;
 }
 
-uint32_t encode_normal(glm::vec3 vec) noexcept {
+uint32_t encode_normal(float3 vec) noexcept {
     return encode_normal(&vec.x);
 }
 

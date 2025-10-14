@@ -36,7 +36,7 @@ void ColorImage::process([[maybe_unused]] GraphRun& run,
 }
 
 ColorImage::NodeStatusFlags ColorImage::properties(Properties& config) {
-    needs_run = config.config_color("color", *merian::as_vec4((float*)&color));
+    needs_run = config.config_color4("color", (float*)&color);
 
     bool needs_reconnect = false;
     needs_reconnect |=
@@ -46,7 +46,7 @@ ColorImage::NodeStatusFlags ColorImage::properties(Properties& config) {
         config.output_text("extent determined by input: {}x{}x{}", extent.width, extent.height,
                            extent.depth);
     } else {
-        needs_reconnect |= config.config_vec("extent", *merian::as_uvec3(&extent.width));
+        needs_reconnect |= config.config_uint("extent", &extent.width, "", 3);
     }
 
     if (needs_reconnect) {

@@ -6,7 +6,7 @@ using json = nlohmann::json;
 
 namespace merian {
 
-float decode_float(json& j) {
+static float decode_float(json& j) {
     if (j.type() == json::value_t::string) {
         std::string encoded = j.template get<std::string>();
         return std::atof(encoded.c_str());
@@ -14,32 +14,33 @@ float decode_float(json& j) {
     return j.template get<float>();
 }
 
-void load_vec3(json& j, float3& v) {
-    json::iterator it = j.begin();
-    for (int i = 0; i < 3; i++, it++) {
-        v[i] = decode_float(*it);
+template <typename T>
+static bool load_if_exist(json& j, const std::string& id, T* value, const int components) {
+    bool changed = false;
+    if (j.contains(id)) {
+        json::iterator it = j[id].begin();
+        for (int i = 0; i < components; i++, it++) {
+            assert(it != j[id].end());
+            const T new_value = *it;
+            changed |= (new_value != value[i]);
+            value[i] = new_value;
+        }
     }
+    return changed;
 }
 
-void load_vec4(json& j, float4& v) {
-    json::iterator it = j.begin();
-    for (int i = 0; i < 4; i++, it++) {
-        v[i] = decode_float(*it);
+static bool load_if_exist(json& j, const std::string& id, float* value, const int components) {
+    bool changed = false;
+    if (j.contains(id)) {
+        json::iterator it = j[id].begin();
+        for (int i = 0; i < components; i++, it++) {
+            assert(it != j[id].end());
+            const float new_value = decode_float(*it);
+            changed |= (new_value != value[i]);
+            value[i] = new_value;
+        }
     }
-}
-
-void load_vec3(json& j, uint3& v) {
-    json::iterator it = j.begin();
-    for (int i = 0; i < 3; i++, it++) {
-        v[i] = *it;
-    }
-}
-
-void load_vec4(json& j, uint4& v) {
-    json::iterator it = j.begin();
-    for (int i = 0; i < 4; i++, it++) {
-        v[i] = *it;
-    }
+    return changed;
 }
 
 JSONLoadProperties::JSONLoadProperties(const std::string& json_string) : o(1) {
@@ -66,8 +67,8 @@ JSONLoadProperties::JSONLoadProperties(const nlohmann::json&& json) : o(1) {
 JSONLoadProperties::~JSONLoadProperties() {}
 
 bool JSONLoadProperties::st_begin_child(const std::string& id,
-                                        const std::string&,
-                                        const ChildFlags) {
+                                        const std::string& /*label*/,
+                                        const ChildFlags /*flags*/) {
     if (o.back().contains(id)) {
         o.push_back(o.back()[id]);
         return true;
@@ -87,133 +88,50 @@ std::vector<std::string> JSONLoadProperties::st_list_children() {
     return children;
 }
 
-void JSONLoadProperties::st_separate(const std::string&) {}
+void JSONLoadProperties::st_separate(const std::string& /*label*/) {}
 void JSONLoadProperties::st_no_space() {}
 
-void JSONLoadProperties::output_text(const std::string&) {}
-void JSONLoadProperties::output_plot_line(
-    const std::string&, const float*, const uint32_t, const float, const float) {}
+void JSONLoadProperties::output_text(const std::string& /*text*/) {}
+void JSONLoadProperties::output_plot_line(const std::string& /*label*/,
+                                          const float* /*samples*/,
+                                          const uint32_t /*count*/,
+                                          const float /*scale_min*/,
+                                          const float /*scale_max*/) {}
 
-bool JSONLoadProperties::config_color(const std::string& id, float3& color, const std::string&) {
-    const float3 old_color = color;
-    if (o.back().contains(id))
-        load_vec3(o.back()[id], color);
-    return any(old_color != color);
-}
-bool JSONLoadProperties::config_color(const std::string& id, float4& color, const std::string&) {
-    const float4 old_color = color;
-    if (o.back().contains(id))
-        load_vec4(o.back()[id], color);
-    return any(old_color != color);
-}
-bool JSONLoadProperties::config_vec(const std::string& id, float3& value, const std::string&) {
-    const float3 old_value = value;
-    if (o.back().contains(id))
-        load_vec3(o.back()[id], value);
-    return any(old_value != value);
-}
-bool JSONLoadProperties::config_vec(const std::string& id, float4& value, const std::string&) {
-    const float4 old_value = value;
-    if (o.back().contains(id))
-        load_vec4(o.back()[id], value);
-    return any(old_value != value);
-}
-bool JSONLoadProperties::config_vec(const std::string& id, uint3& value, const std::string&) {
-    const uint3 old_value = value;
-    if (o.back().contains(id))
-        load_vec3(o.back()[id], value);
-    return any(old_value != value);
-}
-bool JSONLoadProperties::config_vec(const std::string& id, uint4& value, const std::string&) {
-    const uint4 old_value = value;
-    if (o.back().contains(id))
-        load_vec4(o.back()[id], value);
-    return any(old_value != value);
-}
-bool JSONLoadProperties::config_angle(
-    const std::string& id, float& angle, const std::string&, const float, const float) {
-    const float old_angle = angle;
-    if (o.back().contains(id))
-        angle = decode_float(o.back()[id]);
-    return old_angle != angle;
-}
-bool JSONLoadProperties::config_percent(const std::string& id, float& value, const std::string&) {
-    const float old_value = value;
-    if (o.back().contains(id))
-        value = decode_float(o.back()[id]);
-    return old_value != value;
-}
 bool JSONLoadProperties::config_float(const std::string& id,
-                                      float& value,
-                                      const std::string&,
-                                      const float) {
-    const float old_value = value;
-    if (o.back().contains(id))
-        value = decode_float(o.back()[id]);
-    return value != old_value;
+                                      float* value,
+                                      const std::string& /*desc*/,
+                                      const int components) {
+    return load_if_exist(o.back(), id, value, components);
 }
-bool JSONLoadProperties::config_float(
-    const std::string& id, float& value, const float&, const float&, const std::string&) {
-    const float old_value = value;
-    if (o.back().contains(id))
-        value = decode_float(o.back()[id]);
-    return old_value != value;
+bool JSONLoadProperties::config_int(const std::string& id,
+                                    int32_t* value,
+                                    const std::string& /*desc*/,
+                                    const int components) {
+    return load_if_exist(o.back(), id, value, components);
 }
-bool JSONLoadProperties::config_int(const std::string& id, int& value, const std::string&) {
-    const int old_value = value;
-    if (o.back().contains(id))
-        value = o.back()[id].template get<int>();
-    return old_value != value;
+bool JSONLoadProperties::config_uint(const std::string& id,
+                                     uint32_t* value,
+                                     const std::string& /*desc*/,
+                                     const int components) {
+    return load_if_exist(o.back(), id, value, components);
 }
-bool JSONLoadProperties::config_int(
-    const std::string& id, int& value, const int&, const int&, const std::string&) {
-    const int old_value = value;
-    if (o.back().contains(id))
-        value = o.back()[id].template get<int>();
-    return old_value != value;
+bool JSONLoadProperties::config_uint64(const std::string& id,
+                                       uint64_t* value,
+                                       const std::string& /*desc*/,
+                                       const int components) {
+    return load_if_exist(o.back(), id, value, components);
 }
-bool JSONLoadProperties::config_uint(const std::string& id, uint32_t& value, const std::string&) {
-    const uint32_t old_value = value;
-    if (o.back().contains(id))
-        value = o.back()[id].template get<uint32_t>();
-    return old_value != value;
-}
-bool JSONLoadProperties::config_uint(
-    const std::string& id, uint32_t& value, const uint32_t&, const uint32_t&, const std::string&) {
-    const uint32_t old_value = value;
-    if (o.back().contains(id))
-        value = o.back()[id].template get<uint32_t>();
-    return old_value != value;
-}
-bool JSONLoadProperties::config_uint(const std::string& id, uint64_t& value, const std::string&) {
-    const uint64_t old_value = value;
-    if (o.back().contains(id))
-        value = o.back()[id].template get<uint64_t>();
-    return old_value != value;
-}
-bool JSONLoadProperties::config_uint(
-    const std::string& id, uint64_t& value, const uint64_t&, const uint64_t&, const std::string&) {
-    const uint64_t old_value = value;
-    if (o.back().contains(id))
-        value = o.back()[id].template get<uint64_t>();
-    return old_value != value;
-}
-bool JSONLoadProperties::config_float3(const std::string& id, float value[3], const std::string&) {
-    float3 v = load_float3(value);
-    const float3 old_v = v;
-    if (o.back().contains(id)) {
-        load_vec3(o.back()[id], v);
-    }
-    store(v, value);
-    return any(v != old_v);
-}
-bool JSONLoadProperties::config_bool(const std::string& id, bool& value, const std::string&) {
+
+bool JSONLoadProperties::config_bool(const std::string& id,
+                                     bool& value,
+                                     const std::string& /*desc*/) {
     const bool old_value = value;
     if (o.back().contains(id))
         value = o.back()[id].template get<bool>();
     return old_value != value;
 }
-bool JSONLoadProperties::config_bool(const std::string& id, const std::string&) {
+bool JSONLoadProperties::config_bool(const std::string& id, const std::string& /*desc*/) {
     if (o.back().contains(id))
         return o.back()[id].template get<bool>();
     return false;
@@ -221,12 +139,12 @@ bool JSONLoadProperties::config_bool(const std::string& id, const std::string&) 
 bool JSONLoadProperties::config_options(const std::string& id,
                                         int& selected,
                                         const std::vector<std::string>& options,
-                                        const OptionsStyle,
-                                        const std::string&) {
+                                        const OptionsStyle /*style*/,
+                                        const std::string& /*desc*/) {
     const int old_selected = selected;
     if (o.back().contains(id)) {
         std::string option = o.back()[id].template get<std::string>();
-        for (uint32_t i = 0; i < options.size(); i++) {
+        for (int i = 0; i < (int)options.size(); i++) {
             if (options[i] == option)
                 selected = i;
         }
@@ -235,8 +153,8 @@ bool JSONLoadProperties::config_options(const std::string& id,
 }
 bool JSONLoadProperties::config_text(const std::string& id,
                                      std::string& string,
-                                     const bool,
-                                     const std::string&) {
+                                     const bool /*needs_submit*/,
+                                     const std::string& /*desc*/) {
 
     if (o.back().contains(id)) {
         string = o.back()[id].template get<std::string>();
@@ -247,8 +165,8 @@ bool JSONLoadProperties::config_text(const std::string& id,
 }
 bool JSONLoadProperties::config_text_multiline(const std::string& id,
                                                std::string& string,
-                                               const bool,
-                                               const std::string&) {
+                                               const bool /*needs_submit*/,
+                                               const std::string& /*desc*/) {
 
     if (o.back().contains(id)) {
         string = o.back()[id].template get<std::string>();

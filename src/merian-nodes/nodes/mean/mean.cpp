@@ -35,7 +35,7 @@ std::vector<OutputConnectorHandle> MeanToBuffer::describe_outputs(const NodeIOLa
     con_mean = std::make_shared<ManagedVkBufferOut>(
         "mean", vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
         vk::PipelineStageFlagBits2::eComputeShader, vk::ShaderStageFlagBits::eCompute,
-        vk::BufferCreateInfo({}, buffer_size * sizeof(glm::vec4),
+        vk::BufferCreateInfo({}, buffer_size * sizeof(merian::float4),
                              vk::BufferUsageFlagBits::eStorageBuffer));
 
     return {con_mean};

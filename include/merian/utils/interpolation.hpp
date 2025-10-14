@@ -1,6 +1,5 @@
 #pragma once
 
-#include "glm/glm.hpp"
 namespace merian {
 
 // Variation of smoothstep from Ken Perlin

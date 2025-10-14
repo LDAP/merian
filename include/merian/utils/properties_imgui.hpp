@@ -27,18 +27,23 @@ class ImGuiProperties : public Properties {
                                   const float scale_min,
                                   const float scale_max) override;
 
-    virtual bool
-    config_color(const std::string& id, float3& color, const std::string& desc = "") override;
-    virtual bool
-    config_color(const std::string& id, float4& color, const std::string& desc = "") override;
-    virtual bool
-    config_vec(const std::string& id, float3& value, const std::string& desc = "") override;
-    virtual bool
-    config_vec(const std::string& id, float4& value, const std::string& desc = "") override;
-    virtual bool
-    config_vec(const std::string& id, uint3& value, const std::string& desc = "") override;
-    virtual bool
-    config_vec(const std::string& id, uint4& value, const std::string& desc = "") override;
+    virtual bool config_float(const std::string& id,
+                              float* value,
+                              const std::string& desc = "",
+                              const int components = 1) override;
+    virtual bool config_int(const std::string& id,
+                            int32_t* value,
+                            const std::string& desc = "",
+                            const int components = 1) override;
+    virtual bool config_uint(const std::string& id,
+                             uint32_t* value,
+                             const std::string& desc = "",
+                             const int components = 1) override;
+    virtual bool config_uint64(const std::string& id,
+                               uint64_t* value,
+                               const std::string& desc = "",
+                               const int components = 1) override;
+
     virtual bool config_angle(const std::string& id,
                               float& angle,
                               const std::string& desc = "",
@@ -46,38 +51,37 @@ class ImGuiProperties : public Properties {
                               const float max = 360) override;
     virtual bool
     config_percent(const std::string& id, float& value, const std::string& desc = "") override;
+
+    virtual bool
+    config_color3(const std::string& id, float color[3], const std::string& desc = "") override;
+    virtual bool
+    config_color4(const std::string& id, float color[4], const std::string& desc = "") override;
+
     virtual bool config_float(const std::string& id,
                               float& value,
                               const std::string& desc = "",
                               const float sensitivity = 1.0f) override;
     virtual bool config_float(const std::string& id,
                               float& value,
-                              const float& min = FLT_MIN,
-                              const float& max = FLT_MAX,
+                              const float& min,
+                              const float& max,
                               const std::string& desc = "") override;
-    virtual bool
-    config_int(const std::string& id, int& value, const std::string& desc = "") override;
     virtual bool config_int(const std::string& id,
-                            int& value,
-                            const int& min = std::numeric_limits<int>::min(),
-                            const int& max = std::numeric_limits<int>::max(),
+                            int32_t& value,
+                            const int32_t& min,
+                            const int32_t& max,
                             const std::string& desc = "") override;
-    virtual bool
-    config_uint(const std::string& id, uint32_t& value, const std::string& desc = "") override;
     virtual bool config_uint(const std::string& id,
                              uint32_t& value,
-                             const uint32_t& min = std::numeric_limits<uint32_t>::min(),
-                             const uint32_t& max = std::numeric_limits<uint32_t>::max(),
+                             const uint32_t& min,
+                             const uint32_t& max,
                              const std::string& desc = "") override;
-    virtual bool
-    config_uint(const std::string& id, uint64_t& value, const std::string& desc = "") override;
-    virtual bool config_uint(const std::string& id,
-                             uint64_t& value,
-                             const uint64_t& min = std::numeric_limits<uint64_t>::min(),
-                             const uint64_t& max = std::numeric_limits<uint64_t>::max(),
-                             const std::string& desc = "") override;
-    virtual bool
-    config_float3(const std::string& id, float value[3], const std::string& desc = "") override;
+    virtual bool config_uint64(const std::string& id,
+                               uint64_t& value,
+                               const uint64_t& min,
+                               const uint64_t& max,
+                               const std::string& desc = "") override;
+
     virtual bool
     config_bool(const std::string& id, bool& value, const std::string& desc = "") override;
     // For buttons

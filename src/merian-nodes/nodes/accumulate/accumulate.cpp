@@ -190,10 +190,10 @@ Accumulate::NodeStatusFlags Accumulate::properties(Properties& config) {
     needs_rebuild |=
         config.config_bool("enable motion vectors", enable_mv, "uses motion vectors if connected.");
     config.st_separate("Reproject");
-    float angle = glm::acos(accumulate_pc.normal_reject_cos);
+    float angle = std::acos(accumulate_pc.normal_reject_cos);
     config.config_angle("normal threshold", angle, "Reject points with normals farther apart", 0,
                         180);
-    accumulate_pc.normal_reject_cos = glm::cos(angle);
+    accumulate_pc.normal_reject_cos = std::cos(angle);
     config.config_percent("depth threshold", accumulate_pc.depth_reject_percent,
                           "Reject points with depths farther apart (relative to the max)");
     needs_rebuild |=

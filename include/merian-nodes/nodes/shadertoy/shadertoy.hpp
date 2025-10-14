@@ -1,12 +1,9 @@
 #pragma once
 
-#include "glm/ext/vector_float2.hpp"
-
 #include "merian-nodes/nodes/compute_node/compute_node.hpp"
 
 #include "merian/shader/shader_compiler.hpp"
 #include "merian/shader/shader_hotreloader.hpp"
-#include "merian/shader/shader_module.hpp"
 
 namespace merian_nodes {
 
@@ -18,12 +15,12 @@ class Shadertoy : public AbstractCompute {
 
   private:
     struct PushConstant {
-        glm::vec2 iResolution{};
+        merian::float2 iResolution{};
         float iTime{};
         float iTimeDelta{};
         int32_t iFrame{};
-        glm::vec4 iMouse{};
-        glm::vec4 iDate{};
+        merian::float4 iMouse{};
+        merian::float4 iDate{};
     };
 
   public:

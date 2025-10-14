@@ -1,5 +1,7 @@
 #include "merian/utils/camera/camera_animator.hpp"
 
+#include "merian/utils/interpolation.hpp"
+
 namespace merian {
 
 CameraAnimator::CameraAnimator(double animation_duration_ms)
@@ -26,13 +28,12 @@ void CameraAnimator::update(const chrono_clock::time_point now) {
 
     // Interpolate camera start and end position
     // Use bezier to connect the camera positon (eye) for consistent animation
-    float interpolated_fov =
-        glm::mix(animation_start.get_field_of_view(), animation_end.get_field_of_view(), smoothed);
-    glm::vec3 interpolated_center =
-        glm::mix(animation_start.get_center(), animation_end.get_center(), smoothed);
-    glm::vec3 interpolated_up =
-        glm::mix(animation_start.get_up(), animation_end.get_up(), smoothed);
-    glm::vec3 interpolated_eye =
+    float interpolated_fov = lerp(float1(animation_start.get_field_of_view()),
+                                  float1(animation_end.get_field_of_view()), smoothed);
+    float3 interpolated_center =
+        lerp(animation_start.get_center(), animation_end.get_center(), smoothed);
+    float3 interpolated_up = lerp(animation_start.get_up(), animation_end.get_up(), smoothed);
+    float3 interpolated_eye =
         evaluate_bezier(smoothed, eye_animation_bezier_points[0], eye_animation_bezier_points[1],
                         eye_animation_bezier_points[2]);
     camera_current.look_at(interpolated_eye, interpolated_center, interpolated_up,
@@ -65,22 +66,22 @@ bool CameraAnimator::is_animating() {
 }
 
 void CameraAnimator::calculate_eye_animation_bezier_points() {
-    const glm::vec3 p0 = animation_start.get_eye();
-    const glm::vec3 p2 = animation_end.get_eye();
-    glm::vec3 p1, pc;
+    const float3 p0 = animation_start.get_eye();
+    const float3 p2 = animation_end.get_eye();
+    float3 p1, pc;
 
     // point of interest
-    const glm::vec3 pi = (animation_end.get_center() + animation_start.get_center()) * 0.5f;
+    const float3 pi = (animation_end.get_center() + animation_start.get_center()) * 0.5f;
 
-    const glm::vec3 p02 = (p0 + p2) * 0.5f;                          // mid p0-p2
+    const float3 p02 = (p0 + p2) * 0.5f;                             // mid p0-p2
     const float radius = (length(p0 - pi) + length(p2 - pi)) * 0.5f; // Radius for p1
-    glm::vec3 p02pi(glm::normalize(p02 - pi)); // Vector from interest to mid point
+    float3 p02pi(normalize(p02 - pi)); // Vector from interest to mid point
     p02pi *= radius;
     pc = pi + p02pi;                       // Calculated point to go through
     p1 = 2.f * pc - p0 * 0.5f - p2 * 0.5f; // Computing p1 for t=0.5
     p1.y = p02.y;                          // Clamping the P1 to be in the same height as p0-p2
 
-    eye_animation_bezier_points = glm::mat3(p0, p1, p2);
+    eye_animation_bezier_points = float3x3(p0, p1, p2);
 }
 
 } // namespace merian

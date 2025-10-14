@@ -77,84 +77,198 @@ class Properties {
     // Config
 
     // Returns true if the value changed.
-    virtual bool
-    config_color(const std::string& id, float3& color, const std::string& desc = "") = 0;
-    // Returns true if the value changed.
-    virtual bool
-    config_color(const std::string& id, float4& color, const std::string& desc = "") = 0;
-    // Returns true if the value changed.
-    virtual bool
-    config_vec(const std::string& id, float3& value, const std::string& desc = "") = 0;
-    // Returns true if the value changed.
-    virtual bool
-    config_vec(const std::string& id, float4& value, const std::string& desc = "") = 0;
-    // Returns true if the value changed.
-    virtual bool
-    config_vec(const std::string& id, uint3& value, const std::string& desc = "") = 0;
-    // Returns true if the value changed.
-    virtual bool
-    config_vec(const std::string& id, uint4& value, const std::string& desc = "") = 0;
-    // Returns true if the value changed.
-    virtual bool config_angle(const std::string& id,
-                              float& angle,
+    virtual bool config_float(const std::string& id,
+                              float* value,
                               const std::string& desc = "",
-                              const float min = -360,
-                              const float max = 360) = 0;
+                              const int components = 1) = 0;
     // Returns true if the value changed.
-    virtual bool
-    config_percent(const std::string& id, float& value, const std::string& desc = "") = 0;
+    virtual bool config_int(const std::string& id,
+                            int32_t* value,
+                            const std::string& desc = "",
+                            const int components = 1) = 0;
+    // Returns true if the value changed.
+    virtual bool config_uint(const std::string& id,
+                             uint32_t* value,
+                             const std::string& desc = "",
+                             const int components = 1) = 0;
+    // Returns true if the value changed.
+    virtual bool config_uint64(const std::string& id,
+                               uint64_t* value,
+                               const std::string& desc = "",
+                               const int components = 1) = 0;
 
     // Returns true if the value changed.
     virtual bool config_float(const std::string& id,
                               float& value,
                               const std::string& desc = "",
-                              const float sensitivity = 1.0f) = 0;
+                              const float /*sensitivity*/ = 1.0f) {
+        return config_float(id, &value, desc, 1);
+    }
     // Returns true if the value changed.
     virtual bool config_float(const std::string& id,
                               float& value,
-                              const float& min,
-                              const float& max,
-                              const std::string& desc = "") = 0;
+                              const float& /*min*/,
+                              const float& /*max*/,
+                              const std::string& desc = "") {
+        return config_float(id, &value, desc, 1);
+    }
     // Returns true if the value changed.
-    virtual bool config_int(const std::string& id, int& value, const std::string& desc = "") = 0;
+    virtual bool
+    config_int(const std::string& id, int32_t& value, const std::string& desc = "") final {
+        return config_int(id, &value, desc, 1);
+    }
     // Returns true if the value changed.
     virtual bool config_int(const std::string& id,
                             int& value,
-                            const int& min = std::numeric_limits<int>::min(),
-                            const int& max = std::numeric_limits<int>::max(),
-                            const std::string& desc = "") = 0;
+                            const int& /*min*/,
+                            const int& /*max*/,
+                            const std::string& desc = "") {
+        return config_int(id, &value, desc, 1);
+    }
     // Returns true if the value changed.
     virtual bool
-    config_uint(const std::string& id, uint32_t& value, const std::string& desc = "") = 0;
+    config_uint(const std::string& id, uint32_t& value, const std::string& desc = "") final {
+        return config_uint(id, &value, desc, 1);
+    }
     // Returns true if the value changed.
     virtual bool config_uint(const std::string& id,
                              uint32_t& value,
-                             const uint32_t& min = std::numeric_limits<uint32_t>::min(),
-                             const uint32_t& max = std::numeric_limits<uint32_t>::max(),
-                             const std::string& desc = "") = 0;
+                             const uint32_t& /*min*/,
+                             const uint32_t& /*max*/,
+                             const std::string& desc = "") {
+        return config_uint(id, &value, desc, 1);
+    }
     // Returns true if the value changed.
     virtual bool
-    config_uint(const std::string& id, uint64_t& value, const std::string& desc = "") = 0;
+    config_uint64(const std::string& id, uint64_t& value, const std::string& desc = "") final {
+        return config_uint64(id, &value, desc, 1);
+    }
     // Returns true if the value changed.
-    virtual bool config_uint(const std::string& id,
-                             uint64_t& value,
-                             const uint64_t& min = std::numeric_limits<uint64_t>::min(),
-                             const uint64_t& max = std::numeric_limits<uint64_t>::max(),
-                             const std::string& desc = "") = 0;
+    virtual bool config_uint64(const std::string& id,
+                               uint64_t& value,
+                               const uint64_t& /*min*/,
+                               const uint64_t& /*max*/,
+                               const std::string& desc = "") {
+        return config_uint64(id, &value, desc, 1);
+    }
+
     // Returns true if the value changed.
     virtual bool
-    config_float3(const std::string& id, float value[3], const std::string& desc = "") = 0;
+    config_vec(const std::string& id, float1& value, const std::string& desc = "") final {
+        return config_float(id, &value.x, desc, 1);
+    }
+    // Returns true if the value changed.
+    virtual bool
+    config_vec(const std::string& id, float2& value, const std::string& desc = "") final {
+        return config_float(id, &value.x, desc, 2);
+    }
+    // Returns true if the value changed.
+    virtual bool
+    config_vec(const std::string& id, float3& value, const std::string& desc = "") final {
+        return config_float(id, &value.x, desc, 3);
+    }
+    // Returns true if the value changed.
+    virtual bool
+    config_vec(const std::string& id, float4& value, const std::string& desc = "") final {
+        return config_float(id, &value.x, desc, 4);
+    }
+
+    // Returns true if the value changed.
+    virtual bool
+    config_vec(const std::string& id, int1& value, const std::string& desc = "") final {
+        return config_int(id, &value.x, desc, 1);
+    }
+    // Returns true if the value changed.
+    virtual bool
+    config_vec(const std::string& id, int2& value, const std::string& desc = "") final {
+        return config_int(id, &value.x, desc, 2);
+    }
+    // Returns true if the value changed.
+    virtual bool
+    config_vec(const std::string& id, int3& value, const std::string& desc = "") final {
+        return config_int(id, &value.x, desc, 3);
+    }
+    // Returns true if the value changed.
+    virtual bool
+    config_vec(const std::string& id, int4& value, const std::string& desc = "") final {
+        return config_int(id, &value.x, desc, 4);
+    }
+
+    // Returns true if the value changed.
+    virtual bool
+    config_vec(const std::string& id, uint1& value, const std::string& desc = "") final {
+        return config_uint(id, &value.x, desc, 1);
+    }
+    // Returns true if the value changed.
+    virtual bool
+    config_vec(const std::string& id, uint2& value, const std::string& desc = "") final {
+        return config_uint(id, &value.x, desc, 2);
+    }
+    // Returns true if the value changed.
+    virtual bool
+    config_vec(const std::string& id, uint3& value, const std::string& desc = "") final {
+        return config_uint(id, &value.x, desc, 3);
+    }
+    // Returns true if the value changed.
+    virtual bool
+    config_vec(const std::string& id, uint4& value, const std::string& desc = "") final {
+        return config_uint(id, &value.x, desc, 4);
+    }
+
+    // Returns true if the value changed.
+    virtual bool
+    config_color3(const std::string& id, float color[3], const std::string& desc = "") {
+        return config_float(id, color, desc, 3);
+    }
+    // Returns true if the value changed.
+    virtual bool
+    config_color4(const std::string& id, float color[4], const std::string& desc = "") {
+        return config_float(id, color, desc, 4);
+    }
+
+    // Returns true if the value changed.
+    virtual bool
+    config_color(const std::string& id, float3& color, const std::string& desc = "") final {
+        return config_color3(id, &color.x, desc);
+    }
+    // Returns true if the value changed.
+    virtual bool
+    config_color(const std::string& id, float4& color, const std::string& desc = "") final {
+        return config_color4(id, &color.x, desc);
+    }
+
+    // Returns true if the value changed.
+    virtual bool config_angle(const std::string& id,
+                              float& angle,
+                              const std::string& desc = "",
+                              const float min = -360,
+                              const float max = 360) {
+        return config_float(id, angle, min, max, desc);
+    }
+
+    // Returns true if the value changed.
+    virtual bool config_percent(const std::string& id, float& value, const std::string& desc = "") {
+        return config_float(id, value, 0.f, 1.f, desc);
+    }
+
     // Holds the supplied `value` if not changed by the configuration.
     // Converts to a checkbox in a GUI context.
     // Returns true if the value changed.
-    virtual bool config_bool(const std::string& id, int& value, const std::string& desc = "") {
+    virtual bool config_bool(const std::string& id, bool& value, const std::string& desc = "") = 0;
+    // Holds the supplied `value` if not changed by the configuration.
+    // Converts to a checkbox in a GUI context.
+    // Returns true if the value changed.
+    virtual bool config_bool(const std::string& id, int32_t& value, const std::string& desc = "") {
         bool bool_value = value != 0;
         if (config_bool(id, bool_value, desc)) {
-            value = static_cast<int>(bool_value);
+            value = static_cast<int32_t>(bool_value);
             return true;
         }
         return false;
     }
+    // Holds the supplied `value` if not changed by the configuration.
+    // Converts to a checkbox in a GUI context.
+    // Returns true if the value changed.
     virtual bool config_bool(const std::string& id, uint32_t& value, const std::string& desc = "") {
         bool bool_value = value != 0u;
         if (config_bool(id, bool_value, desc)) {
@@ -163,10 +277,6 @@ class Properties {
         }
         return false;
     }
-    // Holds the supplied `value` if not changed by the configuration.
-    // Converts to a checkbox in a GUI context.
-    // Returns true if the value changed.
-    virtual bool config_bool(const std::string& id, bool& value, const std::string& desc = "") = 0;
     // Returns true if the value changed.
     virtual bool config_options(const std::string& id,
                                 int& selected,

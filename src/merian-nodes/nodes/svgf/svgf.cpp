@@ -273,18 +273,18 @@ SVGF::NodeStatusFlags SVGF::properties(Properties& config) {
     config.config_float("spatial bias", variance_estimate_pc.spatial_bias,
                         "higher means use spatial information longer before using the falloff",
                         0.1);
-    float angle = glm::acos(variance_estimate_pc.normal_reject_cos);
+    float angle = std::acos(variance_estimate_pc.normal_reject_cos);
     config.config_angle("normal reject", angle, "Reject points with farther apart", 0, 180);
-    variance_estimate_pc.normal_reject_cos = glm::cos(angle);
+    variance_estimate_pc.normal_reject_cos = std::cos(angle);
     config.config_float("depth accept", variance_estimate_pc.depth_accept, "More means more reuse");
 
     config.st_separate("Filter");
     needs_rebuild |= config.config_int("SVGF iterations", svgf_iterations, 0, 10,
                                        "0 disables SVGF completely (TAA-only mode)");
     config.config_float("filter depth", filter_pc.param_z, "more means more blur");
-    angle = glm::acos(filter_pc.param_n);
+    angle = std::acos(filter_pc.param_n);
     config.config_angle("filter normals", angle, "Reject with normals farther apart", 0, 180);
-    filter_pc.param_n = glm::cos(angle);
+    filter_pc.param_n = std::cos(angle);
     config.config_float("filter luminance", filter_pc.param_l, "more means more blur", 0.1);
     config.config_float("z-bias normals", filter_pc.z_bias_normals,
                         "z-dependent rejection: increase to reject more. Disable with <= 0.");

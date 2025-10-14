@@ -170,9 +170,9 @@ void Camera::look_at_bounding_box(const float3& box_min, const float3& box_max, 
         // Using the bounding sphere
         float radius = length(bb_half_dimensions);
         if (aspect_ratio > 1.f)
-            offset = radius / sin(radians(float1(yfov * 0.5f)));
+            offset = radius / sin(merian::radians(yfov * 0.5f));
         else
-            offset = radius / sin(radians(float1(xfov * 0.5f)));
+            offset = radius / sin(merian::radians(xfov * 0.5f));
     } else {
         // keep only rotation
         float4x4 view = float4x4::look_at(eye, bb_center, up);
@@ -186,10 +186,10 @@ void Camera::look_at_bounding_box(const float3& box_min, const float3& box_max, 
             if (vct.z < 0) // Take only points in front of the center
             {
                 // Keep the largest offset to see that vertex
-                offset = std::max(abs(vct.y) / tan(radians(float1(yfov * 0.5f))) + abs(vct.z),
-                                  float1(offset));
-                offset = std::max(abs(vct.x) / tan(radians(float1(xfov * 0.5f))) + abs(vct.z),
-                                  float1(offset));
+                offset =
+                    std::max(abs(vct.y) / tan(merian::radians(yfov * 0.5f)) + abs(vct.z), offset);
+                offset =
+                    std::max(abs(vct.x) / tan(merian::radians(xfov * 0.5f)) + abs(vct.z), offset);
             }
         }
     }
