@@ -13,7 +13,7 @@ inline uint32_t uint32_from_rgba(float r, float g, float b, float a) {
 };
 
 inline float yuv_luminance(const float3& color) {
-    return dot(color, float3(0.299, 0.587, 0.114));
+    return merian::dot(color, float3(0.299, 0.587, 0.114));
 }
 
 } // namespace merian

@@ -25,8 +25,6 @@ endif
 global_args = [
     # Vulkan dynamic loader (VULKAN_HPP_DEFAULT_DISPATCHER initialized in Context)
     '-DVULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1',
-    # Vulkan uses [0, 1] for depth instead of [-1, 1] like OpenGL
-    '-DGLM_FORCE_DEPTH_ZERO_TO_ONE',
     # Guides the default optimization of the runtime shader compiler 
     '-DMERIAN_BUILD_OPTIMIZATION=@0@'.format(get_option('optimization')),
 ]
@@ -61,7 +59,7 @@ vulkan = vulkan.partial_dependency(compile_args: true, link_args: true, links: t
 vulkanheaders = subproject('vulkanheaders').get_variable('vulkanheaders_dep')
 glfw = dependency('glfw3', version: ['>=3.4.0'], fallback: ['glfw', 'glfw_dep'])
 subprocess = dependency('subprocess', version: ['>=0.4.0'], fallback: ['subprocess', 'subprocess_dep'])
-glm = dependency('glm', fallback : ['glm', 'glm_dep'], version: ['>=0.9.9.8'])
+glm = dependency('glm', fallback : ['glm', 'glm_dep'], version: ['>=1.0.2'])
 tol = dependency('tinyobjloader', fallback : ['tinyobjloader', 'tinyobjloader_dep'])
 tgltf = dependency('tinygltf', required: get_option('tinygltf'), fallback: ['tinygltf', 'tinygltf_dep'])
 imgui = dependency('imgui', version: ['>=1.90.9'], fallback: ['imgui', 'imgui_dep'], static: true)

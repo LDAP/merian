@@ -41,7 +41,9 @@ void erase_range(std::vector<T>& from, const std::size_t first, const std::size_
 }
 
 // Copies the memory from `from` to the back of `to`. `to` is accordingly resized.
-template <class T> void raw_copy_back(std::vector<T>& to, std::vector<T> const& from) {
+template <class T>
+    requires std::is_trivially_copyable_v<T>
+void raw_copy_back(std::vector<T>& to, std::vector<T> const& from) {
     if (from.empty())
         return;
 

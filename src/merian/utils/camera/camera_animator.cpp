@@ -28,8 +28,8 @@ void CameraAnimator::update(const chrono_clock::time_point now) {
 
     // Interpolate camera start and end position
     // Use bezier to connect the camera positon (eye) for consistent animation
-    float interpolated_fov = lerp(float1(animation_start.get_field_of_view()),
-                                  float1(animation_end.get_field_of_view()), smoothed);
+    float interpolated_fov =
+        lerp(animation_start.get_field_of_view(), animation_end.get_field_of_view(), smoothed);
     float3 interpolated_center =
         lerp(animation_start.get_center(), animation_end.get_center(), smoothed);
     float3 interpolated_up = lerp(animation_start.get_up(), animation_end.get_up(), smoothed);
@@ -73,8 +73,9 @@ void CameraAnimator::calculate_eye_animation_bezier_points() {
     // point of interest
     const float3 pi = (animation_end.get_center() + animation_start.get_center()) * 0.5f;
 
-    const float3 p02 = (p0 + p2) * 0.5f;                             // mid p0-p2
-    const float radius = (length(p0 - pi) + length(p2 - pi)) * 0.5f; // Radius for p1
+    const float3 p02 = (p0 + p2) * 0.5f; // mid p0-p2
+    const float radius =
+        (merian::length(p0 - pi) + merian::length(p2 - pi)) * 0.5f; // Radius for p1
     float3 p02pi(normalize(p02 - pi)); // Vector from interest to mid point
     p02pi *= radius;
     pc = pi + p02pi;                       // Calculated point to go through

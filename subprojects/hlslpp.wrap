@@ -8,4 +8,4 @@ depth = 1
 patch_directory = hlslpp
 
 [provide]
-hlslpp = glslang_dep
+hlslpp = hlslpp_dep

@@ -13,7 +13,7 @@ Camera::Camera(const float3& eye,
                const float aspect_ratio,
                const float near_plane,
                const float far_plane)
-    : eye(eye), center(center), up(normalize(up)), field_of_view(field_of_view),
+    : position(eye), target(center), up(normalize(up)), field_of_view(field_of_view),
       aspect_ratio(aspect_ratio), near_plane(near_plane), far_plane(far_plane) {
 
     assert(field_of_view < 179.99);
@@ -29,16 +29,15 @@ Camera::Camera(const float3& eye,
 
 const float4x4& Camera::get_view_matrix() noexcept {
     if (has_changed(view_change_id, view_change_id_cache)) {
-        view_cache = float4x4::look_at(eye, center, up);
+        view_cache = merian::look_at(position, target, up);
     }
     return view_cache;
 }
 
 const float4x4& Camera::get_projection_matrix() noexcept {
-    // if (has_changed(projection_change_id, projection_change_id_cache)) {
-    //     projection_cache = float4x4::perspective(projection(frustum()))//
-    //     glm::perspective(field_of_view, aspect_ratio, near_plane, far_plane);
-    // }
+    if (has_changed(projection_change_id, projection_change_id_cache)) {
+        projection_cache = merian::perspective(field_of_view, aspect_ratio, near_plane, far_plane);
+    }
     return projection_cache;
 }
 
@@ -59,8 +58,8 @@ uint64_t Camera::get_change_id() const noexcept {
 // -----------------------------------------------------------------------------
 
 void Camera::look_at(const float3& eye, const float3& center, const float3& up) noexcept {
-    this->eye = eye;
-    this->center = center;
+    this->position = eye;
+    this->target = center;
     this->up = normalize(up);
     view_change_id++;
 }
@@ -69,8 +68,8 @@ void Camera::look_at(const float3& eye,
                      const float3& center,
                      const float3& up,
                      const float field_of_view) noexcept {
-    this->eye = eye;
-    this->center = center;
+    this->position = eye;
+    this->target = center;
     this->up = normalize(up);
     this->field_of_view = field_of_view;
     view_change_id++;
@@ -78,12 +77,12 @@ void Camera::look_at(const float3& eye,
 }
 
 void Camera::set_eye(const float3& eye) noexcept {
-    this->eye = eye;
+    this->position = eye;
     view_change_id++;
 }
 
 void Camera::set_center(const float3& center) noexcept {
-    this->center = center;
+    this->target = center;
     view_change_id++;
 }
 
@@ -93,11 +92,11 @@ void Camera::set_up(const float3& up) noexcept {
 }
 
 const float3& Camera::get_eye() const noexcept {
-    return eye;
+    return position;
 }
 
 const float3& Camera::get_center() const noexcept {
-    return center;
+    return target;
 }
 
 const float3& Camera::get_up() const noexcept {
@@ -175,7 +174,7 @@ void Camera::look_at_bounding_box(const float3& box_min, const float3& box_max, 
             offset = radius / sin(merian::radians(xfov * 0.5f));
     } else {
         // keep only rotation
-        float4x4 view = float4x4::look_at(eye, bb_center, up);
+        float4x4 view = merian::look_at(position, bb_center, up);
 
         for (int i = 0; i < 8; i++) {
             float4 vct(i & 1 ? bb_half_dimensions.x : -bb_half_dimensions.x,
@@ -186,15 +185,17 @@ void Camera::look_at_bounding_box(const float3& box_min, const float3& box_max, 
             if (vct.z < 0) // Take only points in front of the center
             {
                 // Keep the largest offset to see that vertex
-                offset =
-                    std::max(abs(vct.y) / tan(merian::radians(yfov * 0.5f)) + abs(vct.z), offset);
-                offset =
-                    std::max(abs(vct.x) / tan(merian::radians(xfov * 0.5f)) + abs(vct.z), offset);
+                offset = std::max(std::abs(vct.y) / std::tan(merian::radians(yfov * 0.5f)) +
+                                      std::abs(vct.z),
+                                  offset);
+                offset = std::max(std::abs(vct.x) / std::tan(merian::radians(xfov * 0.5f)) +
+                                      std::abs(vct.z),
+                                  offset);
             }
         }
     }
 
-    auto view_direction = normalize(eye - center);
+    auto view_direction = normalize(position - target);
     auto new_eye = bb_center + view_direction * offset;
 
     // updates all matrices and change id
@@ -202,11 +203,11 @@ void Camera::look_at_bounding_box(const float3& box_min, const float3& box_max, 
 }
 
 void Camera::move(const float dx, const float dup, const float dz) {
-    eye += dup * up;
-    center += dup * up;
+    position += dup * up;
+    target += dup * up;
 
-    float3 z = eye - center;
-    if (length(z) < float1(1e-5))
+    float3 z = position - target;
+    if (merian::length(z) < 1e-5)
         return;
     z = normalize(z);
 
@@ -214,15 +215,15 @@ void Camera::move(const float dx, const float dup, const float dz) {
     const float3 in = normalize(cross(x, up));
 
     const float3 d = dx * x + dz * in;
-    eye += d;
-    center += d;
+    position += d;
+    target += d;
 
     view_change_id++;
 }
 
 void Camera::fly(const float dx, const float dy, const float dz) {
-    float3 z = eye - center;
-    if (length(z) < float1(1e-5))
+    float3 z = position - target;
+    if (merian::length(z) < 1e-5)
         return;
     z = normalize(z);
 
@@ -230,21 +231,21 @@ void Camera::fly(const float dx, const float dy, const float dz) {
     const float3 y = normalize(cross(z, x));
 
     const float3 d = dx * x + dy * y + dz * z;
-    eye += d;
-    center += d;
+    position += d;
+    target += d;
 
     view_change_id++;
 }
 
 void Camera::rotate(const float d_phi, const float d_theta) {
-    rotate_around(center, eye, up, d_phi, d_theta);
+    rotate_around(target, position, up, d_phi, d_theta);
     view_change_id++;
 }
 
 // Orbit around the "center" horizontally (phi) or vertically (theta).
 //  * pi equals a full turn.
 void Camera::orbit(const float d_phi, const float d_theta) {
-    rotate_around(eye, center, up, d_phi, d_theta);
+    rotate_around(position, target, up, d_phi, d_theta);
     view_change_id++;
 }
 

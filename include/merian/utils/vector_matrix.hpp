@@ -2,6 +2,7 @@
 
 #include "glm/glm.hpp"
 #include "glm/gtc/type_ptr.hpp"
+#include <fmt/ranges.h>
 
 namespace merian {
 
@@ -50,91 +51,166 @@ using float4x2 = glm::mat<4, 2, glm::f32, glm::defaultp>;
 using float4x3 = glm::mat<4, 3, glm::f32, glm::defaultp>;
 using float4x4 = glm::mat<4, 4, glm::f32, glm::defaultp>;
 
+template <typename T>
+concept Numeric = std::is_arithmetic_v<std::remove_cvref_t<T>>;
+
+// 2. GLM vector or matrix types
+template <typename T>
+concept GlmType = requires {
+    typename std::remove_cvref_t<T>::value_type;
+    // These members are present in glm::vec*, glm::mat* etc.
+    glm::length_t(std::remove_cvref_t<T>::length());
+};
+
+// 3. Unified concept for allowed types
+template <typename T>
+concept NumericOrGlm = Numeric<T> || GlmType<T>;
+
 #define FUNCTION_ALIAS(ALIAS, FUNC)                                                                \
     template <typename... Args>                                                                    \
+        requires((NumericOrGlm<Args>) && ...)                                                      \
     auto ALIAS(Args&&... args) -> decltype(FUNC(std::forward<Args>(args)...)) {                    \
         return FUNC(std::forward<Args>(args)...);                                                  \
     }
 
 FUNCTION_ALIAS(mul, glm::operator*)
 
-FUNCTION_ALIAS(normalize, glm::normalize)
+using glm::normalize;
 
 FUNCTION_ALIAS(lerp, glm::mix)
 
-FUNCTION_ALIAS(dot, glm::dot)
+using glm::dot;
 
-FUNCTION_ALIAS(cross, glm::cross)
+using glm::cross;
 
-FUNCTION_ALIAS(length, glm::length)
+using glm::length;
 
-FUNCTION_ALIAS(distance, glm::distance)
+using glm::distance;
 
-FUNCTION_ALIAS(inverse, glm::inverse)
+using glm::inverse;
 
-FUNCTION_ALIAS(transpose, glm::transpose)
+using glm::transpose;
 
-FUNCTION_ALIAS(acos, glm::acos)
+using glm::acos;
 
-FUNCTION_ALIAS(max, glm::max)
+using glm::max;
 
-FUNCTION_ALIAS(min, glm::min)
+using glm::min;
 
-FUNCTION_ALIAS(radians, glm::radians)
+using glm::radians;
 
-FUNCTION_ALIAS(any, glm::any)
+using glm::any;
 
-FUNCTION_ALIAS(value_ptr, glm::value_ptr)
+using glm::value_ptr;
 
-inline const float1& as_float1(const float f[1]) {
+template <typename genType = merian::float4x4>
+    requires((NumericOrGlm<genType>))
+genType identity() {
+    return glm::identity<genType>();
+}
+
+inline float4x4 look_at(const float3& position, const float3& target, const float3& up) {
+    return glm::lookAt(position, target, up);
+}
+
+inline float4x4 rotation(const float3& axis, const float angle) {
+    return glm::rotate(identity<float4x4>(), angle, axis);
+}
+
+inline float4x4 translation(const float3& translation) {
+    return glm::translate(identity<float4x4>(), translation);
+}
+
+inline float4x4 scale(const float3& scale) {
+    return glm::scale(identity<float4x4>(), scale);
+}
+
+inline float4x4
+perspective(const float fovy, const float aspect, const float near, const float far) {
+    return glm::perspective(fovy, aspect, near, far);
+}
+
+inline float1 as_float1(const float f[1]) {
     static_assert(sizeof(float1) == sizeof(float));
-    return *reinterpret_cast<const float1*>(f);
+    float1 v;
+    memcpy(&v.x, f, sizeof(float1));
+    return v;
 }
-inline const float2& as_float2(const float f[2]) {
+inline float2 as_float2(const float f[2]) {
     static_assert(sizeof(float2) == 2 * sizeof(float));
-    return *reinterpret_cast<const float2*>(f);
+    float2 v;
+    memcpy(&v.x, f, sizeof(float2));
+    return v;
 }
-inline const float3& as_float3(const float f[3]) {
+inline float3 as_float3(const float f[3]) {
     static_assert(sizeof(float3) == 3 * sizeof(float));
-    return *reinterpret_cast<const float3*>(f);
+    float3 v;
+    memcpy(&v.x, f, sizeof(float3));
+    return v;
 }
-inline const float4& as_float4(const float f[4]) {
+inline float4 as_float4(const float f[4]) {
     static_assert(sizeof(float4) == 4 * sizeof(float));
-    return *reinterpret_cast<const float4*>(f);
+    float4 v;
+    memcpy(&v.x, f, sizeof(float4));
+    return v;
 }
 
-inline const int1& as_int1(const int32_t f[1]) {
+inline int1 as_int1(const int32_t f[1]) {
     static_assert(sizeof(int1) == sizeof(int32_t));
-    return *reinterpret_cast<const int1*>(f);
+    int1 v;
+    memcpy(&v.x, f, sizeof(int1));
+    return v;
 }
-inline const int2& as_int2(const int32_t f[2]) {
+inline int2 as_int2(const int32_t f[2]) {
     static_assert(sizeof(int2) == 2 * sizeof(int32_t));
-    return *reinterpret_cast<const int2*>(f);
+    int2 v;
+    memcpy(&v.x, f, sizeof(int2));
+    return v;
 }
-inline const int3& as_int3(const int32_t f[3]) {
+inline int3 as_int3(const int32_t f[3]) {
     static_assert(sizeof(int3) == 3 * sizeof(int32_t));
-    return *reinterpret_cast<const int3*>(f);
+    int3 v;
+    memcpy(&v.x, f, sizeof(int3));
+    return v;
 }
-inline const int4& as_int4(const int32_t f[4]) {
+inline int4 as_int4(const int32_t f[4]) {
     static_assert(sizeof(int4) == 4 * sizeof(int32_t));
-    return *reinterpret_cast<const int4*>(f);
+    int4 v;
+    memcpy(&v.x, f, sizeof(int4));
+    return v;
 }
 
-inline const uint1& as_int1(const uint32_t f[1]) {
+inline uint1 as_int1(const uint32_t f[1]) {
     static_assert(sizeof(uint1) == sizeof(uint32_t));
-    return *reinterpret_cast<const uint1*>(f);
+    uint1 v;
+    memcpy(&v.x, f, sizeof(uint1));
+    return v;
 }
-inline const uint2& as_int2(const uint32_t f[2]) {
+inline uint2 as_int2(const uint32_t f[2]) {
     static_assert(sizeof(uint2) == 2 * sizeof(uint32_t));
-    return *reinterpret_cast<const uint2*>(f);
+    uint2 v;
+    memcpy(&v.x, f, sizeof(uint2));
+    return v;
 }
-inline const uint3& as_int3(const uint32_t f[3]) {
+inline uint3 as_int3(const uint32_t f[3]) {
     static_assert(sizeof(uint3) == 3 * sizeof(uint32_t));
-    return *reinterpret_cast<const uint3*>(f);
+    uint3 v;
+    memcpy(&v.x, f, sizeof(uint3));
+    return v;
 }
-inline const uint4& as_int4(const uint32_t f[4]) {
+inline uint4 as_int4(const uint32_t f[4]) {
     static_assert(sizeof(uint4) == 4 * sizeof(uint32_t));
-    return *reinterpret_cast<const uint4*>(f);
+    uint4 v;
+    memcpy(&v.x, f, sizeof(uint4));
+    return v;
 }
 
 } // namespace merian
+
+namespace glm {
+
+template <int L, typename T, glm::qualifier Q> inline auto format_as(const glm::vec<L, T, Q>& v) {
+    return fmt::format("({})", fmt::join(&v[0], &v[0] + L, ", "));
+}
+
+} // namespace glm

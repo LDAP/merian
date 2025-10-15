@@ -217,15 +217,15 @@ inline void rotate_around(float3& pos,
     const float3 normalized_origin_to_pos = normalize(origin_to_pos);
 
     // left-right, around axis up
-    const float3x3 rot_phi = float3x3::rotation_axis(up, -d_phi);
+    const float3x3 rot_phi = merian::rotation(up, -d_phi);
 
     // up-down, around axis x
     const float3 x = normalize(cross(up, normalized_origin_to_pos));
-    const float3x3 rot_theta = float3x3::rotation_axis(x, -d_theta);
+    const float3x3 rot_theta = merian::rotation(x, -d_theta);
 
     float3 rotated = mul(rot_theta, float3(origin_to_pos));
 
-    if (dot(x, cross(up, rotated)).x <= 0.f) {
+    if (merian::dot(x, merian::cross(up, rotated)) <= 0.f) {
         // only rotate left-right
         rotated = normalize(mul(rot_phi, float3(origin_to_pos)));
     } else {
