@@ -52,19 +52,14 @@ using float4x3 = glm::mat<4, 3, glm::f32, glm::defaultp>;
 using float4x4 = glm::mat<4, 4, glm::f32, glm::defaultp>;
 
 template <typename T>
-concept Numeric = std::is_arithmetic_v<std::remove_cvref_t<T>>;
-
-// 2. GLM vector or matrix types
-template <typename T>
 concept GlmType = requires {
     typename std::remove_cvref_t<T>::value_type;
     // These members are present in glm::vec*, glm::mat* etc.
     glm::length_t(std::remove_cvref_t<T>::length());
 };
 
-// 3. Unified concept for allowed types
 template <typename T>
-concept NumericOrGlm = Numeric<T> || GlmType<T>;
+concept NumericOrGlm = std::is_arithmetic_v<std::remove_cvref_t<T>> || GlmType<T>;
 
 #define FUNCTION_ALIAS(ALIAS, FUNC)                                                                \
     template <typename... Args>                                                                    \
@@ -209,8 +204,21 @@ inline uint4 as_int4(const uint32_t f[4]) {
 
 namespace glm {
 
-template <int L, typename T, glm::qualifier Q> inline auto format_as(const glm::vec<L, T, Q>& v) {
+template <glm::length_t L, typename T, glm::qualifier Q>
+inline auto format_as(const glm::vec<L, T, Q>& v) {
     return fmt::format("({})", fmt::join(&v[0], &v[0] + L, ", "));
+}
+
+template <glm::length_t C, glm::length_t R, typename T, glm::qualifier Q>
+inline auto format_as(const glm::mat<C, R, T, Q>& m) {
+    const auto transposed = merian::transpose(m);
+
+    std::array<std::string, C> columns{};
+    for (glm::length_t c = 0; c < C; ++c) {
+        columns[c] = fmt::format("{}", transposed[c]);
+    }
+
+    return fmt::format("({})", fmt::join(columns, ",\n "));
 }
 
 } // namespace glm
