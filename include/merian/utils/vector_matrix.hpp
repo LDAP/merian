@@ -6,7 +6,7 @@
 
 namespace merian {
 
-// vectors
+// VECTORS
 
 using float1 = glm::vec1;
 using float2 = glm::vec2;
@@ -29,27 +29,32 @@ using uint4 = glm::uvec4;
 // using half3 = glm::vec<3, std::float16_t, defaultp>;
 // using half4 = glm::vec<4, std::float16_t, defaultp>;
 
-// matrices
+// MATRICES (rows x columns)
 
-using float1x1 = glm::mat<1, 1, glm::f32, glm::defaultp>;
-using float1x2 = glm::mat<1, 2, glm::f32, glm::defaultp>;
-using float1x3 = glm::mat<1, 3, glm::f32, glm::defaultp>;
-using float1x4 = glm::mat<1, 4, glm::f32, glm::defaultp>;
+// IMPORTANT: glm uses column-major. However we interpret their columns as rows! So we say merian is
+// row-major. That also means when the glm construtor says column 1,.. its actually row 1,.. .
 
-using float2x1 = glm::mat<2, 1, glm::f32, glm::defaultp>;
-using float2x2 = glm::mat<2, 2, glm::f32, glm::defaultp>;
-using float2x3 = glm::mat<2, 3, glm::f32, glm::defaultp>;
-using float2x4 = glm::mat<2, 4, glm::f32, glm::defaultp>;
+template <int ROWS, int COLUMS> using floatRxC = glm::mat<ROWS, COLUMS, glm::f32, glm::defaultp>;
 
-using float3x1 = glm::mat<3, 1, glm::f32, glm::defaultp>;
-using float3x2 = glm::mat<3, 2, glm::f32, glm::defaultp>;
-using float3x3 = glm::mat<3, 3, glm::f32, glm::defaultp>;
-using float3x4 = glm::mat<3, 4, glm::f32, glm::defaultp>;
+using float1x1 = float1;
+using float1x2 = floatRxC<1, 2>;
+using float1x3 = floatRxC<1, 3>;
+using float1x4 = floatRxC<1, 4>;
 
-using float4x1 = glm::mat<4, 1, glm::f32, glm::defaultp>;
-using float4x2 = glm::mat<4, 2, glm::f32, glm::defaultp>;
-using float4x3 = glm::mat<4, 3, glm::f32, glm::defaultp>;
-using float4x4 = glm::mat<4, 4, glm::f32, glm::defaultp>;
+using float2x1 = float2;
+using float2x2 = floatRxC<2, 2>;
+using float2x3 = floatRxC<2, 3>;
+using float2x4 = floatRxC<2, 4>;
+
+using float3x1 = float3;
+using float3x2 = floatRxC<3, 2>;
+using float3x3 = floatRxC<3, 3>;
+using float3x4 = floatRxC<3, 4>;
+
+using float4x1 = float4;
+using float4x2 = floatRxC<4, 2>;
+using float4x3 = floatRxC<4, 3>;
+using float4x4 = floatRxC<4, 4>;
 
 template <typename T>
 concept GlmType = requires {
@@ -67,6 +72,11 @@ concept NumericOrGlm = std::is_arithmetic_v<std::remove_cvref_t<T>> || GlmType<T
     auto ALIAS(Args&&... args) -> decltype(FUNC(std::forward<Args>(args)...)) {                    \
         return FUNC(std::forward<Args>(args)...);                                                  \
     }
+
+template <int R, int C, int D>
+floatRxC<R, D> mul1(const floatRxC<R, C>& m1, const floatRxC<C, D>& m2) {
+    return m2 * m1;
+}
 
 FUNCTION_ALIAS(mul, glm::operator*)
 
@@ -209,16 +219,15 @@ inline auto format_as(const glm::vec<L, T, Q>& v) {
     return fmt::format("({})", fmt::join(&v[0], &v[0] + L, ", "));
 }
 
-template <glm::length_t C, glm::length_t R, typename T, glm::qualifier Q>
-inline auto format_as(const glm::mat<C, R, T, Q>& m) {
-    const auto transposed = merian::transpose(m);
-
-    std::array<std::string, C> columns{};
-    for (glm::length_t c = 0; c < C; ++c) {
-        columns[c] = fmt::format("{}", transposed[c]);
+// see above: rows and colums are switched
+template <glm::length_t R, glm::length_t C, typename T, glm::qualifier Q>
+inline auto format_as(const glm::mat<R, C, T, Q>& m) {
+    std::array<std::string, R> rows{};
+    for (glm::length_t r = 0; r < R; ++r) {
+        rows[r] = fmt::format("{}", m[r]);
     }
 
-    return fmt::format("({})", fmt::join(columns, ",\n "));
+    return fmt::format("({})", fmt::join(rows, ",\n "));
 }
 
 } // namespace glm
