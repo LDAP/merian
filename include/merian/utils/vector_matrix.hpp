@@ -8,20 +8,22 @@ namespace merian {
 
 // VECTORS
 
-using float1 = glm::vec1;
-using float2 = glm::vec2;
-using float3 = glm::vec3;
-using float4 = glm::vec4;
+template <int L, typename T> using vec = glm::vec<L, T, glm::defaultp>;
 
-using int1 = glm::ivec1;
-using int2 = glm::ivec2;
-using int3 = glm::ivec3;
-using int4 = glm::ivec4;
+using float1 = vec<1, float>;
+using float2 = vec<2, float>;
+using float3 = vec<3, float>;
+using float4 = vec<4, float>;
 
-using uint1 = glm::uvec1;
-using uint2 = glm::uvec2;
-using uint3 = glm::uvec3;
-using uint4 = glm::uvec4;
+using int1 = vec<1, std::int32_t>;
+using int2 = vec<2, std::int32_t>;
+using int3 = vec<3, std::int32_t>;
+using int4 = vec<4, std::int32_t>;
+
+using uint1 = vec<1, std::uint32_t>;
+using uint2 = vec<2, std::uint32_t>;
+using uint3 = vec<3, std::uint32_t>;
+using uint4 = vec<4, std::uint32_t>;
 
 // using half = std::float16_t;
 // using half1 = glm::vec<1, std::float16_t, defaultp>;
@@ -34,12 +36,13 @@ using uint4 = glm::uvec4;
 // IMPORTANT: glm uses column-major. However we interpret their columns as rows! So we say merian is
 // row-major. That also means when the glm construtor says column 1,.. its actually row 1,.. .
 
-template <int ROWS, int COLUMS> using floatRxC = glm::mat<ROWS, COLUMS, glm::f32, glm::defaultp>;
+template <int ROWS, int COLUMS, typename T> using matRxC = glm::mat<ROWS, COLUMS, T, glm::defaultp>;
+template <int ROWS, int COLUMS> using floatRxC = matRxC<ROWS, COLUMS, float>;
 
 using float1x1 = float1;
-using float1x2 = floatRxC<1, 2>;
-using float1x3 = floatRxC<1, 3>;
-using float1x4 = floatRxC<1, 4>;
+using float1x2 = float2;
+using float1x3 = float3;
+using float1x4 = float4;
 
 using float2x1 = float2;
 using float2x2 = floatRxC<2, 2>;
@@ -73,12 +76,21 @@ concept NumericOrGlm = std::is_arithmetic_v<std::remove_cvref_t<T>> || GlmType<T
         return FUNC(std::forward<Args>(args)...);                                                  \
     }
 
-template <int R, int C, int D>
-floatRxC<R, D> mul1(const floatRxC<R, C>& m1, const floatRxC<C, D>& m2) {
+template <int R, int C, int D, typename T>
+matRxC<R, D, T> mul(const matRxC<R, C, T>& m1, const matRxC<C, D, T>& m2) {
+    // see above: glm is column-major so we need to adapt the operations to our row-major view.
     return m2 * m1;
 }
 
-FUNCTION_ALIAS(mul, glm::operator*)
+template <int R, int C, typename T> vec<R, T> mul(const matRxC<R, C, T>& m, const vec<C, T>& v) {
+    // see above: glm is column-major so we need to adapt the operations to our row-major view.
+    return v * m;
+}
+
+template <int R, int C, typename T> vec<C, T> mul(const vec<R, T>& v, const matRxC<R, C, T>& m) {
+    // see above: glm is column-major so we need to adapt the operations to our row-major view.
+    return m * v;
+}
 
 using glm::normalize;
 
@@ -114,25 +126,46 @@ genType identity() {
     return glm::identity<genType>();
 }
 
-inline float4x4 look_at(const float3& position, const float3& target, const float3& up) {
-    return glm::lookAt(position, target, up);
-}
-
 inline float4x4 rotation(const float3& axis, const float angle) {
-    return glm::rotate(identity<float4x4>(), angle, axis);
+    const float a = angle;
+    const float c = std::cos(a);
+    const float s = std::sin(a);
+
+    float3 n_axis(normalize(axis));
+    float3 temp((1.f - c) * n_axis);
+
+    float4x4 rot = identity();
+    rot[0][0] = c + (temp[0] * n_axis[0]);
+    rot[0][1] = (temp[1] * n_axis[0]) - (s * n_axis[2]);
+    rot[0][2] = (temp[2] * n_axis[0]) + (s * n_axis[1]);
+    rot[1][0] = (temp[0] * n_axis[1]) + (s * n_axis[2]);
+    rot[1][1] = c + (temp[1] * n_axis[1]);
+    rot[1][2] = (temp[2] * n_axis[1]) - (s * n_axis[0]);
+    rot[2][0] = (temp[0] * n_axis[2]) - (s * n_axis[1]);
+    rot[2][1] = (temp[1] * n_axis[2]) + (s * n_axis[0]);
+    rot[2][2] = c + (temp[2] * n_axis[2]);
+    return rot;
 }
 
 inline float4x4 translation(const float3& translation) {
-    return glm::translate(identity<float4x4>(), translation);
+    float4x4 m = identity();
+    m[0][3] = translation[0];
+    m[1][3] = translation[1];
+    m[2][3] = translation[2];
+    return m;
 }
 
 inline float4x4 scale(const float3& scale) {
     return glm::scale(identity<float4x4>(), scale);
 }
 
+inline float4x4 look_at(const float3& position, const float3& target, const float3& up) {
+    return glm::transpose(glm::lookAt(position, target, up));
+}
+
 inline float4x4
 perspective(const float fovy, const float aspect, const float near, const float far) {
-    return glm::perspective(fovy, aspect, near, far);
+    return glm::transpose(glm::perspective(fovy, aspect, near, far));
 }
 
 inline float1 as_float1(const float f[1]) {
@@ -231,3 +264,24 @@ inline auto format_as(const glm::mat<R, C, T, Q>& m) {
 }
 
 } // namespace glm
+
+namespace {
+template <int R1, int C1, int R2, int C2, typename T>
+inline auto operator*(const merian::matRxC<R1, C1, T>& m1, const merian::matRxC<R2, C2, T>& m2) {
+    static_assert(false, "use merian::mul(..) instead!");
+    return m1 * m2;
+}
+
+template <int R, int C, int L, typename T>
+inline merian::vec<R, T> operator*(const merian::matRxC<R, C, T>& m, const merian::vec<L, T>& v) {
+    static_assert(false, "use merian::mul(..) instead!");
+    return m * v;
+}
+
+template <int R, int C, int L, typename T>
+inline merian::vec<C, T> operator*(const merian::vec<L, T>& v, const merian::matRxC<R, C, T>& m) {
+    static_assert(false, "use merian::mul(..) instead!");
+    return v * m;
+}
+
+} // namespace
