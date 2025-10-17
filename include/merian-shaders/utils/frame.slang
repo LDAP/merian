@@ -4,7 +4,7 @@ namespace merian {
 
 // Returns a matrix of axis (tangent, bitangent, z) which all being perpendicular to each other
 // Follows Building an Orthonormal Basis, Revisited, Duff et al. 2017.
-// 
+//
 // The basis vectors are in the rows!
 float3x3 make_frame(const float3 z) {
     const float _sign = (z.z >= 0) ? 1 : -1;
@@ -34,7 +34,7 @@ float3x3 make_frame_naive(const float3 z) {
 }
 
 // needs orthonormal frame
-float3 world_to_frame(const float3x3 frame, const float3 v) {
+float3 world_to_local(const float3x3 frame, const float3 v) {
     return float3(dot(frame[0], v), dot(frame[1], v), dot(frame[2], v));
 }
 
@@ -42,23 +42,69 @@ float3 frame_to_world(const float3x3 frame, const float3 v) {
     return mul(v, frame);
 }
 
-struct Frame {
+interface Frame {
+    float3 to_local(const float3 v);
+
+    float3 to_world(const float3 v);
+
+    float3 get_tangent();
+
+    float3 get_bitangent();
+
+    float3 get_normal();
+}
+
+struct IdentityFrame : Frame {
+    float3 to_local(const float3 v) {
+        return v;
+    }
+
+    float3 to_world(const float3 v) {
+        return v;
+    }
+
+    float3 get_tangent() {
+        return float3(1, 0, 0);
+    }
+
+    float3 get_bitangent() {
+        return float3(0, 1, 0);
+    }
+
+    float3 get_normal() {
+        return float3(0, 0, 1);
+    }
+}
+
+struct OrthonormalFrame : Frame {
     // a orthonormal basis
     // row 0: normalized shading tangent
     // row 1: normalized shading bitangent
     // row 2: normalized shading normal
-    float3x3 basis; 
+    float3x3 basis;
 
     __init(const float3 n) {
         basis = make_frame(n);
     }
 
-    float3 to_frame(const float3 v) {
-        return world_to_frame(basis, v);
+    float3 to_local(const float3 v) {
+        return world_to_local(basis, v);
     }
 
     float3 to_world(const float3 v) {
         return frame_to_world(basis, v);
+    }
+
+    float3 get_tangent() {
+        return basis[0];
+    }
+
+    float3 get_bitangent() {
+        return basis[1];
+    }
+
+    float3 get_normal() {
+        return basis[2];
     }
 }
 

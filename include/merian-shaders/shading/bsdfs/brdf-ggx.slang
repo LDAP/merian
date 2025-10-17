@@ -2,14 +2,9 @@
 
 #include "merian-shaders/utils/math-constants.slangh"
 
-import "merian-shaders/bsdfs/bsdf.slang";
-import "merian-shaders/utils/math.slang";
-import "merian-shaders/utils/fresnel.slang";
-
-[shader("compute")]
-void dummyMain() {
-    return;
-}
+import bsdf;
+import merian_shaders.utils.math;
+import merian_shaders.utils.fresnel;
 
 namespace merian {
 

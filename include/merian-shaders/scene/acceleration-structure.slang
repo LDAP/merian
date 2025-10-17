@@ -25,11 +25,11 @@ interface IRayQuery {
 }
 
 interface AccelerationStructure {
-    associatedtype RQ : IRayQuery;
+    associatedtype RayQueryImpl : IRayQuery;
 
-    RQ trace_ray(const RayDesc ray,
-                 const uint ray_flags = RAY_FLAG_NONE,
-                 const uint instances_mask = 0xff);
+    RayQueryImpl trace_ray(const RayDesc ray,
+                           const uint ray_flags = RAY_FLAG_NONE,
+                           const uint instances_mask = 0xff);
 }
 
 // ---------------------------------------
@@ -42,11 +42,11 @@ struct HWAccelerationStructure : AccelerationStructure {
 
     // -----------------------------------------
 
-    typedef RayQuery RQ;
+    typealias RayQueryImpl = RayQuery;
 
-    RQ trace_ray(const RayDesc ray,
-                 const uint ray_flags = RAY_FLAG_NONE,
-                 const uint instances_mask = 0xff) {
+    RayQueryImpl trace_ray(const RayDesc ray,
+                           const uint ray_flags = RAY_FLAG_NONE,
+                           const uint instances_mask = 0xff) {
         RayQuery rq;
         rq.TraceRayInline(as, ray_flags, instances_mask, ray);
         return rq;

@@ -2,6 +2,22 @@
 
 namespace merian {
 
+uint texture_dimensions<T : ITexelElement, int sampleCount, int access, int isCombined, int format>(
+    const _Texture<T, __Shape1D, 0, 0, sampleCount, access, 0, isCombined, format> tex,
+    const int level) {
+    uint dim;
+    uint dummy;
+    tex.GetDimensions(level, dim, dummy);
+    return dim;
+}
+
+uint texture_dimensions<T : ITexelElement, int sampleCount, int access, int isCombined, int format>(
+    const _Texture<T, __Shape1D, 0, 0, sampleCount, access, 0, isCombined, format> tex) {
+    uint dim;
+    tex.GetDimensions(dim);
+    return dim;
+}
+
 uint2 texture_dimensions<T : ITexelElement,
                          int sampleCount,
                          int access,
@@ -23,6 +39,30 @@ uint2 texture_dimensions<T : ITexelElement,
     const _Texture<T, __Shape2D, 0, 0, sampleCount, access, 0, isCombined, format> tex) {
     uint2 dims;
     tex.GetDimensions(dims.x, dims.y);
+    return dims;
+}
+
+uint3 texture_dimensions<T : ITexelElement,
+                         int sampleCount,
+                         int access,
+                         int isCombined,
+                         int format>(
+    const _Texture<T, __Shape3D, 0, 0, sampleCount, access, 0, isCombined, format> tex,
+    const int level) {
+    uint3 dims;
+    uint dummy;
+    tex.GetDimensions(level, dims.x, dims.y, dims.z, dummy);
+    return dims;
+}
+
+uint3 texture_dimensions<T : ITexelElement,
+                         int sampleCount,
+                         int access,
+                         int isCombined,
+                         int format>(
+    const _Texture<T, __Shape3D, 0, 0, sampleCount, access, 0, isCombined, format> tex) {
+    uint3 dims;
+    tex.GetDimensions(dims.x, dims.y, dims.z);
     return dims;
 }
 
@@ -137,9 +177,9 @@ T texelFetchClamp<T : ITexelElement, int sampleCount, int isCombined, int format
 //
 // Reason:
 // When reprojecting the current pixel, we need to realize that the velocity texture, unlike the
-// history color buffer, is aliased. If we’re not careful we could be reintroducing edge aliasing
+// history color buffer, is aliased. If we're not careful we could be reintroducing edge aliasing
 // indirectly. To better account for the edges, a typical solution is to dilate the aliased
-// information. We’ll use velocity as an example but you can do this with depth and stencil. There
+// information. We'll use velocity as an example but you can do this with depth and stencil. There
 // are a couple of ways I know of doing it:
 //
 // - (here:) Magnitude Dilation: take the velocity with the largest magnitude in a neighborhood
@@ -150,7 +190,7 @@ float2 sample_motion_vector<int sampleCount, int isCombined, int format>(
     int2 center_pixel,
     int radius) {
     // find longest motion vector, transform into texture space
-    // access pixes position of the current fragment with ivec2(gl_FragCoord.xy)
+    // access pixel position of the current fragment with ivec2(gl_FragCoord.xy)
 
     float2 longest = float2(0.0f);
     for (int j = -radius; j <= radius; j++) {
@@ -181,4 +221,171 @@ int2 texturewrap_mirror_repeat(int2 ipos, int2 tex_size) {
     return tex_size - 1 - mirror(ipos % (tex_size * 2) - tex_size);
 }
 
+}
+
+interface LODSampler {
+
+    // LOD Sample method for a combined image sampler (SamplerXD).
+    [ForceInline]
+    T sample<T : ITexelElement,
+             Shape : __ITextureShape,
+             int isArray,
+             int isMS,
+             int sampleCount,
+             int isShadow,
+             int format>(
+        const _Texture<T, Shape, isArray, isMS, sampleCount, 0, isShadow, 1, format> tex,
+        const vector<float, Shape.dimensions + isArray> location);
+
+    // LOD Sample method for a texture and sampler.
+    [ForceInline]
+    T sample<T : ITexelElement,
+             Shape : __ITextureShape,
+             int isArray,
+             int isMS,
+             int sampleCount,
+             int isShadow,
+             int format>(
+        const _Texture<T, Shape, isArray, isMS, sampleCount, 0, isShadow, 0, format> tex,
+        const SamplerState s,
+        const vector<float, Shape.dimensions + isArray> location);
+}
+
+// Uses the textures ::Sample(...) method. LOD is computed using screen space derivatives, in OpenGL
+// terms this is called implicit LOD calculation.
+struct ImplicitLODSampler : LODSampler {
+
+    [ForceInline]
+    T sample<T : ITexelElement,
+             Shape : __ITextureShape,
+             int isArray,
+             int isMS,
+             int sampleCount,
+             int isShadow,
+             int format>(
+        const _Texture<T, Shape, isArray, isMS, sampleCount, 0, isShadow, 1, format> tex,
+        const vector<float, Shape.dimensions + isArray> location) {
+        return tex.Sample(location);
+    }
+
+    [ForceInline]
+    T sample<T : ITexelElement,
+             Shape : __ITextureShape,
+             int isArray,
+             int isMS,
+             int sampleCount,
+             int isShadow,
+             int format>(
+        const _Texture<T, Shape, isArray, isMS, sampleCount, 0, isShadow, 0, format> tex,
+        const SamplerState s,
+        const vector<float, Shape.dimensions + isArray> location) {
+        return tex.Sample(s, location);
+    }
+}
+
+typealias DefaultLODSampler = ImplicitLODSampler;
+
+// Uses the textures ::SampleLod(...) method. In OpenGL terms this is called explicit LOD.
+struct ExplicitLODSampler : LODSampler {
+    float lod;
+
+    __init(const float lod) {
+        this.lod = lod;
+    }
+
+    [ForceInline]
+    T sample<T : ITexelElement,
+             Shape : __ITextureShape,
+             int isArray,
+             int isMS,
+             int sampleCount,
+             int isShadow,
+             int format>(
+        const _Texture<T, Shape, isArray, isMS, sampleCount, 0, isShadow, 1, format> tex,
+        const vector<float, Shape.dimensions + isArray> location) {
+        return tex.SampleLevel(location, lod);
+    }
+
+    [ForceInline]
+    T sample<T : ITexelElement,
+             Shape : __ITextureShape,
+             int isArray,
+             int isMS,
+             int sampleCount,
+             int isShadow,
+             int format>(
+        const _Texture<T, Shape, isArray, isMS, sampleCount, 0, isShadow, 0, format> tex,
+        const SamplerState s,
+        const vector<float, Shape.dimensions + isArray> location) {
+        return tex.SampleLevel(s, location, lod);
+    }
+}
+
+// Uses the textures ::SampleLod(...) method to always sample LOD 0.
+struct LOD0Sampler : LODSampler {
+
+    [ForceInline]
+    T sample<T : ITexelElement,
+             Shape : __ITextureShape,
+             int isArray,
+             int isMS,
+             int sampleCount,
+             int isShadow,
+             int format>(
+        const _Texture<T, Shape, isArray, isMS, sampleCount, 0, isShadow, 1, format> tex,
+        const vector<float, Shape.dimensions + isArray> location) {
+        return tex.SampleLevel(location, 0);
+    }
+
+    [ForceInline]
+    T sample<T : ITexelElement,
+             Shape : __ITextureShape,
+             int isArray,
+             int isMS,
+             int sampleCount,
+             int isShadow,
+             int format>(
+        const _Texture<T, Shape, isArray, isMS, sampleCount, 0, isShadow, 0, format> tex,
+        const SamplerState s,
+        const vector<float, Shape.dimensions + isArray> location) {
+        return tex.SampleLevel(s, location, 0);
+    }
+}
+
+// Uses the textures ::SampleGrad(...) method to sample a LOD using explicit gradients.
+struct GradLODSampler : LODSampler {
+    float grad_x;
+    float grad_y;
+
+    __init(float grad_x, float grad_y) {
+        this.grad_x = grad_x;
+        this.grad_y = grad_y;
+    }
+
+    [ForceInline]
+    T sample<T : ITexelElement,
+             Shape : __ITextureShape,
+             int isArray,
+             int isMS,
+             int sampleCount,
+             int isShadow,
+             int format>(
+        const _Texture<T, Shape, isArray, isMS, sampleCount, 0, isShadow, 1, format> tex,
+        const vector<float, Shape.dimensions + isArray> location) {
+        return tex.SampleGrad(location, grad_x, grad_y);
+    }
+
+    [ForceInline]
+    T sample<T : ITexelElement,
+             Shape : __ITextureShape,
+             int isArray,
+             int isMS,
+             int sampleCount,
+             int isShadow,
+             int format>(
+        const _Texture<T, Shape, isArray, isMS, sampleCount, 0, isShadow, 0, format> tex,
+        const SamplerState s,
+        const vector<float, Shape.dimensions + isArray> location) {
+        return tex.SampleGrad(s, location, grad_x, grad_y);
+    }
 }

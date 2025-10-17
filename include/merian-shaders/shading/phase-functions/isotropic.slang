@@ -2,9 +2,9 @@
 
 #include "merian-shaders/utils/math-constants.slangh"
 
-import "merian-shaders/utils/sampling.slang";
+import merian_shaders.utils.sampling;
 
-__exported import merian_shaders.phase_functions.phase_function;
+__exported import phase_function;
 
 namespace merian {
 
@@ -30,8 +30,8 @@ struct IsotropicPhaseFunction : PhaseFunction {
         return sample_sphere(rng.next_float2());
     }
 
-    override Optional<PhaseFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
-        return PhaseFunctionSample(sample_sphere(rng.next_float2()), MERIAN_INV_FOUR_PI, 1.0f);
+    override Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
+        return ShadingFunctionSample(sample_sphere(rng.next_float2()), MERIAN_INV_FOUR_PI, 1.0f);
     }
 
     float pdf(const float3 wi, const float3 wo) {

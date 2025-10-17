@@ -2,10 +2,10 @@
 
 #include "merian-shaders/utils/math-constants.slangh"
 
-import "merian-shaders/utils/sampling.slang";
-import "merian-shaders/utils/math.slang";
+import merian_shaders.utils.sampling;
+import merian_shaders.utils.math;
 
-__exported import merian_shaders.phase_functions.phase_function;
+__exported import phase_function;
 
 namespace merian {
 
@@ -58,9 +58,9 @@ struct HenyeyGreensteinPhaseFunction : PhaseFunction {
         return sample(rng, wi, g);
     }
 
-    override Optional<PhaseFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
+    override Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
         const float wo = sample(rng, wi, g);
-        return PhaseFunctionSample(wo, pdf(wi, wo), 1.0f);
+        return ShadingFunctionSample(wo, pdf(wi, wo), 1.0f);
     }
 
     float pdf(const float3 wi, const float3 wo) {

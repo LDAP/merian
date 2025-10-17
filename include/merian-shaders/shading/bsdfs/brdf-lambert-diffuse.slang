@@ -2,8 +2,8 @@
 
 #include "merian-shaders/utils/math-constants.slangh"
 
-import "merian-shaders/bsdfs/bsdf.slang";
-import "merian-shaders/utils/sampling.slang";
+import bsdf;
+import merian_shaders.utils.sampling;
 
 namespace merian {
 
@@ -31,13 +31,14 @@ struct LambertDiffuseBRDF : BSDF {
         return wo;
     }
 
-    override Optional<BSDFSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
+    override Optional<ShadingFunctionSample> sample_eval(const float3 wi,
+                                                         inout RandomGenerator rng) {
         const float3 wo = sample_cos(rng.next_float2());
         if (min(wi.z, wo.z) < BSDF_MIN_COS_THETA) {
             return none;
         }
 
-        return BSDFSample(wo, MERIAN_INV_PI * wo.z, albedo);
+        return ShadingFunctionSample(wo, MERIAN_INV_PI * wo.z, albedo);
     }
 
     float pdf(const float3 wi, const float3 wo) {

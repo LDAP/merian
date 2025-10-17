@@ -1,11 +1,11 @@
 #pragma once
 
-__exported import merian_shaders.phase_functions.phase_function;
+import merian_shaders.utils.sampling;
 
-import "merian-shaders/utils/sampling.slang";
+__exported import phase_function;
+import henyey_greenstein;
+import draine;
 
-import merian_shaders.phase_functions.henyey_greenstein;
-import merian_shaders.phase_functions.draine;
 
 namespace merian {
 
@@ -87,9 +87,9 @@ struct MieApproxPhaseFunction : PhaseFunction {
         return sample(rng, wi, hg_g, d_g, d_a, w_d);
     }
 
-    override Optional<PhaseFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
+    override Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
         const float wo = sample(rng, wi, hg_g, d_g, d_a, w_d);
-        return PhaseFunctionSample(wo, pdf(wi, wo), 1.0f);
+        return ShadingFunctionSample(wo, pdf(wi, wo), 1.0f);
     }
 
     float pdf(const float3 wi, const float3 wo) {

@@ -1,6 +1,6 @@
 #pragma once
 
-__exported import merian_shaders.scene.texture_manager;
+__exported import merian_shaders.utils.texture_manager;
 
 namespace merian {
 
