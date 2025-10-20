@@ -25,9 +25,9 @@
 #define MERIAN_M_SQRT1_2 0.707106781186547524401  // 1/sqrt(2)
 
 // Numeric limits from <cstdint>
-#define UINT32_MAX 4294967295
-#define INT32_MIN -2147483648
-#define INT32_MAX 2147483647
+#define MERIAN_UINT32_MAX 4294967295
+#define MERIAN_INT32_MIN -2147483648
+#define MERIAN_INT32_MAX 2147483647
 
 // Numeric limits from <cfloat>
 #define MERIAN_DBL_DECIMAL_DIG 17

@@ -221,6 +221,16 @@ int2 texturewrap_mirror_repeat(int2 ipos, int2 tex_size) {
     return tex_size - 1 - mirror(ipos % (tex_size * 2) - tex_size);
 }
 
+float2 pixel_to_uv_position(const uint2 pixel, const uint2 frame_dimensions) {
+    return (pixel + 0.5f) / frame_dimensions;
+}
+
+float2 pixel_to_uv_position(const float uv, const uint2 frame_dimensions) {
+    return uv * frame_dimensions - 0.5;
+}
+
+float2 pixel_to_ndc(const uint2 pixel, const uint2 frame_dimensions) {
+    return float2(2, -2) * pixel_to_uv_position(pixel, frame_dimensions) + float2(-1, 1);
 }
 
 interface LODSampler {
@@ -388,4 +398,6 @@ struct GradLODSampler : LODSampler {
         const vector<float, Shape.dimensions + isArray> location) {
         return tex.SampleGrad(s, location, grad_x, grad_y);
     }
+}
+
 }

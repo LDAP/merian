@@ -45,7 +45,7 @@ struct MieApproxPhaseFunction : PhaseFunction {
                          const float d_a,
                          const float w_d) {
         const float deflection_cos = sample(rng.next_float2(), hg_g, d_g, d_a, w_d);
-        return sample_cone2(wi, deflection_cos, rng.next_float());
+        return sample_cone2(wi, deflection_cos, rng);
     }
 
     // -----------------------------------------------

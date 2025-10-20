@@ -7,16 +7,22 @@ namespace merian {
 interface RandomGenerator {
 
     /**
-     * Returns the next sample.
+     * Returns the next uniformly distributed pseudorandom sample.
      */
     [mutating]
     uint next();
 
+    /**
+     * Returns a uniformly distributed sample in [0, 1).
+     */
     [mutating]
     float next_float() {
         return uint_to_zero_one_float_rust(next());
     }
 
+    /**
+     * Returns a uniformly distributed sample in [0, 1).
+     */
     [mutating]
     float2 next_float2() {
         float2 sample;
@@ -25,6 +31,9 @@ interface RandomGenerator {
         return sample;
     }
 
+    /**
+     * Returns a uniformly distributed sample in [0, 1).
+     */
     [mutating]
     float3 next_float3() {
         float3 sample;
@@ -34,6 +43,9 @@ interface RandomGenerator {
         return sample;
     }
 
+    /**
+     * Returns a uniformly distributed sample in [0, 1).
+     */
     [mutating]
     float4 next_float4() {
         float4 sample;

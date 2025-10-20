@@ -34,7 +34,7 @@ struct HenyeyGreensteinPhaseFunction : PhaseFunction {
     // wi points away from the sampling point, i.e -wi is the particle direction.
     static float3 sample(inout RandomGenerator rng, const float3 wi, const float g) {
         const float deflection_cos = sample(rng.next_float(), g);
-        return sample_cone2(wi, deflection_cos, rng.next_float());
+        return sample_cone2(wi, deflection_cos, rng);
     }
 
     // ----------------------------------------------------------

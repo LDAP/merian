@@ -8,8 +8,8 @@ __exported import phase_function;
 
 namespace merian {
 
-float3 phase_isotropic_sample(float2 random) {
-    return sample_sphere(random);
+float3 phase_isotropic_sample(inout RandomGenerator rng) {
+    return sample_sphere(rng);
 }
 
 float phase_isotropic_pdf() {
@@ -27,11 +27,12 @@ struct IsotropicPhaseFunction : PhaseFunction {
     }
 
     Optional<float3> sample(const float3 wi, inout RandomGenerator rng) {
-        return sample_sphere(rng.next_float2());
+        return sample_sphere(rng);
     }
 
-    override Optional<ShadingFunctionSample> sample_eval(const float3 wi, inout RandomGenerator rng) {
-        return ShadingFunctionSample(sample_sphere(rng.next_float2()), MERIAN_INV_FOUR_PI, 1.0f);
+    override Optional<ShadingFunctionSample> sample_eval(const float3 wi,
+                                                         inout RandomGenerator rng) {
+        return ShadingFunctionSample(sample_sphere(rng), MERIAN_INV_FOUR_PI, 1.0f);
     }
 
     float pdf(const float3 wi, const float3 wo) {
