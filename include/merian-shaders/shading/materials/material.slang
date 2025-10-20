@@ -14,11 +14,31 @@ enum MaterialFlags : uint8_t {
     NO_NORMAL_MAPPING,
 }
 
+struct MaterialHeader {
+    uint16_t material_model_type_id;
+    TextureID alpha_texture_id = TextureID(-1);
+
+    Optional<TextureID> get_alpha_texture_id() {
+        if (alpha_texture_id != TextureID(-1)) {
+            return alpha_texture_id;
+        }
+
+        return {};
+    }
+
+    bool has_alpha_mask() {
+        return alpha_texture_id != TextureID(-1);
+    }
+}
+
 // This represents the definition of the material (before being evaluated at a shading point), e.g.
 // Disney, glTF.
 //
 // The get_sample() method evaluates the material maps (gloss, normal, ...) to create an instance of
 // this material for the shading point.
+//
+// Materials must ALWAYS have MaterialHeader as first member variable. The CPU side material system
+// checks for this requirement.
 interface MaterialModel {
     associatedtype MaterialSampleImpl : MaterialSample;
 

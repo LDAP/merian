@@ -10,11 +10,13 @@ interface IRayQuery {
     uint CommittedInstanceID();
     uint CommittedPrimitiveIndex();
     uint CommittedGeometryIndex();
+    float2 CommittedRayBarycentrics();
 
     uint CandidateType();
     uint CandidateInstanceID();
     uint CandidatePrimitiveIndex();
     uint CandidateGeometryIndex();
+    float2 CandidateRayBarycentrics();
 
     [mutating]
     bool Proceed();
@@ -22,6 +24,22 @@ interface IRayQuery {
     void CommitNonOpaqueTriangleHit();
     [mutating]
     void CommitProceduralPrimitiveHit(float t);
+
+    // ----------------------------
+
+    float3 CommittedRayBarycentrics2() {
+        float3 barycentrics;
+        barycentrics.xy = CommittedRayBarycentrics();
+        barycentrics.z = 1.0 - barycentrics.x - barycentrics.y;
+        return barycentrics;
+    }
+
+    float3 CandidateRayBarycentrics2() {
+        float3 barycentrics;
+        barycentrics.xy = CandidateRayBarycentrics();
+        barycentrics.z = 1.0 - barycentrics.x - barycentrics.y;
+        return barycentrics;
+    }
 }
 
 interface AccelerationStructure {

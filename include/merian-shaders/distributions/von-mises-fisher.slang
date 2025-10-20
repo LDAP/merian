@@ -73,7 +73,7 @@ struct VonMisesFisher3<bool centered> : Distribution<float3> {
         this.c_mu = float3(0, 0, 1);
     }
 
-    float pdf(const float3 s) {
+    override float pdf(const float3 s) {
         if (let mu = c_mu.get()) {
             return vmf_pdf_tokuyoshi(s, mu, kappa);
         } else {
@@ -81,7 +81,7 @@ struct VonMisesFisher3<bool centered> : Distribution<float3> {
         }
     }
 
-    DistributionSample<float3> sample(inout RandomGenerator rng) {
+    override DistributionSample<float3> sample(inout RandomGenerator rng) {
         if (let mu = c_mu.get()) {
             float3 s = vmf_sample_tokuyosh(mu, kappa, rng.next_float2());
             return DistributionSample<float3>(s, pdf(s));

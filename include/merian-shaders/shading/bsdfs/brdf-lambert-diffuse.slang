@@ -24,7 +24,7 @@ struct LambertDiffuseBRDF : BSDF {
     }
 
     Optional<float3> sample(const float3 wi, inout RandomGenerator rng) {
-        const float3 wo = sample_cos(rng.next_float2());
+        const float3 wo = sample_cos(rng);
         if (min(wi.z, wo.z) < BSDF_MIN_COS_THETA) {
             return none;
         }
@@ -33,7 +33,7 @@ struct LambertDiffuseBRDF : BSDF {
 
     override Optional<ShadingFunctionSample> sample_eval(const float3 wi,
                                                          inout RandomGenerator rng) {
-        const float3 wo = sample_cos(rng.next_float2());
+        const float3 wo = sample_cos(rng);
         if (min(wi.z, wo.z) < BSDF_MIN_COS_THETA) {
             return none;
         }
