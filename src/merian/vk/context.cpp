@@ -802,4 +802,8 @@ const std::map<std::string, std::string>& Context::get_default_shader_macro_defi
     return default_shader_macro_definitions;
 }
 
+const SlangSessionHandle& Context::get_slang_session() const {
+    return slang_session;
+}
+
 } // namespace merian

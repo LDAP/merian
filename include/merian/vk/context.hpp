@@ -280,6 +280,8 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
 
     const std::map<std::string, std::string>& get_default_shader_macro_definitions() const;
 
+    const SlangSessionHandle& get_slang_session() const;
+
   private:
     // in create_instance
 
