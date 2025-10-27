@@ -1,0 +1,7 @@
+#pragma once
+
+namespace merian {
+
+typedef uint16_t MaterialID;
+
+}

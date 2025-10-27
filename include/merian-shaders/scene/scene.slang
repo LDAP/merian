@@ -5,32 +5,9 @@ __exported import merian_shaders.scene.acceleration_structure;
 __exported import merian_shaders.scene.environment_map;
 __exported import merian_shaders.shading.materials.material_system;
 
+#include "merian-shaders/scene/scene-data.slangh"
+
 namespace merian {
-
-/**
- * General description of geometry. In Merians scene each geometry has its own world transform and
- * material. Geometries are identified using an InstanceID and GeometryIndex (which map to the
- * Vulkan TLAS, BLAS interface). The index in the buffer is InstanceID + GeometryIndex.
- */
-struct GeometryData {
-    MaterialID material_id;
-    // might be uint(-1) if no index buffer. Used to access the descriptor array.
-    uint16_t index_buffer_index;
-    // might be uint(-1) if no vertex buffer. Used to access the descriptor array.
-    uint16_t vertex_buffer_index;
-}
-
-// InstanceID + GeometryIndex
-typealias GeometryID = uint;
-
-struct VertexData {
-    float3 position;
-    half2 uv;
-}
-
-struct PrevVertexData {
-    float3 position;
-}
 
 struct Hit {
     uint instance_id;

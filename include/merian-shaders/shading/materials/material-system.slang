@@ -3,13 +3,13 @@
 __exported import merian_shaders.utils.texture_manager;
 __exported import merian_shaders.shading.materials.material;
 
+#include "merian-shaders/shading/materials/material-system-data.slangh"
+
 namespace merian {
 
 extern static const int merian_material_system_payload_max_size;
 // alpha values less than the threshold are considered transparent
 static const float merian_alpha_test_threshold = 0.7;
-
-typealias MaterialID = uint16_t;
 
 struct MaterialPayload {
     uint blob[merian_material_system_payload_max_size];

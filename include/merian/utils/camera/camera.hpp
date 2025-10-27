@@ -2,6 +2,8 @@
 
 #include "merian/utils/vector_matrix.hpp"
 
+#include <memory>
+
 namespace merian {
 
 /**
@@ -146,5 +148,7 @@ class Camera {
     float4x4 projection_cache;
     uint32_t projection_change_id_cache = 0;
 };
+using CameraHandle = std::shared_ptr<Camera>;
+
 
 } // namespace merian
