@@ -1,4 +1,5 @@
 #include "merian/vk/context.hpp"
+#include "merian/shader/slang_session.hpp"
 #include "merian/utils/pointer.hpp"
 #include "merian/utils/stopwatch.hpp"
 #include "merian/utils/vector.hpp"
@@ -109,6 +110,8 @@ Version: {}\n\n",
     file_loader.add_search_path(FileLoader::install_datadir_name());
     file_loader.add_search_path(FileLoader::install_datadir_name() / MERIAN_PROJECT_NAME);
     file_loader.add_search_path(FileLoader::install_includedir_name());
+
+    slang_session = SlangSession::get_or_create(ShaderCompileContext::create(*this));
 
     SPDLOG_INFO("context ready. (took: {})", format_duration(sw.nanos()));
 }

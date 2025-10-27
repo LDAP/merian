@@ -79,6 +79,8 @@ using QueueHandle = std::shared_ptr<Queue>;
 class CommandPool;
 class CommandBuffer;
 using CommandBufferHandle = std::shared_ptr<CommandBuffer>;
+class SlangSession;
+using SlangSessionHandle = std::shared_ptr<SlangSession>;
 
 struct PhysicalDevice {
     const vk::PhysicalDevice& operator*() const {
@@ -337,6 +339,8 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
 
     std::vector<std::filesystem::path> default_shader_include_paths;
     std::map<std::string, std::string> default_shader_macro_definitions;
+
+    SlangSessionHandle slang_session;
 };
 
 } // namespace merian

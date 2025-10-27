@@ -53,13 +53,15 @@ class ShaderCompileContext {
         file_loader.add_search_path(search_paths);
     }
 
-    ShaderCompileContext(const ContextHandle& context)
-        : preprocessor_macros(context->get_default_shader_macro_definitions()),
+    ShaderCompileContext(const ContextHandle& context) : ShaderCompileContext(*context) {}
+
+    ShaderCompileContext(const Context& context)
+        : preprocessor_macros(context.get_default_shader_macro_definitions()),
           debug_info(Context::IS_DEBUG_BUILD),
           optimization_level(Context::BUILD_OPTIMIZATION_LEVEL),
-          target(spirv_target_for_vulkan_api_version(context->vk_api_version)),
-          target_vk_api_version(context->vk_api_version) {
-        file_loader.add_search_path(context->get_default_shader_include_paths());
+          target(spirv_target_for_vulkan_api_version(context.vk_api_version)),
+          target_vk_api_version(context.vk_api_version) {
+        file_loader.add_search_path(context.get_default_shader_include_paths());
     }
 
   public:
@@ -140,6 +142,10 @@ class ShaderCompileContext {
     // -------------------------------------------------
 
     static ShaderCompileContextHandle create(const ContextHandle& context) {
+        return ShaderCompileContextHandle(new ShaderCompileContext(context));
+    }
+
+    static ShaderCompileContextHandle create(const Context& context) {
         return ShaderCompileContextHandle(new ShaderCompileContext(context));
     }
 
