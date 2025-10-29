@@ -48,7 +48,7 @@ private:
 
     const std::optional<vk::Format> output_format;
 
-    VkSampledImageInHandle con_src = VkSampledImageIn::compute_read("src");
+    VkSampledImageInHandle con_src;
 
     vk::Extent3D extent;
     PushConstant pc;

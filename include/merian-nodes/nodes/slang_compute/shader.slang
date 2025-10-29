@@ -5,11 +5,6 @@ import merian_shaders.colors.tonemaps;
 
 using merian;
 
-[__AttributeUsage(_AttributeTargets.Var)]
-struct MerianInput {
-    bool marker;
-}
-
 [vk::constant_id(0)]
 const int workgroup_size_x = 1;
 [vk::constant_id(1)]
@@ -20,11 +15,6 @@ const int tonemap = 0;
 const int alpha_mode = 0;
 [vk::constant_id(4)]
 const int clamp_output = 1;
-
-[vk::binding(0), MerianInput]
-Sampler2D<float4> img_src;
-[vk::binding(1)]
-RWTexture2D<float4> img_output;
 
 struct PushConstant {
     float param1;
@@ -39,13 +29,23 @@ struct PushConstant {
 [vk::push_constant]
 ConstantBuffer<PushConstant> params;
 
+struct MerianIn {
+    [vk::binding(0)]
+    Sampler2D<float4> img_src;
+};
+
+struct MerianOut {
+    [vk::binding(1)]
+    RWTexture2D<float4> img_output;
+};
+
 [numthreads(workgroup_size_x, workgroup_size_y, 1)]
 [shader("compute")]
-void main(int2 ipos: SV_DispatchThreadID) {
-    if (not_on_texture(ipos, img_output))
+void main(int2 ipos: SV_DispatchThreadID, MerianIn merian_in, MerianOut merian_out) {
+    if (not_on_texture(ipos,  merian_out.img_output))
         return;
 
-    const float4 rgb_in = img_src.Load(int3(ipos, 0));
+    const float4 rgb_in =  merian_in.img_src.Load(int3(ipos, 0));
     float3 rgb_out;
 
     switch (tonemap) {
@@ -79,13 +79,13 @@ void main(int2 ipos: SV_DispatchThreadID) {
 
     switch (alpha_mode) {
     case ALPHA_MODE_PASSTHROUGH:
-        img_output.Store(ipos, float4(rgb_out, rgb_in.a));
+        merian_out.img_output.Store(ipos, float4(rgb_out, rgb_in.a));
         break;
     case ALPHA_MODE_LUMINANCE:
-        img_output.Store(ipos, float4(rgb_out, yuv_luminance(rgb_out)));
+         merian_out.img_output.Store(ipos, float4(rgb_out, yuv_luminance(rgb_out)));
         break;
     case ALPHA_MODE_PERCEPTUAL_LUMINANCE:
-        img_output.Store(ipos,
+         merian_out.img_output.Store(ipos,
                          float4(rgb_out, pow(yuv_luminance(rgb_out), 1. / params.perceptual_exp)));
         break;
     }

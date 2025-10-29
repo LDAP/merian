@@ -1,4 +1,6 @@
 #include "merian-nodes/nodes/slang_compute/slang_compute.hpp"
+#include "merian-nodes/connectors/image/vk_image_in_sampled.hpp"
+#include "merian-nodes/connectors/image/vk_image_in_sampled.hpp"
 #include "merian-nodes/connectors/image/vk_image_out_managed.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 #include "merian/vk/shader/entry_point.hpp"
@@ -57,11 +59,6 @@ std::vector<slang::VariableLayoutReflection*> findInputVariables(std::vector<sla
 
     for (const auto& var_layout : variable_layouts) {
         slang::VariableReflection* var = var_layout->getVariable();
-        for (unsigned i = 0; i < var->getUserAttributeCount(); i++) {
-            auto attr = var->getUserAttributeByIndex(i);
-            SPDLOG_INFO("Found attribute: {}", attr->getName());
-        }
-
         auto attr = var->findUserAttributeByName(global_session, "MerianInput");
 
         if (attr != nullptr) {
@@ -73,14 +70,65 @@ std::vector<slang::VariableLayoutReflection*> findInputVariables(std::vector<sla
     return result;
 }
 
+std::vector<slang::VariableLayoutReflection*> reflectFieldsFromStruct(slang::VariableLayoutReflection* struct_layout) {
+    std::vector<slang::VariableLayoutReflection*> result{};
+
+    slang::TypeLayoutReflection* type_layout = struct_layout->getTypeLayout();
+    slang::TypeReflection* type = type_layout->getType();
+
+    slang::TypeReflection::Kind kind = type->getKind();
+    if (kind == slang::TypeReflection::Kind::Struct) {
+        uint32_t field_count = type->getFieldCount();
+        result.reserve(field_count);
+        for (int f = 0; f < field_count; f++)
+        {
+            slang::VariableLayoutReflection* field = type_layout->getFieldByIndex(f);
+            result.push_back(field);
+        }
+    }
+
+    return result;
+}
+
+std::vector<InputConnectorHandle> reflectInputConnectors(slang::EntryPointReflection* entry_point) {
+    std::vector<InputConnectorHandle> result{};
+    std::vector<slang::VariableLayoutReflection*> reflected_inputs{};
+
+    const uint32_t param_count = entry_point->getParameterCount();
+    for (uint32_t i = 0; i < param_count; i++) {
+        slang::VariableLayoutReflection* var_layout = entry_point->getParameterByIndex(i);
+        if (std::string(var_layout->getName()) == "merian_in") {
+            reflected_inputs = reflectFieldsFromStruct(var_layout);
+        }
+    }
+
+    for (const auto& reflected_input : reflected_inputs) {
+        slang::TypeLayoutReflection* type_layout = reflected_input->getTypeLayout();
+        slang::TypeReflection* type = type_layout->getType();
+
+        if (type->getKind() != slang::TypeReflection::Kind::Resource)
+            continue;
+
+        if (type->getResourceShape() == (SLANG_TEXTURE_COMBINED_FLAG | SLANG_TEXTURE_2D)) {
+            slang::TypeReflection* result_type = type->getResourceResultType();
+            result.push_back(VkSampledImageIn::compute_read(reflected_input->getName()));
+        } else if (type->getResourceShape() == SLANG_TEXTURE_2D) {
+            slang::TypeReflection* result_type = type->getResourceResultType();
+            // TODO texture connector
+        }
+    }
+
+    return result;
+}
+
 std::vector<InputConnectorHandle> SlangCompute::describe_inputs() {
     using namespace slang;
-    VariableLayoutReflection* global_scope = program_layout->getGlobalParamsVarLayout();
-    std::vector<VariableLayoutReflection*> vars = getVariableLayoutsFromScope(global_scope);
-    std::vector<VariableLayoutReflection*> input_vars = findInputVariables(vars);
-    return {
-        con_src,
-    };
+
+    assert(program_layout->getEntryPointCount() == 1);
+    EntryPointReflection* entry_point = program_layout->getEntryPointByIndex(0);
+    std::vector<InputConnectorHandle> input_handles = reflectInputConnectors(entry_point);
+    con_src = static_pointer_cast<VkSampledImageIn>(input_handles.at(0)); // TODO remove this
+    return input_handles;
 }
 
 std::vector<OutputConnectorHandle>
