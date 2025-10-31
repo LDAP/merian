@@ -1,6 +1,6 @@
 #include "merian-nodes/nodes/color_image/color_output.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 ColorImage::ColorImage() : Node() {}
 
@@ -54,4 +54,4 @@ ColorImage::NodeStatusFlags ColorImage::properties(Properties& config) {
     return {};
 }
 
-} // namespace merian_nodes
+} // namespace merian

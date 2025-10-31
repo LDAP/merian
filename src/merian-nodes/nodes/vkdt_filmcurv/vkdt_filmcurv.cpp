@@ -4,7 +4,7 @@
 
 #include "vkdt_filmcurv.slang.spv.h"
 
-namespace merian_nodes {
+namespace merian {
 
 VKDTFilmcurv::VKDTFilmcurv(const ContextHandle& context,
                            const std::optional<VKDTFilmcurvePushConstant> options,
@@ -67,4 +67,4 @@ AbstractCompute::NodeStatusFlags VKDTFilmcurv::properties(Properties& config) {
     return {};
 }
 
-} // namespace merian_nodes
+} // namespace merian

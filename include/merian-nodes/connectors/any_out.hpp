@@ -5,7 +5,7 @@
 
 #include <memory>
 
-namespace merian_nodes {
+namespace merian {
 
 class AnyOut;
 using AnyOutHandle = std::shared_ptr<AnyOut>;
@@ -48,4 +48,4 @@ class AnyOut : public OutputConnector, public AccessibleConnector<std::any&> {
     const bool persistent;
 };
 
-} // namespace merian_nodes
+} // namespace merian

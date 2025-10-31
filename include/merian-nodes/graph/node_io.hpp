@@ -4,7 +4,7 @@
 
 #include <any>
 
-namespace merian_nodes {
+namespace merian {
 
 class GraphEvent {
   public:
@@ -178,4 +178,4 @@ class NodeIO {
 
     const std::function<uint32_t(const OutputConnectorHandle&)> binding_for_output_connector;
 };
-} // namespace merian_nodes
+} // namespace merian

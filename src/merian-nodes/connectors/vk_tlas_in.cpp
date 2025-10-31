@@ -1,7 +1,7 @@
 #include "merian-nodes/connectors/vk_tlas_in.hpp"
 #include "merian-nodes/graph/errors.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 VkTLASIn::VkTLASIn(const std::string& name,
                    const vk::ShaderStageFlags stage_flags,
@@ -46,4 +46,4 @@ VkTLASInHandle VkTLASIn::fragment_read(const std::string& name) {
                                       vk::PipelineStageFlagBits2::eFragmentShader);
 }
 
-} // namespace merian_nodes
+} // namespace merian

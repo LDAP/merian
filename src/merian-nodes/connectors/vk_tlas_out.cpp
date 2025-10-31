@@ -5,7 +5,7 @@
 #include "merian-nodes/graph/node.hpp"
 #include "merian/utils/pointer.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 VkTLASOut::VkTLASOut(const std::string& name) : OutputConnector(name, true) {}
 
@@ -76,4 +76,4 @@ VkTLASOutHandle VkTLASOut::create(const std::string& name) {
     return std::make_shared<VkTLASOut>(name);
 }
 
-} // namespace merian_nodes
+} // namespace merian

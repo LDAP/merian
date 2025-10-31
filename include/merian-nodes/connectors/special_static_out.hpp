@@ -3,7 +3,7 @@
 #include "merian-nodes/graph/connector_output.hpp"
 #include "merian-nodes/graph/resource.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 template <typename ValueType> class SpecialStaticOut;
 template <typename ValueType>
@@ -94,4 +94,4 @@ class SpecialStaticOut : public OutputConnector,
     bool has_new = false;
 };
 
-} // namespace merian_nodes
+} // namespace merian

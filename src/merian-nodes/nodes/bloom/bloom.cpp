@@ -7,7 +7,7 @@
 #include "bloom_composite.slang.spv.h"
 #include "bloom_separate.slang.spv.h"
 
-namespace merian_nodes {
+namespace merian {
 
 Bloom::Bloom(const ContextHandle& context) : Node(), context(context) {
     separate_module = EntryPoint::create(context, merian_bloom_separate_slang_spv(),
@@ -91,4 +91,4 @@ Bloom::NodeStatusFlags Bloom::properties(Properties& config) {
     return {};
 }
 
-} // namespace merian_nodes
+} // namespace merian

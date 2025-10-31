@@ -7,7 +7,7 @@
 
 #include <memory>
 
-namespace merian_nodes {
+namespace merian {
 
 template <typename T> class PtrIn;
 template <typename T> using PtrInHandle = std::shared_ptr<PtrIn<T>>;
@@ -55,4 +55,4 @@ class PtrIn : public InputConnector,
     }
 };
 
-} // namespace merian_nodes
+} // namespace merian

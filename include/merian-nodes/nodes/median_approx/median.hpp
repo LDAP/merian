@@ -7,7 +7,7 @@
 #include "merian/vk/pipeline/pipeline.hpp"
 #include "merian/shader/entry_point.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 class MedianApproxNode : public Node {
   private:
@@ -55,4 +55,4 @@ class MedianApproxNode : public Node {
     PipelineHandle pipe_reduce;
 };
 
-} // namespace merian_nodes
+} // namespace merian

@@ -1,6 +1,6 @@
 #include "merian-nodes/connectors/image/vk_image_in_storage.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 VkStorageImageIn::VkStorageImageIn(const std::string& name,
                                    const vk::AccessFlags2 access_flags,
@@ -63,4 +63,4 @@ VkStorageImageIn::compute_read(const std::string& name, const uint32_t delay, co
         vk::ShaderStageFlagBits::eCompute, delay, optional);
 }
 
-} // namespace merian_nodes
+} // namespace merian

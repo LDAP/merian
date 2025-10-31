@@ -3,7 +3,7 @@
 #include "merian-nodes/graph/connector_output.hpp"
 #include "merian-nodes/resources/tlas_resource.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 class VkTLASOut;
 using VkTLASOutHandle = std::shared_ptr<VkTLASOut>;
@@ -58,4 +58,4 @@ class VkTLASOut : public OutputConnector, public AccessibleConnector<TLASResourc
     static VkTLASOutHandle create(const std::string& name);
 };
 
-} // namespace merian_nodes
+} // namespace merian

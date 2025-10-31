@@ -5,7 +5,7 @@
 #include "merian/shader/shader_compiler.hpp"
 #include "merian/shader/shader_hotreloader.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 // A generator node that pushes the Shadertoy variables as push constant.
 class Shadertoy : public AbstractCompute {
@@ -59,4 +59,4 @@ class Shadertoy : public AbstractCompute {
     ShaderCompileContextHandle compile_context;
 };
 
-} // namespace merian_nodes
+} // namespace merian

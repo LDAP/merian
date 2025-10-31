@@ -3,7 +3,7 @@
 #include "merian-nodes/connectors/buffer/vk_buffer_out.hpp"
 #include "merian-nodes/resources/buffer_array_resource.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 class ManagedVkBufferOut;
 using ManagedVkBufferOutHandle = std::shared_ptr<ManagedVkBufferOut>;
@@ -72,4 +72,4 @@ class ManagedVkBufferOut : public VkBufferOut,
     const bool persistent;
 };
 
-} // namespace merian_nodes
+} // namespace merian

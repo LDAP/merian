@@ -4,7 +4,7 @@
 #include "merian-nodes/graph/node.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 // Writes to images files.
 class ImageWrite : public Node {
@@ -121,4 +121,4 @@ class ImageWrite : public Node {
     bool needs_rebuild = false;
 };
 
-} // namespace merian_nodes
+} // namespace merian

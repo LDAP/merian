@@ -5,7 +5,7 @@
 
 #include <filesystem>
 
-namespace merian_nodes {
+namespace merian {
 
 class LDRImageRead : public Node {
 
@@ -42,4 +42,4 @@ class LDRImageRead : public Node {
     std::string config_filename;
 };
 
-} // namespace merian_nodes
+} // namespace merian

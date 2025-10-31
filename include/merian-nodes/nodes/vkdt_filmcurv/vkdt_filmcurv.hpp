@@ -3,7 +3,7 @@
 #include "merian-nodes/connectors/image/vk_image_in_sampled.hpp"
 #include "merian-nodes/nodes/compute_node/compute_node.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 struct VKDTFilmcurvePushConstant {
     float brightness{1.};
@@ -49,4 +49,4 @@ class VKDTFilmcurv : public TypedPCAbstractCompute<VKDTFilmcurvePushConstant> {
     VKDTFilmcurvePushConstant pc;
 };
 
-} // namespace merian_nodes
+} // namespace merian

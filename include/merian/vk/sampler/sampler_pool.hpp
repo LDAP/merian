@@ -2,7 +2,7 @@
 
 #include "merian/utils/hash.hpp"
 #include "merian/vk/context.hpp"
-#include "merian/vk/sampler/sampler.hpp"
+#include "merian/vk/memory/resource_allocations.hpp"
 
 #include <spdlog/spdlog.h>
 #include <vulkan/vulkan.hpp>

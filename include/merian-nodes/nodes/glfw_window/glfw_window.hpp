@@ -11,15 +11,15 @@
 #include "merian/vk/window/swapchain_manager.hpp"
 #include <csignal>
 
-namespace merian_nodes {
+namespace merian {
 
 /*
  * Outputs to a GLFW window.
  * This node requires the error handling features of ExtensionVkGLFW
  */
-class GLFWWindow : public Node {
+class GLFWWindowNode : public Node {
   public:
-    GLFWWindow(const ContextHandle& context) : Node() {
+    GLFWWindowNode(const ContextHandle& context) : Node() {
         const auto glfw_ext = context->get_extension<ExtensionGLFW>();
         if (glfw_ext) {
             window = glfw_ext->create_window();
@@ -263,4 +263,4 @@ class GLFWWindow : public Node {
     bool on_should_close_remove_node = true;
 };
 
-} // namespace merian_nodes
+} // namespace merian

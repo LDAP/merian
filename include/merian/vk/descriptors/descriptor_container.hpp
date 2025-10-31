@@ -182,7 +182,30 @@ class DescriptorContainer : public std::enable_shared_from_this<DescriptorContai
                                               dst_array_element, access_layout);
     }
 
-    // Bind `acceleration_structure` at the binding point `binding` of DescriptorContainer `set`.
+    DescriptorContainer& queue_descriptor_write_sampler(const uint32_t binding,
+                                                        const SamplerHandle& sampler,
+                                                        const uint32_t dst_array_element = 0) {
+        assert(sampler);
+
+        const uint32_t index = layout->get_binding_offset(binding, dst_array_element);
+        const bool needs_queue = write_resources[index] == nullptr;
+        write_infos[index] = sampler->get_descriptor_info();
+        write_resources[index] = sampler;
+        if (needs_queue) {
+            // minimize writes (and allow move in apply_update_for)
+            queue_write(vk::WriteDescriptorSet{
+                VK_NULL_HANDLE,
+                binding,
+                dst_array_element,
+                1,
+                vk::DescriptorType::eSampler,
+                &std::get<vk::DescriptorImageInfo>(write_infos[index]),
+            });
+        }
+
+        return *this;
+    }
+
     DescriptorContainer& queue_descriptor_write_acceleration_structure(
         const uint32_t binding,
         const AccelerationStructureHandle& acceleration_structure,

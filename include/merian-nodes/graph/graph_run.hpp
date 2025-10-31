@@ -13,7 +13,7 @@
 
 #include <cstdint>
 
-namespace merian_nodes {
+namespace merian {
 
 using namespace merian;
 using namespace std::literals::chrono_literals;
@@ -346,4 +346,4 @@ class GraphRun {
     std::chrono::nanoseconds elapsed_since_connect;
 };
 
-} // namespace merian_nodes
+} // namespace merian

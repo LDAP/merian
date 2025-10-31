@@ -5,7 +5,7 @@
 
 #include <filesystem>
 
-namespace merian_nodes {
+namespace merian {
 
 class HDRImageRead : public Node {
 
@@ -41,4 +41,4 @@ class HDRImageRead : public Node {
     std::string config_filename;
 };
 
-} // namespace merian_nodes
+} // namespace merian

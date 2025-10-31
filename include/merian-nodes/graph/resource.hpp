@@ -4,7 +4,7 @@
 
 #include <memory>
 
-namespace merian_nodes {
+namespace merian {
 
 class GraphResource {
   public:
@@ -15,4 +15,4 @@ class GraphResource {
 
 using GraphResourceHandle = std::shared_ptr<GraphResource>;
 
-} // namespace merian_nodes
+} // namespace merian

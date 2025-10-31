@@ -4,7 +4,7 @@
 #include "merian-nodes/connectors/special_static_in.hpp"
 #include "merian-nodes/graph/node.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 class ColorImage : public Node {
 
@@ -30,8 +30,8 @@ class ColorImage : public Node {
 
     bool needs_run = true;
     ManagedVkImageOutHandle con_out;
-    merian_nodes::SpecialStaticInHandle<vk::Extent3D> con_resolution =
-        merian_nodes::SpecialStaticIn<vk::Extent3D>::create("resolution", true);
+    SpecialStaticInHandle<vk::Extent3D> con_resolution =
+        SpecialStaticIn<vk::Extent3D>::create("resolution", true);
 };
 
-} // namespace merian_nodes
+} // namespace merian

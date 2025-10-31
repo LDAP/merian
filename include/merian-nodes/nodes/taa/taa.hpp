@@ -3,7 +3,7 @@
 #include "merian-nodes/connectors/image/vk_image_in_sampled.hpp"
 #include "merian-nodes/nodes/compute_node/compute_node.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 class TAA : public AbstractCompute {
 
@@ -48,4 +48,4 @@ class TAA : public AbstractCompute {
     uint32_t height{};
 };
 
-} // namespace merian_nodes
+} // namespace merian

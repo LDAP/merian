@@ -5,7 +5,7 @@
 
 #include "tonemap.slang.spv.h"
 
-namespace merian_nodes {
+namespace merian {
 
 Tonemap::Tonemap(const ContextHandle& context, const std::optional<vk::Format> output_format)
     : AbstractCompute(context, sizeof(PushConstant)), output_format(output_format) {
@@ -143,4 +143,4 @@ AbstractCompute::NodeStatusFlags Tonemap::properties(Properties& config) {
     return {};
 }
 
-} // namespace merian_nodes
+} // namespace merian

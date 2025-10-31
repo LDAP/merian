@@ -20,7 +20,7 @@
 #include "merian-nodes/nodes/tonemap/tonemap.hpp"
 #include "merian-nodes/nodes/vkdt_filmcurv/vkdt_filmcurv.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 NodeRegistry::NodeRegistry(const ContextHandle& context, const ResourceAllocatorHandle& allocator) {
     register_node_type<ABSplit>(NodeTypeInfo{"AB Split", "Compare two inputs in a split-view.",
@@ -49,9 +49,9 @@ NodeRegistry::NodeRegistry(const ContextHandle& context, const ResourceAllocator
                      "Fast approximate anti-aliasing (FXAA) is a screen-space "
                      "anti-aliasing algorithm created by Timothy Lottes at NVIDIA.",
                      [=]() { return std::make_shared<FXAA>(context); }});
-    register_node_type<GLFWWindow>(
+    register_node_type<GLFWWindowNode>(
         NodeTypeInfo{"Window (GLFW)", "Outputs to a window created with GLFW.",
-                     [=]() { return std::make_shared<GLFWWindow>(context); }});
+                     [=]() { return std::make_shared<GLFWWindowNode>(context); }});
     register_node_type<HDRImageRead>(
         NodeTypeInfo{"HDR Image", "Loads an HDR image.",
                      [=]() { return std::make_shared<HDRImageRead>(context); }});
@@ -104,4 +104,4 @@ NodeRegistry::NodeRegistry(const ContextHandle& context, const ResourceAllocator
                                           {"initial value", "max(accumulator, current_value)"}}));
 }
 
-} // namespace merian_nodes
+} // namespace merian

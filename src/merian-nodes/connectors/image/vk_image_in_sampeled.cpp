@@ -1,6 +1,6 @@
 #include "merian-nodes/connectors/image/vk_image_in_sampled.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 VkSampledImageIn::VkSampledImageIn(const std::string& name,
                                    const vk::AccessFlags2 access_flags,
@@ -80,4 +80,4 @@ std::shared_ptr<VkSampledImageIn> VkSampledImageIn::fragment_read(const std::str
         vk::ImageUsageFlagBits::eSampled, vk::ShaderStageFlagBits::eFragment, delay, optional);
 }
 
-} // namespace merian_nodes
+} // namespace merian

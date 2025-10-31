@@ -3,7 +3,7 @@
 #include "merian-nodes/connectors/image/vk_image_in_sampled.hpp"
 #include "merian-nodes/nodes/compute_node/compute_node.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 class FXAA : public AbstractCompute {
 
@@ -43,4 +43,4 @@ class FXAA : public AbstractCompute {
     VkSampledImageInHandle con_src = VkSampledImageIn::compute_read("src");
 };
 
-} // namespace merian_nodes
+} // namespace merian

@@ -5,7 +5,7 @@
 #include "merian-nodes/graph/connector_input.hpp"
 #include "merian-nodes/resources/image_array_resource.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 class VkImageIn;
 using VkImageInHandle = std::shared_ptr<VkImageIn>;
@@ -75,4 +75,4 @@ class VkImageIn : public InputConnector,
     uint32_t array_size = 1;
 };
 
-} // namespace merian_nodes
+} // namespace merian

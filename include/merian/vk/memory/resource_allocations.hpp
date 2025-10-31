@@ -3,7 +3,8 @@
 // Possible allocations together with their memory handles.
 
 #include "merian/utils/properties.hpp"
-#include "merian/vk/sampler/sampler.hpp"
+#include "merian/vk/context.hpp"
+#include "merian/vk/object.hpp"
 #include "merian/vk/utils/subresource_ranges.hpp"
 
 #include <spdlog/spdlog.h>
@@ -24,6 +25,44 @@ class MemoryAllocation;
 using MemoryAllocationHandle = std::shared_ptr<MemoryAllocation>;
 class Buffer;
 using BufferHandle = std::shared_ptr<Buffer>;
+
+/**
+ * @brief      This class describes a vk::Sampler with automatic cleanup.
+ */
+class Sampler : public std::enable_shared_from_this<Sampler>, public Resource {
+  public:
+    Sampler(const ContextHandle& context, const vk::SamplerCreateInfo& create_info)
+        : context(context) {
+        SPDLOG_DEBUG("create sampler ({})", fmt::ptr(this));
+        sampler = context->device.createSampler(create_info);
+    }
+
+    ~Sampler() {
+        SPDLOG_DEBUG("destroy sampler ({})", fmt::ptr(this));
+        context->device.destroySampler(sampler);
+    }
+
+    operator const vk::Sampler&() const {
+        return sampler;
+    }
+
+    const vk::Sampler& operator*() {
+        return sampler;
+    }
+
+    const vk::Sampler& get_sampler() const {
+        return sampler;
+    }
+
+    vk::DescriptorImageInfo get_descriptor_info() const {
+        return vk::DescriptorImageInfo{sampler, VK_NULL_HANDLE, vk::ImageLayout::eGeneral};
+    }
+
+  private:
+    const ContextHandle context;
+    vk::Sampler sampler;
+};
+using SamplerHandle = std::shared_ptr<Sampler>;
 
 class Buffer : public std::enable_shared_from_this<Buffer>, public Resource {
 

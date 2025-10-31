@@ -6,7 +6,7 @@
 
 #include <optional>
 
-namespace merian_nodes {
+namespace merian {
 
 class AbstractABCompare : public Node {
 
@@ -56,4 +56,4 @@ class ABSideBySide : public AbstractABCompare {
     ManagedVkImageOutHandle con_out;
 };
 
-} // namespace merian_nodes
+} // namespace merian

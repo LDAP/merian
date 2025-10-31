@@ -4,7 +4,7 @@
 
 #include "merian/vk/memory/resource_allocations.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 class TLASResource : public GraphResource {
     friend class VkTLASIn;
@@ -41,4 +41,4 @@ class TLASResource : public GraphResource {
 
 using TLASResourceHandle = std::shared_ptr<TLASResource>;
 
-} // namespace merian_nodes
+} // namespace merian

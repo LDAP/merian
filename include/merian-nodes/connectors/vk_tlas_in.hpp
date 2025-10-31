@@ -5,7 +5,7 @@
 #include "merian-nodes/graph/connector_input.hpp"
 #include "merian-nodes/resources/tlas_resource.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 class VkTLASIn;
 using VkTLASInHandle = std::shared_ptr<VkTLASIn>;
@@ -43,4 +43,4 @@ class VkTLASIn : public InputConnector,
     const vk::PipelineStageFlags2 pipeline_stages;
 };
 
-} // namespace merian_nodes
+} // namespace merian

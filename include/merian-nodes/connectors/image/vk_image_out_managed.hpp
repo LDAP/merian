@@ -4,7 +4,7 @@
 
 #include "merian-nodes/resources/image_array_resource.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 class ManagedVkImageOut;
 using ManagedVkImageOutHandle = std::shared_ptr<ManagedVkImageOut>;
@@ -143,4 +143,4 @@ class ManagedVkImageOut : public VkImageOut, public AccessibleConnector<const Im
     const std::vector<vk::ImageCreateInfo> create_infos;
 };
 
-} // namespace merian_nodes
+} // namespace merian

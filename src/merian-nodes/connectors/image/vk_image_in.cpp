@@ -3,7 +3,7 @@
 #include "merian-nodes/graph/errors.hpp"
 #include "merian-nodes/graph/node.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 VkImageIn::VkImageIn(const std::string& name,
                      const vk::AccessFlags2 access_flags,
@@ -93,4 +93,4 @@ VkImageIn::transfer_src(const std::string& name, const uint32_t delay, const boo
         vk::ShaderStageFlags(), delay, optional);
 }
 
-} // namespace merian_nodes
+} // namespace merian

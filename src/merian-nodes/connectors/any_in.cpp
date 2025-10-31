@@ -6,7 +6,7 @@
 
 #include <memory>
 
-namespace merian_nodes {
+namespace merian {
 
 AnyIn::AnyIn(const std::string& name, const uint32_t delay) : InputConnector(name, delay) {}
 
@@ -42,4 +42,4 @@ AnyInHandle AnyIn::create(const std::string& name, const uint32_t delay) {
     return std::make_shared<AnyIn>(name, delay);
 }
 
-} // namespace merian_nodes
+} // namespace merian

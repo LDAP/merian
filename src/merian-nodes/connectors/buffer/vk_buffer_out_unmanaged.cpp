@@ -5,7 +5,7 @@
 #include "merian-nodes/graph/node.hpp"
 #include "merian/utils/pointer.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 UnmanagedVkBufferOut::UnmanagedVkBufferOut(const std::string& name,
                                            const uint32_t array_size,
@@ -77,4 +77,4 @@ UnmanagedVkBufferOut::create(const std::string& name,
     return std::make_shared<UnmanagedVkBufferOut>(name, array_size, buffer_usage_flags);
 }
 
-} // namespace merian_nodes
+} // namespace merian

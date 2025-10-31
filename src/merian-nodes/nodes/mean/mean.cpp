@@ -7,7 +7,7 @@
 #include "image_to_buffer.comp.spv.h"
 #include "reduce_buffer.comp.spv.h"
 
-namespace merian_nodes {
+namespace merian {
 
 MeanToBuffer::MeanToBuffer(const ContextHandle& context) : Node(), context(context) {
 
@@ -107,4 +107,4 @@ void MeanToBuffer::process([[maybe_unused]] GraphRun& run,
     }
 }
 
-} // namespace merian_nodes
+} // namespace merian

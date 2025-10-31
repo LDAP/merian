@@ -2,7 +2,7 @@
 
 #include "merian-nodes/graph/connector_output.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 class VkImageOut;
 using VkImageOutHandle = std::shared_ptr<VkImageOut>;
@@ -27,4 +27,4 @@ class VkImageOut : public OutputConnector {
     const uint32_t array_size;
 };
 
-} // namespace merian_nodes
+} // namespace merian

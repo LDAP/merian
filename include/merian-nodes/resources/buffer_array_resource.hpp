@@ -3,7 +3,7 @@
 #include "merian-nodes/graph/resource.hpp"
 #include "merian/vk/memory/resource_allocations.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 class BufferArrayResource : public GraphResource {
     friend class VkBufferIn;
@@ -97,4 +97,4 @@ class BufferArrayResource : public GraphResource {
     std::vector<uint32_t> pending_updates;
 };
 
-} // namespace merian_nodes
+} // namespace merian

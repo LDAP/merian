@@ -3,7 +3,7 @@
 #include "merian-nodes/resources/buffer_array_resource.hpp"
 #include "merian/vk/memory/resource_allocations.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 class ManagedBufferArrayResource : public BufferArrayResource {
     friend class ManagedVkBufferOut;
@@ -28,4 +28,4 @@ class ManagedBufferArrayResource : public BufferArrayResource {
     std::vector<merian::BufferHandle> buffers;
 };
 
-} // namespace merian_nodes
+} // namespace merian

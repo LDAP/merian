@@ -9,7 +9,7 @@
 #include "merian/shader/entry_point.hpp"
 #include <optional>
 
-namespace merian_nodes {
+namespace merian {
 
 class Accumulate : public Node {
   private:
@@ -74,11 +74,11 @@ class Accumulate : public Node {
 
     // Graph IO
     VkSampledImageInHandle con_src = VkSampledImageIn::compute_read("src");
-    GBufferInHandle con_gbuf = merian_nodes::GBufferIn::compute_read("gbuffer");
+    GBufferInHandle con_gbuf = GBufferIn::compute_read("gbuffer");
     VkSampledImageInHandle con_mv = VkSampledImageIn::compute_read("mv", 0, true);
 
     VkSampledImageInHandle con_prev_out = VkSampledImageIn::compute_read("prev_out", 1);
-    GBufferInHandle con_prev_gbuf = merian_nodes::GBufferIn::compute_read("prev_gbuffer", 1);
+    GBufferInHandle con_prev_gbuf = GBufferIn::compute_read("prev_gbuffer", 1);
     VkSampledImageInHandle con_prev_history = VkSampledImageIn::compute_read("prev_history", 1);
 
     ManagedVkImageOutHandle con_out;
@@ -118,4 +118,4 @@ class Accumulate : public Node {
     std::string clear_event_listener_pattern = "/user/clear";
 };
 
-} // namespace merian_nodes
+} // namespace merian

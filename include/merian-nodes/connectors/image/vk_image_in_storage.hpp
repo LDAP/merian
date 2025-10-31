@@ -2,7 +2,7 @@
 
 #include "vk_image_in.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 class VkStorageImageIn;
 using VkStorageImageInHandle = std::shared_ptr<VkStorageImageIn>;
@@ -32,4 +32,4 @@ class VkStorageImageIn : public VkImageIn {
     compute_read(const std::string& name, const uint32_t delay = 0, const bool optional = false);
 };
 
-} // namespace merian_nodes
+} // namespace merian

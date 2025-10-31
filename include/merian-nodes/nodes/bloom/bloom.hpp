@@ -8,7 +8,7 @@
 #include "merian/vk/pipeline/pipeline.hpp"
 #include "merian/shader/entry_point.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 class Bloom : public Node {
   private:
@@ -55,4 +55,4 @@ class Bloom : public Node {
     int32_t mode = 0;
 };
 
-} // namespace merian_nodes
+} // namespace merian

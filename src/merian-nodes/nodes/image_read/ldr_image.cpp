@@ -5,7 +5,7 @@
 
 #include <filesystem>
 
-namespace merian_nodes {
+namespace merian {
 
 LDRImageRead::LDRImageRead(const ContextHandle& context) : Node(), context(context) {}
 
@@ -94,4 +94,4 @@ LDRImageRead::NodeStatusFlags LDRImageRead::properties(Properties& config) {
     return {};
 }
 
-} // namespace merian_nodes
+} // namespace merian

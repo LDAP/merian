@@ -6,7 +6,7 @@
 #include "config.h"
 #include "taa.slang.spv.h"
 
-namespace merian_nodes {
+namespace merian {
 
 TAA::TAA(const ContextHandle& context) : AbstractCompute(context, sizeof(PushConstant)) {
     auto spec_builder = SpecializationInfoBuilder();
@@ -71,4 +71,4 @@ AbstractCompute::NodeStatusFlags TAA::properties(Properties& config) {
     return {};
 }
 
-} // namespace merian_nodes
+} // namespace merian

@@ -2,7 +2,7 @@
 
 #include "vk_image_in.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 class VkSampledImageIn;
 using VkSampledImageInHandle = std::shared_ptr<VkSampledImageIn>;
@@ -43,4 +43,4 @@ class VkSampledImageIn : public VkImageIn {
     const std::optional<SamplerHandle> overwrite_sampler;
 };
 
-} // namespace merian_nodes
+} // namespace merian

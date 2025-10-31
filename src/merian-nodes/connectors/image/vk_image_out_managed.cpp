@@ -5,7 +5,7 @@
 #include "merian-nodes/graph/node.hpp"
 #include "merian-nodes/resources/image_array_resource_managed.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 ManagedVkImageOut::ManagedVkImageOut(const std::string& name,
                                      const vk::AccessFlags2& access_flags,
@@ -402,4 +402,4 @@ ManagedVkImageOutHandle ManagedVkImageOut::transfer_write(const std::string& nam
     return transfer_write(name, format, {width, height, depth}, persistent);
 }
 
-} // namespace merian_nodes
+} // namespace merian

@@ -5,7 +5,7 @@
 #include "merian-nodes/graph/connector_input.hpp"
 #include "merian-nodes/resources/buffer_array_resource.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 class VkBufferIn;
 using VkBufferInHandle = std::shared_ptr<VkBufferIn>;
@@ -92,4 +92,4 @@ class VkBufferIn : public InputConnector,
     uint32_t array_size = 1;
 };
 
-} // namespace merian_nodes
+} // namespace merian

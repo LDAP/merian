@@ -3,7 +3,7 @@
 #include "merian-nodes/graph/errors.hpp"
 #include "merian-nodes/resources/host_any_resource.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 AnyOut::AnyOut(const std::string& name, const bool persistent)
     : OutputConnector(name, !persistent), persistent(persistent) {}
@@ -58,4 +58,4 @@ AnyOutHandle AnyOut::create(const std::string& name, const bool persistent) {
     return std::make_shared<AnyOut>(name, persistent);
 }
 
-} // namespace merian_nodes
+} // namespace merian

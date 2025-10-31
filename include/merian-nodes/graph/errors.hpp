@@ -2,7 +2,7 @@
 
 #include <stdexcept>
 
-namespace merian_nodes {
+namespace merian {
 
 namespace graph_errors {
 
@@ -49,4 +49,4 @@ class connection_missing : public build_error {
 };
 
 } // namespace graph_errors
-} // namespace merian_nodes
+} // namespace merian

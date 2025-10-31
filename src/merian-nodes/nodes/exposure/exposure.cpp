@@ -8,7 +8,7 @@
 #include "histogram.slang.spv.h"
 #include "luminance.slang.spv.h"
 
-namespace merian_nodes {
+namespace merian {
 
 AutoExposure::AutoExposure(const ContextHandle& context) : Node(), context(context) {
 
@@ -153,4 +153,4 @@ AutoExposure::NodeStatusFlags AutoExposure::properties(Properties& config) {
     return {};
 }
 
-} // namespace merian_nodes
+} // namespace merian

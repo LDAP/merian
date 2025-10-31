@@ -9,7 +9,7 @@
 
 #include "fmt/args.h"
 
-namespace merian_nodes {
+namespace merian {
 
 #define FORMAT_PNG 0
 #define FORMAT_JPG 1
@@ -411,4 +411,4 @@ void ImageWrite::set_callback(const std::function<void()>& callback) {
     this->callback = callback;
 }
 
-} // namespace merian_nodes
+} // namespace merian

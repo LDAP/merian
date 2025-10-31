@@ -28,7 +28,7 @@
 #include <unordered_set>
 
 #include <fmt/chrono.h>
-namespace merian_nodes {
+namespace merian {
 namespace graph_internal {
 
 // Describes a connection between two connectors of two nodes.
@@ -264,7 +264,10 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
     }
 
     // finds any node with the given type. Returns nullptr if not found.
-    template <typename NODE_TYPE> std::shared_ptr<NODE_TYPE> find_node_for_type() {
+    template <typename NODE_TYPE>
+    std::shared_ptr<NODE_TYPE> find_node_for_type()
+        requires(std::is_base_of_v<Node, NODE_TYPE>)
+    {
         for (const auto& [node, data] : node_data) {
             if (registry.node_type_name(node) == registry.node_type_name<NODE_TYPE>()) {
                 return debugable_ptr_cast<NODE_TYPE>(node);
@@ -275,7 +278,9 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
     }
 
     template <typename NODE_TYPE>
-    std::shared_ptr<NODE_TYPE> find_node_for_identifier_and_type(const std::string& identifier) {
+    std::shared_ptr<NODE_TYPE> find_node_for_identifier_and_type(const std::string& identifier)
+        requires(std::is_base_of_v<Node, NODE_TYPE>)
+    {
         NodeHandle maybe_match = find_node_for_identifier(identifier);
         if (!maybe_match) {
             return nullptr;
@@ -2287,4 +2292,4 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
     GraphRun graph_run;
 };
 
-} // namespace merian_nodes
+} // namespace merian

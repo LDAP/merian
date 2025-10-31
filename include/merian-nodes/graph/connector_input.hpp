@@ -4,7 +4,7 @@
 
 #include "merian/utils/pointer.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 // The base class for all input connectors.
 class InputConnector : public Connector {
@@ -55,4 +55,4 @@ template <typename OutputConnectorType, typename ResourceAccessType = void>
 using OutputAccessibleInputConnectorHandle =
     std::shared_ptr<OutputAccessibleInputConnector<OutputConnectorType>>;
 
-} // namespace merian_nodes
+} // namespace merian

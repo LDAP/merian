@@ -5,7 +5,7 @@
 
 #include <filesystem>
 
-namespace merian_nodes {
+namespace merian {
 
 HDRImageRead::HDRImageRead(const ContextHandle& context) : Node(), context(context) {}
 
@@ -89,4 +89,4 @@ HDRImageRead::NodeStatusFlags HDRImageRead::properties(Properties& config) {
     return {};
 }
 
-} // namespace merian_nodes
+} // namespace merian

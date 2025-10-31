@@ -3,7 +3,7 @@
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 AbstractCompute::AbstractCompute(const ContextHandle& context,
                                  const std::optional<uint32_t> push_constant_size)
@@ -49,4 +49,4 @@ void AbstractCompute::process(GraphRun& run,
     }
 }
 
-} // namespace merian_nodes
+} // namespace merian

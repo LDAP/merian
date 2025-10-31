@@ -3,7 +3,7 @@
 #include "merian-nodes/graph/resource.hpp"
 #include "merian/vk/memory/resource_allocations.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 /**
  * @brief      This class describes an image array resource.
@@ -108,4 +108,4 @@ class ImageArrayResource : public GraphResource {
 
 using ImageArrayResourceHandle = std::shared_ptr<ImageArrayResource>;
 
-} // namespace merian_nodes
+} // namespace merian

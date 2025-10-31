@@ -8,7 +8,7 @@
 
 #include <memory>
 
-namespace merian_nodes {
+namespace merian {
 
 template <typename T> class PtrOut;
 template <typename T> using PtrOutHandle = std::shared_ptr<PtrOut<T>>;
@@ -60,4 +60,4 @@ class PtrOut : public OutputConnector, public AccessibleConnector<std::shared_pt
     const bool persistent;
 };
 
-} // namespace merian_nodes
+} // namespace merian

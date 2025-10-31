@@ -8,7 +8,7 @@
 #include "merian/vk/descriptors/descriptor_set.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 class Node;
 using NodeHandle = std::shared_ptr<Node>;
@@ -121,4 +121,4 @@ template <typename ResourceAccessType = void> class AccessibleConnector {
 template <typename ResourceType, typename ResourceAccessType = void>
 using AccessibleConnectorHandle = std::shared_ptr<AccessibleConnector<ResourceAccessType>>;
 
-} // namespace merian_nodes
+} // namespace merian

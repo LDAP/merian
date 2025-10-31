@@ -4,7 +4,7 @@
 #include "merian/vk/command/command_buffer.hpp"
 #include "merian/vk/memory/resource_allocations.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 class UnmanagedBufferArrayResource : public BufferArrayResource {
     friend class VkBufferIn;
@@ -53,4 +53,4 @@ class UnmanagedBufferArrayResource : public BufferArrayResource {
     std::vector<merian::BufferHandle>& buffers;
 };
 
-} // namespace merian_nodes
+} // namespace merian

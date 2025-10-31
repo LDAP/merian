@@ -4,7 +4,7 @@
 
 #include "merian/vk/memory/resource_allocator.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 class InputConnector;
 using InputConnectorHandle = std::shared_ptr<InputConnector>;
@@ -51,4 +51,4 @@ class OutputConnector : public Connector {
 
 using OutputConnectorHandle = std::shared_ptr<OutputConnector>;
 
-} // namespace merian_nodes
+} // namespace merian

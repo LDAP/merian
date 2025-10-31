@@ -3,7 +3,7 @@
 #include "merian-nodes/connectors/image/vk_image_in_sampled.hpp"
 #include "merian-nodes/nodes/compute_node/compute_node.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 class Reduce : public AbstractCompute {
 
@@ -22,7 +22,7 @@ class Reduce : public AbstractCompute {
     std::vector<OutputConnectorHandle> describe_outputs(const NodeIOLayout& io_layout) override;
 
     std::tuple<uint32_t, uint32_t, uint32_t>
-    get_group_count(const merian_nodes::NodeIO& io) const noexcept override;
+    get_group_count(const NodeIO& io) const noexcept override;
 
     VulkanEntryPointHandle get_entry_point() override;
 
@@ -43,4 +43,4 @@ class Reduce : public AbstractCompute {
     std::vector<VkSampledImageInHandle> input_connectors;
 };
 
-} // namespace merian_nodes
+} // namespace merian

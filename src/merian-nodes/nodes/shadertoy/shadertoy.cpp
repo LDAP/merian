@@ -4,7 +4,7 @@
 #include "merian-nodes/graph/errors.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 static const char* shadertoy_pre = R"(#version 460
 #extension GL_EXT_scalar_block_layout : require
@@ -244,4 +244,4 @@ AbstractCompute::NodeStatusFlags Shadertoy::properties(Properties& config) {
     return {};
 }
 
-} // namespace merian_nodes
+} // namespace merian

@@ -7,7 +7,7 @@
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 Accumulate::Accumulate(const ContextHandle& context,
                        const ResourceAllocatorHandle& allocator,
@@ -243,4 +243,4 @@ void Accumulate::request_clear() {
     clear = true;
 }
 
-} // namespace merian_nodes
+} // namespace merian

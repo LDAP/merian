@@ -6,7 +6,7 @@
 
 #include <optional>
 
-namespace merian_nodes {
+namespace merian {
 
 // A general purpose compute node.
 // The pipeline is automatically rebuild if ShaderModule or SpecializationInfo pointer change.
@@ -67,4 +67,4 @@ template <class PushConstant> class TypedPCAbstractCompute : public AbstractComp
                                                         [[maybe_unused]] const NodeIO& io) = 0;
 };
 
-} // namespace merian_nodes
+} // namespace merian

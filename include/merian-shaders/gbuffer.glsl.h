@@ -3,7 +3,7 @@
 
 #ifdef __cplusplus
 // c++ only
-namespace merian_nodes {
+namespace merian {
 #else
 // GLSL only
 // clang-format off

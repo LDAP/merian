@@ -11,12 +11,12 @@ The graph internally creates (delay + 1) resources and cycles them in every iter
 ### Example:
 
 ```c++
-    merian_nodes::Graph graph{context, alloc};
-    auto window_node = std::make_shared<merian_nodes::GLFWWindow>(context);
-    auto image_in = std::make_shared<merian_nodes::HDRImageRead>(alloc->getStaging(), "filename.hdr", false);
-    auto exp = std::make_shared<merian_nodes::AutoExposure>(context);
-    auto tonemap = std::make_shared<merian_nodes::Tonemap>(context);
-    auto curve = std::make_shared<merian_nodes::VKDTFilmcurv>(context);
+    merian::Graph graph{context, alloc};
+    auto window_node = std::make_shared<merian::GLFWWindow>(context);
+    auto image_in = std::make_shared<merian::HDRImageRead>(alloc->getStaging(), "filename.hdr", false);
+    auto exp = std::make_shared<merian::AutoExposure>(context);
+    auto tonemap = std::make_shared<merian::Tonemap>(context);
+    auto curve = std::make_shared<merian::VKDTFilmcurv>(context);
 
     graph.add_node(window_node, "window");
     graph.add_node(image_in);

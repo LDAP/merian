@@ -8,7 +8,7 @@
 
 #include <regex>
 
-namespace merian_nodes {
+namespace merian {
 
 Reduce::Reduce(const ContextHandle& context, const std::optional<vk::Format>& output_format)
     : AbstractCompute(context), output_format(output_format) {}
@@ -124,7 +124,7 @@ void main() {
 // }
 
 std::tuple<uint32_t, uint32_t, uint32_t>
-Reduce::get_group_count([[maybe_unused]] const merian_nodes::NodeIO& io) const noexcept {
+Reduce::get_group_count([[maybe_unused]] const NodeIO& io) const noexcept {
     return {(extent.width + local_size_x - 1) / local_size_x,
             (extent.height + local_size_y - 1) / local_size_y, 1};
 };
@@ -158,4 +158,4 @@ Reduce::NodeStatusFlags Reduce::properties(Properties& props) {
     return {};
 }
 
-} // namespace merian_nodes
+} // namespace merian

@@ -4,13 +4,13 @@
 #include "merian-nodes/connectors/image/vk_image_in_sampled.hpp"
 #include "merian-nodes/graph/node.hpp"
 
+#include "merian/shader/entry_point.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
-#include "merian/shader/entry_point.hpp"
 
 #include <optional>
 
-namespace merian_nodes {
+namespace merian {
 
 class SVGF : public Node {
   private:
@@ -69,8 +69,8 @@ class SVGF : public Node {
     VkSampledImageInHandle con_history = VkSampledImageIn::compute_read("history");
     VkSampledImageInHandle con_albedo = VkSampledImageIn::compute_read("albedo");
     VkSampledImageInHandle con_mv = VkSampledImageIn::compute_read("mv", 0, true);
-    GBufferInHandle con_gbuffer = merian_nodes::GBufferIn::compute_read("gbuffer");
-    GBufferInHandle con_prev_gbuffer = merian_nodes::GBufferIn::compute_read("prev_gbuffer", 1);
+    GBufferInHandle con_gbuffer = GBufferIn::compute_read("gbuffer");
+    GBufferInHandle con_prev_gbuffer = GBufferIn::compute_read("prev_gbuffer", 1);
 
     ManagedVkImageOutHandle con_out;
 
@@ -112,4 +112,4 @@ class SVGF : public Node {
     bool kaleidoscope_use_shmem = true;
 };
 
-} // namespace merian_nodes
+} // namespace merian

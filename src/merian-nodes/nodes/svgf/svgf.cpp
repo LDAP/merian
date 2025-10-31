@@ -8,7 +8,7 @@
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 SVGF::SVGF(const ContextHandle& context,
            const ResourceAllocatorHandle& allocator,
@@ -335,4 +335,4 @@ SVGF::NodeStatusFlags SVGF::properties(Properties& config) {
     return {};
 }
 
-} // namespace merian_nodes
+} // namespace merian

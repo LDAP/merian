@@ -4,7 +4,7 @@
 #include "merian-nodes/graph/node.hpp"
 #include "merian/utils/pointer.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 UnmanagedVkImageOut::UnmanagedVkImageOut(const std::string& name,
                                          const uint32_t array_size,
@@ -85,4 +85,4 @@ UnmanagedVkImageOutHandle UnmanagedVkImageOut::create(const std::string& name,
     return std::make_shared<UnmanagedVkImageOut>(name, array_size, image_usage_flags);
 }
 
-} // namespace merian_nodes
+} // namespace merian

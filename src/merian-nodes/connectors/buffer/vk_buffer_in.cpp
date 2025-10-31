@@ -1,7 +1,7 @@
 #include "merian-nodes/connectors/buffer/vk_buffer_in.hpp"
 #include "merian-nodes/graph/errors.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 VkBufferIn::VkBufferIn(const std::string& name,
                        const vk::BufferUsageFlags usage_flags,
@@ -119,4 +119,4 @@ VkBufferIn::transfer_src(const std::string& name, const uint32_t delay, const bo
                                         vk::PipelineStageFlagBits2::eAllTransfer, delay, optional);
 }
 
-} // namespace merian_nodes
+} // namespace merian

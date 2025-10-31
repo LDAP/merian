@@ -5,7 +5,7 @@
 
 #include "fxaa.slang.spv.h"
 
-namespace merian_nodes {
+namespace merian {
 
 FXAA::FXAA(const ContextHandle& context) : AbstractCompute(context, sizeof(PushConstant)) {
     auto spec_builder = SpecializationInfoBuilder();
@@ -76,4 +76,4 @@ This can effect sharpness.
     return {};
 }
 
-} // namespace merian_nodes
+} // namespace merian

@@ -3,7 +3,7 @@
 #include "merian-nodes/resources/image_array_resource_unmanaged.hpp"
 #include "vk_image_out.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 class UnmanagedVkImageOut;
 using UnmanagedVkImageOutHandle = std::shared_ptr<UnmanagedVkImageOut>;
@@ -54,4 +54,4 @@ class UnmanagedVkImageOut : public VkImageOut,
     const vk::ImageUsageFlags image_usage_flags;
 };
 
-} // namespace merian_nodes
+} // namespace merian

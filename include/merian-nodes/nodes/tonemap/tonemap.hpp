@@ -3,7 +3,7 @@
 #include "merian-nodes/connectors/image/vk_image_in_sampled.hpp"
 #include "merian-nodes/nodes/compute_node/compute_node.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 class Tonemap : public AbstractCompute {
 
@@ -57,4 +57,4 @@ class Tonemap : public AbstractCompute {
     int32_t clamp_output = 1;
 };
 
-} // namespace merian_nodes
+} // namespace merian

@@ -9,7 +9,7 @@
 #include "merian/vk/raytrace/as_builder.hpp"
 #include "merian/vk/utils/math.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 /**
  * @brief      Builds BLASes and TLASes on the device.
@@ -372,4 +372,4 @@ class DeviceASBuilder : public Node {
     BufferHandle scratch_buffer;
 };
 
-} // namespace merian_nodes
+} // namespace merian

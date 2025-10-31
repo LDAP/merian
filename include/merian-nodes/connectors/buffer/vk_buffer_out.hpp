@@ -2,7 +2,7 @@
 
 #include "merian-nodes/graph/connector_output.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 class VkBufferOut;
 using VkBufferOutHandle = std::shared_ptr<VkBufferOut>;
@@ -27,4 +27,4 @@ class VkBufferOut : public OutputConnector {
     const uint32_t array_size;
 };
 
-} // namespace merian_nodes
+} // namespace merian

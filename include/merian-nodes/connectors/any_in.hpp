@@ -7,7 +7,7 @@
 #include <any>
 #include <memory>
 
-namespace merian_nodes {
+namespace merian {
 
 class AnyIn;
 using AnyInHandle = std::shared_ptr<AnyIn>;
@@ -36,4 +36,4 @@ class AnyIn : public InputConnector,
     static AnyInHandle create(const std::string& name, const uint32_t delay = 0);
 };
 
-} // namespace merian_nodes
+} // namespace merian

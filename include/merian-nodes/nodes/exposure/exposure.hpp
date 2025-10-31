@@ -8,7 +8,7 @@
 #include "merian/vk/pipeline/pipeline.hpp"
 #include "merian/shader/entry_point.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 class AutoExposure : public Node {
   private:
@@ -76,4 +76,4 @@ class AutoExposure : public Node {
     PipelineHandle exposure;
 };
 
-} // namespace merian_nodes
+} // namespace merian

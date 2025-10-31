@@ -5,7 +5,7 @@
 #include "merian-nodes/resources/buffer_array_resource_managed.hpp"
 #include "merian/utils/pointer.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 ManagedVkBufferOut::ManagedVkBufferOut(const std::string& name,
                                        const vk::AccessFlags2& access_flags,
@@ -149,4 +149,4 @@ std::shared_ptr<ManagedVkBufferOut> ManagedVkBufferOut::transfer_write(
                                                 vk::ShaderStageFlags(), create_info, persistent);
 }
 
-} // namespace merian_nodes
+} // namespace merian

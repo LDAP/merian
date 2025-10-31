@@ -4,7 +4,7 @@
 #include "merian-nodes/graph/errors.hpp"
 #include "special_static_out.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 template <typename ValueType> class SpecialStaticIn;
 template <typename ValueType>
@@ -37,4 +37,4 @@ class SpecialStaticIn : public InputConnector,
     }
 };
 
-} // namespace merian_nodes
+} // namespace merian

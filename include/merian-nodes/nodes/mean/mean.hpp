@@ -7,7 +7,7 @@
 #include "merian/vk/pipeline/pipeline.hpp"
 #include "merian/shader/entry_point.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 class MeanToBuffer : public Node {
   private:
@@ -53,4 +53,4 @@ class MeanToBuffer : public Node {
     PipelineHandle reduce_buffer;
 };
 
-} // namespace merian_nodes
+} // namespace merian

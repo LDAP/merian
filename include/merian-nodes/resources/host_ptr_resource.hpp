@@ -3,7 +3,7 @@
 #include "merian-nodes/graph/resource.hpp"
 #include <fmt/format.h>
 
-namespace merian_nodes {
+namespace merian {
 
 template <typename T> class PtrResource : public GraphResource {
     template <typename> friend class PtrOut;
@@ -32,4 +32,4 @@ template <typename T> class PtrResource : public GraphResource {
     std::shared_ptr<T> ptr;
 };
 
-} // namespace merian_nodes
+} // namespace merian

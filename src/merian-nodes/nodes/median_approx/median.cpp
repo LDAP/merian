@@ -7,7 +7,7 @@
 #include "median_histogram.comp.spv.h"
 #include "median_reduce.comp.spv.h"
 
-namespace merian_nodes {
+namespace merian {
 
 MedianApproxNode::MedianApproxNode(const ContextHandle& context) : Node(), context(context) {
 
@@ -100,4 +100,4 @@ MedianApproxNode::NodeStatusFlags MedianApproxNode::properties(Properties& confi
     return {};
 }
 
-} // namespace merian_nodes
+} // namespace merian

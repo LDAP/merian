@@ -5,7 +5,7 @@
 
 #include <any>
 
-namespace merian_nodes {
+namespace merian {
 
 class AnyResource : public GraphResource {
     friend class AnyOut;
@@ -28,4 +28,4 @@ class AnyResource : public GraphResource {
     std::any any;
 };
 
-} // namespace merian_nodes
+} // namespace merian

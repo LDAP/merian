@@ -13,7 +13,7 @@
 
 #include <memory>
 
-namespace merian_nodes {
+namespace merian {
 
 class GraphInfo {};
 
@@ -148,4 +148,4 @@ class Node : public std::enable_shared_from_this<Node> {
 
 using NodeHandle = std::shared_ptr<Node>;
 
-} // namespace merian_nodes
+} // namespace merian

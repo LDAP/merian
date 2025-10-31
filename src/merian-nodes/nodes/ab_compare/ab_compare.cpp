@@ -1,7 +1,7 @@
 #include "merian-nodes/nodes/ab_compare/ab_compare.hpp"
 #include "merian/vk/utils/blits.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 AbstractABCompare::AbstractABCompare(const std::optional<vk::Format> output_format,
                                      const std::optional<vk::Extent2D> output_extent)
@@ -102,4 +102,4 @@ void ABSideBySide::process([[maybe_unused]] GraphRun& run,
     cmd->blit(b, b->get_current_layout(), result, result->get_current_layout(), region);
 }
 
-} // namespace merian_nodes
+} // namespace merian

@@ -4,7 +4,7 @@
 
 #include <string>
 
-namespace merian_nodes {
+namespace merian {
 
 class NodeRegistry {
 
@@ -60,7 +60,9 @@ class NodeRegistry {
     //
     // If add_default_config is true a node with empty config is added.
     template <typename NODE_TYPE>
-    void register_node_type(NodeTypeInfo&& node_info, const bool add_default_config = true) {
+    void register_node_type(NodeTypeInfo&& node_info, const bool add_default_config = true)
+        requires(std::is_base_of_v<Node, NODE_TYPE>)
+    {
         const std::type_index type = typeid(std::remove_pointer_t<NODE_TYPE>);
         if (type_name_to_type.contains(node_info.node_type_name)) {
             throw std::invalid_argument{
@@ -183,4 +185,4 @@ class NodeRegistry {
     std::map<std::type_index, NodeTypeInfo> type_to_type_info;
 };
 
-} // namespace merian_nodes
+} // namespace merian

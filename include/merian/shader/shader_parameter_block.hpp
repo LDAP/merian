@@ -17,6 +17,12 @@
 
 namespace merian {
 
+struct BindingOffset {
+    uint32_t binding_set;
+    uint32_t binding;
+    // uint32_t array_element;
+};
+
 struct ShaderOffset {
     std::size_t uniform_byte_offset = 0;
     uint32_t binding_range_offset = 0;

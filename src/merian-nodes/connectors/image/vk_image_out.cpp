@@ -1,7 +1,7 @@
 #include "merian-nodes/connectors/image/vk_image_out.hpp"
 #include "merian-nodes/graph/errors.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 VkImageOut::VkImageOut(const std::string& name, const bool persistent, const uint32_t array_size)
     : OutputConnector(name, !persistent), persistent(persistent), array_size(array_size) {}
@@ -24,4 +24,4 @@ vk::ImageCreateInfo VkImageOut::get_create_info_or_throw(const uint32_t index) c
     return *optional_infos;
 }
 
-} // namespace merian_nodes
+} // namespace merian

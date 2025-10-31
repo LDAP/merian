@@ -3,7 +3,7 @@
 #include "merian-nodes/connectors/buffer/vk_buffer_out.hpp"
 #include "merian-nodes/resources/buffer_array_resource_unmanaged.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 class UnmanagedVkBufferOut;
 using UnmanagedVkBufferOutHandle = std::shared_ptr<UnmanagedVkBufferOut>;
@@ -51,4 +51,4 @@ class UnmanagedVkBufferOut : public VkBufferOut,
     std::vector<merian::BufferHandle> buffers;
 };
 
-} // namespace merian_nodes
+} // namespace merian

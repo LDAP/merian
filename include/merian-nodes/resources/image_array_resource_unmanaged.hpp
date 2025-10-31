@@ -5,7 +5,7 @@
 #include "merian/vk/memory/resource_allocations.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 
-namespace merian_nodes {
+namespace merian {
 
 class UnmanagedImageArrayResource : public ImageArrayResource {
     friend class UnmanagedVkImageOut;
@@ -120,4 +120,4 @@ class UnmanagedImageArrayResource : public ImageArrayResource {
 
 using UnmanagedImageArrayResourceHandle = std::shared_ptr<UnmanagedImageArrayResource>;
 
-} // namespace merian_nodes
+} // namespace merian
