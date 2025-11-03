@@ -7,6 +7,7 @@
 #include "merian-nodes/nodes/color_image/color_output.hpp"
 #include "merian-nodes/nodes/exposure/exposure.hpp"
 #include "merian-nodes/nodes/fxaa/fxaa.hpp"
+#include "merian-nodes/nodes/gbuffer_rt/gbuffer.hpp"
 #include "merian-nodes/nodes/glfw_window/glfw_window.hpp"
 #include "merian-nodes/nodes/image_read/hdr_image.hpp"
 #include "merian-nodes/nodes/image_read/ldr_image.hpp"
@@ -49,6 +50,9 @@ NodeRegistry::NodeRegistry(const ContextHandle& context, const ResourceAllocator
                      "Fast approximate anti-aliasing (FXAA) is a screen-space "
                      "anti-aliasing algorithm created by Timothy Lottes at NVIDIA.",
                      [=]() { return std::make_shared<FXAA>(context); }});
+    register_node_type<GBufferRTNode>(NodeTypeInfo{
+        "GBuffer (Raytraced)", "Creates a GBuffer for the Merian scene format using Raytracing.",
+        [=]() { return std::make_shared<GBufferRTNode>(); }});
     register_node_type<GLFWWindowNode>(
         NodeTypeInfo{"Window (GLFW)", "Outputs to a window created with GLFW.",
                      [=]() { return std::make_shared<GLFWWindowNode>(context); }});
