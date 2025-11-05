@@ -46,9 +46,26 @@ public:
 private:
     void make_spec_info();
 
+    std::vector<InputConnectorHandle> reflectInputConnectors(slang::EntryPointReflection* entry_point);
+    std::vector<OutputConnectorHandle> reflectOutputConnectors(const NodeIOLayout& io_layout,
+                            slang::EntryPointReflection* entry_point);
+
+    std::vector<slang::VariableLayoutReflection*> getVariableLayoutsFromScope(slang::VariableLayoutReflection* scope_var_layout);
+    std::vector<slang::VariableLayoutReflection*> reflectFieldsFromStruct(slang::VariableLayoutReflection* struct_layout);
+
+    vk::Extent3D getExtentForImageOutputConnector(const NodeIOLayout& io_layout,
+                                             slang::VariableReflection* var) const;
+    vk::Format getFormatForImageOutputConnector(slang::TypeReflection* type);
+
+    static slang::Attribute* findAttributeByName(slang::VariableReflection* var, const std::string& name);
+    InputConnectorHandle findInputConnectorByName(const std::string& name) const;
+
     const std::optional<vk::Format> output_format;
 
     VkSampledImageInHandle con_src;
+
+    std::vector<InputConnectorHandle> input_connectors;
+    std::vector<OutputConnectorHandle> output_connectors;
 
     vk::Extent3D extent;
     PushConstant pc;

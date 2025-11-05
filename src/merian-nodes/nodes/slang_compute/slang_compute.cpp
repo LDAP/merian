@@ -31,7 +31,7 @@ void SlangCompute::make_spec_info() {
     program_layout = slang_entry_point->get_program()->get_program_reflection();
 }
 
-std::vector<slang::VariableLayoutReflection*> getVariableLayoutsFromScope(slang::VariableLayoutReflection* scope_var_layout) {
+std::vector<slang::VariableLayoutReflection*> SlangCompute::getVariableLayoutsFromScope(slang::VariableLayoutReflection* scope_var_layout) {
     std::vector<slang::VariableLayoutReflection*> result{};
 
     auto scope_type_layout = scope_var_layout->getTypeLayout();
@@ -53,44 +53,7 @@ std::vector<slang::VariableLayoutReflection*> getVariableLayoutsFromScope(slang:
     return result;
 }
 
-std::vector<slang::VariableLayoutReflection*> findInputVariables(std::vector<slang::VariableLayoutReflection*> variable_layouts) {
-    std::vector<slang::VariableLayoutReflection*> result{};
-    Slang::ComPtr<slang::IGlobalSession> global_session = get_global_slang_session();
-
-    for (const auto& var_layout : variable_layouts) {
-        slang::VariableReflection* var = var_layout->getVariable();
-        auto attr = var->findUserAttributeByName(global_session, "MerianInput");
-
-        if (attr != nullptr) {
-            result.push_back(var_layout);
-            SPDLOG_INFO(var_layout->getName());
-        }
-    }
-
-    return result;
-}
-
-std::vector<slang::VariableLayoutReflection*> reflectFieldsFromStruct(slang::VariableLayoutReflection* struct_layout) {
-    std::vector<slang::VariableLayoutReflection*> result{};
-
-    slang::TypeLayoutReflection* type_layout = struct_layout->getTypeLayout();
-    slang::TypeReflection* type = type_layout->getType();
-
-    slang::TypeReflection::Kind kind = type->getKind();
-    if (kind == slang::TypeReflection::Kind::Struct) {
-        uint32_t field_count = type->getFieldCount();
-        result.reserve(field_count);
-        for (int f = 0; f < field_count; f++)
-        {
-            slang::VariableLayoutReflection* field = type_layout->getFieldByIndex(f);
-            result.push_back(field);
-        }
-    }
-
-    return result;
-}
-
-std::vector<InputConnectorHandle> reflectInputConnectors(slang::EntryPointReflection* entry_point) {
+std::vector<InputConnectorHandle> SlangCompute::reflectInputConnectors(slang::EntryPointReflection* entry_point) {
     std::vector<InputConnectorHandle> result{};
     std::vector<slang::VariableLayoutReflection*> reflected_inputs{};
 
@@ -121,26 +84,137 @@ std::vector<InputConnectorHandle> reflectInputConnectors(slang::EntryPointReflec
     return result;
 }
 
+std::vector<OutputConnectorHandle> SlangCompute::reflectOutputConnectors(const NodeIOLayout& io_layout, slang::EntryPointReflection* entry_point) {
+    std::vector<OutputConnectorHandle> result{};
+    std::vector<slang::VariableLayoutReflection*> reflected_outputs{};
+
+    const uint32_t param_count = entry_point->getParameterCount();
+    for (uint32_t i = 0; i < param_count; i++) {
+        slang::VariableLayoutReflection* var_layout = entry_point->getParameterByIndex(i);
+        if (std::string(var_layout->getName()) == "merian_out") {
+            reflected_outputs = reflectFieldsFromStruct(var_layout);
+        }
+    }
+
+    for (const auto& reflected_output : reflected_outputs) {
+        slang::TypeLayoutReflection* type_layout = reflected_output->getTypeLayout();
+        slang::TypeReflection* type = type_layout->getType();
+        slang::VariableReflection* var = reflected_output->getVariable();
+
+        if (type->getKind() != slang::TypeReflection::Kind::Resource)
+            continue;
+
+        if (type->getResourceShape() == (SLANG_TEXTURE_COMBINED_FLAG | SLANG_TEXTURE_2D)) {
+            slang::TypeReflection* result_type = type->getResourceResultType();
+
+            // TODO sampler connector
+        } else if (type->getResourceShape() == SLANG_TEXTURE_2D) {
+            const vk::Extent3D extent = getExtentForImageOutputConnector(io_layout, var);
+            const vk::Format format = getFormatForImageOutputConnector(type);
+
+            result.push_back(ManagedVkImageOut::compute_write(reflected_output->getName(), format, extent));
+        }
+    }
+
+    return result;
+}
+
+std::vector<slang::VariableLayoutReflection*> SlangCompute::reflectFieldsFromStruct(slang::VariableLayoutReflection* struct_layout) {
+    std::vector<slang::VariableLayoutReflection*> result{};
+
+    slang::TypeLayoutReflection* type_layout = struct_layout->getTypeLayout();
+    slang::TypeReflection* type = type_layout->getType();
+
+    slang::TypeReflection::Kind kind = type->getKind();
+    if (kind == slang::TypeReflection::Kind::Struct) {
+        uint32_t field_count = type->getFieldCount();
+        result.reserve(field_count);
+        for (int f = 0; f < field_count; f++)
+        {
+            slang::VariableLayoutReflection* field = type_layout->getFieldByIndex(f);
+            result.push_back(field);
+        }
+    }
+
+    return result;
+}
+
+ vk::Extent3D SlangCompute::getExtentForImageOutputConnector(const NodeIOLayout& io_layout, slang::VariableReflection* var) const {
+    constexpr const char* STATIC_EXTENT_ATTRIBUTE_NAME = "MerianExtentStatic";
+    constexpr const char* EXTENT_AS_ATTRIBUTE_NAME = "MerianExtentAs";
+
+    slang::Attribute* extent_attribute = nullptr;
+    if ((extent_attribute = findAttributeByName(var, STATIC_EXTENT_ATTRIBUTE_NAME)) != nullptr) {
+        glm::ivec3 dims = glm::ivec3(0);
+        extent_attribute->getArgumentValueInt(0, &dims.x);
+        extent_attribute->getArgumentValueInt(1, &dims.y);
+        extent_attribute->getArgumentValueInt(2, &dims.z);
+
+        return  vk::Extent3D(dims.x, dims.y, dims.z);
+    }
+
+    if ((extent_attribute = findAttributeByName(var, EXTENT_AS_ATTRIBUTE_NAME)) != nullptr) {
+        std::string const mirrored_input_name = extent_attribute->getArgumentValueString(0, nullptr);
+        VkSampledImageInHandle mirrored_input = dynamic_pointer_cast<VkSampledImageIn>(findInputConnectorByName(mirrored_input_name)); // TODO look at this
+
+        if (mirrored_input == nullptr) {
+            throw MerianException("Input connector " + mirrored_input_name + " can not be mirrored by output connector " + std::string(var->getName()));
+        }
+
+        const vk::ImageCreateInfo create_info = io_layout[mirrored_input]->get_create_info_or_throw();
+        return create_info.extent;
+    }
+
+    throw MerianException("No extent defined for output connector %s" + std::string(var->getName()));
+}
+
+vk::Format SlangCompute::getFormatForImageOutputConnector(slang::TypeReflection* type) {
+    slang::TypeReflection* result_type = type->getResourceResultType();
+    return vk::Format::eR8G8B8A8Unorm; // TODO dont hard code this
+}
+
+slang::Attribute* SlangCompute::findAttributeByName(slang::VariableReflection* var, const std::string& name) {
+    const uint32_t attribute_count = var->getUserAttributeCount();
+    for (uint32_t i = 0; i < attribute_count; i++) {
+        slang::Attribute* attribute = var->getUserAttributeByIndex(i);
+        if (attribute->getName() == name) {
+            return attribute;
+        }
+    }
+    return nullptr;
+}
+
+InputConnectorHandle SlangCompute::findInputConnectorByName(const std::string& name) const {
+    for (const auto& input : input_connectors) {
+        if (input->name == name) {
+            return input;
+        }
+    }
+    return nullptr;
+}
+
 std::vector<InputConnectorHandle> SlangCompute::describe_inputs() {
     using namespace slang;
 
     assert(program_layout->getEntryPointCount() == 1);
     EntryPointReflection* entry_point = program_layout->getEntryPointByIndex(0);
-    std::vector<InputConnectorHandle> input_handles = reflectInputConnectors(entry_point);
-    con_src = static_pointer_cast<VkSampledImageIn>(input_handles.at(0)); // TODO remove this
-    return input_handles;
+    input_connectors = reflectInputConnectors(entry_point);
+    con_src = static_pointer_cast<VkSampledImageIn>(input_connectors.at(0)); // TODO remove this
+    return input_connectors;
 }
 
 std::vector<OutputConnectorHandle>
 SlangCompute::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
+    using namespace slang;
+
     const vk::ImageCreateInfo create_info = io_layout[con_src]->get_create_info_or_throw();
 
     extent = create_info.extent;
     const vk::Format format = output_format.value_or(create_info.format);
 
-    return {
-        ManagedVkImageOut::compute_write("out", format, extent),
-    };
+    EntryPointReflection* entry_point = program_layout->getEntryPointByIndex(0);
+    output_connectors = reflectOutputConnectors(io_layout, entry_point);
+    return output_connectors;
 }
 
 const void* SlangCompute::get_push_constant([[maybe_unused]] GraphRun& run,

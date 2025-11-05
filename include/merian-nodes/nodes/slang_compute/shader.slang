@@ -5,6 +5,23 @@ import merian_shaders.colors.tonemaps;
 
 using merian;
 
+struct StaticDims { int x; int y; int z; };
+struct AsInputImage { String name; };
+
+[__AttributeUsage(_AttributeTargets.Var)]
+struct MerianExtentStaticAttribute
+{
+    int x;
+    int y;
+    int z;
+};
+
+[__AttributeUsage(_AttributeTargets.Var)]
+struct MerianExtentAsAttribute
+{
+    String name;
+};
+
 [vk::constant_id(0)]
 const int workgroup_size_x = 1;
 [vk::constant_id(1)]
@@ -35,13 +52,13 @@ struct MerianIn {
 };
 
 struct MerianOut {
-    [vk::binding(1)]
+    [vk::binding(1)] [MerianExtentAs("img_src")]
     RWTexture2D<float4> img_output;
 };
 
 [numthreads(workgroup_size_x, workgroup_size_y, 1)]
 [shader("compute")]
-void main(int2 ipos: SV_DispatchThreadID, MerianIn merian_in, MerianOut merian_out) {
+void main(int2 ipos: SV_DispatchThreadID, uniform MerianIn merian_in, uniform MerianOut merian_out) {
     if (not_on_texture(ipos,  merian_out.img_output))
         return;
 
