@@ -11,6 +11,9 @@ namespace merian_nodes {
 class SlangCompute : public AbstractCompute {
 
 private:
+    static constexpr std::string INPUT_STRUCT_PARAMETER_NAME = "node_in";
+    static constexpr std::string OUTPUT_STRUCT_PARAMETER_NAME = "node_out";
+
     static constexpr uint32_t local_size_x = 16;
     static constexpr uint32_t local_size_y = 16;
 

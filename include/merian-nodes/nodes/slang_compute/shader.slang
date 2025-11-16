@@ -46,23 +46,23 @@ struct PushConstant {
 [vk::push_constant]
 ConstantBuffer<PushConstant> params;
 
-struct MerianIn {
+struct NodeIn {
     [vk::binding(0)]
     Sampler2D<float4> img_src;
 };
 
-struct MerianOut {
+struct NodeOut {
     [vk::binding(1)] [MerianExtentAs("img_src")]
     RWTexture2D<float4> img_output;
 };
 
 [numthreads(workgroup_size_x, workgroup_size_y, 1)]
 [shader("compute")]
-void main(int2 ipos: SV_DispatchThreadID, uniform MerianIn merian_in, uniform MerianOut merian_out) {
-    if (not_on_texture(ipos,  merian_out.img_output))
+void main(int2 ipos: SV_DispatchThreadID, uniform NodeIn node_in, uniform NodeOut node_out) {
+    if (not_on_texture(ipos,  node_out.img_output))
         return;
 
-    const float4 rgb_in =  merian_in.img_src.Load(int3(ipos, 0));
+    const float4 rgb_in =  node_in.img_src.Load(int3(ipos, 0));
     float3 rgb_out;
 
     switch (tonemap) {
@@ -96,13 +96,13 @@ void main(int2 ipos: SV_DispatchThreadID, uniform MerianIn merian_in, uniform Me
 
     switch (alpha_mode) {
     case ALPHA_MODE_PASSTHROUGH:
-        merian_out.img_output.Store(ipos, float4(rgb_out, rgb_in.a));
+        node_out.img_output.Store(ipos, float4(rgb_out, rgb_in.a));
         break;
     case ALPHA_MODE_LUMINANCE:
-         merian_out.img_output.Store(ipos, float4(rgb_out, yuv_luminance(rgb_out)));
+         node_out.img_output.Store(ipos, float4(rgb_out, yuv_luminance(rgb_out)));
         break;
     case ALPHA_MODE_PERCEPTUAL_LUMINANCE:
-         merian_out.img_output.Store(ipos,
+         node_out.img_output.Store(ipos,
                          float4(rgb_out, pow(yuv_luminance(rgb_out), 1. / params.perceptual_exp)));
         break;
     }

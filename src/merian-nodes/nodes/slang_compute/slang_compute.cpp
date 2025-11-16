@@ -5,6 +5,7 @@
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 #include "merian/vk/shader/entry_point.hpp"
 
+#include "merian-nodes/graph/errors.hpp"
 #include "merian/vk/shader/slang_entry_point.hpp"
 #include "tonemap.slang.spv.h"
 
@@ -60,7 +61,7 @@ std::vector<InputConnectorHandle> SlangCompute::reflectInputConnectors(slang::En
     const uint32_t param_count = entry_point->getParameterCount();
     for (uint32_t i = 0; i < param_count; i++) {
         slang::VariableLayoutReflection* var_layout = entry_point->getParameterByIndex(i);
-        if (std::string(var_layout->getName()) == "merian_in") {
+        if (std::string(var_layout->getName()) == INPUT_STRUCT_PARAMETER_NAME) {
             reflected_inputs = reflectFieldsFromStruct(var_layout);
         }
     }
@@ -91,7 +92,7 @@ std::vector<OutputConnectorHandle> SlangCompute::reflectOutputConnectors(const N
     const uint32_t param_count = entry_point->getParameterCount();
     for (uint32_t i = 0; i < param_count; i++) {
         slang::VariableLayoutReflection* var_layout = entry_point->getParameterByIndex(i);
-        if (std::string(var_layout->getName()) == "merian_out") {
+        if (std::string(var_layout->getName()) == OUTPUT_STRUCT_PARAMETER_NAME) {
             reflected_outputs = reflectFieldsFromStruct(var_layout);
         }
     }
@@ -144,6 +145,12 @@ std::vector<slang::VariableLayoutReflection*> SlangCompute::reflectFieldsFromStr
     constexpr const char* EXTENT_AS_ATTRIBUTE_NAME = "MerianExtentAs";
 
     slang::Attribute* extent_attribute = nullptr;
+
+
+    if ((extent_attribute = findAttributeByName(var, "MerianExtent")) != nullptr) {
+        SPDLOG_INFO("{}", extent_attribute->getArgumentType(0)->getName());
+    }
+
     if ((extent_attribute = findAttributeByName(var, STATIC_EXTENT_ATTRIBUTE_NAME)) != nullptr) {
         glm::ivec3 dims = glm::ivec3(0);
         extent_attribute->getArgumentValueInt(0, &dims.x);
@@ -158,14 +165,14 @@ std::vector<slang::VariableLayoutReflection*> SlangCompute::reflectFieldsFromStr
         VkSampledImageInHandle mirrored_input = dynamic_pointer_cast<VkSampledImageIn>(findInputConnectorByName(mirrored_input_name)); // TODO look at this
 
         if (mirrored_input == nullptr) {
-            throw MerianException("Input connector " + mirrored_input_name + " can not be mirrored by output connector " + std::string(var->getName()));
+            throw graph_errors::node_error("Input connector " + mirrored_input_name + " can not be mirrored by output connector " + std::string(var->getName()));
         }
 
         const vk::ImageCreateInfo create_info = io_layout[mirrored_input]->get_create_info_or_throw();
         return create_info.extent;
     }
 
-    throw MerianException("No extent defined for output connector %s" + std::string(var->getName()));
+    throw graph_errors::node_error("No extent defined for output connector %s" + std::string(var->getName()));
 }
 
 vk::Format SlangCompute::getFormatForImageOutputConnector(slang::TypeReflection* type) {
