@@ -9,10 +9,12 @@
 #include "merian/vk/shader/slang_entry_point.hpp"
 #include "tonemap.slang.spv.h"
 
+#include <fmt/chrono.h>
+
 namespace merian_nodes {
 
 SlangCompute::SlangCompute(const ContextHandle& context, const std::optional<vk::Format> output_format)
-    : AbstractCompute(context, sizeof(PushConstant)), output_format(output_format) {
+    : AbstractCompute(context, 0), output_format(output_format) {
     make_spec_info();
 }
 
@@ -20,7 +22,6 @@ SlangCompute::~SlangCompute() {}
 
 void SlangCompute::make_spec_info() {
     auto spec_builder = SpecializationInfoBuilder();
-    spec_builder.add_entry(local_size_x, local_size_y, tonemap, alpha_mode, clamp_output);
     spec_info = spec_builder.build();
 
     const GLSLShaderCompilerHandle compiler = GLSLShaderCompiler::get();
@@ -110,8 +111,9 @@ std::vector<OutputConnectorHandle> SlangCompute::reflectOutputConnectors(const N
 
             // TODO sampler connector
         } else if (type->getResourceShape() == SLANG_TEXTURE_2D) {
-            const vk::Extent3D extent = getExtentForImageOutputConnector(io_layout, var);
+            const vk::Extent3D connector_extent = getExtentForImageOutputConnector(io_layout, var);
             const vk::Format format = getFormatForImageOutputConnector(type);
+            extent = connector_extent; // TODO this is only needed for the group count calc, which should be configurable
 
             result.push_back(ManagedVkImageOut::compute_write(reflected_output->getName(), format, extent));
         }
@@ -177,6 +179,7 @@ std::vector<slang::VariableLayoutReflection*> SlangCompute::reflectFieldsFromStr
 
 vk::Format SlangCompute::getFormatForImageOutputConnector(slang::TypeReflection* type) {
     slang::TypeReflection* result_type = type->getResourceResultType();
+    // const vk::Format format = output_format.value_or(create_info.format);
     return vk::Format::eR8G8B8A8Unorm; // TODO dont hard code this
 }
 
@@ -214,11 +217,6 @@ std::vector<OutputConnectorHandle>
 SlangCompute::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
     using namespace slang;
 
-    const vk::ImageCreateInfo create_info = io_layout[con_src]->get_create_info_or_throw();
-
-    extent = create_info.extent;
-    const vk::Format format = output_format.value_or(create_info.format);
-
     EntryPointReflection* entry_point = program_layout->getEntryPointByIndex(0);
     output_connectors = reflectOutputConnectors(io_layout, entry_point);
     return output_connectors;
@@ -226,102 +224,30 @@ SlangCompute::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
 
 const void* SlangCompute::get_push_constant([[maybe_unused]] GraphRun& run,
                                        [[maybe_unused]] const NodeIO& io) {
-    return &pc;
+    return nullptr;
 }
 
 std::tuple<uint32_t, uint32_t, uint32_t>
 SlangCompute::get_group_count([[maybe_unused]] const NodeIO& io) const noexcept {
-    return {(extent.width + local_size_x - 1) / local_size_x,
-            (extent.height + local_size_y - 1) / local_size_y, 1};
+    slang::EntryPointReflection* entry_point = program_layout->getEntryPointByIndex(0);
+    auto [x, y, z] = reflectWorkgroupSize(entry_point);
+    return {(extent.width + x - 1) / x,
+            (extent.height + y - 1) / y, 1};
 };
+
+std::tuple<uint32_t, uint32_t, uint32_t>
+SlangCompute::reflectWorkgroupSize(slang::EntryPointReflection* entry_point) {
+    assert(entry_point->getStage() == SLANG_STAGE_COMPUTE);
+    SlangUInt sizes[3];
+    entry_point->getComputeThreadGroupSize(3, sizes);
+    return {sizes[0], sizes[1], sizes[2]};
+}
 
 VulkanEntryPointHandle SlangCompute::get_entry_point() {
     return shader;
 }
 
 AbstractCompute::NodeStatusFlags SlangCompute::properties(Properties& config) {
-    bool needs_rebuild = false;
-
-    const int old_tonemap = tonemap;
-    config.config_options(
-        "tonemap", tonemap,
-        {"None", "Clamp", "Uncharted 2", "Reinhard Extended", "Aces", "Aces-Approx", "Lottes"});
-    needs_rebuild |= old_tonemap != tonemap;
-
-    if (tonemap == TONEMAP_REINHARD_EXTENDED) {
-        if (old_tonemap != TONEMAP_REINHARD_EXTENDED)
-            pc.param1 = 1.0;
-        config.config_float("max white", pc.param1, "max luminance found in the scene", .05);
-    }
-
-    if (tonemap == TONEMAP_UNCHARTED_2) {
-        if (old_tonemap != TONEMAP_UNCHARTED_2) {
-            pc.param1 = 2.0;
-            pc.param2 = 11.2;
-        }
-        config.config_float("exposure bias", pc.param1, "see UNCHARTED 2", .05);
-        config.config_float("W", pc.param2, "see UNCHARTED 2", .1);
-    }
-
-    if (tonemap == TONEMAP_LOTTES) {
-        if (old_tonemap != TONEMAP_LOTTES) {
-            pc.param1 = 1.0;
-            pc.param2 = 1.0;
-            pc.param3 = 16.0;
-            pc.param4 = 0.18;
-            pc.param5 = 0.18;
-        }
-        config.config_float("contrast", pc.param1, "See Lottes talk", 0.01);
-        config.config_float("shoulder", pc.param2, "See Lottes talk", 0.01);
-        config.config_float("hdrMax", pc.param3, "See Lottes talk", 0.1);
-        config.config_float("midIn", pc.param4, "See Lottes talk", 0.001);
-        config.config_float("midOut", pc.param5, "See Lottes talk", 0.001);
-    }
-
-    if (tonemap == TONEMAP_ACES_APPROX) {
-        if (old_tonemap != TONEMAP_ACES_APPROX) {
-            pc.param1 = 2.51;
-            pc.param2 = 0.03;
-            pc.param3 = 2.43;
-            pc.param4 = 0.59;
-            pc.param5 = 0.14;
-        }
-
-        config.config_float("a", pc.param1, "", 0.01);
-        config.config_float("b", pc.param2, "", 0.01);
-        config.config_float("c", pc.param3, "", 0.01);
-        config.config_float("d", pc.param4, "", 0.01);
-        config.config_float("e", pc.param5, "", 0.01);
-    }
-
-    config.st_separate();
-    int32_t old_clamp_output = clamp_output;
-    config.config_bool("clamp output", clamp_output,
-                       "clamps the output (before computing the alpha channel)");
-    needs_rebuild |= old_clamp_output != clamp_output;
-
-    config.st_separate();
-    int32_t old_alpha_mode = alpha_mode;
-    config.config_options("alpha mode", alpha_mode,
-                          {
-                              "Passthrough",
-                              "Luminance",
-                              "Perceptual luminance",
-                          },
-                          Properties::OptionsStyle::DONT_CARE,
-                          "Decides what is written in the alpha channel.");
-    if (alpha_mode == ALPHA_MODE_PERCEPTUAL_LUMINANCE) {
-        config.config_float(
-            "perceptual exponent", pc.perceptual_exponent,
-            "Adjust the exponent that is used to convert the luminance to perceptual space.", 0.1);
-    }
-
-    needs_rebuild |= old_alpha_mode != alpha_mode;
-
-    if (needs_rebuild) {
-        make_spec_info();
-    }
-
     return {};
 }
 

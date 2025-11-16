@@ -14,19 +14,6 @@ private:
     static constexpr std::string INPUT_STRUCT_PARAMETER_NAME = "node_in";
     static constexpr std::string OUTPUT_STRUCT_PARAMETER_NAME = "node_out";
 
-    static constexpr uint32_t local_size_x = 16;
-    static constexpr uint32_t local_size_y = 16;
-
-    struct PushConstant {
-        float param1 = 1.0;
-        float param2 = 1.0;
-        float param3 = 1.0;
-        float param4 = 1.0;
-        float param5 = 1.0;
-
-        float perceptual_exponent = 2.2;
-    };
-
 public:
     SlangCompute(const ContextHandle& context,
             const std::optional<vk::Format> output_format = std::nullopt);
@@ -41,6 +28,8 @@ public:
 
     std::tuple<uint32_t, uint32_t, uint32_t>
     get_group_count(const NodeIO& io) const noexcept override;
+    static std::tuple<uint32_t, uint32_t, uint32_t>
+    reflectWorkgroupSize(slang::EntryPointReflection* entry_point);
 
     VulkanEntryPointHandle get_entry_point() override;
 
@@ -71,15 +60,10 @@ private:
     std::vector<OutputConnectorHandle> output_connectors;
 
     vk::Extent3D extent;
-    PushConstant pc;
     VulkanEntryPointHandle shader;
     SpecializationInfoHandle spec_info;
 
     slang::ProgramLayout* program_layout;
-
-    int32_t tonemap = 0;
-    int32_t alpha_mode = 0;
-    int32_t clamp_output = 1;
 };
 
 } // namespace merian_nodes
