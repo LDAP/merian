@@ -1,5 +1,3 @@
-#include "config.h"
-
 import merian_shaders.utils.textures;
 
 using merian;

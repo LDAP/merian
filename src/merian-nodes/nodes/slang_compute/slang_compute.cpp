@@ -1,7 +1,6 @@
-#include "merian-nodes/nodes/slang_compute/slang_compute.hpp"
-#include "merian-nodes/connectors/image/vk_image_in_sampled.hpp"
 #include "merian-nodes/connectors/image/vk_image_in_sampled.hpp"
 #include "merian-nodes/connectors/image/vk_image_out_managed.hpp"
+#include "merian-nodes/nodes/slang_compute/slang_compute.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 #include "merian/vk/shader/entry_point.hpp"
 
@@ -23,12 +22,25 @@ SlangCompute::~SlangCompute() {}
 void SlangCompute::make_spec_info() {
     auto spec_builder = SpecializationInfoBuilder();
     spec_info = spec_builder.build();
+}
+
+void SlangCompute::loadShader(const std::string& path_string) {
+    std::filesystem::path path = path_string;
+    if (path.empty()) {
+        throw graph_errors::node_error{"no shader set"};
+    }
+    if (!std::filesystem::exists(path)) {
+        throw graph_errors::node_error{fmt::format("shader does not exist: {}", path.string())};
+    }
+    if (path.extension().string() != ".slang") {
+        throw graph_errors::node_error{fmt::format("shader is not a slang shader: {}", path.string())};
+    }
 
     const GLSLShaderCompilerHandle compiler = GLSLShaderCompiler::get();
     ShaderCompileContextHandle compilation_session_desc = ShaderCompileContext::create(context);
-    compilation_session_desc->add_search_path("merian-nodes/nodes/slang_compute");
+    compilation_session_desc->add_search_path(path.parent_path().string());
 
-    SlangProgramEntryPointHandle slang_entry_point = SlangProgramEntryPoint::create(compilation_session_desc, "shader.slang");
+    SlangProgramEntryPointHandle slang_entry_point = SlangProgramEntryPoint::create(compilation_session_desc, path.filename().string());
     shader = VulkanEntryPoint::create(slang_entry_point, spec_info);
     program_layout = slang_entry_point->get_program()->get_program_reflection();
 }
@@ -206,6 +218,10 @@ InputConnectorHandle SlangCompute::findInputConnectorByName(const std::string& n
 std::vector<InputConnectorHandle> SlangCompute::describe_inputs() {
     using namespace slang;
 
+    if (!shader) {
+        loadShader(shader_path);
+    }
+
     assert(program_layout->getEntryPointCount() == 1);
     EntryPointReflection* entry_point = program_layout->getEntryPointByIndex(0);
     input_connectors = reflectInputConnectors(entry_point);
@@ -216,6 +232,10 @@ std::vector<InputConnectorHandle> SlangCompute::describe_inputs() {
 std::vector<OutputConnectorHandle>
 SlangCompute::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
     using namespace slang;
+
+    if (!shader) {
+        loadShader(shader_path);
+    }
 
     EntryPointReflection* entry_point = program_layout->getEntryPointByIndex(0);
     output_connectors = reflectOutputConnectors(io_layout, entry_point);
@@ -248,6 +268,15 @@ VulkanEntryPointHandle SlangCompute::get_entry_point() {
 }
 
 AbstractCompute::NodeStatusFlags SlangCompute::properties(Properties& config) {
+    bool needs_rebuild = false;
+
+    if (config.config_text("shader path", shader_path, true)) {
+        needs_rebuild = true;
+    }
+
+    if (needs_rebuild) {
+        return NEEDS_RECONNECT;
+    }
     return {};
 }
 

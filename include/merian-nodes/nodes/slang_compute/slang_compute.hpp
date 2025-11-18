@@ -2,7 +2,6 @@
 
 #include "merian-nodes/connectors/image/vk_image_in_sampled.hpp"
 #include "merian-nodes/nodes/compute_node/compute_node.hpp"
-#include "config.h"
 
 #include <slang.h>
 
@@ -37,8 +36,9 @@ public:
 
 private:
     void make_spec_info();
+  void loadShader(const std::string& path);
 
-    std::vector<InputConnectorHandle> reflectInputConnectors(slang::EntryPointReflection* entry_point);
+  std::vector<InputConnectorHandle> reflectInputConnectors(slang::EntryPointReflection* entry_point);
     std::vector<OutputConnectorHandle> reflectOutputConnectors(const NodeIOLayout& io_layout,
                             slang::EntryPointReflection* entry_point);
 
@@ -58,6 +58,8 @@ private:
 
     std::vector<InputConnectorHandle> input_connectors;
     std::vector<OutputConnectorHandle> output_connectors;
+
+    std::string shader_path;
 
     vk::Extent3D extent;
     VulkanEntryPointHandle shader;
