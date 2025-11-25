@@ -44,6 +44,8 @@ private:
 
     std::vector<slang::VariableLayoutReflection*> getVariableLayoutsFromScope(slang::VariableLayoutReflection* scope_var_layout);
     std::vector<slang::VariableLayoutReflection*> reflectFieldsFromStruct(slang::VariableLayoutReflection* struct_layout);
+    size_t getSizeForBufferOutputConnector(const NodeIOLayout& io_layout,
+                                           slang::VariableReflection* var) const;
 
     vk::Extent3D getExtentForImageOutputConnector(const NodeIOLayout& io_layout,
                                              slang::VariableReflection* var) const;

@@ -4,6 +4,8 @@
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 #include "merian/vk/shader/entry_point.hpp"
 
+#include "merian-nodes/connectors/buffer/vk_buffer_in.hpp"
+#include "merian-nodes/connectors/buffer/vk_buffer_out_managed.hpp"
 #include "merian-nodes/graph/errors.hpp"
 #include "merian/vk/shader/slang_entry_point.hpp"
 #include "tonemap.slang.spv.h"
@@ -92,6 +94,8 @@ std::vector<InputConnectorHandle> SlangCompute::reflectInputConnectors(slang::En
         } else if (type->getResourceShape() == SLANG_TEXTURE_2D) {
             slang::TypeReflection* result_type = type->getResourceResultType();
             // TODO texture connector
+        } else if (type->getResourceShape() == SLANG_STRUCTURED_BUFFER) {
+            result.push_back(VkBufferIn::compute_read(reflected_input->getName()));
         }
     }
 
@@ -128,6 +132,9 @@ std::vector<OutputConnectorHandle> SlangCompute::reflectOutputConnectors(const N
             extent = connector_extent; // TODO this is only needed for the group count calc, which should be configurable
 
             result.push_back(ManagedVkImageOut::compute_write(reflected_output->getName(), format, extent));
+        } else if (type->getResourceShape() == SLANG_STRUCTURED_BUFFER) {
+            const size_t size = getSizeForBufferOutputConnector(io_layout, var);
+            result.push_back(ManagedVkBufferOut::compute_write(reflected_output->getName(), vk::BufferCreateInfo{{}, size, vk::BufferUsageFlagBits::eStorageBuffer}));
         }
     }
 
@@ -154,17 +161,45 @@ std::vector<slang::VariableLayoutReflection*> SlangCompute::reflectFieldsFromStr
     return result;
 }
 
+size_t SlangCompute::getSizeForBufferOutputConnector(const NodeIOLayout& io_layout, slang::VariableReflection* var) const {
+    constexpr const char* STATIC_SIZE_ATTRIBUTE_NAME = "MerianSizeStatic";
+    constexpr const char* SIZE_AS_ATTRIBUTE_NAME = "MerianExtentAs";
+
+    slang::Attribute* extent_attribute = nullptr;
+    if ((extent_attribute = findAttributeByName(var, STATIC_SIZE_ATTRIBUTE_NAME)) != nullptr) {
+        int32_t size = 0;
+        extent_attribute->getArgumentValueInt(0, &size);
+
+        return  static_cast<size_t>(size);
+    }
+
+    if ((extent_attribute = findAttributeByName(var, SIZE_AS_ATTRIBUTE_NAME)) != nullptr) {
+        std::string const mirrored_input_name = extent_attribute->getArgumentValueString(0, nullptr);
+        InputConnectorHandle mirrored_input = findInputConnectorByName(mirrored_input_name);
+
+        if (typeid(*mirrored_input) == typeid(VkSampledImageIn)) {
+            auto mirrored_image = dynamic_pointer_cast<VkSampledImageIn>(mirrored_input);
+            const vk::ImageCreateInfo create_info = io_layout[mirrored_image]->get_create_info_or_throw();
+            return create_info.extent.width;
+        }
+
+        if (typeid(*mirrored_input) == typeid(VkBufferIn)) {
+            auto mirrored_buffer = dynamic_pointer_cast<VkBufferIn>(mirrored_input);
+            const vk::BufferCreateInfo create_info = io_layout[mirrored_buffer]->get_create_info_or_throw();
+            return create_info.size;
+        }
+
+        throw graph_errors::node_error("Input connector " + mirrored_input_name + " can not be mirrored by output connector " + std::string(var->getName()));
+    }
+
+    throw graph_errors::node_error("No size defined for output connector %s" + std::string(var->getName()));
+}
+
  vk::Extent3D SlangCompute::getExtentForImageOutputConnector(const NodeIOLayout& io_layout, slang::VariableReflection* var) const {
     constexpr const char* STATIC_EXTENT_ATTRIBUTE_NAME = "MerianExtentStatic";
     constexpr const char* EXTENT_AS_ATTRIBUTE_NAME = "MerianExtentAs";
 
     slang::Attribute* extent_attribute = nullptr;
-
-
-    if ((extent_attribute = findAttributeByName(var, "MerianExtent")) != nullptr) {
-        SPDLOG_INFO("{}", extent_attribute->getArgumentType(0)->getName());
-    }
-
     if ((extent_attribute = findAttributeByName(var, STATIC_EXTENT_ATTRIBUTE_NAME)) != nullptr) {
         glm::ivec3 dims = glm::ivec3(0);
         extent_attribute->getArgumentValueInt(0, &dims.x);
@@ -176,7 +211,7 @@ std::vector<slang::VariableLayoutReflection*> SlangCompute::reflectFieldsFromStr
 
     if ((extent_attribute = findAttributeByName(var, EXTENT_AS_ATTRIBUTE_NAME)) != nullptr) {
         std::string const mirrored_input_name = extent_attribute->getArgumentValueString(0, nullptr);
-        VkSampledImageInHandle mirrored_input = dynamic_pointer_cast<VkSampledImageIn>(findInputConnectorByName(mirrored_input_name)); // TODO look at this
+        auto mirrored_input = dynamic_pointer_cast<VkSampledImageIn>(findInputConnectorByName(mirrored_input_name)); // TODO look at this
 
         if (mirrored_input == nullptr) {
             throw graph_errors::node_error("Input connector " + mirrored_input_name + " can not be mirrored by output connector " + std::string(var->getName()));
