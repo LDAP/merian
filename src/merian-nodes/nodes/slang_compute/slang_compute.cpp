@@ -71,15 +71,7 @@ std::vector<slang::VariableLayoutReflection*> SlangCompute::getVariableLayoutsFr
 
 std::vector<InputConnectorHandle> SlangCompute::reflectInputConnectors(slang::EntryPointReflection* entry_point) {
     std::vector<InputConnectorHandle> result{};
-    std::vector<slang::VariableLayoutReflection*> reflected_inputs{};
-
-    const uint32_t param_count = entry_point->getParameterCount();
-    for (uint32_t i = 0; i < param_count; i++) {
-        slang::VariableLayoutReflection* var_layout = entry_point->getParameterByIndex(i);
-        if (std::string(var_layout->getName()) == INPUT_STRUCT_PARAMETER_NAME) {
-            reflected_inputs = reflectFieldsFromStruct(var_layout);
-        }
-    }
+    std::vector<slang::VariableLayoutReflection*> reflected_inputs = reflectFieldsFromEntryPointParameterStruct(entry_point, INPUT_STRUCT_PARAMETER_NAME.data());
 
     for (const auto& reflected_input : reflected_inputs) {
         slang::TypeLayoutReflection* type_layout = reflected_input->getTypeLayout();
@@ -104,15 +96,7 @@ std::vector<InputConnectorHandle> SlangCompute::reflectInputConnectors(slang::En
 
 std::vector<OutputConnectorHandle> SlangCompute::reflectOutputConnectors(const NodeIOLayout& io_layout, slang::EntryPointReflection* entry_point) {
     std::vector<OutputConnectorHandle> result{};
-    std::vector<slang::VariableLayoutReflection*> reflected_outputs{};
-
-    const uint32_t param_count = entry_point->getParameterCount();
-    for (uint32_t i = 0; i < param_count; i++) {
-        slang::VariableLayoutReflection* var_layout = entry_point->getParameterByIndex(i);
-        if (std::string(var_layout->getName()) == OUTPUT_STRUCT_PARAMETER_NAME) {
-            reflected_outputs = reflectFieldsFromStruct(var_layout);
-        }
-    }
+    std::vector<slang::VariableLayoutReflection*> reflected_outputs = reflectFieldsFromEntryPointParameterStruct(entry_point, OUTPUT_STRUCT_PARAMETER_NAME.data());
 
     for (const auto& reflected_output : reflected_outputs) {
         slang::TypeLayoutReflection* type_layout = reflected_output->getTypeLayout();
@@ -140,6 +124,58 @@ std::vector<OutputConnectorHandle> SlangCompute::reflectOutputConnectors(const N
 
     return result;
 }
+void SlangCompute::reflectProperties(Properties& config, slang::EntryPointReflection* entry_point) {
+    std::vector<slang::VariableLayoutReflection*> reflected_props{};
+    try {
+        reflected_props = reflectFieldsFromEntryPointParameterStruct(entry_point, PROPERTY_STRUCT_PARAMETER_NAME.data());
+    } catch (graph_errors::node_error& e) {
+        SPDLOG_WARN(e.what());
+    }
+
+    for (const auto& reflected_prop : reflected_props) {
+        slang::TypeLayoutReflection* type_layout = reflected_prop->getTypeLayout();
+        slang::TypeReflection* type = type_layout->getType();
+        slang::VariableReflection* var = reflected_prop->getVariable();
+
+        const std::string type_name = type->getName();
+        const std::string prop_name = reflected_prop->getName();
+        if (type_name == "int") {
+            slang::Attribute* range_attribute = findAttributeByName(var, INT_RANGE_ATTRIBUTE_NAME.data());
+            if (range_attribute != nullptr) {
+                int32_t min, max;
+                range_attribute->getArgumentValueInt(0, &min);
+                range_attribute->getArgumentValueInt(1, &max);
+                SPDLOG_WARN("{} {}", min, max);
+            }
+        } else if (type_name == "float") {
+            slang::Attribute* range_attribute = findAttributeByName(var, FLOAT_RANGE_ATTRIBUTE_NAME.data());
+            if (range_attribute != nullptr) {
+                float min, max;
+                range_attribute->getArgumentValueFloat(0, &min);
+                range_attribute->getArgumentValueFloat(1, &max);
+                SPDLOG_WARN("{} {}", min, max);
+            }
+        } else if (type_name == "String") {
+
+        } else if (type_name == "vector") {
+            size_t element_count = type->getElementCount();
+            slang::TypeReflection* element_type = type->getElementType();
+        }
+    }
+}
+
+std::vector<slang::VariableLayoutReflection*> SlangCompute::reflectFieldsFromEntryPointParameterStruct(slang::EntryPointReflection* entry_point,
+                                                         const std::string& parameter_name) {
+    const uint32_t param_count = entry_point->getParameterCount();
+    for (uint32_t i = 0; i < param_count; i++) {
+        slang::VariableLayoutReflection* var_layout = entry_point->getParameterByIndex(i);
+        if (std::string(var_layout->getName()) == parameter_name) {
+            return reflectFieldsFromStruct(var_layout);
+        }
+    }
+
+    throw graph_errors::node_error("Parameter '" + parameter_name + "' not found on entry point '" + entry_point->getName() + "'");
+}
 
 std::vector<slang::VariableLayoutReflection*> SlangCompute::reflectFieldsFromStruct(slang::VariableLayoutReflection* struct_layout) {
     std::vector<slang::VariableLayoutReflection*> result{};
@@ -162,18 +198,15 @@ std::vector<slang::VariableLayoutReflection*> SlangCompute::reflectFieldsFromStr
 }
 
 size_t SlangCompute::getSizeForBufferOutputConnector(const NodeIOLayout& io_layout, slang::VariableReflection* var) const {
-    constexpr const char* STATIC_SIZE_ATTRIBUTE_NAME = "MerianSizeStatic";
-    constexpr const char* SIZE_AS_ATTRIBUTE_NAME = "MerianExtentAs";
-
     slang::Attribute* extent_attribute = nullptr;
-    if ((extent_attribute = findAttributeByName(var, STATIC_SIZE_ATTRIBUTE_NAME)) != nullptr) {
+    if ((extent_attribute = findAttributeByName(var, STATIC_SIZE_ATTRIBUTE_NAME.data())) != nullptr) {
         int32_t size = 0;
         extent_attribute->getArgumentValueInt(0, &size);
 
         return  static_cast<size_t>(size);
     }
 
-    if ((extent_attribute = findAttributeByName(var, SIZE_AS_ATTRIBUTE_NAME)) != nullptr) {
+    if ((extent_attribute = findAttributeByName(var, SIZE_AS_ATTRIBUTE_NAME.data())) != nullptr) {
         std::string const mirrored_input_name = extent_attribute->getArgumentValueString(0, nullptr);
         InputConnectorHandle mirrored_input = findInputConnectorByName(mirrored_input_name);
 
@@ -196,20 +229,17 @@ size_t SlangCompute::getSizeForBufferOutputConnector(const NodeIOLayout& io_layo
 }
 
  vk::Extent3D SlangCompute::getExtentForImageOutputConnector(const NodeIOLayout& io_layout, slang::VariableReflection* var) const {
-    constexpr const char* STATIC_EXTENT_ATTRIBUTE_NAME = "MerianExtentStatic";
-    constexpr const char* EXTENT_AS_ATTRIBUTE_NAME = "MerianExtentAs";
-
     slang::Attribute* extent_attribute = nullptr;
-    if ((extent_attribute = findAttributeByName(var, STATIC_EXTENT_ATTRIBUTE_NAME)) != nullptr) {
-        glm::ivec3 dims = glm::ivec3(0);
+    if ((extent_attribute = findAttributeByName(var, STATIC_EXTENT_ATTRIBUTE_NAME.data())) != nullptr) {
+        auto dims = glm::ivec3(0);
         extent_attribute->getArgumentValueInt(0, &dims.x);
         extent_attribute->getArgumentValueInt(1, &dims.y);
         extent_attribute->getArgumentValueInt(2, &dims.z);
 
-        return  vk::Extent3D(dims.x, dims.y, dims.z);
+        return vk::Extent3D(dims.x, dims.y, dims.z);
     }
 
-    if ((extent_attribute = findAttributeByName(var, EXTENT_AS_ATTRIBUTE_NAME)) != nullptr) {
+    if ((extent_attribute = findAttributeByName(var, EXTENT_AS_ATTRIBUTE_NAME.data())) != nullptr) {
         std::string const mirrored_input_name = extent_attribute->getArgumentValueString(0, nullptr);
         auto mirrored_input = dynamic_pointer_cast<VkSampledImageIn>(findInputConnectorByName(mirrored_input_name)); // TODO look at this
 
@@ -303,10 +333,23 @@ VulkanEntryPointHandle SlangCompute::get_entry_point() {
 }
 
 AbstractCompute::NodeStatusFlags SlangCompute::properties(Properties& config) {
+    using namespace slang;
+
     bool needs_rebuild = false;
 
     if (config.config_text("shader path", shader_path, true)) {
         needs_rebuild = true;
+    }
+
+    if (!shader) {
+        try {
+            loadShader(shader_path);
+        } catch (graph_errors::node_error& e) {}
+    }
+
+    if (shader) {
+        EntryPointReflection* entry_point = program_layout->getEntryPointByIndex(0);
+        reflectProperties(config, entry_point);
     }
 
     if (needs_rebuild) {

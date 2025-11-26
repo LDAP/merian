@@ -1,26 +1,7 @@
 import merian_shaders.utils.textures;
+import reflection_attributes;
 
 using merian;
-
-[__AttributeUsage(_AttributeTargets.Var)]
-struct MerianSizeStaticAttribute
-{
-    int size;
-};
-
-[__AttributeUsage(_AttributeTargets.Var)]
-struct MerianExtentStaticAttribute
-{
-    int x;
-    int y;
-    int z;
-};
-
-[__AttributeUsage(_AttributeTargets.Var)]
-struct MerianExtentAsAttribute
-{
-    String name;
-};
 
 struct NodeIn {
     [vk::binding(0)]
@@ -34,9 +15,21 @@ struct NodeOut {
     RWStructuredBuffer<float4> buffer_output;
 };
 
+struct NodeProperties {
+    float4 color;
+    String str;
+    [MerianFloatRange(0.0, 1.5)]
+    float f;
+    [MerianIntRange(0, 5)]
+    int i;
+}
+
 [numthreads(16, 16, 1)]
 [shader("compute")]
-void main(int2 ipos: SV_DispatchThreadID, uniform NodeIn node_in, uniform NodeOut node_out) {
+void main(int2 ipos: SV_DispatchThreadID,
+        uniform NodeIn node_in,
+        uniform NodeOut node_out,
+        uniform NodeProperties node_props) {
     if (not_on_texture(ipos,  node_out.img_output))
         return;
 

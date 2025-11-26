@@ -1,4 +1,5 @@
 import merian_shaders.utils.textures;
+import reflection_attributes;
 
 using merian;
 

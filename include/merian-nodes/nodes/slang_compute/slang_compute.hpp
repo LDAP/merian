@@ -10,8 +10,17 @@ namespace merian_nodes {
 class SlangCompute : public AbstractCompute {
 
 private:
-    static constexpr std::string INPUT_STRUCT_PARAMETER_NAME = "node_in";
-    static constexpr std::string OUTPUT_STRUCT_PARAMETER_NAME = "node_out";
+    static constexpr std::string_view INPUT_STRUCT_PARAMETER_NAME = "node_in";
+    static constexpr std::string_view OUTPUT_STRUCT_PARAMETER_NAME = "node_out";
+    static constexpr std::string_view PROPERTY_STRUCT_PARAMETER_NAME = "node_props";
+
+    static constexpr std::string_view STATIC_EXTENT_ATTRIBUTE_NAME = "MerianExtentStatic";
+    static constexpr std::string_view EXTENT_AS_ATTRIBUTE_NAME = "MerianExtentAs";
+    static constexpr std::string_view STATIC_SIZE_ATTRIBUTE_NAME = "MerianSizeStatic";
+    static constexpr std::string_view SIZE_AS_ATTRIBUTE_NAME = "MerianExtentAs";
+
+    static constexpr std::string_view INT_RANGE_ATTRIBUTE_NAME = "MerianIntRange";
+    static constexpr std::string_view FLOAT_RANGE_ATTRIBUTE_NAME = "MerianFloatRange";
 
 public:
     SlangCompute(const ContextHandle& context,
@@ -36,22 +45,36 @@ public:
 
 private:
     void make_spec_info();
-  void loadShader(const std::string& path);
+    void loadShader(const std::string& path);
 
-  std::vector<InputConnectorHandle> reflectInputConnectors(slang::EntryPointReflection* entry_point);
+    std::vector<InputConnectorHandle> reflectInputConnectors(slang::EntryPointReflection* entry_point);
+
     std::vector<OutputConnectorHandle> reflectOutputConnectors(const NodeIOLayout& io_layout,
                             slang::EntryPointReflection* entry_point);
 
+    void reflectProperties(Properties& config, slang::EntryPointReflection* entry_point);
+
+
     std::vector<slang::VariableLayoutReflection*> getVariableLayoutsFromScope(slang::VariableLayoutReflection* scope_var_layout);
-    std::vector<slang::VariableLayoutReflection*> reflectFieldsFromStruct(slang::VariableLayoutReflection* struct_layout);
+
+    std::vector<slang::VariableLayoutReflection*>
+    reflectFieldsFromEntryPointParameterStruct(slang::EntryPointReflection* entry_point,
+                                               const std::string& parameter_name);
+
+    static std::vector<slang::VariableLayoutReflection*> reflectFieldsFromStruct(slang::VariableLayoutReflection* struct_layout);
+
     size_t getSizeForBufferOutputConnector(const NodeIOLayout& io_layout,
                                            slang::VariableReflection* var) const;
 
+
     vk::Extent3D getExtentForImageOutputConnector(const NodeIOLayout& io_layout,
                                              slang::VariableReflection* var) const;
+
     vk::Format getFormatForImageOutputConnector(slang::TypeReflection* type);
 
+
     static slang::Attribute* findAttributeByName(slang::VariableReflection* var, const std::string& name);
+
     InputConnectorHandle findInputConnectorByName(const std::string& name) const;
 
     const std::optional<vk::Format> output_format;
