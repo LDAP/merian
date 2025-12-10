@@ -143,6 +143,11 @@ class NodeRegistry {
         return type_to_type_info.at(type_name_to_type.at(node_type_name));
     }
 
+    const NodeInfo& node_info(const std::string& node_name) const {
+        assert_node_name_exists(node_name);
+        return node_name_to_node_info.at(node_name);
+    }
+
     template <typename NODE_TYPE> const NodeTypeInfo& node_type_info() const {
         const std::type_index type = typeid(std::remove_pointer_t<NODE_TYPE>);
         if (!type_to_type_info.contains(type)) {

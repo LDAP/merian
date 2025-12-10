@@ -245,14 +245,26 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
 
     // Adds a node to the graph.
     //
-    // The node_type must be a known type to the registry.
+    // The node_name must be a known type to the registry.
     //
     // Throws invalid_argument, if a node with this identifier already exists.
     //
     // Returns the node identifier.
-    const std::string& add_node(const std::string& node_type,
+    const std::string& add_node(const std::string& node_name,
                                 const std::optional<std::string>& identifier = std::nullopt) {
-        return add_node(registry.create_node_from_name(node_type), identifier);
+
+        if (!identifier) {
+            // Preserve node name if we can. add_node below uses the node type.
+            std::string node_identifier;
+            uint32_t i = 0;
+            do {
+                node_identifier = fmt::format("{} {}", node_name, i++);
+            } while (node_for_identifier.contains(node_identifier));
+
+            return add_node(registry.create_node_from_name(node_name), node_identifier);
+        }
+
+        return add_node(registry.create_node_from_name(node_name), identifier);
     }
 
     // Returns nullptr if the node does not exist.
@@ -815,7 +827,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
             }
             props.output_text(
                 "{}: {}", registry.node_names()[new_node_selected],
-                registry.node_type_info(registry.node_names()[new_node_selected]).description);
+                registry.node_info(registry.node_names()[new_node_selected]).description);
 
             const std::vector<std::string> node_ids(identifiers().begin(), identifiers().end());
             props.st_separate("Add Connection");
