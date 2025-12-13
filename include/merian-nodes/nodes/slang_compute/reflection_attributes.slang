@@ -1,3 +1,7 @@
+[__AttributeUsage(_AttributeTargets.Function)]
+struct MerianOperateOnAttribute {
+    String name;
+}
 
 // used to define the size of buffer outputs
 [__AttributeUsage(_AttributeTargets.Var)]

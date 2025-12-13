@@ -1,5 +1,6 @@
 #pragma once
 
+#include "merian-nodes/connectors/buffer/vk_buffer_in.hpp"
 #include "merian-nodes/connectors/image/vk_image_in_sampled.hpp"
 #include "merian-nodes/nodes/compute_node/compute_node.hpp"
 
@@ -13,6 +14,8 @@ private:
     static constexpr std::string_view INPUT_STRUCT_PARAMETER_NAME = "node_in";
     static constexpr std::string_view OUTPUT_STRUCT_PARAMETER_NAME = "node_out";
     static constexpr std::string_view PROPERTY_STRUCT_PARAMETER_NAME = "node_props";
+
+    static constexpr std::string_view TARGET_ATTRIBUTE_NAME = "MerianOperateOn";
 
     static constexpr std::string_view STATIC_EXTENT_ATTRIBUTE_NAME = "MerianExtentStatic";
     static constexpr std::string_view EXTENT_AS_ATTRIBUTE_NAME = "MerianExtentAs";
@@ -47,9 +50,9 @@ private:
     void make_spec_info();
     void loadShader(const std::string& path);
 
-    std::vector<InputConnectorHandle> reflectInputConnectors(slang::EntryPointReflection* entry_point);
+    void reflectInputConnectors(slang::EntryPointReflection* entry_point);
 
-    std::vector<OutputConnectorHandle> reflectOutputConnectors(const NodeIOLayout& io_layout,
+    void reflectOutputConnectors(const NodeIOLayout& io_layout,
                             slang::EntryPointReflection* entry_point);
 
     void reflectProperties(Properties& config, slang::EntryPointReflection* entry_point);
@@ -73,20 +76,22 @@ private:
     vk::Format getFormatForImageOutputConnector(slang::TypeReflection* type);
 
 
-    static slang::Attribute* findAttributeByName(slang::VariableReflection* var, const std::string& name);
-
-    InputConnectorHandle findInputConnectorByName(const std::string& name) const;
+    static slang::Attribute* findVarAttributeByName(slang::VariableReflection* var, const std::string& name);
+    static slang::Attribute* findFuncAttributeByName(slang::FunctionReflection* var,
+                                              const std::string& name);
 
     const std::optional<vk::Format> output_format;
 
     VkSampledImageInHandle con_src;
 
-    std::vector<InputConnectorHandle> input_connectors;
-    std::vector<OutputConnectorHandle> output_connectors;
+    std::unordered_map<std::string, VkImageInHandle> image_in_connectors;
+    std::unordered_map<std::string, VkBufferInHandle> buffer_in_connectors;
+
+    std::unordered_map<std::string, VkImageOutHandle> image_out_connectors;
+    std::unordered_map<std::string, VkBufferOutHandle> buffer_out_connectors;
 
     std::string shader_path;
 
-    vk::Extent3D extent;
     VulkanEntryPointHandle shader;
     SpecializationInfoHandle spec_info;
 

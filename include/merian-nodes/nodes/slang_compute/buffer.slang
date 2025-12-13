@@ -26,6 +26,7 @@ struct NodeProperties {
 
 [numthreads(16, 16, 1)]
 [shader("compute")]
+[MerianOperateOn("img_src")]
 void main(int2 ipos: SV_DispatchThreadID,
         uniform NodeIn node_in,
         uniform NodeOut node_out,
@@ -34,11 +35,9 @@ void main(int2 ipos: SV_DispatchThreadID,
         return;
 
     const float4 rgb_in =  node_in.img_src.Load(int3(ipos, 0));
-    float3 rgb_out = float3(0);
+    float3 rgb_out;
 
-    if (ipos.x < node_out.buffer_output.getCount()) {
-        rgb_out = rgb_in.rgb;
-    }
+    rgb_out = float3(1.0) - clamp(rgb_in.rgb, float3(0), float3(1.0));
 
     node_out.img_output.Store(ipos, float4(rgb_out, rgb_in.a));
 
