@@ -55,7 +55,7 @@ private:
     void reflectOutputConnectors(const NodeIOLayout& io_layout,
                             slang::EntryPointReflection* entry_point);
 
-    void reflectProperties(Properties& config, slang::EntryPointReflection* entry_point);
+    bool reflectProperties(Properties& config, slang::EntryPointReflection* entry_point);
 
 
     std::vector<slang::VariableLayoutReflection*> getVariableLayoutsFromScope(slang::VariableLayoutReflection* scope_var_layout);
@@ -89,6 +89,13 @@ private:
 
     std::unordered_map<std::string, VkImageOutHandle> image_out_connectors;
     std::unordered_map<std::string, VkBufferOutHandle> buffer_out_connectors;
+
+    std::unordered_map<std::string, std::unique_ptr<int>> int_properties;
+    std::unordered_map<std::string, std::unique_ptr<uint>> uint_properties;
+    std::unordered_map<std::string, std::unique_ptr<float>> float_properties;
+    std::unordered_map<std::string, std::unique_ptr<bool>> bool_properties;
+    std::unordered_map<std::string, std::unique_ptr<std::string>> string_properties;
+    std::unordered_map<std::string, std::unique_ptr<glm::vec4>> vector_properties;
 
     std::string shader_path;
 

@@ -11,8 +11,6 @@ struct NodeIn {
 struct NodeOut {
     [vk::binding(1)] [MerianExtentAs("img_src")]
     RWTexture2D<float4> img_output;
-    [vk::binding(2)] [MerianExtentAs("img_src")]
-    RWStructuredBuffer<float4> buffer_output;
 };
 
 struct NodeProperties {
@@ -22,6 +20,8 @@ struct NodeProperties {
     float f;
     [MerianIntRange(0, 5)]
     int i;
+    [MerianIntRange(1, 6)]
+    uint ui;
 }
 
 [numthreads(16, 16, 1)]

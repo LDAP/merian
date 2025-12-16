@@ -85,7 +85,7 @@ void SlangCompute::reflectInputConnectors(slang::EntryPointReflection* entry_poi
             image_in_connectors.emplace(reflected_name, VkSampledImageIn::compute_read(reflected_name));
         } else if (type->getResourceShape() == SLANG_TEXTURE_2D) {
             slang::TypeReflection* result_type = type->getResourceResultType();
-            // TODO texture connector
+            image_in_connectors.emplace(reflected_name, VkSampledImageIn::compute_read(reflected_name)); // TODO use a not sample compute tex here
         } else if (type->getResourceShape() == SLANG_STRUCTURED_BUFFER) {
             buffer_in_connectors.emplace(reflected_name, VkBufferIn::compute_read(reflected_name));
         }
@@ -105,10 +105,12 @@ void SlangCompute::reflectOutputConnectors(const NodeIOLayout& io_layout, slang:
 
         std::string const reflected_name = reflected_output->getName();
         if (type->getResourceShape() == (SLANG_TEXTURE_COMBINED_FLAG | SLANG_TEXTURE_2D)) {
-            slang::TypeReflection* result_type = type->getResourceResultType();
+            throw graph_errors::node_error{fmt::format(
+            "Error for declared output connector {}: Sampled textures are not supported as outputs as they are read_only, use RWTexture2D instead",
+                reflected_name)};
+        }
 
-            // TODO sampler connector
-        } else if (type->getResourceShape() == SLANG_TEXTURE_2D) {
+        if (type->getResourceShape() == SLANG_TEXTURE_2D) {
             const vk::Extent3D extent = getExtentForImageOutputConnector(io_layout, var);
             const vk::Format format = getFormatForImageOutputConnector(type);
 
@@ -123,13 +125,15 @@ void SlangCompute::reflectOutputConnectors(const NodeIOLayout& io_layout, slang:
         }
     }
 }
-void SlangCompute::reflectProperties(Properties& config, slang::EntryPointReflection* entry_point) {
+bool SlangCompute::reflectProperties(Properties& config, slang::EntryPointReflection* entry_point) {
     std::vector<slang::VariableLayoutReflection*> reflected_props{};
     try {
         reflected_props = reflectFieldsFromEntryPointParameterStruct(entry_point, PROPERTY_STRUCT_PARAMETER_NAME.data());
     } catch (graph_errors::node_error& e) {
         SPDLOG_WARN(e.what());
     }
+
+    bool needs_rebuild = false;
 
     for (const auto& reflected_prop : reflected_props) {
         slang::TypeLayoutReflection* type_layout = reflected_prop->getTypeLayout();
@@ -139,27 +143,78 @@ void SlangCompute::reflectProperties(Properties& config, slang::EntryPointReflec
         const std::string type_name = type->getName();
         const std::string prop_name = reflected_prop->getName();
         if (type_name == "int") {
+            if (!int_properties.contains(prop_name)) {
+                int_properties[prop_name] = std::make_unique<int>();
+            }
+
             slang::Attribute* range_attribute = findVarAttributeByName(var, INT_RANGE_ATTRIBUTE_NAME.data());
             if (range_attribute != nullptr) {
                 int32_t min, max;
                 range_attribute->getArgumentValueInt(0, &min);
                 range_attribute->getArgumentValueInt(1, &max);
-                // TODO add these to the config
+
+                needs_rebuild |= config.config_int(prop_name, *int_properties[prop_name], min, max, "");
+            } else {
+                needs_rebuild |= config.config_int(prop_name, *int_properties[prop_name], "");
+            }
+        } else if (type_name == "uint") {
+            if (!uint_properties.contains(prop_name)) {
+                uint_properties[prop_name] = std::make_unique<uint>();
+            }
+
+            slang::Attribute* range_attribute = findVarAttributeByName(var, INT_RANGE_ATTRIBUTE_NAME.data());
+            if (range_attribute != nullptr) {
+                int32_t min, max;
+                range_attribute->getArgumentValueInt(0, &min);
+                range_attribute->getArgumentValueInt(1, &max);
+
+                if (min < 0 || max < 0) {
+                    throw graph_errors::node_error("No negative range values allowed for reflected uint property");
+                }
+
+                needs_rebuild |= config.config_uint(prop_name, *uint_properties[prop_name], min, max, "");
+            } else {
+                needs_rebuild |= config.config_uint(prop_name, *uint_properties[prop_name], "");
             }
         } else if (type_name == "float") {
+            if (!float_properties.contains(prop_name)) {
+                float_properties[prop_name] = std::make_unique<float>();
+            }
+
             slang::Attribute* range_attribute = findVarAttributeByName(var, FLOAT_RANGE_ATTRIBUTE_NAME.data());
             if (range_attribute != nullptr) {
                 float min, max;
                 range_attribute->getArgumentValueFloat(0, &min);
                 range_attribute->getArgumentValueFloat(1, &max);
+
+                needs_rebuild |= config.config_float(prop_name, *float_properties[prop_name], min, max, "");
+            } else {
+                needs_rebuild |= config.config_float(prop_name, *float_properties[prop_name], "");
             }
         } else if (type_name == "String") {
-
+            if (!string_properties.contains(prop_name)) {
+                string_properties[prop_name] = std::make_unique<std::string>();
+            }
+            needs_rebuild |= config.config_text(prop_name, *string_properties[prop_name], "");
         } else if (type_name == "vector") {
-            size_t element_count = type->getElementCount();
+            size_t const element_count = type->getElementCount();
             slang::TypeReflection* element_type = type->getElementType();
+            std::string element_type_name = element_type->getName();
+
+            if (element_count < 3 || element_type_name != "float") {
+                throw graph_errors::node_error("Only float3 or float4 vectors are supported as reflected properties!");
+            }
+
+            if (!vector_properties.contains(prop_name)) {
+                vector_properties[prop_name] = std::make_unique<glm::vec4>();
+            }
+            config.config_color(prop_name, *vector_properties[prop_name], "");
+        } else {
+            throw graph_errors::node_error(fmt::format("Type {} is not supported as reflectable property!", type_name));
         }
     }
+
+    return needs_rebuild;
 }
 
 std::vector<slang::VariableLayoutReflection*> SlangCompute::reflectFieldsFromEntryPointParameterStruct(slang::EntryPointReflection* entry_point,
@@ -378,7 +433,7 @@ AbstractCompute::NodeStatusFlags SlangCompute::properties(Properties& config) {
 
     if (shader) {
         EntryPointReflection* entry_point = program_layout->getEntryPointByIndex(0);
-        reflectProperties(config, entry_point);
+        needs_rebuild |= reflectProperties(config, entry_point);
     }
 
     if (needs_rebuild) {
