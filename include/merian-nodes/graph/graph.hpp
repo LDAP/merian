@@ -10,6 +10,8 @@
 #include "node.hpp"
 #include "resource.hpp"
 
+#include "graph_data.hpp"
+
 #include "merian-nodes/graph/node_registry.hpp"
 #include "merian/shader/shader_compiler.hpp"
 #include "merian/utils/math.hpp"
@@ -28,153 +30,8 @@
 #include <unordered_set>
 
 #include <fmt/chrono.h>
+
 namespace merian {
-namespace graph_internal {
-
-// Describes a connection between two connectors of two nodes.
-struct OutgoingNodeConnection {
-    const NodeHandle dst;
-    const std::string src_output;
-    const std::string dst_input;
-
-    bool operator==(const OutgoingNodeConnection&) const = default;
-
-  public:
-    struct Hash {
-        size_t operator()(const OutgoingNodeConnection& c) const noexcept {
-            return hash_val(c.dst, c.src_output, c.dst_input);
-        }
-    };
-};
-
-// Data that is stored for every node that is present in the graph.
-struct NodeData {
-    NodeData(const std::string& identifier) : identifier(identifier) {}
-
-    // A unique name that identifies this node (user configurable).
-    // This is not the name from the node registry.
-    // (on add_node)
-    std::string identifier;
-
-    // User disabled
-    bool disable{};
-    // Errors during build / connect
-    std::vector<std::string> errors{};
-    // Errors in on_connected and while run.
-    std::vector<std::string> errors_queued{};
-
-    // Cache input connectors (node->describe_inputs())
-    // (on start_nodes added and checked for name conflicts)
-    std::vector<InputConnectorHandle> input_connectors;
-    std::unordered_map<std::string, InputConnectorHandle> input_connector_for_name;
-    // Cache output connectors (node->describe_outputs())
-    // (on conncet_nodes added and checked for name conflicts)
-    std::vector<OutputConnectorHandle> output_connectors;
-    std::unordered_map<std::string, OutputConnectorHandle> output_connector_for_name;
-
-    // --- Desired connections. ---
-    // Set by the user using the public add_connection method.
-    // This information is used by connect() to connect the graph
-    std::unordered_set<OutgoingNodeConnection, typename OutgoingNodeConnection::Hash>
-        desired_outgoing_connections;
-    // (input connector name -> (src_node, src_output_name))
-    std::unordered_map<std::string, std::pair<NodeHandle, std::string>>
-        desired_incoming_connections;
-
-    // --- Actual connections. ---
-    // For each input the connected node and the corresponding output connector on the other
-    // node (on connect).
-    // For optional inputs an connection with nullptrs is inserted in start_nodes.
-    struct PerInputInfo {
-        NodeHandle node{};
-        OutputConnectorHandle output{};
-
-        uint32_t descriptor_set_binding{
-            DescriptorSet::NO_DESCRIPTOR_BINDING}; // (on prepare_descriptor_sets)
-        // precomputed such that (iteration % precomputed_resources.size()) is the index of the
-        // resource that must be used in the iteration. Matches the descriptor_sets array below.
-        // (resource handle, resource index the resources array of the corresponding output)
-        // (on prepare_descriptor_sets)
-        //
-        // resources can be null if an optional input is not connected, the resource index is then
-        // -1ul;
-        std::vector<std::tuple<GraphResourceHandle, uint32_t>> precomputed_resources{};
-    };
-    std::unordered_map<InputConnectorHandle, PerInputInfo> input_connections{};
-    // for each output the connected nodes and the corresponding input connector on the other
-    // node (on connect)
-    struct PerResourceInfo {
-        GraphResourceHandle resource;
-
-        // precomputed occurrences in descriptor sets (needed to "record" descriptor set updates)
-        // in descriptor sets of the node this output / resource belongs to
-        std::vector<uint32_t> set_indices{};
-        // in descriptor sets of other nodes this resource is accessed using inputs
-        // (using in node, input connector, set_idx)
-        std::vector<std::tuple<NodeHandle, InputConnectorHandle, uint32_t>> other_set_indices{};
-    };
-    struct PerOutputInfo {
-        // (max_delay + 1) resources
-        std::vector<PerResourceInfo> resources;
-        std::vector<std::tuple<NodeHandle, InputConnectorHandle>> inputs;
-        uint32_t descriptor_set_binding{
-            DescriptorSet::NO_DESCRIPTOR_BINDING}; // (on prepare_descriptor_sets)
-        // precomputed such that (iteration % precomputed_resources.size()) is the index of the
-        // resource that must be used in the iteration. Matches the descriptor_sets array below.
-        // (resource handle, resource index the resources array)
-        std::vector<std::tuple<GraphResourceHandle, uint32_t>>
-            precomputed_resources{}; // (on prepare_descriptor_sets)
-    };
-    std::unordered_map<OutputConnectorHandle, PerOutputInfo> output_connections{};
-
-    // Precomputed descriptor set layout including all input and output connectors which
-    // get_descriptor_info() does not return std::nullopt.
-    DescriptorSetLayoutHandle descriptor_set_layout;
-
-    DescriptorPoolHandle descriptor_pool;
-
-    // A descriptor set for each combination of resources that can occur, due to delayed accesses.
-    // Also keep at least RING_SIZE to allow updating descriptor sets while iterations are in
-    // flight. Access with iteration % data.descriptor_sets.size() (on prepare descriptor sets)
-    std::vector<DescriptorSetHandle> descriptor_sets;
-    std::vector<NodeIO> resource_maps;
-
-    struct NodeStatistics {
-        uint32_t last_descriptor_set_updates{};
-    };
-    NodeStatistics statistics{};
-
-    void reset() {
-        input_connectors.clear();
-        output_connectors.clear();
-
-        input_connector_for_name.clear();
-        output_connector_for_name.clear();
-
-        input_connections.clear();
-        output_connections.clear();
-
-        resource_maps.clear();
-        descriptor_sets.clear();
-        descriptor_pool.reset();
-        descriptor_set_layout.reset();
-
-        statistics = {};
-
-        errors.clear();
-    }
-
-    uint32_t set_index(const uint64_t run_iteration) const {
-        assert(!descriptor_sets.empty());
-        return run_iteration % descriptor_sets.size();
-    }
-};
-
-inline std::string format_as(const NodeData::NodeStatistics stats) {
-    return fmt::format("Descriptor bindings updated: {}", stats.last_descriptor_set_updates);
-}
-
-} // namespace graph_internal
 
 using namespace merian;
 using namespace graph_internal;
@@ -185,8 +42,7 @@ using namespace std::literals::chrono_literals;
  *
  * @tparam     RING_SIZE  Controls the amount of in-flight processing (frames-in-flight).
  */
-template <uint32_t ITERATIONS_IN_FLIGHT = 2>
-class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
+class Graph : public std::enable_shared_from_this<Graph> {
     // Data that is stored for every iteration in flight.
     // Created for each iteration in flight in Graph::Graph.
     struct InFlightData {
@@ -209,24 +65,26 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
     Graph(const ContextHandle& context, const ResourceAllocatorHandle& resource_allocator)
         : context(context), resource_allocator(resource_allocator), queue(context->get_queue_GCT()),
           registry(context, resource_allocator), thread_pool(std::make_shared<ThreadPool>()),
-          cpu_queue(std::make_shared<CPUQueue>(context, thread_pool)), ring_fences(context),
+          cpu_queue(std::make_shared<CPUQueue>(context, thread_pool)),
+          ring_fences(context,
+                      2,
+                      [context, this](const uint32_t /*index*/) {
+                          InFlightData in_flight_data;
+                          in_flight_data.command_pool = std::make_shared<CommandPool>(queue);
+                          in_flight_data.command_buffer_cache =
+                              std::make_shared<CachingCommandPool>(in_flight_data.command_pool);
+                          in_flight_data.profiler_query_pool =
+                              std::make_shared<merian::QueryPool<vk::QueryType::eTimestamp>>(
+                                  context, 512, true);
+                          return in_flight_data;
+                      }),
           run_profiler(std::make_shared<merian::Profiler>(context)),
-          graph_run(ITERATIONS_IN_FLIGHT,
-                    thread_pool,
+          graph_run(thread_pool,
                     cpu_queue,
                     run_profiler,
                     resource_allocator,
                     queue,
                     GLSLShaderCompiler::get()) {
-
-        for (uint32_t i = 0; i < ITERATIONS_IN_FLIGHT; i++) {
-            InFlightData& in_flight_data = ring_fences.get(i).user_data;
-            in_flight_data.command_pool = std::make_shared<CommandPool>(queue);
-            in_flight_data.command_buffer_cache =
-                std::make_shared<CachingCommandPool>(in_flight_data.command_pool);
-            in_flight_data.profiler_query_pool =
-                std::make_shared<merian::QueryPool<vk::QueryType::eTimestamp>>(context, 512, true);
-        }
 
         debug_utils = context->get_extension<ExtensionVkDebugUtils>();
         time_connect_reference = time_reference = std::chrono::high_resolution_clock::now();
@@ -349,7 +207,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
             const std::string node_identifier = data.identifier;
             node_data.erase(node);
             node_for_identifier.erase(identifier);
-            for (uint32_t i = 0; i < ITERATIONS_IN_FLIGHT; i++) {
+            for (uint32_t i = 0; i < ring_fences.size(); i++) {
                 InFlightData& in_flight_data = ring_fences.get(i).user_data;
                 in_flight_data.in_flight_data.erase(node);
             }
@@ -399,6 +257,10 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
             {
                 MERIAN_PROFILE_SCOPE(profiler, "wait for in-flight iterations");
                 wait();
+            }
+
+            {
+                ring_fences.resize(desired_iterations_in_flight);
             }
 
             {
@@ -471,7 +333,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                             node->on_connected(io_layout, data.descriptor_set_layout);
                         needs_reconnect |= flags & Node::NodeStatusFlagBits::NEEDS_RECONNECT;
                         if ((flags & Node::NodeStatusFlagBits::RESET_IN_FLIGHT_DATA) != 0u) {
-                            for (uint32_t i = 0; i < ITERATIONS_IN_FLIGHT; i++) {
+                            for (uint32_t i = 0; i < ring_fences.size(); i++) {
                                 ring_fences.get(i).user_data.in_flight_data.at(node).reset();
                             }
                         }
@@ -585,8 +447,8 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                 connect();
             }
 
-            graph_run.begin_run(cmd_cache, run_iteration, total_iteration,
-                                run_iteration % ITERATIONS_IN_FLIGHT, time_delta, duration_elapsed,
+            graph_run.begin_run(ring_fences.size(), cmd_cache, run_iteration, total_iteration,
+                                ring_fences.current_cycle_index(), time_delta, duration_elapsed,
                                 duration_elapsed_since_connect);
 
             // While preprocessing nodes can signalize that they need to reconnect as well
@@ -692,7 +554,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
 
         node_data.clear();
         node_for_identifier.clear();
-        for (uint32_t i = 0; i < ITERATIONS_IN_FLIGHT; i++) {
+        for (uint32_t i = 0; i < ring_fences.size(); i++) {
             InFlightData& in_flight_data = ring_fences.get(i).user_data;
             in_flight_data.in_flight_data.clear();
         }
@@ -705,7 +567,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
         needs_reconnect = true;
     }
 
-    bool get_needs_reconnect() {
+    bool get_needs_reconnect() const {
         return needs_reconnect;
     }
 
@@ -746,8 +608,13 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
             props.output_text("Time delta: {:04f}ms", to_milliseconds(time_delta));
             props.output_text("GPU wait: {:04f}ms", to_milliseconds(gpu_wait_time));
             props.output_text("External wait: {:04f}ms", to_milliseconds(external_wait_time));
+            props.output_text("Iterations in flight {:02}/{:02}", ring_fences.count_waiting(),
+                              ring_fences.size());
 
             props.st_separate();
+            if (props.config_uint("iterations in flight", desired_iterations_in_flight)) {
+                request_reconnect();
+            }
             if (props.config_options("time overwrite", time_overwrite, {"None", "Time", "Delta"},
                                      Properties::OptionsStyle::COMBO)) {
                 if (time_overwrite == 0) {
@@ -1923,7 +1790,7 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                 for (uint32_t i = 0; i <= max_delay; i++) {
                     const GraphResourceHandle res =
                         output->create_resource(per_output_info.inputs, resource_allocator,
-                                                resource_allocator, i, ITERATIONS_IN_FLIGHT);
+                                                resource_allocator, i, ring_fences.size());
                     per_output_info.resources.emplace_back(res);
                 }
             }
@@ -1984,10 +1851,10 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
                 num_resources.push_back(per_output_info.resources.size());
             }
 
-            uint32_t num_sets = std::max(lcm(num_resources), ITERATIONS_IN_FLIGHT);
+            uint32_t num_sets = std::max(lcm(num_resources), ring_fences.size());
             // make sure it is at least RING_SIZE to allow updates while iterations are in-flight
             // solve k * num_sets >= RING_SIZE
-            const uint32_t k = (ITERATIONS_IN_FLIGHT + num_sets - 1) / num_sets;
+            const uint32_t k = (ring_fences.size() + num_sets - 1) / num_sets;
             num_sets *= k;
 
             SPDLOG_DEBUG("needing {} descriptor sets for node {} ({})", num_sets,
@@ -2217,7 +2084,9 @@ class Graph : public std::enable_shared_from_this<Graph<ITERATIONS_IN_FLIGHT>> {
     // clang-format on
 
     // Per-iteration data management
-    merian::RingFences<ITERATIONS_IN_FLIGHT, InFlightData> ring_fences;
+    uint32_t desired_iterations_in_flight = 2;
+    // set to desired_iterations_in_flight in connect()
+    merian::RingFences<InFlightData> ring_fences;
 
     // State
     bool needs_reconnect = false;
