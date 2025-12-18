@@ -260,10 +260,6 @@ class Graph : public std::enable_shared_from_this<Graph> {
             }
 
             {
-                ring_fences.resize(desired_iterations_in_flight);
-            }
-
-            {
                 MERIAN_PROFILE_SCOPE(profiler, "reset");
                 reset_connections();
             }
@@ -381,6 +377,14 @@ class Graph : public std::enable_shared_from_this<Graph> {
 
         if (flush_thread_pool_at_run_start) {
             thread_pool->wait_empty();
+        }
+
+        if (desired_iterations_in_flight != ring_fences.size()) {
+            // TODO: Move to connect but currently this is not possible since below we get a
+            // reference to the inflight data but then resize which might invalidate the reference
+            // (because the internal buffer is resized...)
+            ring_fences.resize(desired_iterations_in_flight);
+            request_reconnect();
         }
 
         // wait for the in-flight processing to finish
