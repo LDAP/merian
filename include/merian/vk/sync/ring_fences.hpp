@@ -17,8 +17,8 @@ namespace merian {
  *
  *  You can store additional data for every frame.
  */
-template <uint32_t RING_SIZE = 2, typename UserDataType = void*>
-class RingFences : public std::enable_shared_from_this<RingFences<RING_SIZE, UserDataType>> {
+template <typename UserDataType = void*>
+class RingFences : public std::enable_shared_from_this<RingFences<UserDataType>> {
   public:
     struct RingData {
         vk::Fence fence{};
@@ -30,18 +30,42 @@ class RingFences : public std::enable_shared_from_this<RingFences<RING_SIZE, Use
     RingFences& operator=(RingFences const&) = delete;
     RingFences() = delete;
 
-    RingFences(const ContextHandle& context) : context(context) {
-        for (uint32_t i = 0; i < RING_SIZE; i++) {
-            vk::FenceCreateInfo fence_create_info{vk::FenceCreateFlagBits::eSignaled};
-            ring_data[i].fence = context->device.createFence(fence_create_info);
-        }
+    RingFences(
+        const ContextHandle& context,
+        uint32_t ring_size = 2,
+        const std::function<UserDataType(const uint32_t index)>& user_data_initializer =
+            [](const uint32_t /*index*/) -> UserDataType { return UserDataType(); })
+        : context(context), user_data_initializer(user_data_initializer) {
+
+        resize(ring_size);
     }
 
     ~RingFences() {
-        wait_all();
-        for (uint32_t i = 0; i < RING_SIZE; i++) {
-            context->device.destroyFence(ring_data[i].fence);
+        resize(0);
+    }
+
+    // Elements are erased starting from the current index. All new indices will be initialized
+    // using the provided user_data_initializer.
+    void resize(const uint32_t ring_size) {
+        const vk::FenceCreateInfo fence_create_info{vk::FenceCreateFlagBits::eSignaled};
+        while (ring_data.size() < ring_size) {
+            ring_data.emplace_back(context->device.createFence(fence_create_info),
+                                   user_data_initializer(ring_data.size()));
         }
+
+        while (ring_size < ring_data.size()) {
+            check_result(
+                context->device.waitForFences(1, &ring_data[current_index].fence, VK_TRUE, ~0ULL),
+                "failed waiting for fence");
+            context->device.destroyFence(ring_data[current_index].fence);
+            ring_data.erase(ring_data.begin() + current_index);
+
+            if (current_index >= ring_data.size()) {
+                current_index = 0;
+            }
+        }
+
+        assert(ring_data.size() == ring_size);
     }
 
     // Resets the fence of the current iteration ring and returns the fence.
@@ -61,7 +85,7 @@ class RingFences : public std::enable_shared_from_this<RingFences<RING_SIZE, Use
     // Allows access to the user data of the whole ring.
     // Use with caution and do not change data of in-flight processing.
     RingData& get(const uint32_t index) {
-        assert(index < RING_SIZE);
+        assert(index < size());
         return ring_data[index];
     }
 
@@ -74,7 +98,7 @@ class RingFences : public std::enable_shared_from_this<RingFences<RING_SIZE, Use
     // ensures the availability of the passed cycle
     // cycle can be absolute (e.g. current frame number)
     RingData& set_cycle_wait_reset_get(uint32_t cycle) {
-        current_index = cycle % RING_SIZE;
+        current_index = cycle % size();
         RingData& data = ring_data[current_index];
         check_result(context->device.waitForFences(1, &data.fence, VK_TRUE, ~0ULL),
                      "failed waiting for fence");
@@ -97,7 +121,7 @@ class RingFences : public std::enable_shared_from_this<RingFences<RING_SIZE, Use
     // Sets cycle, waits for the cycle to be available and returns the ring data.
     // reset() has to be manually called.
     UserDataType& set_cycle_wait_get(uint32_t cycle) {
-        current_index = cycle % RING_SIZE;
+        current_index = cycle % size();
         RingData& data = ring_data[current_index];
         check_result(context->device.waitForFences(1, &data.fence, VK_TRUE, ~0ULL),
                      "failed waiting for fence");
@@ -107,7 +131,7 @@ class RingFences : public std::enable_shared_from_this<RingFences<RING_SIZE, Use
     // Sets cycle, waits for the cycle to be available and returns the ring data.
     // reset() has to be manually called.
     UserDataType& set_cycle_wait_get(uint32_t cycle, bool& did_wait) {
-        current_index = cycle % RING_SIZE;
+        current_index = cycle % size();
         RingData& data = ring_data[current_index];
 
         const vk::Result status = context->device.getFenceStatus(data.fence);
@@ -127,12 +151,22 @@ class RingFences : public std::enable_shared_from_this<RingFences<RING_SIZE, Use
         return current_index;
     }
 
-    uint32_t ring_size() const {
-        return RING_SIZE;
+    uint32_t size() const {
+        return ring_data.size();
+    }
+
+    uint32_t count_waiting() const {
+        uint32_t waiting = 0;
+
+        for (uint32_t i = 0; i < size(); i++) {
+            waiting += context->device.getFenceStatus(ring_data[i].fence) == vk::Result::eNotReady;
+        }
+
+        return waiting;
     }
 
     void wait_all() {
-        for (uint32_t i = 0; i < RING_SIZE; i++) {
+        for (uint32_t i = 0; i < size(); i++) {
             check_result(context->device.waitForFences(1, &ring_data[i].fence, VK_TRUE, ~0ULL),
                          "failed waiting for fence");
         }
@@ -143,9 +177,11 @@ class RingFences : public std::enable_shared_from_this<RingFences<RING_SIZE, Use
         check_result(context->device.resetFences(1, &data.fence), "could not reset fence");
     }
 
-    uint32_t current_index = 0;
     const ContextHandle context;
-    std::array<RingData, RING_SIZE> ring_data;
+    const std::function<UserDataType(const uint32_t index)> user_data_initializer;
+
+    uint32_t current_index = 0;
+    std::vector<RingData> ring_data;
 };
 
 } // namespace merian

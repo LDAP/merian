@@ -1,11 +1,11 @@
 #pragma once
 
+#include "merian/shader/glsl_shader_compiler.hpp"
 #include "merian/utils/chrono.hpp"
 #include "merian/utils/concurrent/thread_pool.hpp"
 #include "merian/vk/command/caching_command_pool.hpp"
 #include "merian/vk/command/command_buffer.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
-#include "merian/shader/glsl_shader_compiler.hpp"
 #include "merian/vk/sync/semaphore_binary.hpp"
 #include "merian/vk/sync/semaphore_timeline.hpp"
 #include "merian/vk/utils/cpu_queue.hpp"
@@ -20,26 +20,17 @@ using namespace std::literals::chrono_literals;
 
 // Manages data of a single graph run.
 class GraphRun {
-    template <uint32_t> friend class Graph;
+    friend class Graph;
 
   public:
-    GraphRun(const uint32_t iterations_in_flight,
-             const ThreadPoolHandle& thread_pool,
+    GraphRun(const ThreadPoolHandle& thread_pool,
              const CPUQueueHandle& cpu_queue,
              const ProfilerHandle& profiler,
              const ResourceAllocatorHandle& allocator,
              const QueueHandle& queue,
              const GLSLShaderCompilerHandle& shader_compiler)
-        : iterations_in_flight(iterations_in_flight), thread_pool(thread_pool),
-          cpu_queue(cpu_queue), profiler(profiler), allocator(allocator), queue(queue),
-          shader_compiler(shader_compiler) {
-
-        semaphores.resize(iterations_in_flight);
-        semaphore_value.assign(iterations_in_flight, 1);
-        for (uint32_t i = 0; i < iterations_in_flight; i++) {
-            semaphores[i] = TimelineSemaphore::create(queue->get_context());
-        }
-    }
+        : thread_pool(thread_pool), cpu_queue(cpu_queue), profiler(profiler), allocator(allocator),
+          queue(queue), shader_compiler(shader_compiler) {}
 
     GraphRun(GraphRun& graph_run) = delete;
     GraphRun(GraphRun&& graph_run) = delete;
@@ -259,13 +250,24 @@ class GraphRun {
     }
 
   private:
-    void begin_run(const std::shared_ptr<CachingCommandPool>& cmd_cache,
+    void begin_run(const uint32_t iterations_in_flight,
+                   const std::shared_ptr<CachingCommandPool>& cmd_cache,
                    const uint64_t iteration,
                    const uint64_t total_iteration,
                    const uint32_t in_flight_index,
                    const std::chrono::nanoseconds& time_delta,
                    const std::chrono::nanoseconds& elapsed,
                    const std::chrono::nanoseconds& elapsed_since_connect) {
+
+        if (semaphores.size() != iterations_in_flight) {
+            semaphores.resize(iterations_in_flight);
+            semaphore_value.assign(iterations_in_flight, 1);
+            for (uint32_t i = 0; i < iterations_in_flight; i++) {
+                semaphores[i] = TimelineSemaphore::create(queue->get_context());
+            }
+        }
+
+        this->iterations_in_flight = iterations_in_flight;
         this->cmd_cache = cmd_cache;
         this->iteration = iteration;
         this->total_iteration = total_iteration;
@@ -314,13 +316,14 @@ class GraphRun {
     }
 
   private:
-    const uint32_t iterations_in_flight;
     const ThreadPoolHandle thread_pool;
     const CPUQueueHandle cpu_queue;
     const ProfilerHandle profiler;
     const ResourceAllocatorHandle allocator;
     const QueueHandle queue;
     const GLSLShaderCompilerHandle shader_compiler;
+
+    uint32_t iterations_in_flight;
 
     std::shared_ptr<CachingCommandPool> cmd_cache = nullptr;
     CommandBufferHandle cmd = nullptr;
