@@ -93,4 +93,12 @@ VkImageIn::transfer_src(const std::string& name, const uint32_t delay, const boo
         vk::ShaderStageFlags(), delay, optional);
 }
 
+VkImageInHandle
+VkImageIn::compute_read(const std::string& name, const uint32_t delay, const bool optional) {
+    return std::make_shared<VkImageIn>(
+        name, vk::AccessFlagBits2::eShaderRead, vk::PipelineStageFlagBits2::eComputeShader,
+        vk::ImageLayout::eGeneral, vk::ImageUsageFlagBits::eStorage, vk::ShaderStageFlagBits::eCompute, delay, optional);
+}
+
+
 } // namespace merian_nodes

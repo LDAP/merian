@@ -112,8 +112,7 @@ void SlangCompute::reflect_input_connectors(slang::EntryPointReflection* entry_p
                                         VkSampledImageIn::compute_read(reflected_name));
         } else if (type->getResourceShape() == SLANG_TEXTURE_2D) {
             image_in_connectors.emplace(
-                reflected_name, VkSampledImageIn::compute_read(
-                                    reflected_name)); // TODO use a not sample compute tex here
+                reflected_name, VkImageIn::compute_read(reflected_name));
         } else if (type->getResourceShape() == SLANG_STRUCTURED_BUFFER) {
             buffer_in_connectors.emplace(reflected_name, VkBufferIn::compute_read(reflected_name));
         }
