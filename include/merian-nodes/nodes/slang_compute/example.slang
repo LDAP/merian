@@ -3,23 +3,6 @@ import reflection_attributes;
 
 using merian;
 
-struct StaticDims { int x; int y; int z; };
-struct AsInputImage { String name; };
-
-[__AttributeUsage(_AttributeTargets.Var)]
-struct MerianExtentStaticAttribute
-{
-    int x;
-    int y;
-    int z;
-};
-
-[__AttributeUsage(_AttributeTargets.Var)]
-struct MerianExtentAsAttribute
-{
-    String name;
-};
-
 struct NodeIn {
     [vk::binding(0)]
     Sampler2D<float4> img_src;
@@ -28,10 +11,18 @@ struct NodeIn {
 struct NodeOut {
     [vk::binding(1)] [MerianExtentAs("img_src")]
     RWTexture2D<float4> img_output;
+    [vk::binding(2)] [MerianExtentAs("img_src")]
+    RWBuffer<float4> buffer_output;
 };
+
+struct NodeProperties {
+    [MerianFloatRange(0.0, 1.5)]
+    float f;
+}
 
 [numthreads(16, 16, 1)]
 [shader("compute")]
+[MerianOperateOn("img_src")]
 void main(int2 ipos: SV_DispatchThreadID, uniform NodeIn node_in, uniform NodeOut node_out) {
     if (not_on_texture(ipos,  node_out.img_output))
         return;

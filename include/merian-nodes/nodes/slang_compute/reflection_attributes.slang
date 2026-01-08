@@ -39,3 +39,8 @@ struct MerianFloatRangeAttribute
     float min;
     float max;
 };
+
+[__AttributeUsage(_AttributeTargets.Var)]
+struct MerianColorAttribute
+{
+};
