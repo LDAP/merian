@@ -1,7 +1,7 @@
 project(
   'spdlog',
   'cpp',
-  version: '1.12.0',
+  version: '1.17.0',
   license: 'MIT',
   default_options: ['cpp_std=c++14'],
   meson_version: '>=0.49.0',

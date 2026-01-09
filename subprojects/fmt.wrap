@@ -2,7 +2,7 @@
 directory = fmt
 
 url = https://github.com/fmtlib/fmt
-revision = 10.1.1
+revision = 12.1.0
 depth = 1
 
 patch_directory = fmt
