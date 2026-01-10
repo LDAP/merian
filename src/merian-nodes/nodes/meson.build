@@ -2,6 +2,7 @@
 
 subdir('ab_compare')
 subdir('accumulate')
+subdir('blit')
 subdir('bloom')
 subdir('color_image')
 subdir('compute_node')

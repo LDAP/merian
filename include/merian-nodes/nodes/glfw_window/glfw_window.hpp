@@ -1,6 +1,7 @@
 #pragma once
 
 #include "merian-nodes/connectors/image/vk_image_in.hpp"
+#include "merian-nodes/connectors/image/vk_image_out_unmanaged.hpp"
 #include "merian-nodes/graph/errors.hpp"
 #include "merian-nodes/graph/node.hpp"
 
@@ -36,6 +37,14 @@ class GLFWWindow : public Node {
         }
 
         return {image_in};
+    }
+
+    virtual std::vector<OutputConnectorHandle> describe_outputs(const NodeIOLayout& io_layout) override {
+        if (!window) {
+            throw graph_errors::node_error{"node requires ExtensionVkGLFW context extension"};
+        }
+
+        return {image_out};
     }
 
     virtual NodeStatusFlags pre_process([[maybe_unused]] const GraphRun& run,
@@ -86,7 +95,12 @@ class GLFWWindow : public Node {
                 cmd->clear(image);
             }
 
-            cmd->barrier(image->barrier2(vk::ImageLayout::ePresentSrcKHR));
+            run.add_pre_submit_callback([acquire](const QueueHandle& queue, GraphRun& run) {
+                const CommandBufferHandle& cmd = run.get_cmd();
+                const ImageHandle image = acquire->image_view->get_image();
+
+                cmd->barrier(image->barrier2(vk::ImageLayout::ePresentSrcKHR));
+            });
 
             on_blit_completed(cmd, *acquire);
 
@@ -253,6 +267,7 @@ class GLFWWindow : public Node {
                                [[maybe_unused]] const SwapchainAcquireResult& acquire_result) {};
 
     VkImageInHandle image_in = VkImageIn::transfer_src("src", 0, true);
+    VkImageOutHandle image_out = UnmanagedVkImageOut::create("out", 1, vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferDst);
 
     std::array<int, 4> windowed_pos_size;
     bool request_rebuild_on_recreate = false;

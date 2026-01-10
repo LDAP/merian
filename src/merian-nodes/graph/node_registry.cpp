@@ -3,6 +3,7 @@
 #include "merian-nodes/nodes/ab_compare/ab_compare.hpp"
 #include "merian-nodes/nodes/accumulate/accumulate.hpp"
 #include "merian-nodes/nodes/as_builder/device_as_builder.hpp"
+#include "merian-nodes/nodes/blit/blit.hpp"
 #include "merian-nodes/nodes/bloom/bloom.hpp"
 #include "merian-nodes/nodes/color_image/color_output.hpp"
 #include "merian-nodes/nodes/exposure/exposure.hpp"
@@ -35,6 +36,9 @@ NodeRegistry::NodeRegistry(const ContextHandle& context, const ResourceAllocator
         NodeTypeInfo{"Acceleration Structure Builder",
                      "Build acceleration structures from geometry on the device.",
                      [=]() { return std::make_shared<DeviceASBuilder>(context, allocator); }});
+    register_node_type<Blit>(NodeTypeInfo{"Blit",
+                                           "Blit a src image on a dst image.",
+                                           [=]() { return std::make_shared<Blit>(context); }});
     register_node_type<Bloom>(NodeTypeInfo{"Bloom",
                                            "Selectively blurs pixels that surpass a threshold.",
                                            [=]() { return std::make_shared<Bloom>(context); }});

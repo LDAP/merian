@@ -90,6 +90,13 @@ class GraphRun {
         submit_callbacks.push_back(callback);
     }
 
+    // Enqueues a callback that is executed before the next submit. Note that during a graph run
+    // multiple submits might happen.
+    void add_pre_submit_callback(
+        const std::function<void(const QueueHandle& queue, GraphRun& run)>& callback) noexcept {
+        pre_submit_callbacks.push_back(callback);
+    }
+
     // ------------------------------------------------------------------------------------
 
     // Number of iterations since connect.
@@ -293,6 +300,13 @@ class GraphRun {
 
     void submit(const vk::Fence& fence = VK_NULL_HANDLE) {
         {
+            MERIAN_PROFILE_SCOPE(profiler, "execute pre-submit callbacks");
+            for (const auto& callback : pre_submit_callbacks) {
+                callback(queue, *this);
+            }
+        }
+
+        {
             MERIAN_PROFILE_SCOPE(profiler, "submit");
             queue->submit(get_cmd(), fence, signal_semaphores, wait_semaphores, wait_stages,
                           vk::TimelineSemaphoreSubmitInfo{wait_values, signal_values});
@@ -311,6 +325,7 @@ class GraphRun {
         signal_semaphores.clear();
         signal_values.clear();
         submit_callbacks.clear();
+        pre_submit_callbacks.clear();
     }
 
   private:
@@ -334,6 +349,7 @@ class GraphRun {
     std::vector<vk::Semaphore> signal_semaphores;
     std::vector<uint64_t> signal_values;
     std::vector<std::function<void(const QueueHandle& queue, GraphRun& run)>> submit_callbacks;
+    std::vector<std::function<void(const QueueHandle& queue, GraphRun& run)>> pre_submit_callbacks;
 
     std::chrono::nanoseconds external_wait_time;
 
