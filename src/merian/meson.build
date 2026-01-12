@@ -20,6 +20,7 @@ merian_src = files(
     'vk/command/queue.cpp',
     'vk/descriptors/descriptor_buffer.cpp',
     'vk/descriptors/descriptor_container.cpp',
+    'vk/descriptors/descriptor_pool.cpp',
     'vk/context.cpp',
     'vk/extension/extension.cpp',
     'vk/extension/extension_glfw.cpp',

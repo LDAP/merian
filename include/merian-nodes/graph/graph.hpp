@@ -1876,15 +1876,11 @@ class Graph : public std::enable_shared_from_this<Graph> {
             SPDLOG_DEBUG("needing {} descriptor sets for node {} ({})", num_sets,
                          dst_data.identifier, registry.node_type_name(dst_node));
 
-            // --- ALLOCATE POOL ---
-            dst_data.descriptor_pool =
-                std::make_shared<DescriptorPool>(dst_data.descriptor_set_layout, num_sets);
-
             // --- ALLOCATE SETS and PRECOMUTE RESOURCES for each iteration ---
             for (uint32_t set_idx = 0; set_idx < num_sets; set_idx++) {
                 // allocate
                 dst_data.descriptor_sets.emplace_back(
-                    DescriptorSet::create(dst_data.descriptor_pool));
+                    resource_allocator->allocate_descriptor_set(dst_data.descriptor_set_layout));
 
                 // precompute resources for inputs
                 for (auto& [input, per_input_info] : dst_data.input_connections) {

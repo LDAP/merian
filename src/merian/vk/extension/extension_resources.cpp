@@ -56,7 +56,7 @@ void ExtensionResources::on_context_created(const ContextHandle& context,
 
 void ExtensionResources::on_destroy_context() {}
 
-std::shared_ptr<MemoryAllocator> ExtensionResources::memory_allocator() {
+MemoryAllocatorHandle ExtensionResources::memory_allocator() {
     if (_memory_allocator.expired()) {
         assert(!weak_context.expired());
         auto ptr = VMAMemoryAllocator::create(weak_context.lock(), flags);
@@ -65,17 +65,17 @@ std::shared_ptr<MemoryAllocator> ExtensionResources::memory_allocator() {
     }
     return _memory_allocator.lock();
 }
-std::shared_ptr<ResourceAllocator> ExtensionResources::resource_allocator() {
+ResourceAllocatorHandle ExtensionResources::resource_allocator() {
     if (_resource_allocator.expired()) {
         assert(!weak_context.expired());
-        auto ptr = std::make_shared<ResourceAllocator>(weak_context.lock(), memory_allocator(),
-                                                       staging(), sampler_pool());
+        auto ptr = std::make_shared<ResourceAllocator>(
+            weak_context.lock(), memory_allocator(), staging(), sampler_pool(), descriptor_pool());
         _resource_allocator = ptr;
         return ptr;
     }
     return _resource_allocator.lock();
 }
-std::shared_ptr<SamplerPool> ExtensionResources::sampler_pool() {
+SamplerPoolHandle ExtensionResources::sampler_pool() {
     if (_sampler_pool.expired()) {
         assert(!weak_context.expired());
         auto ptr = std::make_shared<SamplerPool>(weak_context.lock());
@@ -84,7 +84,7 @@ std::shared_ptr<SamplerPool> ExtensionResources::sampler_pool() {
     }
     return _sampler_pool.lock();
 }
-std::shared_ptr<StagingMemoryManager> ExtensionResources::staging() {
+StagingMemoryManagerHandle ExtensionResources::staging() {
     if (_staging.expired()) {
         assert(!weak_context.expired());
         auto ptr = std::make_shared<StagingMemoryManager>(memory_allocator());
@@ -92,6 +92,15 @@ std::shared_ptr<StagingMemoryManager> ExtensionResources::staging() {
         return ptr;
     }
     return _staging.lock();
+}
+DescriptorPoolHandle ExtensionResources::descriptor_pool() {
+    if (_descriptor_pool.expired()) {
+        assert(!weak_context.expired());
+        auto ptr = ResizingVulkanDescriptorPool::create(weak_context.lock());
+        _descriptor_pool = ptr;
+        return ptr;
+    }
+    return _descriptor_pool.lock();
 }
 
 } // namespace merian

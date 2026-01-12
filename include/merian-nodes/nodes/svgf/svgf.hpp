@@ -91,7 +91,6 @@ class SVGF : public Node {
     int svgf_iterations = 0;
 
     DescriptorSetLayoutHandle ping_pong_layout;
-    DescriptorPoolHandle filter_pool;
     struct EAWRes {
         TextureHandle ping_pong;
         TextureHandle gbuf_ping_pong;

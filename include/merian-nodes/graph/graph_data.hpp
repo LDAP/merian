@@ -106,8 +106,6 @@ struct NodeData {
     // get_descriptor_info() does not return std::nullopt.
     DescriptorSetLayoutHandle descriptor_set_layout;
 
-    DescriptorPoolHandle descriptor_pool;
-
     // A descriptor set for each combination of resources that can occur, due to delayed accesses.
     // Also keep at least RING_SIZE to allow updating descriptor sets while iterations are in
     // flight. Access with iteration % data.descriptor_sets.size() (on prepare descriptor sets)
@@ -131,7 +129,6 @@ struct NodeData {
 
         resource_maps.clear();
         descriptor_sets.clear();
-        descriptor_pool.reset();
         descriptor_set_layout.reset();
 
         statistics = {};

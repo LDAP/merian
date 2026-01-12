@@ -59,11 +59,8 @@ Accumulate::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
         accumulate_desc_layout =
             DescriptorSetLayoutBuilder().add_binding_combined_sampler().build_layout(context);
 
-        percentile_desc_pool = std::make_shared<DescriptorPool>(percentile_desc_layout);
-        accumulate_desc_pool = std::make_shared<DescriptorPool>(accumulate_desc_layout);
-
-        percentile_set = DescriptorSet::create(percentile_desc_pool);
-        accumulate_set = DescriptorSet::create(accumulate_desc_pool);
+        percentile_set = allocator->allocate_descriptor_set(percentile_desc_layout);
+        accumulate_set = allocator->allocate_descriptor_set(accumulate_desc_layout);
     }
 
     percentile_group_count_x =

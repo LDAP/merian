@@ -8,31 +8,6 @@
 
 namespace merian {
 
-// Allocates one set for each layout
-inline std::vector<vk::DescriptorSet>
-allocate_descriptor_sets(const vk::Device& device,
-                         const vk::DescriptorPool& pool,
-                         const std::vector<vk::DescriptorSetLayout>& layouts) {
-    vk::DescriptorSetAllocateInfo info{pool, layouts};
-    return device.allocateDescriptorSets(info);
-}
-
-// Allocates `count` sets for the supplied layout.
-inline std::vector<vk::DescriptorSet>
-allocate_descriptor_sets(const vk::Device& device,
-                         const vk::DescriptorPool& pool,
-                         const vk::DescriptorSetLayout& layout,
-                         uint32_t count) {
-    std::vector<vk::DescriptorSetLayout> layouts(count, layout);
-    return allocate_descriptor_sets(device, pool, layouts);
-}
-
-inline vk::DescriptorSet allocate_descriptor_set(const vk::Device& device,
-                                                 const vk::DescriptorPool& pool,
-                                                 const vk::DescriptorSetLayout& layout) {
-    return allocate_descriptor_sets(device, pool, {layout})[0];
-}
-
 class DescriptorSet;
 using DescriptorSetHandle = std::shared_ptr<DescriptorSet>;
 
@@ -42,27 +17,21 @@ using DescriptorSetHandle = std::shared_ptr<DescriptorSet>;
 // The DescriptorSet holds references to the resources that are bound to it.
 class DescriptorSet : public DescriptorContainer {
 
-  public:
-    // Allocates a DescriptorSet that matches the layout that is attached to the Pool
-    DescriptorSet(const DescriptorPoolHandle& pool)
-        : DescriptorContainer(pool->get_layout()), pool(pool) {
-        set = allocate_descriptor_set(*pool->get_context(), *pool, *pool->get_layout());
+    friend class VulkanDescriptorPool;
+
+  private:
+    DescriptorSet(const VulkanDescriptorPoolHandle& pool,
+                  const DescriptorSetLayoutHandle& layout,
+                  const vk::DescriptorSet& set)
+        : DescriptorContainer(layout), pool(pool), set(set) {
         SPDLOG_DEBUG("allocated DescriptorSet ({})", fmt::ptr(static_cast<VkDescriptorSet>(set)));
 
         queued_writes.reserve(get_layout()->get_descriptor_count());
     }
 
+  public:
     ~DescriptorSet() {
-        if (pool->get_create_flags() & vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet) {
-            // DescriptorSet can be given back to the DescriptorPool
-            SPDLOG_DEBUG("freeing DescriptorSet ({})", fmt::ptr(static_cast<VkDescriptorSet>(set)));
-            pool->get_context()->device.freeDescriptorSets(*pool, set);
-        } else {
-            SPDLOG_DEBUG("destroying DescriptorSet ({}) but not freeing since the pool was not "
-                         "created with the {} bit set.",
-                         fmt::ptr(static_cast<VkDescriptorSet>(set)),
-                         vk::to_string(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet));
-        }
+        pool->free(this);
     }
 
     operator const vk::DescriptorSet&() const {
@@ -116,14 +85,16 @@ class DescriptorSet : public DescriptorContainer {
         queued_writes.back().dstSet = set;
     }
 
-  public:
-    static DescriptorSetHandle create(const DescriptorPoolHandle& pool) {
-        return DescriptorSetHandle(new DescriptorSet(pool));
+  private:
+    static DescriptorSetHandle create(const VulkanDescriptorPoolHandle& pool,
+                                      const DescriptorSetLayoutHandle& layout,
+                                      const vk::DescriptorSet& set) {
+        return DescriptorSetHandle(new DescriptorSet(pool, layout, set));
     }
 
   private:
-    const DescriptorPoolHandle pool;
-    vk::DescriptorSet set;
+    const VulkanDescriptorPoolHandle pool;
+    const vk::DescriptorSet set;
 
     // ---------------------------------------------------------------------
     // Queued Updates

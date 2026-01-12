@@ -103,10 +103,8 @@ class Accumulate : public Node {
     PipelineHandle accumulate;
 
     DescriptorSetLayoutHandle percentile_desc_layout;
-    DescriptorPoolHandle percentile_desc_pool;
     DescriptorSetHandle percentile_set;
     DescriptorSetLayoutHandle accumulate_desc_layout;
-    DescriptorPoolHandle accumulate_desc_pool;
     DescriptorSetHandle accumulate_set;
 
     bool clear = false;

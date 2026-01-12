@@ -11,8 +11,10 @@ namespace merian {
 ResourceAllocator::ResourceAllocator(const ContextHandle& context,
                                      const std::shared_ptr<MemoryAllocator>& memAllocator,
                                      const std::shared_ptr<StagingMemoryManager>& staging,
-                                     const std::shared_ptr<SamplerPool>& samplerPool)
+                                     const std::shared_ptr<SamplerPool>& samplerPool,
+                                     const DescriptorPoolHandle& descriptor_pool)
     : context(context), m_memAlloc(memAllocator), m_staging(staging), m_samplerPool(samplerPool),
+      descriptor_pool(descriptor_pool),
       debug_utils(context->get_extension<ExtensionVkDebugUtils>()) {
     SPDLOG_DEBUG("create ResourceAllocator ({})", fmt::ptr(this));
 
@@ -235,16 +237,17 @@ TextureHandle ResourceAllocator::createTexture(const ImageHandle& image,
     return createTexture(image, view_create_info, sampler, debug_name);
 }
 
-TextureHandle ResourceAllocator::createTextureFromRGBA8(const CommandBufferHandle& cmd,
-                                                        const uint32_t* data,
-                                                        const uint32_t width,
-                                                        const uint32_t height,
-                                                        const vk::Filter mag_filter,
-                                                        const vk::Filter min_filter,
-                                                        const bool isSRGB,
-                                                        const std::string& debug_name,
-                                                        const bool generate_mipmaps,
-                                                        const vk::ImageUsageFlags additional_usage_flags) {
+TextureHandle
+ResourceAllocator::createTextureFromRGBA8(const CommandBufferHandle& cmd,
+                                          const uint32_t* data,
+                                          const uint32_t width,
+                                          const uint32_t height,
+                                          const vk::Filter mag_filter,
+                                          const vk::Filter min_filter,
+                                          const bool isSRGB,
+                                          const std::string& debug_name,
+                                          const bool generate_mipmaps,
+                                          const vk::ImageUsageFlags additional_usage_flags) {
     uint32_t mip_levels = 1;
     vk::ImageUsageFlags usage_flags = vk::ImageUsageFlagBits::eSampled | additional_usage_flags;
     if (generate_mipmaps) {
@@ -322,6 +325,17 @@ AccelerationStructureHandle ResourceAllocator::createAccelerationStructure(
 #endif
 
     return AccelerationStructure::create(as, buffer, size_info);
+}
+
+DescriptorSetHandle
+ResourceAllocator::allocate_descriptor_set(const DescriptorSetLayoutHandle& layout) {
+    return descriptor_pool->allocate(layout);
+}
+
+std::vector<DescriptorSetHandle>
+ResourceAllocator::allocate_descriptor_set(const DescriptorSetLayoutHandle& layout,
+                                           const uint32_t set_count) {
+    return descriptor_pool->allocate(layout, set_count);
 }
 
 std::shared_ptr<StagingMemoryManager> ResourceAllocator::getStaging() {

@@ -53,7 +53,6 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
                                .add_binding_storage_image()
                                .build_layout(context);
     }
-    filter_pool = std::make_shared<DescriptorPool>(ping_pong_layout, 2); // ping pong
 
     // Ping pong textures
     irr_create_info.usage |= vk::ImageUsageFlagBits::eSampled;
@@ -68,7 +67,7 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
 
     for (int i = 0; i < 2; i++) {
         if (!ping_pong_res[i].set)
-            ping_pong_res[i].set = DescriptorSet::create(filter_pool);
+            ping_pong_res[i].set = allocator->allocate_descriptor_set(ping_pong_layout);
 
         // irradiance
         ImageHandle tmp_irr_image = allocator->createImage(irr_create_info, MemoryMappingType::NONE,

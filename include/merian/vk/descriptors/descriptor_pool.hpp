@@ -3,34 +3,148 @@
 #include "merian/vk/context.hpp"
 #include "merian/vk/descriptors/descriptor_set_layout.hpp"
 
-#include <map>
-#include <optional>
+#include <unordered_map>
 #include <vulkan/vulkan.hpp>
 
 namespace merian {
 
+class DescriptorSet;
+using DescriptorSetHandle = std::shared_ptr<DescriptorSet>;
+
 class DescriptorPool : public std::enable_shared_from_this<DescriptorPool> {
 
   public:
-    /**
-     * @brief      Creates a DescriptorPool that has enough descriptors to allocate set_count
-     * DescriptorSet of the layout "layout".
-     *
-     * By default the max_sets parameter is set to set_count
-     */
-    DescriptorPool(std::shared_ptr<DescriptorSetLayout>& layout,
-                   const uint32_t set_count = 1,
-                   const vk::DescriptorPoolCreateFlags flags = {},
-                   const std::optional<uint32_t> max_sets = std::nullopt)
-        : context(layout->get_context()), layout(layout), flags(flags) {
-        SPDLOG_DEBUG("create DescriptorPool ({})", fmt::ptr(this));
-        pool = descriptor_pool_for_bindings(layout->get_bindings(), layout->get_context()->device,
-                                            set_count, flags, max_sets);
+    virtual ~DescriptorPool() {}
+
+    // Returns the number of sets this pool can allocate for the supplied layout.
+    virtual uint32_t can_allocate(const DescriptorSetLayoutHandle& layout) const = 0;
+
+    virtual std::vector<DescriptorSetHandle> allocate(const DescriptorSetLayoutHandle& layout,
+                                                      const uint32_t set_count) = 0;
+
+    virtual DescriptorSetHandle allocate(const DescriptorSetLayoutHandle& layout) {
+        return allocate(layout, 1).back();
+    }
+};
+
+using DescriptorPoolHandle = std::shared_ptr<DescriptorPool>;
+
+class VulkanDescriptorPool;
+using VulkanDescriptorPoolHandle = std::shared_ptr<VulkanDescriptorPool>;
+
+class VulkanDescriptorPool : public DescriptorPool {
+
+    friend class DescriptorSet;
+
+  public:
+    // Allocates one set for each layout
+    static std::vector<vk::DescriptorSet>
+    allocate_descriptor_sets(const vk::Device& device,
+                             const vk::DescriptorPool& pool,
+                             const vk::ArrayProxy<vk::DescriptorSetLayout>& layouts) {
+        vk::DescriptorSetAllocateInfo info{pool, layouts};
+        return device.allocateDescriptorSets(info);
     }
 
-    ~DescriptorPool() {
-        SPDLOG_DEBUG("destroy DescriptorPool ({})", fmt::ptr(this));
+    // Allocates `count` sets for the supplied layout.
+    static std::vector<vk::DescriptorSet>
+    allocate_descriptor_sets(const vk::Device& device,
+                             const vk::DescriptorPool& pool,
+                             const vk::DescriptorSetLayout& layout,
+                             uint32_t count) {
+        std::vector<vk::DescriptorSetLayout> layouts(count, layout);
+        return allocate_descriptor_sets(device, pool, layouts);
+    }
+
+    static vk::DescriptorSet allocate_descriptor_set(const vk::Device& device,
+                                                     const vk::DescriptorPool& pool,
+                                                     const vk::DescriptorSetLayout& layout) {
+        return allocate_descriptor_sets(device, pool, layout)[0];
+    }
+
+    static const inline std::vector<vk::DescriptorPoolSize> DEFAULT_POOL_SIZES = {
+        {vk::DescriptorType::eCombinedImageSampler, 65536},
+        {vk::DescriptorType::eSampledImage, 16384},
+        {vk::DescriptorType::eSampler, 16384},
+        {vk::DescriptorType::eUniformBuffer, 16384},
+        {vk::DescriptorType::eStorageBuffer, 32768},
+        {vk::DescriptorType::eStorageImage, 16384},
+        {vk::DescriptorType::eAccelerationStructureKHR, 4096},
+        {vk::DescriptorType::eInputAttachment, 4096},
+    };
+    static const inline uint32_t DEFAULT_POOL_MAX_SETS = 4096;
+
+  private:
+    /**
+     * @brief      Creates a DescriptorPool that has enough descriptors to allocate set_count
+     * DescriptorSets of the supplied DescriptorSetLayouts.
+     *
+     */
+    VulkanDescriptorPool(const DescriptorSetLayoutHandle& layout,
+                         const uint32_t set_count = 1,
+                         const vk::DescriptorPoolCreateFlags flags = {})
+        : merian::VulkanDescriptorPool(layout->get_context(),
+                                       layout->get_pool_sizes_as_vector(set_count),
+                                       set_count,
+                                       flags) {}
+
+    VulkanDescriptorPool(
+        const ContextHandle& context,
+        const vk::ArrayProxy<vk::DescriptorPoolSize>& pool_sizes = DEFAULT_POOL_SIZES,
+        const uint32_t max_sets = DEFAULT_POOL_MAX_SETS,
+        const vk::DescriptorPoolCreateFlags flags =
+            vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet)
+        : context(context), flags(flags), remaining_set_count(max_sets) {
+
+        remaining_pool_descriptors.reserve(pool_sizes.size());
+        for (const auto& size : pool_sizes) {
+            remaining_pool_descriptors[size.type] += size.descriptorCount;
+        }
+
+        const vk::DescriptorPoolCreateInfo info{flags, max_sets, pool_sizes};
+        pool = context->device.createDescriptorPool(info);
+
+        SPDLOG_DEBUG("created DescriptorPool ({})", fmt::ptr(VkDescriptorPool(pool)));
+    }
+
+  public:
+    static VulkanDescriptorPoolHandle create(const DescriptorSetLayoutHandle& layout,
+                                             const uint32_t set_count = 1,
+                                             const vk::DescriptorPoolCreateFlags flags = {}) {
+        return VulkanDescriptorPoolHandle(new VulkanDescriptorPool(layout, set_count, flags));
+    }
+
+    static VulkanDescriptorPoolHandle
+    create(const ContextHandle& context,
+           const vk::ArrayProxy<vk::DescriptorPoolSize>& pool_sizes = DEFAULT_POOL_SIZES,
+           const uint32_t max_sets = DEFAULT_POOL_MAX_SETS,
+           const vk::DescriptorPoolCreateFlags flags =
+               vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet) {
+        return VulkanDescriptorPoolHandle(
+            new VulkanDescriptorPool(context, pool_sizes, max_sets, flags));
+    }
+
+  public:
+    ~VulkanDescriptorPool() {
+        SPDLOG_DEBUG("destroy DescriptorPool ({})", fmt::ptr(VkDescriptorPool(pool)));
         context->device.destroyDescriptorPool(pool);
+    }
+
+    // -------------------------------------------------------------------------
+
+    uint32_t can_allocate(const DescriptorSetLayoutHandle& layout) const override;
+
+    std::vector<DescriptorSetHandle> allocate(const DescriptorSetLayoutHandle& layout,
+                                              const uint32_t set_count) override;
+
+    // -------------------------------------------------------------------------
+
+    const std::unordered_map<vk::DescriptorType, uint32_t>& get_allocated_descriptor_count() const {
+        return allocated_pool_descriptors;
+    }
+
+    const uint32_t& get_allocated_set_count() const {
+        return allocated_set_count;
     }
 
     operator const vk::DescriptorPool&() const {
@@ -41,10 +155,6 @@ class DescriptorPool : public std::enable_shared_from_this<DescriptorPool> {
         return pool;
     }
 
-    const std::shared_ptr<DescriptorSetLayout>& get_layout() const {
-        return layout;
-    }
-
     const ContextHandle& get_context() const {
         return context;
     }
@@ -53,63 +163,54 @@ class DescriptorPool : public std::enable_shared_from_this<DescriptorPool> {
         return flags;
     }
 
-    // // Returns all descriptor sets to the pool
-    // void reset() {
-    //     // Problem: DescriptorSets try to call free in their destuctor
-    //     // Solution: Keep a weak reference of every set and notify the sets when they are
-    //     destroyed
-    // }
+    bool supports_free_descriptor_set() const {
+        return bool(flags & vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet);
+    }
+
+  private:
+    void free(const DescriptorSet* set);
 
   private:
     const ContextHandle context;
-    const std::shared_ptr<DescriptorSetLayout> layout;
     const vk::DescriptorPoolCreateFlags flags;
+
+    std::unordered_map<vk::DescriptorType, uint32_t> remaining_pool_descriptors;
+    std::unordered_map<vk::DescriptorType, uint32_t> allocated_pool_descriptors;
+    uint32_t remaining_set_count = 0;
+    uint32_t allocated_set_count = 0;
+
     vk::DescriptorPool pool;
-
-  public:
-    // Determines the pool sizes to generate set_count DescriptorSets with these bindings.
-    // E.g. set_count = 1 means with these sizes exactly once DescriptorSet with all bindings can be
-    // created (or two with half of the bindings).
-    static std::vector<vk::DescriptorPoolSize>
-    make_pool_sizes_from_bindings(const std::vector<vk::DescriptorSetLayoutBinding>& bindings,
-                                  uint32_t set_count = 1) {
-
-        // We make one entry for each "type" of binding.
-        std::vector<vk::DescriptorPoolSize> sizes;
-        std::map<vk::DescriptorType, uint32_t> type_to_index;
-
-        for (const auto& binding : bindings) {
-            if (!type_to_index.contains(binding.descriptorType)) {
-                vk::DescriptorPoolSize size_for_type{binding.descriptorType,
-                                                     binding.descriptorCount * set_count};
-                type_to_index[binding.descriptorType] = sizes.size();
-                sizes.push_back(size_for_type);
-            } else {
-                sizes[type_to_index[binding.descriptorType]].descriptorCount +=
-                    binding.descriptorCount * set_count;
-            }
-        }
-
-        return sizes;
-    }
-
-    // Creates a vk::DescriptorPool that has enough Descriptors such that set_count DescriptorSets
-    // with these bindings can be created. By default the pools max sets property is set to
-    // set_count, you can override that if this pool should be used for different layouts for
-    // example.
-    static vk::DescriptorPool
-    descriptor_pool_for_bindings(const std::vector<vk::DescriptorSetLayoutBinding>& bindings,
-                                 const vk::Device& device,
-                                 const uint32_t set_count = 1,
-                                 const vk::DescriptorPoolCreateFlags flags = {},
-                                 const std::optional<uint32_t> max_sets = std::nullopt) {
-        std::vector<vk::DescriptorPoolSize> pool_sizes =
-            make_pool_sizes_from_bindings(bindings, set_count);
-        vk::DescriptorPoolCreateInfo info{flags, max_sets.value_or(set_count), pool_sizes};
-        return device.createDescriptorPool(info);
-    }
 };
 
-using DescriptorPoolHandle = std::shared_ptr<DescriptorPool>;
+class ResizingVulkanDescriptorPool;
+using ResizingDescriptorPoolHandle = std::shared_ptr<ResizingVulkanDescriptorPool>;
+
+class ResizingVulkanDescriptorPool : public DescriptorPool {
+  private:
+    ResizingVulkanDescriptorPool(const ContextHandle& context) : context(context) {
+        pools.reserve(16);
+        pools.emplace_back(VulkanDescriptorPool::create(context));
+    }
+
+  public:
+    static ResizingDescriptorPoolHandle create(const ContextHandle& context) {
+        return ResizingDescriptorPoolHandle(new ResizingVulkanDescriptorPool(context));
+    }
+
+  public:
+    // Returns the number of sets this pool can allocate for the supplied layout.
+    uint32_t can_allocate(const DescriptorSetLayoutHandle& /*layout*/) const override {
+        // if we need we create a pool that can allocate whatever is needed.
+        return uint32_t(-1);
+    }
+
+    std::vector<DescriptorSetHandle> allocate(const DescriptorSetLayoutHandle& layout,
+                                              const uint32_t set_count) override;
+
+  private:
+    const ContextHandle context;
+
+    std::vector<VulkanDescriptorPoolHandle> pools;
+};
 
 } // namespace merian

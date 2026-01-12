@@ -26,9 +26,10 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
     ResourceAllocator() = delete;
 
     ResourceAllocator(const ContextHandle& context,
-                      const std::shared_ptr<MemoryAllocator>& memAllocator,
+                      const MemoryAllocatorHandle& memAllocator,
                       const StagingMemoryManagerHandle& staging,
-                      const SamplerPoolHandle& samplerPool);
+                      const SamplerPoolHandle& samplerPool,
+                      const DescriptorPoolHandle& descriptor_pool);
 
     // All staging buffers must be cleared before
     virtual ~ResourceAllocator() {
@@ -206,12 +207,25 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
 
     //--------------------------------------------------------------------------------------------------
 
+    // Shortcut for get_descriptor_pool()->allocate(...)
+    DescriptorSetHandle allocate_descriptor_set(const DescriptorSetLayoutHandle& layout);
+
+    // Shortcut for get_descriptor_pool()->allocate(...)
+    std::vector<DescriptorSetHandle>
+    allocate_descriptor_set(const DescriptorSetLayoutHandle& layout, const uint32_t set_count);
+
+    //--------------------------------------------------------------------------------------------------
+
     StagingMemoryManagerHandle getStaging();
 
     const StagingMemoryManagerHandle& getStaging() const;
 
     const SamplerPoolHandle& get_sampler_pool() const {
         return m_samplerPool;
+    }
+
+    const DescriptorPoolHandle& get_descriptor_pool() {
+        return descriptor_pool;
     }
 
     //--------------------------------------------------------------------------------------------------
@@ -221,6 +235,7 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
     const std::shared_ptr<MemoryAllocator> m_memAlloc;
     const StagingMemoryManagerHandle m_staging;
     const SamplerPoolHandle m_samplerPool;
+    const DescriptorPoolHandle descriptor_pool;
     const std::shared_ptr<ExtensionVkDebugUtils> debug_utils;
 
     ImageViewHandle dummy_storage_image_view;
