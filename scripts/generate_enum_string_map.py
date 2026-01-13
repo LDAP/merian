@@ -3,7 +3,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from urllib.request import urlopen
 
-VULKAN_SPEC_VERSION = "v1.3.275"
+VULKAN_SPEC_VERSION = "v1.4.338"
 VULKAN_SPEC_URL = f"https://raw.githubusercontent.com/KhronosGroup/Vulkan-Docs/{VULKAN_SPEC_VERSION}/xml/vk.xml"
 VULKAN_ENUMS_URL = f"https://github.com/KhronosGroup/Vulkan-Headers/blob/{VULKAN_SPEC_VERSION}/include/vulkan/vulkan_enums.hpp"
 

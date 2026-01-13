@@ -2,7 +2,7 @@
 directory = vulkanheaders
 
 url = https://github.com/KhronosGroup/Vulkan-Headers
-revision = v1.4.305
+revision = v1.4.338
 depth = 1
 
 patch_directory = vulkanheaders
