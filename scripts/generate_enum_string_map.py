@@ -16,7 +16,7 @@ with urlopen(VULKAN_SPEC_URL) as response:
 # with urlopen(VULKAN_ENUMS_URL) as response:
 #     vulkan_enums = str(response.read())
 
-tags = [i.get("name") for i in xml.findall("tags/tag")]
+tags: list[str] = [i.get("name") for i in xml.findall("tags/tag")]  # pyright: ignore[reportAssignmentType]
 
 skiplist = []
 
@@ -34,16 +34,34 @@ for feat in xml.findall("feature"):
                 skiplist.append(type.get("name"))
 
 
-def to_camel_case(snake_str, enum_tag):
-    snake_str = snake_str.removesuffix(enum_tag).removesuffix("_")
+def remove_tag(with_tag: str, tag: str):
+    return with_tag.removesuffix(tag).removesuffix("_")
+
+
+def to_upper_case(name: str):
+    result = ""
+    prev_lower = False
+    prev_digit = False
+
+    for c in name:
+        if c.isupper() and (prev_lower or prev_digit) or (c.isdigit() and prev_lower):
+            result += "_"
+        result += c.upper()
+        prev_lower = c.islower()
+        prev_digit = c.isdigit()
+
+    return result
+
+
+def to_camel_case(name: str):
     tag = ""
-    if (s := snake_str.split("_")[-1]) in tags:
+    if (s := name.split("_")[-1]) in tags:
         tag = s
-        snake_str = snake_str[: -1 - len(s)]
+        name = name[: -1 - len(s)]
 
     result = ""
     last = None
-    for c in snake_str:
+    for c in name:
         if c == "_":
             pass
         elif last is None:
@@ -78,18 +96,18 @@ namespace merian {{
     for enum in xml.findall("enums"):
         if enum.get("type") != "enum":
             continue
-        enum_name = enum.get("name")
-        assert enum_name
-        if enum_name in skiplist:
+        spec_enum_name = enum.get("name")
+        assert spec_enum_name
+        if spec_enum_name in skiplist:
             continue
-        enum_name = enum_name[2:]
-        if enum_name in done:
+        if spec_enum_name in done:
             continue
         tag = ""
         for s in tags:
-            if enum_name.endswith(s):
+            if spec_enum_name.endswith(s):
                 tag = s
-        done.append(enum_name)
+        enum_name = spec_enum_name.removeprefix("Vk")
+        done.append(spec_enum_name)
 
         values = []
         for i in enum:
@@ -100,9 +118,12 @@ namespace merian {{
                 continue
             if i.get("alias") is not None:
                 continue
-            value_name = to_camel_case(value_name, tag)
-            value_name = value_name.removeprefix("Vk")
-            value_name = value_name.removeprefix(enum_name.removesuffix(tag))
+            value_name = remove_tag(value_name, tag)
+            value_name = value_name.removeprefix(
+                to_upper_case(spec_enum_name.removesuffix(tag))
+            )
+            value_name = value_name.removeprefix("VK_")
+            value_name = to_camel_case(value_name)
             value_name = f"VULKAN_HPP_NAMESPACE::{enum_name}::e" + value_name
             values.append(value_name)
 
