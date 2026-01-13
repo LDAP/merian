@@ -1,7 +1,7 @@
 #pragma once
 
-#include "merian/vk/pipeline/pipeline.hpp"
 #include "merian/shader/entry_point.hpp"
+#include "merian/vk/pipeline/pipeline.hpp"
 
 namespace merian {
 
@@ -12,8 +12,8 @@ class ComputePipeline : public Pipeline {
                     const vk::PipelineCreateFlags flags = {},
                     const PipelineHandle& base_pipeline = {},
                     const void* pNext = nullptr)
-        : Pipeline(pipeline_layout->get_context(), pipeline_layout), entry_point(entry_point),
-          base_pipeline(base_pipeline) {
+        : Pipeline(pipeline_layout->get_context(), pipeline_layout, flags),
+          entry_point(entry_point), base_pipeline(base_pipeline) {
 
         assert(entry_point->get_stage() == vk::ShaderStageFlagBits::eCompute);
 

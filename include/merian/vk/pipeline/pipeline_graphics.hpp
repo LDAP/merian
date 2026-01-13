@@ -23,7 +23,8 @@ class GraphicsPipeline : public Pipeline {
                      const uint32_t subpass,
                      const vk::PipelineCreateFlags flags = {},
                      const std::shared_ptr<Pipeline>& base_pipeline = {})
-        : Pipeline(pipeline_layout->get_context(), pipeline_layout), base_pipeline(base_pipeline) {
+        : Pipeline(pipeline_layout->get_context(), pipeline_layout, flags),
+          base_pipeline(base_pipeline) {
 
         SPDLOG_DEBUG("create GraphicsPipeline ({})", fmt::ptr(this));
         const vk::GraphicsPipelineCreateInfo info{flags,

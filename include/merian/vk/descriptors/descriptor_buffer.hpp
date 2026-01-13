@@ -23,6 +23,8 @@ class DescriptorBuffer : public DescriptorContainer {
     DescriptorBuffer(const DescriptorSetLayoutHandle& layout,
                      const MemoryAllocatorHandle& allocator)
         : DescriptorContainer(layout), context(layout->get_context()) {
+        assert(layout->supports_descriptor_buffer());
+
         const auto ext_descriptor_buffer =
             allocator->get_context()->get_extension<ExtensionVkDescriptorBuffer>();
         assert(ext_descriptor_buffer);

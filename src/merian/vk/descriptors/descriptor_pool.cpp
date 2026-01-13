@@ -19,6 +19,7 @@ std::vector<DescriptorSetHandle>
 VulkanDescriptorPool::allocate(const DescriptorSetLayoutHandle& layout, const uint32_t set_count) {
     assert(remaining_set_count >= set_count && "out of descriptor sets");
     assert(set_count > 0);
+    assert(layout->supports_descriptor_set());
 
     remaining_set_count -= set_count;
     allocated_set_count += set_count;

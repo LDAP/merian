@@ -25,7 +25,7 @@ class DescriptorSetLayout : public std::enable_shared_from_this<DescriptorSetLay
     DescriptorSetLayout(const ContextHandle& context,
                         const std::vector<vk::DescriptorSetLayoutBinding>& bindings,
                         const vk::DescriptorSetLayoutCreateFlags flags = {})
-        : context(context), bindings(bindings), binding_offsets(bindings.size(), 0) {
+        : context(context), bindings(bindings), flags(flags), binding_offsets(bindings.size(), 0) {
         vk::DescriptorSetLayoutCreateInfo info{flags, bindings};
         SPDLOG_DEBUG("create DescriptorSetLayout ({})", fmt::ptr(this));
         layout = context->device.createDescriptorSetLayout(info);
@@ -86,9 +86,20 @@ class DescriptorSetLayout : public std::enable_shared_from_this<DescriptorSetLay
         return pool_sizes_to_vector(pool_sizes, multiplier);
     }
 
+    bool supports_descriptor_buffer() const {
+        return bool(flags & vk::DescriptorSetLayoutCreateFlagBits::eDescriptorBufferEXT);
+    }
+
+    bool supports_descriptor_set() const {
+        // https://docs.vulkan.org/refpages/latest/refpages/source/VkDescriptorSetLayoutCreateFlagBits.html#
+        return !supports_descriptor_buffer();
+    }
+
   private:
     const ContextHandle context;
     const std::vector<vk::DescriptorSetLayoutBinding> bindings;
+    const vk::DescriptorSetLayoutCreateFlags flags;
+
     std::unordered_map<vk::DescriptorType, uint32_t> pool_sizes;
     vk::DescriptorSetLayout layout;
 

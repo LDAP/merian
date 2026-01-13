@@ -11,21 +11,20 @@ namespace merian {
 class PipelineLayout : public std::enable_shared_from_this<PipelineLayout> {
 
   public:
-    PipelineLayout(
-        const ContextHandle& context,
-        const std::vector<std::shared_ptr<DescriptorSetLayout>>& shared_descriptor_set_layouts,
-        const std::vector<vk::PushConstantRange>& ranges = {},
-        const vk::PipelineLayoutCreateFlags flags = {})
-        : context(context), ranges(ranges),
-          shared_descriptor_set_layouts(shared_descriptor_set_layouts) {
+    PipelineLayout(const ContextHandle& context,
+                   const std::vector<std::shared_ptr<DescriptorSetLayout>>& descriptor_set_layouts,
+                   const std::vector<vk::PushConstantRange>& ranges = {},
+                   const vk::PipelineLayoutCreateFlags flags = {})
+        : context(context), ranges(ranges), descriptor_set_layouts(descriptor_set_layouts),
+          flags(flags) {
         SPDLOG_DEBUG("create PipelineLayout ({})", fmt::ptr(this));
 
-        std::vector<vk::DescriptorSetLayout> descriptor_set_layouts(
-            shared_descriptor_set_layouts.size());
-        std::transform(shared_descriptor_set_layouts.begin(), shared_descriptor_set_layouts.end(),
-                       descriptor_set_layouts.begin(),
+        std::vector<vk::DescriptorSetLayout> vk_descriptor_set_layouts(
+            descriptor_set_layouts.size());
+        std::transform(descriptor_set_layouts.begin(), descriptor_set_layouts.end(),
+                       vk_descriptor_set_layouts.begin(),
                        [&](auto& shared) { return shared->get_layout(); });
-        vk::PipelineLayoutCreateInfo info{flags, descriptor_set_layouts, ranges};
+        vk::PipelineLayoutCreateInfo info{flags, vk_descriptor_set_layouts, ranges};
         pipeline_layout = context->device.createPipelineLayout(info);
     }
 
@@ -51,15 +50,18 @@ class PipelineLayout : public std::enable_shared_from_this<PipelineLayout> {
         return ranges[id];
     }
 
-    const std::shared_ptr<DescriptorSetLayout>& get_descriptor_set_layout(const uint32_t set = 0) const {
-        assert(set < shared_descriptor_set_layouts.size());
-        return shared_descriptor_set_layouts[set];
+    const std::shared_ptr<DescriptorSetLayout>&
+    get_descriptor_set_layout(const uint32_t set = 0) const {
+        assert(set < descriptor_set_layouts.size());
+        return descriptor_set_layouts[set];
     }
 
   private:
     const ContextHandle context;
     const std::vector<vk::PushConstantRange> ranges;
-    const std::vector<std::shared_ptr<DescriptorSetLayout>> shared_descriptor_set_layouts;
+    const std::vector<DescriptorSetLayoutHandle> descriptor_set_layouts;
+    const vk::PipelineLayoutCreateFlags flags;
+
     vk::PipelineLayout pipeline_layout;
 };
 
