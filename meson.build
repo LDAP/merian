@@ -27,6 +27,10 @@ global_args = [
     '-DVULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1',
     # Guides the default optimization of the runtime shader compiler 
     '-DMERIAN_BUILD_OPTIMIZATION=@0@'.format(get_option('optimization')),
+
+    # Vulkan uses [0, 1] for depth instead of [-1, 1] like OpenGL
+    '-DGLM_FORCE_DEPTH_ZERO_TO_ONE',
+    '-DGLM_FORCE_SWIZZLE=1'
 ]
 
 if get_option('performance_profiling')
