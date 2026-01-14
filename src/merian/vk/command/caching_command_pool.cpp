@@ -105,7 +105,7 @@ void CachingCommandPool::reset() {
     pool->reset();
 }
 
-void CachingCommandPool::keep_until_pool_reset(const ObjectHandle& object) {
+void CachingCommandPool::keep_until_pool_reset(const ConstObjectHandle& object) {
     pool->keep_until_pool_reset(object);
 }
 

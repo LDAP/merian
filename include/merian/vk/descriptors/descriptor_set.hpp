@@ -10,6 +10,7 @@ namespace merian {
 
 class DescriptorSet;
 using DescriptorSetHandle = std::shared_ptr<DescriptorSet>;
+using ConstDescriptorSetHandle = std::shared_ptr<const DescriptorSet>;
 
 // A DescriptorSet that knows its layout -> Can be used to simplify DescriptorSet updates.
 // DescriptorsSet updates are queued until they are executed with a call to update(). In this case
@@ -17,10 +18,10 @@ using DescriptorSetHandle = std::shared_ptr<DescriptorSet>;
 // The DescriptorSet holds references to the resources that are bound to it.
 class DescriptorSet : public DescriptorContainer {
 
-    friend class VulkanDescriptorPool;
+    friend class DescriptorPool;
 
   private:
-    DescriptorSet(const VulkanDescriptorPoolHandle& pool,
+    DescriptorSet(const DescriptorPoolHandle& pool,
                   const DescriptorSetLayoutHandle& layout,
                   const vk::DescriptorSet& set)
         : DescriptorContainer(layout), pool(pool), set(set) {
@@ -57,6 +58,10 @@ class DescriptorSet : public DescriptorContainer {
         return !queued_writes.empty();
     }
 
+    void bind(const CommandBufferHandle& cmd,
+              const PipelineHandle& pipeline,
+              const uint32_t descriptor_set_index) const override;
+
     void update() override {
         if (!has_updates()) {
             return;
@@ -86,14 +91,14 @@ class DescriptorSet : public DescriptorContainer {
     }
 
   private:
-    static DescriptorSetHandle create(const VulkanDescriptorPoolHandle& pool,
+    static DescriptorSetHandle create(const DescriptorPoolHandle& pool,
                                       const DescriptorSetLayoutHandle& layout,
                                       const vk::DescriptorSet& set) {
         return DescriptorSetHandle(new DescriptorSet(pool, layout, set));
     }
 
   private:
-    const VulkanDescriptorPoolHandle pool;
+    const DescriptorPoolHandle pool;
     const vk::DescriptorSet set;
 
     // ---------------------------------------------------------------------

@@ -13,6 +13,7 @@ namespace merian {
 class Object {};
 
 using ObjectHandle = std::shared_ptr<Object>;
+using ConstObjectHandle = std::shared_ptr<const Object>;
 
 using UniqueObjectHandle = std::unique_ptr<Object>;
 

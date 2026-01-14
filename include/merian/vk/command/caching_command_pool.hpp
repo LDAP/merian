@@ -38,7 +38,7 @@ class CachingCommandPool : public CommandPool {
 
     void reset() override;
 
-    void keep_until_pool_reset(const ObjectHandle& object) override;
+    void keep_until_pool_reset(const ConstObjectHandle& object) override;
 
     // ------------------------------------------------------------
 

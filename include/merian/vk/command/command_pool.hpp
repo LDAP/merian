@@ -45,11 +45,11 @@ class CommandPool : public std::enable_shared_from_this<CommandPool> {
     // Resets the command pool and releases objects attached to this pool.
     virtual void reset();
 
-    virtual void keep_until_pool_reset(const ObjectHandle& object) {
+    virtual void keep_until_pool_reset(const ConstObjectHandle& object) {
         objects_in_use.emplace_back(object);
     }
 
-    virtual void keep_until_pool_reset(ObjectHandle&& object) {
+    virtual void keep_until_pool_reset(ConstObjectHandle&& object) {
         objects_in_use.emplace_back(std::move(object));
     }
 
@@ -59,7 +59,7 @@ class CommandPool : public std::enable_shared_from_this<CommandPool> {
         return context;
     }
 
-    const std::vector<ObjectHandle>& get_objects_in_use() const {
+    const std::vector<ConstObjectHandle>& get_objects_in_use() const {
         return objects_in_use;
     }
 
@@ -68,7 +68,7 @@ class CommandPool : public std::enable_shared_from_this<CommandPool> {
     const uint32_t queue_family_index;
     vk::CommandPool pool = VK_NULL_HANDLE;
 
-    std::vector<ObjectHandle> objects_in_use;
+    std::vector<ConstObjectHandle> objects_in_use;
 };
 
 using CommandPoolHandle = std::shared_ptr<CommandPool>;

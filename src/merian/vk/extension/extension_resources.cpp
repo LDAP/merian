@@ -93,10 +93,10 @@ StagingMemoryManagerHandle ExtensionResources::staging() {
     }
     return _staging.lock();
 }
-DescriptorPoolHandle ExtensionResources::descriptor_pool() {
+DescriptorSetAllocatorHandle ExtensionResources::descriptor_pool() {
     if (_descriptor_pool.expired()) {
         assert(!weak_context.expired());
-        auto ptr = ResizingVulkanDescriptorPool::create(weak_context.lock());
+        auto ptr = ResizingDescriptorPool::create(weak_context.lock());
         _descriptor_pool = ptr;
         return ptr;
     }

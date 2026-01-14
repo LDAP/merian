@@ -32,7 +32,7 @@ class ExtensionResources : public Extension {
     ResourceAllocatorHandle resource_allocator();
     SamplerPoolHandle sampler_pool();
     StagingMemoryManagerHandle staging();
-    DescriptorPoolHandle descriptor_pool();
+    DescriptorSetAllocatorHandle descriptor_pool();
 
   private:
     WeakContextHandle weak_context;
@@ -45,7 +45,7 @@ class ExtensionResources : public Extension {
     std::weak_ptr<ResourceAllocator> _resource_allocator;
     std::weak_ptr<SamplerPool> _sampler_pool;
     std::weak_ptr<StagingMemoryManager> _staging;
-    std::weak_ptr<DescriptorPool> _descriptor_pool;
+    std::weak_ptr<DescriptorSetAllocator> _descriptor_pool;
 };
 
 } // namespace merian

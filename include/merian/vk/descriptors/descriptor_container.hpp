@@ -2,6 +2,7 @@
 
 #include "merian/vk/descriptors/descriptor_set_layout.hpp"
 #include "merian/vk/memory/resource_allocations.hpp"
+#include "merian/vk/pipeline/pipeline.hpp"
 
 #include <memory>
 #include <variant>
@@ -13,6 +14,8 @@ namespace merian {
 // A base class for container that hold descriptors (sets, buffers)
 class DescriptorContainer : public std::enable_shared_from_this<DescriptorContainer>,
                             public Object {
+
+    friend class CommandBuffer;
 
   protected:
     using DescriptorInfo = std::variant<vk::DescriptorBufferInfo,
@@ -239,6 +242,10 @@ class DescriptorContainer : public std::enable_shared_from_this<DescriptorContai
     virtual uint32_t update_count() const noexcept = 0;
 
     virtual bool has_updates() const noexcept = 0;
+
+    virtual void bind(const CommandBufferHandle& cmd,
+                      const PipelineHandle& pipeline,
+                      const uint32_t descriptor_set_index) const = 0;
 
     virtual void update() {
         throw std::runtime_error{"update on the CPU timeline not supported."};

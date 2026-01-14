@@ -11,10 +11,10 @@ namespace merian {
 class DescriptorSet;
 using DescriptorSetHandle = std::shared_ptr<DescriptorSet>;
 
-class DescriptorPool : public std::enable_shared_from_this<DescriptorPool> {
+class DescriptorSetAllocator : public std::enable_shared_from_this<DescriptorSetAllocator> {
 
   public:
-    virtual ~DescriptorPool() {}
+    virtual ~DescriptorSetAllocator() {}
 
     // Returns the number of sets this pool can allocate for the supplied layout.
     virtual uint32_t can_allocate(const DescriptorSetLayoutHandle& layout) const = 0;
@@ -27,12 +27,12 @@ class DescriptorPool : public std::enable_shared_from_this<DescriptorPool> {
     }
 };
 
+using DescriptorSetAllocatorHandle = std::shared_ptr<DescriptorSetAllocator>;
+
+class DescriptorPool;
 using DescriptorPoolHandle = std::shared_ptr<DescriptorPool>;
 
-class VulkanDescriptorPool;
-using VulkanDescriptorPoolHandle = std::shared_ptr<VulkanDescriptorPool>;
-
-class VulkanDescriptorPool : public DescriptorPool {
+class DescriptorPool : public DescriptorSetAllocator {
 
     friend class DescriptorSet;
 
@@ -80,15 +80,15 @@ class VulkanDescriptorPool : public DescriptorPool {
      * DescriptorSets of the supplied DescriptorSetLayouts.
      *
      */
-    VulkanDescriptorPool(const DescriptorSetLayoutHandle& layout,
+    DescriptorPool(const DescriptorSetLayoutHandle& layout,
                          const uint32_t set_count = 1,
                          const vk::DescriptorPoolCreateFlags flags = {})
-        : merian::VulkanDescriptorPool(layout->get_context(),
+        : merian::DescriptorPool(layout->get_context(),
                                        layout->get_pool_sizes_as_vector(set_count),
                                        set_count,
                                        flags) {}
 
-    VulkanDescriptorPool(
+    DescriptorPool(
         const ContextHandle& context,
         const vk::ArrayProxy<vk::DescriptorPoolSize>& pool_sizes = DEFAULT_POOL_SIZES,
         const uint32_t max_sets = DEFAULT_POOL_MAX_SETS,
@@ -108,24 +108,24 @@ class VulkanDescriptorPool : public DescriptorPool {
     }
 
   public:
-    static VulkanDescriptorPoolHandle create(const DescriptorSetLayoutHandle& layout,
+    static DescriptorPoolHandle create(const DescriptorSetLayoutHandle& layout,
                                              const uint32_t set_count = 1,
                                              const vk::DescriptorPoolCreateFlags flags = {}) {
-        return VulkanDescriptorPoolHandle(new VulkanDescriptorPool(layout, set_count, flags));
+        return DescriptorPoolHandle(new DescriptorPool(layout, set_count, flags));
     }
 
-    static VulkanDescriptorPoolHandle
+    static DescriptorPoolHandle
     create(const ContextHandle& context,
            const vk::ArrayProxy<vk::DescriptorPoolSize>& pool_sizes = DEFAULT_POOL_SIZES,
            const uint32_t max_sets = DEFAULT_POOL_MAX_SETS,
            const vk::DescriptorPoolCreateFlags flags =
                vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet) {
-        return VulkanDescriptorPoolHandle(
-            new VulkanDescriptorPool(context, pool_sizes, max_sets, flags));
+        return DescriptorPoolHandle(
+            new DescriptorPool(context, pool_sizes, max_sets, flags));
     }
 
   public:
-    ~VulkanDescriptorPool() {
+    ~DescriptorPool() {
         SPDLOG_DEBUG("destroy DescriptorPool ({})", fmt::ptr(VkDescriptorPool(pool)));
         context->device.destroyDescriptorPool(pool);
     }
@@ -182,19 +182,19 @@ class VulkanDescriptorPool : public DescriptorPool {
     vk::DescriptorPool pool;
 };
 
-class ResizingVulkanDescriptorPool;
-using ResizingDescriptorPoolHandle = std::shared_ptr<ResizingVulkanDescriptorPool>;
+class ResizingDescriptorPool;
+using ResizingDescriptorPoolHandle = std::shared_ptr<ResizingDescriptorPool>;
 
-class ResizingVulkanDescriptorPool : public DescriptorPool {
+class ResizingDescriptorPool : public DescriptorSetAllocator {
   private:
-    ResizingVulkanDescriptorPool(const ContextHandle& context) : context(context) {
+    ResizingDescriptorPool(const ContextHandle& context) : context(context) {
         pools.reserve(16);
-        pools.emplace_back(VulkanDescriptorPool::create(context));
+        pools.emplace_back(DescriptorPool::create(context));
     }
 
   public:
     static ResizingDescriptorPoolHandle create(const ContextHandle& context) {
-        return ResizingDescriptorPoolHandle(new ResizingVulkanDescriptorPool(context));
+        return ResizingDescriptorPoolHandle(new ResizingDescriptorPool(context));
     }
 
   public:
@@ -210,7 +210,7 @@ class ResizingVulkanDescriptorPool : public DescriptorPool {
   private:
     const ContextHandle context;
 
-    std::vector<VulkanDescriptorPoolHandle> pools;
+    std::vector<DescriptorPoolHandle> pools;
 };
 
 } // namespace merian

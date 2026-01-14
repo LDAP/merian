@@ -12,7 +12,7 @@ ResourceAllocator::ResourceAllocator(const ContextHandle& context,
                                      const std::shared_ptr<MemoryAllocator>& memAllocator,
                                      const std::shared_ptr<StagingMemoryManager>& staging,
                                      const std::shared_ptr<SamplerPool>& samplerPool,
-                                     const DescriptorPoolHandle& descriptor_pool)
+                                     const DescriptorSetAllocatorHandle& descriptor_pool)
     : context(context), m_memAlloc(memAllocator), m_staging(staging), m_samplerPool(samplerPool),
       descriptor_pool(descriptor_pool),
       debug_utils(context->get_extension<ExtensionVkDebugUtils>()) {

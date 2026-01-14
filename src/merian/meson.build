@@ -21,6 +21,8 @@ merian_src = files(
     'vk/descriptors/descriptor_buffer.cpp',
     'vk/descriptors/descriptor_container.cpp',
     'vk/descriptors/descriptor_pool.cpp',
+    'vk/descriptors/descriptor_set.cpp',
+    'vk/descriptors/push_descriptor_set.cpp',
     'vk/context.cpp',
     'vk/extension/extension.cpp',
     'vk/extension/extension_glfw.cpp',

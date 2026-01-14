@@ -11,6 +11,7 @@ namespace merian {
 
 class DescriptorBuffer;
 using DescriptorBufferHandle = std::shared_ptr<DescriptorBuffer>;
+using ConstDescriptorBufferHandle = std::shared_ptr<const DescriptorBuffer>;
 
 // A DescriptorBuffer that knows its layout -> Can be used to simplify DescriptorBuffer updates.
 // DescriptorsBuffer updates are queued until they are executed with a call to update(). In this
@@ -83,6 +84,10 @@ class DescriptorBuffer : public DescriptorContainer {
     bool has_updates() const noexcept override {
         return !queued_writes.empty();
     }
+
+    void bind(const CommandBufferHandle& cmd,
+              const PipelineHandle& pipeline,
+              const uint32_t descriptor_set_index) const override;
 
     void update() override;
 

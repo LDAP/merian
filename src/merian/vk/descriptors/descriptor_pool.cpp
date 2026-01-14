@@ -4,7 +4,7 @@
 
 namespace merian {
 
-uint32_t VulkanDescriptorPool::can_allocate(const DescriptorSetLayoutHandle& layout) const {
+uint32_t DescriptorPool::can_allocate(const DescriptorSetLayoutHandle& layout) const {
     uint32_t max_sets = remaining_set_count;
     for (const auto& required_pool_size : layout->get_pool_sizes()) {
         const auto it = remaining_pool_descriptors.find(required_pool_size.first);
@@ -16,7 +16,7 @@ uint32_t VulkanDescriptorPool::can_allocate(const DescriptorSetLayoutHandle& lay
 }
 
 std::vector<DescriptorSetHandle>
-VulkanDescriptorPool::allocate(const DescriptorSetLayoutHandle& layout, const uint32_t set_count) {
+DescriptorPool::allocate(const DescriptorSetLayoutHandle& layout, const uint32_t set_count) {
     assert(remaining_set_count >= set_count && "out of descriptor sets");
     assert(set_count > 0);
     assert(layout->supports_descriptor_set());
@@ -36,8 +36,8 @@ VulkanDescriptorPool::allocate(const DescriptorSetLayoutHandle& layout, const ui
 
     std::vector<DescriptorSetHandle> sets(allocated_sets.size());
 
-    const VulkanDescriptorPoolHandle pool_ptr =
-        static_pointer_cast<VulkanDescriptorPool>(shared_from_this());
+    const DescriptorPoolHandle pool_ptr =
+        static_pointer_cast<DescriptorPool>(shared_from_this());
 
     for (uint32_t i = 0; i < allocated_sets.size(); i++) {
         sets[i] = DescriptorSet::create(pool_ptr, layout, allocated_sets[i]);
@@ -46,7 +46,7 @@ VulkanDescriptorPool::allocate(const DescriptorSetLayoutHandle& layout, const ui
     return sets;
 }
 
-void VulkanDescriptorPool::free(const DescriptorSet* set) {
+void DescriptorPool::free(const DescriptorSet* set) {
     remaining_set_count++;
     allocated_set_count--;
     for (const auto& size : set->get_layout()->get_pool_sizes()) {
@@ -71,7 +71,7 @@ void VulkanDescriptorPool::free(const DescriptorSet* set) {
 
 namespace {
 
-uint32_t allocate_from_pool(const DescriptorPoolHandle& pool,
+uint32_t allocate_from_pool(const DescriptorSetAllocatorHandle& pool,
                             const DescriptorSetLayoutHandle& layout,
                             std::vector<DescriptorSetHandle>& insert_into,
                             const uint32_t max_count) {
@@ -86,7 +86,7 @@ uint32_t allocate_from_pool(const DescriptorPoolHandle& pool,
 } // namespace
 
 std::vector<DescriptorSetHandle>
-ResizingVulkanDescriptorPool::allocate(const DescriptorSetLayoutHandle& layout,
+ResizingDescriptorPool::allocate(const DescriptorSetLayoutHandle& layout,
                                        const uint32_t set_count) {
 
     std::vector<DescriptorSetHandle> result;
@@ -124,7 +124,7 @@ ResizingVulkanDescriptorPool::allocate(const DescriptorSetLayoutHandle& layout,
                      new_pool_set_count, fmt::join(debug_sizes, "\n"));
 #endif
 
-        pools.emplace_back(VulkanDescriptorPool::create(
+        pools.emplace_back(DescriptorPool::create(
             context, DescriptorSetLayout::pool_sizes_to_vector(new_pool_sizes, 1),
             new_pool_set_count));
 

@@ -1,8 +1,6 @@
 #pragma once
 
 #include "merian/vk/descriptors/descriptor_container.hpp"
-#include "merian/vk/extension/extension_vk_descriptor_buffer.hpp"
-#include "merian/vk/memory/memory_allocator.hpp"
 
 #include <vector>
 #include <vulkan/vulkan.hpp>
@@ -11,11 +9,8 @@ namespace merian {
 
 class PushDescriptorSet;
 using PushDescriptorSetHandle = std::shared_ptr<PushDescriptorSet>;
+using ConstPushDescriptorSetHandle = std::shared_ptr<const PushDescriptorSet>;
 
-// A PushDescriptorSet that knows its layout -> Can be used to simplify PushDescriptorSet updates.
-// DescriptorsSet updates are queued until they are executed with a call to update(). In this
-// case the update is performed immediately on the CPU timeline or update(cmd) for an update on the
-// GPU timeline. The PushDescriptorSet holds references to the resources that are bound to it.
 class PushDescriptorSet : public DescriptorContainer {
 
   public:
@@ -29,9 +24,9 @@ class PushDescriptorSet : public DescriptorContainer {
 
     ~PushDescriptorSet();
 
-    const std::vector<vk::WriteDescriptorSet>& get_writes() {
+    const std::vector<vk::WriteDescriptorSet>& get_writes() const {
         return writes;
-    }    
+    }
 
     // ---------------------------------------------------------------------
     // Updates
@@ -43,6 +38,10 @@ class PushDescriptorSet : public DescriptorContainer {
     bool has_updates() const noexcept override {
         return !queued_writes.empty();
     }
+
+    void bind(const CommandBufferHandle& cmd,
+              const PipelineHandle& pipeline,
+              const uint32_t descriptor_set_index) const override;
 
     void update() override {
         if (!has_updates()) {

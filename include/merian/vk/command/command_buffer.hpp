@@ -4,6 +4,7 @@
 #include "merian/vk/command/event.hpp"
 #include "merian/vk/descriptors/descriptor_buffer.hpp"
 #include "merian/vk/descriptors/descriptor_set.hpp"
+#include "merian/vk/descriptors/push_descriptor_set.hpp"
 #include "merian/vk/memory/resource_allocations.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
 #include "merian/vk/renderpass/framebuffer.hpp"
@@ -51,6 +52,7 @@ class CommandBuffer : public std::enable_shared_from_this<CommandBuffer> {
 
     void begin(const vk::CommandBufferBeginInfo& info) {
         cmd.begin(info);
+        descriptor_buffers_need_rebind = false;
 
 #ifndef NDEBUG
         did_bind_descriptor_buffers = false;
@@ -66,6 +68,8 @@ class CommandBuffer : public std::enable_shared_from_this<CommandBuffer> {
     void end() {
         cmd.end();
         current_pipeline.reset();
+        descriptor_buffer_bindings.clear();
+        pipeline_descriptor_buffer_set_offsets.clear();
     }
 
     // ------------------------------------------------------------
@@ -88,11 +92,11 @@ class CommandBuffer : public std::enable_shared_from_this<CommandBuffer> {
 
     // ------------------------------------------------------------
 
-    void keep_until_pool_reset(const ObjectHandle& object) {
+    void keep_until_pool_reset(const ConstObjectHandle& object) {
         pool->keep_until_pool_reset(object);
     }
 
-    void keep_until_pool_reset(ObjectHandle&& object) {
+    void keep_until_pool_reset(ConstObjectHandle&& object) {
         pool->keep_until_pool_reset(std::move(object));
     }
 
@@ -266,8 +270,10 @@ class CommandBuffer : public std::enable_shared_from_this<CommandBuffer> {
 
     // Binds the descriptor sets to the indices first_set, first_set + 1, first_set + 2,...
     template <typename... T>
-    std::enable_if_t<(std::is_same_v<DescriptorSetHandle, T> && ...)> bind_descriptor_set(
-        const PipelineHandle& pipeline, const uint32_t first_set, const T&... descriptor_set) {
+    std::enable_if_t<(std::is_convertible_v<T, ConstDescriptorSetHandle> && ...)>
+    bind_descriptor_set(const PipelineHandle& pipeline,
+                        const uint32_t first_set,
+                        const T&... descriptor_set) {
         std::array<const vk::DescriptorSet, sizeof...(T)> sets = {*descriptor_set...};
         cmd.bindDescriptorSets(pipeline->get_pipeline_bind_point(), *pipeline->get_layout(),
                                first_set, sets, {});
@@ -277,7 +283,7 @@ class CommandBuffer : public std::enable_shared_from_this<CommandBuffer> {
 
     // Binds the descriptor sets to the indices 0, 1, 2,...
     template <typename... T>
-    std::enable_if_t<(std::is_same_v<DescriptorSetHandle, T> && ...)>
+    std::enable_if_t<(std::is_convertible_v<T, ConstDescriptorSetHandle> && ...)>
     bind_descriptor_set(const PipelineHandle& pipeline, const T&... descriptor_set) {
         bind_descriptor_set(pipeline, 0, descriptor_set...);
     }
@@ -292,7 +298,12 @@ class CommandBuffer : public std::enable_shared_from_this<CommandBuffer> {
     template <typename... T>
     std::enable_if_t<(std::is_same_v<BufferHandle, T> && ...)>
     register_descriptor_buffers(const T&... descriptor_buffers) {
-        asduih
+        for (const auto& b : {descriptor_buffers...}) {
+            auto [it, inserted] = descriptor_buffer_bindings.try_emplace(b, std::nullopt);
+            if (inserted) {
+                keep_until_pool_reset(b);
+            }
+        }
     }
 
     // This is Merians API for descriptor buffers which attemps to be close to the API for
@@ -301,7 +312,7 @@ class CommandBuffer : public std::enable_shared_from_this<CommandBuffer> {
     //
     // Registers a descriptor buffer to be bound automatically later.
     template <typename... T>
-    std::enable_if_t<(std::is_same_v<DescriptorBufferHandle, T> && ...)>
+    std::enable_if_t<(std::is_convertible_v<T, ConstDescriptorBufferHandle> && ...)>
     register_descriptor_buffers(const T&... descriptor_buffers) {
         register_descriptor_buffers(descriptor_buffers->get_buffer()...);
     }
@@ -312,9 +323,22 @@ class CommandBuffer : public std::enable_shared_from_this<CommandBuffer> {
     //
     // Binds the descriptor buffers to the indices first_set, first_set + 1, first_set + 2,...
     template <typename... T>
-    std::enable_if_t<(std::is_same_v<DescriptorSetHandle, T> && ...)> bind_descriptor_buffer(
+    std::enable_if_t<(std::is_same_v<BufferHandle, T> && ...)> bind_descriptor_buffer(
         const PipelineHandle& pipeline, const uint32_t first_set, const T&... descriptor_buffer) {
-        kashdkah
+        uint32_t set = first_set;
+        auto& pipeline_set_offsets = pipeline_descriptor_buffer_set_offsets[pipeline];
+        for (const auto& b : {descriptor_buffer...}) {
+            pipeline_set_offsets[set] = b;
+            auto [it, inserted] = descriptor_buffer_bindings.try_emplace(b);
+            if (inserted) {
+                keep_until_pool_reset(b);
+                descriptor_buffers_need_rebind = true;
+            } else if (!it->second.has_value()) {
+                descriptor_buffers_need_rebind = true;
+            }
+
+            set++;
+        }
     }
 
     // This is Merians API for descriptor buffers which attemps to be close to the API for
@@ -323,9 +347,33 @@ class CommandBuffer : public std::enable_shared_from_this<CommandBuffer> {
     //
     // Binds the descriptor buffers to the indices 0, 1, 2,...
     template <typename... T>
-    std::enable_if_t<(std::is_same_v<DescriptorSetHandle, T> && ...)>
+    std::enable_if_t<(std::is_same_v<BufferHandle, T> && ...)>
     bind_descriptor_buffer(const PipelineHandle& pipeline, const T&... descriptor_buffer) {
         bind_descriptor_buffer(pipeline, 0, descriptor_buffer...);
+    }
+
+    // This is Merians API for descriptor buffers which attemps to be close to the API for
+    // descriptor sets by letting the command buffer decide when to bind descriptor buffer and when
+    // to set the offsets.
+    //
+    // Binds the descriptor buffers to the indices first_set, first_set + 1, first_set + 2,...
+    template <typename... T>
+    std::enable_if_t<(std::is_convertible_v<T, ConstDescriptorBufferHandle> && ...)>
+    bind_descriptor_buffer(const PipelineHandle& pipeline,
+                           const uint32_t first_set,
+                           const T&... descriptor_buffer) {
+        bind_descriptor_buffer(pipeline, first_set, descriptor_buffer->get_buffer()...);
+    }
+
+    // This is Merians API for descriptor buffers which attemps to be close to the API for
+    // descriptor sets by letting the command buffer decide when to bind descriptor buffer and when
+    // to set the offsets.
+    //
+    // Binds the descriptor buffers to the indices 0, 1, 2,...
+    template <typename... T>
+    std::enable_if_t<(std::is_convertible_v<T, ConstDescriptorBufferHandle> && ...)>
+    bind_descriptor_buffer(const PipelineHandle& pipeline, const T&... descriptor_buffer) {
+        bind_descriptor_buffer(pipeline, 0, descriptor_buffer->get_buffer()...);
     }
 
   private:
@@ -351,12 +399,23 @@ class CommandBuffer : public std::enable_shared_from_this<CommandBuffer> {
     // Changing the descriptor buffer bindings is highly discouraged, just like D3D12, but this
     // depends on the implementation. . A good mental model is that changing the descriptor buffer
     // might imply an ALL_COMMANDS -> ALL_COMMANDS pipeline barrier.
+    void bind_descriptor_buffers(
+        const vk::ArrayProxy<vk::DescriptorBufferBindingInfoEXT>& descriptor_buffers) {
+        cmd.bindDescriptorBuffersEXT(descriptor_buffers);
+    }
+
+    // warn: this does not bind descriptor buffers to sets. It only binds the buffers to be able to
+    // be bound to sets using set_descriptor_buffer_offsets.
+    //
+    // Changing the descriptor buffer bindings is highly discouraged, just like D3D12, but this
+    // depends on the implementation. . A good mental model is that changing the descriptor buffer
+    // might imply an ALL_COMMANDS -> ALL_COMMANDS pipeline barrier.
     //
     // WARNING: Prefer to use the register_descriptor_buffer and bind_descriptor_buffer(pipeline,
     // first_set, buffers...) or bind_descriptor_buffer(pipeline, buffers...) and let this command
     // buffer handle the binding.
     template <typename... T>
-    std::enable_if_t<(std::is_same_v<DescriptorBufferHandle, T> && ...)>
+    std::enable_if_t<(std::is_convertible_v<T, ConstDescriptorBufferHandle> && ...)>
     bind_descriptor_buffers(const T&... descriptor_buffers) {
         bind_descriptor_buffers(descriptor_buffers->get_buffer()...);
 
@@ -399,26 +458,22 @@ class CommandBuffer : public std::enable_shared_from_this<CommandBuffer> {
                                       std::integer_sequence<uint32_t, buffer_indices...>{});
     }
 
-    // WARNING: Prefer to use the register_descriptor_buffer and bind_descriptor_buffer(pipeline,
-    // first_set, buffers...) or bind_descriptor_buffer(pipeline, buffers...) and let this command
-    // buffer handle the binding.
-    template <typename... T>
-    std::enable_if_t<(std::is_same_v<DescriptorBufferHandle, T> && ...)>
-    bind_and_set_descriptor_buffers(const PipelineHandle& pipeline,
-                                    const uint32_t first_set,
-                                    const T&... descriptor_buffers) {
-        bind_descriptor_buffers(descriptor_buffers...);
-        set_descriptor_buffer_offsets(pipeline, first_set,
-                                      std::make_integer_sequence<uint32_t, sizeof...(T)>{});
-    }
-
   public:
     void push_descriptor_set(const PipelineHandle& pipeline,
                              const uint32_t set,
-                             const std::vector<vk::WriteDescriptorSet>& writes) {
+                             const vk::ArrayProxy<vk::WriteDescriptorSet>& writes) {
         cmd.pushDescriptorSetKHR(pipeline->get_pipeline_bind_point(), *pipeline->get_layout(), set,
                                  writes);
         keep_until_pool_reset(pipeline);
+    }
+
+    void push_descriptor_set(const PipelineHandle& pipeline,
+                             const uint32_t set_index,
+                             const ConstPushDescriptorSetHandle& set) {
+        push_descriptor_set(pipeline, set_index, set->get_writes());
+        for (const auto& res : set->resources) {
+            keep_until_pool_reset(res);
+        }
     }
 
     void push_descriptor_set(const PipelineHandle& pipeline,
@@ -520,6 +575,7 @@ class CommandBuffer : public std::enable_shared_from_this<CommandBuffer> {
                   const uint32_t group_count_y = 1,
                   const uint32_t group_count_z = 1) {
         if (current_pipeline->supports_descriptor_buffer()) {
+            update_descriptor_buffer_bindings(current_pipeline);
         }
 
         cmd.dispatch(group_count_x, group_count_y, group_count_z);
@@ -726,6 +782,52 @@ class CommandBuffer : public std::enable_shared_from_this<CommandBuffer> {
         keep_until_pool_reset(pipeline);
     }
 
+    void update_descriptor_buffer_bindings(const PipelineHandle& pipeline) {
+        assert(pipeline->supports_descriptor_buffer());
+
+        if (descriptor_buffers_need_rebind) {
+            std::vector<vk::DescriptorBufferBindingInfoEXT> prepared_descriptor_buffer_bindings(
+                descriptor_buffer_bindings.size());
+            uint32_t new_buffer_index = 0;
+            for (auto& [buffer, buffer_index] : descriptor_buffer_bindings) {
+                prepared_descriptor_buffer_bindings[new_buffer_index] =
+                    vk::DescriptorBufferBindingInfoEXT{buffer->get_device_address(),
+                                                       buffer->get_usage_flags()};
+                buffer_index = new_buffer_index;
+                new_buffer_index++;
+            }
+
+            bind_descriptor_buffers(prepared_descriptor_buffer_bindings);
+        }
+
+        // map descriptor set indices to buffer indices
+
+        auto& descriptor_buffer_set_offsets = pipeline_descriptor_buffer_set_offsets[pipeline];
+        std::vector<uint32_t> batch_buffer_indices;
+        std::vector<vk::DeviceSize> batch_buffer_offsets;
+
+        auto it = descriptor_buffer_set_offsets.begin();
+        while (it != descriptor_buffer_set_offsets.end()) {
+            uint32_t first_set = it->first;
+            batch_buffer_indices.clear();
+            batch_buffer_offsets.clear();
+
+            // Batch consecutive sets
+            while (it != descriptor_buffer_set_offsets.end() &&
+                   it->first == first_set + batch_buffer_indices.size()) {
+                const auto& buffer = it->second;
+                assert(descriptor_buffer_bindings.contains(buffer));
+                assert(descriptor_buffer_bindings.at(buffer).has_value());
+                batch_buffer_indices.push_back(descriptor_buffer_bindings.at(buffer).value());
+                batch_buffer_offsets.push_back(0);
+                ++it;
+            }
+
+            set_descriptor_buffer_offsets(pipeline, first_set, batch_buffer_indices,
+                                          batch_buffer_offsets);
+        }
+    }
+
   private:
     const CommandPoolHandle pool;
     vk::CommandBuffer cmd;
@@ -736,7 +838,10 @@ class CommandBuffer : public std::enable_shared_from_this<CommandBuffer> {
 
     PipelineHandle current_pipeline;
     bool descriptor_buffers_need_rebind = false;
-    bool descriptor_buffers_need_set = false;
+
+    std::unordered_map<BufferHandle, std::optional<uint32_t>> descriptor_buffer_bindings;
+    std::unordered_map<PipelineHandle, std::map<uint32_t, BufferHandle>>
+        pipeline_descriptor_buffer_set_offsets;
 
   public:
     static CommandBufferHandle

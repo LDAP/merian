@@ -111,4 +111,11 @@ void DescriptorBuffer::update(const CommandBufferHandle& cmd) {
                                          vk::AccessFlagBits2::eDescriptorBufferReadEXT));
 }
 
+void DescriptorBuffer::bind(const CommandBufferHandle& cmd,
+                            const PipelineHandle& pipeline,
+                            const uint32_t descriptor_set_index) const {
+    cmd->bind_descriptor_buffer(pipeline, descriptor_set_index,
+                                std::static_pointer_cast<const DescriptorBuffer>(shared_from_this()));
+}
+
 } // namespace merian
