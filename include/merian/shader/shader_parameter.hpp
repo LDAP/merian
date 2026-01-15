@@ -46,49 +46,95 @@ struct ShaderOffset {
     uint32_t binding_array_index = 0;
 };
 
-// see
-// https://docs.shader-slang.org/en/latest/shader-cursors.html#making-a-multi-platform-shader-cursor
-//
-// this is the ShaderObject in slang documentation.
-//
-// It holds the buffer and descriptor set for one feature, i.e a ParameterBlock<...> or the default
-// toplevel "block" and the target specific functions to write into it.
-class ParameterBlock {
-  public:
-    virtual void write(const ShaderOffset& offset, const ImageHandle& image) = 0;
-
-    virtual void write(const ShaderOffset& offset, const BufferHandle& buffer) = 0;
-
-    virtual void write(const ShaderOffset& offset, const TextureHandle& texture) = 0;
-
-    virtual void write(const ShaderOffset& offset, const SamplerHandle& sampler) = 0;
-
-    virtual void write(const ShaderOffset& offset, const void* data, std::size_t size) = 0;
-
-    template <class T> void write(const ShaderOffset& offset, const T& data) {
-        write(offset, &data, sizeof(T));
-    }
-};
-
-using ParameterBlockHandle = std::shared_ptr<ParameterBlock>;
-
-class DescriptorContainerParameterBlock : public ParameterBlock {
-  public:
-    virtual void write(const ShaderOffset& offset, const ImageHandle& image) override {}
-
-    virtual void write(const ShaderOffset& offset, const BufferHandle& buffer) override {}
-
-    virtual void write(const ShaderOffset& offset, const TextureHandle& texture) override {}
-
-    virtual void write(const ShaderOffset& offset, const SamplerHandle& sampler) override {}
-
-    virtual void write(const ShaderOffset& offset, const void* data, std::size_t size) override {}
+class IParameterBlock {
 
   private:
-    slang::TypeLayoutReflection* type_layout;
-
-    DescriptorContainerHandle descriptor_container;
+    DescriptorContainerHandle descriptors;
 };
+
+struct ShaderObjectLayout {
+    DescriptorSetLayoutHandle descriptor_set_layout;
+    std::size_t ordinary_buffer_size;
+};
+
+class ShaderObjectAllocator {};
+
+class ShaderCursor;
+
+// This represents a Slang-like struct that is bound to a shader either directly to a ParameterBlock
+// or as member of another ShaderObject as value or as ConstantBuffer.
+class ShaderObject {
+  public:
+
+    void bind(ShaderCursor& cursor, ShaderObjectAllocator so_allocator) {
+        // if (cursor.is_parameter_pack()) {
+        //     bind_as_parameter_pack(cursor.dereference(), so_allocator)
+        // } else if (cursor.is_constant_buffer()) {
+        //     bind_as_constant_buffer(cursor.dereference())
+        // } else {
+        //     bind_as_value(cursor)
+        // }
+        // 
+        // bind_nested? // call bind on all subobjects...?
+    }
+
+    virtual void bind_nested() {}
+
+    void bind_as_value(ShaderCursor& cursor);
+
+    void bind_as_constant_buffer(ShaderCursor& cursor);
+
+    // Binds this ShaderObject and all subobjects to the command buffer
+    void bind_as_parameter_pack(ShaderCursor& cursor, ShaderObjectAllocator so_allocator) {
+        // set = so_allocator.get_descriptor_set(shared_from_this())
+        // auto [it, inserted] = b.descriptor_sets.emplace(set)
+        // if (inserted) {
+        //     // we were not tracking this descriptor set yet. Initialize it:
+        //     bind_as_value(set);
+        // }
+        //
+        //
+        // set.update()
+        // cmd->bind(set, cursor.get_set_index());
+    }
+
+    void write(const ShaderOffset& offset, const ImageHandle& image) {}
+
+    void write(const ShaderOffset& offset, const BufferHandle& buffer) {}
+
+    void write(const ShaderOffset& offset, const TextureHandle& texture) {}
+
+    void write(const ShaderOffset& offset, const SamplerHandle& sampler) {}
+
+    void write(const ShaderOffset& offset, const void* data, std::size_t size) {}
+
+  private:
+    struct ParameterBlock {
+        // Contains the ordinary data of this object and all objects that are value members of this
+        // object.
+        //
+        // Can be nullptr if this object was only bound as value to parents (then their ordinary
+        // data buffer is used). Do not write to this buffer directly but use the cursor in the
+        // binding instead.
+        BufferHandle ordinary_data = nullptr;
+
+        // All descriptor sets that should be updated whenever this object changes
+        // Only non-empty if were used as parameter block somewhere. Do not write to these sets
+        // directly but use the cursor in the binding instead.
+        std::set<DescriptorContainerHandle, std::owner_less<DescriptorContainerHandle>>
+            descriptor_sets;
+    };
+
+    ParameterBlock b;
+
+    // the cursors pointing to the offsets of this object in parameter blocks this object is bound
+    // to.
+    std::vector<ShaderCursor> bindings;
+
+    slang::TypeLayoutReflection* type_layout;
+};
+
+using ShaderObjectHandle = std::shared_ptr<ShaderObject>;
 
 // Points to a position in a shader. Positions can be structs, fields (ordinary data, opaque data),
 // array (elemenets). Always relative to the corresponding parameter block this cursor refers to.
@@ -98,6 +144,14 @@ class DescriptorContainerParameterBlock : public ParameterBlock {
 // this is the ShaderCursor from Slangs docs.
 class ShaderCursor {
   public:
+    ShaderCursor() {}
+
+    // --------------------------------------------------------------------
+
+    bool is_valid() {
+        return bool(base_object);
+    }
+
     // --------------------------------------------------------------------
 
     ShaderCursor field(const std::string& name) {
@@ -145,27 +199,27 @@ class ShaderCursor {
     // --------------------------------------------------------------------
 
     ShaderCursor& write(const ImageHandle& image) {
-        parameter_block->write(offset, image);
+        base_object->write(offset, image);
         return *this;
     }
 
     ShaderCursor& write(const BufferHandle& buffer) {
-        parameter_block->write(offset, buffer);
+        base_object->write(offset, buffer);
         return *this;
     }
 
     ShaderCursor& write(const TextureHandle& texture) {
-        parameter_block->write(offset, texture);
+        base_object->write(offset, texture);
         return *this;
     }
 
     ShaderCursor& write(const SamplerHandle& sampler) {
-        parameter_block->write(offset, sampler);
+        base_object->write(offset, sampler);
         return *this;
     }
 
     ShaderCursor& write(const void* data, std::size_t size) {
-        parameter_block->write(offset, data, size);
+        base_object->write(offset, data, size);
         return *this;
     }
 
@@ -175,22 +229,22 @@ class ShaderCursor {
     }
 
     ShaderCursor& operator=(const ImageHandle& image) {
-        parameter_block->write(offset, image);
+        base_object->write(offset, image);
         return *this;
     }
 
     ShaderCursor& operator=(const BufferHandle& buffer) {
-        parameter_block->write(offset, buffer);
+        base_object->write(offset, buffer);
         return *this;
     }
 
     ShaderCursor& operator=(const TextureHandle& texture) {
-        parameter_block->write(offset, texture);
+        base_object->write(offset, texture);
         return *this;
     }
 
     ShaderCursor& operator=(const SamplerHandle& sampler) {
-        parameter_block->write(offset, sampler);
+        base_object->write(offset, sampler);
         return *this;
     }
 
@@ -200,45 +254,10 @@ class ShaderCursor {
     }
 
   private:
-    ParameterBlockHandle parameter_block = nullptr;
+    ShaderObjectHandle base_object = nullptr;
 
     slang::TypeLayoutReflection* type_layout;
     ShaderOffset offset;
-};
-
-class IParameterBlock {
-
-  private:
-    DescriptorContainerHandle descriptors;
-};
-
-struct ShaderObjectLayout {
-    DescriptorSetLayoutHandle descriptor_set_layout;
-    std::size_t ordinary_buffer_size;
-};
-
-// This represents a Slang-like struct that is bound to a shader either directly to a ParameterBlock
-// or as member of another ShaderObject as value or ConstantBuffer.
-class ShaderObject {
-  public:
-    void bind_as_value(ShaderCursor& cursor);
-
-    void bind_as_constant_buffer(ShaderCursor& cursor);
-
-    void bind_as_parameter_pack(ShaderCursor& cursor);
-
-  private:
-    // Contains the ordinary data of this object and all objects that are value members of this
-    // object.
-    //
-    // Can be nullptr if this object was only bound as value to parents (then their ordinary data
-    // buffer is used) Do not write to this buffer directly but use the cursor in the binding
-    // instead.
-    BufferHandle ordinary_data = nullptr;
-
-    // the cursors pointing to the offsets of this object in parameter blocks this object is bound
-    // to.
-    std::vector<ShaderCursor> bindings;
 };
 
 } // namespace merian
