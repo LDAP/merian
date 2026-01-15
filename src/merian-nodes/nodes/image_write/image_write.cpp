@@ -184,7 +184,7 @@ void ImageWrite::process(GraphRun& run,
         vk::ImageLayout::eUndefined,
     };
     ImageHandle linear_image =
-        allocator->createImage(linear_info, MemoryMappingType::HOST_ACCESS_RANDOM);
+        allocator->create_image(linear_info, MemoryMappingType::HOST_ACCESS_RANDOM);
     cmd->barrier(vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eTransfer,
                  linear_image->barrier(vk::ImageLayout::eTransferDstOptimal, {},
                                        vk::AccessFlagBits::eTransferWrite));
@@ -213,7 +213,7 @@ void ImageWrite::process(GraphRun& run,
             {},
             vk::ImageLayout::eUndefined,
         };
-        ImageHandle intermediate_image = allocator->createImage(intermediate_info);
+        ImageHandle intermediate_image = allocator->create_image(intermediate_info);
 
         {
             MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "blit to optimal tiled image");

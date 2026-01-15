@@ -76,14 +76,14 @@ Accumulate::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
     quartile_image_create_info.format = vk::Format::eR32G32B32A32Sfloat;
     quartile_image_create_info.usage |= vk::ImageUsageFlagBits::eSampled;
     quartile_image_create_info.setExtent({percentile_group_count_x, percentile_group_count_y, 1});
-    const ImageHandle quartile_image = allocator->createImage(
+    const ImageHandle quartile_image = allocator->create_image(
         quartile_image_create_info, MemoryMappingType::NONE, "accum node, quartiles");
     vk::ImageViewCreateInfo quartile_image_view_create_info{
         {}, *quartile_image,        vk::ImageViewType::e2D, quartile_image->get_format(),
         {}, first_level_and_layer()};
     percentile_texture =
-        allocator->createTexture(quartile_image, quartile_image_view_create_info,
-                                 allocator->get_sampler_pool()->linear_mirrored_repeat());
+        allocator->create_texture(quartile_image, quartile_image_view_create_info,
+                                  allocator->get_sampler_pool()->linear_mirrored_repeat());
 
     percentile_set
         ->queue_descriptor_write_texture(0, percentile_texture, 0, vk::ImageLayout::eGeneral)

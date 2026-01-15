@@ -70,11 +70,11 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
             ping_pong_res[i].set = allocator->allocate_descriptor_set(ping_pong_layout);
 
         // irradiance
-        ImageHandle tmp_irr_image = allocator->createImage(irr_create_info, MemoryMappingType::NONE,
-                                                           fmt::format("SVGF ping pong: {}", i));
+        ImageHandle tmp_irr_image = allocator->create_image(
+            irr_create_info, MemoryMappingType::NONE, fmt::format("SVGF ping pong: {}", i));
         ping_pong_res[i].ping_pong =
-            allocator->createTexture(tmp_irr_image, tmp_irr_image->make_view_create_info(),
-                                     allocator->get_sampler_pool()->linear_mirrored_repeat());
+            allocator->create_texture(tmp_irr_image, tmp_irr_image->make_view_create_info(),
+                                      allocator->get_sampler_pool()->linear_mirrored_repeat());
 
         // gbuffer
         vk::ImageCreateInfo gbuf_create_info = irr_create_info;
@@ -84,10 +84,10 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
             gbuf_create_info.extent.height = 1;
         }
         gbuf_create_info.format = vk::Format::eR32G32B32A32Uint;
-        ImageHandle tmp_gbuf_image = allocator->createImage(gbuf_create_info);
+        ImageHandle tmp_gbuf_image = allocator->create_image(gbuf_create_info);
         ping_pong_res[i].gbuf_ping_pong =
-            allocator->createTexture(tmp_gbuf_image, tmp_gbuf_image->make_view_create_info(),
-                                     allocator->get_sampler_pool()->nearest_mirrored_repeat());
+            allocator->create_texture(tmp_gbuf_image, tmp_gbuf_image->make_view_create_info(),
+                                      allocator->get_sampler_pool()->nearest_mirrored_repeat());
     }
     for (int i = 0; i < 2; i++) {
         ping_pong_res[i]

@@ -22,31 +22,31 @@ ResourceAllocator::ResourceAllocator(const ContextHandle& context,
     const std::vector<uint32_t> data = {missing_rgba, missing_rgba, missing_rgba, missing_rgba};
     context->get_queue_GCT()->submit_wait([&](const CommandBufferHandle& cmd) {
         const ImageHandle dummy_storage_image =
-            createImageFromRGBA8(cmd, data.data(), 2, 2, vk::ImageUsageFlagBits::eStorage, false, 1,
-                                 "ResourceAllocator::dummy_storage_image");
+            create_image_from_rgba8(cmd, data.data(), 2, 2, vk::ImageUsageFlagBits::eStorage, false,
+                                    1, "ResourceAllocator::dummy_storage_image");
         dummy_storage_image_view = ImageView::create(dummy_storage_image);
 
         const auto img_transition = dummy_storage_image->barrier2(vk::ImageLayout::eGeneral);
-        dummy_texture =
-            createTextureFromRGBA8(cmd, data.data(), 2, 2, vk::Filter::eNearest,
-                                   vk::Filter::eNearest, true, "ResourceAllocator::dummy_texture");
+        dummy_texture = create_texture_from_rgba8(cmd, data.data(), 2, 2, vk::Filter::eNearest,
+                                                  vk::Filter::eNearest, true,
+                                                  "ResourceAllocator::dummy_texture");
         const auto tex_transition =
             dummy_texture->get_image()->barrier2(vk::ImageLayout::eShaderReadOnlyOptimal);
 
         cmd->barrier({img_transition, tex_transition});
 
-        dummy_buffer = createBuffer(cmd, data.size() * sizeof(uint32_t),
-                                    vk::BufferUsageFlagBits::eStorageBuffer, data.data(),
-                                    MemoryMappingType::NONE, "ResourceAllocator::dummy_buffer");
+        dummy_buffer = create_buffer(cmd, data.size() * sizeof(uint32_t),
+                                     vk::BufferUsageFlagBits::eStorageBuffer, data.data(),
+                                     MemoryMappingType::NONE, "ResourceAllocator::dummy_buffer");
     });
 
     SPDLOG_DEBUG("Uploaded dummy texture and buffer");
 }
 
-BufferHandle ResourceAllocator::createBuffer(const vk::BufferCreateInfo& info,
-                                             const MemoryMappingType mapping_type,
-                                             const std::string& debug_name,
-                                             const std::optional<vk::DeviceSize> min_alignment) {
+BufferHandle ResourceAllocator::create_buffer(const vk::BufferCreateInfo& info,
+                                              const MemoryMappingType mapping_type,
+                                              const std::string& debug_name,
+                                              const std::optional<vk::DeviceSize> min_alignment) {
     const BufferHandle buffer =
         m_memAlloc->create_buffer(info, mapping_type, debug_name, min_alignment);
 
@@ -60,24 +60,24 @@ BufferHandle ResourceAllocator::createBuffer(const vk::BufferCreateInfo& info,
     return buffer;
 }
 
-BufferHandle ResourceAllocator::createBuffer(const vk::DeviceSize size_,
-                                             const vk::BufferUsageFlags usage_,
-                                             const MemoryMappingType mapping_type,
-                                             const std::string& debug_name,
-                                             const std::optional<vk::DeviceSize> min_alignment) {
+BufferHandle ResourceAllocator::create_buffer(const vk::DeviceSize size_,
+                                              const vk::BufferUsageFlags usage_,
+                                              const MemoryMappingType mapping_type,
+                                              const std::string& debug_name,
+                                              const std::optional<vk::DeviceSize> min_alignment) {
     vk::BufferCreateInfo info{{}, size_, vk::BufferUsageFlagBits::eTransferDst | usage_};
-    return createBuffer(info, mapping_type, debug_name, min_alignment);
+    return create_buffer(info, mapping_type, debug_name, min_alignment);
 }
 
-BufferHandle ResourceAllocator::createBuffer(const CommandBufferHandle& cmdBuf,
-                                             const vk::DeviceSize& size_,
-                                             const vk::BufferUsageFlags usage_,
-                                             const void* data_,
-                                             const MemoryMappingType mapping_type,
-                                             const std::string& debug_name,
-                                             const std::optional<vk::DeviceSize> min_alignment) {
+BufferHandle ResourceAllocator::create_buffer(const CommandBufferHandle& cmdBuf,
+                                              const vk::DeviceSize& size_,
+                                              const vk::BufferUsageFlags usage_,
+                                              const void* data_,
+                                              const MemoryMappingType mapping_type,
+                                              const std::string& debug_name,
+                                              const std::optional<vk::DeviceSize> min_alignment) {
     BufferHandle resultBuffer =
-        createBuffer(size_, usage_, mapping_type, debug_name, min_alignment);
+        create_buffer(size_, usage_, mapping_type, debug_name, min_alignment);
 
     if (data_ != nullptr) {
         m_staging->cmd_to_device(cmdBuf, resultBuffer, data_);
@@ -92,24 +92,24 @@ const BufferHandle& ResourceAllocator::get_dummy_buffer() const {
 
 // You get the alignment from
 // VkPhysicalDeviceAccelerationStructurePropertiesKHR::minAccelerationStructureScratchOffsetAlignment
-BufferHandle ResourceAllocator::createScratchBuffer(const vk::DeviceSize size,
-                                                    const vk::DeviceSize alignment,
-                                                    const std::string& debug_name) {
-    return createBuffer(size, Buffer::SCRATCH_BUFFER_USAGE, MemoryMappingType::NONE, debug_name,
-                        alignment);
-}
-
-BufferHandle ResourceAllocator::createInstancesBuffer(const uint32_t instance_count,
+BufferHandle ResourceAllocator::create_scratch_buffer(const vk::DeviceSize size,
+                                                      const vk::DeviceSize alignment,
                                                       const std::string& debug_name) {
-
-    return createBuffer(sizeof(vk::AccelerationStructureInstanceKHR) * instance_count,
-                        Buffer::INSTANCES_BUFFER_USAGE, merian::MemoryMappingType::NONE, debug_name,
-                        16);
+    return create_buffer(size, Buffer::SCRATCH_BUFFER_USAGE, MemoryMappingType::NONE, debug_name,
+                         alignment);
 }
 
-ImageHandle ResourceAllocator::createImage(const vk::ImageCreateInfo& info_,
-                                           const MemoryMappingType mapping_type,
-                                           const std::string& debug_name) {
+BufferHandle ResourceAllocator::create_instances_buffer(const uint32_t instance_count,
+                                                        const std::string& debug_name) {
+
+    return create_buffer(sizeof(vk::AccelerationStructureInstanceKHR) * instance_count,
+                         Buffer::INSTANCES_BUFFER_USAGE, merian::MemoryMappingType::NONE,
+                         debug_name, 16);
+}
+
+ImageHandle ResourceAllocator::create_image(const vk::ImageCreateInfo& info_,
+                                            const MemoryMappingType mapping_type,
+                                            const std::string& debug_name) {
     const ImageHandle image = m_memAlloc->create_image(info_, mapping_type, debug_name);
 
 #ifndef NDEBUG
@@ -122,14 +122,14 @@ ImageHandle ResourceAllocator::createImage(const vk::ImageCreateInfo& info_,
     return image;
 }
 
-ImageHandle ResourceAllocator::createImage(const CommandBufferHandle& cmdBuf,
-                                           const void* data_,
-                                           const vk::ImageCreateInfo& info_,
-                                           const MemoryMappingType mapping_type,
-                                           const std::string& debug_name) {
+ImageHandle ResourceAllocator::create_image(const CommandBufferHandle& cmdBuf,
+                                            const void* data_,
+                                            const vk::ImageCreateInfo& info_,
+                                            const MemoryMappingType mapping_type,
+                                            const std::string& debug_name) {
     assert(data_);
 
-    const ImageHandle result_image = createImage(info_, mapping_type, debug_name);
+    const ImageHandle result_image = create_image(info_, mapping_type, debug_name);
 
     // doing these transitions per copy is not efficient, should do in bulk for many images
     cmdBuf->barrier(vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eTransfer,
@@ -143,14 +143,14 @@ ImageHandle ResourceAllocator::createImage(const CommandBufferHandle& cmdBuf,
     return result_image;
 }
 
-ImageHandle ResourceAllocator::createImageFromRGBA8(const CommandBufferHandle& cmd,
-                                                    const uint32_t* data,
-                                                    const uint32_t width,
-                                                    const uint32_t height,
-                                                    const vk::ImageUsageFlags usage,
-                                                    const bool isSRGB,
-                                                    const uint32_t mip_levels,
-                                                    const std::string& debug_name) {
+ImageHandle ResourceAllocator::create_image_from_rgba8(const CommandBufferHandle& cmd,
+                                                       const uint32_t* data,
+                                                       const uint32_t width,
+                                                       const uint32_t height,
+                                                       const vk::ImageUsageFlags usage,
+                                                       const bool isSRGB,
+                                                       const uint32_t mip_levels,
+                                                       const std::string& debug_name) {
     const vk::ImageCreateInfo tex_image_info{
         {},
         vk::ImageType::e2D,
@@ -168,7 +168,7 @@ ImageHandle ResourceAllocator::createImageFromRGBA8(const CommandBufferHandle& c
     };
 
     // transfers all levels to TransferDstOptimal
-    return createImage(cmd, data, tex_image_info, MemoryMappingType::NONE, debug_name);
+    return create_image(cmd, data, tex_image_info, MemoryMappingType::NONE, debug_name);
 }
 
 const ImageViewHandle& ResourceAllocator::get_dummy_storage_image_view() const {
@@ -194,31 +194,31 @@ ResourceAllocator::create_image_view(const ImageHandle& image,
     return view;
 }
 
-TextureHandle ResourceAllocator::createTexture(const ImageHandle& image,
-                                               const vk::ImageViewCreateInfo& view_create_info,
-                                               const SamplerHandle& sampler,
-                                               [[maybe_unused]] const std::string& debug_name) {
+TextureHandle ResourceAllocator::create_texture(const ImageHandle& image,
+                                                const vk::ImageViewCreateInfo& view_create_info,
+                                                const SamplerHandle& sampler,
+                                                [[maybe_unused]] const std::string& debug_name) {
     const ImageViewHandle view = create_image_view(image, view_create_info, debug_name);
 
     return Texture::create(view, sampler);
 }
 
-TextureHandle ResourceAllocator::createTexture(const ImageHandle& image,
-                                               const vk::ImageViewCreateInfo& imageViewCreateInfo,
-                                               const vk::SamplerCreateInfo& samplerCreateInfo,
-                                               const std::string& debug_name) {
+TextureHandle ResourceAllocator::create_texture(const ImageHandle& image,
+                                                const vk::ImageViewCreateInfo& imageViewCreateInfo,
+                                                const vk::SamplerCreateInfo& samplerCreateInfo,
+                                                const std::string& debug_name) {
     const SamplerHandle sampler = m_samplerPool->acquire_sampler(samplerCreateInfo);
-    return createTexture(image, imageViewCreateInfo, sampler, debug_name);
+    return create_texture(image, imageViewCreateInfo, sampler, debug_name);
 }
 
-TextureHandle ResourceAllocator::createTexture(const ImageHandle& image,
-                                               const std::string& debug_name) {
-    return createTexture(image, image->make_view_create_info(), debug_name);
+TextureHandle ResourceAllocator::create_texture(const ImageHandle& image,
+                                                const std::string& debug_name) {
+    return create_texture(image, image->make_view_create_info(), debug_name);
 }
 
-TextureHandle ResourceAllocator::createTexture(const ImageHandle& image,
-                                               const vk::ImageViewCreateInfo& view_create_info,
-                                               const std::string& debug_name) {
+TextureHandle ResourceAllocator::create_texture(const ImageHandle& image,
+                                                const vk::ImageViewCreateInfo& view_create_info,
+                                                const std::string& debug_name) {
     const ContextHandle& context = image->get_memory()->get_context();
 
     const vk::FormatProperties props =
@@ -234,20 +234,20 @@ TextureHandle ResourceAllocator::createTexture(const ImageHandle& image,
         sampler = get_sampler_pool()->nearest_mirrored_repeat();
     }
 
-    return createTexture(image, view_create_info, sampler, debug_name);
+    return create_texture(image, view_create_info, sampler, debug_name);
 }
 
 TextureHandle
-ResourceAllocator::createTextureFromRGBA8(const CommandBufferHandle& cmd,
-                                          const uint32_t* data,
-                                          const uint32_t width,
-                                          const uint32_t height,
-                                          const vk::Filter mag_filter,
-                                          const vk::Filter min_filter,
-                                          const bool isSRGB,
-                                          const std::string& debug_name,
-                                          const bool generate_mipmaps,
-                                          const vk::ImageUsageFlags additional_usage_flags) {
+ResourceAllocator::create_texture_from_rgba8(const CommandBufferHandle& cmd,
+                                             const uint32_t* data,
+                                             const uint32_t width,
+                                             const uint32_t height,
+                                             const vk::Filter mag_filter,
+                                             const vk::Filter min_filter,
+                                             const bool isSRGB,
+                                             const std::string& debug_name,
+                                             const bool generate_mipmaps,
+                                             const vk::ImageUsageFlags additional_usage_flags) {
     uint32_t mip_levels = 1;
     vk::ImageUsageFlags usage_flags = vk::ImageUsageFlagBits::eSampled | additional_usage_flags;
     if (generate_mipmaps) {
@@ -255,8 +255,8 @@ ResourceAllocator::createTextureFromRGBA8(const CommandBufferHandle& cmd,
         usage_flags |= vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst;
     }
 
-    const merian::ImageHandle image =
-        createImageFromRGBA8(cmd, data, width, height, usage_flags, isSRGB, mip_levels, debug_name);
+    const merian::ImageHandle image = create_image_from_rgba8(cmd, data, width, height, usage_flags,
+                                                              isSRGB, mip_levels, debug_name);
 
     if (generate_mipmaps) {
         for (uint32_t i = 1; i <= mip_levels; i++) {
@@ -294,22 +294,22 @@ ResourceAllocator::createTextureFromRGBA8(const CommandBufferHandle& cmd,
     merian::SamplerHandle sampler = get_sampler_pool()->for_filter_and_address_mode(
         mag_filter, min_filter, vk::SamplerAddressMode::eRepeat);
 
-    return createTexture(image, image->make_view_create_info(), sampler, debug_name);
+    return create_texture(image, image->make_view_create_info(), sampler, debug_name);
 }
 
 const TextureHandle& ResourceAllocator::get_dummy_texture() const {
     return dummy_texture;
 }
 
-AccelerationStructureHandle ResourceAllocator::createAccelerationStructure(
+AccelerationStructureHandle ResourceAllocator::create_acceleration_structure(
     const vk::AccelerationStructureTypeKHR type,
     const vk::AccelerationStructureBuildSizesInfoKHR& size_info,
     const std::string& debug_name) {
     // Allocating the buffer to hold the acceleration structure
-    BufferHandle buffer = createBuffer(size_info.accelerationStructureSize,
-                                       vk::BufferUsageFlagBits::eAccelerationStructureStorageKHR |
-                                           vk::BufferUsageFlagBits::eShaderDeviceAddress,
-                                       MemoryMappingType::NONE, debug_name);
+    BufferHandle buffer = create_buffer(size_info.accelerationStructureSize,
+                                        vk::BufferUsageFlagBits::eAccelerationStructureStorageKHR |
+                                            vk::BufferUsageFlagBits::eShaderDeviceAddress,
+                                        MemoryMappingType::NONE, debug_name);
     vk::AccelerationStructureKHR as;
     // Setting the buffer
     vk::AccelerationStructureCreateInfoKHR createInfo{
@@ -338,11 +338,11 @@ ResourceAllocator::allocate_descriptor_set(const DescriptorSetLayoutHandle& layo
     return descriptor_pool->allocate(layout, set_count);
 }
 
-std::shared_ptr<StagingMemoryManager> ResourceAllocator::getStaging() {
+std::shared_ptr<StagingMemoryManager> ResourceAllocator::get_staging() {
     return m_staging;
 }
 
-const std::shared_ptr<StagingMemoryManager>& ResourceAllocator::getStaging() const {
+const std::shared_ptr<StagingMemoryManager>& ResourceAllocator::get_staging() const {
     return m_staging;
 }
 

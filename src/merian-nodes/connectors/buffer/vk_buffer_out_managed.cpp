@@ -124,7 +124,7 @@ GraphResourceHandle ManagedVkBufferOut::create_resource(
         get_array_size(), buffer_create_info.usage, input_pipeline_stages, input_access_flags);
 
     for (uint32_t i = 0; i < get_array_size(); i++) {
-        res->buffers[i] = alloc->createBuffer(buffer_create_info, MemoryMappingType::NONE, name);
+        res->buffers[i] = alloc->create_buffer(buffer_create_info, MemoryMappingType::NONE, name);
     }
 
     return res;

@@ -297,7 +297,7 @@ class DeviceASBuilder : public Node {
         }
 
         // 2. Create Instance buffer
-        if (!allocator->ensureBufferSize(
+        if (!allocator->ensure_buffer_size(
                 tlas_build_info.instances_buffer,
                 std::max(
                     size_of(tlas_build_info.instances),
@@ -314,7 +314,7 @@ class DeviceASBuilder : public Node {
                     vk::AccessFlagBits::eShaderRead, vk::AccessFlagBits::eTransferWrite));
         }
         // 2.1. Upload instances to GPU and copy to buffer
-        allocator->getStaging()->cmd_to_device(run.get_cmd(), tlas_build_info.instances_buffer,
+        allocator->get_staging()->cmd_to_device(run.get_cmd(), tlas_build_info.instances_buffer,
                                                tlas_build_info.instances);
 
         // Validation Layers complain if dst does not include transfer write and compute shader dst

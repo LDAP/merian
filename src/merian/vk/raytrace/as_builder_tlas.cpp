@@ -21,7 +21,7 @@ ASBuilder::queue_build(const uint32_t instance_count,
         context->device.getAccelerationStructureBuildSizesKHR(
             vk::AccelerationStructureBuildTypeKHR::eDevice, build_info, instance_count);
 
-    AccelerationStructureHandle tlas = allocator->createAccelerationStructure(
+    AccelerationStructureHandle tlas = allocator->create_acceleration_structure(
         vk::AccelerationStructureTypeKHR::eTopLevel, size_info);
 
     pending_min_scratch_buffer = std::max(pending_min_scratch_buffer, size_info.buildScratchSize);

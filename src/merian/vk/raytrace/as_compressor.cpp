@@ -53,7 +53,7 @@ ASCompressor::compact(const ContextHandle& context,
         size_info.accelerationStructureSize = compact_sizes[i];
 
         // Creating a compact version of the AS
-        result[i] = allocator->createAccelerationStructure(type, size_info);
+        result[i] = allocator->create_acceleration_structure(type, size_info);
 
         // Copy the original BLAS to a compact version
         cmd->copy_acceleration_structure(ass[i], result[i],

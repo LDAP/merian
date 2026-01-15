@@ -44,8 +44,9 @@ GraphResourceHandle UnmanagedVkBufferOut::create_resource(
         }
     }
 
-    return std::make_shared<UnmanagedBufferArrayResource>(
-        get_array_size(), all_buffer_usage_flags, input_pipeline_stages, input_access_flags, buffers);
+    return std::make_shared<UnmanagedBufferArrayResource>(get_array_size(), all_buffer_usage_flags,
+                                                          input_pipeline_stages, input_access_flags,
+                                                          buffers);
 }
 
 UnmanagedBufferArrayResource& UnmanagedVkBufferOut::resource(const GraphResourceHandle& resource) {

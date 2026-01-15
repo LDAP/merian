@@ -43,7 +43,7 @@ ASBuilder::queue_build(const vk::AccelerationStructureGeometryKHR* geometry,
 
     // 2. Create the AS with the aquired info
     //--------------------------------------------
-    const AccelerationStructureHandle as = allocator->createAccelerationStructure(
+    const AccelerationStructureHandle as = allocator->create_acceleration_structure(
         vk::AccelerationStructureTypeKHR::eBottomLevel, size_info);
 
     // 3. Enqueue the build with the new AS as target

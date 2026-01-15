@@ -141,7 +141,7 @@ GraphResourceHandle ManagedVkImageOut::create_resource(
     for (uint32_t i = 0; i < get_array_size(); i++) {
         vk::ImageCreateInfo create_info = create_infos[i];
         create_info.usage |= all_input_usage_flags;
-        res->images[i] = alloc->createImage(create_info, MemoryMappingType::NONE, name);
+        res->images[i] = alloc->create_image(create_info, MemoryMappingType::NONE, name);
     }
 
     // we assert in constructor that if this is true for one, it is true for everyone!
@@ -152,7 +152,7 @@ GraphResourceHandle ManagedVkImageOut::create_resource(
         res->textures.emplace(get_array_size());
 
         for (uint32_t i = 0; i < get_array_size(); i++) {
-            res->textures.value()[i] = allocator->createTexture(
+            res->textures.value()[i] = allocator->create_texture(
                 res->images[i], res->images[i]->make_view_create_info(), name);
         }
     }

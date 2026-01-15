@@ -263,7 +263,7 @@ class ASBuilder {
             return;
         }
         scratch_buffer.reset();
-        scratch_buffer = allocator->createScratchBuffer(min_size, scratch_buffer_min_alignment,
+        scratch_buffer = allocator->create_scratch_buffer(min_size, scratch_buffer_min_alignment,
                                                         "ASBuilder scratch buffer");
     }
 

@@ -70,7 +70,7 @@ class UnmanagedImageArrayResource : public ImageArrayResource {
         if (images[index] != image) {
             images[index] = image;
             if (textures.has_value()) {
-                textures.value()[index] = image ? allocator->createTexture(image) : nullptr;
+                textures.value()[index] = image ? allocator->create_texture(image) : nullptr;
             }
             queue_descriptor_update(index);
         }

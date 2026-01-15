@@ -38,47 +38,47 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
 
     //--------------------------------------------------------------------------------------------------
 
-    std::shared_ptr<MemoryAllocator> getMemoryAllocator() {
+    std::shared_ptr<MemoryAllocator> get_memory_allocator() {
         return m_memAlloc;
     }
 
     //--------------------------------------------------------------------------------------------------
 
     // Basic buffer creation
-    BufferHandle createBuffer(const vk::BufferCreateInfo& info_,
-                              const MemoryMappingType mapping_type = MemoryMappingType::NONE,
-                              const std::string& debug_name = {},
-                              const std::optional<vk::DeviceSize> min_alignment = std::nullopt);
+    BufferHandle create_buffer(const vk::BufferCreateInfo& info_,
+                               const MemoryMappingType mapping_type = MemoryMappingType::NONE,
+                               const std::string& debug_name = {},
+                               const std::optional<vk::DeviceSize> min_alignment = std::nullopt);
 
     // Simple buffer creation
     // implicitly sets VK_BUFFER_USAGE_TRANSFER_DST_BIT
-    BufferHandle createBuffer(const vk::DeviceSize size_,
-                              const vk::BufferUsageFlags usage_ = {},
-                              const MemoryMappingType mapping_type = MemoryMappingType::NONE,
-                              const std::string& debug_name = {},
-                              const std::optional<vk::DeviceSize> min_alignment = std::nullopt);
+    BufferHandle create_buffer(const vk::DeviceSize size_,
+                               const vk::BufferUsageFlags usage_ = {},
+                               const MemoryMappingType mapping_type = MemoryMappingType::NONE,
+                               const std::string& debug_name = {},
+                               const std::optional<vk::DeviceSize> min_alignment = std::nullopt);
 
     // Simple buffer creation with data uploaded through staging manager
     // implicitly sets VK_BUFFER_USAGE_TRANSFER_DST_BIT
-    BufferHandle createBuffer(const CommandBufferHandle& cmdBuf,
-                              const vk::DeviceSize& size_,
-                              const vk::BufferUsageFlags usage_ = {},
-                              const void* data_ = nullptr,
-                              const MemoryMappingType mapping_type = MemoryMappingType::NONE,
-                              const std::string& debug_name = {},
-                              const std::optional<vk::DeviceSize> min_alignment = std::nullopt);
+    BufferHandle create_buffer(const CommandBufferHandle& cmdBuf,
+                               const vk::DeviceSize& size_,
+                               const vk::BufferUsageFlags usage_ = {},
+                               const void* data_ = nullptr,
+                               const MemoryMappingType mapping_type = MemoryMappingType::NONE,
+                               const std::string& debug_name = {},
+                               const std::optional<vk::DeviceSize> min_alignment = std::nullopt);
 
     // Simple buffer creation with data uploaded through staging manager
     // implicitly sets VK_BUFFER_USAGE_TRANSFER_DST_BIT
     template <typename T>
-    BufferHandle createBuffer(const CommandBufferHandle& cmdBuf,
-                              const std::vector<T>& data_,
-                              const vk::BufferUsageFlags usage_,
-                              const std::string& debug_name = {},
-                              const MemoryMappingType mapping_type = MemoryMappingType::NONE,
-                              const std::optional<vk::DeviceSize> min_alignment = std::nullopt) {
-        return createBuffer(cmdBuf, sizeof(T) * data_.size(), usage_, data_.data(), mapping_type,
-                            debug_name, min_alignment);
+    BufferHandle create_buffer(const CommandBufferHandle& cmdBuf,
+                               const std::vector<T>& data_,
+                               const vk::BufferUsageFlags usage_,
+                               const std::string& debug_name = {},
+                               const MemoryMappingType mapping_type = MemoryMappingType::NONE,
+                               const std::optional<vk::DeviceSize> min_alignment = std::nullopt) {
+        return create_buffer(cmdBuf, sizeof(T) * data_.size(), usage_, data_.data(), mapping_type,
+                             debug_name, min_alignment);
     }
 
     // Utility function that creates a larger buffer if optional_existing_buffer is to small or
@@ -88,21 +88,21 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
     //
     // returns true if the buffer was (re)created and the buffer handle was updated, false if the
     // existing buffer can be used.
-    bool ensureBufferSize(BufferHandle& buffer,
-                          const vk::DeviceSize buffer_size,
-                          const vk::BufferUsageFlags usage,
-                          const std::string& debug_name = {},
-                          const MemoryMappingType mapping_type = MemoryMappingType::NONE,
-                          const std::optional<vk::DeviceSize> min_alignment = std::nullopt,
-                          const float growth_factor = 1) {
+    bool ensure_buffer_size(BufferHandle& buffer,
+                            const vk::DeviceSize buffer_size,
+                            const vk::BufferUsageFlags usage,
+                            const std::string& debug_name = {},
+                            const MemoryMappingType mapping_type = MemoryMappingType::NONE,
+                            const std::optional<vk::DeviceSize> min_alignment = std::nullopt,
+                            const float growth_factor = 1) {
         assert(growth_factor >= 1);
 
         if (buffer && buffer->get_size() >= buffer_size) {
             return false;
         }
 
-        buffer = createBuffer(buffer_size * growth_factor, usage, mapping_type, debug_name,
-                              min_alignment);
+        buffer = create_buffer(buffer_size * growth_factor, usage, mapping_type, debug_name,
+                               min_alignment);
         return true;
     }
 
@@ -113,38 +113,38 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
     //--------------------------------------------------------------------------------------------------
 
     // Create a scratch buffer for acceleration buffer builds.
-    BufferHandle createScratchBuffer(const vk::DeviceSize size,
-                                     const vk::DeviceSize alignment,
-                                     const std::string& debug_name = {});
+    BufferHandle create_scratch_buffer(const vk::DeviceSize size,
+                                       const vk::DeviceSize alignment,
+                                       const std::string& debug_name = {});
 
     // Create a buffer that holds acceleration strcture instances.
-    BufferHandle createInstancesBuffer(const uint32_t instance_count,
-                                       const std::string& debug_name = {});
+    BufferHandle create_instances_buffer(const uint32_t instance_count,
+                                         const std::string& debug_name = {});
 
     //--------------------------------------------------------------------------------------------------
 
     // Basic image creation
-    ImageHandle createImage(const vk::ImageCreateInfo& info_,
-                            const MemoryMappingType mapping_type = MemoryMappingType::NONE,
-                            const std::string& debug_name = {});
+    ImageHandle create_image(const vk::ImageCreateInfo& info_,
+                             const MemoryMappingType mapping_type = MemoryMappingType::NONE,
+                             const std::string& debug_name = {});
 
     // Create an image with data uploaded through staging manager
     //
     // Important: You are responsible to insert a barrier for the upload.
-    ImageHandle createImage(const CommandBufferHandle& cmdBuf,
-                            const void* data_,
-                            const vk::ImageCreateInfo& info_,
-                            const MemoryMappingType mapping_type = MemoryMappingType::NONE,
-                            const std::string& debug_name = {});
+    ImageHandle create_image(const CommandBufferHandle& cmdBuf,
+                             const void* data_,
+                             const vk::ImageCreateInfo& info_,
+                             const MemoryMappingType mapping_type = MemoryMappingType::NONE,
+                             const std::string& debug_name = {});
 
-    ImageHandle createImageFromRGBA8(const CommandBufferHandle& cmd,
-                                     const uint32_t* data,
-                                     const uint32_t width,
-                                     const uint32_t height,
-                                     const vk::ImageUsageFlags usage,
-                                     const bool isSRGB = true,
-                                     const uint32_t mip_levels = 1,
-                                     const std::string& debug_name = {});
+    ImageHandle create_image_from_rgba8(const CommandBufferHandle& cmd,
+                                        const uint32_t* data,
+                                        const uint32_t width,
+                                        const uint32_t height,
+                                        const vk::ImageUsageFlags usage,
+                                        const bool isSRGB = true,
+                                        const uint32_t mip_levels = 1,
+                                        const std::string& debug_name = {});
 
     // Returns a dummy 4x4 image with the "missing texture" color (1,0,1,1).
     const ImageViewHandle& get_dummy_storage_image_view() const;
@@ -158,42 +158,42 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
     //--------------------------------------------------------------------------------------------------
 
     // shortcut to create an image view and a texture
-    TextureHandle createTexture(const ImageHandle& image,
-                                const vk::ImageViewCreateInfo& imageViewCreateInfo,
-                                const SamplerHandle& sampler,
-                                const std::string& debug_name = {});
+    TextureHandle create_texture(const ImageHandle& image,
+                                 const vk::ImageViewCreateInfo& imageViewCreateInfo,
+                                 const SamplerHandle& sampler,
+                                 const std::string& debug_name = {});
 
     // shortcut to create an image view and a texture
-    TextureHandle createTexture(const ImageHandle& image,
-                                const vk::ImageViewCreateInfo& imageViewCreateInfo,
-                                const vk::SamplerCreateInfo& samplerCreateInfo,
-                                const std::string& debug_name = {});
+    TextureHandle create_texture(const ImageHandle& image,
+                                 const vk::ImageViewCreateInfo& imageViewCreateInfo,
+                                 const vk::SamplerCreateInfo& samplerCreateInfo,
+                                 const std::string& debug_name = {});
 
     // shortcut to create an image view and a texture
     // Create a texture with a linear sampler if the view format supports it.
     // With a view to the whole subresource (using image->make_view_create_info()).
-    TextureHandle createTexture(const ImageHandle& image, const std::string& debug_name = {});
+    TextureHandle create_texture(const ImageHandle& image, const std::string& debug_name = {});
 
     // shortcut to create an image view and a texture
     // Create a texture with a linear sampler if the view format supports it.
-    TextureHandle createTexture(const ImageHandle& image,
-                                const vk::ImageViewCreateInfo& imageViewCreateInfo,
-                                const std::string& debug_name = {});
+    TextureHandle create_texture(const ImageHandle& image,
+                                 const vk::ImageViewCreateInfo& imageViewCreateInfo,
+                                 const std::string& debug_name = {});
 
     // shortcut to create an image view and a texture from RGB8 data
     // layout: the layout for the image view
     //
     // Important: You are responsible to perform the image transition!
-    TextureHandle createTextureFromRGBA8(const CommandBufferHandle& cmd,
-                                         const uint32_t* data,
-                                         const uint32_t width,
-                                         const uint32_t height,
-                                         const vk::Filter mag_filter,
-                                         const vk::Filter min_filter,
-                                         const bool isSRGB = true,
-                                         const std::string& debug_name = {},
-                                         const bool generate_mipmaps = false,
-                                         const vk::ImageUsageFlags additional_usage_flags = {});
+    TextureHandle create_texture_from_rgba8(const CommandBufferHandle& cmd,
+                                            const uint32_t* data,
+                                            const uint32_t width,
+                                            const uint32_t height,
+                                            const vk::Filter mag_filter,
+                                            const vk::Filter min_filter,
+                                            const bool isSRGB = true,
+                                            const std::string& debug_name = {},
+                                            const bool generate_mipmaps = false,
+                                            const vk::ImageUsageFlags additional_usage_flags = {});
 
     // Returns a dummy 4x4 texture with the "missing texture" color (1,0,1,1).
     const TextureHandle& get_dummy_texture() const;
@@ -201,9 +201,9 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
     //--------------------------------------------------------------------------------------------------
 
     AccelerationStructureHandle
-    createAccelerationStructure(const vk::AccelerationStructureTypeKHR type,
-                                const vk::AccelerationStructureBuildSizesInfoKHR& size_info,
-                                const std::string& debug_name = {});
+    create_acceleration_structure(const vk::AccelerationStructureTypeKHR type,
+                                  const vk::AccelerationStructureBuildSizesInfoKHR& size_info,
+                                  const std::string& debug_name = {});
 
     //--------------------------------------------------------------------------------------------------
 
@@ -216,9 +216,9 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
 
     //--------------------------------------------------------------------------------------------------
 
-    StagingMemoryManagerHandle getStaging();
+    StagingMemoryManagerHandle get_staging();
 
-    const StagingMemoryManagerHandle& getStaging() const;
+    const StagingMemoryManagerHandle& get_staging() const;
 
     const SamplerPoolHandle& get_sampler_pool() const {
         return m_samplerPool;

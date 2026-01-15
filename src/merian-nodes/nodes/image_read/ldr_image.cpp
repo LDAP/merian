@@ -48,7 +48,7 @@ void LDRImageRead::process([[maybe_unused]] GraphRun& run,
                         height, channels);
         }
 
-        run.get_allocator()->getStaging()->cmd_to_device(run.get_cmd(), io[con_out], image);
+        run.get_allocator()->get_staging()->cmd_to_device(run.get_cmd(), io[con_out], image);
 
         if (!keep_on_host) {
             stbi_image_free(image);
