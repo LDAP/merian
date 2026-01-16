@@ -65,7 +65,6 @@ class ShaderCursor;
 // or as member of another ShaderObject as value or as ConstantBuffer.
 class ShaderObject {
   public:
-
     void bind(ShaderCursor& cursor, ShaderObjectAllocator so_allocator) {
         // if (cursor.is_parameter_pack()) {
         //     bind_as_parameter_pack(cursor.dereference(), so_allocator)
@@ -74,13 +73,9 @@ class ShaderObject {
         // } else {
         //     bind_as_value(cursor)
         // }
-        // 
+        //
         // bind_nested? // call bind on all subobjects...?
     }
-
-    virtual void bind_nested() {}
-
-    void bind_as_value(ShaderCursor& cursor);
 
     void bind_as_constant_buffer(ShaderCursor& cursor);
 
@@ -97,6 +92,19 @@ class ShaderObject {
         // set.update()
         // cmd->bind(set, cursor.get_set_index());
     }
+
+    // ---------------------------------------------
+
+    // Bind all your shader data to this cursor (and call bind_as_value(..) on your nested objects
+    // as well).
+    //
+    // This is called whenever this object is bound to a new parameter block. Everytime you update
+    // your data you should also update the data on the cursor retrieved by get_cursor().
+    virtual void bind_as_value(ShaderCursor& cursor) = 0;
+
+    ShaderCursor get_cursor();
+
+    // ---------------------------------------------
 
     void write(const ShaderOffset& offset, const ImageHandle& image) {}
 
@@ -192,8 +200,18 @@ class ShaderCursor {
         return element(index);
     }
 
+    // the base object essentially does this?
+    // 
     // ShaderCursor dereference() {
-
+    //     switch (type_layout->getKind()) {
+    //     case slang::TypeReflection::Kind::ConstantBuffer:
+    //     case slang::TypeReflection::Kind::ParameterBlock: {
+    //         return base_object->get_object(offset);
+    //     }
+    //     default:
+    //         throw std::invalid_argument{fmt::format(
+    //             "shader cursor at kind {} cannot be dereferenced", int(type_layout->getKind()))};
+    //     }
     // }
 
     // --------------------------------------------------------------------
