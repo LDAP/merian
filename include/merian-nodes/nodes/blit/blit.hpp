@@ -32,7 +32,7 @@ private:
     BlitMode mode = FIT;
 
     VkImageInHandle src_image_in = VkImageIn::transfer_src("src", 0, true);
-    VkImageInHandle dst_image_in = VkImageIn::transfer_src("dst", 0, true);
+    VkImageInHandle dst_image_in = VkImageIn::transfer_dst("dst", 0, true);
 };
 
 } // namespace merian_nodes

@@ -64,6 +64,8 @@ class VkImageIn : public InputConnector,
   public:
     static VkImageInHandle
     transfer_src(const std::string& name, const uint32_t delay = 0, const bool optional = false);
+    static VkImageInHandle
+    transfer_dst(const std::string& name, uint32_t delay, bool optional);
 
   private:
     const vk::AccessFlags2 access_flags;

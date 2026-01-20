@@ -28,7 +28,7 @@ void Blit::process(GraphRun& run, const DescriptorSetHandle& descriptor_set, con
 
     ImageHandle dst_image;
     if (io.is_connected(dst_image_in) && io[dst_image_in].get_array_size() > 0) {
-        src_image = io[dst_image_in].get_image(0);
+        dst_image = io[dst_image_in].get_image(0);
     }
 
     const CommandBufferHandle& cmd = run.get_cmd();

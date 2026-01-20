@@ -81,7 +81,7 @@ class GLFWWindow : public Node {
                 current_src_array_size = 0;
             }
 
-            if (src_image) {
+            /*if (src_image) {
                 const vk::Filter filter =
                     src_image->format_features() &
                             vk::FormatFeatureFlagBits::eSampledImageFilterLinear
@@ -93,7 +93,7 @@ class GLFWWindow : public Node {
                          image->get_extent(), vk::ClearColorValue{}, filter);
             } else {
                 cmd->clear(image);
-            }
+            }*/
 
             run.add_pre_submit_callback([acquire](const QueueHandle& queue, GraphRun& run) {
                 const CommandBufferHandle& cmd = run.get_cmd();
@@ -102,7 +102,7 @@ class GLFWWindow : public Node {
                 cmd->barrier(image->barrier2(vk::ImageLayout::ePresentSrcKHR));
             });
 
-            on_blit_completed(cmd, *acquire);
+            //on_blit_completed(cmd, *acquire);
 
             run.add_wait_semaphore(acquire->wait_semaphore, vk::PipelineStageFlagBits::eTransfer);
             run.add_signal_semaphore(acquire->signal_semaphore);
@@ -122,6 +122,9 @@ class GLFWWindow : public Node {
 
             if (request_rebuild_on_recreate && acquire->did_recreate)
                 run.request_reconnect();
+
+            UnmanagedImageArrayResource out_resource = io[image_out];
+            out_resource.set(0, acquire->image_view->get_image(), cmd, run.get_allocator(), vk::AccessFlagBits2::eNone, vk::PipelineStageFlagBits2::eNone);
         }
 
         if (window && window->should_close()) {
@@ -267,7 +270,7 @@ class GLFWWindow : public Node {
                                [[maybe_unused]] const SwapchainAcquireResult& acquire_result) {};
 
     VkImageInHandle image_in = VkImageIn::transfer_src("src", 0, true);
-    VkImageOutHandle image_out = UnmanagedVkImageOut::create("out", 1, vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferDst);
+    UnmanagedVkImageOutHandle image_out = UnmanagedVkImageOut::create("out", 1, vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferDst);
 
     std::array<int, 4> windowed_pos_size;
     bool request_rebuild_on_recreate = false;

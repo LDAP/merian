@@ -93,4 +93,12 @@ VkImageIn::transfer_src(const std::string& name, const uint32_t delay, const boo
         vk::ShaderStageFlags(), delay, optional);
 }
 
+std::shared_ptr<VkImageIn>
+VkImageIn::transfer_dst(const std::string& name, const uint32_t delay, const bool optional) {
+    return std::make_shared<VkImageIn>(
+        name, vk::AccessFlagBits2::eTransferWrite, vk::PipelineStageFlagBits2::eAllTransfer,
+        vk::ImageLayout::eTransferDstOptimal, vk::ImageUsageFlagBits::eTransferDst,
+        vk::ShaderStageFlags(), delay, optional);
+}
+
 } // namespace merian_nodes
