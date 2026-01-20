@@ -5,11 +5,13 @@
 #include "merian-nodes/graph/errors.hpp"
 #include "merian-nodes/graph/node.hpp"
 
+#include "merian-nodes/connectors/ptr_out.hpp"
 #include "merian/vk/extension/extension_glfw.hpp"
 #include "merian/vk/utils/blits.hpp"
 #include "merian/vk/window/glfw_window.hpp"
 #include "merian/vk/window/swapchain.hpp"
 #include "merian/vk/window/swapchain_manager.hpp"
+
 #include <csignal>
 
 namespace merian_nodes {
@@ -44,7 +46,7 @@ class GLFWWindow : public Node {
             throw graph_errors::node_error{"node requires ExtensionVkGLFW context extension"};
         }
 
-        return {image_out};
+        return {image_out, aquire_out};
     }
 
     virtual NodeStatusFlags pre_process([[maybe_unused]] const GraphRun& run,
@@ -81,7 +83,7 @@ class GLFWWindow : public Node {
                 current_src_array_size = 0;
             }
 
-            /*if (src_image) {
+            if (src_image) {
                 const vk::Filter filter =
                     src_image->format_features() &
                             vk::FormatFeatureFlagBits::eSampledImageFilterLinear
@@ -93,16 +95,18 @@ class GLFWWindow : public Node {
                          image->get_extent(), vk::ClearColorValue{}, filter);
             } else {
                 cmd->clear(image);
-            }*/
+            }
 
-            run.add_pre_submit_callback([acquire](const QueueHandle& queue, GraphRun& run) {
+            run.add_pre_submit_callback([this, acquire](const QueueHandle& queue, GraphRun& run) {
                 const CommandBufferHandle& cmd = run.get_cmd();
-                const ImageHandle image = acquire->image_view->get_image();
 
+                on_blit_completed(cmd, *acquire);
+
+                const ImageHandle image = acquire->image_view->get_image();
                 cmd->barrier(image->barrier2(vk::ImageLayout::ePresentSrcKHR));
             });
 
-            //on_blit_completed(cmd, *acquire);
+
 
             run.add_wait_semaphore(acquire->wait_semaphore, vk::PipelineStageFlagBits::eTransfer);
             run.add_signal_semaphore(acquire->signal_semaphore);
@@ -125,6 +129,7 @@ class GLFWWindow : public Node {
 
             UnmanagedImageArrayResource out_resource = io[image_out];
             out_resource.set(0, acquire->image_view->get_image(), cmd, run.get_allocator(), vk::AccessFlagBits2::eNone, vk::PipelineStageFlagBits2::eNone);
+            io[aquire_out] = std::make_shared<SwapchainAcquireResult>(acquire.value());
         }
 
         if (window && window->should_close()) {
@@ -270,7 +275,8 @@ class GLFWWindow : public Node {
                                [[maybe_unused]] const SwapchainAcquireResult& acquire_result) {};
 
     VkImageInHandle image_in = VkImageIn::transfer_src("src", 0, true);
-    UnmanagedVkImageOutHandle image_out = UnmanagedVkImageOut::create("out", 1, vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferDst);
+    UnmanagedVkImageOutHandle image_out = UnmanagedVkImageOut::create("aquired_img", 1, vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferDst);
+    PtrOutHandle<SwapchainAcquireResult> aquire_out = PtrOut<SwapchainAcquireResult>::create("aquire_result", false);
 
     std::array<int, 4> windowed_pos_size;
     bool request_rebuild_on_recreate = false;

@@ -1,8 +1,10 @@
 #ifndef MERIAN_SHADERTOY_BLIT_HPP
 #define MERIAN_SHADERTOY_BLIT_HPP
 #include "merian-nodes/connectors/image/vk_image_in.hpp"
+#include "merian-nodes/connectors/ptr_in.hpp"
 #include "merian-nodes/graph/node.hpp"
 #include "merian/vk/utils/blits.hpp"
+#include "merian/vk/window/swapchain_manager.hpp"
 
 namespace merian_nodes {
 
@@ -32,6 +34,7 @@ private:
     BlitMode mode = FIT;
 
     VkImageInHandle src_image_in = VkImageIn::transfer_src("src", 0, true);
+    //PtrInHandle<SwapchainAcquireResult> aquire_in = PtrIn<SwapchainAcquireResult>::create("aquire_in");
     VkImageInHandle dst_image_in = VkImageIn::transfer_dst("dst", 0, true);
 };
 

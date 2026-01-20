@@ -30,6 +30,9 @@ void Blit::process(GraphRun& run, const DescriptorSetHandle& descriptor_set, con
     if (io.is_connected(dst_image_in) && io[dst_image_in].get_array_size() > 0) {
         dst_image = io[dst_image_in].get_image(0);
     }
+    /*if (io.is_connected(aquire_in)) {
+        dst_image = io[aquire_in]->image_view->get_image();
+    }*/
 
     const CommandBufferHandle& cmd = run.get_cmd();
     if (src_image && dst_image) {
@@ -47,6 +50,8 @@ void Blit::process(GraphRun& run, const DescriptorSetHandle& descriptor_set, con
             const CommandBufferHandle& cmd = run.get_cmd();
             cmd->barrier(dst_image->barrier2(vk::ImageLayout::ePresentSrcKHR));
         });
+    } else if (dst_image) {
+        cmd->clear(dst_image);
     }
 }
 
