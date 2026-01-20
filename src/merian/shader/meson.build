@@ -7,13 +7,16 @@ merian_src += files(
     'glsl_shader_compiler_system_glslangValidator.cpp',
     'glsl_shader_compiler_system_glslc.cpp',
     'shader_compiler.cpp',
+    'shader_cursor.cpp',
     'shader_hotreloader.cpp',
     'shader_module.cpp',
+    'shader_object.cpp',
     'slang_composition.cpp',
     'slang_entry_point.cpp',
     'slang_global_session.cpp',
     'slang_program.cpp',
     'slang_session.cpp',
+    'slang_utils.cpp',
 )
 
 if shaderc.found()
