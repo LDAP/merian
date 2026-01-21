@@ -127,85 +127,59 @@ void ShaderObject::bind_to(ShaderCursor& cursor, ShaderObjectAllocator& allocato
     // }
 }
 
-void ShaderObject::for_each_descriptor_set(const std::function<void(const DescriptorContainerHandle&)> f) {
+void ShaderObject::for_each_descriptor_set(
+    const std::function<void(const DescriptorContainerHandle&)>& f) {
     auto it = parameter_block.descriptor_sets.begin();
     while (it != parameter_block.descriptor_sets.end()) {
         if (it->expired()) {
             it = parameter_block.descriptor_sets.erase(it);
             continue;
-        } else {
-            f(it->lock());
         }
+
+        f(it->lock());
     }
 }
 
 void ShaderObject::write(const ShaderOffset& offset, const ImageViewHandle& image) {
-    // Get binding info
-    auto binding_info = get_binding_info_from_offset(offset, type_layout);
-
-    // Update our descriptor set if we have one
-    if (descriptor_set) {
-        // Create image view if needed
-        ImageViewHandle view;
-        if (auto existing_view = std::dynamic_pointer_cast<ImageView>(image)) {
-            view = existing_view;
-        } else {
-            view = ImageView::create(image);
-        }
-
-        descriptor_set->queue_descriptor_write_image(binding_info.binding, view,
-                                                     offset.binding_array_index);
-        descriptor_set->update();
-    }
+    const auto binding_info = get_binding_info_from_offset(offset, type_layout);
+    for_each_descriptor_set([&](const DescriptorContainerHandle& set) {
+        set->queue_descriptor_write_image(binding_info.binding, image, offset.binding_array_index);
+    });
 }
 
 void ShaderObject::write(const ShaderOffset& offset, const BufferHandle& buffer) {
-    // Get binding info
-    auto binding_info = get_binding_info_from_offset(offset, type_layout);
-
-    // Update our descriptor set if we have one
-    if (descriptor_set) {
-        descriptor_set->queue_descriptor_write_buffer(binding_info.binding, buffer, 0,
-                                                      VK_WHOLE_SIZE, offset.binding_array_index);
-        descriptor_set->update();
-    }
+    const auto binding_info = get_binding_info_from_offset(offset, type_layout);
+    for_each_descriptor_set([&](const DescriptorContainerHandle& set) {
+        set->queue_descriptor_write_buffer(binding_info.binding, buffer,
+                                           offset.binding_array_index);
+    });
 }
 
 void ShaderObject::write(const ShaderOffset& offset, const TextureHandle& texture) {
-    // Get binding info
-    auto binding_info = get_binding_info_from_offset(offset, type_layout);
-
-    // Update our descriptor set if we have one
-    if (descriptor_set) {
-        descriptor_set->queue_descriptor_write_texture(binding_info.binding, texture,
-                                                       offset.binding_array_index);
-        descriptor_set->update();
-    }
+    const auto binding_info = get_binding_info_from_offset(offset, type_layout);
+    for_each_descriptor_set([&](const DescriptorContainerHandle& set) {
+        set->queue_descriptor_write_texture(binding_info.binding, texture,
+                                            offset.binding_array_index);
+    });
 }
 
 void ShaderObject::write(const ShaderOffset& offset, const SamplerHandle& sampler) {
-    // Get binding info
-    auto binding_info = get_binding_info_from_offset(offset, type_layout);
-
-    // Update our descriptor set if we have one
-    if (descriptor_set) {
-        descriptor_set->queue_descriptor_write_sampler(binding_info.binding, sampler,
-                                                       offset.binding_array_index);
-        descriptor_set->update();
-    }
+    const auto binding_info = get_binding_info_from_offset(offset, type_layout);
+    for_each_descriptor_set([&](const DescriptorContainerHandle& set) {
+        set->queue_descriptor_write_sampler(binding_info.binding, sampler,
+                                            offset.binding_array_index);
+    });
 }
 
 void ShaderObject::write(const ShaderOffset& offset, const void* data, std::size_t size) {
     // Write to our staging buffer if we have one
-    if (!ordinary_data_staging.empty()) {
-        assert(offset.uniform_byte_offset + size <= ordinary_data_staging.size());
-        std::memcpy(ordinary_data_staging.data() + offset.uniform_byte_offset, data, size);
-
-        // Upload to GPU buffer
-        if (ordinary_data) {
-            // TODO: Map, copy, unmap or use staging upload
-        }
+    if (!parameter_block.ordinary_data_staging.empty()) {
+        assert(offset.uniform_byte_offset + size <= parameter_block.ordinary_data_staging.size());
+        std::memcpy(parameter_block.ordinary_data_staging.data() + offset.uniform_byte_offset, data,
+                    size);
     }
+
+    // TODO: mark dirty and upload to GPU later (when binding)
 }
 
 } // namespace merian

@@ -139,7 +139,7 @@ class ShaderObject : public std::enable_shared_from_this<ShaderObject> {
     }
 
   private:
-    void for_each_descriptor_set(const std::function<void(const DescriptorContainerHandle&)> f);
+    void for_each_descriptor_set(const std::function<void(const DescriptorContainerHandle&)>& f);
 
   private:
     // The root cursor - tracks all binding locations for this object
