@@ -97,7 +97,7 @@ class ShaderObject : public std::enable_shared_from_this<ShaderObject> {
      *
      * @param cursor The cursor to write data through
      */
-    virtual void populate(ShaderCursor& cursor) = 0;
+    virtual void write_to(ShaderCursor& cursor) = 0;
 
     /**
      * @brief Get the root cursor for this object.

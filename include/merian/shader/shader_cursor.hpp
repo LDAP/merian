@@ -146,12 +146,16 @@ class ShaderCursor {
     void add_locations(const ShaderCursor& other);
 
   private:
-    struct Location {
-        ShaderObjectHandle base_object;
+    struct WeakLocation {
+        std::weak_ptr<ShaderObject> base_object;
         ShaderOffset offset;
     };
 
-    std::vector<Location> locations;
+    void for_each_location(const std::function<void(const ShaderObjectHandle& base_object,
+                                                    const ShaderOffset& offset)>& f);
+
+  private:
+    std::vector<WeakLocation> locations;
     slang::TypeLayoutReflection* type_layout = nullptr;
 
     friend class ShaderObject;

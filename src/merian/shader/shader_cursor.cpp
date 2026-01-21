@@ -8,6 +8,21 @@ ShaderCursor::ShaderCursor(const ShaderObjectHandle& base_object)
     locations.emplace_back(base_object, ShaderOffset());
 }
 
+void ShaderCursor::for_each_location(const std::function<void(const ShaderObjectHandle& base_object,
+                                                              const ShaderOffset& offset)>& f) {
+    for (uint32_t i = 0; i < locations.size();) {
+        auto& loc = locations[i];
+        if (loc.base_object.expired()) {
+            std::swap(loc, locations.back());
+            locations.pop_back();
+            continue;
+        }
+
+        f(loc.base_object.lock(), loc.offset);
+        i++;
+    }
+}
+
 ShaderCursor ShaderCursor::field(const std::string& name) {
     if (!is_valid()) {
         SPDLOG_ERROR("Cannot navigate field '{}' on invalid cursor", name);
@@ -37,13 +52,13 @@ ShaderCursor ShaderCursor::field(uint32_t index) {
     result.type_layout = field->getTypeLayout();
     result.locations.reserve(locations.size());
 
-    for (auto& loc : locations) {
-        ShaderOffset new_offset = loc.offset;
+    for_each_location([&](const ShaderObjectHandle& base_object, const ShaderOffset& offset) {
+        ShaderOffset new_offset = offset;
         new_offset.uniform_byte_offset += field->getOffset();
         new_offset.binding_range_offset += type_layout->getFieldBindingRangeOffset(index);
 
-        result.locations.push_back({loc.base_object, new_offset});
-    }
+        result.locations.emplace_back(base_object, new_offset);
+    });
 
     return result;
 }
@@ -64,14 +79,14 @@ ShaderCursor ShaderCursor::element(uint32_t index) {
     result.type_layout = element_type_layout;
     result.locations.reserve(locations.size());
 
-    for (auto& loc : locations) {
-        ShaderOffset new_offset = loc.offset;
+    for_each_location([&](const ShaderObjectHandle& base_object, const ShaderOffset& offset) {
+        ShaderOffset new_offset = offset;
         new_offset.uniform_byte_offset += index * element_type_layout->getStride();
         new_offset.binding_array_index =
-            (loc.offset.binding_array_index * type_layout->getElementCount()) + index;
+            (offset.binding_array_index * type_layout->getElementCount()) + index;
 
-        result.locations.push_back({loc.base_object, new_offset});
-    }
+        result.locations.emplace_back(base_object, new_offset);
+    });
 
     return result;
 }
@@ -85,37 +100,37 @@ ShaderCursor ShaderCursor::operator[](uint32_t index) {
 }
 
 ShaderCursor& ShaderCursor::write(const ImageViewHandle& image) {
-    for (auto& loc : locations) {
-        loc.base_object->write(loc.offset, image);
-    }
+    for_each_location([&](const ShaderObjectHandle& base_object, const ShaderOffset& offset) {
+        base_object->write(offset, image);
+    });
     return *this;
 }
 
 ShaderCursor& ShaderCursor::write(const BufferHandle& buffer) {
-    for (auto& loc : locations) {
-        loc.base_object->write(loc.offset, buffer);
-    }
+    for_each_location([&](const ShaderObjectHandle& base_object, const ShaderOffset& offset) {
+        base_object->write(offset, buffer);
+    });
     return *this;
 }
 
 ShaderCursor& ShaderCursor::write(const TextureHandle& texture) {
-    for (auto& loc : locations) {
-        loc.base_object->write(loc.offset, texture);
-    }
+    for_each_location([&](const ShaderObjectHandle& base_object, const ShaderOffset& offset) {
+        base_object->write(offset, texture);
+    });
     return *this;
 }
 
 ShaderCursor& ShaderCursor::write(const SamplerHandle& sampler) {
-    for (auto& loc : locations) {
-        loc.base_object->write(loc.offset, sampler);
-    }
+    for_each_location([&](const ShaderObjectHandle& base_object, const ShaderOffset& offset) {
+        base_object->write(offset, sampler);
+    });
     return *this;
 }
 
 ShaderCursor& ShaderCursor::write(const void* data, std::size_t size) {
-    for (auto& loc : locations) {
-        loc.base_object->write(loc.offset, data, size);
-    }
+    for_each_location([&](const ShaderObjectHandle& base_object, const ShaderOffset& offset) {
+        base_object->write(offset, data, size);
+    });
     return *this;
 }
 

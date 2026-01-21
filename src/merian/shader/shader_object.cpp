@@ -5,8 +5,8 @@
 
 namespace merian {
 
-ShaderObject::ShaderObject(const ContextHandle& ctx, slang::TypeLayoutReflection* layout)
-    : type_layout(layout), context(ctx) {
+ShaderObject::ShaderObject(const ContextHandle& context, slang::TypeLayoutReflection* layout)
+    : type_layout(layout), context(context) {
     assert(type_layout);
 }
 
@@ -137,6 +137,7 @@ void ShaderObject::for_each_descriptor_set(
         }
 
         f(it->lock());
+        it++;
     }
 }
 
