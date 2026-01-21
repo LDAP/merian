@@ -23,14 +23,15 @@ using ShaderObjectHandle = std::shared_ptr<ShaderObject>;
  */
 class ShaderCursor {
   public:
+    /**
+     * @brief Create an invalid cursor
+     */
     ShaderCursor() = default;
 
     /**
      * @brief Create a cursor with a single location.
      *
      * @param base_object The object this cursor points into
-     * @param type_layout Slang type layout at this position
-     * @param offset Offset within the object
      */
     ShaderCursor(const ShaderObjectHandle& base_object);
 
@@ -64,8 +65,6 @@ class ShaderCursor {
         return field(name);
     }
     ShaderCursor operator[](uint32_t index);
-
-    // Write operations - traverse all locations
 
     ShaderCursor& write(const ImageViewHandle& image);
     ShaderCursor& write(const BufferHandle& buffer);
@@ -110,7 +109,7 @@ class ShaderCursor {
      * @param object The object to bind
      * @param allocator Allocator for descriptor sets (if needed)
      */
-    void bind_object(const ShaderObjectHandle& object, ShaderObjectAllocator& allocator);
+    // void bind_object(const ShaderObjectHandle& object, ShaderObjectAllocator& allocator);
 
     // Query operations
 

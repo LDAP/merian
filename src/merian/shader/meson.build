@@ -11,6 +11,7 @@ merian_src += files(
     'shader_hotreloader.cpp',
     'shader_module.cpp',
     'shader_object.cpp',
+    'shader_object_allocator.cpp',
     'slang_composition.cpp',
     'slang_entry_point.cpp',
     'slang_global_session.cpp',

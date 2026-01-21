@@ -1,7 +1,8 @@
 #pragma once
 
 #include "merian/vk/descriptors/descriptor_container.hpp"
-#include "merian/vk/descriptors/descriptor_set_layout.hpp"
+#include "merian/vk/descriptors/descriptor_set.hpp"
+#include "merian/vk/memory/resource_allocator.hpp"
 
 #include <memory>
 
@@ -24,10 +25,29 @@ class ShaderObjectAllocator {
      * @return Cached or newly created descriptor set
      */
     virtual DescriptorContainerHandle
-    get_or_create_descriptor_set(const ShaderObjectHandle& object,
-                                 const DescriptorSetLayoutHandle& layout) = 0;
+    get_or_create_descriptor_set(const ShaderObjectHandle& object) = 0;
 };
 
 using ShaderObjectAllocatorHandle = std::shared_ptr<ShaderObjectAllocator>;
+
+class DescriptorSetShaderObjectAllocator : public ShaderObjectAllocator {
+  public:
+    DescriptorSetShaderObjectAllocator(const ResourceAllocatorHandle& allocator,
+                                       const uint32_t iterations_in_flight);
+
+    DescriptorContainerHandle
+    get_or_create_descriptor_set(const ShaderObjectHandle& object) override;
+
+    void set_iteration(const uint32_t iteration);
+
+    void reset();
+
+  private:
+    const ResourceAllocatorHandle allocator;
+    const uint32_t iterations_in_flight;
+    uint32_t iteration_in_flight;
+
+    std::unordered_map<ShaderObjectHandle, std::vector<DescriptorSetHandle>> sets;
+};
 
 } // namespace merian

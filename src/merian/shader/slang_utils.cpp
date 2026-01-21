@@ -30,28 +30,26 @@ vk::DescriptorType map_slang_to_vk_descriptor_type(slang::BindingType type) {
 }
 
 DescriptorSetLayoutHandle
-create_descriptor_set_layout_from_slang(const ContextHandle& context,
-                                        slang::TypeLayoutReflection* type_layout) {
+create_descriptor_set_layout_from_slang_type_layout(const ContextHandle& context,
+                                                    slang::TypeLayoutReflection* type_layout) {
 
     std::vector<vk::DescriptorSetLayoutBinding> bindings;
 
     // Iterate through all binding ranges
     uint32_t binding_range_count = type_layout->getBindingRangeCount();
     for (uint32_t i = 0; i < binding_range_count; i++) {
-        slang::BindingType kind = type_layout->getBindingRangeType(i);
-        uint32_t count = type_layout->getBindingRangeBindingCount(i);
+        const slang::BindingType kind = type_layout->getBindingRangeType(i);
+        const uint32_t count = type_layout->getBindingRangeBindingCount(i);
 
         // Get the descriptor set and binding indices
-        uint32_t desc_set_index = type_layout->getDescriptorSetDescriptorRangeIndexOffset(i, 0);
-        uint32_t binding = desc_set_index; // Simplified - may need adjustment
+        const uint32_t desc_set_index =
+            type_layout->getDescriptorSetDescriptorRangeIndexOffset(i, 0);
+        const uint32_t binding = desc_set_index; // Simplified - may need adjustment
 
-        vk::DescriptorType desc_type = map_slang_to_vk_descriptor_type(kind);
+        const vk::DescriptorType desc_type = map_slang_to_vk_descriptor_type(kind);
 
-        // For now, assume all stages - could be refined using entry point info
-        vk::ShaderStageFlags stages = vk::ShaderStageFlagBits::eAll;
-
-        bindings.push_back(
-            vk::DescriptorSetLayoutBinding{binding, desc_type, count, stages, nullptr});
+        bindings.push_back(vk::DescriptorSetLayoutBinding{binding, desc_type, count,
+                                                          vk::ShaderStageFlagBits::eAll, nullptr});
     }
 
     if (bindings.empty()) {

@@ -228,6 +228,10 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
         return descriptor_pool;
     }
 
+    const ContextHandle& get_context() const {
+        return context;
+    }
+
     //--------------------------------------------------------------------------------------------------
 
   protected:

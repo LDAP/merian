@@ -61,29 +61,29 @@ class DescriptorSetLayoutBuilder {
 
     // --------------------------------------------------------------------------------------------------------------------
 
-    DescriptorSetLayoutBuilder&
-    add_binding_storage_buffer(vk::ShaderStageFlags stage_flags = vk::ShaderStageFlagBits::eCompute,
-                               uint32_t descriptor_count = 1,
-                               std::optional<uint32_t> binding = std::nullopt) {
-        add_binding(stage_flags, vk::DescriptorType::eStorageBuffer, descriptor_count, nullptr,
+    DescriptorSetLayoutBuilder& add_binding_storage_buffer(
+        uint32_t descriptor_count = 1,
+        const vk::ShaderStageFlags stage_flags = vk::ShaderStageFlagBits::eAll,
+        std::optional<uint32_t> binding = std::nullopt) {
+        add_binding(vk::DescriptorType::eStorageBuffer, descriptor_count, stage_flags, nullptr,
                     binding);
         return *this;
     }
 
-    DescriptorSetLayoutBuilder&
-    add_binding_uniform_buffer(vk::ShaderStageFlags stage_flags = vk::ShaderStageFlagBits::eCompute,
-                               uint32_t descriptor_count = 1,
-                               std::optional<uint32_t> binding = std::nullopt) {
-        add_binding(stage_flags, vk::DescriptorType::eUniformBuffer, descriptor_count, nullptr,
+    DescriptorSetLayoutBuilder& add_binding_uniform_buffer(
+        uint32_t descriptor_count = 1,
+        const vk::ShaderStageFlags stage_flags = vk::ShaderStageFlagBits::eAll,
+        std::optional<uint32_t> binding = std::nullopt) {
+        add_binding(vk::DescriptorType::eUniformBuffer, descriptor_count, stage_flags, nullptr,
                     binding);
         return *this;
     }
 
-    DescriptorSetLayoutBuilder&
-    add_binding_storage_image(vk::ShaderStageFlags stage_flags = vk::ShaderStageFlagBits::eCompute,
-                              uint32_t descriptor_count = 1,
-                              std::optional<uint32_t> binding = std::nullopt) {
-        add_binding(stage_flags, vk::DescriptorType::eStorageImage, descriptor_count, nullptr,
+    DescriptorSetLayoutBuilder& add_binding_storage_image(
+        uint32_t descriptor_count = 1,
+        const vk::ShaderStageFlags stage_flags = vk::ShaderStageFlagBits::eAll,
+        std::optional<uint32_t> binding = std::nullopt) {
+        add_binding(vk::DescriptorType::eStorageImage, descriptor_count, stage_flags, nullptr,
                     binding);
         return *this;
     }
@@ -92,11 +92,11 @@ class DescriptorSetLayoutBuilder {
     // are permanently bound into the set layout and must not be changed; updating a
     // VK_DESCRIPTOR_TYPE_SAMPLER descriptor with immutable samplers is not allowed.
     DescriptorSetLayoutBuilder&
-    add_binding_sampler(vk::ShaderStageFlags stage_flags = vk::ShaderStageFlagBits::eCompute,
-                        uint32_t descriptor_count = 1,
+    add_binding_sampler(const vk::ShaderStageFlags stage_flags = vk::ShaderStageFlagBits::eAll,
+                        const uint32_t descriptor_count = 1,
                         const vk::Sampler* immutable_sampler = nullptr,
                         std::optional<uint32_t> binding = std::nullopt) {
-        add_binding(stage_flags, vk::DescriptorType::eSampler, descriptor_count, immutable_sampler,
+        add_binding(vk::DescriptorType::eSampler, descriptor_count, stage_flags, immutable_sampler,
                     binding);
         return *this;
     }
@@ -106,21 +106,21 @@ class DescriptorSetLayoutBuilder {
     // VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER descriptor with immutable samplers does not modify
     // the samplers (the image views are updated, but the sampler updates are ignored).
     DescriptorSetLayoutBuilder& add_binding_combined_sampler(
-        vk::ShaderStageFlags stage_flags = vk::ShaderStageFlagBits::eCompute,
         uint32_t descriptor_count = 1,
+        const vk::ShaderStageFlags stage_flags = vk::ShaderStageFlagBits::eAll,
         const vk::Sampler* immutable_sampler = nullptr,
         std::optional<uint32_t> binding = std::nullopt) {
-        add_binding(stage_flags, vk::DescriptorType::eCombinedImageSampler, descriptor_count,
+        add_binding(vk::DescriptorType::eCombinedImageSampler, descriptor_count, stage_flags,
                     immutable_sampler, binding);
         return *this;
     }
 
     DescriptorSetLayoutBuilder& add_binding_acceleration_structure(
-        vk::ShaderStageFlags stage_flags = vk::ShaderStageFlagBits::eCompute,
         uint32_t descriptor_count = 1,
+        const vk::ShaderStageFlags stage_flags = vk::ShaderStageFlagBits::eAll,
         const vk::Sampler* immutable_sampler = nullptr,
         std::optional<uint32_t> binding = std::nullopt) {
-        add_binding(stage_flags, vk::DescriptorType::eAccelerationStructureKHR, descriptor_count,
+        add_binding(vk::DescriptorType::eAccelerationStructureKHR, descriptor_count, stage_flags,
                     immutable_sampler, binding);
         return *this;
     }
@@ -141,9 +141,9 @@ class DescriptorSetLayoutBuilder {
      * @param[in]  pImmutableSamplers_  See vulkan spec
      */
     DescriptorSetLayoutBuilder&
-    add_binding(vk::ShaderStageFlags stage_flags,
-                vk::DescriptorType descriptor_type = vk::DescriptorType::eSampler,
-                uint32_t descriptor_count = 1,
+    add_binding(const vk::DescriptorType descriptor_type = vk::DescriptorType::eSampler,
+                const uint32_t descriptor_count = 1,
+                const vk::ShaderStageFlags stage_flags = vk::ShaderStageFlagBits::eAll,
                 const vk::Sampler* immutable_sampler = nullptr,
                 std::optional<uint32_t> binding = std::nullopt) {
         vk::DescriptorSetLayoutBinding layout_binding{binding.value_or(next_free_binding()),

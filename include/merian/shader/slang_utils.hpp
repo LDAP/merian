@@ -28,7 +28,7 @@ struct BindingInfo {
  * @return Descriptor set layout handle
  */
 DescriptorSetLayoutHandle
-create_descriptor_set_layout_from_slang(const ContextHandle& context,
+create_descriptor_set_layout_from_slang_type_layout(const ContextHandle& context,
                                         slang::TypeLayoutReflection* type_layout);
 
 /**

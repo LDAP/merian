@@ -134,33 +134,33 @@ ShaderCursor& ShaderCursor::write(const void* data, std::size_t size) {
     return *this;
 }
 
-void ShaderCursor::bind_object(const ShaderObjectHandle& object, ShaderObjectAllocator& allocator) {
-    // if (!is_valid()) {
-    //     SPDLOG_ERROR("Cannot bind object to invalid cursor");
-    //     return;
-    // }
+// void ShaderCursor::bind_object(const ShaderObjectHandle& object, ShaderObjectAllocator&
+// allocator) { if (!is_valid()) {
+//     SPDLOG_ERROR("Cannot bind object to invalid cursor");
+//     return;
+// }
 
-    // auto kind = type_layout->getType()->getKind();
+// auto kind = type_layout->getType()->getKind();
 
-    // if (kind == slang::TypeReflection::Kind::ParameterBlock) {
-    //     // Nested parameter block - gets its own descriptor set
-    //     if (!object->get_descriptor_set()) {
-    //         object->initialize_as_parameter_block(allocator);
-    //     }
-    //     // The nested parameter block's descriptor set is bound separately at draw time
+// if (kind == slang::TypeReflection::Kind::ParameterBlock) {
+//     // Nested parameter block - gets its own descriptor set
+//     if (!object->get_descriptor_set()) {
+//         object->initialize_as_parameter_block(allocator);
+//     }
+//     // The nested parameter block's descriptor set is bound separately at draw time
 
-    // } else {
-    //     // Constant buffer or value - bind to all our locations
-    //     object->bind_to(*this, allocator);
-    // }
-}
+// } else {
+//     // Constant buffer or value - bind to all our locations
+//     object->bind_to(*this, allocator);
+// }
+// }
 
 void ShaderCursor::add_locations(const ShaderCursor& other) {
-    // assert(type_layout == other.type_layout || !type_layout);
-    // if (!type_layout) {
-    //     type_layout = other.type_layout;
-    // }
-    // locations.insert(locations.end(), other.locations.begin(), other.locations.end());
+    assert(type_layout == other.type_layout || !type_layout);
+    if (type_layout == nullptr) {
+        type_layout = other.type_layout;
+    }
+    locations.insert(locations.end(), other.locations.begin(), other.locations.end());
 }
 
 } // namespace merian
