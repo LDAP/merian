@@ -5,14 +5,10 @@
 
 #include <typeindex>
 
-// attempt to set the dynamic dispach launcher as early as possible
-#ifndef VULKAN_HPP_DISPATCH_LOADER_DYNAMIC
-#define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
-#endif
-
-#include <vulkan/vulkan.hpp>
+#include "merian/vk/instance.hpp"
 
 #include "merian/io/file_loader.hpp"
+#include "merian/fwd.hpp"
 
 namespace merian {
 
@@ -67,53 +63,6 @@ class VulkanException : public MerianException {
 
   private:
     vk::Result result;
-};
-
-// cyclic -> forward definition
-class Extension;
-class Context;
-using ContextHandle = std::shared_ptr<Context>;
-using WeakContextHandle = std::weak_ptr<Context>;
-class Queue;
-using QueueHandle = std::shared_ptr<Queue>;
-class CommandPool;
-class CommandBuffer;
-using CommandBufferHandle = std::shared_ptr<CommandBuffer>;
-class SlangSession;
-using SlangSessionHandle = std::shared_ptr<SlangSession>;
-
-struct PhysicalDevice {
-    const vk::PhysicalDevice& operator*() const {
-        return physical_device;
-    }
-
-    operator const vk::PhysicalDevice&() const {
-        return physical_device;
-    }
-
-    operator vk::PhysicalDevice&() {
-        return physical_device;
-    }
-
-    const vk::PhysicalDeviceLimits& get_physical_device_limits() const {
-        return physical_device_properties.properties.limits;
-    }
-
-    vk::PhysicalDevice physical_device;
-
-    vk::PhysicalDeviceProperties2 physical_device_properties;
-    vk::PhysicalDeviceVulkan11Properties physical_device_11_properties;
-    vk::PhysicalDeviceVulkan12Properties physical_device_12_properties;
-    vk::PhysicalDeviceVulkan13Properties physical_device_13_properties;
-    vk::PhysicalDeviceVulkan14Properties physical_device_14_properties;
-
-    // all supported features. Must be enabled with ExtensionVkCore.
-    vk::PhysicalDeviceFeatures2 physical_device_features;
-    vk::PhysicalDeviceMemoryProperties2 physical_device_memory_properties;
-    vk::PhysicalDeviceSubgroupProperties physical_device_subgroup_properties;
-    vk::PhysicalDeviceSubgroupSizeControlProperties
-        physical_device_subgroup_size_control_properties;
-    std::vector<vk::ExtensionProperties> physical_device_extension_properties;
 };
 
 class ExtensionContainer {
@@ -203,18 +152,6 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
   public:
     ~Context();
 
-    operator vk::Instance&() {
-        return instance;
-    }
-
-    operator vk::PhysicalDevice&() {
-        return physical_device;
-    }
-
-    operator vk::Device&() {
-        return device;
-    }
-
   private: // Vulkan initialization
     void create_instance();
     void prepare_physical_device(uint32_t filter_vendor_id,
@@ -299,19 +236,17 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
 
     // in create_instance
 
-    vk::Instance instance;
+    InstanceHandle instance;
 
     // in prepare_physical_device
 
     // the vk::PhysicalDevice for this Context
-    PhysicalDevice physical_device;
+    PhysicalDeviceHandle physical_device;
 
     // in create_device_and_queues
 
     // the vk::Device for this Context
-    vk::Device device;
-
-    vk::PipelineCache pipeline_cache;
+    DeviceHandle device;
 
     // -----------------
 

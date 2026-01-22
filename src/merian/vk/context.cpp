@@ -117,29 +117,20 @@ Version: {}\n\n",
 }
 
 Context::~Context() {
-    device.waitIdle();
-
     SPDLOG_DEBUG("destroy context");
 
     for (auto& ext : extensions) {
         ext.second->on_destroy_context();
     }
 
-    SPDLOG_DEBUG("destroy pipeline cache");
-    device.destroyPipelineCache(pipeline_cache);
-
-    SPDLOG_DEBUG("destroy device");
     for (auto& ext : extensions) {
         ext.second->on_destroy_device(device);
     }
-    device.destroy();
 
-    SPDLOG_DEBUG("destroy instance");
     for (auto& ext : extensions) {
         ext.second->on_destroy_instance(instance);
     }
-    instance.destroy();
-
+    
     SPDLOG_INFO("context destroyed");
 }
 
@@ -179,7 +170,7 @@ void Context::create_instance() {
                  VK_API_VERSION_PATCH(instance_vulkan_version));
 
     // Must happen before on_instance_created since it requires dynamic loading
-    VULKAN_HPP_DEFAULT_DISPATCHER.init(instance);
+    VULKAN_HPP_DEFAULT_DISPATCHER.init(**instance);
     for (auto& ext : extensions) {
         ext.second->on_instance_created(instance);
     }
