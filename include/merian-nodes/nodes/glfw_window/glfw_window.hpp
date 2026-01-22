@@ -5,6 +5,7 @@
 #include "merian-nodes/graph/errors.hpp"
 #include "merian-nodes/graph/node.hpp"
 
+#include "merian-nodes/connectors/any_out.hpp"
 #include "merian-nodes/connectors/ptr_out.hpp"
 #include "merian/vk/extension/extension_glfw.hpp"
 #include "merian/vk/utils/blits.hpp"
@@ -129,7 +130,7 @@ class GLFWWindow : public Node {
 
             UnmanagedImageArrayResource out_resource = io[image_out];
             out_resource.set(0, acquire->image_view->get_image(), cmd, run.get_allocator(), vk::AccessFlagBits2::eNone, vk::PipelineStageFlagBits2::eNone);
-            io[aquire_out] = std::make_shared<SwapchainAcquireResult>(acquire.value());
+            io[aquire_out] = std::make_any<SwapchainAcquireResult>(acquire.value());
         }
 
         if (window && window->should_close()) {
@@ -276,7 +277,9 @@ class GLFWWindow : public Node {
 
     VkImageInHandle image_in = VkImageIn::transfer_src("src", 0, true);
     UnmanagedVkImageOutHandle image_out = UnmanagedVkImageOut::create("aquired_img", 1, vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferDst);
-    PtrOutHandle<SwapchainAcquireResult> aquire_out = PtrOut<SwapchainAcquireResult>::create("aquire_result", false);
+    //PtrOutHandle<SwapchainAcquireResult> aquire_out = PtrOut<SwapchainAcquireResult>::create("aquire_result", false);
+
+    AnyOutHandle aquire_out = AnyOut::create("aquire_result", false);
 
     std::array<int, 4> windowed_pos_size;
     bool request_rebuild_on_recreate = false;
