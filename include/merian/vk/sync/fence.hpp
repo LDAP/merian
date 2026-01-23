@@ -10,27 +10,27 @@ using FenceHandle = std::shared_ptr<Fence>;
 class Fence : public std::enable_shared_from_this<Fence> {
   private:
     Fence(const ContextHandle& context, const vk::FenceCreateFlags flags) : context(context) {
-        fence = context->device.createFence(vk::FenceCreateInfo{flags});
+        fence = context->get_device()->get_device().createFence(vk::FenceCreateInfo{flags});
     }
 
   public:
     ~Fence() {
-        context->device.destroyFence(fence);
+        context->get_device()->get_device().destroyFence(fence);
     }
 
     // -----------------------------------------------------------------
 
     // Returns false if the timeout passes without the fence being signaled.
     bool wait(const uint64_t timeout = ~0) {
-        return context->device.waitForFences(fence, VK_TRUE, timeout) == vk::Result::eSuccess;
+        return context->get_device()->get_device().waitForFences(fence, VK_TRUE, timeout) == vk::Result::eSuccess;
     }
 
     bool is_signaled() {
-        return context->device.waitForFences(fence, VK_TRUE, 0) == vk::Result::eSuccess;
+        return context->get_device()->get_device().waitForFences(fence, VK_TRUE, 0) == vk::Result::eSuccess;
     }
 
     void reset() {
-        context->device.resetFences(fence);
+        context->get_device()->get_device().resetFences(fence);
     }
 
     // -----------------------------------------------------------------

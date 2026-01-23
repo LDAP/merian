@@ -10,7 +10,7 @@ namespace merian {
 inline vk::SurfaceKHR surface_from_glfw_window(const ContextHandle& context,
                                                const GLFWWindowHandle& window) {
     VkSurfaceKHR psurf;
-    if (glfwCreateWindowSurface(context->instance, *window, NULL, &psurf))
+    if (glfwCreateWindowSurface(context->get_instance()->get_instance(), *window, NULL, &psurf))
         throw std::runtime_error("Surface creation failed!");
     return vk::SurfaceKHR(psurf);
 }

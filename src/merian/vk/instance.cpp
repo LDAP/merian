@@ -3,7 +3,11 @@
 
 namespace merian {
 
-Instance::Instance(vk::Instance instance) : instance(instance) {}
+Instance::Instance(const vk::Instance& instance) : instance(instance) {}
+
+InstanceHandle Instance::create(const vk::Instance& instance) {
+    return InstanceHandle(new Instance(instance));
+}
 
 Instance::~Instance() {
     SPDLOG_DEBUG("destroy instance");

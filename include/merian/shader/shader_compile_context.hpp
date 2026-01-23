@@ -59,8 +59,8 @@ class ShaderCompileContext {
         : preprocessor_macros(context.get_default_shader_macro_definitions()),
           debug_info(Context::IS_DEBUG_BUILD),
           optimization_level(Context::BUILD_OPTIMIZATION_LEVEL),
-          target(spirv_target_for_vulkan_api_version(context.vk_api_version)),
-          target_vk_api_version(context.vk_api_version) {
+          target(spirv_target_for_vulkan_api_version(context.get_vk_api_version())),
+          target_vk_api_version(context.get_vk_api_version()) {
         file_loader.add_search_path(context.get_default_shader_include_paths());
     }
 

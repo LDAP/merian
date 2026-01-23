@@ -36,14 +36,15 @@ class CommandBuffer : public std::enable_shared_from_this<CommandBuffer> {
         : pool(pool) {
 
         const vk::CommandBufferAllocateInfo info{*pool, level, 1};
-        check_result(pool->get_context()->device.allocateCommandBuffers(&info, &cmd),
-                     "could not allocate command buffer");
+        check_result(
+            pool->get_context()->get_device()->get_device().allocateCommandBuffers(&info, &cmd),
+            "could not allocate command buffer");
 
         SPDLOG_DEBUG("allocate command buffer ({})", fmt::ptr(static_cast<VkCommandBuffer>(cmd)));
     }
 
     ~CommandBuffer() {
-        pool->get_context()->device.freeCommandBuffers(*pool, cmd);
+        pool->get_context()->get_device()->get_device().freeCommandBuffers(*pool, cmd);
 
         SPDLOG_DEBUG("free command buffer ({})", fmt::ptr(static_cast<VkCommandBuffer>(cmd)));
     }

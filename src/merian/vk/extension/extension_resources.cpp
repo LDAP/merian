@@ -1,6 +1,7 @@
 #include "merian/vk/extension/extension_resources.hpp"
 #include "merian/vk/extension/extension_vk_core.hpp"
 #include "merian/vk/memory/memory_allocator_vma.hpp"
+#include "merian/vk/physical_device.hpp"
 
 #include <fmt/ranges.h>
 
@@ -17,8 +18,8 @@ void ExtensionResources::on_context_initializing(const ExtensionContainer& exten
     core_extension->request_optional_feature("vk12/bufferDeviceAddress");
 }
 
-void ExtensionResources::on_physical_device_selected(const PhysicalDevice& physical_device) {
-    for (const auto& extension : physical_device.physical_device_extension_properties) {
+void ExtensionResources::on_physical_device_selected(const PhysicalDeviceHandle& physical_device) {
+    for (const auto& extension : physical_device->physical_device_extension_properties) {
         if (strcmp(extension.extensionName, VK_KHR_MAINTENANCE_4_EXTENSION_NAME) == 0) {
             required_extensions.push_back(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
             flags |= VMA_ALLOCATOR_CREATE_KHR_MAINTENANCE4_BIT;
@@ -53,8 +54,6 @@ void ExtensionResources::on_context_created(const ContextHandle& context,
         }
     }
 }
-
-void ExtensionResources::on_destroy_context() {}
 
 MemoryAllocatorHandle ExtensionResources::memory_allocator() {
     if (_memory_allocator.expired()) {

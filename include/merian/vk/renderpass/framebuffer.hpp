@@ -28,11 +28,11 @@ class Framebuffer : public Object {
                        [&](auto& view) { return view->get_view(); });
 
         vk::FramebufferCreateInfo create_info{flags, *renderpass, views, width, height, layers};
-        framebuffer = context->device.createFramebuffer(create_info);
+        framebuffer = context->get_device()->get_device().createFramebuffer(create_info);
     }
 
     ~Framebuffer() {
-        context->device.destroyFramebuffer(framebuffer);
+        context->get_device()->get_device().destroyFramebuffer(framebuffer);
     }
 
     operator const vk::Framebuffer&() const {

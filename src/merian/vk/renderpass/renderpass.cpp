@@ -6,7 +6,7 @@ RenderPass::RenderPass(const ContextHandle& context,
                        const vk::RenderPassCreateInfo2 renderpass_create_info)
     : context(context), attachment_count(renderpass_create_info.attachmentCount) {
 
-    renderpass = context->device.createRenderPass2(renderpass_create_info);
+    renderpass = context->get_device()->get_device().createRenderPass2(renderpass_create_info);
     SPDLOG_DEBUG("create renderpass ({})", fmt::ptr(static_cast<VkRenderPass>(renderpass)));
 }
 
@@ -14,14 +14,14 @@ RenderPass::RenderPass(const ContextHandle& context,
                        const vk::RenderPassCreateInfo renderpass_create_info)
     : context(context), attachment_count(renderpass_create_info.attachmentCount) {
 
-    renderpass = context->device.createRenderPass(renderpass_create_info);
+    renderpass = context->get_device()->get_device().createRenderPass(renderpass_create_info);
     SPDLOG_DEBUG("create renderpass ({})", fmt::ptr(static_cast<VkRenderPass>(renderpass)));
 }
 
 RenderPass::~RenderPass() {
     SPDLOG_DEBUG("destroy renderpass ({})", fmt::ptr(static_cast<VkRenderPass>(renderpass)));
 
-    context->device.destroyRenderPass(renderpass);
+    context->get_device()->get_device().destroyRenderPass(renderpass);
 }
 
 RenderPass::operator const vk::RenderPass&() const {

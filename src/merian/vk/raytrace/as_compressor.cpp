@@ -16,7 +16,7 @@ ASCompressor::compact(const ContextHandle& context,
     // vk::QueryPoolCreateInfo qpci{{},
     //                              vk::QueryType::eAccelerationStructureCompactedSizeKHR,
     //                              static_cast<uint32_t>(ass.size())};
-    // vk::QueryPool query_pool = context->device.createQueryPool(qpci);
+    // vk::QueryPool query_pool = context->get_device()->get_device().createQueryPool(qpci);
 
     QueryPoolHandle<vk::QueryType::eAccelerationStructureCompactedSizeKHR> query_pool =
         QueryPool<vk::QueryType::eAccelerationStructureCompactedSizeKHR>::create(context,
@@ -31,16 +31,16 @@ ASCompressor::compact(const ContextHandle& context,
 
     // Query compacted size
     cmd->write_acceleration_structures_properties(query_pool, ass);
-    vk::Fence fence = context->device.createFence({});
+    vk::Fence fence = context->get_device()->get_device().createFence({});
     cmd->end();
     queue->submit(cmd, fence);
 
     // TODO: Can this be done without waiting?
     check_result(
-        context->device.waitForFences(fence, VK_TRUE, std::numeric_limits<uint64_t>::max()),
+        context->get_device()->get_device().waitForFences(fence, VK_TRUE, std::numeric_limits<uint64_t>::max()),
         "failed waiting for fences");
     pool->reset();
-    context->device.resetFences(fence);
+    context->get_device()->get_device().resetFences(fence);
     cmd->begin();
 
     std::vector<vk::DeviceSize> compact_sizes =
@@ -75,9 +75,9 @@ ASCompressor::compact(const ContextHandle& context,
 
     // TODO: Can this be done without waiting?
     check_result(
-        context->device.waitForFences(fence, VK_TRUE, std::numeric_limits<uint64_t>::max()),
+        context->get_device()->get_device().waitForFences(fence, VK_TRUE, std::numeric_limits<uint64_t>::max()),
         "failed waiting for fences");
-    context->device.destroyFence(fence);
+    context->get_device()->get_device().destroyFence(fence);
     return result;
 }
 

@@ -28,13 +28,16 @@ class ComputePipeline : public Pipeline {
             pNext,
         };
         // Hm. This is a bug in the API there should not be .value
-        pipeline = context->device.createComputePipeline(context->pipeline_cache, info).value;
+        pipeline = context->get_device()
+                       ->get_device()
+                       .createComputePipeline(context->get_device()->get_pipeline_cache(), info)
+                       .value;
     }
 
   public:
     ~ComputePipeline() {
         SPDLOG_DEBUG("destroy ComputePipeline ({})", fmt::ptr(this));
-        context->device.destroyPipeline(pipeline);
+        context->get_device()->get_device().destroyPipeline(pipeline);
     }
 
     // ---------------------------------------------------------------------------

@@ -107,16 +107,12 @@ void* ExtensionVkDebugUtils::pnext_instance_create_info(void* p_next) {
     return &validation_features;
 }
 
-void ExtensionVkDebugUtils::on_instance_created(const vk::Instance& instance) {
+void ExtensionVkDebugUtils::on_instance_created(const InstanceHandle& instance) {
     this->create_info.setPNext(nullptr);
-    messenger = instance.createDebugUtilsMessengerEXT(create_info);
-}
+    messenger = (**instance).createDebugUtilsMessengerEXT(create_info);
+    assert(this->instance == nullptr);
 
-void ExtensionVkDebugUtils::on_destroy_instance(const vk::Instance& instance) {
-    if (messenger) {
-        SPDLOG_DEBUG("destroy DebugUtilsMessengerEXT");
-        instance.destroyDebugUtilsMessengerEXT(messenger);
-    }
+    this->instance = instance;
 }
 
 } // namespace merian

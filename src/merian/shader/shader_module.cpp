@@ -4,7 +4,7 @@ namespace merian {
 
 ShaderModule::ShaderModule(const ContextHandle& context, const vk::ShaderModuleCreateInfo& info)
     : context(context) {
-    shader_module = context->device.createShaderModule(info);
+    shader_module = context->get_device()->get_device().createShaderModule(info);
 }
 
 ShaderModule::ShaderModule(const ContextHandle& context,
@@ -14,7 +14,7 @@ ShaderModule::ShaderModule(const ContextHandle& context,
 
 ShaderModule::~ShaderModule() {
     SPDLOG_DEBUG("destroy shader module ({})", fmt::ptr(this));
-    context->device.destroyShaderModule(shader_module);
+    context->get_device()->get_device().destroyShaderModule(shader_module);
 }
 
 ShaderModule::operator const vk::ShaderModule&() const {

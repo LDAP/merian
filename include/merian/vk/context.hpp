@@ -5,10 +5,12 @@
 
 #include <typeindex>
 
+#include "merian/vk/device.hpp"
 #include "merian/vk/instance.hpp"
+#include "merian/vk/physical_device.hpp"
 
-#include "merian/io/file_loader.hpp"
 #include "merian/fwd.hpp"
+#include "merian/io/file_loader.hpp"
 
 namespace merian {
 
@@ -219,6 +221,16 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
 
     const SlangSessionHandle& get_slang_session() const;
 
+    const InstanceHandle& get_instance();
+
+    const PhysicalDeviceHandle& get_physical_device();
+
+    const DeviceHandle& get_device();
+
+    const uint32_t& get_vk_api_version() const;
+
+    FileLoader& get_file_loader();
+
   private:
     // in create_instance
 
@@ -229,7 +241,7 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
 
     std::vector<const char*> device_extensions;
 
-  public:
+  private:
     const std::string application_name;
     const uint32_t vk_api_version;
     const uint32_t application_vk_version;
@@ -253,7 +265,6 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
     // A shared file_loader for convenience.
     FileLoader file_loader;
 
-  private:
     // in find_queues. Indexes are -1 if no suitable queue was found!
 
     QueueInfo queue_info;

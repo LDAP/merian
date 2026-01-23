@@ -46,7 +46,7 @@ class DescriptorBuffer : public DescriptorContainer {
             binding_info.size =
                 ext_descriptor_buffer->descriptor_size_for_type(layout->get_type_for_binding(i));
             binding_info.offset =
-                context->device.getDescriptorSetLayoutBindingOffsetEXT(*get_layout(), i);
+                context->get_device()->get_device().getDescriptorSetLayoutBindingOffsetEXT(*get_layout(), i);
 
             max_binding_size = std::max(max_binding_size, binding_info.size);
         }
@@ -65,7 +65,7 @@ class DescriptorBuffer : public DescriptorContainer {
 
     // size in bytes for a descriptor buffer.
     vk::DeviceSize get_size() {
-        return context->device.getDescriptorSetLayoutSizeEXT(*get_layout());
+        return context->get_device()->get_device().getDescriptorSetLayoutSizeEXT(*get_layout());
     }
 
     vk::DeviceSize get_layout_binding_offset(const uint32_t binding,

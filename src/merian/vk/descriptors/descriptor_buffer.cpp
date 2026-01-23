@@ -71,7 +71,7 @@ void DescriptorBuffer::update() {
 
         make_desc_get_info(desc_get_info, address_info, write);
 
-        context->device.getDescriptorEXT(&desc_get_info, size, gpu_buffer + offset);
+        context->get_device()->get_device().getDescriptorEXT(&desc_get_info, size, gpu_buffer + offset);
     }
 
     buffer->get_memory()->unmap();
@@ -101,7 +101,7 @@ void DescriptorBuffer::update(const CommandBufferHandle& cmd) {
 
         make_desc_get_info(desc_get_info, address_info, write);
 
-        context->device.getDescriptorEXT(&desc_get_info, size, scratch);
+        context->get_device()->get_device().getDescriptorEXT(&desc_get_info, size, scratch);
         cmd->update(buffer, offset, size, scratch);
     }
     queued_writes.clear();

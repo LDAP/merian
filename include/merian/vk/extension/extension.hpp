@@ -64,7 +64,7 @@ class Extension {
         return p_next;
     }
 
-    virtual void on_instance_created(const vk::Instance& /*unused*/) {}
+    virtual void on_instance_created(const InstanceHandle& /*unused*/) {}
 
     /**
      * Vote against a physical device by returning false. The context attemps to select a physical
@@ -119,7 +119,7 @@ class Extension {
 
     /* Called after the physical device was select and before extensions are checked for
      * compatibility and check_support is called.*/
-    virtual void on_physical_device_selected(const PhysicalDevice& /*unused*/) {}
+    virtual void on_physical_device_selected(const PhysicalDeviceHandle& /*unused*/) {}
 
     /* E.g. to dismiss a queue that does not support present-to-surface. Similar to
      * accpet_physical_device, the context attempt to select a graphics queue that is accepted by
@@ -163,21 +163,12 @@ class Extension {
         return p_next;
     }
 
-    virtual void on_device_created(const vk::Device& /*unused*/) {}
+    virtual void on_device_created(const DeviceHandle& /*unused*/) {}
 
     /* Called right before context constructor returns. */
     virtual void
     on_context_created([[maybe_unused]] const ContextHandle& context,
                        [[maybe_unused]] const ExtensionContainer& extension_container) {}
-
-    /* Called after device is idle and before context is destroyed. */
-    virtual void on_destroy_context() {}
-
-    /* Called right before device is destroyed. */
-    virtual void on_destroy_device(const vk::Device& /*unused*/) {}
-
-    /* Called before the instance is destroyed or if the extension is determined as unsupported. */
-    virtual void on_destroy_instance(const vk::Instance& /*unused*/) {}
 
     // Called by context if extension was determined as unsupported. The extension might not receive
     // further callbacks.

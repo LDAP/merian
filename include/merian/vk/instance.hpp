@@ -1,5 +1,7 @@
 #pragma once
 
+#include "merian/fwd.hpp"
+
 #include <memory>
 
 // attempt to set the dynamic dispach launcher as early as possible
@@ -12,12 +14,23 @@
 namespace merian {
 
 class Instance : public std::enable_shared_from_this<Instance> {
+  private:
+    Instance(const vk::Instance& instance);
+
   public:
-    Instance(vk::Instance instance);
+    static InstanceHandle create(const vk::Instance& instance);
 
     ~Instance();
 
-    operator vk::Instance&() {
+    const vk::Instance& get_instance() const {
+        return instance;
+    }
+
+    const vk::Instance& operator*() const {
+        return instance;
+    }
+
+    operator const vk::Instance&() const {
         return instance;
     }
 

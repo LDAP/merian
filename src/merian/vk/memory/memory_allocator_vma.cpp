@@ -191,19 +191,19 @@ void VMAMemoryAllocation::properties(Properties& props) {
 VMAMemoryAllocator::VMAMemoryAllocator(const ContextHandle& context,
                                        const VmaAllocatorCreateFlags flags)
     : MemoryAllocator(context) {
-    VmaAllocatorCreateInfo allocator_info = {.flags = flags,
-                                             .physicalDevice =
-                                                 context->physical_device.physical_device,
-                                             .device = context->device,
-                                             .preferredLargeHeapBlockSize = 0,
-                                             .pAllocationCallbacks = nullptr,
-                                             .pDeviceMemoryCallbacks = nullptr,
-                                             .pHeapSizeLimit = nullptr,
-                                             .pVulkanFunctions = nullptr,
-                                             .instance = context->instance,
-                                             .vulkanApiVersion = context->vk_api_version,
+    VmaAllocatorCreateInfo allocator_info = {
+        .flags = flags,
+        .physicalDevice = context->get_physical_device()->get_physical_device(),
+        .device = context->get_device()->get_device(),
+        .preferredLargeHeapBlockSize = 0,
+        .pAllocationCallbacks = nullptr,
+        .pDeviceMemoryCallbacks = nullptr,
+        .pHeapSizeLimit = nullptr,
+        .pVulkanFunctions = nullptr,
+        .instance = context->get_instance()->get_instance(),
+        .vulkanApiVersion = context->get_vk_api_version(),
 #if VMA_EXTERNAL_MEMORY
-                                             .pTypeExternalMemoryHandleTypes = nullptr
+        .pTypeExternalMemoryHandleTypes = nullptr
 #endif
     };
     SPDLOG_DEBUG("create VMA allocator ({})", fmt::ptr(this));

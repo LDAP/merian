@@ -166,7 +166,7 @@ void ImageWrite::process(GraphRun& run,
     const vk::Format format =
         this->format == FORMAT_HDR ? vk::Format::eR32G32B32A32Sfloat : vk::Format::eR8G8B8A8Srgb;
     const vk::FormatProperties format_properties =
-        context->physical_device.physical_device.getFormatProperties(format);
+        context->get_physical_device()->get_physical_device().getFormatProperties(format);
 
     vk::ImageCreateInfo linear_info{
         {},

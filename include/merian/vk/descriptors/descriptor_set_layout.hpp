@@ -28,7 +28,7 @@ class DescriptorSetLayout : public std::enable_shared_from_this<DescriptorSetLay
         : context(context), bindings(bindings), flags(flags), binding_offsets(bindings.size(), 0) {
         vk::DescriptorSetLayoutCreateInfo info{flags, bindings};
         SPDLOG_DEBUG("create DescriptorSetLayout ({})", fmt::ptr(this));
-        layout = context->device.createDescriptorSetLayout(info);
+        layout = context->get_device()->get_device().createDescriptorSetLayout(info);
 
         if (!bindings.empty()) {
             for (uint32_t i = 1; i < bindings.size(); i++) {
@@ -44,7 +44,7 @@ class DescriptorSetLayout : public std::enable_shared_from_this<DescriptorSetLay
 
     ~DescriptorSetLayout() {
         SPDLOG_DEBUG("destroy DescriptorSetLayout ({})", fmt::ptr(this));
-        context->device.destroyDescriptorSetLayout(layout);
+        context->get_device()->get_device().destroyDescriptorSetLayout(layout);
     }
 
     operator const vk::DescriptorSetLayout&() const {

@@ -18,7 +18,7 @@ class Surface : public std::enable_shared_from_this<Surface> {
 
     ~Surface() {
         SPDLOG_DEBUG("destroy surface ({})", fmt::ptr(this));
-        context->instance.destroySurfaceKHR(surface);
+        context->get_instance()->get_instance().destroySurfaceKHR(surface);
     }
 
     operator const vk::SurfaceKHR&() const {

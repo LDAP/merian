@@ -102,7 +102,7 @@ class DescriptorPool : public DescriptorSetAllocator {
         }
 
         const vk::DescriptorPoolCreateInfo info{flags, max_sets, pool_sizes};
-        pool = context->device.createDescriptorPool(info);
+        pool = context->get_device()->get_device().createDescriptorPool(info);
 
         SPDLOG_DEBUG("created DescriptorPool ({})", fmt::ptr(VkDescriptorPool(pool)));
     }
@@ -127,7 +127,7 @@ class DescriptorPool : public DescriptorSetAllocator {
   public:
     ~DescriptorPool() {
         SPDLOG_DEBUG("destroy DescriptorPool ({})", fmt::ptr(VkDescriptorPool(pool)));
-        context->device.destroyDescriptorPool(pool);
+        context->get_device()->get_device().destroyDescriptorPool(pool);
     }
 
     // -------------------------------------------------------------------------

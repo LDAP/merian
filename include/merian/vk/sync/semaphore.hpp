@@ -10,11 +10,11 @@ class Semaphore : public std::enable_shared_from_this<Semaphore>, public Object 
     Semaphore(const ContextHandle& context, const vk::SemaphoreTypeCreateInfo& type_create_info)
         : context(context) {
         vk::SemaphoreCreateInfo create_info{{}, &type_create_info};
-        semaphore = context->device.createSemaphore(create_info);
+        semaphore = context->get_device()->get_device().createSemaphore(create_info);
     }
 
     virtual ~Semaphore() {
-        context->device.destroySemaphore(semaphore);
+        context->get_device()->get_device().destroySemaphore(semaphore);
     }
 
     Semaphore(const Semaphore&) = delete;

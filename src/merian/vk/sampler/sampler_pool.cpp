@@ -73,13 +73,13 @@ SamplerHandle SamplerPool::acquire_sampler(const vk::SamplerCreateInfo& createIn
 }
 
 SamplerHandle SamplerPool::acquire_sampler(const vk::Filter mag_filter,
-                                                       const vk::Filter min_filter,
-                                                       const vk::SamplerAddressMode address_mode_u,
-                                                       const vk::SamplerAddressMode address_mode_v,
-                                                       const vk::SamplerAddressMode address_mode_w,
-                                                       const vk::SamplerMipmapMode mipmap_mode,
-                                                       const bool anisotropy,
-                                                       const vk::BorderColor border_color) {
+                                           const vk::Filter min_filter,
+                                           const vk::SamplerAddressMode address_mode_u,
+                                           const vk::SamplerAddressMode address_mode_v,
+                                           const vk::SamplerAddressMode address_mode_w,
+                                           const vk::SamplerMipmapMode mipmap_mode,
+                                           const bool anisotropy,
+                                           const vk::BorderColor border_color) {
     const vk::SamplerCreateInfo info{
         {},
         mag_filter,
@@ -90,7 +90,7 @@ SamplerHandle SamplerPool::acquire_sampler(const vk::Filter mag_filter,
         address_mode_w,
         {},
         anisotropy ? VK_TRUE : VK_FALSE,
-        context->physical_device.get_physical_device_limits().maxSamplerAnisotropy,
+        context->get_physical_device()->get_physical_device_limits().maxSamplerAnisotropy,
         VK_FALSE,
         {},
         0.0f,
@@ -106,8 +106,8 @@ SamplerHandle SamplerPool::for_filter_and_address_mode(const vk::Filter mag_filt
                                                        const vk::SamplerMipmapMode mipmap_mode,
                                                        const bool anisotropy,
                                                        const vk::BorderColor border_color) {
-    return acquire_sampler(mag_filter, min_filter, address_mode, address_mode,
-                                       address_mode, mipmap_mode, anisotropy, border_color);
+    return acquire_sampler(mag_filter, min_filter, address_mode, address_mode, address_mode,
+                           mipmap_mode, anisotropy, border_color);
 }
 
 SamplerHandle SamplerPool::linear_repeat() {

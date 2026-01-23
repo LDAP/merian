@@ -52,7 +52,7 @@ BufferHandle ResourceAllocator::create_buffer(const vk::BufferCreateInfo& info,
 
 #ifndef NDEBUG
     if (debug_utils) {
-        debug_utils->set_object_name(context->device, **buffer, debug_name);
+        debug_utils->set_object_name(context->get_device()->get_device(), **buffer, debug_name);
     }
     SPDLOG_TRACE("created buffer {} ({})", fmt::ptr(static_cast<VkBuffer>(**buffer)), debug_name);
 #endif
@@ -114,7 +114,7 @@ ImageHandle ResourceAllocator::create_image(const vk::ImageCreateInfo& info_,
 
 #ifndef NDEBUG
     if (debug_utils) {
-        debug_utils->set_object_name(context->device, **image, debug_name);
+        debug_utils->set_object_name(context->get_device()->get_device(), **image, debug_name);
     }
     SPDLOG_TRACE("created image {} ({})", fmt::ptr(static_cast<VkImage>(**image)), debug_name);
 #endif
@@ -184,7 +184,7 @@ ResourceAllocator::create_image_view(const ImageHandle& image,
 
 #ifndef NDEBUG
     if (debug_utils) {
-        debug_utils->set_object_name(context->device, **view, debug_name);
+        debug_utils->set_object_name(context->get_device()->get_device(), **view, debug_name);
     }
     SPDLOG_TRACE("created image view {} ({}), for image {}",
                  fmt::ptr(static_cast<VkImageView>(**view)), debug_name,
@@ -222,7 +222,8 @@ TextureHandle ResourceAllocator::create_texture(const ImageHandle& image,
     const ContextHandle& context = image->get_memory()->get_context();
 
     const vk::FormatProperties props =
-        context->physical_device.physical_device.getFormatProperties(view_create_info.format);
+        context->get_physical_device()->get_physical_device().getFormatProperties(
+            view_create_info.format);
 
     SamplerHandle sampler;
     if ((image->get_tiling() == vk::ImageTiling::eOptimal &&
@@ -314,13 +315,14 @@ AccelerationStructureHandle ResourceAllocator::create_acceleration_structure(
     // Setting the buffer
     vk::AccelerationStructureCreateInfoKHR createInfo{
         {}, *buffer, {}, size_info.accelerationStructureSize, type};
-    check_result(context->device.createAccelerationStructureKHR(&createInfo, nullptr, &as),
+    check_result(context->get_device()->get_device().createAccelerationStructureKHR(&createInfo,
+                                                                                    nullptr, &as),
                  "could not create acceleration structure");
 
 #ifndef NDEBUG
     if (debug_utils) {
-        debug_utils->set_object_name(context->device, **buffer, debug_name);
-        debug_utils->set_object_name(context->device, as, debug_name);
+        debug_utils->set_object_name(context->get_device()->get_device(), **buffer, debug_name);
+        debug_utils->set_object_name(context->get_device()->get_device(), as, debug_name);
     }
 #endif
 

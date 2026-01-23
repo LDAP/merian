@@ -25,12 +25,12 @@ class PipelineLayout : public std::enable_shared_from_this<PipelineLayout> {
                        vk_descriptor_set_layouts.begin(),
                        [&](auto& shared) { return shared->get_layout(); });
         vk::PipelineLayoutCreateInfo info{flags, vk_descriptor_set_layouts, ranges};
-        pipeline_layout = context->device.createPipelineLayout(info);
+        pipeline_layout = context->get_device()->get_device().createPipelineLayout(info);
     }
 
     ~PipelineLayout() {
         SPDLOG_DEBUG("destroy PipelineLayout ({})", fmt::ptr(this));
-        context->device.destroyPipelineLayout(pipeline_layout);
+        context->get_device()->get_device().destroyPipelineLayout(pipeline_layout);
     }
 
     operator const vk::PipelineLayout&() const {

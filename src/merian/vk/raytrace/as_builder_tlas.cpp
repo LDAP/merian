@@ -18,7 +18,7 @@ ASBuilder::queue_build(const uint32_t instance_count,
         top_as_geometry};
 
     vk::AccelerationStructureBuildSizesInfoKHR size_info =
-        context->device.getAccelerationStructureBuildSizesKHR(
+        context->get_device()->get_device().getAccelerationStructureBuildSizesKHR(
             vk::AccelerationStructureBuildTypeKHR::eDevice, build_info, instance_count);
 
     AccelerationStructureHandle tlas = allocator->create_acceleration_structure(

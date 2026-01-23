@@ -103,8 +103,8 @@ class Queue : public std::enable_shared_from_this<Queue> {
     }
 
     vk::QueueFamilyProperties get_queue_family_properties() const {
-        return context->physical_device.physical_device
-            .getQueueFamilyProperties()[queue_family_index];
+        return context->get_physical_device()
+            ->physical_device.getQueueFamilyProperties()[queue_family_index];
     }
 
     operator uint32_t() const {

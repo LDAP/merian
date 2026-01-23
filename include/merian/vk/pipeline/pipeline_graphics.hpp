@@ -48,12 +48,15 @@ class GraphicsPipeline : public Pipeline {
         };
 
         // Hm. This is a bug in the API there should not be .value
-        pipeline = context->device.createGraphicsPipeline(context->pipeline_cache, info).value;
+        pipeline = context->get_device()
+                       ->get_device()
+                       .createGraphicsPipeline(context->get_device()->get_pipeline_cache(), info)
+                       .value;
     }
 
     ~GraphicsPipeline() {
         SPDLOG_DEBUG("destroy GraphicsPipeline ({})", fmt::ptr(this));
-        context->device.destroyPipeline(pipeline);
+        context->get_device()->get_device().destroyPipeline(pipeline);
     }
 
     // Overrides

@@ -65,7 +65,7 @@ CPUQueue::CPUQueue(const ContextHandle& context, const ThreadPoolHandle& thread_
             wait_info_any.setValues(waiting_values);
 
             SPDLOG_TRACE("dispatcher thread waiting for {} semaphores", waiting_semaphores.size());
-            check_result(this->context->device.waitSemaphores(wait_info_any,
+            check_result(this->context->get_device()->get_device().waitSemaphores(wait_info_any,
                                                               std::numeric_limits<uint64_t>::max()),
                          "failed waiting for semaphores in SyncDispatcher");
             SPDLOG_TRACE("dispatcher thread woke up");
@@ -74,7 +74,7 @@ CPUQueue::CPUQueue(const ContextHandle& context, const ThreadPoolHandle& thread_
                 wait_info_all.setSemaphores(waiting_vk_semaphores[i]);
                 wait_info_all.setValues(waiting_values[i]);
 
-                vk::Result result = this->context->device.waitSemaphores(wait_info_all, 0);
+                vk::Result result = this->context->get_device()->get_device().waitSemaphores(wait_info_all, 0);
                 if (result == vk::Result::eSuccess) {
                     std::swap(waiting_vk_semaphores[i], waiting_vk_semaphores.back());
                     std::swap(waiting_semaphores[i], waiting_semaphores.back());

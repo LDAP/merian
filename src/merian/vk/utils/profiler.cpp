@@ -10,7 +10,8 @@
 namespace merian {
 
 Profiler::Profiler(const ContextHandle& context)
-    : timestamp_period(context->physical_device.get_physical_device_limits().timestampPeriod) {
+    : timestamp_period(
+          context->get_physical_device()->get_physical_device_limits().timestampPeriod) {
     cpu_sections.assign(1, {});
     gpu_sections.assign(1, {});
     gpu_sections.reserve(1024);

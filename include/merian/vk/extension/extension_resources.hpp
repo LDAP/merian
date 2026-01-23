@@ -18,15 +18,13 @@ class ExtensionResources : public Extension {
 
     void on_context_initializing(const ExtensionContainer& extension_container) override;
 
-    void on_physical_device_selected(const PhysicalDevice& /*unused*/) override;
+    void on_physical_device_selected(const PhysicalDeviceHandle& /*unused*/) override;
 
     std::vector<const char*>
     required_device_extension_names(const vk::PhysicalDevice& /*unused*/) const override;
 
     void on_context_created(const ContextHandle& context,
                             const ExtensionContainer& extension_container) override;
-
-    void on_destroy_context() override;
 
     MemoryAllocatorHandle memory_allocator();
     ResourceAllocatorHandle resource_allocator();

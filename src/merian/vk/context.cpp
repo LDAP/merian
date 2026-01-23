@@ -117,20 +117,6 @@ Version: {}\n\n",
 }
 
 Context::~Context() {
-    SPDLOG_DEBUG("destroy context");
-
-    for (auto& ext : extensions) {
-        ext.second->on_destroy_context();
-    }
-
-    for (auto& ext : extensions) {
-        ext.second->on_destroy_device(device);
-    }
-
-    for (auto& ext : extensions) {
-        ext.second->on_destroy_instance(instance);
-    }
-    
     SPDLOG_INFO("context destroyed");
 }
 
@@ -162,7 +148,7 @@ void Context::create_instance() {
         {}, &application_info, instance_layer_names, instance_extension_names, p_next,
     };
 
-    instance = vk::createInstance(instance_create_info);
+    instance = Instance::create(vk::createInstance(instance_create_info));
     [[maybe_unused]] const uint32_t instance_vulkan_version = vk::enumerateInstanceVersion();
     SPDLOG_DEBUG("instance created (version: {}.{}.{})",
                  VK_API_VERSION_MAJOR(instance_vulkan_version),
@@ -179,7 +165,7 @@ void Context::create_instance() {
 void Context::prepare_physical_device(uint32_t filter_vendor_id,
                                       uint32_t filter_device_id,
                                       std::string filter_device_name) {
-    const std::vector<vk::PhysicalDevice> devices = instance.enumeratePhysicalDevices();
+    const std::vector<vk::PhysicalDevice> devices = (**instance).enumeratePhysicalDevices();
     if (devices.empty()) {
         throw std::runtime_error("No vulkan device found!");
     }
@@ -258,53 +244,53 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id,
                   return false;
               });
 
-    physical_device.physical_device = std::get<0>(matches.back());
+    physical_device = PhysicalDevice::create(instance, std::get<0>(matches.back()));
 
     void* extension_properties_pnext = nullptr;
     for (auto& ext : extensions) {
         extension_properties_pnext = ext.second->pnext_get_properties_2(extension_properties_pnext);
     }
-    physical_device.physical_device_subgroup_size_control_properties.pNext =
+    physical_device->physical_device_subgroup_size_control_properties.pNext =
         extension_properties_pnext;
     // ^
-    physical_device.physical_device_subgroup_properties.pNext =
-        &physical_device.physical_device_subgroup_size_control_properties;
+    physical_device->physical_device_subgroup_properties.pNext =
+        &physical_device->physical_device_subgroup_size_control_properties;
     // ^
-    physical_device.physical_device_14_properties.pNext =
-        &physical_device.physical_device_subgroup_properties;
+    physical_device->physical_device_14_properties.pNext =
+        &physical_device->physical_device_subgroup_properties;
     // ^
-    physical_device.physical_device_13_properties.pNext =
-        &physical_device.physical_device_14_properties;
+    physical_device->physical_device_13_properties.pNext =
+        &physical_device->physical_device_14_properties;
     // ^
-    physical_device.physical_device_12_properties.pNext =
-        &physical_device.physical_device_13_properties;
+    physical_device->physical_device_12_properties.pNext =
+        &physical_device->physical_device_13_properties;
     // ^
-    physical_device.physical_device_11_properties.pNext =
-        &physical_device.physical_device_12_properties;
+    physical_device->physical_device_11_properties.pNext =
+        &physical_device->physical_device_12_properties;
     // ^
-    physical_device.physical_device_properties.pNext =
-        &physical_device.physical_device_11_properties;
+    physical_device->physical_device_properties.pNext =
+        &physical_device->physical_device_11_properties;
     // ^
-    physical_device.physical_device.getProperties2(&physical_device.physical_device_properties);
+    physical_device->physical_device.getProperties2(&physical_device->physical_device_properties);
     SPDLOG_INFO("selected physical device {}, vendor id: {}, device id: {}, driver: {}, {}",
-                physical_device.physical_device_properties.properties.deviceName.data(),
-                physical_device.physical_device_properties.properties.vendorID,
-                physical_device.physical_device_properties.properties.deviceID,
-                vk::to_string(physical_device.physical_device_12_properties.driverID),
-                physical_device.physical_device_12_properties.driverInfo.data());
+                physical_device->physical_device_properties.properties.deviceName.data(),
+                physical_device->physical_device_properties.properties.vendorID,
+                physical_device->physical_device_properties.properties.deviceID,
+                vk::to_string(physical_device->physical_device_12_properties.driverID),
+                physical_device->physical_device_12_properties.driverInfo.data());
 
     void* extension_features_pnext = nullptr;
     for (auto& ext : extensions) {
         extension_features_pnext = ext.second->pnext_get_features_2(extension_features_pnext);
     }
-    physical_device.physical_device_features.setPNext(extension_features_pnext);
-    physical_device.physical_device.getFeatures2(&physical_device.physical_device_features);
+    physical_device->physical_device_features.setPNext(extension_features_pnext);
+    physical_device->physical_device.getFeatures2(&physical_device->physical_device_features);
 
-    physical_device.physical_device_memory_properties =
-        physical_device.physical_device.getMemoryProperties2();
+    physical_device->physical_device_memory_properties =
+        physical_device->physical_device.getMemoryProperties2();
 
-    physical_device.physical_device_extension_properties =
-        physical_device.physical_device.enumerateDeviceExtensionProperties();
+    physical_device->physical_device_extension_properties =
+        physical_device->physical_device.enumerateDeviceExtensionProperties();
 
     for (auto& ext : extensions) {
         ext.second->on_physical_device_selected(physical_device);
@@ -313,7 +299,7 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id,
 
 void Context::find_queues() {
     std::vector<vk::QueueFamilyProperties> queue_family_props =
-        physical_device.physical_device.getQueueFamilyProperties();
+        physical_device->physical_device.getQueueFamilyProperties();
 
     if (queue_family_props.empty()) {
         throw std::runtime_error{"no queue families available!"};
@@ -373,9 +359,9 @@ void Context::find_queues() {
                     !found_GCT
                         ? 0
                         : std::accumulate(extensions.begin(), extensions.end(), 0,
-                                          [&](uint32_t accum, auto ext) {
+                                          [&](uint32_t accum, auto& ext) {
                                               return accum + ext.second->accept_graphics_queue(
-                                                                 instance, physical_device,
+                                                                 *instance, *physical_device,
                                                                  queue_family_idx_GCT);
                                           });
                 // Prio 2: T (additional)
@@ -427,7 +413,7 @@ void Context::create_device_and_queues(uint32_t preferred_number_compute_queues)
     // PREPARE QUEUES
 
     std::vector<vk::QueueFamilyProperties> queue_family_props =
-        physical_device.physical_device.getQueueFamilyProperties();
+        physical_device->physical_device.getQueueFamilyProperties();
     std::vector<uint32_t> count_per_family(queue_family_props.size());
     uint32_t actual_number_compute_queues = 0;
 
@@ -470,7 +456,7 @@ void Context::create_device_and_queues(uint32_t preferred_number_compute_queues)
     // DEVICE EXTENSIONS
     for (auto& ext : extensions) {
         insert_all(device_extensions,
-                   ext.second->required_device_extension_names(physical_device.physical_device));
+                   ext.second->required_device_extension_names(physical_device->physical_device));
     }
     remove_duplicates(device_extensions);
     SPDLOG_DEBUG("enabling device extensions: [{}]", fmt::join(device_extensions, ", "));
@@ -491,17 +477,14 @@ void Context::create_device_and_queues(uint32_t preferred_number_compute_queues)
                                             nullptr,
                                             extensions_device_create_p_next};
 
-    device = physical_device.physical_device.createDevice(device_create_info);
+    device = Device::create(physical_device,
+                            physical_device->physical_device.createDevice(device_create_info));
     SPDLOG_DEBUG("device created and queues created");
 
-    VULKAN_HPP_DEFAULT_DISPATCHER.init(device);
+    VULKAN_HPP_DEFAULT_DISPATCHER.init(**device);
     for (auto& ext : extensions) {
         ext.second->on_device_created(device);
     }
-
-    SPDLOG_DEBUG("create pipeline cache");
-    vk::PipelineCacheCreateInfo pipeline_cache_create_info{};
-    pipeline_cache = device.createPipelineCache(pipeline_cache_create_info);
 }
 
 void Context::prepare_shader_include_defines() {
@@ -621,11 +604,11 @@ void Context::extensions_check_device_extension_support(const bool fail_if_unsup
 
     for (auto& ext : extensions) {
         std::vector<const char*> device_extensions =
-            ext.second->required_device_extension_names(physical_device.physical_device);
+            ext.second->required_device_extension_names(physical_device->physical_device);
         bool all_extensions_found = true;
         for (auto& layer : device_extensions) {
             bool extension_found = false;
-            for (auto& extension_prop : physical_device.physical_device_extension_properties) {
+            for (auto& extension_prop : physical_device->physical_device_extension_properties) {
                 if (strcmp(extension_prop.extensionName, layer) == 0) {
                     extension_found = true;
                     break;
@@ -645,7 +628,7 @@ void Context::extensions_self_check_support(const bool fail_if_unsupported) {
     SPDLOG_DEBUG("extensions: self-check support...");
     std::vector<std::shared_ptr<Extension>> not_supported;
     for (auto& ext : extensions) {
-        if (!ext.second->extension_supported(instance, physical_device, *this, queue_info)) {
+        if (!ext.second->extension_supported(*instance, *physical_device, *this, queue_info)) {
             ext.second->on_unsupported("self-check failed");
             not_supported.push_back(ext.second);
         }
@@ -795,6 +778,26 @@ const std::map<std::string, std::string>& Context::get_default_shader_macro_defi
 
 const SlangSessionHandle& Context::get_slang_session() const {
     return slang_session;
+}
+
+const InstanceHandle& Context::get_instance() {
+    return instance;
+}
+
+const PhysicalDeviceHandle& Context::get_physical_device() {
+    return physical_device;
+}
+
+const DeviceHandle& Context::get_device() {
+    return device;
+}
+
+const uint32_t& Context::get_vk_api_version() const {
+    return vk_api_version;
+}
+
+FileLoader& Context::get_file_loader() {
+    return file_loader;
 }
 
 } // namespace merian

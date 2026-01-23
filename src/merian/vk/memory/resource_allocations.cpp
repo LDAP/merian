@@ -16,21 +16,21 @@ Buffer::Buffer(const vk::Buffer& buffer,
     : context(memory->get_context()), buffer(buffer), memory(memory), create_info(create_info) {}
 
 Buffer::Buffer(const ContextHandle& context, const vk::BufferCreateInfo& create_info)
-    : context(context), buffer(context->device.createBuffer(create_info)),
+    : context(context), buffer(context->get_device()->get_device().createBuffer(create_info)),
       create_info(create_info) {}
 
 Buffer::~Buffer() {
     SPDLOG_TRACE("destroy buffer ({})", fmt::ptr(static_cast<VkBuffer>(buffer)));
-    context->device.destroyBuffer(buffer);
+    context->get_device()->get_device().destroyBuffer(buffer);
 }
 
 vk::MemoryRequirements Buffer::get_memory_requirements() const {
-    return context->device.getBufferMemoryRequirements(buffer);
+    return context->get_device()->get_device().getBufferMemoryRequirements(buffer);
 }
 
 vk::DeviceAddress Buffer::get_device_address() const {
     assert(create_info.usage | vk::BufferUsageFlagBits::eShaderDeviceAddress);
-    return context->device.getBufferAddress(get_buffer_device_address_info());
+    return context->get_device()->get_device().getBufferAddress(get_buffer_device_address_info());
 }
 
 vk::BufferMemoryBarrier Buffer::buffer_barrier(const vk::AccessFlags src_access_flags,
@@ -107,24 +107,24 @@ Image::Image(const ContextHandle& context,
     : context(context), image(image), create_info(create_info), current_layout(current_layout) {}
 
 Image::Image(const ContextHandle& context, const vk::ImageCreateInfo create_info)
-    : context(context), image(context->device.createImage(create_info)), create_info(create_info),
+    : context(context), image(context->get_device()->get_device().createImage(create_info)), create_info(create_info),
       current_layout(create_info.initialLayout) {}
 
 Image::~Image() {
     SPDLOG_TRACE("destroy image ({})", fmt::ptr(static_cast<VkImage>(image)));
-    context->device.destroyImage(image);
+    context->get_device()->get_device().destroyImage(image);
 }
 
 vk::MemoryRequirements Image::get_memory_requirements() const {
-    return context->device.getImageMemoryRequirements(image);
+    return context->get_device()->get_device().getImageMemoryRequirements(image);
 }
 
 vk::FormatFeatureFlags Image::format_features() const {
     if (get_tiling() == vk::ImageTiling::eOptimal) {
-        return context->physical_device.physical_device.getFormatProperties(get_format())
+        return context->get_physical_device()->get_physical_device().getFormatProperties(get_format())
             .optimalTilingFeatures;
     }
-    return context->physical_device.physical_device.getFormatProperties(get_format())
+    return context->get_physical_device()->get_physical_device().getFormatProperties(get_format())
         .linearTilingFeatures;
 }
 
@@ -410,7 +410,7 @@ ImageView::ImageView(const vk::ImageViewCreateInfo& view_create_info, const Imag
     assert(image->valid_for_view());
     assert(view_create_info.image == **image);
 
-    view = image->get_context()->device.createImageView(view_create_info);
+    view = image->get_context()->get_device()->get_device().createImageView(view_create_info);
     SPDLOG_TRACE("create image view ({})", fmt::ptr(static_cast<VkImageView>(view)));
 }
 
@@ -421,7 +421,7 @@ ImageView::ImageView(const vk::ImageView& view, const ImageHandle& image)
 
 ImageView::~ImageView() {
     SPDLOG_TRACE("destroy image view ({})", fmt::ptr(static_cast<VkImageView>(view)));
-    image->get_context()->device.destroyImageView(view);
+    image->get_context()->get_device()->get_device().destroyImageView(view);
 }
 
 void ImageView::properties(Properties& props) {
@@ -477,12 +477,12 @@ AccelerationStructure::AccelerationStructure(
 
 AccelerationStructure::~AccelerationStructure() {
     SPDLOG_TRACE("destroy acceleration structure ({})", fmt::ptr(this));
-    buffer->get_memory()->get_context()->device.destroyAccelerationStructureKHR(as);
+    buffer->get_memory()->get_context()->get_device()->get_device().destroyAccelerationStructureKHR(as);
 }
 
 vk::DeviceAddress AccelerationStructure::get_acceleration_structure_device_address() const {
     vk::AccelerationStructureDeviceAddressInfoKHR address_info{as};
-    return buffer->get_memory()->get_context()->device.getAccelerationStructureAddressKHR(
+    return buffer->get_memory()->get_context()->get_device()->get_device().getAccelerationStructureAddressKHR(
         address_info);
 }
 

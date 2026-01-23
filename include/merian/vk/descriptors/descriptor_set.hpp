@@ -79,7 +79,7 @@ class DescriptorSet : public DescriptorContainer {
             apply_update_for(write.dstBinding, write.dstArrayElement);
         }
 
-        pool->get_context()->device.updateDescriptorSets(queued_writes, {});
+        pool->get_context()->get_device()->get_device().updateDescriptorSets(queued_writes, {});
 
         queued_writes.clear();
     }

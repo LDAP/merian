@@ -1,5 +1,6 @@
 #pragma once
 
+#include "merian/fwd.hpp"
 #include "merian/vk/instance.hpp"
 
 #include <memory>
@@ -7,8 +8,16 @@
 namespace merian {
 
 class PhysicalDevice : public std::enable_shared_from_this<PhysicalDevice> {
-  public:
+  private:
     PhysicalDevice(const InstanceHandle& instance, const vk::PhysicalDevice& physical_device);
+
+  public:
+    static PhysicalDeviceHandle create(const InstanceHandle& instance,
+                                       const vk::PhysicalDevice& physical_device);
+
+    const vk::PhysicalDevice& get_physical_device() const {
+        return physical_device;
+    }
 
     const vk::PhysicalDevice& operator*() const {
         return physical_device;
@@ -22,8 +31,7 @@ class PhysicalDevice : public std::enable_shared_from_this<PhysicalDevice> {
         return physical_device_properties.properties.limits;
     }
 
-  private:
-  private:
+  public:
     const InstanceHandle instance;
     const vk::PhysicalDevice physical_device;
 

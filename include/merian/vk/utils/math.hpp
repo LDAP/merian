@@ -16,7 +16,9 @@ workgroup_size_for_shared_memory(const ContextHandle& context,
     for (uint32_t workgroup_size = max_workgroup_size; workgroup_size >= min_workgroup_size;
          workgroup_size /= 2) {
         if (workgroup_size * workgroup_size * required_shared_memory_bytes_per_invocation <=
-            context->physical_device.get_physical_device_limits().maxComputeSharedMemorySize) {
+            context->get_physical_device()
+                ->get_physical_device_limits()
+                .maxComputeSharedMemorySize) {
             return workgroup_size;
         }
     }
@@ -37,7 +39,9 @@ inline uint32_t workgroup_size_for_shared_memory_with_halo(
          workgroup_size /= 2) {
         if ((workgroup_size + halo_size * 2) * (workgroup_size + halo_size * 2) *
                 required_shared_memory_bytes_per_invocation <=
-            context->physical_device.get_physical_device_limits().maxComputeSharedMemorySize) {
+            context->get_physical_device()
+                ->get_physical_device_limits()
+                .maxComputeSharedMemorySize) {
             return workgroup_size;
         }
     }

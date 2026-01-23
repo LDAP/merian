@@ -22,7 +22,7 @@ class QueryPool : public std::enable_shared_from_this<QueryPool<QUERY_TYPE>>, pu
         : context(context), query_count(query_count) {
 
         const vk::QueryPoolCreateInfo create_info({}, QUERY_TYPE, query_count);
-        query_pool = context->device.createQueryPool(create_info);
+        query_pool = context->get_device()->get_device().createQueryPool(create_info);
 
         if (host_reset_after_creation) {
             reset();
@@ -30,7 +30,7 @@ class QueryPool : public std::enable_shared_from_this<QueryPool<QUERY_TYPE>>, pu
     }
 
     ~QueryPool() {
-        context->device.destroyQueryPool(query_pool);
+        context->get_device()->get_device().destroyQueryPool(query_pool);
     }
 
     // ------------------------------------------------------------------
@@ -58,7 +58,7 @@ class QueryPool : public std::enable_shared_from_this<QueryPool<QUERY_TYPE>>, pu
                    .get_physical_device_features_v12()
                    .hostQueryReset);
 
-        context->device.resetQueryPool(query_pool, first_query, query_count);
+        context->get_device()->get_device().resetQueryPool(query_pool, first_query, query_count);
     }
 
     // uses the Vulkan 1.2 hostQueryReset feature to reset the pool
@@ -76,7 +76,7 @@ class QueryPool : public std::enable_shared_from_this<QueryPool<QUERY_TYPE>>, pu
                                                     const uint32_t query_count,
                                                     const vk::QueryResultFlags flags = {}) const {
         std::vector<RETURN_TYPE> data(query_count);
-        check_result(context->device.getQueryPoolResults(query_pool, first_query, data.size(),
+        check_result(context->get_device()->get_device().getQueryPoolResults(query_pool, first_query, data.size(),
                                                          sizeof(RETURN_TYPE) * data.size(),
                                                          data.data(), sizeof(RETURN_TYPE), flags),
                      "could not get query results");
@@ -86,7 +86,7 @@ class QueryPool : public std::enable_shared_from_this<QueryPool<QUERY_TYPE>>, pu
     template <typename RETURN_TYPE>
     std::vector<RETURN_TYPE> get_query_pool_results(const vk::QueryResultFlags flags = {}) const {
         std::vector<RETURN_TYPE> data(query_count);
-        check_result(context->device.getQueryPoolResults(query_pool, 0, data.size(),
+        check_result(context->get_device()->get_device().getQueryPoolResults(query_pool, 0, data.size(),
                                                          sizeof(RETURN_TYPE) * data.size(),
                                                          data.data(), sizeof(RETURN_TYPE), flags),
                      "could not get query results");

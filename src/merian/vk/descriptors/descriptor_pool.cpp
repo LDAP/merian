@@ -32,7 +32,7 @@ DescriptorPool::allocate(const DescriptorSetLayoutHandle& layout, const uint32_t
     }
 
     const std::vector<vk::DescriptorSet> allocated_sets =
-        allocate_descriptor_sets(context->device, pool, *layout, set_count);
+        allocate_descriptor_sets(context->get_device()->get_device(), pool, *layout, set_count);
 
     std::vector<DescriptorSetHandle> sets(allocated_sets.size());
 
@@ -58,7 +58,7 @@ void DescriptorPool::free(const DescriptorSet* set) {
         // DescriptorSet can be given back to the DescriptorPool
         SPDLOG_DEBUG("freeing DescriptorSet ({})",
                      fmt::ptr(static_cast<VkDescriptorSet>(set->set)));
-        context->device.freeDescriptorSets(pool, set->set);
+        context->get_device()->get_device().freeDescriptorSets(pool, set->set);
     } else {
         SPDLOG_DEBUG("destroying DescriptorSet ({}) but not freeing since the pool was not "
                      "created with the {} bit set.",

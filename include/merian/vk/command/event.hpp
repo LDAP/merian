@@ -11,11 +11,11 @@ class Event : public std::enable_shared_from_this<Event>, public Object {
 
     Event(const ContextHandle& context, const vk::EventCreateFlags flags = {}) : context(context) {
         vk::EventCreateInfo info{flags};
-        event = context->device.createEvent(info);
+        event = context->get_device()->get_device().createEvent(info);
     }
 
     ~Event() {
-        context->device.destroyEvent(event);
+        context->get_device()->get_device().destroyEvent(event);
     }
 
     operator const vk::Event&() const {

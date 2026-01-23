@@ -16,7 +16,7 @@ CommandPool::CommandPool(const ContextHandle& context,
                          const vk::CommandPoolCreateFlags create_flags)
     : context(context), queue_family_index(queue_family_index) {
     vk::CommandPoolCreateInfo info{create_flags, queue_family_index};
-    pool = context->device.createCommandPool(info);
+    pool = context->get_device()->get_device().createCommandPool(info);
     SPDLOG_DEBUG("create command pool ({})", fmt::ptr(static_cast<VkCommandPool>(pool)));
 };
 
@@ -25,7 +25,7 @@ CommandPool::~CommandPool() {
         // special case for Cachign Command Pool
         SPDLOG_DEBUG("destroy command pool ({})", fmt::ptr(static_cast<VkCommandPool>(pool)));
         reset();
-        context->device.destroyCommandPool(pool);
+        context->get_device()->get_device().destroyCommandPool(pool);
     }
 };
 
@@ -47,7 +47,7 @@ const vk::CommandPool& CommandPool::operator*() const noexcept {
 
 // Frees command buffers, resets command pool
 void CommandPool::reset() {
-    context->device.resetCommandPool(pool);
+    context->get_device()->get_device().resetCommandPool(pool);
     objects_in_use.clear();
 }
 

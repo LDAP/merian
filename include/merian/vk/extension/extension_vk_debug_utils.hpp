@@ -28,7 +28,10 @@ class ExtensionVkDebugUtils : public Extension {
     }
 
     // Overrides
-    ~ExtensionVkDebugUtils() {}
+    ~ExtensionVkDebugUtils() {
+        (**instance).destroyDebugUtilsMessengerEXT(messenger);
+    }
+
     std::vector<const char*> required_instance_extension_names() const override {
         return {
             VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
@@ -44,12 +47,13 @@ class ExtensionVkDebugUtils : public Extension {
     required_device_extension_names(const vk::PhysicalDevice&) const override {
         return {};
     }
-    void on_instance_created(const vk::Instance& /*unused*/) override;
-    void on_destroy_instance(const vk::Instance& /*unused*/) override;
+    void on_instance_created(const InstanceHandle& /*unused*/) override;
+
     void* pnext_instance_create_info(void* const p_next) override;
 
     // Own methods
-    template <typename T> void set_object_name(vk::Device& device, T handle, std::string name) {
+    template <typename T>
+    void set_object_name(const vk::Device& device, T handle, std::string name) {
         vk::DebugUtilsObjectNameInfoEXT info_ext(
             handle.objectType, uint64_t(static_cast<typename T::CType>(handle)), name.c_str());
         device.setDebugUtilsObjectNameEXT(info_ext);
@@ -78,6 +82,7 @@ class ExtensionVkDebugUtils : public Extension {
     };
 
     UserData user_data;
+    InstanceHandle instance;
 
     vk::DebugUtilsMessengerCreateInfoEXT create_info;
     vk::DebugUtilsMessengerEXT messenger = VK_NULL_HANDLE;

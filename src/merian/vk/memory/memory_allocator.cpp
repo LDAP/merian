@@ -11,7 +11,7 @@ MemoryAllocation::~MemoryAllocation() {}
 
 MemoryAllocator::MemoryAllocator(const ContextHandle& context) : context(context) {
     supports_memory_requirements_without_object =
-        context->vk_api_version >= VK_VERSION_1_3 ||
+        context->get_vk_api_version() >= VK_VERSION_1_3 ||
         context->device_extension_enabled(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
 }
 
@@ -20,30 +20,34 @@ MemoryAllocator::~MemoryAllocator() {}
 vk::MemoryRequirements
 MemoryAllocator::get_image_memory_requirements(const vk::ImageCreateInfo& image_create_info) {
     if (supports_memory_requirements_without_object) {
-        const vk::MemoryRequirements2 mem_req = context->device.getImageMemoryRequirements(
-            vk::DeviceImageMemoryRequirements{&image_create_info});
+        const vk::MemoryRequirements2 mem_req =
+            context->get_device()->get_device().getImageMemoryRequirements(
+                vk::DeviceImageMemoryRequirements{&image_create_info});
         return mem_req.memoryRequirements;
     }
 
     SPDLOG_TRACE("create temporary image to query memory requirements");
-    vk::Image tmp_image = context->device.createImage(image_create_info);
-    vk::MemoryRequirements mem_req = context->device.getImageMemoryRequirements(tmp_image);
-    context->device.destroyImage(tmp_image);
+    vk::Image tmp_image = context->get_device()->get_device().createImage(image_create_info);
+    vk::MemoryRequirements mem_req =
+        context->get_device()->get_device().getImageMemoryRequirements(tmp_image);
+    context->get_device()->get_device().destroyImage(tmp_image);
     return mem_req;
 }
 
 vk::MemoryRequirements
 MemoryAllocator::get_buffer_memory_requirements(const vk::BufferCreateInfo& buffer_create_info) {
     if (supports_memory_requirements_without_object) {
-        const vk::MemoryRequirements2 mem_req = context->device.getBufferMemoryRequirements(
-            vk::DeviceBufferMemoryRequirements{&buffer_create_info});
+        const vk::MemoryRequirements2 mem_req =
+            context->get_device()->get_device().getBufferMemoryRequirements(
+                vk::DeviceBufferMemoryRequirements{&buffer_create_info});
         return mem_req.memoryRequirements;
     }
 
     SPDLOG_TRACE("create temporary image to query memory requirements");
-    vk::Buffer tmp_buffer = context->device.createBuffer(buffer_create_info);
-    vk::MemoryRequirements mem_req = context->device.getBufferMemoryRequirements(tmp_buffer);
-    context->device.destroyBuffer(tmp_buffer);
+    vk::Buffer tmp_buffer = context->get_device()->get_device().createBuffer(buffer_create_info);
+    vk::MemoryRequirements mem_req =
+        context->get_device()->get_device().getBufferMemoryRequirements(tmp_buffer);
+    context->get_device()->get_device().destroyBuffer(tmp_buffer);
     return mem_req;
 }
 

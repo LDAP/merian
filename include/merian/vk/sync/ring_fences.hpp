@@ -49,15 +49,15 @@ class RingFences : public std::enable_shared_from_this<RingFences<UserDataType>>
     void resize(const uint32_t ring_size) {
         const vk::FenceCreateInfo fence_create_info{vk::FenceCreateFlagBits::eSignaled};
         while (ring_data.size() < ring_size) {
-            ring_data.emplace_back(context->device.createFence(fence_create_info),
+            ring_data.emplace_back(context->get_device()->get_device().createFence(fence_create_info),
                                    user_data_initializer(ring_data.size()));
         }
 
         while (ring_size < ring_data.size()) {
             check_result(
-                context->device.waitForFences(1, &ring_data[current_index].fence, VK_TRUE, ~0ULL),
+                context->get_device()->get_device().waitForFences(1, &ring_data[current_index].fence, VK_TRUE, ~0ULL),
                 "failed waiting for fence");
-            context->device.destroyFence(ring_data[current_index].fence);
+            context->get_device()->get_device().destroyFence(ring_data[current_index].fence);
             ring_data.erase(ring_data.begin() + current_index);
 
             if (current_index >= ring_data.size()) {
@@ -100,7 +100,7 @@ class RingFences : public std::enable_shared_from_this<RingFences<UserDataType>>
     RingData& set_cycle_wait_reset_get(uint32_t cycle) {
         current_index = cycle % size();
         RingData& data = ring_data[current_index];
-        check_result(context->device.waitForFences(1, &data.fence, VK_TRUE, ~0ULL),
+        check_result(context->get_device()->get_device().waitForFences(1, &data.fence, VK_TRUE, ~0ULL),
                      "failed waiting for fence");
         reset_fence(data);
         return data;
@@ -123,7 +123,7 @@ class RingFences : public std::enable_shared_from_this<RingFences<UserDataType>>
     UserDataType& set_cycle_wait_get(uint32_t cycle) {
         current_index = cycle % size();
         RingData& data = ring_data[current_index];
-        check_result(context->device.waitForFences(1, &data.fence, VK_TRUE, ~0ULL),
+        check_result(context->get_device()->get_device().waitForFences(1, &data.fence, VK_TRUE, ~0ULL),
                      "failed waiting for fence");
         return data.user_data;
     }
@@ -134,14 +134,14 @@ class RingFences : public std::enable_shared_from_this<RingFences<UserDataType>>
         current_index = cycle % size();
         RingData& data = ring_data[current_index];
 
-        const vk::Result status = context->device.getFenceStatus(data.fence);
+        const vk::Result status = context->get_device()->get_device().getFenceStatus(data.fence);
         if (status == vk::Result::eSuccess) {
             did_wait = false;
             return data.user_data;
         }
 
         did_wait = true;
-        check_result(context->device.waitForFences(1, &data.fence, VK_TRUE, ~0ULL),
+        check_result(context->get_device()->get_device().waitForFences(1, &data.fence, VK_TRUE, ~0ULL),
                      "failed waiting for fence");
         return data.user_data;
     }
@@ -159,7 +159,7 @@ class RingFences : public std::enable_shared_from_this<RingFences<UserDataType>>
         uint32_t waiting = 0;
 
         for (uint32_t i = 0; i < size(); i++) {
-            waiting += context->device.getFenceStatus(ring_data[i].fence) == vk::Result::eNotReady;
+            waiting += context->get_device()->get_device().getFenceStatus(ring_data[i].fence) == vk::Result::eNotReady;
         }
 
         return waiting;
@@ -167,14 +167,14 @@ class RingFences : public std::enable_shared_from_this<RingFences<UserDataType>>
 
     void wait_all() {
         for (uint32_t i = 0; i < size(); i++) {
-            check_result(context->device.waitForFences(1, &ring_data[i].fence, VK_TRUE, ~0ULL),
+            check_result(context->get_device()->get_device().waitForFences(1, &ring_data[i].fence, VK_TRUE, ~0ULL),
                          "failed waiting for fence");
         }
     }
 
   private:
     void reset_fence(const RingData& data) const {
-        check_result(context->device.resetFences(1, &data.fence), "could not reset fence");
+        check_result(context->get_device()->get_device().resetFences(1, &data.fence), "could not reset fence");
     }
 
     const ContextHandle context;

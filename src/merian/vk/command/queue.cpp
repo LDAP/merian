@@ -11,7 +11,7 @@
 namespace merian {
 
 Queue::Queue(const ContextHandle& context, uint32_t queue_family_index, uint32_t queue_index)
-    : context(context), queue(context->device.getQueue(queue_family_index, queue_index)),
+    : context(context), queue(context->get_device()->get_device().getQueue(queue_family_index, queue_index)),
       queue_family_index(queue_family_index) {}
 
 void Queue::submit(const vk::ArrayProxy<vk::SubmitInfo>& submit_infos, vk::Fence fence) {
@@ -58,7 +58,7 @@ void Queue::submit_wait(const vk::ArrayProxy<vk::SubmitInfo>& submit_infos, cons
 
     if (fence) {
         check_result(
-            context->device.waitForFences(fence, VK_TRUE, std::numeric_limits<uint64_t>::max()),
+            context->get_device()->get_device().waitForFences(fence, VK_TRUE, std::numeric_limits<uint64_t>::max()),
             "failed waiting for fence");
     } else {
         wait_idle();
@@ -105,9 +105,9 @@ void Queue::submit_wait(const CommandPoolHandle& cmd_pool,
     cmd->begin();
     cmd_function(cmd);
     cmd->end();
-    const vk::Fence fence = context->device.createFence({});
+    const vk::Fence fence = context->get_device()->get_device().createFence({});
     submit_wait(cmd, fence);
-    context->device.destroyFence(fence);
+    context->get_device()->get_device().destroyFence(fence);
 }
 
 void Queue::submit_wait(const std::function<void(const CommandBufferHandle& cmd)>& cmd_function) {

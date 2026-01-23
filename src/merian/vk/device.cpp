@@ -11,6 +11,10 @@ Device::Device(const PhysicalDeviceHandle& physical_device, const vk::Device& de
     pipeline_cache = device.createPipelineCache(pipeline_cache_create_info);
 }
 
+DeviceHandle Device::create(const PhysicalDeviceHandle& physical_device, const vk::Device& device) {
+    return DeviceHandle(new Device(physical_device, device));
+}
+
 Device::~Device() {
     device.waitIdle();
 

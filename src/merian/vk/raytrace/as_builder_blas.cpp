@@ -36,7 +36,7 @@ ASBuilder::queue_build(const vk::AccelerationStructureGeometryKHR* geometry,
                    [&](auto& range) { return range.primitiveCount; });
 
     const vk::AccelerationStructureBuildSizesInfoKHR size_info =
-        context->device.getAccelerationStructureBuildSizesKHR(
+        context->get_device()->get_device().getAccelerationStructureBuildSizesKHR(
             vk::AccelerationStructureBuildTypeKHR::eDevice, build_info, primitive_counts);
 
     pending_min_scratch_buffer = std::max(pending_min_scratch_buffer, size_info.buildScratchSize);

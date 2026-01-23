@@ -85,12 +85,12 @@ Swapchain::Swapchain(const ContextHandle& context,
     assert(surface);
 
     supported_surface_formats =
-        context->physical_device.physical_device.getSurfaceFormatsKHR(*surface);
+        context->get_physical_device()->get_physical_device().getSurfaceFormatsKHR(*surface);
     if (supported_surface_formats.empty())
         throw std::runtime_error("Surface doesn't support any surface formats!");
 
     supported_present_modes =
-        context->physical_device.physical_device.getSurfacePresentModesKHR(*surface);
+        context->get_physical_device()->get_physical_device().getSurfacePresentModesKHR(*surface);
     if (supported_surface_formats.empty())
         throw std::runtime_error("Surface doesn't support any present modes!");
 
@@ -116,7 +116,7 @@ Swapchain::~Swapchain() {
 
         // TODO: use
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_EXT_swapchain_maintenance1.html
-        context->device.waitIdle();
+        context->get_device()->get_device().waitIdle();
     }
 
     if (old_swapchain) {
@@ -124,7 +124,7 @@ Swapchain::~Swapchain() {
         old_swapchain->save_to_destoy = true;
     }
 
-    context->device.destroySwapchainKHR(swapchain);
+    context->get_device()->get_device().destroySwapchainKHR(swapchain);
     swapchain = VK_NULL_HANDLE;
 }
 
@@ -173,7 +173,7 @@ vk::Extent2D Swapchain::create_swapchain(const uint32_t width, const uint32_t he
     }
 
     const auto capabilities =
-        context->physical_device.physical_device.getSurfaceCapabilitiesKHR(*surface);
+        context->get_physical_device()->get_physical_device().getSurfaceCapabilitiesKHR(*surface);
 
     info = SwapchainInfo();
     info->extent = make_extent2D(capabilities, width, height);
@@ -239,13 +239,13 @@ vk::Extent2D Swapchain::create_swapchain(const uint32_t width, const uint32_t he
         old,
     };
 
-    swapchain = context->device.createSwapchainKHR(create_info, nullptr);
+    swapchain = context->get_device()->get_device().createSwapchainKHR(create_info, nullptr);
 
     info->cur_width = width;
     info->cur_height = height;
     info->present_mode = new_present_mode;
     info->surface_format = new_surface_format;
-    info->images = context->device.getSwapchainImagesKHR(swapchain);
+    info->images = context->get_device()->get_device().getSwapchainImagesKHR(swapchain);
 
     sync_groups.resize(info->images.size());
 
@@ -291,7 +291,7 @@ Swapchain::acquire(const vk::Extent2D extent, const uint64_t timeout) {
     }
 
     uint32_t image_idx;
-    const vk::Result result = context->device.acquireNextImageKHR(
+    const vk::Result result = context->get_device()->get_device().acquireNextImageKHR(
         swapchain, timeout, *spare_read_semaphore, VK_NULL_HANDLE, &image_idx);
     std::swap(spare_read_semaphore, sync_groups[image_idx].read_semaphore);
 

@@ -34,12 +34,12 @@ class Sampler : public std::enable_shared_from_this<Sampler>, public Resource {
     Sampler(const ContextHandle& context, const vk::SamplerCreateInfo& create_info)
         : context(context) {
         SPDLOG_DEBUG("create sampler ({})", fmt::ptr(this));
-        sampler = context->device.createSampler(create_info);
+        sampler = context->get_device()->get_device().createSampler(create_info);
     }
 
     ~Sampler() {
         SPDLOG_DEBUG("destroy sampler ({})", fmt::ptr(this));
-        context->device.destroySampler(sampler);
+        context->get_device()->get_device().destroySampler(sampler);
     }
 
     operator const vk::Sampler&() const {
