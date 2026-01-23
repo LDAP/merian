@@ -1,5 +1,3 @@
-#pragma once
-
 #include "merian/shader/shader_object_allocator.hpp"
 #include "merian/shader/shader_object.hpp"
 

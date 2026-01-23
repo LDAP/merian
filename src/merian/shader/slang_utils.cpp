@@ -1,5 +1,3 @@
-#pragma once
-
 #include "merian/shader/slang_utils.hpp"
 
 namespace merian {
