@@ -20,8 +20,8 @@ from urllib.request import urlopen
 VULKAN_SPEC_VERSION = "v1.4.338"
 VULKAN_SPEC_URL = f"https://raw.githubusercontent.com/KhronosGroup/Vulkan-Docs/{VULKAN_SPEC_VERSION}/xml/vk.xml"
 
-out_path = Path(__file__).parent.parent / "src" / "merian" / "vk" / "extension"
-include_path = Path(__file__).parent.parent / "include" / "merian" / "vk" / "extension"
+out_path = Path(__file__).parent.parent / "src" / "merian" / "vk" / "utils"
+include_path = Path(__file__).parent.parent / "include" / "merian" / "vk" / "utils"
 assert out_path.is_dir(), f"Output path does not exist: {out_path}"
 assert include_path.is_dir(), f"Include path does not exist: {include_path}"
 
@@ -434,7 +434,7 @@ def generate_implementation(features: list[FeatureStruct]) -> str:
         f"// Created: {datetime.datetime.now()}",
         "// Do not edit manually!",
         "",
-        '#include "merian/vk/extension/features.hpp"',
+        '#include "merian/vk/utils/features.hpp"',
         "",
         "#include <unordered_map>",
         "#include <functional>",
