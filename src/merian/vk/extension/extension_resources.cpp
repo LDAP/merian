@@ -35,7 +35,7 @@ void ExtensionResources::on_physical_device_selected(const PhysicalDeviceHandle&
 }
 
 std::vector<const char*>
-ExtensionResources::required_device_extension_names(const vk::PhysicalDevice& /*unused*/) const {
+ExtensionResources::enable_device_extension_names(const vk::PhysicalDevice& /*unused*/) const {
     return required_extensions;
 }
 

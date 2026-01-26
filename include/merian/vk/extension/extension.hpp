@@ -17,29 +17,37 @@ namespace merian {
  * If a extension is determined to be not compatible it is removed from the context and
  * the corresponding on_destroy_* lifecycle methods are called.
  */
-class Extension {
+class ContextExtension {
 
     friend Context;
 
   public:
-    Extension(const std::string& name) : name(name) {}
+    ContextExtension(const std::string& name) : name(name) {}
 
-    virtual ~Extension() = 0;
+    virtual ~ContextExtension() = 0;
 
     // REQUIREMENTS
 
     /* Extensions that should be enabled instance-wide. */
-    virtual std::vector<const char*> required_instance_extension_names() const {
+    virtual std::vector<const char*> enable_instance_extension_names() const {
         return {};
     }
     /* Layers that should be enabled instance-wide. */
-    virtual std::vector<const char*> required_instance_layer_names() const {
+    virtual std::vector<const char*> enable_instance_layer_names() const {
         return {};
     }
+
     /* Extensions that should be enabled device-wide. Note that on_physical_device_selected is
      * called before. */
     virtual std::vector<const char*>
-    required_device_extension_names(const vk::PhysicalDevice& /*unused*/) const {
+    enable_device_extension_names(const vk::PhysicalDevice& /*unused*/) const {
+        return {};
+    }
+
+    /* Features that should be enabled device-wide. Note that on_physical_device_selected is
+     * called before. */
+    virtual std::vector<std::string>
+    enable_device_features(const vk::PhysicalDevice& /*unused*/) const {
         return {};
     }
 
@@ -78,7 +86,7 @@ class Extension {
                            [[maybe_unused]] const vk::PhysicalDeviceProperties2& props) {
         bool all_extensions_supported = true;
         const auto supported_extensions = physical_device.enumerateDeviceExtensionProperties();
-        for (const auto& required_extension : required_device_extension_names(physical_device)) {
+        for (const auto& required_extension : enable_device_extension_names(physical_device)) {
             bool found = false;
             for (const auto& supported_extension : supported_extensions) {
                 if (strcmp(supported_extension.extensionName, required_extension) == 0) {
@@ -93,28 +101,6 @@ class Extension {
         }
 
         return all_extensions_supported;
-    }
-
-    /* Append a structure to pNext of a getProperties2() call. This can be used to determine
-     * extension support.
-     *
-     * If a struct should be appended, set pNext of your struct to the supplied pointer,
-     * then return a pointer to your struct.
-     * If nothing should be appended, return the supplied pointer.
-     */
-    virtual void* pnext_get_properties_2(void* const p_next) {
-        return p_next;
-    }
-
-    /* Append a structure to pNext of a getFeatures2() call. This can be used to determine extension
-     * support.
-     *
-     * If a struct should be appended, set pNext of your struct to the supplied pointer,
-     * then return a pointer to your struct.
-     * If nothing should be appended, return the supplied pointer.
-     */
-    virtual void* pnext_get_features_2(void* const p_next) {
-        return p_next;
     }
 
     /* Called after the physical device was select and before extensions are checked for
@@ -162,6 +148,14 @@ class Extension {
     virtual void* pnext_device_create_info(void* const p_next) {
         return p_next;
     }
+
+    /**
+     * Called with the device create info just before createDevice is called.
+     *
+     * Use to hook into device creation.
+     */
+    virtual void on_create_device(const PhysicalDeviceHandle& /*physical_device*/,
+                                  vk::DeviceCreateInfo& /*create_info*/) {}
 
     virtual void on_device_created(const DeviceHandle& /*unused*/) {}
 

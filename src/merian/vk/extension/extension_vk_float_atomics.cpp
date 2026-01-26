@@ -6,12 +6,12 @@ namespace merian {
 
 ExtensionVkFloatAtomics::ExtensionVkFloatAtomics(const std::set<std::string>& required_features,
                                                  const std::set<std::string>& optional_features)
-    : Extension("ExtensionVkFloatAtomics"), required_features(required_features),
+    : ContextExtension("ExtensionVkFloatAtomics"), required_features(required_features),
       optional_features(optional_features) {}
 
 ExtensionVkFloatAtomics::~ExtensionVkFloatAtomics() {}
 
-std::vector<const char*> ExtensionVkFloatAtomics::required_device_extension_names(
+std::vector<const char*> ExtensionVkFloatAtomics::enable_device_extension_names(
     const vk::PhysicalDevice& /*unused*/) const {
     return {
         VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME,

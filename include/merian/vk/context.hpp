@@ -4,6 +4,7 @@
 #include <spdlog/logger.h>
 
 #include <typeindex>
+#include <unordered_set>
 
 #include "merian/vk/device.hpp"
 #include "merian/vk/instance.hpp"
@@ -11,6 +12,7 @@
 
 #include "merian/fwd.hpp"
 #include "merian/io/file_loader.hpp"
+#include "merian/vk/utils/features.hpp"
 
 namespace merian {
 
@@ -68,16 +70,19 @@ class VulkanException : public MerianException {
 };
 
 class ExtensionContainer {
+
   public:
-    template <class Extension> std::shared_ptr<Extension> get_extension() const {
-        if (extensions.contains(typeid(Extension))) {
-            return std::static_pointer_cast<Extension>(extensions.at(typeid(Extension)));
+    template <class ContextExtension>
+    std::shared_ptr<ContextExtension> get_context_extension() const {
+        if (context_extensions.contains(typeid(ContextExtension))) {
+            return std::static_pointer_cast<ContextExtension>(
+                context_extensions.at(typeid(ContextExtension)));
         }
         return nullptr;
     }
 
   protected:
-    std::unordered_map<std::type_index, std::shared_ptr<Extension>> extensions;
+    std::unordered_map<std::type_index, std::shared_ptr<ContextExtension>> context_extensions;
 };
 
 struct QueueInfo {
@@ -130,7 +135,9 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
      *
      */
     static ContextHandle
-    create(const std::vector<std::shared_ptr<Extension>>& extensions,
+    create(const std::vector<std::string>& features,
+           const std::vector<const char*>& extensions,
+           const std::vector<std::shared_ptr<ContextExtension>>& context_extensions,
            const std::string& application_name = "",
            const uint32_t application_vk_version = VK_MAKE_VERSION(1, 0, 0),
            const uint32_t preffered_number_compute_queues = 1, // Additionally to the GCT queue
@@ -141,7 +148,9 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
            const std::string& filter_device_name = "");
 
   private:
-    Context(const std::vector<std::shared_ptr<Extension>>& extensions,
+    Context(const std::vector<std::string>& features,
+            const std::vector<const char*>& extensions,
+            const std::vector<std::shared_ptr<ContextExtension>>& context_extensions,
             const std::string& application_name,
             const uint32_t application_vk_version,
             const uint32_t preffered_number_compute_queues,
@@ -155,7 +164,7 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
     ~Context();
 
   private: // Vulkan initialization
-    void create_instance();
+    void create_instance(const uint32_t vk_api_version);
     void prepare_physical_device(uint32_t filter_vendor_id,
                                  uint32_t filter_device_id,
                                  std::string filter_device_name);
@@ -168,8 +177,9 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
     void extensions_check_instance_extension_support(const bool fail_if_unsupported);
     void extensions_check_device_extension_support(const bool fail_if_unsupported);
     void extensions_self_check_support(const bool fail_if_unsupported);
-    void destroy_unsupported_extensions(const std::vector<std::shared_ptr<Extension>>& extensions,
-                                        const bool fail_if_unsupported);
+    void
+    destroy_unsupported_extensions(const std::vector<std::shared_ptr<ContextExtension>>& extensions,
+                                   const bool fail_if_unsupported);
 
   public: // Getter
     // The actual number of compute queues (< preffered_number_compute_queues).
@@ -240,10 +250,10 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
     // in create_device_and_queues
 
     std::vector<const char*> device_extensions;
+    std::unordered_set<std::string> extensions;
+    std::unordered_map<vk::StructureType, FeatureHandle> features;
 
-  private:
     const std::string application_name;
-    const uint32_t vk_api_version;
     const uint32_t application_vk_version;
 
     // in create_instance

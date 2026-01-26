@@ -5,12 +5,12 @@ namespace merian {
 
 ExtensionVkAccelerationStructure::ExtensionVkAccelerationStructure(
     const std::set<std::string>& required_features, const std::set<std::string>& optional_features)
-    : Extension("ExtensionVkAccelerationStructure"), required_features(required_features),
+    : ContextExtension("ExtensionVkAccelerationStructure"), required_features(required_features),
       optional_features(optional_features) {}
 
 ExtensionVkAccelerationStructure::~ExtensionVkAccelerationStructure() {}
 
-std::vector<const char*> ExtensionVkAccelerationStructure::required_device_extension_names(
+std::vector<const char*> ExtensionVkAccelerationStructure::enable_device_extension_names(
     const vk::PhysicalDevice& /*unused*/) const {
     return {
         VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,

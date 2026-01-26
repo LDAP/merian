@@ -2,6 +2,6 @@
 
 namespace merian {
 
-Extension::~Extension() {}
+ContextExtension::~ContextExtension() {}
 
 } // namespace merian

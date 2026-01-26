@@ -15,10 +15,10 @@ namespace merian {
 
 class Instance : public std::enable_shared_from_this<Instance> {
   private:
-    Instance(const vk::Instance& instance);
+    Instance(const vk::InstanceCreateInfo& instance_create_info);
 
   public:
-    static InstanceHandle create(const vk::Instance& instance);
+    static InstanceHandle create(const vk::InstanceCreateInfo& instance_create_info);
 
     ~Instance();
 
@@ -34,8 +34,13 @@ class Instance : public std::enable_shared_from_this<Instance> {
         return instance;
     }
 
+    const uint32_t& get_vk_api_version() const {
+        return vk_api_version;
+    }
+
   private:
-    vk::Instance instance;
+    const vk::Instance instance;
+    const uint32_t vk_api_version;
 };
 
 using InstanceHandle = std::shared_ptr<Instance>;

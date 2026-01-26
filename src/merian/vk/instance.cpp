@@ -3,10 +3,12 @@
 
 namespace merian {
 
-Instance::Instance(const vk::Instance& instance) : instance(instance) {}
+Instance::Instance(const vk::InstanceCreateInfo& instance_create_info)
+    : instance(vk::createInstance(instance_create_info)),
+      vk_api_version(instance_create_info.pApplicationInfo->apiVersion) {}
 
-InstanceHandle Instance::create(const vk::Instance& instance) {
-    return InstanceHandle(new Instance(instance));
+InstanceHandle Instance::create(const vk::InstanceCreateInfo& instance_create_info) {
+    return InstanceHandle(new Instance(instance_create_info));
 }
 
 Instance::~Instance() {

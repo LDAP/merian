@@ -33,9 +33,6 @@ class SlangSession;
 using SlangSessionHandle = std::shared_ptr<SlangSession>;
 
 // New extension hierarchy (in extension/*.hpp)
-class Extension;
-class InstanceExtension;
-class DeviceExtension;
 class ContextExtension;
 
 } // namespace merian

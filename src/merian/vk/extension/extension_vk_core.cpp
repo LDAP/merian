@@ -9,7 +9,7 @@ ExtensionVkCore::ExtensionVkCore(const std::set<std::string>& required_features,
                                  const std::vector<const char*>& device_extensions,
                                  const std::vector<const char*>& instance_extensions,
                                  const std::vector<const char*>& instance_layers)
-    : Extension("ExtensionVkCore"), required_features(required_features),
+    : ContextExtension("ExtensionVkCore"), required_features(required_features),
       optional_features(optional_features), device_extensions(device_extensions),
       instance_extensions(instance_extensions), instance_layers(instance_layers) {}
 
@@ -18,17 +18,17 @@ ExtensionVkCore::~ExtensionVkCore() {}
 // --------------------------------------------------------------------------
 
 /* Extensions that should be enabled instance-wide. */
-std::vector<const char*> ExtensionVkCore::required_instance_extension_names() const {
+std::vector<const char*> ExtensionVkCore::enable_instance_extension_names() const {
     return instance_extensions;
 }
 /* Layers that should be enabled instance-wide. */
-std::vector<const char*> ExtensionVkCore::required_instance_layer_names() const {
+std::vector<const char*> ExtensionVkCore::enable_instance_layer_names() const {
     return instance_layers;
 }
 /* Extensions that should be enabled device-wide. Note that on_physical_device_selected is
  * called before. */
 std::vector<const char*>
-ExtensionVkCore::required_device_extension_names(const vk::PhysicalDevice& /*unused*/) const {
+ExtensionVkCore::enable_device_extension_names(const vk::PhysicalDevice& /*unused*/) const {
     return device_extensions;
 }
 

@@ -5,7 +5,7 @@
 
 namespace merian {
 
-ExtensionGLFW::ExtensionGLFW() : Extension("ExtensionGLFW") {
+ExtensionGLFW::ExtensionGLFW() : ContextExtension("ExtensionGLFW") {
     glfwSetErrorCallback(glfw_error_callback);
 
     SPDLOG_DEBUG("Initialize GLFW");
@@ -26,7 +26,7 @@ ExtensionGLFW::~ExtensionGLFW() {
         glfwTerminate();
 }
 
-std::vector<const char*> ExtensionGLFW::required_instance_extension_names() const {
+std::vector<const char*> ExtensionGLFW::enable_instance_extension_names() const {
     if (glfw_vulkan_support == GLFW_FALSE) {
         return {};
     }
@@ -39,7 +39,7 @@ std::vector<const char*> ExtensionGLFW::required_instance_extension_names() cons
 }
 
 std::vector<const char*>
-ExtensionGLFW::required_device_extension_names(const vk::PhysicalDevice& /*unused*/) const {
+ExtensionGLFW::enable_device_extension_names(const vk::PhysicalDevice& /*unused*/) const {
     if (glfw_vulkan_support == GLFW_FALSE) {
         return {};
     }

@@ -1,4 +1,4 @@
-#pragma once
+#pragma onceVK_LAYER_KHRONOS_validation
 
 #include "merian/vk/context.hpp"
 #include "merian/vk/extension/extension.hpp"
@@ -11,13 +11,13 @@ namespace merian {
 using SEVERITY = vk::DebugUtilsMessageSeverityFlagBitsEXT;
 using MESSAGE = vk::DebugUtilsMessageTypeFlagBitsEXT;
 
-class ExtensionVkDebugUtils : public Extension {
+class ExtensionVkDebugUtils : public ContextExtension {
   public:
     // Set assert_message to true to throw if an message with severity error is emitted.
     ExtensionVkDebugUtils(bool assert_message = false,
                           const std::unordered_set<int32_t>& ignore_message_ids = {648835635,
                                                                                    767975156})
-        : Extension("ExtensionVkDebugUtils"), user_data(ignore_message_ids, assert_message) {
+        : ContextExtension("ExtensionVkDebugUtils"), user_data(ignore_message_ids, assert_message) {
         create_info = {
             {},
             SEVERITY::eError | SEVERITY::eWarning | SEVERITY::eInfo | SEVERITY::eVerbose,
@@ -32,21 +32,18 @@ class ExtensionVkDebugUtils : public Extension {
         (**instance).destroyDebugUtilsMessengerEXT(messenger);
     }
 
-    std::vector<const char*> required_instance_extension_names() const override {
+    std::vector<const char*> enable_instance_extension_names() const override {
         return {
             VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
             VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
         };
     }
-    std::vector<const char*> required_instance_layer_names() const override {
+    std::vector<const char*> enable_instance_layer_names() const override {
         return {
             "VK_LAYER_KHRONOS_validation",
         };
     }
-    std::vector<const char*>
-    required_device_extension_names(const vk::PhysicalDevice&) const override {
-        return {};
-    }
+
     void on_instance_created(const InstanceHandle& /*unused*/) override;
 
     void* pnext_instance_create_info(void* const p_next) override;

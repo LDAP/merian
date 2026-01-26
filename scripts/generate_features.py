@@ -351,6 +351,7 @@ def generate_header(features: list[FeatureStruct]) -> str:
         "",
         "#include <cstdint>",
         "#include <memory>",
+        "#include <optional>",
         "#include <string>",
         "#include <vector>",
         "",
@@ -429,11 +430,24 @@ def generate_header(features: list[FeatureStruct]) -> str:
         "FeatureHandle get_feature(vk::StructureType stype);",
         "",
         "/**",
+        " * @brief Get the Vulkan structure type for a feature name.",
+        ' * @param name The name of the feature structure (e.g., "PhysicalDeviceRobustness2FeaturesEXT").',
+        " * @return The vk::StructureType, or std::nullopt if not found.",
+        " */",
+        "std::optional<vk::StructureType> structure_type_for_feature_name(const std::string& name);",
+        "",
+        "/**",
         " * @brief Get a Feature instance by name.",
         ' * @param name The name of the feature structure (e.g., "PhysicalDeviceRobustness2FeaturesEXT").',
         " * @return A shared pointer to the Feature, or nullptr if not found.",
         " */",
         "FeatureHandle get_feature(const std::string& name);",
+        "",
+        "/**",
+        " * @brief Get all available Feature instances.",
+        " * @return Vector of shared pointers to all Feature types.",
+        " */",
+        "std::vector<FeatureHandle> get_all_features();",
         "",
     ]
 
@@ -463,8 +477,8 @@ def generate_implementation(features: list[FeatureStruct]) -> str:
         "",
         '#include "merian/vk/utils/features.hpp"',
         "",
+        "#include <optional>",
         "#include <unordered_map>",
-        "#include <functional>",
         "",
         "namespace merian {",
         "",
@@ -601,16 +615,17 @@ def generate_implementation(features: list[FeatureStruct]) -> str:
     lines.append("}")
     lines.append("")
 
-    # Generate get_feature(const std::string&) function
-    lines.append("FeatureHandle get_feature(const std::string& name) {")
+    # Generate structure_type_for_feature_name function
+    lines.append("std::optional<vk::StructureType> structure_type_for_feature_name(const std::string& name) {")
     lines.append(
-        "    static const std::unordered_map<std::string, std::function<FeatureHandle()>> feature_map = {"
+        "    static const std::unordered_map<std::string, vk::StructureType> name_map = {"
     )
 
     for feat in sorted(features, key=lambda f: f.cpp_name):
-        class_name = generate_feature_class_name(feat.cpp_name)
+        stype_enum = feat.stype.replace("VK_STRUCTURE_TYPE_", "")
+        stype_camel = "e" + to_camel_case(stype_enum)
         lines.append(
-            f'        {{"{feat.cpp_name}", []() {{ return std::make_shared<{class_name}>(); }}}},'
+            f'        {{"{feat.cpp_name}", vk::StructureType::{stype_camel}}},'
         )
         # Also add without the "Features" part for convenience
         short_name = feat.cpp_name
@@ -624,16 +639,36 @@ def generate_implementation(features: list[FeatureStruct]) -> str:
 
         if short_name != feat.cpp_name:
             lines.append(
-                f'        {{"{short_name}", []() {{ return std::make_shared<{class_name}>(); }}}},'
+                f'        {{"{short_name}", vk::StructureType::{stype_camel}}},'
             )
 
     lines.append("    };")
     lines.append("")
-    lines.append("    auto it = feature_map.find(name);")
-    lines.append("    if (it != feature_map.end()) {")
-    lines.append("        return it->second();")
+    lines.append("    auto it = name_map.find(name);")
+    lines.append("    if (it != name_map.end()) {")
+    lines.append("        return it->second;")
+    lines.append("    }")
+    lines.append("    return std::nullopt;")
+    lines.append("}")
+    lines.append("")
+
+    # Generate get_feature(const std::string&) function using structure_type_for_feature_name
+    lines.append("FeatureHandle get_feature(const std::string& name) {")
+    lines.append("    auto stype = structure_type_for_feature_name(name);")
+    lines.append("    if (stype) {")
+    lines.append("        return get_feature(*stype);")
     lines.append("    }")
     lines.append("    return nullptr;")
+    lines.append("}")
+    lines.append("")
+
+    # Generate get_all_features() function
+    lines.append("std::vector<FeatureHandle> get_all_features() {")
+    lines.append("    return {")
+    for feat in sorted(features, key=lambda f: f.cpp_name):
+        class_name = generate_feature_class_name(feat.cpp_name)
+        lines.append(f"        std::make_shared<{class_name}>(),")
+    lines.append("    };")
     lines.append("}")
     lines.append("")
 

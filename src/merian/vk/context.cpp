@@ -14,30 +14,35 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
 namespace merian {
 
-ContextHandle Context::create(const std::vector<std::shared_ptr<Extension>>& extensions,
-                              const std::string& application_name,
-                              const uint32_t application_vk_version,
-                              const uint32_t preffered_number_compute_queues,
-                              const uint32_t vk_api_version,
-                              const bool require_extension_support,
-                              const uint32_t filter_vendor_id,
-                              const uint32_t filter_device_id,
-                              const std::string& filter_device_name) {
+ContextHandle
+Context::create(const std::vector<std::string>& features,
+                const std::vector<const char*>& extensions,
+                const std::vector<std::shared_ptr<ContextExtension>>& context_extensions,
+                const std::string& application_name,
+                const uint32_t application_vk_version,
+                const uint32_t preffered_number_compute_queues,
+                const uint32_t vk_api_version,
+                const bool require_extension_support,
+                const uint32_t filter_vendor_id,
+                const uint32_t filter_device_id,
+                const std::string& filter_device_name) {
 
     // call constructor manually since its private for make_shared...
-    const ContextHandle context = std::shared_ptr<Context>(
-        new Context(extensions, application_name, application_vk_version,
-                    preffered_number_compute_queues, vk_api_version, require_extension_support,
-                    filter_vendor_id, filter_device_id, filter_device_name));
+    const ContextHandle context = std::shared_ptr<Context>(new Context(
+        features, extensions, context_extensions, application_name, application_vk_version,
+        preffered_number_compute_queues, vk_api_version, require_extension_support,
+        filter_vendor_id, filter_device_id, filter_device_name));
 
-    for (auto& ext : context->extensions) {
+    for (auto& ext : context->context_extensions) {
         ext.second->on_context_created(context, *context);
     }
 
     return context;
 }
 
-Context::Context(const std::vector<std::shared_ptr<Extension>>& desired_extensions,
+Context::Context(const std::vector<std::string>& features,
+                 const std::vector<const char*>& extensions,
+                 const std::vector<std::shared_ptr<ContextExtension>>& context_extensions,
                  const std::string& application_name,
                  const uint32_t application_vk_version,
                  const uint32_t preffered_number_compute_queues,
@@ -46,8 +51,7 @@ Context::Context(const std::vector<std::shared_ptr<Extension>>& desired_extensio
                  const uint32_t filter_vendor_id,
                  const uint32_t filter_device_id,
                  const std::string& filter_device_name)
-    : application_name(application_name), vk_api_version(vk_api_version),
-      application_vk_version(application_vk_version) {
+    : application_name(application_name), application_vk_version(application_vk_version) {
     merian::Stopwatch sw;
 
     SPDLOG_INFO("\n\n\
@@ -68,15 +72,15 @@ Version: {}\n\n",
     VULKAN_HPP_DEFAULT_DISPATCHER.init();
 
     SPDLOG_DEBUG("supplied extensions:");
-    for (const auto& ext : desired_extensions) {
+    for (const auto& ext : context_extensions) {
         SPDLOG_DEBUG("{}", ext->name);
-        if (extensions.contains(typeindex_from_pointer(ext))) {
+        if (this->context_extensions.contains(typeindex_from_pointer(ext))) {
             throw std::runtime_error{"A extension type can only be added once."};
         }
-        extensions[typeindex_from_pointer(ext)] = ext;
+        this->context_extensions[typeindex_from_pointer(ext)] = ext;
     }
 
-    for (const auto& ext : desired_extensions) {
+    for (const auto& ext : context_extensions) {
         ext->on_context_initializing(*this);
     }
 
@@ -84,14 +88,14 @@ Version: {}\n\n",
 
     extensions_check_instance_extension_support(require_extension_support);
 
-    create_instance();
+    create_instance(vk_api_version);
 
     prepare_physical_device(filter_vendor_id, filter_device_id, filter_device_name);
 
     extensions_check_device_extension_support(require_extension_support);
     find_queues();
     extensions_self_check_support(require_extension_support);
-    for (auto& ext : extensions) {
+    for (auto& ext : this->context_extensions) {
         ext.second->on_extension_support_confirmed(*this);
     }
     create_device_and_queues(preffered_number_compute_queues);
@@ -120,10 +124,10 @@ Context::~Context() {
     SPDLOG_INFO("context destroyed");
 }
 
-void Context::create_instance() {
-    for (auto& ext : extensions) {
-        insert_all(instance_layer_names, ext.second->required_instance_layer_names());
-        insert_all(instance_extension_names, ext.second->required_instance_extension_names());
+void Context::create_instance(const uint32_t vk_api_version) {
+    for (auto& ext : context_extensions) {
+        insert_all(instance_layer_names, ext.second->enable_instance_layer_names());
+        insert_all(instance_extension_names, ext.second->enable_instance_extension_names());
     }
     remove_duplicates(instance_layer_names);
     remove_duplicates(instance_extension_names);
@@ -132,7 +136,7 @@ void Context::create_instance() {
     SPDLOG_DEBUG("enabling instance extensions: [{}]", fmt::join(instance_extension_names, ", "));
 
     void* p_next = nullptr;
-    for (auto& ext : extensions) {
+    for (auto& ext : context_extensions) {
         p_next = ext.second->pnext_instance_create_info(p_next);
     }
 
@@ -148,7 +152,7 @@ void Context::create_instance() {
         {}, &application_info, instance_layer_names, instance_extension_names, p_next,
     };
 
-    instance = Instance::create(vk::createInstance(instance_create_info));
+    instance = Instance::create(instance_create_info);
     [[maybe_unused]] const uint32_t instance_vulkan_version = vk::enumerateInstanceVersion();
     SPDLOG_DEBUG("instance created (version: {}.{}.{})",
                  VK_API_VERSION_MAJOR(instance_vulkan_version),
@@ -157,7 +161,7 @@ void Context::create_instance() {
 
     // Must happen before on_instance_created since it requires dynamic loading
     VULKAN_HPP_DEFAULT_DISPATCHER.init(**instance);
-    for (auto& ext : extensions) {
+    for (auto& ext : context_extensions) {
         ext.second->on_instance_created(instance);
     }
 }
@@ -167,7 +171,7 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id,
                                       std::string filter_device_name) {
     const std::vector<vk::PhysicalDevice> devices = (**instance).enumeratePhysicalDevices();
     if (devices.empty()) {
-        throw std::runtime_error("No vulkan device found!");
+        throw MerianException("No vulkan device found!");
     }
 
     // Check environment variables
@@ -199,13 +203,13 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id,
             (filter_device_name == "" || filter_device_name == props.properties.deviceName)) {
 
             uint32_t number_of_accept_votes = 0;
-            for (auto& ext : extensions) {
+            for (auto& ext : context_extensions) {
                 number_of_accept_votes +=
                     static_cast<uint32_t>(ext.second->accept_physical_device(devices[i], props));
             }
 
             SPDLOG_DEBUG("device received {} of {} extension votes.", number_of_accept_votes,
-                         extensions.size());
+                         context_extensions.size());
 
             matches.emplace_back(devices[i], props, number_of_accept_votes);
         }
@@ -246,60 +250,22 @@ void Context::prepare_physical_device(uint32_t filter_vendor_id,
 
     physical_device = PhysicalDevice::create(instance, std::get<0>(matches.back()));
 
-    void* extension_properties_pnext = nullptr;
-    for (auto& ext : extensions) {
-        extension_properties_pnext = ext.second->pnext_get_properties_2(extension_properties_pnext);
-    }
-    physical_device->physical_device_subgroup_size_control_properties.pNext =
-        extension_properties_pnext;
-    // ^
-    physical_device->physical_device_subgroup_properties.pNext =
-        &physical_device->physical_device_subgroup_size_control_properties;
-    // ^
-    physical_device->physical_device_14_properties.pNext =
-        &physical_device->physical_device_subgroup_properties;
-    // ^
-    physical_device->physical_device_13_properties.pNext =
-        &physical_device->physical_device_14_properties;
-    // ^
-    physical_device->physical_device_12_properties.pNext =
-        &physical_device->physical_device_13_properties;
-    // ^
-    physical_device->physical_device_11_properties.pNext =
-        &physical_device->physical_device_12_properties;
-    // ^
-    physical_device->physical_device_properties.pNext =
-        &physical_device->physical_device_11_properties;
-    // ^
-    physical_device->physical_device.getProperties2(&physical_device->physical_device_properties);
+    const vk::PhysicalDeviceProperties* props = physical_device->get_properties<>();
+    const vk::PhysicalDeviceVulkan12Properties* props12 =
+        physical_device->get_properties<vk::PhysicalDeviceVulkan12Properties>();
+
     SPDLOG_INFO("selected physical device {}, vendor id: {}, device id: {}, driver: {}, {}",
-                physical_device->physical_device_properties.properties.deviceName.data(),
-                physical_device->physical_device_properties.properties.vendorID,
-                physical_device->physical_device_properties.properties.deviceID,
-                vk::to_string(physical_device->physical_device_12_properties.driverID),
-                physical_device->physical_device_12_properties.driverInfo.data());
+                props->deviceName.data(), props->vendorID, props->deviceID,
+                vk::to_string(props12->driverID), props12->driverInfo.data());
 
-    void* extension_features_pnext = nullptr;
-    for (auto& ext : extensions) {
-        extension_features_pnext = ext.second->pnext_get_features_2(extension_features_pnext);
-    }
-    physical_device->physical_device_features.setPNext(extension_features_pnext);
-    physical_device->physical_device.getFeatures2(&physical_device->physical_device_features);
-
-    physical_device->physical_device_memory_properties =
-        physical_device->physical_device.getMemoryProperties2();
-
-    physical_device->physical_device_extension_properties =
-        physical_device->physical_device.enumerateDeviceExtensionProperties();
-
-    for (auto& ext : extensions) {
+    for (auto& ext : context_extensions) {
         ext.second->on_physical_device_selected(physical_device);
     }
 }
 
 void Context::find_queues() {
     std::vector<vk::QueueFamilyProperties> queue_family_props =
-        physical_device->physical_device.getQueueFamilyProperties();
+        physical_device->get_physical_device().getQueueFamilyProperties();
 
     if (queue_family_props.empty()) {
         throw std::runtime_error{"no queue families available!"};
@@ -358,7 +324,7 @@ void Context::find_queues() {
                 uint32_t GCT_accepts =
                     !found_GCT
                         ? 0
-                        : std::accumulate(extensions.begin(), extensions.end(), 0,
+                        : std::accumulate(context_extensions.begin(), context_extensions.end(), 0,
                                           [&](uint32_t accum, auto& ext) {
                                               return accum + ext.second->accept_graphics_queue(
                                                                  *instance, *physical_device,
@@ -405,7 +371,7 @@ void Context::find_queues() {
 
     SPDLOG_DEBUG("determined queue families indices: GCT: {} ({}/{} accept votes), T: {} C: {}",
                  queue_info.queue_family_idx_GCT, std::get<1>(best),
-                 found_GCT ? extensions.size() : 0, queue_info.queue_family_idx_T,
+                 found_GCT ? context_extensions.size() : 0, queue_info.queue_family_idx_T,
                  queue_info.queue_family_idx_C);
 }
 
@@ -413,7 +379,7 @@ void Context::create_device_and_queues(uint32_t preferred_number_compute_queues)
     // PREPARE QUEUES
 
     std::vector<vk::QueueFamilyProperties> queue_family_props =
-        physical_device->physical_device.getQueueFamilyProperties();
+        physical_device->get_physical_device().getQueueFamilyProperties();
     std::vector<uint32_t> count_per_family(queue_family_props.size());
     uint32_t actual_number_compute_queues = 0;
 
@@ -454,9 +420,9 @@ void Context::create_device_and_queues(uint32_t preferred_number_compute_queues)
     }
 
     // DEVICE EXTENSIONS
-    for (auto& ext : extensions) {
-        insert_all(device_extensions,
-                   ext.second->required_device_extension_names(physical_device->physical_device));
+    for (auto& ext : context_extensions) {
+        insert_all(device_extensions, ext.second->enable_device_extension_names(
+                                          physical_device->get_physical_device()));
     }
     remove_duplicates(device_extensions);
     SPDLOG_DEBUG("enabling device extensions: [{}]", fmt::join(device_extensions, ", "));
@@ -466,7 +432,7 @@ void Context::create_device_and_queues(uint32_t preferred_number_compute_queues)
     // Setup p_next for extensions
     // Extensions can enable features of their extensions
     void* extensions_device_create_p_next = nullptr;
-    for (auto& ext : extensions) {
+    for (auto& ext : context_extensions) {
         extensions_device_create_p_next =
             ext.second->pnext_device_create_info(extensions_device_create_p_next);
     }
@@ -477,12 +443,15 @@ void Context::create_device_and_queues(uint32_t preferred_number_compute_queues)
                                             nullptr,
                                             extensions_device_create_p_next};
 
-    device = Device::create(physical_device,
-                            physical_device->physical_device.createDevice(device_create_info));
+    for (auto& ext : context_extensions) {
+        ext.second->on_create_device(physical_device, device_create_info);
+    }
+
+    device = Device::create(physical_device, device_create_info);
     SPDLOG_DEBUG("device created and queues created");
 
     VULKAN_HPP_DEFAULT_DISPATCHER.init(**device);
-    for (auto& ext : extensions) {
+    for (auto& ext : context_extensions) {
         ext.second->on_device_created(device);
     }
 }
@@ -514,7 +483,7 @@ void Context::prepare_shader_include_defines() {
     }
 
     // add macro definitions from context extensions and enabled instance and device extensions.
-    for (const auto& ext : extensions) {
+    for (const auto& ext : context_extensions) {
         const auto extension_macro_definitions = ext.second->shader_macro_definitions();
         default_shader_macro_definitions.insert(extension_macro_definitions.begin(),
                                                 extension_macro_definitions.end());
@@ -546,11 +515,11 @@ void Context::prepare_shader_include_defines() {
 
 void Context::extensions_check_instance_layer_support(const bool fail_if_unsupported) {
     SPDLOG_DEBUG("extensions: checking instance layer support...");
-    std::vector<std::shared_ptr<Extension>> not_supported;
+    std::vector<std::shared_ptr<ContextExtension>> not_supported;
     std::vector<vk::LayerProperties> layer_props = vk::enumerateInstanceLayerProperties();
 
-    for (auto& ext : extensions) {
-        std::vector<const char*> layers = ext.second->required_instance_layer_names();
+    for (auto& ext : context_extensions) {
+        std::vector<const char*> layers = ext.second->enable_instance_layer_names();
         bool all_layers_found = true;
         for (auto& layer : layers) {
             bool layer_found = false;
@@ -572,13 +541,13 @@ void Context::extensions_check_instance_layer_support(const bool fail_if_unsuppo
 
 void Context::extensions_check_instance_extension_support(const bool fail_if_unsupported) {
     SPDLOG_DEBUG("extensions: checking instance extension support...");
-    std::vector<std::shared_ptr<Extension>> not_supported;
+    std::vector<std::shared_ptr<ContextExtension>> not_supported;
     std::vector<vk::ExtensionProperties> extension_props =
         vk::enumerateInstanceExtensionProperties();
 
-    for (auto& ext : extensions) {
+    for (auto& ext : context_extensions) {
         std::vector<const char*> instance_extensions =
-            ext.second->required_instance_extension_names();
+            ext.second->enable_instance_extension_names();
         bool all_extensions_found = true;
         for (auto& layer : instance_extensions) {
             bool extension_found = false;
@@ -600,11 +569,11 @@ void Context::extensions_check_instance_extension_support(const bool fail_if_uns
 
 void Context::extensions_check_device_extension_support(const bool fail_if_unsupported) {
     SPDLOG_DEBUG("extensions: checking device extension support...");
-    std::vector<std::shared_ptr<Extension>> not_supported;
+    std::vector<std::shared_ptr<ContextExtension>> not_supported;
 
-    for (auto& ext : extensions) {
+    for (auto& ext : context_extensions) {
         std::vector<const char*> device_extensions =
-            ext.second->required_device_extension_names(physical_device->physical_device);
+            ext.second->enable_device_extension_names(physical_device->physical_device);
         bool all_extensions_found = true;
         for (auto& layer : device_extensions) {
             bool extension_found = false;
@@ -626,8 +595,8 @@ void Context::extensions_check_device_extension_support(const bool fail_if_unsup
 
 void Context::extensions_self_check_support(const bool fail_if_unsupported) {
     SPDLOG_DEBUG("extensions: self-check support...");
-    std::vector<std::shared_ptr<Extension>> not_supported;
-    for (auto& ext : extensions) {
+    std::vector<std::shared_ptr<ContextExtension>> not_supported;
+    for (auto& ext : context_extensions) {
         if (!ext.second->extension_supported(*instance, *physical_device, *this, queue_info)) {
             ext.second->on_unsupported("self-check failed");
             not_supported.push_back(ext.second);
@@ -637,7 +606,8 @@ void Context::extensions_self_check_support(const bool fail_if_unsupported) {
 }
 
 void Context::destroy_unsupported_extensions(
-    const std::vector<std::shared_ptr<Extension>>& extensions, const bool fail_if_unsupported) {
+    const std::vector<std::shared_ptr<ContextExtension>>& extensions,
+    const bool fail_if_unsupported) {
 
     if (fail_if_unsupported) {
         if (!extensions.empty()) {
@@ -652,7 +622,7 @@ void Context::destroy_unsupported_extensions(
         }
     } else {
         for (const auto& ext : extensions) {
-            this->extensions.erase(typeindex_from_pointer(ext));
+            this->context_extensions.erase(typeindex_from_pointer(ext));
             SPDLOG_DEBUG("extension {} unsupported, removing from context", ext->name);
         }
     }
@@ -793,7 +763,7 @@ const DeviceHandle& Context::get_device() {
 }
 
 const uint32_t& Context::get_vk_api_version() const {
-    return vk_api_version;
+    return instance->get_vk_api_version();
 }
 
 FileLoader& Context::get_file_loader() {

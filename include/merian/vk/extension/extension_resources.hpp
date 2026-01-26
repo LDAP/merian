@@ -11,9 +11,9 @@ namespace merian {
  *
  * The extension automatically enables commonly used features (like device address) if available.
  */
-class ExtensionResources : public Extension {
+class ExtensionResources : public ContextExtension {
   public:
-    ExtensionResources() : Extension("ExtensionResources") {}
+    ExtensionResources() : ContextExtension("ExtensionResources") {}
     ~ExtensionResources() {}
 
     void on_context_initializing(const ExtensionContainer& extension_container) override;
@@ -21,7 +21,7 @@ class ExtensionResources : public Extension {
     void on_physical_device_selected(const PhysicalDeviceHandle& /*unused*/) override;
 
     std::vector<const char*>
-    required_device_extension_names(const vk::PhysicalDevice& /*unused*/) const override;
+    enable_device_extension_names(const vk::PhysicalDevice& /*unused*/) const override;
 
     void on_context_created(const ContextHandle& context,
                             const ExtensionContainer& extension_container) override;

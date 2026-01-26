@@ -8,11 +8,11 @@ namespace merian {
 
 class Device : public std::enable_shared_from_this<Device> {
   private:
-    Device(const PhysicalDeviceHandle& physical_device, const vk::Device& device);
+    Device(const PhysicalDeviceHandle& physical_device, const vk::DeviceCreateInfo& create_info);
 
   public:
     static DeviceHandle create(const PhysicalDeviceHandle& physical_device,
-                               const vk::Device& device);
+                               const vk::DeviceCreateInfo& create_info);
 
     ~Device();
 
