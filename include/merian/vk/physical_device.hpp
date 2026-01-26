@@ -93,12 +93,8 @@ class PhysicalDevice : public std::enable_shared_from_this<PhysicalDevice> {
         return reinterpret_cast<const Features*>(it->second->get_structure_ptr());
     }
 
-    template <> const vk::PhysicalDeviceFeatures2* get_supported_features() const {
-        return &physical_device_features;
-    }
-
     template <> const vk::PhysicalDeviceFeatures* get_supported_features() const {
-        return &physical_device_features.features;
+        return &(get_supported_features<vk::PhysicalDeviceFeatures2>()->features);
     }
 
     const FeatureHandle& get_supported_features(const vk::StructureType s_type) const {
@@ -110,8 +106,6 @@ class PhysicalDevice : public std::enable_shared_from_this<PhysicalDevice> {
 
         return supported_features.at(s_type);
     }
-
-    // ----------------------------------------
 
     // ----------------------------------------
 
@@ -128,7 +122,6 @@ class PhysicalDevice : public std::enable_shared_from_this<PhysicalDevice> {
 
     std::vector<vk::ExtensionProperties> physical_device_extension_properties;
 
-    vk::PhysicalDeviceFeatures2 physical_device_features;
     std::unordered_map<vk::StructureType, FeatureHandle> supported_features;
 };
 

@@ -19,16 +19,57 @@ using ConstDescriptorBufferHandle = std::shared_ptr<const DescriptorBuffer>;
 // GPU timeline. The DescriptorBuffer holds references to the resources that are bound to it.
 class DescriptorBuffer : public DescriptorContainer {
 
+    static std::size_t
+    descriptor_size_for_type(const vk::PhysicalDeviceDescriptorBufferPropertiesEXT& props,
+                             const vk::DescriptorType type) {
+        switch (type) {
+
+        case vk::DescriptorType::eSampler:
+            return props.samplerDescriptorSize;
+        case vk::DescriptorType::eCombinedImageSampler:
+            return props.combinedImageSamplerDescriptorSize;
+        case vk::DescriptorType::eSampledImage:
+            return props.sampledImageDescriptorSize;
+        case vk::DescriptorType::eStorageImage:
+            return props.storageImageDescriptorSize;
+        case vk::DescriptorType::eUniformTexelBuffer:
+            return props.uniformTexelBufferDescriptorSize;
+        case vk::DescriptorType::eStorageTexelBuffer:
+            return props.storageTexelBufferDescriptorSize;
+        case vk::DescriptorType::eUniformBuffer:
+            return props.uniformBufferDescriptorSize;
+        case vk::DescriptorType::eStorageBuffer:
+            return props.storageBufferDescriptorSize;
+        case vk::DescriptorType::eInputAttachment:
+            return props.inputAttachmentDescriptorSize;
+        case vk::DescriptorType::eAccelerationStructureKHR:
+        case vk::DescriptorType::eAccelerationStructureNV:
+            return props.accelerationStructureDescriptorSize;
+        case vk::DescriptorType::eUniformBufferDynamic:
+        case vk::DescriptorType::eStorageBufferDynamic:
+        case vk::DescriptorType::eInlineUniformBlock:
+        case vk::DescriptorType::eSampleWeightImageQCOM:
+        case vk::DescriptorType::eBlockMatchImageQCOM:
+        case vk::DescriptorType::eMutableEXT:
+        default:
+            throw std::invalid_argument{
+                fmt::format("{} not supported in descriptor buffers.", vk::to_string(type))};
+        }
+    }
+
   public:
     // Allocates a DescriptorBuffer that matches the layout that is attached to the Pool
     DescriptorBuffer(const DescriptorSetLayoutHandle& layout,
                      const MemoryAllocatorHandle& allocator)
         : DescriptorContainer(layout), context(layout->get_context()) {
         assert(layout->supports_descriptor_buffer());
+        assert(allocator->get_context()->get_device()->extension_enabled(
+            VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME));
 
-        const auto ext_descriptor_buffer =
-            allocator->get_context()->get_extension<ExtensionVkDescriptorBuffer>();
-        assert(ext_descriptor_buffer);
+        const vk::PhysicalDeviceDescriptorBufferPropertiesEXT* props =
+            allocator->get_context()
+                ->get_physical_device()
+                ->get_properties<vk::PhysicalDeviceDescriptorBufferPropertiesEXT>();
 
         const vk::BufferCreateInfo create_info{
             vk::BufferCreateFlags{}, get_size(),
@@ -43,10 +84,10 @@ class DescriptorBuffer : public DescriptorContainer {
         for (uint32_t i = 0; i < layout->get_bindings().size(); i++) {
             auto& binding_info = binding_infos[i];
 
-            binding_info.size =
-                ext_descriptor_buffer->descriptor_size_for_type(layout->get_type_for_binding(i));
+            binding_info.size = descriptor_size_for_type(*props, layout->get_type_for_binding(i));
             binding_info.offset =
-                context->get_device()->get_device().getDescriptorSetLayoutBindingOffsetEXT(*get_layout(), i);
+                context->get_device()->get_device().getDescriptorSetLayoutBindingOffsetEXT(
+                    *get_layout(), i);
 
             max_binding_size = std::max(max_binding_size, binding_info.size);
         }

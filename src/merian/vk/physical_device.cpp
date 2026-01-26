@@ -29,8 +29,14 @@ PhysicalDevice::PhysicalDevice(const InstanceHandle& instance,
     physical_device_extension_properties = physical_device.enumerateDeviceExtensionProperties();
 
     void* feat_p_next = nullptr;
+    vk::PhysicalDeviceFeatures2* features = nullptr;
     for (const auto& feature : get_all_features()) {
         supported_features.emplace(feature->get_structure_type(), feature);
+
+        if (feature->get_structure_type() == vk::StructureType::ePhysicalDeviceFeatures2) {
+            features = reinterpret_cast<vk::PhysicalDeviceFeatures2*>(feature->get_structure_ptr());
+            continue;
+        }
 
         bool supported = true;
         for (const auto& req_ext :
@@ -46,8 +52,9 @@ PhysicalDevice::PhysicalDevice(const InstanceHandle& instance,
             feat_p_next = feature->get_structure_ptr();
         }
     }
-    physical_device_features.pNext = feat_p_next;
-    physical_device.getFeatures2(&physical_device_features);
+    assert(features);
+    features->pNext = feat_p_next;
+    physical_device.getFeatures2(features);
 }
 
 PhysicalDeviceHandle PhysicalDevice::create(const InstanceHandle& instance,

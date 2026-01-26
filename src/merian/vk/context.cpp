@@ -438,9 +438,9 @@ void Context::create_device_and_queues(uint32_t preferred_number_compute_queues)
     }
     vk::DeviceCreateInfo device_create_info{{},
                                             queue_create_infos,
-                                            instance_layer_names,
+                                            {},
                                             device_extensions,
-                                            nullptr,
+                                            {},
                                             extensions_device_create_p_next};
 
     for (auto& ext : context_extensions) {
@@ -572,18 +572,11 @@ void Context::extensions_check_device_extension_support(const bool fail_if_unsup
     std::vector<std::shared_ptr<ContextExtension>> not_supported;
 
     for (auto& ext : context_extensions) {
-        std::vector<const char*> device_extensions =
-            ext.second->enable_device_extension_names(physical_device->physical_device);
+        const std::vector<const char*> wanted_device_extensions =
+            ext.second->enable_device_extension_names(physical_device->get_physical_device());
         bool all_extensions_found = true;
-        for (auto& layer : device_extensions) {
-            bool extension_found = false;
-            for (auto& extension_prop : physical_device->physical_device_extension_properties) {
-                if (strcmp(extension_prop.extensionName, layer) == 0) {
-                    extension_found = true;
-                    break;
-                }
-            }
-            all_extensions_found &= extension_found;
+        for (const auto& wanted_ext : wanted_device_extensions) {
+            all_extensions_found &= physical_device->extension_supported(wanted_ext);
         }
         if (!all_extensions_found) {
             not_supported.push_back(ext.second);
