@@ -82,6 +82,7 @@ class FeatureStruct:
     promotion_version: Optional[str] = (
         None  # e.g., VK_API_VERSION_1_2 (when extension became core)
     )
+    member_prefix: str = ""  # e.g., "features." for VkPhysicalDeviceFeatures2
     aliases: list[str] = field(default_factory=list)
 
 
@@ -273,6 +274,32 @@ def find_feature_structures(xml_root) -> list[FeatureStruct]:
         )
 
         features.append(feature)
+
+    # Add VkPhysicalDeviceFeatures2 (its booleans are nested in VkPhysicalDeviceFeatures)
+    vk_features_members = []
+    for type_elem in xml_root.findall("types/type"):
+        if type_elem.get("name") == "VkPhysicalDeviceFeatures":
+            for member in type_elem.findall("member"):
+                member_type = member.find("type")
+                member_name = member.find("name")
+                if member_type is not None and member_name is not None:
+                    if member_type.text == "VkBool32":
+                        comment = member.get("comment", "")
+                        vk_features_members.append(
+                            FeatureMember(name=member_name.text, comment=comment)
+                        )
+            break
+
+    if vk_features_members:
+        features.append(
+            FeatureStruct(
+                vk_name="VkPhysicalDeviceFeatures2",
+                cpp_name="PhysicalDeviceFeatures2",
+                stype="VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2",
+                members=vk_features_members,
+                member_prefix="features.",
+            )
+        )
 
     # Find aliases
     for type_elem in xml_root.findall("types/type"):
@@ -491,10 +518,11 @@ def generate_implementation(features: list[FeatureStruct]) -> str:
         lines.append("")
 
         # get_feature
+        prefix = feat.member_prefix
         lines.append("    bool get_feature(const std::string& name) const override {")
         for member in feat.members:
             lines.append(
-                f'        if (name == "{member.name}") return features.{member.name} == VK_TRUE;'
+                f'        if (name == "{member.name}") return features.{prefix}{member.name} == VK_TRUE;'
             )
         lines.append("        return false;")
         lines.append("    }")
@@ -506,7 +534,7 @@ def generate_implementation(features: list[FeatureStruct]) -> str:
         )
         for member in feat.members:
             lines.append(
-                f'        if (name == "{member.name}") {{ features.{member.name} = value ? VK_TRUE : VK_FALSE; return true; }}'
+                f'        if (name == "{member.name}") {{ features.{prefix}{member.name} = value ? VK_TRUE : VK_FALSE; return true; }}'
             )
         lines.append("        return false;")
         lines.append("    }")
@@ -590,6 +618,9 @@ def generate_implementation(features: list[FeatureStruct]) -> str:
             short_name = short_name.removesuffix(tag)
         short_name = short_name.removesuffix("Features")
         short_name = short_name.removeprefix("PhysicalDevice")
+
+        if feat.cpp_name == "PhysicalDeviceFeatures2":
+            short_name = "Vulkan10"
 
         if short_name != feat.cpp_name:
             lines.append(
