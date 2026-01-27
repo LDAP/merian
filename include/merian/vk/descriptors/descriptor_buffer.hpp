@@ -1,7 +1,6 @@
 #pragma once
 
 #include "merian/vk/descriptors/descriptor_container.hpp"
-#include "merian/vk/extension/extension_vk_descriptor_buffer.hpp"
 #include "merian/vk/memory/memory_allocator.hpp"
 
 #include <vector>

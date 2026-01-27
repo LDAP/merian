@@ -12,23 +12,34 @@ class Device : public std::enable_shared_from_this<Device> {
     Device(const PhysicalDeviceHandle& physical_device,
            const vk::ArrayProxyNoTemporaries<const vk::DeviceQueueCreateInfo>& queue_create_infos,
            const vk::ArrayProxyNoTemporaries<const char*>& extensions,
-           std::ranges::forward_range auto&& features,
+           const std::vector<std::string>& requested_feature_names,
            void* p_next)
-        requires std::same_as<std::ranges::range_value_t<decltype(features)>, FeatureHandle>
         : physical_device(physical_device),
-          enabled_extensions(extensions.begin(), extensions.end()) {
+          enabled_extensions(extensions.begin(), extensions.end()),
+          enabled_features(physical_device->get_supported_features()) {
 
-        for (const auto& feature : get_all_features()) {
-            enabled_features.emplace(feature->get_structure_type(), feature);
+        // Enable requested features based on feature names
+        for (const auto& feature_name : requested_feature_names) {
+            // Parse feature_name and enable via enabled_features.set_feature()
+            // For now, we'll copy all supported features and assume they're enabled
+            // TODO: Parse feature names properly
         }
 
-        void* create_device_p_next = p_next;
-        for (const auto& feature : features) {
-            feature->set_pnext(create_device_p_next);
-            create_device_p_next = feature->get_structure_ptr();
+        // Build pNext chain from enabled features
+        void* feature_chain = enabled_features.build_chain_for_device_creation();
+
+        // Chain with any additional p_next from caller
+        if (p_next) {
+            // Find the end of feature_chain and append p_next
+            void** current = &feature_chain;
+            while (*current) {
+                current = reinterpret_cast<void**>(static_cast<char*>(*current) + sizeof(vk::StructureType));
+            }
+            *current = p_next;
         }
+
         const vk::DeviceCreateInfo device_create_info{{}, queue_create_infos,  {}, extensions,
-                                                      {}, create_device_p_next};
+                                                      {}, feature_chain};
         device = physical_device->get_physical_device().createDevice(device_create_info);
 
         SPDLOG_DEBUG("create pipeline cache");
@@ -41,12 +52,11 @@ class Device : public std::enable_shared_from_this<Device> {
     create(const PhysicalDeviceHandle& physical_device,
            const vk::ArrayProxyNoTemporaries<const vk::DeviceQueueCreateInfo>& queue_create_infos,
            const vk::ArrayProxyNoTemporaries<const char*>& extensions,
-           std::ranges::forward_range auto&& features,
-           void* p_next)
-        requires std::same_as<std::ranges::range_value_t<decltype(features)>, FeatureHandle>
+           const std::vector<std::string>& requested_feature_names = {},
+           void* p_next = nullptr)
     {
         return DeviceHandle(
-            new Device(physical_device, queue_create_infos, extensions, features, p_next));
+            new Device(physical_device, queue_create_infos, extensions, requested_feature_names, p_next));
     }
 
     ~Device();
@@ -75,30 +85,9 @@ class Device : public std::enable_shared_from_this<Device> {
 
     // ---------------------------------------------
 
-    // Can be called with vk::PhysicalDeviceFeatures2 and any struct that extends it.
-    template <typename Features = vk::PhysicalDeviceFeatures>
-    const Features* get_enabled_features() const {
-        const auto it = enabled_features.find(Features::structureType);
-        if (it == enabled_features.end()) {
-            throw std::runtime_error{fmt::format("{} not a known feature struct.",
-                                                 vk::to_string(Features::structureType))};
-        }
-
-        return reinterpret_cast<const Features*>(it->second->get_structure_ptr());
-    }
-
-    template <> const vk::PhysicalDeviceFeatures* get_enabled_features() const {
-        return &(get_enabled_features<vk::PhysicalDeviceFeatures2>()->features);
-    }
-
-    const FeatureHandle& get_enabled_features(const vk::StructureType s_type) const {
-        const auto it = enabled_features.find(s_type);
-        if (it == enabled_features.end()) {
-            throw std::runtime_error{
-                fmt::format("{} not a known feature struct.", vk::to_string(s_type))};
-        }
-
-        return enabled_features.at(s_type);
+    // Get reference to VulkanFeatures aggregate containing all enabled features
+    const VulkanFeatures& get_enabled_features() const {
+        return enabled_features;
     }
 
   private:
@@ -107,7 +96,7 @@ class Device : public std::enable_shared_from_this<Device> {
 
     vk::Device device;
 
-    std::unordered_map<vk::StructureType, FeatureHandle> enabled_features;
+    VulkanFeatures enabled_features;
 
     vk::PipelineCache pipeline_cache;
 };

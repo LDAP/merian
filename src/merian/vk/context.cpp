@@ -51,7 +51,9 @@ Context::Context(const std::vector<std::string>& features,
                  const uint32_t filter_vendor_id,
                  const uint32_t filter_device_id,
                  const std::string& filter_device_name)
-    : application_name(application_name), application_vk_version(application_vk_version) {
+    : requested_features(features),
+      application_name(application_name),
+      application_vk_version(application_vk_version) {
     merian::Stopwatch sw;
 
     SPDLOG_INFO("\n\n\
@@ -447,7 +449,7 @@ void Context::create_device_and_queues(uint32_t preferred_number_compute_queues)
     }
 
     device = Device::create(physical_device, queue_create_infos, device_extensions,
-                            features | std::views::values, extensions_device_create_p_next);
+                            requested_features, extensions_device_create_p_next);
     SPDLOG_DEBUG("device created and queues created");
 
     VULKAN_HPP_DEFAULT_DISPATCHER.init(**device);

@@ -12,7 +12,7 @@
 
 #include "merian/fwd.hpp"
 #include "merian/io/file_loader.hpp"
-#include "merian/vk/utils/features.hpp"
+#include "merian/vk/utils/vulkan_features.hpp"
 
 namespace merian {
 
@@ -242,7 +242,7 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
 
     std::vector<const char*> device_extensions;
     std::unordered_set<std::string> extensions;
-    std::unordered_map<vk::StructureType, FeatureHandle> features;
+    std::vector<std::string> requested_features;
 
     const std::string application_name;
     const uint32_t application_vk_version;
