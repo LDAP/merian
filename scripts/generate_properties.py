@@ -37,19 +37,9 @@ from vulkan_codegen.spec import (
 out_path, include_path = get_output_paths()
 
 
-def find_property_structures(xml_root, tags) -> list[PropertyStruct]:
-    """
-    Find all structures that extend VkPhysicalDeviceProperties2.
-    These are the property structures we generate wrappers for.
-    """
-    properties = []
-
-    skiplist = build_skiplist(xml_root)
-
-    # Build map: struct_name -> (ext_name_macro, ext_name)
+def build_extension_type_map(xml_root):
+    """Build map of struct_name -> (ext_name_macro, ext_name)."""
     ext_type_map = {}
-    # Build map: ext_name -> promotedto version
-    promotedto_map = {}
 
     for ext in xml_root.findall("extensions/extension"):
         ext_supported = ext.get("supported", "")
@@ -71,7 +61,20 @@ def find_property_structures(xml_root, tags) -> list[PropertyStruct]:
         if not ext_name_macro:
             continue
 
-        # Check promotedto attribute
+        for req in ext.findall("require"):
+            for type_elem in req.findall("type"):
+                type_name = type_elem.get("name")
+                if type_name:
+                    ext_type_map[type_name] = (ext_name_macro, ext.get("name"))
+
+    return ext_type_map
+
+
+def build_promotedto_map(xml_root):
+    """Build map of ext_name -> VK_API_VERSION when promoted to core."""
+    promotedto_map = {}
+
+    for ext in xml_root.findall("extensions/extension"):
         promotedto = ext.get("promotedto", "")
         if promotedto:
             match = re.match(r"VK_VERSION_(\d+)_(\d+)", promotedto)
@@ -79,15 +82,14 @@ def find_property_structures(xml_root, tags) -> list[PropertyStruct]:
                 major, minor = match.groups()
                 promotedto_map[ext.get("name")] = f"VK_API_VERSION_{major}_{minor}"
 
-        for req in ext.findall("require"):
-            for type_elem in req.findall("type"):
-                type_name = type_elem.get("name")
-                if type_name:
-                    ext_type_map[type_name] = (ext_name_macro, ext.get("name"))
+    return promotedto_map
 
-    # Build alias map
+
+def build_alias_maps(xml_root):
+    """Build bidirectional alias maps for type aliasing."""
     alias_to_canonical = {}
     canonical_to_aliases = {}
+
     for type_elem in xml_root.findall("types/type"):
         alias = type_elem.get("alias")
         name = type_elem.get("name")
@@ -95,15 +97,22 @@ def find_property_structures(xml_root, tags) -> list[PropertyStruct]:
             alias_to_canonical[name] = alias
             canonical_to_aliases.setdefault(alias, []).append(name)
 
-    # Propagate ext_type_map through aliases
+    return alias_to_canonical, canonical_to_aliases
+
+
+def propagate_aliases_to_extension_map(ext_type_map, alias_to_canonical):
+    """Propagate extension info through aliases so canonical names also map to extensions."""
     for alias_name, canonical_name in alias_to_canonical.items():
         if alias_name in ext_type_map and canonical_name not in ext_type_map:
             ext_type_map[canonical_name] = ext_type_map[alias_name]
         elif canonical_name in ext_type_map and alias_name not in ext_type_map:
             ext_type_map[alias_name] = ext_type_map[canonical_name]
 
-    # Build map: struct_name -> VK_API_VERSION from <feature> tags
+
+def build_feature_type_map(xml_root):
+    """Build map of struct_name -> VK_API_VERSION from <feature> tags."""
     feature_type_map = {}
+
     for feat in xml_root.findall("feature"):
         api = feat.get("api", "")
         if "vulkan" not in api.split(","):
@@ -122,9 +131,45 @@ def find_property_structures(xml_root, tags) -> list[PropertyStruct]:
                 if type_name:
                     feature_type_map[type_name] = api_version
 
+    return feature_type_map
+
+
+def determine_property_metadata(vk_name, ext_type_map, promotedto_map, feature_type_map):
+    """Determine extension and core_version for a property struct."""
+    extension = None
+    core_version = None
+
+    ext_info = ext_type_map.get(vk_name)
+    if ext_info:
+        ext_name_macro, ext_name = ext_info
+        extension = ext_name_macro
+        core_version = promotedto_map.get(ext_name)
+
+    if vk_name in feature_type_map:
+        core_version = feature_type_map[vk_name]
+
+    # VkPhysicalDeviceVulkanXXProperties: derive version from name
+    vulkan_ver_match = re.match(r"VkPhysicalDeviceVulkan(\d)(\d)Properties$", vk_name)
+    if vulkan_ver_match:
+        vmajor, vminor = vulkan_ver_match.groups()
+        core_version = f"VK_API_VERSION_{vmajor}_{vminor}"
+
+    return extension, core_version
+
+
+def find_property_structures(xml_root, tags) -> list[PropertyStruct]:
+    """Find all structures that extend VkPhysicalDeviceProperties2."""
+    properties = []
+    skiplist = build_skiplist(xml_root)
+
+    ext_type_map = build_extension_type_map(xml_root)
+    promotedto_map = build_promotedto_map(xml_root)
+    alias_to_canonical, _ = build_alias_maps(xml_root)
+    propagate_aliases_to_extension_map(ext_type_map, alias_to_canonical)
+    feature_type_map = build_feature_type_map(xml_root)
+
     accepted_extends = {"VkPhysicalDeviceProperties2"}
 
-    # Find all structs extending accepted chain roots
     for type_elem in xml_root.findall("types/type"):
         if type_elem.get("category") != "struct":
             continue
@@ -134,27 +179,17 @@ def find_property_structures(xml_root, tags) -> list[PropertyStruct]:
             continue
 
         struct_extends = type_elem.get("structextends", "")
-        extends_accepted = bool(accepted_extends & set(struct_extends.split(",")))
-
-        if not extends_accepted:
+        if not (accepted_extends & set(struct_extends.split(","))):
             continue
 
-        if vk_name in skiplist:
+        if vk_name in skiplist or type_elem.get("alias") is not None:
             continue
 
-        # Skip alias definitions
-        if type_elem.get("alias") is not None:
-            continue
-
-        # Get the sType from the struct members
+        # Get sType from struct members
         stype = None
         for member in type_elem.findall("member"):
             member_name = member.find("name")
-            if (
-                member_name is not None
-                and member_name.text == "sType"
-                and member.get("values")
-            ):
+            if member_name is not None and member_name.text == "sType" and member.get("values"):
                 stype = member.get("values")
                 break
 
@@ -162,28 +197,9 @@ def find_property_structures(xml_root, tags) -> list[PropertyStruct]:
             stype = get_stype_from_name(vk_name)
 
         cpp_name = vk_name_to_cpp_name(vk_name)
-
-        # Determine extension and core_version
-        extension = None
-        core_version = None
-
-        ext_info = ext_type_map.get(vk_name)
-        if ext_info:
-            ext_name_macro, ext_name = ext_info
-            extension = ext_name_macro
-            core_version = promotedto_map.get(ext_name)
-
-        # Feature tags override / supplement
-        if vk_name in feature_type_map:
-            core_version = feature_type_map[vk_name]
-
-        # VkPhysicalDeviceVulkanXXProperties: derive version from name
-        vulkan_ver_match = re.match(
-            r"VkPhysicalDeviceVulkan(\d)(\d)Properties$", vk_name
+        extension, core_version = determine_property_metadata(
+            vk_name, ext_type_map, promotedto_map, feature_type_map
         )
-        if vulkan_ver_match:
-            vmajor, vminor = vulkan_ver_match.groups()
-            core_version = f"VK_API_VERSION_{vmajor}_{vminor}"
 
         properties.append(
             PropertyStruct(
@@ -196,6 +212,102 @@ def find_property_structures(xml_root, tags) -> list[PropertyStruct]:
         )
 
     return properties
+
+
+def generate_concept_definition(properties: list[PropertyStruct]) -> list[str]:
+    """Generate the VulkanPropertyStruct concept definition."""
+    lines = [
+        "/**",
+        " * @brief C++20 concept for validating Vulkan property structure types.",
+        " * @tparam T The type to validate.",
+        " */",
+        "template <typename T>",
+        "concept VulkanPropertyStruct = (",
+    ]
+
+    type_checks = ["    std::same_as<T, vk::PhysicalDeviceProperties2>"]
+    for prop in sorted(properties, key=lambda p: p.cpp_name):
+        type_checks.append(f"    std::same_as<T, vk::{prop.cpp_name}>")
+
+    lines.append(" ||\n".join(type_checks))
+    lines.append(");")
+    lines.append("")
+
+    return lines
+
+
+def generate_class_declaration(properties: list[PropertyStruct]) -> list[str]:
+    """Generate the VulkanProperties class declaration."""
+    lines = [
+        "/**",
+        " * @brief Aggregate class containing all Vulkan property structures.",
+        " *",
+        " * Provides type-safe access to all ~120 Vulkan property structs without",
+        " * unsafe casting or map lookups. Each property struct is stored as a direct member.",
+        " *",
+        " * Properties can be accessed via:",
+        " * - Template method: get<vk::PhysicalDevicePushDescriptorPropertiesKHR>()",
+        " * - Named getter: get_push_descriptor_properties_khr()",
+        " */",
+        "class VulkanProperties {",
+        "  public:",
+        "    /// Default constructor (zero-initialized properties)",
+        "    VulkanProperties() = delete;",
+        "",
+        "    /// Constructor: query properties from physical device",
+        "    VulkanProperties(const vk::PhysicalDevice& physical_device,",
+        "                     const InstanceHandle& instance);",
+        "",
+        "    /// Copy and move",
+        "    VulkanProperties(const VulkanProperties&) = default;",
+        "    VulkanProperties& operator=(const VulkanProperties&) = default;",
+        "    VulkanProperties(VulkanProperties&&) = default;",
+        "    VulkanProperties& operator=(VulkanProperties&&) = default;",
+        "",
+        "    /// Type-safe template access (throws if extension not available)",
+        "    template<typename T> requires VulkanPropertyStruct<T>",
+        "    const T& get() const;",
+        "",
+        "    // Named getters for each property struct",
+        "    const vk::PhysicalDeviceProperties& get_properties() const;",
+        "    const vk::PhysicalDeviceProperties2& get_properties2() const;",
+    ]
+
+    for prop in sorted(properties, key=lambda p: p.cpp_name):
+        getter_name = generate_getter_name(prop.cpp_name)
+        lines.append(f"    const vk::{prop.cpp_name}& {getter_name}() const;")
+
+    lines.extend([
+        "",
+        "    /// Check if property struct is available (only valid after physical_device constructor)",
+        "    bool is_available(vk::StructureType stype) const;",
+        "",
+        "    template<typename T> requires VulkanPropertyStruct<T>",
+        "    bool is_available() const {",
+        "        return is_available(T::structureType);",
+        "    }",
+        "",
+        "  private:",
+        "    /// Internal: get pointer to struct by StructureType",
+        "    const void* get_struct_ptr(vk::StructureType stype) const;",
+        "",
+        "    // Property struct members (~120 structs)",
+    ])
+
+    for prop in sorted(properties, key=lambda p: p.cpp_name):
+        member_name = generate_member_name(prop.cpp_name)
+        lines.append(f"    vk::{prop.cpp_name} {member_name}{{}};")
+
+    lines.extend([
+        "",
+        "    vk::PhysicalDeviceProperties2 m_properties2{};",
+        "",
+        "    /// Track which structs are available via extensions or API version",
+        "    std::unordered_set<vk::StructureType> available_structs;",
+        "};",
+    ])
+
+    return lines
 
 
 def generate_header(extensions, properties: list[PropertyStruct]) -> str:
@@ -220,112 +332,175 @@ def generate_header(extensions, properties: list[PropertyStruct]) -> str:
         "",
     ]
 
-    # Generate VulkanPropertyStruct concept
-    lines.append("/**")
-    lines.append(
-        " * @brief C++20 concept for validating Vulkan property structure types."
-    )
-    lines.append(" * @tparam T The type to validate.")
-    lines.append(" */")
-    lines.append("template <typename T>")
-    lines.append("concept VulkanPropertyStruct = (")
-
-    type_checks = []
-    type_checks.append("    std::same_as<T, vk::PhysicalDeviceProperties2>")
-    for prop in sorted(properties, key=lambda p: p.cpp_name):
-        type_checks.append(f"    std::same_as<T, vk::{prop.cpp_name}>")
-
-    lines.append(" ||\n".join(type_checks))
-    lines.append(");")
-    lines.append("")
-
-    # Generate VulkanProperties class
-    lines.extend(
-        [
-            "/**",
-            " * @brief Aggregate class containing all Vulkan property structures.",
-            " *",
-            " * Provides type-safe access to all ~120 Vulkan property structs without",
-            " * unsafe casting or map lookups. Each property struct is stored as a direct member.",
-            " *",
-            " * Properties can be accessed via:",
-            " * - Template method: get<vk::PhysicalDevicePushDescriptorPropertiesKHR>()",
-            " * - Named getter: get_push_descriptor_properties_khr()",
-            " */",
-            "class VulkanProperties {",
-            "  public:",
-            "    /// Default constructor (zero-initialized properties)",
-            "    VulkanProperties() = delete;",
-            "",
-            "    /// Constructor: query properties from physical device",
-            "    VulkanProperties(const vk::PhysicalDevice& physical_device,",
-            "                     const InstanceHandle& instance);",
-            "",
-            "    /// Copy and move",
-            "    VulkanProperties(const VulkanProperties&) = default;",
-            "    VulkanProperties& operator=(const VulkanProperties&) = default;",
-            "    VulkanProperties(VulkanProperties&&) = default;",
-            "    VulkanProperties& operator=(VulkanProperties&&) = default;",
-            "",
-            "    /// Type-safe template access (throws if extension not available)",
-            "    template<typename T> requires VulkanPropertyStruct<T>",
-            "    const T& get() const;",
-            "",
-        ]
-    )
-
-    # Generate named getters
-    lines.append("    // Named getters for each property struct")
-    lines.append("    const vk::PhysicalDeviceProperties& get_properties() const;")
-    lines.append("    const vk::PhysicalDeviceProperties2& get_properties2() const;")
-    for prop in sorted(properties, key=lambda p: p.cpp_name):
-        getter_name = generate_getter_name(prop.cpp_name)
-        lines.append(f"    const vk::{prop.cpp_name}& {getter_name}() const;")
-
-    lines.extend(
-        [
-            "",
-            "    /// Check if property struct is available (only valid after physical_device constructor)",
-            "    bool is_available(vk::StructureType stype) const;",
-            "",
-            "    template<typename T> requires VulkanPropertyStruct<T>",
-            "    bool is_available() const {",
-            "        return is_available(T::structureType);",
-            "    }",
-            "",
-            "  private:",
-            "    /// Internal: get pointer to struct by StructureType",
-            "    const void* get_struct_ptr(vk::StructureType stype) const;",
-            "",
-        ]
-    )
-
-    # Generate member variables
-    lines.append("    // Property struct members (~120 structs)")
-    for prop in sorted(properties, key=lambda p: p.cpp_name):
-        member_name = generate_member_name(prop.cpp_name)
-        lines.append(f"    vk::{prop.cpp_name} {member_name}{{}};")
-    lines.append("")
-    lines.append("    vk::PhysicalDeviceProperties2 m_properties2{};")
-
-    lines.extend(
-        [
-            "",
-            "    /// Track which structs are available via extensions or API version",
-            "    std::unordered_set<vk::StructureType> available_structs;",
-            "};",
-            "",
-            "} // namespace merian",
-            "",
-        ]
-    )
+    lines.extend(generate_concept_definition(properties))
+    lines.extend(generate_class_declaration(properties))
+    lines.extend([
+        "",
+        "} // namespace merian",
+        "",
+    ])
 
     return "\n".join(lines)
 
 
-def generate_implementation(
-    extensions, properties: list[PropertyStruct], tags
-) -> str:
+def generate_constructor(properties: list[PropertyStruct]) -> list[str]:
+    """Generate VulkanProperties constructor implementation."""
+    return [
+        "VulkanProperties::VulkanProperties(const vk::PhysicalDevice& physical_device,",
+        "                                   const InstanceHandle& instance) {",
+        "    // Enumerate supported extensions",
+        "    std::unordered_set<std::string> extensions;",
+        "    for (const auto& ext : physical_device.enumerateDeviceExtensionProperties()) {",
+        "        extensions.insert(ext.extensionName);",
+        "    }",
+        "",
+        "    // Build pNext chain using BaseOutStructure for safe chaining",
+        "    vk::BaseOutStructure* chain_tail = nullptr;",
+        "",
+        "    // Add properties from API version",
+        "    for (const auto& stype : get_api_version_property_types(instance->get_vk_api_version())) {",
+        "        void* struct_ptr = const_cast<void*>(get_struct_ptr(stype));",
+        "        if (struct_ptr != nullptr) {",
+        "            auto* base = reinterpret_cast<vk::BaseOutStructure*>(struct_ptr);",
+        "            base->pNext = chain_tail;",
+        "            chain_tail = base;",
+        "            available_structs.insert(stype);",
+        "        }",
+        "    }",
+        "",
+        "    // Add properties from extensions",
+        "    for (const auto& ext_name : extensions) {",
+        "        const auto* const ext_macro = ext_name.c_str();",
+        "        for (const auto& stype : get_extension_property_types(ext_macro)) {",
+        "            if (available_structs.contains(stype)) continue;  // Already added via API version",
+        "            void* struct_ptr = const_cast<void*>(get_struct_ptr(stype));",
+        "            if (struct_ptr != nullptr) {",
+        "                auto* base = reinterpret_cast<vk::BaseOutStructure*>(struct_ptr);",
+        "                base->pNext = chain_tail;",
+        "                chain_tail = base;",
+        "                available_structs.insert(stype);",
+        "            }",
+        "        }",
+        "    }",
+        "",
+        "    // Query properties from device",
+        "    m_properties2.pNext = chain_tail;",
+        "    physical_device.getProperties2(&m_properties2);",
+        "}",
+        "",
+    ]
+
+
+def generate_template_get(properties: list[PropertyStruct]) -> list[str]:
+    """Generate template get<T>() method and explicit instantiations."""
+    lines = [
+        "// Template get<T>() implementation",
+        "template<typename T> requires VulkanPropertyStruct<T>",
+        "const T& VulkanProperties::get() const {",
+        "    const auto stype = T::structureType;",
+        "    if (!is_available(stype)) {",
+        "        throw std::runtime_error(fmt::format(",
+        '            "Property struct {} not available (extension not supported)", ',
+        "            vk::to_string(stype)));",
+        "    }",
+        "    const void* ptr = get_struct_ptr(stype);",
+        "    if (!ptr) {",
+        "        throw std::runtime_error(fmt::format(",
+        '            "Unknown property struct type: {}", vk::to_string(stype)));',
+        "    }",
+        "    return *reinterpret_cast<const T*>(ptr);",
+        "}",
+        "",
+        "// Explicit template instantiations",
+        "template const vk::PhysicalDeviceProperties2& VulkanProperties::get<vk::PhysicalDeviceProperties2>() const;",
+    ]
+
+    for prop in sorted(properties, key=lambda p: p.cpp_name):
+        lines.append(
+            f"template const vk::{prop.cpp_name}& VulkanProperties::get<vk::{prop.cpp_name}>() const;"
+        )
+    lines.append("")
+
+    return lines
+
+
+def generate_named_getters(properties: list[PropertyStruct], tags) -> list[str]:
+    """Generate named getter implementations."""
+    lines = [
+        "// Named getter implementations",
+        "const vk::PhysicalDeviceProperties& VulkanProperties::get_properties() const {",
+        "    return m_properties2.properties;",
+        "}",
+        "// Named getter implementations",
+        "const vk::PhysicalDeviceProperties2& VulkanProperties::get_properties2() const {",
+        "    return m_properties2;",
+        "}",
+    ]
+
+    for prop in sorted(properties, key=lambda p: p.cpp_name):
+        member_name = generate_member_name(prop.cpp_name)
+        getter_name = generate_getter_name(prop.cpp_name)
+        stype_enum = prop.stype.replace("VK_STRUCTURE_TYPE_", "")
+        stype_camel = "e" + to_camel_case(stype_enum, tags)
+
+        lines.extend([
+            f"const vk::{prop.cpp_name}& VulkanProperties::{getter_name}() const {{",
+            f"    if (!is_available(vk::StructureType::{stype_camel})) {{",
+            "        throw std::runtime_error(fmt::format(",
+            f'            "Property struct {prop.cpp_name} not available (extension not supported)"));',
+            "    }",
+            f"    return {member_name};",
+            "}",
+        ])
+
+    lines.append("")
+    return lines
+
+
+def generate_get_struct_ptr(properties: list[PropertyStruct], tags) -> list[str]:
+    """Generate get_struct_ptr switch statement."""
+    lines = [
+        "const void* VulkanProperties::get_struct_ptr(vk::StructureType stype) const {",
+        "    switch (stype) {",
+        "        case vk::StructureType::ePhysicalDeviceProperties2:",
+        "            return &m_properties2;",
+    ]
+
+    for prop in sorted(properties, key=lambda p: p.cpp_name):
+        member_name = generate_member_name(prop.cpp_name)
+        stype_enum = prop.stype.replace("VK_STRUCTURE_TYPE_", "")
+        stype_camel = "e" + to_camel_case(stype_enum, tags)
+        lines.extend([
+            f"        case vk::StructureType::{stype_camel}:",
+            f"            return &{member_name};",
+        ])
+
+    lines.extend([
+        "        default:",
+        "            return nullptr;",
+        "    }",
+        "}",
+        "",
+    ])
+
+    return lines
+
+
+def generate_is_available() -> list[str]:
+    """Generate is_available implementation."""
+    return [
+        "bool VulkanProperties::is_available(vk::StructureType stype) const {",
+        "    // Properties2 is always available",
+        "    if (stype == vk::StructureType::ePhysicalDeviceProperties2) {",
+        "        return true;",
+        "    }",
+        "    return available_structs.contains(stype);",
+        "}",
+        "",
+    ]
+
+
+def generate_implementation(extensions, properties: list[PropertyStruct], tags) -> str:
     """Generate the vulkan_properties.cpp implementation file content."""
     lines = [
         f"// This file was autogenerated for Vulkan {VULKAN_SPEC_VERSION}.",
@@ -344,165 +519,16 @@ def generate_implementation(
         "",
     ]
 
-    # Generate VulkanProperties constructor
-    lines.extend(
-        [
-            "VulkanProperties::VulkanProperties(const vk::PhysicalDevice& physical_device,",
-            "                                   const InstanceHandle& instance) {",
-            "    // Enumerate supported extensions",
-            "    std::unordered_set<std::string> extensions;",
-            "    for (const auto& ext : physical_device.enumerateDeviceExtensionProperties()) {",
-            "        extensions.insert(ext.extensionName);",
-            "    }",
-            "",
-            "    // Build pNext chain using BaseOutStructure for safe chaining",
-            "    vk::BaseOutStructure* chain_tail = nullptr;",
-            "",
-            "    // Add properties from API version",
-            "    for (const auto& stype : get_api_version_property_types(instance->get_vk_api_version())) {",
-            "        void* struct_ptr = const_cast<void*>(get_struct_ptr(stype));",
-            "        if (struct_ptr != nullptr) {",
-            "            auto* base = reinterpret_cast<vk::BaseOutStructure*>(struct_ptr);",
-            "            base->pNext = chain_tail;",
-            "            chain_tail = base;",
-            "            available_structs.insert(stype);",
-            "        }",
-            "    }",
-            "",
-            "    // Add properties from extensions",
-            "    for (const auto& ext_name : extensions) {",
-            "        const auto* const ext_macro = ext_name.c_str();",
-            "        for (const auto& stype : get_extension_property_types(ext_macro)) {",
-            "            if (available_structs.contains(stype)) continue;  // Already added via API version",
-            "            void* struct_ptr = const_cast<void*>(get_struct_ptr(stype));",
-            "            if (struct_ptr != nullptr) {",
-            "                auto* base = reinterpret_cast<vk::BaseOutStructure*>(struct_ptr);",
-            "                base->pNext = chain_tail;",
-            "                chain_tail = base;",
-            "                available_structs.insert(stype);",
-            "            }",
-            "        }",
-            "    }",
-            "",
-            "    // Query properties from device",
-            "    m_properties2.pNext = chain_tail;",
-            "    physical_device.getProperties2(&m_properties2);",
-            "}",
-            "",
-        ]
-    )
+    lines.extend(generate_constructor(properties))
+    lines.extend(generate_template_get(properties))
+    lines.extend(generate_named_getters(properties, tags))
+    lines.extend(generate_get_struct_ptr(properties, tags))
+    lines.extend(generate_is_available())
 
-    # Generate template get<T>() method
-    lines.extend(
-        [
-            "// Template get<T>() implementation",
-            "template<typename T> requires VulkanPropertyStruct<T>",
-            "const T& VulkanProperties::get() const {",
-            "    const auto stype = T::structureType;",
-            "    if (!is_available(stype)) {",
-            "        throw std::runtime_error(fmt::format(",
-            '            "Property struct {} not available (extension not supported)", ',
-            "            vk::to_string(stype)));",
-            "    }",
-            "    const void* ptr = get_struct_ptr(stype);",
-            "    if (!ptr) {",
-            "        throw std::runtime_error(fmt::format(",
-            '            "Unknown property struct type: {}", vk::to_string(stype)));',
-            "    }",
-            "    return *reinterpret_cast<const T*>(ptr);",
-            "}",
-            "",
-        ]
-    )
-
-    # Generate explicit template instantiations
-    lines.append("// Explicit template instantiations")
-    lines.append(
-        "template const vk::PhysicalDeviceProperties2& VulkanProperties::get<vk::PhysicalDeviceProperties2>() const;"
-    )
-    for prop in sorted(properties, key=lambda p: p.cpp_name):
-        lines.append(
-            f"template const vk::{prop.cpp_name}& VulkanProperties::get<vk::{prop.cpp_name}>() const;"
-        )
-    lines.append("")
-
-    # Generate named getters
-    lines.append("// Named getter implementations")
-    lines.append(
-        "const vk::PhysicalDeviceProperties& VulkanProperties::get_properties() const {"
-    )
-    lines.append("    return m_properties2.properties;")
-    lines.append("}")
-    lines.append("// Named getter implementations")
-    lines.append(
-        "const vk::PhysicalDeviceProperties2& VulkanProperties::get_properties2() const {"
-    )
-    lines.append("    return m_properties2;")
-    lines.append("}")
-
-    for prop in sorted(properties, key=lambda p: p.cpp_name):
-        member_name = generate_member_name(prop.cpp_name)
-        getter_name = generate_getter_name(prop.cpp_name)
-        stype_enum = prop.stype.replace("VK_STRUCTURE_TYPE_", "")
-        stype_camel = "e" + to_camel_case(stype_enum, tags)
-
-        lines.append(
-            f"const vk::{prop.cpp_name}& VulkanProperties::{getter_name}() const {{"
-        )
-        lines.append(f"    if (!is_available(vk::StructureType::{stype_camel})) {{")
-        lines.append("        throw std::runtime_error(fmt::format(")
-        lines.append(
-            f'            "Property struct {prop.cpp_name} not available (extension not supported)"));'
-        )
-        lines.append("    }")
-        lines.append(f"    return {member_name};")
-        lines.append("}")
-
-    lines.append("")
-
-    # Generate get_struct_ptr
-    lines.extend(
-        [
-            "const void* VulkanProperties::get_struct_ptr(vk::StructureType stype) const {",
-            "    switch (stype) {",
-        ]
-    )
-
-    lines.append("        case vk::StructureType::ePhysicalDeviceProperties2:")
-    lines.append("            return &m_properties2;")
-
-    for prop in sorted(properties, key=lambda p: p.cpp_name):
-        member_name = generate_member_name(prop.cpp_name)
-        stype_enum = prop.stype.replace("VK_STRUCTURE_TYPE_", "")
-        stype_camel = "e" + to_camel_case(stype_enum, tags)
-        lines.append(f"        case vk::StructureType::{stype_camel}:")
-        lines.append(f"            return &{member_name};")
-
-    lines.extend(
-        [
-            "        default:",
-            "            return nullptr;",
-            "    }",
-            "}",
-            "",
-        ]
-    )
-
-    # Generate is_available
-    lines.extend(
-        [
-            "bool VulkanProperties::is_available(vk::StructureType stype) const {",
-            "    // Properties2 is always available",
-            "    if (stype == vk::StructureType::ePhysicalDeviceProperties2) {",
-            "        return true;",
-            "    }",
-            "    return available_structs.contains(stype);",
-            "}",
-            "",
-            "} // namespace merian",
-            "",
-        ]
-    )
+    lines.extend([
+        "} // namespace merian",
+        "",
+    ])
 
     return "\n".join(lines)
 
