@@ -14,120 +14,25 @@ aggregate design that eliminates unsafe casting and map lookups.
 """
 
 import datetime
-import xml.etree.ElementTree as ET
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Optional
-from urllib.request import urlopen
+import re
 
-VULKAN_SPEC_VERSION = "v1.4.338"
-VULKAN_SPEC_URL = f"https://raw.githubusercontent.com/KhronosGroup/Vulkan-Docs/{VULKAN_SPEC_VERSION}/xml/vk.xml"
+from vulkan_codegen.models import FeatureMember, FeatureStruct
+from vulkan_codegen.naming import (
+    generate_getter_name,
+    generate_member_name,
+    get_stype_from_name,
+    to_camel_case,
+    vk_name_to_cpp_name,
+)
+from vulkan_codegen.spec import (
+    VULKAN_SPEC_VERSION,
+    build_skiplist,
+    get_output_paths,
+    load_vendor_tags,
+    load_vulkan_spec,
+)
 
-out_path = Path(__file__).parent.parent / "src" / "merian" / "vk" / "utils"
-include_path = Path(__file__).parent.parent / "include" / "merian" / "vk" / "utils"
-assert out_path.is_dir(), f"Output path does not exist: {out_path}"
-assert include_path.is_dir(), f"Include path does not exist: {include_path}"
-
-# Vendor tags for proper casing (loaded from spec)
-tags: list[str] = []
-
-
-def to_camel_case(name: str) -> str:
-    """
-    Convert UPPER_SNAKE_CASE to CamelCase, matching vulkan.hpp conventions.
-
-    Rules:
-    - After underscore: next char stays uppercase
-    - After digit: next char stays uppercase
-    - Otherwise: lowercase
-    - Vendor tags (KHR, EXT, etc.) stay uppercase at the end
-    """
-    tag = ""
-    if (s := name.split("_")[-1]) in tags:
-        tag = s
-        name = name[: -1 - len(s)]
-
-    result = ""
-    last = None
-    for c in name:
-        if c == "_":
-            pass
-        elif last is None:
-            result += c
-        elif last == "_":
-            result += c
-        elif last.isdigit():
-            result += c
-        else:
-            result += c.lower()
-        last = c
-
-    return result + tag
-
-
-def to_snake_case(name: str) -> str:
-    """Convert CamelCase to snake_case for member names."""
-    result = ""
-    for i, c in enumerate(name):
-        if c.isupper() and i > 0:
-            # Insert underscore before uppercase if previous char was lowercase or digit
-            if name[i - 1].islower() or name[i - 1].isdigit():
-                result += "_"
-            # Insert underscore before uppercase if next char is lowercase (handles acronyms)
-            elif i + 1 < len(name) and name[i + 1].islower():
-                result += "_"
-        result += c.lower()
-    return result
-
-
-@dataclass
-class FeatureMember:
-    """Represents a VkBool32 member in a feature structure."""
-
-    name: str
-    comment: str = ""
-
-
-@dataclass
-class FeatureStruct:
-    """Represents a Vulkan feature structure like VkPhysicalDeviceRobustness2FeaturesEXT."""
-
-    vk_name: str  # e.g., VkPhysicalDeviceRobustness2FeaturesEXT
-    cpp_name: str  # e.g., PhysicalDeviceRobustness2FeaturesEXT
-    stype: str  # e.g., VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT
-    members: list[FeatureMember] = field(default_factory=list)
-    extension: Optional[str] = None  # e.g., VK_EXT_ROBUSTNESS_2_EXTENSION_NAME
-    promotion_version: Optional[str] = (
-        None  # e.g., VK_API_VERSION_1_2 (when extension became core)
-    )
-    member_prefix: str = ""  # e.g., "features." for VkPhysicalDeviceFeatures2
-    aliases: list[str] = field(default_factory=list)
-
-
-def vk_name_to_cpp_name(vk_name: str) -> str:
-    """Convert VkPhysicalDeviceFoo to PhysicalDeviceFoo."""
-    return vk_name.removeprefix("Vk")
-
-
-def get_stype_from_name(name: str) -> str:
-    """
-    Convert a struct name to its sType enum value.
-    e.g., VkPhysicalDeviceRobustness2FeaturesEXT -> VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT
-    """
-    result = "VK_STRUCTURE_TYPE_"
-    prev_lower = False
-    prev_digit = False
-
-    for c in name.removeprefix("Vk"):
-        if c.isupper() and (prev_lower or prev_digit):
-            result += "_"
-        elif c.isdigit() and prev_lower:
-            result += "_"
-        result += c.upper()
-        prev_lower = c.islower()
-        prev_digit = c.isdigit()
-
-    return result
+out_path, include_path = get_output_paths()
 
 
 def get_short_feature_name(cpp_name: str, tags: list[str]) -> str:
@@ -137,81 +42,34 @@ def get_short_feature_name(cpp_name: str, tags: list[str]) -> str:
     """
     short_name = cpp_name
 
-    # Remove vendor tags
     for tag in tags:
         short_name = short_name.removesuffix(tag)
 
-    # Remove "Features" suffix
     short_name = short_name.removesuffix("Features")
-
-    # Remove "PhysicalDevice" prefix
     short_name = short_name.removeprefix("PhysicalDevice")
 
-    # Special case for Vulkan 1.0 features
     if cpp_name == "PhysicalDeviceFeatures2":
         short_name = "Vulkan10"
 
     return short_name
 
 
-def parse_vulkan_spec():
-    """Download and parse the Vulkan XML specification."""
-    global tags
-    print(f"Downloading Vulkan spec {VULKAN_SPEC_VERSION}...")
-    with urlopen(VULKAN_SPEC_URL) as response:
-        xml_root = ET.parse(response).getroot()
-
-    # Load vendor tags for proper casing
-    tags = [i.get("name") for i in xml_root.findall("tags/tag")]  # pyright: ignore[reportAssignmentType]
-    return xml_root
-
-
-def find_feature_structures(xml_root) -> list[FeatureStruct]:
+def find_feature_structures(xml_root, tags) -> list[FeatureStruct]:
     """
     Find all structures that extend VkPhysicalDeviceFeatures2.
     These are the feature structures we want to generate classes for.
     """
     features = []
 
-    # Build skiplist for platform-specific types (same logic as generate_enum_string_map.py)
-    skiplist = set()
-
-    for ext in xml_root.findall("extensions/extension"):
-        # Skip types from platform-specific extensions
-        if ext.get("platform") is not None:
-            for req in ext.findall("require"):
-                for type_elem in req.findall("type"):
-                    if name := type_elem.get("name"):
-                        skiplist.add(name)
-
-        # Skip types from extensions not supported on vulkan
-        ext_supported = ext.get("supported", "")
-        if "vulkan" not in ext_supported.split(","):
-            for req in ext.findall("require"):
-                for type_elem in req.findall("type"):
-                    if name := type_elem.get("name"):
-                        skiplist.add(name)
-
-    # Skip types from non-vulkan API features (e.g., vulkansc)
-    for feat in xml_root.findall("feature"):
-        if (s := feat.get("api")) is not None and "vulkan" not in s.split(","):
-            for req in feat.findall("require"):
-                for type_elem in req.findall("type"):
-                    if name := type_elem.get("name"):
-                        skiplist.add(name)
+    skiplist = build_skiplist(xml_root)
 
     # Build a map of extension names to their required extensions and promotion versions
-    extension_map = {}  # struct name -> (extension name constant, promotion version or None)
+    extension_map = {}
 
-    def parse_promotion_version(depends: str) -> Optional[str]:
-        """Extract VK_VERSION from depends attribute, e.g., 'VK_VERSION_1_1' -> 'VK_API_VERSION_1_1'."""
+    def parse_promotion_version(depends: str) -> str | None:
+        """Extract VK_VERSION from depends attribute."""
         if not depends:
             return None
-        # depends can be like "VK_KHR_get_physical_device_properties2,VK_VERSION_1_1"
-        # or "(VK_KHR_get_physical_device_properties2,VK_VERSION_1_1)+VK_KHR_shader_float16_int8"
-        # We look for VK_VERSION_X_Y patterns
-        import re
-
         match = re.search(r"VK_VERSION_(\d+)_(\d+)", depends)
         if match:
             major, minor = match.groups()
@@ -222,15 +80,12 @@ def find_feature_structures(xml_root) -> list[FeatureStruct]:
     for ext in xml_root.findall("extensions/extension"):
         ext_supported = ext.get("supported", "")
 
-        # Skip extensions not for Vulkan
         if "vulkan" not in ext_supported.split(","):
             continue
 
-        # Skip platform-specific extensions (like Android, Win32, etc.)
         if ext.get("platform") is not None:
             continue
 
-        # Find the EXTENSION_NAME enum in the require block
         ext_name_macro = None
         for req in ext.findall("require"):
             for enum_elem in req.findall("enum"):
@@ -244,7 +99,6 @@ def find_feature_structures(xml_root) -> list[FeatureStruct]:
         if not ext_name_macro:
             continue
 
-        # Use the promotedto attribute to find promotion version
         promotedto = ext.get("promotedto", "")
         promotion_version = parse_promotion_version(promotedto) if promotedto else None
 
@@ -255,21 +109,16 @@ def find_feature_structures(xml_root) -> list[FeatureStruct]:
                     extension_map[type_name] = (ext_name_macro, promotion_version)
 
     # Add aliases to extension_map
-    # When VkPhysicalDevice16BitStorageFeaturesKHR is in the map,
-    # also add VkPhysicalDevice16BitStorageFeatures (the alias)
     for type_elem in xml_root.findall("types/type"):
         if type_elem.get("category") != "struct":
             continue
 
-        # Check if this is an alias definition
         alias_of = type_elem.get("alias")
         type_name = type_elem.get("name")
 
         if alias_of and type_name:
-            # If the aliased type has extension info, copy it to this type
             if alias_of in extension_map:
                 extension_map[type_name] = extension_map[alias_of]
-            # Also handle reverse: if this type has info, copy to alias
             elif type_name in extension_map:
                 extension_map[alias_of] = extension_map[type_name]
 
@@ -286,15 +135,12 @@ def find_feature_structures(xml_root) -> list[FeatureStruct]:
         if not vk_name:
             continue
 
-        # Skip types in the skiplist (platform-specific or non-vulkan)
         if vk_name in skiplist:
             continue
 
-        # Skip alias definitions
         if type_elem.get("alias") is not None:
             continue
 
-        # Get the sType from the struct members
         stype = None
         members = []
 
@@ -315,12 +161,10 @@ def find_feature_structures(xml_root) -> list[FeatureStruct]:
                 members.append(FeatureMember(name=name_text, comment=comment))
 
         if not stype:
-            # Compute sType from name if not found
             stype = get_stype_from_name(vk_name)
 
         cpp_name = vk_name_to_cpp_name(vk_name)
 
-        # Get extension info (extension name, promotion version)
         ext_info = extension_map.get(vk_name)
         extension = ext_info[0] if ext_info else None
         promotion_version = ext_info[1] if ext_info else None
@@ -336,7 +180,7 @@ def find_feature_structures(xml_root) -> list[FeatureStruct]:
 
         features.append(feature)
 
-    # Add VkPhysicalDeviceFeatures2 (its booleans are nested in VkPhysicalDeviceFeatures)
+    # Add VkPhysicalDeviceFeatures2
     vk_features_members = []
     for type_elem in xml_root.findall("types/type"):
         if type_elem.get("name") == "VkPhysicalDeviceFeatures":
@@ -375,32 +219,6 @@ def find_feature_structures(xml_root) -> list[FeatureStruct]:
     return features
 
 
-def generate_member_name(cpp_name: str) -> str:
-    """Generate member variable name from struct name.
-
-    PhysicalDeviceRayTracingPipelineFeaturesKHR -> m_ray_tracing_pipeline_features_khr
-    PhysicalDeviceFeatures2 -> m_features_2
-    """
-    # Remove PhysicalDevice prefix
-    name = cpp_name.removeprefix("PhysicalDevice")
-    # Convert to snake_case
-    snake = to_snake_case(name)
-    return f"m_{snake}"
-
-
-def generate_getter_name(cpp_name: str) -> str:
-    """Generate getter method name from struct name.
-
-    PhysicalDeviceRayTracingPipelineFeaturesKHR -> get_ray_tracing_pipeline_features_khr
-    PhysicalDeviceFeatures2 -> get_features_2
-    """
-    # Remove PhysicalDevice prefix
-    name = cpp_name.removeprefix("PhysicalDevice")
-    # Convert to snake_case
-    snake = to_snake_case(name)
-    return f"get_{snake}"
-
-
 def generate_header(features: list[FeatureStruct]) -> str:
     """Generate the vulkan_features.hpp header file content."""
     lines = [
@@ -436,7 +254,6 @@ def generate_header(features: list[FeatureStruct]) -> str:
     lines.append("template <typename T>")
     lines.append("concept VulkanFeatureStruct = (")
 
-    # Generate type checks for all features
     type_checks = []
     for feat in sorted(features, key=lambda f: f.cpp_name):
         type_checks.append(f"    std::same_as<T, vk::{feat.cpp_name}>")
@@ -491,7 +308,7 @@ def generate_header(features: list[FeatureStruct]) -> str:
         lines.append(f"    vk::{feat.cpp_name}& {getter_name}();")
         lines.append(f"    const vk::{feat.cpp_name}& {getter_name}() const;")
 
-    # Generate alias getters for backwards compatibility
+    # Generate alias getters
     lines.append("")
     lines.append("    // Alias getters (for backwards compatibility)")
     for feat in sorted(features, key=lambda f: f.cpp_name):
@@ -560,7 +377,7 @@ def generate_header(features: list[FeatureStruct]) -> str:
     return "\n".join(lines)
 
 
-def generate_implementation(features: list[FeatureStruct]) -> str:
+def generate_implementation(features: list[FeatureStruct], tags) -> str:
     """Generate the vulkan_features.cpp implementation file content."""
     lines = [
         f"// This file was autogenerated for Vulkan {VULKAN_SPEC_VERSION}.",
@@ -604,11 +421,11 @@ def generate_implementation(features: list[FeatureStruct]) -> str:
         (f for f in features if f.cpp_name == "PhysicalDeviceFeatures2"), None
     )
 
-    # Generate chain building for each feature (except Features2)
+    # Generate chain building for each feature
     for feat in sorted_features:
         member_name = generate_member_name(feat.cpp_name)
         stype_enum = feat.stype.replace("VK_STRUCTURE_TYPE_", "")
-        stype_camel = "e" + to_camel_case(stype_enum)
+        stype_camel = "e" + to_camel_case(stype_enum, tags)
 
         lines.append(f"    // {feat.cpp_name}")
         if feat.extension and feat.promotion_version:
@@ -633,8 +450,6 @@ def generate_implementation(features: list[FeatureStruct]) -> str:
     # Add PhysicalDeviceFeatures2 at the head
     if features2:
         member_name = generate_member_name(features2.cpp_name)
-        stype_enum = features2.stype.replace("VK_STRUCTURE_TYPE_", "")
-        stype_camel = "e" + to_camel_case(stype_enum)
         lines.extend(
             [
                 "    // PhysicalDeviceFeatures2 (always at head of chain)",
@@ -733,7 +548,7 @@ def generate_implementation(features: list[FeatureStruct]) -> str:
     for feat in sorted(features, key=lambda f: f.cpp_name):
         member_name = generate_member_name(feat.cpp_name)
         stype_enum = feat.stype.replace("VK_STRUCTURE_TYPE_", "")
-        stype_camel = "e" + to_camel_case(stype_enum)
+        stype_camel = "e" + to_camel_case(stype_enum, tags)
         lines.append(f"        case vk::StructureType::{stype_camel}:")
         lines.append(f"            return &{member_name};")
 
@@ -766,7 +581,7 @@ def generate_implementation(features: list[FeatureStruct]) -> str:
     for feat in sorted(features, key=lambda f: f.cpp_name):
         member_name = generate_member_name(feat.cpp_name)
         stype_enum = feat.stype.replace("VK_STRUCTURE_TYPE_", "")
-        stype_camel = "e" + to_camel_case(stype_enum)
+        stype_camel = "e" + to_camel_case(stype_enum, tags)
         prefix = feat.member_prefix
 
         lines.append(f"        case vk::StructureType::{stype_camel}: {{")
@@ -798,7 +613,7 @@ def generate_implementation(features: list[FeatureStruct]) -> str:
     for feat in sorted(features, key=lambda f: f.cpp_name):
         member_name = generate_member_name(feat.cpp_name)
         stype_enum = feat.stype.replace("VK_STRUCTURE_TYPE_", "")
-        stype_camel = "e" + to_camel_case(stype_enum)
+        stype_camel = "e" + to_camel_case(stype_enum, tags)
         prefix = feat.member_prefix
 
         lines.append(f"        case vk::StructureType::{stype_camel}: {{")
@@ -834,7 +649,7 @@ def generate_implementation(features: list[FeatureStruct]) -> str:
 
     for feat in sorted(features, key=lambda f: f.cpp_name):
         stype_enum = feat.stype.replace("VK_STRUCTURE_TYPE_", "")
-        stype_camel = "e" + to_camel_case(stype_enum)
+        stype_camel = "e" + to_camel_case(stype_enum, tags)
 
         lines.append(f"        case vk::StructureType::{stype_camel}:")
         lines.append("            return {")
@@ -882,7 +697,6 @@ def generate_implementation(features: list[FeatureStruct]) -> str:
         ]
     )
 
-    # Reverse order so Features2 ends up at the head
     for feat in reversed(sorted(features, key=lambda f: f.cpp_name)):
         member_name = generate_member_name(feat.cpp_name)
         prefix = feat.member_prefix
@@ -916,16 +730,14 @@ def generate_implementation(features: list[FeatureStruct]) -> str:
         ]
     )
 
-    # Check each feature struct for enabled features
     for feat in sorted(features, key=lambda f: f.cpp_name):
-        if not feat.extension:  # Skip features without extensions
+        if not feat.extension:
             continue
 
         member_name = generate_member_name(feat.cpp_name)
         prefix = feat.member_prefix
 
         if feat.members:
-            # Check if any feature in this struct is enabled
             conditions = [
                 f"{member_name}.{prefix}{m.name} == VK_TRUE" for m in feat.members
             ]
@@ -953,12 +765,11 @@ def generate_implementation(features: list[FeatureStruct]) -> str:
 
     for feat in sorted(features, key=lambda f: f.cpp_name):
         stype_enum = feat.stype.replace("VK_STRUCTURE_TYPE_", "")
-        stype_camel = "e" + to_camel_case(stype_enum)
+        stype_camel = "e" + to_camel_case(stype_enum, tags)
         lines.append(
             f'        {{"{feat.cpp_name}", vk::StructureType::{stype_camel}}},'
         )
 
-        # Also add short name for convenience
         short_name = get_short_feature_name(feat.cpp_name, tags)
         if short_name != feat.cpp_name:
             lines.append(
@@ -985,13 +796,13 @@ def generate_implementation(features: list[FeatureStruct]) -> str:
 
 
 def main():
-    xml_root = parse_vulkan_spec()
+    xml_root = load_vulkan_spec()
+    tags = load_vendor_tags(xml_root)
 
     print("Finding feature structures...")
-    features = find_feature_structures(xml_root)
+    features = find_feature_structures(xml_root, tags)
     print(f"Found {len(features)} feature structures")
 
-    # Print some examples
     print("\nExample features found:")
     for feat in features[:5]:
         print(f"  - {feat.cpp_name}: {len(feat.members)} members")
@@ -1006,7 +817,7 @@ def main():
         f.write(header_content)
 
     print(f"Generating implementation file: {out_path / 'vulkan_features.cpp'}")
-    impl_content = generate_implementation(features)
+    impl_content = generate_implementation(features, tags)
     with open(out_path / "vulkan_features.cpp", "w") as f:
         f.write(impl_content)
 
