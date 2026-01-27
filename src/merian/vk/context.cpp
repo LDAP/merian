@@ -125,6 +125,9 @@ Context::~Context() {
 }
 
 void Context::create_instance(const uint32_t vk_api_version) {
+    std::vector<const char*> instance_layer_names;
+    std::vector<const char*> instance_extension_names;
+
     for (auto& ext : context_extensions) {
         insert_all(instance_layer_names, ext.second->enable_instance_layer_names());
         insert_all(instance_extension_names, ext.second->enable_instance_extension_names());
@@ -436,18 +439,15 @@ void Context::create_device_and_queues(uint32_t preferred_number_compute_queues)
         extensions_device_create_p_next =
             ext.second->pnext_device_create_info(extensions_device_create_p_next);
     }
-    vk::DeviceCreateInfo device_create_info{{},
-                                            queue_create_infos,
-                                            {},
-                                            device_extensions,
-                                            {},
-                                            extensions_device_create_p_next};
+    vk::DeviceCreateInfo device_create_info{
+        {}, queue_create_infos, {}, device_extensions, {}, extensions_device_create_p_next};
 
     for (auto& ext : context_extensions) {
         ext.second->on_create_device(physical_device, device_create_info);
     }
 
-    device = Device::create(physical_device, device_create_info);
+    device = Device::create(physical_device, queue_create_infos, device_extensions,
+                            features | std::views::values, extensions_device_create_p_next);
     SPDLOG_DEBUG("device created and queues created");
 
     VULKAN_HPP_DEFAULT_DISPATCHER.init(**device);
@@ -718,18 +718,19 @@ bool Context::device_extension_enabled(const std::string& name) const {
                         [&](const char* s) { return name == s; }) != device_extensions.end();
 }
 
-bool Context::instance_extension_enabled(const std::string& name) const {
-    return std::find_if(instance_extension_names.begin(), instance_extension_names.end(),
-                        [&](const char* s) { return name == s; }) != instance_extension_names.end();
-}
+// bool Context::instance_extension_enabled(const std::string& name) const {
+//     return std::find_if(instance_extension_names.begin(), instance_extension_names.end(),
+//                         [&](const char* s) { return name == s; }) !=
+//                         instance_extension_names.end();
+// }
 
 const std::vector<const char*>& Context::get_enabled_device_extensions() const {
     return device_extensions;
 }
 
-const std::vector<const char*>& Context::get_enabled_instance_extensions() const {
-    return instance_extension_names;
-}
+// const std::vector<const char*>& Context::get_enabled_instance_extensions() const {
+//     return instance_extension_names;
+// }
 
 const std::vector<std::filesystem::path>& Context::get_default_shader_include_paths() const {
     return default_shader_include_paths;

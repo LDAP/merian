@@ -24,11 +24,11 @@ class ExtensionMitigations : public ContextExtension {
                         reinterpret_cast<
                             const vk::PhysicalDeviceRayTracingPositionFetchFeaturesKHR*>(s));
 
-                auto props =
+                const auto* const props =
                     physical_device->get_properties<vk::PhysicalDeviceVulkan12Properties>();
 
-                if (props.driverID == vk::DriverId::eAmdOpenSource ||
-                    props.driverID == vk::DriverId::eAmdProprietary) {
+                if ((props != nullptr) && (props->driverID == vk::DriverId::eAmdOpenSource ||
+                                           props->driverID == vk::DriverId::eAmdProprietary)) {
                     features->rayTracingPositionFetch = VK_FALSE;
 
                     SPDLOG_WARN(

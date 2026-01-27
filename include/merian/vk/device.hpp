@@ -1,6 +1,7 @@
 #pragma once
 
 #include "merian/vk/physical_device.hpp"
+#include "spdlog/spdlog.h"
 
 #include <memory>
 
@@ -9,16 +10,44 @@ namespace merian {
 class Device : public std::enable_shared_from_this<Device> {
   private:
     Device(const PhysicalDeviceHandle& physical_device,
-           const vk::ArrayProxyNoTemporaries<const char*>& extensions,
            const vk::ArrayProxyNoTemporaries<const vk::DeviceQueueCreateInfo>& queue_create_infos,
-           const std::unordered_map<vk::StructureType, FeatureHandle> features);
+           const vk::ArrayProxyNoTemporaries<const char*>& extensions,
+           std::ranges::forward_range auto&& features,
+           void* p_next)
+        requires std::same_as<std::ranges::range_value_t<decltype(features)>, FeatureHandle>
+        : physical_device(physical_device),
+          enabled_extensions(extensions.begin(), extensions.end()) {
+
+        for (const auto& feature : get_all_features()) {
+            enabled_features.emplace(feature->get_structure_type(), feature);
+        }
+
+        void* create_device_p_next = p_next;
+        for (const auto& feature : features) {
+            feature->set_pnext(create_device_p_next);
+            create_device_p_next = feature->get_structure_ptr();
+        }
+        const vk::DeviceCreateInfo device_create_info{{}, queue_create_infos,  {}, extensions,
+                                                      {}, create_device_p_next};
+        device = physical_device->get_physical_device().createDevice(device_create_info);
+
+        SPDLOG_DEBUG("create pipeline cache");
+        vk::PipelineCacheCreateInfo pipeline_cache_create_info{};
+        pipeline_cache = device.createPipelineCache(pipeline_cache_create_info);
+    }
 
   public:
     static DeviceHandle
     create(const PhysicalDeviceHandle& physical_device,
-           const vk::ArrayProxyNoTemporaries<const char*>& extensions,
            const vk::ArrayProxyNoTemporaries<const vk::DeviceQueueCreateInfo>& queue_create_infos,
-           const std::unordered_map<vk::StructureType, FeatureHandle> features);
+           const vk::ArrayProxyNoTemporaries<const char*>& extensions,
+           std::ranges::forward_range auto&& features,
+           void* p_next)
+        requires std::same_as<std::ranges::range_value_t<decltype(features)>, FeatureHandle>
+    {
+        return DeviceHandle(
+            new Device(physical_device, queue_create_infos, extensions, features, p_next));
+    }
 
     ~Device();
 
@@ -74,9 +103,10 @@ class Device : public std::enable_shared_from_this<Device> {
 
   private:
     const PhysicalDeviceHandle physical_device;
-    const vk::Device device;
-
     const std::unordered_set<std::string> enabled_extensions;
+
+    vk::Device device;
+
     std::unordered_map<vk::StructureType, FeatureHandle> enabled_features;
 
     vk::PipelineCache pipeline_cache;

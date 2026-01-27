@@ -218,11 +218,7 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
 
     bool device_extension_enabled(const std::string& name) const;
 
-    bool instance_extension_enabled(const std::string& name) const;
-
     const std::vector<const char*>& get_enabled_device_extensions() const;
-
-    const std::vector<const char*>& get_enabled_instance_extensions() const;
 
     // weakly canonical paths
     const std::vector<std::filesystem::path>& get_default_shader_include_paths() const;
@@ -242,11 +238,6 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
     FileLoader& get_file_loader();
 
   private:
-    // in create_instance
-
-    std::vector<const char*> instance_layer_names;
-    std::vector<const char*> instance_extension_names;
-
     // in create_device_and_queues
 
     std::vector<const char*> device_extensions;
