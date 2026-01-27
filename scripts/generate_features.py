@@ -244,15 +244,34 @@ def find_feature_structures(xml_root) -> list[FeatureStruct]:
         if not ext_name_macro:
             continue
 
-        # Parse the depends attribute to find promotion version
-        depends = ext.get("depends", "")
-        promotion_version = parse_promotion_version(depends)
+        # Use the promotedto attribute to find promotion version
+        promotedto = ext.get("promotedto", "")
+        promotion_version = parse_promotion_version(promotedto) if promotedto else None
 
         for req in ext.findall("require"):
             for type_elem in req.findall("type"):
                 type_name = type_elem.get("name")
                 if type_name:
                     extension_map[type_name] = (ext_name_macro, promotion_version)
+
+    # Add aliases to extension_map
+    # When VkPhysicalDevice16BitStorageFeaturesKHR is in the map,
+    # also add VkPhysicalDevice16BitStorageFeatures (the alias)
+    for type_elem in xml_root.findall("types/type"):
+        if type_elem.get("category") != "struct":
+            continue
+
+        # Check if this is an alias definition
+        alias_of = type_elem.get("alias")
+        type_name = type_elem.get("name")
+
+        if alias_of and type_name:
+            # If the aliased type has extension info, copy it to this type
+            if alias_of in extension_map:
+                extension_map[type_name] = extension_map[alias_of]
+            # Also handle reverse: if this type has info, copy to alias
+            elif type_name in extension_map:
+                extension_map[alias_of] = extension_map[type_name]
 
     # Find all structures that extend VkPhysicalDeviceFeatures2
     for type_elem in xml_root.findall("types/type"):
@@ -472,6 +491,16 @@ def generate_header(features: list[FeatureStruct]) -> str:
         lines.append(f"    vk::{feat.cpp_name}& {getter_name}();")
         lines.append(f"    const vk::{feat.cpp_name}& {getter_name}() const;")
 
+    # Generate alias getters for backwards compatibility
+    lines.append("")
+    lines.append("    // Alias getters (for backwards compatibility)")
+    for feat in sorted(features, key=lambda f: f.cpp_name):
+        for alias_vk_name in feat.aliases:
+            alias_cpp_name = vk_name_to_cpp_name(alias_vk_name)
+            alias_getter_name = generate_getter_name(alias_cpp_name)
+            lines.append(f"    vk::{feat.cpp_name}& {alias_getter_name}();  // Alias for {feat.cpp_name}")
+            lines.append(f"    const vk::{feat.cpp_name}& {alias_getter_name}() const;")
+
     lines.extend(
         [
             "",
@@ -670,6 +699,22 @@ def generate_implementation(features: list[FeatureStruct]) -> str:
         )
         lines.append(f"    return {member_name};")
         lines.append("}")
+
+    lines.append("")
+
+    # Generate alias getter implementations
+    lines.append("// Alias getter implementations (for backwards compatibility)")
+    for feat in sorted(features, key=lambda f: f.cpp_name):
+        member_name = generate_member_name(feat.cpp_name)
+        for alias_vk_name in feat.aliases:
+            alias_cpp_name = vk_name_to_cpp_name(alias_vk_name)
+            alias_getter_name = generate_getter_name(alias_cpp_name)
+            lines.append(f"vk::{feat.cpp_name}& VulkanFeatures::{alias_getter_name}() {{")
+            lines.append(f"    return {member_name};  // Alias for {feat.cpp_name}")
+            lines.append("}")
+            lines.append(f"const vk::{feat.cpp_name}& VulkanFeatures::{alias_getter_name}() const {{")
+            lines.append(f"    return {member_name};")
+            lines.append("}")
 
     lines.append("")
 
