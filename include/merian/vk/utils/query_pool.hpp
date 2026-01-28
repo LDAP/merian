@@ -51,10 +51,9 @@ class QueryPool : public std::enable_shared_from_this<QueryPool<QUERY_TYPE>>, pu
     // uses the Vulkan 1.2 hostQueryReset feature to reset the pool,
     // use CommandBuffer::reset_query_pool to use the command buffer to reset.
     void reset(const uint32_t first_query, const uint32_t query_count) const {
-        assert(context->get_extension<ExtensionVkCore>());
-        assert(context->get_extension<ExtensionVkCore>()
-                   ->get_enabled_features()
-                   .get_physical_device_features_v12()
+        assert(context->get_physical_device()
+                   ->get_supported_features()
+                   .get_vulkan12_features()
                    .hostQueryReset);
 
         context->get_device()->get_device().resetQueryPool(query_pool, first_query, query_count);

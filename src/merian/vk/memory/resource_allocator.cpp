@@ -15,7 +15,7 @@ ResourceAllocator::ResourceAllocator(const ContextHandle& context,
                                      const DescriptorSetAllocatorHandle& descriptor_pool)
     : context(context), m_memAlloc(memAllocator), m_staging(staging), m_samplerPool(samplerPool),
       descriptor_pool(descriptor_pool),
-      debug_utils(context->get_extension<ExtensionVkDebugUtils>()) {
+      debug_utils(context->get_context_extension<ExtensionVkDebugUtils>()) {
     SPDLOG_DEBUG("create ResourceAllocator ({})", fmt::ptr(this));
 
     const uint32_t missing_rgba = merian::uint32_from_rgba(1, 0, 1, 1);

@@ -1,4 +1,6 @@
 #include "merian/vk/instance.hpp"
+#include "merian/vk/physical_device.hpp"
+
 #include "spdlog/spdlog.h"
 
 namespace merian {
@@ -20,6 +22,16 @@ InstanceHandle Instance::create(const vk::InstanceCreateInfo& instance_create_in
 Instance::~Instance() {
     SPDLOG_DEBUG("destroy instance");
     instance.destroy();
+}
+
+std::vector<PhysicalDeviceHandle> Instance::get_physical_devices() {
+    std::vector<PhysicalDeviceHandle> physical_devices;
+    const auto shared_instance = shared_from_this();
+    for (const auto& physical_device : instance.enumeratePhysicalDevices()) {
+        physical_devices.emplace_back(PhysicalDevice::create(shared_instance, physical_device));
+    }
+
+    return physical_devices;
 }
 
 } // namespace merian

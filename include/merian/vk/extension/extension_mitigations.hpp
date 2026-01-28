@@ -13,32 +13,32 @@ class ExtensionMitigations : public ContextExtension {
     ~ExtensionMitigations() {}
 
     void on_create_device(const PhysicalDeviceHandle& physical_device,
-                          vk::DeviceCreateInfo& create_info) override {
-        const vk::BaseInStructure* s =
-            reinterpret_cast<const vk::BaseInStructure*>(create_info.pNext);
+                          VulkanFeatures& features,
+                          std::vector<const char*>& extensions) override {
 
-        while (s != nullptr) {
-            if (s->sType == vk::StructureType::ePhysicalDeviceRayTracingPositionFetchFeaturesKHR) {
-                vk::PhysicalDeviceRayTracingPositionFetchFeaturesKHR* features =
-                    const_cast<vk::PhysicalDeviceRayTracingPositionFetchFeaturesKHR*>(
-                        reinterpret_cast<
-                            const vk::PhysicalDeviceRayTracingPositionFetchFeaturesKHR*>(s));
+        // ------------------
+        // Mitigation: ExtensionVkRayTracingPositionFetch on AMDVLK
+        const vk::PhysicalDeviceVulkan12Properties props = physical_device->get_properties();
+        if ((props.driverID == vk::DriverId::eAmdOpenSource ||
+             props.driverID == vk::DriverId::eAmdProprietary) &&
+            features.get_ray_tracing_position_fetch_features_khr().rayTracingPositionFetch ==
+                VK_TRUE) {
 
-                const auto* const props =
-                    physical_device->get_properties<vk::PhysicalDeviceVulkan12Properties>();
-
-                if ((props != nullptr) && (props->driverID == vk::DriverId::eAmdOpenSource ||
-                                           props->driverID == vk::DriverId::eAmdProprietary)) {
-                    features->rayTracingPositionFetch = VK_FALSE;
-
-                    SPDLOG_WARN(
-                        "Mitigation: Detected AMDVLK driver. ExtensionVkRayTracingPositionFetch is "
+            SPDLOG_WARN("Mitigation: Detected AMDVLK driver. ExtensionVkRayTracingPositionFetch is "
                         "broken (last checked: 2025/07/14) - disabling!");
+
+            features.get_ray_tracing_position_fetch_features_khr().rayTracingPositionFetch =
+                VK_FALSE;
+            auto it = extensions.begin();
+            while (it != extensions.end()) {
+                if (strcmp(*it, VK_KHR_RAY_TRACING_POSITION_FETCH_EXTENSION_NAME) == 0) {
+                    it = extensions.erase(it);
+                } else {
+                    it++;
                 }
             }
-
-            s = s->pNext;
         }
+        // ------------------
     }
 };
 

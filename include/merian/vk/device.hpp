@@ -1,6 +1,7 @@
 #pragma once
 
 #include "merian/vk/physical_device.hpp"
+#include "merian/vk/utils/vulkan_extensions.hpp"
 #include "spdlog/spdlog.h"
 
 #include <memory>
@@ -36,29 +37,37 @@ class Device : public std::enable_shared_from_this<Device> {
         }
 
         SPDLOG_DEBUG("...with extensions:");
-        const auto feature_extensions = enabled_features.get_required_extensions(
-            physical_device->get_instance()->get_vk_api_version());
+        const uint32_t vk_api_version = physical_device->get_instance()->get_vk_api_version();
+        const auto feature_extensions = enabled_features.get_required_extensions(vk_api_version);
         std::vector<const char*> all_extensions;
         all_extensions.reserve(additional_extensions.size() + feature_extensions.size());
-        for (const auto* const ext : additional_extensions) {
-            if (!physical_device->extension_supported(ext)) {
-                SPDLOG_WARN("{} requested but not supported!", ext);
-                continue;
+
+        const auto add_extension = [&](const auto& self, const char* ext) -> bool {
+            if (enabled_extensions.contains(ext)) {
+                return true;
             }
-            auto [_, inserted] = enabled_extensions.emplace(ext);
-            if (inserted) {
+
+            bool deps_supported = true;
+            for (const char* dep : get_extension_dependencies(ext, vk_api_version)) {
+                deps_supported &= self(self, dep);
+            }
+
+            if (deps_supported && physical_device->extension_supported(ext)) {
+                enabled_extensions.emplace(ext);
                 all_extensions.emplace_back(ext);
                 SPDLOG_DEBUG(ext);
+                return true;
             }
+
+            SPDLOG_WARN("{} requested but not supported!", ext);
+            return false;
+        };
+
+        for (const auto* const ext : additional_extensions) {
+            add_extension(add_extension, ext);
         }
         for (const auto* const ext : feature_extensions) {
-            assert(physical_device->extension_supported(ext));
-
-            auto [_, inserted] = enabled_extensions.emplace(ext);
-            if (inserted) {
-                all_extensions.emplace_back(ext);
-                SPDLOG_DEBUG(ext);
-            }
+            add_extension(add_extension, ext);
         }
 
         void* p_next_chain = enabled_features.build_chain_for_device_creation(p_next);
@@ -102,10 +111,18 @@ class Device : public std::enable_shared_from_this<Device> {
         return device;
     }
 
+    const PhysicalDeviceHandle& get_physical_device() const {
+        return physical_device;
+    }
+
     // ---------------------------------------------
 
     bool extension_enabled(const std::string& name) {
         return enabled_extensions.contains(name);
+    }
+
+    const std::unordered_set<std::string>& get_enabled_extensions() {
+        return enabled_extensions;
     }
 
     // ---------------------------------------------

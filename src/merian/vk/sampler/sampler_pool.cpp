@@ -59,17 +59,14 @@ SamplerHandle SamplerPool::acquire_sampler(const vk::SamplerCreateInfo& createIn
         SamplerHandle sampler = std::make_shared<Sampler>(context, createInfo);
         state_map[state] = sampler;
         return sampler;
-    } else {
-        if ((*it).second.expired()) {
-            // recreate sampler
-            auto sampler = std::make_shared<Sampler>(context, createInfo);
-            state_map[state] = sampler;
-            return sampler;
-
-        } else {
-            return (*it).second.lock();
-        }
     }
+    if ((*it).second.expired()) {
+        // recreate sampler
+        auto sampler = std::make_shared<Sampler>(context, createInfo);
+        state_map[state] = sampler;
+        return sampler;
+    }
+    return (*it).second.lock();
 }
 
 SamplerHandle SamplerPool::acquire_sampler(const vk::Filter mag_filter,
@@ -90,7 +87,7 @@ SamplerHandle SamplerPool::acquire_sampler(const vk::Filter mag_filter,
         address_mode_w,
         {},
         anisotropy ? VK_TRUE : VK_FALSE,
-        context->get_physical_device()->get_physical_device_limits().maxSamplerAnisotropy,
+        context->get_physical_device()->get_device_limits().maxSamplerAnisotropy,
         VK_FALSE,
         {},
         0.0f,

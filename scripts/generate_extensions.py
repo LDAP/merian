@@ -13,24 +13,16 @@ This is separate from properties/features to keep concerns separated.
 import datetime
 import re
 
+from vulkan_codegen.naming import to_camel_case
 from vulkan_codegen.parsing import find_extensions
 from vulkan_codegen.spec import (
     VULKAN_SPEC_VERSION,
     get_output_paths,
+    load_vendor_tags,
     load_vulkan_spec,
 )
 
 out_path, include_path = get_output_paths()
-
-
-def to_camel_case(name: str) -> str:
-    """Convert UPPER_SNAKE_CASE to CamelCase for StructureType enum values."""
-    parts = name.split("_")
-    result = ""
-    for part in parts:
-        if part:
-            result += part[0].upper() + part[1:].lower()
-    return result
 
 
 def build_extension_name_map(xml_root):
@@ -61,7 +53,7 @@ def build_extension_name_map(xml_root):
     return ext_name_map
 
 
-def find_properties_from_extensions(xml_root, ext_name_map):
+def find_properties_from_extensions(xml_root, ext_name_map, tags):
     """Find property structures provided by extensions."""
     ext_to_stypes = {}
 
@@ -100,7 +92,8 @@ def find_properties_from_extensions(xml_root, ext_name_map):
                                         enum_name = "e" + to_camel_case(
                                             stype_value.replace(
                                                 "VK_STRUCTURE_TYPE_", ""
-                                            )
+                                            ),
+                                            tags,
                                         )
                                         ext_to_stypes.setdefault(
                                             ext_name_macro, []
@@ -111,7 +104,7 @@ def find_properties_from_extensions(xml_root, ext_name_map):
     return ext_to_stypes
 
 
-def find_properties_from_api_versions(xml_root):
+def find_properties_from_api_versions(xml_root, tags):
     """Find property structures available at each API version."""
     version_to_stypes = {}
 
@@ -159,7 +152,8 @@ def find_properties_from_api_versions(xml_root):
                                             enum_name = "e" + to_camel_case(
                                                 stype_value.replace(
                                                     "VK_STRUCTURE_TYPE_", ""
-                                                )
+                                                ),
+                                                tags,
                                             )
                                             version_to_stypes.setdefault(
                                                 api_version, []
@@ -171,12 +165,12 @@ def find_properties_from_api_versions(xml_root):
 
 
 def find_property_extension_mapping(
-    xml_root,
+    xml_root, tags,
 ) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
     """Find mapping of extensions and API versions to property structure types."""
     ext_name_map = build_extension_name_map(xml_root)
-    ext_to_stypes = find_properties_from_extensions(xml_root, ext_name_map)
-    version_to_stypes = find_properties_from_api_versions(xml_root)
+    ext_to_stypes = find_properties_from_extensions(xml_root, ext_name_map, tags)
+    version_to_stypes = find_properties_from_api_versions(xml_root, tags)
     return ext_to_stypes, version_to_stypes
 
 
@@ -361,6 +355,7 @@ def generate_implementation(
 
 def main():
     xml_root = load_vulkan_spec()
+    tags = load_vendor_tags(xml_root)
 
     print("Finding extensions...")
     extensions = find_extensions(xml_root)
@@ -370,7 +365,7 @@ def main():
     print(f"Extensions with dependencies: {len(with_deps)}")
 
     print("Finding property extension mappings...")
-    ext_to_stypes, version_to_stypes = find_property_extension_mapping(xml_root)
+    ext_to_stypes, version_to_stypes = find_property_extension_mapping(xml_root, tags)
     print(f"Extensions with properties: {len(ext_to_stypes)}")
     print(f"API versions with properties: {len(version_to_stypes)}")
 

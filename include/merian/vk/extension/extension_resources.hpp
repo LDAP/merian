@@ -16,15 +16,17 @@ class ExtensionResources : public ContextExtension {
     ExtensionResources() : ContextExtension("ExtensionResources") {}
     ~ExtensionResources() {}
 
-    void on_context_initializing(const ExtensionContainer& extension_container) override;
+    std::vector<const char*>
+    enable_device_extension_names(const PhysicalDeviceHandle& /*unused*/) const override;
+
+    virtual std::vector<std::string>
+    enable_device_features(const PhysicalDeviceHandle& /*unused*/) const override;
+
+    virtual bool
+    extension_supported(const std::unordered_set<std::string>& supported_instance_extensions,
+                        const std::unordered_set<std::string>& supported_instance_layers) override;
 
     void on_physical_device_selected(const PhysicalDeviceHandle& /*unused*/) override;
-
-    std::vector<const char*>
-    enable_device_extension_names(const vk::PhysicalDevice& /*unused*/) const override;
-
-    void on_context_created(const ContextHandle& context,
-                            const ExtensionContainer& extension_container) override;
 
     MemoryAllocatorHandle memory_allocator();
     ResourceAllocatorHandle resource_allocator();

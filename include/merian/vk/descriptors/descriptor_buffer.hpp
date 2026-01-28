@@ -65,10 +65,8 @@ class DescriptorBuffer : public DescriptorContainer {
         assert(allocator->get_context()->get_device()->extension_enabled(
             VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME));
 
-        const vk::PhysicalDeviceDescriptorBufferPropertiesEXT* props =
-            allocator->get_context()
-                ->get_physical_device()
-                ->get_properties<vk::PhysicalDeviceDescriptorBufferPropertiesEXT>();
+        const vk::PhysicalDeviceDescriptorBufferPropertiesEXT& props =
+            allocator->get_context()->get_physical_device()->get_properties();
 
         const vk::BufferCreateInfo create_info{
             vk::BufferCreateFlags{}, get_size(),
@@ -83,7 +81,7 @@ class DescriptorBuffer : public DescriptorContainer {
         for (uint32_t i = 0; i < layout->get_bindings().size(); i++) {
             auto& binding_info = binding_infos[i];
 
-            binding_info.size = descriptor_size_for_type(*props, layout->get_type_for_binding(i));
+            binding_info.size = descriptor_size_for_type(props, layout->get_type_for_binding(i));
             binding_info.offset =
                 context->get_device()->get_device().getDescriptorSetLayoutBindingOffsetEXT(
                     *get_layout(), i);

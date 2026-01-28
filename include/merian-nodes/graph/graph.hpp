@@ -86,7 +86,7 @@ class Graph : public std::enable_shared_from_this<Graph> {
                     queue,
                     GLSLShaderCompiler::get()) {
 
-        debug_utils = context->get_extension<ExtensionVkDebugUtils>();
+        debug_utils = context->get_context_extension<ExtensionVkDebugUtils>();
         time_connect_reference = time_reference = std::chrono::high_resolution_clock::now();
         duration_elapsed = 0ns;
     }

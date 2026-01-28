@@ -1,7 +1,7 @@
 #pragma once
 
-#include "merian-nodes/connectors/ptr_in.hpp"
 #include "merian-nodes/connectors/buffer/vk_buffer_in.hpp"
+#include "merian-nodes/connectors/ptr_in.hpp"
 #include "merian-nodes/connectors/vk_tlas_out.hpp"
 #include "merian-nodes/graph/errors.hpp"
 #include "merian-nodes/graph/node.hpp"
@@ -231,9 +231,13 @@ class DeviceASBuilder : public Node {
 
     std::vector<OutputConnectorHandle>
     describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) override {
-        if (!context->get_extension<ExtensionVkAccelerationStructure>()) {
+        if (context->get_device()
+                ->get_enabled_features()
+                .get_acceleration_structure_features_khr()
+                .accelerationStructure == VK_FALSE) {
             throw graph_errors::node_error{
-                "context extension ExtensionVkAccelerationStructure is required."};
+                "context extension AccelerationStructure/accelerationStructure feature is "
+                "required."};
         }
 
         return {
@@ -315,7 +319,7 @@ class DeviceASBuilder : public Node {
         }
         // 2.1. Upload instances to GPU and copy to buffer
         allocator->get_staging()->cmd_to_device(run.get_cmd(), tlas_build_info.instances_buffer,
-                                               tlas_build_info.instances);
+                                                tlas_build_info.instances);
 
         // Validation Layers complain if dst does not include transfer write and compute shader dst
         // stage?! Seems like a bug to me or wrong specs...

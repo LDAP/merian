@@ -47,6 +47,9 @@ class Instance : public std::enable_shared_from_this<Instance> {
         return enabled_extensions;
     }
 
+    // this also queries all extensions, features and such, can be expensive to call!
+    std::vector<PhysicalDeviceHandle> get_physical_devices();
+
   private:
     const vk::Instance instance;
     const uint32_t vk_api_version;

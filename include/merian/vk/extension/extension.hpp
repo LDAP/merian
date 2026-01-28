@@ -28,26 +28,31 @@ class ContextExtension {
 
     // REQUIREMENTS
 
-    /* Extensions that should be enabled instance-wide. */
-    virtual std::vector<const char*> enable_instance_extension_names() const {
+    /* Extensions that should be enabled instance-wide. The context attempts to enable as many as
+     * possible. */
+    virtual std::vector<const char*> enable_instance_extension_names(
+        const std::unordered_set<std::string>& /*supported_extensions*/) const {
         return {};
     }
-    /* Layers that should be enabled instance-wide. */
-    virtual std::vector<const char*> enable_instance_layer_names() const {
-        return {};
-    }
-
-    /* Extensions that should be enabled device-wide. Note that on_physical_device_selected is
-     * called before. */
+    /* Layers that should be enabled instance-wide. The context attempts to enable as many as
+     * possible. */
     virtual std::vector<const char*>
-    enable_device_extension_names(const vk::PhysicalDevice& /*unused*/) const {
+    enable_instance_layer_names(const std::unordered_set<std::string>& /*supported_layers*/) const {
         return {};
     }
 
-    /* Features that should be enabled device-wide. Note that on_physical_device_selected is
-     * called before. */
+    /* Extensions that should be enabled device-wide. The context attempts to enable as many as
+     * possible. */
+    virtual std::vector<const char*>
+    enable_device_extension_names(const PhysicalDeviceHandle& /*unused*/) const {
+        return {};
+    }
+
+    /* Features that should be enabled device-wide (return a featureStructName/featureName pattern).
+     * The context attempts to enable as
+     * many as possible. */
     virtual std::vector<std::string>
-    enable_device_features(const vk::PhysicalDevice& /*unused*/) const {
+    enable_device_features(const PhysicalDeviceHandle& /*unused*/) const {
         return {};
     }
 
@@ -74,35 +79,6 @@ class ContextExtension {
 
     virtual void on_instance_created(const InstanceHandle& /*unused*/) {}
 
-    /**
-     * Vote against a physical device by returning false. The context attemps to select a physical
-     * device that is accepted by most extensions, meaning this is not a hard criteria and you
-     * should check support in "extension_supported" again!
-     *
-     * The default implementation checks if the desired device extensions are supported.
-     */
-    virtual bool
-    accept_physical_device([[maybe_unused]] const vk::PhysicalDevice& physical_device,
-                           [[maybe_unused]] const vk::PhysicalDeviceProperties2& props) {
-        bool all_extensions_supported = true;
-        const auto supported_extensions = physical_device.enumerateDeviceExtensionProperties();
-        for (const auto& required_extension : enable_device_extension_names(physical_device)) {
-            bool found = false;
-            for (const auto& supported_extension : supported_extensions) {
-                if (strcmp(supported_extension.extensionName, required_extension) == 0) {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                all_extensions_supported = false;
-                break;
-            }
-        }
-
-        return all_extensions_supported;
-    }
-
     /* Called after the physical device was select and before extensions are checked for
      * compatibility and check_support is called.*/
     virtual void on_physical_device_selected(const PhysicalDeviceHandle& /*unused*/) {}
@@ -111,22 +87,63 @@ class ContextExtension {
      * accpet_physical_device, the context attempt to select a graphics queue that is accepted by
      * most extensions.
      */
-    virtual bool accept_graphics_queue([[maybe_unused]] const vk::Instance& instance,
-                                       [[maybe_unused]] const PhysicalDevice& physical_device,
+    virtual bool accept_graphics_queue([[maybe_unused]] const InstanceHandle& instance,
+                                       [[maybe_unused]] const PhysicalDeviceHandle& physical_device,
                                        [[maybe_unused]] std::size_t queue_family_index) {
         return true;
     }
 
-    /* Custom check for compatibility after the physical device is ready and queue family indices
-     * are determined. At this time the structs wired up in pnext_get_features_2 is valid, you can
-     * use those to check if features are available.
+    /* Check if this extension is supported with the supplied instance layers and extensions.
      *
-     * If this method returns false, it is guaranteed that on_unsupported is called.
+     * If this returned false, then on_unsupported is called.
+     *
+     * The default implementation returns false if any instance layer or extension is missing.
      */
-    virtual bool extension_supported([[maybe_unused]] const vk::Instance& instance,
-                                     [[maybe_unused]] const PhysicalDevice& physical_device,
-                                     [[maybe_unused]] const ExtensionContainer& extension_container,
+    virtual bool
+    extension_supported(const std::unordered_set<std::string>& supported_instance_extensions,
+                        const std::unordered_set<std::string>& supported_instance_layers) {
+        for (const auto& req_instance_ext :
+             enable_instance_extension_names(supported_instance_extensions)) {
+            if (!supported_instance_extensions.contains(req_instance_ext)) {
+                SPDLOG_WARN("extension {} requested instance extension {} is not available", name,
+                            req_instance_ext);
+                return false;
+            }
+        }
+        for (const auto& req_instance_layer :
+             enable_instance_layer_names(supported_instance_layers)) {
+            if (!supported_instance_layers.contains(req_instance_layer)) {
+                SPDLOG_WARN("extension {} requested instance layer {} is not available", name,
+                            req_instance_layer);
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /* Check if this extension is supported with the supplied instance layers, extensions, and
+     * device extensions and features.
+     *
+     * If a device is selected where this function returned false, on_unsupported is called.
+     *
+     * The default implementation returns false if any instance layer or extension or device
+     * extension or feature is missing.
+     */
+    virtual bool extension_supported(const PhysicalDeviceHandle& physical_device,
                                      [[maybe_unused]] const QueueInfo& queue_info) {
+
+        for (const auto& req_device_ext : enable_device_extension_names(physical_device)) {
+            if (!physical_device->extension_supported(req_device_ext)) {
+                return false;
+            }
+        }
+        for (const auto& req_device_feature : enable_device_features(physical_device)) {
+            if (!physical_device->get_supported_features().get_feature(req_device_feature)) {
+                return false;
+            }
+        }
+
         return true;
     }
 
@@ -155,7 +172,8 @@ class ContextExtension {
      * Use to hook into device creation.
      */
     virtual void on_create_device(const PhysicalDeviceHandle& /*physical_device*/,
-                                  vk::DeviceCreateInfo& /*create_info*/) {}
+                                  VulkanFeatures& /*features*/,
+                                  std::vector<const char*>& /*extensions*/) {}
 
     virtual void on_device_created(const DeviceHandle& /*unused*/) {}
 

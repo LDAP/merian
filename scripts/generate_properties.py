@@ -276,12 +276,15 @@ def generate_class_declaration(properties: list[PropertyStruct]) -> list[str]:
         "",
         "    // Named getters for each property struct",
         "    const vk::PhysicalDeviceProperties& get_properties() const;",
+        "    operator const vk::PhysicalDeviceProperties&() const;",
         "    const vk::PhysicalDeviceProperties2& get_properties2() const;",
+        "    operator const vk::PhysicalDeviceProperties2&() const;",
     ]
 
     for prop in sorted(properties, key=lambda p: p.cpp_name):
         getter_name = generate_getter_name(prop.cpp_name)
         lines.append(f"    const vk::{prop.cpp_name}& {getter_name}() const;")
+        lines.append(f"    operator const vk::{prop.cpp_name}&() const;")
 
     lines.extend(
         [
@@ -443,9 +446,14 @@ def generate_named_getters(properties: list[PropertyStruct], tags) -> list[str]:
         "const vk::PhysicalDeviceProperties& VulkanProperties::get_properties() const {",
         "    return m_properties2.properties;",
         "}",
-        "// Named getter implementations",
+        "VulkanProperties::operator const vk::PhysicalDeviceProperties&() const {",
+        "    return get_properties();",
+        "}",
         "const vk::PhysicalDeviceProperties2& VulkanProperties::get_properties2() const {",
         "    return m_properties2;",
+        "}",
+        "VulkanProperties::operator const vk::PhysicalDeviceProperties2&() const {",
+        "    return get_properties2();",
         "}",
     ]
 
@@ -463,6 +471,9 @@ def generate_named_getters(properties: list[PropertyStruct], tags) -> list[str]:
                 f'            "Property struct {prop.cpp_name} not available (extension not supported)"));',
                 "    }",
                 f"    return {member_name};",
+                "}",
+                f"VulkanProperties::operator const vk::{prop.cpp_name}&() const {{",
+                f"    return {getter_name}();",
                 "}",
             ]
         )

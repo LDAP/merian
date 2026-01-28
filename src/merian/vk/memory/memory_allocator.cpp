@@ -12,7 +12,7 @@ MemoryAllocation::~MemoryAllocation() {}
 MemoryAllocator::MemoryAllocator(const ContextHandle& context) : context(context) {
     supports_memory_requirements_without_object =
         context->get_vk_api_version() >= VK_VERSION_1_3 ||
-        context->device_extension_enabled(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
+        context->get_device()->extension_enabled(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
 }
 
 MemoryAllocator::~MemoryAllocator() {}

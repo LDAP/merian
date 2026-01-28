@@ -6,7 +6,7 @@
 
 namespace merian {
 
-template <class T> void insert_all(std::vector<T>& to, std::vector<T> const& from) {
+template <class T> void insert_all(std::vector<T>& to, const std::vector<T>& from) {
     to.insert(to.end(), from.begin(), from.end());
 }
 

@@ -20,7 +20,7 @@ namespace merian {
 class GLFWWindowNode : public Node {
   public:
     GLFWWindowNode(const ContextHandle& context) : Node() {
-        const auto glfw_ext = context->get_extension<ExtensionGLFW>();
+        const auto glfw_ext = context->get_context_extension<ExtensionGLFW>();
         if (glfw_ext) {
             window = glfw_ext->create_window();
 

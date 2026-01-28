@@ -32,15 +32,19 @@ class PhysicalDevice : public std::enable_shared_from_this<PhysicalDevice> {
     }
 
     // ----------------------------------------
-    
+
     const InstanceHandle& get_instance() const {
         return instance;
     }
 
     // ----------------------------------------
 
-    bool extension_supported(const std::string& name) {
+    bool extension_supported(const std::string& name) const {
         return supported_extensions.contains(name);
+    }
+
+    const std::unordered_set<std::string>& get_supported_extensions() {
+        return supported_extensions;
     }
 
     // ----------------------------------------

@@ -142,7 +142,6 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
            const uint32_t application_vk_version = VK_MAKE_VERSION(1, 0, 0),
            const uint32_t preffered_number_compute_queues = 1, // Additionally to the GCT queue
            const uint32_t vk_api_version = VK_API_VERSION_1_3,
-           const bool require_extension_support = false,
            const uint32_t filter_vendor_id = -1,
            const uint32_t filter_device_id = -1,
            const std::string& filter_device_name = "");
@@ -155,7 +154,6 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
             const uint32_t application_vk_version,
             const uint32_t preffered_number_compute_queues,
             const uint32_t vk_api_version,
-            const bool require_extension_support,
             const uint32_t filter_vendor_id,
             const uint32_t filter_device_id,
             const std::string& filter_device_name);
@@ -165,22 +163,17 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
 
   private: // Vulkan initialization
     void create_instance(const uint32_t vk_api_version);
-    void prepare_physical_device(uint32_t filter_vendor_id,
-                                 uint32_t filter_device_id,
-                                 std::string filter_device_name);
-    void find_queues();
-    void create_device_and_queues(uint32_t preffered_number_compute_queues);
+    void select_physical_device(uint32_t filter_vendor_id,
+                                uint32_t filter_device_id,
+                                std::string filter_device_name,
+                                const VulkanFeatures& desired_features,
+                                const std::vector<const char*>& desired_additional_extensions);
+    QueueInfo determine_queues(const PhysicalDeviceHandle& physical_device);
+    void create_device_and_queues(uint32_t preffered_number_compute_queues,
+                                  const VulkanFeatures& desired_features,
+                                  const std::vector<const char*>& desired_additional_extensions);
     void prepare_shader_include_defines();
     void prepare_file_loader();
-
-  private: // Helper
-    void extensions_check_instance_layer_support(const bool fail_if_unsupported);
-    void extensions_check_instance_extension_support(const bool fail_if_unsupported);
-    void extensions_check_device_extension_support(const bool fail_if_unsupported);
-    void extensions_self_check_support(const bool fail_if_unsupported);
-    void
-    destroy_unsupported_extensions(const std::vector<std::shared_ptr<ContextExtension>>& extensions,
-                                   const bool fail_if_unsupported);
 
   public: // Getter
     // The actual number of compute queues (< preffered_number_compute_queues).

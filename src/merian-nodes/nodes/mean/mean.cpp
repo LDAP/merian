@@ -49,17 +49,15 @@ MeanToBuffer::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
                                .add_descriptor_set_layout(descriptor_set_layout)
                                .add_push_constant<PushConstant>()
                                .build_pipeline_layout();
+        uint32_t subgroup_size =
+            context->get_physical_device()->get_properties().get_subgroup_properties().subgroupSize;
         auto image_to_buffer_spec_builder = SpecializationInfoBuilder();
-        image_to_buffer_spec_builder.add_entry(
-            local_size_x, local_size_y,
-            context->get_physical_device()->physical_device_subgroup_properties.subgroupSize);
+        image_to_buffer_spec_builder.add_entry(local_size_x, local_size_y, subgroup_size);
         SpecializationInfoHandle spec = image_to_buffer_spec_builder.build();
         image_to_buffer = ComputePipeline::create(pipe_layout, image_to_buffer_shader, spec);
 
         auto reduce_buffer_spec_builder = SpecializationInfoBuilder();
-        reduce_buffer_spec_builder.add_entry(
-            local_size_x * local_size_y, 1,
-            context->get_physical_device()->physical_device_subgroup_properties.subgroupSize);
+        reduce_buffer_spec_builder.add_entry(local_size_x * local_size_y, 1, subgroup_size);
         spec = reduce_buffer_spec_builder.build();
         reduce_buffer = ComputePipeline::create(pipe_layout, reduce_buffer_shader, spec);
     }

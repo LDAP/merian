@@ -32,18 +32,17 @@ class ExtensionGLFW : public ContextExtension {
 
     ~ExtensionGLFW();
 
-    std::vector<const char*> enable_instance_extension_names() const override;
+    std::vector<const char*> enable_instance_extension_names(
+        const std::unordered_set<std::string>& supported_instance_extensions) const override;
 
     std::vector<const char*>
-    enable_device_extension_names(const vk::PhysicalDevice& /*unused*/) const override;
+    enable_device_extension_names(const PhysicalDeviceHandle& /*unused*/) const override;
 
-    bool accept_graphics_queue(const vk::Instance& instance,
-                               const PhysicalDevice& physical_device,
+    bool accept_graphics_queue(const InstanceHandle& instance,
+                               const PhysicalDeviceHandle& physical_device,
                                std::size_t queue_family_indext) override;
 
-    bool extension_supported(const vk::Instance& instance,
-                             const PhysicalDevice& physical_device,
-                             const ExtensionContainer& extension_container,
+    bool extension_supported(const PhysicalDeviceHandle& physical_device,
                              const QueueInfo& queue_info) override;
 
     void on_context_created(const ContextHandle& context,

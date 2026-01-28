@@ -26,7 +26,8 @@ ExtensionGLFW::~ExtensionGLFW() {
         glfwTerminate();
 }
 
-std::vector<const char*> ExtensionGLFW::enable_instance_extension_names() const {
+std::vector<const char*> ExtensionGLFW::enable_instance_extension_names(
+    const std::unordered_set<std::string>& /*supported_instance_extensions*/) const {
     if (glfw_vulkan_support == GLFW_FALSE) {
         return {};
     }
@@ -39,7 +40,7 @@ std::vector<const char*> ExtensionGLFW::enable_instance_extension_names() const 
 }
 
 std::vector<const char*>
-ExtensionGLFW::enable_device_extension_names(const vk::PhysicalDevice& /*unused*/) const {
+ExtensionGLFW::enable_device_extension_names(const PhysicalDeviceHandle& /*unused*/) const {
     if (glfw_vulkan_support == GLFW_FALSE) {
         return {};
     }
@@ -49,22 +50,23 @@ ExtensionGLFW::enable_device_extension_names(const vk::PhysicalDevice& /*unused*
     };
 }
 
-bool ExtensionGLFW::accept_graphics_queue(const vk::Instance& instance,
-                                          const PhysicalDevice& physical_device,
+bool ExtensionGLFW::accept_graphics_queue(const InstanceHandle& instance,
+                                          const PhysicalDeviceHandle& physical_device,
                                           std::size_t queue_family_index) {
     return glfw_vulkan_support == GLFW_FALSE ||
-           glfwGetPhysicalDevicePresentationSupport(instance, *physical_device,
+           glfwGetPhysicalDevicePresentationSupport(**instance, **physical_device,
                                                     queue_family_index) == GLFW_TRUE;
 }
 
-bool ExtensionGLFW::extension_supported(
-    const vk::Instance& instance,
-    [[maybe_unused]] const PhysicalDevice& physical_device,
-    [[maybe_unused]] const ExtensionContainer& extension_container,
-    const QueueInfo& queue_info) {
-    return glfw_vulkan_support == GLFW_TRUE &&
-           glfwGetPhysicalDevicePresentationSupport(instance, *physical_device,
-                                                    queue_info.queue_family_idx_GCT) == GLFW_TRUE;
+bool ExtensionGLFW::extension_supported(const PhysicalDeviceHandle& physical_device,
+                                        [[maybe_unused]] const QueueInfo& queue_info) {
+    if (ContextExtension::extension_supported(physical_device, queue_info)) {
+        return glfw_vulkan_support == GLFW_TRUE &&
+               glfwGetPhysicalDevicePresentationSupport(
+                   **(physical_device->get_instance()), **physical_device,
+                   queue_info.queue_family_idx_GCT) == GLFW_TRUE;
+    }
+    return false;
 }
 
 void ExtensionGLFW::on_context_created(const ContextHandle& context,

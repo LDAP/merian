@@ -1,6 +1,5 @@
 #pragma once
 
-#include "merian/vk/extension/extension_vk_acceleration_structure.hpp"
 #include "merian/vk/memory/resource_allocations.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/utils/profiler.hpp"
@@ -58,11 +57,17 @@ class ASBuilder {
   public:
     ASBuilder(const ContextHandle& context, const ResourceAllocatorHandle& allocator)
         : context(context), allocator(allocator) {
-        const auto ext = context->get_extension<ExtensionVkAccelerationStructure>();
-        if (ext) {
-            scratch_buffer_min_alignment = ext->min_scratch_alignment();
+
+        if (context->get_device()
+                ->get_enabled_features()
+                .get_acceleration_structure_features_khr()
+                .accelerationStructure == VK_TRUE) {
+            scratch_buffer_min_alignment = context->get_physical_device()
+                                               ->get_properties()
+                                               .get_acceleration_structure_properties_khr()
+                                               .minAccelerationStructureScratchOffsetAlignment;
         } else {
-            SPDLOG_ERROR("ExtensionVkAccelerationStructure is required.");
+            SPDLOG_ERROR("AccelerationStructure support is required.");
         }
     }
 
@@ -264,7 +269,7 @@ class ASBuilder {
         }
         scratch_buffer.reset();
         scratch_buffer = allocator->create_scratch_buffer(min_size, scratch_buffer_min_alignment,
-                                                        "ASBuilder scratch buffer");
+                                                          "ASBuilder scratch buffer");
     }
 
   private:

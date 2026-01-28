@@ -4,7 +4,7 @@ namespace merian {
 PhysicalDevice::PhysicalDevice(const InstanceHandle& instance,
                                const vk::PhysicalDevice& physical_device)
     : instance(instance), physical_device(physical_device),
-      properties(physical_device, instance), supported_features(physical_device, instance) {
+      supported_features(physical_device, instance), properties(physical_device, instance) {
     // Enumerate extensions (still needed for extension_supported() method)
     for (const auto& ext : physical_device.enumerateDeviceExtensionProperties()) {
         supported_extensions.emplace(ext.extensionName);

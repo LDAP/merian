@@ -1,4 +1,4 @@
-#pragma onceVK_LAYER_KHRONOS_validation
+#pragma once
 
 #include "merian/vk/context.hpp"
 #include "merian/vk/extension/extension.hpp"
@@ -32,13 +32,15 @@ class ExtensionVkDebugUtils : public ContextExtension {
         (**instance).destroyDebugUtilsMessengerEXT(messenger);
     }
 
-    std::vector<const char*> enable_instance_extension_names() const override {
+    std::vector<const char*> enable_instance_extension_names(
+        const std::unordered_set<std::string>& /*supported_extensions*/) const override {
         return {
             VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
             VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
         };
     }
-    std::vector<const char*> enable_instance_layer_names() const override {
+    std::vector<const char*> enable_instance_layer_names(
+        const std::unordered_set<std::string>& /*supported_layers*/) const override {
         return {
             "VK_LAYER_KHRONOS_validation",
         };
