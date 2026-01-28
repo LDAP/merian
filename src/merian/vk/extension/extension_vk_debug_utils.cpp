@@ -40,8 +40,13 @@ VKAPI_ATTR vk::Bool32 VKAPI_CALL ExtensionVkDebugUtils::messenger_callback(
     spdlog::level::level_enum severity = get_severity(messageSeverity);
     std::string msg_type =
         vk::to_string(static_cast<vk::DebugUtilsMessageTypeFlagsEXT>(messageTypes));
-    spdlog::log(severity, "[{}] [{}] [{}]\n{}", msg_type, pCallbackData->pMessageIdName,
+    spdlog::log(severity, "[{}] [{}] [{}] {}", msg_type, pCallbackData->pMessageIdName,
                 pCallbackData->messageIdNumber, pCallbackData->pMessage);
+    if (severity == spdlog::level::level_enum::info ||
+        severity == spdlog::level::level_enum::trace) {
+        // prevent spaming the log.
+        return VK_FALSE;
+    }
 
     if (0 < pCallbackData->queueLabelCount) {
         std::string additional_info;
