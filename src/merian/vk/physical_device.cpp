@@ -8,7 +8,6 @@ PhysicalDevice::PhysicalDevice(const InstanceHandle& instance,
       supported_features(physical_device, instance), properties(physical_device, instance) {
 
     for (const auto& ext : physical_device.enumerateDeviceExtensionProperties()) {
-        SPDLOG_DEBUG("supports {}", ext.extensionName.data());
         supported_extensions.emplace(ext.extensionName);
     }
 

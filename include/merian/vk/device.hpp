@@ -47,20 +47,20 @@ class Device : public std::enable_shared_from_this<Device> {
                 return true;
             }
 
-            bool deps_supported = true;
+            if (!physical_device->extension_supported(ext)) {
+                SPDLOG_WARN("{} requested but not supported!", ext);
+                return false;
+            }
+
             for (const char* dep : get_extension_dependencies(ext, vk_api_version)) {
-                deps_supported &= self(self, dep);
+                [[maybe_unused]] const bool dep_supported = self(self, dep);
+                assert(dep_supported);
             }
 
-            if (deps_supported && physical_device->extension_supported(ext)) {
-                enabled_extensions.emplace(ext);
-                all_extensions.emplace_back(ext);
-                SPDLOG_DEBUG(ext);
-                return true;
-            }
-
-            SPDLOG_WARN("{} requested but not supported!", ext);
-            return false;
+            enabled_extensions.emplace(ext);
+            all_extensions.emplace_back(ext);
+            SPDLOG_DEBUG(ext);
+            return true;
         };
 
         for (const auto* const ext : additional_extensions) {
