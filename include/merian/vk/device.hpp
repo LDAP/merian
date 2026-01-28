@@ -53,8 +53,9 @@ class Device : public std::enable_shared_from_this<Device> {
             }
 
             for (const char* dep : get_extension_dependencies(ext, vk_api_version)) {
-                [[maybe_unused]] const bool dep_supported = self(self, dep);
-                assert(dep_supported);
+                [[maybe_unused]] const bool ext_dependency_supported = self(self, dep);
+                assert(ext_dependency_supported &&
+                       "extension supported but its dependencies dont.");
             }
 
             enabled_extensions.emplace(ext);
