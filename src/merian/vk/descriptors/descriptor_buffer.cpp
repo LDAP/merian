@@ -71,7 +71,8 @@ void DescriptorBuffer::update() {
 
         make_desc_get_info(desc_get_info, address_info, write);
 
-        context->get_device()->get_device().getDescriptorEXT(&desc_get_info, size, gpu_buffer + offset);
+        context->get_device()->get_device().getDescriptorEXT(&desc_get_info, size,
+                                                             gpu_buffer + offset);
     }
 
     buffer->get_memory()->unmap();
@@ -80,7 +81,8 @@ void DescriptorBuffer::update() {
 }
 
 void DescriptorBuffer::update(const CommandBufferHandle& cmd) {
-    cmd->barrier(buffer->buffer_barrier2(all_shaders2, vk::PipelineStageFlagBits2::eTransfer,
+    cmd->barrier(buffer->buffer_barrier2(context->get_device()->get_supported_pipeline_stages2(),
+                                         vk::PipelineStageFlagBits2::eTransfer,
                                          vk::AccessFlagBits2::eDescriptorBufferReadEXT,
                                          vk::AccessFlagBits2::eTransferWrite));
 
@@ -106,7 +108,8 @@ void DescriptorBuffer::update(const CommandBufferHandle& cmd) {
     }
     queued_writes.clear();
 
-    cmd->barrier(buffer->buffer_barrier2(vk::PipelineStageFlagBits2::eTransfer, all_shaders2,
+    cmd->barrier(buffer->buffer_barrier2(vk::PipelineStageFlagBits2::eTransfer,
+                                         context->get_device()->get_supported_pipeline_stages2(),
                                          vk::AccessFlagBits2::eTransferWrite,
                                          vk::AccessFlagBits2::eDescriptorBufferReadEXT));
 }
@@ -114,8 +117,9 @@ void DescriptorBuffer::update(const CommandBufferHandle& cmd) {
 void DescriptorBuffer::bind(const CommandBufferHandle& cmd,
                             const PipelineHandle& pipeline,
                             const uint32_t descriptor_set_index) const {
-    cmd->bind_descriptor_buffer(pipeline, descriptor_set_index,
-                                std::static_pointer_cast<const DescriptorBuffer>(shared_from_this()));
+    cmd->bind_descriptor_buffer(
+        pipeline, descriptor_set_index,
+        std::static_pointer_cast<const DescriptorBuffer>(shared_from_this()));
 }
 
 } // namespace merian

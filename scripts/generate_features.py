@@ -252,10 +252,14 @@ def generate_class_methods_declaration(features: list[FeatureStruct]) -> list[st
         "    // Named getters for each feature struct",
     ]
 
+    lines.append("    vk::PhysicalDeviceFeatures& get_features();")
+    lines.append("    const vk::PhysicalDeviceFeatures& get_features() const;")
+    lines.append("    operator const vk::PhysicalDeviceFeatures&() const;")
     for feat in sorted(features, key=lambda f: f.cpp_name):
         getter_name = generate_getter_name(feat.cpp_name)
         lines.append(f"    vk::{feat.cpp_name}& {getter_name}();")
         lines.append(f"    const vk::{feat.cpp_name}& {getter_name}() const;")
+        lines.append(f"    operator const vk::{feat.cpp_name}&() const;")
 
     lines.extend(["", "    // Alias getters (for backwards compatibility)"])
 
@@ -519,6 +523,20 @@ def generate_named_getters(features: list[FeatureStruct]) -> list[str]:
     """Generate named getter implementations."""
     lines = ["// Named getter implementations"]
 
+    lines.extend(
+        [
+            "vk::PhysicalDeviceFeatures& VulkanFeatures::get_features() {",
+            "    return m_features2.features;",
+            "}",
+            "const vk::PhysicalDeviceFeatures& VulkanFeatures::get_features() const {",
+            "    return m_features2.features;",
+            "}",
+            "VulkanFeatures::operator const vk::PhysicalDeviceFeatures&() const {",
+            "    return m_features2.features;",
+            "}",
+        ]
+    )
+
     for feat in sorted(features, key=lambda f: f.cpp_name):
         member_name = generate_member_name(feat.cpp_name)
         getter_name = generate_getter_name(feat.cpp_name)
@@ -528,6 +546,9 @@ def generate_named_getters(features: list[FeatureStruct]) -> list[str]:
                 f"    return {member_name};",
                 "}",
                 f"const vk::{feat.cpp_name}& VulkanFeatures::{getter_name}() const {{",
+                f"    return {member_name};",
+                "}",
+                f"VulkanFeatures::operator const vk::{feat.cpp_name}&() const {{",
                 f"    return {member_name};",
                 "}",
             ]

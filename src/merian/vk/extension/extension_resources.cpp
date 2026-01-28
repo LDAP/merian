@@ -27,15 +27,14 @@ ExtensionResources::enable_device_features(const PhysicalDeviceHandle& physical_
     if (physical_device->get_supported_features()
             .get_buffer_device_address_features()
             .bufferDeviceAddress == VK_TRUE) {
-        return {"vulkan12/bufferDeviceAddress"};
+        return {"Vulkan12/bufferDeviceAddress"};
     }
     return {};
 }
 
-bool ExtensionResources::extension_supported(
-    const std::unordered_set<std::string>& /*supported_instance_extensions*/,
-    const std::unordered_set<std::string>& /*supported_instance_layers*/) {
-    return true; // always supported
+bool ExtensionResources::extension_supported(const PhysicalDeviceHandle& /*physical_device*/,
+                                             const QueueInfo& /*queue_info*/) {
+    return true;
 }
 
 void ExtensionResources::on_physical_device_selected(const PhysicalDeviceHandle& physical_device) {
@@ -59,6 +58,13 @@ void ExtensionResources::on_physical_device_selected(const PhysicalDeviceHandle&
         SPDLOG_DEBUG("VMA extension: enable VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT");
     }
 }
+
+void ExtensionResources::on_context_created(const ContextHandle& context,
+                                            const ExtensionContainer& /*extension_container*/) {
+    weak_context = context;
+}
+
+// --------------------
 
 MemoryAllocatorHandle ExtensionResources::memory_allocator() {
     if (_memory_allocator.expired()) {

@@ -6,7 +6,9 @@
 
 namespace merian {
 
-vk::PipelineStageFlags pipeline_stage_for_access_flags(const vk::AccessFlags& flags) {
+vk::PipelineStageFlags
+pipeline_stage_for_access_flags(const vk::AccessFlags& flags,
+                                const vk::PipelineStageFlags supported_pipeline_stages) {
     using AF = vk::AccessFlagBits;
     using PS = vk::PipelineStageFlagBits;
 
@@ -15,10 +17,10 @@ vk::PipelineStageFlags pipeline_stage_for_access_flags(const vk::AccessFlags& fl
         {AF::eIndirectCommandRead                 , PS::eDrawIndirect}, 
         {AF::eIndexRead                           , PS::eVertexInput}, 
         {AF::eVertexAttributeRead                 , PS::eVertexInput}, 
-        {AF::eUniformRead                         , all_shaders}, 
+        {AF::eUniformRead                         , supported_pipeline_stages}, 
         {AF::eInputAttachmentRead                 , PS::eFragmentShader}, 
-        {AF::eShaderRead                          , all_shaders}, 
-        {AF::eShaderWrite                         , all_shaders}, 
+        {AF::eShaderRead                          , supported_pipeline_stages}, 
+        {AF::eShaderWrite                         , supported_pipeline_stages}, 
         {AF::eColorAttachmentRead                 , PS::eColorAttachmentOutput}, 
         {AF::eColorAttachmentWrite                , PS::eColorAttachmentOutput}, 
         {AF::eDepthStencilAttachmentRead          , PS::eEarlyFragmentTests | PS::eLateFragmentTests}, 
@@ -35,10 +37,10 @@ vk::PipelineStageFlags pipeline_stage_for_access_flags(const vk::AccessFlags& fl
         // {AF::eTransformFeedbackCounterWriteEXT    , }, 
         // {AF::eConditionalRenderingReadEXT         , }, 
         {AF::eColorAttachmentReadNoncoherentEXT   , PS::eColorAttachmentOutput}, 
-        {AF::eAccelerationStructureReadKHR        , PS::eAccelerationStructureBuildNV | all_shaders}, 
+        {AF::eAccelerationStructureReadKHR        , PS::eAccelerationStructureBuildNV | supported_pipeline_stages}, 
         {AF::eAccelerationStructureWriteKHR       , PS::eAccelerationStructureBuildKHR}, 
         //{AF::eShadingRateImageReadNV              , }, 
-        {AF::eAccelerationStructureReadNV         , PS::eAccelerationStructureBuildNV | all_shaders | PS::eRayTracingShaderNV}, 
+        {AF::eAccelerationStructureReadNV         , PS::eAccelerationStructureBuildNV | supported_pipeline_stages | PS::eRayTracingShaderNV}, 
         {AF::eAccelerationStructureWriteNV        , PS::eAccelerationStructureBuildNV}, 
         // {AF::eFragmentDensityMapReadEXT           , }, 
         // {AF::eFragmentShadingRateAttachmentReadKHR, }, 
@@ -56,7 +58,9 @@ vk::PipelineStageFlags pipeline_stage_for_access_flags(const vk::AccessFlags& fl
     return result_flags;
 }
 
-vk::PipelineStageFlags2 pipeline_stage_for_access_flags2(const vk::AccessFlags2& flags) {
+vk::PipelineStageFlags2
+pipeline_stage_for_access_flags2(const vk::AccessFlags2& flags,
+                                 const vk::PipelineStageFlags2 supported_pipeline_stages) {
     using AF = vk::AccessFlagBits2;
     using PS = vk::PipelineStageFlagBits2;
 
@@ -65,10 +69,10 @@ vk::PipelineStageFlags2 pipeline_stage_for_access_flags2(const vk::AccessFlags2&
         {AF::eIndirectCommandRead                 , PS::eDrawIndirect}, 
         {AF::eIndexRead                           , PS::eVertexInput}, 
         {AF::eVertexAttributeRead                 , PS::eVertexInput}, 
-        {AF::eUniformRead                         , all_shaders2}, 
+        {AF::eUniformRead                         , supported_pipeline_stages}, 
         {AF::eInputAttachmentRead                 , PS::eFragmentShader}, 
-        {AF::eShaderRead                          , all_shaders2}, 
-        {AF::eShaderWrite                         , all_shaders2}, 
+        {AF::eShaderRead                          , supported_pipeline_stages}, 
+        {AF::eShaderWrite                         , supported_pipeline_stages}, 
         {AF::eColorAttachmentRead                 , PS::eColorAttachmentOutput}, 
         {AF::eColorAttachmentWrite                , PS::eColorAttachmentOutput}, 
         {AF::eDepthStencilAttachmentRead          , PS::eEarlyFragmentTests | PS::eLateFragmentTests}, 
@@ -85,10 +89,10 @@ vk::PipelineStageFlags2 pipeline_stage_for_access_flags2(const vk::AccessFlags2&
         // {AF::eTransformFeedbackCounterWriteEXT    , }, 
         // {AF::eConditionalRenderingReadEXT         , }, 
         {AF::eColorAttachmentReadNoncoherentEXT   , PS::eColorAttachmentOutput}, 
-        {AF::eAccelerationStructureReadKHR        , PS::eAccelerationStructureBuildNV | all_shaders2}, 
+        {AF::eAccelerationStructureReadKHR        , PS::eAccelerationStructureBuildNV | supported_pipeline_stages}, 
         {AF::eAccelerationStructureWriteKHR       , PS::eAccelerationStructureBuildKHR}, 
         //{AF::eShadingRateImageReadNV              , }, 
-        {AF::eAccelerationStructureReadNV         , PS::eAccelerationStructureBuildNV | all_shaders2 | PS::eRayTracingShaderNV}, 
+        {AF::eAccelerationStructureReadNV         , PS::eAccelerationStructureBuildNV | supported_pipeline_stages | PS::eRayTracingShaderNV}, 
         {AF::eAccelerationStructureWriteNV        , PS::eAccelerationStructureBuildNV}, 
         // {AF::eFragmentDensityMapReadEXT           , }, 
         // {AF::eFragmentShadingRateAttachmentReadKHR, }, 
@@ -106,14 +110,16 @@ vk::PipelineStageFlags2 pipeline_stage_for_access_flags2(const vk::AccessFlags2&
     return result_flags;
 }
 
-vk::ImageMemoryBarrier2 barrier_image_layout(const vk::Image& image,
-                                             const vk::ImageLayout& old_image_layout,
-                                             const vk::ImageLayout& new_image_layout,
-                                             const vk::ImageSubresourceRange& subresource_range) {
+vk::ImageMemoryBarrier2
+barrier_image_layout(const vk::Image& image,
+                     const vk::ImageLayout& old_image_layout,
+                     const vk::ImageLayout& new_image_layout,
+                     const vk::ImageSubresourceRange& subresource_range,
+                     const vk::PipelineStageFlags2 supported_pipeline_stages) {
     vk::ImageMemoryBarrier2 image_memory_barrier{
-        pipeline_stage2_for_image_layout(old_image_layout),
+        pipeline_stage2_for_image_layout(old_image_layout, supported_pipeline_stages),
         access_flags2_for_image_layout(old_image_layout),
-        pipeline_stage2_for_image_layout(new_image_layout),
+        pipeline_stage2_for_image_layout(new_image_layout, supported_pipeline_stages),
         access_flags2_for_image_layout(new_image_layout),
         old_image_layout,
         new_image_layout,
@@ -126,12 +132,14 @@ vk::ImageMemoryBarrier2 barrier_image_layout(const vk::Image& image,
     return image_memory_barrier;
 }
 
-vk::ImageMemoryBarrier2 barrier_image_layout(const vk::Image& image,
-                                             const vk::ImageLayout& old_image_layout,
-                                             const vk::ImageLayout& new_image_layout,
-                                             const vk::ImageAspectFlags& aspect_mask) {
+vk::ImageMemoryBarrier2
+barrier_image_layout(const vk::Image& image,
+                     const vk::ImageLayout& old_image_layout,
+                     const vk::ImageLayout& new_image_layout,
+                     const vk::PipelineStageFlags2 supported_pipeline_stages,
+                     const vk::ImageAspectFlags& aspect_mask) {
     return barrier_image_layout(image, old_image_layout, new_image_layout,
-                                all_levels_and_layers(aspect_mask));
+                                all_levels_and_layers(aspect_mask), supported_pipeline_stages);
 }
 
 } // namespace merian

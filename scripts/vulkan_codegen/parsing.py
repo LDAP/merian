@@ -6,7 +6,9 @@ import xml.etree.ElementTree as ET
 from .models import Extension, ExtensionDep
 
 
-def parse_depends(depends: str, ext_name_map: dict[str, str]) -> list[list[ExtensionDep]]:
+def parse_depends(
+    depends: str, ext_name_map: dict[str, str]
+) -> list[list[ExtensionDep]]:
     """
     Parse the depends attribute into a list of OR'd dependencies,
     where each OR'd item is a list of AND'd dependencies.
@@ -66,7 +68,9 @@ def parse_depends(depends: str, ext_name_map: dict[str, str]) -> list[list[Exten
                 match = re.match(r"VK_VERSION_(\d+)_(\d+)", and_part)
                 if match:
                     major, minor = match.groups()
-                    and_deps.append(ExtensionDep(version=f"VK_API_VERSION_{major}_{minor}"))
+                    and_deps.append(
+                        ExtensionDep(version=f"VK_API_VERSION_{major}_{minor}")
+                    )
             elif and_part.startswith("VK_"):
                 # It's an extension requirement
                 ext_macro = ext_name_map.get(and_part)
@@ -139,6 +143,7 @@ def find_extensions(xml_root: ET.Element) -> list[Extension]:
     # Now parse extensions with their dependencies
     for ext in xml_root.findall("extensions/extension"):
         ext_name = ext.get("name")
+        type = ext.get("type", "")
         ext_supported = ext.get("supported", "")
 
         # Skip extensions not for Vulkan
@@ -160,6 +165,7 @@ def find_extensions(xml_root: ET.Element) -> list[Extension]:
             Extension(
                 name=ext_name,
                 name_macro=ext_name_macro,
+                type=type,
                 dependencies=dependencies,
             )
         )

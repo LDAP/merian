@@ -107,8 +107,8 @@ Image::Image(const ContextHandle& context,
     : context(context), image(image), create_info(create_info), current_layout(current_layout) {}
 
 Image::Image(const ContextHandle& context, const vk::ImageCreateInfo create_info)
-    : context(context), image(context->get_device()->get_device().createImage(create_info)), create_info(create_info),
-      current_layout(create_info.initialLayout) {}
+    : context(context), image(context->get_device()->get_device().createImage(create_info)),
+      create_info(create_info), current_layout(create_info.initialLayout) {}
 
 Image::~Image() {
     SPDLOG_TRACE("destroy image ({})", fmt::ptr(static_cast<VkImage>(image)));
@@ -121,10 +121,14 @@ vk::MemoryRequirements Image::get_memory_requirements() const {
 
 vk::FormatFeatureFlags Image::format_features() const {
     if (get_tiling() == vk::ImageTiling::eOptimal) {
-        return context->get_physical_device()->get_physical_device().getFormatProperties(get_format())
+        return context->get_physical_device()
+            ->get_physical_device()
+            .getFormatProperties(get_format())
             .optimalTilingFeatures;
     }
-    return context->get_physical_device()->get_physical_device().getFormatProperties(get_format())
+    return context->get_physical_device()
+        ->get_physical_device()
+        .getFormatProperties(get_format())
         .linearTilingFeatures;
 }
 
@@ -139,9 +143,12 @@ vk::ImageMemoryBarrier2 Image::barrier2(const vk::ImageLayout new_layout,
                                         const bool transition_from_undefined) {
     return barrier2(new_layout, access_flags2_for_image_layout(current_layout),
                     access_flags2_for_image_layout(new_layout),
-                    pipeline_stage2_for_image_layout(current_layout),
-                    pipeline_stage2_for_image_layout(new_layout), VK_QUEUE_FAMILY_IGNORED,
-                    VK_QUEUE_FAMILY_IGNORED, all_levels_and_layers(), transition_from_undefined);
+                    pipeline_stage2_for_image_layout(
+                        current_layout, context->get_device()->get_supported_pipeline_stages2()),
+                    pipeline_stage2_for_image_layout(
+                        new_layout, context->get_device()->get_supported_pipeline_stages2()),
+                    VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, all_levels_and_layers(),
+                    transition_from_undefined);
 }
 
 // Do not forget submit the barrier, else the internal state does not match the actual state
@@ -477,13 +484,17 @@ AccelerationStructure::AccelerationStructure(
 
 AccelerationStructure::~AccelerationStructure() {
     SPDLOG_TRACE("destroy acceleration structure ({})", fmt::ptr(this));
-    buffer->get_memory()->get_context()->get_device()->get_device().destroyAccelerationStructureKHR(as);
+    buffer->get_memory()->get_context()->get_device()->get_device().destroyAccelerationStructureKHR(
+        as);
 }
 
 vk::DeviceAddress AccelerationStructure::get_acceleration_structure_device_address() const {
     vk::AccelerationStructureDeviceAddressInfoKHR address_info{as};
-    return buffer->get_memory()->get_context()->get_device()->get_device().getAccelerationStructureAddressKHR(
-        address_info);
+    return buffer->get_memory()
+        ->get_context()
+        ->get_device()
+        ->get_device()
+        .getAccelerationStructureAddressKHR(address_info);
 }
 
 void AccelerationStructure::properties(Properties& props) {

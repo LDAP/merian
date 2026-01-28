@@ -218,7 +218,7 @@ void Context::select_physical_device(
             uint32_t context_extensions_supported = 0;
             for (const auto& ext : context_extensions) {
                 context_extensions_supported += static_cast<uint32_t>(
-                    ext.second->extension_supported(physical_devices[i], queue_info));
+                    ext.second->extension_supported(physical_devices[i], q_info));
             }
 
             uint32_t extensions_supported = 0;
@@ -234,10 +234,12 @@ void Context::select_physical_device(
             for (const auto& feature_struct_name : desired_features.get_feature_struct_names()) {
                 for (const auto& feature :
                      desired_features.get_feature_names(feature_struct_name)) {
-                    features_supported += static_cast<uint32_t>(
-                        physical_devices[i]->get_supported_features().get_feature(
-                            feature_struct_name, feature));
-                    features_total++;
+                    if (desired_features.get_feature(feature_struct_name, feature)) {
+                        features_supported += static_cast<uint32_t>(
+                            physical_devices[i]->get_supported_features().get_feature(
+                                feature_struct_name, feature));
+                        features_total++;
+                    }
                 }
             }
 
@@ -247,7 +249,7 @@ void Context::select_physical_device(
                 context_extensions_supported, context_extensions.size(), extensions_supported,
                 extensions_total, features_supported, features_total);
 
-            matches.emplace_back(physical_devices[i], std::move(queue_info),
+            matches.emplace_back(physical_devices[i], std::move(q_info),
                                  context_extensions_supported, extensions_supported,
                                  features_supported);
         }

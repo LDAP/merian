@@ -18,6 +18,7 @@ class Extension:
 
     name: str  # e.g., VK_KHR_swapchain
     name_macro: str  # e.g., VK_KHR_SWAPCHAIN_EXTENSION_NAME
+    type: str  # device or instance
     dependencies: list[list[ExtensionDep]] = field(default_factory=list)  # OR of ANDs
 
 

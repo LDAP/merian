@@ -80,6 +80,39 @@ class Device : public std::enable_shared_from_this<Device> {
         SPDLOG_DEBUG("create pipeline cache");
         vk::PipelineCacheCreateInfo pipeline_cache_create_info{};
         pipeline_cache = device.createPipelineCache(pipeline_cache_create_info);
+
+        const vk::PhysicalDeviceFeatures& base_features = enabled_features;
+        supported_pipeline_stages = vk::PipelineStageFlagBits::eVertexShader |
+                                    vk::PipelineStageFlagBits::eFragmentShader |
+                                    vk::PipelineStageFlagBits::eComputeShader;
+        supported_pipeline_stages2 = vk::PipelineStageFlagBits2::eVertexShader |
+                                     vk::PipelineStageFlagBits2::eFragmentShader |
+                                     vk::PipelineStageFlagBits2::eComputeShader;
+        if (base_features.tessellationShader == VK_TRUE) {
+            supported_pipeline_stages |= vk::PipelineStageFlagBits::eTessellationControlShader |
+                                         vk::PipelineStageFlagBits::eTessellationEvaluationShader;
+            supported_pipeline_stages2 |= vk::PipelineStageFlagBits2::eTessellationControlShader |
+                                          vk::PipelineStageFlagBits2::eTessellationEvaluationShader;
+        }
+        if (base_features.geometryShader == VK_TRUE) {
+            supported_pipeline_stages |= vk::PipelineStageFlagBits::eGeometryShader;
+            supported_pipeline_stages2 |= vk::PipelineStageFlagBits2::eGeometryShader;
+        }
+        const vk::PhysicalDeviceRayTracingPipelineFeaturesKHR& rt_pipeline_features =
+            enabled_features;
+        if (rt_pipeline_features.rayTracingPipeline == VK_TRUE) {
+            supported_pipeline_stages |= vk::PipelineStageFlagBits::eRayTracingShaderKHR;
+            supported_pipeline_stages2 |= vk::PipelineStageFlagBits2::eRayTracingShaderKHR;
+        }
+        const vk::PhysicalDeviceMeshShaderFeaturesEXT& mesh_shader_features = enabled_features;
+        if (mesh_shader_features.meshShader == VK_TRUE) {
+            supported_pipeline_stages |= vk::PipelineStageFlagBits::eMeshShaderEXT;
+            supported_pipeline_stages2 |= vk::PipelineStageFlagBits2::eMeshShaderEXT;
+        }
+        if (mesh_shader_features.taskShader == VK_TRUE) {
+            supported_pipeline_stages |= vk::PipelineStageFlagBits::eTaskShaderEXT;
+            supported_pipeline_stages2 |= vk::PipelineStageFlagBits2::eTaskShaderEXT;
+        }
     }
 
   public:
@@ -125,10 +158,18 @@ class Device : public std::enable_shared_from_this<Device> {
         return enabled_extensions;
     }
 
-    // ---------------------------------------------
-
     const VulkanFeatures& get_enabled_features() const {
         return enabled_features;
+    }
+
+    // ---------------------------------------------
+
+    vk::PipelineStageFlags get_supported_pipeline_stages() const {
+        return supported_pipeline_stages;
+    }
+
+    vk::PipelineStageFlags2 get_supported_pipeline_stages2() const {
+        return supported_pipeline_stages2;
     }
 
   private:
@@ -138,8 +179,10 @@ class Device : public std::enable_shared_from_this<Device> {
     VulkanFeatures enabled_features;
 
     vk::Device device;
-
     vk::PipelineCache pipeline_cache;
+
+    vk::PipelineStageFlags supported_pipeline_stages;
+    vk::PipelineStageFlags2 supported_pipeline_stages2;
 };
 
 using DeviceHandle = std::shared_ptr<Device>;
