@@ -34,6 +34,7 @@ merian_src = files(
     'vk/utils/vulkan_extensions.cpp',
     'vk/utils/vulkan_features.cpp',
     'vk/utils/vulkan_properties.cpp',
+    'vk/utils/vulkan_spirv.cpp',
     'vk/memory/memory_allocator.cpp',
     'vk/memory/memory_allocator_vma.cpp',
     'vk/memory/resource_allocations.cpp',

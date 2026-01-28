@@ -13,7 +13,13 @@ Instance::Instance(const vk::InstanceCreateInfo& instance_create_info)
                          instance_create_info.enabledLayerCount),
       enabled_extensions(instance_create_info.ppEnabledExtensionNames,
                          instance_create_info.ppEnabledExtensionNames +
-                             instance_create_info.enabledExtensionCount) {}
+                             instance_create_info.enabledExtensionCount) {
+    [[maybe_unused]] const uint32_t instance_vulkan_version = vk::enumerateInstanceVersion();
+    SPDLOG_DEBUG("instance ({}) created (version: {}.{}.{})", fmt::ptr(VkInstance(instance)),
+                 VK_API_VERSION_MAJOR(instance_vulkan_version),
+                 VK_API_VERSION_MINOR(instance_vulkan_version),
+                 VK_API_VERSION_PATCH(instance_vulkan_version));
+}
 
 InstanceHandle Instance::create(const vk::InstanceCreateInfo& instance_create_info) {
     return InstanceHandle(new Instance(instance_create_info));

@@ -166,11 +166,6 @@ void Context::create_instance(const uint32_t vk_api_version) {
     };
 
     instance = Instance::create(instance_create_info);
-    [[maybe_unused]] const uint32_t instance_vulkan_version = vk::enumerateInstanceVersion();
-    SPDLOG_DEBUG("instance created (version: {}.{}.{})",
-                 VK_API_VERSION_MAJOR(instance_vulkan_version),
-                 VK_API_VERSION_MINOR(instance_vulkan_version),
-                 VK_API_VERSION_PATCH(instance_vulkan_version));
 
     // Must happen before on_instance_created since it requires dynamic loading
     VULKAN_HPP_DEFAULT_DISPATCHER.init(**instance);

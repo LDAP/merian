@@ -131,41 +131,33 @@ def find_properties_from_api_versions(xml_root, tags):
                 for typedef in xml_root.findall("types/type"):
                     if typedef.get("name") == type_name:
                         struct_extends = typedef.get("structextends", "")
-                        if (
-                            "VkPhysicalDeviceProperties2" in struct_extends
-                            or type_name == "VkPhysicalDeviceProperties2"
-                        ):
-                            if type_name == "VkPhysicalDeviceProperties2":
-                                enum_name = "ePhysicalDeviceProperties2"
-                                version_to_stypes.setdefault(api_version, []).append(
-                                    enum_name
-                                )
-                            else:
-                                for member in typedef.findall("member"):
-                                    member_name_elem = member.find("name")
-                                    if (
-                                        member_name_elem is not None
-                                        and member_name_elem.text == "sType"
-                                    ):
-                                        stype_value = member.get("values")
-                                        if stype_value:
-                                            enum_name = "e" + to_camel_case(
-                                                stype_value.replace(
-                                                    "VK_STRUCTURE_TYPE_", ""
-                                                ),
-                                                tags,
-                                            )
-                                            version_to_stypes.setdefault(
-                                                api_version, []
-                                            ).append(enum_name)
-                                        break
+                        if "VkPhysicalDeviceProperties2" in struct_extends:
+                            for member in typedef.findall("member"):
+                                member_name_elem = member.find("name")
+                                if (
+                                    member_name_elem is not None
+                                    and member_name_elem.text == "sType"
+                                ):
+                                    stype_value = member.get("values")
+                                    if stype_value:
+                                        enum_name = "e" + to_camel_case(
+                                            stype_value.replace(
+                                                "VK_STRUCTURE_TYPE_", ""
+                                            ),
+                                            tags,
+                                        )
+                                        version_to_stypes.setdefault(
+                                            api_version, []
+                                        ).append(enum_name)
+                                    break
                         break
 
     return version_to_stypes
 
 
 def find_property_extension_mapping(
-    xml_root, tags,
+    xml_root,
+    tags,
 ) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
     """Find mapping of extensions and API versions to property structure types."""
     ext_name_map = build_extension_name_map(xml_root)
@@ -200,14 +192,14 @@ def generate_header(extensions) -> str:
         "std::vector<const char*> get_extension_dependencies(const char* name, uint32_t vk_api_version);",
         "",
         "/**",
-        " * @brief Get the property structure types provided by an extension.",
+        " * @brief For a extension, gets the new vk::StructureTypes that extend vk::VkPhysicalDeviceProperties2.",
         " * @param name The extension name macro.",
         " * @return Vector of vk::StructureType values for property structs from this extension.",
         " */",
         "std::vector<vk::StructureType> get_extension_property_types(const char* name);",
         "",
         "/**",
-        " * @brief Get all property structure types available at a given API version.",
+        " * @brief For a given API version, gets the new vk::StructureTypes that extend vk::VkPhysicalDeviceProperties2.",
         " * @param vk_api_version The Vulkan API version.",
         " * @return Vector of vk::StructureType values for core property structs (cumulative).",
         " */",
