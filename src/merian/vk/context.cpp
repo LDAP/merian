@@ -15,9 +15,9 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 namespace merian {
 
 ContextHandle
-Context::create(const std::vector<std::string>& features,
-                const std::vector<const char*>& extensions,
-                const std::vector<std::shared_ptr<ContextExtension>>& context_extensions,
+Context::create(const VulkanFeatures& desired_features,
+                const std::vector<const char*>& desired_additional_extensions,
+                const std::vector<std::shared_ptr<ContextExtension>>& desired_context_extensions,
                 const std::string& application_name,
                 const uint32_t application_vk_version,
                 const uint32_t preffered_number_compute_queues,
@@ -29,9 +29,9 @@ Context::create(const std::vector<std::string>& features,
 
     // call constructor manually since its private for make_shared...
     const ContextHandle context = std::shared_ptr<Context>(new Context(
-        features, extensions, context_extensions, application_name, application_vk_version,
-        preffered_number_compute_queues, vk_api_version, require_extension_support,
-        filter_vendor_id, filter_device_id, filter_device_name));
+        desired_features, desired_additional_extensions, desired_context_extensions,
+        application_name, application_vk_version, preffered_number_compute_queues, vk_api_version,
+        require_extension_support, filter_vendor_id, filter_device_id, filter_device_name));
 
     for (auto& ext : context->context_extensions) {
         ext.second->on_context_created(context, *context);
@@ -40,9 +40,9 @@ Context::create(const std::vector<std::string>& features,
     return context;
 }
 
-Context::Context(const std::vector<std::string>& features,
-                 const std::vector<const char*>& extensions,
-                 const std::vector<std::shared_ptr<ContextExtension>>& context_extensions,
+Context::Context(const VulkanFeatures& desired_features,
+                 const std::vector<const char*>& desired_additional_extensions,
+                 const std::vector<std::shared_ptr<ContextExtension>>& desired_context_extensions,
                  const std::string& application_name,
                  const uint32_t application_vk_version,
                  const uint32_t preffered_number_compute_queues,
@@ -51,9 +51,7 @@ Context::Context(const std::vector<std::string>& features,
                  const uint32_t filter_vendor_id,
                  const uint32_t filter_device_id,
                  const std::string& filter_device_name)
-    : requested_features(features),
-      application_name(application_name),
-      application_vk_version(application_vk_version) {
+    : application_name(application_name), application_vk_version(application_vk_version) {
     merian::Stopwatch sw;
 
     SPDLOG_INFO("\n\n\
@@ -74,7 +72,7 @@ Version: {}\n\n",
     VULKAN_HPP_DEFAULT_DISPATCHER.init();
 
     SPDLOG_DEBUG("supplied extensions:");
-    for (const auto& ext : context_extensions) {
+    for (const auto& ext : desired_context_extensions) {
         SPDLOG_DEBUG("{}", ext->name);
         if (this->context_extensions.contains(typeindex_from_pointer(ext))) {
             throw std::runtime_error{"A extension type can only be added once."};
@@ -83,7 +81,7 @@ Version: {}\n\n",
     }
 
     for (const auto& ext : context_extensions) {
-        ext->on_context_initializing(*this);
+        ext.second->on_context_initializing(*this);
     }
 
     extensions_check_instance_layer_support(require_extension_support);
@@ -95,27 +93,20 @@ Version: {}\n\n",
     prepare_physical_device(filter_vendor_id, filter_device_id, filter_device_name);
 
     extensions_check_device_extension_support(require_extension_support);
+
     find_queues();
+
     extensions_self_check_support(require_extension_support);
+
     for (auto& ext : this->context_extensions) {
         ext.second->on_extension_support_confirmed(*this);
     }
+
     create_device_and_queues(preffered_number_compute_queues);
 
     prepare_shader_include_defines();
-    // add those first => prefer development headers.
-    file_loader.add_search_path(default_shader_include_paths);
 
-    // add common folders to file loader
-    if (const auto portable_prefix = FileLoader::portable_prefix(); portable_prefix) {
-        file_loader.add_search_path(*portable_prefix);
-    }
-    if (const auto install_prefix = FileLoader::install_prefix(); install_prefix) {
-        file_loader.add_search_path(*install_prefix);
-    }
-    file_loader.add_search_path(FileLoader::install_datadir_name());
-    file_loader.add_search_path(FileLoader::install_datadir_name() / MERIAN_PROJECT_NAME);
-    file_loader.add_search_path(FileLoader::install_includedir_name());
+    prepare_file_loader();
 
     slang_session = SlangSession::get_or_create(ShaderCompileContext::create(*this));
 
@@ -511,6 +502,22 @@ void Context::prepare_shader_include_defines() {
 #endif
 }
 
+void Context::prepare_file_loader() {
+    // add those first => prefer development headers.
+    file_loader.add_search_path(default_shader_include_paths);
+
+    // add common folders to file loader
+    if (const auto portable_prefix = FileLoader::portable_prefix(); portable_prefix) {
+        file_loader.add_search_path(*portable_prefix);
+    }
+    if (const auto install_prefix = FileLoader::install_prefix(); install_prefix) {
+        file_loader.add_search_path(*install_prefix);
+    }
+    file_loader.add_search_path(FileLoader::install_datadir_name());
+    file_loader.add_search_path(FileLoader::install_datadir_name() / MERIAN_PROJECT_NAME);
+    file_loader.add_search_path(FileLoader::install_includedir_name());
+}
+
 ////////////
 // HELPERS
 ////////////
@@ -714,25 +721,6 @@ std::shared_ptr<CommandPool> Context::get_cmd_pool_C() {
     cmd_pool_C = cmd;
     return cmd;
 }
-
-bool Context::device_extension_enabled(const std::string& name) const {
-    return std::find_if(device_extensions.begin(), device_extensions.end(),
-                        [&](const char* s) { return name == s; }) != device_extensions.end();
-}
-
-// bool Context::instance_extension_enabled(const std::string& name) const {
-//     return std::find_if(instance_extension_names.begin(), instance_extension_names.end(),
-//                         [&](const char* s) { return name == s; }) !=
-//                         instance_extension_names.end();
-// }
-
-const std::vector<const char*>& Context::get_enabled_device_extensions() const {
-    return device_extensions;
-}
-
-// const std::vector<const char*>& Context::get_enabled_instance_extensions() const {
-//     return instance_extension_names;
-// }
 
 const std::vector<std::filesystem::path>& Context::get_default_shader_include_paths() const {
     return default_shader_include_paths;

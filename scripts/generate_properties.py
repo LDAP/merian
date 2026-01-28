@@ -134,7 +134,9 @@ def build_feature_type_map(xml_root):
     return feature_type_map
 
 
-def determine_property_metadata(vk_name, ext_type_map, promotedto_map, feature_type_map):
+def determine_property_metadata(
+    vk_name, ext_type_map, promotedto_map, feature_type_map
+):
     """Determine extension and core_version for a property struct."""
     extension = None
     core_version = None
@@ -189,7 +191,11 @@ def find_property_structures(xml_root, tags) -> list[PropertyStruct]:
         stype = None
         for member in type_elem.findall("member"):
             member_name = member.find("name")
-            if member_name is not None and member_name.text == "sType" and member.get("values"):
+            if (
+                member_name is not None
+                and member_name.text == "sType"
+                and member.get("values")
+            ):
                 stype = member.get("values")
                 break
 
@@ -277,35 +283,39 @@ def generate_class_declaration(properties: list[PropertyStruct]) -> list[str]:
         getter_name = generate_getter_name(prop.cpp_name)
         lines.append(f"    const vk::{prop.cpp_name}& {getter_name}() const;")
 
-    lines.extend([
-        "",
-        "    /// Check if property struct is available (only valid after physical_device constructor)",
-        "    bool is_available(vk::StructureType stype) const;",
-        "",
-        "    template<typename T> requires VulkanPropertyStruct<T>",
-        "    bool is_available() const {",
-        "        return is_available(T::structureType);",
-        "    }",
-        "",
-        "  private:",
-        "    /// Internal: get pointer to struct by StructureType",
-        "    const void* get_struct_ptr(vk::StructureType stype) const;",
-        "",
-        "    // Property struct members (~120 structs)",
-    ])
+    lines.extend(
+        [
+            "",
+            "    /// Check if property struct is available (only valid after physical_device constructor)",
+            "    bool is_available(vk::StructureType stype) const;",
+            "",
+            "    template<typename T> requires VulkanPropertyStruct<T>",
+            "    bool is_available() const {",
+            "        return is_available(T::structureType);",
+            "    }",
+            "",
+            "  private:",
+            "    /// Internal: get pointer to struct by StructureType",
+            "    const void* get_struct_ptr(vk::StructureType stype) const;",
+            "",
+            "    // Property struct members (~120 structs)",
+        ]
+    )
 
     for prop in sorted(properties, key=lambda p: p.cpp_name):
         member_name = generate_member_name(prop.cpp_name)
         lines.append(f"    vk::{prop.cpp_name} {member_name}{{}};")
 
-    lines.extend([
-        "",
-        "    vk::PhysicalDeviceProperties2 m_properties2{};",
-        "",
-        "    /// Track which structs are available via extensions or API version",
-        "    std::unordered_set<vk::StructureType> available_structs;",
-        "};",
-    ])
+    lines.extend(
+        [
+            "",
+            "    vk::PhysicalDeviceProperties2 m_properties2{};",
+            "",
+            "    /// Track which structs are available via extensions or API version",
+            "    std::unordered_set<vk::StructureType> available_structs;",
+            "};",
+        ]
+    )
 
     return lines
 
@@ -334,11 +344,13 @@ def generate_header(extensions, properties: list[PropertyStruct]) -> str:
 
     lines.extend(generate_concept_definition(properties))
     lines.extend(generate_class_declaration(properties))
-    lines.extend([
-        "",
-        "} // namespace merian",
-        "",
-    ])
+    lines.extend(
+        [
+            "",
+            "} // namespace merian",
+            "",
+        ]
+    )
 
     return "\n".join(lines)
 
@@ -443,15 +455,17 @@ def generate_named_getters(properties: list[PropertyStruct], tags) -> list[str]:
         stype_enum = prop.stype.replace("VK_STRUCTURE_TYPE_", "")
         stype_camel = "e" + to_camel_case(stype_enum, tags)
 
-        lines.extend([
-            f"const vk::{prop.cpp_name}& VulkanProperties::{getter_name}() const {{",
-            f"    if (!is_available(vk::StructureType::{stype_camel})) {{",
-            "        throw std::runtime_error(fmt::format(",
-            f'            "Property struct {prop.cpp_name} not available (extension not supported)"));',
-            "    }",
-            f"    return {member_name};",
-            "}",
-        ])
+        lines.extend(
+            [
+                f"const vk::{prop.cpp_name}& VulkanProperties::{getter_name}() const {{",
+                f"    if (!is_available(vk::StructureType::{stype_camel})) {{",
+                "        throw std::runtime_error(fmt::format(",
+                f'            "Property struct {prop.cpp_name} not available (extension not supported)"));',
+                "    }",
+                f"    return {member_name};",
+                "}",
+            ]
+        )
 
     lines.append("")
     return lines
@@ -470,18 +484,22 @@ def generate_get_struct_ptr(properties: list[PropertyStruct], tags) -> list[str]
         member_name = generate_member_name(prop.cpp_name)
         stype_enum = prop.stype.replace("VK_STRUCTURE_TYPE_", "")
         stype_camel = "e" + to_camel_case(stype_enum, tags)
-        lines.extend([
-            f"        case vk::StructureType::{stype_camel}:",
-            f"            return &{member_name};",
-        ])
+        lines.extend(
+            [
+                f"        case vk::StructureType::{stype_camel}:",
+                f"            return &{member_name};",
+            ]
+        )
 
-    lines.extend([
-        "        default:",
-        "            return nullptr;",
-        "    }",
-        "}",
-        "",
-    ])
+    lines.extend(
+        [
+            "        default:",
+            "            return nullptr;",
+            "    }",
+            "}",
+            "",
+        ]
+    )
 
     return lines
 
@@ -525,10 +543,12 @@ def generate_implementation(extensions, properties: list[PropertyStruct], tags) 
     lines.extend(generate_get_struct_ptr(properties, tags))
     lines.extend(generate_is_available())
 
-    lines.extend([
-        "} // namespace merian",
-        "",
-    ])
+    lines.extend(
+        [
+            "} // namespace merian",
+            "",
+        ]
+    )
 
     return "\n".join(lines)
 

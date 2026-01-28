@@ -199,14 +199,16 @@ def find_feature_structures(xml_root, tags) -> list[FeatureStruct]:
         extension = ext_info[0] if ext_info else None
         promotion_version = ext_info[1] if ext_info else None
 
-        features.append(FeatureStruct(
-            vk_name=vk_name,
-            cpp_name=cpp_name,
-            stype=stype,
-            members=members,
-            extension=extension,
-            promotion_version=promotion_version,
-        ))
+        features.append(
+            FeatureStruct(
+                vk_name=vk_name,
+                cpp_name=cpp_name,
+                stype=stype,
+                members=members,
+                extension=extension,
+                promotion_version=promotion_version,
+            )
+        )
 
     # Add VkPhysicalDeviceFeatures2
     if features2 := find_vk_physical_device_features2(xml_root):
@@ -227,8 +229,10 @@ def generate_concept_definition(features: list[FeatureStruct]) -> list[str]:
         "concept VulkanFeatureStruct = (",
     ]
 
-    type_checks = [f"    std::same_as<T, vk::{feat.cpp_name}>"
-                   for feat in sorted(features, key=lambda f: f.cpp_name)]
+    type_checks = [
+        f"    std::same_as<T, vk::{feat.cpp_name}>"
+        for feat in sorted(features, key=lambda f: f.cpp_name)
+    ]
     lines.append(" ||\n".join(type_checks))
     lines.extend([");", ""])
 
@@ -259,7 +263,9 @@ def generate_class_methods_declaration(features: list[FeatureStruct]) -> list[st
         for alias_vk_name in feat.aliases:
             alias_cpp_name = vk_name_to_cpp_name(alias_vk_name)
             alias_getter_name = generate_getter_name(alias_cpp_name)
-            lines.append(f"    vk::{feat.cpp_name}& {alias_getter_name}();  // Alias for {feat.cpp_name}")
+            lines.append(
+                f"    vk::{feat.cpp_name}& {alias_getter_name}();  // Alias for {feat.cpp_name}"
+            )
             lines.append(f"    const vk::{feat.cpp_name}& {alias_getter_name}() const;")
 
     return lines
@@ -292,87 +298,107 @@ def generate_header(features: list[FeatureStruct]) -> str:
 
     lines.extend(generate_concept_definition(features))
 
-    lines.extend([
-        "/**",
-        " * @brief Aggregate class containing all Vulkan feature structures.",
-        " *",
-        " * Provides type-safe access to all ~240 Vulkan feature structs without",
-        " * unsafe casting or map lookups. Each feature struct is stored as a direct member.",
-        " *",
-        " * Features can be accessed via:",
-        " * - Template method: get<vk::PhysicalDeviceRayTracingPipelineFeaturesKHR>()",
-        " * - Named getter: get_ray_tracing_pipeline_features_khr()",
-        ' * - String-based: set_feature("RayTracingPipelineKHR", "rayTracingPipeline", true)',
-        " */",
-        "class VulkanFeatures {",
-        "  public:",
-        "    /// Default constructor (zero-initialized features)",
-        "    VulkanFeatures() = default;",
-        "",
-        "    /// Constructor: query features from physical device",
-        "    VulkanFeatures(const vk::PhysicalDevice& physical_device,",
-        "                   const InstanceHandle& instance);",
-        "",
-        "    /// Copy and move",
-        "    VulkanFeatures(const VulkanFeatures&) = default;",
-        "    VulkanFeatures& operator=(const VulkanFeatures&) = default;",
-        "    VulkanFeatures(VulkanFeatures&&) = default;",
-        "    VulkanFeatures& operator=(VulkanFeatures&&) = default;",
-        "",
-    ])
+    lines.extend(
+        [
+            "/**",
+            " * @brief Aggregate class containing all Vulkan feature structures.",
+            " *",
+            " * Provides type-safe access to all ~240 Vulkan feature structs without",
+            " * unsafe casting or map lookups. Each feature struct is stored as a direct member.",
+            " *",
+            " * Features can be accessed via:",
+            " * - Template method: get<vk::PhysicalDeviceRayTracingPipelineFeaturesKHR>()",
+            " * - Named getter: get_ray_tracing_pipeline_features_khr()",
+            ' * - String-based: set_feature("RayTracingPipelineKHR", "rayTracingPipeline", true)',
+            " */",
+            "class VulkanFeatures {",
+            "  public:",
+            "    /// Default constructor (zero-initialized features)",
+            "    VulkanFeatures() = default;",
+            "",
+            "    /// Constructor: query features from physical device",
+            "    VulkanFeatures(const vk::PhysicalDevice& physical_device,",
+            "                   const InstanceHandle& instance);",
+            "",
+            '    /// Constructor: enable features from strings of the form "structName/featureName"',
+            "    VulkanFeatures(const vk::ArrayProxy<const std::string>& features);",
+            "",
+            "    /// Copy and move",
+            "    VulkanFeatures(const VulkanFeatures&) = default;",
+            "    VulkanFeatures& operator=(const VulkanFeatures&) = default;",
+            "    VulkanFeatures(VulkanFeatures&&) = default;",
+            "    VulkanFeatures& operator=(VulkanFeatures&&) = default;",
+            "",
+        ]
+    )
 
     lines.extend(generate_class_methods_declaration(features))
 
-    lines.extend([
-        "",
-        "    /// String-based feature access (runtime)",
-        "    bool set_feature(const std::string& feature_struct_name,",
-        "                     const std::string& feature_name,",
-        "                     bool value);",
-        "",
-        "    bool get_feature(const std::string& feature_struct_name,",
-        "                     const std::string& feature_name) const;",
-        "",
-        "    /// Get list of all feature names for a struct",
-        "    std::vector<std::string> get_feature_names(const std::string& feature_struct_name) const;",
-        "",
-        "    /// Get list of all feature struct names (e.g., \"RayTracingPipelineKHR\", \"16BitStorage\")",
-        "    /// Useful for iterating over all feature structs to merge or compare VulkanFeatures objects",
-        "    std::vector<std::string> get_feature_struct_names() const;",
-        "",
-        "    /// Build pNext chain for device creation (includes only structs with non-zero features)",
-        "    void* build_chain_for_device_creation();",
-        "",
-        "    /// Get all extensions required by currently enabled features",
-        "    /// @return Vector of extension name macros needed for enabled features",
-        "    std::vector<const char*> get_required_extensions() const;",
-        "",
-        "  private:",
-        "    /// Internal: get pointer to struct by StructureType",
-        "    void* get_struct_ptr(vk::StructureType stype);",
-        "    const void* get_struct_ptr(vk::StructureType stype) const;",
-        "",
-        "    // Feature struct members (~240 structs)",
-    ])
+    lines.extend(
+        [
+            "",
+            '    /// Enable features from strings of the form "structName/featureName"',
+            "    void enable_features(const vk::ArrayProxy<const std::string>& features);",
+            "",
+            '    /// Disable features from strings of the form "structName/featureName"',
+            "    void disable_features(const vk::ArrayProxy<const std::string>& features);",
+            "",
+            "    /// String-based feature access (runtime)",
+            "    bool set_feature(const std::string& feature_struct_name,",
+            "                     const std::string& feature_name,",
+            "                     bool value);",
+            "",
+            "    bool get_feature(const std::string& feature_struct_name,",
+            "                     const std::string& feature_name) const;",
+            "",
+            "    /// Get list of all feature names for a struct",
+            "    std::vector<std::string> get_feature_names(const std::string& feature_struct_name) const;",
+            "",
+            '    /// Get list of all feature struct names (e.g., "RayTracingPipelineKHR", "16BitStorage")',
+            "    /// Useful for iterating over all feature structs to merge or compare VulkanFeatures objects",
+            "    std::vector<std::string> get_feature_struct_names() const;",
+            "",
+            "    /// Build pNext chain for device creation (includes only structs with non-zero features)",
+            "    /// @param p_next Optional pointer to chain with other structures",
+            "    void* build_chain_for_device_creation(void* p_next = nullptr);",
+            "",
+            "    /// Get all extensions required by currently enabled features",
+            "    /// Extensions promoted to core at or below vk_api_version are omitted",
+            "    /// @return Vector of extension name macros needed for enabled features",
+            "    std::vector<const char*> get_required_extensions(const uint32_t vk_api_version) const;",
+            "",
+            "  private:",
+            "    /// Internal: parse and set features from strings",
+            "    void parse_and_set_features(const vk::ArrayProxy<const std::string>& features, bool value);",
+            "",
+            "    /// Internal: get pointer to struct by StructureType",
+            "    void* get_struct_ptr(vk::StructureType stype);",
+            "    const void* get_struct_ptr(vk::StructureType stype) const;",
+            "",
+            "    // Feature struct members (~240 structs)",
+        ]
+    )
 
     for feat in sorted(features, key=lambda f: f.cpp_name):
         member_name = generate_member_name(feat.cpp_name)
         lines.append(f"    vk::{feat.cpp_name} {member_name}{{}};")
 
-    lines.extend([
-        "",
-        "};",
-        "",
-        "/**",
-        " * @brief Get the Vulkan structure type for a feature name.",
-        ' * @param name The name of the feature structure (e.g., "PhysicalDeviceRobustness2FeaturesEXT").',
-        " * @return The vk::StructureType, or std::nullopt if not found.",
-        " */",
-        "std::optional<vk::StructureType> structure_type_for_feature_name(const std::string& name);",
-        "",
-        "} // namespace merian",
-        "",
-    ])
+    lines.extend(
+        [
+            "",
+            "};",
+            "",
+            "/**",
+            " * @brief Get the Vulkan structure type for a feature name.",
+            ' * @param name The name of the feature structure (e.g., "PhysicalDeviceRobustness2FeaturesEXT").',
+            " * @return The vk::StructureType, or std::nullopt if not found.",
+            " */",
+            "std::optional<vk::StructureType> structure_type_for_feature_name(const std::string& name);",
+            "",
+            "} // namespace merian",
+            "",
+        ]
+    )
 
     return "\n".join(lines)
 
@@ -403,34 +429,44 @@ def generate_constructor(features: list[FeatureStruct], tags) -> list[str]:
         lines.append(f"    // {feat.cpp_name}")
 
         if feat.extension and feat.promotion_version:
-            lines.extend([
-                f"    if (instance->get_vk_api_version() >= {feat.promotion_version} ||",
-                f"        device_extensions.contains({feat.extension})) {{",
-            ])
+            lines.extend(
+                [
+                    f"    if (instance->get_vk_api_version() >= {feat.promotion_version} ||",
+                    f"        device_extensions.contains({feat.extension})) {{",
+                ]
+            )
         elif feat.extension:
             lines.append(f"    if (device_extensions.contains({feat.extension})) {{")
         elif feat.promotion_version:
-            lines.append(f"    if (instance->get_vk_api_version() >= {feat.promotion_version}) {{")
+            lines.append(
+                f"    if (instance->get_vk_api_version() >= {feat.promotion_version}) {{"
+            )
         else:
             lines.append("    {")
 
-        lines.extend([
-            f"        {member_name}.pNext = feat_p_next;",
-            f"        feat_p_next = &{member_name};",
-            "    }",
-            "",
-        ])
+        lines.extend(
+            [
+                f"        {member_name}.pNext = feat_p_next;",
+                f"        feat_p_next = &{member_name};",
+                "    }",
+                "",
+            ]
+        )
 
-    features2 = next((f for f in features if f.cpp_name == "PhysicalDeviceFeatures2"), None)
+    features2 = next(
+        (f for f in features if f.cpp_name == "PhysicalDeviceFeatures2"), None
+    )
     if features2:
         member_name = generate_member_name(features2.cpp_name)
-        lines.extend([
-            "    // PhysicalDeviceFeatures2 (always at head of chain)",
-            f"    {member_name}.pNext = feat_p_next;",
-            "",
-            "    // Query features from device",
-            f"    physical_device.getFeatures2(&{member_name});",
-        ])
+        lines.extend(
+            [
+                "    // PhysicalDeviceFeatures2 (always at head of chain)",
+                f"    {member_name}.pNext = feat_p_next;",
+                "",
+                "    // Query features from device",
+                f"    physical_device.getFeatures2(&{member_name});",
+            ]
+        )
 
     lines.extend(["}", ""])
     return lines
@@ -460,10 +496,12 @@ def generate_template_get(features: list[FeatureStruct]) -> list[str]:
     ]
 
     for feat in sorted(features, key=lambda f: f.cpp_name):
-        lines.extend([
-            f"template vk::{feat.cpp_name}& VulkanFeatures::get<vk::{feat.cpp_name}>();",
-            f"template const vk::{feat.cpp_name}& VulkanFeatures::get<vk::{feat.cpp_name}>() const;",
-        ])
+        lines.extend(
+            [
+                f"template vk::{feat.cpp_name}& VulkanFeatures::get<vk::{feat.cpp_name}>();",
+                f"template const vk::{feat.cpp_name}& VulkanFeatures::get<vk::{feat.cpp_name}>() const;",
+            ]
+        )
 
     lines.append("")
     return lines
@@ -476,14 +514,16 @@ def generate_named_getters(features: list[FeatureStruct]) -> list[str]:
     for feat in sorted(features, key=lambda f: f.cpp_name):
         member_name = generate_member_name(feat.cpp_name)
         getter_name = generate_getter_name(feat.cpp_name)
-        lines.extend([
-            f"vk::{feat.cpp_name}& VulkanFeatures::{getter_name}() {{",
-            f"    return {member_name};",
-            "}",
-            f"const vk::{feat.cpp_name}& VulkanFeatures::{getter_name}() const {{",
-            f"    return {member_name};",
-            "}",
-        ])
+        lines.extend(
+            [
+                f"vk::{feat.cpp_name}& VulkanFeatures::{getter_name}() {{",
+                f"    return {member_name};",
+                "}",
+                f"const vk::{feat.cpp_name}& VulkanFeatures::{getter_name}() const {{",
+                f"    return {member_name};",
+                "}",
+            ]
+        )
 
     lines.append("")
     return lines
@@ -498,14 +538,16 @@ def generate_alias_getters(features: list[FeatureStruct]) -> list[str]:
         for alias_vk_name in feat.aliases:
             alias_cpp_name = vk_name_to_cpp_name(alias_vk_name)
             alias_getter_name = generate_getter_name(alias_cpp_name)
-            lines.extend([
-                f"vk::{feat.cpp_name}& VulkanFeatures::{alias_getter_name}() {{",
-                f"    return {member_name};  // Alias for {feat.cpp_name}",
-                "}",
-                f"const vk::{feat.cpp_name}& VulkanFeatures::{alias_getter_name}() const {{",
-                f"    return {member_name};",
-                "}",
-            ])
+            lines.extend(
+                [
+                    f"vk::{feat.cpp_name}& VulkanFeatures::{alias_getter_name}() {{",
+                    f"    return {member_name};  // Alias for {feat.cpp_name}",
+                    "}",
+                    f"const vk::{feat.cpp_name}& VulkanFeatures::{alias_getter_name}() const {{",
+                    f"    return {member_name};",
+                    "}",
+                ]
+            )
 
     lines.append("")
     return lines
@@ -526,18 +568,22 @@ def generate_get_struct_ptr(features: list[FeatureStruct], tags) -> list[str]:
         member_name = generate_member_name(feat.cpp_name)
         stype_enum = feat.stype.replace("VK_STRUCTURE_TYPE_", "")
         stype_camel = "e" + to_camel_case(stype_enum, tags)
-        lines.extend([
-            f"        case vk::StructureType::{stype_camel}:",
-            f"            return &{member_name};",
-        ])
+        lines.extend(
+            [
+                f"        case vk::StructureType::{stype_camel}:",
+                f"            return &{member_name};",
+            ]
+        )
 
-    lines.extend([
-        "        default:",
-        "            return nullptr;",
-        "    }",
-        "}",
-        "",
-    ])
+    lines.extend(
+        [
+            "        default:",
+            "            return nullptr;",
+            "    }",
+            "}",
+            "",
+        ]
+    )
 
     return lines
 
@@ -570,21 +616,23 @@ def generate_set_get_feature(features: list[FeatureStruct], tags) -> list[str]:
             )
         lines.extend(["            return false;", "        }"])
 
-    lines.extend([
-        "        default:",
-        "            return false;",
-        "    }",
-        "}",
-        "",
-        "bool VulkanFeatures::get_feature(const std::string& feature_struct_name,",
-        "                                  const std::string& feature_name) const {",
-        "    auto stype_opt = structure_type_for_feature_name(feature_struct_name);",
-        "    if (!stype_opt) return false;",
-        "    ",
-        "    const vk::StructureType stype = *stype_opt;",
-        "    ",
-        "    switch (stype) {",
-    ])
+    lines.extend(
+        [
+            "        default:",
+            "            return false;",
+            "    }",
+            "}",
+            "",
+            "bool VulkanFeatures::get_feature(const std::string& feature_struct_name,",
+            "                                  const std::string& feature_name) const {",
+            "    auto stype_opt = structure_type_for_feature_name(feature_struct_name);",
+            "    if (!stype_opt) return false;",
+            "    ",
+            "    const vk::StructureType stype = *stype_opt;",
+            "    ",
+            "    switch (stype) {",
+        ]
+    )
 
     for feat in sorted(features, key=lambda f: f.cpp_name):
         member_name = generate_member_name(feat.cpp_name)
@@ -599,13 +647,15 @@ def generate_set_get_feature(features: list[FeatureStruct], tags) -> list[str]:
             )
         lines.extend(["            return false;", "        }"])
 
-    lines.extend([
-        "        default:",
-        "            return false;",
-        "    }",
-        "}",
-        "",
-    ])
+    lines.extend(
+        [
+            "        default:",
+            "            return false;",
+            "    }",
+            "}",
+            "",
+        ]
+    )
 
     return lines
 
@@ -631,29 +681,33 @@ def generate_helper_functions(features: list[FeatureStruct], tags) -> list[str]:
             lines.append(f'                "{member.name}",')
         lines.append("            };")
 
-    lines.extend([
-        "        default:",
-        "            return {};",
-        "    }",
-        "}",
-        "",
-        "std::vector<std::string> VulkanFeatures::get_feature_struct_names() const {",
-        "    return {",
-    ])
+    lines.extend(
+        [
+            "        default:",
+            "            return {};",
+            "    }",
+            "}",
+            "",
+            "std::vector<std::string> VulkanFeatures::get_feature_struct_names() const {",
+            "    return {",
+        ]
+    )
 
     for feat in sorted(features, key=lambda f: f.cpp_name):
         short_name = get_short_feature_name(feat.cpp_name, tags)
         lines.append(f'        "{short_name}",')
 
-    lines.extend([
-        "    };",
-        "}",
-        "",
-        "void* VulkanFeatures::build_chain_for_device_creation() {",
-        "    void* chain_head = nullptr;",
-        "    ",
-        "    // Build chain from all structs with at least one enabled feature",
-    ])
+    lines.extend(
+        [
+            "    };",
+            "}",
+            "",
+            "void* VulkanFeatures::build_chain_for_device_creation(void* p_next) {",
+            "    void* chain_head = p_next;",
+            "    ",
+            "    // Build chain from all structs with at least one enabled feature",
+        ]
+    )
 
     for feat in reversed(sorted(features, key=lambda f: f.cpp_name)):
         if not feat.members:
@@ -661,26 +715,32 @@ def generate_helper_functions(features: list[FeatureStruct], tags) -> list[str]:
 
         member_name = generate_member_name(feat.cpp_name)
         prefix = feat.member_prefix
-        conditions = [f"{member_name}.{prefix}{m.name} == VK_TRUE" for m in feat.members]
+        conditions = [
+            f"{member_name}.{prefix}{m.name} == VK_TRUE" for m in feat.members
+        ]
         condition_str = " ||\n        ".join(conditions)
 
-        lines.extend([
-            f"    // Check {feat.cpp_name}",
-            f"    if ({condition_str}) {{",
-            f"        {member_name}.pNext = chain_head;",
-            f"        chain_head = &{member_name};",
-            "    }",
-            "",
-        ])
+        lines.extend(
+            [
+                f"    // Check {feat.cpp_name}",
+                f"    if ({condition_str}) {{",
+                f"        {member_name}.pNext = chain_head;",
+                f"        chain_head = &{member_name};",
+                "    }",
+                "",
+            ]
+        )
 
-    lines.extend([
-        "    return chain_head;",
-        "}",
-        "",
-        "std::vector<const char*> VulkanFeatures::get_required_extensions() const {",
-        "    std::unordered_set<const char*> extensions;",
-        "    ",
-    ])
+    lines.extend(
+        [
+            "    return chain_head;",
+            "}",
+            "",
+            "std::vector<const char*> VulkanFeatures::get_required_extensions(const uint32_t vk_api_version) const {",
+            "    std::unordered_set<const char*> extensions;",
+            "    ",
+        ]
+    )
 
     for feat in sorted(features, key=lambda f: f.cpp_name):
         if not feat.extension or not feat.members:
@@ -688,21 +748,36 @@ def generate_helper_functions(features: list[FeatureStruct], tags) -> list[str]:
 
         member_name = generate_member_name(feat.cpp_name)
         prefix = feat.member_prefix
-        conditions = [f"{member_name}.{prefix}{m.name} == VK_TRUE" for m in feat.members]
+        conditions = [
+            f"{member_name}.{prefix}{m.name} == VK_TRUE" for m in feat.members
+        ]
         condition_str = " || ".join(conditions)
 
-        lines.extend([
-            f"    if ({condition_str}) {{",
-            f"        extensions.insert({feat.extension});",
-            "    }",
-        ])
+        if feat.promotion_version:
+            lines.extend(
+                [
+                    f"    if (vk_api_version < {feat.promotion_version} && ({condition_str})) {{",
+                    f"        extensions.insert({feat.extension});",
+                    "    }",
+                ]
+            )
+        else:
+            lines.extend(
+                [
+                    f"    if ({condition_str}) {{",
+                    f"        extensions.insert({feat.extension});",
+                    "    }",
+                ]
+            )
 
-    lines.extend([
-        "    ",
-        "    return std::vector<const char*>(extensions.begin(), extensions.end());",
-        "}",
-        "",
-    ])
+    lines.extend(
+        [
+            "    ",
+            "    return std::vector<const char*>(extensions.begin(), extensions.end());",
+            "}",
+            "",
+        ]
+    )
 
     return lines
 
@@ -717,25 +792,65 @@ def generate_structure_type_lookup(features: list[FeatureStruct], tags) -> list[
     for feat in sorted(features, key=lambda f: f.cpp_name):
         stype_enum = feat.stype.replace("VK_STRUCTURE_TYPE_", "")
         stype_camel = "e" + to_camel_case(stype_enum, tags)
-        lines.append(f'        {{"{feat.cpp_name}", vk::StructureType::{stype_camel}}},')
+        lines.append(
+            f'        {{"{feat.cpp_name}", vk::StructureType::{stype_camel}}},'
+        )
 
         short_name = get_short_feature_name(feat.cpp_name, tags)
         if short_name != feat.cpp_name:
-            lines.append(f'        {{"{short_name}", vk::StructureType::{stype_camel}}},')
+            lines.append(
+                f'        {{"{short_name}", vk::StructureType::{stype_camel}}},'
+            )
 
-    lines.extend([
-        "    };",
-        "    ",
-        "    auto it = name_map.find(name);",
-        "    if (it != name_map.end()) {",
-        "        return it->second;",
-        "    }",
-        "    return std::nullopt;",
-        "}",
-        "",
-    ])
+    lines.extend(
+        [
+            "    };",
+            "    ",
+            "    auto it = name_map.find(name);",
+            "    if (it != name_map.end()) {",
+            "        return it->second;",
+            "    }",
+            "    return std::nullopt;",
+            "}",
+            "",
+        ]
+    )
 
     return lines
+
+
+def generate_string_features_methods() -> list[str]:
+    """Generate parse_and_set_features, string constructor, enable/disable methods."""
+    return [
+        "void VulkanFeatures::parse_and_set_features(const vk::ArrayProxy<const std::string>& features, bool value) {",
+        "    for (const auto& feature : features) {",
+        "        const auto sep = feature.find('/');",
+        "        if (sep == std::string::npos) {",
+        "            throw std::invalid_argument(fmt::format(",
+        "                \"Invalid feature string '{}': expected 'structName/featureName'\", feature));",
+        "        }",
+        "        const auto struct_name = feature.substr(0, sep);",
+        "        const auto feature_name = feature.substr(sep + 1);",
+        "        if (!set_feature(struct_name, feature_name, value)) {",
+        "            throw std::invalid_argument(fmt::format(",
+        "                \"Unknown feature '{}' in struct '{}'\", feature_name, struct_name));",
+        "        }",
+        "    }",
+        "}",
+        "",
+        "VulkanFeatures::VulkanFeatures(const vk::ArrayProxy<const std::string>& features) {",
+        "    parse_and_set_features(features, true);",
+        "}",
+        "",
+        "void VulkanFeatures::enable_features(const vk::ArrayProxy<const std::string>& features) {",
+        "    parse_and_set_features(features, true);",
+        "}",
+        "",
+        "void VulkanFeatures::disable_features(const vk::ArrayProxy<const std::string>& features) {",
+        "    parse_and_set_features(features, false);",
+        "}",
+        "",
+    ]
 
 
 def generate_implementation(features: list[FeatureStruct], tags) -> str:
@@ -757,6 +872,7 @@ def generate_implementation(features: list[FeatureStruct], tags) -> str:
     ]
 
     lines.extend(generate_constructor(features, tags))
+    lines.extend(generate_string_features_methods())
     lines.extend(generate_template_get(features))
     lines.extend(generate_named_getters(features))
     lines.extend(generate_alias_getters(features))

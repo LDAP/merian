@@ -1,7 +1,6 @@
 #pragma once
 
 #include "merian/vk/context.hpp"
-#include "merian/vk/extension/extension_vk_core.hpp"
 #include "merian/vk/utils/check_result.hpp"
 
 #include <memory>
@@ -76,9 +75,9 @@ class QueryPool : public std::enable_shared_from_this<QueryPool<QUERY_TYPE>>, pu
                                                     const uint32_t query_count,
                                                     const vk::QueryResultFlags flags = {}) const {
         std::vector<RETURN_TYPE> data(query_count);
-        check_result(context->get_device()->get_device().getQueryPoolResults(query_pool, first_query, data.size(),
-                                                         sizeof(RETURN_TYPE) * data.size(),
-                                                         data.data(), sizeof(RETURN_TYPE), flags),
+        check_result(context->get_device()->get_device().getQueryPoolResults(
+                         query_pool, first_query, data.size(), sizeof(RETURN_TYPE) * data.size(),
+                         data.data(), sizeof(RETURN_TYPE), flags),
                      "could not get query results");
         return data;
     }
@@ -86,9 +85,9 @@ class QueryPool : public std::enable_shared_from_this<QueryPool<QUERY_TYPE>>, pu
     template <typename RETURN_TYPE>
     std::vector<RETURN_TYPE> get_query_pool_results(const vk::QueryResultFlags flags = {}) const {
         std::vector<RETURN_TYPE> data(query_count);
-        check_result(context->get_device()->get_device().getQueryPoolResults(query_pool, 0, data.size(),
-                                                         sizeof(RETURN_TYPE) * data.size(),
-                                                         data.data(), sizeof(RETURN_TYPE), flags),
+        check_result(context->get_device()->get_device().getQueryPoolResults(
+                         query_pool, 0, data.size(), sizeof(RETURN_TYPE) * data.size(), data.data(),
+                         sizeof(RETURN_TYPE), flags),
                      "could not get query results");
         return data;
     }

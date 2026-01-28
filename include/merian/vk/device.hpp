@@ -9,38 +9,64 @@ namespace merian {
 
 class Device : public std::enable_shared_from_this<Device> {
   private:
+    // features and extensions are checked for support and skipped if not available.
     Device(const PhysicalDeviceHandle& physical_device,
+           const VulkanFeatures& features,
+           const vk::ArrayProxyNoTemporaries<const char*>& additional_extensions,
            const vk::ArrayProxyNoTemporaries<const vk::DeviceQueueCreateInfo>& queue_create_infos,
-           const vk::ArrayProxyNoTemporaries<const char*>& extensions,
-           const std::vector<std::string>& requested_feature_names,
            void* p_next)
-        : physical_device(physical_device),
-          enabled_extensions(extensions.begin(), extensions.end()),
-          enabled_features(physical_device->get_supported_features()) {
+        : physical_device(physical_device) {
 
-        // Enable requested features based on feature names
-        for (const auto& feature_name : requested_feature_names) {
-            // Parse feature_name and enable via enabled_features.set_feature()
-            // For now, we'll copy all supported features and assume they're enabled
-            // TODO: Parse feature names properly
-        }
+        SPDLOG_DEBUG("create device");
 
-        // Build pNext chain from enabled features
-        void* feature_chain = enabled_features.build_chain_for_device_creation();
-
-        // Chain with any additional p_next from caller
-        if (p_next) {
-            // Find the end of feature_chain and append p_next
-            void** current = &feature_chain;
-            while (*current) {
-                current = reinterpret_cast<void**>(static_cast<char*>(*current) + sizeof(vk::StructureType));
+        SPDLOG_DEBUG("...with features:");
+        for (const auto& feature_struct_name : features.get_feature_struct_names()) {
+            for (const auto& feature_name : features.get_feature_names(feature_struct_name)) {
+                if (features.get_feature(feature_struct_name, feature_name)) {
+                    if (physical_device->get_supported_features().get_feature(feature_struct_name,
+                                                                              feature_name)) {
+                        SPDLOG_DEBUG("{}/{}", feature_struct_name, feature_name);
+                        enabled_features.set_feature(feature_struct_name, feature_name, true);
+                    } else {
+                        SPDLOG_WARN("{}/{} requested but not supported", feature_struct_name,
+                                    feature_name);
+                    }
+                }
             }
-            *current = p_next;
         }
 
-        const vk::DeviceCreateInfo device_create_info{{}, queue_create_infos,  {}, extensions,
-                                                      {}, feature_chain};
+        SPDLOG_DEBUG("...with extensions:");
+        const auto feature_extensions = enabled_features.get_required_extensions(
+            physical_device->get_instance()->get_vk_api_version());
+        std::vector<const char*> all_extensions;
+        all_extensions.reserve(additional_extensions.size() + feature_extensions.size());
+        for (const auto* const ext : additional_extensions) {
+            if (!physical_device->extension_supported(ext)) {
+                SPDLOG_WARN("{} requested but not supported!", ext);
+                continue;
+            }
+            auto [_, inserted] = enabled_extensions.emplace(ext);
+            if (inserted) {
+                all_extensions.emplace_back(ext);
+                SPDLOG_DEBUG(ext);
+            }
+        }
+        for (const auto* const ext : feature_extensions) {
+            assert(physical_device->extension_supported(ext));
+
+            auto [_, inserted] = enabled_extensions.emplace(ext);
+            if (inserted) {
+                all_extensions.emplace_back(ext);
+                SPDLOG_DEBUG(ext);
+            }
+        }
+
+        void* p_next_chain = enabled_features.build_chain_for_device_creation(p_next);
+        const vk::DeviceCreateInfo device_create_info{{}, queue_create_infos, {}, all_extensions,
+                                                      {}, p_next_chain};
+
         device = physical_device->get_physical_device().createDevice(device_create_info);
+        SPDLOG_DEBUG("device {} created", fmt::ptr(VkDevice(device)));
 
         SPDLOG_DEBUG("create pipeline cache");
         vk::PipelineCacheCreateInfo pipeline_cache_create_info{};
@@ -50,13 +76,12 @@ class Device : public std::enable_shared_from_this<Device> {
   public:
     static DeviceHandle
     create(const PhysicalDeviceHandle& physical_device,
+           const VulkanFeatures& features,
+           const vk::ArrayProxyNoTemporaries<const char*>& user_extensions,
            const vk::ArrayProxyNoTemporaries<const vk::DeviceQueueCreateInfo>& queue_create_infos,
-           const vk::ArrayProxyNoTemporaries<const char*>& extensions,
-           const std::vector<std::string>& requested_feature_names = {},
-           void* p_next = nullptr)
-    {
+           void* p_next) {
         return DeviceHandle(
-            new Device(physical_device, queue_create_infos, extensions, requested_feature_names, p_next));
+            new Device(physical_device, features, user_extensions, queue_create_infos, p_next));
     }
 
     ~Device();
@@ -85,18 +110,17 @@ class Device : public std::enable_shared_from_this<Device> {
 
     // ---------------------------------------------
 
-    // Get reference to VulkanFeatures aggregate containing all enabled features
     const VulkanFeatures& get_enabled_features() const {
         return enabled_features;
     }
 
   private:
     const PhysicalDeviceHandle physical_device;
-    const std::unordered_set<std::string> enabled_extensions;
+
+    std::unordered_set<std::string> enabled_extensions;
+    VulkanFeatures enabled_features;
 
     vk::Device device;
-
-    VulkanFeatures enabled_features;
 
     vk::PipelineCache pipeline_cache;
 };

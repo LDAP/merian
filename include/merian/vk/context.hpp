@@ -135,9 +135,9 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
      *
      */
     static ContextHandle
-    create(const std::vector<std::string>& features,
-           const std::vector<const char*>& extensions,
-           const std::vector<std::shared_ptr<ContextExtension>>& context_extensions,
+    create(const VulkanFeatures& desired_features,
+           const std::vector<const char*>& desired_additional_extensions,
+           const std::vector<std::shared_ptr<ContextExtension>>& desired_context_extensions,
            const std::string& application_name = "",
            const uint32_t application_vk_version = VK_MAKE_VERSION(1, 0, 0),
            const uint32_t preffered_number_compute_queues = 1, // Additionally to the GCT queue
@@ -148,9 +148,9 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
            const std::string& filter_device_name = "");
 
   private:
-    Context(const std::vector<std::string>& features,
-            const std::vector<const char*>& extensions,
-            const std::vector<std::shared_ptr<ContextExtension>>& context_extensions,
+    Context(const VulkanFeatures& desired_features,
+            const std::vector<const char*>& desired_additional_extensions,
+            const std::vector<std::shared_ptr<ContextExtension>>& desired_context_extensions,
             const std::string& application_name,
             const uint32_t application_vk_version,
             const uint32_t preffered_number_compute_queues,
@@ -171,6 +171,7 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
     void find_queues();
     void create_device_and_queues(uint32_t preffered_number_compute_queues);
     void prepare_shader_include_defines();
+    void prepare_file_loader();
 
   private: // Helper
     void extensions_check_instance_layer_support(const bool fail_if_unsupported);
@@ -216,10 +217,6 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
     // Make sure to keep a reference, else the pool and its buffers are destroyed
     std::shared_ptr<CommandPool> get_cmd_pool_C();
 
-    bool device_extension_enabled(const std::string& name) const;
-
-    const std::vector<const char*>& get_enabled_device_extensions() const;
-
     // weakly canonical paths
     const std::vector<std::filesystem::path>& get_default_shader_include_paths() const;
 
@@ -239,10 +236,6 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
 
   private:
     // in create_device_and_queues
-
-    std::vector<const char*> device_extensions;
-    std::unordered_set<std::string> extensions;
-    std::vector<std::string> requested_features;
 
     const std::string application_name;
     const uint32_t application_vk_version;

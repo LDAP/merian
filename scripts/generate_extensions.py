@@ -91,11 +91,20 @@ def find_properties_from_extensions(xml_root, ext_name_map):
                             # Get the sType
                             for member in typedef.findall("member"):
                                 member_name_elem = member.find("name")
-                                if member_name_elem is not None and member_name_elem.text == "sType":
+                                if (
+                                    member_name_elem is not None
+                                    and member_name_elem.text == "sType"
+                                ):
                                     stype_value = member.get("values")
                                     if stype_value:
-                                        enum_name = "e" + to_camel_case(stype_value.replace("VK_STRUCTURE_TYPE_", ""))
-                                        ext_to_stypes.setdefault(ext_name_macro, []).append(enum_name)
+                                        enum_name = "e" + to_camel_case(
+                                            stype_value.replace(
+                                                "VK_STRUCTURE_TYPE_", ""
+                                            )
+                                        )
+                                        ext_to_stypes.setdefault(
+                                            ext_name_macro, []
+                                        ).append(enum_name)
                                     break
                         break
 
@@ -111,7 +120,9 @@ def find_properties_from_api_versions(xml_root):
         if "vulkan" not in api.split(","):
             continue
         feat_name = feat.get("name", "")
-        match = re.match(r"VK_(?:BASE_|COMPUTE_|GRAPHICS_)?VERSION_(\d+)_(\d+)", feat_name)
+        match = re.match(
+            r"VK_(?:BASE_|COMPUTE_|GRAPHICS_)?VERSION_(\d+)_(\d+)", feat_name
+        )
         if not match:
             continue
         major, minor = match.groups()
@@ -127,25 +138,41 @@ def find_properties_from_api_versions(xml_root):
                 for typedef in xml_root.findall("types/type"):
                     if typedef.get("name") == type_name:
                         struct_extends = typedef.get("structextends", "")
-                        if "VkPhysicalDeviceProperties2" in struct_extends or type_name == "VkPhysicalDeviceProperties2":
+                        if (
+                            "VkPhysicalDeviceProperties2" in struct_extends
+                            or type_name == "VkPhysicalDeviceProperties2"
+                        ):
                             if type_name == "VkPhysicalDeviceProperties2":
                                 enum_name = "ePhysicalDeviceProperties2"
-                                version_to_stypes.setdefault(api_version, []).append(enum_name)
+                                version_to_stypes.setdefault(api_version, []).append(
+                                    enum_name
+                                )
                             else:
                                 for member in typedef.findall("member"):
                                     member_name_elem = member.find("name")
-                                    if member_name_elem is not None and member_name_elem.text == "sType":
+                                    if (
+                                        member_name_elem is not None
+                                        and member_name_elem.text == "sType"
+                                    ):
                                         stype_value = member.get("values")
                                         if stype_value:
-                                            enum_name = "e" + to_camel_case(stype_value.replace("VK_STRUCTURE_TYPE_", ""))
-                                            version_to_stypes.setdefault(api_version, []).append(enum_name)
+                                            enum_name = "e" + to_camel_case(
+                                                stype_value.replace(
+                                                    "VK_STRUCTURE_TYPE_", ""
+                                                )
+                                            )
+                                            version_to_stypes.setdefault(
+                                                api_version, []
+                                            ).append(enum_name)
                                         break
                         break
 
     return version_to_stypes
 
 
-def find_property_extension_mapping(xml_root) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
+def find_property_extension_mapping(
+    xml_root,
+) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
     """Find mapping of extensions and API versions to property structure types."""
     ext_name_map = build_extension_name_map(xml_root)
     ext_to_stypes = find_properties_from_extensions(xml_root, ext_name_map)
@@ -231,7 +258,9 @@ def generate_extension_dependencies_impl(extensions) -> list[str]:
 
         if version_only_groups and extension_groups:
             version_only_groups.sort(reverse=True)
-            version_check = " && ".join(f"vk_api_version < {v}" for v in version_only_groups)
+            version_check = " && ".join(
+                f"vk_api_version < {v}" for v in version_only_groups
+            )
             lines.append(f"        if ({version_check}) {{")
             for dep in extension_groups[0]:
                 if dep.extension:
