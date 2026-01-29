@@ -24,6 +24,11 @@ from vulkan_codegen.naming import (
     to_camel_case,
     vk_name_to_cpp_name,
 )
+from vulkan_codegen.codegen import (
+    build_extension_type_map,
+    build_alias_maps,
+    propagate_ext_map_through_aliases,
+)
 from vulkan_codegen.spec import (
     VULKAN_SPEC_VERSION,
     build_skiplist,
@@ -45,67 +50,6 @@ def get_short_feature_name(cpp_name: str, tags: list[str]) -> str:
     if cpp_name == "PhysicalDeviceFeatures2":
         short_name = "Vulkan10"
     return short_name
-
-
-def build_extension_map(xml_root):
-    """Build map of type_name -> (ext_name_macro, promotion_version)."""
-    extension_map = {}
-
-    def parse_promotion_version(depends: str) -> str | None:
-        if not depends:
-            return None
-        match = re.search(r"VK_VERSION_(\d+)_(\d+)", depends)
-        if match:
-            major, minor = match.groups()
-            return f"VK_API_VERSION_{major}_{minor}"
-        return None
-
-    for ext in xml_root.findall("extensions/extension"):
-        ext_supported = ext.get("supported", "")
-        if "vulkan" not in ext_supported.split(","):
-            continue
-        if ext.get("platform") is not None:
-            continue
-
-        ext_name_macro = None
-        for req in ext.findall("require"):
-            for enum_elem in req.findall("enum"):
-                enum_name = enum_elem.get("name", "")
-                if enum_name.endswith("_EXTENSION_NAME"):
-                    ext_name_macro = enum_name
-                    break
-            if ext_name_macro:
-                break
-
-        if not ext_name_macro:
-            continue
-
-        promotedto = ext.get("promotedto", "")
-        promotion_version = parse_promotion_version(promotedto) if promotedto else None
-
-        for req in ext.findall("require"):
-            for type_elem in req.findall("type"):
-                type_name = type_elem.get("name")
-                if type_name:
-                    extension_map[type_name] = (ext_name_macro, promotion_version)
-
-    return extension_map
-
-
-def propagate_aliases_to_extension_map(xml_root, extension_map):
-    """Add aliases to extension_map."""
-    for type_elem in xml_root.findall("types/type"):
-        if type_elem.get("category") != "struct":
-            continue
-
-        alias_of = type_elem.get("alias")
-        type_name = type_elem.get("name")
-
-        if alias_of and type_name:
-            if alias_of in extension_map:
-                extension_map[type_name] = extension_map[alias_of]
-            elif type_name in extension_map:
-                extension_map[alias_of] = extension_map[type_name]
 
 
 def extract_feature_members(type_elem) -> tuple[str | None, list[FeatureMember]]:
@@ -175,8 +119,9 @@ def find_feature_structures(xml_root, tags) -> list[FeatureStruct]:
     """Find all structures that extend VkPhysicalDeviceFeatures2."""
     features = []
     skiplist = build_skiplist(xml_root)
-    extension_map = build_extension_map(xml_root)
-    propagate_aliases_to_extension_map(xml_root, extension_map)
+    extension_map = build_extension_type_map(xml_root)
+    alias_to_canonical, _ = build_alias_maps(xml_root)
+    propagate_ext_map_through_aliases(extension_map, alias_to_canonical)
 
     for type_elem in xml_root.findall("types/type"):
         if type_elem.get("category") != "struct":
@@ -197,7 +142,7 @@ def find_feature_structures(xml_root, tags) -> list[FeatureStruct]:
         cpp_name = vk_name_to_cpp_name(vk_name)
         ext_info = extension_map.get(vk_name)
         extension = ext_info[0] if ext_info else None
-        promotion_version = ext_info[1] if ext_info else None
+        promotion_version = ext_info[2] if ext_info else None
 
         features.append(
             FeatureStruct(

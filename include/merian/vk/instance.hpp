@@ -47,6 +47,14 @@ class Instance : public std::enable_shared_from_this<Instance> {
         return enabled_extensions;
     }
 
+    bool layer_enabled(const std::string& layer) const {
+        return enabled_layers.contains(layer);
+    }
+
+    bool extension_enabled(const std::string& extension) const {
+        return enabled_extensions.contains(extension);
+    }
+
     // this also queries all extensions, features and such, can be expensive to call!
     std::vector<PhysicalDeviceHandle> get_physical_devices();
 

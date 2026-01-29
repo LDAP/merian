@@ -42,33 +42,60 @@ class Device : public std::enable_shared_from_this<Device> {
         std::vector<const char*> all_extensions;
         all_extensions.reserve(additional_extensions.size() + feature_extensions.size());
 
-        const auto add_extension = [&](const auto& self, const char* ext) -> bool {
+        const auto add_extension_recurse =
+            [&](const auto& self, const ExtensionInfo* ext_info) -> std::pair<bool, std::string> {
+            assert(ext_info->is_device_extension());
+
+            // already enabled or not necessary
+            if (enabled_extensions.contains(ext_info->name)) {
+                return {true, ""};
+            }
+            if (ext_info->promoted_to_version <= vk_api_version) {
+                SPDLOG_DEBUG("{} skipped (provided by API version)", ext_info->name);
+                return {true, ""};
+            }
+
+            if (!physical_device->extension_supported(ext_info->name)) {
+                return {false, fmt::format("{} not supported by physical device!", ext_info->name)};
+            }
+
+            for (const ExtensionInfo* dep : ext_info->get_dependencies(vk_api_version)) {
+                if (dep->is_instance_extension()) {
+                    if (!physical_device->get_instance()->extension_enabled(dep->name)) {
+                        return {false,
+                                fmt::format("instance extension {} is not enabled!", dep->name)};
+                    }
+                } else {
+                    auto [deps_supported, reason] = self(self, dep);
+                    if (!deps_supported) {
+                        return {false, fmt::format("dependency {} is not supported beacause {}",
+                                                   dep->name, reason)};
+                    }
+                }
+            }
+
+            enabled_extensions.emplace(ext_info->name);
+            all_extensions.emplace_back(ext_info->name);
+            SPDLOG_DEBUG(ext_info->name);
+            return {true, ""};
+        };
+
+        const auto add_extension = [&](const auto* const ext) {
             if (enabled_extensions.contains(ext)) {
-                return true;
+                return;
             }
-
-            if (!physical_device->extension_supported(ext)) {
-                SPDLOG_WARN("{} requested but not supported!", ext);
-                return false;
+            auto [supported, reason] =
+                add_extension_recurse(add_extension_recurse, get_extension_info(ext));
+            if (!supported) {
+                SPDLOG_WARN("{} requested but not supported, reason: {}", ext, reason);
             }
-
-            for (const char* dep : get_extension_dependencies(ext, vk_api_version)) {
-                [[maybe_unused]] const bool ext_dependency_supported = self(self, dep);
-                assert(ext_dependency_supported &&
-                       "extension supported but its dependencies dont.");
-            }
-
-            enabled_extensions.emplace(ext);
-            all_extensions.emplace_back(ext);
-            SPDLOG_DEBUG(ext);
-            return true;
         };
 
         for (const auto* const ext : additional_extensions) {
-            add_extension(add_extension, ext);
+            add_extension(ext);
         }
         for (const auto* const ext : feature_extensions) {
-            add_extension(add_extension, ext);
+            add_extension(ext);
         }
 
         void* p_next_chain = enabled_features.build_chain_for_device_creation(p_next);

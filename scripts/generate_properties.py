@@ -26,6 +26,12 @@ from vulkan_codegen.naming import (
     vk_name_to_cpp_name,
 )
 from vulkan_codegen.parsing import find_extensions
+from vulkan_codegen.codegen import (
+    build_extension_type_map,
+    build_alias_maps,
+    propagate_ext_map_through_aliases,
+    build_feature_version_map,
+)
 from vulkan_codegen.spec import (
     VULKAN_SPEC_VERSION,
     build_skiplist,
@@ -37,118 +43,19 @@ from vulkan_codegen.spec import (
 out_path, include_path = get_output_paths()
 
 
-def build_extension_type_map(xml_root):
-    """Build map of struct_name -> (ext_name_macro, ext_name)."""
-    ext_type_map = {}
-
-    for ext in xml_root.findall("extensions/extension"):
-        ext_supported = ext.get("supported", "")
-        if "vulkan" not in ext_supported.split(","):
-            continue
-        if ext.get("platform") is not None:
-            continue
-
-        ext_name_macro = None
-        for req in ext.findall("require"):
-            for enum_elem in req.findall("enum"):
-                enum_name = enum_elem.get("name", "")
-                if enum_name.endswith("_EXTENSION_NAME"):
-                    ext_name_macro = enum_name
-                    break
-            if ext_name_macro:
-                break
-
-        if not ext_name_macro:
-            continue
-
-        for req in ext.findall("require"):
-            for type_elem in req.findall("type"):
-                type_name = type_elem.get("name")
-                if type_name:
-                    ext_type_map[type_name] = (ext_name_macro, ext.get("name"))
-
-    return ext_type_map
-
-
-def build_promotedto_map(xml_root):
-    """Build map of ext_name -> VK_API_VERSION when promoted to core."""
-    promotedto_map = {}
-
-    for ext in xml_root.findall("extensions/extension"):
-        promotedto = ext.get("promotedto", "")
-        if promotedto:
-            match = re.match(r"VK_VERSION_(\d+)_(\d+)", promotedto)
-            if match:
-                major, minor = match.groups()
-                promotedto_map[ext.get("name")] = f"VK_API_VERSION_{major}_{minor}"
-
-    return promotedto_map
-
-
-def build_alias_maps(xml_root):
-    """Build bidirectional alias maps for type aliasing."""
-    alias_to_canonical = {}
-    canonical_to_aliases = {}
-
-    for type_elem in xml_root.findall("types/type"):
-        alias = type_elem.get("alias")
-        name = type_elem.get("name")
-        if alias and name:
-            alias_to_canonical[name] = alias
-            canonical_to_aliases.setdefault(alias, []).append(name)
-
-    return alias_to_canonical, canonical_to_aliases
-
-
-def propagate_aliases_to_extension_map(ext_type_map, alias_to_canonical):
-    """Propagate extension info through aliases so canonical names also map to extensions."""
-    for alias_name, canonical_name in alias_to_canonical.items():
-        if alias_name in ext_type_map and canonical_name not in ext_type_map:
-            ext_type_map[canonical_name] = ext_type_map[alias_name]
-        elif canonical_name in ext_type_map and alias_name not in ext_type_map:
-            ext_type_map[alias_name] = ext_type_map[canonical_name]
-
-
-def build_feature_type_map(xml_root):
-    """Build map of struct_name -> VK_API_VERSION from <feature> tags."""
-    feature_type_map = {}
-
-    for feat in xml_root.findall("feature"):
-        api = feat.get("api", "")
-        if "vulkan" not in api.split(","):
-            continue
-        feat_name = feat.get("name", "")
-        match = re.match(
-            r"VK_(?:BASE_|COMPUTE_|GRAPHICS_)?VERSION_(\d+)_(\d+)", feat_name
-        )
-        if not match:
-            continue
-        major, minor = match.groups()
-        api_version = f"VK_API_VERSION_{major}_{minor}"
-        for req in feat.findall("require"):
-            for type_elem in req.findall("type"):
-                type_name = type_elem.get("name")
-                if type_name:
-                    feature_type_map[type_name] = api_version
-
-    return feature_type_map
-
-
-def determine_property_metadata(
-    vk_name, ext_type_map, promotedto_map, feature_type_map
-):
+def determine_property_metadata(vk_name, ext_type_map, feature_version_map):
     """Determine extension and core_version for a property struct."""
     extension = None
     core_version = None
 
     ext_info = ext_type_map.get(vk_name)
     if ext_info:
-        ext_name_macro, ext_name = ext_info
+        ext_name_macro, ext_name, promotion_version = ext_info
         extension = ext_name_macro
-        core_version = promotedto_map.get(ext_name)
+        core_version = promotion_version
 
-    if vk_name in feature_type_map:
-        core_version = feature_type_map[vk_name]
+    if vk_name in feature_version_map:
+        core_version = feature_version_map[vk_name]
 
     # VkPhysicalDeviceVulkanXXProperties: derive version from name
     vulkan_ver_match = re.match(r"VkPhysicalDeviceVulkan(\d)(\d)Properties$", vk_name)
@@ -165,10 +72,9 @@ def find_property_structures(xml_root, tags) -> list[PropertyStruct]:
     skiplist = build_skiplist(xml_root)
 
     ext_type_map = build_extension_type_map(xml_root)
-    promotedto_map = build_promotedto_map(xml_root)
     alias_to_canonical, _ = build_alias_maps(xml_root)
-    propagate_aliases_to_extension_map(ext_type_map, alias_to_canonical)
-    feature_type_map = build_feature_type_map(xml_root)
+    propagate_ext_map_through_aliases(ext_type_map, alias_to_canonical)
+    feature_version_map = build_feature_version_map(xml_root)
 
     accepted_extends = {"VkPhysicalDeviceProperties2"}
 
@@ -204,7 +110,7 @@ def find_property_structures(xml_root, tags) -> list[PropertyStruct]:
 
         cpp_name = vk_name_to_cpp_name(vk_name)
         extension, core_version = determine_property_metadata(
-            vk_name, ext_type_map, promotedto_map, feature_type_map
+            vk_name, ext_type_map, feature_version_map
         )
 
         properties.append(
@@ -336,12 +242,15 @@ def generate_header(extensions, properties: list[PropertyStruct]) -> str:
         "",
         "#include <memory>",
         "#include <unordered_set>",
+        "#include <vector>",
         "",
         "namespace merian {",
         "",
         "// Forward declaration",
         "class Instance;",
         "using InstanceHandle = std::shared_ptr<Instance>;",
+        "",
+        "std::vector<vk::StructureType> get_api_version_property_types(uint32_t vk_api_version);",
         "",
     ]
 
@@ -385,9 +294,11 @@ def generate_constructor(properties: list[PropertyStruct]) -> list[str]:
         "",
         "    // Add properties from extensions",
         "    for (const auto& ext_name : extensions) {",
-        "        const auto* const ext_macro = ext_name.c_str();",
-        "        for (const auto& stype : get_extension_property_types(ext_macro)) {",
-        "            if (available_structs.contains(stype)) continue;  // Already added via API version",
+        "        const ExtensionInfo* ext_info = get_extension_info(ext_name.c_str());",
+        "        if (!ext_info) continue;",
+        "",
+        "        for (const auto& stype : ext_info->property_types) {",
+        "            if (available_structs.contains(stype)) continue;",
         "            void* struct_ptr = const_cast<void*>(get_struct_ptr(stype));",
         "            if (struct_ptr != nullptr) {",
         "                auto* base = reinterpret_cast<vk::BaseOutStructure*>(struct_ptr);",
@@ -529,7 +440,79 @@ def generate_is_available() -> list[str]:
     ]
 
 
-def generate_implementation(extensions, properties: list[PropertyStruct], tags) -> str:
+def generate_api_version_property_types(xml_root, tags) -> list[str]:
+    """Generate get_api_version_property_types() implementation."""
+    from vulkan_codegen.naming import to_camel_case
+
+    version_to_stypes = {}
+
+    for feat in xml_root.findall("feature"):
+        api = feat.get("api", "")
+        if "vulkan" not in api.split(","):
+            continue
+        feat_name = feat.get("name", "")
+        match = re.match(
+            r"VK_(?:BASE_|COMPUTE_|GRAPHICS_)?VERSION_(\d+)_(\d+)", feat_name
+        )
+        if not match:
+            continue
+        major, minor = match.groups()
+        api_version = f"VK_API_VERSION_{major}_{minor}"
+
+        for req in feat.findall("require"):
+            for type_elem in req.findall("type"):
+                type_name = type_elem.get("name")
+                if not type_name:
+                    continue
+
+                for typedef in xml_root.findall("types/type"):
+                    if typedef.get("name") == type_name:
+                        struct_extends = typedef.get("structextends", "")
+                        if "VkPhysicalDeviceProperties2" in struct_extends:
+                            for member in typedef.findall("member"):
+                                member_name_elem = member.find("name")
+                                if (
+                                    member_name_elem is not None
+                                    and member_name_elem.text == "sType"
+                                ):
+                                    stype_value = member.get("values")
+                                    if stype_value:
+                                        enum_name = "e" + to_camel_case(
+                                            stype_value.replace(
+                                                "VK_STRUCTURE_TYPE_", ""
+                                            ),
+                                            tags,
+                                        )
+                                        version_to_stypes.setdefault(
+                                            api_version, []
+                                        ).append(enum_name)
+                                    break
+                        break
+
+    lines = [
+        "std::vector<vk::StructureType> get_api_version_property_types(uint32_t vk_api_version) {",
+        "    std::vector<vk::StructureType> result;",
+        "",
+    ]
+
+    def version_sort_key(v: str) -> tuple[int, int]:
+        match = re.match(r"VK_API_VERSION_(\d+)_(\d+)", v)
+        if match:
+            return (int(match.group(1)), int(match.group(2)))
+        return (0, 0)
+
+    for version in sorted(version_to_stypes.keys(), key=version_sort_key):
+        stypes = version_to_stypes[version]
+        lines.append(f"    if (vk_api_version >= {version}) {{")
+        for stype_enum in sorted(stypes):
+            lines.append(f"        result.push_back(vk::StructureType::{stype_enum});")
+        lines.append("    }")
+
+    lines.extend(["", "    return result;", "}", ""])
+    return lines
+
+
+def generate_implementation(extensions, properties: list[PropertyStruct], tags, xml_root) -> str:
     """Generate the vulkan_properties.cpp implementation file content."""
     lines = [
         f"// This file was autogenerated for Vulkan {VULKAN_SPEC_VERSION}.",
@@ -548,6 +531,7 @@ def generate_implementation(extensions, properties: list[PropertyStruct], tags) 
         "",
     ]
 
+    lines.extend(generate_api_version_property_types(xml_root, tags))
     lines.extend(generate_constructor(properties))
     lines.extend(generate_template_get(properties))
     lines.extend(generate_named_getters(properties, tags))
@@ -590,7 +574,7 @@ def main():
         f.write(header_content)
 
     print(f"Generating implementation file: {out_path / 'vulkan_properties.cpp'}")
-    impl_content = generate_implementation(extensions, properties, tags)
+    impl_content = generate_implementation(extensions, properties, tags, xml_root)
     with open(out_path / "vulkan_properties.cpp", "w") as f:
         f.write(impl_content)
 

@@ -1,20 +1,19 @@
 #!/usr/bin/env python3
 """
-Generate C++ extension utility functions from the Vulkan specification.
+Generate C++ extension info system from the Vulkan specification.
 
-This script parses the Vulkan XML specification and generates:
-1. get_extension_dependencies() - returns dependencies for a given extension
-2. get_extension_property_types() - returns property types for an extension
-3. get_api_version_property_types() - returns property types for an API version
-
-This is separate from properties/features to keep concerns separated.
+Generates:
+- ExtensionType enum (Instance, Device)
+- DependencyInfo struct for representing dependencies
+- ExtensionInfo struct with name, type, dependencies, promoted version, and property types
+- Static storage of all extension info
+- get_extension_info() lookup function
+- get_api_version_property_types() helper function
 """
 
 import datetime
-import re
 
-from vulkan_codegen.naming import to_camel_case
-from vulkan_codegen.parsing import find_extensions
+from vulkan_codegen.parsing import enrich_extensions_with_struct_types, find_extensions
 from vulkan_codegen.spec import (
     VULKAN_SPEC_VERSION,
     get_output_paths,
@@ -25,149 +24,8 @@ from vulkan_codegen.spec import (
 out_path, include_path = get_output_paths()
 
 
-def build_extension_name_map(xml_root):
-    """Build map of extension name to EXTENSION_NAME macro."""
-    ext_name_map = {}
-
-    for ext in xml_root.findall("extensions/extension"):
-        ext_name = ext.get("name")
-        ext_supported = ext.get("supported", "")
-        if "vulkan" not in ext_supported.split(","):
-            continue
-        if ext.get("platform") is not None:
-            continue
-
-        ext_name_macro = None
-        for req in ext.findall("require"):
-            for enum_elem in req.findall("enum"):
-                enum_name = enum_elem.get("name", "")
-                if enum_name.endswith("_EXTENSION_NAME"):
-                    ext_name_macro = enum_name
-                    break
-            if ext_name_macro:
-                break
-
-        if ext_name and ext_name_macro:
-            ext_name_map[ext_name] = ext_name_macro
-
-    return ext_name_map
-
-
-def find_properties_from_extensions(xml_root, ext_name_map, tags):
-    """Find property structures provided by extensions."""
-    ext_to_stypes = {}
-
-    for ext in xml_root.findall("extensions/extension"):
-        ext_name = ext.get("name")
-        ext_supported = ext.get("supported", "")
-        if "vulkan" not in ext_supported.split(","):
-            continue
-        if ext.get("platform") is not None:
-            continue
-
-        ext_name_macro = ext_name_map.get(ext_name)
-        if not ext_name_macro:
-            continue
-
-        for req in ext.findall("require"):
-            for type_elem in req.findall("type"):
-                type_name = type_elem.get("name")
-                if not type_name:
-                    continue
-
-                # Check if this type is a property struct
-                for typedef in xml_root.findall("types/type"):
-                    if typedef.get("name") == type_name:
-                        struct_extends = typedef.get("structextends", "")
-                        if "VkPhysicalDeviceProperties2" in struct_extends:
-                            # Get the sType
-                            for member in typedef.findall("member"):
-                                member_name_elem = member.find("name")
-                                if (
-                                    member_name_elem is not None
-                                    and member_name_elem.text == "sType"
-                                ):
-                                    stype_value = member.get("values")
-                                    if stype_value:
-                                        enum_name = "e" + to_camel_case(
-                                            stype_value.replace(
-                                                "VK_STRUCTURE_TYPE_", ""
-                                            ),
-                                            tags,
-                                        )
-                                        ext_to_stypes.setdefault(
-                                            ext_name_macro, []
-                                        ).append(enum_name)
-                                    break
-                        break
-
-    return ext_to_stypes
-
-
-def find_properties_from_api_versions(xml_root, tags):
-    """Find property structures available at each API version."""
-    version_to_stypes = {}
-
-    for feat in xml_root.findall("feature"):
-        api = feat.get("api", "")
-        if "vulkan" not in api.split(","):
-            continue
-        feat_name = feat.get("name", "")
-        match = re.match(
-            r"VK_(?:BASE_|COMPUTE_|GRAPHICS_)?VERSION_(\d+)_(\d+)", feat_name
-        )
-        if not match:
-            continue
-        major, minor = match.groups()
-        api_version = f"VK_API_VERSION_{major}_{minor}"
-
-        for req in feat.findall("require"):
-            for type_elem in req.findall("type"):
-                type_name = type_elem.get("name")
-                if not type_name:
-                    continue
-
-                # Check if this type is a property struct
-                for typedef in xml_root.findall("types/type"):
-                    if typedef.get("name") == type_name:
-                        struct_extends = typedef.get("structextends", "")
-                        if "VkPhysicalDeviceProperties2" in struct_extends:
-                            for member in typedef.findall("member"):
-                                member_name_elem = member.find("name")
-                                if (
-                                    member_name_elem is not None
-                                    and member_name_elem.text == "sType"
-                                ):
-                                    stype_value = member.get("values")
-                                    if stype_value:
-                                        enum_name = "e" + to_camel_case(
-                                            stype_value.replace(
-                                                "VK_STRUCTURE_TYPE_", ""
-                                            ),
-                                            tags,
-                                        )
-                                        version_to_stypes.setdefault(
-                                            api_version, []
-                                        ).append(enum_name)
-                                    break
-                        break
-
-    return version_to_stypes
-
-
-def find_property_extension_mapping(
-    xml_root,
-    tags,
-) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
-    """Find mapping of extensions and API versions to property structure types."""
-    ext_name_map = build_extension_name_map(xml_root)
-    ext_to_stypes = find_properties_from_extensions(xml_root, ext_name_map, tags)
-    version_to_stypes = find_properties_from_api_versions(xml_root, tags)
-    return ext_to_stypes, version_to_stypes
-
-
 def generate_header(extensions) -> str:
-    """Generate the vulkan_extensions.hpp header file content."""
+    """Generate the vulkan_extensions.hpp header file."""
     lines = [
         f"// This file was autogenerated for Vulkan {VULKAN_SPEC_VERSION}.",
         f"// Created: {datetime.datetime.now()}",
@@ -178,150 +36,186 @@ def generate_header(extensions) -> str:
         '#include "vulkan/vulkan.hpp"',
         "",
         "#include <cstdint>",
+        "#include <span>",
         "#include <vector>",
         "",
         "namespace merian {",
         "",
-        "/**",
-        " * @brief Get the list of extension dependencies for a given extension.",
-        " * @param name The extension name macro (e.g., VK_KHR_SWAPCHAIN_EXTENSION_NAME).",
-        " * @param vk_api_version The Vulkan API version being used.",
-        " * @return Vector of extension name strings that are required dependencies.",
-        " *         Returns empty if no dependencies or if dependencies are satisfied by the API version.",
-        " */",
-        "std::vector<const char*> get_extension_dependencies(const char* name, uint32_t vk_api_version);",
+        "enum class ExtensionType : uint8_t {",
+        "    Instance,",
+        "    Device,",
+        "};",
         "",
-        "/**",
-        " * @brief For a extension, gets the new vk::StructureTypes that extend vk::VkPhysicalDeviceProperties2.",
-        " * @param name The extension name macro.",
-        " * @return Vector of vk::StructureType values for property structs from this extension.",
-        " */",
-        "std::vector<vk::StructureType> get_extension_property_types(const char* name);",
+        "struct ExtensionInfo;",
         "",
-        "/**",
-        " * @brief For a given API version, gets the new vk::StructureTypes that extend vk::VkPhysicalDeviceProperties2.",
-        " * @param vk_api_version The Vulkan API version.",
-        " * @return Vector of vk::StructureType values for core property structs (cumulative).",
-        " */",
-        "std::vector<vk::StructureType> get_api_version_property_types(uint32_t vk_api_version);",
+        "struct ExtensionInfo {",
+        "    const char* name;",
+        "    ExtensionType type;",
+        "    std::span<const ExtensionInfo* const> dependencies;",
+        "    uint32_t promoted_to_version;",
+        "    std::span<const vk::StructureType> property_types;",
+        "    std::span<const vk::StructureType> feature_types;",
         "",
-        "} // namespace merian",
+        "    bool is_device_extension() const { return type == ExtensionType::Device; }",
+        "    bool is_instance_extension() const { return type == ExtensionType::Instance; }",
+        "",
+        "    std::vector<const ExtensionInfo*> get_dependencies(uint32_t vk_api_version) const {",
+        "        std::vector<const ExtensionInfo*> result;",
+        "        for (const auto* dep : dependencies) {",
+        "            if (dep->promoted_to_version == 0 || vk_api_version < dep->promoted_to_version) {",
+        "                result.push_back(dep);",
+        "            }",
+        "        }",
+        "        return result;",
+        "    }",
+        "};",
+        "",
+        "const ExtensionInfo* get_extension_info(const char* name);",
         "",
     ]
+
+    # Generate forward declarations for all extensions
+    lines.append("// Forward declarations for all extensions")
+    for ext in sorted(extensions, key=lambda e: e.name):
+        var_name = sanitize_var_name(ext.name_macro)
+        lines.append(f"extern const ExtensionInfo {var_name}_info;")
+
+    lines.extend(["", "} // namespace merian", ""])
     return "\n".join(lines)
 
 
-def generate_extension_dependencies_impl(extensions) -> list[str]:
-    """Generate get_extension_dependencies() implementation."""
-    lines = [
-        "std::vector<const char*> get_extension_dependencies(const char* name, uint32_t vk_api_version) {",
-        "    std::vector<const char*> result;",
-        "",
-    ]
+def sanitize_var_name(ext_macro: str) -> str:
+    """Convert extension macro to a valid C++ variable name."""
+    return ext_macro.lower().replace("_extension_name", "").replace("_", "")
 
-    first = True
+
+def generate_static_extension_infos(extensions) -> list[str]:
+    """Generate static ExtensionInfo objects."""
+    lines = []
+
+    # Build map of extension macro to variable name
+    ext_to_var = {
+        ext.name_macro: sanitize_var_name(ext.name_macro) for ext in extensions
+    }
+
+    # Generate dependency pointer arrays
     for ext in sorted(extensions, key=lambda e: e.name):
         if not ext.dependencies:
             continue
 
-        condition = "if" if first else "} else if"
-        first = False
+        var_name = sanitize_var_name(ext.name_macro)
 
-        lines.append(f"    {condition} (std::strcmp(name, {ext.name_macro}) == 0) {{")
-
-        # Analyze dependencies
-        version_only_groups = []
-        extension_groups = []
-
+        # Collect all unique dependencies from all OR groups
+        all_deps = set()
         for and_group in ext.dependencies:
-            has_extension = any(d.extension for d in and_group)
-            if has_extension:
-                extension_groups.append(and_group)
-            else:
-                versions = [d.version for d in and_group if d.version]
-                if versions:
-                    version_only_groups.append(versions[0])
+            for dep in and_group:
+                if dep.extension:
+                    all_deps.add(dep.extension)
 
-        if version_only_groups and extension_groups:
-            version_only_groups.sort(reverse=True)
-            version_check = " && ".join(
-                f"vk_api_version < {v}" for v in version_only_groups
+        if all_deps:
+            lines.append(f"const ExtensionInfo* const {var_name}_deps[] = {{")
+            for dep_ext in sorted(all_deps):
+                dep_var = ext_to_var.get(dep_ext)
+                if dep_var:
+                    lines.append(f"    &{dep_var}_info,")
+            lines.append("};")
+
+    lines.append("")
+
+    # Generate property type arrays
+    for ext in sorted(extensions, key=lambda e: e.name):
+        if not ext.property_types:
+            continue
+
+        var_name = sanitize_var_name(ext.name_macro)
+        lines.append(f"const vk::StructureType {var_name}_properties[] = {{")
+        for stype in sorted(ext.property_types):
+            lines.append(f"    vk::StructureType::{stype},")
+        lines.append("};")
+
+    lines.append("")
+
+    # Generate feature type arrays
+    for ext in sorted(extensions, key=lambda e: e.name):
+        if not ext.feature_types:
+            continue
+
+        var_name = sanitize_var_name(ext.name_macro)
+        lines.append(f"const vk::StructureType {var_name}_features[] = {{")
+        for stype in sorted(ext.feature_types):
+            lines.append(f"    vk::StructureType::{stype},")
+        lines.append("};")
+
+    lines.append("")
+
+    # Generate ExtensionInfo objects
+    for ext in sorted(extensions, key=lambda e: e.name):
+        var_name = sanitize_var_name(ext.name_macro)
+        ext_type = (
+            "ExtensionType::Device"
+            if ext.type == "device"
+            else "ExtensionType::Instance"
+        )
+        promoted = ext.promotedto if ext.promotedto else "(uint32_t)-1"
+
+        # Count unique dependencies
+        all_deps = set()
+        for and_group in ext.dependencies:
+            for dep in and_group:
+                if dep.extension:
+                    all_deps.add(dep.extension)
+
+        lines.append(f"const ExtensionInfo {var_name}_info = {{")
+        lines.append(f"    {ext.name_macro},")
+        lines.append(f"    {ext_type},")
+
+        if all_deps:
+            lines.append(
+                f"    std::span<const ExtensionInfo* const>({var_name}_deps, {len(all_deps)}),"
             )
-            lines.append(f"        if ({version_check}) {{")
-            for dep in extension_groups[0]:
-                if dep.extension:
-                    lines.append(f"            result.push_back({dep.extension});")
-            lines.append("        }")
-        elif version_only_groups:
-            lines.append("        (void)vk_api_version; // Satisfied by Vulkan version")
-        elif extension_groups:
-            lines.append("        (void)vk_api_version;")
-            for dep in extension_groups[0]:
-                if dep.extension:
-                    lines.append(f"        result.push_back({dep.extension});")
+        else:
+            lines.append("    {},")
 
-    if not first:
-        lines.append("    }")
+        lines.append(f"    {promoted},")
 
-    lines.extend(["", "    return result;", "}", ""])
+        if ext.property_types:
+            lines.append(
+                f"    std::span<const vk::StructureType>({var_name}_properties, {len(ext.property_types)}),"
+            )
+        else:
+            lines.append("    {},")
+
+        if ext.feature_types:
+            lines.append(
+                f"    std::span<const vk::StructureType>({var_name}_features, {len(ext.feature_types)}),"
+            )
+        else:
+            lines.append("    {},")
+
+        lines.append("};")
+
+    lines.append("")
     return lines
 
 
-def generate_extension_property_types_impl(ext_to_stypes) -> list[str]:
-    """Generate get_extension_property_types() implementation."""
+def generate_get_extension_info_impl(extensions) -> list[str]:
+    """Generate get_extension_info() implementation."""
     lines = [
-        "std::vector<vk::StructureType> get_extension_property_types(const char* name) {",
-        "    std::vector<vk::StructureType> result;",
-        "",
+        "const ExtensionInfo* get_extension_info(const char* name) {",
     ]
 
-    first = True
-    for ext_macro in sorted(ext_to_stypes.keys()):
-        stypes = ext_to_stypes[ext_macro]
-        condition = "if" if first else "} else if"
-        first = False
-        lines.append(f"    {condition} (std::strcmp(name, {ext_macro}) == 0) {{")
-        for stype_enum in sorted(stypes):
-            lines.append(f"        result.push_back(vk::StructureType::{stype_enum});")
-
-    if not first:
+    for ext in sorted(extensions, key=lambda e: e.name):
+        var_name = sanitize_var_name(ext.name_macro)
+        lines.append(f"    if (std::strcmp(name, {ext.name_macro}) == 0) {{")
+        lines.append(f"        return &{var_name}_info;")
         lines.append("    }")
 
-    lines.extend(["", "    return result;", "}", ""])
+    lines.extend(["    return nullptr;", "}", ""])
     return lines
 
 
-def generate_api_version_property_types_impl(version_to_stypes) -> list[str]:
-    """Generate get_api_version_property_types() implementation."""
-    lines = [
-        "std::vector<vk::StructureType> get_api_version_property_types(uint32_t vk_api_version) {",
-        "    std::vector<vk::StructureType> result;",
-        "",
-    ]
-
-    def version_sort_key(v: str) -> tuple[int, int]:
-        match = re.match(r"VK_API_VERSION_(\d+)_(\d+)", v)
-        if match:
-            return (int(match.group(1)), int(match.group(2)))
-        return (0, 0)
-
-    for version in sorted(version_to_stypes.keys(), key=version_sort_key):
-        stypes = version_to_stypes[version]
-        lines.append(f"    if (vk_api_version >= {version}) {{")
-        for stype_enum in sorted(stypes):
-            lines.append(f"        result.push_back(vk::StructureType::{stype_enum});")
-        lines.append("    }")
-
-    lines.extend(["", "    return result;", "}", ""])
-    return lines
-
-
-def generate_implementation(
-    extensions,
-    ext_to_stypes: dict[str, list[str]],
-    version_to_stypes: dict[str, list[str]],
-) -> str:
-    """Generate the vulkan_extensions.cpp implementation file content."""
+def generate_implementation(extensions) -> str:
+    """Generate the vulkan_extensions.cpp implementation file."""
     lines = [
         f"// This file was autogenerated for Vulkan {VULKAN_SPEC_VERSION}.",
         f"// Created: {datetime.datetime.now()}",
@@ -336,9 +230,8 @@ def generate_implementation(
         "",
     ]
 
-    lines.extend(generate_extension_dependencies_impl(extensions))
-    lines.extend(generate_extension_property_types_impl(ext_to_stypes))
-    lines.extend(generate_api_version_property_types_impl(version_to_stypes))
+    lines.extend(generate_static_extension_infos(extensions))
+    lines.extend(generate_get_extension_info_impl(extensions))
 
     lines.extend(["} // namespace merian", ""])
 
@@ -353,13 +246,22 @@ def main():
     extensions = find_extensions(xml_root)
     print(f"Found {len(extensions)} extensions")
 
-    with_deps = [e for e in extensions if e.dependencies]
-    print(f"Extensions with dependencies: {len(with_deps)}")
+    print("Enriching extensions with property/feature types...")
+    enrich_extensions_with_struct_types(extensions, xml_root, tags)
 
-    print("Finding property extension mappings...")
-    ext_to_stypes, version_to_stypes = find_property_extension_mapping(xml_root, tags)
-    print(f"Extensions with properties: {len(ext_to_stypes)}")
-    print(f"API versions with properties: {len(version_to_stypes)}")
+    device_exts = [e for e in extensions if e.type == "device"]
+    instance_exts = [e for e in extensions if e.type == "instance"]
+    with_deps = [e for e in extensions if e.dependencies]
+    promoted = [e for e in extensions if e.promotedto]
+    with_props = [e for e in extensions if e.property_types]
+    with_features = [e for e in extensions if e.feature_types]
+
+    print(f"  Device extensions: {len(device_exts)}")
+    print(f"  Instance extensions: {len(instance_exts)}")
+    print(f"  With dependencies: {len(with_deps)}")
+    print(f"  Promoted to core: {len(promoted)}")
+    print(f"  With property types: {len(with_props)}")
+    print(f"  With feature types: {len(with_features)}")
 
     print(f"\nGenerating header file: {include_path / 'vulkan_extensions.hpp'}")
     header_content = generate_header(extensions)
@@ -367,7 +269,7 @@ def main():
         f.write(header_content)
 
     print(f"Generating implementation file: {out_path / 'vulkan_extensions.cpp'}")
-    impl_content = generate_implementation(extensions, ext_to_stypes, version_to_stypes)
+    impl_content = generate_implementation(extensions)
     with open(out_path / "vulkan_extensions.cpp", "w") as f:
         f.write(impl_content)
 

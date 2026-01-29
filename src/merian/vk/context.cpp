@@ -83,7 +83,7 @@ Version: {}\n\n",
         ext.second->on_context_initializing(*this);
     }
 
-    create_instance(vk_api_version);
+    create_instance(vk_api_version, desired_features, desired_additional_extensions);
 
     select_physical_device(filter_vendor_id, filter_device_id, filter_device_name, desired_features,
                            desired_additional_extensions);
@@ -108,7 +108,9 @@ Context::~Context() {
     SPDLOG_INFO("context destroyed");
 }
 
-void Context::create_instance(const uint32_t vk_api_version) {
+void Context::create_instance(const uint32_t vk_api_version,
+                              const VulkanFeatures& desired_features,
+                              const std::vector<const char*>& desired_additional_extensions) {
     std::unordered_set<std::string> supported_instance_layers;
     std::unordered_set<std::string> supported_instance_extensions;
     for (const auto& instance_layer : vk::enumerateInstanceLayerProperties()) {
@@ -133,10 +135,34 @@ void Context::create_instance(const uint32_t vk_api_version) {
     }
 
     // -----------------
-    // Create instance
-
+    // Determine all needed instance extensions
     std::vector<const char*> instance_layer_names;
     std::vector<const char*> instance_extension_names;
+
+    // we ignore context extensions here, since we assume that they already do the right checks.
+    std::vector<const char*> device_extensions = desired_features.get_required_extensions(vk_api_version);
+    for (const auto& ext : desired_additional_extensions) {
+        device_extensions.emplace_back(ext);
+    }
+    const auto add_instance_extensions = [&](const auto& self, const char* ext) -> void {
+        for (const ExtensionInfo* dep : get_extension_info(ext)->dependencies) {
+            SPDLOG_INFO(dep->name);
+            if (dep->is_instance_extension() && dep->promoted_to_version > vk_api_version) {
+                if (supported_instance_extensions.contains(dep->name)) {
+                    instance_extension_names.emplace_back(dep->name);
+                } else {
+                    SPDLOG_WARN("instance extension {} (indirectly) requested but not supported.",
+                                dep->name);
+                }
+            }
+            self(self, dep->name);
+        }
+    };
+    for (const auto& ext : device_extensions) {
+        add_instance_extensions(add_instance_extensions, ext);
+    }
+
+    // from context extensions:
     for (auto& ext : context_extensions) {
         insert_all(instance_layer_names,
                    ext.second->enable_instance_layer_names(supported_instance_layers));
@@ -145,6 +171,9 @@ void Context::create_instance(const uint32_t vk_api_version) {
     }
     remove_duplicates(instance_layer_names);
     remove_duplicates(instance_extension_names);
+
+    // -----------------
+    // Create instance
 
     SPDLOG_DEBUG("enabling instance layers: [{}]", fmt::join(instance_layer_names, ", "));
     SPDLOG_DEBUG("enabling instance extensions: [{}]", fmt::join(instance_extension_names, ", "));

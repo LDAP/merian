@@ -4,6 +4,7 @@ import re
 import xml.etree.ElementTree as ET
 
 from .models import Extension, ExtensionDep
+from .naming import to_camel_case
 
 
 def parse_depends(
@@ -161,13 +162,100 @@ def find_extensions(xml_root: ET.Element) -> list[Extension]:
         depends = ext.get("depends", "")
         dependencies = parse_depends(depends, ext_name_map)
 
+        promotedto = ext.get("promotedto", "")
+        promoted_version = None
+        if promotedto:
+            match = re.match(r"VK_VERSION_(\d+)_(\d+)", promotedto)
+            if match:
+                major, minor = match.groups()
+                promoted_version = f"VK_API_VERSION_{major}_{minor}"
+
         extensions.append(
             Extension(
                 name=ext_name,
                 name_macro=ext_name_macro,
                 type=type,
                 dependencies=dependencies,
+                promotedto=promoted_version,
             )
         )
 
     return extensions
+
+
+def enrich_extensions_with_struct_types(
+    extensions: list[Extension], xml_root: ET.Element, tags: list[str]
+) -> None:
+    """
+    Enrich Extension objects with property and feature structure types.
+
+    Args:
+        extensions: List of Extension objects to enrich (modified in place)
+        xml_root: Root element of the Vulkan spec XML
+        tags: List of vendor tags for proper casing
+    """
+    ext_name_to_ext = {ext.name_macro: ext for ext in extensions}
+
+    for ext_elem in xml_root.findall("extensions/extension"):
+        ext_name = ext_elem.get("name")
+        ext_supported = ext_elem.get("supported", "")
+
+        if "vulkan" not in ext_supported.split(","):
+            continue
+        if ext_elem.get("platform") is not None:
+            continue
+
+        # Find the extension object
+        ext_obj = None
+        for req in ext_elem.findall("require"):
+            for enum_elem in req.findall("enum"):
+                enum_name = enum_elem.get("name", "")
+                if enum_name.endswith("_EXTENSION_NAME"):
+                    ext_obj = ext_name_to_ext.get(enum_name)
+                    break
+            if ext_obj:
+                break
+
+        if not ext_obj:
+            continue
+
+        # Find types required by this extension
+        for req in ext_elem.findall("require"):
+            for type_elem in req.findall("type"):
+                type_name = type_elem.get("name")
+                if not type_name:
+                    continue
+
+                # Find the type definition
+                for typedef in xml_root.findall("types/type"):
+                    if typedef.get("name") != type_name:
+                        continue
+
+                    struct_extends = typedef.get("structextends", "")
+
+                    # Check if it's a property struct
+                    if "VkPhysicalDeviceProperties2" in struct_extends:
+                        stype = _extract_stype(typedef, type_name, tags)
+                        if stype and stype not in ext_obj.property_types:
+                            ext_obj.property_types.append(stype)
+
+                    # Check if it's a feature struct
+                    if "VkPhysicalDeviceFeatures2" in struct_extends:
+                        stype = _extract_stype(typedef, type_name, tags)
+                        if stype and stype not in ext_obj.feature_types:
+                            ext_obj.feature_types.append(stype)
+                    break
+
+
+def _extract_stype(typedef: ET.Element, type_name: str, tags: list[str]) -> str | None:
+    """Extract sType enum value from a struct definition."""
+    for member in typedef.findall("member"):
+        member_name_elem = member.find("name")
+        if member_name_elem is not None and member_name_elem.text == "sType":
+            stype_value = member.get("values")
+            if stype_value:
+                enum_name = "e" + to_camel_case(
+                    stype_value.replace("VK_STRUCTURE_TYPE_", ""), tags
+                )
+                return enum_name
+    return None

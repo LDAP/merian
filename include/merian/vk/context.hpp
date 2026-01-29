@@ -162,7 +162,9 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
     ~Context();
 
   private: // Vulkan initialization
-    void create_instance(const uint32_t vk_api_version);
+    void create_instance(const uint32_t vk_api_version,
+                         const VulkanFeatures& desired_features,
+                         const std::vector<const char*>& desired_additional_extensions);
     void select_physical_device(uint32_t filter_vendor_id,
                                 uint32_t filter_device_id,
                                 std::string filter_device_name,

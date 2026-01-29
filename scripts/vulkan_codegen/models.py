@@ -20,6 +20,9 @@ class Extension:
     name_macro: str  # e.g., VK_KHR_SWAPCHAIN_EXTENSION_NAME
     type: str  # device or instance
     dependencies: list[list[ExtensionDep]] = field(default_factory=list)  # OR of ANDs
+    promotedto: Optional[str] = None  # e.g., VK_API_VERSION_1_3
+    property_types: list[str] = field(default_factory=list)  # e.g., ["ePhysicalDeviceProperties2"]
+    feature_types: list[str] = field(default_factory=list)  # e.g., ["ePhysicalDeviceFeatures2"]
 
 
 @dataclass
