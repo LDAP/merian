@@ -4,6 +4,7 @@
 #include "merian/utils/stopwatch.hpp"
 #include "merian/utils/vector.hpp"
 #include "merian/vk/extension/extension.hpp"
+#include "merian/vk/utils/vulkan_spirv.hpp"
 
 #include <fmt/ranges.h>
 #include <numeric>
@@ -524,6 +525,16 @@ void Context::create_device_and_queues(
     }
 }
 
+bool spirv_extension_supported(const DeviceHandle& device, const char* extension) {
+    const auto device_extension_deps = get_spirv_extension_requirements(
+        extension, device->get_physical_device()->get_instance()->get_vk_api_version());
+    bool all_enabled = true;
+    for (const auto& dep : device_extension_deps) {
+        all_enabled &= device->extension_enabled(dep);
+    }
+    return all_enabled;
+}
+
 void Context::prepare_shader_include_defines() {
     // search merian-shaders
     const std::filesystem::path development_headers =
@@ -565,6 +576,20 @@ void Context::prepare_shader_include_defines() {
     const std::string device_ext_define_prefix = "MERIAN_DEVICE_EXT_ENABLED_";
     for (const auto& ext : device->get_enabled_extensions()) {
         default_shader_macro_definitions.emplace(device_ext_define_prefix + ext, "1");
+    }
+    const std::string spirv_ext_define_prefix = "MERIAN_SPIRV_EXT_SUPPORTED_";
+    for (const auto& ext : get_spirv_extensions()) {
+        if (spirv_extension_supported(device, ext)) {
+            default_shader_macro_definitions.emplace(spirv_ext_define_prefix + ext, "1");
+        }
+    }
+    const std::string spirv_cap_define_prefix = "MERIAN_SPIRV_CAP_SUPPORTED_";
+    for (const auto& cap : get_spirv_capabilities()) {
+        if (is_spirv_capability_supported(cap, instance->get_vk_api_version(),
+                                          device->get_enabled_features(),
+                                          physical_device->get_properties())) {
+            default_shader_macro_definitions.emplace(spirv_cap_define_prefix + cap, "1");
+        }
     }
 
 #ifndef NDEBUG
