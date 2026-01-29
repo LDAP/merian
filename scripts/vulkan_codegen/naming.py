@@ -127,3 +127,40 @@ def generate_getter_name(cpp_name: str) -> str:
 def remove_tag(with_tag: str, tag: str) -> str:
     """Remove vendor tag suffix from a name."""
     return with_tag.removesuffix(tag).removesuffix("_")
+
+
+def get_short_feature_name(cpp_name: str, vendor_tags: list[str]) -> str:
+    """
+    Generate short feature name from cpp_name.
+
+    This is used for string-based API access to features.
+
+    Examples:
+        PhysicalDeviceRayTracingPipelineFeaturesKHR -> RayTracingPipelineKHR
+        PhysicalDeviceVulkan12Features -> Vulkan12
+        PhysicalDeviceFeatures2 -> Vulkan10 (special case)
+
+    Args:
+        cpp_name: C++ struct name (without Vk prefix)
+        vendor_tags: List of vendor tags (e.g., ["KHR", "EXT", "AMD"])
+
+    Returns:
+        Short feature name for string-based access
+    """
+    short_name = cpp_name
+
+    # Remove vendor tags
+    for tag in vendor_tags:
+        short_name = short_name.removesuffix(tag)
+
+    # Remove "Features" suffix
+    short_name = short_name.removesuffix("Features")
+
+    # Remove "PhysicalDevice" prefix
+    short_name = short_name.removeprefix("PhysicalDevice")
+
+    # Special case for Vulkan 1.0 features (PhysicalDeviceFeatures2)
+    if cpp_name == "PhysicalDeviceFeatures2":
+        short_name = "Vulkan10"
+
+    return short_name

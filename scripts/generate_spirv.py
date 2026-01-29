@@ -14,7 +14,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Optional
 
-from vulkan_codegen.naming import vk_name_to_cpp_name
+from vulkan_codegen.naming import get_short_feature_name, vk_name_to_cpp_name
 from vulkan_codegen.spec import (
     VULKAN_SPEC_VERSION,
     get_output_paths,
@@ -161,35 +161,6 @@ def parse_spirv_capabilities(xml_root) -> list[SpirvCapability]:
         capabilities.append(cap)
 
     return capabilities
-
-
-def get_short_feature_struct_name(vk_name: str, tags: list[str]) -> str:
-    """
-    Convert VkPhysicalDevice*Features* struct name to short form.
-
-    e.g., VkPhysicalDeviceFeatures -> Vulkan10
-          VkPhysicalDeviceVulkan12Features -> Vulkan12
-          VkPhysicalDeviceRobustness2FeaturesEXT -> Robustness2EXT
-    """
-    cpp_name = vk_name_to_cpp_name(vk_name)
-    short_name = cpp_name
-
-    # Remove vendor tags temporarily for suffix removal
-    tag_suffix = ""
-    for tag in tags:
-        if short_name.endswith(tag):
-            tag_suffix = tag
-            short_name = short_name[: -len(tag)]
-            break
-
-    short_name = short_name.removesuffix("Features")
-    short_name = short_name.removeprefix("PhysicalDevice")
-
-    # Special case for core features
-    if vk_name == "VkPhysicalDeviceFeatures":
-        return "Vulkan10"
-
-    return short_name + tag_suffix
 
 
 def get_short_property_struct_name(vk_name: str, tags: list[str]) -> str:
@@ -485,7 +456,8 @@ def generate_is_capability_supported_impl(
                 pass
 
             elif enable.feature_struct and enable.feature_name:
-                short_name = get_short_feature_struct_name(enable.feature_struct, tags)
+                cpp_name = vk_name_to_cpp_name(enable.feature_struct)
+                short_name = get_short_feature_name(cpp_name, tags)
                 conditions.append(
                     f'features.get_feature("{short_name}", "{enable.feature_name}")'
                 )
@@ -621,7 +593,8 @@ def generate_capability_features_impl(
         lines.append("        return {")
 
         for enable in feature_enables:
-            short_name = get_short_feature_struct_name(enable.feature_struct, tags)
+            cpp_name = vk_name_to_cpp_name(enable.feature_struct)
+            short_name = get_short_feature_name(cpp_name, tags)
             lines.append(f'            "{short_name}/{enable.feature_name}",')
 
         lines.append("        };")

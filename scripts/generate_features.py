@@ -20,6 +20,7 @@ from vulkan_codegen.models import FeatureMember, FeatureStruct
 from vulkan_codegen.naming import (
     generate_getter_name,
     generate_member_name,
+    get_short_feature_name,
     get_stype_from_name,
     to_camel_case,
     vk_name_to_cpp_name,
@@ -38,18 +39,6 @@ from vulkan_codegen.spec import (
 )
 
 out_path, include_path = get_output_paths()
-
-
-def get_short_feature_name(cpp_name: str, tags: list[str]) -> str:
-    """Generate short feature name from cpp_name."""
-    short_name = cpp_name
-    for tag in tags:
-        short_name = short_name.removesuffix(tag)
-    short_name = short_name.removesuffix("Features")
-    short_name = short_name.removeprefix("PhysicalDevice")
-    if cpp_name == "PhysicalDeviceFeatures2":
-        short_name = "Vulkan10"
-    return short_name
 
 
 def extract_feature_members(type_elem) -> tuple[str | None, list[FeatureMember]]:
