@@ -306,7 +306,7 @@ Swapchain::acquire(const vk::Extent2D extent, const uint64_t timeout) {
         info.reset();
         throw needs_recreate("changed surface format");
     } else if (new_min_images > info->min_images &&
-               new_min_images <= surface->get_capabilities().maxImageCount) {
+               info->min_images < surface->get_capabilities().maxImageCount) {
         info.reset();
         throw needs_recreate("changed min images");
     }
