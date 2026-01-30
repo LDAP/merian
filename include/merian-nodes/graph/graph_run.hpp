@@ -249,6 +249,13 @@ class GraphRun {
         semaphore_value[get_in_flight_index()] += 2;
     }
 
+    // ---------------------
+
+    // Returns a semaphore that is signaled at the end of a run with the value of the next run.
+    const TimelineSemaphoreHandle& get_iteration_semaphore() {
+        return iteration_semaphore;
+    }
+
   private:
     void begin_run(const uint32_t iterations_in_flight,
                    const std::shared_ptr<CachingCommandPool>& cmd_cache,
@@ -265,6 +272,10 @@ class GraphRun {
             for (uint32_t i = 0; i < iterations_in_flight; i++) {
                 semaphores[i] = TimelineSemaphore::create(queue->get_context());
             }
+        }
+
+        if (iteration == 0) {
+            iteration_semaphore = TimelineSemaphore::create(allocator->get_context());
         }
 
         this->iterations_in_flight = iterations_in_flight;
@@ -294,6 +305,8 @@ class GraphRun {
     }
 
     void submit(const vk::Fence& fence = VK_NULL_HANDLE) {
+        add_signal_semaphore(iteration_semaphore, iteration + 1);
+
         {
             MERIAN_PROFILE_SCOPE(profiler, "submit");
             queue->submit(get_cmd(), fence, signal_semaphores, wait_semaphores, wait_stages,
@@ -322,6 +335,8 @@ class GraphRun {
     const ResourceAllocatorHandle allocator;
     const QueueHandle queue;
     const GLSLShaderCompilerHandle shader_compiler;
+
+    TimelineSemaphoreHandle iteration_semaphore;
 
     uint32_t iterations_in_flight;
 

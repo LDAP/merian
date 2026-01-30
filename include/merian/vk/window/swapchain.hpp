@@ -2,7 +2,6 @@
 
 #include "merian/vk/command/queue.hpp"
 #include "merian/vk/memory/resource_allocations.hpp"
-#include "merian/vk/sync/fence.hpp"
 #include "merian/vk/sync/semaphore_binary.hpp"
 #include "merian/vk/window/surface.hpp"
 
@@ -29,7 +28,7 @@ class SwapchainImage : public Image {
 /**
  * @brief      This class describes a swapchain.
  *
- * Can only be used in a loop with num_swapchain_images >= frames_in_flight.
+ * Can only be used in a loop with get_max_image_count() >= num_swapchain_images >= frames_in_flight.
  */
 class Swapchain : public std::enable_shared_from_this<Swapchain> {
     static constexpr uint32_t MAX_OLD_SWAPCHAIN_CHAIN_LENGTH = 5;
