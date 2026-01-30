@@ -71,6 +71,7 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
      */
     Swapchain(const ContextHandle& context,
               const SurfaceHandle& surface,
+              const uint32_t min_images = 2,
               const std::vector<vk::SurfaceFormatKHR>& preferred_surface_formats =
                   {vk::Format::eR8G8B8A8Srgb, vk::Format::eB8G8R8A8Srgb},
               const std::vector<vk::PresentModeKHR>& preferred_present_modes = {
@@ -90,7 +91,7 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
     /* May throw Swapchain::needs_recreate.
      * For that you should use the Swapchains copy constructor.
      *
-     * If the framebuffer extent is 0 or the aquire was not successfull, std::nullopt is returned.
+     * If the framebuffer extent is 0 or the acquire was not successful, std::nullopt is returned.
      * Returns the swapchain image index and the sync group that must be used to sync access to the
      * swapchain images.
      */
@@ -128,6 +129,9 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
     // returns the actually selected one from supported_surface_formats
     vk::SurfaceFormatKHR set_new_surface_format(const vk::SurfaceFormatKHR desired);
 
+    // Used for new Swapchains. Triggers a needs_recreate.
+    void set_min_images(const uint32_t min_images);
+
     const vk::PresentModeKHR& get_new_present_mode() const;
 
     const vk::SurfaceFormatKHR& get_new_surface_format() const;
@@ -149,6 +153,7 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
 
     vk::SurfaceFormatKHR new_surface_format;
     vk::PresentModeKHR new_present_mode;
+    uint32_t new_min_images;
 
     vk::SwapchainKHR swapchain = VK_NULL_HANDLE;
 
@@ -158,7 +163,7 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
 
     // ---------------------------------------------------------------------------
     // See https://github.com/KhronosGroup/Vulkan-Samples/tree/main/samples/api/swapchain_recreation
-    // we keep here a chain of old swapchains that are cleaned up when the next aquire is
+    // we keep here a chain of old swapchains that are cleaned up when the next acquire is
     // successful.
     std::shared_ptr<Swapchain> old_swapchain;
     uint32_t old_swapchain_chain_length = 0;
@@ -168,17 +173,17 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
     // We then set save_to_destoy to true for the old swapchain, and reset the pointer.
     std::size_t acquire_count = 0;
 
-    // set by the new swapchain, if false then a deviceIdle/queueIdle is necesarry when destroying.
+    // set by the new swapchain, if false then a deviceIdle/queueIdle is necessary when destroying.
     bool save_to_destoy = false;
     // ---------------------------------------------------------------------------
 
     // Contains:
-    // - Semaphore (read) that is signaled by the presentation engine when the aquired image is ready.
-    // access with acquire_index
-    // - Semaphore (written) that must be signaled by the user when they finished writing to the acquired image.
-    // access with image_idx
-    // - Helper to detect if an aquire has finished on a swapchain
-    // access with image_idx
+    // - Semaphore (read) that is signaled by the presentation engine when the acquired image is
+    // ready. access with acquire_index
+    // - Semaphore (written) that must be signaled by the user when they finished writing to the
+    // acquired image. access with image_idx
+    // - Helper to detect if an acquire has finished on a swapchain
+    //
     std::vector<SyncGroup> sync_groups;
 
     BinarySemaphoreHandle spare_read_semaphore;

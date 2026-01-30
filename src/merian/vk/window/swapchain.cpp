@@ -78,6 +78,7 @@ SwapchainImage::~SwapchainImage() {
 
 Swapchain::Swapchain(const ContextHandle& context,
                      const SurfaceHandle& surface,
+                     const uint32_t min_images,
                      const std::vector<vk::SurfaceFormatKHR>& preferred_surface_formats,
                      const std::vector<vk::PresentModeKHR>& preferred_present_modes)
     : context(context), surface(surface) {
@@ -96,6 +97,7 @@ Swapchain::Swapchain(const ContextHandle& context,
 
     new_surface_format = select_best(supported_surface_formats, preferred_surface_formats);
     new_present_mode = select_best(supported_present_modes, preferred_present_modes);
+    new_min_images = min_images;
 }
 
 Swapchain::Swapchain(const SwapchainHandle& swapchain)
@@ -103,7 +105,8 @@ Swapchain::Swapchain(const SwapchainHandle& swapchain)
       supported_present_modes(swapchain->supported_present_modes),
       supported_surface_formats(swapchain->supported_surface_formats),
       new_surface_format(swapchain->new_surface_format),
-      new_present_mode(swapchain->new_present_mode), old_swapchain(swapchain),
+      new_present_mode(swapchain->new_present_mode), new_min_images(swapchain->new_min_images),
+      old_swapchain(swapchain),
       old_swapchain_chain_length(
           swapchain->old_swapchain ? (swapchain->old_swapchain_chain_length + 1) : 1) {}
 
@@ -152,6 +155,10 @@ vk::SurfaceFormatKHR Swapchain::set_new_surface_format(const vk::SurfaceFormatKH
     return new_surface_format;
 }
 
+void Swapchain::set_min_images(const uint32_t min_images) {
+    new_min_images = min_images;
+}
+
 const vk::PresentModeKHR& Swapchain::get_new_present_mode() const {
     return new_present_mode;
 }
@@ -172,15 +179,17 @@ vk::Extent2D Swapchain::create_swapchain(const uint32_t width, const uint32_t he
         SPDLOG_DEBUG("create swapchain");
     }
 
-    const auto capabilities =
-        context->get_physical_device()->get_physical_device().getSurfaceCapabilitiesKHR(*surface);
+    const auto& capabilities = surface->get_capabilities();
 
     info = SwapchainInfo();
     info->extent = make_extent2D(capabilities, width, height);
 
-    info->min_images = capabilities.minImageCount + 1; // one extra to own
-    if (capabilities.maxImageCount > 0)                // 0 means no limit
-        info->min_images = std::min(info->min_images, capabilities.maxImageCount);
+    info->min_images = std::max(capabilities.minImageCount, new_min_images); // one extra to own
+    if (capabilities.maxImageCount > 0 && capabilities.maxImageCount < info->min_images) {
+        SPDLOG_WARN("requested {} swapchain images but max is {}", info->min_images,
+                    capabilities.maxImageCount);
+        info->min_images = capabilities.maxImageCount;
+    }
 
     vk::SurfaceTransformFlagBitsKHR pre_transform;
     if (capabilities.supportedTransforms & vk::SurfaceTransformFlagBitsKHR::eIdentity) {
@@ -288,7 +297,13 @@ Swapchain::acquire(const vk::Extent2D extent, const uint64_t timeout) {
     } else if (new_surface_format != info->surface_format) {
         info.reset();
         throw needs_recreate("changed surface format");
+    } else if (new_min_images > info->min_images &&
+               new_min_images <= surface->get_capabilities().maxImageCount) {
+        info.reset();
+        throw needs_recreate("changed min images");
     }
+
+    SPDLOG_TRACE("aquire index {}", acquire_count % sync_groups.size());
 
     uint32_t image_idx;
     const vk::Result result = context->get_device()->get_device().acquireNextImageKHR(
@@ -301,6 +316,7 @@ Swapchain::acquire(const vk::Extent2D extent, const uint64_t timeout) {
     }
 
     if (result == vk::Result::eSuccess) {
+        SPDLOG_TRACE("aquired image index {}", image_idx);
         acquire_count++;
 
         if (old_swapchain) {

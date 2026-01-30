@@ -12,7 +12,10 @@ class Surface : public std::enable_shared_from_this<Surface> {
   public:
     // Manage the supplied surface.
     Surface(const ContextHandle& context, const vk::SurfaceKHR& surface)
-        : context(context), surface(surface) {
+        : context(context), surface(surface),
+          capabilities(
+              context->get_physical_device()->get_physical_device().getSurfaceCapabilitiesKHR(
+                  surface)) {
         SPDLOG_DEBUG("create surface ({})", fmt::ptr(this));
     }
 
@@ -29,9 +32,14 @@ class Surface : public std::enable_shared_from_this<Surface> {
         return surface;
     }
 
+    const vk::SurfaceCapabilitiesKHR& get_capabilities() const {
+        return capabilities;
+    }
+
   private:
     const ContextHandle context;
     vk::SurfaceKHR surface;
+    vk::SurfaceCapabilitiesKHR capabilities;
 };
 
 using SurfaceHandle = std::shared_ptr<Surface>;
