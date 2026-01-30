@@ -55,8 +55,8 @@ class GLFWWindowNode : public Node {
         assert(swapchain_manager);
 
         if (run.get_iterations_in_flight() > get_swapchain()->get_max_image_count()) {
-            std::string err =
-                fmt::format("to many frames in flight. Swapchain only supports up to {}",
+            const std::string err =
+                fmt::format("too many frames in flight. Swapchain only supports up to {}",
                             get_swapchain()->get_max_image_count());
             SPDLOG_ERROR(err);
             throw graph_errors::node_error{err};
