@@ -132,6 +132,8 @@ class Swapchain : public std::enable_shared_from_this<Swapchain> {
     // Used for new Swapchains. Triggers a needs_recreate.
     void set_min_images(const uint32_t min_images);
 
+    uint32_t get_max_image_count();
+
     const vk::PresentModeKHR& get_new_present_mode() const;
 
     const vk::SurfaceFormatKHR& get_new_surface_format() const;

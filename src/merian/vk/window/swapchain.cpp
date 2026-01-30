@@ -159,6 +159,14 @@ void Swapchain::set_min_images(const uint32_t min_images) {
     new_min_images = min_images;
 }
 
+uint32_t Swapchain::get_max_image_count() {
+    uint32_t surface_max_count = surface->get_capabilities().maxImageCount;
+    if (surface_max_count > 0) {
+        return surface_max_count;
+    }
+    return (uint32_t)-1;
+}
+
 const vk::PresentModeKHR& Swapchain::get_new_present_mode() const {
     return new_present_mode;
 }

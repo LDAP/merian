@@ -6,6 +6,7 @@
 
 #include "merian/vk/extension/extension_glfw.hpp"
 #include "merian/vk/utils/blits.hpp"
+#include "merian/vk/utils/profiler.hpp"
 #include "merian/vk/window/glfw_window.hpp"
 #include "merian/vk/window/swapchain.hpp"
 #include "merian/vk/window/swapchain_manager.hpp"
@@ -53,8 +54,20 @@ class GLFWWindowNode : public Node {
                          const NodeIO& io) override {
         assert(swapchain_manager);
 
-        const std::optional<SwapchainAcquireResult> acquire =
-            swapchain_manager->acquire(window, acquire_timeout_ns);
+        if (run.get_iterations_in_flight() > get_swapchain()->get_max_image_count()) {
+            std::string err =
+                fmt::format("to many frames in flight. Swapchain only supports up to {}",
+                            get_swapchain()->get_max_image_count());
+            SPDLOG_ERROR(err);
+            throw graph_errors::node_error{err};
+        }
+
+        get_swapchain()->set_min_images(run.get_iterations_in_flight());
+        std::optional<SwapchainAcquireResult> acquire;
+        {
+            MERIAN_PROFILE_SCOPE(run.get_profiler(), "acquire");
+            acquire = swapchain_manager->acquire(window, acquire_timeout_ns);
+        }
 
         if (acquire) {
             const CommandBufferHandle& cmd = run.get_cmd();
@@ -72,23 +85,29 @@ class GLFWWindowNode : public Node {
                 current_src_array_size = 0;
             }
 
-            if (src_image) {
-                const vk::Filter filter =
-                    src_image->format_features() &
-                            vk::FormatFeatureFlagBits::eSampledImageFilterLinear
-                        ? vk::Filter::eLinear
-                        : vk::Filter::eNearest;
+            {
+                MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "blit/clear");
+                if (src_image) {
+                    const vk::Filter filter =
+                        src_image->format_features() &
+                                vk::FormatFeatureFlagBits::eSampledImageFilterLinear
+                            ? vk::Filter::eLinear
+                            : vk::Filter::eNearest;
 
-                cmd_blit(mode, cmd, src_image, vk::ImageLayout::eTransferSrcOptimal,
-                         src_image->get_extent(), image, vk::ImageLayout::eTransferDstOptimal,
-                         image->get_extent(), vk::ClearColorValue{}, filter);
-            } else {
-                cmd->clear(image);
+                    cmd_blit(mode, cmd, src_image, vk::ImageLayout::eTransferSrcOptimal,
+                             src_image->get_extent(), image, vk::ImageLayout::eTransferDstOptimal,
+                             image->get_extent(), vk::ClearColorValue{}, filter);
+                } else {
+                    cmd->clear(image);
+                }
             }
 
             cmd->barrier(image->barrier2(vk::ImageLayout::ePresentSrcKHR));
 
-            on_blit_completed(cmd, *acquire);
+            {
+                MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "on_blit_completed callback");
+                on_blit_completed(cmd, *acquire);
+            }
 
             run.add_wait_semaphore(acquire->wait_semaphore, vk::PipelineStageFlagBits::eTransfer);
             run.add_signal_semaphore(acquire->signal_semaphore);
