@@ -317,7 +317,6 @@ Swapchain::acquire(const vk::Extent2D extent, const uint64_t timeout) {
     uint32_t image_idx;
     const vk::Result result = context->get_device()->get_device().acquireNextImageKHR(
         swapchain, timeout, *spare_read_semaphore, VK_NULL_HANDLE, &image_idx);
-    std::swap(spare_read_semaphore, sync_groups[image_idx].read_semaphore);
 
     if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR) {
         info.reset();
@@ -326,6 +325,7 @@ Swapchain::acquire(const vk::Extent2D extent, const uint64_t timeout) {
 
     if (result == vk::Result::eSuccess) {
         SPDLOG_TRACE("aquired image index {}", image_idx);
+        std::swap(spare_read_semaphore, sync_groups[image_idx].read_semaphore);
         acquire_count++;
 
         if (old_swapchain) {
