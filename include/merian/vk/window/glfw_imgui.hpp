@@ -31,6 +31,8 @@ class GLFWImGui {
     ~GLFWImGui();
 
     // Start a new ImGui frame
+    //
+    // Note: ImGui assumes internally that frames_in_flight < num swapchain images.
     FramebufferHandle new_frame(QueueHandle& queue,
                                 const CommandBufferHandle& cmd,
                                 GLFWwindow* window,
