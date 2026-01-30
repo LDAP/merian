@@ -28,6 +28,8 @@ class SwapchainImage : public Image {
 
 /**
  * @brief      This class describes a swapchain.
+ *
+ * Can only be used in a loop with num_swapchain_images >= frames_in_flight.
  */
 class Swapchain : public std::enable_shared_from_this<Swapchain> {
     static constexpr uint32_t MAX_OLD_SWAPCHAIN_CHAIN_LENGTH = 5;

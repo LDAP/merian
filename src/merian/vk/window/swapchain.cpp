@@ -192,12 +192,13 @@ vk::Extent2D Swapchain::create_swapchain(const uint32_t width, const uint32_t he
     info = SwapchainInfo();
     info->extent = make_extent2D(capabilities, width, height);
 
-    info->min_images = std::max(capabilities.minImageCount, new_min_images); // one extra to own
-    if (capabilities.maxImageCount > 0 && capabilities.maxImageCount < info->min_images) {
-        SPDLOG_WARN("requested {} swapchain images but max is {}", info->min_images,
+    if (capabilities.maxImageCount > 0 && capabilities.maxImageCount < new_min_images) {
+        SPDLOG_WARN("requested {} swapchain images but max is {}", new_min_images,
                     capabilities.maxImageCount);
-        info->min_images = capabilities.maxImageCount;
     }
+
+    info->min_images = std::min(std::max(capabilities.minImageCount, new_min_images) + 1,
+                                capabilities.maxImageCount);
 
     vk::SurfaceTransformFlagBitsKHR pre_transform;
     if (capabilities.supportedTransforms & vk::SurfaceTransformFlagBitsKHR::eIdentity) {

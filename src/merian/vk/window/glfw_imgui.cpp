@@ -131,9 +131,8 @@ FramebufferHandle GLFWImGui::new_frame(QueueHandle& queue,
 
     if (!imgui_initialized) {
         init_imgui(window, aquire_result, queue);
-    } else if (aquire_result.did_recreate &&
-               aquire_result.image_view->get_image()->get_format() != current_surface_format) {
-        // Workaround: needs vulkan backend restart
+    } else if (aquire_result.did_recreate) {
+        // Workaround: needs vulkan backend restart (surface format and min images)
         context->get_device()->get_device().waitIdle();
         ImGui_ImplVulkan_DestroyFontsTexture();
         ImGui_ImplVulkan_Shutdown();
