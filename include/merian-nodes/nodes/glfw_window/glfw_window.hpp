@@ -54,13 +54,11 @@ class GLFWWindowNode : public Node {
                          const NodeIO& io) override {
         assert(swapchain_manager);
 
-        if (run.get_iterations_in_flight() > get_swapchain()->get_max_image_count()) {
-            const std::string err =
-                fmt::format("too many frames in flight. Swapchain only supports up to {}",
-                            get_swapchain()->get_max_image_count());
-            SPDLOG_ERROR(err);
-            throw graph_errors::node_error{err};
-        }
+        // swapchain only supports up to get_swapchain()->get_max_image_count() frames in flight.
+        const int64_t signed_max_img_count = get_swapchain()->get_max_image_count();
+        const int64_t signed_iteration = (int64_t)run.get_iteration();
+        throttle = run.get_iteration_semaphore()->wait(
+            std::max((int64_t)0, signed_iteration - signed_max_img_count + 1));
 
         get_swapchain()->set_min_images(run.get_iterations_in_flight());
         std::optional<SwapchainAcquireResult> acquire;
@@ -145,6 +143,10 @@ class GLFWWindowNode : public Node {
     }
 
     NodeStatusFlags properties(Properties& config) override {
+        if (throttle) {
+            config.output_text("WARN: throttling CPU, to many frames in flight for swapchain!");
+        }
+
         if (current_src_array_size > 0) {
             config.config_uint("source array element", src_array_element, 0,
                                current_src_array_size - 1);
@@ -280,6 +282,8 @@ class GLFWWindowNode : public Node {
     bool on_should_close_sigint = false;
     bool on_should_close_sigterm = false;
     bool on_should_close_remove_node = true;
+
+    bool throttle = false;
 };
 
 } // namespace merian
