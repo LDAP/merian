@@ -32,6 +32,9 @@ class ExtensionGLFW : public ContextExtension {
 
     ~ExtensionGLFW();
 
+    void on_context_initializing(const ExtensionContainer& extension_container,
+                                 const vk::detail::DispatchLoaderDynamic& loader) override;
+
     std::vector<const char*> enable_instance_extension_names(
         const std::unordered_set<std::string>& supported_instance_extensions) const override;
 

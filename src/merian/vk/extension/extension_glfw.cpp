@@ -12,18 +12,30 @@ ExtensionGLFW::ExtensionGLFW() : ContextExtension("ExtensionGLFW") {
     glfw_initialized = glfwInit();
     if (glfw_initialized == GLFW_FALSE) {
         SPDLOG_WARN("GLFW initialization failed!");
-    } else {
-        glfw_vulkan_support = glfwVulkanSupported();
-        if (glfw_vulkan_support == GLFW_FALSE)
-            SPDLOG_WARN("GLFW reports to have no Vulkan support! Maybe it couldn't "
-                        "find the Vulkan loader!");
     }
+
+    SPDLOG_DEBUG("Initialized GLFW: {}", glfw_initialized == GLFW_TRUE);
 }
 
 ExtensionGLFW::~ExtensionGLFW() {
     SPDLOG_DEBUG("Terminate GLFW");
     if (glfw_initialized == GLFW_TRUE)
         glfwTerminate();
+}
+
+void ExtensionGLFW::on_context_initializing(
+    [[maybe_unused]] const ExtensionContainer& extension_container,
+    const vk::detail::DispatchLoaderDynamic& loader) {
+
+    SPDLOG_DEBUG("Querying Vulkan support");
+    glfwInitVulkanLoader(loader.vkGetInstanceProcAddr);
+    glfw_vulkan_support = glfwVulkanSupported();
+    if (glfw_vulkan_support == GLFW_FALSE) {
+        SPDLOG_WARN("...failed! GLFW reports to have no Vulkan support! Maybe it couldn't "
+                    "find the Vulkan loader!");
+    } else {
+        SPDLOG_DEBUG("...success!");
+    }
 }
 
 std::vector<const char*> ExtensionGLFW::enable_instance_extension_names(

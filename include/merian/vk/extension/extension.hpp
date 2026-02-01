@@ -64,7 +64,8 @@ class ContextExtension {
      * Note, this are the desired extensions and support is yet to be determined.
      */
     virtual void
-    on_context_initializing([[maybe_unused]] const ExtensionContainer& extension_container) {}
+    on_context_initializing([[maybe_unused]] const ExtensionContainer& extension_container,
+                            [[maybe_unused]] const vk::detail::DispatchLoaderDynamic& loader) {}
 
     /**
      * Append structs to vkInstanceCreateInfo to enable features of extensions.

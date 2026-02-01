@@ -60,6 +60,7 @@ class GLFWWindowNode : public Node {
         throttle = run.get_iteration_semaphore()->wait(
             std::max((int64_t)0, signed_iteration - signed_max_img_count + 1));
 
+        // move to on_connected when there is an API for iterations_in_flight.
         get_swapchain()->set_min_images(run.get_iterations_in_flight());
         std::optional<SwapchainAcquireResult> acquire;
         {

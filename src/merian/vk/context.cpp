@@ -80,7 +80,7 @@ Version: {}\n\n",
     }
 
     for (const auto& ext : context_extensions) {
-        ext.second->on_context_initializing(*this);
+        ext.second->on_context_initializing(*this, VULKAN_HPP_DEFAULT_DISPATCHER);
     }
 
     create_instance(vk_api_version, desired_features, desired_additional_extensions);
@@ -140,7 +140,8 @@ void Context::create_instance(const uint32_t vk_api_version,
     std::vector<const char*> instance_extension_names;
 
     // we ignore context extensions here, since we assume that they already do the right checks.
-    std::vector<const char*> device_extensions = desired_features.get_required_extensions(vk_api_version);
+    std::vector<const char*> device_extensions =
+        desired_features.get_required_extensions(vk_api_version);
     for (const auto& ext : desired_additional_extensions) {
         device_extensions.emplace_back(ext);
     }
