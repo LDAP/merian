@@ -67,7 +67,7 @@ Version: {}\n\n",
                  VK_API_VERSION_MINOR(VK_HEADER_VERSION_COMPLETE),
                  VK_API_VERSION_PATCH(VK_HEADER_VERSION_COMPLETE));
 
-    // Init dynamic loader
+    SPDLOG_DEBUG("initializing dynamic loader");
     VULKAN_HPP_DEFAULT_DISPATCHER.init();
 
     SPDLOG_DEBUG("supplied extensions:");
