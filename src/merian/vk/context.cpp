@@ -22,7 +22,6 @@ Context::create(const VulkanFeatures& desired_features,
                 const std::string& application_name,
                 const uint32_t application_vk_version,
                 const uint32_t preffered_number_compute_queues,
-                const uint32_t vk_api_version,
                 const uint32_t filter_vendor_id,
                 const uint32_t filter_device_id,
                 const std::string& filter_device_name) {
@@ -31,7 +30,7 @@ Context::create(const VulkanFeatures& desired_features,
     const ContextHandle context = std::shared_ptr<Context>(
         new Context(desired_features, desired_additional_extensions, desired_context_extensions,
                     application_name, application_vk_version, preffered_number_compute_queues,
-                    vk_api_version, filter_vendor_id, filter_device_id, filter_device_name));
+                    filter_vendor_id, filter_device_id, filter_device_name));
 
     for (auto& ext : context->context_extensions) {
         ext.second->on_context_created(context, *context);
@@ -46,7 +45,6 @@ Context::Context(const VulkanFeatures& desired_features,
                  const std::string& application_name,
                  const uint32_t application_vk_version,
                  const uint32_t preffered_number_compute_queues,
-                 const uint32_t vk_api_version,
                  const uint32_t filter_vendor_id,
                  const uint32_t filter_device_id,
                  const std::string& filter_device_name)
@@ -83,7 +81,9 @@ Version: {}\n\n",
         ext.second->on_context_initializing(*this, VULKAN_HPP_DEFAULT_DISPATCHER);
     }
 
-    create_instance(vk_api_version, desired_features, desired_additional_extensions);
+    // attempt to target the latest version
+    const uint32_t target_vk_api_version = VK_HEADER_VERSION_COMPLETE;
+    create_instance(target_vk_api_version, desired_features, desired_additional_extensions);
 
     select_physical_device(filter_vendor_id, filter_device_id, filter_device_name, desired_features,
                            desired_additional_extensions);
@@ -108,9 +108,12 @@ Context::~Context() {
     SPDLOG_INFO("context destroyed");
 }
 
-void Context::create_instance(const uint32_t vk_api_version,
+void Context::create_instance(const uint32_t targeted_vk_api_version,
                               const VulkanFeatures& desired_features,
                               const std::vector<const char*>& desired_additional_extensions) {
+    const uint32_t effective_vk_instance_api_version =
+        std::min(targeted_vk_api_version, Instance::get_instance_vk_api_version());
+
     std::unordered_set<std::string> supported_instance_layers;
     std::unordered_set<std::string> supported_instance_extensions;
     for (const auto& instance_layer : vk::enumerateInstanceLayerProperties()) {
@@ -139,15 +142,28 @@ void Context::create_instance(const uint32_t vk_api_version,
     std::vector<const char*> instance_layer_names;
     std::vector<const char*> instance_extension_names;
 
+    // minimum requirements for Merian
+    if (effective_vk_instance_api_version < VK_API_VERSION_1_1) {
+        if (!supported_instance_extensions.contains(
+                VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME)) {
+            throw MerianException{
+                fmt::format("Merian needs Vulkan 1.1 or {}",
+                            VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME)};
+        }
+        instance_extension_names.emplace_back(
+            VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+    }
+
     // we ignore context extensions here, since we assume that they already do the right checks.
-    std::vector<const char*> device_extensions =
-        desired_features.get_required_extensions(vk_api_version);
+    std::vector<const char*> device_extensions = desired_features.get_required_extensions(
+        VK_API_VERSION_1_0 /*created later, assume minumum*/);
     for (const auto& ext : desired_additional_extensions) {
         device_extensions.emplace_back(ext);
     }
     const auto add_instance_extensions = [&](const auto& self, const char* ext) -> void {
         for (const ExtensionInfo* dep : get_extension_info(ext)->dependencies) {
-            if (dep->is_instance_extension() && dep->promoted_to_version > vk_api_version) {
+            if (dep->is_instance_extension() &&
+                dep->promoted_to_version > effective_vk_instance_api_version) {
                 if (supported_instance_extensions.contains(dep->name)) {
                     instance_extension_names.emplace_back(dep->name);
                 } else {
@@ -188,7 +204,7 @@ void Context::create_instance(const uint32_t vk_api_version,
         application_vk_version,
         MERIAN_PROJECT_NAME,
         VK_MAKE_VERSION(MERIAN_VERSION_MAJOR, MERIAN_VERSION_MINOR, MERIAN_VERSION_PATCH),
-        vk_api_version,
+        targeted_vk_api_version,
     };
 
     vk::InstanceCreateInfo instance_create_info{
@@ -614,7 +630,7 @@ void Context::prepare_shader_include_defines() {
     }
     const std::string spirv_cap_define_prefix = "MERIAN_SPIRV_CAP_SUPPORTED_";
     for (const auto& cap : get_spirv_capabilities()) {
-        if (is_spirv_capability_supported(cap, instance->get_vk_api_version(),
+        if (is_spirv_capability_supported(cap, device->get_vk_api_version(),
                                           device->get_enabled_features(),
                                           physical_device->get_properties())) {
             default_shader_macro_definitions.emplace(spirv_cap_define_prefix + cap, "1");
@@ -751,20 +767,16 @@ const SlangSessionHandle& Context::get_slang_session() const {
     return slang_session;
 }
 
-const InstanceHandle& Context::get_instance() {
+const InstanceHandle& Context::get_instance() const {
     return instance;
 }
 
-const PhysicalDeviceHandle& Context::get_physical_device() {
+const PhysicalDeviceHandle& Context::get_physical_device() const {
     return physical_device;
 }
 
-const DeviceHandle& Context::get_device() {
+const DeviceHandle& Context::get_device() const {
     return device;
-}
-
-const uint32_t& Context::get_vk_api_version() const {
-    return instance->get_vk_api_version();
 }
 
 FileLoader& Context::get_file_loader() {

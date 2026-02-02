@@ -19,21 +19,16 @@ enum class CompilationTarget {
 };
 
 inline CompilationTarget spirv_target_for_vulkan_api_version(const uint32_t vulkan_api_version) {
-    switch (vulkan_api_version) {
-    case VK_API_VERSION_1_0:
-        return CompilationTarget::SPIRV_1_0;
-    case VK_API_VERSION_1_1:
-        return CompilationTarget::SPIRV_1_3;
-    case VK_API_VERSION_1_2:
-        return CompilationTarget::SPIRV_1_5;
-    case VK_API_VERSION_1_3:
-    case VK_API_VERSION_1_4:
+    if (vulkan_api_version >= VK_API_VERSION_1_3) {
         return CompilationTarget::SPIRV_1_6;
-
-    default: {
-        throw std::invalid_argument("unknown Vulkan API version");
     }
+    if (vulkan_api_version >= VK_API_VERSION_1_2) {
+        return CompilationTarget::SPIRV_1_5;
     }
+    if (vulkan_api_version >= VK_API_VERSION_1_1) {
+        return CompilationTarget::SPIRV_1_3;
+    }
+    return CompilationTarget::SPIRV_1_0;
 }
 
 class ShaderCompileContext;
@@ -59,8 +54,8 @@ class ShaderCompileContext {
         : preprocessor_macros(context.get_default_shader_macro_definitions()),
           debug_info(Context::IS_DEBUG_BUILD),
           optimization_level(Context::BUILD_OPTIMIZATION_LEVEL),
-          target(spirv_target_for_vulkan_api_version(context.get_vk_api_version())),
-          target_vk_api_version(context.get_vk_api_version()) {
+          target(spirv_target_for_vulkan_api_version(context.get_device()->get_vk_api_version())),
+          target_vk_api_version(context.get_device()->get_vk_api_version()) {
         file_loader.add_search_path(context.get_default_shader_include_paths());
     }
 

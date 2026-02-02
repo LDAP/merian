@@ -37,7 +37,10 @@ class Device : public std::enable_shared_from_this<Device> {
         }
 
         SPDLOG_DEBUG("...with extensions:");
-        const uint32_t vk_api_version = physical_device->get_instance()->get_vk_api_version();
+        const uint32_t device_vk_api_version = physical_device->get_vk_api_version();
+        const uint32_t instance_vk_api_version =
+            physical_device->get_instance()->get_vk_api_version();
+
         const auto feature_extensions = enabled_features.get_required_extensions(vk_api_version);
         std::vector<const char*> all_extensions;
         all_extensions.reserve(additional_extensions.size() + feature_extensions.size());
@@ -103,7 +106,7 @@ class Device : public std::enable_shared_from_this<Device> {
                                                       {}, p_next_chain};
 
         device = physical_device->get_physical_device().createDevice(device_create_info);
-        SPDLOG_DEBUG("device {} created", fmt::ptr(VkDevice(device)));
+        SPDLOG_DEBUG("device ({}) created", fmt::ptr(VkDevice(device)));
 
         SPDLOG_DEBUG("create pipeline cache");
         vk::PipelineCacheCreateInfo pipeline_cache_create_info{};
@@ -188,6 +191,13 @@ class Device : public std::enable_shared_from_this<Device> {
 
     const VulkanFeatures& get_enabled_features() const {
         return enabled_features;
+    }
+
+    // Shortcut for get_physical_device()->get_vk_api_version()
+    // Returns the effective API version of the physical device, that is the minimum of the
+    // targeted version and the supported version.
+    uint32_t get_vk_api_version() const {
+        return physical_device->get_vk_api_version();
     }
 
     // ---------------------------------------------

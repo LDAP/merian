@@ -141,7 +141,6 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
            const std::string& application_name = "",
            const uint32_t application_vk_version = VK_MAKE_VERSION(1, 0, 0),
            const uint32_t preffered_number_compute_queues = 1, // Additionally to the GCT queue
-           const uint32_t vk_api_version = VK_API_VERSION_1_3,
            const uint32_t filter_vendor_id = -1,
            const uint32_t filter_device_id = -1,
            const std::string& filter_device_name = "");
@@ -153,7 +152,6 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
             const std::string& application_name,
             const uint32_t application_vk_version,
             const uint32_t preffered_number_compute_queues,
-            const uint32_t vk_api_version,
             const uint32_t filter_vendor_id,
             const uint32_t filter_device_id,
             const std::string& filter_device_name);
@@ -162,7 +160,7 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
     ~Context();
 
   private: // Vulkan initialization
-    void create_instance(const uint32_t vk_api_version,
+    void create_instance(const uint32_t targeted_vk_api_version,
                          const VulkanFeatures& desired_features,
                          const std::vector<const char*>& desired_additional_extensions);
     void select_physical_device(uint32_t filter_vendor_id,
@@ -219,13 +217,11 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
 
     const SlangSessionHandle& get_slang_session() const;
 
-    const InstanceHandle& get_instance();
+    const InstanceHandle& get_instance() const;
 
-    const PhysicalDeviceHandle& get_physical_device();
+    const PhysicalDeviceHandle& get_physical_device() const;
 
-    const DeviceHandle& get_device();
-
-    const uint32_t& get_vk_api_version() const;
+    const DeviceHandle& get_device() const;
 
     FileLoader& get_file_loader();
 

@@ -73,6 +73,18 @@ class PhysicalDevice : public std::enable_shared_from_this<PhysicalDevice> {
         return supported_features;
     }
 
+    // Returns the effective API version of the physical device, that is the minimum of the
+    // targeted version and the supported version.
+    uint32_t get_vk_api_version() const {
+        return properties.get_vk_api_version();
+    }
+
+    // Returns the physical device's supported API version. The effective
+    // version for device use (get_vk_api_version) might be lower.
+    uint32_t get_physical_device_vk_api_version() const {
+        return properties.get_physical_device_vk_api_version();
+    }
+
     // ----------------------------------------
 
   private:
@@ -81,9 +93,8 @@ class PhysicalDevice : public std::enable_shared_from_this<PhysicalDevice> {
 
     std::unordered_set<std::string> supported_extensions;
 
-    VulkanFeatures supported_features;
-
     VulkanProperties properties;
+    VulkanFeatures supported_features;
 
     vk::PhysicalDeviceMemoryProperties2 physical_device_memory_properties;
 

@@ -1,11 +1,11 @@
 #include "merian/vk/physical_device.hpp"
-#include "spdlog/spdlog.h"
 
 namespace merian {
 PhysicalDevice::PhysicalDevice(const InstanceHandle& instance,
                                const vk::PhysicalDevice& physical_device)
     : instance(instance), physical_device(physical_device),
-      supported_features(physical_device, instance), properties(physical_device, instance) {
+      properties(physical_device, instance),
+      supported_features(physical_device, properties) {
 
     for (const auto& ext : physical_device.enumerateDeviceExtensionProperties()) {
         supported_extensions.emplace(ext.extensionName);

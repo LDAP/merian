@@ -201,7 +201,9 @@ VMAMemoryAllocator::VMAMemoryAllocator(const ContextHandle& context,
         .pHeapSizeLimit = nullptr,
         .pVulkanFunctions = nullptr,
         .instance = context->get_instance()->get_instance(),
-        .vulkanApiVersion = context->get_vk_api_version(),
+        .vulkanApiVersion = std::min(
+            context->get_device()->get_physical_device()->get_vk_api_version(),
+            VK_API_VERSION_1_3), // VMA currently asserts a maxumum version for some reason.
 #if VMA_EXTERNAL_MEMORY
         .pTypeExternalMemoryHandleTypes = nullptr
 #endif

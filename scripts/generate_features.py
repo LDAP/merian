@@ -228,9 +228,8 @@ def generate_header(features: list[FeatureStruct]) -> str:
         "",
         "namespace merian {",
         "",
-        "// Forward declaration",
-        "class Instance;",
-        "using InstanceHandle = std::shared_ptr<Instance>;",
+        "// Forward declarations",
+        "class VulkanProperties;",
         "",
     ]
 
@@ -256,7 +255,7 @@ def generate_header(features: list[FeatureStruct]) -> str:
             "",
             "    /// Constructor: query features from physical device",
             "    VulkanFeatures(const vk::PhysicalDevice& physical_device,",
-            "                   const InstanceHandle& instance);",
+            "                   const VulkanProperties& properties);",
             "",
             '    /// Constructor: enable features from strings of the form "structName/featureName"',
             "    VulkanFeatures(const vk::ArrayProxy<const std::string>& features);",
@@ -353,12 +352,15 @@ def generate_constructor(features: list[FeatureStruct], tags) -> list[str]:
     """Generate VulkanFeatures constructor implementation."""
     lines = [
         "VulkanFeatures::VulkanFeatures(const vk::PhysicalDevice& physical_device,",
-        "                               const InstanceHandle& instance) {",
+        "                               const VulkanProperties& properties) {",
         "    // Enumerate device extensions to check support",
         "    std::unordered_set<std::string> device_extensions;",
         "    for (const auto& ext : physical_device.enumerateDeviceExtensionProperties()) {",
         "        device_extensions.insert(ext.extensionName);",
         "    }",
+        "",
+        "    // Get effective API version from properties",
+        "    const uint32_t vk_api_version = properties.get_vk_api_version();",
         "",
         "    // Build pNext chain for all features with supported extensions",
         "    void* feat_p_next = nullptr;",
@@ -377,7 +379,7 @@ def generate_constructor(features: list[FeatureStruct], tags) -> list[str]:
         if feat.extension and feat.promotion_version:
             lines.extend(
                 [
-                    f"    if (instance->get_vk_api_version() >= {feat.promotion_version} ||",
+                    f"    if (vk_api_version >= {feat.promotion_version} ||",
                     f"        device_extensions.contains({feat.extension})) {{",
                 ]
             )
@@ -385,7 +387,7 @@ def generate_constructor(features: list[FeatureStruct], tags) -> list[str]:
             lines.append(f"    if (device_extensions.contains({feat.extension})) {{")
         elif feat.promotion_version:
             lines.append(
-                f"    if (instance->get_vk_api_version() >= {feat.promotion_version}) {{"
+                f"    if (vk_api_version >= {feat.promotion_version}) {{"
             )
         else:
             lines.append("    {")
@@ -840,7 +842,7 @@ def generate_implementation(features: list[FeatureStruct], tags) -> str:
         "// Do not edit manually!",
         "",
         '#include "merian/vk/utils/vulkan_features.hpp"',
-        '#include "merian/vk/instance.hpp"',
+        '#include "merian/vk/utils/vulkan_properties.hpp"',
         "",
         "#include <fmt/format.h>",
         "#include <stdexcept>",
