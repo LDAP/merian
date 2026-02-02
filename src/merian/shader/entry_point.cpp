@@ -51,4 +51,11 @@ EntryPoint::create(const ContextHandle& context,
         specialization_info);
 }
 
+vk::PipelineShaderStageCreateInfo
+VulkanEntryPoint::get_shader_stage_create_info(const ContextHandle& context,
+                                               const vk::PipelineShaderStageCreateFlags flags) const {
+    return vk::PipelineShaderStageCreateInfo{flags, get_stage(), *vulkan_shader_module(context),
+                                             get_name(), *get_specialization_info()};
+}
+
 } // namespace merian

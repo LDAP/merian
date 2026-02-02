@@ -94,17 +94,7 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
                             const std::string& debug_name = {},
                             const MemoryMappingType mapping_type = MemoryMappingType::NONE,
                             const std::optional<vk::DeviceSize> min_alignment = std::nullopt,
-                            const float growth_factor = 1) {
-        assert(growth_factor >= 1);
-
-        if (buffer && buffer->get_size() >= buffer_size) {
-            return false;
-        }
-
-        buffer = create_buffer(buffer_size * growth_factor, usage, mapping_type, debug_name,
-                               min_alignment);
-        return true;
-    }
+                            const float growth_factor = 1);
 
     // Returns a dummy buffer containing exactly 4 entries of the "missing texture" color
     // (1,0,1,1).

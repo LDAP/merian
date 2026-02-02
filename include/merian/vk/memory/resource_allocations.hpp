@@ -31,16 +31,9 @@ using BufferHandle = std::shared_ptr<Buffer>;
  */
 class Sampler : public std::enable_shared_from_this<Sampler>, public Resource {
   public:
-    Sampler(const ContextHandle& context, const vk::SamplerCreateInfo& create_info)
-        : context(context) {
-        SPDLOG_DEBUG("create sampler ({})", fmt::ptr(this));
-        sampler = context->get_device()->get_device().createSampler(create_info);
-    }
+    Sampler(const ContextHandle& context, const vk::SamplerCreateInfo& create_info);
 
-    ~Sampler() {
-        SPDLOG_DEBUG("destroy sampler ({})", fmt::ptr(this));
-        context->get_device()->get_device().destroySampler(sampler);
-    }
+    ~Sampler();
 
     operator const vk::Sampler&() const {
         return sampler;
@@ -54,9 +47,7 @@ class Sampler : public std::enable_shared_from_this<Sampler>, public Resource {
         return sampler;
     }
 
-    vk::DescriptorImageInfo get_descriptor_info() const {
-        return vk::DescriptorImageInfo{sampler, VK_NULL_HANDLE, vk::ImageLayout::eGeneral};
-    }
+    vk::DescriptorImageInfo get_descriptor_info() const;
 
   private:
     const ContextHandle context;
@@ -121,21 +112,13 @@ class Buffer : public std::enable_shared_from_this<Buffer>, public Resource {
     // -----------------------------------------------------------
 
     vk::DescriptorBufferInfo get_descriptor_info(const vk::DeviceSize offset = 0,
-                                                 const vk::DeviceSize range = VK_WHOLE_SIZE) const {
-        return vk::DescriptorBufferInfo{buffer, offset, range};
-    }
+                                                 const vk::DeviceSize range = VK_WHOLE_SIZE) const;
 
     vk::DescriptorAddressInfoEXT
     get_descriptor_address_info(const vk::DeviceSize offset = 0,
-                                const vk::DeviceSize range = VK_WHOLE_SIZE) const {
-        assert(offset < get_size());
-        return vk::DescriptorAddressInfoEXT{get_device_address() + offset,
-                                            range == VK_WHOLE_SIZE ? get_size() - offset : range};
-    }
+                                const vk::DeviceSize range = VK_WHOLE_SIZE) const;
 
-    vk::BufferDeviceAddressInfo get_buffer_device_address_info() const {
-        return vk::BufferDeviceAddressInfo{buffer};
-    }
+    vk::BufferDeviceAddressInfo get_buffer_device_address_info() const;
 
     vk::MemoryRequirements get_memory_requirements() const;
 
@@ -163,9 +146,7 @@ class Buffer : public std::enable_shared_from_this<Buffer>, public Resource {
     // -----------------------------------------------------------
 
     // Use only by memory allocators to set after memory was bound to this resource.
-    void _set_memory_allocation(const MemoryAllocationHandle& allocation) {
-        this->memory = allocation;
-    }
+    void _set_memory_allocation(const MemoryAllocationHandle& allocation);
 
     void properties(Properties& props);
 
@@ -267,9 +248,7 @@ class Image : public std::enable_shared_from_this<Image>, public Resource {
     }
 
     // Use only by memory allocators to set after memory was bound to this resource.
-    void _set_memory_allocation(const MemoryAllocationHandle& allocation) {
-        this->memory = allocation;
-    }
+    void _set_memory_allocation(const MemoryAllocationHandle& allocation);
 
     // Guess AccessFlags from old and new layout.
     [[nodiscard]] vk::ImageMemoryBarrier barrier(const vk::ImageLayout new_layout,
@@ -305,33 +284,7 @@ class Image : public std::enable_shared_from_this<Image>, public Resource {
     // Convenience method to create a view info.
     // By default all levels and layers are accessed and if array layers > 1 a array view is used.
     // If the image is 2D and is_cube is true a cube view is returned.
-    vk::ImageViewCreateInfo make_view_create_info(const bool is_cube = false) const {
-        vk::ImageViewCreateInfo view_info{
-            {}, get_image(), {}, create_info.format, {}, all_levels_and_layers(),
-        };
-
-        switch (create_info.imageType) {
-        case vk::ImageType::e1D:
-            view_info.viewType = (create_info.arrayLayers > 1 ? vk::ImageViewType::e1DArray
-                                                              : vk::ImageViewType::e1D);
-            break;
-        case vk::ImageType::e2D:
-            if (is_cube) {
-                view_info.viewType = vk::ImageViewType::eCube;
-            } else {
-                view_info.viewType = create_info.arrayLayers > 1 ? vk::ImageViewType::e2DArray
-                                                                 : vk::ImageViewType::e2D;
-            }
-            break;
-        case vk::ImageType::e3D:
-            view_info.viewType = vk::ImageViewType::e3D;
-            break;
-        default:
-            assert(0);
-        }
-
-        return view_info;
-    }
+    vk::ImageViewCreateInfo make_view_create_info(const bool is_cube = false) const;
 
     vk::MemoryRequirements get_memory_requirements() const;
 
@@ -417,10 +370,7 @@ class ImageView : public std::enable_shared_from_this<ImageView>, public Resourc
     }
 
     vk::DescriptorImageInfo
-    get_descriptor_info(const std::optional<vk::ImageLayout> access_layout = std::nullopt) const {
-        return vk::DescriptorImageInfo{VK_NULL_HANDLE, view,
-                                       access_layout.value_or(get_image()->get_current_layout())};
-    }
+    get_descriptor_info(const std::optional<vk::ImageLayout> access_layout = std::nullopt) const;
 
     // -----------------------------------------------------------
 
@@ -496,10 +446,7 @@ class Texture : public std::enable_shared_from_this<Texture>, public Resource {
     }
 
     vk::DescriptorImageInfo
-    get_descriptor_info(const std::optional<vk::ImageLayout> access_layout = std::nullopt) const {
-        return vk::DescriptorImageInfo{*sampler, *view,
-                                       access_layout.value_or(get_image()->get_current_layout())};
-    }
+    get_descriptor_info(const std::optional<vk::ImageLayout> access_layout = std::nullopt) const;
 
     // -----------------------------------------------------------
 
@@ -567,48 +514,22 @@ class AccelerationStructure : public std::enable_shared_from_this<AccelerationSt
     vk::DeviceAddress get_acceleration_structure_device_address() const;
 
     // A barrier to insert between tlas builds and tlas usage.
-    vk::BufferMemoryBarrier2 tlas_read_barrier2(const vk::PipelineStageFlags2 read_stages) const {
-        return buffer->buffer_barrier2(vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
-                                       read_stages,
-                                       vk::AccessFlagBits2::eAccelerationStructureWriteKHR,
-                                       vk::AccessFlagBits2::eAccelerationStructureReadKHR);
-    }
+    vk::BufferMemoryBarrier2 tlas_read_barrier2(const vk::PipelineStageFlags2 read_stages) const;
 
     // A barier to insert between blas builds and blas usage.
-    vk::BufferMemoryBarrier2 blas_read_barrier2() const {
-        return buffer->buffer_barrier2(vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
-                                       vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
-                                       vk::AccessFlagBits2::eAccelerationStructureWriteKHR,
-                                       vk::AccessFlagBits2::eAccelerationStructureReadKHR);
-    }
+    vk::BufferMemoryBarrier2 blas_read_barrier2() const;
 
     // A barier to insert between blas builds and blas usage.
-    vk::BufferMemoryBarrier blas_read_barrier() const {
-        return buffer->buffer_barrier(vk::AccessFlagBits::eAccelerationStructureWriteKHR,
-                                      vk::AccessFlagBits::eAccelerationStructureReadKHR);
-    }
+    vk::BufferMemoryBarrier blas_read_barrier() const;
 
     // A barrier to insert between tlas usage and tlas rebuild/update.
-    vk::BufferMemoryBarrier2 tlas_build_barrier2(const vk::PipelineStageFlags2 read_stages) const {
-        return buffer->buffer_barrier2(read_stages,
-                                       vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
-                                       vk::AccessFlagBits2::eAccelerationStructureReadKHR,
-                                       vk::AccessFlagBits2::eAccelerationStructureWriteKHR);
-    }
+    vk::BufferMemoryBarrier2 tlas_build_barrier2(const vk::PipelineStageFlags2 read_stages) const;
 
     // A barier to insert between blas read (for TLAS build) and blas rebuild/update.
-    vk::BufferMemoryBarrier2 blas_build_barrier2() const {
-        return buffer->buffer_barrier2(vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
-                                       vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
-                                       vk::AccessFlagBits2::eAccelerationStructureReadKHR,
-                                       vk::AccessFlagBits2::eAccelerationStructureWriteKHR);
-    }
+    vk::BufferMemoryBarrier2 blas_build_barrier2() const;
 
     // A barier to insert between blas usage and blas rebuild/update.
-    vk::BufferMemoryBarrier blas_build_barrier() const {
-        return buffer->buffer_barrier(vk::AccessFlagBits::eAccelerationStructureReadKHR,
-                                      vk::AccessFlagBits::eAccelerationStructureWriteKHR);
-    }
+    vk::BufferMemoryBarrier blas_build_barrier() const;
 
     // -----------------------------------------------------------
 

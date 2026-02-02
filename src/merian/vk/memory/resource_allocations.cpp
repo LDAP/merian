@@ -10,6 +10,29 @@ namespace merian {
 
 Resource::~Resource() {}
 
+// --------------------------------------------------------------------------
+// Sampler
+// --------------------------------------------------------------------------
+
+Sampler::Sampler(const ContextHandle& context, const vk::SamplerCreateInfo& create_info)
+    : context(context) {
+    SPDLOG_DEBUG("create sampler ({})", fmt::ptr(this));
+    sampler = context->get_device()->get_device().createSampler(create_info);
+}
+
+Sampler::~Sampler() {
+    SPDLOG_DEBUG("destroy sampler ({})", fmt::ptr(this));
+    context->get_device()->get_device().destroySampler(sampler);
+}
+
+vk::DescriptorImageInfo Sampler::get_descriptor_info() const {
+    return vk::DescriptorImageInfo{sampler, VK_NULL_HANDLE, vk::ImageLayout::eGeneral};
+}
+
+// --------------------------------------------------------------------------
+// Buffer
+// --------------------------------------------------------------------------
+
 Buffer::Buffer(const vk::Buffer& buffer,
                const MemoryAllocationHandle& memory,
                const vk::BufferCreateInfo& create_info)
@@ -28,9 +51,29 @@ vk::MemoryRequirements Buffer::get_memory_requirements() const {
     return context->get_device()->get_device().getBufferMemoryRequirements(buffer);
 }
 
+vk::DescriptorBufferInfo Buffer::get_descriptor_info(const vk::DeviceSize offset,
+                                                     const vk::DeviceSize range) const {
+    return vk::DescriptorBufferInfo{buffer, offset, range};
+}
+
+vk::DescriptorAddressInfoEXT Buffer::get_descriptor_address_info(const vk::DeviceSize offset,
+                                                                  const vk::DeviceSize range) const {
+    assert(offset < get_size());
+    return vk::DescriptorAddressInfoEXT{get_device_address() + offset,
+                                        range == VK_WHOLE_SIZE ? get_size() - offset : range};
+}
+
+vk::BufferDeviceAddressInfo Buffer::get_buffer_device_address_info() const {
+    return vk::BufferDeviceAddressInfo{buffer};
+}
+
 vk::DeviceAddress Buffer::get_device_address() const {
     assert(create_info.usage | vk::BufferUsageFlagBits::eShaderDeviceAddress);
     return context->get_device()->get_device().getBufferAddress(get_buffer_device_address_info());
+}
+
+void Buffer::_set_memory_allocation(const MemoryAllocationHandle& allocation) {
+    this->memory = allocation;
 }
 
 vk::BufferMemoryBarrier Buffer::buffer_barrier(const vk::AccessFlags src_access_flags,
@@ -117,6 +160,38 @@ Image::~Image() {
 
 vk::MemoryRequirements Image::get_memory_requirements() const {
     return context->get_device()->get_device().getImageMemoryRequirements(image);
+}
+
+void Image::_set_memory_allocation(const MemoryAllocationHandle& allocation) {
+    this->memory = allocation;
+}
+
+vk::ImageViewCreateInfo Image::make_view_create_info(const bool is_cube) const {
+    vk::ImageViewCreateInfo view_info{
+        {}, get_image(), {}, create_info.format, {}, all_levels_and_layers(),
+    };
+
+    switch (create_info.imageType) {
+    case vk::ImageType::e1D:
+        view_info.viewType = (create_info.arrayLayers > 1 ? vk::ImageViewType::e1DArray
+                                                          : vk::ImageViewType::e1D);
+        break;
+    case vk::ImageType::e2D:
+        if (is_cube) {
+            view_info.viewType = vk::ImageViewType::eCube;
+        } else {
+            view_info.viewType = create_info.arrayLayers > 1 ? vk::ImageViewType::e2DArray
+                                                             : vk::ImageViewType::e2D;
+        }
+        break;
+    case vk::ImageType::e3D:
+        view_info.viewType = vk::ImageViewType::e3D;
+        break;
+    default:
+        assert(0);
+    }
+
+    return view_info;
 }
 
 vk::FormatFeatureFlags Image::format_features() const {
@@ -431,6 +506,12 @@ ImageView::~ImageView() {
     image->get_context()->get_device()->get_device().destroyImageView(view);
 }
 
+vk::DescriptorImageInfo
+ImageView::get_descriptor_info(const std::optional<vk::ImageLayout> access_layout) const {
+    return vk::DescriptorImageInfo{VK_NULL_HANDLE, view,
+                                   access_layout.value_or(get_image()->get_current_layout())};
+}
+
 void ImageView::properties(Properties& props) {
     if (props.st_begin_child("image_info", "Image")) {
         image->properties(props);
@@ -460,6 +541,12 @@ Texture::Texture(const ImageViewHandle& view, const SamplerHandle& sampler)
 }
 
 Texture::~Texture() {}
+
+vk::DescriptorImageInfo
+Texture::get_descriptor_info(const std::optional<vk::ImageLayout> access_layout) const {
+    return vk::DescriptorImageInfo{*sampler, *view,
+                                   access_layout.value_or(get_image()->get_current_layout())};
+}
 
 void Texture::properties(Properties& props) {
     if (props.st_begin_child("image_view_info", "Image View")) {
@@ -495,6 +582,46 @@ vk::DeviceAddress AccelerationStructure::get_acceleration_structure_device_addre
         ->get_device()
         ->get_device()
         .getAccelerationStructureAddressKHR(address_info);
+}
+
+vk::BufferMemoryBarrier2
+AccelerationStructure::tlas_read_barrier2(const vk::PipelineStageFlags2 read_stages) const {
+    return buffer->buffer_barrier2(vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
+                                   read_stages,
+                                   vk::AccessFlagBits2::eAccelerationStructureWriteKHR,
+                                   vk::AccessFlagBits2::eAccelerationStructureReadKHR);
+}
+
+vk::BufferMemoryBarrier2 AccelerationStructure::blas_read_barrier2() const {
+    return buffer->buffer_barrier2(vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
+                                   vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
+                                   vk::AccessFlagBits2::eAccelerationStructureWriteKHR,
+                                   vk::AccessFlagBits2::eAccelerationStructureReadKHR);
+}
+
+vk::BufferMemoryBarrier AccelerationStructure::blas_read_barrier() const {
+    return buffer->buffer_barrier(vk::AccessFlagBits::eAccelerationStructureWriteKHR,
+                                  vk::AccessFlagBits::eAccelerationStructureReadKHR);
+}
+
+vk::BufferMemoryBarrier2
+AccelerationStructure::tlas_build_barrier2(const vk::PipelineStageFlags2 read_stages) const {
+    return buffer->buffer_barrier2(read_stages,
+                                   vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
+                                   vk::AccessFlagBits2::eAccelerationStructureReadKHR,
+                                   vk::AccessFlagBits2::eAccelerationStructureWriteKHR);
+}
+
+vk::BufferMemoryBarrier2 AccelerationStructure::blas_build_barrier2() const {
+    return buffer->buffer_barrier2(vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
+                                   vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
+                                   vk::AccessFlagBits2::eAccelerationStructureReadKHR,
+                                   vk::AccessFlagBits2::eAccelerationStructureWriteKHR);
+}
+
+vk::BufferMemoryBarrier AccelerationStructure::blas_build_barrier() const {
+    return buffer->buffer_barrier(vk::AccessFlagBits::eAccelerationStructureReadKHR,
+                                  vk::AccessFlagBits::eAccelerationStructureWriteKHR);
 }
 
 void AccelerationStructure::properties(Properties& props) {

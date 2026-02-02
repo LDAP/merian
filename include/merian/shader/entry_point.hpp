@@ -120,10 +120,7 @@ class VulkanEntryPoint : public EntryPoint {
 
     virtual vk::PipelineShaderStageCreateInfo
     get_shader_stage_create_info(const ContextHandle& context,
-                                 const vk::PipelineShaderStageCreateFlags flags = {}) const {
-        return vk::PipelineShaderStageCreateInfo{flags, get_stage(), *vulkan_shader_module(context),
-                                                 get_name(), *get_specialization_info()};
-    }
+                                 const vk::PipelineShaderStageCreateFlags flags = {}) const;
 
     // ------------------------------
 

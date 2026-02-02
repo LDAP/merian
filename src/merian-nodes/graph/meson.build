@@ -1,4 +1,5 @@
 merian_nodes_src += files(
+    'node.cpp',
     'node_registry.cpp',
     'graph.cpp',
     'graph_edit.cpp',

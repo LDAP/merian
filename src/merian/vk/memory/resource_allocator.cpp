@@ -90,6 +90,24 @@ const BufferHandle& ResourceAllocator::get_dummy_buffer() const {
     return dummy_buffer;
 }
 
+bool ResourceAllocator::ensure_buffer_size(BufferHandle& buffer,
+                                           const vk::DeviceSize buffer_size,
+                                           const vk::BufferUsageFlags usage,
+                                           const std::string& debug_name,
+                                           const MemoryMappingType mapping_type,
+                                           const std::optional<vk::DeviceSize> min_alignment,
+                                           const float growth_factor) {
+    assert(growth_factor >= 1);
+
+    if (buffer && buffer->get_size() >= buffer_size) {
+        return false;
+    }
+
+    buffer = create_buffer(buffer_size * growth_factor, usage, mapping_type, debug_name,
+                           min_alignment);
+    return true;
+}
+
 // You get the alignment from
 // VkPhysicalDeviceAccelerationStructurePropertiesKHR::minAccelerationStructureScratchOffsetAlignment
 BufferHandle ResourceAllocator::create_scratch_buffer(const vk::DeviceSize size,

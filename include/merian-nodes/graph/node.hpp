@@ -39,18 +39,10 @@ class Node : public std::enable_shared_from_this<Node> {
     // -----------------------------------------------------------
 
     // This might be called at any time of the graph lifecycle. Must be consistent with dump_config.
-    virtual NodeStatusFlags load_config(const nlohmann::json& json) {
-        merian::JSONLoadProperties props(json);
-        std::ignore = properties(props);
-        return {};
-    }
+    virtual NodeStatusFlags load_config(const nlohmann::json& json);
 
     // This might be called at any time of the graph lifecycle. Must be consistent with load_config.
-    virtual nlohmann::json dump_config() {
-        merian::JSONDumpProperties props;
-        std::ignore = properties(props);
-        return props.get();
-    }
+    virtual nlohmann::json dump_config();
 
     // -----------------------------------------------------------
 

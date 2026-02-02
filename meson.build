@@ -5,6 +5,7 @@ project(
     default_options : [
         'warning_level=3',
         'cpp_std=c++23',
+        'b_lto=true',
         'b_ndebug=if-release',
     ],
     meson_version: '>=1.5.0',
