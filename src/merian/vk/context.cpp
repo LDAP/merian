@@ -571,8 +571,8 @@ void Context::create_device_and_queues(
 }
 
 bool spirv_extension_supported(const DeviceHandle& device, const char* extension) {
-    const auto device_extension_deps = get_spirv_extension_requirements(
-        extension, device->get_physical_device()->get_instance()->get_vk_api_version());
+    const auto device_extension_deps =
+        get_spirv_extension_requirements(extension, device->get_vk_api_version());
     bool all_enabled = true;
     for (const auto& dep : device_extension_deps) {
         all_enabled &= device->extension_enabled(dep);
