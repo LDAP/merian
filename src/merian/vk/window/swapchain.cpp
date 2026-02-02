@@ -312,7 +312,7 @@ Swapchain::acquire(const vk::Extent2D extent, const uint64_t timeout) {
         throw needs_recreate("changed min images");
     }
 
-    SPDLOG_DEBUG("aquire index {}", acquire_count % sync_groups.size());
+    SPDLOG_TRACE("aquire index {}", acquire_count % sync_groups.size());
 
     uint32_t image_idx;
     const vk::Result result = context->get_device()->get_device().acquireNextImageKHR(
@@ -324,7 +324,7 @@ Swapchain::acquire(const vk::Extent2D extent, const uint64_t timeout) {
     }
 
     if (result == vk::Result::eSuccess) {
-        SPDLOG_DEBUG("aquired image index {}", image_idx);
+        SPDLOG_TRACE("aquired image index {}", image_idx);
         std::swap(spare_read_semaphore, sync_groups[image_idx].read_semaphore);
         acquire_count++;
 
