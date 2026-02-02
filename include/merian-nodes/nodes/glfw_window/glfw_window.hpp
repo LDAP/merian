@@ -57,7 +57,9 @@ class GLFWWindowNode : public Node {
         // swapchain only supports up to get_swapchain()->get_max_image_count() frames in flight.
         const int64_t signed_max_img_count = get_swapchain()->get_max_image_count();
         const int64_t signed_iteration = (int64_t)run.get_iteration();
-        throttle = run.get_iteration_semaphore()->wait(
+        throttle = !run.get_iteration_semaphore()->wait(
+            std::max((int64_t)0, signed_iteration - signed_max_img_count + 1), 0);
+        run.get_iteration_semaphore()->wait(
             std::max((int64_t)0, signed_iteration - signed_max_img_count + 1));
 
         // move to on_connected when there is an API for iterations_in_flight.
@@ -145,7 +147,7 @@ class GLFWWindowNode : public Node {
 
     NodeStatusFlags properties(Properties& config) override {
         if (throttle) {
-            config.output_text("WARN: throttling CPU, to many frames in flight for swapchain!");
+            config.output_text("WARN: throttling CPU, too many frames in flight for swapchain!");
         }
 
         if (current_src_array_size > 0) {

@@ -15,7 +15,7 @@ class TimelineSemaphore : public Semaphore {
     uint64_t get_counter_value() const;
 
     // Waits until the semaphore holds a value that is >= the supplied value.
-    // If timeout_nanos > 0: returns true of the value was signaled, false if the timeout was
+    // If timeout_nanos > 0: returns true if the value was signaled, false if the timeout was
     // reached. If timeout_nanos = 0: returns true if the value was signaled, false otherwise (does
     // not wait).
     bool wait(const uint64_t value, const uint64_t timeout_nanos = UINT64_MAX);
