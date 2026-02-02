@@ -305,9 +305,8 @@ def generate_header(features: list[FeatureStruct]) -> str:
             "    void* build_chain_for_device_creation(void* p_next = nullptr);",
             "",
             "    /// Get all extensions required by currently enabled features",
-            "    /// Extensions promoted to core at or below vk_api_version are omitted",
             "    /// @return Vector of extension name macros needed for enabled features",
-            "    std::vector<const char*> get_required_extensions(const uint32_t vk_api_version) const;",
+            "    std::vector<const char*> get_required_extensions() const;",
             "",
             "  private:",
             '    /// Internal: parse "structName/featureName" string into components',
@@ -701,7 +700,7 @@ def generate_helper_functions(features: list[FeatureStruct], tags) -> list[str]:
             "    return chain_head;",
             "}",
             "",
-            "std::vector<const char*> VulkanFeatures::get_required_extensions(const uint32_t vk_api_version) const {",
+            "std::vector<const char*> VulkanFeatures::get_required_extensions() const {",
             "    std::unordered_set<const char*> extensions;",
             "    ",
         ]
@@ -718,22 +717,13 @@ def generate_helper_functions(features: list[FeatureStruct], tags) -> list[str]:
         ]
         condition_str = " || ".join(conditions)
 
-        if feat.promotion_version:
-            lines.extend(
-                [
-                    f"    if (vk_api_version < {feat.promotion_version} && ({condition_str})) {{",
-                    f"        extensions.insert({feat.extension});",
-                    "    }",
-                ]
-            )
-        else:
-            lines.extend(
-                [
-                    f"    if ({condition_str}) {{",
-                    f"        extensions.insert({feat.extension});",
-                    "    }",
-                ]
-            )
+        lines.extend(
+            [
+                f"    if ({condition_str}) {{",
+                f"        extensions.insert({feat.extension});",
+                "    }",
+            ]
+        )
 
     lines.extend(
         [

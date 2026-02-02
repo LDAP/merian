@@ -41,7 +41,7 @@ class Device : public std::enable_shared_from_this<Device> {
         const uint32_t instance_vk_api_version =
             physical_device->get_instance()->get_vk_api_version();
 
-        const auto feature_extensions = enabled_features.get_required_extensions(vk_api_version);
+        const auto feature_extensions = enabled_features.get_required_extensions();
         std::vector<const char*> all_extensions;
         all_extensions.reserve(additional_extensions.size() + feature_extensions.size());
 
@@ -53,7 +53,7 @@ class Device : public std::enable_shared_from_this<Device> {
             if (enabled_extensions.contains(ext_info->name)) {
                 return {true, ""};
             }
-            if (ext_info->promoted_to_version <= vk_api_version) {
+            if (ext_info->promoted_to_version <= device_vk_api_version) {
                 SPDLOG_DEBUG("{} skipped (provided by API version)", ext_info->name);
                 return {true, ""};
             }
@@ -62,13 +62,23 @@ class Device : public std::enable_shared_from_this<Device> {
                 return {false, fmt::format("{} not supported by physical device!", ext_info->name)};
             }
 
-            for (const ExtensionInfo* dep : ext_info->get_dependencies(vk_api_version)) {
+            for (const ExtensionInfo* dep : ext_info->dependencies) {
                 if (dep->is_instance_extension()) {
+                    // Check if promoted to instance's API version
+                    if (dep->promoted_to_version <= instance_vk_api_version) {
+                        continue; // Instance extension is promoted, no need to enable
+                    }
                     if (!physical_device->get_instance()->extension_enabled(dep->name)) {
                         return {false,
                                 fmt::format("instance extension {} is not enabled!", dep->name)};
                     }
                 } else {
+                    // Filter: only process if not promoted or device doesn't have promotion version
+                    // yet
+                    if (dep->promoted_to_version <= device_vk_api_version) {
+                        continue; // Skip this dependency - it's promoted and available in device
+                                  // API version
+                    }
                     auto [deps_supported, reason] = self(self, dep);
                     if (!deps_supported) {
                         return {false, fmt::format("dependency {} is not supported beacause {}",

@@ -155,8 +155,7 @@ void Context::create_instance(const uint32_t targeted_vk_api_version,
     }
 
     // we ignore context extensions here, since we assume that they already do the right checks.
-    std::vector<const char*> device_extensions = desired_features.get_required_extensions(
-        VK_API_VERSION_1_0 /*created later, assume minumum*/);
+    std::vector<const char*> device_extensions = desired_features.get_required_extensions();
     for (const auto& ext : desired_additional_extensions) {
         device_extensions.emplace_back(ext);
     }
