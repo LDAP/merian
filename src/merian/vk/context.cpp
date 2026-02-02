@@ -147,7 +147,6 @@ void Context::create_instance(const uint32_t vk_api_version,
     }
     const auto add_instance_extensions = [&](const auto& self, const char* ext) -> void {
         for (const ExtensionInfo* dep : get_extension_info(ext)->dependencies) {
-            SPDLOG_INFO(dep->name);
             if (dep->is_instance_extension() && dep->promoted_to_version > vk_api_version) {
                 if (supported_instance_extensions.contains(dep->name)) {
                     instance_extension_names.emplace_back(dep->name);
