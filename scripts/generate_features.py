@@ -13,6 +13,7 @@ Replaces the old polymorphic Feature class hierarchy with a more efficient
 aggregate design that eliminates unsafe casting and map lookups.
 """
 
+from pprint import pprint
 from vulkan_codegen.codegen import (
     build_alias_maps,
     build_extension_type_map,
@@ -1024,15 +1025,8 @@ def main():
 
     print("Finding feature structures...")
     features = find_feature_structures(xml_root, tags)
-    print(f"Found {len(features)} feature structures")
-
-    print("\nExample features found:")
-    for feat in features[:5]:
-        print(f"  - {feat.cpp_name}: {len(feat.members)} members")
-        if feat.extension:
-            print(f"    Extension: {feat.extension}")
-        if feat.members:
-            print(f"    Members: {', '.join(m.name for m in feat.members[:3])}...")
+    print(f"Found {len(features)} feature structures:")
+    pprint(features)
 
     print(f"\nGenerating header file: {include_path / 'vulkan_features.hpp'}")
     header_content = generate_header(features)
