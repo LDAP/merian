@@ -197,8 +197,8 @@ vk::Extent2D Swapchain::create_swapchain(const uint32_t width, const uint32_t he
                     capabilities.maxImageCount);
     }
 
-    info->min_images = std::min(std::max(capabilities.minImageCount, new_min_images) + 1,
-                                capabilities.maxImageCount);
+    info->min_images =
+        std::min(std::max(capabilities.minImageCount, new_min_images) + 1, get_max_image_count());
 
     vk::SurfaceTransformFlagBitsKHR pre_transform;
     if (capabilities.supportedTransforms & vk::SurfaceTransformFlagBitsKHR::eIdentity) {
