@@ -618,11 +618,9 @@ bool is_spirv_capability_supported(
     } else if (cap_name == "ClusterCullingShadingHUAWEI") {
         return features.get_feature("clustercullingShader");
     } else if (cap_name == "ComputeDerivativeGroupLinearKHR") {
-        return features.get_feature("computeDerivativeGroupLinear") ||
-            features.get_feature("computeDerivativeGroupLinear");
+        return features.get_feature("computeDerivativeGroupLinear");
     } else if (cap_name == "ComputeDerivativeGroupQuadsKHR") {
-        return features.get_feature("computeDerivativeGroupQuads") ||
-            features.get_feature("computeDerivativeGroupQuads");
+        return features.get_feature("computeDerivativeGroupQuads");
     } else if (cap_name == "CooperativeMatrixBlockLoadsNV") {
         return features.get_feature("cooperativeMatrixBlockLoads");
     } else if (cap_name == "CooperativeMatrixConversionQCOM") {
@@ -648,8 +646,7 @@ bool is_spirv_capability_supported(
     } else if (cap_name == "CullDistance") {
         return features.get_feature("shaderCullDistance");
     } else if (cap_name == "DemoteToHelperInvocation") {
-        return features.get_feature("shaderDemoteToHelperInvocation") ||
-            features.get_feature("shaderDemoteToHelperInvocation");
+        return features.get_feature("shaderDemoteToHelperInvocation");
     } else if (cap_name == "DenormFlushToZero") {
         return (properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderDenormFlushToZeroFloat16 == VK_TRUE) ||
             (properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderDenormFlushToZeroFloat32 == VK_TRUE) ||
@@ -665,23 +662,17 @@ bool is_spirv_capability_supported(
     } else if (cap_name == "DeviceGroup") {
         return (vk_api_version >= VK_API_VERSION_1_1);
     } else if (cap_name == "DotProduct") {
-        return features.get_feature("shaderIntegerDotProduct") ||
-            features.get_feature("shaderIntegerDotProduct");
+        return features.get_feature("shaderIntegerDotProduct");
     } else if (cap_name == "DotProductInput4x8Bit") {
-        return features.get_feature("shaderIntegerDotProduct") ||
-            features.get_feature("shaderIntegerDotProduct");
+        return features.get_feature("shaderIntegerDotProduct");
     } else if (cap_name == "DotProductInput4x8BitPacked") {
-        return features.get_feature("shaderIntegerDotProduct") ||
-            features.get_feature("shaderIntegerDotProduct");
+        return features.get_feature("shaderIntegerDotProduct");
     } else if (cap_name == "DotProductInputAll") {
-        return features.get_feature("shaderIntegerDotProduct") ||
-            features.get_feature("shaderIntegerDotProduct");
+        return features.get_feature("shaderIntegerDotProduct");
     } else if (cap_name == "DrawParameters") {
-        return features.get_feature("shaderDrawParameters") ||
-            features.get_feature("shaderDrawParameters");
+        return features.get_feature("shaderDrawParameters");
     } else if (cap_name == "ExpectAssumeKHR") {
-        return features.get_feature("shaderExpectAssume") ||
-            features.get_feature("shaderExpectAssume");
+        return features.get_feature("shaderExpectAssume");
     } else if (cap_name == "FMAKHR") {
         return features.get_feature("shaderFmaFloat16") ||
             features.get_feature("shaderFmaFloat32") ||
@@ -695,11 +686,9 @@ bool is_spirv_capability_supported(
     } else if (cap_name == "Float8EXT") {
         return features.get_feature("shaderFloat8");
     } else if (cap_name == "FloatControls2") {
-        return features.get_feature("shaderFloatControls2") ||
-            features.get_feature("shaderFloatControls2");
+        return features.get_feature("shaderFloatControls2");
     } else if (cap_name == "FragmentBarycentricKHR") {
-        return features.get_feature("fragmentShaderBarycentric") ||
-            features.get_feature("fragmentShaderBarycentric");
+        return features.get_feature("fragmentShaderBarycentric");
     } else if (cap_name == "FragmentDensityEXT") {
         return features.get_feature("fragmentDensityMap") ||
             features.get_feature("shadingRateImage");
@@ -742,8 +731,7 @@ bool is_spirv_capability_supported(
     } else if (cap_name == "GroupNonUniformQuad") {
         return (static_cast<uint32_t>(properties.get<vk::PhysicalDeviceVulkan11Properties>().subgroupSupportedOperations) & VK_SUBGROUP_FEATURE_QUAD_BIT);
     } else if (cap_name == "GroupNonUniformRotateKHR") {
-        return features.get_feature("shaderSubgroupRotate") ||
-            features.get_feature("shaderSubgroupRotate");
+        return features.get_feature("shaderSubgroupRotate");
     } else if (cap_name == "GroupNonUniformShuffle") {
         return (static_cast<uint32_t>(properties.get<vk::PhysicalDeviceVulkan11Properties>().subgroupSupportedOperations) & VK_SUBGROUP_FEATURE_SHUFFLE_BIT);
     } else if (cap_name == "GroupNonUniformShuffleRelative") {
@@ -801,15 +789,13 @@ bool is_spirv_capability_supported(
     } else if (cap_name == "MinLod") {
         return features.get_feature("shaderResourceMinLod");
     } else if (cap_name == "MultiView") {
-        return features.get_feature("multiview") ||
-            features.get_feature("multiview");
+        return features.get_feature("multiview");
     } else if (cap_name == "MultiViewport") {
         return features.get_feature("multiViewport");
     } else if (cap_name == "PerViewAttributesNV") {
         return false;
     } else if (cap_name == "PhysicalStorageBufferAddresses") {
-        return features.get_feature("bufferDeviceAddress") ||
-            features.get_feature("bufferDeviceAddress");
+        return features.get_feature("bufferDeviceAddress");
     } else if (cap_name == "PushConstantBanksNV") {
         return features.get_feature("pushConstantBank");
     } else if (cap_name == "QuadControlKHR") {
@@ -902,8 +888,7 @@ bool is_spirv_capability_supported(
     } else if (cap_name == "StencilExportEXT") {
         return false;
     } else if (cap_name == "StorageBuffer16BitAccess") {
-        return features.get_feature("storageBuffer16BitAccess") ||
-            features.get_feature("storageBuffer16BitAccess");
+        return features.get_feature("storageBuffer16BitAccess");
     } else if (cap_name == "StorageBuffer8BitAccess") {
         return features.get_feature("storageBuffer8BitAccess");
     } else if (cap_name == "StorageBufferArrayDynamicIndexing") {
@@ -925,11 +910,9 @@ bool is_spirv_capability_supported(
         return features.get_feature("shaderStorageImageWriteWithoutFormat") ||
             (vk_api_version >= VK_API_VERSION_1_3);
     } else if (cap_name == "StorageInputOutput16") {
-        return features.get_feature("storageInputOutput16") ||
-            features.get_feature("storageInputOutput16");
+        return features.get_feature("storageInputOutput16");
     } else if (cap_name == "StoragePushConstant16") {
-        return features.get_feature("storagePushConstant16") ||
-            features.get_feature("storagePushConstant16");
+        return features.get_feature("storagePushConstant16");
     } else if (cap_name == "StoragePushConstant8") {
         return features.get_feature("storagePushConstant8");
     } else if (cap_name == "StorageTensorArrayDynamicIndexingARM") {
@@ -971,8 +954,7 @@ bool is_spirv_capability_supported(
     } else if (cap_name == "TransformFeedback") {
         return features.get_feature("transformFeedback");
     } else if (cap_name == "UniformAndStorageBuffer16BitAccess") {
-        return features.get_feature("uniformAndStorageBuffer16BitAccess") ||
-            features.get_feature("uniformAndStorageBuffer16BitAccess");
+        return features.get_feature("uniformAndStorageBuffer16BitAccess");
     } else if (cap_name == "UniformAndStorageBuffer8BitAccess") {
         return features.get_feature("uniformAndStorageBuffer8BitAccess");
     } else if (cap_name == "UniformBufferArrayDynamicIndexing") {
@@ -986,11 +968,9 @@ bool is_spirv_capability_supported(
     } else if (cap_name == "UntypedPointersKHR") {
         return features.get_feature("shaderUntypedPointers");
     } else if (cap_name == "VariablePointers") {
-        return features.get_feature("variablePointers") ||
-            features.get_feature("variablePointers");
+        return features.get_feature("variablePointers");
     } else if (cap_name == "VariablePointersStorageBuffer") {
-        return features.get_feature("variablePointersStorageBuffer") ||
-            features.get_feature("variablePointersStorageBuffer");
+        return features.get_feature("variablePointersStorageBuffer");
     } else if (cap_name == "VulkanMemoryModel") {
         return features.get_feature("vulkanMemoryModel");
     } else if (cap_name == "VulkanMemoryModelDeviceScope") {
@@ -1482,11 +1462,9 @@ std::vector<std::string> get_spirv_capability_features(
     } else if (cap_name == "ComputeDerivativeGroupLinearKHR") {
         return {
             "computeDerivativeGroupLinear",
-            "computeDerivativeGroupLinear",
         };
     } else if (cap_name == "ComputeDerivativeGroupQuadsKHR") {
         return {
-            "computeDerivativeGroupQuads",
             "computeDerivativeGroupQuads",
         };
     } else if (cap_name == "CooperativeMatrixBlockLoadsNV") {
@@ -1540,7 +1518,6 @@ std::vector<std::string> get_spirv_capability_features(
     } else if (cap_name == "DemoteToHelperInvocation") {
         return {
             "shaderDemoteToHelperInvocation",
-            "shaderDemoteToHelperInvocation",
         };
     } else if (cap_name == "DescriptorHeapEXT") {
         return {
@@ -1549,31 +1526,25 @@ std::vector<std::string> get_spirv_capability_features(
     } else if (cap_name == "DotProduct") {
         return {
             "shaderIntegerDotProduct",
-            "shaderIntegerDotProduct",
         };
     } else if (cap_name == "DotProductInput4x8Bit") {
         return {
-            "shaderIntegerDotProduct",
             "shaderIntegerDotProduct",
         };
     } else if (cap_name == "DotProductInput4x8BitPacked") {
         return {
             "shaderIntegerDotProduct",
-            "shaderIntegerDotProduct",
         };
     } else if (cap_name == "DotProductInputAll") {
         return {
-            "shaderIntegerDotProduct",
             "shaderIntegerDotProduct",
         };
     } else if (cap_name == "DrawParameters") {
         return {
             "shaderDrawParameters",
-            "shaderDrawParameters",
         };
     } else if (cap_name == "ExpectAssumeKHR") {
         return {
-            "shaderExpectAssume",
             "shaderExpectAssume",
         };
     } else if (cap_name == "FMAKHR") {
@@ -1601,11 +1572,9 @@ std::vector<std::string> get_spirv_capability_features(
     } else if (cap_name == "FloatControls2") {
         return {
             "shaderFloatControls2",
-            "shaderFloatControls2",
         };
     } else if (cap_name == "FragmentBarycentricKHR") {
         return {
-            "fragmentShaderBarycentric",
             "fragmentShaderBarycentric",
         };
     } else if (cap_name == "FragmentDensityEXT") {
@@ -1654,7 +1623,6 @@ std::vector<std::string> get_spirv_capability_features(
         };
     } else if (cap_name == "GroupNonUniformRotateKHR") {
         return {
-            "shaderSubgroupRotate",
             "shaderSubgroupRotate",
         };
     } else if (cap_name == "ImageCubeArray") {
@@ -1722,7 +1690,6 @@ std::vector<std::string> get_spirv_capability_features(
     } else if (cap_name == "MultiView") {
         return {
             "multiview",
-            "multiview",
         };
     } else if (cap_name == "MultiViewport") {
         return {
@@ -1730,7 +1697,6 @@ std::vector<std::string> get_spirv_capability_features(
         };
     } else if (cap_name == "PhysicalStorageBufferAddresses") {
         return {
-            "bufferDeviceAddress",
             "bufferDeviceAddress",
         };
     } else if (cap_name == "PushConstantBanksNV") {
@@ -1837,7 +1803,6 @@ std::vector<std::string> get_spirv_capability_features(
     } else if (cap_name == "StorageBuffer16BitAccess") {
         return {
             "storageBuffer16BitAccess",
-            "storageBuffer16BitAccess",
         };
     } else if (cap_name == "StorageBuffer8BitAccess") {
         return {
@@ -1874,11 +1839,9 @@ std::vector<std::string> get_spirv_capability_features(
     } else if (cap_name == "StorageInputOutput16") {
         return {
             "storageInputOutput16",
-            "storageInputOutput16",
         };
     } else if (cap_name == "StoragePushConstant16") {
         return {
-            "storagePushConstant16",
             "storagePushConstant16",
         };
     } else if (cap_name == "StoragePushConstant8") {
@@ -1956,7 +1919,6 @@ std::vector<std::string> get_spirv_capability_features(
     } else if (cap_name == "UniformAndStorageBuffer16BitAccess") {
         return {
             "uniformAndStorageBuffer16BitAccess",
-            "uniformAndStorageBuffer16BitAccess",
         };
     } else if (cap_name == "UniformAndStorageBuffer8BitAccess") {
         return {
@@ -1985,11 +1947,9 @@ std::vector<std::string> get_spirv_capability_features(
     } else if (cap_name == "VariablePointers") {
         return {
             "variablePointers",
-            "variablePointers",
         };
     } else if (cap_name == "VariablePointersStorageBuffer") {
         return {
-            "variablePointersStorageBuffer",
             "variablePointersStorageBuffer",
         };
     } else if (cap_name == "VulkanMemoryModel") {

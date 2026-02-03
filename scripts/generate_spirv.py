@@ -440,6 +440,7 @@ def generate_is_capability_supported_impl(
 
         # Generate check for each enable condition (any one being true is sufficient)
         conditions = []
+        seen_features = set()  # Track seen feature names to avoid duplicates
 
         for enable in cap.enables:
             if enable.version:
@@ -452,6 +453,11 @@ def generate_is_capability_supported_impl(
                 pass
 
             elif enable.feature_struct and enable.feature_name:
+                # Skip if we've already seen this feature name
+                if enable.feature_name in seen_features:
+                    continue
+                seen_features.add(enable.feature_name)
+
                 # Use new feature-name-only API
                 conditions.append(
                     f'features.get_feature("{enable.feature_name}")'
@@ -587,7 +593,14 @@ def generate_capability_features_impl(
         lines.append(f'    {keyword} (cap_name == "{cap.name}") {{')
         lines.append("        return {")
 
+        # Track seen feature names to avoid duplicates
+        seen_features = set()
         for enable in feature_enables:
+            # Skip if we've already seen this feature name
+            if enable.feature_name in seen_features:
+                continue
+            seen_features.add(enable.feature_name)
+
             # Use new feature-name-only API
             lines.append(f'            "{enable.feature_name}",')
 

@@ -132,3 +132,40 @@ def build_feature_version_map(xml_root):
                     feature_map[type_name] = api_version
 
     return feature_map
+
+
+def propagate_extension_requirements_from_aliases(
+    extension_map: dict[str, tuple[str, list[tuple], str | None]],
+    xml_root
+) -> None:
+    """
+    Propagate extension requirements from alias structs to canonical structs.
+
+    When extensions define feature structs that get promoted to core, the XML
+    often has the extension info on the alias (e.g., VkPhysicalDevice8BitStorageFeaturesKHR)
+    but the generator processes the canonical struct (e.g., VkPhysicalDevice8BitStorageFeatures).
+
+    This function copies extension info from aliases to their canonical structs.
+
+    Args:
+        extension_map: The extension map to modify (maps struct name to extension info)
+        xml_root: The Vulkan XML root element
+    """
+    # Build alias -> canonical mapping
+    alias_to_canonical = {}
+    for type_elem in xml_root.findall("types/type"):
+        alias = type_elem.get("alias")
+        name = type_elem.get("name")
+        if alias and name:
+            alias_to_canonical[name] = alias
+
+    # Copy extension info from aliases to canonical structs
+    aliases_with_ext_info = []
+    for alias, canonical in alias_to_canonical.items():
+        if alias in extension_map and canonical not in extension_map:
+            # Alias has extension info, but canonical doesn't
+            extension_map[canonical] = extension_map[alias]
+            aliases_with_ext_info.append(f"{alias} -> {canonical}")
+
+    if aliases_with_ext_info:
+        print(f"  Propagated extension info from {len(aliases_with_ext_info)} aliases to canonical structs")

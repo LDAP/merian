@@ -57,3 +57,4 @@ class FeatureStruct:
     required_version: Optional[str] = None  # e.g., VK_API_VERSION_1_3 (for core VulkanXXFeatures)
     member_prefix: str = ""  # e.g., "features." for VkPhysicalDeviceFeatures2
     aliases: list[str] = field(default_factory=list)
+    structextends: list[str] = field(default_factory=list)  # e.g., ["VkPhysicalDeviceFeatures2", "VkDeviceCreateInfo"]

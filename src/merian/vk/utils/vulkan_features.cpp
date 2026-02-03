@@ -24,11 +24,12 @@ VulkanFeatures::VulkanFeatures(const vk::PhysicalDevice& physical_device,
     // Get effective API version from properties
     const uint32_t vk_api_version = properties.get_vk_api_version();
 
-    // Build pNext chain for all features with supported extensions
+    // PHASE 1: Build pNext chain for all features with supported extensions/versions
     void* feat_p_next = nullptr;
 
     // PhysicalDevice16BitStorageFeatures
-    if (vk_api_version >= VK_API_VERSION_1_1) {
+    if (vk_api_version >= VK_API_VERSION_1_1 ||
+        device_extensions.contains(VK_KHR_16BIT_STORAGE_EXTENSION_NAME)) {
         m_16_bit_storage_features.pNext = feat_p_next;
         feat_p_next = &m_16_bit_storage_features;
     }
@@ -41,7 +42,8 @@ VulkanFeatures::VulkanFeatures(const vk::PhysicalDevice& physical_device,
     }
 
     // PhysicalDevice8BitStorageFeatures
-    if (vk_api_version >= VK_API_VERSION_1_2) {
+    if (vk_api_version >= VK_API_VERSION_1_2 ||
+        device_extensions.contains(VK_KHR_8BIT_STORAGE_EXTENSION_NAME)) {
         m_8_bit_storage_features.pNext = feat_p_next;
         feat_p_next = &m_8_bit_storage_features;
     }
@@ -101,7 +103,8 @@ VulkanFeatures::VulkanFeatures(const vk::PhysicalDevice& physical_device,
     }
 
     // PhysicalDeviceBufferDeviceAddressFeatures
-    if (vk_api_version >= VK_API_VERSION_1_2) {
+    if (vk_api_version >= VK_API_VERSION_1_2 ||
+        device_extensions.contains(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME)) {
         m_buffer_device_address_features.pNext = feat_p_next;
         feat_p_next = &m_buffer_device_address_features;
     }
@@ -305,7 +308,8 @@ VulkanFeatures::VulkanFeatures(const vk::PhysicalDevice& physical_device,
     }
 
     // PhysicalDeviceDescriptorIndexingFeatures
-    if (vk_api_version >= VK_API_VERSION_1_2) {
+    if (vk_api_version >= VK_API_VERSION_1_2 ||
+        device_extensions.contains(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME)) {
         m_descriptor_indexing_features.pNext = feat_p_next;
         feat_p_next = &m_descriptor_indexing_features;
     }
@@ -353,13 +357,15 @@ VulkanFeatures::VulkanFeatures(const vk::PhysicalDevice& physical_device,
     }
 
     // PhysicalDeviceDynamicRenderingFeatures
-    if (vk_api_version >= VK_API_VERSION_1_3) {
+    if (vk_api_version >= VK_API_VERSION_1_3 ||
+        device_extensions.contains(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME)) {
         m_dynamic_rendering_features.pNext = feat_p_next;
         feat_p_next = &m_dynamic_rendering_features;
     }
 
     // PhysicalDeviceDynamicRenderingLocalReadFeatures
-    if (vk_api_version >= VK_API_VERSION_1_4) {
+    if (vk_api_version >= VK_API_VERSION_1_4 ||
+        device_extensions.contains(VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_EXTENSION_NAME)) {
         m_dynamic_rendering_local_read_features.pNext = feat_p_next;
         feat_p_next = &m_dynamic_rendering_local_read_features;
     }
@@ -475,7 +481,8 @@ VulkanFeatures::VulkanFeatures(const vk::PhysicalDevice& physical_device,
     }
 
     // PhysicalDeviceGlobalPriorityQueryFeatures
-    if (vk_api_version >= VK_API_VERSION_1_4) {
+    if (vk_api_version >= VK_API_VERSION_1_4 ||
+        device_extensions.contains(VK_KHR_GLOBAL_PRIORITY_EXTENSION_NAME)) {
         m_global_priority_query_features.pNext = feat_p_next;
         feat_p_next = &m_global_priority_query_features;
     }
@@ -493,13 +500,15 @@ VulkanFeatures::VulkanFeatures(const vk::PhysicalDevice& physical_device,
     }
 
     // PhysicalDeviceHostImageCopyFeatures
-    if (vk_api_version >= VK_API_VERSION_1_4) {
+    if (vk_api_version >= VK_API_VERSION_1_4 ||
+        device_extensions.contains(VK_EXT_HOST_IMAGE_COPY_EXTENSION_NAME)) {
         m_host_image_copy_features.pNext = feat_p_next;
         feat_p_next = &m_host_image_copy_features;
     }
 
     // PhysicalDeviceHostQueryResetFeatures
-    if (vk_api_version >= VK_API_VERSION_1_2) {
+    if (vk_api_version >= VK_API_VERSION_1_2 ||
+        device_extensions.contains(VK_EXT_HOST_QUERY_RESET_EXTENSION_NAME)) {
         m_host_query_reset_features.pNext = feat_p_next;
         feat_p_next = &m_host_query_reset_features;
     }
@@ -541,7 +550,8 @@ VulkanFeatures::VulkanFeatures(const vk::PhysicalDevice& physical_device,
     }
 
     // PhysicalDeviceImageRobustnessFeatures
-    if (vk_api_version >= VK_API_VERSION_1_3) {
+    if (vk_api_version >= VK_API_VERSION_1_3 ||
+        device_extensions.contains(VK_EXT_IMAGE_ROBUSTNESS_EXTENSION_NAME)) {
         m_image_robustness_features.pNext = feat_p_next;
         feat_p_next = &m_image_robustness_features;
     }
@@ -559,13 +569,15 @@ VulkanFeatures::VulkanFeatures(const vk::PhysicalDevice& physical_device,
     }
 
     // PhysicalDeviceImagelessFramebufferFeatures
-    if (vk_api_version >= VK_API_VERSION_1_2) {
+    if (vk_api_version >= VK_API_VERSION_1_2 ||
+        device_extensions.contains(VK_KHR_IMAGELESS_FRAMEBUFFER_EXTENSION_NAME)) {
         m_imageless_framebuffer_features.pNext = feat_p_next;
         feat_p_next = &m_imageless_framebuffer_features;
     }
 
     // PhysicalDeviceIndexTypeUint8Features
-    if (vk_api_version >= VK_API_VERSION_1_4) {
+    if (vk_api_version >= VK_API_VERSION_1_4 ||
+        device_extensions.contains(VK_KHR_INDEX_TYPE_UINT8_EXTENSION_NAME)) {
         m_index_type_uint8_features.pNext = feat_p_next;
         feat_p_next = &m_index_type_uint8_features;
     }
@@ -577,7 +589,8 @@ VulkanFeatures::VulkanFeatures(const vk::PhysicalDevice& physical_device,
     }
 
     // PhysicalDeviceInlineUniformBlockFeatures
-    if (vk_api_version >= VK_API_VERSION_1_3) {
+    if (vk_api_version >= VK_API_VERSION_1_3 ||
+        device_extensions.contains(VK_EXT_INLINE_UNIFORM_BLOCK_EXTENSION_NAME)) {
         m_inline_uniform_block_features.pNext = feat_p_next;
         feat_p_next = &m_inline_uniform_block_features;
     }
@@ -607,7 +620,8 @@ VulkanFeatures::VulkanFeatures(const vk::PhysicalDevice& physical_device,
     }
 
     // PhysicalDeviceLineRasterizationFeatures
-    if (vk_api_version >= VK_API_VERSION_1_4) {
+    if (vk_api_version >= VK_API_VERSION_1_4 ||
+        device_extensions.contains(VK_KHR_LINE_RASTERIZATION_EXTENSION_NAME)) {
         m_line_rasterization_features.pNext = feat_p_next;
         feat_p_next = &m_line_rasterization_features;
     }
@@ -625,19 +639,22 @@ VulkanFeatures::VulkanFeatures(const vk::PhysicalDevice& physical_device,
     }
 
     // PhysicalDeviceMaintenance4Features
-    if (vk_api_version >= VK_API_VERSION_1_3) {
+    if (vk_api_version >= VK_API_VERSION_1_3 ||
+        device_extensions.contains(VK_KHR_MAINTENANCE_4_EXTENSION_NAME)) {
         m_maintenance4_features.pNext = feat_p_next;
         feat_p_next = &m_maintenance4_features;
     }
 
     // PhysicalDeviceMaintenance5Features
-    if (vk_api_version >= VK_API_VERSION_1_4) {
+    if (vk_api_version >= VK_API_VERSION_1_4 ||
+        device_extensions.contains(VK_KHR_MAINTENANCE_5_EXTENSION_NAME)) {
         m_maintenance5_features.pNext = feat_p_next;
         feat_p_next = &m_maintenance5_features;
     }
 
     // PhysicalDeviceMaintenance6Features
-    if (vk_api_version >= VK_API_VERSION_1_4) {
+    if (vk_api_version >= VK_API_VERSION_1_4 ||
+        device_extensions.contains(VK_KHR_MAINTENANCE_6_EXTENSION_NAME)) {
         m_maintenance6_features.pNext = feat_p_next;
         feat_p_next = &m_maintenance6_features;
     }
@@ -703,7 +720,8 @@ VulkanFeatures::VulkanFeatures(const vk::PhysicalDevice& physical_device,
     }
 
     // PhysicalDeviceMultiviewFeatures
-    if (vk_api_version >= VK_API_VERSION_1_1) {
+    if (vk_api_version >= VK_API_VERSION_1_1 ||
+        device_extensions.contains(VK_KHR_MULTIVIEW_EXTENSION_NAME)) {
         m_multiview_features.pNext = feat_p_next;
         feat_p_next = &m_multiview_features;
     }
@@ -793,7 +811,8 @@ VulkanFeatures::VulkanFeatures(const vk::PhysicalDevice& physical_device,
     }
 
     // PhysicalDevicePipelineCreationCacheControlFeatures
-    if (vk_api_version >= VK_API_VERSION_1_3) {
+    if (vk_api_version >= VK_API_VERSION_1_3 ||
+        device_extensions.contains(VK_EXT_PIPELINE_CREATION_CACHE_CONTROL_EXTENSION_NAME)) {
         m_pipeline_creation_cache_control_features.pNext = feat_p_next;
         feat_p_next = &m_pipeline_creation_cache_control_features;
     }
@@ -823,13 +842,15 @@ VulkanFeatures::VulkanFeatures(const vk::PhysicalDevice& physical_device,
     }
 
     // PhysicalDevicePipelineProtectedAccessFeatures
-    if (vk_api_version >= VK_API_VERSION_1_4) {
+    if (vk_api_version >= VK_API_VERSION_1_4 ||
+        device_extensions.contains(VK_EXT_PIPELINE_PROTECTED_ACCESS_EXTENSION_NAME)) {
         m_pipeline_protected_access_features.pNext = feat_p_next;
         feat_p_next = &m_pipeline_protected_access_features;
     }
 
     // PhysicalDevicePipelineRobustnessFeatures
-    if (vk_api_version >= VK_API_VERSION_1_4) {
+    if (vk_api_version >= VK_API_VERSION_1_4 ||
+        device_extensions.contains(VK_EXT_PIPELINE_ROBUSTNESS_EXTENSION_NAME)) {
         m_pipeline_robustness_features.pNext = feat_p_next;
         feat_p_next = &m_pipeline_robustness_features;
     }
@@ -889,7 +910,8 @@ VulkanFeatures::VulkanFeatures(const vk::PhysicalDevice& physical_device,
     }
 
     // PhysicalDevicePrivateDataFeatures
-    if (vk_api_version >= VK_API_VERSION_1_3) {
+    if (vk_api_version >= VK_API_VERSION_1_3 ||
+        device_extensions.contains(VK_EXT_PRIVATE_DATA_EXTENSION_NAME)) {
         m_private_data_features.pNext = feat_p_next;
         feat_p_next = &m_private_data_features;
     }
@@ -1009,13 +1031,15 @@ VulkanFeatures::VulkanFeatures(const vk::PhysicalDevice& physical_device,
     }
 
     // PhysicalDeviceSamplerYcbcrConversionFeatures
-    if (vk_api_version >= VK_API_VERSION_1_1) {
+    if (vk_api_version >= VK_API_VERSION_1_1 ||
+        device_extensions.contains(VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME)) {
         m_sampler_ycbcr_conversion_features.pNext = feat_p_next;
         feat_p_next = &m_sampler_ycbcr_conversion_features;
     }
 
     // PhysicalDeviceScalarBlockLayoutFeatures
-    if (vk_api_version >= VK_API_VERSION_1_2) {
+    if (vk_api_version >= VK_API_VERSION_1_2 ||
+        device_extensions.contains(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME)) {
         m_scalar_block_layout_features.pNext = feat_p_next;
         feat_p_next = &m_scalar_block_layout_features;
     }
@@ -1027,7 +1051,8 @@ VulkanFeatures::VulkanFeatures(const vk::PhysicalDevice& physical_device,
     }
 
     // PhysicalDeviceSeparateDepthStencilLayoutsFeatures
-    if (vk_api_version >= VK_API_VERSION_1_2) {
+    if (vk_api_version >= VK_API_VERSION_1_2 ||
+        device_extensions.contains(VK_KHR_SEPARATE_DEPTH_STENCIL_LAYOUTS_EXTENSION_NAME)) {
         m_separate_depth_stencil_layouts_features.pNext = feat_p_next;
         feat_p_next = &m_separate_depth_stencil_layouts_features;
     }
@@ -1057,7 +1082,8 @@ VulkanFeatures::VulkanFeatures(const vk::PhysicalDevice& physical_device,
     }
 
     // PhysicalDeviceShaderAtomicInt64Features
-    if (vk_api_version >= VK_API_VERSION_1_2) {
+    if (vk_api_version >= VK_API_VERSION_1_2 ||
+        device_extensions.contains(VK_KHR_SHADER_ATOMIC_INT64_EXTENSION_NAME)) {
         m_shader_atomic_int64_features.pNext = feat_p_next;
         feat_p_next = &m_shader_atomic_int64_features;
     }
@@ -1081,7 +1107,8 @@ VulkanFeatures::VulkanFeatures(const vk::PhysicalDevice& physical_device,
     }
 
     // PhysicalDeviceShaderDemoteToHelperInvocationFeatures
-    if (vk_api_version >= VK_API_VERSION_1_3) {
+    if (vk_api_version >= VK_API_VERSION_1_3 ||
+        device_extensions.contains(VK_EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION_EXTENSION_NAME)) {
         m_shader_demote_to_helper_invocation_features.pNext = feat_p_next;
         feat_p_next = &m_shader_demote_to_helper_invocation_features;
     }
@@ -1099,13 +1126,15 @@ VulkanFeatures::VulkanFeatures(const vk::PhysicalDevice& physical_device,
     }
 
     // PhysicalDeviceShaderExpectAssumeFeatures
-    if (vk_api_version >= VK_API_VERSION_1_4) {
+    if (vk_api_version >= VK_API_VERSION_1_4 ||
+        device_extensions.contains(VK_KHR_SHADER_EXPECT_ASSUME_EXTENSION_NAME)) {
         m_shader_expect_assume_features.pNext = feat_p_next;
         feat_p_next = &m_shader_expect_assume_features;
     }
 
     // PhysicalDeviceShaderFloat16Int8Features
-    if (vk_api_version >= VK_API_VERSION_1_2) {
+    if (vk_api_version >= VK_API_VERSION_1_2 ||
+        device_extensions.contains(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME)) {
         m_shader_float16_int8_features.pNext = feat_p_next;
         feat_p_next = &m_shader_float16_int8_features;
     }
@@ -1117,7 +1146,8 @@ VulkanFeatures::VulkanFeatures(const vk::PhysicalDevice& physical_device,
     }
 
     // PhysicalDeviceShaderFloatControls2Features
-    if (vk_api_version >= VK_API_VERSION_1_4) {
+    if (vk_api_version >= VK_API_VERSION_1_4 ||
+        device_extensions.contains(VK_KHR_SHADER_FLOAT_CONTROLS_2_EXTENSION_NAME)) {
         m_shader_float_controls2_features.pNext = feat_p_next;
         feat_p_next = &m_shader_float_controls2_features;
     }
@@ -1141,7 +1171,8 @@ VulkanFeatures::VulkanFeatures(const vk::PhysicalDevice& physical_device,
     }
 
     // PhysicalDeviceShaderIntegerDotProductFeatures
-    if (vk_api_version >= VK_API_VERSION_1_3) {
+    if (vk_api_version >= VK_API_VERSION_1_3 ||
+        device_extensions.contains(VK_KHR_SHADER_INTEGER_DOT_PRODUCT_EXTENSION_NAME)) {
         m_shader_integer_dot_product_features.pNext = feat_p_next;
         feat_p_next = &m_shader_integer_dot_product_features;
     }
@@ -1201,7 +1232,8 @@ VulkanFeatures::VulkanFeatures(const vk::PhysicalDevice& physical_device,
     }
 
     // PhysicalDeviceShaderSubgroupExtendedTypesFeatures
-    if (vk_api_version >= VK_API_VERSION_1_2) {
+    if (vk_api_version >= VK_API_VERSION_1_2 ||
+        device_extensions.contains(VK_KHR_SHADER_SUBGROUP_EXTENDED_TYPES_EXTENSION_NAME)) {
         m_shader_subgroup_extended_types_features.pNext = feat_p_next;
         feat_p_next = &m_shader_subgroup_extended_types_features;
     }
@@ -1213,7 +1245,8 @@ VulkanFeatures::VulkanFeatures(const vk::PhysicalDevice& physical_device,
     }
 
     // PhysicalDeviceShaderSubgroupRotateFeatures
-    if (vk_api_version >= VK_API_VERSION_1_4) {
+    if (vk_api_version >= VK_API_VERSION_1_4 ||
+        device_extensions.contains(VK_KHR_SHADER_SUBGROUP_ROTATE_EXTENSION_NAME)) {
         m_shader_subgroup_rotate_features.pNext = feat_p_next;
         feat_p_next = &m_shader_subgroup_rotate_features;
     }
@@ -1225,7 +1258,8 @@ VulkanFeatures::VulkanFeatures(const vk::PhysicalDevice& physical_device,
     }
 
     // PhysicalDeviceShaderTerminateInvocationFeatures
-    if (vk_api_version >= VK_API_VERSION_1_3) {
+    if (vk_api_version >= VK_API_VERSION_1_3 ||
+        device_extensions.contains(VK_KHR_SHADER_TERMINATE_INVOCATION_EXTENSION_NAME)) {
         m_shader_terminate_invocation_features.pNext = feat_p_next;
         feat_p_next = &m_shader_terminate_invocation_features;
     }
@@ -1255,7 +1289,8 @@ VulkanFeatures::VulkanFeatures(const vk::PhysicalDevice& physical_device,
     }
 
     // PhysicalDeviceSubgroupSizeControlFeatures
-    if (vk_api_version >= VK_API_VERSION_1_3) {
+    if (vk_api_version >= VK_API_VERSION_1_3 ||
+        device_extensions.contains(VK_EXT_SUBGROUP_SIZE_CONTROL_EXTENSION_NAME)) {
         m_subgroup_size_control_features.pNext = feat_p_next;
         feat_p_next = &m_subgroup_size_control_features;
     }
@@ -1279,7 +1314,8 @@ VulkanFeatures::VulkanFeatures(const vk::PhysicalDevice& physical_device,
     }
 
     // PhysicalDeviceSynchronization2Features
-    if (vk_api_version >= VK_API_VERSION_1_3) {
+    if (vk_api_version >= VK_API_VERSION_1_3 ||
+        device_extensions.contains(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME)) {
         m_synchronization2_features.pNext = feat_p_next;
         feat_p_next = &m_synchronization2_features;
     }
@@ -1304,7 +1340,8 @@ VulkanFeatures::VulkanFeatures(const vk::PhysicalDevice& physical_device,
     }
 
     // PhysicalDeviceTextureCompressionASTCHDRFeatures
-    if (vk_api_version >= VK_API_VERSION_1_3) {
+    if (vk_api_version >= VK_API_VERSION_1_3 ||
+        device_extensions.contains(VK_EXT_TEXTURE_COMPRESSION_ASTC_HDR_EXTENSION_NAME)) {
         m_texture_compression_astchdr_features.pNext = feat_p_next;
         feat_p_next = &m_texture_compression_astchdr_features;
     }
@@ -1328,7 +1365,8 @@ VulkanFeatures::VulkanFeatures(const vk::PhysicalDevice& physical_device,
     }
 
     // PhysicalDeviceTimelineSemaphoreFeatures
-    if (vk_api_version >= VK_API_VERSION_1_2) {
+    if (vk_api_version >= VK_API_VERSION_1_2 ||
+        device_extensions.contains(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME)) {
         m_timeline_semaphore_features.pNext = feat_p_next;
         feat_p_next = &m_timeline_semaphore_features;
     }
@@ -1346,19 +1384,22 @@ VulkanFeatures::VulkanFeatures(const vk::PhysicalDevice& physical_device,
     }
 
     // PhysicalDeviceUniformBufferStandardLayoutFeatures
-    if (vk_api_version >= VK_API_VERSION_1_2) {
+    if (vk_api_version >= VK_API_VERSION_1_2 ||
+        device_extensions.contains(VK_KHR_UNIFORM_BUFFER_STANDARD_LAYOUT_EXTENSION_NAME)) {
         m_uniform_buffer_standard_layout_features.pNext = feat_p_next;
         feat_p_next = &m_uniform_buffer_standard_layout_features;
     }
 
     // PhysicalDeviceVariablePointersFeatures
-    if (vk_api_version >= VK_API_VERSION_1_1) {
+    if (vk_api_version >= VK_API_VERSION_1_1 ||
+        device_extensions.contains(VK_KHR_VARIABLE_POINTERS_EXTENSION_NAME)) {
         m_variable_pointers_features.pNext = feat_p_next;
         feat_p_next = &m_variable_pointers_features;
     }
 
     // PhysicalDeviceVertexAttributeDivisorFeatures
-    if (vk_api_version >= VK_API_VERSION_1_4) {
+    if (vk_api_version >= VK_API_VERSION_1_4 ||
+        device_extensions.contains(VK_KHR_VERTEX_ATTRIBUTE_DIVISOR_EXTENSION_NAME)) {
         m_vertex_attribute_divisor_features.pNext = feat_p_next;
         feat_p_next = &m_vertex_attribute_divisor_features;
     }
@@ -1442,7 +1483,8 @@ VulkanFeatures::VulkanFeatures(const vk::PhysicalDevice& physical_device,
     }
 
     // PhysicalDeviceVulkanMemoryModelFeatures
-    if (vk_api_version >= VK_API_VERSION_1_2) {
+    if (vk_api_version >= VK_API_VERSION_1_2 ||
+        device_extensions.contains(VK_KHR_VULKAN_MEMORY_MODEL_EXTENSION_NAME)) {
         m_vulkan_memory_model_features.pNext = feat_p_next;
         feat_p_next = &m_vulkan_memory_model_features;
     }
@@ -1479,7 +1521,8 @@ VulkanFeatures::VulkanFeatures(const vk::PhysicalDevice& physical_device,
     }
 
     // PhysicalDeviceZeroInitializeWorkgroupMemoryFeatures
-    if (vk_api_version >= VK_API_VERSION_1_3) {
+    if (vk_api_version >= VK_API_VERSION_1_3 ||
+        device_extensions.contains(VK_KHR_ZERO_INITIALIZE_WORKGROUP_MEMORY_EXTENSION_NAME)) {
         m_zero_initialize_workgroup_memory_features.pNext = feat_p_next;
         feat_p_next = &m_zero_initialize_workgroup_memory_features;
     }
@@ -1489,6 +1532,482 @@ VulkanFeatures::VulkanFeatures(const vk::PhysicalDevice& physical_device,
 
     // Query features from device
     physical_device.getFeatures2(&m_features2);
+
+    // PHASE 2: Sync duplicate features between structs using OR logic
+    // When multiple structs contain the same feature (due to promotion/deprecation),
+    // compute the OR of all values and set it in all structs.
+    // This ensures that if ANY struct was queried and has the feature enabled,
+    // ALL structs will have it enabled (regardless of query order).
+    // Example: bufferDeviceAddress appears in KHR, EXT, and Vulkan12Features
+
+    // Sync bresenhamLines across 2 structs (OR logic)
+    const VkBool32 bresenhamLines_value = m_line_rasterization_features.bresenhamLines || m_vulkan14_features.bresenhamLines;
+    m_line_rasterization_features.bresenhamLines = bresenhamLines_value;
+    m_vulkan14_features.bresenhamLines = bresenhamLines_value;
+
+    // Sync bufferDeviceAddress across 3 structs (OR logic)
+    const VkBool32 bufferDeviceAddress_value = m_buffer_device_address_features.bufferDeviceAddress || m_buffer_device_address_features_ext.bufferDeviceAddress || m_vulkan12_features.bufferDeviceAddress;
+    m_buffer_device_address_features.bufferDeviceAddress = bufferDeviceAddress_value;
+    m_buffer_device_address_features_ext.bufferDeviceAddress = bufferDeviceAddress_value;
+    m_vulkan12_features.bufferDeviceAddress = bufferDeviceAddress_value;
+
+    // Sync bufferDeviceAddressCaptureReplay across 3 structs (OR logic)
+    const VkBool32 bufferDeviceAddressCaptureReplay_value = m_buffer_device_address_features.bufferDeviceAddressCaptureReplay || m_buffer_device_address_features_ext.bufferDeviceAddressCaptureReplay || m_vulkan12_features.bufferDeviceAddressCaptureReplay;
+    m_buffer_device_address_features.bufferDeviceAddressCaptureReplay = bufferDeviceAddressCaptureReplay_value;
+    m_buffer_device_address_features_ext.bufferDeviceAddressCaptureReplay = bufferDeviceAddressCaptureReplay_value;
+    m_vulkan12_features.bufferDeviceAddressCaptureReplay = bufferDeviceAddressCaptureReplay_value;
+
+    // Sync bufferDeviceAddressMultiDevice across 3 structs (OR logic)
+    const VkBool32 bufferDeviceAddressMultiDevice_value = m_buffer_device_address_features.bufferDeviceAddressMultiDevice || m_buffer_device_address_features_ext.bufferDeviceAddressMultiDevice || m_vulkan12_features.bufferDeviceAddressMultiDevice;
+    m_buffer_device_address_features.bufferDeviceAddressMultiDevice = bufferDeviceAddressMultiDevice_value;
+    m_buffer_device_address_features_ext.bufferDeviceAddressMultiDevice = bufferDeviceAddressMultiDevice_value;
+    m_vulkan12_features.bufferDeviceAddressMultiDevice = bufferDeviceAddressMultiDevice_value;
+
+    // Sync computeFullSubgroups across 2 structs (OR logic)
+    const VkBool32 computeFullSubgroups_value = m_subgroup_size_control_features.computeFullSubgroups || m_vulkan13_features.computeFullSubgroups;
+    m_subgroup_size_control_features.computeFullSubgroups = computeFullSubgroups_value;
+    m_vulkan13_features.computeFullSubgroups = computeFullSubgroups_value;
+
+    // Sync cooperativeMatrix across 2 structs (OR logic)
+    const VkBool32 cooperativeMatrix_value = m_cooperative_matrix_features_nv.cooperativeMatrix || m_cooperative_matrix_features_khr.cooperativeMatrix;
+    m_cooperative_matrix_features_nv.cooperativeMatrix = cooperativeMatrix_value;
+    m_cooperative_matrix_features_khr.cooperativeMatrix = cooperativeMatrix_value;
+
+    // Sync cooperativeMatrixRobustBufferAccess across 2 structs (OR logic)
+    const VkBool32 cooperativeMatrixRobustBufferAccess_value = m_cooperative_matrix_features_nv.cooperativeMatrixRobustBufferAccess || m_cooperative_matrix_features_khr.cooperativeMatrixRobustBufferAccess;
+    m_cooperative_matrix_features_nv.cooperativeMatrixRobustBufferAccess = cooperativeMatrixRobustBufferAccess_value;
+    m_cooperative_matrix_features_khr.cooperativeMatrixRobustBufferAccess = cooperativeMatrixRobustBufferAccess_value;
+
+    // Sync descriptorBindingInlineUniformBlockUpdateAfterBind across 2 structs (OR logic)
+    const VkBool32 descriptorBindingInlineUniformBlockUpdateAfterBind_value = m_inline_uniform_block_features.descriptorBindingInlineUniformBlockUpdateAfterBind || m_vulkan13_features.descriptorBindingInlineUniformBlockUpdateAfterBind;
+    m_inline_uniform_block_features.descriptorBindingInlineUniformBlockUpdateAfterBind = descriptorBindingInlineUniformBlockUpdateAfterBind_value;
+    m_vulkan13_features.descriptorBindingInlineUniformBlockUpdateAfterBind = descriptorBindingInlineUniformBlockUpdateAfterBind_value;
+
+    // Sync descriptorBindingPartiallyBound across 2 structs (OR logic)
+    const VkBool32 descriptorBindingPartiallyBound_value = m_descriptor_indexing_features.descriptorBindingPartiallyBound || m_vulkan12_features.descriptorBindingPartiallyBound;
+    m_descriptor_indexing_features.descriptorBindingPartiallyBound = descriptorBindingPartiallyBound_value;
+    m_vulkan12_features.descriptorBindingPartiallyBound = descriptorBindingPartiallyBound_value;
+
+    // Sync descriptorBindingSampledImageUpdateAfterBind across 2 structs (OR logic)
+    const VkBool32 descriptorBindingSampledImageUpdateAfterBind_value = m_descriptor_indexing_features.descriptorBindingSampledImageUpdateAfterBind || m_vulkan12_features.descriptorBindingSampledImageUpdateAfterBind;
+    m_descriptor_indexing_features.descriptorBindingSampledImageUpdateAfterBind = descriptorBindingSampledImageUpdateAfterBind_value;
+    m_vulkan12_features.descriptorBindingSampledImageUpdateAfterBind = descriptorBindingSampledImageUpdateAfterBind_value;
+
+    // Sync descriptorBindingStorageBufferUpdateAfterBind across 2 structs (OR logic)
+    const VkBool32 descriptorBindingStorageBufferUpdateAfterBind_value = m_descriptor_indexing_features.descriptorBindingStorageBufferUpdateAfterBind || m_vulkan12_features.descriptorBindingStorageBufferUpdateAfterBind;
+    m_descriptor_indexing_features.descriptorBindingStorageBufferUpdateAfterBind = descriptorBindingStorageBufferUpdateAfterBind_value;
+    m_vulkan12_features.descriptorBindingStorageBufferUpdateAfterBind = descriptorBindingStorageBufferUpdateAfterBind_value;
+
+    // Sync descriptorBindingStorageImageUpdateAfterBind across 2 structs (OR logic)
+    const VkBool32 descriptorBindingStorageImageUpdateAfterBind_value = m_descriptor_indexing_features.descriptorBindingStorageImageUpdateAfterBind || m_vulkan12_features.descriptorBindingStorageImageUpdateAfterBind;
+    m_descriptor_indexing_features.descriptorBindingStorageImageUpdateAfterBind = descriptorBindingStorageImageUpdateAfterBind_value;
+    m_vulkan12_features.descriptorBindingStorageImageUpdateAfterBind = descriptorBindingStorageImageUpdateAfterBind_value;
+
+    // Sync descriptorBindingStorageTexelBufferUpdateAfterBind across 2 structs (OR logic)
+    const VkBool32 descriptorBindingStorageTexelBufferUpdateAfterBind_value = m_descriptor_indexing_features.descriptorBindingStorageTexelBufferUpdateAfterBind || m_vulkan12_features.descriptorBindingStorageTexelBufferUpdateAfterBind;
+    m_descriptor_indexing_features.descriptorBindingStorageTexelBufferUpdateAfterBind = descriptorBindingStorageTexelBufferUpdateAfterBind_value;
+    m_vulkan12_features.descriptorBindingStorageTexelBufferUpdateAfterBind = descriptorBindingStorageTexelBufferUpdateAfterBind_value;
+
+    // Sync descriptorBindingUniformBufferUpdateAfterBind across 2 structs (OR logic)
+    const VkBool32 descriptorBindingUniformBufferUpdateAfterBind_value = m_descriptor_indexing_features.descriptorBindingUniformBufferUpdateAfterBind || m_vulkan12_features.descriptorBindingUniformBufferUpdateAfterBind;
+    m_descriptor_indexing_features.descriptorBindingUniformBufferUpdateAfterBind = descriptorBindingUniformBufferUpdateAfterBind_value;
+    m_vulkan12_features.descriptorBindingUniformBufferUpdateAfterBind = descriptorBindingUniformBufferUpdateAfterBind_value;
+
+    // Sync descriptorBindingUniformTexelBufferUpdateAfterBind across 2 structs (OR logic)
+    const VkBool32 descriptorBindingUniformTexelBufferUpdateAfterBind_value = m_descriptor_indexing_features.descriptorBindingUniformTexelBufferUpdateAfterBind || m_vulkan12_features.descriptorBindingUniformTexelBufferUpdateAfterBind;
+    m_descriptor_indexing_features.descriptorBindingUniformTexelBufferUpdateAfterBind = descriptorBindingUniformTexelBufferUpdateAfterBind_value;
+    m_vulkan12_features.descriptorBindingUniformTexelBufferUpdateAfterBind = descriptorBindingUniformTexelBufferUpdateAfterBind_value;
+
+    // Sync descriptorBindingUpdateUnusedWhilePending across 2 structs (OR logic)
+    const VkBool32 descriptorBindingUpdateUnusedWhilePending_value = m_descriptor_indexing_features.descriptorBindingUpdateUnusedWhilePending || m_vulkan12_features.descriptorBindingUpdateUnusedWhilePending;
+    m_descriptor_indexing_features.descriptorBindingUpdateUnusedWhilePending = descriptorBindingUpdateUnusedWhilePending_value;
+    m_vulkan12_features.descriptorBindingUpdateUnusedWhilePending = descriptorBindingUpdateUnusedWhilePending_value;
+
+    // Sync descriptorBindingVariableDescriptorCount across 2 structs (OR logic)
+    const VkBool32 descriptorBindingVariableDescriptorCount_value = m_descriptor_indexing_features.descriptorBindingVariableDescriptorCount || m_vulkan12_features.descriptorBindingVariableDescriptorCount;
+    m_descriptor_indexing_features.descriptorBindingVariableDescriptorCount = descriptorBindingVariableDescriptorCount_value;
+    m_vulkan12_features.descriptorBindingVariableDescriptorCount = descriptorBindingVariableDescriptorCount_value;
+
+    // Sync deviceGeneratedCommands across 2 structs (OR logic)
+    const VkBool32 deviceGeneratedCommands_value = m_device_generated_commands_features_nv.deviceGeneratedCommands || m_device_generated_commands_features_ext.deviceGeneratedCommands;
+    m_device_generated_commands_features_nv.deviceGeneratedCommands = deviceGeneratedCommands_value;
+    m_device_generated_commands_features_ext.deviceGeneratedCommands = deviceGeneratedCommands_value;
+
+    // Sync dynamicRendering across 2 structs (OR logic)
+    const VkBool32 dynamicRendering_value = m_vulkan13_features.dynamicRendering || m_dynamic_rendering_features.dynamicRendering;
+    m_vulkan13_features.dynamicRendering = dynamicRendering_value;
+    m_dynamic_rendering_features.dynamicRendering = dynamicRendering_value;
+
+    // Sync dynamicRenderingLocalRead across 2 structs (OR logic)
+    const VkBool32 dynamicRenderingLocalRead_value = m_vulkan14_features.dynamicRenderingLocalRead || m_dynamic_rendering_local_read_features.dynamicRenderingLocalRead;
+    m_vulkan14_features.dynamicRenderingLocalRead = dynamicRenderingLocalRead_value;
+    m_dynamic_rendering_local_read_features.dynamicRenderingLocalRead = dynamicRenderingLocalRead_value;
+
+    // Sync globalPriorityQuery across 2 structs (OR logic)
+    const VkBool32 globalPriorityQuery_value = m_global_priority_query_features.globalPriorityQuery || m_vulkan14_features.globalPriorityQuery;
+    m_global_priority_query_features.globalPriorityQuery = globalPriorityQuery_value;
+    m_vulkan14_features.globalPriorityQuery = globalPriorityQuery_value;
+
+    // Sync hostImageCopy across 2 structs (OR logic)
+    const VkBool32 hostImageCopy_value = m_vulkan14_features.hostImageCopy || m_host_image_copy_features.hostImageCopy;
+    m_vulkan14_features.hostImageCopy = hostImageCopy_value;
+    m_host_image_copy_features.hostImageCopy = hostImageCopy_value;
+
+    // Sync hostQueryReset across 2 structs (OR logic)
+    const VkBool32 hostQueryReset_value = m_host_query_reset_features.hostQueryReset || m_vulkan12_features.hostQueryReset;
+    m_host_query_reset_features.hostQueryReset = hostQueryReset_value;
+    m_vulkan12_features.hostQueryReset = hostQueryReset_value;
+
+    // Sync imagelessFramebuffer across 2 structs (OR logic)
+    const VkBool32 imagelessFramebuffer_value = m_imageless_framebuffer_features.imagelessFramebuffer || m_vulkan12_features.imagelessFramebuffer;
+    m_imageless_framebuffer_features.imagelessFramebuffer = imagelessFramebuffer_value;
+    m_vulkan12_features.imagelessFramebuffer = imagelessFramebuffer_value;
+
+    // Sync indexTypeUint8 across 2 structs (OR logic)
+    const VkBool32 indexTypeUint8_value = m_index_type_uint8_features.indexTypeUint8 || m_vulkan14_features.indexTypeUint8;
+    m_index_type_uint8_features.indexTypeUint8 = indexTypeUint8_value;
+    m_vulkan14_features.indexTypeUint8 = indexTypeUint8_value;
+
+    // Sync inlineUniformBlock across 2 structs (OR logic)
+    const VkBool32 inlineUniformBlock_value = m_inline_uniform_block_features.inlineUniformBlock || m_vulkan13_features.inlineUniformBlock;
+    m_inline_uniform_block_features.inlineUniformBlock = inlineUniformBlock_value;
+    m_vulkan13_features.inlineUniformBlock = inlineUniformBlock_value;
+
+    // Sync maintenance4 across 2 structs (OR logic)
+    const VkBool32 maintenance4_value = m_maintenance4_features.maintenance4 || m_vulkan13_features.maintenance4;
+    m_maintenance4_features.maintenance4 = maintenance4_value;
+    m_vulkan13_features.maintenance4 = maintenance4_value;
+
+    // Sync maintenance5 across 2 structs (OR logic)
+    const VkBool32 maintenance5_value = m_maintenance5_features.maintenance5 || m_vulkan14_features.maintenance5;
+    m_maintenance5_features.maintenance5 = maintenance5_value;
+    m_vulkan14_features.maintenance5 = maintenance5_value;
+
+    // Sync maintenance6 across 2 structs (OR logic)
+    const VkBool32 maintenance6_value = m_maintenance6_features.maintenance6 || m_vulkan14_features.maintenance6;
+    m_maintenance6_features.maintenance6 = maintenance6_value;
+    m_vulkan14_features.maintenance6 = maintenance6_value;
+
+    // Sync meshShader across 2 structs (OR logic)
+    const VkBool32 meshShader_value = m_mesh_shader_features_nv.meshShader || m_mesh_shader_features_ext.meshShader;
+    m_mesh_shader_features_nv.meshShader = meshShader_value;
+    m_mesh_shader_features_ext.meshShader = meshShader_value;
+
+    // Sync multiview across 2 structs (OR logic)
+    const VkBool32 multiview_value = m_multiview_features.multiview || m_vulkan11_features.multiview;
+    m_multiview_features.multiview = multiview_value;
+    m_vulkan11_features.multiview = multiview_value;
+
+    // Sync multiviewGeometryShader across 2 structs (OR logic)
+    const VkBool32 multiviewGeometryShader_value = m_multiview_features.multiviewGeometryShader || m_vulkan11_features.multiviewGeometryShader;
+    m_multiview_features.multiviewGeometryShader = multiviewGeometryShader_value;
+    m_vulkan11_features.multiviewGeometryShader = multiviewGeometryShader_value;
+
+    // Sync multiviewTessellationShader across 2 structs (OR logic)
+    const VkBool32 multiviewTessellationShader_value = m_multiview_features.multiviewTessellationShader || m_vulkan11_features.multiviewTessellationShader;
+    m_multiview_features.multiviewTessellationShader = multiviewTessellationShader_value;
+    m_vulkan11_features.multiviewTessellationShader = multiviewTessellationShader_value;
+
+    // Sync pipelineCreationCacheControl across 2 structs (OR logic)
+    const VkBool32 pipelineCreationCacheControl_value = m_pipeline_creation_cache_control_features.pipelineCreationCacheControl || m_vulkan13_features.pipelineCreationCacheControl;
+    m_pipeline_creation_cache_control_features.pipelineCreationCacheControl = pipelineCreationCacheControl_value;
+    m_vulkan13_features.pipelineCreationCacheControl = pipelineCreationCacheControl_value;
+
+    // Sync pipelineProtectedAccess across 2 structs (OR logic)
+    const VkBool32 pipelineProtectedAccess_value = m_vulkan14_features.pipelineProtectedAccess || m_pipeline_protected_access_features.pipelineProtectedAccess;
+    m_vulkan14_features.pipelineProtectedAccess = pipelineProtectedAccess_value;
+    m_pipeline_protected_access_features.pipelineProtectedAccess = pipelineProtectedAccess_value;
+
+    // Sync pipelineRobustness across 2 structs (OR logic)
+    const VkBool32 pipelineRobustness_value = m_vulkan14_features.pipelineRobustness || m_pipeline_robustness_features.pipelineRobustness;
+    m_vulkan14_features.pipelineRobustness = pipelineRobustness_value;
+    m_pipeline_robustness_features.pipelineRobustness = pipelineRobustness_value;
+
+    // Sync privateData across 2 structs (OR logic)
+    const VkBool32 privateData_value = m_private_data_features.privateData || m_vulkan13_features.privateData;
+    m_private_data_features.privateData = privateData_value;
+    m_vulkan13_features.privateData = privateData_value;
+
+    // Sync protectedMemory across 2 structs (OR logic)
+    const VkBool32 protectedMemory_value = m_protected_memory_features.protectedMemory || m_vulkan11_features.protectedMemory;
+    m_protected_memory_features.protectedMemory = protectedMemory_value;
+    m_vulkan11_features.protectedMemory = protectedMemory_value;
+
+    // Sync rayTracingInvocationReorder across 2 structs (OR logic)
+    const VkBool32 rayTracingInvocationReorder_value = m_ray_tracing_invocation_reorder_features_ext.rayTracingInvocationReorder || m_ray_tracing_invocation_reorder_features_nv.rayTracingInvocationReorder;
+    m_ray_tracing_invocation_reorder_features_ext.rayTracingInvocationReorder = rayTracingInvocationReorder_value;
+    m_ray_tracing_invocation_reorder_features_nv.rayTracingInvocationReorder = rayTracingInvocationReorder_value;
+
+    // Sync rectangularLines across 2 structs (OR logic)
+    const VkBool32 rectangularLines_value = m_line_rasterization_features.rectangularLines || m_vulkan14_features.rectangularLines;
+    m_line_rasterization_features.rectangularLines = rectangularLines_value;
+    m_vulkan14_features.rectangularLines = rectangularLines_value;
+
+    // Sync robustImageAccess across 2 structs (OR logic)
+    const VkBool32 robustImageAccess_value = m_vulkan13_features.robustImageAccess || m_image_robustness_features.robustImageAccess;
+    m_vulkan13_features.robustImageAccess = robustImageAccess_value;
+    m_image_robustness_features.robustImageAccess = robustImageAccess_value;
+
+    // Sync runtimeDescriptorArray across 2 structs (OR logic)
+    const VkBool32 runtimeDescriptorArray_value = m_descriptor_indexing_features.runtimeDescriptorArray || m_vulkan12_features.runtimeDescriptorArray;
+    m_descriptor_indexing_features.runtimeDescriptorArray = runtimeDescriptorArray_value;
+    m_vulkan12_features.runtimeDescriptorArray = runtimeDescriptorArray_value;
+
+    // Sync samplerYcbcrConversion across 2 structs (OR logic)
+    const VkBool32 samplerYcbcrConversion_value = m_sampler_ycbcr_conversion_features.samplerYcbcrConversion || m_vulkan11_features.samplerYcbcrConversion;
+    m_sampler_ycbcr_conversion_features.samplerYcbcrConversion = samplerYcbcrConversion_value;
+    m_vulkan11_features.samplerYcbcrConversion = samplerYcbcrConversion_value;
+
+    // Sync scalarBlockLayout across 2 structs (OR logic)
+    const VkBool32 scalarBlockLayout_value = m_scalar_block_layout_features.scalarBlockLayout || m_vulkan12_features.scalarBlockLayout;
+    m_scalar_block_layout_features.scalarBlockLayout = scalarBlockLayout_value;
+    m_vulkan12_features.scalarBlockLayout = scalarBlockLayout_value;
+
+    // Sync separateDepthStencilLayouts across 2 structs (OR logic)
+    const VkBool32 separateDepthStencilLayouts_value = m_separate_depth_stencil_layouts_features.separateDepthStencilLayouts || m_vulkan12_features.separateDepthStencilLayouts;
+    m_separate_depth_stencil_layouts_features.separateDepthStencilLayouts = separateDepthStencilLayouts_value;
+    m_vulkan12_features.separateDepthStencilLayouts = separateDepthStencilLayouts_value;
+
+    // Sync shaderBufferInt64Atomics across 2 structs (OR logic)
+    const VkBool32 shaderBufferInt64Atomics_value = m_shader_atomic_int64_features.shaderBufferInt64Atomics || m_vulkan12_features.shaderBufferInt64Atomics;
+    m_shader_atomic_int64_features.shaderBufferInt64Atomics = shaderBufferInt64Atomics_value;
+    m_vulkan12_features.shaderBufferInt64Atomics = shaderBufferInt64Atomics_value;
+
+    // Sync shaderDemoteToHelperInvocation across 2 structs (OR logic)
+    const VkBool32 shaderDemoteToHelperInvocation_value = m_shader_demote_to_helper_invocation_features.shaderDemoteToHelperInvocation || m_vulkan13_features.shaderDemoteToHelperInvocation;
+    m_shader_demote_to_helper_invocation_features.shaderDemoteToHelperInvocation = shaderDemoteToHelperInvocation_value;
+    m_vulkan13_features.shaderDemoteToHelperInvocation = shaderDemoteToHelperInvocation_value;
+
+    // Sync shaderDrawParameters across 2 structs (OR logic)
+    const VkBool32 shaderDrawParameters_value = m_shader_draw_parameters_features.shaderDrawParameters || m_vulkan11_features.shaderDrawParameters;
+    m_shader_draw_parameters_features.shaderDrawParameters = shaderDrawParameters_value;
+    m_vulkan11_features.shaderDrawParameters = shaderDrawParameters_value;
+
+    // Sync shaderExpectAssume across 2 structs (OR logic)
+    const VkBool32 shaderExpectAssume_value = m_vulkan14_features.shaderExpectAssume || m_shader_expect_assume_features.shaderExpectAssume;
+    m_vulkan14_features.shaderExpectAssume = shaderExpectAssume_value;
+    m_shader_expect_assume_features.shaderExpectAssume = shaderExpectAssume_value;
+
+    // Sync shaderFloat16 across 2 structs (OR logic)
+    const VkBool32 shaderFloat16_value = m_shader_float16_int8_features.shaderFloat16 || m_vulkan12_features.shaderFloat16;
+    m_shader_float16_int8_features.shaderFloat16 = shaderFloat16_value;
+    m_vulkan12_features.shaderFloat16 = shaderFloat16_value;
+
+    // Sync shaderFloatControls2 across 2 structs (OR logic)
+    const VkBool32 shaderFloatControls2_value = m_vulkan14_features.shaderFloatControls2 || m_shader_float_controls2_features.shaderFloatControls2;
+    m_vulkan14_features.shaderFloatControls2 = shaderFloatControls2_value;
+    m_shader_float_controls2_features.shaderFloatControls2 = shaderFloatControls2_value;
+
+    // Sync shaderInputAttachmentArrayDynamicIndexing across 2 structs (OR logic)
+    const VkBool32 shaderInputAttachmentArrayDynamicIndexing_value = m_descriptor_indexing_features.shaderInputAttachmentArrayDynamicIndexing || m_vulkan12_features.shaderInputAttachmentArrayDynamicIndexing;
+    m_descriptor_indexing_features.shaderInputAttachmentArrayDynamicIndexing = shaderInputAttachmentArrayDynamicIndexing_value;
+    m_vulkan12_features.shaderInputAttachmentArrayDynamicIndexing = shaderInputAttachmentArrayDynamicIndexing_value;
+
+    // Sync shaderInputAttachmentArrayNonUniformIndexing across 2 structs (OR logic)
+    const VkBool32 shaderInputAttachmentArrayNonUniformIndexing_value = m_descriptor_indexing_features.shaderInputAttachmentArrayNonUniformIndexing || m_vulkan12_features.shaderInputAttachmentArrayNonUniformIndexing;
+    m_descriptor_indexing_features.shaderInputAttachmentArrayNonUniformIndexing = shaderInputAttachmentArrayNonUniformIndexing_value;
+    m_vulkan12_features.shaderInputAttachmentArrayNonUniformIndexing = shaderInputAttachmentArrayNonUniformIndexing_value;
+
+    // Sync shaderInt8 across 2 structs (OR logic)
+    const VkBool32 shaderInt8_value = m_shader_float16_int8_features.shaderInt8 || m_vulkan12_features.shaderInt8;
+    m_shader_float16_int8_features.shaderInt8 = shaderInt8_value;
+    m_vulkan12_features.shaderInt8 = shaderInt8_value;
+
+    // Sync shaderIntegerDotProduct across 2 structs (OR logic)
+    const VkBool32 shaderIntegerDotProduct_value = m_vulkan13_features.shaderIntegerDotProduct || m_shader_integer_dot_product_features.shaderIntegerDotProduct;
+    m_vulkan13_features.shaderIntegerDotProduct = shaderIntegerDotProduct_value;
+    m_shader_integer_dot_product_features.shaderIntegerDotProduct = shaderIntegerDotProduct_value;
+
+    // Sync shaderSampledImageArrayNonUniformIndexing across 2 structs (OR logic)
+    const VkBool32 shaderSampledImageArrayNonUniformIndexing_value = m_descriptor_indexing_features.shaderSampledImageArrayNonUniformIndexing || m_vulkan12_features.shaderSampledImageArrayNonUniformIndexing;
+    m_descriptor_indexing_features.shaderSampledImageArrayNonUniformIndexing = shaderSampledImageArrayNonUniformIndexing_value;
+    m_vulkan12_features.shaderSampledImageArrayNonUniformIndexing = shaderSampledImageArrayNonUniformIndexing_value;
+
+    // Sync shaderSharedInt64Atomics across 2 structs (OR logic)
+    const VkBool32 shaderSharedInt64Atomics_value = m_shader_atomic_int64_features.shaderSharedInt64Atomics || m_vulkan12_features.shaderSharedInt64Atomics;
+    m_shader_atomic_int64_features.shaderSharedInt64Atomics = shaderSharedInt64Atomics_value;
+    m_vulkan12_features.shaderSharedInt64Atomics = shaderSharedInt64Atomics_value;
+
+    // Sync shaderStorageBufferArrayNonUniformIndexing across 2 structs (OR logic)
+    const VkBool32 shaderStorageBufferArrayNonUniformIndexing_value = m_descriptor_indexing_features.shaderStorageBufferArrayNonUniformIndexing || m_vulkan12_features.shaderStorageBufferArrayNonUniformIndexing;
+    m_descriptor_indexing_features.shaderStorageBufferArrayNonUniformIndexing = shaderStorageBufferArrayNonUniformIndexing_value;
+    m_vulkan12_features.shaderStorageBufferArrayNonUniformIndexing = shaderStorageBufferArrayNonUniformIndexing_value;
+
+    // Sync shaderStorageImageArrayNonUniformIndexing across 2 structs (OR logic)
+    const VkBool32 shaderStorageImageArrayNonUniformIndexing_value = m_descriptor_indexing_features.shaderStorageImageArrayNonUniformIndexing || m_vulkan12_features.shaderStorageImageArrayNonUniformIndexing;
+    m_descriptor_indexing_features.shaderStorageImageArrayNonUniformIndexing = shaderStorageImageArrayNonUniformIndexing_value;
+    m_vulkan12_features.shaderStorageImageArrayNonUniformIndexing = shaderStorageImageArrayNonUniformIndexing_value;
+
+    // Sync shaderStorageTexelBufferArrayDynamicIndexing across 2 structs (OR logic)
+    const VkBool32 shaderStorageTexelBufferArrayDynamicIndexing_value = m_descriptor_indexing_features.shaderStorageTexelBufferArrayDynamicIndexing || m_vulkan12_features.shaderStorageTexelBufferArrayDynamicIndexing;
+    m_descriptor_indexing_features.shaderStorageTexelBufferArrayDynamicIndexing = shaderStorageTexelBufferArrayDynamicIndexing_value;
+    m_vulkan12_features.shaderStorageTexelBufferArrayDynamicIndexing = shaderStorageTexelBufferArrayDynamicIndexing_value;
+
+    // Sync shaderStorageTexelBufferArrayNonUniformIndexing across 2 structs (OR logic)
+    const VkBool32 shaderStorageTexelBufferArrayNonUniformIndexing_value = m_descriptor_indexing_features.shaderStorageTexelBufferArrayNonUniformIndexing || m_vulkan12_features.shaderStorageTexelBufferArrayNonUniformIndexing;
+    m_descriptor_indexing_features.shaderStorageTexelBufferArrayNonUniformIndexing = shaderStorageTexelBufferArrayNonUniformIndexing_value;
+    m_vulkan12_features.shaderStorageTexelBufferArrayNonUniformIndexing = shaderStorageTexelBufferArrayNonUniformIndexing_value;
+
+    // Sync shaderSubgroupExtendedTypes across 2 structs (OR logic)
+    const VkBool32 shaderSubgroupExtendedTypes_value = m_shader_subgroup_extended_types_features.shaderSubgroupExtendedTypes || m_vulkan12_features.shaderSubgroupExtendedTypes;
+    m_shader_subgroup_extended_types_features.shaderSubgroupExtendedTypes = shaderSubgroupExtendedTypes_value;
+    m_vulkan12_features.shaderSubgroupExtendedTypes = shaderSubgroupExtendedTypes_value;
+
+    // Sync shaderSubgroupRotate across 2 structs (OR logic)
+    const VkBool32 shaderSubgroupRotate_value = m_vulkan14_features.shaderSubgroupRotate || m_shader_subgroup_rotate_features.shaderSubgroupRotate;
+    m_vulkan14_features.shaderSubgroupRotate = shaderSubgroupRotate_value;
+    m_shader_subgroup_rotate_features.shaderSubgroupRotate = shaderSubgroupRotate_value;
+
+    // Sync shaderSubgroupRotateClustered across 2 structs (OR logic)
+    const VkBool32 shaderSubgroupRotateClustered_value = m_vulkan14_features.shaderSubgroupRotateClustered || m_shader_subgroup_rotate_features.shaderSubgroupRotateClustered;
+    m_vulkan14_features.shaderSubgroupRotateClustered = shaderSubgroupRotateClustered_value;
+    m_shader_subgroup_rotate_features.shaderSubgroupRotateClustered = shaderSubgroupRotateClustered_value;
+
+    // Sync shaderTerminateInvocation across 2 structs (OR logic)
+    const VkBool32 shaderTerminateInvocation_value = m_vulkan13_features.shaderTerminateInvocation || m_shader_terminate_invocation_features.shaderTerminateInvocation;
+    m_vulkan13_features.shaderTerminateInvocation = shaderTerminateInvocation_value;
+    m_shader_terminate_invocation_features.shaderTerminateInvocation = shaderTerminateInvocation_value;
+
+    // Sync shaderUniformBufferArrayNonUniformIndexing across 2 structs (OR logic)
+    const VkBool32 shaderUniformBufferArrayNonUniformIndexing_value = m_descriptor_indexing_features.shaderUniformBufferArrayNonUniformIndexing || m_vulkan12_features.shaderUniformBufferArrayNonUniformIndexing;
+    m_descriptor_indexing_features.shaderUniformBufferArrayNonUniformIndexing = shaderUniformBufferArrayNonUniformIndexing_value;
+    m_vulkan12_features.shaderUniformBufferArrayNonUniformIndexing = shaderUniformBufferArrayNonUniformIndexing_value;
+
+    // Sync shaderUniformTexelBufferArrayDynamicIndexing across 2 structs (OR logic)
+    const VkBool32 shaderUniformTexelBufferArrayDynamicIndexing_value = m_descriptor_indexing_features.shaderUniformTexelBufferArrayDynamicIndexing || m_vulkan12_features.shaderUniformTexelBufferArrayDynamicIndexing;
+    m_descriptor_indexing_features.shaderUniformTexelBufferArrayDynamicIndexing = shaderUniformTexelBufferArrayDynamicIndexing_value;
+    m_vulkan12_features.shaderUniformTexelBufferArrayDynamicIndexing = shaderUniformTexelBufferArrayDynamicIndexing_value;
+
+    // Sync shaderUniformTexelBufferArrayNonUniformIndexing across 2 structs (OR logic)
+    const VkBool32 shaderUniformTexelBufferArrayNonUniformIndexing_value = m_descriptor_indexing_features.shaderUniformTexelBufferArrayNonUniformIndexing || m_vulkan12_features.shaderUniformTexelBufferArrayNonUniformIndexing;
+    m_descriptor_indexing_features.shaderUniformTexelBufferArrayNonUniformIndexing = shaderUniformTexelBufferArrayNonUniformIndexing_value;
+    m_vulkan12_features.shaderUniformTexelBufferArrayNonUniformIndexing = shaderUniformTexelBufferArrayNonUniformIndexing_value;
+
+    // Sync shaderZeroInitializeWorkgroupMemory across 2 structs (OR logic)
+    const VkBool32 shaderZeroInitializeWorkgroupMemory_value = m_vulkan13_features.shaderZeroInitializeWorkgroupMemory || m_zero_initialize_workgroup_memory_features.shaderZeroInitializeWorkgroupMemory;
+    m_vulkan13_features.shaderZeroInitializeWorkgroupMemory = shaderZeroInitializeWorkgroupMemory_value;
+    m_zero_initialize_workgroup_memory_features.shaderZeroInitializeWorkgroupMemory = shaderZeroInitializeWorkgroupMemory_value;
+
+    // Sync smoothLines across 2 structs (OR logic)
+    const VkBool32 smoothLines_value = m_line_rasterization_features.smoothLines || m_vulkan14_features.smoothLines;
+    m_line_rasterization_features.smoothLines = smoothLines_value;
+    m_vulkan14_features.smoothLines = smoothLines_value;
+
+    // Sync stippledBresenhamLines across 2 structs (OR logic)
+    const VkBool32 stippledBresenhamLines_value = m_line_rasterization_features.stippledBresenhamLines || m_vulkan14_features.stippledBresenhamLines;
+    m_line_rasterization_features.stippledBresenhamLines = stippledBresenhamLines_value;
+    m_vulkan14_features.stippledBresenhamLines = stippledBresenhamLines_value;
+
+    // Sync stippledRectangularLines across 2 structs (OR logic)
+    const VkBool32 stippledRectangularLines_value = m_line_rasterization_features.stippledRectangularLines || m_vulkan14_features.stippledRectangularLines;
+    m_line_rasterization_features.stippledRectangularLines = stippledRectangularLines_value;
+    m_vulkan14_features.stippledRectangularLines = stippledRectangularLines_value;
+
+    // Sync stippledSmoothLines across 2 structs (OR logic)
+    const VkBool32 stippledSmoothLines_value = m_line_rasterization_features.stippledSmoothLines || m_vulkan14_features.stippledSmoothLines;
+    m_line_rasterization_features.stippledSmoothLines = stippledSmoothLines_value;
+    m_vulkan14_features.stippledSmoothLines = stippledSmoothLines_value;
+
+    // Sync storageBuffer16BitAccess across 2 structs (OR logic)
+    const VkBool32 storageBuffer16BitAccess_value = m_16_bit_storage_features.storageBuffer16BitAccess || m_vulkan11_features.storageBuffer16BitAccess;
+    m_16_bit_storage_features.storageBuffer16BitAccess = storageBuffer16BitAccess_value;
+    m_vulkan11_features.storageBuffer16BitAccess = storageBuffer16BitAccess_value;
+
+    // Sync storageBuffer8BitAccess across 2 structs (OR logic)
+    const VkBool32 storageBuffer8BitAccess_value = m_8_bit_storage_features.storageBuffer8BitAccess || m_vulkan12_features.storageBuffer8BitAccess;
+    m_8_bit_storage_features.storageBuffer8BitAccess = storageBuffer8BitAccess_value;
+    m_vulkan12_features.storageBuffer8BitAccess = storageBuffer8BitAccess_value;
+
+    // Sync storageInputOutput16 across 2 structs (OR logic)
+    const VkBool32 storageInputOutput16_value = m_16_bit_storage_features.storageInputOutput16 || m_vulkan11_features.storageInputOutput16;
+    m_16_bit_storage_features.storageInputOutput16 = storageInputOutput16_value;
+    m_vulkan11_features.storageInputOutput16 = storageInputOutput16_value;
+
+    // Sync storagePushConstant16 across 2 structs (OR logic)
+    const VkBool32 storagePushConstant16_value = m_16_bit_storage_features.storagePushConstant16 || m_vulkan11_features.storagePushConstant16;
+    m_16_bit_storage_features.storagePushConstant16 = storagePushConstant16_value;
+    m_vulkan11_features.storagePushConstant16 = storagePushConstant16_value;
+
+    // Sync storagePushConstant8 across 2 structs (OR logic)
+    const VkBool32 storagePushConstant8_value = m_8_bit_storage_features.storagePushConstant8 || m_vulkan12_features.storagePushConstant8;
+    m_8_bit_storage_features.storagePushConstant8 = storagePushConstant8_value;
+    m_vulkan12_features.storagePushConstant8 = storagePushConstant8_value;
+
+    // Sync subgroupSizeControl across 2 structs (OR logic)
+    const VkBool32 subgroupSizeControl_value = m_subgroup_size_control_features.subgroupSizeControl || m_vulkan13_features.subgroupSizeControl;
+    m_subgroup_size_control_features.subgroupSizeControl = subgroupSizeControl_value;
+    m_vulkan13_features.subgroupSizeControl = subgroupSizeControl_value;
+
+    // Sync synchronization2 across 2 structs (OR logic)
+    const VkBool32 synchronization2_value = m_vulkan13_features.synchronization2 || m_synchronization2_features.synchronization2;
+    m_vulkan13_features.synchronization2 = synchronization2_value;
+    m_synchronization2_features.synchronization2 = synchronization2_value;
+
+    // Sync taskShader across 2 structs (OR logic)
+    const VkBool32 taskShader_value = m_mesh_shader_features_nv.taskShader || m_mesh_shader_features_ext.taskShader;
+    m_mesh_shader_features_nv.taskShader = taskShader_value;
+    m_mesh_shader_features_ext.taskShader = taskShader_value;
+
+    // Sync textureCompressionASTC_HDR across 2 structs (OR logic)
+    const VkBool32 textureCompressionASTC_HDR_value = m_texture_compression_astchdr_features.textureCompressionASTC_HDR || m_vulkan13_features.textureCompressionASTC_HDR;
+    m_texture_compression_astchdr_features.textureCompressionASTC_HDR = textureCompressionASTC_HDR_value;
+    m_vulkan13_features.textureCompressionASTC_HDR = textureCompressionASTC_HDR_value;
+
+    // Sync timelineSemaphore across 2 structs (OR logic)
+    const VkBool32 timelineSemaphore_value = m_timeline_semaphore_features.timelineSemaphore || m_vulkan12_features.timelineSemaphore;
+    m_timeline_semaphore_features.timelineSemaphore = timelineSemaphore_value;
+    m_vulkan12_features.timelineSemaphore = timelineSemaphore_value;
+
+    // Sync uniformAndStorageBuffer16BitAccess across 2 structs (OR logic)
+    const VkBool32 uniformAndStorageBuffer16BitAccess_value = m_16_bit_storage_features.uniformAndStorageBuffer16BitAccess || m_vulkan11_features.uniformAndStorageBuffer16BitAccess;
+    m_16_bit_storage_features.uniformAndStorageBuffer16BitAccess = uniformAndStorageBuffer16BitAccess_value;
+    m_vulkan11_features.uniformAndStorageBuffer16BitAccess = uniformAndStorageBuffer16BitAccess_value;
+
+    // Sync uniformAndStorageBuffer8BitAccess across 2 structs (OR logic)
+    const VkBool32 uniformAndStorageBuffer8BitAccess_value = m_8_bit_storage_features.uniformAndStorageBuffer8BitAccess || m_vulkan12_features.uniformAndStorageBuffer8BitAccess;
+    m_8_bit_storage_features.uniformAndStorageBuffer8BitAccess = uniformAndStorageBuffer8BitAccess_value;
+    m_vulkan12_features.uniformAndStorageBuffer8BitAccess = uniformAndStorageBuffer8BitAccess_value;
+
+    // Sync uniformBufferStandardLayout across 2 structs (OR logic)
+    const VkBool32 uniformBufferStandardLayout_value = m_uniform_buffer_standard_layout_features.uniformBufferStandardLayout || m_vulkan12_features.uniformBufferStandardLayout;
+    m_uniform_buffer_standard_layout_features.uniformBufferStandardLayout = uniformBufferStandardLayout_value;
+    m_vulkan12_features.uniformBufferStandardLayout = uniformBufferStandardLayout_value;
+
+    // Sync variablePointers across 2 structs (OR logic)
+    const VkBool32 variablePointers_value = m_variable_pointers_features.variablePointers || m_vulkan11_features.variablePointers;
+    m_variable_pointers_features.variablePointers = variablePointers_value;
+    m_vulkan11_features.variablePointers = variablePointers_value;
+
+    // Sync variablePointersStorageBuffer across 2 structs (OR logic)
+    const VkBool32 variablePointersStorageBuffer_value = m_variable_pointers_features.variablePointersStorageBuffer || m_vulkan11_features.variablePointersStorageBuffer;
+    m_variable_pointers_features.variablePointersStorageBuffer = variablePointersStorageBuffer_value;
+    m_vulkan11_features.variablePointersStorageBuffer = variablePointersStorageBuffer_value;
+
+    // Sync vertexAttributeInstanceRateDivisor across 2 structs (OR logic)
+    const VkBool32 vertexAttributeInstanceRateDivisor_value = m_vertex_attribute_divisor_features.vertexAttributeInstanceRateDivisor || m_vulkan14_features.vertexAttributeInstanceRateDivisor;
+    m_vertex_attribute_divisor_features.vertexAttributeInstanceRateDivisor = vertexAttributeInstanceRateDivisor_value;
+    m_vulkan14_features.vertexAttributeInstanceRateDivisor = vertexAttributeInstanceRateDivisor_value;
+
+    // Sync vertexAttributeInstanceRateZeroDivisor across 2 structs (OR logic)
+    const VkBool32 vertexAttributeInstanceRateZeroDivisor_value = m_vertex_attribute_divisor_features.vertexAttributeInstanceRateZeroDivisor || m_vulkan14_features.vertexAttributeInstanceRateZeroDivisor;
+    m_vertex_attribute_divisor_features.vertexAttributeInstanceRateZeroDivisor = vertexAttributeInstanceRateZeroDivisor_value;
+    m_vulkan14_features.vertexAttributeInstanceRateZeroDivisor = vertexAttributeInstanceRateZeroDivisor_value;
+
+    // Sync vulkanMemoryModel across 2 structs (OR logic)
+    const VkBool32 vulkanMemoryModel_value = m_vulkan_memory_model_features.vulkanMemoryModel || m_vulkan12_features.vulkanMemoryModel;
+    m_vulkan_memory_model_features.vulkanMemoryModel = vulkanMemoryModel_value;
+    m_vulkan12_features.vulkanMemoryModel = vulkanMemoryModel_value;
+
+    // Sync vulkanMemoryModelAvailabilityVisibilityChains across 2 structs (OR logic)
+    const VkBool32 vulkanMemoryModelAvailabilityVisibilityChains_value = m_vulkan_memory_model_features.vulkanMemoryModelAvailabilityVisibilityChains || m_vulkan12_features.vulkanMemoryModelAvailabilityVisibilityChains;
+    m_vulkan_memory_model_features.vulkanMemoryModelAvailabilityVisibilityChains = vulkanMemoryModelAvailabilityVisibilityChains_value;
+    m_vulkan12_features.vulkanMemoryModelAvailabilityVisibilityChains = vulkanMemoryModelAvailabilityVisibilityChains_value;
+
+    // Sync vulkanMemoryModelDeviceScope across 2 structs (OR logic)
+    const VkBool32 vulkanMemoryModelDeviceScope_value = m_vulkan_memory_model_features.vulkanMemoryModelDeviceScope || m_vulkan12_features.vulkanMemoryModelDeviceScope;
+    m_vulkan_memory_model_features.vulkanMemoryModelDeviceScope = vulkanMemoryModelDeviceScope_value;
+    m_vulkan12_features.vulkanMemoryModelDeviceScope = vulkanMemoryModelDeviceScope_value;
+
 }
 
 VulkanFeatures::VulkanFeatures(const vk::ArrayProxy<const std::string>& feature_names) {
@@ -9204,12 +9723,13 @@ void* VulkanFeatures::build_chain_for_device_creation(
     void* chain_head = p_next;
     
     // Build chain from supported structs with at least one enabled feature
-    // Asserts that required extensions are supported if features from that extension are enabled
+    // Prefers VulkanXXFeatures over individual extension structs when BOTH are available
 
     // Check PhysicalDeviceZeroInitializeWorkgroupMemoryFeatures
     if (m_zero_initialize_workgroup_memory_features.shaderZeroInitializeWorkgroupMemory == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_3 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_KHR_ZERO_INITIALIZE_WORKGROUP_MEMORY_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_3) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_zero_initialize_workgroup_memory_features.pNext = chain_head;
         chain_head = &m_zero_initialize_workgroup_memory_features;
     }
@@ -9243,11 +9763,8 @@ void* VulkanFeatures::build_chain_for_device_creation(
         assert((physical_device->extension_supported(VK_EXT_YCBCR_2PLANE_444_FORMATS_EXTENSION_NAME) ||
                 vk_api_version >= VK_API_VERSION_1_3) &&
                "Feature enabled but neither extension nor promoted version supported");
-        if (vk_api_version < VK_API_VERSION_1_3) {
-            // Core version not available, use extension version
-            m_ycbcr2_plane444_formats_features_ext.pNext = chain_head;
-            chain_head = &m_ycbcr2_plane444_formats_features_ext;
-        }
+        m_ycbcr2_plane444_formats_features_ext.pNext = chain_head;
+        chain_head = &m_ycbcr2_plane444_formats_features_ext;
     }
 
     // Check PhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR
@@ -9265,133 +9782,11 @@ void* VulkanFeatures::build_chain_for_device_creation(
     if (m_vulkan_memory_model_features.vulkanMemoryModel == VK_TRUE ||
         m_vulkan_memory_model_features.vulkanMemoryModelDeviceScope == VK_TRUE ||
         m_vulkan_memory_model_features.vulkanMemoryModelAvailabilityVisibilityChains == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_2 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_KHR_VULKAN_MEMORY_MODEL_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_2) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_vulkan_memory_model_features.pNext = chain_head;
         chain_head = &m_vulkan_memory_model_features;
-    }
-
-    // Check PhysicalDeviceVulkan14Features
-    if (m_vulkan14_features.globalPriorityQuery == VK_TRUE ||
-        m_vulkan14_features.shaderSubgroupRotate == VK_TRUE ||
-        m_vulkan14_features.shaderSubgroupRotateClustered == VK_TRUE ||
-        m_vulkan14_features.shaderFloatControls2 == VK_TRUE ||
-        m_vulkan14_features.shaderExpectAssume == VK_TRUE ||
-        m_vulkan14_features.rectangularLines == VK_TRUE ||
-        m_vulkan14_features.bresenhamLines == VK_TRUE ||
-        m_vulkan14_features.smoothLines == VK_TRUE ||
-        m_vulkan14_features.stippledRectangularLines == VK_TRUE ||
-        m_vulkan14_features.stippledBresenhamLines == VK_TRUE ||
-        m_vulkan14_features.stippledSmoothLines == VK_TRUE ||
-        m_vulkan14_features.vertexAttributeInstanceRateDivisor == VK_TRUE ||
-        m_vulkan14_features.vertexAttributeInstanceRateZeroDivisor == VK_TRUE ||
-        m_vulkan14_features.indexTypeUint8 == VK_TRUE ||
-        m_vulkan14_features.dynamicRenderingLocalRead == VK_TRUE ||
-        m_vulkan14_features.maintenance5 == VK_TRUE ||
-        m_vulkan14_features.maintenance6 == VK_TRUE ||
-        m_vulkan14_features.pipelineProtectedAccess == VK_TRUE ||
-        m_vulkan14_features.pipelineRobustness == VK_TRUE ||
-        m_vulkan14_features.hostImageCopy == VK_TRUE ||
-        m_vulkan14_features.pushDescriptor == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_4 &&
-               "Feature enabled but required Vulkan version not supported");
-        m_vulkan14_features.pNext = chain_head;
-        chain_head = &m_vulkan14_features;
-    }
-
-    // Check PhysicalDeviceVulkan13Features
-    if (m_vulkan13_features.robustImageAccess == VK_TRUE ||
-        m_vulkan13_features.inlineUniformBlock == VK_TRUE ||
-        m_vulkan13_features.descriptorBindingInlineUniformBlockUpdateAfterBind == VK_TRUE ||
-        m_vulkan13_features.pipelineCreationCacheControl == VK_TRUE ||
-        m_vulkan13_features.privateData == VK_TRUE ||
-        m_vulkan13_features.shaderDemoteToHelperInvocation == VK_TRUE ||
-        m_vulkan13_features.shaderTerminateInvocation == VK_TRUE ||
-        m_vulkan13_features.subgroupSizeControl == VK_TRUE ||
-        m_vulkan13_features.computeFullSubgroups == VK_TRUE ||
-        m_vulkan13_features.synchronization2 == VK_TRUE ||
-        m_vulkan13_features.textureCompressionASTC_HDR == VK_TRUE ||
-        m_vulkan13_features.shaderZeroInitializeWorkgroupMemory == VK_TRUE ||
-        m_vulkan13_features.dynamicRendering == VK_TRUE ||
-        m_vulkan13_features.shaderIntegerDotProduct == VK_TRUE ||
-        m_vulkan13_features.maintenance4 == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_3 &&
-               "Feature enabled but required Vulkan version not supported");
-        m_vulkan13_features.pNext = chain_head;
-        chain_head = &m_vulkan13_features;
-    }
-
-    // Check PhysicalDeviceVulkan12Features
-    if (m_vulkan12_features.samplerMirrorClampToEdge == VK_TRUE ||
-        m_vulkan12_features.drawIndirectCount == VK_TRUE ||
-        m_vulkan12_features.storageBuffer8BitAccess == VK_TRUE ||
-        m_vulkan12_features.uniformAndStorageBuffer8BitAccess == VK_TRUE ||
-        m_vulkan12_features.storagePushConstant8 == VK_TRUE ||
-        m_vulkan12_features.shaderBufferInt64Atomics == VK_TRUE ||
-        m_vulkan12_features.shaderSharedInt64Atomics == VK_TRUE ||
-        m_vulkan12_features.shaderFloat16 == VK_TRUE ||
-        m_vulkan12_features.shaderInt8 == VK_TRUE ||
-        m_vulkan12_features.descriptorIndexing == VK_TRUE ||
-        m_vulkan12_features.shaderInputAttachmentArrayDynamicIndexing == VK_TRUE ||
-        m_vulkan12_features.shaderUniformTexelBufferArrayDynamicIndexing == VK_TRUE ||
-        m_vulkan12_features.shaderStorageTexelBufferArrayDynamicIndexing == VK_TRUE ||
-        m_vulkan12_features.shaderUniformBufferArrayNonUniformIndexing == VK_TRUE ||
-        m_vulkan12_features.shaderSampledImageArrayNonUniformIndexing == VK_TRUE ||
-        m_vulkan12_features.shaderStorageBufferArrayNonUniformIndexing == VK_TRUE ||
-        m_vulkan12_features.shaderStorageImageArrayNonUniformIndexing == VK_TRUE ||
-        m_vulkan12_features.shaderInputAttachmentArrayNonUniformIndexing == VK_TRUE ||
-        m_vulkan12_features.shaderUniformTexelBufferArrayNonUniformIndexing == VK_TRUE ||
-        m_vulkan12_features.shaderStorageTexelBufferArrayNonUniformIndexing == VK_TRUE ||
-        m_vulkan12_features.descriptorBindingUniformBufferUpdateAfterBind == VK_TRUE ||
-        m_vulkan12_features.descriptorBindingSampledImageUpdateAfterBind == VK_TRUE ||
-        m_vulkan12_features.descriptorBindingStorageImageUpdateAfterBind == VK_TRUE ||
-        m_vulkan12_features.descriptorBindingStorageBufferUpdateAfterBind == VK_TRUE ||
-        m_vulkan12_features.descriptorBindingUniformTexelBufferUpdateAfterBind == VK_TRUE ||
-        m_vulkan12_features.descriptorBindingStorageTexelBufferUpdateAfterBind == VK_TRUE ||
-        m_vulkan12_features.descriptorBindingUpdateUnusedWhilePending == VK_TRUE ||
-        m_vulkan12_features.descriptorBindingPartiallyBound == VK_TRUE ||
-        m_vulkan12_features.descriptorBindingVariableDescriptorCount == VK_TRUE ||
-        m_vulkan12_features.runtimeDescriptorArray == VK_TRUE ||
-        m_vulkan12_features.samplerFilterMinmax == VK_TRUE ||
-        m_vulkan12_features.scalarBlockLayout == VK_TRUE ||
-        m_vulkan12_features.imagelessFramebuffer == VK_TRUE ||
-        m_vulkan12_features.uniformBufferStandardLayout == VK_TRUE ||
-        m_vulkan12_features.shaderSubgroupExtendedTypes == VK_TRUE ||
-        m_vulkan12_features.separateDepthStencilLayouts == VK_TRUE ||
-        m_vulkan12_features.hostQueryReset == VK_TRUE ||
-        m_vulkan12_features.timelineSemaphore == VK_TRUE ||
-        m_vulkan12_features.bufferDeviceAddress == VK_TRUE ||
-        m_vulkan12_features.bufferDeviceAddressCaptureReplay == VK_TRUE ||
-        m_vulkan12_features.bufferDeviceAddressMultiDevice == VK_TRUE ||
-        m_vulkan12_features.vulkanMemoryModel == VK_TRUE ||
-        m_vulkan12_features.vulkanMemoryModelDeviceScope == VK_TRUE ||
-        m_vulkan12_features.vulkanMemoryModelAvailabilityVisibilityChains == VK_TRUE ||
-        m_vulkan12_features.shaderOutputViewportIndex == VK_TRUE ||
-        m_vulkan12_features.shaderOutputLayer == VK_TRUE ||
-        m_vulkan12_features.subgroupBroadcastDynamicId == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_2 &&
-               "Feature enabled but required Vulkan version not supported");
-        m_vulkan12_features.pNext = chain_head;
-        chain_head = &m_vulkan12_features;
-    }
-
-    // Check PhysicalDeviceVulkan11Features
-    if (m_vulkan11_features.storageBuffer16BitAccess == VK_TRUE ||
-        m_vulkan11_features.uniformAndStorageBuffer16BitAccess == VK_TRUE ||
-        m_vulkan11_features.storagePushConstant16 == VK_TRUE ||
-        m_vulkan11_features.storageInputOutput16 == VK_TRUE ||
-        m_vulkan11_features.multiview == VK_TRUE ||
-        m_vulkan11_features.multiviewGeometryShader == VK_TRUE ||
-        m_vulkan11_features.multiviewTessellationShader == VK_TRUE ||
-        m_vulkan11_features.variablePointersStorageBuffer == VK_TRUE ||
-        m_vulkan11_features.variablePointers == VK_TRUE ||
-        m_vulkan11_features.protectedMemory == VK_TRUE ||
-        m_vulkan11_features.samplerYcbcrConversion == VK_TRUE ||
-        m_vulkan11_features.shaderDrawParameters == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_2 &&
-               "Feature enabled but required Vulkan version not supported");
-        m_vulkan11_features.pNext = chain_head;
-        chain_head = &m_vulkan11_features;
     }
 
     // Check PhysicalDeviceVideoMaintenance2FeaturesKHR
@@ -9469,8 +9864,9 @@ void* VulkanFeatures::build_chain_for_device_creation(
     // Check PhysicalDeviceVertexAttributeDivisorFeatures
     if (m_vertex_attribute_divisor_features.vertexAttributeInstanceRateDivisor == VK_TRUE ||
         m_vertex_attribute_divisor_features.vertexAttributeInstanceRateZeroDivisor == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_4 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_KHR_VERTEX_ATTRIBUTE_DIVISOR_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_4) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_vertex_attribute_divisor_features.pNext = chain_head;
         chain_head = &m_vertex_attribute_divisor_features;
     }
@@ -9478,16 +9874,18 @@ void* VulkanFeatures::build_chain_for_device_creation(
     // Check PhysicalDeviceVariablePointersFeatures
     if (m_variable_pointers_features.variablePointersStorageBuffer == VK_TRUE ||
         m_variable_pointers_features.variablePointers == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_1 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_KHR_VARIABLE_POINTERS_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_1) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_variable_pointers_features.pNext = chain_head;
         chain_head = &m_variable_pointers_features;
     }
 
     // Check PhysicalDeviceUniformBufferStandardLayoutFeatures
     if (m_uniform_buffer_standard_layout_features.uniformBufferStandardLayout == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_2 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_KHR_UNIFORM_BUFFER_STANDARD_LAYOUT_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_2) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_uniform_buffer_standard_layout_features.pNext = chain_head;
         chain_head = &m_uniform_buffer_standard_layout_features;
     }
@@ -9512,8 +9910,9 @@ void* VulkanFeatures::build_chain_for_device_creation(
 
     // Check PhysicalDeviceTimelineSemaphoreFeatures
     if (m_timeline_semaphore_features.timelineSemaphore == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_2 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_2) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_timeline_semaphore_features.pNext = chain_head;
         chain_head = &m_timeline_semaphore_features;
     }
@@ -9557,8 +9956,9 @@ void* VulkanFeatures::build_chain_for_device_creation(
 
     // Check PhysicalDeviceTextureCompressionASTCHDRFeatures
     if (m_texture_compression_astchdr_features.textureCompressionASTC_HDR == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_3 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_EXT_TEXTURE_COMPRESSION_ASTC_HDR_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_3) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_texture_compression_astchdr_features.pNext = chain_head;
         chain_head = &m_texture_compression_astchdr_features;
     }
@@ -9576,11 +9976,8 @@ void* VulkanFeatures::build_chain_for_device_creation(
         assert((physical_device->extension_supported(VK_EXT_TEXEL_BUFFER_ALIGNMENT_EXTENSION_NAME) ||
                 vk_api_version >= VK_API_VERSION_1_3) &&
                "Feature enabled but neither extension nor promoted version supported");
-        if (vk_api_version < VK_API_VERSION_1_3) {
-            // Core version not available, use extension version
-            m_texel_buffer_alignment_features_ext.pNext = chain_head;
-            chain_head = &m_texel_buffer_alignment_features_ext;
-        }
+        m_texel_buffer_alignment_features_ext.pNext = chain_head;
+        chain_head = &m_texel_buffer_alignment_features_ext;
     }
 
     // Check PhysicalDeviceTensorFeaturesARM
@@ -9598,8 +9995,9 @@ void* VulkanFeatures::build_chain_for_device_creation(
 
     // Check PhysicalDeviceSynchronization2Features
     if (m_synchronization2_features.synchronization2 == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_3 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_3) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_synchronization2_features.pNext = chain_head;
         chain_head = &m_synchronization2_features;
     }
@@ -9631,8 +10029,9 @@ void* VulkanFeatures::build_chain_for_device_creation(
     // Check PhysicalDeviceSubgroupSizeControlFeatures
     if (m_subgroup_size_control_features.subgroupSizeControl == VK_TRUE ||
         m_subgroup_size_control_features.computeFullSubgroups == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_3 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_EXT_SUBGROUP_SIZE_CONTROL_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_3) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_subgroup_size_control_features.pNext = chain_head;
         chain_head = &m_subgroup_size_control_features;
     }
@@ -9674,8 +10073,9 @@ void* VulkanFeatures::build_chain_for_device_creation(
 
     // Check PhysicalDeviceShaderTerminateInvocationFeatures
     if (m_shader_terminate_invocation_features.shaderTerminateInvocation == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_3 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_KHR_SHADER_TERMINATE_INVOCATION_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_3) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_shader_terminate_invocation_features.pNext = chain_head;
         chain_head = &m_shader_terminate_invocation_features;
     }
@@ -9691,8 +10091,9 @@ void* VulkanFeatures::build_chain_for_device_creation(
     // Check PhysicalDeviceShaderSubgroupRotateFeatures
     if (m_shader_subgroup_rotate_features.shaderSubgroupRotate == VK_TRUE ||
         m_shader_subgroup_rotate_features.shaderSubgroupRotateClustered == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_4 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_KHR_SHADER_SUBGROUP_ROTATE_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_4) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_shader_subgroup_rotate_features.pNext = chain_head;
         chain_head = &m_shader_subgroup_rotate_features;
     }
@@ -9707,8 +10108,9 @@ void* VulkanFeatures::build_chain_for_device_creation(
 
     // Check PhysicalDeviceShaderSubgroupExtendedTypesFeatures
     if (m_shader_subgroup_extended_types_features.shaderSubgroupExtendedTypes == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_2 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_KHR_SHADER_SUBGROUP_EXTENDED_TYPES_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_2) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_shader_subgroup_extended_types_features.pNext = chain_head;
         chain_head = &m_shader_subgroup_extended_types_features;
     }
@@ -9787,8 +10189,9 @@ void* VulkanFeatures::build_chain_for_device_creation(
 
     // Check PhysicalDeviceShaderIntegerDotProductFeatures
     if (m_shader_integer_dot_product_features.shaderIntegerDotProduct == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_3 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_KHR_SHADER_INTEGER_DOT_PRODUCT_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_3) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_shader_integer_dot_product_features.pNext = chain_head;
         chain_head = &m_shader_integer_dot_product_features;
     }
@@ -9822,8 +10225,9 @@ void* VulkanFeatures::build_chain_for_device_creation(
 
     // Check PhysicalDeviceShaderFloatControls2Features
     if (m_shader_float_controls2_features.shaderFloatControls2 == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_4 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_KHR_SHADER_FLOAT_CONTROLS_2_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_4) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_shader_float_controls2_features.pNext = chain_head;
         chain_head = &m_shader_float_controls2_features;
     }
@@ -9840,16 +10244,18 @@ void* VulkanFeatures::build_chain_for_device_creation(
     // Check PhysicalDeviceShaderFloat16Int8Features
     if (m_shader_float16_int8_features.shaderFloat16 == VK_TRUE ||
         m_shader_float16_int8_features.shaderInt8 == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_2 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_2) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_shader_float16_int8_features.pNext = chain_head;
         chain_head = &m_shader_float16_int8_features;
     }
 
     // Check PhysicalDeviceShaderExpectAssumeFeatures
     if (m_shader_expect_assume_features.shaderExpectAssume == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_4 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_KHR_SHADER_EXPECT_ASSUME_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_4) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_shader_expect_assume_features.pNext = chain_head;
         chain_head = &m_shader_expect_assume_features;
     }
@@ -9862,18 +10268,11 @@ void* VulkanFeatures::build_chain_for_device_creation(
         chain_head = &m_shader_early_and_late_fragment_tests_features_amd;
     }
 
-    // Check PhysicalDeviceShaderDrawParametersFeatures
-    if (m_shader_draw_parameters_features.shaderDrawParameters == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_1 &&
-               "Feature enabled but required Vulkan version not supported");
-        m_shader_draw_parameters_features.pNext = chain_head;
-        chain_head = &m_shader_draw_parameters_features;
-    }
-
     // Check PhysicalDeviceShaderDemoteToHelperInvocationFeatures
     if (m_shader_demote_to_helper_invocation_features.shaderDemoteToHelperInvocation == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_3 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_3) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_shader_demote_to_helper_invocation_features.pNext = chain_head;
         chain_head = &m_shader_demote_to_helper_invocation_features;
     }
@@ -9908,8 +10307,9 @@ void* VulkanFeatures::build_chain_for_device_creation(
     // Check PhysicalDeviceShaderAtomicInt64Features
     if (m_shader_atomic_int64_features.shaderBufferInt64Atomics == VK_TRUE ||
         m_shader_atomic_int64_features.shaderSharedInt64Atomics == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_2 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_KHR_SHADER_ATOMIC_INT64_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_2) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_shader_atomic_int64_features.pNext = chain_head;
         chain_head = &m_shader_atomic_int64_features;
     }
@@ -9970,8 +10370,9 @@ void* VulkanFeatures::build_chain_for_device_creation(
 
     // Check PhysicalDeviceSeparateDepthStencilLayoutsFeatures
     if (m_separate_depth_stencil_layouts_features.separateDepthStencilLayouts == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_2 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_KHR_SEPARATE_DEPTH_STENCIL_LAYOUTS_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_2) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_separate_depth_stencil_layouts_features.pNext = chain_head;
         chain_head = &m_separate_depth_stencil_layouts_features;
     }
@@ -9986,16 +10387,18 @@ void* VulkanFeatures::build_chain_for_device_creation(
 
     // Check PhysicalDeviceScalarBlockLayoutFeatures
     if (m_scalar_block_layout_features.scalarBlockLayout == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_2 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_2) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_scalar_block_layout_features.pNext = chain_head;
         chain_head = &m_scalar_block_layout_features;
     }
 
     // Check PhysicalDeviceSamplerYcbcrConversionFeatures
     if (m_sampler_ycbcr_conversion_features.samplerYcbcrConversion == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_1 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_1) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_sampler_ycbcr_conversion_features.pNext = chain_head;
         chain_head = &m_sampler_ycbcr_conversion_features;
     }
@@ -10156,18 +10559,11 @@ void* VulkanFeatures::build_chain_for_device_creation(
         chain_head = &m_provoking_vertex_features_ext;
     }
 
-    // Check PhysicalDeviceProtectedMemoryFeatures
-    if (m_protected_memory_features.protectedMemory == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_1 &&
-               "Feature enabled but required Vulkan version not supported");
-        m_protected_memory_features.pNext = chain_head;
-        chain_head = &m_protected_memory_features;
-    }
-
     // Check PhysicalDevicePrivateDataFeatures
     if (m_private_data_features.privateData == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_3 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_EXT_PRIVATE_DATA_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_3) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_private_data_features.pNext = chain_head;
         chain_head = &m_private_data_features;
     }
@@ -10251,16 +10647,18 @@ void* VulkanFeatures::build_chain_for_device_creation(
 
     // Check PhysicalDevicePipelineRobustnessFeatures
     if (m_pipeline_robustness_features.pipelineRobustness == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_4 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_EXT_PIPELINE_ROBUSTNESS_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_4) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_pipeline_robustness_features.pNext = chain_head;
         chain_head = &m_pipeline_robustness_features;
     }
 
     // Check PhysicalDevicePipelineProtectedAccessFeatures
     if (m_pipeline_protected_access_features.pipelineProtectedAccess == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_4 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_EXT_PIPELINE_PROTECTED_ACCESS_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_4) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_pipeline_protected_access_features.pNext = chain_head;
         chain_head = &m_pipeline_protected_access_features;
     }
@@ -10299,8 +10697,9 @@ void* VulkanFeatures::build_chain_for_device_creation(
 
     // Check PhysicalDevicePipelineCreationCacheControlFeatures
     if (m_pipeline_creation_cache_control_features.pipelineCreationCacheControl == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_3 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_EXT_PIPELINE_CREATION_CACHE_CONTROL_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_3) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_pipeline_creation_cache_control_features.pNext = chain_head;
         chain_head = &m_pipeline_creation_cache_control_features;
     }
@@ -10427,8 +10826,9 @@ void* VulkanFeatures::build_chain_for_device_creation(
     if (m_multiview_features.multiview == VK_TRUE ||
         m_multiview_features.multiviewGeometryShader == VK_TRUE ||
         m_multiview_features.multiviewTessellationShader == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_1 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_KHR_MULTIVIEW_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_1) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_multiview_features.pNext = chain_head;
         chain_head = &m_multiview_features;
     }
@@ -10522,24 +10922,27 @@ void* VulkanFeatures::build_chain_for_device_creation(
 
     // Check PhysicalDeviceMaintenance6Features
     if (m_maintenance6_features.maintenance6 == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_4 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_KHR_MAINTENANCE_6_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_4) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_maintenance6_features.pNext = chain_head;
         chain_head = &m_maintenance6_features;
     }
 
     // Check PhysicalDeviceMaintenance5Features
     if (m_maintenance5_features.maintenance5 == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_4 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_KHR_MAINTENANCE_5_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_4) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_maintenance5_features.pNext = chain_head;
         chain_head = &m_maintenance5_features;
     }
 
     // Check PhysicalDeviceMaintenance4Features
     if (m_maintenance4_features.maintenance4 == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_3 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_KHR_MAINTENANCE_4_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_3) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_maintenance4_features.pNext = chain_head;
         chain_head = &m_maintenance4_features;
     }
@@ -10567,8 +10970,9 @@ void* VulkanFeatures::build_chain_for_device_creation(
         m_line_rasterization_features.stippledRectangularLines == VK_TRUE ||
         m_line_rasterization_features.stippledBresenhamLines == VK_TRUE ||
         m_line_rasterization_features.stippledSmoothLines == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_4 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_KHR_LINE_RASTERIZATION_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_4) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_line_rasterization_features.pNext = chain_head;
         chain_head = &m_line_rasterization_features;
     }
@@ -10608,8 +11012,9 @@ void* VulkanFeatures::build_chain_for_device_creation(
     // Check PhysicalDeviceInlineUniformBlockFeatures
     if (m_inline_uniform_block_features.inlineUniformBlock == VK_TRUE ||
         m_inline_uniform_block_features.descriptorBindingInlineUniformBlockUpdateAfterBind == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_3 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_EXT_INLINE_UNIFORM_BLOCK_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_3) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_inline_uniform_block_features.pNext = chain_head;
         chain_head = &m_inline_uniform_block_features;
     }
@@ -10624,16 +11029,18 @@ void* VulkanFeatures::build_chain_for_device_creation(
 
     // Check PhysicalDeviceIndexTypeUint8Features
     if (m_index_type_uint8_features.indexTypeUint8 == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_4 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_KHR_INDEX_TYPE_UINT8_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_4) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_index_type_uint8_features.pNext = chain_head;
         chain_head = &m_index_type_uint8_features;
     }
 
     // Check PhysicalDeviceImagelessFramebufferFeatures
     if (m_imageless_framebuffer_features.imagelessFramebuffer == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_2 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_KHR_IMAGELESS_FRAMEBUFFER_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_2) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_imageless_framebuffer_features.pNext = chain_head;
         chain_head = &m_imageless_framebuffer_features;
     }
@@ -10656,8 +11063,9 @@ void* VulkanFeatures::build_chain_for_device_creation(
 
     // Check PhysicalDeviceImageRobustnessFeatures
     if (m_image_robustness_features.robustImageAccess == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_3 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_EXT_IMAGE_ROBUSTNESS_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_3) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_image_robustness_features.pNext = chain_head;
         chain_head = &m_image_robustness_features;
     }
@@ -10715,16 +11123,18 @@ void* VulkanFeatures::build_chain_for_device_creation(
 
     // Check PhysicalDeviceHostQueryResetFeatures
     if (m_host_query_reset_features.hostQueryReset == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_2 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_EXT_HOST_QUERY_RESET_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_2) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_host_query_reset_features.pNext = chain_head;
         chain_head = &m_host_query_reset_features;
     }
 
     // Check PhysicalDeviceHostImageCopyFeatures
     if (m_host_image_copy_features.hostImageCopy == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_4 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_EXT_HOST_IMAGE_COPY_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_4) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_host_image_copy_features.pNext = chain_head;
         chain_head = &m_host_image_copy_features;
     }
@@ -10747,8 +11157,9 @@ void* VulkanFeatures::build_chain_for_device_creation(
 
     // Check PhysicalDeviceGlobalPriorityQueryFeatures
     if (m_global_priority_query_features.globalPriorityQuery == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_4 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_KHR_GLOBAL_PRIORITY_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_4) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_global_priority_query_features.pNext = chain_head;
         chain_head = &m_global_priority_query_features;
     }
@@ -10841,66 +11252,6 @@ void* VulkanFeatures::build_chain_for_device_creation(
         chain_head = &m_format_pack_features_arm;
     }
 
-    // Check PhysicalDeviceFeatures2
-    if (m_features2.features.robustBufferAccess == VK_TRUE ||
-        m_features2.features.fullDrawIndexUint32 == VK_TRUE ||
-        m_features2.features.imageCubeArray == VK_TRUE ||
-        m_features2.features.independentBlend == VK_TRUE ||
-        m_features2.features.geometryShader == VK_TRUE ||
-        m_features2.features.tessellationShader == VK_TRUE ||
-        m_features2.features.sampleRateShading == VK_TRUE ||
-        m_features2.features.dualSrcBlend == VK_TRUE ||
-        m_features2.features.logicOp == VK_TRUE ||
-        m_features2.features.multiDrawIndirect == VK_TRUE ||
-        m_features2.features.drawIndirectFirstInstance == VK_TRUE ||
-        m_features2.features.depthClamp == VK_TRUE ||
-        m_features2.features.depthBiasClamp == VK_TRUE ||
-        m_features2.features.fillModeNonSolid == VK_TRUE ||
-        m_features2.features.depthBounds == VK_TRUE ||
-        m_features2.features.wideLines == VK_TRUE ||
-        m_features2.features.largePoints == VK_TRUE ||
-        m_features2.features.alphaToOne == VK_TRUE ||
-        m_features2.features.multiViewport == VK_TRUE ||
-        m_features2.features.samplerAnisotropy == VK_TRUE ||
-        m_features2.features.textureCompressionETC2 == VK_TRUE ||
-        m_features2.features.textureCompressionASTC_LDR == VK_TRUE ||
-        m_features2.features.textureCompressionBC == VK_TRUE ||
-        m_features2.features.occlusionQueryPrecise == VK_TRUE ||
-        m_features2.features.pipelineStatisticsQuery == VK_TRUE ||
-        m_features2.features.vertexPipelineStoresAndAtomics == VK_TRUE ||
-        m_features2.features.fragmentStoresAndAtomics == VK_TRUE ||
-        m_features2.features.shaderTessellationAndGeometryPointSize == VK_TRUE ||
-        m_features2.features.shaderImageGatherExtended == VK_TRUE ||
-        m_features2.features.shaderStorageImageExtendedFormats == VK_TRUE ||
-        m_features2.features.shaderStorageImageMultisample == VK_TRUE ||
-        m_features2.features.shaderStorageImageReadWithoutFormat == VK_TRUE ||
-        m_features2.features.shaderStorageImageWriteWithoutFormat == VK_TRUE ||
-        m_features2.features.shaderUniformBufferArrayDynamicIndexing == VK_TRUE ||
-        m_features2.features.shaderSampledImageArrayDynamicIndexing == VK_TRUE ||
-        m_features2.features.shaderStorageBufferArrayDynamicIndexing == VK_TRUE ||
-        m_features2.features.shaderStorageImageArrayDynamicIndexing == VK_TRUE ||
-        m_features2.features.shaderClipDistance == VK_TRUE ||
-        m_features2.features.shaderCullDistance == VK_TRUE ||
-        m_features2.features.shaderFloat64 == VK_TRUE ||
-        m_features2.features.shaderInt64 == VK_TRUE ||
-        m_features2.features.shaderInt16 == VK_TRUE ||
-        m_features2.features.shaderResourceResidency == VK_TRUE ||
-        m_features2.features.shaderResourceMinLod == VK_TRUE ||
-        m_features2.features.sparseBinding == VK_TRUE ||
-        m_features2.features.sparseResidencyBuffer == VK_TRUE ||
-        m_features2.features.sparseResidencyImage2D == VK_TRUE ||
-        m_features2.features.sparseResidencyImage3D == VK_TRUE ||
-        m_features2.features.sparseResidency2Samples == VK_TRUE ||
-        m_features2.features.sparseResidency4Samples == VK_TRUE ||
-        m_features2.features.sparseResidency8Samples == VK_TRUE ||
-        m_features2.features.sparseResidency16Samples == VK_TRUE ||
-        m_features2.features.sparseResidencyAliased == VK_TRUE ||
-        m_features2.features.variableMultisampleRate == VK_TRUE ||
-        m_features2.features.inheritedQueries == VK_TRUE) {
-        m_features2.pNext = chain_head;
-        chain_head = &m_features2;
-    }
-
     // Check PhysicalDeviceFaultFeaturesEXT
     if (m_fault_features_ext.deviceFault == VK_TRUE ||
         m_fault_features_ext.deviceFaultVendorBinary == VK_TRUE) {
@@ -10931,11 +11282,8 @@ void* VulkanFeatures::build_chain_for_device_creation(
         assert((physical_device->extension_supported(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME) ||
                 vk_api_version >= VK_API_VERSION_1_3) &&
                "Feature enabled but neither extension nor promoted version supported");
-        if (vk_api_version < VK_API_VERSION_1_3) {
-            // Core version not available, use extension version
-            m_extended_dynamic_state_features_ext.pNext = chain_head;
-            chain_head = &m_extended_dynamic_state_features_ext;
-        }
+        m_extended_dynamic_state_features_ext.pNext = chain_head;
+        chain_head = &m_extended_dynamic_state_features_ext;
     }
 
     // Check PhysicalDeviceExtendedDynamicState3FeaturesEXT
@@ -10983,11 +11331,8 @@ void* VulkanFeatures::build_chain_for_device_creation(
         assert((physical_device->extension_supported(VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME) ||
                 vk_api_version >= VK_API_VERSION_1_3) &&
                "Feature enabled but neither extension nor promoted version supported");
-        if (vk_api_version < VK_API_VERSION_1_3) {
-            // Core version not available, use extension version
-            m_extended_dynamic_state2_features_ext.pNext = chain_head;
-            chain_head = &m_extended_dynamic_state2_features_ext;
-        }
+        m_extended_dynamic_state2_features_ext.pNext = chain_head;
+        chain_head = &m_extended_dynamic_state2_features_ext;
     }
 
     // Check PhysicalDeviceExclusiveScissorFeaturesNV
@@ -11008,16 +11353,18 @@ void* VulkanFeatures::build_chain_for_device_creation(
 
     // Check PhysicalDeviceDynamicRenderingLocalReadFeatures
     if (m_dynamic_rendering_local_read_features.dynamicRenderingLocalRead == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_4 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_4) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_dynamic_rendering_local_read_features.pNext = chain_head;
         chain_head = &m_dynamic_rendering_local_read_features;
     }
 
     // Check PhysicalDeviceDynamicRenderingFeatures
     if (m_dynamic_rendering_features.dynamicRendering == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_3 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_3) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_dynamic_rendering_features.pNext = chain_head;
         chain_head = &m_dynamic_rendering_features;
     }
@@ -11102,8 +11449,9 @@ void* VulkanFeatures::build_chain_for_device_creation(
         m_descriptor_indexing_features.descriptorBindingPartiallyBound == VK_TRUE ||
         m_descriptor_indexing_features.descriptorBindingVariableDescriptorCount == VK_TRUE ||
         m_descriptor_indexing_features.runtimeDescriptorArray == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_2 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_2) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_descriptor_indexing_features.pNext = chain_head;
         chain_head = &m_descriptor_indexing_features;
     }
@@ -11403,8 +11751,9 @@ void* VulkanFeatures::build_chain_for_device_creation(
     if (m_buffer_device_address_features.bufferDeviceAddress == VK_TRUE ||
         m_buffer_device_address_features.bufferDeviceAddressCaptureReplay == VK_TRUE ||
         m_buffer_device_address_features.bufferDeviceAddressMultiDevice == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_2 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_2) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_buffer_device_address_features.pNext = chain_head;
         chain_head = &m_buffer_device_address_features;
     }
@@ -11490,8 +11839,9 @@ void* VulkanFeatures::build_chain_for_device_creation(
     if (m_8_bit_storage_features.storageBuffer8BitAccess == VK_TRUE ||
         m_8_bit_storage_features.uniformAndStorageBuffer8BitAccess == VK_TRUE ||
         m_8_bit_storage_features.storagePushConstant8 == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_2 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_KHR_8BIT_STORAGE_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_2) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_8_bit_storage_features.pNext = chain_head;
         chain_head = &m_8_bit_storage_features;
     }
@@ -11502,11 +11852,8 @@ void* VulkanFeatures::build_chain_for_device_creation(
         assert((physical_device->extension_supported(VK_EXT_4444_FORMATS_EXTENSION_NAME) ||
                 vk_api_version >= VK_API_VERSION_1_3) &&
                "Feature enabled but neither extension nor promoted version supported");
-        if (vk_api_version < VK_API_VERSION_1_3) {
-            // Core version not available, use extension version
-            m_4444_formats_features_ext.pNext = chain_head;
-            chain_head = &m_4444_formats_features_ext;
-        }
+        m_4444_formats_features_ext.pNext = chain_head;
+        chain_head = &m_4444_formats_features_ext;
     }
 
     // Check PhysicalDevice16BitStorageFeatures
@@ -11514,10 +11861,150 @@ void* VulkanFeatures::build_chain_for_device_creation(
         m_16_bit_storage_features.uniformAndStorageBuffer16BitAccess == VK_TRUE ||
         m_16_bit_storage_features.storagePushConstant16 == VK_TRUE ||
         m_16_bit_storage_features.storageInputOutput16 == VK_TRUE) {
-        assert(vk_api_version >= VK_API_VERSION_1_1 &&
-               "Feature enabled but required Vulkan version not supported");
+        assert((physical_device->extension_supported(VK_KHR_16BIT_STORAGE_EXTENSION_NAME) ||
+                vk_api_version >= VK_API_VERSION_1_1) &&
+               "Feature enabled but neither extension nor promoted version supported");
         m_16_bit_storage_features.pNext = chain_head;
         chain_head = &m_16_bit_storage_features;
+    }
+
+    // Check PhysicalDeviceVulkan14Features
+    if (vk_api_version >= VK_API_VERSION_1_4) {
+        if (m_vulkan14_features.globalPriorityQuery == VK_TRUE ||
+        m_vulkan14_features.shaderSubgroupRotate == VK_TRUE ||
+        m_vulkan14_features.shaderSubgroupRotateClustered == VK_TRUE ||
+        m_vulkan14_features.shaderFloatControls2 == VK_TRUE ||
+        m_vulkan14_features.shaderExpectAssume == VK_TRUE ||
+        m_vulkan14_features.rectangularLines == VK_TRUE ||
+        m_vulkan14_features.bresenhamLines == VK_TRUE ||
+        m_vulkan14_features.smoothLines == VK_TRUE ||
+        m_vulkan14_features.stippledRectangularLines == VK_TRUE ||
+        m_vulkan14_features.stippledBresenhamLines == VK_TRUE ||
+        m_vulkan14_features.stippledSmoothLines == VK_TRUE ||
+        m_vulkan14_features.vertexAttributeInstanceRateDivisor == VK_TRUE ||
+        m_vulkan14_features.vertexAttributeInstanceRateZeroDivisor == VK_TRUE ||
+        m_vulkan14_features.indexTypeUint8 == VK_TRUE ||
+        m_vulkan14_features.dynamicRenderingLocalRead == VK_TRUE ||
+        m_vulkan14_features.maintenance5 == VK_TRUE ||
+        m_vulkan14_features.maintenance6 == VK_TRUE ||
+        m_vulkan14_features.pipelineProtectedAccess == VK_TRUE ||
+        m_vulkan14_features.pipelineRobustness == VK_TRUE ||
+        m_vulkan14_features.hostImageCopy == VK_TRUE ||
+        m_vulkan14_features.pushDescriptor == VK_TRUE) {
+            m_vulkan14_features.pNext = chain_head;
+            chain_head = &m_vulkan14_features;
+        }
+    }
+
+    // Check PhysicalDeviceVulkan13Features
+    if (vk_api_version >= VK_API_VERSION_1_3) {
+        if (m_vulkan13_features.robustImageAccess == VK_TRUE ||
+        m_vulkan13_features.inlineUniformBlock == VK_TRUE ||
+        m_vulkan13_features.descriptorBindingInlineUniformBlockUpdateAfterBind == VK_TRUE ||
+        m_vulkan13_features.pipelineCreationCacheControl == VK_TRUE ||
+        m_vulkan13_features.privateData == VK_TRUE ||
+        m_vulkan13_features.shaderDemoteToHelperInvocation == VK_TRUE ||
+        m_vulkan13_features.shaderTerminateInvocation == VK_TRUE ||
+        m_vulkan13_features.subgroupSizeControl == VK_TRUE ||
+        m_vulkan13_features.computeFullSubgroups == VK_TRUE ||
+        m_vulkan13_features.synchronization2 == VK_TRUE ||
+        m_vulkan13_features.textureCompressionASTC_HDR == VK_TRUE ||
+        m_vulkan13_features.shaderZeroInitializeWorkgroupMemory == VK_TRUE ||
+        m_vulkan13_features.dynamicRendering == VK_TRUE ||
+        m_vulkan13_features.shaderIntegerDotProduct == VK_TRUE ||
+        m_vulkan13_features.maintenance4 == VK_TRUE) {
+            m_vulkan13_features.pNext = chain_head;
+            chain_head = &m_vulkan13_features;
+        }
+    }
+
+    // Check PhysicalDeviceVulkan12Features
+    if (vk_api_version >= VK_API_VERSION_1_2) {
+        if (m_vulkan12_features.samplerMirrorClampToEdge == VK_TRUE ||
+        m_vulkan12_features.drawIndirectCount == VK_TRUE ||
+        m_vulkan12_features.storageBuffer8BitAccess == VK_TRUE ||
+        m_vulkan12_features.uniformAndStorageBuffer8BitAccess == VK_TRUE ||
+        m_vulkan12_features.storagePushConstant8 == VK_TRUE ||
+        m_vulkan12_features.shaderBufferInt64Atomics == VK_TRUE ||
+        m_vulkan12_features.shaderSharedInt64Atomics == VK_TRUE ||
+        m_vulkan12_features.shaderFloat16 == VK_TRUE ||
+        m_vulkan12_features.shaderInt8 == VK_TRUE ||
+        m_vulkan12_features.descriptorIndexing == VK_TRUE ||
+        m_vulkan12_features.shaderInputAttachmentArrayDynamicIndexing == VK_TRUE ||
+        m_vulkan12_features.shaderUniformTexelBufferArrayDynamicIndexing == VK_TRUE ||
+        m_vulkan12_features.shaderStorageTexelBufferArrayDynamicIndexing == VK_TRUE ||
+        m_vulkan12_features.shaderUniformBufferArrayNonUniformIndexing == VK_TRUE ||
+        m_vulkan12_features.shaderSampledImageArrayNonUniformIndexing == VK_TRUE ||
+        m_vulkan12_features.shaderStorageBufferArrayNonUniformIndexing == VK_TRUE ||
+        m_vulkan12_features.shaderStorageImageArrayNonUniformIndexing == VK_TRUE ||
+        m_vulkan12_features.shaderInputAttachmentArrayNonUniformIndexing == VK_TRUE ||
+        m_vulkan12_features.shaderUniformTexelBufferArrayNonUniformIndexing == VK_TRUE ||
+        m_vulkan12_features.shaderStorageTexelBufferArrayNonUniformIndexing == VK_TRUE ||
+        m_vulkan12_features.descriptorBindingUniformBufferUpdateAfterBind == VK_TRUE ||
+        m_vulkan12_features.descriptorBindingSampledImageUpdateAfterBind == VK_TRUE ||
+        m_vulkan12_features.descriptorBindingStorageImageUpdateAfterBind == VK_TRUE ||
+        m_vulkan12_features.descriptorBindingStorageBufferUpdateAfterBind == VK_TRUE ||
+        m_vulkan12_features.descriptorBindingUniformTexelBufferUpdateAfterBind == VK_TRUE ||
+        m_vulkan12_features.descriptorBindingStorageTexelBufferUpdateAfterBind == VK_TRUE ||
+        m_vulkan12_features.descriptorBindingUpdateUnusedWhilePending == VK_TRUE ||
+        m_vulkan12_features.descriptorBindingPartiallyBound == VK_TRUE ||
+        m_vulkan12_features.descriptorBindingVariableDescriptorCount == VK_TRUE ||
+        m_vulkan12_features.runtimeDescriptorArray == VK_TRUE ||
+        m_vulkan12_features.samplerFilterMinmax == VK_TRUE ||
+        m_vulkan12_features.scalarBlockLayout == VK_TRUE ||
+        m_vulkan12_features.imagelessFramebuffer == VK_TRUE ||
+        m_vulkan12_features.uniformBufferStandardLayout == VK_TRUE ||
+        m_vulkan12_features.shaderSubgroupExtendedTypes == VK_TRUE ||
+        m_vulkan12_features.separateDepthStencilLayouts == VK_TRUE ||
+        m_vulkan12_features.hostQueryReset == VK_TRUE ||
+        m_vulkan12_features.timelineSemaphore == VK_TRUE ||
+        m_vulkan12_features.bufferDeviceAddress == VK_TRUE ||
+        m_vulkan12_features.bufferDeviceAddressCaptureReplay == VK_TRUE ||
+        m_vulkan12_features.bufferDeviceAddressMultiDevice == VK_TRUE ||
+        m_vulkan12_features.vulkanMemoryModel == VK_TRUE ||
+        m_vulkan12_features.vulkanMemoryModelDeviceScope == VK_TRUE ||
+        m_vulkan12_features.vulkanMemoryModelAvailabilityVisibilityChains == VK_TRUE ||
+        m_vulkan12_features.shaderOutputViewportIndex == VK_TRUE ||
+        m_vulkan12_features.shaderOutputLayer == VK_TRUE ||
+        m_vulkan12_features.subgroupBroadcastDynamicId == VK_TRUE) {
+            m_vulkan12_features.pNext = chain_head;
+            chain_head = &m_vulkan12_features;
+        }
+    }
+
+    // Check PhysicalDeviceVulkan11Features
+    if (vk_api_version >= VK_API_VERSION_1_2) {
+        if (m_vulkan11_features.storageBuffer16BitAccess == VK_TRUE ||
+        m_vulkan11_features.uniformAndStorageBuffer16BitAccess == VK_TRUE ||
+        m_vulkan11_features.storagePushConstant16 == VK_TRUE ||
+        m_vulkan11_features.storageInputOutput16 == VK_TRUE ||
+        m_vulkan11_features.multiview == VK_TRUE ||
+        m_vulkan11_features.multiviewGeometryShader == VK_TRUE ||
+        m_vulkan11_features.multiviewTessellationShader == VK_TRUE ||
+        m_vulkan11_features.variablePointersStorageBuffer == VK_TRUE ||
+        m_vulkan11_features.variablePointers == VK_TRUE ||
+        m_vulkan11_features.protectedMemory == VK_TRUE ||
+        m_vulkan11_features.samplerYcbcrConversion == VK_TRUE ||
+        m_vulkan11_features.shaderDrawParameters == VK_TRUE) {
+            m_vulkan11_features.pNext = chain_head;
+            chain_head = &m_vulkan11_features;
+        }
+    }
+
+    // Check PhysicalDeviceShaderDrawParametersFeatures
+    if (vk_api_version >= VK_API_VERSION_1_1) {
+        if (m_shader_draw_parameters_features.shaderDrawParameters == VK_TRUE) {
+            m_shader_draw_parameters_features.pNext = chain_head;
+            chain_head = &m_shader_draw_parameters_features;
+        }
+    }
+
+    // Check PhysicalDeviceProtectedMemoryFeatures
+    if (vk_api_version >= VK_API_VERSION_1_1) {
+        if (m_protected_memory_features.protectedMemory == VK_TRUE) {
+            m_protected_memory_features.pNext = chain_head;
+            chain_head = &m_protected_memory_features;
+        }
     }
 
     return chain_head;
