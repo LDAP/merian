@@ -404,7 +404,7 @@ def generate_constructor(features: list[FeatureStruct], tags) -> list[str]:
         member_name = generate_member_name(features2.cpp_name)
         lines.extend(
             [
-                "    // PhysicalDeviceFeatures2 (always at head of chain)",
+                "    // PhysicalDeviceFeatures2",
                 f"    {member_name}.pNext = feat_p_next;",
                 "",
                 "    // Query features from device",
@@ -416,11 +416,8 @@ def generate_constructor(features: list[FeatureStruct], tags) -> list[str]:
     # PHASE 2: Sync features between structs that share feature names
     lines.extend(
         [
-            "    // PHASE 2: Sync duplicate features between structs using OR logic",
-            "    // When multiple structs contain the same feature (due to promotion/deprecation),",
-            "    // compute the OR of all values and set it in all structs.",
-            "    // This ensures that if ANY struct was queried and has the feature enabled,",
-            "    // ALL structs will have it enabled (regardless of query order).",
+            "    // PHASE 2: Sync features between structs",
+            "    // containing the same feature (due to promotion / deprecation).",
             "    // Example: bufferDeviceAddress appears in KHR, EXT, and Vulkan12Features",
             "",
         ]

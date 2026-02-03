@@ -1527,483 +1527,480 @@ VulkanFeatures::VulkanFeatures(const vk::PhysicalDevice& physical_device,
         feat_p_next = &m_zero_initialize_workgroup_memory_features;
     }
 
-    // PhysicalDeviceFeatures2 (always at head of chain)
+    // PhysicalDeviceFeatures2
     m_features2.pNext = feat_p_next;
 
     // Query features from device
     physical_device.getFeatures2(&m_features2);
 
-    // PHASE 2: Sync duplicate features between structs using OR logic
-    // When multiple structs contain the same feature (due to promotion/deprecation),
-    // compute the OR of all values and set it in all structs.
-    // This ensures that if ANY struct was queried and has the feature enabled,
-    // ALL structs will have it enabled (regardless of query order).
+    // PHASE 2: Sync features between structs
+    // containing the same feature (due to promotion / deprecation).
     // Example: bufferDeviceAddress appears in KHR, EXT, and Vulkan12Features
 
-    // Sync bresenhamLines across 2 structs (OR logic)
+    // Sync bresenhamLines with all 2 structs that provide the feature.
     const VkBool32 bresenhamLines_value = m_line_rasterization_features.bresenhamLines || m_vulkan14_features.bresenhamLines;
     m_line_rasterization_features.bresenhamLines = bresenhamLines_value;
     m_vulkan14_features.bresenhamLines = bresenhamLines_value;
 
-    // Sync bufferDeviceAddress across 3 structs (OR logic)
+    // Sync bufferDeviceAddress with all 3 structs that provide the feature.
     const VkBool32 bufferDeviceAddress_value = m_buffer_device_address_features.bufferDeviceAddress || m_buffer_device_address_features_ext.bufferDeviceAddress || m_vulkan12_features.bufferDeviceAddress;
     m_buffer_device_address_features.bufferDeviceAddress = bufferDeviceAddress_value;
     m_buffer_device_address_features_ext.bufferDeviceAddress = bufferDeviceAddress_value;
     m_vulkan12_features.bufferDeviceAddress = bufferDeviceAddress_value;
 
-    // Sync bufferDeviceAddressCaptureReplay across 3 structs (OR logic)
+    // Sync bufferDeviceAddressCaptureReplay with all 3 structs that provide the feature.
     const VkBool32 bufferDeviceAddressCaptureReplay_value = m_buffer_device_address_features.bufferDeviceAddressCaptureReplay || m_buffer_device_address_features_ext.bufferDeviceAddressCaptureReplay || m_vulkan12_features.bufferDeviceAddressCaptureReplay;
     m_buffer_device_address_features.bufferDeviceAddressCaptureReplay = bufferDeviceAddressCaptureReplay_value;
     m_buffer_device_address_features_ext.bufferDeviceAddressCaptureReplay = bufferDeviceAddressCaptureReplay_value;
     m_vulkan12_features.bufferDeviceAddressCaptureReplay = bufferDeviceAddressCaptureReplay_value;
 
-    // Sync bufferDeviceAddressMultiDevice across 3 structs (OR logic)
+    // Sync bufferDeviceAddressMultiDevice with all 3 structs that provide the feature.
     const VkBool32 bufferDeviceAddressMultiDevice_value = m_buffer_device_address_features.bufferDeviceAddressMultiDevice || m_buffer_device_address_features_ext.bufferDeviceAddressMultiDevice || m_vulkan12_features.bufferDeviceAddressMultiDevice;
     m_buffer_device_address_features.bufferDeviceAddressMultiDevice = bufferDeviceAddressMultiDevice_value;
     m_buffer_device_address_features_ext.bufferDeviceAddressMultiDevice = bufferDeviceAddressMultiDevice_value;
     m_vulkan12_features.bufferDeviceAddressMultiDevice = bufferDeviceAddressMultiDevice_value;
 
-    // Sync computeFullSubgroups across 2 structs (OR logic)
+    // Sync computeFullSubgroups with all 2 structs that provide the feature.
     const VkBool32 computeFullSubgroups_value = m_subgroup_size_control_features.computeFullSubgroups || m_vulkan13_features.computeFullSubgroups;
     m_subgroup_size_control_features.computeFullSubgroups = computeFullSubgroups_value;
     m_vulkan13_features.computeFullSubgroups = computeFullSubgroups_value;
 
-    // Sync cooperativeMatrix across 2 structs (OR logic)
+    // Sync cooperativeMatrix with all 2 structs that provide the feature.
     const VkBool32 cooperativeMatrix_value = m_cooperative_matrix_features_nv.cooperativeMatrix || m_cooperative_matrix_features_khr.cooperativeMatrix;
     m_cooperative_matrix_features_nv.cooperativeMatrix = cooperativeMatrix_value;
     m_cooperative_matrix_features_khr.cooperativeMatrix = cooperativeMatrix_value;
 
-    // Sync cooperativeMatrixRobustBufferAccess across 2 structs (OR logic)
+    // Sync cooperativeMatrixRobustBufferAccess with all 2 structs that provide the feature.
     const VkBool32 cooperativeMatrixRobustBufferAccess_value = m_cooperative_matrix_features_nv.cooperativeMatrixRobustBufferAccess || m_cooperative_matrix_features_khr.cooperativeMatrixRobustBufferAccess;
     m_cooperative_matrix_features_nv.cooperativeMatrixRobustBufferAccess = cooperativeMatrixRobustBufferAccess_value;
     m_cooperative_matrix_features_khr.cooperativeMatrixRobustBufferAccess = cooperativeMatrixRobustBufferAccess_value;
 
-    // Sync descriptorBindingInlineUniformBlockUpdateAfterBind across 2 structs (OR logic)
+    // Sync descriptorBindingInlineUniformBlockUpdateAfterBind with all 2 structs that provide the feature.
     const VkBool32 descriptorBindingInlineUniformBlockUpdateAfterBind_value = m_inline_uniform_block_features.descriptorBindingInlineUniformBlockUpdateAfterBind || m_vulkan13_features.descriptorBindingInlineUniformBlockUpdateAfterBind;
     m_inline_uniform_block_features.descriptorBindingInlineUniformBlockUpdateAfterBind = descriptorBindingInlineUniformBlockUpdateAfterBind_value;
     m_vulkan13_features.descriptorBindingInlineUniformBlockUpdateAfterBind = descriptorBindingInlineUniformBlockUpdateAfterBind_value;
 
-    // Sync descriptorBindingPartiallyBound across 2 structs (OR logic)
+    // Sync descriptorBindingPartiallyBound with all 2 structs that provide the feature.
     const VkBool32 descriptorBindingPartiallyBound_value = m_descriptor_indexing_features.descriptorBindingPartiallyBound || m_vulkan12_features.descriptorBindingPartiallyBound;
     m_descriptor_indexing_features.descriptorBindingPartiallyBound = descriptorBindingPartiallyBound_value;
     m_vulkan12_features.descriptorBindingPartiallyBound = descriptorBindingPartiallyBound_value;
 
-    // Sync descriptorBindingSampledImageUpdateAfterBind across 2 structs (OR logic)
+    // Sync descriptorBindingSampledImageUpdateAfterBind with all 2 structs that provide the feature.
     const VkBool32 descriptorBindingSampledImageUpdateAfterBind_value = m_descriptor_indexing_features.descriptorBindingSampledImageUpdateAfterBind || m_vulkan12_features.descriptorBindingSampledImageUpdateAfterBind;
     m_descriptor_indexing_features.descriptorBindingSampledImageUpdateAfterBind = descriptorBindingSampledImageUpdateAfterBind_value;
     m_vulkan12_features.descriptorBindingSampledImageUpdateAfterBind = descriptorBindingSampledImageUpdateAfterBind_value;
 
-    // Sync descriptorBindingStorageBufferUpdateAfterBind across 2 structs (OR logic)
+    // Sync descriptorBindingStorageBufferUpdateAfterBind with all 2 structs that provide the feature.
     const VkBool32 descriptorBindingStorageBufferUpdateAfterBind_value = m_descriptor_indexing_features.descriptorBindingStorageBufferUpdateAfterBind || m_vulkan12_features.descriptorBindingStorageBufferUpdateAfterBind;
     m_descriptor_indexing_features.descriptorBindingStorageBufferUpdateAfterBind = descriptorBindingStorageBufferUpdateAfterBind_value;
     m_vulkan12_features.descriptorBindingStorageBufferUpdateAfterBind = descriptorBindingStorageBufferUpdateAfterBind_value;
 
-    // Sync descriptorBindingStorageImageUpdateAfterBind across 2 structs (OR logic)
+    // Sync descriptorBindingStorageImageUpdateAfterBind with all 2 structs that provide the feature.
     const VkBool32 descriptorBindingStorageImageUpdateAfterBind_value = m_descriptor_indexing_features.descriptorBindingStorageImageUpdateAfterBind || m_vulkan12_features.descriptorBindingStorageImageUpdateAfterBind;
     m_descriptor_indexing_features.descriptorBindingStorageImageUpdateAfterBind = descriptorBindingStorageImageUpdateAfterBind_value;
     m_vulkan12_features.descriptorBindingStorageImageUpdateAfterBind = descriptorBindingStorageImageUpdateAfterBind_value;
 
-    // Sync descriptorBindingStorageTexelBufferUpdateAfterBind across 2 structs (OR logic)
+    // Sync descriptorBindingStorageTexelBufferUpdateAfterBind with all 2 structs that provide the feature.
     const VkBool32 descriptorBindingStorageTexelBufferUpdateAfterBind_value = m_descriptor_indexing_features.descriptorBindingStorageTexelBufferUpdateAfterBind || m_vulkan12_features.descriptorBindingStorageTexelBufferUpdateAfterBind;
     m_descriptor_indexing_features.descriptorBindingStorageTexelBufferUpdateAfterBind = descriptorBindingStorageTexelBufferUpdateAfterBind_value;
     m_vulkan12_features.descriptorBindingStorageTexelBufferUpdateAfterBind = descriptorBindingStorageTexelBufferUpdateAfterBind_value;
 
-    // Sync descriptorBindingUniformBufferUpdateAfterBind across 2 structs (OR logic)
+    // Sync descriptorBindingUniformBufferUpdateAfterBind with all 2 structs that provide the feature.
     const VkBool32 descriptorBindingUniformBufferUpdateAfterBind_value = m_descriptor_indexing_features.descriptorBindingUniformBufferUpdateAfterBind || m_vulkan12_features.descriptorBindingUniformBufferUpdateAfterBind;
     m_descriptor_indexing_features.descriptorBindingUniformBufferUpdateAfterBind = descriptorBindingUniformBufferUpdateAfterBind_value;
     m_vulkan12_features.descriptorBindingUniformBufferUpdateAfterBind = descriptorBindingUniformBufferUpdateAfterBind_value;
 
-    // Sync descriptorBindingUniformTexelBufferUpdateAfterBind across 2 structs (OR logic)
+    // Sync descriptorBindingUniformTexelBufferUpdateAfterBind with all 2 structs that provide the feature.
     const VkBool32 descriptorBindingUniformTexelBufferUpdateAfterBind_value = m_descriptor_indexing_features.descriptorBindingUniformTexelBufferUpdateAfterBind || m_vulkan12_features.descriptorBindingUniformTexelBufferUpdateAfterBind;
     m_descriptor_indexing_features.descriptorBindingUniformTexelBufferUpdateAfterBind = descriptorBindingUniformTexelBufferUpdateAfterBind_value;
     m_vulkan12_features.descriptorBindingUniformTexelBufferUpdateAfterBind = descriptorBindingUniformTexelBufferUpdateAfterBind_value;
 
-    // Sync descriptorBindingUpdateUnusedWhilePending across 2 structs (OR logic)
+    // Sync descriptorBindingUpdateUnusedWhilePending with all 2 structs that provide the feature.
     const VkBool32 descriptorBindingUpdateUnusedWhilePending_value = m_descriptor_indexing_features.descriptorBindingUpdateUnusedWhilePending || m_vulkan12_features.descriptorBindingUpdateUnusedWhilePending;
     m_descriptor_indexing_features.descriptorBindingUpdateUnusedWhilePending = descriptorBindingUpdateUnusedWhilePending_value;
     m_vulkan12_features.descriptorBindingUpdateUnusedWhilePending = descriptorBindingUpdateUnusedWhilePending_value;
 
-    // Sync descriptorBindingVariableDescriptorCount across 2 structs (OR logic)
+    // Sync descriptorBindingVariableDescriptorCount with all 2 structs that provide the feature.
     const VkBool32 descriptorBindingVariableDescriptorCount_value = m_descriptor_indexing_features.descriptorBindingVariableDescriptorCount || m_vulkan12_features.descriptorBindingVariableDescriptorCount;
     m_descriptor_indexing_features.descriptorBindingVariableDescriptorCount = descriptorBindingVariableDescriptorCount_value;
     m_vulkan12_features.descriptorBindingVariableDescriptorCount = descriptorBindingVariableDescriptorCount_value;
 
-    // Sync deviceGeneratedCommands across 2 structs (OR logic)
+    // Sync deviceGeneratedCommands with all 2 structs that provide the feature.
     const VkBool32 deviceGeneratedCommands_value = m_device_generated_commands_features_nv.deviceGeneratedCommands || m_device_generated_commands_features_ext.deviceGeneratedCommands;
     m_device_generated_commands_features_nv.deviceGeneratedCommands = deviceGeneratedCommands_value;
     m_device_generated_commands_features_ext.deviceGeneratedCommands = deviceGeneratedCommands_value;
 
-    // Sync dynamicRendering across 2 structs (OR logic)
+    // Sync dynamicRendering with all 2 structs that provide the feature.
     const VkBool32 dynamicRendering_value = m_vulkan13_features.dynamicRendering || m_dynamic_rendering_features.dynamicRendering;
     m_vulkan13_features.dynamicRendering = dynamicRendering_value;
     m_dynamic_rendering_features.dynamicRendering = dynamicRendering_value;
 
-    // Sync dynamicRenderingLocalRead across 2 structs (OR logic)
+    // Sync dynamicRenderingLocalRead with all 2 structs that provide the feature.
     const VkBool32 dynamicRenderingLocalRead_value = m_vulkan14_features.dynamicRenderingLocalRead || m_dynamic_rendering_local_read_features.dynamicRenderingLocalRead;
     m_vulkan14_features.dynamicRenderingLocalRead = dynamicRenderingLocalRead_value;
     m_dynamic_rendering_local_read_features.dynamicRenderingLocalRead = dynamicRenderingLocalRead_value;
 
-    // Sync globalPriorityQuery across 2 structs (OR logic)
+    // Sync globalPriorityQuery with all 2 structs that provide the feature.
     const VkBool32 globalPriorityQuery_value = m_global_priority_query_features.globalPriorityQuery || m_vulkan14_features.globalPriorityQuery;
     m_global_priority_query_features.globalPriorityQuery = globalPriorityQuery_value;
     m_vulkan14_features.globalPriorityQuery = globalPriorityQuery_value;
 
-    // Sync hostImageCopy across 2 structs (OR logic)
+    // Sync hostImageCopy with all 2 structs that provide the feature.
     const VkBool32 hostImageCopy_value = m_vulkan14_features.hostImageCopy || m_host_image_copy_features.hostImageCopy;
     m_vulkan14_features.hostImageCopy = hostImageCopy_value;
     m_host_image_copy_features.hostImageCopy = hostImageCopy_value;
 
-    // Sync hostQueryReset across 2 structs (OR logic)
+    // Sync hostQueryReset with all 2 structs that provide the feature.
     const VkBool32 hostQueryReset_value = m_host_query_reset_features.hostQueryReset || m_vulkan12_features.hostQueryReset;
     m_host_query_reset_features.hostQueryReset = hostQueryReset_value;
     m_vulkan12_features.hostQueryReset = hostQueryReset_value;
 
-    // Sync imagelessFramebuffer across 2 structs (OR logic)
+    // Sync imagelessFramebuffer with all 2 structs that provide the feature.
     const VkBool32 imagelessFramebuffer_value = m_imageless_framebuffer_features.imagelessFramebuffer || m_vulkan12_features.imagelessFramebuffer;
     m_imageless_framebuffer_features.imagelessFramebuffer = imagelessFramebuffer_value;
     m_vulkan12_features.imagelessFramebuffer = imagelessFramebuffer_value;
 
-    // Sync indexTypeUint8 across 2 structs (OR logic)
+    // Sync indexTypeUint8 with all 2 structs that provide the feature.
     const VkBool32 indexTypeUint8_value = m_index_type_uint8_features.indexTypeUint8 || m_vulkan14_features.indexTypeUint8;
     m_index_type_uint8_features.indexTypeUint8 = indexTypeUint8_value;
     m_vulkan14_features.indexTypeUint8 = indexTypeUint8_value;
 
-    // Sync inlineUniformBlock across 2 structs (OR logic)
+    // Sync inlineUniformBlock with all 2 structs that provide the feature.
     const VkBool32 inlineUniformBlock_value = m_inline_uniform_block_features.inlineUniformBlock || m_vulkan13_features.inlineUniformBlock;
     m_inline_uniform_block_features.inlineUniformBlock = inlineUniformBlock_value;
     m_vulkan13_features.inlineUniformBlock = inlineUniformBlock_value;
 
-    // Sync maintenance4 across 2 structs (OR logic)
+    // Sync maintenance4 with all 2 structs that provide the feature.
     const VkBool32 maintenance4_value = m_maintenance4_features.maintenance4 || m_vulkan13_features.maintenance4;
     m_maintenance4_features.maintenance4 = maintenance4_value;
     m_vulkan13_features.maintenance4 = maintenance4_value;
 
-    // Sync maintenance5 across 2 structs (OR logic)
+    // Sync maintenance5 with all 2 structs that provide the feature.
     const VkBool32 maintenance5_value = m_maintenance5_features.maintenance5 || m_vulkan14_features.maintenance5;
     m_maintenance5_features.maintenance5 = maintenance5_value;
     m_vulkan14_features.maintenance5 = maintenance5_value;
 
-    // Sync maintenance6 across 2 structs (OR logic)
+    // Sync maintenance6 with all 2 structs that provide the feature.
     const VkBool32 maintenance6_value = m_maintenance6_features.maintenance6 || m_vulkan14_features.maintenance6;
     m_maintenance6_features.maintenance6 = maintenance6_value;
     m_vulkan14_features.maintenance6 = maintenance6_value;
 
-    // Sync meshShader across 2 structs (OR logic)
+    // Sync meshShader with all 2 structs that provide the feature.
     const VkBool32 meshShader_value = m_mesh_shader_features_nv.meshShader || m_mesh_shader_features_ext.meshShader;
     m_mesh_shader_features_nv.meshShader = meshShader_value;
     m_mesh_shader_features_ext.meshShader = meshShader_value;
 
-    // Sync multiview across 2 structs (OR logic)
+    // Sync multiview with all 2 structs that provide the feature.
     const VkBool32 multiview_value = m_multiview_features.multiview || m_vulkan11_features.multiview;
     m_multiview_features.multiview = multiview_value;
     m_vulkan11_features.multiview = multiview_value;
 
-    // Sync multiviewGeometryShader across 2 structs (OR logic)
+    // Sync multiviewGeometryShader with all 2 structs that provide the feature.
     const VkBool32 multiviewGeometryShader_value = m_multiview_features.multiviewGeometryShader || m_vulkan11_features.multiviewGeometryShader;
     m_multiview_features.multiviewGeometryShader = multiviewGeometryShader_value;
     m_vulkan11_features.multiviewGeometryShader = multiviewGeometryShader_value;
 
-    // Sync multiviewTessellationShader across 2 structs (OR logic)
+    // Sync multiviewTessellationShader with all 2 structs that provide the feature.
     const VkBool32 multiviewTessellationShader_value = m_multiview_features.multiviewTessellationShader || m_vulkan11_features.multiviewTessellationShader;
     m_multiview_features.multiviewTessellationShader = multiviewTessellationShader_value;
     m_vulkan11_features.multiviewTessellationShader = multiviewTessellationShader_value;
 
-    // Sync pipelineCreationCacheControl across 2 structs (OR logic)
+    // Sync pipelineCreationCacheControl with all 2 structs that provide the feature.
     const VkBool32 pipelineCreationCacheControl_value = m_pipeline_creation_cache_control_features.pipelineCreationCacheControl || m_vulkan13_features.pipelineCreationCacheControl;
     m_pipeline_creation_cache_control_features.pipelineCreationCacheControl = pipelineCreationCacheControl_value;
     m_vulkan13_features.pipelineCreationCacheControl = pipelineCreationCacheControl_value;
 
-    // Sync pipelineProtectedAccess across 2 structs (OR logic)
+    // Sync pipelineProtectedAccess with all 2 structs that provide the feature.
     const VkBool32 pipelineProtectedAccess_value = m_vulkan14_features.pipelineProtectedAccess || m_pipeline_protected_access_features.pipelineProtectedAccess;
     m_vulkan14_features.pipelineProtectedAccess = pipelineProtectedAccess_value;
     m_pipeline_protected_access_features.pipelineProtectedAccess = pipelineProtectedAccess_value;
 
-    // Sync pipelineRobustness across 2 structs (OR logic)
+    // Sync pipelineRobustness with all 2 structs that provide the feature.
     const VkBool32 pipelineRobustness_value = m_vulkan14_features.pipelineRobustness || m_pipeline_robustness_features.pipelineRobustness;
     m_vulkan14_features.pipelineRobustness = pipelineRobustness_value;
     m_pipeline_robustness_features.pipelineRobustness = pipelineRobustness_value;
 
-    // Sync privateData across 2 structs (OR logic)
+    // Sync privateData with all 2 structs that provide the feature.
     const VkBool32 privateData_value = m_private_data_features.privateData || m_vulkan13_features.privateData;
     m_private_data_features.privateData = privateData_value;
     m_vulkan13_features.privateData = privateData_value;
 
-    // Sync protectedMemory across 2 structs (OR logic)
+    // Sync protectedMemory with all 2 structs that provide the feature.
     const VkBool32 protectedMemory_value = m_protected_memory_features.protectedMemory || m_vulkan11_features.protectedMemory;
     m_protected_memory_features.protectedMemory = protectedMemory_value;
     m_vulkan11_features.protectedMemory = protectedMemory_value;
 
-    // Sync rayTracingInvocationReorder across 2 structs (OR logic)
+    // Sync rayTracingInvocationReorder with all 2 structs that provide the feature.
     const VkBool32 rayTracingInvocationReorder_value = m_ray_tracing_invocation_reorder_features_ext.rayTracingInvocationReorder || m_ray_tracing_invocation_reorder_features_nv.rayTracingInvocationReorder;
     m_ray_tracing_invocation_reorder_features_ext.rayTracingInvocationReorder = rayTracingInvocationReorder_value;
     m_ray_tracing_invocation_reorder_features_nv.rayTracingInvocationReorder = rayTracingInvocationReorder_value;
 
-    // Sync rectangularLines across 2 structs (OR logic)
+    // Sync rectangularLines with all 2 structs that provide the feature.
     const VkBool32 rectangularLines_value = m_line_rasterization_features.rectangularLines || m_vulkan14_features.rectangularLines;
     m_line_rasterization_features.rectangularLines = rectangularLines_value;
     m_vulkan14_features.rectangularLines = rectangularLines_value;
 
-    // Sync robustImageAccess across 2 structs (OR logic)
+    // Sync robustImageAccess with all 2 structs that provide the feature.
     const VkBool32 robustImageAccess_value = m_vulkan13_features.robustImageAccess || m_image_robustness_features.robustImageAccess;
     m_vulkan13_features.robustImageAccess = robustImageAccess_value;
     m_image_robustness_features.robustImageAccess = robustImageAccess_value;
 
-    // Sync runtimeDescriptorArray across 2 structs (OR logic)
+    // Sync runtimeDescriptorArray with all 2 structs that provide the feature.
     const VkBool32 runtimeDescriptorArray_value = m_descriptor_indexing_features.runtimeDescriptorArray || m_vulkan12_features.runtimeDescriptorArray;
     m_descriptor_indexing_features.runtimeDescriptorArray = runtimeDescriptorArray_value;
     m_vulkan12_features.runtimeDescriptorArray = runtimeDescriptorArray_value;
 
-    // Sync samplerYcbcrConversion across 2 structs (OR logic)
+    // Sync samplerYcbcrConversion with all 2 structs that provide the feature.
     const VkBool32 samplerYcbcrConversion_value = m_sampler_ycbcr_conversion_features.samplerYcbcrConversion || m_vulkan11_features.samplerYcbcrConversion;
     m_sampler_ycbcr_conversion_features.samplerYcbcrConversion = samplerYcbcrConversion_value;
     m_vulkan11_features.samplerYcbcrConversion = samplerYcbcrConversion_value;
 
-    // Sync scalarBlockLayout across 2 structs (OR logic)
+    // Sync scalarBlockLayout with all 2 structs that provide the feature.
     const VkBool32 scalarBlockLayout_value = m_scalar_block_layout_features.scalarBlockLayout || m_vulkan12_features.scalarBlockLayout;
     m_scalar_block_layout_features.scalarBlockLayout = scalarBlockLayout_value;
     m_vulkan12_features.scalarBlockLayout = scalarBlockLayout_value;
 
-    // Sync separateDepthStencilLayouts across 2 structs (OR logic)
+    // Sync separateDepthStencilLayouts with all 2 structs that provide the feature.
     const VkBool32 separateDepthStencilLayouts_value = m_separate_depth_stencil_layouts_features.separateDepthStencilLayouts || m_vulkan12_features.separateDepthStencilLayouts;
     m_separate_depth_stencil_layouts_features.separateDepthStencilLayouts = separateDepthStencilLayouts_value;
     m_vulkan12_features.separateDepthStencilLayouts = separateDepthStencilLayouts_value;
 
-    // Sync shaderBufferInt64Atomics across 2 structs (OR logic)
+    // Sync shaderBufferInt64Atomics with all 2 structs that provide the feature.
     const VkBool32 shaderBufferInt64Atomics_value = m_shader_atomic_int64_features.shaderBufferInt64Atomics || m_vulkan12_features.shaderBufferInt64Atomics;
     m_shader_atomic_int64_features.shaderBufferInt64Atomics = shaderBufferInt64Atomics_value;
     m_vulkan12_features.shaderBufferInt64Atomics = shaderBufferInt64Atomics_value;
 
-    // Sync shaderDemoteToHelperInvocation across 2 structs (OR logic)
+    // Sync shaderDemoteToHelperInvocation with all 2 structs that provide the feature.
     const VkBool32 shaderDemoteToHelperInvocation_value = m_shader_demote_to_helper_invocation_features.shaderDemoteToHelperInvocation || m_vulkan13_features.shaderDemoteToHelperInvocation;
     m_shader_demote_to_helper_invocation_features.shaderDemoteToHelperInvocation = shaderDemoteToHelperInvocation_value;
     m_vulkan13_features.shaderDemoteToHelperInvocation = shaderDemoteToHelperInvocation_value;
 
-    // Sync shaderDrawParameters across 2 structs (OR logic)
+    // Sync shaderDrawParameters with all 2 structs that provide the feature.
     const VkBool32 shaderDrawParameters_value = m_shader_draw_parameters_features.shaderDrawParameters || m_vulkan11_features.shaderDrawParameters;
     m_shader_draw_parameters_features.shaderDrawParameters = shaderDrawParameters_value;
     m_vulkan11_features.shaderDrawParameters = shaderDrawParameters_value;
 
-    // Sync shaderExpectAssume across 2 structs (OR logic)
+    // Sync shaderExpectAssume with all 2 structs that provide the feature.
     const VkBool32 shaderExpectAssume_value = m_vulkan14_features.shaderExpectAssume || m_shader_expect_assume_features.shaderExpectAssume;
     m_vulkan14_features.shaderExpectAssume = shaderExpectAssume_value;
     m_shader_expect_assume_features.shaderExpectAssume = shaderExpectAssume_value;
 
-    // Sync shaderFloat16 across 2 structs (OR logic)
+    // Sync shaderFloat16 with all 2 structs that provide the feature.
     const VkBool32 shaderFloat16_value = m_shader_float16_int8_features.shaderFloat16 || m_vulkan12_features.shaderFloat16;
     m_shader_float16_int8_features.shaderFloat16 = shaderFloat16_value;
     m_vulkan12_features.shaderFloat16 = shaderFloat16_value;
 
-    // Sync shaderFloatControls2 across 2 structs (OR logic)
+    // Sync shaderFloatControls2 with all 2 structs that provide the feature.
     const VkBool32 shaderFloatControls2_value = m_vulkan14_features.shaderFloatControls2 || m_shader_float_controls2_features.shaderFloatControls2;
     m_vulkan14_features.shaderFloatControls2 = shaderFloatControls2_value;
     m_shader_float_controls2_features.shaderFloatControls2 = shaderFloatControls2_value;
 
-    // Sync shaderInputAttachmentArrayDynamicIndexing across 2 structs (OR logic)
+    // Sync shaderInputAttachmentArrayDynamicIndexing with all 2 structs that provide the feature.
     const VkBool32 shaderInputAttachmentArrayDynamicIndexing_value = m_descriptor_indexing_features.shaderInputAttachmentArrayDynamicIndexing || m_vulkan12_features.shaderInputAttachmentArrayDynamicIndexing;
     m_descriptor_indexing_features.shaderInputAttachmentArrayDynamicIndexing = shaderInputAttachmentArrayDynamicIndexing_value;
     m_vulkan12_features.shaderInputAttachmentArrayDynamicIndexing = shaderInputAttachmentArrayDynamicIndexing_value;
 
-    // Sync shaderInputAttachmentArrayNonUniformIndexing across 2 structs (OR logic)
+    // Sync shaderInputAttachmentArrayNonUniformIndexing with all 2 structs that provide the feature.
     const VkBool32 shaderInputAttachmentArrayNonUniformIndexing_value = m_descriptor_indexing_features.shaderInputAttachmentArrayNonUniformIndexing || m_vulkan12_features.shaderInputAttachmentArrayNonUniformIndexing;
     m_descriptor_indexing_features.shaderInputAttachmentArrayNonUniformIndexing = shaderInputAttachmentArrayNonUniformIndexing_value;
     m_vulkan12_features.shaderInputAttachmentArrayNonUniformIndexing = shaderInputAttachmentArrayNonUniformIndexing_value;
 
-    // Sync shaderInt8 across 2 structs (OR logic)
+    // Sync shaderInt8 with all 2 structs that provide the feature.
     const VkBool32 shaderInt8_value = m_shader_float16_int8_features.shaderInt8 || m_vulkan12_features.shaderInt8;
     m_shader_float16_int8_features.shaderInt8 = shaderInt8_value;
     m_vulkan12_features.shaderInt8 = shaderInt8_value;
 
-    // Sync shaderIntegerDotProduct across 2 structs (OR logic)
+    // Sync shaderIntegerDotProduct with all 2 structs that provide the feature.
     const VkBool32 shaderIntegerDotProduct_value = m_vulkan13_features.shaderIntegerDotProduct || m_shader_integer_dot_product_features.shaderIntegerDotProduct;
     m_vulkan13_features.shaderIntegerDotProduct = shaderIntegerDotProduct_value;
     m_shader_integer_dot_product_features.shaderIntegerDotProduct = shaderIntegerDotProduct_value;
 
-    // Sync shaderSampledImageArrayNonUniformIndexing across 2 structs (OR logic)
+    // Sync shaderSampledImageArrayNonUniformIndexing with all 2 structs that provide the feature.
     const VkBool32 shaderSampledImageArrayNonUniformIndexing_value = m_descriptor_indexing_features.shaderSampledImageArrayNonUniformIndexing || m_vulkan12_features.shaderSampledImageArrayNonUniformIndexing;
     m_descriptor_indexing_features.shaderSampledImageArrayNonUniformIndexing = shaderSampledImageArrayNonUniformIndexing_value;
     m_vulkan12_features.shaderSampledImageArrayNonUniformIndexing = shaderSampledImageArrayNonUniformIndexing_value;
 
-    // Sync shaderSharedInt64Atomics across 2 structs (OR logic)
+    // Sync shaderSharedInt64Atomics with all 2 structs that provide the feature.
     const VkBool32 shaderSharedInt64Atomics_value = m_shader_atomic_int64_features.shaderSharedInt64Atomics || m_vulkan12_features.shaderSharedInt64Atomics;
     m_shader_atomic_int64_features.shaderSharedInt64Atomics = shaderSharedInt64Atomics_value;
     m_vulkan12_features.shaderSharedInt64Atomics = shaderSharedInt64Atomics_value;
 
-    // Sync shaderStorageBufferArrayNonUniformIndexing across 2 structs (OR logic)
+    // Sync shaderStorageBufferArrayNonUniformIndexing with all 2 structs that provide the feature.
     const VkBool32 shaderStorageBufferArrayNonUniformIndexing_value = m_descriptor_indexing_features.shaderStorageBufferArrayNonUniformIndexing || m_vulkan12_features.shaderStorageBufferArrayNonUniformIndexing;
     m_descriptor_indexing_features.shaderStorageBufferArrayNonUniformIndexing = shaderStorageBufferArrayNonUniformIndexing_value;
     m_vulkan12_features.shaderStorageBufferArrayNonUniformIndexing = shaderStorageBufferArrayNonUniformIndexing_value;
 
-    // Sync shaderStorageImageArrayNonUniformIndexing across 2 structs (OR logic)
+    // Sync shaderStorageImageArrayNonUniformIndexing with all 2 structs that provide the feature.
     const VkBool32 shaderStorageImageArrayNonUniformIndexing_value = m_descriptor_indexing_features.shaderStorageImageArrayNonUniformIndexing || m_vulkan12_features.shaderStorageImageArrayNonUniformIndexing;
     m_descriptor_indexing_features.shaderStorageImageArrayNonUniformIndexing = shaderStorageImageArrayNonUniformIndexing_value;
     m_vulkan12_features.shaderStorageImageArrayNonUniformIndexing = shaderStorageImageArrayNonUniformIndexing_value;
 
-    // Sync shaderStorageTexelBufferArrayDynamicIndexing across 2 structs (OR logic)
+    // Sync shaderStorageTexelBufferArrayDynamicIndexing with all 2 structs that provide the feature.
     const VkBool32 shaderStorageTexelBufferArrayDynamicIndexing_value = m_descriptor_indexing_features.shaderStorageTexelBufferArrayDynamicIndexing || m_vulkan12_features.shaderStorageTexelBufferArrayDynamicIndexing;
     m_descriptor_indexing_features.shaderStorageTexelBufferArrayDynamicIndexing = shaderStorageTexelBufferArrayDynamicIndexing_value;
     m_vulkan12_features.shaderStorageTexelBufferArrayDynamicIndexing = shaderStorageTexelBufferArrayDynamicIndexing_value;
 
-    // Sync shaderStorageTexelBufferArrayNonUniformIndexing across 2 structs (OR logic)
+    // Sync shaderStorageTexelBufferArrayNonUniformIndexing with all 2 structs that provide the feature.
     const VkBool32 shaderStorageTexelBufferArrayNonUniformIndexing_value = m_descriptor_indexing_features.shaderStorageTexelBufferArrayNonUniformIndexing || m_vulkan12_features.shaderStorageTexelBufferArrayNonUniformIndexing;
     m_descriptor_indexing_features.shaderStorageTexelBufferArrayNonUniformIndexing = shaderStorageTexelBufferArrayNonUniformIndexing_value;
     m_vulkan12_features.shaderStorageTexelBufferArrayNonUniformIndexing = shaderStorageTexelBufferArrayNonUniformIndexing_value;
 
-    // Sync shaderSubgroupExtendedTypes across 2 structs (OR logic)
+    // Sync shaderSubgroupExtendedTypes with all 2 structs that provide the feature.
     const VkBool32 shaderSubgroupExtendedTypes_value = m_shader_subgroup_extended_types_features.shaderSubgroupExtendedTypes || m_vulkan12_features.shaderSubgroupExtendedTypes;
     m_shader_subgroup_extended_types_features.shaderSubgroupExtendedTypes = shaderSubgroupExtendedTypes_value;
     m_vulkan12_features.shaderSubgroupExtendedTypes = shaderSubgroupExtendedTypes_value;
 
-    // Sync shaderSubgroupRotate across 2 structs (OR logic)
+    // Sync shaderSubgroupRotate with all 2 structs that provide the feature.
     const VkBool32 shaderSubgroupRotate_value = m_vulkan14_features.shaderSubgroupRotate || m_shader_subgroup_rotate_features.shaderSubgroupRotate;
     m_vulkan14_features.shaderSubgroupRotate = shaderSubgroupRotate_value;
     m_shader_subgroup_rotate_features.shaderSubgroupRotate = shaderSubgroupRotate_value;
 
-    // Sync shaderSubgroupRotateClustered across 2 structs (OR logic)
+    // Sync shaderSubgroupRotateClustered with all 2 structs that provide the feature.
     const VkBool32 shaderSubgroupRotateClustered_value = m_vulkan14_features.shaderSubgroupRotateClustered || m_shader_subgroup_rotate_features.shaderSubgroupRotateClustered;
     m_vulkan14_features.shaderSubgroupRotateClustered = shaderSubgroupRotateClustered_value;
     m_shader_subgroup_rotate_features.shaderSubgroupRotateClustered = shaderSubgroupRotateClustered_value;
 
-    // Sync shaderTerminateInvocation across 2 structs (OR logic)
+    // Sync shaderTerminateInvocation with all 2 structs that provide the feature.
     const VkBool32 shaderTerminateInvocation_value = m_vulkan13_features.shaderTerminateInvocation || m_shader_terminate_invocation_features.shaderTerminateInvocation;
     m_vulkan13_features.shaderTerminateInvocation = shaderTerminateInvocation_value;
     m_shader_terminate_invocation_features.shaderTerminateInvocation = shaderTerminateInvocation_value;
 
-    // Sync shaderUniformBufferArrayNonUniformIndexing across 2 structs (OR logic)
+    // Sync shaderUniformBufferArrayNonUniformIndexing with all 2 structs that provide the feature.
     const VkBool32 shaderUniformBufferArrayNonUniformIndexing_value = m_descriptor_indexing_features.shaderUniformBufferArrayNonUniformIndexing || m_vulkan12_features.shaderUniformBufferArrayNonUniformIndexing;
     m_descriptor_indexing_features.shaderUniformBufferArrayNonUniformIndexing = shaderUniformBufferArrayNonUniformIndexing_value;
     m_vulkan12_features.shaderUniformBufferArrayNonUniformIndexing = shaderUniformBufferArrayNonUniformIndexing_value;
 
-    // Sync shaderUniformTexelBufferArrayDynamicIndexing across 2 structs (OR logic)
+    // Sync shaderUniformTexelBufferArrayDynamicIndexing with all 2 structs that provide the feature.
     const VkBool32 shaderUniformTexelBufferArrayDynamicIndexing_value = m_descriptor_indexing_features.shaderUniformTexelBufferArrayDynamicIndexing || m_vulkan12_features.shaderUniformTexelBufferArrayDynamicIndexing;
     m_descriptor_indexing_features.shaderUniformTexelBufferArrayDynamicIndexing = shaderUniformTexelBufferArrayDynamicIndexing_value;
     m_vulkan12_features.shaderUniformTexelBufferArrayDynamicIndexing = shaderUniformTexelBufferArrayDynamicIndexing_value;
 
-    // Sync shaderUniformTexelBufferArrayNonUniformIndexing across 2 structs (OR logic)
+    // Sync shaderUniformTexelBufferArrayNonUniformIndexing with all 2 structs that provide the feature.
     const VkBool32 shaderUniformTexelBufferArrayNonUniformIndexing_value = m_descriptor_indexing_features.shaderUniformTexelBufferArrayNonUniformIndexing || m_vulkan12_features.shaderUniformTexelBufferArrayNonUniformIndexing;
     m_descriptor_indexing_features.shaderUniformTexelBufferArrayNonUniformIndexing = shaderUniformTexelBufferArrayNonUniformIndexing_value;
     m_vulkan12_features.shaderUniformTexelBufferArrayNonUniformIndexing = shaderUniformTexelBufferArrayNonUniformIndexing_value;
 
-    // Sync shaderZeroInitializeWorkgroupMemory across 2 structs (OR logic)
+    // Sync shaderZeroInitializeWorkgroupMemory with all 2 structs that provide the feature.
     const VkBool32 shaderZeroInitializeWorkgroupMemory_value = m_vulkan13_features.shaderZeroInitializeWorkgroupMemory || m_zero_initialize_workgroup_memory_features.shaderZeroInitializeWorkgroupMemory;
     m_vulkan13_features.shaderZeroInitializeWorkgroupMemory = shaderZeroInitializeWorkgroupMemory_value;
     m_zero_initialize_workgroup_memory_features.shaderZeroInitializeWorkgroupMemory = shaderZeroInitializeWorkgroupMemory_value;
 
-    // Sync smoothLines across 2 structs (OR logic)
+    // Sync smoothLines with all 2 structs that provide the feature.
     const VkBool32 smoothLines_value = m_line_rasterization_features.smoothLines || m_vulkan14_features.smoothLines;
     m_line_rasterization_features.smoothLines = smoothLines_value;
     m_vulkan14_features.smoothLines = smoothLines_value;
 
-    // Sync stippledBresenhamLines across 2 structs (OR logic)
+    // Sync stippledBresenhamLines with all 2 structs that provide the feature.
     const VkBool32 stippledBresenhamLines_value = m_line_rasterization_features.stippledBresenhamLines || m_vulkan14_features.stippledBresenhamLines;
     m_line_rasterization_features.stippledBresenhamLines = stippledBresenhamLines_value;
     m_vulkan14_features.stippledBresenhamLines = stippledBresenhamLines_value;
 
-    // Sync stippledRectangularLines across 2 structs (OR logic)
+    // Sync stippledRectangularLines with all 2 structs that provide the feature.
     const VkBool32 stippledRectangularLines_value = m_line_rasterization_features.stippledRectangularLines || m_vulkan14_features.stippledRectangularLines;
     m_line_rasterization_features.stippledRectangularLines = stippledRectangularLines_value;
     m_vulkan14_features.stippledRectangularLines = stippledRectangularLines_value;
 
-    // Sync stippledSmoothLines across 2 structs (OR logic)
+    // Sync stippledSmoothLines with all 2 structs that provide the feature.
     const VkBool32 stippledSmoothLines_value = m_line_rasterization_features.stippledSmoothLines || m_vulkan14_features.stippledSmoothLines;
     m_line_rasterization_features.stippledSmoothLines = stippledSmoothLines_value;
     m_vulkan14_features.stippledSmoothLines = stippledSmoothLines_value;
 
-    // Sync storageBuffer16BitAccess across 2 structs (OR logic)
+    // Sync storageBuffer16BitAccess with all 2 structs that provide the feature.
     const VkBool32 storageBuffer16BitAccess_value = m_16_bit_storage_features.storageBuffer16BitAccess || m_vulkan11_features.storageBuffer16BitAccess;
     m_16_bit_storage_features.storageBuffer16BitAccess = storageBuffer16BitAccess_value;
     m_vulkan11_features.storageBuffer16BitAccess = storageBuffer16BitAccess_value;
 
-    // Sync storageBuffer8BitAccess across 2 structs (OR logic)
+    // Sync storageBuffer8BitAccess with all 2 structs that provide the feature.
     const VkBool32 storageBuffer8BitAccess_value = m_8_bit_storage_features.storageBuffer8BitAccess || m_vulkan12_features.storageBuffer8BitAccess;
     m_8_bit_storage_features.storageBuffer8BitAccess = storageBuffer8BitAccess_value;
     m_vulkan12_features.storageBuffer8BitAccess = storageBuffer8BitAccess_value;
 
-    // Sync storageInputOutput16 across 2 structs (OR logic)
+    // Sync storageInputOutput16 with all 2 structs that provide the feature.
     const VkBool32 storageInputOutput16_value = m_16_bit_storage_features.storageInputOutput16 || m_vulkan11_features.storageInputOutput16;
     m_16_bit_storage_features.storageInputOutput16 = storageInputOutput16_value;
     m_vulkan11_features.storageInputOutput16 = storageInputOutput16_value;
 
-    // Sync storagePushConstant16 across 2 structs (OR logic)
+    // Sync storagePushConstant16 with all 2 structs that provide the feature.
     const VkBool32 storagePushConstant16_value = m_16_bit_storage_features.storagePushConstant16 || m_vulkan11_features.storagePushConstant16;
     m_16_bit_storage_features.storagePushConstant16 = storagePushConstant16_value;
     m_vulkan11_features.storagePushConstant16 = storagePushConstant16_value;
 
-    // Sync storagePushConstant8 across 2 structs (OR logic)
+    // Sync storagePushConstant8 with all 2 structs that provide the feature.
     const VkBool32 storagePushConstant8_value = m_8_bit_storage_features.storagePushConstant8 || m_vulkan12_features.storagePushConstant8;
     m_8_bit_storage_features.storagePushConstant8 = storagePushConstant8_value;
     m_vulkan12_features.storagePushConstant8 = storagePushConstant8_value;
 
-    // Sync subgroupSizeControl across 2 structs (OR logic)
+    // Sync subgroupSizeControl with all 2 structs that provide the feature.
     const VkBool32 subgroupSizeControl_value = m_subgroup_size_control_features.subgroupSizeControl || m_vulkan13_features.subgroupSizeControl;
     m_subgroup_size_control_features.subgroupSizeControl = subgroupSizeControl_value;
     m_vulkan13_features.subgroupSizeControl = subgroupSizeControl_value;
 
-    // Sync synchronization2 across 2 structs (OR logic)
+    // Sync synchronization2 with all 2 structs that provide the feature.
     const VkBool32 synchronization2_value = m_vulkan13_features.synchronization2 || m_synchronization2_features.synchronization2;
     m_vulkan13_features.synchronization2 = synchronization2_value;
     m_synchronization2_features.synchronization2 = synchronization2_value;
 
-    // Sync taskShader across 2 structs (OR logic)
+    // Sync taskShader with all 2 structs that provide the feature.
     const VkBool32 taskShader_value = m_mesh_shader_features_nv.taskShader || m_mesh_shader_features_ext.taskShader;
     m_mesh_shader_features_nv.taskShader = taskShader_value;
     m_mesh_shader_features_ext.taskShader = taskShader_value;
 
-    // Sync textureCompressionASTC_HDR across 2 structs (OR logic)
+    // Sync textureCompressionASTC_HDR with all 2 structs that provide the feature.
     const VkBool32 textureCompressionASTC_HDR_value = m_texture_compression_astchdr_features.textureCompressionASTC_HDR || m_vulkan13_features.textureCompressionASTC_HDR;
     m_texture_compression_astchdr_features.textureCompressionASTC_HDR = textureCompressionASTC_HDR_value;
     m_vulkan13_features.textureCompressionASTC_HDR = textureCompressionASTC_HDR_value;
 
-    // Sync timelineSemaphore across 2 structs (OR logic)
+    // Sync timelineSemaphore with all 2 structs that provide the feature.
     const VkBool32 timelineSemaphore_value = m_timeline_semaphore_features.timelineSemaphore || m_vulkan12_features.timelineSemaphore;
     m_timeline_semaphore_features.timelineSemaphore = timelineSemaphore_value;
     m_vulkan12_features.timelineSemaphore = timelineSemaphore_value;
 
-    // Sync uniformAndStorageBuffer16BitAccess across 2 structs (OR logic)
+    // Sync uniformAndStorageBuffer16BitAccess with all 2 structs that provide the feature.
     const VkBool32 uniformAndStorageBuffer16BitAccess_value = m_16_bit_storage_features.uniformAndStorageBuffer16BitAccess || m_vulkan11_features.uniformAndStorageBuffer16BitAccess;
     m_16_bit_storage_features.uniformAndStorageBuffer16BitAccess = uniformAndStorageBuffer16BitAccess_value;
     m_vulkan11_features.uniformAndStorageBuffer16BitAccess = uniformAndStorageBuffer16BitAccess_value;
 
-    // Sync uniformAndStorageBuffer8BitAccess across 2 structs (OR logic)
+    // Sync uniformAndStorageBuffer8BitAccess with all 2 structs that provide the feature.
     const VkBool32 uniformAndStorageBuffer8BitAccess_value = m_8_bit_storage_features.uniformAndStorageBuffer8BitAccess || m_vulkan12_features.uniformAndStorageBuffer8BitAccess;
     m_8_bit_storage_features.uniformAndStorageBuffer8BitAccess = uniformAndStorageBuffer8BitAccess_value;
     m_vulkan12_features.uniformAndStorageBuffer8BitAccess = uniformAndStorageBuffer8BitAccess_value;
 
-    // Sync uniformBufferStandardLayout across 2 structs (OR logic)
+    // Sync uniformBufferStandardLayout with all 2 structs that provide the feature.
     const VkBool32 uniformBufferStandardLayout_value = m_uniform_buffer_standard_layout_features.uniformBufferStandardLayout || m_vulkan12_features.uniformBufferStandardLayout;
     m_uniform_buffer_standard_layout_features.uniformBufferStandardLayout = uniformBufferStandardLayout_value;
     m_vulkan12_features.uniformBufferStandardLayout = uniformBufferStandardLayout_value;
 
-    // Sync variablePointers across 2 structs (OR logic)
+    // Sync variablePointers with all 2 structs that provide the feature.
     const VkBool32 variablePointers_value = m_variable_pointers_features.variablePointers || m_vulkan11_features.variablePointers;
     m_variable_pointers_features.variablePointers = variablePointers_value;
     m_vulkan11_features.variablePointers = variablePointers_value;
 
-    // Sync variablePointersStorageBuffer across 2 structs (OR logic)
+    // Sync variablePointersStorageBuffer with all 2 structs that provide the feature.
     const VkBool32 variablePointersStorageBuffer_value = m_variable_pointers_features.variablePointersStorageBuffer || m_vulkan11_features.variablePointersStorageBuffer;
     m_variable_pointers_features.variablePointersStorageBuffer = variablePointersStorageBuffer_value;
     m_vulkan11_features.variablePointersStorageBuffer = variablePointersStorageBuffer_value;
 
-    // Sync vertexAttributeInstanceRateDivisor across 2 structs (OR logic)
+    // Sync vertexAttributeInstanceRateDivisor with all 2 structs that provide the feature.
     const VkBool32 vertexAttributeInstanceRateDivisor_value = m_vertex_attribute_divisor_features.vertexAttributeInstanceRateDivisor || m_vulkan14_features.vertexAttributeInstanceRateDivisor;
     m_vertex_attribute_divisor_features.vertexAttributeInstanceRateDivisor = vertexAttributeInstanceRateDivisor_value;
     m_vulkan14_features.vertexAttributeInstanceRateDivisor = vertexAttributeInstanceRateDivisor_value;
 
-    // Sync vertexAttributeInstanceRateZeroDivisor across 2 structs (OR logic)
+    // Sync vertexAttributeInstanceRateZeroDivisor with all 2 structs that provide the feature.
     const VkBool32 vertexAttributeInstanceRateZeroDivisor_value = m_vertex_attribute_divisor_features.vertexAttributeInstanceRateZeroDivisor || m_vulkan14_features.vertexAttributeInstanceRateZeroDivisor;
     m_vertex_attribute_divisor_features.vertexAttributeInstanceRateZeroDivisor = vertexAttributeInstanceRateZeroDivisor_value;
     m_vulkan14_features.vertexAttributeInstanceRateZeroDivisor = vertexAttributeInstanceRateZeroDivisor_value;
 
-    // Sync vulkanMemoryModel across 2 structs (OR logic)
+    // Sync vulkanMemoryModel with all 2 structs that provide the feature.
     const VkBool32 vulkanMemoryModel_value = m_vulkan_memory_model_features.vulkanMemoryModel || m_vulkan12_features.vulkanMemoryModel;
     m_vulkan_memory_model_features.vulkanMemoryModel = vulkanMemoryModel_value;
     m_vulkan12_features.vulkanMemoryModel = vulkanMemoryModel_value;
 
-    // Sync vulkanMemoryModelAvailabilityVisibilityChains across 2 structs (OR logic)
+    // Sync vulkanMemoryModelAvailabilityVisibilityChains with all 2 structs that provide the feature.
     const VkBool32 vulkanMemoryModelAvailabilityVisibilityChains_value = m_vulkan_memory_model_features.vulkanMemoryModelAvailabilityVisibilityChains || m_vulkan12_features.vulkanMemoryModelAvailabilityVisibilityChains;
     m_vulkan_memory_model_features.vulkanMemoryModelAvailabilityVisibilityChains = vulkanMemoryModelAvailabilityVisibilityChains_value;
     m_vulkan12_features.vulkanMemoryModelAvailabilityVisibilityChains = vulkanMemoryModelAvailabilityVisibilityChains_value;
 
-    // Sync vulkanMemoryModelDeviceScope across 2 structs (OR logic)
+    // Sync vulkanMemoryModelDeviceScope with all 2 structs that provide the feature.
     const VkBool32 vulkanMemoryModelDeviceScope_value = m_vulkan_memory_model_features.vulkanMemoryModelDeviceScope || m_vulkan12_features.vulkanMemoryModelDeviceScope;
     m_vulkan_memory_model_features.vulkanMemoryModelDeviceScope = vulkanMemoryModelDeviceScope_value;
     m_vulkan12_features.vulkanMemoryModelDeviceScope = vulkanMemoryModelDeviceScope_value;
