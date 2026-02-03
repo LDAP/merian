@@ -5,3 +5,5 @@
 /subprojects/*
 !/subprojects/*.wrap
 !/subprojects/packagefiles
+
+**/__pycache__/**

@@ -11,6 +11,8 @@ project(
     meson_version: '>=1.5.0',
 )
 
+vulkan_target_api_version = '1.4.342'
+
 cmake = import('cmake')
 
 ccx = meson.get_compiler('cpp')
@@ -55,13 +57,14 @@ add_project_arguments('-DMERIAN_DEVELOPMENT_INCLUDE_DIR="@0@"'.format(join_paths
 # Dependencies
 fmt = dependency('fmt', version : ['>=12.1.0'], fallback : ['fmt', 'fmt_dep'])
 spdlog = dependency('spdlog', version : ['>=1.17.0'], fallback : ['spdlog', 'spdlog_dep'], default_options : ['external_fmt=enabled'])
-vulkan = dependency('vulkan', version: ['>=1.3.0'], required: false)
+vulkan = dependency('vulkan', version: ['>=1.0.0'], required: false)
 if not vulkan.found()
     # version specifier is broken for vulkan in older meson versions. https://github.com/mesonbuild/meson/issues/12072
     vulkan = dependency('vulkan')
 endif
 vulkan = vulkan.partial_dependency(compile_args: true, link_args: true, links: true)
-vulkanheaders = subproject('vulkanheaders').get_variable('vulkanheaders_dep')
+vulkanheaders_subp = subproject('vulkanheaders', version: ['>=' + vulkan_target_api_version])
+vulkanheaders = vulkanheaders_subp.get_variable('vulkanheaders_dep')
 glfw = dependency('glfw3', version: ['>=3.4.0'], fallback: ['glfw', 'glfw_dep'])
 subprocess = dependency('subprocess', version: ['>=0.4.0'], fallback: ['subprocess', 'subprocess_dep'])
 glm = dependency('glm', fallback : ['glm', 'glm_dep'], version: ['>=1.0.2'])
@@ -110,6 +113,26 @@ if shaderc.found()
 endif
 slang = dependency('slang', version: ['>=2025.14.3'], fallback: ['slang', 'slang_dep'])
 
+py = import('python').find_installation('python3')
+
+generator_scripts = [
+    'scripts/generate_enum_string_map.py',
+    'scripts/generate_extensions.py',
+    'scripts/generate_features.py',
+    'scripts/generate_properties.py',
+    'scripts/generate_spirv.py',
+]
+message('Generating Vulkan code generators for version v@0@...'.format(vulkan_target_api_version))
+foreach script : generator_scripts
+    run_command(
+        py, meson.current_source_dir() / script,
+        env: {'VULKAN_SPEC_VERSION': 'v' + vulkan_target_api_version},
+        check: true
+    )
+endforeach
+message('Vulkan code generation complete.')
+
+
 project_root = meson.current_source_dir()
 inc_dirs = [
     include_directories('./include'),
@@ -152,7 +175,6 @@ if get_option('buildtype').startswith('debug')
     spv_compiler_args += ['-g']
 endif
 
-py = import('python').find_installation('python3') 
 shader_generator = generator(
     py,
     output: ['@PLAINNAME@.spv.h', '@PLAINNAME@.spv.c'],

@@ -1,10 +1,12 @@
 """Vulkan specification loading and parsing utilities."""
 
+import os
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from urllib.request import urlopen
 
-VULKAN_SPEC_VERSION = "v1.4.338"
+# Read version from environment variable, fallback to default
+VULKAN_SPEC_VERSION = os.environ.get("VULKAN_SPEC_VERSION", "v1.4.338")
 VULKAN_SPEC_URL = f"https://raw.githubusercontent.com/KhronosGroup/Vulkan-Docs/{VULKAN_SPEC_VERSION}/xml/vk.xml"
 
 
