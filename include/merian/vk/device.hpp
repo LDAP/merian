@@ -21,18 +21,12 @@ class Device : public std::enable_shared_from_this<Device> {
         SPDLOG_DEBUG("create device");
 
         SPDLOG_DEBUG("...with features:");
-        for (const auto& feature_struct_name : features.get_feature_struct_names()) {
-            for (const auto& feature_name : features.get_feature_names(feature_struct_name)) {
-                if (features.get_feature(feature_struct_name, feature_name)) {
-                    if (physical_device->get_supported_features().get_feature(feature_struct_name,
-                                                                              feature_name)) {
-                        SPDLOG_DEBUG("{}/{}", feature_struct_name, feature_name);
-                        enabled_features.set_feature(feature_struct_name, feature_name, true);
-                    } else {
-                        SPDLOG_WARN("{}/{} requested but not supported", feature_struct_name,
-                                    feature_name);
-                    }
-                }
+        for (const auto& feature_name : features.get_enabled_features()) {
+            if (physical_device->get_supported_features().get_feature(feature_name)) {
+                SPDLOG_DEBUG("{}", feature_name);
+                enabled_features.set_feature(feature_name, true);
+            } else {
+                SPDLOG_WARN("{} requested but not supported", feature_name);
             }
         }
 
@@ -111,7 +105,7 @@ class Device : public std::enable_shared_from_this<Device> {
             add_extension(ext);
         }
 
-        void* p_next_chain = enabled_features.build_chain_for_device_creation(p_next);
+        void* p_next_chain = enabled_features.build_chain_for_device_creation(physical_device, p_next);
         const vk::DeviceCreateInfo device_create_info{{}, queue_create_infos, {}, all_extensions,
                                                       {}, p_next_chain};
 

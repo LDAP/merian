@@ -299,12 +299,12 @@ def generate_header(
         "/**",
         " * @brief Get features required for a SPIR-V capability.",
         " *",
-        ' * Returns feature requirements as "structShortName/featureName" strings',
+        " * Returns feature requirement names (e.g., \"rayTracingPipeline\")",
         " * that can be passed directly to VulkanFeatures::enable_features().",
         " *",
         " * @param capability The SPIR-V capability name",
         " * @param vk_api_version The Vulkan API version",
-        " * @return Vector of feature strings in \"structName/featureName\" format",
+        " * @return Vector of feature name strings",
         " */",
         "std::vector<std::string> get_spirv_capability_features(",
         "    const char* capability,",
@@ -452,10 +452,9 @@ def generate_is_capability_supported_impl(
                 pass
 
             elif enable.feature_struct and enable.feature_name:
-                cpp_name = vk_name_to_cpp_name(enable.feature_struct)
-                short_name = get_short_feature_name(cpp_name, tags)
+                # Use new feature-name-only API
                 conditions.append(
-                    f'features.get_feature("{short_name}", "{enable.feature_name}")'
+                    f'features.get_feature("{enable.feature_name}")'
                 )
 
             elif enable.property_struct and enable.property_member and enable.property_value:
@@ -589,9 +588,8 @@ def generate_capability_features_impl(
         lines.append("        return {")
 
         for enable in feature_enables:
-            cpp_name = vk_name_to_cpp_name(enable.feature_struct)
-            short_name = get_short_feature_name(cpp_name, tags)
-            lines.append(f'            "{short_name}/{enable.feature_name}",')
+            # Use new feature-name-only API
+            lines.append(f'            "{enable.feature_name}",')
 
         lines.append("        };")
 

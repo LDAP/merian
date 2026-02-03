@@ -27,6 +27,7 @@ from vulkan_codegen.naming import (
 from vulkan_codegen.codegen import (
     build_extension_type_map,
     build_alias_maps,
+    build_feature_version_map,
     generate_file_header,
     propagate_ext_map_through_aliases,
 )
@@ -111,6 +112,7 @@ def find_feature_structures(xml_root, tags) -> list[FeatureStruct]:
     extension_map = build_extension_type_map(xml_root)
     alias_to_canonical, _ = build_alias_maps(xml_root)
     propagate_ext_map_through_aliases(extension_map, alias_to_canonical)
+    version_map = build_feature_version_map(xml_root)
 
     for type_elem in xml_root.findall("types/type"):
         if type_elem.get("category") != "struct":
@@ -132,6 +134,7 @@ def find_feature_structures(xml_root, tags) -> list[FeatureStruct]:
         ext_info = extension_map.get(vk_name)
         extension = ext_info[0] if ext_info else None
         promotion_version = ext_info[2] if ext_info else None
+        required_version = version_map.get(vk_name)
 
         features.append(
             FeatureStruct(
@@ -141,6 +144,7 @@ def find_feature_structures(xml_root, tags) -> list[FeatureStruct]:
                 members=members,
                 extension=extension,
                 promotion_version=promotion_version,
+                required_version=required_version,
             )
         )
 
@@ -226,6 +230,8 @@ def generate_header(features: list[FeatureStruct]) -> str:
         "",
         "// Forward declarations",
         "class VulkanProperties;",
+        "class PhysicalDevice;",
+        "using PhysicalDeviceHandle = std::shared_ptr<PhysicalDevice>;",
         "",
     ]
 
@@ -240,9 +246,13 @@ def generate_header(features: list[FeatureStruct]) -> str:
             " * unsafe casting or map lookups. Each feature struct is stored as a direct member.",
             " *",
             " * Features can be accessed via:",
+            " * - Feature name only: set_feature(\"robustImageAccess\", true)",
             " * - Template method: get<vk::PhysicalDeviceRayTracingPipelineFeaturesKHR>()",
             " * - Named getter: get_ray_tracing_pipeline_features_khr()",
-            ' * - String-based: set_feature("RayTracingPipelineKHR", "rayTracingPipeline", true)',
+            " *",
+            " * Version-portable: Promoted features (e.g., robustImageAccess) are set in ALL",
+            " * matching structs (both core and extension). The constructor's pNext chain builder",
+            " * selects the appropriate struct based on device API version and extension support.",
             " */",
             "class VulkanFeatures {",
             "  public:",
@@ -253,8 +263,8 @@ def generate_header(features: list[FeatureStruct]) -> str:
             "    VulkanFeatures(const vk::PhysicalDevice& physical_device,",
             "                   const VulkanProperties& properties);",
             "",
-            '    /// Constructor: enable features from strings of the form "structName/featureName"',
-            "    VulkanFeatures(const vk::ArrayProxy<const std::string>& features);",
+            "    /// Constructor: enable features from feature names",
+            "    VulkanFeatures(const vk::ArrayProxy<const std::string>& feature_names);",
             "",
             "    /// Copy and move",
             "    VulkanFeatures(const VulkanFeatures&) = default;",
@@ -270,47 +280,31 @@ def generate_header(features: list[FeatureStruct]) -> str:
     lines.extend(
         [
             "",
-            '    /// Enable features from strings of the form "structName/featureName"',
-            "    void enable_features(const vk::ArrayProxy<const std::string>& features);",
+            "    /// Feature-name-only API (simplified, version-portable)",
+            "    void set_feature(const std::string& feature_name, bool enable);",
+            "    bool get_feature(const std::string& feature_name) const;",
             "",
-            '    /// Disable features from strings of the form "structName/featureName"',
-            "    void disable_features(const vk::ArrayProxy<const std::string>& features);",
+            "    /// Enable multiple features by name",
+            "    void enable_features(const vk::ArrayProxy<const std::string>& feature_names);",
             "",
-            "    /// String-based feature access (runtime)",
-            "    bool set_feature(const std::string& feature_struct_name,",
-            "                     const std::string& feature_name,",
-            "                     bool value);",
+            "    /// Get list of all available feature names",
+            "    std::vector<std::string> get_all_feature_names() const;",
             "",
-            "    bool get_feature(const std::string& feature_struct_name,",
-            "                     const std::string& feature_name) const;",
+            "    /// Get list of all currently enabled feature names",
+            "    std::vector<std::string> get_enabled_features() const;",
             "",
-            '    /// String-based feature access using "structName/featureName" format',
-            "    void set_feature(const std::string& feature, bool value);",
-            "",
-            "    bool get_feature(const std::string& feature) const;",
-            "",
-            "    /// Get list of all feature names for a struct",
-            "    std::vector<std::string> get_feature_names(const std::string& feature_struct_name) const;",
-            "",
-            '    /// Get list of all feature struct names (e.g., "RayTracingPipelineKHR", "16BitStorage")',
-            "    /// Useful for iterating over all feature structs to merge or compare VulkanFeatures objects",
-            "    std::vector<std::string> get_feature_struct_names() const;",
-            "",
-            "    /// Build pNext chain for device creation (includes only structs with non-zero features)",
+            "    /// Build pNext chain for device creation (includes only supported structs with enabled features)",
+            "    /// @param physical_device The physical device to query for API version and extension support",
             "    /// @param p_next Optional pointer to chain with other structures",
-            "    void* build_chain_for_device_creation(void* p_next = nullptr);",
+            "    void* build_chain_for_device_creation(",
+            "        const PhysicalDeviceHandle& physical_device,",
+            "        void* p_next = nullptr);",
             "",
             "    /// Get all extensions required by currently enabled features",
             "    /// @return Vector of extension name macros needed for enabled features",
             "    std::vector<const char*> get_required_extensions() const;",
             "",
             "  private:",
-            '    /// Internal: parse "structName/featureName" string into components',
-            "    static std::pair<std::string, std::string> parse_feature_string(const std::string& feature);",
-            "",
-            "    /// Internal: parse and set features from strings",
-            "    void parse_and_set_features(const vk::ArrayProxy<const std::string>& features, bool value);",
-            "",
             "    /// Internal: get pointer to struct by StructureType",
             "    void* get_struct_ptr(vk::StructureType stype);",
             "    const void* get_struct_ptr(vk::StructureType stype) const;",
@@ -371,7 +365,10 @@ def generate_constructor(features: list[FeatureStruct], tags) -> list[str]:
         member_name = generate_member_name(feat.cpp_name)
         lines.append(f"    // {feat.cpp_name}")
 
-        if feat.extension and feat.promotion_version:
+        if feat.required_version:
+            # Core feature struct - requires specific API version
+            lines.append(f"    if (vk_api_version >= {feat.required_version}) {{")
+        elif feat.extension and feat.promotion_version:
             lines.extend(
                 [
                     f"    if (vk_api_version >= {feat.promotion_version} ||",
@@ -548,126 +545,102 @@ def generate_get_struct_ptr(features: list[FeatureStruct], tags) -> list[str]:
     return lines
 
 
-def generate_set_get_feature(features: list[FeatureStruct], tags) -> list[str]:
-    """Generate set_feature and get_feature implementations."""
+def build_feature_to_structs_map(features: list[FeatureStruct]) -> dict:
+    """Build mapping of feature name -> list of (FeatureStruct, member) tuples."""
+    feature_map = {}
+    for feat in features:
+        for member in feat.members:
+            if member.name not in feature_map:
+                feature_map[member.name] = []
+            feature_map[member.name].append({
+                'struct': feat,
+                'member': member
+            })
+    return feature_map
+
+
+def generate_set_feature(feature_map: dict) -> list[str]:
+    """Generate set_feature implementation with type-safe if/else chain."""
     lines = [
-        "bool VulkanFeatures::set_feature(const std::string& feature_struct_name,",
-        "                                  const std::string& feature_name,",
-        "                                  bool value) {",
-        "    auto stype_opt = structure_type_for_feature_name(feature_struct_name);",
-        "    if (!stype_opt) return false;",
-        "    ",
-        "    const vk::StructureType stype = *stype_opt;",
-        "    const vk::Bool32 vk_value = value ? VK_TRUE : VK_FALSE;",
-        "    ",
-        "    switch (stype) {",
+        "void VulkanFeatures::set_feature(const std::string& feature_name, bool enable) {",
+        "    const VkBool32 value = enable ? VK_TRUE : VK_FALSE;",
+        "",
     ]
 
-    for feat in sorted(features, key=lambda f: f.cpp_name):
-        member_name = generate_member_name(feat.cpp_name)
-        stype_enum = feat.stype.replace("VK_STRUCTURE_TYPE_", "")
-        stype_camel = "e" + to_camel_case(stype_enum, tags)
-        prefix = feat.member_prefix
+    first = True
+    for feature_name, struct_list in sorted(feature_map.items()):
+        if_keyword = "if" if first else "else if"
+        first = False
 
-        lines.append(f"        case vk::StructureType::{stype_camel}: {{")
-        for member in feat.members:
-            lines.append(
-                f'            if (feature_name == "{member.name}") {{ {member_name}.{prefix}{member.name} = vk_value; return true; }}'
-            )
-        lines.extend(["            return false;", "        }"])
+        lines.append(f'    {if_keyword} (feature_name == "{feature_name}") {{')
 
-    lines.extend(
-        [
-            "        default:",
-            "            return false;",
-            "    }",
-            "}",
-            "",
-            "bool VulkanFeatures::get_feature(const std::string& feature_struct_name,",
-            "                                  const std::string& feature_name) const {",
-            "    auto stype_opt = structure_type_for_feature_name(feature_struct_name);",
-            "    if (!stype_opt) return false;",
-            "    ",
-            "    const vk::StructureType stype = *stype_opt;",
-            "    ",
-            "    switch (stype) {",
-        ]
-    )
+        # Set in ALL structs that contain this feature
+        for entry in struct_list:
+            member_name = generate_member_name(entry['struct'].cpp_name)
+            prefix = entry['struct'].member_prefix
+            feat_name = entry['member'].name
+            lines.append(f'        {member_name}.{prefix}{feat_name} = value;')
 
-    for feat in sorted(features, key=lambda f: f.cpp_name):
-        member_name = generate_member_name(feat.cpp_name)
-        stype_enum = feat.stype.replace("VK_STRUCTURE_TYPE_", "")
-        stype_camel = "e" + to_camel_case(stype_enum, tags)
-        prefix = feat.member_prefix
+        lines.append('    }')
 
-        lines.append(f"        case vk::StructureType::{stype_camel}: {{")
-        for member in feat.members:
-            lines.append(
-                f'            if (feature_name == "{member.name}") return {member_name}.{prefix}{member.name} == VK_TRUE;'
-            )
-        lines.extend(["            return false;", "        }"])
+    lines.extend([
+        '    else {',
+        '        throw std::invalid_argument(',
+        '            fmt::format("Unknown feature: \'{}\'", feature_name));',
+        '    }',
+        '}',
+        '',
+    ])
 
-    lines.extend(
-        [
-            "        default:",
-            "            return false;",
-            "    }",
-            "}",
-            "",
-        ]
-    )
+    return lines
+
+
+def generate_get_feature(feature_map: dict) -> list[str]:
+    """Generate get_feature implementation with type-safe if/else chain."""
+    lines = [
+        "bool VulkanFeatures::get_feature(const std::string& feature_name) const {",
+    ]
+
+    first = True
+    for feature_name, struct_list in sorted(feature_map.items()):
+        if_keyword = "if" if first else "else if"
+        first = False
+
+        # Return from first struct (all aliases must be consistent per Vulkan spec)
+        entry = struct_list[0]
+        member_name = generate_member_name(entry['struct'].cpp_name)
+        prefix = entry['struct'].member_prefix
+        feat_name = entry['member'].name
+
+        lines.append(f'    {if_keyword} (feature_name == "{feature_name}") {{')
+        lines.append(f'        return {member_name}.{prefix}{feat_name} == VK_TRUE;')
+        lines.append('    }')
+
+    lines.extend([
+        '    else {',
+        '        throw std::invalid_argument(',
+        '            fmt::format("Unknown feature: \'{}\'", feature_name));',
+        '    }',
+        '}',
+        '',
+    ])
 
     return lines
 
 
 def generate_helper_functions(features: list[FeatureStruct], tags) -> list[str]:
-    """Generate get_feature_names, get_feature_struct_names, build_chain, get_required_extensions."""
+    """Generate build_chain_for_device_creation and get_required_extensions."""
     lines = [
-        "std::vector<std::string> VulkanFeatures::get_feature_names(const std::string& feature_struct_name) const {",
-        "    auto stype_opt = structure_type_for_feature_name(feature_struct_name);",
-        "    if (!stype_opt) return {};",
+        "void* VulkanFeatures::build_chain_for_device_creation(",
+        "    const PhysicalDeviceHandle& physical_device,",
+        "    void* p_next) {",
+        "    const uint32_t vk_api_version = physical_device->get_vk_api_version();",
+        "    void* chain_head = p_next;",
         "    ",
-        "    const vk::StructureType stype = *stype_opt;",
-        "    ",
-        "    switch (stype) {",
+        "    // Build chain from supported structs with at least one enabled feature",
+        "    // Asserts that required extensions are supported if features from that extension are enabled",
+        "",
     ]
-
-    for feat in sorted(features, key=lambda f: f.cpp_name):
-        stype_enum = feat.stype.replace("VK_STRUCTURE_TYPE_", "")
-        stype_camel = "e" + to_camel_case(stype_enum, tags)
-        lines.append(f"        case vk::StructureType::{stype_camel}:")
-        lines.append("            return {")
-        for member in feat.members:
-            lines.append(f'                "{member.name}",')
-        lines.append("            };")
-
-    lines.extend(
-        [
-            "        default:",
-            "            return {};",
-            "    }",
-            "}",
-            "",
-            "std::vector<std::string> VulkanFeatures::get_feature_struct_names() const {",
-            "    return {",
-        ]
-    )
-
-    for feat in sorted(features, key=lambda f: f.cpp_name):
-        short_name = get_short_feature_name(feat.cpp_name, tags)
-        lines.append(f'        "{short_name}",')
-
-    lines.extend(
-        [
-            "    };",
-            "}",
-            "",
-            "void* VulkanFeatures::build_chain_for_device_creation(void* p_next) {",
-            "    void* chain_head = p_next;",
-            "    ",
-            "    // Build chain from all structs with at least one enabled feature",
-        ]
-    )
 
     for feat in reversed(sorted(features, key=lambda f: f.cpp_name)):
         if not feat.members:
@@ -675,15 +648,61 @@ def generate_helper_functions(features: list[FeatureStruct], tags) -> list[str]:
 
         member_name = generate_member_name(feat.cpp_name)
         prefix = feat.member_prefix
-        conditions = [
+
+        # Build feature enable condition
+        feature_conditions = [
             f"{member_name}.{prefix}{m.name} == VK_TRUE" for m in feat.members
         ]
-        condition_str = " ||\n        ".join(conditions)
+        feature_condition_str = " ||\n        ".join(feature_conditions)
+
+        lines.append(f"    // Check {feat.cpp_name}")
+
+        # Build support condition
+        if feat.required_version:
+            # Core feature struct - requires specific API version
+            lines.append(f"    if ({feature_condition_str}) {{")
+            lines.append(f"        assert(vk_api_version >= {feat.required_version} &&")
+            lines.append(f'               "Feature enabled but required Vulkan version not supported");')
+            lines.extend(
+                [
+                    f"        {member_name}.pNext = chain_head;",
+                    f"        chain_head = &{member_name};",
+                    "    }",
+                    "",
+                ]
+            )
+            continue
+        elif feat.extension and feat.promotion_version:
+            # Promoted extension feature struct - can be used if extension OR promoted version available
+            # Only include if core version is NOT available (prefer core)
+            lines.append(f"    if ({feature_condition_str}) {{")
+            lines.append(f"        assert((physical_device->extension_supported({feat.extension}) ||")
+            lines.append(f"                vk_api_version >= {feat.promotion_version}) &&")
+            lines.append(f'               "Feature enabled but neither extension nor promoted version supported");')
+            lines.append(f"        if (vk_api_version < {feat.promotion_version}) {{")
+            lines.append(f"            // Core version not available, use extension version")
+            lines.append(f"            {member_name}.pNext = chain_head;")
+            lines.append(f"            chain_head = &{member_name};")
+            lines.append(f"        }}")
+            lines.append("    }")
+            lines.append("")
+            continue
+        elif feat.extension:
+            # Extension-only feature - assert extension is supported when feature is enabled
+            lines.append(f"    if ({feature_condition_str}) {{")
+            lines.append(f"        assert(physical_device->extension_supported({feat.extension}) &&")
+            lines.append(f'               "Feature enabled but required extension not supported");')
+        elif feat.promotion_version:
+            # Core VulkanXXFeatures struct - requires API version
+            lines.append(f"    if ({feature_condition_str}) {{")
+            lines.append(f"        assert(vk_api_version >= {feat.promotion_version} &&")
+            lines.append(f'               "Feature enabled but required Vulkan version not supported");')
+        else:
+            # Base Vulkan 1.0 features (no version/extension requirement)
+            lines.append(f"    if ({feature_condition_str}) {{")
 
         lines.extend(
             [
-                f"    // Check {feat.cpp_name}",
-                f"    if ({condition_str}) {{",
                 f"        {member_name}.pNext = chain_head;",
                 f"        chain_head = &{member_name};",
                 "    }",
@@ -770,62 +789,65 @@ def generate_structure_type_lookup(features: list[FeatureStruct], tags) -> list[
     return lines
 
 
-def generate_string_features_methods() -> list[str]:
-    """Generate parse_and_set_features, string constructor, enable/disable methods."""
-    return [
-        "std::pair<std::string, std::string> VulkanFeatures::parse_feature_string(const std::string& feature) {",
-        "    const auto sep = feature.find('/');",
-        "    if (sep == std::string::npos) {",
-        "        throw std::invalid_argument(fmt::format(",
-        "            \"Invalid feature string '{}': expected 'structName/featureName'\", feature));",
-        "    }",
-        "    return {feature.substr(0, sep), feature.substr(sep + 1)};",
+def generate_string_features_methods(feature_map: dict) -> list[str]:
+    """Generate constructor, enable_features, and feature query methods."""
+    lines = [
+        "VulkanFeatures::VulkanFeatures(const vk::ArrayProxy<const std::string>& feature_names) {",
+        "    enable_features(feature_names);",
         "}",
         "",
-        "void VulkanFeatures::parse_and_set_features(const vk::ArrayProxy<const std::string>& features, bool value) {",
-        "    for (const auto& feature : features) {",
-        "        const auto [struct_name, feature_name] = parse_feature_string(feature);",
-        "        if (!set_feature(struct_name, feature_name, value)) {",
-        "            throw std::invalid_argument(fmt::format(",
-        "                \"Unknown feature '{}' in struct '{}'\", feature_name, struct_name));",
-        "        }",
+        "void VulkanFeatures::enable_features(const vk::ArrayProxy<const std::string>& feature_names) {",
+        "    for (const auto& feature_name : feature_names) {",
+        "        set_feature(feature_name, true);",
         "    }",
         "}",
         "",
-        "VulkanFeatures::VulkanFeatures(const vk::ArrayProxy<const std::string>& features) {",
-        "    parse_and_set_features(features, true);",
-        "}",
-        "",
-        "void VulkanFeatures::enable_features(const vk::ArrayProxy<const std::string>& features) {",
-        "    parse_and_set_features(features, true);",
-        "}",
-        "",
-        "void VulkanFeatures::disable_features(const vk::ArrayProxy<const std::string>& features) {",
-        "    parse_and_set_features(features, false);",
-        "}",
-        "",
-        "void VulkanFeatures::set_feature(const std::string& feature, bool value) {",
-        "    const auto [struct_name, feature_name] = parse_feature_string(feature);",
-        "    if (!set_feature(struct_name, feature_name, value)) {",
-        "        throw std::invalid_argument(fmt::format(",
-        "            \"Unknown feature '{}' in struct '{}'\", feature_name, struct_name));",
-        "    }",
-        "}",
-        "",
-        "bool VulkanFeatures::get_feature(const std::string& feature) const {",
-        "    const auto [struct_name, feature_name] = parse_feature_string(feature);",
-        "    return get_feature(struct_name, feature_name);",
-        "}",
-        "",
+        "std::vector<std::string> VulkanFeatures::get_all_feature_names() const {",
+        "    return {",
     ]
+
+    # Add all feature names
+    for feature_name in sorted(feature_map.keys()):
+        lines.append(f'        "{feature_name}",')
+
+    lines.extend([
+        "    };",
+        "}",
+        "",
+        "std::vector<std::string> VulkanFeatures::get_enabled_features() const {",
+        "    std::vector<std::string> enabled;",
+        "",
+    ])
+
+    # Check each feature by directly accessing struct members (not calling get_feature)
+    for feature_name, struct_list in sorted(feature_map.items()):
+        # Use first struct to check (all aliases must be consistent per Vulkan spec)
+        entry = struct_list[0]
+        member_name = generate_member_name(entry['struct'].cpp_name)
+        prefix = entry['struct'].member_prefix
+        feat_name = entry['member'].name
+
+        lines.append(f'    if ({member_name}.{prefix}{feat_name} == VK_TRUE) enabled.push_back("{feature_name}");')
+
+    lines.extend([
+        "",
+        "    return enabled;",
+        "}",
+        "",
+    ])
+
+    return lines
 
 
 def generate_implementation(features: list[FeatureStruct], tags) -> str:
     """Generate the vulkan_features.cpp implementation file content."""
     lines = generate_file_header(VULKAN_SPEC_VERSION) + [
         '#include "merian/vk/utils/vulkan_features.hpp"',
+        "",
+        '#include "merian/vk/physical_device.hpp"',
         '#include "merian/vk/utils/vulkan_properties.hpp"',
         "",
+        "#include <cassert>",
         "#include <fmt/format.h>",
         "#include <stdexcept>",
         "#include <unordered_map>",
@@ -834,13 +856,17 @@ def generate_implementation(features: list[FeatureStruct], tags) -> str:
         "",
     ]
 
+    # Build feature-to-structs mapping for new API
+    feature_map = build_feature_to_structs_map(features)
+
     lines.extend(generate_constructor(features, tags))
-    lines.extend(generate_string_features_methods())
+    lines.extend(generate_string_features_methods(feature_map))
     lines.extend(generate_template_get(features))
     lines.extend(generate_named_getters(features))
     lines.extend(generate_alias_getters(features))
     lines.extend(generate_get_struct_ptr(features, tags))
-    lines.extend(generate_set_get_feature(features, tags))
+    lines.extend(generate_set_feature(feature_map))
+    lines.extend(generate_get_feature(feature_map))
     lines.extend(generate_helper_functions(features, tags))
     lines.extend(generate_structure_type_lookup(features, tags))
 

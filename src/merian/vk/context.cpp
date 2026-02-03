@@ -276,16 +276,10 @@ void Context::select_physical_device(
 
             uint32_t features_supported = 0;
             uint32_t features_total = 0;
-            for (const auto& feature_struct_name : desired_features.get_feature_struct_names()) {
-                for (const auto& feature :
-                     desired_features.get_feature_names(feature_struct_name)) {
-                    if (desired_features.get_feature(feature_struct_name, feature)) {
-                        features_supported += static_cast<uint32_t>(
-                            physical_devices[i]->get_supported_features().get_feature(
-                                feature_struct_name, feature));
-                        features_total++;
-                    }
-                }
+            for (const auto& feature_name : desired_features.get_enabled_features()) {
+                features_supported += static_cast<uint32_t>(
+                    physical_devices[i]->get_supported_features().get_feature(feature_name));
+                features_total++;
             }
 
             SPDLOG_DEBUG(

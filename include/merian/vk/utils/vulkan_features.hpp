@@ -15,6 +15,8 @@ namespace merian {
 
 // Forward declarations
 class VulkanProperties;
+class PhysicalDevice;
+using PhysicalDeviceHandle = std::shared_ptr<PhysicalDevice>;
 
 /**
  * @brief C++20 concept for validating Vulkan feature structure types.
@@ -274,9 +276,13 @@ concept VulkanFeatureStruct = (
  * unsafe casting or map lookups. Each feature struct is stored as a direct member.
  *
  * Features can be accessed via:
+ * - Feature name only: set_feature("robustImageAccess", true)
  * - Template method: get<vk::PhysicalDeviceRayTracingPipelineFeaturesKHR>()
  * - Named getter: get_ray_tracing_pipeline_features_khr()
- * - String-based: set_feature("RayTracingPipelineKHR", "rayTracingPipeline", true)
+ *
+ * Version-portable: Promoted features (e.g., robustImageAccess) are set in ALL
+ * matching structs (both core and extension). The constructor's pNext chain builder
+ * selects the appropriate struct based on device API version and extension support.
  */
 class VulkanFeatures {
   public:
@@ -287,8 +293,8 @@ class VulkanFeatures {
     VulkanFeatures(const vk::PhysicalDevice& physical_device,
                    const VulkanProperties& properties);
 
-    /// Constructor: enable features from strings of the form "structName/featureName"
-    VulkanFeatures(const vk::ArrayProxy<const std::string>& features);
+    /// Constructor: enable features from feature names
+    VulkanFeatures(const vk::ArrayProxy<const std::string>& feature_names);
 
     /// Copy and move
     VulkanFeatures(const VulkanFeatures&) = default;
@@ -1165,47 +1171,31 @@ class VulkanFeatures {
     vk::PhysicalDeviceZeroInitializeWorkgroupMemoryFeatures& get_zero_initialize_workgroup_memory_features_khr();  // Alias for PhysicalDeviceZeroInitializeWorkgroupMemoryFeatures
     const vk::PhysicalDeviceZeroInitializeWorkgroupMemoryFeatures& get_zero_initialize_workgroup_memory_features_khr() const;
 
-    /// Enable features from strings of the form "structName/featureName"
-    void enable_features(const vk::ArrayProxy<const std::string>& features);
+    /// Feature-name-only API (simplified, version-portable)
+    void set_feature(const std::string& feature_name, bool enable);
+    bool get_feature(const std::string& feature_name) const;
 
-    /// Disable features from strings of the form "structName/featureName"
-    void disable_features(const vk::ArrayProxy<const std::string>& features);
+    /// Enable multiple features by name
+    void enable_features(const vk::ArrayProxy<const std::string>& feature_names);
 
-    /// String-based feature access (runtime)
-    bool set_feature(const std::string& feature_struct_name,
-                     const std::string& feature_name,
-                     bool value);
+    /// Get list of all available feature names
+    std::vector<std::string> get_all_feature_names() const;
 
-    bool get_feature(const std::string& feature_struct_name,
-                     const std::string& feature_name) const;
+    /// Get list of all currently enabled feature names
+    std::vector<std::string> get_enabled_features() const;
 
-    /// String-based feature access using "structName/featureName" format
-    void set_feature(const std::string& feature, bool value);
-
-    bool get_feature(const std::string& feature) const;
-
-    /// Get list of all feature names for a struct
-    std::vector<std::string> get_feature_names(const std::string& feature_struct_name) const;
-
-    /// Get list of all feature struct names (e.g., "RayTracingPipelineKHR", "16BitStorage")
-    /// Useful for iterating over all feature structs to merge or compare VulkanFeatures objects
-    std::vector<std::string> get_feature_struct_names() const;
-
-    /// Build pNext chain for device creation (includes only structs with non-zero features)
+    /// Build pNext chain for device creation (includes only supported structs with enabled features)
+    /// @param physical_device The physical device to query for API version and extension support
     /// @param p_next Optional pointer to chain with other structures
-    void* build_chain_for_device_creation(void* p_next = nullptr);
+    void* build_chain_for_device_creation(
+        const PhysicalDeviceHandle& physical_device,
+        void* p_next = nullptr);
 
     /// Get all extensions required by currently enabled features
     /// @return Vector of extension name macros needed for enabled features
     std::vector<const char*> get_required_extensions() const;
 
   private:
-    /// Internal: parse "structName/featureName" string into components
-    static std::pair<std::string, std::string> parse_feature_string(const std::string& feature);
-
-    /// Internal: parse and set features from strings
-    void parse_and_set_features(const vk::ArrayProxy<const std::string>& features, bool value);
-
     /// Internal: get pointer to struct by StructureType
     void* get_struct_ptr(vk::StructureType stype);
     const void* get_struct_ptr(vk::StructureType stype) const;

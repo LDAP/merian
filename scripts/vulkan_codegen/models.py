@@ -54,5 +54,6 @@ class FeatureStruct:
     members: list[FeatureMember] = field(default_factory=list)
     extension: Optional[str] = None  # e.g., VK_EXT_ROBUSTNESS_2_EXTENSION_NAME
     promotion_version: Optional[str] = None  # e.g., VK_API_VERSION_1_2
+    required_version: Optional[str] = None  # e.g., VK_API_VERSION_1_3 (for core VulkanXXFeatures)
     member_prefix: str = ""  # e.g., "features." for VkPhysicalDeviceFeatures2
     aliases: list[str] = field(default_factory=list)

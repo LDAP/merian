@@ -586,70 +586,70 @@ bool is_spirv_capability_supported(
     const std::string_view cap_name{capability};
     
     if (cap_name == "AtomicFloat16AddEXT") {
-        return features.get_feature("ShaderAtomicFloat2", "shaderBufferFloat16AtomicAdd") ||
-            features.get_feature("ShaderAtomicFloat2", "shaderSharedFloat16AtomicAdd");
+        return features.get_feature("shaderBufferFloat16AtomicAdd") ||
+            features.get_feature("shaderSharedFloat16AtomicAdd");
     } else if (cap_name == "AtomicFloat16MinMaxEXT") {
-        return features.get_feature("ShaderAtomicFloat2", "shaderBufferFloat16AtomicMinMax") ||
-            features.get_feature("ShaderAtomicFloat2", "shaderSharedFloat16AtomicMinMax");
+        return features.get_feature("shaderBufferFloat16AtomicMinMax") ||
+            features.get_feature("shaderSharedFloat16AtomicMinMax");
     } else if (cap_name == "AtomicFloat16VectorNV") {
-        return features.get_feature("ShaderAtomicFloat16Vector", "shaderFloat16VectorAtomics");
+        return features.get_feature("shaderFloat16VectorAtomics");
     } else if (cap_name == "AtomicFloat32AddEXT") {
-        return features.get_feature("ShaderAtomicFloat", "shaderBufferFloat32AtomicAdd") ||
-            features.get_feature("ShaderAtomicFloat", "shaderSharedFloat32AtomicAdd") ||
-            features.get_feature("ShaderAtomicFloat", "shaderImageFloat32AtomicAdd");
+        return features.get_feature("shaderBufferFloat32AtomicAdd") ||
+            features.get_feature("shaderSharedFloat32AtomicAdd") ||
+            features.get_feature("shaderImageFloat32AtomicAdd");
     } else if (cap_name == "AtomicFloat32MinMaxEXT") {
-        return features.get_feature("ShaderAtomicFloat2", "shaderBufferFloat32AtomicMinMax") ||
-            features.get_feature("ShaderAtomicFloat2", "shaderSharedFloat32AtomicMinMax") ||
-            features.get_feature("ShaderAtomicFloat2", "shaderImageFloat32AtomicMinMax");
+        return features.get_feature("shaderBufferFloat32AtomicMinMax") ||
+            features.get_feature("shaderSharedFloat32AtomicMinMax") ||
+            features.get_feature("shaderImageFloat32AtomicMinMax");
     } else if (cap_name == "AtomicFloat64AddEXT") {
-        return features.get_feature("ShaderAtomicFloat", "shaderBufferFloat64AtomicAdd") ||
-            features.get_feature("ShaderAtomicFloat", "shaderSharedFloat64AtomicAdd");
+        return features.get_feature("shaderBufferFloat64AtomicAdd") ||
+            features.get_feature("shaderSharedFloat64AtomicAdd");
     } else if (cap_name == "AtomicFloat64MinMaxEXT") {
-        return features.get_feature("ShaderAtomicFloat2", "shaderBufferFloat64AtomicMinMax") ||
-            features.get_feature("ShaderAtomicFloat2", "shaderSharedFloat64AtomicMinMax");
+        return features.get_feature("shaderBufferFloat64AtomicMinMax") ||
+            features.get_feature("shaderSharedFloat64AtomicMinMax");
     } else if (cap_name == "BFloat16CooperativeMatrixKHR") {
-        return features.get_feature("ShaderBfloat16", "shaderBFloat16CooperativeMatrix");
+        return features.get_feature("shaderBFloat16CooperativeMatrix");
     } else if (cap_name == "BFloat16DotProductKHR") {
-        return features.get_feature("ShaderBfloat16", "shaderBFloat16DotProduct");
+        return features.get_feature("shaderBFloat16DotProduct");
     } else if (cap_name == "BFloat16TypeKHR") {
-        return features.get_feature("ShaderBfloat16", "shaderBFloat16Type");
+        return features.get_feature("shaderBFloat16Type");
     } else if (cap_name == "ClipDistance") {
-        return features.get_feature("", "shaderClipDistance");
+        return features.get_feature("shaderClipDistance");
     } else if (cap_name == "ClusterCullingShadingHUAWEI") {
-        return features.get_feature("ClusterCullingShader", "clustercullingShader");
+        return features.get_feature("clustercullingShader");
     } else if (cap_name == "ComputeDerivativeGroupLinearKHR") {
-        return features.get_feature("ComputeShaderDerivatives", "computeDerivativeGroupLinear") ||
-            features.get_feature("ComputeShaderDerivatives", "computeDerivativeGroupLinear");
+        return features.get_feature("computeDerivativeGroupLinear") ||
+            features.get_feature("computeDerivativeGroupLinear");
     } else if (cap_name == "ComputeDerivativeGroupQuadsKHR") {
-        return features.get_feature("ComputeShaderDerivatives", "computeDerivativeGroupQuads") ||
-            features.get_feature("ComputeShaderDerivatives", "computeDerivativeGroupQuads");
+        return features.get_feature("computeDerivativeGroupQuads") ||
+            features.get_feature("computeDerivativeGroupQuads");
     } else if (cap_name == "CooperativeMatrixBlockLoadsNV") {
-        return features.get_feature("CooperativeMatrix2", "cooperativeMatrixBlockLoads");
+        return features.get_feature("cooperativeMatrixBlockLoads");
     } else if (cap_name == "CooperativeMatrixConversionQCOM") {
-        return features.get_feature("CooperativeMatrixConversion", "cooperativeMatrixConversion");
+        return features.get_feature("cooperativeMatrixConversion");
     } else if (cap_name == "CooperativeMatrixConversionsNV") {
-        return features.get_feature("CooperativeMatrix2", "cooperativeMatrixConversions");
+        return features.get_feature("cooperativeMatrixConversions");
     } else if (cap_name == "CooperativeMatrixKHR") {
-        return features.get_feature("CooperativeMatrix", "cooperativeMatrix");
+        return features.get_feature("cooperativeMatrix");
     } else if (cap_name == "CooperativeMatrixNV") {
-        return features.get_feature("CooperativeMatrix", "cooperativeMatrix");
+        return features.get_feature("cooperativeMatrix");
     } else if (cap_name == "CooperativeMatrixPerElementOperationsNV") {
-        return features.get_feature("CooperativeMatrix2", "cooperativeMatrixPerElementOperations");
+        return features.get_feature("cooperativeMatrixPerElementOperations");
     } else if (cap_name == "CooperativeMatrixReductionsNV") {
-        return features.get_feature("CooperativeMatrix2", "cooperativeMatrixReductions");
+        return features.get_feature("cooperativeMatrixReductions");
     } else if (cap_name == "CooperativeMatrixTensorAddressingNV") {
-        return features.get_feature("CooperativeMatrix2", "cooperativeMatrixTensorAddressing");
+        return features.get_feature("cooperativeMatrixTensorAddressing");
     } else if (cap_name == "CooperativeVectorNV") {
-        return features.get_feature("CooperativeVector", "cooperativeVector");
+        return features.get_feature("cooperativeVector");
     } else if (cap_name == "CooperativeVectorTrainingNV") {
-        return features.get_feature("CooperativeVector", "cooperativeVectorTraining");
+        return features.get_feature("cooperativeVectorTraining");
     } else if (cap_name == "CoreBuiltinsARM") {
-        return features.get_feature("ShaderCoreBuiltins", "shaderCoreBuiltins");
+        return features.get_feature("shaderCoreBuiltins");
     } else if (cap_name == "CullDistance") {
-        return features.get_feature("", "shaderCullDistance");
+        return features.get_feature("shaderCullDistance");
     } else if (cap_name == "DemoteToHelperInvocation") {
-        return features.get_feature("Vulkan13", "shaderDemoteToHelperInvocation") ||
-            features.get_feature("ShaderDemoteToHelperInvocation", "shaderDemoteToHelperInvocation");
+        return features.get_feature("shaderDemoteToHelperInvocation") ||
+            features.get_feature("shaderDemoteToHelperInvocation");
     } else if (cap_name == "DenormFlushToZero") {
         return (properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderDenormFlushToZeroFloat16 == VK_TRUE) ||
             (properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderDenormFlushToZeroFloat32 == VK_TRUE) ||
@@ -661,73 +661,73 @@ bool is_spirv_capability_supported(
     } else if (cap_name == "DerivativeControl") {
         return (vk_api_version >= VK_API_VERSION_1_0);
     } else if (cap_name == "DescriptorHeapEXT") {
-        return features.get_feature("DescriptorHeap", "descriptorHeap");
+        return features.get_feature("descriptorHeap");
     } else if (cap_name == "DeviceGroup") {
         return (vk_api_version >= VK_API_VERSION_1_1);
     } else if (cap_name == "DotProduct") {
-        return features.get_feature("Vulkan13", "shaderIntegerDotProduct") ||
-            features.get_feature("ShaderIntegerDotProduct", "shaderIntegerDotProduct");
+        return features.get_feature("shaderIntegerDotProduct") ||
+            features.get_feature("shaderIntegerDotProduct");
     } else if (cap_name == "DotProductInput4x8Bit") {
-        return features.get_feature("Vulkan13", "shaderIntegerDotProduct") ||
-            features.get_feature("ShaderIntegerDotProduct", "shaderIntegerDotProduct");
+        return features.get_feature("shaderIntegerDotProduct") ||
+            features.get_feature("shaderIntegerDotProduct");
     } else if (cap_name == "DotProductInput4x8BitPacked") {
-        return features.get_feature("Vulkan13", "shaderIntegerDotProduct") ||
-            features.get_feature("ShaderIntegerDotProduct", "shaderIntegerDotProduct");
+        return features.get_feature("shaderIntegerDotProduct") ||
+            features.get_feature("shaderIntegerDotProduct");
     } else if (cap_name == "DotProductInputAll") {
-        return features.get_feature("Vulkan13", "shaderIntegerDotProduct") ||
-            features.get_feature("ShaderIntegerDotProduct", "shaderIntegerDotProduct");
+        return features.get_feature("shaderIntegerDotProduct") ||
+            features.get_feature("shaderIntegerDotProduct");
     } else if (cap_name == "DrawParameters") {
-        return features.get_feature("Vulkan11", "shaderDrawParameters") ||
-            features.get_feature("ShaderDrawParameters", "shaderDrawParameters");
+        return features.get_feature("shaderDrawParameters") ||
+            features.get_feature("shaderDrawParameters");
     } else if (cap_name == "ExpectAssumeKHR") {
-        return features.get_feature("Vulkan14", "shaderExpectAssume") ||
-            features.get_feature("ShaderExpectAssume", "shaderExpectAssume");
+        return features.get_feature("shaderExpectAssume") ||
+            features.get_feature("shaderExpectAssume");
     } else if (cap_name == "FMAKHR") {
-        return features.get_feature("ShaderFma", "shaderFmaFloat16") ||
-            features.get_feature("ShaderFma", "shaderFmaFloat32") ||
-            features.get_feature("ShaderFma", "shaderFmaFloat64");
+        return features.get_feature("shaderFmaFloat16") ||
+            features.get_feature("shaderFmaFloat32") ||
+            features.get_feature("shaderFmaFloat64");
     } else if (cap_name == "Float16") {
-        return features.get_feature("Vulkan12", "shaderFloat16");
+        return features.get_feature("shaderFloat16");
     } else if (cap_name == "Float64") {
-        return features.get_feature("", "shaderFloat64");
+        return features.get_feature("shaderFloat64");
     } else if (cap_name == "Float8CooperativeMatrixEXT") {
-        return features.get_feature("ShaderFloat8", "shaderFloat8CooperativeMatrix");
+        return features.get_feature("shaderFloat8CooperativeMatrix");
     } else if (cap_name == "Float8EXT") {
-        return features.get_feature("ShaderFloat8", "shaderFloat8");
+        return features.get_feature("shaderFloat8");
     } else if (cap_name == "FloatControls2") {
-        return features.get_feature("Vulkan14", "shaderFloatControls2") ||
-            features.get_feature("ShaderFloatControls2", "shaderFloatControls2");
+        return features.get_feature("shaderFloatControls2") ||
+            features.get_feature("shaderFloatControls2");
     } else if (cap_name == "FragmentBarycentricKHR") {
-        return features.get_feature("FragmentShaderBarycentric", "fragmentShaderBarycentric") ||
-            features.get_feature("FragmentShaderBarycentric", "fragmentShaderBarycentric");
+        return features.get_feature("fragmentShaderBarycentric") ||
+            features.get_feature("fragmentShaderBarycentric");
     } else if (cap_name == "FragmentDensityEXT") {
-        return features.get_feature("FragmentDensityMap", "fragmentDensityMap") ||
-            features.get_feature("ShadingRateImage", "shadingRateImage");
+        return features.get_feature("fragmentDensityMap") ||
+            features.get_feature("shadingRateImage");
     } else if (cap_name == "FragmentFullyCoveredEXT") {
         return false;
     } else if (cap_name == "FragmentMaskAMD") {
         return false;
     } else if (cap_name == "FragmentShaderPixelInterlockEXT") {
-        return features.get_feature("FragmentShaderInterlock", "fragmentShaderPixelInterlock");
+        return features.get_feature("fragmentShaderPixelInterlock");
     } else if (cap_name == "FragmentShaderSampleInterlockEXT") {
-        return features.get_feature("FragmentShaderInterlock", "fragmentShaderSampleInterlock");
+        return features.get_feature("fragmentShaderSampleInterlock");
     } else if (cap_name == "FragmentShaderShadingRateInterlockEXT") {
-        return features.get_feature("FragmentShaderInterlock", "fragmentShaderShadingRateInterlock") ||
-            features.get_feature("ShadingRateImage", "shadingRateImage");
+        return features.get_feature("fragmentShaderShadingRateInterlock") ||
+            features.get_feature("shadingRateImage");
     } else if (cap_name == "FragmentShadingRateKHR") {
-        return features.get_feature("FragmentShadingRate", "pipelineFragmentShadingRate") ||
-            features.get_feature("FragmentShadingRate", "primitiveFragmentShadingRate") ||
-            features.get_feature("FragmentShadingRate", "attachmentFragmentShadingRate");
+        return features.get_feature("pipelineFragmentShadingRate") ||
+            features.get_feature("primitiveFragmentShadingRate") ||
+            features.get_feature("attachmentFragmentShadingRate");
     } else if (cap_name == "Geometry") {
-        return features.get_feature("", "geometryShader");
+        return features.get_feature("geometryShader");
     } else if (cap_name == "GeometryPointSize") {
-        return features.get_feature("", "shaderTessellationAndGeometryPointSize");
+        return features.get_feature("shaderTessellationAndGeometryPointSize");
     } else if (cap_name == "GeometryShaderPassthroughNV") {
         return false;
     } else if (cap_name == "GeometryStreams") {
-        return features.get_feature("TransformFeedback", "geometryStreams");
+        return features.get_feature("geometryStreams");
     } else if (cap_name == "GraphARM") {
-        return features.get_feature("DataGraph", "dataGraph");
+        return features.get_feature("dataGraph");
     } else if (cap_name == "GroupNonUniform") {
         return (static_cast<uint32_t>(properties.get<vk::PhysicalDeviceVulkan11Properties>().subgroupSupportedOperations) & VK_SUBGROUP_FEATURE_BASIC_BIT);
     } else if (cap_name == "GroupNonUniformArithmetic") {
@@ -737,13 +737,13 @@ bool is_spirv_capability_supported(
     } else if (cap_name == "GroupNonUniformClustered") {
         return (static_cast<uint32_t>(properties.get<vk::PhysicalDeviceVulkan11Properties>().subgroupSupportedOperations) & VK_SUBGROUP_FEATURE_CLUSTERED_BIT);
     } else if (cap_name == "GroupNonUniformPartitionedEXT") {
-        return features.get_feature("ShaderSubgroupPartitioned", "shaderSubgroupPartitioned") ||
+        return features.get_feature("shaderSubgroupPartitioned") ||
             (static_cast<uint32_t>(properties.get<vk::PhysicalDeviceVulkan11Properties>().subgroupSupportedOperations) & VK_SUBGROUP_FEATURE_PARTITIONED_BIT_NV);
     } else if (cap_name == "GroupNonUniformQuad") {
         return (static_cast<uint32_t>(properties.get<vk::PhysicalDeviceVulkan11Properties>().subgroupSupportedOperations) & VK_SUBGROUP_FEATURE_QUAD_BIT);
     } else if (cap_name == "GroupNonUniformRotateKHR") {
-        return features.get_feature("Vulkan14", "shaderSubgroupRotate") ||
-            features.get_feature("ShaderSubgroupRotate", "shaderSubgroupRotate");
+        return features.get_feature("shaderSubgroupRotate") ||
+            features.get_feature("shaderSubgroupRotate");
     } else if (cap_name == "GroupNonUniformShuffle") {
         return (static_cast<uint32_t>(properties.get<vk::PhysicalDeviceVulkan11Properties>().subgroupSupportedOperations) & VK_SUBGROUP_FEATURE_SHUFFLE_BIT);
     } else if (cap_name == "GroupNonUniformShuffleRelative") {
@@ -755,15 +755,15 @@ bool is_spirv_capability_supported(
     } else if (cap_name == "ImageBuffer") {
         return (vk_api_version >= VK_API_VERSION_1_0);
     } else if (cap_name == "ImageCubeArray") {
-        return features.get_feature("", "imageCubeArray");
+        return features.get_feature("imageCubeArray");
     } else if (cap_name == "ImageFootprintNV") {
-        return features.get_feature("ShaderImageFootprint", "imageFootprint");
+        return features.get_feature("imageFootprint");
     } else if (cap_name == "ImageGatherBiasLodAMD") {
         return false;
     } else if (cap_name == "ImageGatherExtended") {
-        return features.get_feature("", "shaderImageGatherExtended");
+        return features.get_feature("shaderImageGatherExtended");
     } else if (cap_name == "ImageMSArray") {
-        return features.get_feature("", "shaderStorageImageMultisample");
+        return features.get_feature("shaderStorageImageMultisample");
     } else if (cap_name == "ImageQuery") {
         return (vk_api_version >= VK_API_VERSION_1_0);
     } else if (cap_name == "ImageReadWriteLodAMD") {
@@ -771,27 +771,27 @@ bool is_spirv_capability_supported(
     } else if (cap_name == "InputAttachment") {
         return (vk_api_version >= VK_API_VERSION_1_0);
     } else if (cap_name == "InputAttachmentArrayDynamicIndexing") {
-        return features.get_feature("Vulkan12", "shaderInputAttachmentArrayDynamicIndexing");
+        return features.get_feature("shaderInputAttachmentArrayDynamicIndexing");
     } else if (cap_name == "InputAttachmentArrayNonUniformIndexing") {
-        return features.get_feature("Vulkan12", "shaderInputAttachmentArrayNonUniformIndexing");
+        return features.get_feature("shaderInputAttachmentArrayNonUniformIndexing");
     } else if (cap_name == "Int16") {
-        return features.get_feature("", "shaderInt16");
+        return features.get_feature("shaderInt16");
     } else if (cap_name == "Int64") {
-        return features.get_feature("", "shaderInt64");
+        return features.get_feature("shaderInt64");
     } else if (cap_name == "Int64Atomics") {
-        return features.get_feature("Vulkan12", "shaderBufferInt64Atomics") ||
-            features.get_feature("Vulkan12", "shaderSharedInt64Atomics") ||
-            features.get_feature("ShaderImageAtomicInt64", "shaderImageInt64Atomics");
+        return features.get_feature("shaderBufferInt64Atomics") ||
+            features.get_feature("shaderSharedInt64Atomics") ||
+            features.get_feature("shaderImageInt64Atomics");
     } else if (cap_name == "Int64ImageEXT") {
-        return features.get_feature("ShaderImageAtomicInt64", "shaderImageInt64Atomics");
+        return features.get_feature("shaderImageInt64Atomics");
     } else if (cap_name == "Int8") {
-        return features.get_feature("Vulkan12", "shaderInt8");
+        return features.get_feature("shaderInt8");
     } else if (cap_name == "IntegerFunctions2INTEL") {
-        return features.get_feature("ShaderIntegerFunctions2", "shaderIntegerFunctions2");
+        return features.get_feature("shaderIntegerFunctions2");
     } else if (cap_name == "InterpolationFunction") {
-        return features.get_feature("", "sampleRateShading");
+        return features.get_feature("sampleRateShading");
     } else if (cap_name == "LongVectorEXT") {
-        return features.get_feature("ShaderLongVector", "longVector");
+        return features.get_feature("longVector");
     } else if (cap_name == "Matrix") {
         return (vk_api_version >= VK_API_VERSION_1_0);
     } else if (cap_name == "MeshShadingEXT") {
@@ -799,50 +799,50 @@ bool is_spirv_capability_supported(
     } else if (cap_name == "MeshShadingNV") {
         return false;
     } else if (cap_name == "MinLod") {
-        return features.get_feature("", "shaderResourceMinLod");
+        return features.get_feature("shaderResourceMinLod");
     } else if (cap_name == "MultiView") {
-        return features.get_feature("Vulkan11", "multiview") ||
-            features.get_feature("Multiview", "multiview");
+        return features.get_feature("multiview") ||
+            features.get_feature("multiview");
     } else if (cap_name == "MultiViewport") {
-        return features.get_feature("", "multiViewport");
+        return features.get_feature("multiViewport");
     } else if (cap_name == "PerViewAttributesNV") {
         return false;
     } else if (cap_name == "PhysicalStorageBufferAddresses") {
-        return features.get_feature("Vulkan12", "bufferDeviceAddress") ||
-            features.get_feature("BufferDeviceAddress", "bufferDeviceAddress");
+        return features.get_feature("bufferDeviceAddress") ||
+            features.get_feature("bufferDeviceAddress");
     } else if (cap_name == "PushConstantBanksNV") {
-        return features.get_feature("PushConstantBank", "pushConstantBank");
+        return features.get_feature("pushConstantBank");
     } else if (cap_name == "QuadControlKHR") {
-        return features.get_feature("ShaderQuadControl", "shaderQuadControl");
+        return features.get_feature("shaderQuadControl");
     } else if (cap_name == "RawAccessChainsNV") {
-        return features.get_feature("RawAccessChains", "shaderRawAccessChains");
+        return features.get_feature("shaderRawAccessChains");
     } else if (cap_name == "RayCullMaskKHR") {
-        return features.get_feature("RayTracingMaintenance1", "rayTracingMaintenance1");
+        return features.get_feature("rayTracingMaintenance1");
     } else if (cap_name == "RayQueryKHR") {
-        return features.get_feature("RayQuery", "rayQuery");
+        return features.get_feature("rayQuery");
     } else if (cap_name == "RayQueryPositionFetchKHR") {
-        return features.get_feature("RayTracingPositionFetch", "rayTracingPositionFetch");
+        return features.get_feature("rayTracingPositionFetch");
     } else if (cap_name == "RayTracingClusterAccelerationStructureNV") {
-        return features.get_feature("ClusterAccelerationStructure", "clusterAccelerationStructure");
+        return features.get_feature("clusterAccelerationStructure");
     } else if (cap_name == "RayTracingKHR") {
-        return features.get_feature("RayTracingPipeline", "rayTracingPipeline");
+        return features.get_feature("rayTracingPipeline");
     } else if (cap_name == "RayTracingLinearSweptSpheresGeometryNV") {
-        return features.get_feature("RayTracingLinearSweptSpheres", "linearSweptSpheres");
+        return features.get_feature("linearSweptSpheres");
     } else if (cap_name == "RayTracingMotionBlurNV") {
-        return features.get_feature("RayTracingMotionBlur", "rayTracingMotionBlur");
+        return features.get_feature("rayTracingMotionBlur");
     } else if (cap_name == "RayTracingNV") {
         return false;
     } else if (cap_name == "RayTracingOpacityMicromapEXT") {
         return false;
     } else if (cap_name == "RayTracingPositionFetchKHR") {
-        return features.get_feature("RayTracingPositionFetch", "rayTracingPositionFetch");
+        return features.get_feature("rayTracingPositionFetch");
     } else if (cap_name == "RayTracingSpheresGeometryNV") {
-        return features.get_feature("RayTracingLinearSweptSpheres", "spheres");
+        return features.get_feature("spheres");
     } else if (cap_name == "RayTraversalPrimitiveCullingKHR") {
-        return features.get_feature("RayTracingPipeline", "rayTraversalPrimitiveCulling") ||
-            features.get_feature("RayQuery", "rayQuery");
+        return features.get_feature("rayTraversalPrimitiveCulling") ||
+            features.get_feature("rayQuery");
     } else if (cap_name == "ReplicatedCompositesEXT") {
-        return features.get_feature("ShaderReplicatedComposites", "shaderReplicatedComposites");
+        return features.get_feature("shaderReplicatedComposites");
     } else if (cap_name == "RoundingModeRTE") {
         return (properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderRoundingModeRTEFloat16 == VK_TRUE) ||
             (properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderRoundingModeRTEFloat32 == VK_TRUE) ||
@@ -852,43 +852,43 @@ bool is_spirv_capability_supported(
             (properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderRoundingModeRTZFloat32 == VK_TRUE) ||
             (properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderRoundingModeRTZFloat64 == VK_TRUE);
     } else if (cap_name == "RuntimeDescriptorArray") {
-        return features.get_feature("Vulkan12", "runtimeDescriptorArray");
+        return features.get_feature("runtimeDescriptorArray");
     } else if (cap_name == "SampleMaskOverrideCoverageNV") {
         return false;
     } else if (cap_name == "SampleMaskPostDepthCoverage") {
         return false;
     } else if (cap_name == "SampleRateShading") {
-        return features.get_feature("", "sampleRateShading");
+        return features.get_feature("sampleRateShading");
     } else if (cap_name == "Sampled1D") {
         return (vk_api_version >= VK_API_VERSION_1_0);
     } else if (cap_name == "SampledBuffer") {
         return (vk_api_version >= VK_API_VERSION_1_0);
     } else if (cap_name == "SampledCubeArray") {
-        return features.get_feature("", "imageCubeArray");
+        return features.get_feature("imageCubeArray");
     } else if (cap_name == "SampledImageArrayDynamicIndexing") {
-        return features.get_feature("", "shaderSampledImageArrayDynamicIndexing");
+        return features.get_feature("shaderSampledImageArrayDynamicIndexing");
     } else if (cap_name == "SampledImageArrayNonUniformIndexing") {
-        return features.get_feature("Vulkan12", "shaderSampledImageArrayNonUniformIndexing");
+        return features.get_feature("shaderSampledImageArrayNonUniformIndexing");
     } else if (cap_name == "Shader") {
         return (vk_api_version >= VK_API_VERSION_1_0);
     } else if (cap_name == "Shader64BitIndexingEXT") {
-        return features.get_feature("Shader64BitIndexing", "shader64BitIndexing");
+        return features.get_feature("shader64BitIndexing");
     } else if (cap_name == "ShaderClockKHR") {
         return false;
     } else if (cap_name == "ShaderEnqueueAMDX") {
-        return features.get_feature("ShaderEnqueue", "shaderEnqueue");
+        return features.get_feature("shaderEnqueue");
     } else if (cap_name == "ShaderInvocationReorderEXT") {
         return false;
     } else if (cap_name == "ShaderInvocationReorderNV") {
         return false;
     } else if (cap_name == "ShaderLayer") {
-        return features.get_feature("Vulkan12", "shaderOutputLayer");
+        return features.get_feature("shaderOutputLayer");
     } else if (cap_name == "ShaderNonUniform") {
         return (vk_api_version >= VK_API_VERSION_1_2);
     } else if (cap_name == "ShaderSMBuiltinsNV") {
-        return features.get_feature("ShaderSMBuiltins", "shaderSMBuiltins");
+        return features.get_feature("shaderSMBuiltins");
     } else if (cap_name == "ShaderViewportIndex") {
-        return features.get_feature("Vulkan12", "shaderOutputViewportIndex");
+        return features.get_feature("shaderOutputViewportIndex");
     } else if (cap_name == "ShaderViewportIndexLayerEXT") {
         return false;
     } else if (cap_name == "ShaderViewportMaskNV") {
@@ -898,109 +898,109 @@ bool is_spirv_capability_supported(
             (properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderSignedZeroInfNanPreserveFloat32 == VK_TRUE) ||
             (properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderSignedZeroInfNanPreserveFloat64 == VK_TRUE);
     } else if (cap_name == "SparseResidency") {
-        return features.get_feature("", "shaderResourceResidency");
+        return features.get_feature("shaderResourceResidency");
     } else if (cap_name == "StencilExportEXT") {
         return false;
     } else if (cap_name == "StorageBuffer16BitAccess") {
-        return features.get_feature("Vulkan11", "storageBuffer16BitAccess") ||
-            features.get_feature("16BitStorage", "storageBuffer16BitAccess");
+        return features.get_feature("storageBuffer16BitAccess") ||
+            features.get_feature("storageBuffer16BitAccess");
     } else if (cap_name == "StorageBuffer8BitAccess") {
-        return features.get_feature("Vulkan12", "storageBuffer8BitAccess");
+        return features.get_feature("storageBuffer8BitAccess");
     } else if (cap_name == "StorageBufferArrayDynamicIndexing") {
-        return features.get_feature("", "shaderStorageBufferArrayDynamicIndexing");
+        return features.get_feature("shaderStorageBufferArrayDynamicIndexing");
     } else if (cap_name == "StorageBufferArrayNonUniformIndexing") {
-        return features.get_feature("Vulkan12", "shaderStorageBufferArrayNonUniformIndexing");
+        return features.get_feature("shaderStorageBufferArrayNonUniformIndexing");
     } else if (cap_name == "StorageImageArrayDynamicIndexing") {
-        return features.get_feature("", "shaderStorageImageArrayDynamicIndexing");
+        return features.get_feature("shaderStorageImageArrayDynamicIndexing");
     } else if (cap_name == "StorageImageArrayNonUniformIndexing") {
-        return features.get_feature("Vulkan12", "shaderStorageImageArrayNonUniformIndexing");
+        return features.get_feature("shaderStorageImageArrayNonUniformIndexing");
     } else if (cap_name == "StorageImageExtendedFormats") {
         return (vk_api_version >= VK_API_VERSION_1_0);
     } else if (cap_name == "StorageImageMultisample") {
-        return features.get_feature("", "shaderStorageImageMultisample");
+        return features.get_feature("shaderStorageImageMultisample");
     } else if (cap_name == "StorageImageReadWithoutFormat") {
-        return features.get_feature("", "shaderStorageImageReadWithoutFormat") ||
+        return features.get_feature("shaderStorageImageReadWithoutFormat") ||
             (vk_api_version >= VK_API_VERSION_1_3);
     } else if (cap_name == "StorageImageWriteWithoutFormat") {
-        return features.get_feature("", "shaderStorageImageWriteWithoutFormat") ||
+        return features.get_feature("shaderStorageImageWriteWithoutFormat") ||
             (vk_api_version >= VK_API_VERSION_1_3);
     } else if (cap_name == "StorageInputOutput16") {
-        return features.get_feature("Vulkan11", "storageInputOutput16") ||
-            features.get_feature("16BitStorage", "storageInputOutput16");
+        return features.get_feature("storageInputOutput16") ||
+            features.get_feature("storageInputOutput16");
     } else if (cap_name == "StoragePushConstant16") {
-        return features.get_feature("Vulkan11", "storagePushConstant16") ||
-            features.get_feature("16BitStorage", "storagePushConstant16");
+        return features.get_feature("storagePushConstant16") ||
+            features.get_feature("storagePushConstant16");
     } else if (cap_name == "StoragePushConstant8") {
-        return features.get_feature("Vulkan12", "storagePushConstant8");
+        return features.get_feature("storagePushConstant8");
     } else if (cap_name == "StorageTensorArrayDynamicIndexingARM") {
-        return features.get_feature("Tensor", "shaderStorageTensorArrayDynamicIndexing");
+        return features.get_feature("shaderStorageTensorArrayDynamicIndexing");
     } else if (cap_name == "StorageTensorArrayNonUniformIndexingARM") {
-        return features.get_feature("Tensor", "shaderStorageTensorArrayNonUniformIndexing");
+        return features.get_feature("shaderStorageTensorArrayNonUniformIndexing");
     } else if (cap_name == "StorageTexelBufferArrayDynamicIndexing") {
-        return features.get_feature("Vulkan12", "shaderStorageTexelBufferArrayDynamicIndexing");
+        return features.get_feature("shaderStorageTexelBufferArrayDynamicIndexing");
     } else if (cap_name == "StorageTexelBufferArrayNonUniformIndexing") {
-        return features.get_feature("Vulkan12", "shaderStorageTexelBufferArrayNonUniformIndexing");
+        return features.get_feature("shaderStorageTexelBufferArrayNonUniformIndexing");
     } else if (cap_name == "SubgroupBallotKHR") {
         return false;
     } else if (cap_name == "SubgroupVoteKHR") {
         return false;
     } else if (cap_name == "TensorAddressingNV") {
-        return features.get_feature("CooperativeMatrix2", "cooperativeMatrixTensorAddressing");
+        return features.get_feature("cooperativeMatrixTensorAddressing");
     } else if (cap_name == "TensorsARM") {
-        return features.get_feature("Tensor", "shaderTensorAccess");
+        return features.get_feature("shaderTensorAccess");
     } else if (cap_name == "Tessellation") {
-        return features.get_feature("", "tessellationShader");
+        return features.get_feature("tessellationShader");
     } else if (cap_name == "TessellationPointSize") {
-        return features.get_feature("", "shaderTessellationAndGeometryPointSize");
+        return features.get_feature("shaderTessellationAndGeometryPointSize");
     } else if (cap_name == "TextureBlockMatch2QCOM") {
-        return features.get_feature("ImageProcessing2", "textureBlockMatch2");
+        return features.get_feature("textureBlockMatch2");
     } else if (cap_name == "TextureBlockMatchQCOM") {
-        return features.get_feature("ImageProcessing", "textureBlockMatch");
+        return features.get_feature("textureBlockMatch");
     } else if (cap_name == "TextureBoxFilterQCOM") {
-        return features.get_feature("ImageProcessing", "textureBoxFilter");
+        return features.get_feature("textureBoxFilter");
     } else if (cap_name == "TextureSampleWeightedQCOM") {
-        return features.get_feature("ImageProcessing", "textureSampleWeighted");
+        return features.get_feature("textureSampleWeighted");
     } else if (cap_name == "TileImageColorReadAccessEXT") {
-        return features.get_feature("ShaderTileImage", "shaderTileImageColorReadAccess");
+        return features.get_feature("shaderTileImageColorReadAccess");
     } else if (cap_name == "TileImageDepthReadAccessEXT") {
-        return features.get_feature("ShaderTileImage", "shaderTileImageDepthReadAccess");
+        return features.get_feature("shaderTileImageDepthReadAccess");
     } else if (cap_name == "TileImageStencilReadAccessEXT") {
-        return features.get_feature("ShaderTileImage", "shaderTileImageStencilReadAccess");
+        return features.get_feature("shaderTileImageStencilReadAccess");
     } else if (cap_name == "TileShadingQCOM") {
-        return features.get_feature("TileShading", "tileShading");
+        return features.get_feature("tileShading");
     } else if (cap_name == "TransformFeedback") {
-        return features.get_feature("TransformFeedback", "transformFeedback");
+        return features.get_feature("transformFeedback");
     } else if (cap_name == "UniformAndStorageBuffer16BitAccess") {
-        return features.get_feature("Vulkan11", "uniformAndStorageBuffer16BitAccess") ||
-            features.get_feature("16BitStorage", "uniformAndStorageBuffer16BitAccess");
+        return features.get_feature("uniformAndStorageBuffer16BitAccess") ||
+            features.get_feature("uniformAndStorageBuffer16BitAccess");
     } else if (cap_name == "UniformAndStorageBuffer8BitAccess") {
-        return features.get_feature("Vulkan12", "uniformAndStorageBuffer8BitAccess");
+        return features.get_feature("uniformAndStorageBuffer8BitAccess");
     } else if (cap_name == "UniformBufferArrayDynamicIndexing") {
-        return features.get_feature("", "shaderUniformBufferArrayDynamicIndexing");
+        return features.get_feature("shaderUniformBufferArrayDynamicIndexing");
     } else if (cap_name == "UniformBufferArrayNonUniformIndexing") {
-        return features.get_feature("Vulkan12", "shaderUniformBufferArrayNonUniformIndexing");
+        return features.get_feature("shaderUniformBufferArrayNonUniformIndexing");
     } else if (cap_name == "UniformTexelBufferArrayDynamicIndexing") {
-        return features.get_feature("Vulkan12", "shaderUniformTexelBufferArrayDynamicIndexing");
+        return features.get_feature("shaderUniformTexelBufferArrayDynamicIndexing");
     } else if (cap_name == "UniformTexelBufferArrayNonUniformIndexing") {
-        return features.get_feature("Vulkan12", "shaderUniformTexelBufferArrayNonUniformIndexing");
+        return features.get_feature("shaderUniformTexelBufferArrayNonUniformIndexing");
     } else if (cap_name == "UntypedPointersKHR") {
-        return features.get_feature("ShaderUntypedPointers", "shaderUntypedPointers");
+        return features.get_feature("shaderUntypedPointers");
     } else if (cap_name == "VariablePointers") {
-        return features.get_feature("Vulkan11", "variablePointers") ||
-            features.get_feature("VariablePointers", "variablePointers");
+        return features.get_feature("variablePointers") ||
+            features.get_feature("variablePointers");
     } else if (cap_name == "VariablePointersStorageBuffer") {
-        return features.get_feature("Vulkan11", "variablePointersStorageBuffer") ||
-            features.get_feature("VariablePointers", "variablePointersStorageBuffer");
+        return features.get_feature("variablePointersStorageBuffer") ||
+            features.get_feature("variablePointersStorageBuffer");
     } else if (cap_name == "VulkanMemoryModel") {
-        return features.get_feature("Vulkan12", "vulkanMemoryModel");
+        return features.get_feature("vulkanMemoryModel");
     } else if (cap_name == "VulkanMemoryModelDeviceScope") {
-        return features.get_feature("Vulkan12", "vulkanMemoryModelDeviceScope");
+        return features.get_feature("vulkanMemoryModelDeviceScope");
     } else if (cap_name == "WorkgroupMemoryExplicitLayout16BitAccessKHR") {
-        return features.get_feature("WorkgroupMemoryExplicitLayout", "workgroupMemoryExplicitLayout16BitAccess");
+        return features.get_feature("workgroupMemoryExplicitLayout16BitAccess");
     } else if (cap_name == "WorkgroupMemoryExplicitLayout8BitAccessKHR") {
-        return features.get_feature("WorkgroupMemoryExplicitLayout", "workgroupMemoryExplicitLayout8BitAccess");
+        return features.get_feature("workgroupMemoryExplicitLayout8BitAccess");
     } else if (cap_name == "WorkgroupMemoryExplicitLayoutKHR") {
-        return features.get_feature("WorkgroupMemoryExplicitLayout", "workgroupMemoryExplicitLayout");
+        return features.get_feature("workgroupMemoryExplicitLayout");
     }
     
     return false;
@@ -1425,592 +1425,592 @@ std::vector<std::string> get_spirv_capability_features(
     
     if (cap_name == "AtomicFloat16AddEXT") {
         return {
-            "ShaderAtomicFloat2/shaderBufferFloat16AtomicAdd",
-            "ShaderAtomicFloat2/shaderSharedFloat16AtomicAdd",
+            "shaderBufferFloat16AtomicAdd",
+            "shaderSharedFloat16AtomicAdd",
         };
     } else if (cap_name == "AtomicFloat16MinMaxEXT") {
         return {
-            "ShaderAtomicFloat2/shaderBufferFloat16AtomicMinMax",
-            "ShaderAtomicFloat2/shaderSharedFloat16AtomicMinMax",
+            "shaderBufferFloat16AtomicMinMax",
+            "shaderSharedFloat16AtomicMinMax",
         };
     } else if (cap_name == "AtomicFloat16VectorNV") {
         return {
-            "ShaderAtomicFloat16Vector/shaderFloat16VectorAtomics",
+            "shaderFloat16VectorAtomics",
         };
     } else if (cap_name == "AtomicFloat32AddEXT") {
         return {
-            "ShaderAtomicFloat/shaderBufferFloat32AtomicAdd",
-            "ShaderAtomicFloat/shaderSharedFloat32AtomicAdd",
-            "ShaderAtomicFloat/shaderImageFloat32AtomicAdd",
+            "shaderBufferFloat32AtomicAdd",
+            "shaderSharedFloat32AtomicAdd",
+            "shaderImageFloat32AtomicAdd",
         };
     } else if (cap_name == "AtomicFloat32MinMaxEXT") {
         return {
-            "ShaderAtomicFloat2/shaderBufferFloat32AtomicMinMax",
-            "ShaderAtomicFloat2/shaderSharedFloat32AtomicMinMax",
-            "ShaderAtomicFloat2/shaderImageFloat32AtomicMinMax",
+            "shaderBufferFloat32AtomicMinMax",
+            "shaderSharedFloat32AtomicMinMax",
+            "shaderImageFloat32AtomicMinMax",
         };
     } else if (cap_name == "AtomicFloat64AddEXT") {
         return {
-            "ShaderAtomicFloat/shaderBufferFloat64AtomicAdd",
-            "ShaderAtomicFloat/shaderSharedFloat64AtomicAdd",
+            "shaderBufferFloat64AtomicAdd",
+            "shaderSharedFloat64AtomicAdd",
         };
     } else if (cap_name == "AtomicFloat64MinMaxEXT") {
         return {
-            "ShaderAtomicFloat2/shaderBufferFloat64AtomicMinMax",
-            "ShaderAtomicFloat2/shaderSharedFloat64AtomicMinMax",
+            "shaderBufferFloat64AtomicMinMax",
+            "shaderSharedFloat64AtomicMinMax",
         };
     } else if (cap_name == "BFloat16CooperativeMatrixKHR") {
         return {
-            "ShaderBfloat16/shaderBFloat16CooperativeMatrix",
+            "shaderBFloat16CooperativeMatrix",
         };
     } else if (cap_name == "BFloat16DotProductKHR") {
         return {
-            "ShaderBfloat16/shaderBFloat16DotProduct",
+            "shaderBFloat16DotProduct",
         };
     } else if (cap_name == "BFloat16TypeKHR") {
         return {
-            "ShaderBfloat16/shaderBFloat16Type",
+            "shaderBFloat16Type",
         };
     } else if (cap_name == "ClipDistance") {
         return {
-            "/shaderClipDistance",
+            "shaderClipDistance",
         };
     } else if (cap_name == "ClusterCullingShadingHUAWEI") {
         return {
-            "ClusterCullingShader/clustercullingShader",
+            "clustercullingShader",
         };
     } else if (cap_name == "ComputeDerivativeGroupLinearKHR") {
         return {
-            "ComputeShaderDerivatives/computeDerivativeGroupLinear",
-            "ComputeShaderDerivatives/computeDerivativeGroupLinear",
+            "computeDerivativeGroupLinear",
+            "computeDerivativeGroupLinear",
         };
     } else if (cap_name == "ComputeDerivativeGroupQuadsKHR") {
         return {
-            "ComputeShaderDerivatives/computeDerivativeGroupQuads",
-            "ComputeShaderDerivatives/computeDerivativeGroupQuads",
+            "computeDerivativeGroupQuads",
+            "computeDerivativeGroupQuads",
         };
     } else if (cap_name == "CooperativeMatrixBlockLoadsNV") {
         return {
-            "CooperativeMatrix2/cooperativeMatrixBlockLoads",
+            "cooperativeMatrixBlockLoads",
         };
     } else if (cap_name == "CooperativeMatrixConversionQCOM") {
         return {
-            "CooperativeMatrixConversion/cooperativeMatrixConversion",
+            "cooperativeMatrixConversion",
         };
     } else if (cap_name == "CooperativeMatrixConversionsNV") {
         return {
-            "CooperativeMatrix2/cooperativeMatrixConversions",
+            "cooperativeMatrixConversions",
         };
     } else if (cap_name == "CooperativeMatrixKHR") {
         return {
-            "CooperativeMatrix/cooperativeMatrix",
+            "cooperativeMatrix",
         };
     } else if (cap_name == "CooperativeMatrixNV") {
         return {
-            "CooperativeMatrix/cooperativeMatrix",
+            "cooperativeMatrix",
         };
     } else if (cap_name == "CooperativeMatrixPerElementOperationsNV") {
         return {
-            "CooperativeMatrix2/cooperativeMatrixPerElementOperations",
+            "cooperativeMatrixPerElementOperations",
         };
     } else if (cap_name == "CooperativeMatrixReductionsNV") {
         return {
-            "CooperativeMatrix2/cooperativeMatrixReductions",
+            "cooperativeMatrixReductions",
         };
     } else if (cap_name == "CooperativeMatrixTensorAddressingNV") {
         return {
-            "CooperativeMatrix2/cooperativeMatrixTensorAddressing",
+            "cooperativeMatrixTensorAddressing",
         };
     } else if (cap_name == "CooperativeVectorNV") {
         return {
-            "CooperativeVector/cooperativeVector",
+            "cooperativeVector",
         };
     } else if (cap_name == "CooperativeVectorTrainingNV") {
         return {
-            "CooperativeVector/cooperativeVectorTraining",
+            "cooperativeVectorTraining",
         };
     } else if (cap_name == "CoreBuiltinsARM") {
         return {
-            "ShaderCoreBuiltins/shaderCoreBuiltins",
+            "shaderCoreBuiltins",
         };
     } else if (cap_name == "CullDistance") {
         return {
-            "/shaderCullDistance",
+            "shaderCullDistance",
         };
     } else if (cap_name == "DemoteToHelperInvocation") {
         return {
-            "Vulkan13/shaderDemoteToHelperInvocation",
-            "ShaderDemoteToHelperInvocation/shaderDemoteToHelperInvocation",
+            "shaderDemoteToHelperInvocation",
+            "shaderDemoteToHelperInvocation",
         };
     } else if (cap_name == "DescriptorHeapEXT") {
         return {
-            "DescriptorHeap/descriptorHeap",
+            "descriptorHeap",
         };
     } else if (cap_name == "DotProduct") {
         return {
-            "Vulkan13/shaderIntegerDotProduct",
-            "ShaderIntegerDotProduct/shaderIntegerDotProduct",
+            "shaderIntegerDotProduct",
+            "shaderIntegerDotProduct",
         };
     } else if (cap_name == "DotProductInput4x8Bit") {
         return {
-            "Vulkan13/shaderIntegerDotProduct",
-            "ShaderIntegerDotProduct/shaderIntegerDotProduct",
+            "shaderIntegerDotProduct",
+            "shaderIntegerDotProduct",
         };
     } else if (cap_name == "DotProductInput4x8BitPacked") {
         return {
-            "Vulkan13/shaderIntegerDotProduct",
-            "ShaderIntegerDotProduct/shaderIntegerDotProduct",
+            "shaderIntegerDotProduct",
+            "shaderIntegerDotProduct",
         };
     } else if (cap_name == "DotProductInputAll") {
         return {
-            "Vulkan13/shaderIntegerDotProduct",
-            "ShaderIntegerDotProduct/shaderIntegerDotProduct",
+            "shaderIntegerDotProduct",
+            "shaderIntegerDotProduct",
         };
     } else if (cap_name == "DrawParameters") {
         return {
-            "Vulkan11/shaderDrawParameters",
-            "ShaderDrawParameters/shaderDrawParameters",
+            "shaderDrawParameters",
+            "shaderDrawParameters",
         };
     } else if (cap_name == "ExpectAssumeKHR") {
         return {
-            "Vulkan14/shaderExpectAssume",
-            "ShaderExpectAssume/shaderExpectAssume",
+            "shaderExpectAssume",
+            "shaderExpectAssume",
         };
     } else if (cap_name == "FMAKHR") {
         return {
-            "ShaderFma/shaderFmaFloat16",
-            "ShaderFma/shaderFmaFloat32",
-            "ShaderFma/shaderFmaFloat64",
+            "shaderFmaFloat16",
+            "shaderFmaFloat32",
+            "shaderFmaFloat64",
         };
     } else if (cap_name == "Float16") {
         return {
-            "Vulkan12/shaderFloat16",
+            "shaderFloat16",
         };
     } else if (cap_name == "Float64") {
         return {
-            "/shaderFloat64",
+            "shaderFloat64",
         };
     } else if (cap_name == "Float8CooperativeMatrixEXT") {
         return {
-            "ShaderFloat8/shaderFloat8CooperativeMatrix",
+            "shaderFloat8CooperativeMatrix",
         };
     } else if (cap_name == "Float8EXT") {
         return {
-            "ShaderFloat8/shaderFloat8",
+            "shaderFloat8",
         };
     } else if (cap_name == "FloatControls2") {
         return {
-            "Vulkan14/shaderFloatControls2",
-            "ShaderFloatControls2/shaderFloatControls2",
+            "shaderFloatControls2",
+            "shaderFloatControls2",
         };
     } else if (cap_name == "FragmentBarycentricKHR") {
         return {
-            "FragmentShaderBarycentric/fragmentShaderBarycentric",
-            "FragmentShaderBarycentric/fragmentShaderBarycentric",
+            "fragmentShaderBarycentric",
+            "fragmentShaderBarycentric",
         };
     } else if (cap_name == "FragmentDensityEXT") {
         return {
-            "FragmentDensityMap/fragmentDensityMap",
-            "ShadingRateImage/shadingRateImage",
+            "fragmentDensityMap",
+            "shadingRateImage",
         };
     } else if (cap_name == "FragmentShaderPixelInterlockEXT") {
         return {
-            "FragmentShaderInterlock/fragmentShaderPixelInterlock",
+            "fragmentShaderPixelInterlock",
         };
     } else if (cap_name == "FragmentShaderSampleInterlockEXT") {
         return {
-            "FragmentShaderInterlock/fragmentShaderSampleInterlock",
+            "fragmentShaderSampleInterlock",
         };
     } else if (cap_name == "FragmentShaderShadingRateInterlockEXT") {
         return {
-            "FragmentShaderInterlock/fragmentShaderShadingRateInterlock",
-            "ShadingRateImage/shadingRateImage",
+            "fragmentShaderShadingRateInterlock",
+            "shadingRateImage",
         };
     } else if (cap_name == "FragmentShadingRateKHR") {
         return {
-            "FragmentShadingRate/pipelineFragmentShadingRate",
-            "FragmentShadingRate/primitiveFragmentShadingRate",
-            "FragmentShadingRate/attachmentFragmentShadingRate",
+            "pipelineFragmentShadingRate",
+            "primitiveFragmentShadingRate",
+            "attachmentFragmentShadingRate",
         };
     } else if (cap_name == "Geometry") {
         return {
-            "/geometryShader",
+            "geometryShader",
         };
     } else if (cap_name == "GeometryPointSize") {
         return {
-            "/shaderTessellationAndGeometryPointSize",
+            "shaderTessellationAndGeometryPointSize",
         };
     } else if (cap_name == "GeometryStreams") {
         return {
-            "TransformFeedback/geometryStreams",
+            "geometryStreams",
         };
     } else if (cap_name == "GraphARM") {
         return {
-            "DataGraph/dataGraph",
+            "dataGraph",
         };
     } else if (cap_name == "GroupNonUniformPartitionedEXT") {
         return {
-            "ShaderSubgroupPartitioned/shaderSubgroupPartitioned",
+            "shaderSubgroupPartitioned",
         };
     } else if (cap_name == "GroupNonUniformRotateKHR") {
         return {
-            "Vulkan14/shaderSubgroupRotate",
-            "ShaderSubgroupRotate/shaderSubgroupRotate",
+            "shaderSubgroupRotate",
+            "shaderSubgroupRotate",
         };
     } else if (cap_name == "ImageCubeArray") {
         return {
-            "/imageCubeArray",
+            "imageCubeArray",
         };
     } else if (cap_name == "ImageFootprintNV") {
         return {
-            "ShaderImageFootprint/imageFootprint",
+            "imageFootprint",
         };
     } else if (cap_name == "ImageGatherExtended") {
         return {
-            "/shaderImageGatherExtended",
+            "shaderImageGatherExtended",
         };
     } else if (cap_name == "ImageMSArray") {
         return {
-            "/shaderStorageImageMultisample",
+            "shaderStorageImageMultisample",
         };
     } else if (cap_name == "InputAttachmentArrayDynamicIndexing") {
         return {
-            "Vulkan12/shaderInputAttachmentArrayDynamicIndexing",
+            "shaderInputAttachmentArrayDynamicIndexing",
         };
     } else if (cap_name == "InputAttachmentArrayNonUniformIndexing") {
         return {
-            "Vulkan12/shaderInputAttachmentArrayNonUniformIndexing",
+            "shaderInputAttachmentArrayNonUniformIndexing",
         };
     } else if (cap_name == "Int16") {
         return {
-            "/shaderInt16",
+            "shaderInt16",
         };
     } else if (cap_name == "Int64") {
         return {
-            "/shaderInt64",
+            "shaderInt64",
         };
     } else if (cap_name == "Int64Atomics") {
         return {
-            "Vulkan12/shaderBufferInt64Atomics",
-            "Vulkan12/shaderSharedInt64Atomics",
-            "ShaderImageAtomicInt64/shaderImageInt64Atomics",
+            "shaderBufferInt64Atomics",
+            "shaderSharedInt64Atomics",
+            "shaderImageInt64Atomics",
         };
     } else if (cap_name == "Int64ImageEXT") {
         return {
-            "ShaderImageAtomicInt64/shaderImageInt64Atomics",
+            "shaderImageInt64Atomics",
         };
     } else if (cap_name == "Int8") {
         return {
-            "Vulkan12/shaderInt8",
+            "shaderInt8",
         };
     } else if (cap_name == "IntegerFunctions2INTEL") {
         return {
-            "ShaderIntegerFunctions2/shaderIntegerFunctions2",
+            "shaderIntegerFunctions2",
         };
     } else if (cap_name == "InterpolationFunction") {
         return {
-            "/sampleRateShading",
+            "sampleRateShading",
         };
     } else if (cap_name == "LongVectorEXT") {
         return {
-            "ShaderLongVector/longVector",
+            "longVector",
         };
     } else if (cap_name == "MinLod") {
         return {
-            "/shaderResourceMinLod",
+            "shaderResourceMinLod",
         };
     } else if (cap_name == "MultiView") {
         return {
-            "Vulkan11/multiview",
-            "Multiview/multiview",
+            "multiview",
+            "multiview",
         };
     } else if (cap_name == "MultiViewport") {
         return {
-            "/multiViewport",
+            "multiViewport",
         };
     } else if (cap_name == "PhysicalStorageBufferAddresses") {
         return {
-            "Vulkan12/bufferDeviceAddress",
-            "BufferDeviceAddress/bufferDeviceAddress",
+            "bufferDeviceAddress",
+            "bufferDeviceAddress",
         };
     } else if (cap_name == "PushConstantBanksNV") {
         return {
-            "PushConstantBank/pushConstantBank",
+            "pushConstantBank",
         };
     } else if (cap_name == "QuadControlKHR") {
         return {
-            "ShaderQuadControl/shaderQuadControl",
+            "shaderQuadControl",
         };
     } else if (cap_name == "RawAccessChainsNV") {
         return {
-            "RawAccessChains/shaderRawAccessChains",
+            "shaderRawAccessChains",
         };
     } else if (cap_name == "RayCullMaskKHR") {
         return {
-            "RayTracingMaintenance1/rayTracingMaintenance1",
+            "rayTracingMaintenance1",
         };
     } else if (cap_name == "RayQueryKHR") {
         return {
-            "RayQuery/rayQuery",
+            "rayQuery",
         };
     } else if (cap_name == "RayQueryPositionFetchKHR") {
         return {
-            "RayTracingPositionFetch/rayTracingPositionFetch",
+            "rayTracingPositionFetch",
         };
     } else if (cap_name == "RayTracingClusterAccelerationStructureNV") {
         return {
-            "ClusterAccelerationStructure/clusterAccelerationStructure",
+            "clusterAccelerationStructure",
         };
     } else if (cap_name == "RayTracingKHR") {
         return {
-            "RayTracingPipeline/rayTracingPipeline",
+            "rayTracingPipeline",
         };
     } else if (cap_name == "RayTracingLinearSweptSpheresGeometryNV") {
         return {
-            "RayTracingLinearSweptSpheres/linearSweptSpheres",
+            "linearSweptSpheres",
         };
     } else if (cap_name == "RayTracingMotionBlurNV") {
         return {
-            "RayTracingMotionBlur/rayTracingMotionBlur",
+            "rayTracingMotionBlur",
         };
     } else if (cap_name == "RayTracingPositionFetchKHR") {
         return {
-            "RayTracingPositionFetch/rayTracingPositionFetch",
+            "rayTracingPositionFetch",
         };
     } else if (cap_name == "RayTracingSpheresGeometryNV") {
         return {
-            "RayTracingLinearSweptSpheres/spheres",
+            "spheres",
         };
     } else if (cap_name == "RayTraversalPrimitiveCullingKHR") {
         return {
-            "RayTracingPipeline/rayTraversalPrimitiveCulling",
-            "RayQuery/rayQuery",
+            "rayTraversalPrimitiveCulling",
+            "rayQuery",
         };
     } else if (cap_name == "ReplicatedCompositesEXT") {
         return {
-            "ShaderReplicatedComposites/shaderReplicatedComposites",
+            "shaderReplicatedComposites",
         };
     } else if (cap_name == "RuntimeDescriptorArray") {
         return {
-            "Vulkan12/runtimeDescriptorArray",
+            "runtimeDescriptorArray",
         };
     } else if (cap_name == "SampleRateShading") {
         return {
-            "/sampleRateShading",
+            "sampleRateShading",
         };
     } else if (cap_name == "SampledCubeArray") {
         return {
-            "/imageCubeArray",
+            "imageCubeArray",
         };
     } else if (cap_name == "SampledImageArrayDynamicIndexing") {
         return {
-            "/shaderSampledImageArrayDynamicIndexing",
+            "shaderSampledImageArrayDynamicIndexing",
         };
     } else if (cap_name == "SampledImageArrayNonUniformIndexing") {
         return {
-            "Vulkan12/shaderSampledImageArrayNonUniformIndexing",
+            "shaderSampledImageArrayNonUniformIndexing",
         };
     } else if (cap_name == "Shader64BitIndexingEXT") {
         return {
-            "Shader64BitIndexing/shader64BitIndexing",
+            "shader64BitIndexing",
         };
     } else if (cap_name == "ShaderEnqueueAMDX") {
         return {
-            "ShaderEnqueue/shaderEnqueue",
+            "shaderEnqueue",
         };
     } else if (cap_name == "ShaderLayer") {
         return {
-            "Vulkan12/shaderOutputLayer",
+            "shaderOutputLayer",
         };
     } else if (cap_name == "ShaderSMBuiltinsNV") {
         return {
-            "ShaderSMBuiltins/shaderSMBuiltins",
+            "shaderSMBuiltins",
         };
     } else if (cap_name == "ShaderViewportIndex") {
         return {
-            "Vulkan12/shaderOutputViewportIndex",
+            "shaderOutputViewportIndex",
         };
     } else if (cap_name == "SparseResidency") {
         return {
-            "/shaderResourceResidency",
+            "shaderResourceResidency",
         };
     } else if (cap_name == "StorageBuffer16BitAccess") {
         return {
-            "Vulkan11/storageBuffer16BitAccess",
-            "16BitStorage/storageBuffer16BitAccess",
+            "storageBuffer16BitAccess",
+            "storageBuffer16BitAccess",
         };
     } else if (cap_name == "StorageBuffer8BitAccess") {
         return {
-            "Vulkan12/storageBuffer8BitAccess",
+            "storageBuffer8BitAccess",
         };
     } else if (cap_name == "StorageBufferArrayDynamicIndexing") {
         return {
-            "/shaderStorageBufferArrayDynamicIndexing",
+            "shaderStorageBufferArrayDynamicIndexing",
         };
     } else if (cap_name == "StorageBufferArrayNonUniformIndexing") {
         return {
-            "Vulkan12/shaderStorageBufferArrayNonUniformIndexing",
+            "shaderStorageBufferArrayNonUniformIndexing",
         };
     } else if (cap_name == "StorageImageArrayDynamicIndexing") {
         return {
-            "/shaderStorageImageArrayDynamicIndexing",
+            "shaderStorageImageArrayDynamicIndexing",
         };
     } else if (cap_name == "StorageImageArrayNonUniformIndexing") {
         return {
-            "Vulkan12/shaderStorageImageArrayNonUniformIndexing",
+            "shaderStorageImageArrayNonUniformIndexing",
         };
     } else if (cap_name == "StorageImageMultisample") {
         return {
-            "/shaderStorageImageMultisample",
+            "shaderStorageImageMultisample",
         };
     } else if (cap_name == "StorageImageReadWithoutFormat") {
         return {
-            "/shaderStorageImageReadWithoutFormat",
+            "shaderStorageImageReadWithoutFormat",
         };
     } else if (cap_name == "StorageImageWriteWithoutFormat") {
         return {
-            "/shaderStorageImageWriteWithoutFormat",
+            "shaderStorageImageWriteWithoutFormat",
         };
     } else if (cap_name == "StorageInputOutput16") {
         return {
-            "Vulkan11/storageInputOutput16",
-            "16BitStorage/storageInputOutput16",
+            "storageInputOutput16",
+            "storageInputOutput16",
         };
     } else if (cap_name == "StoragePushConstant16") {
         return {
-            "Vulkan11/storagePushConstant16",
-            "16BitStorage/storagePushConstant16",
+            "storagePushConstant16",
+            "storagePushConstant16",
         };
     } else if (cap_name == "StoragePushConstant8") {
         return {
-            "Vulkan12/storagePushConstant8",
+            "storagePushConstant8",
         };
     } else if (cap_name == "StorageTensorArrayDynamicIndexingARM") {
         return {
-            "Tensor/shaderStorageTensorArrayDynamicIndexing",
+            "shaderStorageTensorArrayDynamicIndexing",
         };
     } else if (cap_name == "StorageTensorArrayNonUniformIndexingARM") {
         return {
-            "Tensor/shaderStorageTensorArrayNonUniformIndexing",
+            "shaderStorageTensorArrayNonUniformIndexing",
         };
     } else if (cap_name == "StorageTexelBufferArrayDynamicIndexing") {
         return {
-            "Vulkan12/shaderStorageTexelBufferArrayDynamicIndexing",
+            "shaderStorageTexelBufferArrayDynamicIndexing",
         };
     } else if (cap_name == "StorageTexelBufferArrayNonUniformIndexing") {
         return {
-            "Vulkan12/shaderStorageTexelBufferArrayNonUniformIndexing",
+            "shaderStorageTexelBufferArrayNonUniformIndexing",
         };
     } else if (cap_name == "TensorAddressingNV") {
         return {
-            "CooperativeMatrix2/cooperativeMatrixTensorAddressing",
+            "cooperativeMatrixTensorAddressing",
         };
     } else if (cap_name == "TensorsARM") {
         return {
-            "Tensor/shaderTensorAccess",
+            "shaderTensorAccess",
         };
     } else if (cap_name == "Tessellation") {
         return {
-            "/tessellationShader",
+            "tessellationShader",
         };
     } else if (cap_name == "TessellationPointSize") {
         return {
-            "/shaderTessellationAndGeometryPointSize",
+            "shaderTessellationAndGeometryPointSize",
         };
     } else if (cap_name == "TextureBlockMatch2QCOM") {
         return {
-            "ImageProcessing2/textureBlockMatch2",
+            "textureBlockMatch2",
         };
     } else if (cap_name == "TextureBlockMatchQCOM") {
         return {
-            "ImageProcessing/textureBlockMatch",
+            "textureBlockMatch",
         };
     } else if (cap_name == "TextureBoxFilterQCOM") {
         return {
-            "ImageProcessing/textureBoxFilter",
+            "textureBoxFilter",
         };
     } else if (cap_name == "TextureSampleWeightedQCOM") {
         return {
-            "ImageProcessing/textureSampleWeighted",
+            "textureSampleWeighted",
         };
     } else if (cap_name == "TileImageColorReadAccessEXT") {
         return {
-            "ShaderTileImage/shaderTileImageColorReadAccess",
+            "shaderTileImageColorReadAccess",
         };
     } else if (cap_name == "TileImageDepthReadAccessEXT") {
         return {
-            "ShaderTileImage/shaderTileImageDepthReadAccess",
+            "shaderTileImageDepthReadAccess",
         };
     } else if (cap_name == "TileImageStencilReadAccessEXT") {
         return {
-            "ShaderTileImage/shaderTileImageStencilReadAccess",
+            "shaderTileImageStencilReadAccess",
         };
     } else if (cap_name == "TileShadingQCOM") {
         return {
-            "TileShading/tileShading",
+            "tileShading",
         };
     } else if (cap_name == "TransformFeedback") {
         return {
-            "TransformFeedback/transformFeedback",
+            "transformFeedback",
         };
     } else if (cap_name == "UniformAndStorageBuffer16BitAccess") {
         return {
-            "Vulkan11/uniformAndStorageBuffer16BitAccess",
-            "16BitStorage/uniformAndStorageBuffer16BitAccess",
+            "uniformAndStorageBuffer16BitAccess",
+            "uniformAndStorageBuffer16BitAccess",
         };
     } else if (cap_name == "UniformAndStorageBuffer8BitAccess") {
         return {
-            "Vulkan12/uniformAndStorageBuffer8BitAccess",
+            "uniformAndStorageBuffer8BitAccess",
         };
     } else if (cap_name == "UniformBufferArrayDynamicIndexing") {
         return {
-            "/shaderUniformBufferArrayDynamicIndexing",
+            "shaderUniformBufferArrayDynamicIndexing",
         };
     } else if (cap_name == "UniformBufferArrayNonUniformIndexing") {
         return {
-            "Vulkan12/shaderUniformBufferArrayNonUniformIndexing",
+            "shaderUniformBufferArrayNonUniformIndexing",
         };
     } else if (cap_name == "UniformTexelBufferArrayDynamicIndexing") {
         return {
-            "Vulkan12/shaderUniformTexelBufferArrayDynamicIndexing",
+            "shaderUniformTexelBufferArrayDynamicIndexing",
         };
     } else if (cap_name == "UniformTexelBufferArrayNonUniformIndexing") {
         return {
-            "Vulkan12/shaderUniformTexelBufferArrayNonUniformIndexing",
+            "shaderUniformTexelBufferArrayNonUniformIndexing",
         };
     } else if (cap_name == "UntypedPointersKHR") {
         return {
-            "ShaderUntypedPointers/shaderUntypedPointers",
+            "shaderUntypedPointers",
         };
     } else if (cap_name == "VariablePointers") {
         return {
-            "Vulkan11/variablePointers",
-            "VariablePointers/variablePointers",
+            "variablePointers",
+            "variablePointers",
         };
     } else if (cap_name == "VariablePointersStorageBuffer") {
         return {
-            "Vulkan11/variablePointersStorageBuffer",
-            "VariablePointers/variablePointersStorageBuffer",
+            "variablePointersStorageBuffer",
+            "variablePointersStorageBuffer",
         };
     } else if (cap_name == "VulkanMemoryModel") {
         return {
-            "Vulkan12/vulkanMemoryModel",
+            "vulkanMemoryModel",
         };
     } else if (cap_name == "VulkanMemoryModelDeviceScope") {
         return {
-            "Vulkan12/vulkanMemoryModelDeviceScope",
+            "vulkanMemoryModelDeviceScope",
         };
     } else if (cap_name == "WorkgroupMemoryExplicitLayout16BitAccessKHR") {
         return {
-            "WorkgroupMemoryExplicitLayout/workgroupMemoryExplicitLayout16BitAccess",
+            "workgroupMemoryExplicitLayout16BitAccess",
         };
     } else if (cap_name == "WorkgroupMemoryExplicitLayout8BitAccessKHR") {
         return {
-            "WorkgroupMemoryExplicitLayout/workgroupMemoryExplicitLayout8BitAccess",
+            "workgroupMemoryExplicitLayout8BitAccess",
         };
     } else if (cap_name == "WorkgroupMemoryExplicitLayoutKHR") {
         return {
-            "WorkgroupMemoryExplicitLayout/workgroupMemoryExplicitLayout",
+            "workgroupMemoryExplicitLayout",
         };
     }
     
