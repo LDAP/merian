@@ -28,6 +28,7 @@ from vulkan_codegen.parsing import find_extensions
 from vulkan_codegen.codegen import (
     build_extension_type_map,
     build_feature_version_map,
+    build_struct_aggregation_map,
     generate_file_header,
 )
 from vulkan_codegen.spec import (
@@ -42,15 +43,17 @@ out_path, include_path = get_output_paths()
 
 
 def determine_property_metadata(vk_name, ext_type_map, feature_version_map):
-    """Determine extension and core_version for a property struct."""
+    """Determine extension, core_version, and promotion_version for a property struct."""
     extension = None
     core_version = None
+    promotion_version = None
 
     ext_info = ext_type_map.get(vk_name)
     if ext_info:
-        ext_name_macro, ext_name, promotion_version = ext_info
+        ext_name_macro, ext_name, ext_promotion_version = ext_info
         extension = ext_name_macro
-        core_version = promotion_version
+        promotion_version = ext_promotion_version
+        core_version = ext_promotion_version
 
     if vk_name in feature_version_map:
         core_version = feature_version_map[vk_name]
@@ -61,7 +64,7 @@ def determine_property_metadata(vk_name, ext_type_map, feature_version_map):
         vmajor, vminor = vulkan_ver_match.groups()
         core_version = f"VK_API_VERSION_{vmajor}_{vminor}"
 
-    return extension, core_version
+    return extension, core_version, promotion_version
 
 
 def find_property_structures(xml_root, tags) -> list[PropertyStruct]:
@@ -106,7 +109,7 @@ def find_property_structures(xml_root, tags) -> list[PropertyStruct]:
             stype = get_stype_from_name(vk_name)
 
         cpp_name = vk_name_to_cpp_name(vk_name)
-        extension, core_version = determine_property_metadata(
+        extension, core_version, promotion_version = determine_property_metadata(
             vk_name, ext_type_map, feature_version_map
         )
 
@@ -117,8 +120,27 @@ def find_property_structures(xml_root, tags) -> list[PropertyStruct]:
                 stype=stype,
                 extension=extension,
                 core_version=core_version,
+                promotion_version=promotion_version,
             )
         )
+
+    # Build aggregation map using unified function
+    aggregation_map = build_struct_aggregation_map(xml_root, "Properties")
+
+    # Build reverse map
+    aggregates_map = {}  # {VkPhysicalDeviceVulkan11Properties: [list of structs]}
+    for individual, aggregate in aggregation_map.items():
+        if aggregate not in aggregates_map:
+            aggregates_map[aggregate] = []
+        aggregates_map[aggregate].append(individual)
+
+    # Populate PropertyStruct fields
+    for prop in properties:
+        if prop.vk_name in aggregation_map:
+            prop.aggregated_by = aggregation_map[prop.vk_name]
+
+        if prop.vk_name in aggregates_map:
+            prop.aggregates = aggregates_map[prop.vk_name]
 
     return properties
 
@@ -277,7 +299,7 @@ def generate_header(extensions, properties: list[PropertyStruct]) -> str:
 
 def generate_constructor(properties: list[PropertyStruct]) -> list[str]:
     """Generate VulkanProperties constructor implementation."""
-    return [
+    lines = [
         "VulkanProperties::VulkanProperties(const vk::PhysicalDevice& physical_device,",
         "                                   const InstanceHandle& instance) {",
         "    // Calculate effective API version (minimum of targeted and physical device version)",
@@ -290,43 +312,64 @@ def generate_constructor(properties: list[PropertyStruct]) -> list[str]:
         "        extensions.insert(ext.extensionName);",
         "    }",
         "",
-        "    // Build pNext chain using BaseOutStructure for safe chaining",
-        "    vk::BaseOutStructure* chain_tail = nullptr;",
+        "    // Query ALL supported property structs to populate their values",
+        "    // Both VkPhysicalDeviceVulkan{XX}Properties and individual promoted structs are queried.",
+        "    void* chain_tail = nullptr;",
         "",
-        "    // Add properties from API version",
-        "    for (const auto& stype : get_api_version_property_types(effective_vk_api_version)) {",
-        "        void* struct_ptr = const_cast<void*>(get_struct_ptr(stype));",
-        "        if (struct_ptr != nullptr) {",
-        "            auto* base = reinterpret_cast<vk::BaseOutStructure*>(struct_ptr);",
-        "            base->pNext = chain_tail;",
-        "            chain_tail = base;",
-        "            available_structs.insert(stype);",
-        "        }",
-        "    }",
-        "",
-        "    // Add properties from extensions",
-        "    for (const auto& ext_name : extensions) {",
-        "        const ExtensionInfo* ext_info = get_extension_info(ext_name.c_str());",
-        "        if (!ext_info) continue;",
-        "",
-        "        for (const auto& stype : ext_info->property_types) {",
-        "            if (available_structs.contains(stype)) continue;",
-        "            void* struct_ptr = const_cast<void*>(get_struct_ptr(stype));",
-        "            if (struct_ptr != nullptr) {",
-        "                auto* base = reinterpret_cast<vk::BaseOutStructure*>(struct_ptr);",
-        "                base->pNext = chain_tail;",
-        "                chain_tail = base;",
-        "                available_structs.insert(stype);",
-        "            }",
-        "        }",
-        "    }",
-        "",
+    ]
+
+    # Sort all properties alphabetically
+    sorted_properties = sorted(properties, key=lambda p: p.cpp_name)
+
+    for prop in sorted_properties:
+        member_name = generate_member_name(prop.cpp_name)
+        lines.append(f"    // {prop.cpp_name}")
+
+        # Build condition: promotion_version (when promoted to core) OR extension
+        # For VulkanXXProperties structs, use core_version since they have no extension
+        conditions = []
+
+        # Prefer promotion_version over core_version to avoid duplicates
+        if prop.promotion_version:
+            # Struct was promoted from an extension - check promotion version OR extension
+            conditions.append(f"effective_vk_api_version >= {prop.promotion_version}")
+            if prop.extension:
+                conditions.append(f"extensions.contains({prop.extension})")
+        elif prop.core_version:
+            # Core struct (like VulkanXXProperties) - only check core version
+            conditions.append(f"effective_vk_api_version >= {prop.core_version}")
+        elif prop.extension:
+            # Extension-only struct - check extension
+            conditions.append(f"extensions.contains({prop.extension})")
+
+        if conditions:
+            condition = " || ".join(conditions)
+            lines.extend([
+                f"    if ({condition}) {{",
+                f"        {member_name}.pNext = chain_tail;",
+                f"        chain_tail = &{member_name};",
+                f"        available_structs.insert({member_name}.sType);",
+                "    }",
+                "",
+            ])
+        else:
+            lines.extend([
+                f"    {member_name}.pNext = chain_tail;",
+                f"    chain_tail = &{member_name};",
+                f"    available_structs.insert({member_name}.sType);",
+                "",
+            ])
+
+    lines.extend([
         "    // Query properties from device",
         "    m_properties2.pNext = chain_tail;",
         "    physical_device.getProperties2(&m_properties2);",
+        "    available_structs.insert(vk::StructureType::ePhysicalDeviceProperties2);",
         "}",
         "",
-    ]
+    ])
+
+    return lines
 
 
 def generate_template_get(properties: list[PropertyStruct]) -> list[str]:

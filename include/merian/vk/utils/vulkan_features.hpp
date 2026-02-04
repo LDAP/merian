@@ -302,10 +302,7 @@ class VulkanFeatures {
     VulkanFeatures(VulkanFeatures&&) = default;
     VulkanFeatures& operator=(VulkanFeatures&&) = default;
 
-    /// Type-safe template access
-    template<typename T> requires VulkanFeatureStruct<T>
-    T& get();
-
+    /// Type-safe template access (const only - use set_feature for modifications)
     template<typename T> requires VulkanFeatureStruct<T>
     const T& get() const;
 
@@ -1179,7 +1176,7 @@ class VulkanFeatures {
     void enable_features(const vk::ArrayProxy<const std::string>& feature_names);
 
     /// Get list of all available feature names
-    std::vector<std::string> get_all_feature_names() const;
+    static const std::vector<std::string>& get_all_feature_names();
 
     /// Get list of all currently enabled feature names
     std::vector<std::string> get_enabled_features() const;

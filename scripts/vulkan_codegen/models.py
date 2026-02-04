@@ -34,6 +34,9 @@ class PropertyStruct:
     stype: str  # e.g., VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PUSH_DESCRIPTOR_PROPERTIES_KHR
     extension: Optional[str] = None  # e.g., VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME
     core_version: Optional[str] = None  # e.g., VK_API_VERSION_1_4 (when it became core)
+    promotion_version: Optional[str] = None  # e.g., VK_API_VERSION_1_1 (when extension was promoted)
+    aggregated_by: Optional[str] = None  # e.g., VkPhysicalDeviceVulkan11Properties (which VulkanXX struct aggregates this)
+    aggregates: list[str] = field(default_factory=list)  # Which structs this aggregates (if VulkanXX aggregate)
 
 
 @dataclass
@@ -53,8 +56,10 @@ class FeatureStruct:
     stype: str  # e.g., VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT
     members: list[FeatureMember] = field(default_factory=list)
     extension: Optional[str] = None  # e.g., VK_EXT_ROBUSTNESS_2_EXTENSION_NAME
-    promotion_version: Optional[str] = None  # e.g., VK_API_VERSION_1_2
+    promotion_version: Optional[str] = None  # e.g., VK_API_VERSION_1_2 (when extension was promoted to core)
     required_version: Optional[str] = None  # e.g., VK_API_VERSION_1_3 (for core VulkanXXFeatures)
     member_prefix: str = ""  # e.g., "features." for VkPhysicalDeviceFeatures2
     aliases: list[str] = field(default_factory=list)
     structextends: list[str] = field(default_factory=list)  # e.g., ["VkPhysicalDeviceFeatures2", "VkDeviceCreateInfo"]
+    aggregated_by: Optional[str] = None  # e.g., VkPhysicalDeviceVulkan11Features (which VulkanXX struct aggregates this)
+    aggregates: list[str] = field(default_factory=list)  # Which structs this aggregates (if VulkanXX aggregate)

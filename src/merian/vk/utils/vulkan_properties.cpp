@@ -66,40 +66,784 @@ VulkanProperties::VulkanProperties(const vk::PhysicalDevice& physical_device,
         extensions.insert(ext.extensionName);
     }
 
-    // Build pNext chain using BaseOutStructure for safe chaining
-    vk::BaseOutStructure* chain_tail = nullptr;
+    // Query ALL supported property structs to populate their values
+    // Both VkPhysicalDeviceVulkan{XX}Properties and individual promoted structs are queried.
+    void* chain_tail = nullptr;
 
-    // Add properties from API version
-    for (const auto& stype : get_api_version_property_types(effective_vk_api_version)) {
-        void* struct_ptr = const_cast<void*>(get_struct_ptr(stype));
-        if (struct_ptr != nullptr) {
-            auto* base = reinterpret_cast<vk::BaseOutStructure*>(struct_ptr);
-            base->pNext = chain_tail;
-            chain_tail = base;
-            available_structs.insert(stype);
-        }
+    // PhysicalDeviceAccelerationStructurePropertiesKHR
+    if (extensions.contains(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME)) {
+        m_acceleration_structure_properties_khr.pNext = chain_tail;
+        chain_tail = &m_acceleration_structure_properties_khr;
+        available_structs.insert(m_acceleration_structure_properties_khr.sType);
     }
 
-    // Add properties from extensions
-    for (const auto& ext_name : extensions) {
-        const ExtensionInfo* ext_info = get_extension_info(ext_name.c_str());
-        if (!ext_info) continue;
+    // PhysicalDeviceBlendOperationAdvancedPropertiesEXT
+    if (extensions.contains(VK_EXT_BLEND_OPERATION_ADVANCED_EXTENSION_NAME)) {
+        m_blend_operation_advanced_properties_ext.pNext = chain_tail;
+        chain_tail = &m_blend_operation_advanced_properties_ext;
+        available_structs.insert(m_blend_operation_advanced_properties_ext.sType);
+    }
 
-        for (const auto& stype : ext_info->property_types) {
-            if (available_structs.contains(stype)) continue;
-            void* struct_ptr = const_cast<void*>(get_struct_ptr(stype));
-            if (struct_ptr != nullptr) {
-                auto* base = reinterpret_cast<vk::BaseOutStructure*>(struct_ptr);
-                base->pNext = chain_tail;
-                chain_tail = base;
-                available_structs.insert(stype);
-            }
-        }
+    // PhysicalDeviceClusterAccelerationStructurePropertiesNV
+    if (extensions.contains(VK_NV_CLUSTER_ACCELERATION_STRUCTURE_EXTENSION_NAME)) {
+        m_cluster_acceleration_structure_properties_nv.pNext = chain_tail;
+        chain_tail = &m_cluster_acceleration_structure_properties_nv;
+        available_structs.insert(m_cluster_acceleration_structure_properties_nv.sType);
+    }
+
+    // PhysicalDeviceClusterCullingShaderPropertiesHUAWEI
+    if (extensions.contains(VK_HUAWEI_CLUSTER_CULLING_SHADER_EXTENSION_NAME)) {
+        m_cluster_culling_shader_properties_huawei.pNext = chain_tail;
+        chain_tail = &m_cluster_culling_shader_properties_huawei;
+        available_structs.insert(m_cluster_culling_shader_properties_huawei.sType);
+    }
+
+    // PhysicalDeviceComputeShaderDerivativesPropertiesKHR
+    if (extensions.contains(VK_KHR_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME)) {
+        m_compute_shader_derivatives_properties_khr.pNext = chain_tail;
+        chain_tail = &m_compute_shader_derivatives_properties_khr;
+        available_structs.insert(m_compute_shader_derivatives_properties_khr.sType);
+    }
+
+    // PhysicalDeviceConservativeRasterizationPropertiesEXT
+    if (extensions.contains(VK_EXT_CONSERVATIVE_RASTERIZATION_EXTENSION_NAME)) {
+        m_conservative_rasterization_properties_ext.pNext = chain_tail;
+        chain_tail = &m_conservative_rasterization_properties_ext;
+        available_structs.insert(m_conservative_rasterization_properties_ext.sType);
+    }
+
+    // PhysicalDeviceCooperativeMatrix2PropertiesNV
+    if (extensions.contains(VK_NV_COOPERATIVE_MATRIX_2_EXTENSION_NAME)) {
+        m_cooperative_matrix2_properties_nv.pNext = chain_tail;
+        chain_tail = &m_cooperative_matrix2_properties_nv;
+        available_structs.insert(m_cooperative_matrix2_properties_nv.sType);
+    }
+
+    // PhysicalDeviceCooperativeMatrixPropertiesKHR
+    if (extensions.contains(VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME)) {
+        m_cooperative_matrix_properties_khr.pNext = chain_tail;
+        chain_tail = &m_cooperative_matrix_properties_khr;
+        available_structs.insert(m_cooperative_matrix_properties_khr.sType);
+    }
+
+    // PhysicalDeviceCooperativeMatrixPropertiesNV
+    if (extensions.contains(VK_NV_COOPERATIVE_MATRIX_EXTENSION_NAME)) {
+        m_cooperative_matrix_properties_nv.pNext = chain_tail;
+        chain_tail = &m_cooperative_matrix_properties_nv;
+        available_structs.insert(m_cooperative_matrix_properties_nv.sType);
+    }
+
+    // PhysicalDeviceCooperativeVectorPropertiesNV
+    if (extensions.contains(VK_NV_COOPERATIVE_VECTOR_EXTENSION_NAME)) {
+        m_cooperative_vector_properties_nv.pNext = chain_tail;
+        chain_tail = &m_cooperative_vector_properties_nv;
+        available_structs.insert(m_cooperative_vector_properties_nv.sType);
+    }
+
+    // PhysicalDeviceCopyMemoryIndirectPropertiesKHR
+    if (extensions.contains(VK_KHR_COPY_MEMORY_INDIRECT_EXTENSION_NAME)) {
+        m_copy_memory_indirect_properties_khr.pNext = chain_tail;
+        chain_tail = &m_copy_memory_indirect_properties_khr;
+        available_structs.insert(m_copy_memory_indirect_properties_khr.sType);
+    }
+
+    // PhysicalDeviceCustomBorderColorPropertiesEXT
+    if (extensions.contains(VK_EXT_CUSTOM_BORDER_COLOR_EXTENSION_NAME)) {
+        m_custom_border_color_properties_ext.pNext = chain_tail;
+        chain_tail = &m_custom_border_color_properties_ext;
+        available_structs.insert(m_custom_border_color_properties_ext.sType);
+    }
+
+    // PhysicalDeviceDepthStencilResolveProperties
+    if (effective_vk_api_version >= VK_API_VERSION_1_2 || extensions.contains(VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME)) {
+        m_depth_stencil_resolve_properties.pNext = chain_tail;
+        chain_tail = &m_depth_stencil_resolve_properties;
+        available_structs.insert(m_depth_stencil_resolve_properties.sType);
+    }
+
+    // PhysicalDeviceDescriptorBufferDensityMapPropertiesEXT
+    if (extensions.contains(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME)) {
+        m_descriptor_buffer_density_map_properties_ext.pNext = chain_tail;
+        chain_tail = &m_descriptor_buffer_density_map_properties_ext;
+        available_structs.insert(m_descriptor_buffer_density_map_properties_ext.sType);
+    }
+
+    // PhysicalDeviceDescriptorBufferPropertiesEXT
+    if (extensions.contains(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME)) {
+        m_descriptor_buffer_properties_ext.pNext = chain_tail;
+        chain_tail = &m_descriptor_buffer_properties_ext;
+        available_structs.insert(m_descriptor_buffer_properties_ext.sType);
+    }
+
+    // PhysicalDeviceDescriptorBufferTensorPropertiesARM
+    if (extensions.contains(VK_ARM_TENSORS_EXTENSION_NAME)) {
+        m_descriptor_buffer_tensor_properties_arm.pNext = chain_tail;
+        chain_tail = &m_descriptor_buffer_tensor_properties_arm;
+        available_structs.insert(m_descriptor_buffer_tensor_properties_arm.sType);
+    }
+
+    // PhysicalDeviceDescriptorHeapPropertiesEXT
+    if (extensions.contains(VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME)) {
+        m_descriptor_heap_properties_ext.pNext = chain_tail;
+        chain_tail = &m_descriptor_heap_properties_ext;
+        available_structs.insert(m_descriptor_heap_properties_ext.sType);
+    }
+
+    // PhysicalDeviceDescriptorHeapTensorPropertiesARM
+    if (extensions.contains(VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME)) {
+        m_descriptor_heap_tensor_properties_arm.pNext = chain_tail;
+        chain_tail = &m_descriptor_heap_tensor_properties_arm;
+        available_structs.insert(m_descriptor_heap_tensor_properties_arm.sType);
+    }
+
+    // PhysicalDeviceDescriptorIndexingProperties
+    if (effective_vk_api_version >= VK_API_VERSION_1_2 || extensions.contains(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME)) {
+        m_descriptor_indexing_properties.pNext = chain_tail;
+        chain_tail = &m_descriptor_indexing_properties;
+        available_structs.insert(m_descriptor_indexing_properties.sType);
+    }
+
+    // PhysicalDeviceDeviceGeneratedCommandsPropertiesEXT
+    if (extensions.contains(VK_EXT_DEVICE_GENERATED_COMMANDS_EXTENSION_NAME)) {
+        m_device_generated_commands_properties_ext.pNext = chain_tail;
+        chain_tail = &m_device_generated_commands_properties_ext;
+        available_structs.insert(m_device_generated_commands_properties_ext.sType);
+    }
+
+    // PhysicalDeviceDeviceGeneratedCommandsPropertiesNV
+    if (extensions.contains(VK_NV_DEVICE_GENERATED_COMMANDS_EXTENSION_NAME)) {
+        m_device_generated_commands_properties_nv.pNext = chain_tail;
+        chain_tail = &m_device_generated_commands_properties_nv;
+        available_structs.insert(m_device_generated_commands_properties_nv.sType);
+    }
+
+    // PhysicalDeviceDiscardRectanglePropertiesEXT
+    if (extensions.contains(VK_EXT_DISCARD_RECTANGLES_EXTENSION_NAME)) {
+        m_discard_rectangle_properties_ext.pNext = chain_tail;
+        chain_tail = &m_discard_rectangle_properties_ext;
+        available_structs.insert(m_discard_rectangle_properties_ext.sType);
+    }
+
+    // PhysicalDeviceDriverProperties
+    if (effective_vk_api_version >= VK_API_VERSION_1_2 || extensions.contains(VK_KHR_DRIVER_PROPERTIES_EXTENSION_NAME)) {
+        m_driver_properties.pNext = chain_tail;
+        chain_tail = &m_driver_properties;
+        available_structs.insert(m_driver_properties.sType);
+    }
+
+    // PhysicalDeviceDrmPropertiesEXT
+    if (extensions.contains(VK_EXT_PHYSICAL_DEVICE_DRM_EXTENSION_NAME)) {
+        m_drm_properties_ext.pNext = chain_tail;
+        chain_tail = &m_drm_properties_ext;
+        available_structs.insert(m_drm_properties_ext.sType);
+    }
+
+    // PhysicalDeviceExtendedDynamicState3PropertiesEXT
+    if (extensions.contains(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME)) {
+        m_extended_dynamic_state3_properties_ext.pNext = chain_tail;
+        chain_tail = &m_extended_dynamic_state3_properties_ext;
+        available_structs.insert(m_extended_dynamic_state3_properties_ext.sType);
+    }
+
+    // PhysicalDeviceExtendedSparseAddressSpacePropertiesNV
+    if (extensions.contains(VK_NV_EXTENDED_SPARSE_ADDRESS_SPACE_EXTENSION_NAME)) {
+        m_extended_sparse_address_space_properties_nv.pNext = chain_tail;
+        chain_tail = &m_extended_sparse_address_space_properties_nv;
+        available_structs.insert(m_extended_sparse_address_space_properties_nv.sType);
+    }
+
+    // PhysicalDeviceExternalComputeQueuePropertiesNV
+    if (extensions.contains(VK_NV_EXTERNAL_COMPUTE_QUEUE_EXTENSION_NAME)) {
+        m_external_compute_queue_properties_nv.pNext = chain_tail;
+        chain_tail = &m_external_compute_queue_properties_nv;
+        available_structs.insert(m_external_compute_queue_properties_nv.sType);
+    }
+
+    // PhysicalDeviceExternalMemoryHostPropertiesEXT
+    if (extensions.contains(VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME)) {
+        m_external_memory_host_properties_ext.pNext = chain_tail;
+        chain_tail = &m_external_memory_host_properties_ext;
+        available_structs.insert(m_external_memory_host_properties_ext.sType);
+    }
+
+    // PhysicalDeviceFloatControlsProperties
+    if (effective_vk_api_version >= VK_API_VERSION_1_2 || extensions.contains(VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME)) {
+        m_float_controls_properties.pNext = chain_tail;
+        chain_tail = &m_float_controls_properties;
+        available_structs.insert(m_float_controls_properties.sType);
+    }
+
+    // PhysicalDeviceFragmentDensityMap2PropertiesEXT
+    if (extensions.contains(VK_EXT_FRAGMENT_DENSITY_MAP_2_EXTENSION_NAME)) {
+        m_fragment_density_map2_properties_ext.pNext = chain_tail;
+        chain_tail = &m_fragment_density_map2_properties_ext;
+        available_structs.insert(m_fragment_density_map2_properties_ext.sType);
+    }
+
+    // PhysicalDeviceFragmentDensityMapLayeredPropertiesVALVE
+    if (extensions.contains(VK_VALVE_FRAGMENT_DENSITY_MAP_LAYERED_EXTENSION_NAME)) {
+        m_fragment_density_map_layered_properties_valve.pNext = chain_tail;
+        chain_tail = &m_fragment_density_map_layered_properties_valve;
+        available_structs.insert(m_fragment_density_map_layered_properties_valve.sType);
+    }
+
+    // PhysicalDeviceFragmentDensityMapOffsetPropertiesEXT
+    if (extensions.contains(VK_EXT_FRAGMENT_DENSITY_MAP_OFFSET_EXTENSION_NAME)) {
+        m_fragment_density_map_offset_properties_ext.pNext = chain_tail;
+        chain_tail = &m_fragment_density_map_offset_properties_ext;
+        available_structs.insert(m_fragment_density_map_offset_properties_ext.sType);
+    }
+
+    // PhysicalDeviceFragmentDensityMapPropertiesEXT
+    if (extensions.contains(VK_EXT_FRAGMENT_DENSITY_MAP_EXTENSION_NAME)) {
+        m_fragment_density_map_properties_ext.pNext = chain_tail;
+        chain_tail = &m_fragment_density_map_properties_ext;
+        available_structs.insert(m_fragment_density_map_properties_ext.sType);
+    }
+
+    // PhysicalDeviceFragmentShaderBarycentricPropertiesKHR
+    if (extensions.contains(VK_KHR_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME)) {
+        m_fragment_shader_barycentric_properties_khr.pNext = chain_tail;
+        chain_tail = &m_fragment_shader_barycentric_properties_khr;
+        available_structs.insert(m_fragment_shader_barycentric_properties_khr.sType);
+    }
+
+    // PhysicalDeviceFragmentShadingRateEnumsPropertiesNV
+    if (extensions.contains(VK_NV_FRAGMENT_SHADING_RATE_ENUMS_EXTENSION_NAME)) {
+        m_fragment_shading_rate_enums_properties_nv.pNext = chain_tail;
+        chain_tail = &m_fragment_shading_rate_enums_properties_nv;
+        available_structs.insert(m_fragment_shading_rate_enums_properties_nv.sType);
+    }
+
+    // PhysicalDeviceFragmentShadingRatePropertiesKHR
+    if (extensions.contains(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME)) {
+        m_fragment_shading_rate_properties_khr.pNext = chain_tail;
+        chain_tail = &m_fragment_shading_rate_properties_khr;
+        available_structs.insert(m_fragment_shading_rate_properties_khr.sType);
+    }
+
+    // PhysicalDeviceGraphicsPipelineLibraryPropertiesEXT
+    if (extensions.contains(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME)) {
+        m_graphics_pipeline_library_properties_ext.pNext = chain_tail;
+        chain_tail = &m_graphics_pipeline_library_properties_ext;
+        available_structs.insert(m_graphics_pipeline_library_properties_ext.sType);
+    }
+
+    // PhysicalDeviceHostImageCopyProperties
+    if (effective_vk_api_version >= VK_API_VERSION_1_4 || extensions.contains(VK_EXT_HOST_IMAGE_COPY_EXTENSION_NAME)) {
+        m_host_image_copy_properties.pNext = chain_tail;
+        chain_tail = &m_host_image_copy_properties;
+        available_structs.insert(m_host_image_copy_properties.sType);
+    }
+
+    // PhysicalDeviceIDProperties
+    if (effective_vk_api_version >= VK_API_VERSION_1_1 || extensions.contains(VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME)) {
+        m_id_properties.pNext = chain_tail;
+        chain_tail = &m_id_properties;
+        available_structs.insert(m_id_properties.sType);
+    }
+
+    // PhysicalDeviceImageAlignmentControlPropertiesMESA
+    if (extensions.contains(VK_MESA_IMAGE_ALIGNMENT_CONTROL_EXTENSION_NAME)) {
+        m_image_alignment_control_properties_mesa.pNext = chain_tail;
+        chain_tail = &m_image_alignment_control_properties_mesa;
+        available_structs.insert(m_image_alignment_control_properties_mesa.sType);
+    }
+
+    // PhysicalDeviceImageProcessing2PropertiesQCOM
+    if (extensions.contains(VK_QCOM_IMAGE_PROCESSING_2_EXTENSION_NAME)) {
+        m_image_processing2_properties_qcom.pNext = chain_tail;
+        chain_tail = &m_image_processing2_properties_qcom;
+        available_structs.insert(m_image_processing2_properties_qcom.sType);
+    }
+
+    // PhysicalDeviceImageProcessingPropertiesQCOM
+    if (extensions.contains(VK_QCOM_IMAGE_PROCESSING_EXTENSION_NAME)) {
+        m_image_processing_properties_qcom.pNext = chain_tail;
+        chain_tail = &m_image_processing_properties_qcom;
+        available_structs.insert(m_image_processing_properties_qcom.sType);
+    }
+
+    // PhysicalDeviceInlineUniformBlockProperties
+    if (effective_vk_api_version >= VK_API_VERSION_1_3 || extensions.contains(VK_EXT_INLINE_UNIFORM_BLOCK_EXTENSION_NAME)) {
+        m_inline_uniform_block_properties.pNext = chain_tail;
+        chain_tail = &m_inline_uniform_block_properties;
+        available_structs.insert(m_inline_uniform_block_properties.sType);
+    }
+
+    // PhysicalDeviceLayeredApiPropertiesListKHR
+    if (extensions.contains(VK_KHR_MAINTENANCE_7_EXTENSION_NAME)) {
+        m_layered_api_properties_list_khr.pNext = chain_tail;
+        chain_tail = &m_layered_api_properties_list_khr;
+        available_structs.insert(m_layered_api_properties_list_khr.sType);
+    }
+
+    // PhysicalDeviceLayeredDriverPropertiesMSFT
+    if (extensions.contains(VK_MSFT_LAYERED_DRIVER_EXTENSION_NAME)) {
+        m_layered_driver_properties_msft.pNext = chain_tail;
+        chain_tail = &m_layered_driver_properties_msft;
+        available_structs.insert(m_layered_driver_properties_msft.sType);
+    }
+
+    // PhysicalDeviceLegacyVertexAttributesPropertiesEXT
+    if (extensions.contains(VK_EXT_LEGACY_VERTEX_ATTRIBUTES_EXTENSION_NAME)) {
+        m_legacy_vertex_attributes_properties_ext.pNext = chain_tail;
+        chain_tail = &m_legacy_vertex_attributes_properties_ext;
+        available_structs.insert(m_legacy_vertex_attributes_properties_ext.sType);
+    }
+
+    // PhysicalDeviceLineRasterizationProperties
+    if (effective_vk_api_version >= VK_API_VERSION_1_4 || extensions.contains(VK_KHR_LINE_RASTERIZATION_EXTENSION_NAME)) {
+        m_line_rasterization_properties.pNext = chain_tail;
+        chain_tail = &m_line_rasterization_properties;
+        available_structs.insert(m_line_rasterization_properties.sType);
+    }
+
+    // PhysicalDeviceMaintenance10PropertiesKHR
+    if (extensions.contains(VK_KHR_MAINTENANCE_10_EXTENSION_NAME)) {
+        m_maintenance10_properties_khr.pNext = chain_tail;
+        chain_tail = &m_maintenance10_properties_khr;
+        available_structs.insert(m_maintenance10_properties_khr.sType);
+    }
+
+    // PhysicalDeviceMaintenance3Properties
+    if (effective_vk_api_version >= VK_API_VERSION_1_1 || extensions.contains(VK_KHR_MAINTENANCE_3_EXTENSION_NAME)) {
+        m_maintenance3_properties.pNext = chain_tail;
+        chain_tail = &m_maintenance3_properties;
+        available_structs.insert(m_maintenance3_properties.sType);
+    }
+
+    // PhysicalDeviceMaintenance4Properties
+    if (effective_vk_api_version >= VK_API_VERSION_1_3 || extensions.contains(VK_KHR_MAINTENANCE_4_EXTENSION_NAME)) {
+        m_maintenance4_properties.pNext = chain_tail;
+        chain_tail = &m_maintenance4_properties;
+        available_structs.insert(m_maintenance4_properties.sType);
+    }
+
+    // PhysicalDeviceMaintenance5Properties
+    if (effective_vk_api_version >= VK_API_VERSION_1_4 || extensions.contains(VK_KHR_MAINTENANCE_5_EXTENSION_NAME)) {
+        m_maintenance5_properties.pNext = chain_tail;
+        chain_tail = &m_maintenance5_properties;
+        available_structs.insert(m_maintenance5_properties.sType);
+    }
+
+    // PhysicalDeviceMaintenance6Properties
+    if (effective_vk_api_version >= VK_API_VERSION_1_4 || extensions.contains(VK_KHR_MAINTENANCE_6_EXTENSION_NAME)) {
+        m_maintenance6_properties.pNext = chain_tail;
+        chain_tail = &m_maintenance6_properties;
+        available_structs.insert(m_maintenance6_properties.sType);
+    }
+
+    // PhysicalDeviceMaintenance7PropertiesKHR
+    if (extensions.contains(VK_KHR_MAINTENANCE_7_EXTENSION_NAME)) {
+        m_maintenance7_properties_khr.pNext = chain_tail;
+        chain_tail = &m_maintenance7_properties_khr;
+        available_structs.insert(m_maintenance7_properties_khr.sType);
+    }
+
+    // PhysicalDeviceMaintenance9PropertiesKHR
+    if (extensions.contains(VK_KHR_MAINTENANCE_9_EXTENSION_NAME)) {
+        m_maintenance9_properties_khr.pNext = chain_tail;
+        chain_tail = &m_maintenance9_properties_khr;
+        available_structs.insert(m_maintenance9_properties_khr.sType);
+    }
+
+    // PhysicalDeviceMapMemoryPlacedPropertiesEXT
+    if (extensions.contains(VK_EXT_MAP_MEMORY_PLACED_EXTENSION_NAME)) {
+        m_map_memory_placed_properties_ext.pNext = chain_tail;
+        chain_tail = &m_map_memory_placed_properties_ext;
+        available_structs.insert(m_map_memory_placed_properties_ext.sType);
+    }
+
+    // PhysicalDeviceMemoryDecompressionPropertiesEXT
+    if (extensions.contains(VK_EXT_MEMORY_DECOMPRESSION_EXTENSION_NAME)) {
+        m_memory_decompression_properties_ext.pNext = chain_tail;
+        chain_tail = &m_memory_decompression_properties_ext;
+        available_structs.insert(m_memory_decompression_properties_ext.sType);
+    }
+
+    // PhysicalDeviceMeshShaderPropertiesEXT
+    if (extensions.contains(VK_EXT_MESH_SHADER_EXTENSION_NAME)) {
+        m_mesh_shader_properties_ext.pNext = chain_tail;
+        chain_tail = &m_mesh_shader_properties_ext;
+        available_structs.insert(m_mesh_shader_properties_ext.sType);
+    }
+
+    // PhysicalDeviceMeshShaderPropertiesNV
+    if (extensions.contains(VK_NV_MESH_SHADER_EXTENSION_NAME)) {
+        m_mesh_shader_properties_nv.pNext = chain_tail;
+        chain_tail = &m_mesh_shader_properties_nv;
+        available_structs.insert(m_mesh_shader_properties_nv.sType);
+    }
+
+    // PhysicalDeviceMultiDrawPropertiesEXT
+    if (extensions.contains(VK_EXT_MULTI_DRAW_EXTENSION_NAME)) {
+        m_multi_draw_properties_ext.pNext = chain_tail;
+        chain_tail = &m_multi_draw_properties_ext;
+        available_structs.insert(m_multi_draw_properties_ext.sType);
+    }
+
+    // PhysicalDeviceMultiviewPerViewAttributesPropertiesNVX
+    if (extensions.contains(VK_NVX_MULTIVIEW_PER_VIEW_ATTRIBUTES_EXTENSION_NAME)) {
+        m_multiview_per_view_attributes_properties_nvx.pNext = chain_tail;
+        chain_tail = &m_multiview_per_view_attributes_properties_nvx;
+        available_structs.insert(m_multiview_per_view_attributes_properties_nvx.sType);
+    }
+
+    // PhysicalDeviceMultiviewProperties
+    if (effective_vk_api_version >= VK_API_VERSION_1_1 || extensions.contains(VK_KHR_MULTIVIEW_EXTENSION_NAME)) {
+        m_multiview_properties.pNext = chain_tail;
+        chain_tail = &m_multiview_properties;
+        available_structs.insert(m_multiview_properties.sType);
+    }
+
+    // PhysicalDeviceNestedCommandBufferPropertiesEXT
+    if (extensions.contains(VK_EXT_NESTED_COMMAND_BUFFER_EXTENSION_NAME)) {
+        m_nested_command_buffer_properties_ext.pNext = chain_tail;
+        chain_tail = &m_nested_command_buffer_properties_ext;
+        available_structs.insert(m_nested_command_buffer_properties_ext.sType);
+    }
+
+    // PhysicalDeviceOpacityMicromapPropertiesEXT
+    if (extensions.contains(VK_EXT_OPACITY_MICROMAP_EXTENSION_NAME)) {
+        m_opacity_micromap_properties_ext.pNext = chain_tail;
+        chain_tail = &m_opacity_micromap_properties_ext;
+        available_structs.insert(m_opacity_micromap_properties_ext.sType);
+    }
+
+    // PhysicalDeviceOpticalFlowPropertiesNV
+    if (extensions.contains(VK_NV_OPTICAL_FLOW_EXTENSION_NAME)) {
+        m_optical_flow_properties_nv.pNext = chain_tail;
+        chain_tail = &m_optical_flow_properties_nv;
+        available_structs.insert(m_optical_flow_properties_nv.sType);
+    }
+
+    // PhysicalDevicePCIBusInfoPropertiesEXT
+    if (extensions.contains(VK_EXT_PCI_BUS_INFO_EXTENSION_NAME)) {
+        m_pci_bus_info_properties_ext.pNext = chain_tail;
+        chain_tail = &m_pci_bus_info_properties_ext;
+        available_structs.insert(m_pci_bus_info_properties_ext.sType);
+    }
+
+    // PhysicalDevicePartitionedAccelerationStructurePropertiesNV
+    if (extensions.contains(VK_NV_PARTITIONED_ACCELERATION_STRUCTURE_EXTENSION_NAME)) {
+        m_partitioned_acceleration_structure_properties_nv.pNext = chain_tail;
+        chain_tail = &m_partitioned_acceleration_structure_properties_nv;
+        available_structs.insert(m_partitioned_acceleration_structure_properties_nv.sType);
+    }
+
+    // PhysicalDevicePerformanceCountersByRegionPropertiesARM
+    if (extensions.contains(VK_ARM_PERFORMANCE_COUNTERS_BY_REGION_EXTENSION_NAME)) {
+        m_performance_counters_by_region_properties_arm.pNext = chain_tail;
+        chain_tail = &m_performance_counters_by_region_properties_arm;
+        available_structs.insert(m_performance_counters_by_region_properties_arm.sType);
+    }
+
+    // PhysicalDevicePerformanceQueryPropertiesKHR
+    if (extensions.contains(VK_KHR_PERFORMANCE_QUERY_EXTENSION_NAME)) {
+        m_performance_query_properties_khr.pNext = chain_tail;
+        chain_tail = &m_performance_query_properties_khr;
+        available_structs.insert(m_performance_query_properties_khr.sType);
+    }
+
+    // PhysicalDevicePipelineBinaryPropertiesKHR
+    if (extensions.contains(VK_KHR_PIPELINE_BINARY_EXTENSION_NAME)) {
+        m_pipeline_binary_properties_khr.pNext = chain_tail;
+        chain_tail = &m_pipeline_binary_properties_khr;
+        available_structs.insert(m_pipeline_binary_properties_khr.sType);
+    }
+
+    // PhysicalDevicePipelineRobustnessProperties
+    if (effective_vk_api_version >= VK_API_VERSION_1_4 || extensions.contains(VK_EXT_PIPELINE_ROBUSTNESS_EXTENSION_NAME)) {
+        m_pipeline_robustness_properties.pNext = chain_tail;
+        chain_tail = &m_pipeline_robustness_properties;
+        available_structs.insert(m_pipeline_robustness_properties.sType);
+    }
+
+    // PhysicalDevicePointClippingProperties
+    if (effective_vk_api_version >= VK_API_VERSION_1_1 || extensions.contains(VK_KHR_MAINTENANCE_2_EXTENSION_NAME)) {
+        m_point_clipping_properties.pNext = chain_tail;
+        chain_tail = &m_point_clipping_properties;
+        available_structs.insert(m_point_clipping_properties.sType);
+    }
+
+    // PhysicalDeviceProtectedMemoryProperties
+    if (effective_vk_api_version >= VK_API_VERSION_1_1) {
+        m_protected_memory_properties.pNext = chain_tail;
+        chain_tail = &m_protected_memory_properties;
+        available_structs.insert(m_protected_memory_properties.sType);
+    }
+
+    // PhysicalDeviceProvokingVertexPropertiesEXT
+    if (extensions.contains(VK_EXT_PROVOKING_VERTEX_EXTENSION_NAME)) {
+        m_provoking_vertex_properties_ext.pNext = chain_tail;
+        chain_tail = &m_provoking_vertex_properties_ext;
+        available_structs.insert(m_provoking_vertex_properties_ext.sType);
+    }
+
+    // PhysicalDevicePushConstantBankPropertiesNV
+    if (extensions.contains(VK_NV_PUSH_CONSTANT_BANK_EXTENSION_NAME)) {
+        m_push_constant_bank_properties_nv.pNext = chain_tail;
+        chain_tail = &m_push_constant_bank_properties_nv;
+        available_structs.insert(m_push_constant_bank_properties_nv.sType);
+    }
+
+    // PhysicalDevicePushDescriptorProperties
+    if (effective_vk_api_version >= VK_API_VERSION_1_4 || extensions.contains(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME)) {
+        m_push_descriptor_properties.pNext = chain_tail;
+        chain_tail = &m_push_descriptor_properties;
+        available_structs.insert(m_push_descriptor_properties.sType);
+    }
+
+    // PhysicalDeviceRayTracingInvocationReorderPropertiesEXT
+    if (extensions.contains(VK_EXT_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME)) {
+        m_ray_tracing_invocation_reorder_properties_ext.pNext = chain_tail;
+        chain_tail = &m_ray_tracing_invocation_reorder_properties_ext;
+        available_structs.insert(m_ray_tracing_invocation_reorder_properties_ext.sType);
+    }
+
+    // PhysicalDeviceRayTracingInvocationReorderPropertiesNV
+    if (extensions.contains(VK_NV_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME)) {
+        m_ray_tracing_invocation_reorder_properties_nv.pNext = chain_tail;
+        chain_tail = &m_ray_tracing_invocation_reorder_properties_nv;
+        available_structs.insert(m_ray_tracing_invocation_reorder_properties_nv.sType);
+    }
+
+    // PhysicalDeviceRayTracingPipelinePropertiesKHR
+    if (extensions.contains(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME)) {
+        m_ray_tracing_pipeline_properties_khr.pNext = chain_tail;
+        chain_tail = &m_ray_tracing_pipeline_properties_khr;
+        available_structs.insert(m_ray_tracing_pipeline_properties_khr.sType);
+    }
+
+    // PhysicalDeviceRayTracingPropertiesNV
+    if (extensions.contains(VK_NV_RAY_TRACING_EXTENSION_NAME)) {
+        m_ray_tracing_properties_nv.pNext = chain_tail;
+        chain_tail = &m_ray_tracing_properties_nv;
+        available_structs.insert(m_ray_tracing_properties_nv.sType);
+    }
+
+    // PhysicalDeviceRenderPassStripedPropertiesARM
+    if (extensions.contains(VK_ARM_RENDER_PASS_STRIPED_EXTENSION_NAME)) {
+        m_render_pass_striped_properties_arm.pNext = chain_tail;
+        chain_tail = &m_render_pass_striped_properties_arm;
+        available_structs.insert(m_render_pass_striped_properties_arm.sType);
+    }
+
+    // PhysicalDeviceRobustness2PropertiesKHR
+    if (extensions.contains(VK_KHR_ROBUSTNESS_2_EXTENSION_NAME)) {
+        m_robustness2_properties_khr.pNext = chain_tail;
+        chain_tail = &m_robustness2_properties_khr;
+        available_structs.insert(m_robustness2_properties_khr.sType);
+    }
+
+    // PhysicalDeviceSampleLocationsPropertiesEXT
+    if (extensions.contains(VK_EXT_SAMPLE_LOCATIONS_EXTENSION_NAME)) {
+        m_sample_locations_properties_ext.pNext = chain_tail;
+        chain_tail = &m_sample_locations_properties_ext;
+        available_structs.insert(m_sample_locations_properties_ext.sType);
+    }
+
+    // PhysicalDeviceSamplerFilterMinmaxProperties
+    if (effective_vk_api_version >= VK_API_VERSION_1_2 || extensions.contains(VK_EXT_SAMPLER_FILTER_MINMAX_EXTENSION_NAME)) {
+        m_sampler_filter_minmax_properties.pNext = chain_tail;
+        chain_tail = &m_sampler_filter_minmax_properties;
+        available_structs.insert(m_sampler_filter_minmax_properties.sType);
+    }
+
+    // PhysicalDeviceSchedulingControlsPropertiesARM
+    if (extensions.contains(VK_ARM_SCHEDULING_CONTROLS_EXTENSION_NAME)) {
+        m_scheduling_controls_properties_arm.pNext = chain_tail;
+        chain_tail = &m_scheduling_controls_properties_arm;
+        available_structs.insert(m_scheduling_controls_properties_arm.sType);
+    }
+
+    // PhysicalDeviceShaderCoreBuiltinsPropertiesARM
+    if (extensions.contains(VK_ARM_SHADER_CORE_BUILTINS_EXTENSION_NAME)) {
+        m_shader_core_builtins_properties_arm.pNext = chain_tail;
+        chain_tail = &m_shader_core_builtins_properties_arm;
+        available_structs.insert(m_shader_core_builtins_properties_arm.sType);
+    }
+
+    // PhysicalDeviceShaderCoreProperties2AMD
+    if (extensions.contains(VK_AMD_SHADER_CORE_PROPERTIES_2_EXTENSION_NAME)) {
+        m_shader_core_properties2_amd.pNext = chain_tail;
+        chain_tail = &m_shader_core_properties2_amd;
+        available_structs.insert(m_shader_core_properties2_amd.sType);
+    }
+
+    // PhysicalDeviceShaderCorePropertiesAMD
+    if (extensions.contains(VK_AMD_SHADER_CORE_PROPERTIES_EXTENSION_NAME)) {
+        m_shader_core_properties_amd.pNext = chain_tail;
+        chain_tail = &m_shader_core_properties_amd;
+        available_structs.insert(m_shader_core_properties_amd.sType);
+    }
+
+    // PhysicalDeviceShaderCorePropertiesARM
+    if (extensions.contains(VK_ARM_SHADER_CORE_PROPERTIES_EXTENSION_NAME)) {
+        m_shader_core_properties_arm.pNext = chain_tail;
+        chain_tail = &m_shader_core_properties_arm;
+        available_structs.insert(m_shader_core_properties_arm.sType);
+    }
+
+    // PhysicalDeviceShaderIntegerDotProductProperties
+    if (effective_vk_api_version >= VK_API_VERSION_1_3 || extensions.contains(VK_KHR_SHADER_INTEGER_DOT_PRODUCT_EXTENSION_NAME)) {
+        m_shader_integer_dot_product_properties.pNext = chain_tail;
+        chain_tail = &m_shader_integer_dot_product_properties;
+        available_structs.insert(m_shader_integer_dot_product_properties.sType);
+    }
+
+    // PhysicalDeviceShaderLongVectorPropertiesEXT
+    if (extensions.contains(VK_EXT_SHADER_LONG_VECTOR_EXTENSION_NAME)) {
+        m_shader_long_vector_properties_ext.pNext = chain_tail;
+        chain_tail = &m_shader_long_vector_properties_ext;
+        available_structs.insert(m_shader_long_vector_properties_ext.sType);
+    }
+
+    // PhysicalDeviceShaderModuleIdentifierPropertiesEXT
+    if (extensions.contains(VK_EXT_SHADER_MODULE_IDENTIFIER_EXTENSION_NAME)) {
+        m_shader_module_identifier_properties_ext.pNext = chain_tail;
+        chain_tail = &m_shader_module_identifier_properties_ext;
+        available_structs.insert(m_shader_module_identifier_properties_ext.sType);
+    }
+
+    // PhysicalDeviceShaderObjectPropertiesEXT
+    if (extensions.contains(VK_EXT_SHADER_OBJECT_EXTENSION_NAME)) {
+        m_shader_object_properties_ext.pNext = chain_tail;
+        chain_tail = &m_shader_object_properties_ext;
+        available_structs.insert(m_shader_object_properties_ext.sType);
+    }
+
+    // PhysicalDeviceShaderSMBuiltinsPropertiesNV
+    if (extensions.contains(VK_NV_SHADER_SM_BUILTINS_EXTENSION_NAME)) {
+        m_shader_sm_builtins_properties_nv.pNext = chain_tail;
+        chain_tail = &m_shader_sm_builtins_properties_nv;
+        available_structs.insert(m_shader_sm_builtins_properties_nv.sType);
+    }
+
+    // PhysicalDeviceShaderTileImagePropertiesEXT
+    if (extensions.contains(VK_EXT_SHADER_TILE_IMAGE_EXTENSION_NAME)) {
+        m_shader_tile_image_properties_ext.pNext = chain_tail;
+        chain_tail = &m_shader_tile_image_properties_ext;
+        available_structs.insert(m_shader_tile_image_properties_ext.sType);
+    }
+
+    // PhysicalDeviceShadingRateImagePropertiesNV
+    if (extensions.contains(VK_NV_SHADING_RATE_IMAGE_EXTENSION_NAME)) {
+        m_shading_rate_image_properties_nv.pNext = chain_tail;
+        chain_tail = &m_shading_rate_image_properties_nv;
+        available_structs.insert(m_shading_rate_image_properties_nv.sType);
+    }
+
+    // PhysicalDeviceSubgroupProperties
+    if (effective_vk_api_version >= VK_API_VERSION_1_1) {
+        m_subgroup_properties.pNext = chain_tail;
+        chain_tail = &m_subgroup_properties;
+        available_structs.insert(m_subgroup_properties.sType);
+    }
+
+    // PhysicalDeviceSubgroupSizeControlProperties
+    if (effective_vk_api_version >= VK_API_VERSION_1_3 || extensions.contains(VK_EXT_SUBGROUP_SIZE_CONTROL_EXTENSION_NAME)) {
+        m_subgroup_size_control_properties.pNext = chain_tail;
+        chain_tail = &m_subgroup_size_control_properties;
+        available_structs.insert(m_subgroup_size_control_properties.sType);
+    }
+
+    // PhysicalDeviceSubpassShadingPropertiesHUAWEI
+    if (extensions.contains(VK_HUAWEI_SUBPASS_SHADING_EXTENSION_NAME)) {
+        m_subpass_shading_properties_huawei.pNext = chain_tail;
+        chain_tail = &m_subpass_shading_properties_huawei;
+        available_structs.insert(m_subpass_shading_properties_huawei.sType);
+    }
+
+    // PhysicalDeviceTensorPropertiesARM
+    if (extensions.contains(VK_ARM_TENSORS_EXTENSION_NAME)) {
+        m_tensor_properties_arm.pNext = chain_tail;
+        chain_tail = &m_tensor_properties_arm;
+        available_structs.insert(m_tensor_properties_arm.sType);
+    }
+
+    // PhysicalDeviceTexelBufferAlignmentProperties
+    if (effective_vk_api_version >= VK_API_VERSION_1_3 || extensions.contains(VK_EXT_TEXEL_BUFFER_ALIGNMENT_EXTENSION_NAME)) {
+        m_texel_buffer_alignment_properties.pNext = chain_tail;
+        chain_tail = &m_texel_buffer_alignment_properties;
+        available_structs.insert(m_texel_buffer_alignment_properties.sType);
+    }
+
+    // PhysicalDeviceTileMemoryHeapPropertiesQCOM
+    if (extensions.contains(VK_QCOM_TILE_MEMORY_HEAP_EXTENSION_NAME)) {
+        m_tile_memory_heap_properties_qcom.pNext = chain_tail;
+        chain_tail = &m_tile_memory_heap_properties_qcom;
+        available_structs.insert(m_tile_memory_heap_properties_qcom.sType);
+    }
+
+    // PhysicalDeviceTileShadingPropertiesQCOM
+    if (extensions.contains(VK_QCOM_TILE_SHADING_EXTENSION_NAME)) {
+        m_tile_shading_properties_qcom.pNext = chain_tail;
+        chain_tail = &m_tile_shading_properties_qcom;
+        available_structs.insert(m_tile_shading_properties_qcom.sType);
+    }
+
+    // PhysicalDeviceTimelineSemaphoreProperties
+    if (effective_vk_api_version >= VK_API_VERSION_1_2 || extensions.contains(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME)) {
+        m_timeline_semaphore_properties.pNext = chain_tail;
+        chain_tail = &m_timeline_semaphore_properties;
+        available_structs.insert(m_timeline_semaphore_properties.sType);
+    }
+
+    // PhysicalDeviceTransformFeedbackPropertiesEXT
+    if (extensions.contains(VK_EXT_TRANSFORM_FEEDBACK_EXTENSION_NAME)) {
+        m_transform_feedback_properties_ext.pNext = chain_tail;
+        chain_tail = &m_transform_feedback_properties_ext;
+        available_structs.insert(m_transform_feedback_properties_ext.sType);
+    }
+
+    // PhysicalDeviceVertexAttributeDivisorProperties
+    if (effective_vk_api_version >= VK_API_VERSION_1_4 || extensions.contains(VK_KHR_VERTEX_ATTRIBUTE_DIVISOR_EXTENSION_NAME)) {
+        m_vertex_attribute_divisor_properties.pNext = chain_tail;
+        chain_tail = &m_vertex_attribute_divisor_properties;
+        available_structs.insert(m_vertex_attribute_divisor_properties.sType);
+    }
+
+    // PhysicalDeviceVertexAttributeDivisorPropertiesEXT
+    if (extensions.contains(VK_EXT_VERTEX_ATTRIBUTE_DIVISOR_EXTENSION_NAME)) {
+        m_vertex_attribute_divisor_properties_ext.pNext = chain_tail;
+        chain_tail = &m_vertex_attribute_divisor_properties_ext;
+        available_structs.insert(m_vertex_attribute_divisor_properties_ext.sType);
+    }
+
+    // PhysicalDeviceVulkan11Properties
+    if (effective_vk_api_version >= VK_API_VERSION_1_1) {
+        m_vulkan11_properties.pNext = chain_tail;
+        chain_tail = &m_vulkan11_properties;
+        available_structs.insert(m_vulkan11_properties.sType);
+    }
+
+    // PhysicalDeviceVulkan12Properties
+    if (effective_vk_api_version >= VK_API_VERSION_1_2) {
+        m_vulkan12_properties.pNext = chain_tail;
+        chain_tail = &m_vulkan12_properties;
+        available_structs.insert(m_vulkan12_properties.sType);
+    }
+
+    // PhysicalDeviceVulkan13Properties
+    if (effective_vk_api_version >= VK_API_VERSION_1_3) {
+        m_vulkan13_properties.pNext = chain_tail;
+        chain_tail = &m_vulkan13_properties;
+        available_structs.insert(m_vulkan13_properties.sType);
+    }
+
+    // PhysicalDeviceVulkan14Properties
+    if (effective_vk_api_version >= VK_API_VERSION_1_4) {
+        m_vulkan14_properties.pNext = chain_tail;
+        chain_tail = &m_vulkan14_properties;
+        available_structs.insert(m_vulkan14_properties.sType);
     }
 
     // Query properties from device
     m_properties2.pNext = chain_tail;
     physical_device.getProperties2(&m_properties2);
+    available_structs.insert(vk::StructureType::ePhysicalDeviceProperties2);
 }
 
 // Template get<T>() implementation

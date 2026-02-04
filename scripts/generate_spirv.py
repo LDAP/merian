@@ -13,7 +13,11 @@ import re
 from dataclasses import dataclass, field
 from typing import Optional
 
-from vulkan_codegen.codegen import generate_file_header
+from vulkan_codegen.codegen import (
+    build_extension_name_map,
+    generate_file_header,
+    version_to_api_version,
+)
 from vulkan_codegen.naming import get_short_feature_name, vk_name_to_cpp_name
 from vulkan_codegen.spec import (
     VULKAN_SPEC_VERSION,
@@ -71,44 +75,6 @@ class SpirvCapability:
 
 
 out_path, include_path = get_output_paths()
-
-
-def build_extension_name_map(xml_root) -> dict[str, str]:
-    """
-    Build map of extension name to EXTENSION_NAME macro.
-
-    e.g., VK_EXT_shader_atomic_float2 -> VK_EXT_SHADER_ATOMIC_FLOAT_2_EXTENSION_NAME
-
-    Skips provisional/platform-specific extensions as their macros are protected
-    by preprocessor defines (e.g., VK_ENABLE_BETA_EXTENSIONS).
-    """
-    ext_name_map = {}
-
-    for ext in xml_root.findall("extensions/extension"):
-        ext_name = ext.get("name")
-        ext_supported = ext.get("supported", "")
-        if not ext_name:
-            continue
-        if "vulkan" not in ext_supported.split(","):
-            continue
-        # Skip platform-specific/provisional extensions
-        if ext.get("platform") is not None:
-            continue
-
-        ext_name_macro = None
-        for req in ext.findall("require"):
-            for enum_elem in req.findall("enum"):
-                enum_name = enum_elem.get("name", "")
-                if enum_name.endswith("_EXTENSION_NAME"):
-                    ext_name_macro = enum_name
-                    break
-            if ext_name_macro:
-                break
-
-        if ext_name_macro:
-            ext_name_map[ext_name] = ext_name_macro
-
-    return ext_name_map
 
 
 def parse_spirv_extensions(xml_root) -> list[SpirvExtension]:
@@ -185,15 +151,6 @@ def get_short_property_struct_name(vk_name: str, tags: list[str]) -> str:
     short_name = short_name.removeprefix("PhysicalDevice")
 
     return short_name + tag_suffix
-
-
-def version_to_api_version(version_str: str) -> str:
-    """
-    Convert VK_VERSION_X_Y to VK_API_VERSION_X_Y.
-
-    e.g., VK_VERSION_1_1 -> VK_API_VERSION_1_1
-    """
-    return version_str.replace("VK_VERSION_", "VK_API_VERSION_")
 
 
 def parse_requires(requires_str: str, ext_name_map: dict[str, str]) -> tuple[Optional[str], list[str]]:

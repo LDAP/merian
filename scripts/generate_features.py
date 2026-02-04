@@ -18,6 +18,7 @@ from vulkan_codegen.codegen import (
     build_alias_maps,
     build_extension_type_map,
     build_feature_version_map,
+    build_struct_aggregation_map,
     generate_file_header,
 )
 from vulkan_codegen.models import FeatureMember, FeatureStruct
@@ -91,16 +92,11 @@ def find_vk_physical_device_features2(xml_root) -> FeatureStruct | None:
     return None
 
 
-def find_aliases_for_features(xml_root, features: list[FeatureStruct]):
-    """Find and populate aliases for feature structures."""
-    for type_elem in xml_root.findall("types/type"):
-        alias = type_elem.get("alias")
-        name = type_elem.get("name")
-        if alias and name:
-            for feat in features:
-                if feat.vk_name == alias:
-                    feat.aliases.append(name)
-                    break
+def find_aliases_for_features(canonical_to_aliases: dict, features: list[FeatureStruct]):
+    """Populate feature.aliases using pre-built alias map."""
+    for feat in features:
+        if feat.vk_name in canonical_to_aliases:
+            feat.aliases = canonical_to_aliases[feat.vk_name]
 
 
 def find_feature_structures(xml_root, tags) -> list[FeatureStruct]:
@@ -110,6 +106,7 @@ def find_feature_structures(xml_root, tags) -> list[FeatureStruct]:
     # Extension map now handles aliases internally during building
     extension_map = build_extension_type_map(xml_root)
     version_map = build_feature_version_map(xml_root)
+    _, canonical_to_aliases = build_alias_maps(xml_root)
 
     for type_elem in xml_root.findall("types/type"):
         if type_elem.get("category") != "struct":
@@ -150,7 +147,28 @@ def find_feature_structures(xml_root, tags) -> list[FeatureStruct]:
     if features2 := find_vk_physical_device_features2(xml_root):
         features.append(features2)
 
-    find_aliases_for_features(xml_root, features)
+    find_aliases_for_features(canonical_to_aliases, features)
+
+    # Build aggregation map using unified function
+    aggregation_map = build_struct_aggregation_map(xml_root, "Features")
+
+    # Build reverse map (aggregate -> list of structs it aggregates)
+    aggregates_map = {}  # {VkPhysicalDeviceVulkan11Features: [list of structs]}
+    for individual, aggregate in aggregation_map.items():
+        if aggregate not in aggregates_map:
+            aggregates_map[aggregate] = []
+        aggregates_map[aggregate].append(individual)
+
+    # Populate FeatureStruct fields
+    for feat in features:
+        # Check if this struct is aggregated by a VulkanXXFeatures
+        if feat.vk_name in aggregation_map:
+            feat.aggregated_by = aggregation_map[feat.vk_name]
+
+        # Check if this is a VulkanXXFeatures that aggregates others
+        if feat.vk_name in aggregates_map:
+            feat.aggregates = aggregates_map[feat.vk_name]
+
     return features
 
 
@@ -178,10 +196,7 @@ def generate_concept_definition(features: list[FeatureStruct]) -> list[str]:
 def generate_class_methods_declaration(features: list[FeatureStruct]) -> list[str]:
     """Generate method declarations for VulkanFeatures class."""
     lines = [
-        "    /// Type-safe template access",
-        "    template<typename T> requires VulkanFeatureStruct<T>",
-        "    T& get();",
-        "",
+        "    /// Type-safe template access (const only - use set_feature for modifications)",
         "    template<typename T> requires VulkanFeatureStruct<T>",
         "    const T& get() const;",
         "",
@@ -286,7 +301,7 @@ def generate_header(features: list[FeatureStruct]) -> str:
             "    void enable_features(const vk::ArrayProxy<const std::string>& feature_names);",
             "",
             "    /// Get list of all available feature names",
-            "    std::vector<std::string> get_all_feature_names() const;",
+            "    static const std::vector<std::string>& get_all_feature_names();",
             "",
             "    /// Get list of all currently enabled feature names",
             "    std::vector<std::string> get_enabled_features() const;",
@@ -349,11 +364,14 @@ def generate_constructor(features: list[FeatureStruct], tags) -> list[str]:
         "    // Get effective API version from properties",
         "    const uint32_t vk_api_version = properties.get_vk_api_version();",
         "",
-        "    // PHASE 1: Build pNext chain for all features with supported extensions/versions",
+        "    // PHASE 1: Query ALL supported feature structs to populate their values",
+        "    // Both VkPhysicalDeviceVulkan{XX}Features and individual promoted structs are queried.",
+        "    // Device creation will prefer VulkanXXFeatures when available (see build_chain_for_device_creation).",
         "    void* feat_p_next = nullptr;",
         "",
     ]
 
+    # Sort all features (except PhysicalDeviceFeatures2) alphabetically
     sorted_features = sorted(
         [f for f in features if f.cpp_name != "PhysicalDeviceFeatures2"],
         key=lambda f: f.cpp_name,
@@ -363,33 +381,40 @@ def generate_constructor(features: list[FeatureStruct], tags) -> list[str]:
         member_name = generate_member_name(feat.cpp_name)
         lines.append(f"    // {feat.cpp_name}")
 
-        # Check extension + promotion first before required_version alone
-        # This handles promoted structs that have all three attributes
-        if feat.extension and feat.promotion_version:
-            lines.extend(
-                [
-                    f"    if (vk_api_version >= {feat.promotion_version} ||",
-                    f"        device_extensions.contains({feat.extension})) {{",
-                ]
-            )
-        elif feat.required_version:
-            # Core feature struct - requires specific API version (VulkanXXFeatures)
-            lines.append(f"    if (vk_api_version >= {feat.required_version}) {{")
-        elif feat.extension:
-            lines.append(f"    if (device_extensions.contains({feat.extension})) {{")
-        elif feat.promotion_version:
-            lines.append(f"    if (vk_api_version >= {feat.promotion_version}) {{")
-        else:
-            lines.append("    {")
+        # Build condition: promotion_version (when promoted to core) OR extension
+        # For VulkanXXFeatures structs, use required_version since they have no extension
+        conditions = []
 
-        lines.extend(
-            [
+        # Prefer promotion_version over required_version to avoid duplicates
+        # (e.g., a struct promoted in 1.2 shouldn't check both required_version=1.2 and promotion_version=1.2)
+        if feat.promotion_version:
+            # Struct was promoted from an extension - check promotion version OR extension
+            conditions.append(f"vk_api_version >= {feat.promotion_version}")
+            if feat.extension:
+                conditions.append(f"device_extensions.contains({feat.extension})")
+        elif feat.required_version:
+            # Core struct (like VulkanXXFeatures) - only check required version
+            conditions.append(f"vk_api_version >= {feat.required_version}")
+        elif feat.extension:
+            # Extension-only struct - check extension
+            conditions.append(f"device_extensions.contains({feat.extension})")
+
+        if conditions:
+            condition = " || ".join(conditions)
+            lines.extend([
+                f"    if ({condition}) {{",
                 f"        {member_name}.pNext = feat_p_next;",
                 f"        feat_p_next = &{member_name};",
                 "    }",
                 "",
-            ]
-        )
+            ])
+        else:
+            # No conditions - always available
+            lines.extend([
+                f"    {member_name}.pNext = feat_p_next;",
+                f"    feat_p_next = &{member_name};",
+                "",
+            ])
 
     features2 = next(
         (f for f in features if f.cpp_name == "PhysicalDeviceFeatures2"), None
@@ -467,14 +492,9 @@ def generate_constructor(features: list[FeatureStruct], tags) -> list[str]:
 
 
 def generate_template_get(features: list[FeatureStruct]) -> list[str]:
-    """Generate template get<T>() methods and instantiations."""
+    """Generate template get<T>() const method and instantiations."""
     lines = [
-        "// Template get<T>() implementation",
-        "template<typename T> requires VulkanFeatureStruct<T>",
-        "T& VulkanFeatures::get() {",
-        "    return const_cast<T&>(static_cast<const VulkanFeatures*>(this)->get<T>());",
-        "}",
-        "",
+        "// Template get<T>() implementation (const only - use set_feature for modifications)",
         "template<typename T> requires VulkanFeatureStruct<T>",
         "const T& VulkanFeatures::get() const {",
         "    const auto stype = T::structureType;",
@@ -490,12 +510,7 @@ def generate_template_get(features: list[FeatureStruct]) -> list[str]:
     ]
 
     for feat in sorted(features, key=lambda f: f.cpp_name):
-        lines.extend(
-            [
-                f"template vk::{feat.cpp_name}& VulkanFeatures::get<vk::{feat.cpp_name}>();",
-                f"template const vk::{feat.cpp_name}& VulkanFeatures::get<vk::{feat.cpp_name}>() const;",
-            ]
-        )
+        lines.append(f"template const vk::{feat.cpp_name}& VulkanFeatures::get<vk::{feat.cpp_name}>() const;")
 
     lines.append("")
     return lines
@@ -565,12 +580,8 @@ def generate_alias_getters(features: list[FeatureStruct]) -> list[str]:
 
 
 def generate_get_struct_ptr(features: list[FeatureStruct], tags) -> list[str]:
-    """Generate get_struct_ptr switch implementations."""
+    """Generate get_struct_ptr const switch implementation."""
     lines = [
-        "void* VulkanFeatures::get_struct_ptr(vk::StructureType stype) {",
-        "    return const_cast<void*>(static_cast<const VulkanFeatures*>(this)->get_struct_ptr(stype));",
-        "}",
-        "",
         "const void* VulkanFeatures::get_struct_ptr(vk::StructureType stype) const {",
         "    switch (stype) {",
     ]
@@ -691,155 +702,142 @@ def generate_helper_functions(features: list[FeatureStruct], tags) -> list[str]:
         "    void* p_next) {",
         "    const uint32_t vk_api_version = physical_device->get_vk_api_version();",
         "    void* chain_head = p_next;",
-        "    ",
-        "    // Build chain from supported structs with at least one enabled feature",
-        "    // Prefers VulkanXXFeatures over individual extension structs when BOTH are available",
+        "",
+        "    // Build chain using version-based if-chains",
+        "    // For each API version: use aggregate if available, else use individual promoted structs",
+        "    // This ensures VUID compliance: aggregates and their individual structs are mutually exclusive",
         "",
     ]
 
-    # Build map: promotion_version -> aggregate struct's required_version
-    # Aggregate structs are those with required_version but NO extension
-    # (they collect features from multiple promoted extensions)
-    # This tells us when aggregate feature structs became available
-    aggregate_struct_availability = {}
-    for feat in features:
-        if feat.required_version and not feat.extension:
-            # This is an aggregate struct (like PhysicalDeviceVulkan11Features)
-            # It becomes available at its required_version
-            # Map from its promotion_version (if it has one) to its required_version
-            if feat.promotion_version:
-                aggregate_struct_availability[feat.promotion_version] = (
-                    feat.required_version
-                )
+    # Identify aggregates by checking if aggregates field is populated (NOT by name pattern)
+    aggregate_structs = [f for f in features if f.aggregates and "VkPhysicalDeviceFeatures2" in f.structextends]
 
-    # Sort: Aggregate structs first (will be added to chain first due to reverse iteration)
-    # Aggregate structs = have required_version but no extension
-    sorted_features = sorted(
-        features,
-        key=lambda f: (not (f.required_version and not f.extension), f.cpp_name),
+    # Group aggregates by their required_version
+    version_to_aggregate = {}
+    for feat in aggregate_structs:
+        if feat.required_version:
+            version_to_aggregate[feat.required_version] = feat
+
+    # Get all unique versions and sort them (newest first)
+    unique_versions = sorted(
+        set(f.required_version for f in aggregate_structs if f.required_version),
+        key=lambda v: tuple(map(int, v.replace("VK_API_VERSION_", "").split("_"))),
+        reverse=True
     )
 
-    for feat in reversed(sorted_features):
-        if not feat.members:
+    # Generate version-based if-chains
+    for version in unique_versions:
+        aggregate = version_to_aggregate.get(version)
+        if not aggregate or not aggregate.members:
             continue
 
-        # Skip non-extending structs - only include structs that extend VkPhysicalDeviceFeatures2
-        # Base features (VkPhysicalDeviceFeatures) should be accessed via get_features() instead
-        # PhysicalDeviceFeatures2 extends VkDeviceCreateInfo but not itself, so it's filtered out
-        if "VkPhysicalDeviceFeatures2" not in feat.structextends:
-            continue
+        member_name = generate_member_name(aggregate.cpp_name)
+        prefix = aggregate.member_prefix
 
+        # Build feature enable condition for aggregate
+        feature_conditions = [f"{member_name}.{prefix}{m.name} == VK_TRUE" for m in aggregate.members]
+        feature_condition_str = " ||\n        ".join(feature_conditions)
+
+        lines.extend([
+            f"    // API {version}: {aggregate.cpp_name} or individual promoted structs",
+            f"    if (vk_api_version >= {version}) {{",
+            f"        // Use aggregate if any features enabled",
+            f"        if ({feature_condition_str}) {{",
+            f"            {member_name}.pNext = chain_head;",
+            f"            chain_head = &{member_name};",
+            "        }",
+            "    } else {",
+            f"        // API version < {version}: use individual structs",
+        ])
+
+        # Add individual structs that are aggregated by this aggregate
+        for individual_vk_name in sorted(aggregate.aggregates):
+            # Find the feature struct
+            individual = next((f for f in features if f.vk_name == individual_vk_name), None)
+            if not individual or not individual.members:
+                continue
+
+            ind_member_name = generate_member_name(individual.cpp_name)
+            ind_prefix = individual.member_prefix
+
+            # Build feature enable condition for individual
+            ind_conditions = [f"{ind_member_name}.{ind_prefix}{m.name} == VK_TRUE" for m in individual.members]
+            ind_condition_str = " ||\n            ".join(ind_conditions)
+
+            lines.append(f"        // {individual.cpp_name}")
+            lines.append(f"        if ({ind_condition_str}) {{")
+
+            # Add extension/version assertion
+            if individual.extension and individual.promotion_version:
+                lines.extend([
+                    f"            assert((physical_device->extension_supported({individual.extension}) ||",
+                    f"                    vk_api_version >= {individual.promotion_version}) &&",
+                    f'                   "Feature enabled but neither extension nor promoted version supported");',
+                ])
+            elif individual.extension:
+                lines.extend([
+                    f"            assert(physical_device->extension_supported({individual.extension}) &&",
+                    f'                   "Feature enabled but required extension not supported");',
+                ])
+
+            lines.extend([
+                f"            {ind_member_name}.pNext = chain_head;",
+                f"            chain_head = &{ind_member_name};",
+                "        }",
+            ])
+
+        lines.extend([
+            "    }",
+            "",
+        ])
+
+    # Add non-aggregated structs (those without aggregated_by)
+    lines.extend([
+        "    // Non-promoted feature structs (not part of any aggregate)",
+        "",
+    ])
+
+    non_aggregated = [f for f in features
+                     if not f.aggregated_by
+                     and not f.aggregates
+                     and f.members
+                     and "VkPhysicalDeviceFeatures2" in f.structextends]
+
+    for feat in sorted(non_aggregated, key=lambda f: f.cpp_name):
         member_name = generate_member_name(feat.cpp_name)
         prefix = feat.member_prefix
 
         # Build feature enable condition
-        feature_conditions = [
-            f"{member_name}.{prefix}{m.name} == VK_TRUE" for m in feat.members
-        ]
+        feature_conditions = [f"{member_name}.{prefix}{m.name} == VK_TRUE" for m in feat.members]
         feature_condition_str = " ||\n        ".join(feature_conditions)
 
-        lines.append(f"    // Check {feat.cpp_name}")
+        lines.append(f"    // {feat.cpp_name}")
+        lines.append(f"    if ({feature_condition_str}) {{")
 
-        # For extension structs that have promoted features:
-        # - Only use if corresponding aggregate struct is NOT supported by device
-        # - This ensures aggregate structs are preferred when available
-        if feat.promotion_version and feat.extension:
-            # This is an extension struct with promoted features
-            # Check if an aggregate struct is available for this promotion version
-            aggregate_version = aggregate_struct_availability.get(
-                feat.promotion_version
-            )
-
-            if aggregate_version:
-                lines.append(f"    if ({feature_condition_str}) {{")
-                lines.append(
-                    f"        // Extension struct for features promoted to {feat.promotion_version}"
-                )
-                lines.append(
-                    f"        // Only include if aggregate struct not available (requires >= {aggregate_version})"
-                )
-                lines.append(
-                    f"        assert((physical_device->extension_supported({feat.extension}) ||"
-                )
-                lines.append(
-                    f"                vk_api_version >= {feat.promotion_version}) &&"
-                )
-                lines.append(
-                    '               "Feature enabled but neither extension nor promoted version supported");'
-                )
-                lines.append(f"        if (vk_api_version < {aggregate_version}) {{")
-                lines.append(
-                    "            // Aggregate struct not supported, use extension struct"
-                )
-                lines.append(f"            {member_name}.pNext = chain_head;")
-                lines.append(f"            chain_head = &{member_name};")
-                lines.append("        } else {")
-                lines.append(
-                    "            // Aggregate struct is supported, it will be used instead"
-                )
-                lines.append("        }")
-                lines.append("    }")
-                lines.append("")
-                continue
-
-        # Build support condition
-        # Check extension + promotion first, before checking required_version alone
-        # This handles structs that have ALL THREE attributes
+        # Add extension/version assertion
         if feat.extension and feat.promotion_version:
-            # Promoted extension feature struct (may also have required_version)
-            lines.append(f"    if ({feature_condition_str}) {{")
-            lines.append(
-                f"        assert((physical_device->extension_supported({feat.extension}) ||"
-            )
-            lines.append(
-                f"                vk_api_version >= {feat.promotion_version}) &&"
-            )
-            lines.append(
-                '               "Feature enabled but neither extension nor promoted version supported");'
-            )
-        elif feat.required_version and not feat.extension:
-            # Aggregate struct (core-only, no extension fallback)
-            # Check version FIRST, then features
-            # Features might be enabled via syncing from extension structs,
-            # but we can't use this aggregate struct if the device doesn't support the required version
-            lines.append(f"    if (vk_api_version >= {feat.required_version}) {{")
-            lines.append(f"        if ({feature_condition_str}) {{")
-            lines.append(f"            {member_name}.pNext = chain_head;")
-            lines.append(f"            chain_head = &{member_name};")
-            lines.append("        }")
-            lines.append("    }")
-            lines.append("")
-            continue
+            lines.extend([
+                f"        assert((physical_device->extension_supported({feat.extension}) ||",
+                f"                vk_api_version >= {feat.promotion_version}) &&",
+                f'               "Feature enabled but neither extension nor promoted version supported");',
+            ])
         elif feat.extension:
-            # Extension-only feature - assert extension is supported when feature is enabled
-            lines.append(f"    if ({feature_condition_str}) {{")
-            lines.append(
-                f"        assert(physical_device->extension_supported({feat.extension}) &&"
-            )
-            lines.append(
-                '               "Feature enabled but required extension not supported");'
-            )
-        elif feat.promotion_version:
-            # Core VulkanXXFeatures struct - requires API version
-            lines.append(f"    if ({feature_condition_str}) {{")
-            lines.append(
-                f"        assert(vk_api_version >= {feat.promotion_version} &&"
-            )
-            lines.append(
-                '               "Feature enabled but required Vulkan version not supported");'
-            )
-        else:
-            # Base Vulkan 1.0 features (no version/extension requirement)
-            lines.append(f"    if ({feature_condition_str}) {{")
+            lines.extend([
+                f"        assert(physical_device->extension_supported({feat.extension}) &&",
+                f'               "Feature enabled but required extension not supported");',
+            ])
+        elif feat.required_version:
+            lines.extend([
+                f"        assert(vk_api_version >= {feat.required_version} &&",
+                f'               "Feature enabled but required Vulkan version not supported");',
+            ])
 
-        lines.extend(
-            [
-                f"        {member_name}.pNext = chain_head;",
-                f"        chain_head = &{member_name};",
-                "    }",
-                "",
-            ]
-        )
+        lines.extend([
+            f"        {member_name}.pNext = chain_head;",
+            f"        chain_head = &{member_name};",
+            "    }",
+            "",
+        ])
 
     lines.extend(
         [
@@ -933,8 +931,8 @@ def generate_string_features_methods(feature_map: dict) -> list[str]:
         "    }",
         "}",
         "",
-        "std::vector<std::string> VulkanFeatures::get_all_feature_names() const {",
-        "    return {",
+        "const std::vector<std::string>& VulkanFeatures::get_all_feature_names() {",
+        "    static const std::vector<std::string> feature_names = {",
     ]
 
     # Add all feature names
@@ -944,6 +942,7 @@ def generate_string_features_methods(feature_map: dict) -> list[str]:
     lines.extend(
         [
             "    };",
+            "    return feature_names;",
             "}",
             "",
             "std::vector<std::string> VulkanFeatures::get_enabled_features() const {",

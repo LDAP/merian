@@ -3,6 +3,24 @@
 import re
 
 
+def version_to_api_version(version_str: str) -> str | None:
+    """Convert VK_VERSION_X_Y to VK_API_VERSION_X_Y.
+
+    Args:
+        version_str: Version string (e.g., "VK_VERSION_1_2")
+
+    Returns:
+        API version string (e.g., "VK_API_VERSION_1_2") or None if invalid
+    """
+    if not version_str:
+        return None
+    match = re.match(r"VK_VERSION_(\d+)_(\d+)", version_str)
+    if match:
+        major, minor = match.groups()
+        return f"VK_API_VERSION_{major}_{minor}"
+    return None
+
+
 def generate_file_header(spec_version: str) -> list[str]:
     """Generate standard file header."""
     return [
@@ -88,12 +106,7 @@ def build_extension_type_map(xml_root):
             continue
 
         promotedto = ext.get("promotedto", "")
-        promotion_version = None
-        if promotedto:
-            match = re.match(r"VK_VERSION_(\d+)_(\d+)", promotedto)
-            if match:
-                major, minor = match.groups()
-                promotion_version = f"VK_API_VERSION_{major}_{minor}"
+        promotion_version = version_to_api_version(promotedto)
 
         ext_info = (ext_name_macro, ext.get("name"), promotion_version)
 
@@ -155,5 +168,65 @@ def build_feature_version_map(xml_root):
                     feature_map[type_name] = api_version
 
     return feature_map
+
+
+def build_struct_aggregation_map(xml_root, struct_type: str) -> dict[str, str]:
+    """Build map of struct_name -> aggregated_by_struct_name.
+
+    Args:
+        xml_root: Vulkan XML root element
+        struct_type: Either "Features" or "Properties"
+
+    Returns:
+        Dict mapping individual structs to their VulkanXX aggregate.
+        Example: {"VkPhysicalDevice16BitStorageFeatures": "VkPhysicalDeviceVulkan11Features"}
+    """
+    aggregation_map = {}
+
+    # Track which members appear in VulkanXX aggregates
+    vulkan_aggregate_members = {}  # {VkPhysicalDeviceVulkan11Features: set(member_names)}
+
+    # First pass: collect members of VulkanXX aggregate structs
+    for type_elem in xml_root.findall("types/type"):
+        vk_name = type_elem.get("name", "")
+        # Match VkPhysicalDeviceVulkan11Features or VkPhysicalDeviceVulkan11Properties
+        if not vk_name.startswith("VkPhysicalDeviceVulkan") or struct_type not in vk_name:
+            continue
+
+        members = set()
+        for member in type_elem.findall("member"):
+            member_name = member.find("name")
+            if member_name is not None and member_name.text not in ("sType", "pNext"):
+                members.add(member_name.text)
+
+        vulkan_aggregate_members[vk_name] = members
+
+    # Second pass: find individual structs and match to aggregates
+    for type_elem in xml_root.findall("types/type"):
+        if type_elem.get("category") != "struct":
+            continue
+        if type_elem.get("alias") is not None:
+            continue
+
+        vk_name = type_elem.get("name", "")
+        if not vk_name or vk_name.startswith("VkPhysicalDeviceVulkan"):
+            continue
+        if struct_type not in vk_name:
+            continue
+
+        # Extract members
+        struct_members = set()
+        for member in type_elem.findall("member"):
+            member_name = member.find("name")
+            if member_name is not None and member_name.text not in ("sType", "pNext"):
+                struct_members.add(member_name.text)
+
+        # Find which VulkanXX aggregate contains these members
+        for aggregate_name, aggregate_members in vulkan_aggregate_members.items():
+            if struct_members and struct_members.issubset(aggregate_members):
+                aggregation_map[vk_name] = aggregate_name
+                break
+
+    return aggregation_map
 
 

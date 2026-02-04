@@ -3,6 +3,7 @@
 import re
 import xml.etree.ElementTree as ET
 
+from .codegen import build_extension_name_map
 from .models import Extension, ExtensionDep
 from .naming import to_camel_case
 
@@ -82,48 +83,6 @@ def parse_depends(
             result.append(and_deps)
 
     return result
-
-
-def build_extension_name_map(xml_root: ET.Element) -> dict[str, str]:
-    """
-    Build a map of extension name to EXTENSION_NAME macro.
-
-    Args:
-        xml_root: Root element of the Vulkan spec XML
-
-    Returns:
-        Map of extension names (e.g., VK_KHR_swapchain) to their
-        EXTENSION_NAME macro (e.g., VK_KHR_SWAPCHAIN_EXTENSION_NAME)
-    """
-    ext_name_map = {}
-
-    for ext in xml_root.findall("extensions/extension"):
-        ext_name = ext.get("name")
-        ext_supported = ext.get("supported", "")
-
-        # Skip extensions not for Vulkan
-        if "vulkan" not in ext_supported.split(","):
-            continue
-
-        # Skip platform-specific extensions
-        if ext.get("platform") is not None:
-            continue
-
-        # Find the EXTENSION_NAME enum
-        ext_name_macro = None
-        for req in ext.findall("require"):
-            for enum_elem in req.findall("enum"):
-                enum_name = enum_elem.get("name", "")
-                if enum_name.endswith("_EXTENSION_NAME"):
-                    ext_name_macro = enum_name
-                    break
-            if ext_name_macro:
-                break
-
-        if ext_name and ext_name_macro:
-            ext_name_map[ext_name] = ext_name_macro
-
-    return ext_name_map
 
 
 def find_extensions(xml_root: ET.Element) -> list[Extension]:
