@@ -19,8 +19,6 @@ from vulkan_codegen.codegen import (
     build_extension_type_map,
     build_feature_version_map,
     generate_file_header,
-    propagate_ext_map_through_aliases,
-    propagate_extension_requirements_from_aliases,
 )
 from vulkan_codegen.models import FeatureMember, FeatureStruct
 from vulkan_codegen.naming import (
@@ -109,13 +107,8 @@ def find_feature_structures(xml_root, tags) -> list[FeatureStruct]:
     """Find all structures that extend VkPhysicalDeviceFeatures2."""
     features = []
     skiplist = build_skiplist(xml_root)
+    # Extension map now handles aliases internally during building
     extension_map = build_extension_type_map(xml_root)
-    alias_to_canonical, _ = build_alias_maps(xml_root)
-    propagate_ext_map_through_aliases(extension_map, alias_to_canonical)
-
-    # Propagate extension requirements from aliases to canonical structs
-    propagate_extension_requirements_from_aliases(extension_map, xml_root)
-
     version_map = build_feature_version_map(xml_root)
 
     for type_elem in xml_root.findall("types/type"):
@@ -1025,8 +1018,7 @@ def main():
 
     print("Finding feature structures...")
     features = find_feature_structures(xml_root, tags)
-    print(f"Found {len(features)} feature structures:")
-    pprint(features)
+    print(f"Found {len(features)} feature structures")
 
     print(f"\nGenerating header file: {include_path / 'vulkan_features.hpp'}")
     header_content = generate_header(features)

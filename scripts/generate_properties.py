@@ -27,10 +27,8 @@ from vulkan_codegen.naming import (
 from vulkan_codegen.parsing import find_extensions
 from vulkan_codegen.codegen import (
     build_extension_type_map,
-    build_alias_maps,
-    generate_file_header,
-    propagate_ext_map_through_aliases,
     build_feature_version_map,
+    generate_file_header,
 )
 from vulkan_codegen.spec import (
     VULKAN_SPEC_VERSION,
@@ -71,9 +69,8 @@ def find_property_structures(xml_root, tags) -> list[PropertyStruct]:
     properties = []
     skiplist = build_skiplist(xml_root)
 
+    # Extension map now handles aliases internally during building
     ext_type_map = build_extension_type_map(xml_root)
-    alias_to_canonical, _ = build_alias_maps(xml_root)
-    propagate_ext_map_through_aliases(ext_type_map, alias_to_canonical)
     feature_version_map = build_feature_version_map(xml_root)
 
     accepted_extends = {"VkPhysicalDeviceProperties2"}

@@ -40,13 +40,32 @@ def build_extension_name_map(xml_root):
     return ext_name_map
 
 
+def build_alias_maps(xml_root):
+    """Build bidirectional alias maps for type aliasing."""
+    alias_to_canonical = {}
+    canonical_to_aliases = {}
+
+    for type_elem in xml_root.findall("types/type"):
+        alias = type_elem.get("alias")
+        name = type_elem.get("name")
+        if alias and name:
+            alias_to_canonical[name] = alias
+            canonical_to_aliases.setdefault(alias, []).append(name)
+
+    return alias_to_canonical, canonical_to_aliases
+
+
 def build_extension_type_map(xml_root):
     """
     Build map of type_name -> (ext_name_macro, ext_name, promotion_version).
 
     Returns a dict mapping struct names to tuple of (extension macro, extension name, promoted version).
+    Handles aliases by including both alias and canonical names in the map.
     """
     ext_type_map = {}
+
+    # First pass: build alias maps so we can resolve aliases while building extension map
+    alias_to_canonical, canonical_to_aliases = build_alias_maps(xml_root)
 
     for ext in xml_root.findall("extensions/extension"):
         ext_supported = ext.get("supported", "")
@@ -76,37 +95,41 @@ def build_extension_type_map(xml_root):
                 major, minor = match.groups()
                 promotion_version = f"VK_API_VERSION_{major}_{minor}"
 
+        ext_info = (ext_name_macro, ext.get("name"), promotion_version)
+
         for req in ext.findall("require"):
             for type_elem in req.findall("type"):
                 type_name = type_elem.get("name")
                 if type_name:
-                    ext_type_map[type_name] = (ext_name_macro, ext.get("name"), promotion_version)
+                    # Add the type name itself (always - this is the primary definition)
+                    ext_type_map[type_name] = ext_info
+
+                    # If this is an alias, propagate to canonical
+                    # Prefer extension info with promotion_version (was promoted to core)
+                    # over info without promotion_version (not promoted)
+                    if type_name in alias_to_canonical:
+                        canonical = alias_to_canonical[type_name]
+                        if canonical not in ext_type_map:
+                            # Canonical doesn't have info yet, add it
+                            ext_type_map[canonical] = ext_info
+                        elif promotion_version and not ext_type_map[canonical][2]:
+                            # Canonical has info without promotion_version, but this alias has one
+                            # Prefer the promoted extension (e.g., KHR over EXT)
+                            ext_type_map[canonical] = ext_info
+
+                    # If this is canonical, propagate to all its aliases
+                    # Prefer extension info with promotion_version
+                    if type_name in canonical_to_aliases:
+                        for alias in canonical_to_aliases[type_name]:
+                            if alias not in ext_type_map:
+                                # Alias doesn't have info yet, add it
+                                ext_type_map[alias] = ext_info
+                            elif promotion_version and not ext_type_map[alias][2]:
+                                # Alias has info without promotion_version, but canonical has one
+                                # Prefer the promoted extension
+                                ext_type_map[alias] = ext_info
 
     return ext_type_map
-
-
-def build_alias_maps(xml_root):
-    """Build bidirectional alias maps for type aliasing."""
-    alias_to_canonical = {}
-    canonical_to_aliases = {}
-
-    for type_elem in xml_root.findall("types/type"):
-        alias = type_elem.get("alias")
-        name = type_elem.get("name")
-        if alias and name:
-            alias_to_canonical[name] = alias
-            canonical_to_aliases.setdefault(alias, []).append(name)
-
-    return alias_to_canonical, canonical_to_aliases
-
-
-def propagate_ext_map_through_aliases(ext_type_map, alias_to_canonical):
-    """Propagate extension info through type aliases."""
-    for alias_name, canonical_name in alias_to_canonical.items():
-        if alias_name in ext_type_map and canonical_name not in ext_type_map:
-            ext_type_map[canonical_name] = ext_type_map[alias_name]
-        elif canonical_name in ext_type_map and alias_name not in ext_type_map:
-            ext_type_map[alias_name] = ext_type_map[canonical_name]
 
 
 def build_feature_version_map(xml_root):
@@ -134,38 +157,3 @@ def build_feature_version_map(xml_root):
     return feature_map
 
 
-def propagate_extension_requirements_from_aliases(
-    extension_map: dict[str, tuple[str, list[tuple], str | None]],
-    xml_root
-) -> None:
-    """
-    Propagate extension requirements from alias structs to canonical structs.
-
-    When extensions define feature structs that get promoted to core, the XML
-    often has the extension info on the alias (e.g., VkPhysicalDevice8BitStorageFeaturesKHR)
-    but the generator processes the canonical struct (e.g., VkPhysicalDevice8BitStorageFeatures).
-
-    This function copies extension info from aliases to their canonical structs.
-
-    Args:
-        extension_map: The extension map to modify (maps struct name to extension info)
-        xml_root: The Vulkan XML root element
-    """
-    # Build alias -> canonical mapping
-    alias_to_canonical = {}
-    for type_elem in xml_root.findall("types/type"):
-        alias = type_elem.get("alias")
-        name = type_elem.get("name")
-        if alias and name:
-            alias_to_canonical[name] = alias
-
-    # Copy extension info from aliases to canonical structs
-    aliases_with_ext_info = []
-    for alias, canonical in alias_to_canonical.items():
-        if alias in extension_map and canonical not in extension_map:
-            # Alias has extension info, but canonical doesn't
-            extension_map[canonical] = extension_map[alias]
-            aliases_with_ext_info.append(f"{alias} -> {canonical}")
-
-    if aliases_with_ext_info:
-        print(f"  Propagated extension info from {len(aliases_with_ext_info)} aliases to canonical structs")
