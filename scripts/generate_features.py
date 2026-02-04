@@ -687,8 +687,8 @@ def compute_feature_fingerprint(feat: FeatureStruct) -> frozenset[str]:
 def compute_priority_score(feat: FeatureStruct) -> tuple:
     """Compute priority score for sorting. Higher = better priority.
 
-    Returns tuple for lexicographic comparison:
-    (has_required_version, required_version_value, has_promotion, promotion_value, extension_number, name)
+    1. Supersets (more features) come first
+    2. Then prefer promoted/newer extensions
     """
     # Extract version number for comparison (e.g., VK_API_VERSION_1_3 -> (1, 3))
     def version_to_tuple(version_str):
@@ -700,63 +700,297 @@ def compute_priority_score(feat: FeatureStruct) -> tuple:
         return (0, 0)
 
     return (
-        1 if feat.required_version else 0,  # VulkanXXFeatures have required_version
-        version_to_tuple(feat.required_version),
-        1 if feat.promotion_version else 0,  # Promoted extensions
-        version_to_tuple(feat.promotion_version),
+        len(feat.members),  # More features = superset = higher priority
+        version_to_tuple(feat.promotion_version),  # Higher promotion version = newer
         feat.extension_number or 0,  # Higher extension number = newer
         feat.vk_name,  # Stable tie-breaker
     )
 
 
-def group_features_by_relationship(features: list[FeatureStruct]) -> list[list[FeatureStruct]]:
-    """Group features by their member set relationships.
+def group_features_by_relationship(features: list[FeatureStruct]) -> list:
+    """Group features into nested hierarchies.
 
-    Returns list of groups where each group contains:
-    - Structs with identical feature sets (aliases), or
-    - Structs where one is a superset of others (aggregation)
+    Returns nested structure where each group can be:
+    - A single feature (independent)
+    - A list [parent, ...children] where children can themselves be groups
 
-    Within each group, structs are sorted by priority (highest first).
+    Children with identical features are grouped as aliases.
     """
-    # Compute fingerprints (use indices to avoid hashability issues)
+    # Compute fingerprints for all features
     feat_fingerprints = [compute_feature_fingerprint(feat) for feat in features]
 
-    # Find groups
-    groups = []
-    processed = set()
+    def build_hierarchy(candidates: list[int], assigned: set[int]) -> list:
+        """Recursively build hierarchy from candidate indices."""
+        groups = []
 
-    for i, feat in enumerate(features):
-        if i in processed:
-            continue
-
-        fp = feat_fingerprints[i]
-        if not fp:  # Skip empty feature sets
-            continue
-
-        # Find all related structs (same set, subset, or superset)
-        group = [feat]
-        processed.add(i)
-
-        for j, other in enumerate(features):
-            if j in processed:
-                continue
-            other_fp = feat_fingerprints[j]
-            if not other_fp:
+        for i in candidates:
+            if i in assigned:
                 continue
 
-            # Check if related: identical, subset, or superset
-            if (fp == other_fp or  # Identical (aliases)
-                fp < other_fp or    # feat is subset of other
-                fp > other_fp):     # feat is superset of other
-                group.append(other)
-                processed.add(j)
+            parent_fp = feat_fingerprints[i]
+            if not parent_fp:
+                continue
 
-        if len(group) > 1:  # Only keep groups with multiple members
-            # Sort by priority (highest first)
-            group.sort(key=compute_priority_score, reverse=True)
-            groups.append(group)
+            # Find direct children (proper subsets)
+            children_indices = []
+            for j in candidates:
+                if i == j or j in assigned:
+                    continue
+                child_fp = feat_fingerprints[j]
+                if not child_fp:
+                    continue
+                if child_fp < parent_fp:  # Proper subset
+                    children_indices.append(j)
 
-    return groups
+            if children_indices:
+                # Mark children as assigned
+                for j in children_indices:
+                    assigned.add(j)
+
+                # Group children by their feature fingerprints (find aliases)
+                child_groups_by_fp = {}
+                for j in children_indices:
+                    fp = feat_fingerprints[j]
+                    if fp not in child_groups_by_fp:
+                        child_groups_by_fp[fp] = []
+                    child_groups_by_fp[fp].append(j)
+
+                # Build child groups (aliases or further hierarchies)
+                child_groups = []
+                for fp, indices in child_groups_by_fp.items():
+                    if len(indices) > 1:
+                        # Aliases - sort by priority
+                        alias_group = [features[idx] for idx in indices]
+                        alias_group.sort(key=compute_priority_score, reverse=True)
+                        child_groups.append(alias_group)
+                    else:
+                        # Single child - might have its own children
+                        # Recursively build its hierarchy
+                        child_hierarchy = build_hierarchy([indices[0]], assigned)
+                        if child_hierarchy:
+                            child_groups.extend(child_hierarchy)
+                        else:
+                            child_groups.append(features[indices[0]])
+
+                # Create parent-child group
+                group = [features[i]] + child_groups
+                groups.append(group)
+                assigned.add(i)
+
+        return groups
+
+    # Start with all features as candidates
+    assigned = set()
+    all_indices = list(range(len(features)))
+    hierarchies = build_hierarchy(all_indices, assigned)
+
+    return hierarchies
+
+
+def generate_feature_enabled_condition(feat: FeatureStruct) -> str:
+    """Generate condition string for checking if any features are enabled."""
+    if not feat.members:
+        return "false"
+
+    member_name = generate_member_name(feat.cpp_name)
+    prefix = feat.member_prefix
+    conditions = [f"{member_name}.{prefix}{m.name} == VK_TRUE" for m in feat.members]
+    return " ||\n        ".join(conditions)
+
+
+def generate_support_assertion(feat: FeatureStruct) -> list[str]:
+    """Generate assertion for extension/version support."""
+    lines = []
+
+    if feat.extension and feat.promotion_version:
+        lines.extend([
+            f"        assert((physical_device->extension_supported({feat.extension}) ||",
+            f"                vk_api_version >= {feat.promotion_version}) &&",
+            f'               "Feature enabled but neither extension nor promoted version supported");',
+        ])
+    elif feat.extension:
+        lines.extend([
+            f"        assert(physical_device->extension_supported({feat.extension}) &&",
+            f'               "Feature enabled but required extension not supported");',
+        ])
+    elif feat.required_version:
+        lines.extend([
+            f"        assert(vk_api_version >= {feat.required_version} &&",
+            f'               "Feature enabled but required Vulkan version not supported");',
+        ])
+
+    return lines
+
+
+def generate_device_creation_for_item(item, indent: str = "    ") -> list[str]:
+    """Recursively generate code for a feature or nested group.
+
+    item can be:
+    - A FeatureStruct (leaf node)
+    - A list [parent, ...children] (hierarchy)
+    """
+    if isinstance(item, FeatureStruct):
+        # Leaf node - generate simple if block
+        return generate_single_feature(item, indent)
+    elif isinstance(item, list) and len(item) > 0:
+        # Check if this is aliases or parent-child
+        if all(isinstance(x, FeatureStruct) for x in item):
+            # All FeatureStructs - check if aliases
+            fingerprints = {compute_feature_fingerprint(f) for f in item}
+            if len(fingerprints) == 1:
+                # Aliases - generate if/else-if chain
+                return generate_aliases(item, indent)
+            else:
+                # Parent-child where children are all leaves
+                return generate_parent_child(item[0], item[1:], indent)
+        else:
+            # Mixed - first is parent, rest are nested groups
+            return generate_parent_child(item[0], item[1:], indent)
+    return []
+
+
+def generate_single_feature(feat: FeatureStruct, indent: str) -> list[str]:
+    """Generate simple if block for a single feature."""
+    lines = []
+    member_name = generate_member_name(feat.cpp_name)
+    feature_condition = generate_feature_enabled_condition(feat)
+
+    support_conditions = []
+    if feat.promotion_version:
+        support_conditions.append(f"vk_api_version >= {feat.promotion_version}")
+    if feat.extension:
+        support_conditions.append(f"physical_device->extension_supported({feat.extension})")
+    support_condition = " || ".join(support_conditions) if support_conditions else "true"
+
+    lines.extend([
+        f"{indent}if (({feature_condition}) &&",
+        f"{indent}    ({support_condition})) {{",
+    ])
+    lines.extend([indent + "    " + line for line in generate_support_assertion(feat)])
+    lines.extend([
+        f"{indent}    {member_name}.pNext = chain_head;",
+        f"{indent}    chain_head = &{member_name};",
+        f"{indent}}}",
+    ])
+    return lines
+
+
+def generate_aliases(aliases: list[FeatureStruct], indent: str) -> list[str]:
+    """Generate if/else-if chain for aliases (same features)."""
+    lines = []
+    for i, feat in enumerate(aliases):
+        member_name = generate_member_name(feat.cpp_name)
+        feature_condition = generate_feature_enabled_condition(feat)
+        if_keyword = "if" if i == 0 else "else if"
+
+        support_conditions = []
+        if feat.required_version:
+            support_conditions.append(f"vk_api_version >= {feat.required_version}")
+        elif feat.promotion_version:
+            support_conditions.append(f"vk_api_version >= {feat.promotion_version}")
+        if feat.extension:
+            support_conditions.append(f"physical_device->extension_supported({feat.extension})")
+        support_condition = " || ".join(support_conditions) if support_conditions else "true"
+
+        lines.extend([
+            f"{indent}{if_keyword} (({feature_condition}) &&",
+            f"{indent}    ({support_condition})) {{",
+        ])
+        lines.extend([indent + "    " + line for line in generate_support_assertion(feat)])
+        lines.extend([
+            f"{indent}    {member_name}.pNext = chain_head;",
+            f"{indent}    chain_head = &{member_name};",
+            f"{indent}}}",
+        ])
+    return lines
+
+
+def generate_parent_child(parent: FeatureStruct, children: list, indent: str) -> list[str]:
+    """Generate if (parent) {...} else { children } with recursive nesting."""
+    lines = []
+
+    # Parent condition
+    parent_member = generate_member_name(parent.cpp_name)
+    parent_feature_cond = generate_feature_enabled_condition(parent)
+
+    parent_support_cond = []
+    if parent.required_version:
+        parent_support_cond.append(f"vk_api_version >= {parent.required_version}")
+    elif parent.promotion_version:
+        parent_support_cond.append(f"vk_api_version >= {parent.promotion_version}")
+    if parent.extension:
+        parent_support_cond.append(f"physical_device->extension_supported({parent.extension})")
+    parent_support = " || ".join(parent_support_cond) if parent_support_cond else "true"
+
+    lines.extend([
+        f"{indent}if (({parent_feature_cond}) &&",
+        f"{indent}    ({parent_support})) {{",
+    ])
+    lines.extend([indent + "    " + line for line in generate_support_assertion(parent)])
+    lines.extend([
+        f"{indent}    {parent_member}.pNext = chain_head;",
+        f"{indent}    chain_head = &{parent_member};",
+        f"{indent}}} else {{",
+    ])
+
+    # Recursively generate children
+    for child in children:
+        child_lines = generate_device_creation_for_item(child, indent + "    ")
+        lines.extend(child_lines)
+
+    lines.append(f"{indent}}}")
+    return lines
+
+
+def count_features_recursive(item) -> int:
+    """Count total FeatureStructs in a (possibly nested) group."""
+    if isinstance(item, FeatureStruct):
+        return 1
+    elif isinstance(item, list):
+        return sum(count_features_recursive(x) for x in item)
+    return 0
+
+
+def generate_device_creation_for_group(group, group_idx: int) -> list[str]:
+    """Generate code for a hierarchical group with comment."""
+    lines = []
+
+    # Add comment
+    if isinstance(group, list) and len(group) > 0 and isinstance(group[0], FeatureStruct):
+        total = count_features_recursive(group)
+        lines.append(f"    // Group {group_idx}: {group[0].cpp_name} and {total-1} related struct(s)")
+
+    # Generate recursive code
+    item_lines = generate_device_creation_for_item(group)
+    lines.extend(item_lines)
+    lines.append("")
+
+    return lines
+
+
+def generate_device_creation_for_independent(feat: FeatureStruct) -> list[str]:
+    """Generate simple if block for an independent struct (not in any group)."""
+    lines = []
+    member_name = generate_member_name(feat.cpp_name)
+    feature_condition = generate_feature_enabled_condition(feat)
+
+    lines.extend([
+        f"    // {feat.cpp_name}",
+        f"    if ({feature_condition}) {{",
+    ])
+
+    # Add assertion
+    lines.extend(["    " + line for line in generate_support_assertion(feat)])
+
+    # Add to chain
+    lines.extend([
+        f"        {member_name}.pNext = chain_head;",
+        f"        chain_head = &{member_name};",
+        "    }",
+        "",
+    ])
+
+    return lines
 
 
 def generate_helper_functions(features: list[FeatureStruct], tags) -> list[str]:
@@ -768,141 +1002,52 @@ def generate_helper_functions(features: list[FeatureStruct], tags) -> list[str]:
         "    const uint32_t vk_api_version = physical_device->get_vk_api_version();",
         "    void* chain_head = p_next;",
         "",
-        "    // Build chain using version-based if-chains",
-        "    // For each API version: use aggregate if available, else use individual promoted structs",
-        "    // This ensures VUID compliance: aggregates and their individual structs are mutually exclusive",
+        "    // Build chain using priority-based grouping",
+        "    // For structs with related features (same/subset/superset), use if/else chains",
+        "    // Priority: higher API version > promoted > newer extension number",
+        "    // This ensures mutual exclusivity and prefers newer/better versions",
         "",
     ]
 
-    # Identify aggregates by checking if aggregates field is populated (NOT by name pattern)
-    aggregate_structs = [f for f in features if f.aggregates and "VkPhysicalDeviceFeatures2" in f.structextends]
+    # Filter to only features that extend VkPhysicalDeviceFeatures2 and have members
+    relevant_features = [
+        f for f in features
+        if f.members and "VkPhysicalDeviceFeatures2" in f.structextends
+    ]
 
-    # Group aggregates by their required_version
-    version_to_aggregate = {}
-    for feat in aggregate_structs:
-        if feat.required_version:
-            version_to_aggregate[feat.required_version] = feat
+    # Group features by their relationships
+    groups = group_features_by_relationship(relevant_features)
 
-    # Get all unique versions and sort them (newest first)
-    unique_versions = sorted(
-        set(f.required_version for f in aggregate_structs if f.required_version),
-        key=lambda v: tuple(map(int, v.replace("VK_API_VERSION_", "").split("_"))),
-        reverse=True
-    )
+    # Get features that are in groups (to exclude from independent list)
+    def extract_all_features(item, result: set):
+        """Recursively extract all FeatureStructs from nested hierarchy."""
+        if isinstance(item, FeatureStruct):
+            result.add(item.vk_name)
+        elif isinstance(item, list):
+            for x in item:
+                extract_all_features(x, result)
 
-    # Generate version-based if-chains
-    for version in unique_versions:
-        aggregate = version_to_aggregate.get(version)
-        if not aggregate or not aggregate.members:
-            continue
+    grouped_features = set()
+    for group in groups:
+        extract_all_features(group, grouped_features)
 
-        member_name = generate_member_name(aggregate.cpp_name)
-        prefix = aggregate.member_prefix
+    # Generate if/else chains for each group
+    lines.append("    // Feature groups (related structs with priority ordering)")
+    lines.append("")
+    for i, group in enumerate(groups, 1):
+        lines.extend(generate_device_creation_for_group(group, i))
 
-        # Build feature enable condition for aggregate
-        feature_conditions = [f"{member_name}.{prefix}{m.name} == VK_TRUE" for m in aggregate.members]
-        feature_condition_str = " ||\n        ".join(feature_conditions)
+    # Generate simple if blocks for independent features
+    independent = [
+        f for f in sorted(relevant_features, key=lambda f: f.cpp_name)
+        if f.vk_name not in grouped_features
+    ]
 
-        lines.extend([
-            f"    // API {version}: {aggregate.cpp_name} or individual promoted structs",
-            f"    if (vk_api_version >= {version}) {{",
-            f"        // Use aggregate if any features enabled",
-            f"        if ({feature_condition_str}) {{",
-            f"            {member_name}.pNext = chain_head;",
-            f"            chain_head = &{member_name};",
-            "        }",
-            "    } else {",
-            f"        // API version < {version}: use individual structs",
-        ])
-
-        # Add individual structs that are aggregated by this aggregate
-        for individual_vk_name in sorted(aggregate.aggregates):
-            # Find the feature struct
-            individual = next((f for f in features if f.vk_name == individual_vk_name), None)
-            if not individual or not individual.members:
-                continue
-
-            ind_member_name = generate_member_name(individual.cpp_name)
-            ind_prefix = individual.member_prefix
-
-            # Build feature enable condition for individual
-            ind_conditions = [f"{ind_member_name}.{ind_prefix}{m.name} == VK_TRUE" for m in individual.members]
-            ind_condition_str = " ||\n            ".join(ind_conditions)
-
-            lines.append(f"        // {individual.cpp_name}")
-            lines.append(f"        if ({ind_condition_str}) {{")
-
-            # Add extension/version assertion
-            if individual.extension and individual.promotion_version:
-                lines.extend([
-                    f"            assert((physical_device->extension_supported({individual.extension}) ||",
-                    f"                    vk_api_version >= {individual.promotion_version}) &&",
-                    f'                   "Feature enabled but neither extension nor promoted version supported");',
-                ])
-            elif individual.extension:
-                lines.extend([
-                    f"            assert(physical_device->extension_supported({individual.extension}) &&",
-                    f'                   "Feature enabled but required extension not supported");',
-                ])
-
-            lines.extend([
-                f"            {ind_member_name}.pNext = chain_head;",
-                f"            chain_head = &{ind_member_name};",
-                "        }",
-            ])
-
-        lines.extend([
-            "    }",
-            "",
-        ])
-
-    # Add non-aggregated structs (those without aggregated_by)
-    lines.extend([
-        "    // Non-promoted feature structs (not part of any aggregate)",
-        "",
-    ])
-
-    non_aggregated = [f for f in features
-                     if not f.aggregated_by
-                     and not f.aggregates
-                     and f.members
-                     and "VkPhysicalDeviceFeatures2" in f.structextends]
-
-    for feat in sorted(non_aggregated, key=lambda f: f.cpp_name):
-        member_name = generate_member_name(feat.cpp_name)
-        prefix = feat.member_prefix
-
-        # Build feature enable condition
-        feature_conditions = [f"{member_name}.{prefix}{m.name} == VK_TRUE" for m in feat.members]
-        feature_condition_str = " ||\n        ".join(feature_conditions)
-
-        lines.append(f"    // {feat.cpp_name}")
-        lines.append(f"    if ({feature_condition_str}) {{")
-
-        # Add extension/version assertion
-        if feat.extension and feat.promotion_version:
-            lines.extend([
-                f"        assert((physical_device->extension_supported({feat.extension}) ||",
-                f"                vk_api_version >= {feat.promotion_version}) &&",
-                f'               "Feature enabled but neither extension nor promoted version supported");',
-            ])
-        elif feat.extension:
-            lines.extend([
-                f"        assert(physical_device->extension_supported({feat.extension}) &&",
-                f'               "Feature enabled but required extension not supported");',
-            ])
-        elif feat.required_version:
-            lines.extend([
-                f"        assert(vk_api_version >= {feat.required_version} &&",
-                f'               "Feature enabled but required Vulkan version not supported");',
-            ])
-
-        lines.extend([
-            f"        {member_name}.pNext = chain_head;",
-            f"        chain_head = &{member_name};",
-            "    }",
-            "",
-        ])
+    if independent:
+        lines.append("    // Independent features (no aliases or aggregation relationships)")
+        lines.append("")
+        for feat in independent:
+            lines.extend(generate_device_creation_for_independent(feat))
 
     lines.extend(
         [

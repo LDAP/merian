@@ -9422,287 +9422,110 @@ void* VulkanFeatures::build_chain_for_device_creation(
     const uint32_t vk_api_version = physical_device->get_vk_api_version();
     void* chain_head = p_next;
 
-    // Build chain using version-based if-chains
-    // For each API version: use aggregate if available, else use individual promoted structs
-    // This ensures VUID compliance: aggregates and their individual structs are mutually exclusive
+    // Build chain using priority-based grouping
+    // For structs with related features (same/subset/superset), use if/else chains
+    // Priority: higher API version > promoted > newer extension number
+    // This ensures mutual exclusivity and prefers newer/better versions
 
-    // API VK_API_VERSION_1_4: PhysicalDeviceVulkan14Features or individual promoted structs
-    if (vk_api_version >= VK_API_VERSION_1_4) {
-        // Use aggregate if any features enabled
-        if (m_vulkan14_features.globalPriorityQuery == VK_TRUE ||
-        m_vulkan14_features.shaderSubgroupRotate == VK_TRUE ||
-        m_vulkan14_features.shaderSubgroupRotateClustered == VK_TRUE ||
-        m_vulkan14_features.shaderFloatControls2 == VK_TRUE ||
-        m_vulkan14_features.shaderExpectAssume == VK_TRUE ||
-        m_vulkan14_features.rectangularLines == VK_TRUE ||
-        m_vulkan14_features.bresenhamLines == VK_TRUE ||
-        m_vulkan14_features.smoothLines == VK_TRUE ||
-        m_vulkan14_features.stippledRectangularLines == VK_TRUE ||
-        m_vulkan14_features.stippledBresenhamLines == VK_TRUE ||
-        m_vulkan14_features.stippledSmoothLines == VK_TRUE ||
-        m_vulkan14_features.vertexAttributeInstanceRateDivisor == VK_TRUE ||
-        m_vulkan14_features.vertexAttributeInstanceRateZeroDivisor == VK_TRUE ||
-        m_vulkan14_features.indexTypeUint8 == VK_TRUE ||
-        m_vulkan14_features.dynamicRenderingLocalRead == VK_TRUE ||
-        m_vulkan14_features.maintenance5 == VK_TRUE ||
-        m_vulkan14_features.maintenance6 == VK_TRUE ||
-        m_vulkan14_features.pipelineProtectedAccess == VK_TRUE ||
-        m_vulkan14_features.pipelineRobustness == VK_TRUE ||
-        m_vulkan14_features.hostImageCopy == VK_TRUE ||
-        m_vulkan14_features.pushDescriptor == VK_TRUE) {
-            m_vulkan14_features.pNext = chain_head;
-            chain_head = &m_vulkan14_features;
-        }
+    // Feature groups (related structs with priority ordering)
+
+    // Group 1: PhysicalDeviceMeshShaderFeaturesEXT and 1 related struct(s)
+    if ((m_mesh_shader_features_ext.taskShader == VK_TRUE ||
+        m_mesh_shader_features_ext.meshShader == VK_TRUE ||
+        m_mesh_shader_features_ext.multiviewMeshShader == VK_TRUE ||
+        m_mesh_shader_features_ext.primitiveFragmentShadingRateMeshShader == VK_TRUE ||
+        m_mesh_shader_features_ext.meshShaderQueries == VK_TRUE) &&
+        (physical_device->extension_supported(VK_EXT_MESH_SHADER_EXTENSION_NAME))) {
+                assert(physical_device->extension_supported(VK_EXT_MESH_SHADER_EXTENSION_NAME) &&
+                       "Feature enabled but required extension not supported");
+        m_mesh_shader_features_ext.pNext = chain_head;
+        chain_head = &m_mesh_shader_features_ext;
     } else {
-        // API version < VK_API_VERSION_1_4: use individual structs
-        // PhysicalDeviceDynamicRenderingLocalReadFeatures
-        if (m_dynamic_rendering_local_read_features.dynamicRenderingLocalRead == VK_TRUE) {
-            assert((physical_device->extension_supported(VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_EXTENSION_NAME) ||
-                    vk_api_version >= VK_API_VERSION_1_4) &&
-                   "Feature enabled but neither extension nor promoted version supported");
-            m_dynamic_rendering_local_read_features.pNext = chain_head;
-            chain_head = &m_dynamic_rendering_local_read_features;
-        }
-        // PhysicalDeviceGlobalPriorityQueryFeatures
-        if (m_global_priority_query_features.globalPriorityQuery == VK_TRUE) {
-            assert((physical_device->extension_supported(VK_KHR_GLOBAL_PRIORITY_EXTENSION_NAME) ||
-                    vk_api_version >= VK_API_VERSION_1_4) &&
-                   "Feature enabled but neither extension nor promoted version supported");
-            m_global_priority_query_features.pNext = chain_head;
-            chain_head = &m_global_priority_query_features;
-        }
-        // PhysicalDeviceHostImageCopyFeatures
-        if (m_host_image_copy_features.hostImageCopy == VK_TRUE) {
-            assert((physical_device->extension_supported(VK_EXT_HOST_IMAGE_COPY_EXTENSION_NAME) ||
-                    vk_api_version >= VK_API_VERSION_1_4) &&
-                   "Feature enabled but neither extension nor promoted version supported");
-            m_host_image_copy_features.pNext = chain_head;
-            chain_head = &m_host_image_copy_features;
-        }
-        // PhysicalDeviceIndexTypeUint8Features
-        if (m_index_type_uint8_features.indexTypeUint8 == VK_TRUE) {
-            assert((physical_device->extension_supported(VK_KHR_INDEX_TYPE_UINT8_EXTENSION_NAME) ||
-                    vk_api_version >= VK_API_VERSION_1_4) &&
-                   "Feature enabled but neither extension nor promoted version supported");
-            m_index_type_uint8_features.pNext = chain_head;
-            chain_head = &m_index_type_uint8_features;
-        }
-        // PhysicalDeviceLineRasterizationFeatures
-        if (m_line_rasterization_features.rectangularLines == VK_TRUE ||
-            m_line_rasterization_features.bresenhamLines == VK_TRUE ||
-            m_line_rasterization_features.smoothLines == VK_TRUE ||
-            m_line_rasterization_features.stippledRectangularLines == VK_TRUE ||
-            m_line_rasterization_features.stippledBresenhamLines == VK_TRUE ||
-            m_line_rasterization_features.stippledSmoothLines == VK_TRUE) {
-            assert((physical_device->extension_supported(VK_KHR_LINE_RASTERIZATION_EXTENSION_NAME) ||
-                    vk_api_version >= VK_API_VERSION_1_4) &&
-                   "Feature enabled but neither extension nor promoted version supported");
-            m_line_rasterization_features.pNext = chain_head;
-            chain_head = &m_line_rasterization_features;
-        }
-        // PhysicalDeviceMaintenance5Features
-        if (m_maintenance5_features.maintenance5 == VK_TRUE) {
-            assert((physical_device->extension_supported(VK_KHR_MAINTENANCE_5_EXTENSION_NAME) ||
-                    vk_api_version >= VK_API_VERSION_1_4) &&
-                   "Feature enabled but neither extension nor promoted version supported");
-            m_maintenance5_features.pNext = chain_head;
-            chain_head = &m_maintenance5_features;
-        }
-        // PhysicalDeviceMaintenance6Features
-        if (m_maintenance6_features.maintenance6 == VK_TRUE) {
-            assert((physical_device->extension_supported(VK_KHR_MAINTENANCE_6_EXTENSION_NAME) ||
-                    vk_api_version >= VK_API_VERSION_1_4) &&
-                   "Feature enabled but neither extension nor promoted version supported");
-            m_maintenance6_features.pNext = chain_head;
-            chain_head = &m_maintenance6_features;
-        }
-        // PhysicalDevicePipelineProtectedAccessFeatures
-        if (m_pipeline_protected_access_features.pipelineProtectedAccess == VK_TRUE) {
-            assert((physical_device->extension_supported(VK_EXT_PIPELINE_PROTECTED_ACCESS_EXTENSION_NAME) ||
-                    vk_api_version >= VK_API_VERSION_1_4) &&
-                   "Feature enabled but neither extension nor promoted version supported");
-            m_pipeline_protected_access_features.pNext = chain_head;
-            chain_head = &m_pipeline_protected_access_features;
-        }
-        // PhysicalDevicePipelineRobustnessFeatures
-        if (m_pipeline_robustness_features.pipelineRobustness == VK_TRUE) {
-            assert((physical_device->extension_supported(VK_EXT_PIPELINE_ROBUSTNESS_EXTENSION_NAME) ||
-                    vk_api_version >= VK_API_VERSION_1_4) &&
-                   "Feature enabled but neither extension nor promoted version supported");
-            m_pipeline_robustness_features.pNext = chain_head;
-            chain_head = &m_pipeline_robustness_features;
-        }
-        // PhysicalDeviceShaderExpectAssumeFeatures
-        if (m_shader_expect_assume_features.shaderExpectAssume == VK_TRUE) {
-            assert((physical_device->extension_supported(VK_KHR_SHADER_EXPECT_ASSUME_EXTENSION_NAME) ||
-                    vk_api_version >= VK_API_VERSION_1_4) &&
-                   "Feature enabled but neither extension nor promoted version supported");
-            m_shader_expect_assume_features.pNext = chain_head;
-            chain_head = &m_shader_expect_assume_features;
-        }
-        // PhysicalDeviceShaderFloatControls2Features
-        if (m_shader_float_controls2_features.shaderFloatControls2 == VK_TRUE) {
-            assert((physical_device->extension_supported(VK_KHR_SHADER_FLOAT_CONTROLS_2_EXTENSION_NAME) ||
-                    vk_api_version >= VK_API_VERSION_1_4) &&
-                   "Feature enabled but neither extension nor promoted version supported");
-            m_shader_float_controls2_features.pNext = chain_head;
-            chain_head = &m_shader_float_controls2_features;
-        }
-        // PhysicalDeviceShaderSubgroupRotateFeatures
-        if (m_shader_subgroup_rotate_features.shaderSubgroupRotate == VK_TRUE ||
-            m_shader_subgroup_rotate_features.shaderSubgroupRotateClustered == VK_TRUE) {
-            assert((physical_device->extension_supported(VK_KHR_SHADER_SUBGROUP_ROTATE_EXTENSION_NAME) ||
-                    vk_api_version >= VK_API_VERSION_1_4) &&
-                   "Feature enabled but neither extension nor promoted version supported");
-            m_shader_subgroup_rotate_features.pNext = chain_head;
-            chain_head = &m_shader_subgroup_rotate_features;
-        }
-        // PhysicalDeviceVertexAttributeDivisorFeatures
-        if (m_vertex_attribute_divisor_features.vertexAttributeInstanceRateDivisor == VK_TRUE ||
-            m_vertex_attribute_divisor_features.vertexAttributeInstanceRateZeroDivisor == VK_TRUE) {
-            assert((physical_device->extension_supported(VK_KHR_VERTEX_ATTRIBUTE_DIVISOR_EXTENSION_NAME) ||
-                    vk_api_version >= VK_API_VERSION_1_4) &&
-                   "Feature enabled but neither extension nor promoted version supported");
-            m_vertex_attribute_divisor_features.pNext = chain_head;
-            chain_head = &m_vertex_attribute_divisor_features;
+        if ((m_mesh_shader_features_nv.taskShader == VK_TRUE ||
+        m_mesh_shader_features_nv.meshShader == VK_TRUE) &&
+            (physical_device->extension_supported(VK_NV_MESH_SHADER_EXTENSION_NAME))) {
+                    assert(physical_device->extension_supported(VK_NV_MESH_SHADER_EXTENSION_NAME) &&
+                           "Feature enabled but required extension not supported");
+            m_mesh_shader_features_nv.pNext = chain_head;
+            chain_head = &m_mesh_shader_features_nv;
         }
     }
 
-    // API VK_API_VERSION_1_3: PhysicalDeviceVulkan13Features or individual promoted structs
-    if (vk_api_version >= VK_API_VERSION_1_3) {
-        // Use aggregate if any features enabled
-        if (m_vulkan13_features.robustImageAccess == VK_TRUE ||
-        m_vulkan13_features.inlineUniformBlock == VK_TRUE ||
-        m_vulkan13_features.descriptorBindingInlineUniformBlockUpdateAfterBind == VK_TRUE ||
-        m_vulkan13_features.pipelineCreationCacheControl == VK_TRUE ||
-        m_vulkan13_features.privateData == VK_TRUE ||
-        m_vulkan13_features.shaderDemoteToHelperInvocation == VK_TRUE ||
-        m_vulkan13_features.shaderTerminateInvocation == VK_TRUE ||
-        m_vulkan13_features.subgroupSizeControl == VK_TRUE ||
-        m_vulkan13_features.computeFullSubgroups == VK_TRUE ||
-        m_vulkan13_features.synchronization2 == VK_TRUE ||
-        m_vulkan13_features.textureCompressionASTC_HDR == VK_TRUE ||
-        m_vulkan13_features.shaderZeroInitializeWorkgroupMemory == VK_TRUE ||
-        m_vulkan13_features.dynamicRendering == VK_TRUE ||
-        m_vulkan13_features.shaderIntegerDotProduct == VK_TRUE ||
-        m_vulkan13_features.maintenance4 == VK_TRUE) {
-            m_vulkan13_features.pNext = chain_head;
-            chain_head = &m_vulkan13_features;
-        }
+    // Group 2: PhysicalDeviceVulkan11Features and 6 related struct(s)
+    if ((m_vulkan11_features.storageBuffer16BitAccess == VK_TRUE ||
+        m_vulkan11_features.uniformAndStorageBuffer16BitAccess == VK_TRUE ||
+        m_vulkan11_features.storagePushConstant16 == VK_TRUE ||
+        m_vulkan11_features.storageInputOutput16 == VK_TRUE ||
+        m_vulkan11_features.multiview == VK_TRUE ||
+        m_vulkan11_features.multiviewGeometryShader == VK_TRUE ||
+        m_vulkan11_features.multiviewTessellationShader == VK_TRUE ||
+        m_vulkan11_features.variablePointersStorageBuffer == VK_TRUE ||
+        m_vulkan11_features.variablePointers == VK_TRUE ||
+        m_vulkan11_features.protectedMemory == VK_TRUE ||
+        m_vulkan11_features.samplerYcbcrConversion == VK_TRUE ||
+        m_vulkan11_features.shaderDrawParameters == VK_TRUE) &&
+        (vk_api_version >= VK_API_VERSION_1_2)) {
+                assert(vk_api_version >= VK_API_VERSION_1_2 &&
+                       "Feature enabled but required Vulkan version not supported");
+        m_vulkan11_features.pNext = chain_head;
+        chain_head = &m_vulkan11_features;
     } else {
-        // API version < VK_API_VERSION_1_3: use individual structs
-        // PhysicalDeviceDynamicRenderingFeatures
-        if (m_dynamic_rendering_features.dynamicRendering == VK_TRUE) {
-            assert((physical_device->extension_supported(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME) ||
-                    vk_api_version >= VK_API_VERSION_1_3) &&
-                   "Feature enabled but neither extension nor promoted version supported");
-            m_dynamic_rendering_features.pNext = chain_head;
-            chain_head = &m_dynamic_rendering_features;
+        if ((m_variable_pointers_features.variablePointersStorageBuffer == VK_TRUE ||
+        m_variable_pointers_features.variablePointers == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_1 || physical_device->extension_supported(VK_KHR_VARIABLE_POINTERS_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_KHR_VARIABLE_POINTERS_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_1) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_variable_pointers_features.pNext = chain_head;
+            chain_head = &m_variable_pointers_features;
         }
-        // PhysicalDeviceImageRobustnessFeatures
-        if (m_image_robustness_features.robustImageAccess == VK_TRUE) {
-            assert((physical_device->extension_supported(VK_EXT_IMAGE_ROBUSTNESS_EXTENSION_NAME) ||
-                    vk_api_version >= VK_API_VERSION_1_3) &&
-                   "Feature enabled but neither extension nor promoted version supported");
-            m_image_robustness_features.pNext = chain_head;
-            chain_head = &m_image_robustness_features;
+        if ((m_multiview_features.multiview == VK_TRUE ||
+        m_multiview_features.multiviewGeometryShader == VK_TRUE ||
+        m_multiview_features.multiviewTessellationShader == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_1 || physical_device->extension_supported(VK_KHR_MULTIVIEW_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_KHR_MULTIVIEW_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_1) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_multiview_features.pNext = chain_head;
+            chain_head = &m_multiview_features;
         }
-        // PhysicalDeviceInlineUniformBlockFeatures
-        if (m_inline_uniform_block_features.inlineUniformBlock == VK_TRUE ||
-            m_inline_uniform_block_features.descriptorBindingInlineUniformBlockUpdateAfterBind == VK_TRUE) {
-            assert((physical_device->extension_supported(VK_EXT_INLINE_UNIFORM_BLOCK_EXTENSION_NAME) ||
-                    vk_api_version >= VK_API_VERSION_1_3) &&
-                   "Feature enabled but neither extension nor promoted version supported");
-            m_inline_uniform_block_features.pNext = chain_head;
-            chain_head = &m_inline_uniform_block_features;
+        if ((m_16_bit_storage_features.storageBuffer16BitAccess == VK_TRUE ||
+        m_16_bit_storage_features.uniformAndStorageBuffer16BitAccess == VK_TRUE ||
+        m_16_bit_storage_features.storagePushConstant16 == VK_TRUE ||
+        m_16_bit_storage_features.storageInputOutput16 == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_1 || physical_device->extension_supported(VK_KHR_16BIT_STORAGE_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_KHR_16BIT_STORAGE_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_1) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_16_bit_storage_features.pNext = chain_head;
+            chain_head = &m_16_bit_storage_features;
         }
-        // PhysicalDeviceMaintenance4Features
-        if (m_maintenance4_features.maintenance4 == VK_TRUE) {
-            assert((physical_device->extension_supported(VK_KHR_MAINTENANCE_4_EXTENSION_NAME) ||
-                    vk_api_version >= VK_API_VERSION_1_3) &&
-                   "Feature enabled but neither extension nor promoted version supported");
-            m_maintenance4_features.pNext = chain_head;
-            chain_head = &m_maintenance4_features;
+        if ((m_sampler_ycbcr_conversion_features.samplerYcbcrConversion == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_1 || physical_device->extension_supported(VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_1) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_sampler_ycbcr_conversion_features.pNext = chain_head;
+            chain_head = &m_sampler_ycbcr_conversion_features;
         }
-        // PhysicalDevicePipelineCreationCacheControlFeatures
-        if (m_pipeline_creation_cache_control_features.pipelineCreationCacheControl == VK_TRUE) {
-            assert((physical_device->extension_supported(VK_EXT_PIPELINE_CREATION_CACHE_CONTROL_EXTENSION_NAME) ||
-                    vk_api_version >= VK_API_VERSION_1_3) &&
-                   "Feature enabled but neither extension nor promoted version supported");
-            m_pipeline_creation_cache_control_features.pNext = chain_head;
-            chain_head = &m_pipeline_creation_cache_control_features;
+        if ((m_protected_memory_features.protectedMemory == VK_TRUE) &&
+            (true)) {
+                    assert(vk_api_version >= VK_API_VERSION_1_1 &&
+                           "Feature enabled but required Vulkan version not supported");
+            m_protected_memory_features.pNext = chain_head;
+            chain_head = &m_protected_memory_features;
         }
-        // PhysicalDevicePrivateDataFeatures
-        if (m_private_data_features.privateData == VK_TRUE) {
-            assert((physical_device->extension_supported(VK_EXT_PRIVATE_DATA_EXTENSION_NAME) ||
-                    vk_api_version >= VK_API_VERSION_1_3) &&
-                   "Feature enabled but neither extension nor promoted version supported");
-            m_private_data_features.pNext = chain_head;
-            chain_head = &m_private_data_features;
-        }
-        // PhysicalDeviceShaderDemoteToHelperInvocationFeatures
-        if (m_shader_demote_to_helper_invocation_features.shaderDemoteToHelperInvocation == VK_TRUE) {
-            assert((physical_device->extension_supported(VK_EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION_EXTENSION_NAME) ||
-                    vk_api_version >= VK_API_VERSION_1_3) &&
-                   "Feature enabled but neither extension nor promoted version supported");
-            m_shader_demote_to_helper_invocation_features.pNext = chain_head;
-            chain_head = &m_shader_demote_to_helper_invocation_features;
-        }
-        // PhysicalDeviceShaderIntegerDotProductFeatures
-        if (m_shader_integer_dot_product_features.shaderIntegerDotProduct == VK_TRUE) {
-            assert((physical_device->extension_supported(VK_KHR_SHADER_INTEGER_DOT_PRODUCT_EXTENSION_NAME) ||
-                    vk_api_version >= VK_API_VERSION_1_3) &&
-                   "Feature enabled but neither extension nor promoted version supported");
-            m_shader_integer_dot_product_features.pNext = chain_head;
-            chain_head = &m_shader_integer_dot_product_features;
-        }
-        // PhysicalDeviceShaderTerminateInvocationFeatures
-        if (m_shader_terminate_invocation_features.shaderTerminateInvocation == VK_TRUE) {
-            assert((physical_device->extension_supported(VK_KHR_SHADER_TERMINATE_INVOCATION_EXTENSION_NAME) ||
-                    vk_api_version >= VK_API_VERSION_1_3) &&
-                   "Feature enabled but neither extension nor promoted version supported");
-            m_shader_terminate_invocation_features.pNext = chain_head;
-            chain_head = &m_shader_terminate_invocation_features;
-        }
-        // PhysicalDeviceSubgroupSizeControlFeatures
-        if (m_subgroup_size_control_features.subgroupSizeControl == VK_TRUE ||
-            m_subgroup_size_control_features.computeFullSubgroups == VK_TRUE) {
-            assert((physical_device->extension_supported(VK_EXT_SUBGROUP_SIZE_CONTROL_EXTENSION_NAME) ||
-                    vk_api_version >= VK_API_VERSION_1_3) &&
-                   "Feature enabled but neither extension nor promoted version supported");
-            m_subgroup_size_control_features.pNext = chain_head;
-            chain_head = &m_subgroup_size_control_features;
-        }
-        // PhysicalDeviceSynchronization2Features
-        if (m_synchronization2_features.synchronization2 == VK_TRUE) {
-            assert((physical_device->extension_supported(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME) ||
-                    vk_api_version >= VK_API_VERSION_1_3) &&
-                   "Feature enabled but neither extension nor promoted version supported");
-            m_synchronization2_features.pNext = chain_head;
-            chain_head = &m_synchronization2_features;
-        }
-        // PhysicalDeviceTextureCompressionASTCHDRFeatures
-        if (m_texture_compression_astchdr_features.textureCompressionASTC_HDR == VK_TRUE) {
-            assert((physical_device->extension_supported(VK_EXT_TEXTURE_COMPRESSION_ASTC_HDR_EXTENSION_NAME) ||
-                    vk_api_version >= VK_API_VERSION_1_3) &&
-                   "Feature enabled but neither extension nor promoted version supported");
-            m_texture_compression_astchdr_features.pNext = chain_head;
-            chain_head = &m_texture_compression_astchdr_features;
-        }
-        // PhysicalDeviceZeroInitializeWorkgroupMemoryFeatures
-        if (m_zero_initialize_workgroup_memory_features.shaderZeroInitializeWorkgroupMemory == VK_TRUE) {
-            assert((physical_device->extension_supported(VK_KHR_ZERO_INITIALIZE_WORKGROUP_MEMORY_EXTENSION_NAME) ||
-                    vk_api_version >= VK_API_VERSION_1_3) &&
-                   "Feature enabled but neither extension nor promoted version supported");
-            m_zero_initialize_workgroup_memory_features.pNext = chain_head;
-            chain_head = &m_zero_initialize_workgroup_memory_features;
+        if ((m_shader_draw_parameters_features.shaderDrawParameters == VK_TRUE) &&
+            (true)) {
+                    assert(vk_api_version >= VK_API_VERSION_1_1 &&
+                           "Feature enabled but required Vulkan version not supported");
+            m_shader_draw_parameters_features.pNext = chain_head;
+            chain_head = &m_shader_draw_parameters_features;
         }
     }
 
-    // API VK_API_VERSION_1_2: PhysicalDeviceVulkan12Features or individual promoted structs
-    if (vk_api_version >= VK_API_VERSION_1_2) {
-        // Use aggregate if any features enabled
-        if (m_vulkan12_features.samplerMirrorClampToEdge == VK_TRUE ||
+    // Group 3: PhysicalDeviceVulkan12Features and 14 related struct(s)
+    if ((m_vulkan12_features.samplerMirrorClampToEdge == VK_TRUE ||
         m_vulkan12_features.drawIndirectCount == VK_TRUE ||
         m_vulkan12_features.storageBuffer8BitAccess == VK_TRUE ||
         m_vulkan12_features.uniformAndStorageBuffer8BitAccess == VK_TRUE ||
@@ -9748,160 +9571,460 @@ void* VulkanFeatures::build_chain_for_device_creation(
         m_vulkan12_features.vulkanMemoryModelAvailabilityVisibilityChains == VK_TRUE ||
         m_vulkan12_features.shaderOutputViewportIndex == VK_TRUE ||
         m_vulkan12_features.shaderOutputLayer == VK_TRUE ||
-        m_vulkan12_features.subgroupBroadcastDynamicId == VK_TRUE) {
-            m_vulkan12_features.pNext = chain_head;
-            chain_head = &m_vulkan12_features;
-        }
+        m_vulkan12_features.subgroupBroadcastDynamicId == VK_TRUE) &&
+        (vk_api_version >= VK_API_VERSION_1_2)) {
+                assert(vk_api_version >= VK_API_VERSION_1_2 &&
+                       "Feature enabled but required Vulkan version not supported");
+        m_vulkan12_features.pNext = chain_head;
+        chain_head = &m_vulkan12_features;
     } else {
-        // API version < VK_API_VERSION_1_2: use individual structs
-        // PhysicalDevice8BitStorageFeatures
-        if (m_8_bit_storage_features.storageBuffer8BitAccess == VK_TRUE ||
-            m_8_bit_storage_features.uniformAndStorageBuffer8BitAccess == VK_TRUE ||
-            m_8_bit_storage_features.storagePushConstant8 == VK_TRUE) {
-            assert((physical_device->extension_supported(VK_KHR_8BIT_STORAGE_EXTENSION_NAME) ||
-                    vk_api_version >= VK_API_VERSION_1_2) &&
-                   "Feature enabled but neither extension nor promoted version supported");
-            m_8_bit_storage_features.pNext = chain_head;
-            chain_head = &m_8_bit_storage_features;
-        }
-        // PhysicalDeviceBufferDeviceAddressFeatures
-        if (m_buffer_device_address_features.bufferDeviceAddress == VK_TRUE ||
-            m_buffer_device_address_features.bufferDeviceAddressCaptureReplay == VK_TRUE ||
-            m_buffer_device_address_features.bufferDeviceAddressMultiDevice == VK_TRUE) {
-            assert((physical_device->extension_supported(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME) ||
-                    vk_api_version >= VK_API_VERSION_1_2) &&
-                   "Feature enabled but neither extension nor promoted version supported");
-            m_buffer_device_address_features.pNext = chain_head;
-            chain_head = &m_buffer_device_address_features;
-        }
-        // PhysicalDeviceBufferDeviceAddressFeaturesEXT
-        if (m_buffer_device_address_features_ext.bufferDeviceAddress == VK_TRUE ||
-            m_buffer_device_address_features_ext.bufferDeviceAddressCaptureReplay == VK_TRUE ||
-            m_buffer_device_address_features_ext.bufferDeviceAddressMultiDevice == VK_TRUE) {
-            assert(physical_device->extension_supported(VK_EXT_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME) &&
-                   "Feature enabled but required extension not supported");
-            m_buffer_device_address_features_ext.pNext = chain_head;
-            chain_head = &m_buffer_device_address_features_ext;
-        }
-        // PhysicalDeviceDescriptorIndexingFeatures
-        if (m_descriptor_indexing_features.shaderInputAttachmentArrayDynamicIndexing == VK_TRUE ||
-            m_descriptor_indexing_features.shaderUniformTexelBufferArrayDynamicIndexing == VK_TRUE ||
-            m_descriptor_indexing_features.shaderStorageTexelBufferArrayDynamicIndexing == VK_TRUE ||
-            m_descriptor_indexing_features.shaderUniformBufferArrayNonUniformIndexing == VK_TRUE ||
-            m_descriptor_indexing_features.shaderSampledImageArrayNonUniformIndexing == VK_TRUE ||
-            m_descriptor_indexing_features.shaderStorageBufferArrayNonUniformIndexing == VK_TRUE ||
-            m_descriptor_indexing_features.shaderStorageImageArrayNonUniformIndexing == VK_TRUE ||
-            m_descriptor_indexing_features.shaderInputAttachmentArrayNonUniformIndexing == VK_TRUE ||
-            m_descriptor_indexing_features.shaderUniformTexelBufferArrayNonUniformIndexing == VK_TRUE ||
-            m_descriptor_indexing_features.shaderStorageTexelBufferArrayNonUniformIndexing == VK_TRUE ||
-            m_descriptor_indexing_features.descriptorBindingUniformBufferUpdateAfterBind == VK_TRUE ||
-            m_descriptor_indexing_features.descriptorBindingSampledImageUpdateAfterBind == VK_TRUE ||
-            m_descriptor_indexing_features.descriptorBindingStorageImageUpdateAfterBind == VK_TRUE ||
-            m_descriptor_indexing_features.descriptorBindingStorageBufferUpdateAfterBind == VK_TRUE ||
-            m_descriptor_indexing_features.descriptorBindingUniformTexelBufferUpdateAfterBind == VK_TRUE ||
-            m_descriptor_indexing_features.descriptorBindingStorageTexelBufferUpdateAfterBind == VK_TRUE ||
-            m_descriptor_indexing_features.descriptorBindingUpdateUnusedWhilePending == VK_TRUE ||
-            m_descriptor_indexing_features.descriptorBindingPartiallyBound == VK_TRUE ||
-            m_descriptor_indexing_features.descriptorBindingVariableDescriptorCount == VK_TRUE ||
-            m_descriptor_indexing_features.runtimeDescriptorArray == VK_TRUE) {
-            assert((physical_device->extension_supported(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME) ||
-                    vk_api_version >= VK_API_VERSION_1_2) &&
-                   "Feature enabled but neither extension nor promoted version supported");
-            m_descriptor_indexing_features.pNext = chain_head;
-            chain_head = &m_descriptor_indexing_features;
-        }
-        // PhysicalDeviceHostQueryResetFeatures
-        if (m_host_query_reset_features.hostQueryReset == VK_TRUE) {
-            assert((physical_device->extension_supported(VK_EXT_HOST_QUERY_RESET_EXTENSION_NAME) ||
-                    vk_api_version >= VK_API_VERSION_1_2) &&
-                   "Feature enabled but neither extension nor promoted version supported");
-            m_host_query_reset_features.pNext = chain_head;
-            chain_head = &m_host_query_reset_features;
-        }
-        // PhysicalDeviceImagelessFramebufferFeatures
-        if (m_imageless_framebuffer_features.imagelessFramebuffer == VK_TRUE) {
-            assert((physical_device->extension_supported(VK_KHR_IMAGELESS_FRAMEBUFFER_EXTENSION_NAME) ||
-                    vk_api_version >= VK_API_VERSION_1_2) &&
-                   "Feature enabled but neither extension nor promoted version supported");
-            m_imageless_framebuffer_features.pNext = chain_head;
-            chain_head = &m_imageless_framebuffer_features;
-        }
-        // PhysicalDeviceScalarBlockLayoutFeatures
-        if (m_scalar_block_layout_features.scalarBlockLayout == VK_TRUE) {
-            assert((physical_device->extension_supported(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME) ||
-                    vk_api_version >= VK_API_VERSION_1_2) &&
-                   "Feature enabled but neither extension nor promoted version supported");
-            m_scalar_block_layout_features.pNext = chain_head;
-            chain_head = &m_scalar_block_layout_features;
-        }
-        // PhysicalDeviceSeparateDepthStencilLayoutsFeatures
-        if (m_separate_depth_stencil_layouts_features.separateDepthStencilLayouts == VK_TRUE) {
-            assert((physical_device->extension_supported(VK_KHR_SEPARATE_DEPTH_STENCIL_LAYOUTS_EXTENSION_NAME) ||
-                    vk_api_version >= VK_API_VERSION_1_2) &&
-                   "Feature enabled but neither extension nor promoted version supported");
-            m_separate_depth_stencil_layouts_features.pNext = chain_head;
-            chain_head = &m_separate_depth_stencil_layouts_features;
-        }
-        // PhysicalDeviceShaderAtomicInt64Features
-        if (m_shader_atomic_int64_features.shaderBufferInt64Atomics == VK_TRUE ||
-            m_shader_atomic_int64_features.shaderSharedInt64Atomics == VK_TRUE) {
-            assert((physical_device->extension_supported(VK_KHR_SHADER_ATOMIC_INT64_EXTENSION_NAME) ||
-                    vk_api_version >= VK_API_VERSION_1_2) &&
-                   "Feature enabled but neither extension nor promoted version supported");
-            m_shader_atomic_int64_features.pNext = chain_head;
-            chain_head = &m_shader_atomic_int64_features;
-        }
-        // PhysicalDeviceShaderFloat16Int8Features
-        if (m_shader_float16_int8_features.shaderFloat16 == VK_TRUE ||
-            m_shader_float16_int8_features.shaderInt8 == VK_TRUE) {
-            assert((physical_device->extension_supported(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME) ||
-                    vk_api_version >= VK_API_VERSION_1_2) &&
-                   "Feature enabled but neither extension nor promoted version supported");
-            m_shader_float16_int8_features.pNext = chain_head;
-            chain_head = &m_shader_float16_int8_features;
-        }
-        // PhysicalDeviceShaderSubgroupExtendedTypesFeatures
-        if (m_shader_subgroup_extended_types_features.shaderSubgroupExtendedTypes == VK_TRUE) {
-            assert((physical_device->extension_supported(VK_KHR_SHADER_SUBGROUP_EXTENDED_TYPES_EXTENSION_NAME) ||
-                    vk_api_version >= VK_API_VERSION_1_2) &&
-                   "Feature enabled but neither extension nor promoted version supported");
+        if ((m_shader_subgroup_extended_types_features.shaderSubgroupExtendedTypes == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_2 || physical_device->extension_supported(VK_KHR_SHADER_SUBGROUP_EXTENDED_TYPES_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_KHR_SHADER_SUBGROUP_EXTENDED_TYPES_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_2) &&
+                           "Feature enabled but neither extension nor promoted version supported");
             m_shader_subgroup_extended_types_features.pNext = chain_head;
             chain_head = &m_shader_subgroup_extended_types_features;
         }
-        // PhysicalDeviceTimelineSemaphoreFeatures
-        if (m_timeline_semaphore_features.timelineSemaphore == VK_TRUE) {
-            assert((physical_device->extension_supported(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME) ||
-                    vk_api_version >= VK_API_VERSION_1_2) &&
-                   "Feature enabled but neither extension nor promoted version supported");
+        if ((m_shader_float16_int8_features.shaderFloat16 == VK_TRUE ||
+        m_shader_float16_int8_features.shaderInt8 == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_2 || physical_device->extension_supported(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_2) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_shader_float16_int8_features.pNext = chain_head;
+            chain_head = &m_shader_float16_int8_features;
+        }
+        if ((m_host_query_reset_features.hostQueryReset == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_2 || physical_device->extension_supported(VK_EXT_HOST_QUERY_RESET_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_EXT_HOST_QUERY_RESET_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_2) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_host_query_reset_features.pNext = chain_head;
+            chain_head = &m_host_query_reset_features;
+        }
+        if ((m_descriptor_indexing_features.shaderInputAttachmentArrayDynamicIndexing == VK_TRUE ||
+        m_descriptor_indexing_features.shaderUniformTexelBufferArrayDynamicIndexing == VK_TRUE ||
+        m_descriptor_indexing_features.shaderStorageTexelBufferArrayDynamicIndexing == VK_TRUE ||
+        m_descriptor_indexing_features.shaderUniformBufferArrayNonUniformIndexing == VK_TRUE ||
+        m_descriptor_indexing_features.shaderSampledImageArrayNonUniformIndexing == VK_TRUE ||
+        m_descriptor_indexing_features.shaderStorageBufferArrayNonUniformIndexing == VK_TRUE ||
+        m_descriptor_indexing_features.shaderStorageImageArrayNonUniformIndexing == VK_TRUE ||
+        m_descriptor_indexing_features.shaderInputAttachmentArrayNonUniformIndexing == VK_TRUE ||
+        m_descriptor_indexing_features.shaderUniformTexelBufferArrayNonUniformIndexing == VK_TRUE ||
+        m_descriptor_indexing_features.shaderStorageTexelBufferArrayNonUniformIndexing == VK_TRUE ||
+        m_descriptor_indexing_features.descriptorBindingUniformBufferUpdateAfterBind == VK_TRUE ||
+        m_descriptor_indexing_features.descriptorBindingSampledImageUpdateAfterBind == VK_TRUE ||
+        m_descriptor_indexing_features.descriptorBindingStorageImageUpdateAfterBind == VK_TRUE ||
+        m_descriptor_indexing_features.descriptorBindingStorageBufferUpdateAfterBind == VK_TRUE ||
+        m_descriptor_indexing_features.descriptorBindingUniformTexelBufferUpdateAfterBind == VK_TRUE ||
+        m_descriptor_indexing_features.descriptorBindingStorageTexelBufferUpdateAfterBind == VK_TRUE ||
+        m_descriptor_indexing_features.descriptorBindingUpdateUnusedWhilePending == VK_TRUE ||
+        m_descriptor_indexing_features.descriptorBindingPartiallyBound == VK_TRUE ||
+        m_descriptor_indexing_features.descriptorBindingVariableDescriptorCount == VK_TRUE ||
+        m_descriptor_indexing_features.runtimeDescriptorArray == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_2 || physical_device->extension_supported(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_2) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_descriptor_indexing_features.pNext = chain_head;
+            chain_head = &m_descriptor_indexing_features;
+        }
+        if ((m_timeline_semaphore_features.timelineSemaphore == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_2 || physical_device->extension_supported(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_2) &&
+                           "Feature enabled but neither extension nor promoted version supported");
             m_timeline_semaphore_features.pNext = chain_head;
             chain_head = &m_timeline_semaphore_features;
         }
-        // PhysicalDeviceUniformBufferStandardLayoutFeatures
-        if (m_uniform_buffer_standard_layout_features.uniformBufferStandardLayout == VK_TRUE) {
-            assert((physical_device->extension_supported(VK_KHR_UNIFORM_BUFFER_STANDARD_LAYOUT_EXTENSION_NAME) ||
-                    vk_api_version >= VK_API_VERSION_1_2) &&
-                   "Feature enabled but neither extension nor promoted version supported");
+        if ((m_8_bit_storage_features.storageBuffer8BitAccess == VK_TRUE ||
+        m_8_bit_storage_features.uniformAndStorageBuffer8BitAccess == VK_TRUE ||
+        m_8_bit_storage_features.storagePushConstant8 == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_2 || physical_device->extension_supported(VK_KHR_8BIT_STORAGE_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_KHR_8BIT_STORAGE_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_2) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_8_bit_storage_features.pNext = chain_head;
+            chain_head = &m_8_bit_storage_features;
+        }
+        if ((m_vulkan_memory_model_features.vulkanMemoryModel == VK_TRUE ||
+        m_vulkan_memory_model_features.vulkanMemoryModelDeviceScope == VK_TRUE ||
+        m_vulkan_memory_model_features.vulkanMemoryModelAvailabilityVisibilityChains == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_2 || physical_device->extension_supported(VK_KHR_VULKAN_MEMORY_MODEL_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_KHR_VULKAN_MEMORY_MODEL_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_2) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_vulkan_memory_model_features.pNext = chain_head;
+            chain_head = &m_vulkan_memory_model_features;
+        }
+        if ((m_shader_atomic_int64_features.shaderBufferInt64Atomics == VK_TRUE ||
+        m_shader_atomic_int64_features.shaderSharedInt64Atomics == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_2 || physical_device->extension_supported(VK_KHR_SHADER_ATOMIC_INT64_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_KHR_SHADER_ATOMIC_INT64_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_2) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_shader_atomic_int64_features.pNext = chain_head;
+            chain_head = &m_shader_atomic_int64_features;
+        }
+        if ((m_scalar_block_layout_features.scalarBlockLayout == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_2 || physical_device->extension_supported(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_2) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_scalar_block_layout_features.pNext = chain_head;
+            chain_head = &m_scalar_block_layout_features;
+        }
+        if ((m_uniform_buffer_standard_layout_features.uniformBufferStandardLayout == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_2 || physical_device->extension_supported(VK_KHR_UNIFORM_BUFFER_STANDARD_LAYOUT_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_KHR_UNIFORM_BUFFER_STANDARD_LAYOUT_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_2) &&
+                           "Feature enabled but neither extension nor promoted version supported");
             m_uniform_buffer_standard_layout_features.pNext = chain_head;
             chain_head = &m_uniform_buffer_standard_layout_features;
         }
+        if ((m_buffer_device_address_features.bufferDeviceAddress == VK_TRUE ||
+        m_buffer_device_address_features.bufferDeviceAddressCaptureReplay == VK_TRUE ||
+        m_buffer_device_address_features.bufferDeviceAddressMultiDevice == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_2 || physical_device->extension_supported(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_2) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_buffer_device_address_features.pNext = chain_head;
+            chain_head = &m_buffer_device_address_features;
+        }
+        else if ((m_buffer_device_address_features_ext.bufferDeviceAddress == VK_TRUE ||
+        m_buffer_device_address_features_ext.bufferDeviceAddressCaptureReplay == VK_TRUE ||
+        m_buffer_device_address_features_ext.bufferDeviceAddressMultiDevice == VK_TRUE) &&
+            (physical_device->extension_supported(VK_EXT_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME))) {
+                    assert(physical_device->extension_supported(VK_EXT_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME) &&
+                           "Feature enabled but required extension not supported");
+            m_buffer_device_address_features_ext.pNext = chain_head;
+            chain_head = &m_buffer_device_address_features_ext;
+        }
+        if ((m_imageless_framebuffer_features.imagelessFramebuffer == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_2 || physical_device->extension_supported(VK_KHR_IMAGELESS_FRAMEBUFFER_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_KHR_IMAGELESS_FRAMEBUFFER_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_2) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_imageless_framebuffer_features.pNext = chain_head;
+            chain_head = &m_imageless_framebuffer_features;
+        }
+        if ((m_separate_depth_stencil_layouts_features.separateDepthStencilLayouts == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_2 || physical_device->extension_supported(VK_KHR_SEPARATE_DEPTH_STENCIL_LAYOUTS_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_KHR_SEPARATE_DEPTH_STENCIL_LAYOUTS_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_2) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_separate_depth_stencil_layouts_features.pNext = chain_head;
+            chain_head = &m_separate_depth_stencil_layouts_features;
+        }
     }
 
-    // Non-promoted feature structs (not part of any aggregate)
+    // Group 4: PhysicalDeviceVulkan13Features and 13 related struct(s)
+    if ((m_vulkan13_features.robustImageAccess == VK_TRUE ||
+        m_vulkan13_features.inlineUniformBlock == VK_TRUE ||
+        m_vulkan13_features.descriptorBindingInlineUniformBlockUpdateAfterBind == VK_TRUE ||
+        m_vulkan13_features.pipelineCreationCacheControl == VK_TRUE ||
+        m_vulkan13_features.privateData == VK_TRUE ||
+        m_vulkan13_features.shaderDemoteToHelperInvocation == VK_TRUE ||
+        m_vulkan13_features.shaderTerminateInvocation == VK_TRUE ||
+        m_vulkan13_features.subgroupSizeControl == VK_TRUE ||
+        m_vulkan13_features.computeFullSubgroups == VK_TRUE ||
+        m_vulkan13_features.synchronization2 == VK_TRUE ||
+        m_vulkan13_features.textureCompressionASTC_HDR == VK_TRUE ||
+        m_vulkan13_features.shaderZeroInitializeWorkgroupMemory == VK_TRUE ||
+        m_vulkan13_features.dynamicRendering == VK_TRUE ||
+        m_vulkan13_features.shaderIntegerDotProduct == VK_TRUE ||
+        m_vulkan13_features.maintenance4 == VK_TRUE) &&
+        (vk_api_version >= VK_API_VERSION_1_3)) {
+                assert(vk_api_version >= VK_API_VERSION_1_3 &&
+                       "Feature enabled but required Vulkan version not supported");
+        m_vulkan13_features.pNext = chain_head;
+        chain_head = &m_vulkan13_features;
+    } else {
+        if ((m_private_data_features.privateData == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_3 || physical_device->extension_supported(VK_EXT_PRIVATE_DATA_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_EXT_PRIVATE_DATA_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_3) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_private_data_features.pNext = chain_head;
+            chain_head = &m_private_data_features;
+        }
+        if ((m_inline_uniform_block_features.inlineUniformBlock == VK_TRUE ||
+        m_inline_uniform_block_features.descriptorBindingInlineUniformBlockUpdateAfterBind == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_3 || physical_device->extension_supported(VK_EXT_INLINE_UNIFORM_BLOCK_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_EXT_INLINE_UNIFORM_BLOCK_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_3) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_inline_uniform_block_features.pNext = chain_head;
+            chain_head = &m_inline_uniform_block_features;
+        }
+        if ((m_maintenance4_features.maintenance4 == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_3 || physical_device->extension_supported(VK_KHR_MAINTENANCE_4_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_KHR_MAINTENANCE_4_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_3) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_maintenance4_features.pNext = chain_head;
+            chain_head = &m_maintenance4_features;
+        }
+        if ((m_texture_compression_astchdr_features.textureCompressionASTC_HDR == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_3 || physical_device->extension_supported(VK_EXT_TEXTURE_COMPRESSION_ASTC_HDR_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_EXT_TEXTURE_COMPRESSION_ASTC_HDR_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_3) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_texture_compression_astchdr_features.pNext = chain_head;
+            chain_head = &m_texture_compression_astchdr_features;
+        }
+        if ((m_shader_demote_to_helper_invocation_features.shaderDemoteToHelperInvocation == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_3 || physical_device->extension_supported(VK_EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_3) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_shader_demote_to_helper_invocation_features.pNext = chain_head;
+            chain_head = &m_shader_demote_to_helper_invocation_features;
+        }
+        if ((m_subgroup_size_control_features.subgroupSizeControl == VK_TRUE ||
+        m_subgroup_size_control_features.computeFullSubgroups == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_3 || physical_device->extension_supported(VK_EXT_SUBGROUP_SIZE_CONTROL_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_EXT_SUBGROUP_SIZE_CONTROL_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_3) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_subgroup_size_control_features.pNext = chain_head;
+            chain_head = &m_subgroup_size_control_features;
+        }
+        if ((m_pipeline_creation_cache_control_features.pipelineCreationCacheControl == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_3 || physical_device->extension_supported(VK_EXT_PIPELINE_CREATION_CACHE_CONTROL_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_EXT_PIPELINE_CREATION_CACHE_CONTROL_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_3) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_pipeline_creation_cache_control_features.pNext = chain_head;
+            chain_head = &m_pipeline_creation_cache_control_features;
+        }
+        if ((m_zero_initialize_workgroup_memory_features.shaderZeroInitializeWorkgroupMemory == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_3 || physical_device->extension_supported(VK_KHR_ZERO_INITIALIZE_WORKGROUP_MEMORY_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_KHR_ZERO_INITIALIZE_WORKGROUP_MEMORY_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_3) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_zero_initialize_workgroup_memory_features.pNext = chain_head;
+            chain_head = &m_zero_initialize_workgroup_memory_features;
+        }
+        if ((m_image_robustness_features.robustImageAccess == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_3 || physical_device->extension_supported(VK_EXT_IMAGE_ROBUSTNESS_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_EXT_IMAGE_ROBUSTNESS_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_3) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_image_robustness_features.pNext = chain_head;
+            chain_head = &m_image_robustness_features;
+        }
+        if ((m_shader_terminate_invocation_features.shaderTerminateInvocation == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_3 || physical_device->extension_supported(VK_KHR_SHADER_TERMINATE_INVOCATION_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_KHR_SHADER_TERMINATE_INVOCATION_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_3) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_shader_terminate_invocation_features.pNext = chain_head;
+            chain_head = &m_shader_terminate_invocation_features;
+        }
+        if ((m_synchronization2_features.synchronization2 == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_3 || physical_device->extension_supported(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_3) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_synchronization2_features.pNext = chain_head;
+            chain_head = &m_synchronization2_features;
+        }
+        if ((m_shader_integer_dot_product_features.shaderIntegerDotProduct == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_3 || physical_device->extension_supported(VK_KHR_SHADER_INTEGER_DOT_PRODUCT_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_KHR_SHADER_INTEGER_DOT_PRODUCT_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_3) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_shader_integer_dot_product_features.pNext = chain_head;
+            chain_head = &m_shader_integer_dot_product_features;
+        }
+        if ((m_dynamic_rendering_features.dynamicRendering == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_3 || physical_device->extension_supported(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_3) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_dynamic_rendering_features.pNext = chain_head;
+            chain_head = &m_dynamic_rendering_features;
+        }
+    }
+
+    // Group 5: PhysicalDeviceVulkan14Features and 13 related struct(s)
+    if ((m_vulkan14_features.globalPriorityQuery == VK_TRUE ||
+        m_vulkan14_features.shaderSubgroupRotate == VK_TRUE ||
+        m_vulkan14_features.shaderSubgroupRotateClustered == VK_TRUE ||
+        m_vulkan14_features.shaderFloatControls2 == VK_TRUE ||
+        m_vulkan14_features.shaderExpectAssume == VK_TRUE ||
+        m_vulkan14_features.rectangularLines == VK_TRUE ||
+        m_vulkan14_features.bresenhamLines == VK_TRUE ||
+        m_vulkan14_features.smoothLines == VK_TRUE ||
+        m_vulkan14_features.stippledRectangularLines == VK_TRUE ||
+        m_vulkan14_features.stippledBresenhamLines == VK_TRUE ||
+        m_vulkan14_features.stippledSmoothLines == VK_TRUE ||
+        m_vulkan14_features.vertexAttributeInstanceRateDivisor == VK_TRUE ||
+        m_vulkan14_features.vertexAttributeInstanceRateZeroDivisor == VK_TRUE ||
+        m_vulkan14_features.indexTypeUint8 == VK_TRUE ||
+        m_vulkan14_features.dynamicRenderingLocalRead == VK_TRUE ||
+        m_vulkan14_features.maintenance5 == VK_TRUE ||
+        m_vulkan14_features.maintenance6 == VK_TRUE ||
+        m_vulkan14_features.pipelineProtectedAccess == VK_TRUE ||
+        m_vulkan14_features.pipelineRobustness == VK_TRUE ||
+        m_vulkan14_features.hostImageCopy == VK_TRUE ||
+        m_vulkan14_features.pushDescriptor == VK_TRUE) &&
+        (vk_api_version >= VK_API_VERSION_1_4)) {
+                assert(vk_api_version >= VK_API_VERSION_1_4 &&
+                       "Feature enabled but required Vulkan version not supported");
+        m_vulkan14_features.pNext = chain_head;
+        chain_head = &m_vulkan14_features;
+    } else {
+        if ((m_maintenance5_features.maintenance5 == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_4 || physical_device->extension_supported(VK_KHR_MAINTENANCE_5_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_KHR_MAINTENANCE_5_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_4) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_maintenance5_features.pNext = chain_head;
+            chain_head = &m_maintenance5_features;
+        }
+        if ((m_maintenance6_features.maintenance6 == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_4 || physical_device->extension_supported(VK_KHR_MAINTENANCE_6_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_KHR_MAINTENANCE_6_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_4) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_maintenance6_features.pNext = chain_head;
+            chain_head = &m_maintenance6_features;
+        }
+        if ((m_global_priority_query_features.globalPriorityQuery == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_4 || physical_device->extension_supported(VK_KHR_GLOBAL_PRIORITY_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_KHR_GLOBAL_PRIORITY_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_4) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_global_priority_query_features.pNext = chain_head;
+            chain_head = &m_global_priority_query_features;
+        }
+        if ((m_vertex_attribute_divisor_features.vertexAttributeInstanceRateDivisor == VK_TRUE ||
+        m_vertex_attribute_divisor_features.vertexAttributeInstanceRateZeroDivisor == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_4 || physical_device->extension_supported(VK_KHR_VERTEX_ATTRIBUTE_DIVISOR_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_KHR_VERTEX_ATTRIBUTE_DIVISOR_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_4) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_vertex_attribute_divisor_features.pNext = chain_head;
+            chain_head = &m_vertex_attribute_divisor_features;
+        }
+        if ((m_index_type_uint8_features.indexTypeUint8 == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_4 || physical_device->extension_supported(VK_KHR_INDEX_TYPE_UINT8_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_KHR_INDEX_TYPE_UINT8_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_4) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_index_type_uint8_features.pNext = chain_head;
+            chain_head = &m_index_type_uint8_features;
+        }
+        if ((m_line_rasterization_features.rectangularLines == VK_TRUE ||
+        m_line_rasterization_features.bresenhamLines == VK_TRUE ||
+        m_line_rasterization_features.smoothLines == VK_TRUE ||
+        m_line_rasterization_features.stippledRectangularLines == VK_TRUE ||
+        m_line_rasterization_features.stippledBresenhamLines == VK_TRUE ||
+        m_line_rasterization_features.stippledSmoothLines == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_4 || physical_device->extension_supported(VK_KHR_LINE_RASTERIZATION_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_KHR_LINE_RASTERIZATION_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_4) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_line_rasterization_features.pNext = chain_head;
+            chain_head = &m_line_rasterization_features;
+        }
+        if ((m_host_image_copy_features.hostImageCopy == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_4 || physical_device->extension_supported(VK_EXT_HOST_IMAGE_COPY_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_EXT_HOST_IMAGE_COPY_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_4) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_host_image_copy_features.pNext = chain_head;
+            chain_head = &m_host_image_copy_features;
+        }
+        if ((m_pipeline_protected_access_features.pipelineProtectedAccess == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_4 || physical_device->extension_supported(VK_EXT_PIPELINE_PROTECTED_ACCESS_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_EXT_PIPELINE_PROTECTED_ACCESS_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_4) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_pipeline_protected_access_features.pNext = chain_head;
+            chain_head = &m_pipeline_protected_access_features;
+        }
+        if ((m_pipeline_robustness_features.pipelineRobustness == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_4 || physical_device->extension_supported(VK_EXT_PIPELINE_ROBUSTNESS_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_EXT_PIPELINE_ROBUSTNESS_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_4) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_pipeline_robustness_features.pNext = chain_head;
+            chain_head = &m_pipeline_robustness_features;
+        }
+        if ((m_shader_subgroup_rotate_features.shaderSubgroupRotate == VK_TRUE ||
+        m_shader_subgroup_rotate_features.shaderSubgroupRotateClustered == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_4 || physical_device->extension_supported(VK_KHR_SHADER_SUBGROUP_ROTATE_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_KHR_SHADER_SUBGROUP_ROTATE_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_4) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_shader_subgroup_rotate_features.pNext = chain_head;
+            chain_head = &m_shader_subgroup_rotate_features;
+        }
+        if ((m_shader_expect_assume_features.shaderExpectAssume == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_4 || physical_device->extension_supported(VK_KHR_SHADER_EXPECT_ASSUME_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_KHR_SHADER_EXPECT_ASSUME_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_4) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_shader_expect_assume_features.pNext = chain_head;
+            chain_head = &m_shader_expect_assume_features;
+        }
+        if ((m_shader_float_controls2_features.shaderFloatControls2 == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_4 || physical_device->extension_supported(VK_KHR_SHADER_FLOAT_CONTROLS_2_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_KHR_SHADER_FLOAT_CONTROLS_2_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_4) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_shader_float_controls2_features.pNext = chain_head;
+            chain_head = &m_shader_float_controls2_features;
+        }
+        if ((m_dynamic_rendering_local_read_features.dynamicRenderingLocalRead == VK_TRUE) &&
+            (vk_api_version >= VK_API_VERSION_1_4 || physical_device->extension_supported(VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_EXTENSION_NAME))) {
+                    assert((physical_device->extension_supported(VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_EXTENSION_NAME) ||
+                            vk_api_version >= VK_API_VERSION_1_4) &&
+                           "Feature enabled but neither extension nor promoted version supported");
+            m_dynamic_rendering_local_read_features.pNext = chain_head;
+            chain_head = &m_dynamic_rendering_local_read_features;
+        }
+    }
+
+    // Group 6: PhysicalDeviceDeviceGeneratedCommandsFeaturesEXT and 1 related struct(s)
+    if ((m_device_generated_commands_features_ext.deviceGeneratedCommands == VK_TRUE ||
+        m_device_generated_commands_features_ext.dynamicGeneratedPipelineLayout == VK_TRUE) &&
+        (physical_device->extension_supported(VK_EXT_DEVICE_GENERATED_COMMANDS_EXTENSION_NAME))) {
+                assert(physical_device->extension_supported(VK_EXT_DEVICE_GENERATED_COMMANDS_EXTENSION_NAME) &&
+                       "Feature enabled but required extension not supported");
+        m_device_generated_commands_features_ext.pNext = chain_head;
+        chain_head = &m_device_generated_commands_features_ext;
+    } else {
+        if ((m_device_generated_commands_features_nv.deviceGeneratedCommands == VK_TRUE) &&
+            (physical_device->extension_supported(VK_NV_DEVICE_GENERATED_COMMANDS_EXTENSION_NAME))) {
+                    assert(physical_device->extension_supported(VK_NV_DEVICE_GENERATED_COMMANDS_EXTENSION_NAME) &&
+                           "Feature enabled but required extension not supported");
+            m_device_generated_commands_features_nv.pNext = chain_head;
+            chain_head = &m_device_generated_commands_features_nv;
+        }
+    }
+
+    // Independent features (no aliases or aggregation relationships)
 
     // PhysicalDevice4444FormatsFeaturesEXT
     if (m_4444_formats_features_ext.formatA4R4G4B4 == VK_TRUE ||
         m_4444_formats_features_ext.formatA4B4G4R4 == VK_TRUE) {
-        assert((physical_device->extension_supported(VK_EXT_4444_FORMATS_EXTENSION_NAME) ||
-                vk_api_version >= VK_API_VERSION_1_3) &&
-               "Feature enabled but neither extension nor promoted version supported");
+            assert((physical_device->extension_supported(VK_EXT_4444_FORMATS_EXTENSION_NAME) ||
+                    vk_api_version >= VK_API_VERSION_1_3) &&
+                   "Feature enabled but neither extension nor promoted version supported");
         m_4444_formats_features_ext.pNext = chain_head;
         chain_head = &m_4444_formats_features_ext;
     }
 
     // PhysicalDeviceASTCDecodeFeaturesEXT
     if (m_astc_decode_features_ext.decodeModeSharedExponent == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_ASTC_DECODE_MODE_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_ASTC_DECODE_MODE_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_astc_decode_features_ext.pNext = chain_head;
         chain_head = &m_astc_decode_features_ext;
     }
@@ -9912,56 +10035,56 @@ void* VulkanFeatures::build_chain_for_device_creation(
         m_acceleration_structure_features_khr.accelerationStructureIndirectBuild == VK_TRUE ||
         m_acceleration_structure_features_khr.accelerationStructureHostCommands == VK_TRUE ||
         m_acceleration_structure_features_khr.descriptorBindingAccelerationStructureUpdateAfterBind == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_acceleration_structure_features_khr.pNext = chain_head;
         chain_head = &m_acceleration_structure_features_khr;
     }
 
     // PhysicalDeviceAddressBindingReportFeaturesEXT
     if (m_address_binding_report_features_ext.reportAddressBinding == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_DEVICE_ADDRESS_BINDING_REPORT_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_DEVICE_ADDRESS_BINDING_REPORT_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_address_binding_report_features_ext.pNext = chain_head;
         chain_head = &m_address_binding_report_features_ext;
     }
 
     // PhysicalDeviceAmigoProfilingFeaturesSEC
     if (m_amigo_profiling_features_sec.amigoProfiling == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_SEC_AMIGO_PROFILING_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_SEC_AMIGO_PROFILING_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_amigo_profiling_features_sec.pNext = chain_head;
         chain_head = &m_amigo_profiling_features_sec;
     }
 
     // PhysicalDeviceAntiLagFeaturesAMD
     if (m_anti_lag_features_amd.antiLag == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_AMD_ANTI_LAG_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_AMD_ANTI_LAG_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_anti_lag_features_amd.pNext = chain_head;
         chain_head = &m_anti_lag_features_amd;
     }
 
     // PhysicalDeviceAttachmentFeedbackLoopDynamicStateFeaturesEXT
     if (m_attachment_feedback_loop_dynamic_state_features_ext.attachmentFeedbackLoopDynamicState == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_ATTACHMENT_FEEDBACK_LOOP_DYNAMIC_STATE_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_ATTACHMENT_FEEDBACK_LOOP_DYNAMIC_STATE_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_attachment_feedback_loop_dynamic_state_features_ext.pNext = chain_head;
         chain_head = &m_attachment_feedback_loop_dynamic_state_features_ext;
     }
 
     // PhysicalDeviceAttachmentFeedbackLoopLayoutFeaturesEXT
     if (m_attachment_feedback_loop_layout_features_ext.attachmentFeedbackLoopLayout == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_attachment_feedback_loop_layout_features_ext.pNext = chain_head;
         chain_head = &m_attachment_feedback_loop_layout_features_ext;
     }
 
     // PhysicalDeviceBlendOperationAdvancedFeaturesEXT
     if (m_blend_operation_advanced_features_ext.advancedBlendCoherentOperations == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_BLEND_OPERATION_ADVANCED_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_BLEND_OPERATION_ADVANCED_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_blend_operation_advanced_features_ext.pNext = chain_head;
         chain_head = &m_blend_operation_advanced_features_ext;
     }
@@ -9969,16 +10092,16 @@ void* VulkanFeatures::build_chain_for_device_creation(
     // PhysicalDeviceBorderColorSwizzleFeaturesEXT
     if (m_border_color_swizzle_features_ext.borderColorSwizzle == VK_TRUE ||
         m_border_color_swizzle_features_ext.borderColorSwizzleFromImage == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_BORDER_COLOR_SWIZZLE_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_BORDER_COLOR_SWIZZLE_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_border_color_swizzle_features_ext.pNext = chain_head;
         chain_head = &m_border_color_swizzle_features_ext;
     }
 
     // PhysicalDeviceClusterAccelerationStructureFeaturesNV
     if (m_cluster_acceleration_structure_features_nv.clusterAccelerationStructure == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_NV_CLUSTER_ACCELERATION_STRUCTURE_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_NV_CLUSTER_ACCELERATION_STRUCTURE_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_cluster_acceleration_structure_features_nv.pNext = chain_head;
         chain_head = &m_cluster_acceleration_structure_features_nv;
     }
@@ -9986,40 +10109,40 @@ void* VulkanFeatures::build_chain_for_device_creation(
     // PhysicalDeviceClusterCullingShaderFeaturesHUAWEI
     if (m_cluster_culling_shader_features_huawei.clustercullingShader == VK_TRUE ||
         m_cluster_culling_shader_features_huawei.multiviewClusterCullingShader == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_HUAWEI_CLUSTER_CULLING_SHADER_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_HUAWEI_CLUSTER_CULLING_SHADER_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_cluster_culling_shader_features_huawei.pNext = chain_head;
         chain_head = &m_cluster_culling_shader_features_huawei;
     }
 
     // PhysicalDeviceCoherentMemoryFeaturesAMD
     if (m_coherent_memory_features_amd.deviceCoherentMemory == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_AMD_DEVICE_COHERENT_MEMORY_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_AMD_DEVICE_COHERENT_MEMORY_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_coherent_memory_features_amd.pNext = chain_head;
         chain_head = &m_coherent_memory_features_amd;
     }
 
     // PhysicalDeviceColorWriteEnableFeaturesEXT
     if (m_color_write_enable_features_ext.colorWriteEnable == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_COLOR_WRITE_ENABLE_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_COLOR_WRITE_ENABLE_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_color_write_enable_features_ext.pNext = chain_head;
         chain_head = &m_color_write_enable_features_ext;
     }
 
     // PhysicalDeviceCommandBufferInheritanceFeaturesNV
     if (m_command_buffer_inheritance_features_nv.commandBufferInheritance == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_NV_COMMAND_BUFFER_INHERITANCE_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_NV_COMMAND_BUFFER_INHERITANCE_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_command_buffer_inheritance_features_nv.pNext = chain_head;
         chain_head = &m_command_buffer_inheritance_features_nv;
     }
 
     // PhysicalDeviceComputeOccupancyPriorityFeaturesNV
     if (m_compute_occupancy_priority_features_nv.computeOccupancyPriority == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_NV_COMPUTE_OCCUPANCY_PRIORITY_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_NV_COMPUTE_OCCUPANCY_PRIORITY_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_compute_occupancy_priority_features_nv.pNext = chain_head;
         chain_head = &m_compute_occupancy_priority_features_nv;
     }
@@ -10027,8 +10150,8 @@ void* VulkanFeatures::build_chain_for_device_creation(
     // PhysicalDeviceComputeShaderDerivativesFeaturesKHR
     if (m_compute_shader_derivatives_features_khr.computeDerivativeGroupQuads == VK_TRUE ||
         m_compute_shader_derivatives_features_khr.computeDerivativeGroupLinear == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_compute_shader_derivatives_features_khr.pNext = chain_head;
         chain_head = &m_compute_shader_derivatives_features_khr;
     }
@@ -10036,8 +10159,8 @@ void* VulkanFeatures::build_chain_for_device_creation(
     // PhysicalDeviceConditionalRenderingFeaturesEXT
     if (m_conditional_rendering_features_ext.conditionalRendering == VK_TRUE ||
         m_conditional_rendering_features_ext.inheritedConditionalRendering == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_CONDITIONAL_RENDERING_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_CONDITIONAL_RENDERING_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_conditional_rendering_features_ext.pNext = chain_head;
         chain_head = &m_conditional_rendering_features_ext;
     }
@@ -10050,16 +10173,16 @@ void* VulkanFeatures::build_chain_for_device_creation(
         m_cooperative_matrix2_features_nv.cooperativeMatrixPerElementOperations == VK_TRUE ||
         m_cooperative_matrix2_features_nv.cooperativeMatrixTensorAddressing == VK_TRUE ||
         m_cooperative_matrix2_features_nv.cooperativeMatrixBlockLoads == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_NV_COOPERATIVE_MATRIX_2_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_NV_COOPERATIVE_MATRIX_2_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_cooperative_matrix2_features_nv.pNext = chain_head;
         chain_head = &m_cooperative_matrix2_features_nv;
     }
 
     // PhysicalDeviceCooperativeMatrixConversionFeaturesQCOM
     if (m_cooperative_matrix_conversion_features_qcom.cooperativeMatrixConversion == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_QCOM_COOPERATIVE_MATRIX_CONVERSION_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_QCOM_COOPERATIVE_MATRIX_CONVERSION_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_cooperative_matrix_conversion_features_qcom.pNext = chain_head;
         chain_head = &m_cooperative_matrix_conversion_features_qcom;
     }
@@ -10067,8 +10190,8 @@ void* VulkanFeatures::build_chain_for_device_creation(
     // PhysicalDeviceCooperativeMatrixFeaturesKHR
     if (m_cooperative_matrix_features_khr.cooperativeMatrix == VK_TRUE ||
         m_cooperative_matrix_features_khr.cooperativeMatrixRobustBufferAccess == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_cooperative_matrix_features_khr.pNext = chain_head;
         chain_head = &m_cooperative_matrix_features_khr;
     }
@@ -10076,8 +10199,8 @@ void* VulkanFeatures::build_chain_for_device_creation(
     // PhysicalDeviceCooperativeMatrixFeaturesNV
     if (m_cooperative_matrix_features_nv.cooperativeMatrix == VK_TRUE ||
         m_cooperative_matrix_features_nv.cooperativeMatrixRobustBufferAccess == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_NV_COOPERATIVE_MATRIX_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_NV_COOPERATIVE_MATRIX_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_cooperative_matrix_features_nv.pNext = chain_head;
         chain_head = &m_cooperative_matrix_features_nv;
     }
@@ -10085,8 +10208,8 @@ void* VulkanFeatures::build_chain_for_device_creation(
     // PhysicalDeviceCooperativeVectorFeaturesNV
     if (m_cooperative_vector_features_nv.cooperativeVector == VK_TRUE ||
         m_cooperative_vector_features_nv.cooperativeVectorTraining == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_NV_COOPERATIVE_VECTOR_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_NV_COOPERATIVE_VECTOR_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_cooperative_vector_features_nv.pNext = chain_head;
         chain_head = &m_cooperative_vector_features_nv;
     }
@@ -10094,48 +10217,48 @@ void* VulkanFeatures::build_chain_for_device_creation(
     // PhysicalDeviceCopyMemoryIndirectFeaturesKHR
     if (m_copy_memory_indirect_features_khr.indirectMemoryCopy == VK_TRUE ||
         m_copy_memory_indirect_features_khr.indirectMemoryToImageCopy == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_COPY_MEMORY_INDIRECT_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_COPY_MEMORY_INDIRECT_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_copy_memory_indirect_features_khr.pNext = chain_head;
         chain_head = &m_copy_memory_indirect_features_khr;
     }
 
     // PhysicalDeviceCopyMemoryIndirectFeaturesNV
     if (m_copy_memory_indirect_features_nv.indirectCopy == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_NV_COPY_MEMORY_INDIRECT_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_NV_COPY_MEMORY_INDIRECT_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_copy_memory_indirect_features_nv.pNext = chain_head;
         chain_head = &m_copy_memory_indirect_features_nv;
     }
 
     // PhysicalDeviceCornerSampledImageFeaturesNV
     if (m_corner_sampled_image_features_nv.cornerSampledImage == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_NV_CORNER_SAMPLED_IMAGE_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_NV_CORNER_SAMPLED_IMAGE_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_corner_sampled_image_features_nv.pNext = chain_head;
         chain_head = &m_corner_sampled_image_features_nv;
     }
 
     // PhysicalDeviceCoverageReductionModeFeaturesNV
     if (m_coverage_reduction_mode_features_nv.coverageReductionMode == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_NV_COVERAGE_REDUCTION_MODE_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_NV_COVERAGE_REDUCTION_MODE_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_coverage_reduction_mode_features_nv.pNext = chain_head;
         chain_head = &m_coverage_reduction_mode_features_nv;
     }
 
     // PhysicalDeviceCubicClampFeaturesQCOM
     if (m_cubic_clamp_features_qcom.cubicRangeClamp == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_QCOM_FILTER_CUBIC_CLAMP_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_QCOM_FILTER_CUBIC_CLAMP_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_cubic_clamp_features_qcom.pNext = chain_head;
         chain_head = &m_cubic_clamp_features_qcom;
     }
 
     // PhysicalDeviceCubicWeightsFeaturesQCOM
     if (m_cubic_weights_features_qcom.selectableCubicWeights == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_QCOM_FILTER_CUBIC_WEIGHTS_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_QCOM_FILTER_CUBIC_WEIGHTS_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_cubic_weights_features_qcom.pNext = chain_head;
         chain_head = &m_cubic_weights_features_qcom;
     }
@@ -10143,16 +10266,16 @@ void* VulkanFeatures::build_chain_for_device_creation(
     // PhysicalDeviceCustomBorderColorFeaturesEXT
     if (m_custom_border_color_features_ext.customBorderColors == VK_TRUE ||
         m_custom_border_color_features_ext.customBorderColorWithoutFormat == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_CUSTOM_BORDER_COLOR_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_CUSTOM_BORDER_COLOR_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_custom_border_color_features_ext.pNext = chain_head;
         chain_head = &m_custom_border_color_features_ext;
     }
 
     // PhysicalDeviceCustomResolveFeaturesEXT
     if (m_custom_resolve_features_ext.customResolve == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_CUSTOM_RESOLVE_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_CUSTOM_RESOLVE_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_custom_resolve_features_ext.pNext = chain_head;
         chain_head = &m_custom_resolve_features_ext;
     }
@@ -10163,24 +10286,24 @@ void* VulkanFeatures::build_chain_for_device_creation(
         m_data_graph_features_arm.dataGraphSpecializationConstants == VK_TRUE ||
         m_data_graph_features_arm.dataGraphDescriptorBuffer == VK_TRUE ||
         m_data_graph_features_arm.dataGraphShaderModule == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_ARM_DATA_GRAPH_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_ARM_DATA_GRAPH_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_data_graph_features_arm.pNext = chain_head;
         chain_head = &m_data_graph_features_arm;
     }
 
     // PhysicalDeviceDataGraphModelFeaturesQCOM
     if (m_data_graph_model_features_qcom.dataGraphModel == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_QCOM_DATA_GRAPH_MODEL_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_QCOM_DATA_GRAPH_MODEL_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_data_graph_model_features_qcom.pNext = chain_head;
         chain_head = &m_data_graph_model_features_qcom;
     }
 
     // PhysicalDeviceDedicatedAllocationImageAliasingFeaturesNV
     if (m_dedicated_allocation_image_aliasing_features_nv.dedicatedAllocationImageAliasing == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_NV_DEDICATED_ALLOCATION_IMAGE_ALIASING_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_NV_DEDICATED_ALLOCATION_IMAGE_ALIASING_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_dedicated_allocation_image_aliasing_features_nv.pNext = chain_head;
         chain_head = &m_dedicated_allocation_image_aliasing_features_nv;
     }
@@ -10190,40 +10313,40 @@ void* VulkanFeatures::build_chain_for_device_creation(
         m_depth_bias_control_features_ext.leastRepresentableValueForceUnormRepresentation == VK_TRUE ||
         m_depth_bias_control_features_ext.floatRepresentation == VK_TRUE ||
         m_depth_bias_control_features_ext.depthBiasExact == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_DEPTH_BIAS_CONTROL_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_DEPTH_BIAS_CONTROL_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_depth_bias_control_features_ext.pNext = chain_head;
         chain_head = &m_depth_bias_control_features_ext;
     }
 
     // PhysicalDeviceDepthClampControlFeaturesEXT
     if (m_depth_clamp_control_features_ext.depthClampControl == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_DEPTH_CLAMP_CONTROL_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_DEPTH_CLAMP_CONTROL_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_depth_clamp_control_features_ext.pNext = chain_head;
         chain_head = &m_depth_clamp_control_features_ext;
     }
 
     // PhysicalDeviceDepthClampZeroOneFeaturesKHR
     if (m_depth_clamp_zero_one_features_khr.depthClampZeroOne == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_DEPTH_CLAMP_ZERO_ONE_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_DEPTH_CLAMP_ZERO_ONE_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_depth_clamp_zero_one_features_khr.pNext = chain_head;
         chain_head = &m_depth_clamp_zero_one_features_khr;
     }
 
     // PhysicalDeviceDepthClipControlFeaturesEXT
     if (m_depth_clip_control_features_ext.depthClipControl == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_DEPTH_CLIP_CONTROL_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_DEPTH_CLIP_CONTROL_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_depth_clip_control_features_ext.pNext = chain_head;
         chain_head = &m_depth_clip_control_features_ext;
     }
 
     // PhysicalDeviceDepthClipEnableFeaturesEXT
     if (m_depth_clip_enable_features_ext.depthClipEnable == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_DEPTH_CLIP_ENABLE_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_DEPTH_CLIP_ENABLE_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_depth_clip_enable_features_ext.pNext = chain_head;
         chain_head = &m_depth_clip_enable_features_ext;
     }
@@ -10233,16 +10356,16 @@ void* VulkanFeatures::build_chain_for_device_creation(
         m_descriptor_buffer_features_ext.descriptorBufferCaptureReplay == VK_TRUE ||
         m_descriptor_buffer_features_ext.descriptorBufferImageLayoutIgnored == VK_TRUE ||
         m_descriptor_buffer_features_ext.descriptorBufferPushDescriptors == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_descriptor_buffer_features_ext.pNext = chain_head;
         chain_head = &m_descriptor_buffer_features_ext;
     }
 
     // PhysicalDeviceDescriptorBufferTensorFeaturesARM
     if (m_descriptor_buffer_tensor_features_arm.descriptorBufferTensorDescriptors == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_ARM_TENSORS_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_ARM_TENSORS_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_descriptor_buffer_tensor_features_arm.pNext = chain_head;
         chain_head = &m_descriptor_buffer_tensor_features_arm;
     }
@@ -10250,24 +10373,24 @@ void* VulkanFeatures::build_chain_for_device_creation(
     // PhysicalDeviceDescriptorHeapFeaturesEXT
     if (m_descriptor_heap_features_ext.descriptorHeap == VK_TRUE ||
         m_descriptor_heap_features_ext.descriptorHeapCaptureReplay == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_descriptor_heap_features_ext.pNext = chain_head;
         chain_head = &m_descriptor_heap_features_ext;
     }
 
     // PhysicalDeviceDescriptorPoolOverallocationFeaturesNV
     if (m_descriptor_pool_overallocation_features_nv.descriptorPoolOverallocation == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_NV_DESCRIPTOR_POOL_OVERALLOCATION_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_NV_DESCRIPTOR_POOL_OVERALLOCATION_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_descriptor_pool_overallocation_features_nv.pNext = chain_head;
         chain_head = &m_descriptor_pool_overallocation_features_nv;
     }
 
     // PhysicalDeviceDescriptorSetHostMappingFeaturesVALVE
     if (m_descriptor_set_host_mapping_features_valve.descriptorSetHostMapping == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_VALVE_DESCRIPTOR_SET_HOST_MAPPING_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_VALVE_DESCRIPTOR_SET_HOST_MAPPING_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_descriptor_set_host_mapping_features_valve.pNext = chain_head;
         chain_head = &m_descriptor_set_host_mapping_features_valve;
     }
@@ -10276,57 +10399,40 @@ void* VulkanFeatures::build_chain_for_device_creation(
     if (m_device_generated_commands_compute_features_nv.deviceGeneratedCompute == VK_TRUE ||
         m_device_generated_commands_compute_features_nv.deviceGeneratedComputePipelines == VK_TRUE ||
         m_device_generated_commands_compute_features_nv.deviceGeneratedComputeCaptureReplay == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_NV_DEVICE_GENERATED_COMMANDS_COMPUTE_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_NV_DEVICE_GENERATED_COMMANDS_COMPUTE_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_device_generated_commands_compute_features_nv.pNext = chain_head;
         chain_head = &m_device_generated_commands_compute_features_nv;
     }
 
-    // PhysicalDeviceDeviceGeneratedCommandsFeaturesEXT
-    if (m_device_generated_commands_features_ext.deviceGeneratedCommands == VK_TRUE ||
-        m_device_generated_commands_features_ext.dynamicGeneratedPipelineLayout == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_DEVICE_GENERATED_COMMANDS_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
-        m_device_generated_commands_features_ext.pNext = chain_head;
-        chain_head = &m_device_generated_commands_features_ext;
-    }
-
-    // PhysicalDeviceDeviceGeneratedCommandsFeaturesNV
-    if (m_device_generated_commands_features_nv.deviceGeneratedCommands == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_NV_DEVICE_GENERATED_COMMANDS_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
-        m_device_generated_commands_features_nv.pNext = chain_head;
-        chain_head = &m_device_generated_commands_features_nv;
-    }
-
     // PhysicalDeviceDeviceMemoryReportFeaturesEXT
     if (m_device_memory_report_features_ext.deviceMemoryReport == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_DEVICE_MEMORY_REPORT_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_DEVICE_MEMORY_REPORT_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_device_memory_report_features_ext.pNext = chain_head;
         chain_head = &m_device_memory_report_features_ext;
     }
 
     // PhysicalDeviceDiagnosticsConfigFeaturesNV
     if (m_diagnostics_config_features_nv.diagnosticsConfig == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_NV_DEVICE_DIAGNOSTICS_CONFIG_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_NV_DEVICE_DIAGNOSTICS_CONFIG_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_diagnostics_config_features_nv.pNext = chain_head;
         chain_head = &m_diagnostics_config_features_nv;
     }
 
     // PhysicalDeviceDynamicRenderingUnusedAttachmentsFeaturesEXT
     if (m_dynamic_rendering_unused_attachments_features_ext.dynamicRenderingUnusedAttachments == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_dynamic_rendering_unused_attachments_features_ext.pNext = chain_head;
         chain_head = &m_dynamic_rendering_unused_attachments_features_ext;
     }
 
     // PhysicalDeviceExclusiveScissorFeaturesNV
     if (m_exclusive_scissor_features_nv.exclusiveScissor == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_NV_SCISSOR_EXCLUSIVE_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_NV_SCISSOR_EXCLUSIVE_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_exclusive_scissor_features_nv.pNext = chain_head;
         chain_head = &m_exclusive_scissor_features_nv;
     }
@@ -10335,9 +10441,9 @@ void* VulkanFeatures::build_chain_for_device_creation(
     if (m_extended_dynamic_state2_features_ext.extendedDynamicState2 == VK_TRUE ||
         m_extended_dynamic_state2_features_ext.extendedDynamicState2LogicOp == VK_TRUE ||
         m_extended_dynamic_state2_features_ext.extendedDynamicState2PatchControlPoints == VK_TRUE) {
-        assert((physical_device->extension_supported(VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME) ||
-                vk_api_version >= VK_API_VERSION_1_3) &&
-               "Feature enabled but neither extension nor promoted version supported");
+            assert((physical_device->extension_supported(VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME) ||
+                    vk_api_version >= VK_API_VERSION_1_3) &&
+                   "Feature enabled but neither extension nor promoted version supported");
         m_extended_dynamic_state2_features_ext.pNext = chain_head;
         chain_head = &m_extended_dynamic_state2_features_ext;
     }
@@ -10374,33 +10480,33 @@ void* VulkanFeatures::build_chain_for_device_creation(
         m_extended_dynamic_state3_features_ext.extendedDynamicState3CoverageReductionMode == VK_TRUE ||
         m_extended_dynamic_state3_features_ext.extendedDynamicState3RepresentativeFragmentTestEnable == VK_TRUE ||
         m_extended_dynamic_state3_features_ext.extendedDynamicState3ShadingRateImageEnable == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_extended_dynamic_state3_features_ext.pNext = chain_head;
         chain_head = &m_extended_dynamic_state3_features_ext;
     }
 
     // PhysicalDeviceExtendedDynamicStateFeaturesEXT
     if (m_extended_dynamic_state_features_ext.extendedDynamicState == VK_TRUE) {
-        assert((physical_device->extension_supported(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME) ||
-                vk_api_version >= VK_API_VERSION_1_3) &&
-               "Feature enabled but neither extension nor promoted version supported");
+            assert((physical_device->extension_supported(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME) ||
+                    vk_api_version >= VK_API_VERSION_1_3) &&
+                   "Feature enabled but neither extension nor promoted version supported");
         m_extended_dynamic_state_features_ext.pNext = chain_head;
         chain_head = &m_extended_dynamic_state_features_ext;
     }
 
     // PhysicalDeviceExtendedSparseAddressSpaceFeaturesNV
     if (m_extended_sparse_address_space_features_nv.extendedSparseAddressSpace == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_NV_EXTENDED_SPARSE_ADDRESS_SPACE_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_NV_EXTENDED_SPARSE_ADDRESS_SPACE_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_extended_sparse_address_space_features_nv.pNext = chain_head;
         chain_head = &m_extended_sparse_address_space_features_nv;
     }
 
     // PhysicalDeviceExternalMemoryRDMAFeaturesNV
     if (m_external_memory_rdma_features_nv.externalMemoryRDMA == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_NV_EXTERNAL_MEMORY_RDMA_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_NV_EXTERNAL_MEMORY_RDMA_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_external_memory_rdma_features_nv.pNext = chain_head;
         chain_head = &m_external_memory_rdma_features_nv;
     }
@@ -10408,24 +10514,24 @@ void* VulkanFeatures::build_chain_for_device_creation(
     // PhysicalDeviceFaultFeaturesEXT
     if (m_fault_features_ext.deviceFault == VK_TRUE ||
         m_fault_features_ext.deviceFaultVendorBinary == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_DEVICE_FAULT_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_DEVICE_FAULT_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_fault_features_ext.pNext = chain_head;
         chain_head = &m_fault_features_ext;
     }
 
     // PhysicalDeviceFormatPackFeaturesARM
     if (m_format_pack_features_arm.formatPack == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_ARM_FORMAT_PACK_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_ARM_FORMAT_PACK_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_format_pack_features_arm.pNext = chain_head;
         chain_head = &m_format_pack_features_arm;
     }
 
     // PhysicalDeviceFragmentDensityMap2FeaturesEXT
     if (m_fragment_density_map2_features_ext.fragmentDensityMapDeferred == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_FRAGMENT_DENSITY_MAP_2_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_FRAGMENT_DENSITY_MAP_2_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_fragment_density_map2_features_ext.pNext = chain_head;
         chain_head = &m_fragment_density_map2_features_ext;
     }
@@ -10434,32 +10540,32 @@ void* VulkanFeatures::build_chain_for_device_creation(
     if (m_fragment_density_map_features_ext.fragmentDensityMap == VK_TRUE ||
         m_fragment_density_map_features_ext.fragmentDensityMapDynamic == VK_TRUE ||
         m_fragment_density_map_features_ext.fragmentDensityMapNonSubsampledImages == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_FRAGMENT_DENSITY_MAP_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_FRAGMENT_DENSITY_MAP_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_fragment_density_map_features_ext.pNext = chain_head;
         chain_head = &m_fragment_density_map_features_ext;
     }
 
     // PhysicalDeviceFragmentDensityMapLayeredFeaturesVALVE
     if (m_fragment_density_map_layered_features_valve.fragmentDensityMapLayered == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_VALVE_FRAGMENT_DENSITY_MAP_LAYERED_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_VALVE_FRAGMENT_DENSITY_MAP_LAYERED_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_fragment_density_map_layered_features_valve.pNext = chain_head;
         chain_head = &m_fragment_density_map_layered_features_valve;
     }
 
     // PhysicalDeviceFragmentDensityMapOffsetFeaturesEXT
     if (m_fragment_density_map_offset_features_ext.fragmentDensityMapOffset == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_FRAGMENT_DENSITY_MAP_OFFSET_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_FRAGMENT_DENSITY_MAP_OFFSET_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_fragment_density_map_offset_features_ext.pNext = chain_head;
         chain_head = &m_fragment_density_map_offset_features_ext;
     }
 
     // PhysicalDeviceFragmentShaderBarycentricFeaturesKHR
     if (m_fragment_shader_barycentric_features_khr.fragmentShaderBarycentric == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_fragment_shader_barycentric_features_khr.pNext = chain_head;
         chain_head = &m_fragment_shader_barycentric_features_khr;
     }
@@ -10468,8 +10574,8 @@ void* VulkanFeatures::build_chain_for_device_creation(
     if (m_fragment_shader_interlock_features_ext.fragmentShaderSampleInterlock == VK_TRUE ||
         m_fragment_shader_interlock_features_ext.fragmentShaderPixelInterlock == VK_TRUE ||
         m_fragment_shader_interlock_features_ext.fragmentShaderShadingRateInterlock == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_FRAGMENT_SHADER_INTERLOCK_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_FRAGMENT_SHADER_INTERLOCK_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_fragment_shader_interlock_features_ext.pNext = chain_head;
         chain_head = &m_fragment_shader_interlock_features_ext;
     }
@@ -10478,8 +10584,8 @@ void* VulkanFeatures::build_chain_for_device_creation(
     if (m_fragment_shading_rate_enums_features_nv.fragmentShadingRateEnums == VK_TRUE ||
         m_fragment_shading_rate_enums_features_nv.supersampleFragmentShadingRates == VK_TRUE ||
         m_fragment_shading_rate_enums_features_nv.noInvocationFragmentShadingRates == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_NV_FRAGMENT_SHADING_RATE_ENUMS_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_NV_FRAGMENT_SHADING_RATE_ENUMS_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_fragment_shading_rate_enums_features_nv.pNext = chain_head;
         chain_head = &m_fragment_shading_rate_enums_features_nv;
     }
@@ -10488,32 +10594,32 @@ void* VulkanFeatures::build_chain_for_device_creation(
     if (m_fragment_shading_rate_features_khr.pipelineFragmentShadingRate == VK_TRUE ||
         m_fragment_shading_rate_features_khr.primitiveFragmentShadingRate == VK_TRUE ||
         m_fragment_shading_rate_features_khr.attachmentFragmentShadingRate == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_fragment_shading_rate_features_khr.pNext = chain_head;
         chain_head = &m_fragment_shading_rate_features_khr;
     }
 
     // PhysicalDeviceFrameBoundaryFeaturesEXT
     if (m_frame_boundary_features_ext.frameBoundary == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_FRAME_BOUNDARY_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_FRAME_BOUNDARY_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_frame_boundary_features_ext.pNext = chain_head;
         chain_head = &m_frame_boundary_features_ext;
     }
 
     // PhysicalDeviceGraphicsPipelineLibraryFeaturesEXT
     if (m_graphics_pipeline_library_features_ext.graphicsPipelineLibrary == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_graphics_pipeline_library_features_ext.pNext = chain_head;
         chain_head = &m_graphics_pipeline_library_features_ext;
     }
 
     // PhysicalDeviceHdrVividFeaturesHUAWEI
     if (m_hdr_vivid_features_huawei.hdrVivid == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_HUAWEI_HDR_VIVID_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_HUAWEI_HDR_VIVID_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_hdr_vivid_features_huawei.pNext = chain_head;
         chain_head = &m_hdr_vivid_features_huawei;
     }
@@ -10521,40 +10627,40 @@ void* VulkanFeatures::build_chain_for_device_creation(
     // PhysicalDeviceImage2DViewOf3DFeaturesEXT
     if (m_image2_d_view_of3_d_features_ext.image2DViewOf3D == VK_TRUE ||
         m_image2_d_view_of3_d_features_ext.sampler2DViewOf3D == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_IMAGE_2D_VIEW_OF_3D_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_IMAGE_2D_VIEW_OF_3D_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_image2_d_view_of3_d_features_ext.pNext = chain_head;
         chain_head = &m_image2_d_view_of3_d_features_ext;
     }
 
     // PhysicalDeviceImageAlignmentControlFeaturesMESA
     if (m_image_alignment_control_features_mesa.imageAlignmentControl == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_MESA_IMAGE_ALIGNMENT_CONTROL_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_MESA_IMAGE_ALIGNMENT_CONTROL_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_image_alignment_control_features_mesa.pNext = chain_head;
         chain_head = &m_image_alignment_control_features_mesa;
     }
 
     // PhysicalDeviceImageCompressionControlFeaturesEXT
     if (m_image_compression_control_features_ext.imageCompressionControl == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_IMAGE_COMPRESSION_CONTROL_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_IMAGE_COMPRESSION_CONTROL_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_image_compression_control_features_ext.pNext = chain_head;
         chain_head = &m_image_compression_control_features_ext;
     }
 
     // PhysicalDeviceImageCompressionControlSwapchainFeaturesEXT
     if (m_image_compression_control_swapchain_features_ext.imageCompressionControlSwapchain == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_IMAGE_COMPRESSION_CONTROL_SWAPCHAIN_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_IMAGE_COMPRESSION_CONTROL_SWAPCHAIN_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_image_compression_control_swapchain_features_ext.pNext = chain_head;
         chain_head = &m_image_compression_control_swapchain_features_ext;
     }
 
     // PhysicalDeviceImageProcessing2FeaturesQCOM
     if (m_image_processing2_features_qcom.textureBlockMatch2 == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_QCOM_IMAGE_PROCESSING_2_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_QCOM_IMAGE_PROCESSING_2_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_image_processing2_features_qcom.pNext = chain_head;
         chain_head = &m_image_processing2_features_qcom;
     }
@@ -10563,104 +10669,104 @@ void* VulkanFeatures::build_chain_for_device_creation(
     if (m_image_processing_features_qcom.textureSampleWeighted == VK_TRUE ||
         m_image_processing_features_qcom.textureBoxFilter == VK_TRUE ||
         m_image_processing_features_qcom.textureBlockMatch == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_QCOM_IMAGE_PROCESSING_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_QCOM_IMAGE_PROCESSING_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_image_processing_features_qcom.pNext = chain_head;
         chain_head = &m_image_processing_features_qcom;
     }
 
     // PhysicalDeviceImageSlicedViewOf3DFeaturesEXT
     if (m_image_sliced_view_of3_d_features_ext.imageSlicedViewOf3D == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_IMAGE_SLICED_VIEW_OF_3D_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_IMAGE_SLICED_VIEW_OF_3D_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_image_sliced_view_of3_d_features_ext.pNext = chain_head;
         chain_head = &m_image_sliced_view_of3_d_features_ext;
     }
 
     // PhysicalDeviceImageViewMinLodFeaturesEXT
     if (m_image_view_min_lod_features_ext.minLod == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_IMAGE_VIEW_MIN_LOD_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_IMAGE_VIEW_MIN_LOD_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_image_view_min_lod_features_ext.pNext = chain_head;
         chain_head = &m_image_view_min_lod_features_ext;
     }
 
     // PhysicalDeviceInheritedViewportScissorFeaturesNV
     if (m_inherited_viewport_scissor_features_nv.inheritedViewportScissor2D == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_NV_INHERITED_VIEWPORT_SCISSOR_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_NV_INHERITED_VIEWPORT_SCISSOR_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_inherited_viewport_scissor_features_nv.pNext = chain_head;
         chain_head = &m_inherited_viewport_scissor_features_nv;
     }
 
     // PhysicalDeviceInternallySynchronizedQueuesFeaturesKHR
     if (m_internally_synchronized_queues_features_khr.internallySynchronizedQueues == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_INTERNALLY_SYNCHRONIZED_QUEUES_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_INTERNALLY_SYNCHRONIZED_QUEUES_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_internally_synchronized_queues_features_khr.pNext = chain_head;
         chain_head = &m_internally_synchronized_queues_features_khr;
     }
 
     // PhysicalDeviceInvocationMaskFeaturesHUAWEI
     if (m_invocation_mask_features_huawei.invocationMask == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_HUAWEI_INVOCATION_MASK_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_HUAWEI_INVOCATION_MASK_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_invocation_mask_features_huawei.pNext = chain_head;
         chain_head = &m_invocation_mask_features_huawei;
     }
 
     // PhysicalDeviceLegacyDitheringFeaturesEXT
     if (m_legacy_dithering_features_ext.legacyDithering == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_LEGACY_DITHERING_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_LEGACY_DITHERING_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_legacy_dithering_features_ext.pNext = chain_head;
         chain_head = &m_legacy_dithering_features_ext;
     }
 
     // PhysicalDeviceLegacyVertexAttributesFeaturesEXT
     if (m_legacy_vertex_attributes_features_ext.legacyVertexAttributes == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_LEGACY_VERTEX_ATTRIBUTES_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_LEGACY_VERTEX_ATTRIBUTES_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_legacy_vertex_attributes_features_ext.pNext = chain_head;
         chain_head = &m_legacy_vertex_attributes_features_ext;
     }
 
     // PhysicalDeviceLinearColorAttachmentFeaturesNV
     if (m_linear_color_attachment_features_nv.linearColorAttachment == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_NV_LINEAR_COLOR_ATTACHMENT_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_NV_LINEAR_COLOR_ATTACHMENT_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_linear_color_attachment_features_nv.pNext = chain_head;
         chain_head = &m_linear_color_attachment_features_nv;
     }
 
     // PhysicalDeviceMaintenance10FeaturesKHR
     if (m_maintenance10_features_khr.maintenance10 == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_MAINTENANCE_10_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_MAINTENANCE_10_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_maintenance10_features_khr.pNext = chain_head;
         chain_head = &m_maintenance10_features_khr;
     }
 
     // PhysicalDeviceMaintenance7FeaturesKHR
     if (m_maintenance7_features_khr.maintenance7 == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_MAINTENANCE_7_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_MAINTENANCE_7_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_maintenance7_features_khr.pNext = chain_head;
         chain_head = &m_maintenance7_features_khr;
     }
 
     // PhysicalDeviceMaintenance8FeaturesKHR
     if (m_maintenance8_features_khr.maintenance8 == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_MAINTENANCE_8_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_MAINTENANCE_8_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_maintenance8_features_khr.pNext = chain_head;
         chain_head = &m_maintenance8_features_khr;
     }
 
     // PhysicalDeviceMaintenance9FeaturesKHR
     if (m_maintenance9_features_khr.maintenance9 == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_MAINTENANCE_9_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_MAINTENANCE_9_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_maintenance9_features_khr.pNext = chain_head;
         chain_head = &m_maintenance9_features_khr;
     }
@@ -10669,85 +10775,64 @@ void* VulkanFeatures::build_chain_for_device_creation(
     if (m_map_memory_placed_features_ext.memoryMapPlaced == VK_TRUE ||
         m_map_memory_placed_features_ext.memoryMapRangePlaced == VK_TRUE ||
         m_map_memory_placed_features_ext.memoryUnmapReserve == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_MAP_MEMORY_PLACED_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_MAP_MEMORY_PLACED_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_map_memory_placed_features_ext.pNext = chain_head;
         chain_head = &m_map_memory_placed_features_ext;
     }
 
     // PhysicalDeviceMemoryDecompressionFeaturesEXT
     if (m_memory_decompression_features_ext.memoryDecompression == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_MEMORY_DECOMPRESSION_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_MEMORY_DECOMPRESSION_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_memory_decompression_features_ext.pNext = chain_head;
         chain_head = &m_memory_decompression_features_ext;
     }
 
     // PhysicalDeviceMemoryPriorityFeaturesEXT
     if (m_memory_priority_features_ext.memoryPriority == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_memory_priority_features_ext.pNext = chain_head;
         chain_head = &m_memory_priority_features_ext;
     }
 
-    // PhysicalDeviceMeshShaderFeaturesEXT
-    if (m_mesh_shader_features_ext.taskShader == VK_TRUE ||
-        m_mesh_shader_features_ext.meshShader == VK_TRUE ||
-        m_mesh_shader_features_ext.multiviewMeshShader == VK_TRUE ||
-        m_mesh_shader_features_ext.primitiveFragmentShadingRateMeshShader == VK_TRUE ||
-        m_mesh_shader_features_ext.meshShaderQueries == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_MESH_SHADER_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
-        m_mesh_shader_features_ext.pNext = chain_head;
-        chain_head = &m_mesh_shader_features_ext;
-    }
-
-    // PhysicalDeviceMeshShaderFeaturesNV
-    if (m_mesh_shader_features_nv.taskShader == VK_TRUE ||
-        m_mesh_shader_features_nv.meshShader == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_NV_MESH_SHADER_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
-        m_mesh_shader_features_nv.pNext = chain_head;
-        chain_head = &m_mesh_shader_features_nv;
-    }
-
     // PhysicalDeviceMultiDrawFeaturesEXT
     if (m_multi_draw_features_ext.multiDraw == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_MULTI_DRAW_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_MULTI_DRAW_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_multi_draw_features_ext.pNext = chain_head;
         chain_head = &m_multi_draw_features_ext;
     }
 
     // PhysicalDeviceMultisampledRenderToSingleSampledFeaturesEXT
     if (m_multisampled_render_to_single_sampled_features_ext.multisampledRenderToSingleSampled == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_MULTISAMPLED_RENDER_TO_SINGLE_SAMPLED_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_MULTISAMPLED_RENDER_TO_SINGLE_SAMPLED_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_multisampled_render_to_single_sampled_features_ext.pNext = chain_head;
         chain_head = &m_multisampled_render_to_single_sampled_features_ext;
     }
 
     // PhysicalDeviceMultiviewPerViewRenderAreasFeaturesQCOM
     if (m_multiview_per_view_render_areas_features_qcom.multiviewPerViewRenderAreas == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_QCOM_MULTIVIEW_PER_VIEW_RENDER_AREAS_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_QCOM_MULTIVIEW_PER_VIEW_RENDER_AREAS_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_multiview_per_view_render_areas_features_qcom.pNext = chain_head;
         chain_head = &m_multiview_per_view_render_areas_features_qcom;
     }
 
     // PhysicalDeviceMultiviewPerViewViewportsFeaturesQCOM
     if (m_multiview_per_view_viewports_features_qcom.multiviewPerViewViewports == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_QCOM_MULTIVIEW_PER_VIEW_VIEWPORTS_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_QCOM_MULTIVIEW_PER_VIEW_VIEWPORTS_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_multiview_per_view_viewports_features_qcom.pNext = chain_head;
         chain_head = &m_multiview_per_view_viewports_features_qcom;
     }
 
     // PhysicalDeviceMutableDescriptorTypeFeaturesEXT
     if (m_mutable_descriptor_type_features_ext.mutableDescriptorType == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_MUTABLE_DESCRIPTOR_TYPE_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_MUTABLE_DESCRIPTOR_TYPE_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_mutable_descriptor_type_features_ext.pNext = chain_head;
         chain_head = &m_mutable_descriptor_type_features_ext;
     }
@@ -10756,16 +10841,16 @@ void* VulkanFeatures::build_chain_for_device_creation(
     if (m_nested_command_buffer_features_ext.nestedCommandBuffer == VK_TRUE ||
         m_nested_command_buffer_features_ext.nestedCommandBufferRendering == VK_TRUE ||
         m_nested_command_buffer_features_ext.nestedCommandBufferSimultaneousUse == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_NESTED_COMMAND_BUFFER_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_NESTED_COMMAND_BUFFER_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_nested_command_buffer_features_ext.pNext = chain_head;
         chain_head = &m_nested_command_buffer_features_ext;
     }
 
     // PhysicalDeviceNonSeamlessCubeMapFeaturesEXT
     if (m_non_seamless_cube_map_features_ext.nonSeamlessCubeMap == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_NON_SEAMLESS_CUBE_MAP_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_NON_SEAMLESS_CUBE_MAP_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_non_seamless_cube_map_features_ext.pNext = chain_head;
         chain_head = &m_non_seamless_cube_map_features_ext;
     }
@@ -10774,32 +10859,32 @@ void* VulkanFeatures::build_chain_for_device_creation(
     if (m_opacity_micromap_features_ext.micromap == VK_TRUE ||
         m_opacity_micromap_features_ext.micromapCaptureReplay == VK_TRUE ||
         m_opacity_micromap_features_ext.micromapHostCommands == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_OPACITY_MICROMAP_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_OPACITY_MICROMAP_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_opacity_micromap_features_ext.pNext = chain_head;
         chain_head = &m_opacity_micromap_features_ext;
     }
 
     // PhysicalDeviceOpticalFlowFeaturesNV
     if (m_optical_flow_features_nv.opticalFlow == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_NV_OPTICAL_FLOW_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_NV_OPTICAL_FLOW_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_optical_flow_features_nv.pNext = chain_head;
         chain_head = &m_optical_flow_features_nv;
     }
 
     // PhysicalDevicePageableDeviceLocalMemoryFeaturesEXT
     if (m_pageable_device_local_memory_features_ext.pageableDeviceLocalMemory == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_pageable_device_local_memory_features_ext.pNext = chain_head;
         chain_head = &m_pageable_device_local_memory_features_ext;
     }
 
     // PhysicalDevicePartitionedAccelerationStructureFeaturesNV
     if (m_partitioned_acceleration_structure_features_nv.partitionedAccelerationStructure == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_NV_PARTITIONED_ACCELERATION_STRUCTURE_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_NV_PARTITIONED_ACCELERATION_STRUCTURE_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_partitioned_acceleration_structure_features_nv.pNext = chain_head;
         chain_head = &m_partitioned_acceleration_structure_features_nv;
     }
@@ -10807,16 +10892,16 @@ void* VulkanFeatures::build_chain_for_device_creation(
     // PhysicalDevicePerStageDescriptorSetFeaturesNV
     if (m_per_stage_descriptor_set_features_nv.perStageDescriptorSet == VK_TRUE ||
         m_per_stage_descriptor_set_features_nv.dynamicPipelineLayout == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_NV_PER_STAGE_DESCRIPTOR_SET_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_NV_PER_STAGE_DESCRIPTOR_SET_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_per_stage_descriptor_set_features_nv.pNext = chain_head;
         chain_head = &m_per_stage_descriptor_set_features_nv;
     }
 
     // PhysicalDevicePerformanceCountersByRegionFeaturesARM
     if (m_performance_counters_by_region_features_arm.performanceCountersByRegion == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_ARM_PERFORMANCE_COUNTERS_BY_REGION_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_ARM_PERFORMANCE_COUNTERS_BY_REGION_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_performance_counters_by_region_features_arm.pNext = chain_head;
         chain_head = &m_performance_counters_by_region_features_arm;
     }
@@ -10824,88 +10909,88 @@ void* VulkanFeatures::build_chain_for_device_creation(
     // PhysicalDevicePerformanceQueryFeaturesKHR
     if (m_performance_query_features_khr.performanceCounterQueryPools == VK_TRUE ||
         m_performance_query_features_khr.performanceCounterMultipleQueryPools == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_PERFORMANCE_QUERY_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_PERFORMANCE_QUERY_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_performance_query_features_khr.pNext = chain_head;
         chain_head = &m_performance_query_features_khr;
     }
 
     // PhysicalDevicePipelineBinaryFeaturesKHR
     if (m_pipeline_binary_features_khr.pipelineBinaries == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_PIPELINE_BINARY_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_PIPELINE_BINARY_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_pipeline_binary_features_khr.pNext = chain_head;
         chain_head = &m_pipeline_binary_features_khr;
     }
 
     // PhysicalDevicePipelineCacheIncrementalModeFeaturesSEC
     if (m_pipeline_cache_incremental_mode_features_sec.pipelineCacheIncrementalMode == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_SEC_PIPELINE_CACHE_INCREMENTAL_MODE_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_SEC_PIPELINE_CACHE_INCREMENTAL_MODE_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_pipeline_cache_incremental_mode_features_sec.pNext = chain_head;
         chain_head = &m_pipeline_cache_incremental_mode_features_sec;
     }
 
     // PhysicalDevicePipelineExecutablePropertiesFeaturesKHR
     if (m_pipeline_executable_properties_features_khr.pipelineExecutableInfo == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_PIPELINE_EXECUTABLE_PROPERTIES_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_PIPELINE_EXECUTABLE_PROPERTIES_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_pipeline_executable_properties_features_khr.pNext = chain_head;
         chain_head = &m_pipeline_executable_properties_features_khr;
     }
 
     // PhysicalDevicePipelineLibraryGroupHandlesFeaturesEXT
     if (m_pipeline_library_group_handles_features_ext.pipelineLibraryGroupHandles == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_PIPELINE_LIBRARY_GROUP_HANDLES_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_PIPELINE_LIBRARY_GROUP_HANDLES_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_pipeline_library_group_handles_features_ext.pNext = chain_head;
         chain_head = &m_pipeline_library_group_handles_features_ext;
     }
 
     // PhysicalDevicePipelineOpacityMicromapFeaturesARM
     if (m_pipeline_opacity_micromap_features_arm.pipelineOpacityMicromap == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_ARM_PIPELINE_OPACITY_MICROMAP_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_ARM_PIPELINE_OPACITY_MICROMAP_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_pipeline_opacity_micromap_features_arm.pNext = chain_head;
         chain_head = &m_pipeline_opacity_micromap_features_arm;
     }
 
     // PhysicalDevicePipelinePropertiesFeaturesEXT
     if (m_pipeline_properties_features_ext.pipelinePropertiesIdentifier == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_PIPELINE_PROPERTIES_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_PIPELINE_PROPERTIES_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_pipeline_properties_features_ext.pNext = chain_head;
         chain_head = &m_pipeline_properties_features_ext;
     }
 
     // PhysicalDevicePresentBarrierFeaturesNV
     if (m_present_barrier_features_nv.presentBarrier == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_NV_PRESENT_BARRIER_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_NV_PRESENT_BARRIER_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_present_barrier_features_nv.pNext = chain_head;
         chain_head = &m_present_barrier_features_nv;
     }
 
     // PhysicalDevicePresentId2FeaturesKHR
     if (m_present_id2_features_khr.presentId2 == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_PRESENT_ID_2_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_PRESENT_ID_2_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_present_id2_features_khr.pNext = chain_head;
         chain_head = &m_present_id2_features_khr;
     }
 
     // PhysicalDevicePresentIdFeaturesKHR
     if (m_present_id_features_khr.presentId == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_PRESENT_ID_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_PRESENT_ID_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_present_id_features_khr.pNext = chain_head;
         chain_head = &m_present_id_features_khr;
     }
 
     // PhysicalDevicePresentModeFifoLatestReadyFeaturesKHR
     if (m_present_mode_fifo_latest_ready_features_khr.presentModeFifoLatestReady == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_PRESENT_MODE_FIFO_LATEST_READY_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_PRESENT_MODE_FIFO_LATEST_READY_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_present_mode_fifo_latest_ready_features_khr.pNext = chain_head;
         chain_head = &m_present_mode_fifo_latest_ready_features_khr;
     }
@@ -10914,24 +10999,24 @@ void* VulkanFeatures::build_chain_for_device_creation(
     if (m_present_timing_features_ext.presentTiming == VK_TRUE ||
         m_present_timing_features_ext.presentAtAbsoluteTime == VK_TRUE ||
         m_present_timing_features_ext.presentAtRelativeTime == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_PRESENT_TIMING_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_PRESENT_TIMING_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_present_timing_features_ext.pNext = chain_head;
         chain_head = &m_present_timing_features_ext;
     }
 
     // PhysicalDevicePresentWait2FeaturesKHR
     if (m_present_wait2_features_khr.presentWait2 == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_PRESENT_WAIT_2_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_PRESENT_WAIT_2_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_present_wait2_features_khr.pNext = chain_head;
         chain_head = &m_present_wait2_features_khr;
     }
 
     // PhysicalDevicePresentWaitFeaturesKHR
     if (m_present_wait_features_khr.presentWait == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_PRESENT_WAIT_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_PRESENT_WAIT_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_present_wait_features_khr.pNext = chain_head;
         chain_head = &m_present_wait_features_khr;
     }
@@ -10939,8 +11024,8 @@ void* VulkanFeatures::build_chain_for_device_creation(
     // PhysicalDevicePrimitiveTopologyListRestartFeaturesEXT
     if (m_primitive_topology_list_restart_features_ext.primitiveTopologyListRestart == VK_TRUE ||
         m_primitive_topology_list_restart_features_ext.primitiveTopologyPatchListRestart == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_PRIMITIVE_TOPOLOGY_LIST_RESTART_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_PRIMITIVE_TOPOLOGY_LIST_RESTART_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_primitive_topology_list_restart_features_ext.pNext = chain_head;
         chain_head = &m_primitive_topology_list_restart_features_ext;
     }
@@ -10949,8 +11034,8 @@ void* VulkanFeatures::build_chain_for_device_creation(
     if (m_primitives_generated_query_features_ext.primitivesGeneratedQuery == VK_TRUE ||
         m_primitives_generated_query_features_ext.primitivesGeneratedQueryWithRasterizerDiscard == VK_TRUE ||
         m_primitives_generated_query_features_ext.primitivesGeneratedQueryWithNonZeroStreams == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_PRIMITIVES_GENERATED_QUERY_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_PRIMITIVES_GENERATED_QUERY_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_primitives_generated_query_features_ext.pNext = chain_head;
         chain_head = &m_primitives_generated_query_features_ext;
     }
@@ -10958,24 +11043,24 @@ void* VulkanFeatures::build_chain_for_device_creation(
     // PhysicalDeviceProvokingVertexFeaturesEXT
     if (m_provoking_vertex_features_ext.provokingVertexLast == VK_TRUE ||
         m_provoking_vertex_features_ext.transformFeedbackPreservesProvokingVertex == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_PROVOKING_VERTEX_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_PROVOKING_VERTEX_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_provoking_vertex_features_ext.pNext = chain_head;
         chain_head = &m_provoking_vertex_features_ext;
     }
 
     // PhysicalDevicePushConstantBankFeaturesNV
     if (m_push_constant_bank_features_nv.pushConstantBank == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_NV_PUSH_CONSTANT_BANK_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_NV_PUSH_CONSTANT_BANK_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_push_constant_bank_features_nv.pNext = chain_head;
         chain_head = &m_push_constant_bank_features_nv;
     }
 
     // PhysicalDeviceRGBA10X6FormatsFeaturesEXT
     if (m_rgba10_x6_formats_features_ext.formatRgba10x6WithoutYCbCrSampler == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_RGBA10X6_FORMATS_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_RGBA10X6_FORMATS_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_rgba10_x6_formats_features_ext.pNext = chain_head;
         chain_head = &m_rgba10_x6_formats_features_ext;
     }
@@ -10984,40 +11069,40 @@ void* VulkanFeatures::build_chain_for_device_creation(
     if (m_rasterization_order_attachment_access_features_ext.rasterizationOrderColorAttachmentAccess == VK_TRUE ||
         m_rasterization_order_attachment_access_features_ext.rasterizationOrderDepthAttachmentAccess == VK_TRUE ||
         m_rasterization_order_attachment_access_features_ext.rasterizationOrderStencilAttachmentAccess == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_rasterization_order_attachment_access_features_ext.pNext = chain_head;
         chain_head = &m_rasterization_order_attachment_access_features_ext;
     }
 
     // PhysicalDeviceRawAccessChainsFeaturesNV
     if (m_raw_access_chains_features_nv.shaderRawAccessChains == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_NV_RAW_ACCESS_CHAINS_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_NV_RAW_ACCESS_CHAINS_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_raw_access_chains_features_nv.pNext = chain_head;
         chain_head = &m_raw_access_chains_features_nv;
     }
 
     // PhysicalDeviceRayQueryFeaturesKHR
     if (m_ray_query_features_khr.rayQuery == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_RAY_QUERY_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_RAY_QUERY_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_ray_query_features_khr.pNext = chain_head;
         chain_head = &m_ray_query_features_khr;
     }
 
     // PhysicalDeviceRayTracingInvocationReorderFeaturesEXT
     if (m_ray_tracing_invocation_reorder_features_ext.rayTracingInvocationReorder == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_ray_tracing_invocation_reorder_features_ext.pNext = chain_head;
         chain_head = &m_ray_tracing_invocation_reorder_features_ext;
     }
 
     // PhysicalDeviceRayTracingInvocationReorderFeaturesNV
     if (m_ray_tracing_invocation_reorder_features_nv.rayTracingInvocationReorder == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_NV_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_NV_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_ray_tracing_invocation_reorder_features_nv.pNext = chain_head;
         chain_head = &m_ray_tracing_invocation_reorder_features_nv;
     }
@@ -11025,8 +11110,8 @@ void* VulkanFeatures::build_chain_for_device_creation(
     // PhysicalDeviceRayTracingLinearSweptSpheresFeaturesNV
     if (m_ray_tracing_linear_swept_spheres_features_nv.spheres == VK_TRUE ||
         m_ray_tracing_linear_swept_spheres_features_nv.linearSweptSpheres == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_NV_RAY_TRACING_LINEAR_SWEPT_SPHERES_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_NV_RAY_TRACING_LINEAR_SWEPT_SPHERES_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_ray_tracing_linear_swept_spheres_features_nv.pNext = chain_head;
         chain_head = &m_ray_tracing_linear_swept_spheres_features_nv;
     }
@@ -11034,8 +11119,8 @@ void* VulkanFeatures::build_chain_for_device_creation(
     // PhysicalDeviceRayTracingMaintenance1FeaturesKHR
     if (m_ray_tracing_maintenance1_features_khr.rayTracingMaintenance1 == VK_TRUE ||
         m_ray_tracing_maintenance1_features_khr.rayTracingPipelineTraceRaysIndirect2 == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_RAY_TRACING_MAINTENANCE_1_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_RAY_TRACING_MAINTENANCE_1_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_ray_tracing_maintenance1_features_khr.pNext = chain_head;
         chain_head = &m_ray_tracing_maintenance1_features_khr;
     }
@@ -11043,8 +11128,8 @@ void* VulkanFeatures::build_chain_for_device_creation(
     // PhysicalDeviceRayTracingMotionBlurFeaturesNV
     if (m_ray_tracing_motion_blur_features_nv.rayTracingMotionBlur == VK_TRUE ||
         m_ray_tracing_motion_blur_features_nv.rayTracingMotionBlurPipelineTraceRaysIndirect == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_NV_RAY_TRACING_MOTION_BLUR_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_NV_RAY_TRACING_MOTION_BLUR_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_ray_tracing_motion_blur_features_nv.pNext = chain_head;
         chain_head = &m_ray_tracing_motion_blur_features_nv;
     }
@@ -11055,48 +11140,48 @@ void* VulkanFeatures::build_chain_for_device_creation(
         m_ray_tracing_pipeline_features_khr.rayTracingPipelineShaderGroupHandleCaptureReplayMixed == VK_TRUE ||
         m_ray_tracing_pipeline_features_khr.rayTracingPipelineTraceRaysIndirect == VK_TRUE ||
         m_ray_tracing_pipeline_features_khr.rayTraversalPrimitiveCulling == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_ray_tracing_pipeline_features_khr.pNext = chain_head;
         chain_head = &m_ray_tracing_pipeline_features_khr;
     }
 
     // PhysicalDeviceRayTracingPositionFetchFeaturesKHR
     if (m_ray_tracing_position_fetch_features_khr.rayTracingPositionFetch == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_RAY_TRACING_POSITION_FETCH_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_RAY_TRACING_POSITION_FETCH_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_ray_tracing_position_fetch_features_khr.pNext = chain_head;
         chain_head = &m_ray_tracing_position_fetch_features_khr;
     }
 
     // PhysicalDeviceRayTracingValidationFeaturesNV
     if (m_ray_tracing_validation_features_nv.rayTracingValidation == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_ray_tracing_validation_features_nv.pNext = chain_head;
         chain_head = &m_ray_tracing_validation_features_nv;
     }
 
     // PhysicalDeviceRelaxedLineRasterizationFeaturesIMG
     if (m_relaxed_line_rasterization_features_img.relaxedLineRasterization == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_IMG_RELAXED_LINE_RASTERIZATION_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_IMG_RELAXED_LINE_RASTERIZATION_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_relaxed_line_rasterization_features_img.pNext = chain_head;
         chain_head = &m_relaxed_line_rasterization_features_img;
     }
 
     // PhysicalDeviceRenderPassStripedFeaturesARM
     if (m_render_pass_striped_features_arm.renderPassStriped == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_ARM_RENDER_PASS_STRIPED_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_ARM_RENDER_PASS_STRIPED_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_render_pass_striped_features_arm.pNext = chain_head;
         chain_head = &m_render_pass_striped_features_arm;
     }
 
     // PhysicalDeviceRepresentativeFragmentTestFeaturesNV
     if (m_representative_fragment_test_features_nv.representativeFragmentTest == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_NV_REPRESENTATIVE_FRAGMENT_TEST_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_NV_REPRESENTATIVE_FRAGMENT_TEST_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_representative_fragment_test_features_nv.pNext = chain_head;
         chain_head = &m_representative_fragment_test_features_nv;
     }
@@ -11105,32 +11190,32 @@ void* VulkanFeatures::build_chain_for_device_creation(
     if (m_robustness2_features_khr.robustBufferAccess2 == VK_TRUE ||
         m_robustness2_features_khr.robustImageAccess2 == VK_TRUE ||
         m_robustness2_features_khr.nullDescriptor == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_ROBUSTNESS_2_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_ROBUSTNESS_2_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_robustness2_features_khr.pNext = chain_head;
         chain_head = &m_robustness2_features_khr;
     }
 
     // PhysicalDeviceSchedulingControlsFeaturesARM
     if (m_scheduling_controls_features_arm.schedulingControls == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_ARM_SCHEDULING_CONTROLS_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_ARM_SCHEDULING_CONTROLS_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_scheduling_controls_features_arm.pNext = chain_head;
         chain_head = &m_scheduling_controls_features_arm;
     }
 
     // PhysicalDeviceShader64BitIndexingFeaturesEXT
     if (m_shader64_bit_indexing_features_ext.shader64BitIndexing == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_SHADER_64BIT_INDEXING_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_SHADER_64BIT_INDEXING_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_shader64_bit_indexing_features_ext.pNext = chain_head;
         chain_head = &m_shader64_bit_indexing_features_ext;
     }
 
     // PhysicalDeviceShaderAtomicFloat16VectorFeaturesNV
     if (m_shader_atomic_float16_vector_features_nv.shaderFloat16VectorAtomics == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_NV_SHADER_ATOMIC_FLOAT16_VECTOR_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_NV_SHADER_ATOMIC_FLOAT16_VECTOR_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_shader_atomic_float16_vector_features_nv.pNext = chain_head;
         chain_head = &m_shader_atomic_float16_vector_features_nv;
     }
@@ -11148,8 +11233,8 @@ void* VulkanFeatures::build_chain_for_device_creation(
         m_shader_atomic_float2_features_ext.shaderSharedFloat64AtomicMinMax == VK_TRUE ||
         m_shader_atomic_float2_features_ext.shaderImageFloat32AtomicMinMax == VK_TRUE ||
         m_shader_atomic_float2_features_ext.sparseImageFloat32AtomicMinMax == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_SHADER_ATOMIC_FLOAT_2_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_SHADER_ATOMIC_FLOAT_2_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_shader_atomic_float2_features_ext.pNext = chain_head;
         chain_head = &m_shader_atomic_float2_features_ext;
     }
@@ -11167,8 +11252,8 @@ void* VulkanFeatures::build_chain_for_device_creation(
         m_shader_atomic_float_features_ext.shaderImageFloat32AtomicAdd == VK_TRUE ||
         m_shader_atomic_float_features_ext.sparseImageFloat32Atomics == VK_TRUE ||
         m_shader_atomic_float_features_ext.sparseImageFloat32AtomicAdd == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_shader_atomic_float_features_ext.pNext = chain_head;
         chain_head = &m_shader_atomic_float_features_ext;
     }
@@ -11177,8 +11262,8 @@ void* VulkanFeatures::build_chain_for_device_creation(
     if (m_shader_bfloat16_features_khr.shaderBFloat16Type == VK_TRUE ||
         m_shader_bfloat16_features_khr.shaderBFloat16DotProduct == VK_TRUE ||
         m_shader_bfloat16_features_khr.shaderBFloat16CooperativeMatrix == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_SHADER_BFLOAT16_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_SHADER_BFLOAT16_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_shader_bfloat16_features_khr.pNext = chain_head;
         chain_head = &m_shader_bfloat16_features_khr;
     }
@@ -11186,24 +11271,24 @@ void* VulkanFeatures::build_chain_for_device_creation(
     // PhysicalDeviceShaderClockFeaturesKHR
     if (m_shader_clock_features_khr.shaderSubgroupClock == VK_TRUE ||
         m_shader_clock_features_khr.shaderDeviceClock == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_SHADER_CLOCK_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_SHADER_CLOCK_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_shader_clock_features_khr.pNext = chain_head;
         chain_head = &m_shader_clock_features_khr;
     }
 
     // PhysicalDeviceShaderCoreBuiltinsFeaturesARM
     if (m_shader_core_builtins_features_arm.shaderCoreBuiltins == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_ARM_SHADER_CORE_BUILTINS_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_ARM_SHADER_CORE_BUILTINS_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_shader_core_builtins_features_arm.pNext = chain_head;
         chain_head = &m_shader_core_builtins_features_arm;
     }
 
     // PhysicalDeviceShaderEarlyAndLateFragmentTestsFeaturesAMD
     if (m_shader_early_and_late_fragment_tests_features_amd.shaderEarlyAndLateFragmentTests == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_AMD_SHADER_EARLY_AND_LATE_FRAGMENT_TESTS_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_AMD_SHADER_EARLY_AND_LATE_FRAGMENT_TESTS_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_shader_early_and_late_fragment_tests_features_amd.pNext = chain_head;
         chain_head = &m_shader_early_and_late_fragment_tests_features_amd;
     }
@@ -11211,8 +11296,8 @@ void* VulkanFeatures::build_chain_for_device_creation(
     // PhysicalDeviceShaderFloat8FeaturesEXT
     if (m_shader_float8_features_ext.shaderFloat8 == VK_TRUE ||
         m_shader_float8_features_ext.shaderFloat8CooperativeMatrix == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_SHADER_FLOAT8_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_SHADER_FLOAT8_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_shader_float8_features_ext.pNext = chain_head;
         chain_head = &m_shader_float8_features_ext;
     }
@@ -11221,8 +11306,8 @@ void* VulkanFeatures::build_chain_for_device_creation(
     if (m_shader_fma_features_khr.shaderFmaFloat16 == VK_TRUE ||
         m_shader_fma_features_khr.shaderFmaFloat32 == VK_TRUE ||
         m_shader_fma_features_khr.shaderFmaFloat64 == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_SHADER_FMA_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_SHADER_FMA_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_shader_fma_features_khr.pNext = chain_head;
         chain_head = &m_shader_fma_features_khr;
     }
@@ -11230,104 +11315,104 @@ void* VulkanFeatures::build_chain_for_device_creation(
     // PhysicalDeviceShaderImageAtomicInt64FeaturesEXT
     if (m_shader_image_atomic_int64_features_ext.shaderImageInt64Atomics == VK_TRUE ||
         m_shader_image_atomic_int64_features_ext.sparseImageInt64Atomics == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_SHADER_IMAGE_ATOMIC_INT64_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_SHADER_IMAGE_ATOMIC_INT64_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_shader_image_atomic_int64_features_ext.pNext = chain_head;
         chain_head = &m_shader_image_atomic_int64_features_ext;
     }
 
     // PhysicalDeviceShaderImageFootprintFeaturesNV
     if (m_shader_image_footprint_features_nv.imageFootprint == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_NV_SHADER_IMAGE_FOOTPRINT_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_NV_SHADER_IMAGE_FOOTPRINT_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_shader_image_footprint_features_nv.pNext = chain_head;
         chain_head = &m_shader_image_footprint_features_nv;
     }
 
     // PhysicalDeviceShaderIntegerFunctions2FeaturesINTEL
     if (m_shader_integer_functions2_features_intel.shaderIntegerFunctions2 == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_INTEL_SHADER_INTEGER_FUNCTIONS_2_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_INTEL_SHADER_INTEGER_FUNCTIONS_2_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_shader_integer_functions2_features_intel.pNext = chain_head;
         chain_head = &m_shader_integer_functions2_features_intel;
     }
 
     // PhysicalDeviceShaderLongVectorFeaturesEXT
     if (m_shader_long_vector_features_ext.longVector == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_SHADER_LONG_VECTOR_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_SHADER_LONG_VECTOR_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_shader_long_vector_features_ext.pNext = chain_head;
         chain_head = &m_shader_long_vector_features_ext;
     }
 
     // PhysicalDeviceShaderMaximalReconvergenceFeaturesKHR
     if (m_shader_maximal_reconvergence_features_khr.shaderMaximalReconvergence == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_SHADER_MAXIMAL_RECONVERGENCE_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_SHADER_MAXIMAL_RECONVERGENCE_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_shader_maximal_reconvergence_features_khr.pNext = chain_head;
         chain_head = &m_shader_maximal_reconvergence_features_khr;
     }
 
     // PhysicalDeviceShaderModuleIdentifierFeaturesEXT
     if (m_shader_module_identifier_features_ext.shaderModuleIdentifier == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_SHADER_MODULE_IDENTIFIER_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_SHADER_MODULE_IDENTIFIER_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_shader_module_identifier_features_ext.pNext = chain_head;
         chain_head = &m_shader_module_identifier_features_ext;
     }
 
     // PhysicalDeviceShaderObjectFeaturesEXT
     if (m_shader_object_features_ext.shaderObject == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_SHADER_OBJECT_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_SHADER_OBJECT_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_shader_object_features_ext.pNext = chain_head;
         chain_head = &m_shader_object_features_ext;
     }
 
     // PhysicalDeviceShaderQuadControlFeaturesKHR
     if (m_shader_quad_control_features_khr.shaderQuadControl == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_SHADER_QUAD_CONTROL_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_SHADER_QUAD_CONTROL_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_shader_quad_control_features_khr.pNext = chain_head;
         chain_head = &m_shader_quad_control_features_khr;
     }
 
     // PhysicalDeviceShaderRelaxedExtendedInstructionFeaturesKHR
     if (m_shader_relaxed_extended_instruction_features_khr.shaderRelaxedExtendedInstruction == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_SHADER_RELAXED_EXTENDED_INSTRUCTION_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_SHADER_RELAXED_EXTENDED_INSTRUCTION_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_shader_relaxed_extended_instruction_features_khr.pNext = chain_head;
         chain_head = &m_shader_relaxed_extended_instruction_features_khr;
     }
 
     // PhysicalDeviceShaderReplicatedCompositesFeaturesEXT
     if (m_shader_replicated_composites_features_ext.shaderReplicatedComposites == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_SHADER_REPLICATED_COMPOSITES_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_SHADER_REPLICATED_COMPOSITES_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_shader_replicated_composites_features_ext.pNext = chain_head;
         chain_head = &m_shader_replicated_composites_features_ext;
     }
 
     // PhysicalDeviceShaderSMBuiltinsFeaturesNV
     if (m_shader_sm_builtins_features_nv.shaderSMBuiltins == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_NV_SHADER_SM_BUILTINS_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_NV_SHADER_SM_BUILTINS_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_shader_sm_builtins_features_nv.pNext = chain_head;
         chain_head = &m_shader_sm_builtins_features_nv;
     }
 
     // PhysicalDeviceShaderSubgroupPartitionedFeaturesEXT
     if (m_shader_subgroup_partitioned_features_ext.shaderSubgroupPartitioned == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_SHADER_SUBGROUP_PARTITIONED_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_SHADER_SUBGROUP_PARTITIONED_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_shader_subgroup_partitioned_features_ext.pNext = chain_head;
         chain_head = &m_shader_subgroup_partitioned_features_ext;
     }
 
     // PhysicalDeviceShaderSubgroupUniformControlFlowFeaturesKHR
     if (m_shader_subgroup_uniform_control_flow_features_khr.shaderSubgroupUniformControlFlow == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_SHADER_SUBGROUP_UNIFORM_CONTROL_FLOW_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_SHADER_SUBGROUP_UNIFORM_CONTROL_FLOW_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_shader_subgroup_uniform_control_flow_features_khr.pNext = chain_head;
         chain_head = &m_shader_subgroup_uniform_control_flow_features_khr;
     }
@@ -11336,24 +11421,24 @@ void* VulkanFeatures::build_chain_for_device_creation(
     if (m_shader_tile_image_features_ext.shaderTileImageColorReadAccess == VK_TRUE ||
         m_shader_tile_image_features_ext.shaderTileImageDepthReadAccess == VK_TRUE ||
         m_shader_tile_image_features_ext.shaderTileImageStencilReadAccess == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_SHADER_TILE_IMAGE_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_SHADER_TILE_IMAGE_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_shader_tile_image_features_ext.pNext = chain_head;
         chain_head = &m_shader_tile_image_features_ext;
     }
 
     // PhysicalDeviceShaderUniformBufferUnsizedArrayFeaturesEXT
     if (m_shader_uniform_buffer_unsized_array_features_ext.shaderUniformBufferUnsizedArray == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_SHADER_UNIFORM_BUFFER_UNSIZED_ARRAY_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_SHADER_UNIFORM_BUFFER_UNSIZED_ARRAY_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_shader_uniform_buffer_unsized_array_features_ext.pNext = chain_head;
         chain_head = &m_shader_uniform_buffer_unsized_array_features_ext;
     }
 
     // PhysicalDeviceShaderUntypedPointersFeaturesKHR
     if (m_shader_untyped_pointers_features_khr.shaderUntypedPointers == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_SHADER_UNTYPED_POINTERS_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_SHADER_UNTYPED_POINTERS_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_shader_untyped_pointers_features_khr.pNext = chain_head;
         chain_head = &m_shader_untyped_pointers_features_khr;
     }
@@ -11361,32 +11446,32 @@ void* VulkanFeatures::build_chain_for_device_creation(
     // PhysicalDeviceShadingRateImageFeaturesNV
     if (m_shading_rate_image_features_nv.shadingRateImage == VK_TRUE ||
         m_shading_rate_image_features_nv.shadingRateCoarseSampleOrder == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_NV_SHADING_RATE_IMAGE_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_NV_SHADING_RATE_IMAGE_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_shading_rate_image_features_nv.pNext = chain_head;
         chain_head = &m_shading_rate_image_features_nv;
     }
 
     // PhysicalDeviceSubpassMergeFeedbackFeaturesEXT
     if (m_subpass_merge_feedback_features_ext.subpassMergeFeedback == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_SUBPASS_MERGE_FEEDBACK_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_SUBPASS_MERGE_FEEDBACK_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_subpass_merge_feedback_features_ext.pNext = chain_head;
         chain_head = &m_subpass_merge_feedback_features_ext;
     }
 
     // PhysicalDeviceSubpassShadingFeaturesHUAWEI
     if (m_subpass_shading_features_huawei.subpassShading == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_HUAWEI_SUBPASS_SHADING_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_HUAWEI_SUBPASS_SHADING_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_subpass_shading_features_huawei.pNext = chain_head;
         chain_head = &m_subpass_shading_features_huawei;
     }
 
     // PhysicalDeviceSwapchainMaintenance1FeaturesKHR
     if (m_swapchain_maintenance1_features_khr.swapchainMaintenance1 == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_swapchain_maintenance1_features_khr.pNext = chain_head;
         chain_head = &m_swapchain_maintenance1_features_khr;
     }
@@ -11398,41 +11483,41 @@ void* VulkanFeatures::build_chain_for_device_creation(
         m_tensor_features_arm.shaderStorageTensorArrayNonUniformIndexing == VK_TRUE ||
         m_tensor_features_arm.descriptorBindingStorageTensorUpdateAfterBind == VK_TRUE ||
         m_tensor_features_arm.tensors == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_ARM_TENSORS_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_ARM_TENSORS_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_tensor_features_arm.pNext = chain_head;
         chain_head = &m_tensor_features_arm;
     }
 
     // PhysicalDeviceTexelBufferAlignmentFeaturesEXT
     if (m_texel_buffer_alignment_features_ext.texelBufferAlignment == VK_TRUE) {
-        assert((physical_device->extension_supported(VK_EXT_TEXEL_BUFFER_ALIGNMENT_EXTENSION_NAME) ||
-                vk_api_version >= VK_API_VERSION_1_3) &&
-               "Feature enabled but neither extension nor promoted version supported");
+            assert((physical_device->extension_supported(VK_EXT_TEXEL_BUFFER_ALIGNMENT_EXTENSION_NAME) ||
+                    vk_api_version >= VK_API_VERSION_1_3) &&
+                   "Feature enabled but neither extension nor promoted version supported");
         m_texel_buffer_alignment_features_ext.pNext = chain_head;
         chain_head = &m_texel_buffer_alignment_features_ext;
     }
 
     // PhysicalDeviceTextureCompressionASTC3DFeaturesEXT
     if (m_texture_compression_astc3_d_features_ext.textureCompressionASTC_3D == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_TEXTURE_COMPRESSION_ASTC_3D_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_TEXTURE_COMPRESSION_ASTC_3D_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_texture_compression_astc3_d_features_ext.pNext = chain_head;
         chain_head = &m_texture_compression_astc3_d_features_ext;
     }
 
     // PhysicalDeviceTileMemoryHeapFeaturesQCOM
     if (m_tile_memory_heap_features_qcom.tileMemoryHeap == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_QCOM_TILE_MEMORY_HEAP_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_QCOM_TILE_MEMORY_HEAP_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_tile_memory_heap_features_qcom.pNext = chain_head;
         chain_head = &m_tile_memory_heap_features_qcom;
     }
 
     // PhysicalDeviceTilePropertiesFeaturesQCOM
     if (m_tile_properties_features_qcom.tileProperties == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_QCOM_TILE_PROPERTIES_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_QCOM_TILE_PROPERTIES_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_tile_properties_features_qcom.pNext = chain_head;
         chain_head = &m_tile_properties_features_qcom;
     }
@@ -11452,8 +11537,8 @@ void* VulkanFeatures::build_chain_for_device_creation(
         m_tile_shading_features_qcom.tileShadingAnisotropicApron == VK_TRUE ||
         m_tile_shading_features_qcom.tileShadingAtomicOps == VK_TRUE ||
         m_tile_shading_features_qcom.tileShadingImageProcessing == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_QCOM_TILE_SHADING_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_QCOM_TILE_SHADING_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_tile_shading_features_qcom.pNext = chain_head;
         chain_head = &m_tile_shading_features_qcom;
     }
@@ -11461,8 +11546,8 @@ void* VulkanFeatures::build_chain_for_device_creation(
     // PhysicalDeviceTransformFeedbackFeaturesEXT
     if (m_transform_feedback_features_ext.transformFeedback == VK_TRUE ||
         m_transform_feedback_features_ext.geometryStreams == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_TRANSFORM_FEEDBACK_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_TRANSFORM_FEEDBACK_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_transform_feedback_features_ext.pNext = chain_head;
         chain_head = &m_transform_feedback_features_ext;
     }
@@ -11470,93 +11555,82 @@ void* VulkanFeatures::build_chain_for_device_creation(
     // PhysicalDeviceUnifiedImageLayoutsFeaturesKHR
     if (m_unified_image_layouts_features_khr.unifiedImageLayouts == VK_TRUE ||
         m_unified_image_layouts_features_khr.unifiedImageLayoutsVideo == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_UNIFIED_IMAGE_LAYOUTS_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_UNIFIED_IMAGE_LAYOUTS_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_unified_image_layouts_features_khr.pNext = chain_head;
         chain_head = &m_unified_image_layouts_features_khr;
     }
 
     // PhysicalDeviceVertexAttributeRobustnessFeaturesEXT
     if (m_vertex_attribute_robustness_features_ext.vertexAttributeRobustness == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_VERTEX_ATTRIBUTE_ROBUSTNESS_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_VERTEX_ATTRIBUTE_ROBUSTNESS_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_vertex_attribute_robustness_features_ext.pNext = chain_head;
         chain_head = &m_vertex_attribute_robustness_features_ext;
     }
 
     // PhysicalDeviceVertexInputDynamicStateFeaturesEXT
     if (m_vertex_input_dynamic_state_features_ext.vertexInputDynamicState == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_vertex_input_dynamic_state_features_ext.pNext = chain_head;
         chain_head = &m_vertex_input_dynamic_state_features_ext;
     }
 
     // PhysicalDeviceVideoDecodeVP9FeaturesKHR
     if (m_video_decode_vp9_features_khr.videoDecodeVP9 == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_VIDEO_DECODE_VP9_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_VIDEO_DECODE_VP9_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_video_decode_vp9_features_khr.pNext = chain_head;
         chain_head = &m_video_decode_vp9_features_khr;
     }
 
     // PhysicalDeviceVideoEncodeAV1FeaturesKHR
     if (m_video_encode_av1_features_khr.videoEncodeAV1 == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_VIDEO_ENCODE_AV1_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_VIDEO_ENCODE_AV1_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_video_encode_av1_features_khr.pNext = chain_head;
         chain_head = &m_video_encode_av1_features_khr;
     }
 
     // PhysicalDeviceVideoEncodeIntraRefreshFeaturesKHR
     if (m_video_encode_intra_refresh_features_khr.videoEncodeIntraRefresh == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_VIDEO_ENCODE_INTRA_REFRESH_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_VIDEO_ENCODE_INTRA_REFRESH_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_video_encode_intra_refresh_features_khr.pNext = chain_head;
         chain_head = &m_video_encode_intra_refresh_features_khr;
     }
 
     // PhysicalDeviceVideoEncodeQuantizationMapFeaturesKHR
     if (m_video_encode_quantization_map_features_khr.videoEncodeQuantizationMap == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_VIDEO_ENCODE_QUANTIZATION_MAP_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_VIDEO_ENCODE_QUANTIZATION_MAP_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_video_encode_quantization_map_features_khr.pNext = chain_head;
         chain_head = &m_video_encode_quantization_map_features_khr;
     }
 
     // PhysicalDeviceVideoEncodeRgbConversionFeaturesVALVE
     if (m_video_encode_rgb_conversion_features_valve.videoEncodeRgbConversion == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_VALVE_VIDEO_ENCODE_RGB_CONVERSION_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_VALVE_VIDEO_ENCODE_RGB_CONVERSION_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_video_encode_rgb_conversion_features_valve.pNext = chain_head;
         chain_head = &m_video_encode_rgb_conversion_features_valve;
     }
 
     // PhysicalDeviceVideoMaintenance1FeaturesKHR
     if (m_video_maintenance1_features_khr.videoMaintenance1 == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_VIDEO_MAINTENANCE_1_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_VIDEO_MAINTENANCE_1_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_video_maintenance1_features_khr.pNext = chain_head;
         chain_head = &m_video_maintenance1_features_khr;
     }
 
     // PhysicalDeviceVideoMaintenance2FeaturesKHR
     if (m_video_maintenance2_features_khr.videoMaintenance2 == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_VIDEO_MAINTENANCE_2_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_VIDEO_MAINTENANCE_2_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_video_maintenance2_features_khr.pNext = chain_head;
         chain_head = &m_video_maintenance2_features_khr;
-    }
-
-    // PhysicalDeviceVulkanMemoryModelFeatures
-    if (m_vulkan_memory_model_features.vulkanMemoryModel == VK_TRUE ||
-        m_vulkan_memory_model_features.vulkanMemoryModelDeviceScope == VK_TRUE ||
-        m_vulkan_memory_model_features.vulkanMemoryModelAvailabilityVisibilityChains == VK_TRUE) {
-        assert((physical_device->extension_supported(VK_KHR_VULKAN_MEMORY_MODEL_EXTENSION_NAME) ||
-                vk_api_version >= VK_API_VERSION_1_2) &&
-               "Feature enabled but neither extension nor promoted version supported");
-        m_vulkan_memory_model_features.pNext = chain_head;
-        chain_head = &m_vulkan_memory_model_features;
     }
 
     // PhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR
@@ -11564,41 +11638,41 @@ void* VulkanFeatures::build_chain_for_device_creation(
         m_workgroup_memory_explicit_layout_features_khr.workgroupMemoryExplicitLayoutScalarBlockLayout == VK_TRUE ||
         m_workgroup_memory_explicit_layout_features_khr.workgroupMemoryExplicitLayout8BitAccess == VK_TRUE ||
         m_workgroup_memory_explicit_layout_features_khr.workgroupMemoryExplicitLayout16BitAccess == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_KHR_WORKGROUP_MEMORY_EXPLICIT_LAYOUT_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_KHR_WORKGROUP_MEMORY_EXPLICIT_LAYOUT_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_workgroup_memory_explicit_layout_features_khr.pNext = chain_head;
         chain_head = &m_workgroup_memory_explicit_layout_features_khr;
     }
 
     // PhysicalDeviceYcbcr2Plane444FormatsFeaturesEXT
     if (m_ycbcr2_plane444_formats_features_ext.ycbcr2plane444Formats == VK_TRUE) {
-        assert((physical_device->extension_supported(VK_EXT_YCBCR_2PLANE_444_FORMATS_EXTENSION_NAME) ||
-                vk_api_version >= VK_API_VERSION_1_3) &&
-               "Feature enabled but neither extension nor promoted version supported");
+            assert((physical_device->extension_supported(VK_EXT_YCBCR_2PLANE_444_FORMATS_EXTENSION_NAME) ||
+                    vk_api_version >= VK_API_VERSION_1_3) &&
+                   "Feature enabled but neither extension nor promoted version supported");
         m_ycbcr2_plane444_formats_features_ext.pNext = chain_head;
         chain_head = &m_ycbcr2_plane444_formats_features_ext;
     }
 
     // PhysicalDeviceYcbcrDegammaFeaturesQCOM
     if (m_ycbcr_degamma_features_qcom.ycbcrDegamma == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_QCOM_YCBCR_DEGAMMA_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_QCOM_YCBCR_DEGAMMA_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_ycbcr_degamma_features_qcom.pNext = chain_head;
         chain_head = &m_ycbcr_degamma_features_qcom;
     }
 
     // PhysicalDeviceYcbcrImageArraysFeaturesEXT
     if (m_ycbcr_image_arrays_features_ext.ycbcrImageArrays == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_YCBCR_IMAGE_ARRAYS_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_YCBCR_IMAGE_ARRAYS_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_ycbcr_image_arrays_features_ext.pNext = chain_head;
         chain_head = &m_ycbcr_image_arrays_features_ext;
     }
 
     // PhysicalDeviceZeroInitializeDeviceMemoryFeaturesEXT
     if (m_zero_initialize_device_memory_features_ext.zeroInitializeDeviceMemory == VK_TRUE) {
-        assert(physical_device->extension_supported(VK_EXT_ZERO_INITIALIZE_DEVICE_MEMORY_EXTENSION_NAME) &&
-               "Feature enabled but required extension not supported");
+            assert(physical_device->extension_supported(VK_EXT_ZERO_INITIALIZE_DEVICE_MEMORY_EXTENSION_NAME) &&
+                   "Feature enabled but required extension not supported");
         m_zero_initialize_device_memory_features_ext.pNext = chain_head;
         chain_head = &m_zero_initialize_device_memory_features_ext;
     }
