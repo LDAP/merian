@@ -13,12 +13,13 @@ Replaces the old polymorphic Feature class hierarchy with a more efficient
 aggregate design that eliminates unsafe casting and map lookups.
 """
 
+import re
 from pprint import pprint
 from vulkan_codegen.codegen import (
     build_alias_maps,
+    build_extension_number_map,
     build_extension_type_map,
     build_feature_version_map,
-    build_struct_aggregation_map,
     generate_file_header,
 )
 from vulkan_codegen.models import FeatureMember, FeatureStruct
@@ -106,6 +107,7 @@ def find_feature_structures(xml_root, tags) -> list[FeatureStruct]:
     # Extension map now handles aliases internally during building
     extension_map = build_extension_type_map(xml_root)
     version_map = build_feature_version_map(xml_root)
+    extension_number_map = build_extension_number_map(xml_root)
     _, canonical_to_aliases = build_alias_maps(xml_root)
 
     for type_elem in xml_root.findall("types/type"):
@@ -127,8 +129,10 @@ def find_feature_structures(xml_root, tags) -> list[FeatureStruct]:
         cpp_name = vk_name_to_cpp_name(vk_name)
         ext_info = extension_map.get(vk_name)
         extension = ext_info[0] if ext_info else None
+        extension_name = ext_info[1] if ext_info else None
         promotion_version = ext_info[2] if ext_info else None
         required_version = version_map.get(vk_name)
+        extension_number = extension_number_map.get(extension_name) if extension_name else None
 
         features.append(
             FeatureStruct(
@@ -137,6 +141,7 @@ def find_feature_structures(xml_root, tags) -> list[FeatureStruct]:
                 stype=stype,
                 members=members,
                 extension=extension,
+                extension_number=extension_number,
                 promotion_version=promotion_version,
                 required_version=required_version,
                 structextends=struct_extends.split(",") if struct_extends else [],
@@ -148,26 +153,6 @@ def find_feature_structures(xml_root, tags) -> list[FeatureStruct]:
         features.append(features2)
 
     find_aliases_for_features(canonical_to_aliases, features)
-
-    # Build aggregation map using unified function
-    aggregation_map = build_struct_aggregation_map(xml_root, "Features")
-
-    # Build reverse map (aggregate -> list of structs it aggregates)
-    aggregates_map = {}  # {VkPhysicalDeviceVulkan11Features: [list of structs]}
-    for individual, aggregate in aggregation_map.items():
-        if aggregate not in aggregates_map:
-            aggregates_map[aggregate] = []
-        aggregates_map[aggregate].append(individual)
-
-    # Populate FeatureStruct fields
-    for feat in features:
-        # Check if this struct is aggregated by a VulkanXXFeatures
-        if feat.vk_name in aggregation_map:
-            feat.aggregated_by = aggregation_map[feat.vk_name]
-
-        # Check if this is a VulkanXXFeatures that aggregates others
-        if feat.vk_name in aggregates_map:
-            feat.aggregates = aggregates_map[feat.vk_name]
 
     return features
 
@@ -692,6 +677,86 @@ def generate_get_feature(feature_map: dict) -> list[str]:
     )
 
     return lines
+
+
+def compute_feature_fingerprint(feat: FeatureStruct) -> frozenset[str]:
+    """Compute a fingerprint (set of member names) for a feature struct."""
+    return frozenset(m.name for m in feat.members)
+
+
+def compute_priority_score(feat: FeatureStruct) -> tuple:
+    """Compute priority score for sorting. Higher = better priority.
+
+    Returns tuple for lexicographic comparison:
+    (has_required_version, required_version_value, has_promotion, promotion_value, extension_number, name)
+    """
+    # Extract version number for comparison (e.g., VK_API_VERSION_1_3 -> (1, 3))
+    def version_to_tuple(version_str):
+        if not version_str:
+            return (0, 0)
+        match = re.match(r"VK_API_VERSION_(\d+)_(\d+)", version_str)
+        if match:
+            return (int(match.group(1)), int(match.group(2)))
+        return (0, 0)
+
+    return (
+        1 if feat.required_version else 0,  # VulkanXXFeatures have required_version
+        version_to_tuple(feat.required_version),
+        1 if feat.promotion_version else 0,  # Promoted extensions
+        version_to_tuple(feat.promotion_version),
+        feat.extension_number or 0,  # Higher extension number = newer
+        feat.vk_name,  # Stable tie-breaker
+    )
+
+
+def group_features_by_relationship(features: list[FeatureStruct]) -> list[list[FeatureStruct]]:
+    """Group features by their member set relationships.
+
+    Returns list of groups where each group contains:
+    - Structs with identical feature sets (aliases), or
+    - Structs where one is a superset of others (aggregation)
+
+    Within each group, structs are sorted by priority (highest first).
+    """
+    # Compute fingerprints (use indices to avoid hashability issues)
+    feat_fingerprints = [compute_feature_fingerprint(feat) for feat in features]
+
+    # Find groups
+    groups = []
+    processed = set()
+
+    for i, feat in enumerate(features):
+        if i in processed:
+            continue
+
+        fp = feat_fingerprints[i]
+        if not fp:  # Skip empty feature sets
+            continue
+
+        # Find all related structs (same set, subset, or superset)
+        group = [feat]
+        processed.add(i)
+
+        for j, other in enumerate(features):
+            if j in processed:
+                continue
+            other_fp = feat_fingerprints[j]
+            if not other_fp:
+                continue
+
+            # Check if related: identical, subset, or superset
+            if (fp == other_fp or  # Identical (aliases)
+                fp < other_fp or    # feat is subset of other
+                fp > other_fp):     # feat is superset of other
+                group.append(other)
+                processed.add(j)
+
+        if len(group) > 1:  # Only keep groups with multiple members
+            # Sort by priority (highest first)
+            group.sort(key=compute_priority_score, reverse=True)
+            groups.append(group)
+
+    return groups
 
 
 def generate_helper_functions(features: list[FeatureStruct], tags) -> list[str]:

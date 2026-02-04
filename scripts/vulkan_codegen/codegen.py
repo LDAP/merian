@@ -170,6 +170,27 @@ def build_feature_version_map(xml_root):
     return feature_map
 
 
+def build_extension_number_map(xml_root) -> dict[str, int]:
+    """Build map of extension_name -> extension_number.
+
+    Higher extension number = newer extension.
+    Used for priority when multiple extensions provide the same features.
+    """
+    ext_number_map = {}
+
+    for ext in xml_root.findall("extensions/extension"):
+        ext_name = ext.get("name")
+        ext_number = ext.get("number")
+
+        if ext_name and ext_number:
+            try:
+                ext_number_map[ext_name] = int(ext_number)
+            except ValueError:
+                pass  # Skip if number is not an integer
+
+    return ext_number_map
+
+
 def build_struct_aggregation_map(xml_root, struct_type: str) -> dict[str, str]:
     """Build map of struct_name -> aggregated_by_struct_name.
 

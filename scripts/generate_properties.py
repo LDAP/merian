@@ -26,9 +26,9 @@ from vulkan_codegen.naming import (
 )
 from vulkan_codegen.parsing import find_extensions
 from vulkan_codegen.codegen import (
+    build_extension_number_map,
     build_extension_type_map,
     build_feature_version_map,
-    build_struct_aggregation_map,
     generate_file_header,
 )
 from vulkan_codegen.spec import (
@@ -42,9 +42,10 @@ from vulkan_codegen.spec import (
 out_path, include_path = get_output_paths()
 
 
-def determine_property_metadata(vk_name, ext_type_map, feature_version_map):
-    """Determine extension, core_version, and promotion_version for a property struct."""
+def determine_property_metadata(vk_name, ext_type_map, feature_version_map, ext_number_map):
+    """Determine extension, core_version, promotion_version, and extension_number for a property struct."""
     extension = None
+    extension_number = None
     core_version = None
     promotion_version = None
 
@@ -54,6 +55,7 @@ def determine_property_metadata(vk_name, ext_type_map, feature_version_map):
         extension = ext_name_macro
         promotion_version = ext_promotion_version
         core_version = ext_promotion_version
+        extension_number = ext_number_map.get(ext_name)
 
     if vk_name in feature_version_map:
         core_version = feature_version_map[vk_name]
@@ -64,7 +66,7 @@ def determine_property_metadata(vk_name, ext_type_map, feature_version_map):
         vmajor, vminor = vulkan_ver_match.groups()
         core_version = f"VK_API_VERSION_{vmajor}_{vminor}"
 
-    return extension, core_version, promotion_version
+    return extension, extension_number, core_version, promotion_version
 
 
 def find_property_structures(xml_root, tags) -> list[PropertyStruct]:
@@ -75,6 +77,7 @@ def find_property_structures(xml_root, tags) -> list[PropertyStruct]:
     # Extension map now handles aliases internally during building
     ext_type_map = build_extension_type_map(xml_root)
     feature_version_map = build_feature_version_map(xml_root)
+    ext_number_map = build_extension_number_map(xml_root)
 
     accepted_extends = {"VkPhysicalDeviceProperties2"}
 
@@ -109,8 +112,8 @@ def find_property_structures(xml_root, tags) -> list[PropertyStruct]:
             stype = get_stype_from_name(vk_name)
 
         cpp_name = vk_name_to_cpp_name(vk_name)
-        extension, core_version, promotion_version = determine_property_metadata(
-            vk_name, ext_type_map, feature_version_map
+        extension, extension_number, core_version, promotion_version = determine_property_metadata(
+            vk_name, ext_type_map, feature_version_map, ext_number_map
         )
 
         properties.append(
@@ -119,28 +122,11 @@ def find_property_structures(xml_root, tags) -> list[PropertyStruct]:
                 cpp_name=cpp_name,
                 stype=stype,
                 extension=extension,
+                extension_number=extension_number,
                 core_version=core_version,
                 promotion_version=promotion_version,
             )
         )
-
-    # Build aggregation map using unified function
-    aggregation_map = build_struct_aggregation_map(xml_root, "Properties")
-
-    # Build reverse map
-    aggregates_map = {}  # {VkPhysicalDeviceVulkan11Properties: [list of structs]}
-    for individual, aggregate in aggregation_map.items():
-        if aggregate not in aggregates_map:
-            aggregates_map[aggregate] = []
-        aggregates_map[aggregate].append(individual)
-
-    # Populate PropertyStruct fields
-    for prop in properties:
-        if prop.vk_name in aggregation_map:
-            prop.aggregated_by = aggregation_map[prop.vk_name]
-
-        if prop.vk_name in aggregates_map:
-            prop.aggregates = aggregates_map[prop.vk_name]
 
     return properties
 
