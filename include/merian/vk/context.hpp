@@ -210,10 +210,7 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
     // Make sure to keep a reference, else the pool and its buffers are destroyed
     std::shared_ptr<CommandPool> get_cmd_pool_C();
 
-    // weakly canonical paths
     const std::vector<std::filesystem::path>& get_default_shader_include_paths() const;
-
-    const std::map<std::string, std::string>& get_default_shader_macro_definitions() const;
 
     const SlangSessionHandle& get_slang_session() const;
 
@@ -271,7 +268,6 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
     std::weak_ptr<CommandPool> cmd_pool_C;
 
     std::vector<std::filesystem::path> default_shader_include_paths;
-    std::map<std::string, std::string> default_shader_macro_definitions;
 
     SlangSessionHandle slang_session;
 };

@@ -51,7 +51,7 @@ class ShaderCompileContext {
     ShaderCompileContext(const ContextHandle& context) : ShaderCompileContext(*context) {}
 
     ShaderCompileContext(const Context& context)
-        : preprocessor_macros(context.get_default_shader_macro_definitions()),
+        : preprocessor_macros(context.get_device()->get_shader_defines(context.get_instance())),
           debug_info(Context::IS_DEBUG_BUILD),
           optimization_level(Context::BUILD_OPTIMIZATION_LEVEL),
           target(spirv_target_for_vulkan_api_version(context.get_device()->get_vk_api_version())),

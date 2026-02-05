@@ -567,16 +567,6 @@ void Context::create_device_and_queues(
     }
 }
 
-bool spirv_extension_supported(const DeviceHandle& device, const char* extension) {
-    const auto device_extension_deps =
-        get_spirv_extension_requirements(extension, device->get_vk_api_version());
-    bool all_enabled = true;
-    for (const auto& dep : device_extension_deps) {
-        all_enabled &= device->extension_enabled(dep);
-    }
-    return all_enabled;
-}
-
 void Context::prepare_shader_include_defines() {
     // search merian-shaders
     const std::filesystem::path development_headers =
@@ -602,39 +592,6 @@ void Context::prepare_shader_include_defines() {
     } else {
         SPDLOG_ERROR("merian-shaders header not found! Shader compilers will not work correctly");
     }
-
-    // add macro definitions from context extensions and enabled instance and device extensions.
-    const std::string instance_ext_define_prefix = "MERIAN_INSTANCE_EXT_ENABLED_";
-    for (const auto& ext : instance->get_enabled_extensions()) {
-        default_shader_macro_definitions.emplace(instance_ext_define_prefix + ext, "1");
-    }
-    const std::string device_ext_define_prefix = "MERIAN_DEVICE_EXT_ENABLED_";
-    for (const auto& ext : device->get_enabled_extensions()) {
-        default_shader_macro_definitions.emplace(device_ext_define_prefix + ext, "1");
-    }
-    const std::string spirv_ext_define_prefix = "MERIAN_SPIRV_EXT_SUPPORTED_";
-    for (const auto& ext : get_spirv_extensions()) {
-        if (spirv_extension_supported(device, ext)) {
-            default_shader_macro_definitions.emplace(spirv_ext_define_prefix + ext, "1");
-        }
-    }
-    const std::string spirv_cap_define_prefix = "MERIAN_SPIRV_CAP_SUPPORTED_";
-    for (const auto& cap : get_spirv_capabilities()) {
-        if (is_spirv_capability_supported(cap, device->get_vk_api_version(),
-                                          device->get_enabled_features(),
-                                          physical_device->get_properties())) {
-            default_shader_macro_definitions.emplace(spirv_cap_define_prefix + cap, "1");
-        }
-    }
-
-#ifndef NDEBUG
-    std::vector<std::string> string_defines;
-    string_defines.reserve(default_shader_macro_definitions.size());
-    for (const auto& def : default_shader_macro_definitions) {
-        string_defines.emplace_back(def.first + "=" + def.second);
-    }
-    SPDLOG_DEBUG("shader defines: {}", fmt::join(string_defines, "\n"));
-#endif
 }
 
 void Context::prepare_file_loader() {
@@ -747,10 +704,6 @@ std::shared_ptr<CommandPool> Context::get_cmd_pool_C() {
 
 const std::vector<std::filesystem::path>& Context::get_default_shader_include_paths() const {
     return default_shader_include_paths;
-}
-
-const std::map<std::string, std::string>& Context::get_default_shader_macro_definitions() const {
-    return default_shader_macro_definitions;
 }
 
 const SlangSessionHandle& Context::get_slang_session() const {

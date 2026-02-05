@@ -1,4 +1,7 @@
 #include "merian/vk/device.hpp"
+
+#include "merian/shader/shader_defines.hpp"
+#include "merian/vk/utils/vulkan_spirv.hpp"
 #include "spdlog/spdlog.h"
 
 namespace merian {
@@ -139,6 +142,25 @@ Device::Device(const PhysicalDeviceHandle& physical_device,
         supported_pipeline_stages |= vk::PipelineStageFlagBits::eTaskShaderEXT;
         supported_pipeline_stages2 |= vk::PipelineStageFlagBits2::eTaskShaderEXT;
     }
+
+    for (const auto& ext : get_spirv_extensions()) {
+        const auto device_extension_deps =
+            get_spirv_extension_requirements(ext, physical_device->get_vk_api_version());
+        bool all_enabled = true;
+        for (const auto& dep : device_extension_deps) {
+            all_enabled &= enabled_extensions.contains(dep);
+        }
+        if (all_enabled) {
+            enabled_spirv_extensions.push_back(ext);
+        }
+    }
+
+    for (const auto& cap : get_spirv_capabilities()) {
+        if (is_spirv_capability_supported(cap, physical_device->get_vk_api_version(),
+                                           enabled_features, physical_device->get_properties())) {
+            enabled_spirv_capabilities.push_back(cap);
+        }
+    }
 }
 
 Device::~Device() {
@@ -149,6 +171,36 @@ Device::~Device() {
 
     SPDLOG_DEBUG("destroy device");
     device.destroy();
+}
+
+const std::vector<const char*>& Device::get_enabled_spirv_extensions() const {
+    return enabled_spirv_extensions;
+}
+
+const std::vector<const char*>& Device::get_enabled_spirv_capabilities() const {
+    return enabled_spirv_capabilities;
+}
+
+std::map<std::string, std::string> Device::get_shader_defines(const InstanceHandle& instance) const {
+    std::map<std::string, std::string> defines;
+
+    for (const auto& ext : instance->get_enabled_extensions()) {
+        defines.emplace(std::string(SHADER_DEFINE_PREFIX_INSTANCE_EXT) + ext, "1");
+    }
+
+    for (const auto& ext : enabled_extensions) {
+        defines.emplace(std::string(SHADER_DEFINE_PREFIX_DEVICE_EXT) + ext, "1");
+    }
+
+    for (const auto& ext : enabled_spirv_extensions) {
+        defines.emplace(std::string(SHADER_DEFINE_PREFIX_SPIRV_EXT) + ext, "1");
+    }
+
+    for (const auto& cap : enabled_spirv_capabilities) {
+        defines.emplace(std::string(SHADER_DEFINE_PREFIX_SPIRV_CAP) + cap, "1");
+    }
+
+    return defines;
 }
 
 } // namespace merian

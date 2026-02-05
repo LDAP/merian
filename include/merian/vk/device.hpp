@@ -4,7 +4,10 @@
 #include "merian/vk/utils/vulkan_extensions.hpp"
 #include "spdlog/spdlog.h"
 
+#include <map>
 #include <memory>
+#include <string>
+#include <vector>
 
 namespace merian {
 
@@ -64,6 +67,11 @@ class Device : public std::enable_shared_from_this<Device> {
         return enabled_features;
     }
 
+    const std::vector<const char*>& get_enabled_spirv_extensions() const;
+    const std::vector<const char*>& get_enabled_spirv_capabilities() const;
+
+    std::map<std::string, std::string> get_shader_defines(const InstanceHandle& instance) const;
+
     // Shortcut for get_physical_device()->get_vk_api_version()
     // Returns the effective API version of the physical device, that is the minimum of the
     // targeted version and the supported version.
@@ -92,6 +100,9 @@ class Device : public std::enable_shared_from_this<Device> {
 
     vk::PipelineStageFlags supported_pipeline_stages;
     vk::PipelineStageFlags2 supported_pipeline_stages2;
+
+    std::vector<const char*> enabled_spirv_extensions;
+    std::vector<const char*> enabled_spirv_capabilities;
 };
 
 using DeviceHandle = std::shared_ptr<Device>;

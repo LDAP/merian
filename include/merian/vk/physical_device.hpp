@@ -6,8 +6,11 @@
 #include "merian/vk/utils/vulkan_properties.hpp"
 
 #include <fmt/format.h>
+#include <map>
 #include <memory>
+#include <string>
 #include <unordered_set>
+#include <vector>
 
 namespace merian {
 
@@ -87,6 +90,13 @@ class PhysicalDevice : public std::enable_shared_from_this<PhysicalDevice> {
 
     // ----------------------------------------
 
+    const std::vector<const char*>& get_supported_spirv_extensions() const;
+    const std::vector<const char*>& get_supported_spirv_capabilities() const;
+
+    std::map<std::string, std::string> get_shader_defines() const;
+
+    // ----------------------------------------
+
   private:
     const InstanceHandle instance;
     const vk::PhysicalDevice physical_device;
@@ -99,6 +109,9 @@ class PhysicalDevice : public std::enable_shared_from_this<PhysicalDevice> {
     vk::PhysicalDeviceMemoryProperties2 physical_device_memory_properties;
 
     std::vector<vk::ExtensionProperties> physical_device_extension_properties;
+
+    std::vector<const char*> supported_spirv_extensions;
+    std::vector<const char*> supported_spirv_capabilities;
 };
 
 using PhysicalDeviceHandle = std::shared_ptr<PhysicalDevice>;
