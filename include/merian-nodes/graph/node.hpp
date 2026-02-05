@@ -31,12 +31,35 @@ class Node : public std::enable_shared_from_this<Node> {
         REMOVE_NODE = 0b100,
     };
 
+    struct DeviceSupportInfo {
+        bool supported = true;
+        std::vector<const char*> required_features{};
+        std::vector<const char*> required_extensions{};
+        std::vector<const char*> required_spirv_capabilities{};
+        std::vector<const char*> required_spirv_extensions{};
+    };
+
   public:
     Node() {}
 
     virtual ~Node() {}
 
     // -----------------------------------------------------------
+
+    // Query if the node is able to run on the supplied physical_device and which features,
+    // extensions and capabilities are required on this device (these must be supported, otherwise
+    // you need to return false!).
+    virtual DeviceSupportInfo
+    query_device_support(const PhysicalDeviceHandle& /*physical_device*/) {
+        return DeviceSupportInfo{true};
+    }
+
+    // Initialize for this context (and device), now knowing which (physical) device to use.
+    // The graph must ensure that you get a device from a physical device for which
+    // query_device_support returned true and all requirements are enabled.
+    //
+    // Use the allocator to allocate static data, that does not depend on graph configuration.
+    virtual void initialize(const ContextHandle context, const ResourceAllocatorHandle& allocator);
 
     // This might be called at any time of the graph lifecycle. Must be consistent with dump_config.
     virtual NodeStatusFlags load_config(const nlohmann::json& json);
