@@ -96,6 +96,7 @@ def find_vk_physical_device_features2(xml_root) -> FeatureStruct | None:
                     stype="VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2",
                     members=vk_features_members,
                     member_prefix="features.",
+                    structextends=[DEVICE_CREATE_INFO],
                 )
             break
     return None

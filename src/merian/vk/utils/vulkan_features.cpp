@@ -11017,6 +11017,66 @@ void* VulkanFeatures::build_chain_for_device_creation(
         chain_head = &m_fault_features_ext;
     }
 
+    // PhysicalDeviceFeatures2
+    if (m_features2.features.robustBufferAccess == VK_TRUE ||
+        m_features2.features.fullDrawIndexUint32 == VK_TRUE ||
+        m_features2.features.imageCubeArray == VK_TRUE ||
+        m_features2.features.independentBlend == VK_TRUE ||
+        m_features2.features.geometryShader == VK_TRUE ||
+        m_features2.features.tessellationShader == VK_TRUE ||
+        m_features2.features.sampleRateShading == VK_TRUE ||
+        m_features2.features.dualSrcBlend == VK_TRUE ||
+        m_features2.features.logicOp == VK_TRUE ||
+        m_features2.features.multiDrawIndirect == VK_TRUE ||
+        m_features2.features.drawIndirectFirstInstance == VK_TRUE ||
+        m_features2.features.depthClamp == VK_TRUE ||
+        m_features2.features.depthBiasClamp == VK_TRUE ||
+        m_features2.features.fillModeNonSolid == VK_TRUE ||
+        m_features2.features.depthBounds == VK_TRUE ||
+        m_features2.features.wideLines == VK_TRUE ||
+        m_features2.features.largePoints == VK_TRUE ||
+        m_features2.features.alphaToOne == VK_TRUE ||
+        m_features2.features.multiViewport == VK_TRUE ||
+        m_features2.features.samplerAnisotropy == VK_TRUE ||
+        m_features2.features.textureCompressionETC2 == VK_TRUE ||
+        m_features2.features.textureCompressionASTC_LDR == VK_TRUE ||
+        m_features2.features.textureCompressionBC == VK_TRUE ||
+        m_features2.features.occlusionQueryPrecise == VK_TRUE ||
+        m_features2.features.pipelineStatisticsQuery == VK_TRUE ||
+        m_features2.features.vertexPipelineStoresAndAtomics == VK_TRUE ||
+        m_features2.features.fragmentStoresAndAtomics == VK_TRUE ||
+        m_features2.features.shaderTessellationAndGeometryPointSize == VK_TRUE ||
+        m_features2.features.shaderImageGatherExtended == VK_TRUE ||
+        m_features2.features.shaderStorageImageExtendedFormats == VK_TRUE ||
+        m_features2.features.shaderStorageImageMultisample == VK_TRUE ||
+        m_features2.features.shaderStorageImageReadWithoutFormat == VK_TRUE ||
+        m_features2.features.shaderStorageImageWriteWithoutFormat == VK_TRUE ||
+        m_features2.features.shaderUniformBufferArrayDynamicIndexing == VK_TRUE ||
+        m_features2.features.shaderSampledImageArrayDynamicIndexing == VK_TRUE ||
+        m_features2.features.shaderStorageBufferArrayDynamicIndexing == VK_TRUE ||
+        m_features2.features.shaderStorageImageArrayDynamicIndexing == VK_TRUE ||
+        m_features2.features.shaderClipDistance == VK_TRUE ||
+        m_features2.features.shaderCullDistance == VK_TRUE ||
+        m_features2.features.shaderFloat64 == VK_TRUE ||
+        m_features2.features.shaderInt64 == VK_TRUE ||
+        m_features2.features.shaderInt16 == VK_TRUE ||
+        m_features2.features.shaderResourceResidency == VK_TRUE ||
+        m_features2.features.shaderResourceMinLod == VK_TRUE ||
+        m_features2.features.sparseBinding == VK_TRUE ||
+        m_features2.features.sparseResidencyBuffer == VK_TRUE ||
+        m_features2.features.sparseResidencyImage2D == VK_TRUE ||
+        m_features2.features.sparseResidencyImage3D == VK_TRUE ||
+        m_features2.features.sparseResidency2Samples == VK_TRUE ||
+        m_features2.features.sparseResidency4Samples == VK_TRUE ||
+        m_features2.features.sparseResidency8Samples == VK_TRUE ||
+        m_features2.features.sparseResidency16Samples == VK_TRUE ||
+        m_features2.features.sparseResidencyAliased == VK_TRUE ||
+        m_features2.features.variableMultisampleRate == VK_TRUE ||
+        m_features2.features.inheritedQueries == VK_TRUE) {
+        m_features2.pNext = chain_head;
+        chain_head = &m_features2;
+    }
+
     // PhysicalDeviceFormatPackFeaturesARM
     if (m_format_pack_features_arm.formatPack == VK_TRUE) {
             assert(physical_device->extension_supported(VK_ARM_FORMAT_PACK_EXTENSION_NAME) &&
