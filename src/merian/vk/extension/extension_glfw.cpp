@@ -31,8 +31,7 @@ void ExtensionGLFW::on_context_initializing(
     glfwInitVulkanLoader(loader.vkGetInstanceProcAddr);
     glfw_vulkan_support = glfwVulkanSupported();
     if (glfw_vulkan_support == GLFW_FALSE) {
-        SPDLOG_WARN("...failed! GLFW reports to have no Vulkan support! Maybe it couldn't "
-                    "find the Vulkan loader!");
+        SPDLOG_WARN("...failed! GLFW reports to have no Vulkan support!");
     } else {
         SPDLOG_DEBUG("...success!");
     }
