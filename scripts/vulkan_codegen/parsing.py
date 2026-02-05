@@ -2,9 +2,10 @@
 
 import re
 import xml.etree.ElementTree as ET
+from dataclasses import replace
 
 from .codegen import build_extension_name_map, version_to_api_version
-from .models import Extension
+from .models import Extension, VulkanStruct, FeatureMember
 from .naming import to_camel_case
 from .spec import FEATURE_STRUCT_BASE, PROPERTY_STRUCT_BASE
 
@@ -231,3 +232,122 @@ def _extract_stype(typedef: ET.Element, type_name: str, tags: list[str]) -> str 
                 )
                 return enum_name
     return None
+
+
+def find_all_structures(xml_root: ET.Element, tags: list[str], skiplist: set[str]) -> list[VulkanStruct]:
+    """
+    Extract ALL Vulkan struct metadata from XML without filtering by structextends.
+
+    Returns VulkanStruct objects for all struct types including:
+    - Feature structs (with VkBool32 members extracted)
+    - Property structs (with all members)
+    - Base struct VkPhysicalDeviceFeatures2 (special case: members from VkPhysicalDeviceFeatures, adds DeviceCreateInfo to structextends)
+    - Alias structs (copies of canonical structs with is_alias=True)
+
+    Args:
+        xml_root: Root element of Vulkan XML spec
+        tags: Vendor tags for proper naming
+        skiplist: Platform-specific types to skip
+
+    Returns:
+        List of VulkanStruct with complete metadata including aliases
+
+    Note:
+        No manual hacks needed - VkPhysicalDeviceFeatures2 handled in main loop.
+    """
+    from .codegen import (
+        build_extension_type_map,
+        build_feature_version_map,
+        build_alias_maps,
+    )
+    from .naming import (
+        get_stype_from_name,
+        vk_name_to_cpp_name,
+    )
+    from .spec import DEVICE_CREATE_INFO
+
+    # Build helper maps
+    extension_type_map = build_extension_type_map(xml_root)
+    version_map = build_feature_version_map(xml_root)
+    alias_to_canonical, canonical_to_aliases = build_alias_maps(xml_root)
+
+    structs = []
+    canonical_structs = {}  # Map vk_name -> VulkanStruct for later alias copying
+
+    # Extract all struct types from XML (skip aliases in first pass)
+    for type_elem in xml_root.findall("types/type"):
+        if type_elem.get("category") != "struct":
+            continue
+
+        vk_name = type_elem.get("name")
+        if not vk_name or vk_name in skiplist or type_elem.get("alias"):
+            continue  # Skip aliases in first pass - we'll create them later
+
+        # Extract structextends (critical for later filtering)
+        struct_extends = type_elem.get("structextends", "")
+        structextends = struct_extends.split(",") if struct_extends else []
+
+        # Special handling for VkPhysicalDeviceFeatures2
+        if vk_name == "VkPhysicalDeviceFeatures2":
+            # Add DeviceCreateInfo to structextends (not declared in XML)
+            structextends.append(DEVICE_CREATE_INFO)
+
+        # Extract sType
+        stype = None
+        for member in type_elem.findall("member"):
+            member_name = member.find("name")
+            if member_name is not None and member_name.text == "sType":
+                if values := member.get("values"):
+                    stype = values
+                    break
+        if not stype:
+            stype = get_stype_from_name(vk_name)
+
+        # Extract ALL members as (type, name, comment) tuples
+        members = []
+        for member in type_elem.findall("member"):
+            member_type = member.find("type")
+            member_name = member.find("name")
+            if member_type is not None and member_name is not None:
+                # Skip sType and pNext
+                if member_name.text not in ("sType", "pNext"):
+                    comment = member.get("comment", "")
+                    members.append((member_type.text, member_name.text, comment))
+
+        # Get extension and version metadata
+        ext_info = extension_type_map.get(vk_name)
+        extension_name = ext_info[1] if ext_info else None
+
+        vulkan_struct = VulkanStruct(
+            vk_name=vk_name,
+            cpp_name=vk_name_to_cpp_name(vk_name),
+            stype=stype,
+            structextends=structextends,
+            extension_name=extension_name,
+            members=members,  # (type, name, comment) tuples for all members
+            aliases=canonical_to_aliases.get(vk_name, []),  # Populate aliases list
+            is_alias=False,  # Canonical struct
+        )
+
+        structs.append(vulkan_struct)
+        canonical_structs[vk_name] = vulkan_struct
+
+    # Second pass: Create alias structs by copying canonical structs
+    for alias_name, canonical_name in alias_to_canonical.items():
+        if canonical_name not in canonical_structs:
+            continue  # Skip if canonical struct wasn't extracted (e.g., filtered by skiplist)
+
+        canonical = canonical_structs[canonical_name]
+
+        # Create copy with alias name
+        alias_struct = replace(
+            canonical,
+            vk_name=alias_name,
+            cpp_name=vk_name_to_cpp_name(alias_name),
+            aliases=[],  # Aliases don't have their own aliases
+            is_alias=True,  # Mark as alias
+        )
+
+        structs.append(alias_struct)
+
+    return structs

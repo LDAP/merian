@@ -843,7 +843,7 @@ VulkanProperties::VulkanProperties(const vk::PhysicalDevice& physical_device,
     // Query properties from device
     m_properties2.pNext = chain_tail;
     physical_device.getProperties2(&m_properties2);
-    available_structs.insert(vk::StructureType::ePhysicalDeviceProperties2);
+    available_structs.insert(m_properties2.sType);
 }
 
 // Template get<T>() implementation
@@ -864,7 +864,6 @@ const T& VulkanProperties::get() const {
 }
 
 // Explicit template instantiations
-template const vk::PhysicalDeviceProperties2& VulkanProperties::get<vk::PhysicalDeviceProperties2>() const;
 template const vk::PhysicalDeviceAccelerationStructurePropertiesKHR& VulkanProperties::get<vk::PhysicalDeviceAccelerationStructurePropertiesKHR>() const;
 template const vk::PhysicalDeviceBlendOperationAdvancedPropertiesEXT& VulkanProperties::get<vk::PhysicalDeviceBlendOperationAdvancedPropertiesEXT>() const;
 template const vk::PhysicalDeviceClusterAccelerationStructurePropertiesNV& VulkanProperties::get<vk::PhysicalDeviceClusterAccelerationStructurePropertiesNV>() const;
@@ -936,6 +935,7 @@ template const vk::PhysicalDevicePerformanceQueryPropertiesKHR& VulkanProperties
 template const vk::PhysicalDevicePipelineBinaryPropertiesKHR& VulkanProperties::get<vk::PhysicalDevicePipelineBinaryPropertiesKHR>() const;
 template const vk::PhysicalDevicePipelineRobustnessProperties& VulkanProperties::get<vk::PhysicalDevicePipelineRobustnessProperties>() const;
 template const vk::PhysicalDevicePointClippingProperties& VulkanProperties::get<vk::PhysicalDevicePointClippingProperties>() const;
+template const vk::PhysicalDeviceProperties2& VulkanProperties::get<vk::PhysicalDeviceProperties2>() const;
 template const vk::PhysicalDeviceProtectedMemoryProperties& VulkanProperties::get<vk::PhysicalDeviceProtectedMemoryProperties>() const;
 template const vk::PhysicalDeviceProvokingVertexPropertiesEXT& VulkanProperties::get<vk::PhysicalDeviceProvokingVertexPropertiesEXT>() const;
 template const vk::PhysicalDevicePushConstantBankPropertiesNV& VulkanProperties::get<vk::PhysicalDevicePushConstantBankPropertiesNV>() const;
@@ -977,17 +977,12 @@ template const vk::PhysicalDeviceVulkan13Properties& VulkanProperties::get<vk::P
 template const vk::PhysicalDeviceVulkan14Properties& VulkanProperties::get<vk::PhysicalDeviceVulkan14Properties>() const;
 
 // Named getter implementations
+// Special getter for inner properties field
 const vk::PhysicalDeviceProperties& VulkanProperties::get_properties() const {
     return m_properties2.properties;
 }
 VulkanProperties::operator const vk::PhysicalDeviceProperties&() const {
     return get_properties();
-}
-const vk::PhysicalDeviceProperties2& VulkanProperties::get_properties2() const {
-    return m_properties2;
-}
-VulkanProperties::operator const vk::PhysicalDeviceProperties2&() const {
-    return get_properties2();
 }
 const vk::PhysicalDeviceAccelerationStructurePropertiesKHR& VulkanProperties::get_acceleration_structure_properties_khr() const {
     if (!is_available(vk::StructureType::ePhysicalDeviceAccelerationStructurePropertiesKHR)) {
@@ -1699,6 +1694,16 @@ const vk::PhysicalDevicePointClippingProperties& VulkanProperties::get_point_cli
 VulkanProperties::operator const vk::PhysicalDevicePointClippingProperties&() const {
     return get_point_clipping_properties();
 }
+const vk::PhysicalDeviceProperties2& VulkanProperties::get_properties2() const {
+    if (!is_available(vk::StructureType::ePhysicalDeviceProperties2)) {
+        throw std::runtime_error(fmt::format(
+            "Property struct PhysicalDeviceProperties2 not available (extension not supported)"));
+    }
+    return m_properties2;
+}
+VulkanProperties::operator const vk::PhysicalDeviceProperties2&() const {
+    return get_properties2();
+}
 const vk::PhysicalDeviceProtectedMemoryProperties& VulkanProperties::get_protected_memory_properties() const {
     if (!is_available(vk::StructureType::ePhysicalDeviceProtectedMemoryProperties)) {
         throw std::runtime_error(fmt::format(
@@ -2090,10 +2095,94 @@ VulkanProperties::operator const vk::PhysicalDeviceVulkan14Properties&() const {
     return get_vulkan14_properties();
 }
 
+// Alias getter implementations (for backwards compatibility)
+const vk::PhysicalDeviceCopyMemoryIndirectPropertiesKHR& VulkanProperties::get_copy_memory_indirect_properties_nv() const {
+    return m_copy_memory_indirect_properties_khr;  // Alias for PhysicalDeviceCopyMemoryIndirectPropertiesKHR
+}
+const vk::PhysicalDeviceDepthStencilResolveProperties& VulkanProperties::get_depth_stencil_resolve_properties_khr() const {
+    return m_depth_stencil_resolve_properties;  // Alias for PhysicalDeviceDepthStencilResolveProperties
+}
+const vk::PhysicalDeviceDescriptorIndexingProperties& VulkanProperties::get_descriptor_indexing_properties_ext() const {
+    return m_descriptor_indexing_properties;  // Alias for PhysicalDeviceDescriptorIndexingProperties
+}
+const vk::PhysicalDeviceDriverProperties& VulkanProperties::get_driver_properties_khr() const {
+    return m_driver_properties;  // Alias for PhysicalDeviceDriverProperties
+}
+const vk::PhysicalDeviceFloatControlsProperties& VulkanProperties::get_float_controls_properties_khr() const {
+    return m_float_controls_properties;  // Alias for PhysicalDeviceFloatControlsProperties
+}
+const vk::PhysicalDeviceFragmentDensityMapOffsetPropertiesEXT& VulkanProperties::get_fragment_density_map_offset_properties_qcom() const {
+    return m_fragment_density_map_offset_properties_ext;  // Alias for PhysicalDeviceFragmentDensityMapOffsetPropertiesEXT
+}
+const vk::PhysicalDeviceHostImageCopyProperties& VulkanProperties::get_host_image_copy_properties_ext() const {
+    return m_host_image_copy_properties;  // Alias for PhysicalDeviceHostImageCopyProperties
+}
+const vk::PhysicalDeviceIDProperties& VulkanProperties::get_id_properties_khr() const {
+    return m_id_properties;  // Alias for PhysicalDeviceIDProperties
+}
+const vk::PhysicalDeviceInlineUniformBlockProperties& VulkanProperties::get_inline_uniform_block_properties_ext() const {
+    return m_inline_uniform_block_properties;  // Alias for PhysicalDeviceInlineUniformBlockProperties
+}
+const vk::PhysicalDeviceLineRasterizationProperties& VulkanProperties::get_line_rasterization_properties_khr() const {
+    return m_line_rasterization_properties;  // Alias for PhysicalDeviceLineRasterizationProperties
+}
+const vk::PhysicalDeviceLineRasterizationProperties& VulkanProperties::get_line_rasterization_properties_ext() const {
+    return m_line_rasterization_properties;  // Alias for PhysicalDeviceLineRasterizationProperties
+}
+const vk::PhysicalDeviceMaintenance3Properties& VulkanProperties::get_maintenance3_properties_khr() const {
+    return m_maintenance3_properties;  // Alias for PhysicalDeviceMaintenance3Properties
+}
+const vk::PhysicalDeviceMaintenance4Properties& VulkanProperties::get_maintenance4_properties_khr() const {
+    return m_maintenance4_properties;  // Alias for PhysicalDeviceMaintenance4Properties
+}
+const vk::PhysicalDeviceMaintenance5Properties& VulkanProperties::get_maintenance5_properties_khr() const {
+    return m_maintenance5_properties;  // Alias for PhysicalDeviceMaintenance5Properties
+}
+const vk::PhysicalDeviceMaintenance6Properties& VulkanProperties::get_maintenance6_properties_khr() const {
+    return m_maintenance6_properties;  // Alias for PhysicalDeviceMaintenance6Properties
+}
+const vk::PhysicalDeviceMemoryDecompressionPropertiesEXT& VulkanProperties::get_memory_decompression_properties_nv() const {
+    return m_memory_decompression_properties_ext;  // Alias for PhysicalDeviceMemoryDecompressionPropertiesEXT
+}
+const vk::PhysicalDeviceMultiviewProperties& VulkanProperties::get_multiview_properties_khr() const {
+    return m_multiview_properties;  // Alias for PhysicalDeviceMultiviewProperties
+}
+const vk::PhysicalDevicePipelineRobustnessProperties& VulkanProperties::get_pipeline_robustness_properties_ext() const {
+    return m_pipeline_robustness_properties;  // Alias for PhysicalDevicePipelineRobustnessProperties
+}
+const vk::PhysicalDevicePointClippingProperties& VulkanProperties::get_point_clipping_properties_khr() const {
+    return m_point_clipping_properties;  // Alias for PhysicalDevicePointClippingProperties
+}
+const vk::PhysicalDeviceProperties2& VulkanProperties::get_properties2_khr() const {
+    return m_properties2;  // Alias for PhysicalDeviceProperties2
+}
+const vk::PhysicalDevicePushDescriptorProperties& VulkanProperties::get_push_descriptor_properties_khr() const {
+    return m_push_descriptor_properties;  // Alias for PhysicalDevicePushDescriptorProperties
+}
+const vk::PhysicalDeviceRobustness2PropertiesKHR& VulkanProperties::get_robustness2_properties_ext() const {
+    return m_robustness2_properties_khr;  // Alias for PhysicalDeviceRobustness2PropertiesKHR
+}
+const vk::PhysicalDeviceSamplerFilterMinmaxProperties& VulkanProperties::get_sampler_filter_minmax_properties_ext() const {
+    return m_sampler_filter_minmax_properties;  // Alias for PhysicalDeviceSamplerFilterMinmaxProperties
+}
+const vk::PhysicalDeviceShaderIntegerDotProductProperties& VulkanProperties::get_shader_integer_dot_product_properties_khr() const {
+    return m_shader_integer_dot_product_properties;  // Alias for PhysicalDeviceShaderIntegerDotProductProperties
+}
+const vk::PhysicalDeviceSubgroupSizeControlProperties& VulkanProperties::get_subgroup_size_control_properties_ext() const {
+    return m_subgroup_size_control_properties;  // Alias for PhysicalDeviceSubgroupSizeControlProperties
+}
+const vk::PhysicalDeviceTexelBufferAlignmentProperties& VulkanProperties::get_texel_buffer_alignment_properties_ext() const {
+    return m_texel_buffer_alignment_properties;  // Alias for PhysicalDeviceTexelBufferAlignmentProperties
+}
+const vk::PhysicalDeviceTimelineSemaphoreProperties& VulkanProperties::get_timeline_semaphore_properties_khr() const {
+    return m_timeline_semaphore_properties;  // Alias for PhysicalDeviceTimelineSemaphoreProperties
+}
+const vk::PhysicalDeviceVertexAttributeDivisorProperties& VulkanProperties::get_vertex_attribute_divisor_properties_khr() const {
+    return m_vertex_attribute_divisor_properties;  // Alias for PhysicalDeviceVertexAttributeDivisorProperties
+}
+
 const void* VulkanProperties::get_struct_ptr(vk::StructureType stype) const {
     switch (stype) {
-        case vk::StructureType::ePhysicalDeviceProperties2:
-            return &m_properties2;
         case vk::StructureType::ePhysicalDeviceAccelerationStructurePropertiesKHR:
             return &m_acceleration_structure_properties_khr;
         case vk::StructureType::ePhysicalDeviceBlendOperationAdvancedPropertiesEXT:
@@ -2236,6 +2325,8 @@ const void* VulkanProperties::get_struct_ptr(vk::StructureType stype) const {
             return &m_pipeline_robustness_properties;
         case vk::StructureType::ePhysicalDevicePointClippingProperties:
             return &m_point_clipping_properties;
+        case vk::StructureType::ePhysicalDeviceProperties2:
+            return &m_properties2;
         case vk::StructureType::ePhysicalDeviceProtectedMemoryProperties:
             return &m_protected_memory_properties;
         case vk::StructureType::ePhysicalDeviceProvokingVertexPropertiesEXT:
@@ -2320,10 +2411,6 @@ const void* VulkanProperties::get_struct_ptr(vk::StructureType stype) const {
 }
 
 bool VulkanProperties::is_available(vk::StructureType stype) const {
-    // Properties2 is always available
-    if (stype == vk::StructureType::ePhysicalDeviceProperties2) {
-        return true;
-    }
     return available_structs.contains(stype);
 }
 

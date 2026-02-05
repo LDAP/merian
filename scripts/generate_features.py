@@ -16,15 +16,12 @@ aggregate design that eliminates unsafe casting and map lookups.
 import re
 from pprint import pprint
 from vulkan_codegen.codegen import (
-    build_alias_maps,
-    build_extension_type_map,
-    build_feature_version_map,
     generate_file_header,
     generate_stype_switch,
     get_extension,
 )
 from vulkan_codegen.models import FeatureMember, FeatureStruct
-from vulkan_codegen.parsing import build_extension_map
+from vulkan_codegen.parsing import build_extension_map, find_all_structures
 from vulkan_codegen.naming import (
     generate_getter_name,
     generate_member_name,
@@ -50,121 +47,89 @@ out_path, include_path = get_output_paths()
 _extension_map = {}
 
 
-def extract_feature_members(type_elem) -> tuple[str | None, list[FeatureMember]]:
-    """Extract sType and VkBool32 members from a struct type element."""
-    stype = None
-    members = []
+def _extract_feature_members(vulkan_struct, struct_map: dict) -> tuple[list[FeatureMember], str]:
+    """
+    Extract VkBool32 feature members from VulkanStruct.
 
-    for member in type_elem.findall("member"):
-        member_type = member.find("type")
-        member_name = member.find("name")
+    For VkPhysicalDeviceFeatures2, recursively looks up VkPhysicalDeviceFeatures
+    and extracts its VkBool32 members with the appropriate prefix.
 
-        if member_type is None or member_name is None:
-            continue
+    Returns:
+        (feature_members, feature_member_prefix)
+    """
+    feature_members = []
+    feature_member_prefix = ""
 
-        type_text = member_type.text
-        name_text = member_name.text
+    # Check if this struct has VkPhysicalDeviceFeatures member (Features2 case)
+    for member_type, member_name, member_comment in vulkan_struct.members:
+        if member_type == "VkPhysicalDeviceFeatures":
+            # Recursive lookup: get features from VkPhysicalDeviceFeatures
+            feature_member_prefix = f"{member_name}."  # e.g., "features."
+            if base_struct := struct_map.get("VkPhysicalDeviceFeatures"):
+                for base_type, base_name, base_comment in base_struct.members:
+                    if base_type == "VkBool32":
+                        feature_members.append(FeatureMember(name=base_name, comment=base_comment))
+            return feature_members, feature_member_prefix
 
-        if name_text == "sType" and member.get("values"):
-            stype = member.get("values")
-        elif type_text == "VkBool32":
-            comment = member.get("comment", "")
-            members.append(FeatureMember(name=name_text, comment=comment))
+    # Regular case: extract VkBool32 members directly
+    for member_type, member_name, member_comment in vulkan_struct.members:
+        if member_type == "VkBool32":
+            feature_members.append(FeatureMember(name=member_name, comment=member_comment))
 
-    return stype, members
-
-
-def find_vk_physical_device_features2(xml_root) -> FeatureStruct | None:
-    """Find and create VkPhysicalDeviceFeatures2 struct."""
-    for type_elem in xml_root.findall("types/type"):
-        if type_elem.get("name") == "VkPhysicalDeviceFeatures":
-            vk_features_members = []
-            for member in type_elem.findall("member"):
-                member_type = member.find("type")
-                member_name = member.find("name")
-                if member_type is not None and member_name is not None:
-                    if member_type.text == "VkBool32":
-                        comment = member.get("comment", "")
-                        vk_features_members.append(
-                            FeatureMember(name=member_name.text, comment=comment)
-                        )
-
-            if vk_features_members:
-                return FeatureStruct(
-                    vk_name=FEATURE_STRUCT_BASE,
-                    cpp_name="PhysicalDeviceFeatures2",
-                    stype="VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2",
-                    members=vk_features_members,
-                    member_prefix="features.",
-                    structextends=[DEVICE_CREATE_INFO],
-                )
-            break
-    return None
-
-
-def find_aliases_for_features(canonical_to_aliases: dict, features: list[FeatureStruct]):
-    """Populate feature.aliases using pre-built alias map."""
-    for feat in features:
-        if feat.vk_name in canonical_to_aliases:
-            feat.aliases = canonical_to_aliases[feat.vk_name]
+    return feature_members, feature_member_prefix
 
 
 def find_feature_structures(xml_root, tags) -> list[FeatureStruct]:
-    """Find all structures that extend VkPhysicalDeviceFeatures2."""
-    features = []
+    """Find all structures that extend VkPhysicalDeviceFeatures2 or VkDeviceCreateInfo."""
     skiplist = build_skiplist(xml_root)
 
-    # Build full extension map with all properties
+    # Build full extension map
     global _extension_map
     _extension_map = build_extension_map(xml_root, tags)
 
-    # Build type -> extension_name map (still needed for struct association)
-    extension_type_map = build_extension_type_map(xml_root)
-    version_map = build_feature_version_map(xml_root)
-    _, canonical_to_aliases = build_alias_maps(xml_root)
+    # Extract all structs using unified function
+    all_structs = find_all_structures(xml_root, tags, skiplist)
 
-    for type_elem in xml_root.findall("types/type"):
-        if type_elem.get("category") != "struct":
-            continue
+    # Filter for feature structs (includes base struct and all extensions)
+    feature_structs = [
+        s for s in all_structs
+        if s.vk_name == FEATURE_STRUCT_BASE  # Include VkPhysicalDeviceFeatures2 itself
+        or FEATURE_STRUCT_BASE in s.structextends  # Or structs that extend it
+    ]
 
-        struct_extends = type_elem.get("structextends", "")
-        if FEATURE_STRUCT_BASE not in struct_extends.split(","):
-            continue
+    # Build lookup map for recursive member resolution
+    struct_map = {s.vk_name: s for s in all_structs}
 
-        vk_name = type_elem.get("name")
-        if not vk_name or vk_name in skiplist or type_elem.get("alias") is not None:
-            continue
+    features = []
+    for vulkan_struct in feature_structs:
+        # Extract VkBool32 members and determine prefix
+        feature_members, feature_member_prefix = _extract_feature_members(vulkan_struct, struct_map)
 
-        stype, members = extract_feature_members(type_elem)
-        if not stype:
-            stype = get_stype_from_name(vk_name)
+        # Get required_version from version map for core structs
+        from vulkan_codegen.codegen import build_feature_version_map
+        version_map = build_feature_version_map(xml_root)
+        required_version = version_map.get(vulkan_struct.vk_name)
 
-        cpp_name = vk_name_to_cpp_name(vk_name)
-
-        # Get extension_name from type map
-        ext_info = extension_type_map.get(vk_name)
-        extension_name = ext_info[1] if ext_info else None
-        required_version = version_map.get(vk_name)
-
-        features.append(
-            FeatureStruct(
-                vk_name=vk_name,
-                cpp_name=cpp_name,
-                stype=stype,
-                members=members,
-                extension_name=extension_name,
-                required_version=required_version,
-                structextends=struct_extends.split(",") if struct_extends else [],
-            )
-        )
-
-    # Add VkPhysicalDeviceFeatures2
-    if features2 := find_vk_physical_device_features2(xml_root):
-        features.append(features2)
-
-    find_aliases_for_features(canonical_to_aliases, features)
+        features.append(FeatureStruct(
+            vk_name=vulkan_struct.vk_name,
+            cpp_name=vulkan_struct.cpp_name,
+            stype=vulkan_struct.stype,
+            extension_name=vulkan_struct.extension_name,
+            structextends=vulkan_struct.structextends,
+            aliases=vulkan_struct.aliases,
+            is_alias=vulkan_struct.is_alias,
+            members=vulkan_struct.members,  # Keep raw members from base class
+            feature_members=feature_members,  # Filtered VkBool32 members
+            required_version=required_version,
+            feature_member_prefix=feature_member_prefix,  # From recursive lookup
+        ))
 
     return features
+
+
+def _canonical_features_only(features: list[FeatureStruct]) -> list[FeatureStruct]:
+    """Filter out aliases - only return canonical structs for member/getter generation."""
+    return [f for f in features if not f.is_alias]
 
 
 def generate_concept_definition(features: list[FeatureStruct]) -> list[str]:
@@ -178,9 +143,11 @@ def generate_concept_definition(features: list[FeatureStruct]) -> list[str]:
         "concept VulkanFeatureStruct = (",
     ]
 
+    # Only include canonical structs (no aliases) in concept
+    canonical = _canonical_features_only(features)
     type_checks = [
         f"    std::same_as<T, vk::{feat.cpp_name}>"
-        for feat in sorted(features, key=lambda f: f.cpp_name)
+        for feat in sorted(canonical, key=lambda f: f.cpp_name)
     ]
     lines.append(" ||\n".join(type_checks))
     lines.extend([");", ""])
@@ -198,18 +165,20 @@ def generate_class_methods_declaration(features: list[FeatureStruct]) -> list[st
         "    // Named getters for each feature struct",
     ]
 
-    lines.append("    vk::PhysicalDeviceFeatures& get_features();")
+    # Only canonical structs get main getters
+    canonical = _canonical_features_only(features)
+
     lines.append("    const vk::PhysicalDeviceFeatures& get_features() const;")
     lines.append("    operator const vk::PhysicalDeviceFeatures&() const;")
-    for feat in sorted(features, key=lambda f: f.cpp_name):
+    for feat in sorted(canonical, key=lambda f: f.cpp_name):
         getter_name = generate_getter_name(feat.cpp_name)
-        lines.append(f"    vk::{feat.cpp_name}& {getter_name}();")
         lines.append(f"    const vk::{feat.cpp_name}& {getter_name}() const;")
         lines.append(f"    operator const vk::{feat.cpp_name}&() const;")
 
     lines.extend(["", "    // Alias getters (for backwards compatibility)"])
 
-    for feat in sorted(features, key=lambda f: f.cpp_name):
+    # Generate alias getters from canonical struct's aliases list
+    for feat in sorted(canonical, key=lambda f: f.cpp_name):
         for alias_vk_name in feat.aliases:
             alias_cpp_name = vk_name_to_cpp_name(alias_vk_name)
             alias_getter_name = generate_getter_name(alias_cpp_name)
@@ -321,7 +290,9 @@ def generate_header(features: list[FeatureStruct]) -> str:
         ]
     )
 
-    for feat in sorted(features, key=lambda f: f.cpp_name):
+    # Only canonical structs get member declarations (no aliases)
+    canonical = _canonical_features_only(features)
+    for feat in sorted(canonical, key=lambda f: f.cpp_name):
         member_name = generate_member_name(feat.cpp_name)
         lines.append(f"    vk::{feat.cpp_name} {member_name}{{}};")
 
@@ -366,11 +337,10 @@ def generate_constructor(features: list[FeatureStruct], tags) -> list[str]:
         "",
     ]
 
-    # Sort all features (except PhysicalDeviceFeatures2) alphabetically
-    sorted_features = sorted(
-        [f for f in features if f.cpp_name != "PhysicalDeviceFeatures2"],
-        key=lambda f: f.cpp_name,
-    )
+    # Only canonical features (no aliases) that extend the base struct
+    canonical = _canonical_features_only(features)
+    extending_features = [f for f in canonical if FEATURE_STRUCT_BASE in f.structextends]
+    sorted_features = sorted(extending_features, key=lambda f: f.cpp_name)
 
     for feat in sorted_features:
         member_name = generate_member_name(feat.cpp_name)
@@ -439,10 +409,11 @@ def generate_constructor(features: list[FeatureStruct], tags) -> list[str]:
         ]
     )
 
-    # Build feature-to-structs map to find duplicates
+    # Build feature-to-structs map to find duplicates (canonical only)
+    canonical = _canonical_features_only(features)
     feature_to_structs = {}
-    for feat in features:
-        for member in feat.members:
+    for feat in canonical:
+        for member in feat.feature_members:
             if member.name not in feature_to_structs:
                 feature_to_structs[member.name] = []
             feature_to_structs[member.name].append((feat, member))
@@ -462,7 +433,7 @@ def generate_constructor(features: list[FeatureStruct], tags) -> list[str]:
         or_parts = []
         for feat, member in struct_members:
             member_name = generate_member_name(feat.cpp_name)
-            prefix = feat.member_prefix
+            prefix = feat.feature_member_prefix
             or_parts.append(f"{member_name}.{prefix}{member.name}")
 
         or_expression = " || ".join(or_parts)
@@ -473,7 +444,7 @@ def generate_constructor(features: list[FeatureStruct], tags) -> list[str]:
         # Set the computed value in all structs
         for feat, member in struct_members:
             member_name = generate_member_name(feat.cpp_name)
-            prefix = feat.member_prefix
+            prefix = feat.feature_member_prefix
             lines.append(
                 f"    {member_name}.{prefix}{member.name} = {feature_name}_value;"
             )
@@ -506,7 +477,9 @@ def generate_template_get(features: list[FeatureStruct]) -> list[str]:
         "// Explicit template instantiations",
     ]
 
-    for feat in sorted(features, key=lambda f: f.cpp_name):
+    # Only canonical structs get template instantiations (no aliases)
+    canonical = _canonical_features_only(features)
+    for feat in sorted(canonical, key=lambda f: f.cpp_name):
         lines.append(f"template const vk::{feat.cpp_name}& VulkanFeatures::get<vk::{feat.cpp_name}>() const;")
 
     lines.append("")
@@ -531,7 +504,9 @@ def generate_named_getters(features: list[FeatureStruct]) -> list[str]:
         ]
     )
 
-    for feat in sorted(features, key=lambda f: f.cpp_name):
+    # Only canonical structs get main getters (no aliases)
+    canonical = _canonical_features_only(features)
+    for feat in sorted(canonical, key=lambda f: f.cpp_name):
         member_name = generate_member_name(feat.cpp_name)
         getter_name = generate_getter_name(feat.cpp_name)
         lines.extend(
@@ -556,18 +531,20 @@ def generate_alias_getters(features: list[FeatureStruct]) -> list[str]:
     """Generate alias getter implementations."""
     lines = ["// Alias getter implementations (for backwards compatibility)"]
 
-    for feat in sorted(features, key=lambda f: f.cpp_name):
-        member_name = generate_member_name(feat.cpp_name)
+    # Only canonical structs have aliases to generate getters for
+    canonical = _canonical_features_only(features)
+    for feat in sorted(canonical, key=lambda f: f.cpp_name):
+        canonical_getter_name = generate_getter_name(feat.cpp_name)
         for alias_vk_name in feat.aliases:
             alias_cpp_name = vk_name_to_cpp_name(alias_vk_name)
             alias_getter_name = generate_getter_name(alias_cpp_name)
             lines.extend(
                 [
                     f"vk::{feat.cpp_name}& VulkanFeatures::{alias_getter_name}() {{",
-                    f"    return {member_name};  // Alias for {feat.cpp_name}",
+                    f"    return {canonical_getter_name}();  // Alias for {feat.cpp_name}",
                     "}",
                     f"const vk::{feat.cpp_name}& VulkanFeatures::{alias_getter_name}() const {{",
-                    f"    return {member_name};",
+                    f"    return {canonical_getter_name}();  // Alias for {feat.cpp_name}",
                     "}",
                 ]
             )
@@ -578,14 +555,18 @@ def generate_alias_getters(features: list[FeatureStruct]) -> list[str]:
 
 def generate_get_struct_ptr(features: list[FeatureStruct], tags) -> list[str]:
     """Generate get_struct_ptr const switch implementation."""
-    return generate_stype_switch(features, "VulkanFeatures", tags)
+    # Only canonical features (no aliases) - aliases share sType with canonical
+    canonical = _canonical_features_only(features)
+    return generate_stype_switch(canonical, "VulkanFeatures", tags)
 
 
 def build_feature_to_structs_map(features: list[FeatureStruct]) -> dict:
     """Build mapping of feature name -> list of (FeatureStruct, member) tuples."""
+    # Only canonical features (no aliases)
+    canonical = _canonical_features_only(features)
     feature_map = {}
-    for feat in features:
-        for member in feat.members:
+    for feat in canonical:
+        for member in feat.feature_members:
             if member.name not in feature_map:
                 feature_map[member.name] = []
             feature_map[member.name].append({"struct": feat, "member": member})
@@ -606,7 +587,7 @@ def generate_set_feature(feature_map: dict) -> list[str]:
         # Set in ALL structs that contain this feature
         for entry in struct_list:
             member_name = generate_member_name(entry["struct"].cpp_name)
-            prefix = entry["struct"].member_prefix
+            prefix = entry["struct"].feature_member_prefix
             feat_name = entry["member"].name
             lines.append(f"        {member_name}.{prefix}{feat_name} = value;")
 
@@ -640,7 +621,7 @@ def generate_get_feature(feature_map: dict) -> list[str]:
         # Return from first struct (all aliases must be consistent per Vulkan spec)
         entry = struct_list[0]
         member_name = generate_member_name(entry["struct"].cpp_name)
-        prefix = entry["struct"].member_prefix
+        prefix = entry["struct"].feature_member_prefix
         feat_name = entry["member"].name
 
         lines.append(f'    {if_keyword} (feature_name == "{feature_name}") {{')
@@ -662,7 +643,7 @@ def generate_get_feature(feature_map: dict) -> list[str]:
 
 def compute_feature_fingerprint(feat: FeatureStruct) -> frozenset[str]:
     """Compute a fingerprint (set of member names) for a feature struct."""
-    return frozenset(m.name for m in feat.members)
+    return frozenset(m.name for m in feat.feature_members)
 
 
 def compute_priority_score(feat: FeatureStruct) -> tuple:
@@ -684,7 +665,7 @@ def compute_priority_score(feat: FeatureStruct) -> tuple:
         extension_number = ext.extension_number or 0
 
     return (
-        len(feat.members),  # More features = superset = higher priority
+        len(feat.feature_members),  # More features = superset = higher priority
         -is_deprecated,  # Non-deprecated (0) > deprecated (1), so negate for sorting
         extension_number,  # Higher extension number = newer
         feat.vk_name,  # Stable tie-breaker
@@ -773,12 +754,12 @@ def group_features_by_relationship(features: list[FeatureStruct]) -> list:
 
 def generate_feature_enabled_condition(feat: FeatureStruct) -> str:
     """Generate condition string for checking if any features are enabled."""
-    if not feat.members:
+    if not feat.feature_members:
         return "false"
 
     member_name = generate_member_name(feat.cpp_name)
-    prefix = feat.member_prefix
-    conditions = [f"{member_name}.{prefix}{m.name} == VK_TRUE" for m in feat.members]
+    prefix = feat.feature_member_prefix
+    conditions = [f"{member_name}.{prefix}{m.name} == VK_TRUE" for m in feat.feature_members]
     return " ||\n        ".join(conditions)
 
 
@@ -1001,10 +982,11 @@ def generate_helper_functions(features: list[FeatureStruct], tags) -> list[str]:
         "",
     ]
 
-    # Filter to only features that extend VkPhysicalDeviceFeatures2 and have members
+    # Filter to only canonical features that extend VkPhysicalDeviceFeatures2 and have members (no aliases)
+    canonical = _canonical_features_only(features)
     relevant_features = [
-        f for f in features
-        if f.members and DEVICE_CREATE_INFO in f.structextends
+        f for f in canonical
+        if f.feature_members and DEVICE_CREATE_INFO in f.structextends
     ]
 
     # Group features by their relationships
@@ -1052,15 +1034,17 @@ def generate_helper_functions(features: list[FeatureStruct], tags) -> list[str]:
         ]
     )
 
-    for feat in sorted(features, key=lambda f: f.cpp_name):
+    # Only canonical structs (no aliases) for extension requirements
+    canonical = _canonical_features_only(features)
+    for feat in sorted(canonical, key=lambda f: f.cpp_name):
         ext = get_extension(feat, _extension_map)
-        if not ext or not feat.members:
+        if not ext or not feat.feature_members:
             continue
 
         member_name = generate_member_name(feat.cpp_name)
-        prefix = feat.member_prefix
+        prefix = feat.feature_member_prefix
         conditions = [
-            f"{member_name}.{prefix}{m.name} == VK_TRUE" for m in feat.members
+            f"{member_name}.{prefix}{m.name} == VK_TRUE" for m in feat.feature_members
         ]
         condition_str = " || ".join(conditions)
 
@@ -1091,7 +1075,9 @@ def generate_structure_type_lookup(features: list[FeatureStruct], tags) -> list[
         "    static const std::unordered_map<std::string, vk::StructureType> name_map = {",
     ]
 
-    for feat in sorted(features, key=lambda f: f.cpp_name):
+    # Only canonical structs (no aliases)
+    canonical = _canonical_features_only(features)
+    for feat in sorted(canonical, key=lambda f: f.cpp_name):
         stype_enum = feat.stype.replace("VK_STRUCTURE_TYPE_", "")
         stype_camel = "e" + to_camel_case(stype_enum, tags)
         lines.append(
@@ -1159,7 +1145,7 @@ def generate_string_features_methods(feature_map: dict) -> list[str]:
         # Use first struct to check (all aliases must be consistent per Vulkan spec)
         entry = struct_list[0]
         member_name = generate_member_name(entry["struct"].cpp_name)
-        prefix = entry["struct"].member_prefix
+        prefix = entry["struct"].feature_member_prefix
         feat_name = entry["member"].name
 
         lines.append(
