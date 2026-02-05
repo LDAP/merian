@@ -29,6 +29,7 @@ from vulkan_codegen.codegen import (
     build_extension_type_map,
     build_feature_version_map,
     generate_file_header,
+    generate_stype_switch,
     get_extension,
 )
 from vulkan_codegen.spec import (
@@ -446,35 +447,9 @@ def generate_named_getters(properties: list[PropertyStruct], tags) -> list[str]:
 
 def generate_get_struct_ptr(properties: list[PropertyStruct], tags) -> list[str]:
     """Generate get_struct_ptr switch statement."""
-    lines = [
-        "const void* VulkanProperties::get_struct_ptr(vk::StructureType stype) const {",
-        "    switch (stype) {",
-        "        case vk::StructureType::ePhysicalDeviceProperties2:",
-        "            return &m_properties2;",
-    ]
-
-    for prop in sorted(properties, key=lambda p: p.cpp_name):
-        member_name = generate_member_name(prop.cpp_name)
-        stype_enum = prop.stype.replace("VK_STRUCTURE_TYPE_", "")
-        stype_camel = "e" + to_camel_case(stype_enum, tags)
-        lines.extend(
-            [
-                f"        case vk::StructureType::{stype_camel}:",
-                f"            return &{member_name};",
-            ]
-        )
-
-    lines.extend(
-        [
-            "        default:",
-            "            return nullptr;",
-            "    }",
-            "}",
-            "",
-        ]
-    )
-
-    return lines
+    # Properties has an extra case for PhysicalDeviceProperties2
+    extra_cases = [("ePhysicalDeviceProperties2", "m_properties2")]
+    return generate_stype_switch(properties, "VulkanProperties", tags, extra_cases)
 
 
 def generate_is_available() -> list[str]:

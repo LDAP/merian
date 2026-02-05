@@ -1,7 +1,9 @@
 """Code generation helper utilities."""
 
 import re
-from typing import Any
+from typing import Any, Optional
+
+from .naming import to_camel_case, generate_member_name
 
 
 def get_extension(struct: Any, extension_map: dict):
@@ -18,6 +20,58 @@ def get_extension(struct: Any, extension_map: dict):
     if hasattr(struct, 'extension_name') and struct.extension_name and struct.extension_name in extension_map:
         return extension_map[struct.extension_name]
     return None
+
+
+def generate_stype_switch(
+    structs: list[Any],
+    class_name: str,
+    tags: list[str],
+    extra_cases: Optional[list[tuple[str, str]]] = None
+) -> list[str]:
+    """
+    Generate switch statement for StructureType -> pointer lookup.
+
+    Args:
+        structs: List of FeatureStruct or PropertyStruct objects
+        class_name: Name of the class (e.g., "VulkanFeatures", "VulkanProperties")
+        tags: List of vendor tags for proper casing
+        extra_cases: Optional list of (stype_camel, member_name) tuples for additional cases
+
+    Returns:
+        List of C++ code lines
+    """
+    lines = [
+        f"const void* {class_name}::get_struct_ptr(vk::StructureType stype) const {{",
+        "    switch (stype) {",
+    ]
+
+    # Add any extra cases first (e.g., Properties2)
+    if extra_cases:
+        for stype_camel, member_name in extra_cases:
+            lines.extend([
+                f"        case vk::StructureType::{stype_camel}:",
+                f"            return &{member_name};",
+            ])
+
+    # Add struct cases
+    for struct in sorted(structs, key=lambda s: s.cpp_name):
+        member_name = generate_member_name(struct.cpp_name)
+        stype_enum = struct.stype.replace("VK_STRUCTURE_TYPE_", "")
+        stype_camel = "e" + to_camel_case(stype_enum, tags)
+        lines.extend([
+            f"        case vk::StructureType::{stype_camel}:",
+            f"            return &{member_name};",
+        ])
+
+    lines.extend([
+        "        default:",
+        "            return nullptr;",
+        "    }",
+        "}",
+        "",
+    ])
+
+    return lines
 
 
 def version_to_api_version(version_str: str) -> str | None:

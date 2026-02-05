@@ -20,6 +20,7 @@ from vulkan_codegen.codegen import (
     build_extension_type_map,
     build_feature_version_map,
     generate_file_header,
+    generate_stype_switch,
     get_extension,
 )
 from vulkan_codegen.models import FeatureMember, FeatureStruct
@@ -34,6 +35,7 @@ from vulkan_codegen.naming import (
 )
 from vulkan_codegen.spec import (
     FEATURE_STRUCT_BASE,
+    DEVICE_CREATE_INFO,
     PHYSICAL_DEVICE_PREFIX,
     VULKAN_SPEC_VERSION,
     build_skiplist,
@@ -575,33 +577,7 @@ def generate_alias_getters(features: list[FeatureStruct]) -> list[str]:
 
 def generate_get_struct_ptr(features: list[FeatureStruct], tags) -> list[str]:
     """Generate get_struct_ptr const switch implementation."""
-    lines = [
-        "const void* VulkanFeatures::get_struct_ptr(vk::StructureType stype) const {",
-        "    switch (stype) {",
-    ]
-
-    for feat in sorted(features, key=lambda f: f.cpp_name):
-        member_name = generate_member_name(feat.cpp_name)
-        stype_enum = feat.stype.replace("VK_STRUCTURE_TYPE_", "")
-        stype_camel = "e" + to_camel_case(stype_enum, tags)
-        lines.extend(
-            [
-                f"        case vk::StructureType::{stype_camel}:",
-                f"            return &{member_name};",
-            ]
-        )
-
-    lines.extend(
-        [
-            "        default:",
-            "            return nullptr;",
-            "    }",
-            "}",
-            "",
-        ]
-    )
-
-    return lines
+    return generate_stype_switch(features, "VulkanFeatures", tags)
 
 
 def build_feature_to_structs_map(features: list[FeatureStruct]) -> dict:
@@ -694,13 +670,15 @@ def compute_priority_score(feat: FeatureStruct) -> tuple:
     1. Supersets (more features) come first
     2. Then prefer non-deprecated over deprecated structs
     3. Then prefer newer extensions (higher extension number)
+
+    Note: Uses global _extension_map for extension lookup.
     """
     # Look up extension properties
     is_deprecated = 0
     extension_number = 0
 
-    if feat.extension_name and feat.extension_name in _extension_map:
-        ext = _extension_map[feat.extension_name]
+    ext = get_extension(feat, _extension_map)
+    if ext:
         is_deprecated = 1 if ext.deprecatedby else 0
         extension_number = ext.extension_number or 0
 
@@ -1025,7 +1003,7 @@ def generate_helper_functions(features: list[FeatureStruct], tags) -> list[str]:
     # Filter to only features that extend VkPhysicalDeviceFeatures2 and have members
     relevant_features = [
         f for f in features
-        if f.members and FEATURE_STRUCT_BASE in f.structextends
+        if f.members and DEVICE_CREATE_INFO in f.structextends
     ]
 
     # Group features by their relationships
