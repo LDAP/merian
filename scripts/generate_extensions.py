@@ -11,6 +11,7 @@ Generates:
 - get_api_version_property_types() helper function
 """
 
+from warnings import deprecated
 from vulkan_codegen.codegen import generate_file_header
 from vulkan_codegen.parsing import enrich_extensions_with_struct_types, find_extensions
 from vulkan_codegen.spec import (
@@ -48,6 +49,7 @@ def generate_header(extensions) -> str:
         "    ExtensionType type;",
         "    std::span<const ExtensionInfo* const> dependencies;",
         "    uint32_t promoted_to_version;",
+        "    const ExtensionInfo* const deprecated_by;",
         "    std::span<const vk::StructureType> property_types;",
         "    std::span<const vk::StructureType> feature_types;",
         "",
@@ -62,16 +64,16 @@ def generate_header(extensions) -> str:
     # Generate forward declarations for all extensions
     lines.append("// Forward declarations for all extensions")
     for ext in sorted(extensions, key=lambda e: e.name):
-        var_name = sanitize_var_name(ext.name_macro)
-        lines.append(f"extern const ExtensionInfo {var_name}_info;")
+        var_name = make_var_name(ext.name)
+        lines.append(f"extern const ExtensionInfo {var_name};")
 
     lines.extend(["", "} // namespace merian", ""])
     return "\n".join(lines)
 
 
-def sanitize_var_name(ext_macro: str) -> str:
-    """Convert extension macro to a valid C++ variable name."""
-    return ext_macro.lower().replace("_extension_name", "").replace("_", "")
+def make_var_name(ext_name: str) -> str:
+    """Convert extension name to our extension info C++ variable name."""
+    return f"{ext_name.upper()}_INFO"
 
 
 def generate_static_extension_infos(extensions) -> list[str]:
@@ -80,7 +82,7 @@ def generate_static_extension_infos(extensions) -> list[str]:
 
     # Build map of extension macro to variable name
     ext_to_var = {
-        ext.name_macro: sanitize_var_name(ext.name_macro) for ext in extensions
+        ext.name: make_var_name(ext.name) for ext in extensions
     }
 
     # Generate dependency pointer arrays
@@ -88,22 +90,16 @@ def generate_static_extension_infos(extensions) -> list[str]:
         if not ext.dependencies:
             continue
 
-        var_name = sanitize_var_name(ext.name_macro)
+        var_name = make_var_name(ext.name)
 
-        # Collect all unique dependencies from all OR groups
-        all_deps = set()
-        for and_group in ext.dependencies:
-            for dep in and_group:
-                if dep.extension:
-                    all_deps.add(dep.extension)
-
-        if all_deps:
-            lines.append(f"const ExtensionInfo* const {var_name}_deps[] = {{")
-            for dep_ext in sorted(all_deps):
-                dep_var = ext_to_var.get(dep_ext)
-                if dep_var:
-                    lines.append(f"    &{dep_var}_info,")
-            lines.append("};")
+        lines.append(f"const ExtensionInfo* const {var_name}_DEPS[] = {{")
+        for dep_ext in sorted(ext.dependencies):
+            dep_var = ext_to_var.get(dep_ext)
+            if dep_var:
+                lines.append(f"    &{dep_var},")
+            else:
+                print(f"WARN: Unknown extension {dep_ext}")
+        lines.append("};")
 
     lines.append("")
 
@@ -112,8 +108,8 @@ def generate_static_extension_infos(extensions) -> list[str]:
         if not ext.property_types:
             continue
 
-        var_name = sanitize_var_name(ext.name_macro)
-        lines.append(f"const vk::StructureType {var_name}_properties[] = {{")
+        var_name = make_var_name(ext.name)
+        lines.append(f"const vk::StructureType {var_name}_PROPERTIES[] = {{")
         for stype in sorted(ext.property_types):
             lines.append(f"    vk::StructureType::{stype},")
         lines.append("};")
@@ -125,8 +121,8 @@ def generate_static_extension_infos(extensions) -> list[str]:
         if not ext.feature_types:
             continue
 
-        var_name = sanitize_var_name(ext.name_macro)
-        lines.append(f"const vk::StructureType {var_name}_features[] = {{")
+        var_name = make_var_name(ext.name)
+        lines.append(f"const vk::StructureType {var_name}_FEATURES[] = {{")
         for stype in sorted(ext.feature_types):
             lines.append(f"    vk::StructureType::{stype},")
         lines.append("};")
@@ -135,44 +131,39 @@ def generate_static_extension_infos(extensions) -> list[str]:
 
     # Generate ExtensionInfo objects
     for ext in sorted(extensions, key=lambda e: e.name):
-        var_name = sanitize_var_name(ext.name_macro)
+        var_name = make_var_name(ext.name)
         ext_type = (
             "ExtensionType::Device"
             if ext.type == "device"
             else "ExtensionType::Instance"
         )
-        promoted = ext.promotedto if ext.promotedto else "(uint32_t)-1"
+        promoted = ext.promotedto if ext.promotedto else (ext.deprecatedby if ext.deprecatedby and not ext.deprecatedby.startswith("VK_API_VERSION") else "(uint32_t)-1")
+        deprecated_by = f"&{make_var_name(ext.deprecatedby)}" if ext.deprecatedby and not ext.deprecatedby.startswith("VK_API_VERSION") else "{}"
 
-        # Count unique dependencies
-        all_deps = set()
-        for and_group in ext.dependencies:
-            for dep in and_group:
-                if dep.extension:
-                    all_deps.add(dep.extension)
-
-        lines.append(f"const ExtensionInfo {var_name}_info = {{")
+        lines.append(f"const ExtensionInfo {var_name} = {{")
         lines.append(f"    {ext.name_macro},")
         lines.append(f"    {ext_type},")
 
-        if all_deps:
+        if ext.dependencies:
             lines.append(
-                f"    std::span<const ExtensionInfo* const>({var_name}_deps, {len(all_deps)}),"
+                f"    std::span<const ExtensionInfo* const>({var_name}_DEPS, {len(ext.dependencies)}),"
             )
         else:
             lines.append("    {},")
 
         lines.append(f"    {promoted},")
+        lines.append(f"    {deprecated_by},")
 
         if ext.property_types:
             lines.append(
-                f"    std::span<const vk::StructureType>({var_name}_properties, {len(ext.property_types)}),"
+                f"    std::span<const vk::StructureType>({var_name}_PROPERTIES, {len(ext.property_types)}),"
             )
         else:
             lines.append("    {},")
 
         if ext.feature_types:
             lines.append(
-                f"    std::span<const vk::StructureType>({var_name}_features, {len(ext.feature_types)}),"
+                f"    std::span<const vk::StructureType>({var_name}_FEATURES, {len(ext.feature_types)}),"
             )
         else:
             lines.append("    {},")
@@ -190,9 +181,9 @@ def generate_get_extension_info_impl(extensions) -> list[str]:
     ]
 
     for ext in sorted(extensions, key=lambda e: e.name):
-        var_name = sanitize_var_name(ext.name_macro)
+        var_name = make_var_name(ext.name)
         lines.append(f"    if (std::strcmp(name, {ext.name_macro}) == 0) {{")
-        lines.append(f"        return &{var_name}_info;")
+        lines.append(f"        return &{var_name};")
         lines.append("    }")
 
     lines.extend(["    return nullptr;", "}", ""])

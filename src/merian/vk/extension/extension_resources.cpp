@@ -27,7 +27,7 @@ ExtensionResources::enable_device_features(const PhysicalDeviceHandle& physical_
     if (physical_device->get_supported_features()
             .get_buffer_device_address_features()
             .bufferDeviceAddress == VK_TRUE) {
-        return {"Vulkan12/bufferDeviceAddress"};
+        return {"bufferDeviceAddress"};
     }
     return {};
 }

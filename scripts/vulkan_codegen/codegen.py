@@ -1,6 +1,95 @@
 """Code generation helper utilities."""
 
 import re
+from typing import Any, Optional
+
+from .naming import to_camel_case, generate_member_name
+
+
+def get_extension(struct: Any, extension_map: dict):
+    """
+    Get Extension object for a struct (feature or property), or None if not from an extension.
+
+    Args:
+        struct: FeatureStruct or PropertyStruct with extension_name attribute
+        extension_map: Map of extension_name -> Extension object
+
+    Returns:
+        Extension object or None
+    """
+    if hasattr(struct, 'extension_name') and struct.extension_name and struct.extension_name in extension_map:
+        return extension_map[struct.extension_name]
+    return None
+
+
+def generate_stype_switch(
+    structs: list[Any],
+    class_name: str,
+    tags: list[str],
+    extra_cases: Optional[list[tuple[str, str]]] = None
+) -> list[str]:
+    """
+    Generate switch statement for StructureType -> pointer lookup.
+
+    Args:
+        structs: List of FeatureStruct or PropertyStruct objects
+        class_name: Name of the class (e.g., "VulkanFeatures", "VulkanProperties")
+        tags: List of vendor tags for proper casing
+        extra_cases: Optional list of (stype_camel, member_name) tuples for additional cases
+
+    Returns:
+        List of C++ code lines
+    """
+    lines = [
+        f"const void* {class_name}::get_struct_ptr(vk::StructureType stype) const {{",
+        "    switch (stype) {",
+    ]
+
+    # Add any extra cases first (e.g., Properties2)
+    if extra_cases:
+        for stype_camel, member_name in extra_cases:
+            lines.extend([
+                f"        case vk::StructureType::{stype_camel}:",
+                f"            return &{member_name};",
+            ])
+
+    # Add struct cases
+    for struct in sorted(structs, key=lambda s: s.cpp_name):
+        member_name = generate_member_name(struct.cpp_name)
+        stype_enum = struct.stype.replace("VK_STRUCTURE_TYPE_", "")
+        stype_camel = "e" + to_camel_case(stype_enum, tags)
+        lines.extend([
+            f"        case vk::StructureType::{stype_camel}:",
+            f"            return &{member_name};",
+        ])
+
+    lines.extend([
+        "        default:",
+        "            return nullptr;",
+        "    }",
+        "}",
+        "",
+    ])
+
+    return lines
+
+
+def version_to_api_version(version_str: str) -> str | None:
+    """Convert VK_VERSION_X_Y to VK_API_VERSION_X_Y.
+
+    Args:
+        version_str: Version string (e.g., "VK_VERSION_1_2")
+
+    Returns:
+        API version string (e.g., "VK_API_VERSION_1_2") or None if invalid
+    """
+    if not version_str:
+        return None
+    match = re.match(r"VK_VERSION_(\d+)_(\d+)", version_str)
+    if match:
+        major, minor = match.groups()
+        return f"VK_API_VERSION_{major}_{minor}"
+    return None
 
 
 def generate_file_header(spec_version: str) -> list[str]:
@@ -40,13 +129,50 @@ def build_extension_name_map(xml_root):
     return ext_name_map
 
 
+def build_extension_deprecation_map(xml_root):
+    """
+    Build map of extension_name -> deprecatedby_extension_name.
+
+    Returns a dict mapping extension names to the extension that deprecated them.
+    """
+    deprecation_map = {}
+
+    for ext in xml_root.findall("extensions/extension"):
+        ext_name = ext.get("name")
+        deprecatedby = ext.get("deprecatedby")
+
+        if ext_name and deprecatedby:
+            deprecation_map[ext_name] = deprecatedby
+
+    return deprecation_map
+
+
+def build_alias_maps(xml_root):
+    """Build bidirectional alias maps for type aliasing."""
+    alias_to_canonical = {}
+    canonical_to_aliases = {}
+
+    for type_elem in xml_root.findall("types/type"):
+        alias = type_elem.get("alias")
+        name = type_elem.get("name")
+        if alias and name:
+            alias_to_canonical[name] = alias
+            canonical_to_aliases.setdefault(alias, []).append(name)
+
+    return alias_to_canonical, canonical_to_aliases
+
+
 def build_extension_type_map(xml_root):
     """
     Build map of type_name -> (ext_name_macro, ext_name, promotion_version).
 
     Returns a dict mapping struct names to tuple of (extension macro, extension name, promoted version).
+    Handles aliases by including both alias and canonical names in the map.
     """
     ext_type_map = {}
+
+    # First pass: build alias maps so we can resolve aliases while building extension map
+    alias_to_canonical, canonical_to_aliases = build_alias_maps(xml_root)
 
     for ext in xml_root.findall("extensions/extension"):
         ext_supported = ext.get("supported", "")
@@ -69,44 +195,43 @@ def build_extension_type_map(xml_root):
             continue
 
         promotedto = ext.get("promotedto", "")
-        promotion_version = None
-        if promotedto:
-            match = re.match(r"VK_VERSION_(\d+)_(\d+)", promotedto)
-            if match:
-                major, minor = match.groups()
-                promotion_version = f"VK_API_VERSION_{major}_{minor}"
+        promotion_version = version_to_api_version(promotedto)
+
+        ext_info = (ext_name_macro, ext.get("name"), promotion_version)
 
         for req in ext.findall("require"):
             for type_elem in req.findall("type"):
                 type_name = type_elem.get("name")
                 if type_name:
-                    ext_type_map[type_name] = (ext_name_macro, ext.get("name"), promotion_version)
+                    # Add the type name itself (always - this is the primary definition)
+                    ext_type_map[type_name] = ext_info
+
+                    # If this is an alias, propagate to canonical
+                    # Prefer extension info with promotion_version (was promoted to core)
+                    # over info without promotion_version (not promoted)
+                    if type_name in alias_to_canonical:
+                        canonical = alias_to_canonical[type_name]
+                        if canonical not in ext_type_map:
+                            # Canonical doesn't have info yet, add it
+                            ext_type_map[canonical] = ext_info
+                        elif promotion_version and not ext_type_map[canonical][2]:
+                            # Canonical has info without promotion_version, but this alias has one
+                            # Prefer the promoted extension (e.g., KHR over EXT)
+                            ext_type_map[canonical] = ext_info
+
+                    # If this is canonical, propagate to all its aliases
+                    # Prefer extension info with promotion_version
+                    if type_name in canonical_to_aliases:
+                        for alias in canonical_to_aliases[type_name]:
+                            if alias not in ext_type_map:
+                                # Alias doesn't have info yet, add it
+                                ext_type_map[alias] = ext_info
+                            elif promotion_version and not ext_type_map[alias][2]:
+                                # Alias has info without promotion_version, but canonical has one
+                                # Prefer the promoted extension
+                                ext_type_map[alias] = ext_info
 
     return ext_type_map
-
-
-def build_alias_maps(xml_root):
-    """Build bidirectional alias maps for type aliasing."""
-    alias_to_canonical = {}
-    canonical_to_aliases = {}
-
-    for type_elem in xml_root.findall("types/type"):
-        alias = type_elem.get("alias")
-        name = type_elem.get("name")
-        if alias and name:
-            alias_to_canonical[name] = alias
-            canonical_to_aliases.setdefault(alias, []).append(name)
-
-    return alias_to_canonical, canonical_to_aliases
-
-
-def propagate_ext_map_through_aliases(ext_type_map, alias_to_canonical):
-    """Propagate extension info through type aliases."""
-    for alias_name, canonical_name in alias_to_canonical.items():
-        if alias_name in ext_type_map and canonical_name not in ext_type_map:
-            ext_type_map[canonical_name] = ext_type_map[alias_name]
-        elif canonical_name in ext_type_map and alias_name not in ext_type_map:
-            ext_type_map[alias_name] = ext_type_map[canonical_name]
 
 
 def build_feature_version_map(xml_root):
@@ -132,3 +257,86 @@ def build_feature_version_map(xml_root):
                     feature_map[type_name] = api_version
 
     return feature_map
+
+
+def build_extension_number_map(xml_root) -> dict[str, int]:
+    """Build map of extension_name -> extension_number.
+
+    Higher extension number = newer extension.
+    Used for priority when multiple extensions provide the same features.
+    """
+    ext_number_map = {}
+
+    for ext in xml_root.findall("extensions/extension"):
+        ext_name = ext.get("name")
+        ext_number = ext.get("number")
+
+        if ext_name and ext_number:
+            try:
+                ext_number_map[ext_name] = int(ext_number)
+            except ValueError:
+                pass  # Skip if number is not an integer
+
+    return ext_number_map
+
+
+def build_struct_aggregation_map(xml_root, struct_type: str) -> dict[str, str]:
+    """Build map of struct_name -> aggregated_by_struct_name.
+
+    Args:
+        xml_root: Vulkan XML root element
+        struct_type: Either "Features" or "Properties"
+
+    Returns:
+        Dict mapping individual structs to their VulkanXX aggregate.
+        Example: {"VkPhysicalDevice16BitStorageFeatures": "VkPhysicalDeviceVulkan11Features"}
+    """
+    aggregation_map = {}
+
+    # Track which members appear in VulkanXX aggregates
+    vulkan_aggregate_members = {}  # {VkPhysicalDeviceVulkan11Features: set(member_names)}
+
+    # First pass: collect members of VulkanXX aggregate structs
+    for type_elem in xml_root.findall("types/type"):
+        vk_name = type_elem.get("name", "")
+        # Match VkPhysicalDeviceVulkan11Features or VkPhysicalDeviceVulkan11Properties
+        if not vk_name.startswith("VkPhysicalDeviceVulkan") or struct_type not in vk_name:
+            continue
+
+        members = set()
+        for member in type_elem.findall("member"):
+            member_name = member.find("name")
+            if member_name is not None and member_name.text not in ("sType", "pNext"):
+                members.add(member_name.text)
+
+        vulkan_aggregate_members[vk_name] = members
+
+    # Second pass: find individual structs and match to aggregates
+    for type_elem in xml_root.findall("types/type"):
+        if type_elem.get("category") != "struct":
+            continue
+        if type_elem.get("alias") is not None:
+            continue
+
+        vk_name = type_elem.get("name", "")
+        if not vk_name or vk_name.startswith("VkPhysicalDeviceVulkan"):
+            continue
+        if struct_type not in vk_name:
+            continue
+
+        # Extract members
+        struct_members = set()
+        for member in type_elem.findall("member"):
+            member_name = member.find("name")
+            if member_name is not None and member_name.text not in ("sType", "pNext"):
+                struct_members.add(member_name.text)
+
+        # Find which VulkanXX aggregate contains these members
+        for aggregate_name, aggregate_members in vulkan_aggregate_members.items():
+            if struct_members and struct_members.issubset(aggregate_members):
+                aggregation_map[vk_name] = aggregate_name
+                break
+
+    return aggregation_map
+
+

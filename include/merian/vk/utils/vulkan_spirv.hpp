@@ -74,12 +74,12 @@ std::vector<const char*> get_spirv_capability_extensions(
 /**
  * @brief Get features required for a SPIR-V capability.
  *
- * Returns feature requirements as "structShortName/featureName" strings
+ * Returns feature requirement names (e.g., "rayTracingPipeline")
  * that can be passed directly to VulkanFeatures::enable_features().
  *
  * @param capability The SPIR-V capability name
  * @param vk_api_version The Vulkan API version
- * @return Vector of feature strings in "structName/featureName" format
+ * @return Vector of feature name strings
  */
 std::vector<std::string> get_spirv_capability_features(
     const char* capability,

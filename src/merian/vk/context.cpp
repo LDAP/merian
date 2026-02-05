@@ -160,7 +160,11 @@ void Context::create_instance(const uint32_t targeted_vk_api_version,
         device_extensions.emplace_back(ext);
     }
     const auto add_instance_extensions = [&](const auto& self, const char* ext) -> void {
-        for (const ExtensionInfo* dep : get_extension_info(ext)->dependencies) {
+        const ExtensionInfo* const ext_info = get_extension_info(ext);
+        if (ext_info == nullptr) {
+            throw std::invalid_argument{fmt::format("extension {} unknown", ext)};
+        }
+        for (const ExtensionInfo* dep : ext_info->dependencies) {
             if (dep->is_instance_extension() &&
                 dep->promoted_to_version > effective_vk_instance_api_version) {
                 if (supported_instance_extensions.contains(dep->name)) {
@@ -276,16 +280,10 @@ void Context::select_physical_device(
 
             uint32_t features_supported = 0;
             uint32_t features_total = 0;
-            for (const auto& feature_struct_name : desired_features.get_feature_struct_names()) {
-                for (const auto& feature :
-                     desired_features.get_feature_names(feature_struct_name)) {
-                    if (desired_features.get_feature(feature_struct_name, feature)) {
-                        features_supported += static_cast<uint32_t>(
-                            physical_devices[i]->get_supported_features().get_feature(
-                                feature_struct_name, feature));
-                        features_total++;
-                    }
-                }
+            for (const auto& feature_name : desired_features.get_enabled_features()) {
+                features_supported += static_cast<uint32_t>(
+                    physical_devices[i]->get_supported_features().get_feature(feature_name));
+                features_total++;
             }
 
             SPDLOG_DEBUG(

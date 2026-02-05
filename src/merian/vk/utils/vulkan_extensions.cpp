@@ -8,6252 +8,6567 @@
 
 namespace merian {
 
-const ExtensionInfo* const vkamdantilag_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_AMD_ANTI_LAG_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkamddevicecoherentmemory_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_AMD_DEVICE_COHERENT_MEMORY_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkamddisplaynativehdr_deps[] = {
-    &vkkhrgetsurfacecapabilities2_info,
-    &vkkhrswapchain_info,
+const ExtensionInfo* const VK_AMD_DISPLAY_NATIVE_HDR_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
+    &VK_KHR_GET_SURFACE_CAPABILITIES2_INFO,
+    &VK_KHR_SWAPCHAIN_INFO,
 };
-const ExtensionInfo* const vkamdshadercoreproperties_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_AMD_SHADER_CORE_PROPERTIES_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkamdshadercoreproperties2_deps[] = {
-    &vkamdshadercoreproperties_info,
+const ExtensionInfo* const VK_AMD_SHADER_CORE_PROPERTIES2_INFO_DEPS[] = {
+    &VK_AMD_SHADER_CORE_PROPERTIES_INFO,
 };
-const ExtensionInfo* const vkamdshaderearlyandlatefragmenttests_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_AMD_SHADER_EARLY_AND_LATE_FRAGMENT_TESTS_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkamdtexturegatherbiaslod_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_AMD_TEXTURE_GATHER_BIAS_LOD_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkarmdatagraph_deps[] = {
-    &vkkhrdeferredhostoperations_info,
-    &vkkhrmaintenance5_info,
+const ExtensionInfo* const VK_ARM_DATA_GRAPH_INFO_DEPS[] = {
+    &VK_KHR_DEFERRED_HOST_OPERATIONS_INFO,
+    &VK_KHR_MAINTENANCE5_INFO,
 };
-const ExtensionInfo* const vkarmformatpack_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_ARM_FORMAT_PACK_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkarmperformancecountersbyregion_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_ARM_PERFORMANCE_COUNTERS_BY_REGION_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkarmpipelineopacitymicromap_deps[] = {
-    &vkextopacitymicromap_info,
+const ExtensionInfo* const VK_ARM_PIPELINE_OPACITY_MICROMAP_INFO_DEPS[] = {
+    &VK_EXT_OPACITY_MICROMAP_INFO,
 };
-const ExtensionInfo* const vkarmrasterizationorderattachmentaccess_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_ARM_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkarmrenderpassstriped_deps[] = {
-    &vkkhrsynchronization2_info,
+const ExtensionInfo* const VK_ARM_RENDER_PASS_STRIPED_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
+    &VK_KHR_SYNCHRONIZATION2_INFO,
 };
-const ExtensionInfo* const vkarmschedulingcontrols_deps[] = {
-    &vkarmshadercorebuiltins_info,
+const ExtensionInfo* const VK_ARM_SCHEDULING_CONTROLS_INFO_DEPS[] = {
+    &VK_ARM_SHADER_CORE_BUILTINS_INFO,
 };
-const ExtensionInfo* const vkarmshadercorebuiltins_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_ARM_SHADER_CORE_BUILTINS_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkext4444formats_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_4444_FORMATS_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextacquiredrmdisplay_deps[] = {
-    &vkextdirectmodedisplay_info,
+const ExtensionInfo* const VK_EXT_ACQUIRE_DRM_DISPLAY_INFO_DEPS[] = {
+    &VK_EXT_DIRECT_MODE_DISPLAY_INFO,
 };
-const ExtensionInfo* const vkextastcdecodemode_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_ASTC_DECODE_MODE_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextattachmentfeedbackloopdynamicstate_deps[] = {
-    &vkextattachmentfeedbacklooplayout_info,
+const ExtensionInfo* const VK_EXT_ATTACHMENT_FEEDBACK_LOOP_DYNAMIC_STATE_INFO_DEPS[] = {
+    &VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_INFO,
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextattachmentfeedbacklooplayout_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextblendoperationadvanced_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_BLEND_OPERATION_ADVANCED_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextbordercolorswizzle_deps[] = {
-    &vkextcustombordercolor_info,
+const ExtensionInfo* const VK_EXT_BORDER_COLOR_SWIZZLE_INFO_DEPS[] = {
+    &VK_EXT_CUSTOM_BORDER_COLOR_INFO,
 };
-const ExtensionInfo* const vkextbufferdeviceaddress_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_BUFFER_DEVICE_ADDRESS_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextcalibratedtimestamps_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_CALIBRATED_TIMESTAMPS_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextcolorwriteenable_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_COLOR_WRITE_ENABLE_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextconditionalrendering_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_CONDITIONAL_RENDERING_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextconservativerasterization_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_CONSERVATIVE_RASTERIZATION_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextcustombordercolor_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_CUSTOM_BORDER_COLOR_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextcustomresolve_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_CUSTOM_RESOLVE_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextdebugmarker_deps[] = {
-    &vkextdebugreport_info,
+const ExtensionInfo* const VK_EXT_DEBUG_MARKER_INFO_DEPS[] = {
+    &VK_EXT_DEBUG_REPORT_INFO,
 };
-const ExtensionInfo* const vkextdepthbiascontrol_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_DEPTH_BIAS_CONTROL_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextdepthclampcontrol_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_DEPTH_CLAMP_CONTROL_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextdepthclampzeroone_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_DEPTH_CLAMP_ZERO_ONE_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextdepthclipcontrol_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_DEPTH_CLIP_CONTROL_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextdepthclipenable_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_DEPTH_CLIP_ENABLE_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextdescriptorbuffer_deps[] = {
-    &vkkhrbufferdeviceaddress_info,
-    &vkkhrsynchronization2_info,
+const ExtensionInfo* const VK_EXT_DESCRIPTOR_BUFFER_INFO_DEPS[] = {
+    &VK_EXT_DESCRIPTOR_INDEXING_INFO,
+    &VK_KHR_BUFFER_DEVICE_ADDRESS_INFO,
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
+    &VK_KHR_SYNCHRONIZATION2_INFO,
 };
-const ExtensionInfo* const vkextdescriptorheap_deps[] = {
-    &vkkhrmaintenance5_info,
+const ExtensionInfo* const VK_EXT_DESCRIPTOR_HEAP_INFO_DEPS[] = {
+    &VK_KHR_BUFFER_DEVICE_ADDRESS_INFO,
+    &VK_KHR_MAINTENANCE5_INFO,
 };
-const ExtensionInfo* const vkextdescriptorindexing_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
-    &vkkhrmaintenance3_info,
+const ExtensionInfo* const VK_EXT_DESCRIPTOR_INDEXING_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
+    &VK_KHR_MAINTENANCE3_INFO,
 };
-const ExtensionInfo* const vkextdeviceaddressbindingreport_deps[] = {
-    &vkextdebugutils_info,
+const ExtensionInfo* const VK_EXT_DEVICE_ADDRESS_BINDING_REPORT_INFO_DEPS[] = {
+    &VK_EXT_DEBUG_UTILS_INFO,
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextdevicefault_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_DEVICE_FAULT_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextdevicegeneratedcommands_deps[] = {
-    &vkkhrmaintenance5_info,
+const ExtensionInfo* const VK_EXT_DEVICE_GENERATED_COMMANDS_INFO_DEPS[] = {
+    &VK_KHR_BUFFER_DEVICE_ADDRESS_INFO,
+    &VK_KHR_MAINTENANCE5_INFO,
 };
-const ExtensionInfo* const vkextdevicememoryreport_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_DEVICE_MEMORY_REPORT_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextdirectmodedisplay_deps[] = {
-    &vkkhrdisplay_info,
+const ExtensionInfo* const VK_EXT_DIRECT_MODE_DISPLAY_INFO_DEPS[] = {
+    &VK_KHR_DISPLAY_INFO,
 };
-const ExtensionInfo* const vkextdiscardrectangles_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_DISCARD_RECTANGLES_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextdisplaycontrol_deps[] = {
-    &vkextdisplaysurfacecounter_info,
-    &vkkhrswapchain_info,
+const ExtensionInfo* const VK_EXT_DISPLAY_CONTROL_INFO_DEPS[] = {
+    &VK_EXT_DISPLAY_SURFACE_COUNTER_INFO,
+    &VK_KHR_SWAPCHAIN_INFO,
 };
-const ExtensionInfo* const vkextdisplaysurfacecounter_deps[] = {
-    &vkkhrdisplay_info,
+const ExtensionInfo* const VK_EXT_DISPLAY_SURFACE_COUNTER_INFO_DEPS[] = {
+    &VK_KHR_DISPLAY_INFO,
 };
-const ExtensionInfo* const vkextdynamicrenderingunusedattachments_deps[] = {
-    &vkkhrdynamicrendering_info,
+const ExtensionInfo* const VK_EXT_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_INFO_DEPS[] = {
+    &VK_KHR_DYNAMIC_RENDERING_INFO,
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextextendeddynamicstate_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_EXTENDED_DYNAMIC_STATE_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextextendeddynamicstate2_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_EXTENDED_DYNAMIC_STATE2_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextextendeddynamicstate3_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_EXTENDED_DYNAMIC_STATE3_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextexternalmemoryacquireunmodified_deps[] = {
-    &vkkhrexternalmemory_info,
+const ExtensionInfo* const VK_EXT_EXTERNAL_MEMORY_ACQUIRE_UNMODIFIED_INFO_DEPS[] = {
+    &VK_KHR_EXTERNAL_MEMORY_INFO,
 };
-const ExtensionInfo* const vkextexternalmemorydmabuf_deps[] = {
-    &vkkhrexternalmemoryfd_info,
+const ExtensionInfo* const VK_EXT_EXTERNAL_MEMORY_DMA_BUF_INFO_DEPS[] = {
+    &VK_KHR_EXTERNAL_MEMORY_FD_INFO,
 };
-const ExtensionInfo* const vkextexternalmemoryhost_deps[] = {
-    &vkkhrexternalmemory_info,
+const ExtensionInfo* const VK_EXT_EXTERNAL_MEMORY_HOST_INFO_DEPS[] = {
+    &VK_KHR_EXTERNAL_MEMORY_INFO,
 };
-const ExtensionInfo* const vkextfragmentdensitymap_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_FRAGMENT_DENSITY_MAP_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextfragmentdensitymap2_deps[] = {
-    &vkextfragmentdensitymap_info,
+const ExtensionInfo* const VK_EXT_FRAGMENT_DENSITY_MAP2_INFO_DEPS[] = {
+    &VK_EXT_FRAGMENT_DENSITY_MAP_INFO,
 };
-const ExtensionInfo* const vkextfragmentdensitymapoffset_deps[] = {
-    &vkextfragmentdensitymap_info,
+const ExtensionInfo* const VK_EXT_FRAGMENT_DENSITY_MAP_OFFSET_INFO_DEPS[] = {
+    &VK_EXT_FRAGMENT_DENSITY_MAP_INFO,
+    &VK_KHR_CREATE_RENDERPASS2_INFO,
+    &VK_KHR_DYNAMIC_RENDERING_INFO,
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextfragmentshaderinterlock_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_FRAGMENT_SHADER_INTERLOCK_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextframeboundary_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_FRAME_BOUNDARY_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextglobalpriorityquery_deps[] = {
-    &vkextglobalpriority_info,
+const ExtensionInfo* const VK_EXT_GLOBAL_PRIORITY_QUERY_INFO_DEPS[] = {
+    &VK_EXT_GLOBAL_PRIORITY_INFO,
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextgraphicspipelinelibrary_deps[] = {
-    &vkkhrpipelinelibrary_info,
+const ExtensionInfo* const VK_EXT_GRAPHICS_PIPELINE_LIBRARY_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
+    &VK_KHR_PIPELINE_LIBRARY_INFO,
 };
-const ExtensionInfo* const vkexthdrmetadata_deps[] = {
-    &vkkhrswapchain_info,
+const ExtensionInfo* const VK_EXT_HDR_METADATA_INFO_DEPS[] = {
+    &VK_KHR_SWAPCHAIN_INFO,
 };
-const ExtensionInfo* const vkextheadlesssurface_deps[] = {
-    &vkkhrsurface_info,
+const ExtensionInfo* const VK_EXT_HEADLESS_SURFACE_INFO_DEPS[] = {
+    &VK_KHR_SURFACE_INFO,
 };
-const ExtensionInfo* const vkexthostimagecopy_deps[] = {
-    &vkkhrcopycommands2_info,
-    &vkkhrformatfeatureflags2_info,
+const ExtensionInfo* const VK_EXT_HOST_IMAGE_COPY_INFO_DEPS[] = {
+    &VK_KHR_COPY_COMMANDS2_INFO,
+    &VK_KHR_FORMAT_FEATURE_FLAGS2_INFO,
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkexthostqueryreset_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_HOST_QUERY_RESET_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextimage2dviewof3d_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
-    &vkkhrmaintenance1_info,
+const ExtensionInfo* const VK_EXT_IMAGE_2D_VIEW_OF_3D_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
+    &VK_KHR_MAINTENANCE1_INFO,
 };
-const ExtensionInfo* const vkextimagecompressioncontrol_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_IMAGE_COMPRESSION_CONTROL_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextimagecompressioncontrolswapchain_deps[] = {
-    &vkextimagecompressioncontrol_info,
+const ExtensionInfo* const VK_EXT_IMAGE_COMPRESSION_CONTROL_SWAPCHAIN_INFO_DEPS[] = {
+    &VK_EXT_IMAGE_COMPRESSION_CONTROL_INFO,
 };
-const ExtensionInfo* const vkextimagedrmformatmodifier_deps[] = {
-    &vkkhrbindmemory2_info,
-    &vkkhrgetphysicaldeviceproperties2_info,
-    &vkkhrimageformatlist_info,
+const ExtensionInfo* const VK_EXT_IMAGE_DRM_FORMAT_MODIFIER_INFO_DEPS[] = {
+    &VK_KHR_BIND_MEMORY2_INFO,
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
+    &VK_KHR_IMAGE_FORMAT_LIST_INFO,
+    &VK_KHR_SAMPLER_YCBCR_CONVERSION_INFO,
 };
-const ExtensionInfo* const vkextimagerobustness_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_IMAGE_ROBUSTNESS_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextimageslicedviewof3d_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
-    &vkkhrmaintenance1_info,
+const ExtensionInfo* const VK_EXT_IMAGE_SLICED_VIEW_OF_3D_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
+    &VK_KHR_MAINTENANCE1_INFO,
 };
-const ExtensionInfo* const vkextimageviewminlod_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_IMAGE_VIEW_MIN_LOD_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextindextypeuint8_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_INDEX_TYPE_UINT8_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextinlineuniformblock_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
-    &vkkhrmaintenance1_info,
+const ExtensionInfo* const VK_EXT_INLINE_UNIFORM_BLOCK_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
+    &VK_KHR_MAINTENANCE1_INFO,
 };
-const ExtensionInfo* const vkextlegacydithering_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_LEGACY_DITHERING_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextlegacyvertexattributes_deps[] = {
-    &vkextvertexinputdynamicstate_info,
+const ExtensionInfo* const VK_EXT_LEGACY_VERTEX_ATTRIBUTES_INFO_DEPS[] = {
+    &VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_INFO,
 };
-const ExtensionInfo* const vkextlinerasterization_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_LINE_RASTERIZATION_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextmapmemoryplaced_deps[] = {
-    &vkkhrmapmemory2_info,
+const ExtensionInfo* const VK_EXT_MAP_MEMORY_PLACED_INFO_DEPS[] = {
+    &VK_KHR_MAP_MEMORY2_INFO,
 };
-const ExtensionInfo* const vkextmemorybudget_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_MEMORY_BUDGET_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextmemorydecompression_deps[] = {
-    &vkkhrbufferdeviceaddress_info,
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_MEMORY_DECOMPRESSION_INFO_DEPS[] = {
+    &VK_KHR_BUFFER_DEVICE_ADDRESS_INFO,
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextmemorypriority_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_MEMORY_PRIORITY_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextmeshshader_deps[] = {
-    &vkkhrspirv14_info,
+const ExtensionInfo* const VK_EXT_MESH_SHADER_INFO_DEPS[] = {
+    &VK_KHR_SPIRV_1_4_INFO,
 };
-const ExtensionInfo* const vkextmultidraw_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_MULTI_DRAW_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextmultisampledrendertosinglesampled_deps[] = {
-    &vkkhrcreaterenderpass2_info,
-    &vkkhrdepthstencilresolve_info,
+const ExtensionInfo* const VK_EXT_MULTISAMPLED_RENDER_TO_SINGLE_SAMPLED_INFO_DEPS[] = {
+    &VK_KHR_CREATE_RENDERPASS2_INFO,
+    &VK_KHR_DEPTH_STENCIL_RESOLVE_INFO,
 };
-const ExtensionInfo* const vkextmutabledescriptortype_deps[] = {
-    &vkkhrmaintenance3_info,
+const ExtensionInfo* const VK_EXT_MUTABLE_DESCRIPTOR_TYPE_INFO_DEPS[] = {
+    &VK_KHR_MAINTENANCE3_INFO,
 };
-const ExtensionInfo* const vkextnestedcommandbuffer_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_NESTED_COMMAND_BUFFER_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextnonseamlesscubemap_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_NON_SEAMLESS_CUBE_MAP_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextopacitymicromap_deps[] = {
-    &vkkhraccelerationstructure_info,
+const ExtensionInfo* const VK_EXT_OPACITY_MICROMAP_INFO_DEPS[] = {
+    &VK_KHR_ACCELERATION_STRUCTURE_INFO,
+    &VK_KHR_SYNCHRONIZATION2_INFO,
 };
-const ExtensionInfo* const vkextpageabledevicelocalmemory_deps[] = {
-    &vkextmemorypriority_info,
+const ExtensionInfo* const VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_INFO_DEPS[] = {
+    &VK_EXT_MEMORY_PRIORITY_INFO,
 };
-const ExtensionInfo* const vkextpcibusinfo_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_PCI_BUS_INFO_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextphysicaldevicedrm_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_PHYSICAL_DEVICE_DRM_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextpipelinecreationcachecontrol_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_PIPELINE_CREATION_CACHE_CONTROL_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextpipelinelibrarygrouphandles_deps[] = {
-    &vkkhrpipelinelibrary_info,
-    &vkkhrraytracingpipeline_info,
+const ExtensionInfo* const VK_EXT_PIPELINE_LIBRARY_GROUP_HANDLES_INFO_DEPS[] = {
+    &VK_KHR_PIPELINE_LIBRARY_INFO,
+    &VK_KHR_RAY_TRACING_PIPELINE_INFO,
 };
-const ExtensionInfo* const vkextpipelineproperties_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_PIPELINE_PROPERTIES_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextpipelineprotectedaccess_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_PIPELINE_PROTECTED_ACCESS_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextpipelinerobustness_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_PIPELINE_ROBUSTNESS_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextpresentmodefifolatestready_deps[] = {
-    &vkkhrswapchain_info,
+const ExtensionInfo* const VK_EXT_PRESENT_MODE_FIFO_LATEST_READY_INFO_DEPS[] = {
+    &VK_KHR_SWAPCHAIN_INFO,
 };
-const ExtensionInfo* const vkextpresenttiming_deps[] = {
-    &vkkhrcalibratedtimestamps_info,
-    &vkkhrgetsurfacecapabilities2_info,
-    &vkkhrpresentid2_info,
-    &vkkhrswapchain_info,
+const ExtensionInfo* const VK_EXT_PRESENT_TIMING_INFO_DEPS[] = {
+    &VK_KHR_CALIBRATED_TIMESTAMPS_INFO,
+    &VK_KHR_GET_SURFACE_CAPABILITIES2_INFO,
+    &VK_KHR_PRESENT_ID2_INFO,
+    &VK_KHR_SWAPCHAIN_INFO,
 };
-const ExtensionInfo* const vkextprimitivetopologylistrestart_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_PRIMITIVE_TOPOLOGY_LIST_RESTART_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextprimitivesgeneratedquery_deps[] = {
-    &vkexttransformfeedback_info,
+const ExtensionInfo* const VK_EXT_PRIMITIVES_GENERATED_QUERY_INFO_DEPS[] = {
+    &VK_EXT_TRANSFORM_FEEDBACK_INFO,
 };
-const ExtensionInfo* const vkextprivatedata_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_PRIVATE_DATA_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextprovokingvertex_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_PROVOKING_VERTEX_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextqueuefamilyforeign_deps[] = {
-    &vkkhrexternalmemory_info,
+const ExtensionInfo* const VK_EXT_QUEUE_FAMILY_FOREIGN_INFO_DEPS[] = {
+    &VK_KHR_EXTERNAL_MEMORY_INFO,
 };
-const ExtensionInfo* const vkextrasterizationorderattachmentaccess_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextraytracinginvocationreorder_deps[] = {
-    &vkkhrraytracingpipeline_info,
+const ExtensionInfo* const VK_EXT_RAY_TRACING_INVOCATION_REORDER_INFO_DEPS[] = {
+    &VK_KHR_RAY_TRACING_PIPELINE_INFO,
 };
-const ExtensionInfo* const vkextrgba10x6formats_deps[] = {
-    &vkkhrsamplerycbcrconversion_info,
+const ExtensionInfo* const VK_EXT_RGBA10X6_FORMATS_INFO_DEPS[] = {
+    &VK_KHR_SAMPLER_YCBCR_CONVERSION_INFO,
 };
-const ExtensionInfo* const vkextrobustness2_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_ROBUSTNESS2_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextsamplelocations_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_SAMPLE_LOCATIONS_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextsamplerfilterminmax_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_SAMPLER_FILTER_MINMAX_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextscalarblocklayout_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_SCALAR_BLOCK_LAYOUT_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextshader64bitindexing_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_SHADER_64BIT_INDEXING_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextshaderatomicfloat_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_SHADER_ATOMIC_FLOAT_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextshaderatomicfloat2_deps[] = {
-    &vkextshaderatomicfloat_info,
+const ExtensionInfo* const VK_EXT_SHADER_ATOMIC_FLOAT2_INFO_DEPS[] = {
+    &VK_EXT_SHADER_ATOMIC_FLOAT_INFO,
 };
-const ExtensionInfo* const vkextshaderdemotetohelperinvocation_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextshaderfloat8_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_SHADER_FLOAT8_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextshaderimageatomicint64_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_SHADER_IMAGE_ATOMIC_INT64_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextshadermoduleidentifier_deps[] = {
-    &vkextpipelinecreationcachecontrol_info,
+const ExtensionInfo* const VK_EXT_SHADER_MODULE_IDENTIFIER_INFO_DEPS[] = {
+    &VK_EXT_PIPELINE_CREATION_CACHE_CONTROL_INFO,
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextshaderobject_deps[] = {
-    &vkkhrdynamicrendering_info,
+const ExtensionInfo* const VK_EXT_SHADER_OBJECT_INFO_DEPS[] = {
+    &VK_KHR_DYNAMIC_RENDERING_INFO,
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextshaderreplicatedcomposites_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_SHADER_REPLICATED_COMPOSITES_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextshadersubgrouppartitioned_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_SHADER_SUBGROUP_PARTITIONED_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextshaderuniformbufferunsizedarray_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_SHADER_UNIFORM_BUFFER_UNSIZED_ARRAY_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextsubpassmergefeedback_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_SUBPASS_MERGE_FEEDBACK_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextsurfacemaintenance1_deps[] = {
-    &vkkhrgetsurfacecapabilities2_info,
-    &vkkhrsurface_info,
+const ExtensionInfo* const VK_EXT_SURFACE_MAINTENANCE1_INFO_DEPS[] = {
+    &VK_KHR_GET_SURFACE_CAPABILITIES2_INFO,
+    &VK_KHR_SURFACE_INFO,
 };
-const ExtensionInfo* const vkextswapchaincolorspace_deps[] = {
-    &vkkhrsurface_info,
+const ExtensionInfo* const VK_EXT_SWAPCHAIN_COLORSPACE_INFO_DEPS[] = {
+    &VK_KHR_SURFACE_INFO,
 };
-const ExtensionInfo* const vkextswapchainmaintenance1_deps[] = {
-    &vkextsurfacemaintenance1_info,
-    &vkkhrswapchain_info,
+const ExtensionInfo* const VK_EXT_SWAPCHAIN_MAINTENANCE1_INFO_DEPS[] = {
+    &VK_EXT_SURFACE_MAINTENANCE1_INFO,
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
+    &VK_KHR_SWAPCHAIN_INFO,
 };
-const ExtensionInfo* const vkexttexelbufferalignment_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_TEXEL_BUFFER_ALIGNMENT_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkexttexturecompressionastc3d_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_TEXTURE_COMPRESSION_ASTC_3D_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkexttexturecompressionastchdr_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_TEXTURE_COMPRESSION_ASTC_HDR_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkexttransformfeedback_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_TRANSFORM_FEEDBACK_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextvertexattributedivisor_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_VERTEX_ATTRIBUTE_DIVISOR_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextvertexattributerobustness_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_VERTEX_ATTRIBUTE_ROBUSTNESS_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextvertexinputdynamicstate_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkextycbcr2plane444formats_deps[] = {
-    &vkkhrsamplerycbcrconversion_info,
+const ExtensionInfo* const VK_EXT_YCBCR_2PLANE_444_FORMATS_INFO_DEPS[] = {
+    &VK_KHR_SAMPLER_YCBCR_CONVERSION_INFO,
 };
-const ExtensionInfo* const vkextycbcrimagearrays_deps[] = {
-    &vkkhrsamplerycbcrconversion_info,
+const ExtensionInfo* const VK_EXT_YCBCR_IMAGE_ARRAYS_INFO_DEPS[] = {
+    &VK_KHR_SAMPLER_YCBCR_CONVERSION_INFO,
 };
-const ExtensionInfo* const vkextzeroinitializedevicememory_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_EXT_ZERO_INITIALIZE_DEVICE_MEMORY_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkgoogledisplaytiming_deps[] = {
-    &vkkhrswapchain_info,
+const ExtensionInfo* const VK_GOOGLE_DISPLAY_TIMING_INFO_DEPS[] = {
+    &VK_KHR_SWAPCHAIN_INFO,
 };
-const ExtensionInfo* const vkgooglesurfacelessquery_deps[] = {
-    &vkkhrsurface_info,
+const ExtensionInfo* const VK_GOOGLE_SURFACELESS_QUERY_INFO_DEPS[] = {
+    &VK_KHR_SURFACE_INFO,
 };
-const ExtensionInfo* const vkhuaweiclustercullingshader_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_HUAWEI_CLUSTER_CULLING_SHADER_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkhuaweihdrvivid_deps[] = {
-    &vkexthdrmetadata_info,
-    &vkkhrswapchain_info,
+const ExtensionInfo* const VK_HUAWEI_HDR_VIVID_INFO_DEPS[] = {
+    &VK_EXT_HDR_METADATA_INFO,
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
+    &VK_KHR_SWAPCHAIN_INFO,
 };
-const ExtensionInfo* const vkhuaweiinvocationmask_deps[] = {
-    &vkkhrraytracingpipeline_info,
+const ExtensionInfo* const VK_HUAWEI_INVOCATION_MASK_INFO_DEPS[] = {
+    &VK_KHR_RAY_TRACING_PIPELINE_INFO,
+    &VK_KHR_SYNCHRONIZATION2_INFO,
 };
-const ExtensionInfo* const vkhuaweisubpassshading_deps[] = {
-    &vkkhrsynchronization2_info,
+const ExtensionInfo* const VK_HUAWEI_SUBPASS_SHADING_INFO_DEPS[] = {
+    &VK_KHR_CREATE_RENDERPASS2_INFO,
+    &VK_KHR_SYNCHRONIZATION2_INFO,
 };
-const ExtensionInfo* const vkimgrelaxedlinerasterization_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_IMG_RELAXED_LINE_RASTERIZATION_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkintelshaderintegerfunctions2_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_INTEL_SHADER_INTEGER_FUNCTIONS2_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhr16bitstorage_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
-    &vkkhrstoragebufferstorageclass_info,
+const ExtensionInfo* const VK_KHR_16BIT_STORAGE_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
+    &VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_INFO,
 };
-const ExtensionInfo* const vkkhr8bitstorage_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
-    &vkkhrstoragebufferstorageclass_info,
+const ExtensionInfo* const VK_KHR_8BIT_STORAGE_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
+    &VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_INFO,
 };
-const ExtensionInfo* const vkkhraccelerationstructure_deps[] = {
-    &vkextdescriptorindexing_info,
-    &vkkhrdeferredhostoperations_info,
+const ExtensionInfo* const VK_KHR_ACCELERATION_STRUCTURE_INFO_DEPS[] = {
+    &VK_EXT_DESCRIPTOR_INDEXING_INFO,
+    &VK_KHR_BUFFER_DEVICE_ADDRESS_INFO,
+    &VK_KHR_DEFERRED_HOST_OPERATIONS_INFO,
 };
-const ExtensionInfo* const vkkhrbufferdeviceaddress_deps[] = {
-    &vkkhrdevicegroup_info,
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_BUFFER_DEVICE_ADDRESS_INFO_DEPS[] = {
+    &VK_KHR_DEVICE_GROUP_INFO,
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrcalibratedtimestamps_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_CALIBRATED_TIMESTAMPS_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrcomputeshaderderivatives_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_COMPUTE_SHADER_DERIVATIVES_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrcooperativematrix_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_COOPERATIVE_MATRIX_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrcopycommands2_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_COPY_COMMANDS2_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrcopymemoryindirect_deps[] = {
-    &vkkhrbufferdeviceaddress_info,
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_COPY_MEMORY_INDIRECT_INFO_DEPS[] = {
+    &VK_KHR_BUFFER_DEVICE_ADDRESS_INFO,
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrcreaterenderpass2_deps[] = {
-    &vkkhrmaintenance2_info,
-    &vkkhrmultiview_info,
+const ExtensionInfo* const VK_KHR_CREATE_RENDERPASS2_INFO_DEPS[] = {
+    &VK_KHR_MAINTENANCE2_INFO,
+    &VK_KHR_MULTIVIEW_INFO,
 };
-const ExtensionInfo* const vkkhrdedicatedallocation_deps[] = {
-    &vkkhrgetmemoryrequirements2_info,
+const ExtensionInfo* const VK_KHR_DEDICATED_ALLOCATION_INFO_DEPS[] = {
+    &VK_KHR_GET_MEMORY_REQUIREMENTS2_INFO,
 };
-const ExtensionInfo* const vkkhrdepthclampzeroone_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_DEPTH_CLAMP_ZERO_ONE_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrdepthstencilresolve_deps[] = {
-    &vkkhrcreaterenderpass2_info,
+const ExtensionInfo* const VK_KHR_DEPTH_STENCIL_RESOLVE_INFO_DEPS[] = {
+    &VK_KHR_CREATE_RENDERPASS2_INFO,
 };
-const ExtensionInfo* const vkkhrdevicegroup_deps[] = {
-    &vkkhrdevicegroupcreation_info,
+const ExtensionInfo* const VK_KHR_DEVICE_GROUP_INFO_DEPS[] = {
+    &VK_KHR_DEVICE_GROUP_CREATION_INFO,
 };
-const ExtensionInfo* const vkkhrdisplay_deps[] = {
-    &vkkhrsurface_info,
+const ExtensionInfo* const VK_KHR_DISPLAY_INFO_DEPS[] = {
+    &VK_KHR_SURFACE_INFO,
 };
-const ExtensionInfo* const vkkhrdisplayswapchain_deps[] = {
-    &vkkhrdisplay_info,
-    &vkkhrswapchain_info,
+const ExtensionInfo* const VK_KHR_DISPLAY_SWAPCHAIN_INFO_DEPS[] = {
+    &VK_KHR_DISPLAY_INFO,
+    &VK_KHR_SWAPCHAIN_INFO,
 };
-const ExtensionInfo* const vkkhrdriverproperties_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_DRIVER_PROPERTIES_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrdynamicrendering_deps[] = {
-    &vkkhrdepthstencilresolve_info,
+const ExtensionInfo* const VK_KHR_DYNAMIC_RENDERING_INFO_DEPS[] = {
+    &VK_KHR_DEPTH_STENCIL_RESOLVE_INFO,
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrdynamicrenderinglocalread_deps[] = {
-    &vkkhrdynamicrendering_info,
+const ExtensionInfo* const VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_INFO_DEPS[] = {
+    &VK_KHR_DYNAMIC_RENDERING_INFO,
 };
-const ExtensionInfo* const vkkhrexternalfence_deps[] = {
-    &vkkhrexternalfencecapabilities_info,
+const ExtensionInfo* const VK_KHR_EXTERNAL_FENCE_INFO_DEPS[] = {
+    &VK_KHR_EXTERNAL_FENCE_CAPABILITIES_INFO,
 };
-const ExtensionInfo* const vkkhrexternalfencecapabilities_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_EXTERNAL_FENCE_CAPABILITIES_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrexternalfencefd_deps[] = {
-    &vkkhrexternalfence_info,
+const ExtensionInfo* const VK_KHR_EXTERNAL_FENCE_FD_INFO_DEPS[] = {
+    &VK_KHR_EXTERNAL_FENCE_INFO,
 };
-const ExtensionInfo* const vkkhrexternalmemory_deps[] = {
-    &vkkhrexternalmemorycapabilities_info,
+const ExtensionInfo* const VK_KHR_EXTERNAL_MEMORY_INFO_DEPS[] = {
+    &VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_INFO,
 };
-const ExtensionInfo* const vkkhrexternalmemorycapabilities_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrexternalmemoryfd_deps[] = {
-    &vkkhrexternalmemory_info,
+const ExtensionInfo* const VK_KHR_EXTERNAL_MEMORY_FD_INFO_DEPS[] = {
+    &VK_KHR_EXTERNAL_MEMORY_INFO,
 };
-const ExtensionInfo* const vkkhrexternalsemaphore_deps[] = {
-    &vkkhrexternalsemaphorecapabilities_info,
+const ExtensionInfo* const VK_KHR_EXTERNAL_SEMAPHORE_INFO_DEPS[] = {
+    &VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_INFO,
 };
-const ExtensionInfo* const vkkhrexternalsemaphorecapabilities_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrexternalsemaphorefd_deps[] = {
-    &vkkhrexternalsemaphore_info,
+const ExtensionInfo* const VK_KHR_EXTERNAL_SEMAPHORE_FD_INFO_DEPS[] = {
+    &VK_KHR_EXTERNAL_SEMAPHORE_INFO,
 };
-const ExtensionInfo* const vkkhrformatfeatureflags2_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_FORMAT_FEATURE_FLAGS2_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrfragmentshaderbarycentric_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_FRAGMENT_SHADER_BARYCENTRIC_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrfragmentshadingrate_deps[] = {
-    &vkkhrcreaterenderpass2_info,
+const ExtensionInfo* const VK_KHR_FRAGMENT_SHADING_RATE_INFO_DEPS[] = {
+    &VK_KHR_CREATE_RENDERPASS2_INFO,
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrgetdisplayproperties2_deps[] = {
-    &vkkhrdisplay_info,
+const ExtensionInfo* const VK_KHR_GET_DISPLAY_PROPERTIES2_INFO_DEPS[] = {
+    &VK_KHR_DISPLAY_INFO,
 };
-const ExtensionInfo* const vkkhrgetsurfacecapabilities2_deps[] = {
-    &vkkhrsurface_info,
+const ExtensionInfo* const VK_KHR_GET_SURFACE_CAPABILITIES2_INFO_DEPS[] = {
+    &VK_KHR_SURFACE_INFO,
 };
-const ExtensionInfo* const vkkhrglobalpriority_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_GLOBAL_PRIORITY_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrimagelessframebuffer_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
-    &vkkhrimageformatlist_info,
+const ExtensionInfo* const VK_KHR_IMAGELESS_FRAMEBUFFER_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
+    &VK_KHR_IMAGE_FORMAT_LIST_INFO,
+    &VK_KHR_MAINTENANCE2_INFO,
 };
-const ExtensionInfo* const vkkhrincrementalpresent_deps[] = {
-    &vkkhrswapchain_info,
+const ExtensionInfo* const VK_KHR_INCREMENTAL_PRESENT_INFO_DEPS[] = {
+    &VK_KHR_SWAPCHAIN_INFO,
 };
-const ExtensionInfo* const vkkhrindextypeuint8_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_INDEX_TYPE_UINT8_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrlinerasterization_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_LINE_RASTERIZATION_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrmaintenance10_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_MAINTENANCE10_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrmaintenance3_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_MAINTENANCE3_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrmaintenance5_deps[] = {
-    &vkkhrdynamicrendering_info,
+const ExtensionInfo* const VK_KHR_MAINTENANCE5_INFO_DEPS[] = {
+    &VK_KHR_DYNAMIC_RENDERING_INFO,
 };
-const ExtensionInfo* const vkkhrmaintenance9_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_MAINTENANCE9_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrmultiview_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_MULTIVIEW_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrperformancequery_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_PERFORMANCE_QUERY_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrpipelinebinary_deps[] = {
-    &vkkhrmaintenance5_info,
+const ExtensionInfo* const VK_KHR_PIPELINE_BINARY_INFO_DEPS[] = {
+    &VK_KHR_MAINTENANCE5_INFO,
 };
-const ExtensionInfo* const vkkhrpipelineexecutableproperties_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_PIPELINE_EXECUTABLE_PROPERTIES_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrpresentid_deps[] = {
-    &vkkhrswapchain_info,
+const ExtensionInfo* const VK_KHR_PRESENT_ID_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
+    &VK_KHR_SWAPCHAIN_INFO,
 };
-const ExtensionInfo* const vkkhrpresentid2_deps[] = {
-    &vkkhrgetsurfacecapabilities2_info,
-    &vkkhrsurface_info,
-    &vkkhrswapchain_info,
+const ExtensionInfo* const VK_KHR_PRESENT_ID2_INFO_DEPS[] = {
+    &VK_KHR_GET_SURFACE_CAPABILITIES2_INFO,
+    &VK_KHR_SURFACE_INFO,
+    &VK_KHR_SWAPCHAIN_INFO,
 };
-const ExtensionInfo* const vkkhrpresentmodefifolatestready_deps[] = {
-    &vkkhrswapchain_info,
+const ExtensionInfo* const VK_KHR_PRESENT_MODE_FIFO_LATEST_READY_INFO_DEPS[] = {
+    &VK_KHR_SWAPCHAIN_INFO,
 };
-const ExtensionInfo* const vkkhrpresentwait_deps[] = {
-    &vkkhrpresentid_info,
-    &vkkhrswapchain_info,
+const ExtensionInfo* const VK_KHR_PRESENT_WAIT_INFO_DEPS[] = {
+    &VK_KHR_PRESENT_ID_INFO,
+    &VK_KHR_SWAPCHAIN_INFO,
 };
-const ExtensionInfo* const vkkhrpresentwait2_deps[] = {
-    &vkkhrgetsurfacecapabilities2_info,
-    &vkkhrpresentid2_info,
-    &vkkhrsurface_info,
-    &vkkhrswapchain_info,
+const ExtensionInfo* const VK_KHR_PRESENT_WAIT2_INFO_DEPS[] = {
+    &VK_KHR_GET_SURFACE_CAPABILITIES2_INFO,
+    &VK_KHR_PRESENT_ID2_INFO,
+    &VK_KHR_SURFACE_INFO,
+    &VK_KHR_SWAPCHAIN_INFO,
 };
-const ExtensionInfo* const vkkhrpushdescriptor_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_PUSH_DESCRIPTOR_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrrayquery_deps[] = {
-    &vkkhraccelerationstructure_info,
+const ExtensionInfo* const VK_KHR_RAY_QUERY_INFO_DEPS[] = {
+    &VK_KHR_ACCELERATION_STRUCTURE_INFO,
+    &VK_KHR_SPIRV_1_4_INFO,
 };
-const ExtensionInfo* const vkkhrraytracingmaintenance1_deps[] = {
-    &vkkhraccelerationstructure_info,
+const ExtensionInfo* const VK_KHR_RAY_TRACING_MAINTENANCE1_INFO_DEPS[] = {
+    &VK_KHR_ACCELERATION_STRUCTURE_INFO,
 };
-const ExtensionInfo* const vkkhrraytracingpipeline_deps[] = {
-    &vkkhraccelerationstructure_info,
+const ExtensionInfo* const VK_KHR_RAY_TRACING_PIPELINE_INFO_DEPS[] = {
+    &VK_KHR_ACCELERATION_STRUCTURE_INFO,
+    &VK_KHR_SPIRV_1_4_INFO,
 };
-const ExtensionInfo* const vkkhrraytracingpositionfetch_deps[] = {
-    &vkkhraccelerationstructure_info,
+const ExtensionInfo* const VK_KHR_RAY_TRACING_POSITION_FETCH_INFO_DEPS[] = {
+    &VK_KHR_ACCELERATION_STRUCTURE_INFO,
 };
-const ExtensionInfo* const vkkhrrobustness2_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_ROBUSTNESS2_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrsamplerycbcrconversion_deps[] = {
-    &vkkhrbindmemory2_info,
-    &vkkhrgetmemoryrequirements2_info,
-    &vkkhrgetphysicaldeviceproperties2_info,
-    &vkkhrmaintenance1_info,
+const ExtensionInfo* const VK_KHR_SAMPLER_YCBCR_CONVERSION_INFO_DEPS[] = {
+    &VK_KHR_BIND_MEMORY2_INFO,
+    &VK_KHR_GET_MEMORY_REQUIREMENTS2_INFO,
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
+    &VK_KHR_MAINTENANCE1_INFO,
 };
-const ExtensionInfo* const vkkhrseparatedepthstencillayouts_deps[] = {
-    &vkkhrcreaterenderpass2_info,
+const ExtensionInfo* const VK_KHR_SEPARATE_DEPTH_STENCIL_LAYOUTS_INFO_DEPS[] = {
+    &VK_KHR_CREATE_RENDERPASS2_INFO,
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrshaderatomicint64_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_SHADER_ATOMIC_INT64_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrshaderbfloat16_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_SHADER_BFLOAT16_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrshaderclock_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_SHADER_CLOCK_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrshaderexpectassume_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_SHADER_EXPECT_ASSUME_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrshaderfloat16int8_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_SHADER_FLOAT16_INT8_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrshaderfloatcontrols_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_SHADER_FLOAT_CONTROLS_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrshaderfloatcontrols2_deps[] = {
-    &vkkhrshaderfloatcontrols_info,
+const ExtensionInfo* const VK_KHR_SHADER_FLOAT_CONTROLS2_INFO_DEPS[] = {
+    &VK_KHR_SHADER_FLOAT_CONTROLS_INFO,
 };
-const ExtensionInfo* const vkkhrshaderfma_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_SHADER_FMA_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrshaderintegerdotproduct_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_SHADER_INTEGER_DOT_PRODUCT_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrshaderquadcontrol_deps[] = {
-    &vkkhrshadermaximalreconvergence_info,
+const ExtensionInfo* const VK_KHR_SHADER_QUAD_CONTROL_INFO_DEPS[] = {
+    &VK_KHR_SHADER_MAXIMAL_RECONVERGENCE_INFO,
+    &VK_KHR_VULKAN_MEMORY_MODEL_INFO,
 };
-const ExtensionInfo* const vkkhrshaderrelaxedextendedinstruction_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_SHADER_RELAXED_EXTENDED_INSTRUCTION_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrshadersubgrouprotate_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_SHADER_SUBGROUP_ROTATE_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrshaderterminateinvocation_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_SHADER_TERMINATE_INVOCATION_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrshaderuntypedpointers_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_SHADER_UNTYPED_POINTERS_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrsharedpresentableimage_deps[] = {
-    &vkkhrgetsurfacecapabilities2_info,
-    &vkkhrswapchain_info,
+const ExtensionInfo* const VK_KHR_SHARED_PRESENTABLE_IMAGE_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
+    &VK_KHR_GET_SURFACE_CAPABILITIES2_INFO,
+    &VK_KHR_SWAPCHAIN_INFO,
 };
-const ExtensionInfo* const vkkhrspirv14_deps[] = {
-    &vkkhrshaderfloatcontrols_info,
+const ExtensionInfo* const VK_KHR_SPIRV_1_4_INFO_DEPS[] = {
+    &VK_KHR_SHADER_FLOAT_CONTROLS_INFO,
 };
-const ExtensionInfo* const vkkhrsurfacemaintenance1_deps[] = {
-    &vkkhrgetsurfacecapabilities2_info,
-    &vkkhrsurface_info,
+const ExtensionInfo* const VK_KHR_SURFACE_MAINTENANCE1_INFO_DEPS[] = {
+    &VK_KHR_GET_SURFACE_CAPABILITIES2_INFO,
+    &VK_KHR_SURFACE_INFO,
 };
-const ExtensionInfo* const vkkhrsurfaceprotectedcapabilities_deps[] = {
-    &vkkhrgetsurfacecapabilities2_info,
+const ExtensionInfo* const VK_KHR_SURFACE_PROTECTED_CAPABILITIES_INFO_DEPS[] = {
+    &VK_KHR_GET_SURFACE_CAPABILITIES2_INFO,
 };
-const ExtensionInfo* const vkkhrswapchain_deps[] = {
-    &vkkhrsurface_info,
+const ExtensionInfo* const VK_KHR_SWAPCHAIN_INFO_DEPS[] = {
+    &VK_KHR_SURFACE_INFO,
 };
-const ExtensionInfo* const vkkhrswapchainmaintenance1_deps[] = {
-    &vkkhrsurfacemaintenance1_info,
-    &vkkhrswapchain_info,
+const ExtensionInfo* const VK_KHR_SWAPCHAIN_MAINTENANCE1_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
+    &VK_KHR_SURFACE_MAINTENANCE1_INFO,
+    &VK_KHR_SWAPCHAIN_INFO,
 };
-const ExtensionInfo* const vkkhrswapchainmutableformat_deps[] = {
-    &vkkhrswapchain_info,
+const ExtensionInfo* const VK_KHR_SWAPCHAIN_MUTABLE_FORMAT_INFO_DEPS[] = {
+    &VK_KHR_IMAGE_FORMAT_LIST_INFO,
+    &VK_KHR_MAINTENANCE2_INFO,
+    &VK_KHR_SWAPCHAIN_INFO,
 };
-const ExtensionInfo* const vkkhrsynchronization2_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_SYNCHRONIZATION2_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrtimelinesemaphore_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_TIMELINE_SEMAPHORE_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrunifiedimagelayouts_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_UNIFIED_IMAGE_LAYOUTS_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhruniformbufferstandardlayout_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_UNIFORM_BUFFER_STANDARD_LAYOUT_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrvariablepointers_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
-    &vkkhrstoragebufferstorageclass_info,
+const ExtensionInfo* const VK_KHR_VARIABLE_POINTERS_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
+    &VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_INFO,
 };
-const ExtensionInfo* const vkkhrvertexattributedivisor_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_VERTEX_ATTRIBUTE_DIVISOR_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrvideodecodeav1_deps[] = {
-    &vkkhrvideodecodequeue_info,
+const ExtensionInfo* const VK_KHR_VIDEO_DECODE_AV1_INFO_DEPS[] = {
+    &VK_KHR_VIDEO_DECODE_QUEUE_INFO,
 };
-const ExtensionInfo* const vkkhrvideodecodeh264_deps[] = {
-    &vkkhrvideodecodequeue_info,
+const ExtensionInfo* const VK_KHR_VIDEO_DECODE_H264_INFO_DEPS[] = {
+    &VK_KHR_VIDEO_DECODE_QUEUE_INFO,
 };
-const ExtensionInfo* const vkkhrvideodecodeh265_deps[] = {
-    &vkkhrvideodecodequeue_info,
+const ExtensionInfo* const VK_KHR_VIDEO_DECODE_H265_INFO_DEPS[] = {
+    &VK_KHR_VIDEO_DECODE_QUEUE_INFO,
 };
-const ExtensionInfo* const vkkhrvideodecodequeue_deps[] = {
-    &vkkhrvideoqueue_info,
+const ExtensionInfo* const VK_KHR_VIDEO_DECODE_QUEUE_INFO_DEPS[] = {
+    &VK_KHR_SYNCHRONIZATION2_INFO,
+    &VK_KHR_VIDEO_QUEUE_INFO,
 };
-const ExtensionInfo* const vkkhrvideodecodevp9_deps[] = {
-    &vkkhrvideodecodequeue_info,
+const ExtensionInfo* const VK_KHR_VIDEO_DECODE_VP9_INFO_DEPS[] = {
+    &VK_KHR_VIDEO_DECODE_QUEUE_INFO,
 };
-const ExtensionInfo* const vkkhrvideoencodeav1_deps[] = {
-    &vkkhrvideoencodequeue_info,
+const ExtensionInfo* const VK_KHR_VIDEO_ENCODE_AV1_INFO_DEPS[] = {
+    &VK_KHR_VIDEO_ENCODE_QUEUE_INFO,
 };
-const ExtensionInfo* const vkkhrvideoencodeh264_deps[] = {
-    &vkkhrvideoencodequeue_info,
+const ExtensionInfo* const VK_KHR_VIDEO_ENCODE_H264_INFO_DEPS[] = {
+    &VK_KHR_VIDEO_ENCODE_QUEUE_INFO,
 };
-const ExtensionInfo* const vkkhrvideoencodeh265_deps[] = {
-    &vkkhrvideoencodequeue_info,
+const ExtensionInfo* const VK_KHR_VIDEO_ENCODE_H265_INFO_DEPS[] = {
+    &VK_KHR_VIDEO_ENCODE_QUEUE_INFO,
 };
-const ExtensionInfo* const vkkhrvideoencodeintrarefresh_deps[] = {
-    &vkkhrvideoencodequeue_info,
+const ExtensionInfo* const VK_KHR_VIDEO_ENCODE_INTRA_REFRESH_INFO_DEPS[] = {
+    &VK_KHR_VIDEO_ENCODE_QUEUE_INFO,
 };
-const ExtensionInfo* const vkkhrvideoencodequantizationmap_deps[] = {
-    &vkkhrvideoencodequeue_info,
+const ExtensionInfo* const VK_KHR_VIDEO_ENCODE_QUANTIZATION_MAP_INFO_DEPS[] = {
+    &VK_KHR_FORMAT_FEATURE_FLAGS2_INFO,
+    &VK_KHR_VIDEO_ENCODE_QUEUE_INFO,
 };
-const ExtensionInfo* const vkkhrvideoencodequeue_deps[] = {
-    &vkkhrvideoqueue_info,
+const ExtensionInfo* const VK_KHR_VIDEO_ENCODE_QUEUE_INFO_DEPS[] = {
+    &VK_KHR_SYNCHRONIZATION2_INFO,
+    &VK_KHR_VIDEO_QUEUE_INFO,
 };
-const ExtensionInfo* const vkkhrvideomaintenance1_deps[] = {
-    &vkkhrvideoqueue_info,
+const ExtensionInfo* const VK_KHR_VIDEO_MAINTENANCE1_INFO_DEPS[] = {
+    &VK_KHR_VIDEO_QUEUE_INFO,
 };
-const ExtensionInfo* const vkkhrvideomaintenance2_deps[] = {
-    &vkkhrvideoqueue_info,
+const ExtensionInfo* const VK_KHR_VIDEO_MAINTENANCE2_INFO_DEPS[] = {
+    &VK_KHR_VIDEO_QUEUE_INFO,
 };
-const ExtensionInfo* const vkkhrvideoqueue_deps[] = {
-    &vkkhrsynchronization2_info,
+const ExtensionInfo* const VK_KHR_VIDEO_QUEUE_INFO_DEPS[] = {
+    &VK_KHR_SYNCHRONIZATION2_INFO,
 };
-const ExtensionInfo* const vkkhrvulkanmemorymodel_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_VULKAN_MEMORY_MODEL_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrworkgroupmemoryexplicitlayout_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_WORKGROUP_MEMORY_EXPLICIT_LAYOUT_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkkhrzeroinitializeworkgroupmemory_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_KHR_ZERO_INITIALIZE_WORKGROUP_MEMORY_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkmesaimagealignmentcontrol_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_MESA_IMAGE_ALIGNMENT_CONTROL_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkmsftlayereddriver_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_MSFT_LAYERED_DRIVER_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vknvxmultiviewperviewattributes_deps[] = {
-    &vkkhrmultiview_info,
+const ExtensionInfo* const VK_NVX_MULTIVIEW_PER_VIEW_ATTRIBUTES_INFO_DEPS[] = {
+    &VK_KHR_MULTIVIEW_INFO,
 };
-const ExtensionInfo* const vknvclusteraccelerationstructure_deps[] = {
-    &vkkhraccelerationstructure_info,
+const ExtensionInfo* const VK_NV_CLUSTER_ACCELERATION_STRUCTURE_INFO_DEPS[] = {
+    &VK_KHR_ACCELERATION_STRUCTURE_INFO,
 };
-const ExtensionInfo* const vknvcommandbufferinheritance_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_NV_COMMAND_BUFFER_INHERITANCE_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vknvcomputeoccupancypriority_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_NV_COMPUTE_OCCUPANCY_PRIORITY_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vknvcomputeshaderderivatives_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_NV_COMPUTE_SHADER_DERIVATIVES_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vknvcooperativematrix_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_NV_COOPERATIVE_MATRIX_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vknvcooperativematrix2_deps[] = {
-    &vkkhrcooperativematrix_info,
+const ExtensionInfo* const VK_NV_COOPERATIVE_MATRIX2_INFO_DEPS[] = {
+    &VK_KHR_COOPERATIVE_MATRIX_INFO,
 };
-const ExtensionInfo* const vknvcooperativevector_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_NV_COOPERATIVE_VECTOR_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vknvcopymemoryindirect_deps[] = {
-    &vkkhrbufferdeviceaddress_info,
+const ExtensionInfo* const VK_NV_COPY_MEMORY_INDIRECT_INFO_DEPS[] = {
+    &VK_KHR_BUFFER_DEVICE_ADDRESS_INFO,
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vknvcornersampledimage_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_NV_CORNER_SAMPLED_IMAGE_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vknvcoveragereductionmode_deps[] = {
-    &vknvframebuffermixedsamples_info,
+const ExtensionInfo* const VK_NV_COVERAGE_REDUCTION_MODE_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
+    &VK_NV_FRAMEBUFFER_MIXED_SAMPLES_INFO,
 };
-const ExtensionInfo* const vknvdedicatedallocationimagealiasing_deps[] = {
-    &vkkhrdedicatedallocation_info,
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_NV_DEDICATED_ALLOCATION_IMAGE_ALIASING_INFO_DEPS[] = {
+    &VK_KHR_DEDICATED_ALLOCATION_INFO,
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vknvdevicediagnosticcheckpoints_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vknvdevicediagnosticsconfig_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_NV_DEVICE_DIAGNOSTICS_CONFIG_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vknvdevicegeneratedcommands_deps[] = {
-    &vkkhrbufferdeviceaddress_info,
+const ExtensionInfo* const VK_NV_DEVICE_GENERATED_COMMANDS_INFO_DEPS[] = {
+    &VK_KHR_BUFFER_DEVICE_ADDRESS_INFO,
 };
-const ExtensionInfo* const vknvdevicegeneratedcommandscompute_deps[] = {
-    &vknvdevicegeneratedcommands_info,
+const ExtensionInfo* const VK_NV_DEVICE_GENERATED_COMMANDS_COMPUTE_INFO_DEPS[] = {
+    &VK_NV_DEVICE_GENERATED_COMMANDS_INFO,
 };
-const ExtensionInfo* const vknvdisplaystereo_deps[] = {
-    &vkkhrdisplay_info,
-    &vkkhrgetdisplayproperties2_info,
+const ExtensionInfo* const VK_NV_DISPLAY_STEREO_INFO_DEPS[] = {
+    &VK_KHR_DISPLAY_INFO,
+    &VK_KHR_GET_DISPLAY_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vknvextendedsparseaddressspace_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_NV_EXTENDED_SPARSE_ADDRESS_SPACE_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vknvexternalmemory_deps[] = {
-    &vknvexternalmemorycapabilities_info,
+const ExtensionInfo* const VK_NV_EXTERNAL_MEMORY_INFO_DEPS[] = {
+    &VK_NV_EXTERNAL_MEMORY_CAPABILITIES_INFO,
 };
-const ExtensionInfo* const vknvexternalmemoryrdma_deps[] = {
-    &vkkhrexternalmemory_info,
+const ExtensionInfo* const VK_NV_EXTERNAL_MEMORY_RDMA_INFO_DEPS[] = {
+    &VK_KHR_EXTERNAL_MEMORY_INFO,
 };
-const ExtensionInfo* const vknvfragmentshaderbarycentric_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_NV_FRAGMENT_SHADER_BARYCENTRIC_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vknvfragmentshadingrateenums_deps[] = {
-    &vkkhrfragmentshadingrate_info,
+const ExtensionInfo* const VK_NV_FRAGMENT_SHADING_RATE_ENUMS_INFO_DEPS[] = {
+    &VK_KHR_FRAGMENT_SHADING_RATE_INFO,
 };
-const ExtensionInfo* const vknvinheritedviewportscissor_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_NV_INHERITED_VIEWPORT_SCISSOR_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vknvlinearcolorattachment_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_NV_LINEAR_COLOR_ATTACHMENT_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vknvmemorydecompression_deps[] = {
-    &vkkhrbufferdeviceaddress_info,
+const ExtensionInfo* const VK_NV_LOW_LATENCY2_INFO_DEPS[] = {
+    &VK_KHR_PRESENT_ID_INFO,
+    &VK_KHR_PRESENT_ID2_INFO,
+    &VK_KHR_TIMELINE_SEMAPHORE_INFO,
 };
-const ExtensionInfo* const vknvmeshshader_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_NV_MEMORY_DECOMPRESSION_INFO_DEPS[] = {
+    &VK_KHR_BUFFER_DEVICE_ADDRESS_INFO,
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vknvopticalflow_deps[] = {
-    &vkkhrformatfeatureflags2_info,
-    &vkkhrsynchronization2_info,
+const ExtensionInfo* const VK_NV_MESH_SHADER_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vknvpartitionedaccelerationstructure_deps[] = {
-    &vkkhraccelerationstructure_info,
+const ExtensionInfo* const VK_NV_OPTICAL_FLOW_INFO_DEPS[] = {
+    &VK_KHR_FORMAT_FEATURE_FLAGS2_INFO,
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
+    &VK_KHR_SYNCHRONIZATION2_INFO,
 };
-const ExtensionInfo* const vknvperstagedescriptorset_deps[] = {
-    &vkkhrmaintenance6_info,
+const ExtensionInfo* const VK_NV_PARTITIONED_ACCELERATION_STRUCTURE_INFO_DEPS[] = {
+    &VK_KHR_ACCELERATION_STRUCTURE_INFO,
 };
-const ExtensionInfo* const vknvpresentbarrier_deps[] = {
-    &vkkhrgetsurfacecapabilities2_info,
-    &vkkhrsurface_info,
-    &vkkhrswapchain_info,
+const ExtensionInfo* const VK_NV_PER_STAGE_DESCRIPTOR_SET_INFO_DEPS[] = {
+    &VK_KHR_MAINTENANCE6_INFO,
 };
-const ExtensionInfo* const vknvrawaccesschains_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_NV_PRESENT_BARRIER_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
+    &VK_KHR_GET_SURFACE_CAPABILITIES2_INFO,
+    &VK_KHR_SURFACE_INFO,
+    &VK_KHR_SWAPCHAIN_INFO,
 };
-const ExtensionInfo* const vknvraytracing_deps[] = {
-    &vkkhrgetmemoryrequirements2_info,
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_NV_RAW_ACCESS_CHAINS_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vknvraytracinginvocationreorder_deps[] = {
-    &vkkhrraytracingpipeline_info,
+const ExtensionInfo* const VK_NV_RAY_TRACING_INFO_DEPS[] = {
+    &VK_KHR_GET_MEMORY_REQUIREMENTS2_INFO,
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vknvraytracinglinearsweptspheres_deps[] = {
-    &vkkhrraytracingpipeline_info,
+const ExtensionInfo* const VK_NV_RAY_TRACING_INVOCATION_REORDER_INFO_DEPS[] = {
+    &VK_KHR_RAY_TRACING_PIPELINE_INFO,
 };
-const ExtensionInfo* const vknvraytracingmotionblur_deps[] = {
-    &vkkhrraytracingpipeline_info,
+const ExtensionInfo* const VK_NV_RAY_TRACING_LINEAR_SWEPT_SPHERES_INFO_DEPS[] = {
+    &VK_KHR_RAY_TRACING_PIPELINE_INFO,
 };
-const ExtensionInfo* const vknvraytracingvalidation_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_NV_RAY_TRACING_MOTION_BLUR_INFO_DEPS[] = {
+    &VK_KHR_RAY_TRACING_PIPELINE_INFO,
 };
-const ExtensionInfo* const vknvrepresentativefragmenttest_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_NV_RAY_TRACING_VALIDATION_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vknvscissorexclusive_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_NV_REPRESENTATIVE_FRAGMENT_TEST_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vknvshaderatomicfloat16vector_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_NV_SCISSOR_EXCLUSIVE_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vknvshaderimagefootprint_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_NV_SHADER_ATOMIC_FLOAT16_VECTOR_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vknvshadingrateimage_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_NV_SHADER_IMAGE_FOOTPRINT_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkqcomcooperativematrixconversion_deps[] = {
-    &vkkhrcooperativematrix_info,
+const ExtensionInfo* const VK_NV_SHADING_RATE_IMAGE_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkqcomdatagraphmodel_deps[] = {
-    &vkarmdatagraph_info,
+const ExtensionInfo* const VK_QCOM_COOPERATIVE_MATRIX_CONVERSION_INFO_DEPS[] = {
+    &VK_KHR_COOPERATIVE_MATRIX_INFO,
 };
-const ExtensionInfo* const vkqcomfiltercubicclamp_deps[] = {
-    &vkextfiltercubic_info,
+const ExtensionInfo* const VK_QCOM_DATA_GRAPH_MODEL_INFO_DEPS[] = {
+    &VK_ARM_DATA_GRAPH_INFO,
 };
-const ExtensionInfo* const vkqcomfiltercubicweights_deps[] = {
-    &vkextfiltercubic_info,
+const ExtensionInfo* const VK_QCOM_FILTER_CUBIC_CLAMP_INFO_DEPS[] = {
+    &VK_EXT_FILTER_CUBIC_INFO,
+    &VK_EXT_SAMPLER_FILTER_MINMAX_INFO,
 };
-const ExtensionInfo* const vkqcomfragmentdensitymapoffset_deps[] = {
-    &vkextfragmentdensitymap_info,
+const ExtensionInfo* const VK_QCOM_FILTER_CUBIC_WEIGHTS_INFO_DEPS[] = {
+    &VK_EXT_FILTER_CUBIC_INFO,
 };
-const ExtensionInfo* const vkqcomimageprocessing_deps[] = {
-    &vkkhrformatfeatureflags2_info,
+const ExtensionInfo* const VK_QCOM_FRAGMENT_DENSITY_MAP_OFFSET_INFO_DEPS[] = {
+    &VK_EXT_FRAGMENT_DENSITY_MAP_INFO,
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkqcomimageprocessing2_deps[] = {
-    &vkqcomimageprocessing_info,
+const ExtensionInfo* const VK_QCOM_IMAGE_PROCESSING_INFO_DEPS[] = {
+    &VK_KHR_FORMAT_FEATURE_FLAGS2_INFO,
 };
-const ExtensionInfo* const vkqcommultiviewperviewrenderareas_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_QCOM_IMAGE_PROCESSING2_INFO_DEPS[] = {
+    &VK_QCOM_IMAGE_PROCESSING_INFO,
 };
-const ExtensionInfo* const vkqcommultiviewperviewviewports_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_QCOM_MULTIVIEW_PER_VIEW_RENDER_AREAS_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkqcomrotatedcopycommands_deps[] = {
-    &vkkhrcopycommands2_info,
+const ExtensionInfo* const VK_QCOM_MULTIVIEW_PER_VIEW_VIEWPORTS_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkqcomtilememoryheap_deps[] = {
-    &vkkhrgetmemoryrequirements2_info,
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_QCOM_ROTATED_COPY_COMMANDS_INFO_DEPS[] = {
+    &VK_KHR_COPY_COMMANDS2_INFO,
 };
-const ExtensionInfo* const vkqcomtileproperties_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_QCOM_TILE_MEMORY_HEAP_INFO_DEPS[] = {
+    &VK_KHR_GET_MEMORY_REQUIREMENTS2_INFO,
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkqcomtileshading_deps[] = {
-    &vkqcomtileproperties_info,
+const ExtensionInfo* const VK_QCOM_TILE_PROPERTIES_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkqcomycbcrdegamma_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_QCOM_TILE_SHADING_INFO_DEPS[] = {
+    &VK_QCOM_TILE_PROPERTIES_INFO,
 };
-const ExtensionInfo* const vksecamigoprofiling_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_QCOM_YCBCR_DEGAMMA_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vksecpipelinecacheincrementalmode_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_SEC_AMIGO_PROFILING_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkvalvedescriptorsethostmapping_deps[] = {
-    &vkkhrgetphysicaldeviceproperties2_info,
+const ExtensionInfo* const VK_SEC_PIPELINE_CACHE_INCREMENTAL_MODE_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkvalvefragmentdensitymaplayered_deps[] = {
-    &vkextfragmentdensitymap_info,
+const ExtensionInfo* const VK_VALVE_DESCRIPTOR_SET_HOST_MAPPING_INFO_DEPS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const vkvalvemutabledescriptortype_deps[] = {
-    &vkkhrmaintenance3_info,
+const ExtensionInfo* const VK_VALVE_FRAGMENT_DENSITY_MAP_LAYERED_INFO_DEPS[] = {
+    &VK_EXT_FRAGMENT_DENSITY_MAP_INFO,
+    &VK_KHR_MAINTENANCE5_INFO,
 };
-const ExtensionInfo* const vkvalvevideoencodergbconversion_deps[] = {
-    &vkkhrvideoencodequeue_info,
+const ExtensionInfo* const VK_VALVE_MUTABLE_DESCRIPTOR_TYPE_INFO_DEPS[] = {
+    &VK_KHR_MAINTENANCE3_INFO,
+};
+const ExtensionInfo* const VK_VALVE_VIDEO_ENCODE_RGB_CONVERSION_INFO_DEPS[] = {
+    &VK_KHR_SAMPLER_YCBCR_CONVERSION_INFO,
+    &VK_KHR_VIDEO_ENCODE_QUEUE_INFO,
 };
 
-const vk::StructureType vkamdshadercoreproperties_properties[] = {
+const vk::StructureType VK_AMD_SHADER_CORE_PROPERTIES_INFO_PROPERTIES[] = {
     vk::StructureType::ePhysicalDeviceShaderCorePropertiesAMD,
 };
-const vk::StructureType vkamdshadercoreproperties2_properties[] = {
+const vk::StructureType VK_AMD_SHADER_CORE_PROPERTIES2_INFO_PROPERTIES[] = {
     vk::StructureType::ePhysicalDeviceShaderCoreProperties2AMD,
 };
-const vk::StructureType vkarmperformancecountersbyregion_properties[] = {
-    vk::StructureType::ePhysicalDevicePerformanceCountersByRegionPropertiesARM,
-};
-const vk::StructureType vkarmrenderpassstriped_properties[] = {
-    vk::StructureType::ePhysicalDeviceRenderPassStripedPropertiesARM,
-};
-const vk::StructureType vkarmschedulingcontrols_properties[] = {
-    vk::StructureType::ePhysicalDeviceSchedulingControlsPropertiesARM,
-};
-const vk::StructureType vkarmshadercorebuiltins_properties[] = {
-    vk::StructureType::ePhysicalDeviceShaderCoreBuiltinsPropertiesARM,
-};
-const vk::StructureType vkarmshadercoreproperties_properties[] = {
+const vk::StructureType VK_ARM_SHADER_CORE_PROPERTIES_INFO_PROPERTIES[] = {
     vk::StructureType::ePhysicalDeviceShaderCorePropertiesARM,
 };
-const vk::StructureType vkarmtensors_properties[] = {
-    vk::StructureType::ePhysicalDeviceDescriptorBufferTensorPropertiesARM,
-    vk::StructureType::ePhysicalDeviceTensorPropertiesARM,
-};
-const vk::StructureType vkextblendoperationadvanced_properties[] = {
-    vk::StructureType::ePhysicalDeviceBlendOperationAdvancedPropertiesEXT,
-};
-const vk::StructureType vkextconservativerasterization_properties[] = {
+const vk::StructureType VK_EXT_CONSERVATIVE_RASTERIZATION_INFO_PROPERTIES[] = {
     vk::StructureType::ePhysicalDeviceConservativeRasterizationPropertiesEXT,
 };
-const vk::StructureType vkextcustombordercolor_properties[] = {
-    vk::StructureType::ePhysicalDeviceCustomBorderColorPropertiesEXT,
-};
-const vk::StructureType vkextdescriptorbuffer_properties[] = {
-    vk::StructureType::ePhysicalDeviceDescriptorBufferDensityMapPropertiesEXT,
+const vk::StructureType VK_EXT_DESCRIPTOR_BUFFER_INFO_PROPERTIES[] = {
     vk::StructureType::ePhysicalDeviceDescriptorBufferPropertiesEXT,
 };
-const vk::StructureType vkextdescriptorheap_properties[] = {
-    vk::StructureType::ePhysicalDeviceDescriptorHeapPropertiesEXT,
+const vk::StructureType VK_EXT_DESCRIPTOR_HEAP_INFO_PROPERTIES[] = {
     vk::StructureType::ePhysicalDeviceDescriptorHeapTensorPropertiesARM,
 };
-const vk::StructureType vkextdevicegeneratedcommands_properties[] = {
-    vk::StructureType::ePhysicalDeviceDeviceGeneratedCommandsPropertiesEXT,
-};
-const vk::StructureType vkextdiscardrectangles_properties[] = {
+const vk::StructureType VK_EXT_DISCARD_RECTANGLES_INFO_PROPERTIES[] = {
     vk::StructureType::ePhysicalDeviceDiscardRectanglePropertiesEXT,
 };
-const vk::StructureType vkextextendeddynamicstate3_properties[] = {
-    vk::StructureType::ePhysicalDeviceExtendedDynamicState3PropertiesEXT,
-};
-const vk::StructureType vkextexternalmemoryhost_properties[] = {
-    vk::StructureType::ePhysicalDeviceExternalMemoryHostPropertiesEXT,
-};
-const vk::StructureType vkextfragmentdensitymap_properties[] = {
-    vk::StructureType::ePhysicalDeviceFragmentDensityMapPropertiesEXT,
-};
-const vk::StructureType vkextfragmentdensitymap2_properties[] = {
-    vk::StructureType::ePhysicalDeviceFragmentDensityMap2PropertiesEXT,
-};
-const vk::StructureType vkextfragmentdensitymapoffset_properties[] = {
-    vk::StructureType::ePhysicalDeviceFragmentDensityMapOffsetPropertiesEXT,
-};
-const vk::StructureType vkextgraphicspipelinelibrary_properties[] = {
-    vk::StructureType::ePhysicalDeviceGraphicsPipelineLibraryPropertiesEXT,
-};
-const vk::StructureType vkextlegacyvertexattributes_properties[] = {
-    vk::StructureType::ePhysicalDeviceLegacyVertexAttributesPropertiesEXT,
-};
-const vk::StructureType vkextmapmemoryplaced_properties[] = {
-    vk::StructureType::ePhysicalDeviceMapMemoryPlacedPropertiesEXT,
-};
-const vk::StructureType vkextmemorydecompression_properties[] = {
-    vk::StructureType::ePhysicalDeviceMemoryDecompressionPropertiesEXT,
-};
-const vk::StructureType vkextmeshshader_properties[] = {
-    vk::StructureType::ePhysicalDeviceMeshShaderPropertiesEXT,
-};
-const vk::StructureType vkextmultidraw_properties[] = {
-    vk::StructureType::ePhysicalDeviceMultiDrawPropertiesEXT,
-};
-const vk::StructureType vkextnestedcommandbuffer_properties[] = {
-    vk::StructureType::ePhysicalDeviceNestedCommandBufferPropertiesEXT,
-};
-const vk::StructureType vkextopacitymicromap_properties[] = {
-    vk::StructureType::ePhysicalDeviceOpacityMicromapPropertiesEXT,
-};
-const vk::StructureType vkextpcibusinfo_properties[] = {
+const vk::StructureType VK_EXT_PCI_BUS_INFO_INFO_PROPERTIES[] = {
     vk::StructureType::ePhysicalDevicePciBusInfoPropertiesEXT,
 };
-const vk::StructureType vkextphysicaldevicedrm_properties[] = {
+const vk::StructureType VK_EXT_PHYSICAL_DEVICE_DRM_INFO_PROPERTIES[] = {
     vk::StructureType::ePhysicalDeviceDrmPropertiesEXT,
 };
-const vk::StructureType vkextprovokingvertex_properties[] = {
-    vk::StructureType::ePhysicalDeviceProvokingVertexPropertiesEXT,
-};
-const vk::StructureType vkextraytracinginvocationreorder_properties[] = {
+const vk::StructureType VK_EXT_RAY_TRACING_INVOCATION_REORDER_INFO_PROPERTIES[] = {
     vk::StructureType::ePhysicalDeviceRayTracingInvocationReorderPropertiesEXT,
 };
-const vk::StructureType vkextsamplelocations_properties[] = {
-    vk::StructureType::ePhysicalDeviceSampleLocationsPropertiesEXT,
-};
-const vk::StructureType vkextshaderlongvector_properties[] = {
-    vk::StructureType::ePhysicalDeviceShaderLongVectorPropertiesEXT,
-};
-const vk::StructureType vkextshadermoduleidentifier_properties[] = {
-    vk::StructureType::ePhysicalDeviceShaderModuleIdentifierPropertiesEXT,
-};
-const vk::StructureType vkextshaderobject_properties[] = {
-    vk::StructureType::ePhysicalDeviceShaderObjectPropertiesEXT,
-};
-const vk::StructureType vkextshadertileimage_properties[] = {
-    vk::StructureType::ePhysicalDeviceShaderTileImagePropertiesEXT,
-};
-const vk::StructureType vkexttransformfeedback_properties[] = {
-    vk::StructureType::ePhysicalDeviceTransformFeedbackPropertiesEXT,
-};
-const vk::StructureType vkextvertexattributedivisor_properties[] = {
+const vk::StructureType VK_EXT_VERTEX_ATTRIBUTE_DIVISOR_INFO_PROPERTIES[] = {
     vk::StructureType::ePhysicalDeviceVertexAttributeDivisorPropertiesEXT,
 };
-const vk::StructureType vkhuaweiclustercullingshader_properties[] = {
-    vk::StructureType::ePhysicalDeviceClusterCullingShaderPropertiesHUAWEI,
+const vk::StructureType VK_KHR_MAINTENANCE2_INFO_PROPERTIES[] = {
+    vk::StructureType::ePhysicalDevicePointClippingProperties,
 };
-const vk::StructureType vkhuaweisubpassshading_properties[] = {
-    vk::StructureType::ePhysicalDeviceSubpassShadingPropertiesHUAWEI,
+const vk::StructureType VK_KHR_MAINTENANCE3_INFO_PROPERTIES[] = {
+    vk::StructureType::ePhysicalDeviceMaintenance3Properties,
 };
-const vk::StructureType vkkhraccelerationstructure_properties[] = {
-    vk::StructureType::ePhysicalDeviceAccelerationStructurePropertiesKHR,
+const vk::StructureType VK_KHR_PUSH_DESCRIPTOR_INFO_PROPERTIES[] = {
+    vk::StructureType::ePhysicalDevicePushDescriptorProperties,
 };
-const vk::StructureType vkkhrcomputeshaderderivatives_properties[] = {
-    vk::StructureType::ePhysicalDeviceComputeShaderDerivativesPropertiesKHR,
+const vk::StructureType VK_KHR_SHADER_FLOAT_CONTROLS_INFO_PROPERTIES[] = {
+    vk::StructureType::ePhysicalDeviceFloatControlsProperties,
 };
-const vk::StructureType vkkhrcooperativematrix_properties[] = {
-    vk::StructureType::ePhysicalDeviceCooperativeMatrixPropertiesKHR,
+const vk::StructureType VK_KHR_VERTEX_ATTRIBUTE_DIVISOR_INFO_PROPERTIES[] = {
+    vk::StructureType::ePhysicalDeviceVertexAttributeDivisorProperties,
 };
-const vk::StructureType vkkhrcopymemoryindirect_properties[] = {
-    vk::StructureType::ePhysicalDeviceCopyMemoryIndirectPropertiesKHR,
-};
-const vk::StructureType vkkhrfragmentshaderbarycentric_properties[] = {
-    vk::StructureType::ePhysicalDeviceFragmentShaderBarycentricPropertiesKHR,
-};
-const vk::StructureType vkkhrfragmentshadingrate_properties[] = {
-    vk::StructureType::ePhysicalDeviceFragmentShadingRatePropertiesKHR,
-};
-const vk::StructureType vkkhrmaintenance10_properties[] = {
-    vk::StructureType::ePhysicalDeviceMaintenance10PropertiesKHR,
-};
-const vk::StructureType vkkhrmaintenance7_properties[] = {
-    vk::StructureType::ePhysicalDeviceLayeredApiPropertiesListKHR,
-    vk::StructureType::ePhysicalDeviceMaintenance7PropertiesKHR,
-};
-const vk::StructureType vkkhrmaintenance9_properties[] = {
-    vk::StructureType::ePhysicalDeviceMaintenance9PropertiesKHR,
-};
-const vk::StructureType vkkhrperformancequery_properties[] = {
-    vk::StructureType::ePhysicalDevicePerformanceQueryPropertiesKHR,
-};
-const vk::StructureType vkkhrpipelinebinary_properties[] = {
-    vk::StructureType::ePhysicalDevicePipelineBinaryPropertiesKHR,
-};
-const vk::StructureType vkkhrraytracingpipeline_properties[] = {
-    vk::StructureType::ePhysicalDeviceRayTracingPipelinePropertiesKHR,
-};
-const vk::StructureType vkkhrrobustness2_properties[] = {
-    vk::StructureType::ePhysicalDeviceRobustness2PropertiesKHR,
-};
-const vk::StructureType vkmesaimagealignmentcontrol_properties[] = {
-    vk::StructureType::ePhysicalDeviceImageAlignmentControlPropertiesMESA,
-};
-const vk::StructureType vkmsftlayereddriver_properties[] = {
+const vk::StructureType VK_MSFT_LAYERED_DRIVER_INFO_PROPERTIES[] = {
     vk::StructureType::ePhysicalDeviceLayeredDriverPropertiesMSFT,
 };
-const vk::StructureType vknvxmultiviewperviewattributes_properties[] = {
+const vk::StructureType VK_NVX_MULTIVIEW_PER_VIEW_ATTRIBUTES_INFO_PROPERTIES[] = {
     vk::StructureType::ePhysicalDeviceMultiviewPerViewAttributesPropertiesNVX,
 };
-const vk::StructureType vknvclusteraccelerationstructure_properties[] = {
-    vk::StructureType::ePhysicalDeviceClusterAccelerationStructurePropertiesNV,
-};
-const vk::StructureType vknvcooperativematrix_properties[] = {
-    vk::StructureType::ePhysicalDeviceCooperativeMatrixPropertiesNV,
-};
-const vk::StructureType vknvcooperativematrix2_properties[] = {
-    vk::StructureType::ePhysicalDeviceCooperativeMatrix2PropertiesNV,
-};
-const vk::StructureType vknvcooperativevector_properties[] = {
+const vk::StructureType VK_NV_COOPERATIVE_VECTOR_INFO_PROPERTIES[] = {
     vk::StructureType::ePhysicalDeviceCooperativeVectorPropertiesNV,
 };
-const vk::StructureType vknvdevicegeneratedcommands_properties[] = {
+const vk::StructureType VK_NV_DEVICE_GENERATED_COMMANDS_INFO_PROPERTIES[] = {
     vk::StructureType::ePhysicalDeviceDeviceGeneratedCommandsPropertiesNV,
 };
-const vk::StructureType vknvextendedsparseaddressspace_properties[] = {
-    vk::StructureType::ePhysicalDeviceExtendedSparseAddressSpacePropertiesNV,
-};
-const vk::StructureType vknvexternalcomputequeue_properties[] = {
-    vk::StructureType::ePhysicalDeviceExternalComputeQueuePropertiesNV,
-};
-const vk::StructureType vknvfragmentshadingrateenums_properties[] = {
-    vk::StructureType::ePhysicalDeviceFragmentShadingRateEnumsPropertiesNV,
-};
-const vk::StructureType vknvmeshshader_properties[] = {
-    vk::StructureType::ePhysicalDeviceMeshShaderPropertiesNV,
-};
-const vk::StructureType vknvopticalflow_properties[] = {
-    vk::StructureType::ePhysicalDeviceOpticalFlowPropertiesNV,
-};
-const vk::StructureType vknvpartitionedaccelerationstructure_properties[] = {
-    vk::StructureType::ePhysicalDevicePartitionedAccelerationStructurePropertiesNV,
-};
-const vk::StructureType vknvpushconstantbank_properties[] = {
-    vk::StructureType::ePhysicalDevicePushConstantBankPropertiesNV,
-};
-const vk::StructureType vknvraytracing_properties[] = {
-    vk::StructureType::ePhysicalDeviceRayTracingPropertiesNV,
-};
-const vk::StructureType vknvraytracinginvocationreorder_properties[] = {
+const vk::StructureType VK_NV_RAY_TRACING_INVOCATION_REORDER_INFO_PROPERTIES[] = {
     vk::StructureType::ePhysicalDeviceRayTracingInvocationReorderPropertiesNV,
 };
-const vk::StructureType vknvshadersmbuiltins_properties[] = {
+const vk::StructureType VK_NV_SHADER_SM_BUILTINS_INFO_PROPERTIES[] = {
     vk::StructureType::ePhysicalDeviceShaderSmBuiltinsPropertiesNV,
 };
-const vk::StructureType vknvshadingrateimage_properties[] = {
-    vk::StructureType::ePhysicalDeviceShadingRateImagePropertiesNV,
-};
-const vk::StructureType vkqcomimageprocessing_properties[] = {
-    vk::StructureType::ePhysicalDeviceImageProcessingPropertiesQCOM,
-};
-const vk::StructureType vkqcomimageprocessing2_properties[] = {
-    vk::StructureType::ePhysicalDeviceImageProcessing2PropertiesQCOM,
-};
-const vk::StructureType vkqcomtilememoryheap_properties[] = {
-    vk::StructureType::ePhysicalDeviceTileMemoryHeapPropertiesQCOM,
-};
-const vk::StructureType vkqcomtileshading_properties[] = {
-    vk::StructureType::ePhysicalDeviceTileShadingPropertiesQCOM,
-};
-const vk::StructureType vkvalvefragmentdensitymaplayered_properties[] = {
-    vk::StructureType::ePhysicalDeviceFragmentDensityMapLayeredPropertiesVALVE,
-};
 
-const vk::StructureType vkamdantilag_features[] = {
+const vk::StructureType VK_AMD_ANTI_LAG_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceAntiLagFeaturesAMD,
 };
-const vk::StructureType vkamddevicecoherentmemory_features[] = {
+const vk::StructureType VK_AMD_DEVICE_COHERENT_MEMORY_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceCoherentMemoryFeaturesAMD,
 };
-const vk::StructureType vkamdshaderearlyandlatefragmenttests_features[] = {
+const vk::StructureType VK_AMD_SHADER_EARLY_AND_LATE_FRAGMENT_TESTS_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceShaderEarlyAndLateFragmentTestsFeaturesAMD,
 };
-const vk::StructureType vkarmdatagraph_features[] = {
+const vk::StructureType VK_ARM_DATA_GRAPH_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceDataGraphFeaturesARM,
 };
-const vk::StructureType vkarmformatpack_features[] = {
+const vk::StructureType VK_ARM_FORMAT_PACK_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceFormatPackFeaturesARM,
 };
-const vk::StructureType vkarmperformancecountersbyregion_features[] = {
+const vk::StructureType VK_ARM_PERFORMANCE_COUNTERS_BY_REGION_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDevicePerformanceCountersByRegionFeaturesARM,
 };
-const vk::StructureType vkarmpipelineopacitymicromap_features[] = {
+const vk::StructureType VK_ARM_PIPELINE_OPACITY_MICROMAP_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDevicePipelineOpacityMicromapFeaturesARM,
 };
-const vk::StructureType vkarmrenderpassstriped_features[] = {
-    vk::StructureType::ePhysicalDeviceRenderPassStripedFeaturesARM,
-};
-const vk::StructureType vkarmschedulingcontrols_features[] = {
-    vk::StructureType::ePhysicalDeviceSchedulingControlsFeaturesARM,
-};
-const vk::StructureType vkarmshadercorebuiltins_features[] = {
-    vk::StructureType::ePhysicalDeviceShaderCoreBuiltinsFeaturesARM,
-};
-const vk::StructureType vkarmtensors_features[] = {
-    vk::StructureType::ePhysicalDeviceDescriptorBufferTensorFeaturesARM,
-    vk::StructureType::ePhysicalDeviceTensorFeaturesARM,
-};
-const vk::StructureType vkext4444formats_features[] = {
-    vk::StructureType::ePhysicalDevice4444FormatsFeaturesEXT,
-};
-const vk::StructureType vkextastcdecodemode_features[] = {
-    vk::StructureType::ePhysicalDeviceAstcDecodeFeaturesEXT,
-};
-const vk::StructureType vkextattachmentfeedbackloopdynamicstate_features[] = {
-    vk::StructureType::ePhysicalDeviceAttachmentFeedbackLoopDynamicStateFeaturesEXT,
-};
-const vk::StructureType vkextattachmentfeedbacklooplayout_features[] = {
-    vk::StructureType::ePhysicalDeviceAttachmentFeedbackLoopLayoutFeaturesEXT,
-};
-const vk::StructureType vkextblendoperationadvanced_features[] = {
-    vk::StructureType::ePhysicalDeviceBlendOperationAdvancedFeaturesEXT,
-};
-const vk::StructureType vkextbordercolorswizzle_features[] = {
-    vk::StructureType::ePhysicalDeviceBorderColorSwizzleFeaturesEXT,
-};
-const vk::StructureType vkextbufferdeviceaddress_features[] = {
-    vk::StructureType::ePhysicalDeviceBufferDeviceAddressFeaturesEXT,
-};
-const vk::StructureType vkextcolorwriteenable_features[] = {
-    vk::StructureType::ePhysicalDeviceColorWriteEnableFeaturesEXT,
-};
-const vk::StructureType vkextconditionalrendering_features[] = {
-    vk::StructureType::ePhysicalDeviceConditionalRenderingFeaturesEXT,
-};
-const vk::StructureType vkextcustombordercolor_features[] = {
-    vk::StructureType::ePhysicalDeviceCustomBorderColorFeaturesEXT,
-};
-const vk::StructureType vkextcustomresolve_features[] = {
-    vk::StructureType::ePhysicalDeviceCustomResolveFeaturesEXT,
-};
-const vk::StructureType vkextdepthbiascontrol_features[] = {
-    vk::StructureType::ePhysicalDeviceDepthBiasControlFeaturesEXT,
-};
-const vk::StructureType vkextdepthclampcontrol_features[] = {
-    vk::StructureType::ePhysicalDeviceDepthClampControlFeaturesEXT,
-};
-const vk::StructureType vkextdepthclipcontrol_features[] = {
-    vk::StructureType::ePhysicalDeviceDepthClipControlFeaturesEXT,
-};
-const vk::StructureType vkextdepthclipenable_features[] = {
-    vk::StructureType::ePhysicalDeviceDepthClipEnableFeaturesEXT,
-};
-const vk::StructureType vkextdescriptorbuffer_features[] = {
-    vk::StructureType::ePhysicalDeviceDescriptorBufferFeaturesEXT,
-};
-const vk::StructureType vkextdescriptorheap_features[] = {
-    vk::StructureType::ePhysicalDeviceDescriptorHeapFeaturesEXT,
-};
-const vk::StructureType vkextdeviceaddressbindingreport_features[] = {
-    vk::StructureType::ePhysicalDeviceAddressBindingReportFeaturesEXT,
-};
-const vk::StructureType vkextdevicefault_features[] = {
-    vk::StructureType::ePhysicalDeviceFaultFeaturesEXT,
-};
-const vk::StructureType vkextdevicegeneratedcommands_features[] = {
-    vk::StructureType::ePhysicalDeviceDeviceGeneratedCommandsFeaturesEXT,
-};
-const vk::StructureType vkextdevicememoryreport_features[] = {
-    vk::StructureType::ePhysicalDeviceDeviceMemoryReportFeaturesEXT,
-};
-const vk::StructureType vkextdynamicrenderingunusedattachments_features[] = {
-    vk::StructureType::ePhysicalDeviceDynamicRenderingUnusedAttachmentsFeaturesEXT,
-};
-const vk::StructureType vkextextendeddynamicstate_features[] = {
-    vk::StructureType::ePhysicalDeviceExtendedDynamicStateFeaturesEXT,
-};
-const vk::StructureType vkextextendeddynamicstate2_features[] = {
-    vk::StructureType::ePhysicalDeviceExtendedDynamicState2FeaturesEXT,
-};
-const vk::StructureType vkextextendeddynamicstate3_features[] = {
-    vk::StructureType::ePhysicalDeviceExtendedDynamicState3FeaturesEXT,
-};
-const vk::StructureType vkextfragmentdensitymap_features[] = {
-    vk::StructureType::ePhysicalDeviceFragmentDensityMapFeaturesEXT,
-};
-const vk::StructureType vkextfragmentdensitymap2_features[] = {
-    vk::StructureType::ePhysicalDeviceFragmentDensityMap2FeaturesEXT,
-};
-const vk::StructureType vkextfragmentdensitymapoffset_features[] = {
-    vk::StructureType::ePhysicalDeviceFragmentDensityMapOffsetFeaturesEXT,
-};
-const vk::StructureType vkextfragmentshaderinterlock_features[] = {
-    vk::StructureType::ePhysicalDeviceFragmentShaderInterlockFeaturesEXT,
-};
-const vk::StructureType vkextframeboundary_features[] = {
-    vk::StructureType::ePhysicalDeviceFrameBoundaryFeaturesEXT,
-};
-const vk::StructureType vkextgraphicspipelinelibrary_features[] = {
-    vk::StructureType::ePhysicalDeviceGraphicsPipelineLibraryFeaturesEXT,
-};
-const vk::StructureType vkextimage2dviewof3d_features[] = {
-    vk::StructureType::ePhysicalDeviceImage2DViewOf3DFeaturesEXT,
-};
-const vk::StructureType vkextimagecompressioncontrol_features[] = {
-    vk::StructureType::ePhysicalDeviceImageCompressionControlFeaturesEXT,
-};
-const vk::StructureType vkextimagecompressioncontrolswapchain_features[] = {
-    vk::StructureType::ePhysicalDeviceImageCompressionControlSwapchainFeaturesEXT,
-};
-const vk::StructureType vkextimageslicedviewof3d_features[] = {
-    vk::StructureType::ePhysicalDeviceImageSlicedViewOf3DFeaturesEXT,
-};
-const vk::StructureType vkextimageviewminlod_features[] = {
-    vk::StructureType::ePhysicalDeviceImageViewMinLodFeaturesEXT,
-};
-const vk::StructureType vkextlegacydithering_features[] = {
-    vk::StructureType::ePhysicalDeviceLegacyDitheringFeaturesEXT,
-};
-const vk::StructureType vkextlegacyvertexattributes_features[] = {
-    vk::StructureType::ePhysicalDeviceLegacyVertexAttributesFeaturesEXT,
-};
-const vk::StructureType vkextmapmemoryplaced_features[] = {
-    vk::StructureType::ePhysicalDeviceMapMemoryPlacedFeaturesEXT,
-};
-const vk::StructureType vkextmemorydecompression_features[] = {
-    vk::StructureType::ePhysicalDeviceMemoryDecompressionFeaturesEXT,
-};
-const vk::StructureType vkextmemorypriority_features[] = {
-    vk::StructureType::ePhysicalDeviceMemoryPriorityFeaturesEXT,
-};
-const vk::StructureType vkextmeshshader_features[] = {
-    vk::StructureType::ePhysicalDeviceMeshShaderFeaturesEXT,
-};
-const vk::StructureType vkextmultidraw_features[] = {
-    vk::StructureType::ePhysicalDeviceMultiDrawFeaturesEXT,
-};
-const vk::StructureType vkextmultisampledrendertosinglesampled_features[] = {
-    vk::StructureType::ePhysicalDeviceMultisampledRenderToSingleSampledFeaturesEXT,
-};
-const vk::StructureType vkextmutabledescriptortype_features[] = {
-    vk::StructureType::ePhysicalDeviceMutableDescriptorTypeFeaturesEXT,
-};
-const vk::StructureType vkextnestedcommandbuffer_features[] = {
-    vk::StructureType::ePhysicalDeviceNestedCommandBufferFeaturesEXT,
-};
-const vk::StructureType vkextnonseamlesscubemap_features[] = {
-    vk::StructureType::ePhysicalDeviceNonSeamlessCubeMapFeaturesEXT,
-};
-const vk::StructureType vkextopacitymicromap_features[] = {
-    vk::StructureType::ePhysicalDeviceOpacityMicromapFeaturesEXT,
-};
-const vk::StructureType vkextpageabledevicelocalmemory_features[] = {
-    vk::StructureType::ePhysicalDevicePageableDeviceLocalMemoryFeaturesEXT,
-};
-const vk::StructureType vkextpipelinelibrarygrouphandles_features[] = {
-    vk::StructureType::ePhysicalDevicePipelineLibraryGroupHandlesFeaturesEXT,
-};
-const vk::StructureType vkextpipelineproperties_features[] = {
-    vk::StructureType::ePhysicalDevicePipelinePropertiesFeaturesEXT,
-};
-const vk::StructureType vkextpresenttiming_features[] = {
-    vk::StructureType::ePhysicalDevicePresentTimingFeaturesEXT,
-};
-const vk::StructureType vkextprimitivetopologylistrestart_features[] = {
-    vk::StructureType::ePhysicalDevicePrimitiveTopologyListRestartFeaturesEXT,
-};
-const vk::StructureType vkextprimitivesgeneratedquery_features[] = {
-    vk::StructureType::ePhysicalDevicePrimitivesGeneratedQueryFeaturesEXT,
-};
-const vk::StructureType vkextprovokingvertex_features[] = {
-    vk::StructureType::ePhysicalDeviceProvokingVertexFeaturesEXT,
-};
-const vk::StructureType vkextrasterizationorderattachmentaccess_features[] = {
+const vk::StructureType VK_ARM_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT,
 };
-const vk::StructureType vkextraytracinginvocationreorder_features[] = {
-    vk::StructureType::ePhysicalDeviceRayTracingInvocationReorderFeaturesEXT,
+const vk::StructureType VK_ARM_RENDER_PASS_STRIPED_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceRenderPassStripedFeaturesARM,
 };
-const vk::StructureType vkextrgba10x6formats_features[] = {
-    vk::StructureType::ePhysicalDeviceRgba10X6FormatsFeaturesEXT,
+const vk::StructureType VK_ARM_SHADER_CORE_BUILTINS_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceShaderCoreBuiltinsFeaturesARM,
 };
-const vk::StructureType vkextshader64bitindexing_features[] = {
-    vk::StructureType::ePhysicalDeviceShader64BitIndexingFeaturesEXT,
+const vk::StructureType VK_ARM_TENSORS_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceDescriptorBufferTensorFeaturesARM,
 };
-const vk::StructureType vkextshaderatomicfloat_features[] = {
-    vk::StructureType::ePhysicalDeviceShaderAtomicFloatFeaturesEXT,
+const vk::StructureType VK_EXT_4444_FORMATS_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDevice4444FormatsFeaturesEXT,
 };
-const vk::StructureType vkextshaderatomicfloat2_features[] = {
-    vk::StructureType::ePhysicalDeviceShaderAtomicFloat2FeaturesEXT,
+const vk::StructureType VK_EXT_ATTACHMENT_FEEDBACK_LOOP_DYNAMIC_STATE_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceAttachmentFeedbackLoopDynamicStateFeaturesEXT,
 };
-const vk::StructureType vkextshaderfloat8_features[] = {
-    vk::StructureType::ePhysicalDeviceShaderFloat8FeaturesEXT,
+const vk::StructureType VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceAttachmentFeedbackLoopLayoutFeaturesEXT,
 };
-const vk::StructureType vkextshaderimageatomicint64_features[] = {
-    vk::StructureType::ePhysicalDeviceShaderImageAtomicInt64FeaturesEXT,
+const vk::StructureType VK_EXT_BLEND_OPERATION_ADVANCED_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceBlendOperationAdvancedFeaturesEXT,
 };
-const vk::StructureType vkextshaderlongvector_features[] = {
-    vk::StructureType::ePhysicalDeviceShaderLongVectorFeaturesEXT,
+const vk::StructureType VK_EXT_BORDER_COLOR_SWIZZLE_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceBorderColorSwizzleFeaturesEXT,
 };
-const vk::StructureType vkextshadermoduleidentifier_features[] = {
-    vk::StructureType::ePhysicalDeviceShaderModuleIdentifierFeaturesEXT,
+const vk::StructureType VK_EXT_BUFFER_DEVICE_ADDRESS_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceBufferDeviceAddressFeaturesEXT,
 };
-const vk::StructureType vkextshaderobject_features[] = {
-    vk::StructureType::ePhysicalDeviceShaderObjectFeaturesEXT,
+const vk::StructureType VK_EXT_COLOR_WRITE_ENABLE_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceColorWriteEnableFeaturesEXT,
 };
-const vk::StructureType vkextshaderreplicatedcomposites_features[] = {
-    vk::StructureType::ePhysicalDeviceShaderReplicatedCompositesFeaturesEXT,
+const vk::StructureType VK_EXT_CUSTOM_RESOLVE_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceCustomResolveFeaturesEXT,
 };
-const vk::StructureType vkextshadersubgrouppartitioned_features[] = {
-    vk::StructureType::ePhysicalDeviceShaderSubgroupPartitionedFeaturesEXT,
+const vk::StructureType VK_EXT_DEPTH_BIAS_CONTROL_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceDepthBiasControlFeaturesEXT,
 };
-const vk::StructureType vkextshadertileimage_features[] = {
-    vk::StructureType::ePhysicalDeviceShaderTileImageFeaturesEXT,
+const vk::StructureType VK_EXT_DEPTH_CLAMP_CONTROL_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceDepthClampControlFeaturesEXT,
 };
-const vk::StructureType vkextshaderuniformbufferunsizedarray_features[] = {
-    vk::StructureType::ePhysicalDeviceShaderUniformBufferUnsizedArrayFeaturesEXT,
-};
-const vk::StructureType vkextsubpassmergefeedback_features[] = {
-    vk::StructureType::ePhysicalDeviceSubpassMergeFeedbackFeaturesEXT,
-};
-const vk::StructureType vkexttexelbufferalignment_features[] = {
-    vk::StructureType::ePhysicalDeviceTexelBufferAlignmentFeaturesEXT,
-};
-const vk::StructureType vkexttexturecompressionastc3d_features[] = {
-    vk::StructureType::ePhysicalDeviceTextureCompressionAstc3DFeaturesEXT,
-};
-const vk::StructureType vkexttransformfeedback_features[] = {
-    vk::StructureType::ePhysicalDeviceTransformFeedbackFeaturesEXT,
-};
-const vk::StructureType vkextvertexattributerobustness_features[] = {
-    vk::StructureType::ePhysicalDeviceVertexAttributeRobustnessFeaturesEXT,
-};
-const vk::StructureType vkextvertexinputdynamicstate_features[] = {
-    vk::StructureType::ePhysicalDeviceVertexInputDynamicStateFeaturesEXT,
-};
-const vk::StructureType vkextycbcr2plane444formats_features[] = {
-    vk::StructureType::ePhysicalDeviceYcbcr2Plane444FormatsFeaturesEXT,
-};
-const vk::StructureType vkextycbcrimagearrays_features[] = {
-    vk::StructureType::ePhysicalDeviceYcbcrImageArraysFeaturesEXT,
-};
-const vk::StructureType vkextzeroinitializedevicememory_features[] = {
-    vk::StructureType::ePhysicalDeviceZeroInitializeDeviceMemoryFeaturesEXT,
-};
-const vk::StructureType vkhuaweiclustercullingshader_features[] = {
-    vk::StructureType::ePhysicalDeviceClusterCullingShaderFeaturesHUAWEI,
-};
-const vk::StructureType vkhuaweihdrvivid_features[] = {
-    vk::StructureType::ePhysicalDeviceHdrVividFeaturesHUAWEI,
-};
-const vk::StructureType vkhuaweiinvocationmask_features[] = {
-    vk::StructureType::ePhysicalDeviceInvocationMaskFeaturesHUAWEI,
-};
-const vk::StructureType vkhuaweisubpassshading_features[] = {
-    vk::StructureType::ePhysicalDeviceSubpassShadingFeaturesHUAWEI,
-};
-const vk::StructureType vkimgrelaxedlinerasterization_features[] = {
-    vk::StructureType::ePhysicalDeviceRelaxedLineRasterizationFeaturesIMG,
-};
-const vk::StructureType vkintelshaderintegerfunctions2_features[] = {
-    vk::StructureType::ePhysicalDeviceShaderIntegerFunctions2FeaturesINTEL,
-};
-const vk::StructureType vkkhraccelerationstructure_features[] = {
-    vk::StructureType::ePhysicalDeviceAccelerationStructureFeaturesKHR,
-};
-const vk::StructureType vkkhrcomputeshaderderivatives_features[] = {
-    vk::StructureType::ePhysicalDeviceComputeShaderDerivativesFeaturesKHR,
-};
-const vk::StructureType vkkhrcooperativematrix_features[] = {
-    vk::StructureType::ePhysicalDeviceCooperativeMatrixFeaturesKHR,
-};
-const vk::StructureType vkkhrcopymemoryindirect_features[] = {
-    vk::StructureType::ePhysicalDeviceCopyMemoryIndirectFeaturesKHR,
-};
-const vk::StructureType vkkhrdepthclampzeroone_features[] = {
+const vk::StructureType VK_EXT_DEPTH_CLAMP_ZERO_ONE_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceDepthClampZeroOneFeaturesKHR,
 };
-const vk::StructureType vkkhrfragmentshaderbarycentric_features[] = {
-    vk::StructureType::ePhysicalDeviceFragmentShaderBarycentricFeaturesKHR,
+const vk::StructureType VK_EXT_DEPTH_CLIP_CONTROL_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceDepthClipControlFeaturesEXT,
 };
-const vk::StructureType vkkhrfragmentshadingrate_features[] = {
-    vk::StructureType::ePhysicalDeviceFragmentShadingRateFeaturesKHR,
+const vk::StructureType VK_EXT_DEPTH_CLIP_ENABLE_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceDepthClipEnableFeaturesEXT,
 };
-const vk::StructureType vkkhrinternallysynchronizedqueues_features[] = {
-    vk::StructureType::ePhysicalDeviceInternallySynchronizedQueuesFeaturesKHR,
+const vk::StructureType VK_EXT_DEVICE_ADDRESS_BINDING_REPORT_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceAddressBindingReportFeaturesEXT,
 };
-const vk::StructureType vkkhrmaintenance10_features[] = {
-    vk::StructureType::ePhysicalDeviceMaintenance10FeaturesKHR,
+const vk::StructureType VK_EXT_DEVICE_FAULT_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceFaultFeaturesEXT,
 };
-const vk::StructureType vkkhrmaintenance7_features[] = {
-    vk::StructureType::ePhysicalDeviceMaintenance7FeaturesKHR,
+const vk::StructureType VK_EXT_DEVICE_GENERATED_COMMANDS_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceDeviceGeneratedCommandsFeaturesEXT,
 };
-const vk::StructureType vkkhrmaintenance8_features[] = {
-    vk::StructureType::ePhysicalDeviceMaintenance8FeaturesKHR,
+const vk::StructureType VK_EXT_DEVICE_MEMORY_REPORT_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceDeviceMemoryReportFeaturesEXT,
 };
-const vk::StructureType vkkhrmaintenance9_features[] = {
-    vk::StructureType::ePhysicalDeviceMaintenance9FeaturesKHR,
+const vk::StructureType VK_EXT_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceDynamicRenderingUnusedAttachmentsFeaturesEXT,
 };
-const vk::StructureType vkkhrperformancequery_features[] = {
-    vk::StructureType::ePhysicalDevicePerformanceQueryFeaturesKHR,
+const vk::StructureType VK_EXT_EXTENDED_DYNAMIC_STATE_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceExtendedDynamicStateFeaturesEXT,
 };
-const vk::StructureType vkkhrpipelinebinary_features[] = {
-    vk::StructureType::ePhysicalDevicePipelineBinaryFeaturesKHR,
+const vk::StructureType VK_EXT_EXTENDED_DYNAMIC_STATE2_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceExtendedDynamicState2FeaturesEXT,
 };
-const vk::StructureType vkkhrpipelineexecutableproperties_features[] = {
-    vk::StructureType::ePhysicalDevicePipelineExecutablePropertiesFeaturesKHR,
+const vk::StructureType VK_EXT_EXTENDED_DYNAMIC_STATE3_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceExtendedDynamicState3FeaturesEXT,
 };
-const vk::StructureType vkkhrpresentid_features[] = {
-    vk::StructureType::ePhysicalDevicePresentIdFeaturesKHR,
+const vk::StructureType VK_EXT_FRAGMENT_DENSITY_MAP_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceFragmentDensityMapFeaturesEXT,
 };
-const vk::StructureType vkkhrpresentid2_features[] = {
-    vk::StructureType::ePhysicalDevicePresentId2FeaturesKHR,
+const vk::StructureType VK_EXT_FRAGMENT_DENSITY_MAP2_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceFragmentDensityMap2FeaturesEXT,
 };
-const vk::StructureType vkkhrpresentmodefifolatestready_features[] = {
+const vk::StructureType VK_EXT_FRAGMENT_SHADER_INTERLOCK_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceFragmentShaderInterlockFeaturesEXT,
+};
+const vk::StructureType VK_EXT_FRAME_BOUNDARY_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceFrameBoundaryFeaturesEXT,
+};
+const vk::StructureType VK_EXT_GLOBAL_PRIORITY_QUERY_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceGlobalPriorityQueryFeatures,
+};
+const vk::StructureType VK_EXT_GRAPHICS_PIPELINE_LIBRARY_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceGraphicsPipelineLibraryFeaturesEXT,
+};
+const vk::StructureType VK_EXT_HOST_IMAGE_COPY_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceHostImageCopyFeatures,
+};
+const vk::StructureType VK_EXT_HOST_QUERY_RESET_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceHostQueryResetFeatures,
+};
+const vk::StructureType VK_EXT_IMAGE_2D_VIEW_OF_3D_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceImage2DViewOf3DFeaturesEXT,
+};
+const vk::StructureType VK_EXT_IMAGE_COMPRESSION_CONTROL_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceImageCompressionControlFeaturesEXT,
+};
+const vk::StructureType VK_EXT_IMAGE_COMPRESSION_CONTROL_SWAPCHAIN_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceImageCompressionControlSwapchainFeaturesEXT,
+};
+const vk::StructureType VK_EXT_IMAGE_ROBUSTNESS_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceImageRobustnessFeatures,
+};
+const vk::StructureType VK_EXT_IMAGE_SLICED_VIEW_OF_3D_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceImageSlicedViewOf3DFeaturesEXT,
+};
+const vk::StructureType VK_EXT_IMAGE_VIEW_MIN_LOD_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceImageViewMinLodFeaturesEXT,
+};
+const vk::StructureType VK_EXT_INDEX_TYPE_UINT8_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceIndexTypeUint8Features,
+};
+const vk::StructureType VK_EXT_INLINE_UNIFORM_BLOCK_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceInlineUniformBlockFeatures,
+};
+const vk::StructureType VK_EXT_LEGACY_DITHERING_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceLegacyDitheringFeaturesEXT,
+};
+const vk::StructureType VK_EXT_LEGACY_VERTEX_ATTRIBUTES_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceLegacyVertexAttributesFeaturesEXT,
+};
+const vk::StructureType VK_EXT_LINE_RASTERIZATION_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceLineRasterizationFeatures,
+};
+const vk::StructureType VK_EXT_MAP_MEMORY_PLACED_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceMapMemoryPlacedFeaturesEXT,
+};
+const vk::StructureType VK_EXT_MEMORY_PRIORITY_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceMemoryPriorityFeaturesEXT,
+};
+const vk::StructureType VK_EXT_MESH_SHADER_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceMeshShaderFeaturesEXT,
+};
+const vk::StructureType VK_EXT_MULTI_DRAW_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceMultiDrawFeaturesEXT,
+};
+const vk::StructureType VK_EXT_MULTISAMPLED_RENDER_TO_SINGLE_SAMPLED_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceMultisampledRenderToSingleSampledFeaturesEXT,
+};
+const vk::StructureType VK_EXT_MUTABLE_DESCRIPTOR_TYPE_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceMutableDescriptorTypeFeaturesEXT,
+};
+const vk::StructureType VK_EXT_NESTED_COMMAND_BUFFER_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceNestedCommandBufferFeaturesEXT,
+};
+const vk::StructureType VK_EXT_NON_SEAMLESS_CUBE_MAP_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceNonSeamlessCubeMapFeaturesEXT,
+};
+const vk::StructureType VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDevicePageableDeviceLocalMemoryFeaturesEXT,
+};
+const vk::StructureType VK_EXT_PIPELINE_CREATION_CACHE_CONTROL_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDevicePipelineCreationCacheControlFeatures,
+};
+const vk::StructureType VK_EXT_PIPELINE_LIBRARY_GROUP_HANDLES_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDevicePipelineLibraryGroupHandlesFeaturesEXT,
+};
+const vk::StructureType VK_EXT_PIPELINE_PROTECTED_ACCESS_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDevicePipelineProtectedAccessFeatures,
+};
+const vk::StructureType VK_EXT_PIPELINE_ROBUSTNESS_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDevicePipelineRobustnessFeatures,
+};
+const vk::StructureType VK_EXT_PRESENT_MODE_FIFO_LATEST_READY_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDevicePresentModeFifoLatestReadyFeaturesKHR,
 };
-const vk::StructureType vkkhrpresentwait_features[] = {
-    vk::StructureType::ePhysicalDevicePresentWaitFeaturesKHR,
+const vk::StructureType VK_EXT_PRESENT_TIMING_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDevicePresentTimingFeaturesEXT,
 };
-const vk::StructureType vkkhrpresentwait2_features[] = {
-    vk::StructureType::ePhysicalDevicePresentWait2FeaturesKHR,
+const vk::StructureType VK_EXT_PRIMITIVE_TOPOLOGY_LIST_RESTART_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDevicePrimitiveTopologyListRestartFeaturesEXT,
 };
-const vk::StructureType vkkhrrayquery_features[] = {
-    vk::StructureType::ePhysicalDeviceRayQueryFeaturesKHR,
+const vk::StructureType VK_EXT_PRIMITIVES_GENERATED_QUERY_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDevicePrimitivesGeneratedQueryFeaturesEXT,
 };
-const vk::StructureType vkkhrraytracingmaintenance1_features[] = {
-    vk::StructureType::ePhysicalDeviceRayTracingMaintenance1FeaturesKHR,
+const vk::StructureType VK_EXT_PRIVATE_DATA_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDevicePrivateDataFeatures,
 };
-const vk::StructureType vkkhrraytracingpipeline_features[] = {
-    vk::StructureType::ePhysicalDeviceRayTracingPipelineFeaturesKHR,
+const vk::StructureType VK_EXT_PROVOKING_VERTEX_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceProvokingVertexFeaturesEXT,
 };
-const vk::StructureType vkkhrraytracingpositionfetch_features[] = {
-    vk::StructureType::ePhysicalDeviceRayTracingPositionFetchFeaturesKHR,
+const vk::StructureType VK_EXT_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT,
 };
-const vk::StructureType vkkhrrobustness2_features[] = {
+const vk::StructureType VK_EXT_RGBA10X6_FORMATS_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceRgba10X6FormatsFeaturesEXT,
+};
+const vk::StructureType VK_EXT_ROBUSTNESS2_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceRobustness2FeaturesKHR,
 };
-const vk::StructureType vkkhrshaderbfloat16_features[] = {
-    vk::StructureType::ePhysicalDeviceShaderBfloat16FeaturesKHR,
+const vk::StructureType VK_EXT_SCALAR_BLOCK_LAYOUT_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceScalarBlockLayoutFeatures,
 };
-const vk::StructureType vkkhrshaderclock_features[] = {
-    vk::StructureType::ePhysicalDeviceShaderClockFeaturesKHR,
+const vk::StructureType VK_EXT_SHADER_64BIT_INDEXING_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceShader64BitIndexingFeaturesEXT,
 };
-const vk::StructureType vkkhrshaderfma_features[] = {
-    vk::StructureType::ePhysicalDeviceShaderFmaFeaturesKHR,
+const vk::StructureType VK_EXT_SHADER_ATOMIC_FLOAT_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceShaderAtomicFloatFeaturesEXT,
 };
-const vk::StructureType vkkhrshadermaximalreconvergence_features[] = {
-    vk::StructureType::ePhysicalDeviceShaderMaximalReconvergenceFeaturesKHR,
+const vk::StructureType VK_EXT_SHADER_ATOMIC_FLOAT2_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceShaderAtomicFloat2FeaturesEXT,
 };
-const vk::StructureType vkkhrshaderquadcontrol_features[] = {
-    vk::StructureType::ePhysicalDeviceShaderQuadControlFeaturesKHR,
+const vk::StructureType VK_EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceShaderDemoteToHelperInvocationFeatures,
 };
-const vk::StructureType vkkhrshaderrelaxedextendedinstruction_features[] = {
-    vk::StructureType::ePhysicalDeviceShaderRelaxedExtendedInstructionFeaturesKHR,
+const vk::StructureType VK_EXT_SHADER_FLOAT8_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceShaderFloat8FeaturesEXT,
 };
-const vk::StructureType vkkhrshadersubgroupuniformcontrolflow_features[] = {
-    vk::StructureType::ePhysicalDeviceShaderSubgroupUniformControlFlowFeaturesKHR,
+const vk::StructureType VK_EXT_SHADER_IMAGE_ATOMIC_INT64_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceShaderImageAtomicInt64FeaturesEXT,
 };
-const vk::StructureType vkkhrshaderuntypedpointers_features[] = {
-    vk::StructureType::ePhysicalDeviceShaderUntypedPointersFeaturesKHR,
+const vk::StructureType VK_EXT_SHADER_LONG_VECTOR_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceShaderLongVectorFeaturesEXT,
 };
-const vk::StructureType vkkhrswapchainmaintenance1_features[] = {
+const vk::StructureType VK_EXT_SHADER_MODULE_IDENTIFIER_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceShaderModuleIdentifierFeaturesEXT,
+};
+const vk::StructureType VK_EXT_SHADER_OBJECT_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceShaderObjectFeaturesEXT,
+};
+const vk::StructureType VK_EXT_SHADER_REPLICATED_COMPOSITES_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceShaderReplicatedCompositesFeaturesEXT,
+};
+const vk::StructureType VK_EXT_SHADER_SUBGROUP_PARTITIONED_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceShaderSubgroupPartitionedFeaturesEXT,
+};
+const vk::StructureType VK_EXT_SHADER_TILE_IMAGE_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceShaderTileImageFeaturesEXT,
+};
+const vk::StructureType VK_EXT_SHADER_UNIFORM_BUFFER_UNSIZED_ARRAY_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceShaderUniformBufferUnsizedArrayFeaturesEXT,
+};
+const vk::StructureType VK_EXT_SUBGROUP_SIZE_CONTROL_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceSubgroupSizeControlFeatures,
+};
+const vk::StructureType VK_EXT_SUBPASS_MERGE_FEEDBACK_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceSubpassMergeFeedbackFeaturesEXT,
+};
+const vk::StructureType VK_EXT_SWAPCHAIN_MAINTENANCE1_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceSwapchainMaintenance1FeaturesKHR,
 };
-const vk::StructureType vkkhrunifiedimagelayouts_features[] = {
+const vk::StructureType VK_EXT_TEXEL_BUFFER_ALIGNMENT_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceTexelBufferAlignmentFeaturesEXT,
+};
+const vk::StructureType VK_EXT_TEXTURE_COMPRESSION_ASTC_3D_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceTextureCompressionAstc3DFeaturesEXT,
+};
+const vk::StructureType VK_EXT_TEXTURE_COMPRESSION_ASTC_HDR_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceTextureCompressionAstcHdrFeatures,
+};
+const vk::StructureType VK_EXT_TRANSFORM_FEEDBACK_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceTransformFeedbackFeaturesEXT,
+};
+const vk::StructureType VK_EXT_VERTEX_ATTRIBUTE_ROBUSTNESS_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceVertexAttributeRobustnessFeaturesEXT,
+};
+const vk::StructureType VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceVertexInputDynamicStateFeaturesEXT,
+};
+const vk::StructureType VK_EXT_YCBCR_2PLANE_444_FORMATS_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceYcbcr2Plane444FormatsFeaturesEXT,
+};
+const vk::StructureType VK_EXT_YCBCR_IMAGE_ARRAYS_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceYcbcrImageArraysFeaturesEXT,
+};
+const vk::StructureType VK_EXT_ZERO_INITIALIZE_DEVICE_MEMORY_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceZeroInitializeDeviceMemoryFeaturesEXT,
+};
+const vk::StructureType VK_HUAWEI_CLUSTER_CULLING_SHADER_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceClusterCullingShaderFeaturesHUAWEI,
+};
+const vk::StructureType VK_HUAWEI_HDR_VIVID_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceHdrVividFeaturesHUAWEI,
+};
+const vk::StructureType VK_HUAWEI_INVOCATION_MASK_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceInvocationMaskFeaturesHUAWEI,
+};
+const vk::StructureType VK_IMG_RELAXED_LINE_RASTERIZATION_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceRelaxedLineRasterizationFeaturesIMG,
+};
+const vk::StructureType VK_INTEL_SHADER_INTEGER_FUNCTIONS2_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceShaderIntegerFunctions2FeaturesINTEL,
+};
+const vk::StructureType VK_KHR_16BIT_STORAGE_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDevice16BitStorageFeatures,
+};
+const vk::StructureType VK_KHR_8BIT_STORAGE_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDevice8BitStorageFeatures,
+};
+const vk::StructureType VK_KHR_BUFFER_DEVICE_ADDRESS_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceBufferDeviceAddressFeatures,
+};
+const vk::StructureType VK_KHR_COMPUTE_SHADER_DERIVATIVES_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceComputeShaderDerivativesFeaturesKHR,
+};
+const vk::StructureType VK_KHR_DEPTH_CLAMP_ZERO_ONE_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceDepthClampZeroOneFeaturesKHR,
+};
+const vk::StructureType VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceDynamicRenderingLocalReadFeatures,
+};
+const vk::StructureType VK_KHR_FRAGMENT_SHADER_BARYCENTRIC_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceFragmentShaderBarycentricFeaturesKHR,
+};
+const vk::StructureType VK_KHR_IMAGELESS_FRAMEBUFFER_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceImagelessFramebufferFeatures,
+};
+const vk::StructureType VK_KHR_INDEX_TYPE_UINT8_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceIndexTypeUint8Features,
+};
+const vk::StructureType VK_KHR_INTERNALLY_SYNCHRONIZED_QUEUES_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceInternallySynchronizedQueuesFeaturesKHR,
+};
+const vk::StructureType VK_KHR_LINE_RASTERIZATION_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceLineRasterizationFeatures,
+};
+const vk::StructureType VK_KHR_MAINTENANCE10_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceMaintenance10FeaturesKHR,
+};
+const vk::StructureType VK_KHR_MAINTENANCE4_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceMaintenance4Features,
+};
+const vk::StructureType VK_KHR_MAINTENANCE5_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceMaintenance5Features,
+};
+const vk::StructureType VK_KHR_MAINTENANCE6_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceMaintenance6Features,
+};
+const vk::StructureType VK_KHR_MAINTENANCE7_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceMaintenance7FeaturesKHR,
+};
+const vk::StructureType VK_KHR_MAINTENANCE9_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceMaintenance9FeaturesKHR,
+};
+const vk::StructureType VK_KHR_PERFORMANCE_QUERY_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDevicePerformanceQueryFeaturesKHR,
+};
+const vk::StructureType VK_KHR_PIPELINE_BINARY_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDevicePipelineBinaryFeaturesKHR,
+};
+const vk::StructureType VK_KHR_PIPELINE_EXECUTABLE_PROPERTIES_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDevicePipelineExecutablePropertiesFeaturesKHR,
+};
+const vk::StructureType VK_KHR_PRESENT_MODE_FIFO_LATEST_READY_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDevicePresentModeFifoLatestReadyFeaturesKHR,
+};
+const vk::StructureType VK_KHR_PRESENT_WAIT_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDevicePresentWaitFeaturesKHR,
+};
+const vk::StructureType VK_KHR_RAY_QUERY_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceRayQueryFeaturesKHR,
+};
+const vk::StructureType VK_KHR_RAY_TRACING_MAINTENANCE1_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceRayTracingMaintenance1FeaturesKHR,
+};
+const vk::StructureType VK_KHR_RAY_TRACING_POSITION_FETCH_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceRayTracingPositionFetchFeaturesKHR,
+};
+const vk::StructureType VK_KHR_ROBUSTNESS2_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceRobustness2FeaturesKHR,
+};
+const vk::StructureType VK_KHR_SEPARATE_DEPTH_STENCIL_LAYOUTS_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceSeparateDepthStencilLayoutsFeatures,
+};
+const vk::StructureType VK_KHR_SHADER_ATOMIC_INT64_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceShaderAtomicInt64Features,
+};
+const vk::StructureType VK_KHR_SHADER_BFLOAT16_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceShaderBfloat16FeaturesKHR,
+};
+const vk::StructureType VK_KHR_SHADER_CLOCK_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceShaderClockFeaturesKHR,
+};
+const vk::StructureType VK_KHR_SHADER_EXPECT_ASSUME_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceShaderExpectAssumeFeatures,
+};
+const vk::StructureType VK_KHR_SHADER_FLOAT16_INT8_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceShaderFloat16Int8Features,
+};
+const vk::StructureType VK_KHR_SHADER_FLOAT_CONTROLS2_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceShaderFloatControls2Features,
+};
+const vk::StructureType VK_KHR_SHADER_FMA_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceShaderFmaFeaturesKHR,
+};
+const vk::StructureType VK_KHR_SHADER_INTEGER_DOT_PRODUCT_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceShaderIntegerDotProductFeatures,
+};
+const vk::StructureType VK_KHR_SHADER_MAXIMAL_RECONVERGENCE_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceShaderMaximalReconvergenceFeaturesKHR,
+};
+const vk::StructureType VK_KHR_SHADER_QUAD_CONTROL_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceShaderQuadControlFeaturesKHR,
+};
+const vk::StructureType VK_KHR_SHADER_RELAXED_EXTENDED_INSTRUCTION_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceShaderRelaxedExtendedInstructionFeaturesKHR,
+};
+const vk::StructureType VK_KHR_SHADER_SUBGROUP_EXTENDED_TYPES_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceShaderSubgroupExtendedTypesFeatures,
+};
+const vk::StructureType VK_KHR_SHADER_SUBGROUP_ROTATE_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceShaderSubgroupRotateFeatures,
+};
+const vk::StructureType VK_KHR_SHADER_SUBGROUP_UNIFORM_CONTROL_FLOW_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceShaderSubgroupUniformControlFlowFeaturesKHR,
+};
+const vk::StructureType VK_KHR_SHADER_TERMINATE_INVOCATION_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceShaderTerminateInvocationFeatures,
+};
+const vk::StructureType VK_KHR_SHADER_UNTYPED_POINTERS_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceShaderUntypedPointersFeaturesKHR,
+};
+const vk::StructureType VK_KHR_SWAPCHAIN_MAINTENANCE1_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceSwapchainMaintenance1FeaturesKHR,
+};
+const vk::StructureType VK_KHR_TIMELINE_SEMAPHORE_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceTimelineSemaphoreFeatures,
+};
+const vk::StructureType VK_KHR_UNIFIED_IMAGE_LAYOUTS_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceUnifiedImageLayoutsFeaturesKHR,
 };
-const vk::StructureType vkkhrvideodecodevp9_features[] = {
+const vk::StructureType VK_KHR_UNIFORM_BUFFER_STANDARD_LAYOUT_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceUniformBufferStandardLayoutFeatures,
+};
+const vk::StructureType VK_KHR_VARIABLE_POINTERS_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceVariablePointersFeatures,
+};
+const vk::StructureType VK_KHR_VIDEO_DECODE_VP9_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceVideoDecodeVp9FeaturesKHR,
 };
-const vk::StructureType vkkhrvideoencodeav1_features[] = {
+const vk::StructureType VK_KHR_VIDEO_ENCODE_AV1_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceVideoEncodeAv1FeaturesKHR,
 };
-const vk::StructureType vkkhrvideoencodeintrarefresh_features[] = {
-    vk::StructureType::ePhysicalDeviceVideoEncodeIntraRefreshFeaturesKHR,
-};
-const vk::StructureType vkkhrvideoencodequantizationmap_features[] = {
-    vk::StructureType::ePhysicalDeviceVideoEncodeQuantizationMapFeaturesKHR,
-};
-const vk::StructureType vkkhrvideomaintenance1_features[] = {
+const vk::StructureType VK_KHR_VIDEO_MAINTENANCE1_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceVideoMaintenance1FeaturesKHR,
 };
-const vk::StructureType vkkhrvideomaintenance2_features[] = {
+const vk::StructureType VK_KHR_VIDEO_MAINTENANCE2_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceVideoMaintenance2FeaturesKHR,
 };
-const vk::StructureType vkkhrworkgroupmemoryexplicitlayout_features[] = {
+const vk::StructureType VK_KHR_VULKAN_MEMORY_MODEL_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceVulkanMemoryModelFeatures,
+};
+const vk::StructureType VK_KHR_WORKGROUP_MEMORY_EXPLICIT_LAYOUT_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR,
 };
-const vk::StructureType vkmesaimagealignmentcontrol_features[] = {
+const vk::StructureType VK_KHR_ZERO_INITIALIZE_WORKGROUP_MEMORY_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceZeroInitializeWorkgroupMemoryFeatures,
+};
+const vk::StructureType VK_MESA_IMAGE_ALIGNMENT_CONTROL_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceImageAlignmentControlFeaturesMESA,
 };
-const vk::StructureType vknvclusteraccelerationstructure_features[] = {
+const vk::StructureType VK_NV_CLUSTER_ACCELERATION_STRUCTURE_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceClusterAccelerationStructureFeaturesNV,
 };
-const vk::StructureType vknvcommandbufferinheritance_features[] = {
+const vk::StructureType VK_NV_COMMAND_BUFFER_INHERITANCE_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceCommandBufferInheritanceFeaturesNV,
 };
-const vk::StructureType vknvcomputeoccupancypriority_features[] = {
-    vk::StructureType::ePhysicalDeviceComputeOccupancyPriorityFeaturesNV,
+const vk::StructureType VK_NV_COMPUTE_SHADER_DERIVATIVES_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceComputeShaderDerivativesFeaturesKHR,
 };
-const vk::StructureType vknvcooperativematrix_features[] = {
-    vk::StructureType::ePhysicalDeviceCooperativeMatrixFeaturesNV,
-};
-const vk::StructureType vknvcooperativematrix2_features[] = {
-    vk::StructureType::ePhysicalDeviceCooperativeMatrix2FeaturesNV,
-};
-const vk::StructureType vknvcooperativevector_features[] = {
-    vk::StructureType::ePhysicalDeviceCooperativeVectorFeaturesNV,
-};
-const vk::StructureType vknvcopymemoryindirect_features[] = {
-    vk::StructureType::ePhysicalDeviceCopyMemoryIndirectFeaturesNV,
-};
-const vk::StructureType vknvcornersampledimage_features[] = {
+const vk::StructureType VK_NV_CORNER_SAMPLED_IMAGE_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceCornerSampledImageFeaturesNV,
 };
-const vk::StructureType vknvcoveragereductionmode_features[] = {
+const vk::StructureType VK_NV_COVERAGE_REDUCTION_MODE_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceCoverageReductionModeFeaturesNV,
 };
-const vk::StructureType vknvdedicatedallocationimagealiasing_features[] = {
+const vk::StructureType VK_NV_DEDICATED_ALLOCATION_IMAGE_ALIASING_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceDedicatedAllocationImageAliasingFeaturesNV,
 };
-const vk::StructureType vknvdescriptorpooloverallocation_features[] = {
+const vk::StructureType VK_NV_DESCRIPTOR_POOL_OVERALLOCATION_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceDescriptorPoolOverallocationFeaturesNV,
 };
-const vk::StructureType vknvdevicediagnosticsconfig_features[] = {
+const vk::StructureType VK_NV_DEVICE_DIAGNOSTICS_CONFIG_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceDiagnosticsConfigFeaturesNV,
 };
-const vk::StructureType vknvdevicegeneratedcommands_features[] = {
-    vk::StructureType::ePhysicalDeviceDeviceGeneratedCommandsFeaturesNV,
-};
-const vk::StructureType vknvdevicegeneratedcommandscompute_features[] = {
+const vk::StructureType VK_NV_DEVICE_GENERATED_COMMANDS_COMPUTE_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceDeviceGeneratedCommandsComputeFeaturesNV,
 };
-const vk::StructureType vknvextendedsparseaddressspace_features[] = {
+const vk::StructureType VK_NV_EXTENDED_SPARSE_ADDRESS_SPACE_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceExtendedSparseAddressSpaceFeaturesNV,
 };
-const vk::StructureType vknvexternalmemoryrdma_features[] = {
-    vk::StructureType::ePhysicalDeviceExternalMemoryRdmaFeaturesNV,
+const vk::StructureType VK_NV_FRAGMENT_SHADER_BARYCENTRIC_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceFragmentShaderBarycentricFeaturesKHR,
 };
-const vk::StructureType vknvfragmentshadingrateenums_features[] = {
+const vk::StructureType VK_NV_FRAGMENT_SHADING_RATE_ENUMS_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceFragmentShadingRateEnumsFeaturesNV,
 };
-const vk::StructureType vknvinheritedviewportscissor_features[] = {
+const vk::StructureType VK_NV_INHERITED_VIEWPORT_SCISSOR_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceInheritedViewportScissorFeaturesNV,
 };
-const vk::StructureType vknvlinearcolorattachment_features[] = {
+const vk::StructureType VK_NV_LINEAR_COLOR_ATTACHMENT_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceLinearColorAttachmentFeaturesNV,
 };
-const vk::StructureType vknvmeshshader_features[] = {
+const vk::StructureType VK_NV_MESH_SHADER_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceMeshShaderFeaturesNV,
 };
-const vk::StructureType vknvopticalflow_features[] = {
+const vk::StructureType VK_NV_OPTICAL_FLOW_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceOpticalFlowFeaturesNV,
 };
-const vk::StructureType vknvpartitionedaccelerationstructure_features[] = {
+const vk::StructureType VK_NV_PARTITIONED_ACCELERATION_STRUCTURE_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDevicePartitionedAccelerationStructureFeaturesNV,
 };
-const vk::StructureType vknvperstagedescriptorset_features[] = {
+const vk::StructureType VK_NV_PER_STAGE_DESCRIPTOR_SET_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDevicePerStageDescriptorSetFeaturesNV,
 };
-const vk::StructureType vknvpresentbarrier_features[] = {
+const vk::StructureType VK_NV_PRESENT_BARRIER_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDevicePresentBarrierFeaturesNV,
 };
-const vk::StructureType vknvpushconstantbank_features[] = {
-    vk::StructureType::ePhysicalDevicePushConstantBankFeaturesNV,
-};
-const vk::StructureType vknvrawaccesschains_features[] = {
+const vk::StructureType VK_NV_RAW_ACCESS_CHAINS_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceRawAccessChainsFeaturesNV,
 };
-const vk::StructureType vknvraytracinginvocationreorder_features[] = {
-    vk::StructureType::ePhysicalDeviceRayTracingInvocationReorderFeaturesNV,
-};
-const vk::StructureType vknvraytracinglinearsweptspheres_features[] = {
+const vk::StructureType VK_NV_RAY_TRACING_LINEAR_SWEPT_SPHERES_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceRayTracingLinearSweptSpheresFeaturesNV,
 };
-const vk::StructureType vknvraytracingmotionblur_features[] = {
-    vk::StructureType::ePhysicalDeviceRayTracingMotionBlurFeaturesNV,
-};
-const vk::StructureType vknvraytracingvalidation_features[] = {
+const vk::StructureType VK_NV_RAY_TRACING_VALIDATION_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceRayTracingValidationFeaturesNV,
 };
-const vk::StructureType vknvrepresentativefragmenttest_features[] = {
+const vk::StructureType VK_NV_REPRESENTATIVE_FRAGMENT_TEST_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceRepresentativeFragmentTestFeaturesNV,
 };
-const vk::StructureType vknvscissorexclusive_features[] = {
-    vk::StructureType::ePhysicalDeviceExclusiveScissorFeaturesNV,
-};
-const vk::StructureType vknvshaderatomicfloat16vector_features[] = {
+const vk::StructureType VK_NV_SHADER_ATOMIC_FLOAT16_VECTOR_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceShaderAtomicFloat16VectorFeaturesNV,
 };
-const vk::StructureType vknvshaderimagefootprint_features[] = {
+const vk::StructureType VK_NV_SHADER_IMAGE_FOOTPRINT_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceShaderImageFootprintFeaturesNV,
 };
-const vk::StructureType vknvshadersmbuiltins_features[] = {
-    vk::StructureType::ePhysicalDeviceShaderSmBuiltinsFeaturesNV,
-};
-const vk::StructureType vknvshadingrateimage_features[] = {
-    vk::StructureType::ePhysicalDeviceShadingRateImageFeaturesNV,
-};
-const vk::StructureType vkqcomcooperativematrixconversion_features[] = {
+const vk::StructureType VK_QCOM_COOPERATIVE_MATRIX_CONVERSION_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceCooperativeMatrixConversionFeaturesQCOM,
 };
-const vk::StructureType vkqcomdatagraphmodel_features[] = {
-    vk::StructureType::ePhysicalDeviceDataGraphModelFeaturesQCOM,
-};
-const vk::StructureType vkqcomfiltercubicclamp_features[] = {
+const vk::StructureType VK_QCOM_FILTER_CUBIC_CLAMP_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceCubicClampFeaturesQCOM,
 };
-const vk::StructureType vkqcomfiltercubicweights_features[] = {
+const vk::StructureType VK_QCOM_FILTER_CUBIC_WEIGHTS_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceCubicWeightsFeaturesQCOM,
 };
-const vk::StructureType vkqcomimageprocessing_features[] = {
-    vk::StructureType::ePhysicalDeviceImageProcessingFeaturesQCOM,
+const vk::StructureType VK_QCOM_FRAGMENT_DENSITY_MAP_OFFSET_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceFragmentDensityMapOffsetFeaturesEXT,
 };
-const vk::StructureType vkqcomimageprocessing2_features[] = {
+const vk::StructureType VK_QCOM_IMAGE_PROCESSING2_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceImageProcessing2FeaturesQCOM,
 };
-const vk::StructureType vkqcommultiviewperviewrenderareas_features[] = {
+const vk::StructureType VK_QCOM_MULTIVIEW_PER_VIEW_RENDER_AREAS_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceMultiviewPerViewRenderAreasFeaturesQCOM,
 };
-const vk::StructureType vkqcommultiviewperviewviewports_features[] = {
+const vk::StructureType VK_QCOM_MULTIVIEW_PER_VIEW_VIEWPORTS_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceMultiviewPerViewViewportsFeaturesQCOM,
 };
-const vk::StructureType vkqcomtilememoryheap_features[] = {
+const vk::StructureType VK_QCOM_TILE_MEMORY_HEAP_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceTileMemoryHeapFeaturesQCOM,
 };
-const vk::StructureType vkqcomtileproperties_features[] = {
+const vk::StructureType VK_QCOM_TILE_PROPERTIES_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceTilePropertiesFeaturesQCOM,
 };
-const vk::StructureType vkqcomtileshading_features[] = {
+const vk::StructureType VK_QCOM_TILE_SHADING_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceTileShadingFeaturesQCOM,
 };
-const vk::StructureType vkqcomycbcrdegamma_features[] = {
+const vk::StructureType VK_QCOM_YCBCR_DEGAMMA_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceYcbcrDegammaFeaturesQCOM,
 };
-const vk::StructureType vksecamigoprofiling_features[] = {
+const vk::StructureType VK_SEC_AMIGO_PROFILING_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceAmigoProfilingFeaturesSEC,
 };
-const vk::StructureType vksecpipelinecacheincrementalmode_features[] = {
+const vk::StructureType VK_SEC_PIPELINE_CACHE_INCREMENTAL_MODE_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDevicePipelineCacheIncrementalModeFeaturesSEC,
 };
-const vk::StructureType vkvalvedescriptorsethostmapping_features[] = {
+const vk::StructureType VK_VALVE_DESCRIPTOR_SET_HOST_MAPPING_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceDescriptorSetHostMappingFeaturesVALVE,
 };
-const vk::StructureType vkvalvefragmentdensitymaplayered_features[] = {
+const vk::StructureType VK_VALVE_FRAGMENT_DENSITY_MAP_LAYERED_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceFragmentDensityMapLayeredFeaturesVALVE,
 };
-const vk::StructureType vkvalvevideoencodergbconversion_features[] = {
+const vk::StructureType VK_VALVE_MUTABLE_DESCRIPTOR_TYPE_INFO_FEATURES[] = {
+    vk::StructureType::ePhysicalDeviceMutableDescriptorTypeFeaturesEXT,
+};
+const vk::StructureType VK_VALVE_VIDEO_ENCODE_RGB_CONVERSION_INFO_FEATURES[] = {
     vk::StructureType::ePhysicalDeviceVideoEncodeRgbConversionFeaturesVALVE,
 };
 
-const ExtensionInfo vkamdantilag_info = {
+const ExtensionInfo VK_AMD_ANTI_LAG_INFO = {
     VK_AMD_ANTI_LAG_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkamdantilag_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_AMD_ANTI_LAG_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkamdantilag_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_AMD_ANTI_LAG_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkamdbuffermarker_info = {
+const ExtensionInfo VK_AMD_BUFFER_MARKER_INFO = {
     VK_AMD_BUFFER_MARKER_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkamddevicecoherentmemory_info = {
+const ExtensionInfo VK_AMD_DEVICE_COHERENT_MEMORY_INFO = {
     VK_AMD_DEVICE_COHERENT_MEMORY_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkamddevicecoherentmemory_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_AMD_DEVICE_COHERENT_MEMORY_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkamddevicecoherentmemory_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_AMD_DEVICE_COHERENT_MEMORY_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkamddisplaynativehdr_info = {
+const ExtensionInfo VK_AMD_DISPLAY_NATIVE_HDR_INFO = {
     VK_AMD_DISPLAY_NATIVE_HDR_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkamddisplaynativehdr_deps, 2),
+    std::span<const ExtensionInfo* const>(VK_AMD_DISPLAY_NATIVE_HDR_INFO_DEPS, 3),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkamddrawindirectcount_info = {
+const ExtensionInfo VK_AMD_DRAW_INDIRECT_COUNT_INFO = {
     VK_AMD_DRAW_INDIRECT_COUNT_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkamdgcnshader_info = {
+const ExtensionInfo VK_AMD_GCN_SHADER_INFO = {
     VK_AMD_GCN_SHADER_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkamdgpushaderhalffloat_info = {
+const ExtensionInfo VK_AMD_GPU_SHADER_HALF_FLOAT_INFO = {
     VK_AMD_GPU_SHADER_HALF_FLOAT_EXTENSION_NAME,
     ExtensionType::Device,
     {},
-    (uint32_t)-1,
+    VK_KHR_shader_float16_int8,
+    &VK_KHR_SHADER_FLOAT16_INT8_INFO,
     {},
     {},
 };
-const ExtensionInfo vkamdgpushaderint16_info = {
+const ExtensionInfo VK_AMD_GPU_SHADER_INT16_INFO = {
     VK_AMD_GPU_SHADER_INT16_EXTENSION_NAME,
     ExtensionType::Device,
     {},
-    (uint32_t)-1,
+    VK_KHR_shader_float16_int8,
+    &VK_KHR_SHADER_FLOAT16_INT8_INFO,
     {},
     {},
 };
-const ExtensionInfo vkamdmemoryoverallocationbehavior_info = {
+const ExtensionInfo VK_AMD_MEMORY_OVERALLOCATION_BEHAVIOR_INFO = {
     VK_AMD_MEMORY_OVERALLOCATION_BEHAVIOR_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkamdmixedattachmentsamples_info = {
+const ExtensionInfo VK_AMD_MIXED_ATTACHMENT_SAMPLES_INFO = {
     VK_AMD_MIXED_ATTACHMENT_SAMPLES_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkamdnegativeviewportheight_info = {
+const ExtensionInfo VK_AMD_NEGATIVE_VIEWPORT_HEIGHT_INFO = {
     VK_AMD_NEGATIVE_VIEWPORT_HEIGHT_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkamdpipelinecompilercontrol_info = {
+const ExtensionInfo VK_AMD_PIPELINE_COMPILER_CONTROL_INFO = {
     VK_AMD_PIPELINE_COMPILER_CONTROL_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkamdrasterizationorder_info = {
+const ExtensionInfo VK_AMD_RASTERIZATION_ORDER_INFO = {
     VK_AMD_RASTERIZATION_ORDER_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkamdshaderballot_info = {
+const ExtensionInfo VK_AMD_SHADER_BALLOT_INFO = {
     VK_AMD_SHADER_BALLOT_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkamdshadercoreproperties_info = {
+const ExtensionInfo VK_AMD_SHADER_CORE_PROPERTIES_INFO = {
     VK_AMD_SHADER_CORE_PROPERTIES_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkamdshadercoreproperties_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_AMD_SHADER_CORE_PROPERTIES_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkamdshadercoreproperties_properties, 1),
+    {},
+    std::span<const vk::StructureType>(VK_AMD_SHADER_CORE_PROPERTIES_INFO_PROPERTIES, 1),
     {},
 };
-const ExtensionInfo vkamdshadercoreproperties2_info = {
+const ExtensionInfo VK_AMD_SHADER_CORE_PROPERTIES2_INFO = {
     VK_AMD_SHADER_CORE_PROPERTIES_2_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkamdshadercoreproperties2_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_AMD_SHADER_CORE_PROPERTIES2_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkamdshadercoreproperties2_properties, 1),
+    {},
+    std::span<const vk::StructureType>(VK_AMD_SHADER_CORE_PROPERTIES2_INFO_PROPERTIES, 1),
     {},
 };
-const ExtensionInfo vkamdshaderearlyandlatefragmenttests_info = {
+const ExtensionInfo VK_AMD_SHADER_EARLY_AND_LATE_FRAGMENT_TESTS_INFO = {
     VK_AMD_SHADER_EARLY_AND_LATE_FRAGMENT_TESTS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkamdshaderearlyandlatefragmenttests_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_AMD_SHADER_EARLY_AND_LATE_FRAGMENT_TESTS_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkamdshaderearlyandlatefragmenttests_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_AMD_SHADER_EARLY_AND_LATE_FRAGMENT_TESTS_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkamdshaderexplicitvertexparameter_info = {
+const ExtensionInfo VK_AMD_SHADER_EXPLICIT_VERTEX_PARAMETER_INFO = {
     VK_AMD_SHADER_EXPLICIT_VERTEX_PARAMETER_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkamdshaderfragmentmask_info = {
+const ExtensionInfo VK_AMD_SHADER_FRAGMENT_MASK_INFO = {
     VK_AMD_SHADER_FRAGMENT_MASK_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkamdshaderimageloadstorelod_info = {
+const ExtensionInfo VK_AMD_SHADER_IMAGE_LOAD_STORE_LOD_INFO = {
     VK_AMD_SHADER_IMAGE_LOAD_STORE_LOD_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkamdshaderinfo_info = {
+const ExtensionInfo VK_AMD_SHADER_INFO_INFO = {
     VK_AMD_SHADER_INFO_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkamdshadertrinaryminmax_info = {
+const ExtensionInfo VK_AMD_SHADER_TRINARY_MINMAX_INFO = {
     VK_AMD_SHADER_TRINARY_MINMAX_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkamdtexturegatherbiaslod_info = {
+const ExtensionInfo VK_AMD_TEXTURE_GATHER_BIAS_LOD_INFO = {
     VK_AMD_TEXTURE_GATHER_BIAS_LOD_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkamdtexturegatherbiaslod_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_AMD_TEXTURE_GATHER_BIAS_LOD_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkarmdatagraph_info = {
+const ExtensionInfo VK_ARM_DATA_GRAPH_INFO = {
     VK_ARM_DATA_GRAPH_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkarmdatagraph_deps, 2),
+    std::span<const ExtensionInfo* const>(VK_ARM_DATA_GRAPH_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkarmdatagraph_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_ARM_DATA_GRAPH_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkarmformatpack_info = {
+const ExtensionInfo VK_ARM_FORMAT_PACK_INFO = {
     VK_ARM_FORMAT_PACK_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkarmformatpack_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_ARM_FORMAT_PACK_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkarmformatpack_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_ARM_FORMAT_PACK_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkarmperformancecountersbyregion_info = {
+const ExtensionInfo VK_ARM_PERFORMANCE_COUNTERS_BY_REGION_INFO = {
     VK_ARM_PERFORMANCE_COUNTERS_BY_REGION_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkarmperformancecountersbyregion_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_ARM_PERFORMANCE_COUNTERS_BY_REGION_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkarmperformancecountersbyregion_properties, 1),
-    std::span<const vk::StructureType>(vkarmperformancecountersbyregion_features, 1),
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_ARM_PERFORMANCE_COUNTERS_BY_REGION_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkarmpipelineopacitymicromap_info = {
+const ExtensionInfo VK_ARM_PIPELINE_OPACITY_MICROMAP_INFO = {
     VK_ARM_PIPELINE_OPACITY_MICROMAP_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkarmpipelineopacitymicromap_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_ARM_PIPELINE_OPACITY_MICROMAP_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkarmpipelineopacitymicromap_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_ARM_PIPELINE_OPACITY_MICROMAP_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkarmrasterizationorderattachmentaccess_info = {
+const ExtensionInfo VK_ARM_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_INFO = {
     VK_ARM_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkarmrasterizationorderattachmentaccess_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_ARM_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    std::span<const vk::StructureType>(VK_ARM_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkarmrenderpassstriped_info = {
+const ExtensionInfo VK_ARM_RENDER_PASS_STRIPED_INFO = {
     VK_ARM_RENDER_PASS_STRIPED_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkarmrenderpassstriped_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_ARM_RENDER_PASS_STRIPED_INFO_DEPS, 2),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkarmrenderpassstriped_properties, 1),
-    std::span<const vk::StructureType>(vkarmrenderpassstriped_features, 1),
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_ARM_RENDER_PASS_STRIPED_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkarmschedulingcontrols_info = {
+const ExtensionInfo VK_ARM_SCHEDULING_CONTROLS_INFO = {
     VK_ARM_SCHEDULING_CONTROLS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkarmschedulingcontrols_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_ARM_SCHEDULING_CONTROLS_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkarmschedulingcontrols_properties, 1),
-    std::span<const vk::StructureType>(vkarmschedulingcontrols_features, 1),
+    {},
+    {},
+    {},
 };
-const ExtensionInfo vkarmshadercorebuiltins_info = {
+const ExtensionInfo VK_ARM_SHADER_CORE_BUILTINS_INFO = {
     VK_ARM_SHADER_CORE_BUILTINS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkarmshadercorebuiltins_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_ARM_SHADER_CORE_BUILTINS_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkarmshadercorebuiltins_properties, 1),
-    std::span<const vk::StructureType>(vkarmshadercorebuiltins_features, 1),
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_ARM_SHADER_CORE_BUILTINS_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkarmshadercoreproperties_info = {
+const ExtensionInfo VK_ARM_SHADER_CORE_PROPERTIES_INFO = {
     VK_ARM_SHADER_CORE_PROPERTIES_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkarmshadercoreproperties_properties, 1),
+    {},
+    std::span<const vk::StructureType>(VK_ARM_SHADER_CORE_PROPERTIES_INFO_PROPERTIES, 1),
     {},
 };
-const ExtensionInfo vkarmtensors_info = {
+const ExtensionInfo VK_ARM_TENSORS_INFO = {
     VK_ARM_TENSORS_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkarmtensors_properties, 2),
-    std::span<const vk::StructureType>(vkarmtensors_features, 2),
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_ARM_TENSORS_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkext4444formats_info = {
+const ExtensionInfo VK_EXT_4444_FORMATS_INFO = {
     VK_EXT_4444_FORMATS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkext4444formats_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_4444_FORMATS_INFO_DEPS, 1),
     VK_API_VERSION_1_3,
     {},
-    std::span<const vk::StructureType>(vkext4444formats_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_4444_FORMATS_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextacquiredrmdisplay_info = {
+const ExtensionInfo VK_EXT_ACQUIRE_DRM_DISPLAY_INFO = {
     VK_EXT_ACQUIRE_DRM_DISPLAY_EXTENSION_NAME,
     ExtensionType::Instance,
-    std::span<const ExtensionInfo* const>(vkextacquiredrmdisplay_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_ACQUIRE_DRM_DISPLAY_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkextastcdecodemode_info = {
+const ExtensionInfo VK_EXT_ASTC_DECODE_MODE_INFO = {
     VK_EXT_ASTC_DECODE_MODE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextastcdecodemode_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_ASTC_DECODE_MODE_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextastcdecodemode_features, 1),
+    {},
+    {},
 };
-const ExtensionInfo vkextattachmentfeedbackloopdynamicstate_info = {
+const ExtensionInfo VK_EXT_ATTACHMENT_FEEDBACK_LOOP_DYNAMIC_STATE_INFO = {
     VK_EXT_ATTACHMENT_FEEDBACK_LOOP_DYNAMIC_STATE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextattachmentfeedbackloopdynamicstate_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_ATTACHMENT_FEEDBACK_LOOP_DYNAMIC_STATE_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextattachmentfeedbackloopdynamicstate_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_ATTACHMENT_FEEDBACK_LOOP_DYNAMIC_STATE_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextattachmentfeedbacklooplayout_info = {
+const ExtensionInfo VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_INFO = {
     VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextattachmentfeedbacklooplayout_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextattachmentfeedbacklooplayout_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextblendoperationadvanced_info = {
+const ExtensionInfo VK_EXT_BLEND_OPERATION_ADVANCED_INFO = {
     VK_EXT_BLEND_OPERATION_ADVANCED_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextblendoperationadvanced_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_BLEND_OPERATION_ADVANCED_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkextblendoperationadvanced_properties, 1),
-    std::span<const vk::StructureType>(vkextblendoperationadvanced_features, 1),
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_EXT_BLEND_OPERATION_ADVANCED_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextbordercolorswizzle_info = {
+const ExtensionInfo VK_EXT_BORDER_COLOR_SWIZZLE_INFO = {
     VK_EXT_BORDER_COLOR_SWIZZLE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextbordercolorswizzle_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_BORDER_COLOR_SWIZZLE_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextbordercolorswizzle_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_BORDER_COLOR_SWIZZLE_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextbufferdeviceaddress_info = {
+const ExtensionInfo VK_EXT_BUFFER_DEVICE_ADDRESS_INFO = {
     VK_EXT_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextbufferdeviceaddress_deps, 1),
-    (uint32_t)-1,
+    std::span<const ExtensionInfo* const>(VK_EXT_BUFFER_DEVICE_ADDRESS_INFO_DEPS, 1),
+    VK_KHR_buffer_device_address,
+    &VK_KHR_BUFFER_DEVICE_ADDRESS_INFO,
     {},
-    std::span<const vk::StructureType>(vkextbufferdeviceaddress_features, 1),
+    std::span<const vk::StructureType>(VK_EXT_BUFFER_DEVICE_ADDRESS_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextcalibratedtimestamps_info = {
+const ExtensionInfo VK_EXT_CALIBRATED_TIMESTAMPS_INFO = {
     VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextcalibratedtimestamps_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_CALIBRATED_TIMESTAMPS_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkextcolorwriteenable_info = {
+const ExtensionInfo VK_EXT_COLOR_WRITE_ENABLE_INFO = {
     VK_EXT_COLOR_WRITE_ENABLE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextcolorwriteenable_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_COLOR_WRITE_ENABLE_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextcolorwriteenable_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_COLOR_WRITE_ENABLE_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextconditionalrendering_info = {
+const ExtensionInfo VK_EXT_CONDITIONAL_RENDERING_INFO = {
     VK_EXT_CONDITIONAL_RENDERING_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextconditionalrendering_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_CONDITIONAL_RENDERING_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextconditionalrendering_features, 1),
+    {},
+    {},
 };
-const ExtensionInfo vkextconservativerasterization_info = {
+const ExtensionInfo VK_EXT_CONSERVATIVE_RASTERIZATION_INFO = {
     VK_EXT_CONSERVATIVE_RASTERIZATION_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextconservativerasterization_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_CONSERVATIVE_RASTERIZATION_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkextconservativerasterization_properties, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_CONSERVATIVE_RASTERIZATION_INFO_PROPERTIES, 1),
     {},
 };
-const ExtensionInfo vkextcustombordercolor_info = {
+const ExtensionInfo VK_EXT_CUSTOM_BORDER_COLOR_INFO = {
     VK_EXT_CUSTOM_BORDER_COLOR_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextcustombordercolor_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_CUSTOM_BORDER_COLOR_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkextcustombordercolor_properties, 1),
-    std::span<const vk::StructureType>(vkextcustombordercolor_features, 1),
+    {},
+    {},
+    {},
 };
-const ExtensionInfo vkextcustomresolve_info = {
+const ExtensionInfo VK_EXT_CUSTOM_RESOLVE_INFO = {
     VK_EXT_CUSTOM_RESOLVE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextcustomresolve_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_CUSTOM_RESOLVE_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextcustomresolve_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_CUSTOM_RESOLVE_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextdebugmarker_info = {
+const ExtensionInfo VK_EXT_DEBUG_MARKER_INFO = {
     VK_EXT_DEBUG_MARKER_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextdebugmarker_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_DEBUG_MARKER_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkextdebugreport_info = {
+const ExtensionInfo VK_EXT_DEBUG_REPORT_INFO = {
     VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
     ExtensionType::Instance,
     {},
-    (uint32_t)-1,
+    VK_EXT_debug_utils,
+    &VK_EXT_DEBUG_UTILS_INFO,
     {},
     {},
 };
-const ExtensionInfo vkextdebugutils_info = {
+const ExtensionInfo VK_EXT_DEBUG_UTILS_INFO = {
     VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
     ExtensionType::Instance,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkextdepthbiascontrol_info = {
+const ExtensionInfo VK_EXT_DEPTH_BIAS_CONTROL_INFO = {
     VK_EXT_DEPTH_BIAS_CONTROL_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextdepthbiascontrol_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_DEPTH_BIAS_CONTROL_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextdepthbiascontrol_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_DEPTH_BIAS_CONTROL_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextdepthclampcontrol_info = {
+const ExtensionInfo VK_EXT_DEPTH_CLAMP_CONTROL_INFO = {
     VK_EXT_DEPTH_CLAMP_CONTROL_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextdepthclampcontrol_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_DEPTH_CLAMP_CONTROL_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextdepthclampcontrol_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_DEPTH_CLAMP_CONTROL_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextdepthclampzeroone_info = {
+const ExtensionInfo VK_EXT_DEPTH_CLAMP_ZERO_ONE_INFO = {
     VK_EXT_DEPTH_CLAMP_ZERO_ONE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextdepthclampzeroone_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_DEPTH_CLAMP_ZERO_ONE_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    std::span<const vk::StructureType>(VK_EXT_DEPTH_CLAMP_ZERO_ONE_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextdepthclipcontrol_info = {
+const ExtensionInfo VK_EXT_DEPTH_CLIP_CONTROL_INFO = {
     VK_EXT_DEPTH_CLIP_CONTROL_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextdepthclipcontrol_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_DEPTH_CLIP_CONTROL_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextdepthclipcontrol_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_DEPTH_CLIP_CONTROL_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextdepthclipenable_info = {
+const ExtensionInfo VK_EXT_DEPTH_CLIP_ENABLE_INFO = {
     VK_EXT_DEPTH_CLIP_ENABLE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextdepthclipenable_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_DEPTH_CLIP_ENABLE_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextdepthclipenable_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_DEPTH_CLIP_ENABLE_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextdepthrangeunrestricted_info = {
+const ExtensionInfo VK_EXT_DEPTH_RANGE_UNRESTRICTED_INFO = {
     VK_EXT_DEPTH_RANGE_UNRESTRICTED_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkextdescriptorbuffer_info = {
+const ExtensionInfo VK_EXT_DESCRIPTOR_BUFFER_INFO = {
     VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextdescriptorbuffer_deps, 2),
-    (uint32_t)-1,
-    std::span<const vk::StructureType>(vkextdescriptorbuffer_properties, 2),
-    std::span<const vk::StructureType>(vkextdescriptorbuffer_features, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_DESCRIPTOR_BUFFER_INFO_DEPS, 4),
+    VK_EXT_descriptor_heap,
+    &VK_EXT_DESCRIPTOR_HEAP_INFO,
+    std::span<const vk::StructureType>(VK_EXT_DESCRIPTOR_BUFFER_INFO_PROPERTIES, 1),
+    {},
 };
-const ExtensionInfo vkextdescriptorheap_info = {
+const ExtensionInfo VK_EXT_DESCRIPTOR_HEAP_INFO = {
     VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextdescriptorheap_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_DESCRIPTOR_HEAP_INFO_DEPS, 2),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkextdescriptorheap_properties, 2),
-    std::span<const vk::StructureType>(vkextdescriptorheap_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_DESCRIPTOR_HEAP_INFO_PROPERTIES, 1),
+    {},
 };
-const ExtensionInfo vkextdescriptorindexing_info = {
+const ExtensionInfo VK_EXT_DESCRIPTOR_INDEXING_INFO = {
     VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextdescriptorindexing_deps, 2),
+    std::span<const ExtensionInfo* const>(VK_EXT_DESCRIPTOR_INDEXING_INFO_DEPS, 2),
     VK_API_VERSION_1_2,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkextdeviceaddressbindingreport_info = {
+const ExtensionInfo VK_EXT_DEVICE_ADDRESS_BINDING_REPORT_INFO = {
     VK_EXT_DEVICE_ADDRESS_BINDING_REPORT_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextdeviceaddressbindingreport_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_DEVICE_ADDRESS_BINDING_REPORT_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextdeviceaddressbindingreport_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_DEVICE_ADDRESS_BINDING_REPORT_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextdevicefault_info = {
+const ExtensionInfo VK_EXT_DEVICE_FAULT_INFO = {
     VK_EXT_DEVICE_FAULT_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextdevicefault_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_DEVICE_FAULT_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextdevicefault_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_DEVICE_FAULT_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextdevicegeneratedcommands_info = {
+const ExtensionInfo VK_EXT_DEVICE_GENERATED_COMMANDS_INFO = {
     VK_EXT_DEVICE_GENERATED_COMMANDS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextdevicegeneratedcommands_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_DEVICE_GENERATED_COMMANDS_INFO_DEPS, 2),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkextdevicegeneratedcommands_properties, 1),
-    std::span<const vk::StructureType>(vkextdevicegeneratedcommands_features, 1),
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_EXT_DEVICE_GENERATED_COMMANDS_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextdevicememoryreport_info = {
+const ExtensionInfo VK_EXT_DEVICE_MEMORY_REPORT_INFO = {
     VK_EXT_DEVICE_MEMORY_REPORT_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextdevicememoryreport_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_DEVICE_MEMORY_REPORT_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextdevicememoryreport_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_DEVICE_MEMORY_REPORT_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextdirectmodedisplay_info = {
+const ExtensionInfo VK_EXT_DIRECT_MODE_DISPLAY_INFO = {
     VK_EXT_DIRECT_MODE_DISPLAY_EXTENSION_NAME,
     ExtensionType::Instance,
-    std::span<const ExtensionInfo* const>(vkextdirectmodedisplay_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_DIRECT_MODE_DISPLAY_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkextdiscardrectangles_info = {
+const ExtensionInfo VK_EXT_DISCARD_RECTANGLES_INFO = {
     VK_EXT_DISCARD_RECTANGLES_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextdiscardrectangles_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_DISCARD_RECTANGLES_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkextdiscardrectangles_properties, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_DISCARD_RECTANGLES_INFO_PROPERTIES, 1),
     {},
 };
-const ExtensionInfo vkextdisplaycontrol_info = {
+const ExtensionInfo VK_EXT_DISPLAY_CONTROL_INFO = {
     VK_EXT_DISPLAY_CONTROL_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextdisplaycontrol_deps, 2),
+    std::span<const ExtensionInfo* const>(VK_EXT_DISPLAY_CONTROL_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkextdisplaysurfacecounter_info = {
+const ExtensionInfo VK_EXT_DISPLAY_SURFACE_COUNTER_INFO = {
     VK_EXT_DISPLAY_SURFACE_COUNTER_EXTENSION_NAME,
     ExtensionType::Instance,
-    std::span<const ExtensionInfo* const>(vkextdisplaysurfacecounter_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_DISPLAY_SURFACE_COUNTER_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkextdynamicrenderingunusedattachments_info = {
+const ExtensionInfo VK_EXT_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_INFO = {
     VK_EXT_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextdynamicrenderingunusedattachments_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextdynamicrenderingunusedattachments_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextextendeddynamicstate_info = {
+const ExtensionInfo VK_EXT_EXTENDED_DYNAMIC_STATE_INFO = {
     VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextextendeddynamicstate_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_EXTENDED_DYNAMIC_STATE_INFO_DEPS, 1),
     VK_API_VERSION_1_3,
     {},
-    std::span<const vk::StructureType>(vkextextendeddynamicstate_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_EXTENDED_DYNAMIC_STATE_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextextendeddynamicstate2_info = {
+const ExtensionInfo VK_EXT_EXTENDED_DYNAMIC_STATE2_INFO = {
     VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextextendeddynamicstate2_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_EXTENDED_DYNAMIC_STATE2_INFO_DEPS, 1),
     VK_API_VERSION_1_3,
     {},
-    std::span<const vk::StructureType>(vkextextendeddynamicstate2_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_EXTENDED_DYNAMIC_STATE2_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextextendeddynamicstate3_info = {
+const ExtensionInfo VK_EXT_EXTENDED_DYNAMIC_STATE3_INFO = {
     VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextextendeddynamicstate3_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_EXTENDED_DYNAMIC_STATE3_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkextextendeddynamicstate3_properties, 1),
-    std::span<const vk::StructureType>(vkextextendeddynamicstate3_features, 1),
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_EXT_EXTENDED_DYNAMIC_STATE3_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextexternalmemoryacquireunmodified_info = {
+const ExtensionInfo VK_EXT_EXTERNAL_MEMORY_ACQUIRE_UNMODIFIED_INFO = {
     VK_EXT_EXTERNAL_MEMORY_ACQUIRE_UNMODIFIED_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextexternalmemoryacquireunmodified_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_EXTERNAL_MEMORY_ACQUIRE_UNMODIFIED_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkextexternalmemorydmabuf_info = {
+const ExtensionInfo VK_EXT_EXTERNAL_MEMORY_DMA_BUF_INFO = {
     VK_EXT_EXTERNAL_MEMORY_DMA_BUF_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextexternalmemorydmabuf_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_EXTERNAL_MEMORY_DMA_BUF_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkextexternalmemoryhost_info = {
+const ExtensionInfo VK_EXT_EXTERNAL_MEMORY_HOST_INFO = {
     VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextexternalmemoryhost_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_EXTERNAL_MEMORY_HOST_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkextexternalmemoryhost_properties, 1),
+    {},
+    {},
     {},
 };
-const ExtensionInfo vkextfiltercubic_info = {
+const ExtensionInfo VK_EXT_FILTER_CUBIC_INFO = {
     VK_EXT_FILTER_CUBIC_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkextfragmentdensitymap_info = {
+const ExtensionInfo VK_EXT_FRAGMENT_DENSITY_MAP_INFO = {
     VK_EXT_FRAGMENT_DENSITY_MAP_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextfragmentdensitymap_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_FRAGMENT_DENSITY_MAP_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkextfragmentdensitymap_properties, 1),
-    std::span<const vk::StructureType>(vkextfragmentdensitymap_features, 1),
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_EXT_FRAGMENT_DENSITY_MAP_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextfragmentdensitymap2_info = {
+const ExtensionInfo VK_EXT_FRAGMENT_DENSITY_MAP2_INFO = {
     VK_EXT_FRAGMENT_DENSITY_MAP_2_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextfragmentdensitymap2_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_FRAGMENT_DENSITY_MAP2_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkextfragmentdensitymap2_properties, 1),
-    std::span<const vk::StructureType>(vkextfragmentdensitymap2_features, 1),
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_EXT_FRAGMENT_DENSITY_MAP2_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextfragmentdensitymapoffset_info = {
+const ExtensionInfo VK_EXT_FRAGMENT_DENSITY_MAP_OFFSET_INFO = {
     VK_EXT_FRAGMENT_DENSITY_MAP_OFFSET_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextfragmentdensitymapoffset_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_FRAGMENT_DENSITY_MAP_OFFSET_INFO_DEPS, 4),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkextfragmentdensitymapoffset_properties, 1),
-    std::span<const vk::StructureType>(vkextfragmentdensitymapoffset_features, 1),
+    {},
+    {},
+    {},
 };
-const ExtensionInfo vkextfragmentshaderinterlock_info = {
+const ExtensionInfo VK_EXT_FRAGMENT_SHADER_INTERLOCK_INFO = {
     VK_EXT_FRAGMENT_SHADER_INTERLOCK_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextfragmentshaderinterlock_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_FRAGMENT_SHADER_INTERLOCK_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextfragmentshaderinterlock_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_FRAGMENT_SHADER_INTERLOCK_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextframeboundary_info = {
+const ExtensionInfo VK_EXT_FRAME_BOUNDARY_INFO = {
     VK_EXT_FRAME_BOUNDARY_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextframeboundary_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_FRAME_BOUNDARY_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextframeboundary_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_FRAME_BOUNDARY_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextglobalpriority_info = {
+const ExtensionInfo VK_EXT_GLOBAL_PRIORITY_INFO = {
     VK_EXT_GLOBAL_PRIORITY_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkextglobalpriorityquery_info = {
+const ExtensionInfo VK_EXT_GLOBAL_PRIORITY_QUERY_INFO = {
     VK_EXT_GLOBAL_PRIORITY_QUERY_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextglobalpriorityquery_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_GLOBAL_PRIORITY_QUERY_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
+    std::span<const vk::StructureType>(VK_EXT_GLOBAL_PRIORITY_QUERY_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextgraphicspipelinelibrary_info = {
+const ExtensionInfo VK_EXT_GRAPHICS_PIPELINE_LIBRARY_INFO = {
     VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextgraphicspipelinelibrary_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_INFO_DEPS, 2),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkextgraphicspipelinelibrary_properties, 1),
-    std::span<const vk::StructureType>(vkextgraphicspipelinelibrary_features, 1),
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkexthdrmetadata_info = {
+const ExtensionInfo VK_EXT_HDR_METADATA_INFO = {
     VK_EXT_HDR_METADATA_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkexthdrmetadata_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_HDR_METADATA_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkextheadlesssurface_info = {
+const ExtensionInfo VK_EXT_HEADLESS_SURFACE_INFO = {
     VK_EXT_HEADLESS_SURFACE_EXTENSION_NAME,
     ExtensionType::Instance,
-    std::span<const ExtensionInfo* const>(vkextheadlesssurface_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_HEADLESS_SURFACE_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkexthostimagecopy_info = {
+const ExtensionInfo VK_EXT_HOST_IMAGE_COPY_INFO = {
     VK_EXT_HOST_IMAGE_COPY_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkexthostimagecopy_deps, 2),
+    std::span<const ExtensionInfo* const>(VK_EXT_HOST_IMAGE_COPY_INFO_DEPS, 3),
     VK_API_VERSION_1_4,
     {},
     {},
+    std::span<const vk::StructureType>(VK_EXT_HOST_IMAGE_COPY_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkexthostqueryreset_info = {
+const ExtensionInfo VK_EXT_HOST_QUERY_RESET_INFO = {
     VK_EXT_HOST_QUERY_RESET_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkexthostqueryreset_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_HOST_QUERY_RESET_INFO_DEPS, 1),
     VK_API_VERSION_1_2,
     {},
     {},
+    std::span<const vk::StructureType>(VK_EXT_HOST_QUERY_RESET_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextimage2dviewof3d_info = {
+const ExtensionInfo VK_EXT_IMAGE_2D_VIEW_OF_3D_INFO = {
     VK_EXT_IMAGE_2D_VIEW_OF_3D_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextimage2dviewof3d_deps, 2),
+    std::span<const ExtensionInfo* const>(VK_EXT_IMAGE_2D_VIEW_OF_3D_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextimage2dviewof3d_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_IMAGE_2D_VIEW_OF_3D_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextimagecompressioncontrol_info = {
+const ExtensionInfo VK_EXT_IMAGE_COMPRESSION_CONTROL_INFO = {
     VK_EXT_IMAGE_COMPRESSION_CONTROL_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextimagecompressioncontrol_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_IMAGE_COMPRESSION_CONTROL_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextimagecompressioncontrol_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_IMAGE_COMPRESSION_CONTROL_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextimagecompressioncontrolswapchain_info = {
+const ExtensionInfo VK_EXT_IMAGE_COMPRESSION_CONTROL_SWAPCHAIN_INFO = {
     VK_EXT_IMAGE_COMPRESSION_CONTROL_SWAPCHAIN_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextimagecompressioncontrolswapchain_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_IMAGE_COMPRESSION_CONTROL_SWAPCHAIN_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextimagecompressioncontrolswapchain_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_IMAGE_COMPRESSION_CONTROL_SWAPCHAIN_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextimagedrmformatmodifier_info = {
+const ExtensionInfo VK_EXT_IMAGE_DRM_FORMAT_MODIFIER_INFO = {
     VK_EXT_IMAGE_DRM_FORMAT_MODIFIER_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextimagedrmformatmodifier_deps, 3),
+    std::span<const ExtensionInfo* const>(VK_EXT_IMAGE_DRM_FORMAT_MODIFIER_INFO_DEPS, 4),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkextimagerobustness_info = {
+const ExtensionInfo VK_EXT_IMAGE_ROBUSTNESS_INFO = {
     VK_EXT_IMAGE_ROBUSTNESS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextimagerobustness_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_IMAGE_ROBUSTNESS_INFO_DEPS, 1),
     VK_API_VERSION_1_3,
     {},
     {},
+    std::span<const vk::StructureType>(VK_EXT_IMAGE_ROBUSTNESS_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextimageslicedviewof3d_info = {
+const ExtensionInfo VK_EXT_IMAGE_SLICED_VIEW_OF_3D_INFO = {
     VK_EXT_IMAGE_SLICED_VIEW_OF_3D_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextimageslicedviewof3d_deps, 2),
+    std::span<const ExtensionInfo* const>(VK_EXT_IMAGE_SLICED_VIEW_OF_3D_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextimageslicedviewof3d_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_IMAGE_SLICED_VIEW_OF_3D_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextimageviewminlod_info = {
+const ExtensionInfo VK_EXT_IMAGE_VIEW_MIN_LOD_INFO = {
     VK_EXT_IMAGE_VIEW_MIN_LOD_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextimageviewminlod_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_IMAGE_VIEW_MIN_LOD_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextimageviewminlod_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_IMAGE_VIEW_MIN_LOD_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextindextypeuint8_info = {
+const ExtensionInfo VK_EXT_INDEX_TYPE_UINT8_INFO = {
     VK_EXT_INDEX_TYPE_UINT8_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextindextypeuint8_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_INDEX_TYPE_UINT8_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    std::span<const vk::StructureType>(VK_EXT_INDEX_TYPE_UINT8_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextinlineuniformblock_info = {
+const ExtensionInfo VK_EXT_INLINE_UNIFORM_BLOCK_INFO = {
     VK_EXT_INLINE_UNIFORM_BLOCK_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextinlineuniformblock_deps, 2),
+    std::span<const ExtensionInfo* const>(VK_EXT_INLINE_UNIFORM_BLOCK_INFO_DEPS, 2),
     VK_API_VERSION_1_3,
     {},
     {},
+    std::span<const vk::StructureType>(VK_EXT_INLINE_UNIFORM_BLOCK_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextlayersettings_info = {
+const ExtensionInfo VK_EXT_LAYER_SETTINGS_INFO = {
     VK_EXT_LAYER_SETTINGS_EXTENSION_NAME,
     ExtensionType::Instance,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkextlegacydithering_info = {
+const ExtensionInfo VK_EXT_LEGACY_DITHERING_INFO = {
     VK_EXT_LEGACY_DITHERING_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextlegacydithering_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_LEGACY_DITHERING_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextlegacydithering_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_LEGACY_DITHERING_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextlegacyvertexattributes_info = {
+const ExtensionInfo VK_EXT_LEGACY_VERTEX_ATTRIBUTES_INFO = {
     VK_EXT_LEGACY_VERTEX_ATTRIBUTES_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextlegacyvertexattributes_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_LEGACY_VERTEX_ATTRIBUTES_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkextlegacyvertexattributes_properties, 1),
-    std::span<const vk::StructureType>(vkextlegacyvertexattributes_features, 1),
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_EXT_LEGACY_VERTEX_ATTRIBUTES_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextlinerasterization_info = {
+const ExtensionInfo VK_EXT_LINE_RASTERIZATION_INFO = {
     VK_EXT_LINE_RASTERIZATION_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextlinerasterization_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_LINE_RASTERIZATION_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    std::span<const vk::StructureType>(VK_EXT_LINE_RASTERIZATION_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextloadstoreopnone_info = {
+const ExtensionInfo VK_EXT_LOAD_STORE_OP_NONE_INFO = {
     VK_EXT_LOAD_STORE_OP_NONE_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkextmapmemoryplaced_info = {
+const ExtensionInfo VK_EXT_MAP_MEMORY_PLACED_INFO = {
     VK_EXT_MAP_MEMORY_PLACED_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextmapmemoryplaced_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_MAP_MEMORY_PLACED_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkextmapmemoryplaced_properties, 1),
-    std::span<const vk::StructureType>(vkextmapmemoryplaced_features, 1),
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_EXT_MAP_MEMORY_PLACED_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextmemorybudget_info = {
+const ExtensionInfo VK_EXT_MEMORY_BUDGET_INFO = {
     VK_EXT_MEMORY_BUDGET_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextmemorybudget_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_MEMORY_BUDGET_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkextmemorydecompression_info = {
+const ExtensionInfo VK_EXT_MEMORY_DECOMPRESSION_INFO = {
     VK_EXT_MEMORY_DECOMPRESSION_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextmemorydecompression_deps, 2),
+    std::span<const ExtensionInfo* const>(VK_EXT_MEMORY_DECOMPRESSION_INFO_DEPS, 2),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkextmemorydecompression_properties, 1),
-    std::span<const vk::StructureType>(vkextmemorydecompression_features, 1),
+    {},
+    {},
+    {},
 };
-const ExtensionInfo vkextmemorypriority_info = {
+const ExtensionInfo VK_EXT_MEMORY_PRIORITY_INFO = {
     VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextmemorypriority_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_MEMORY_PRIORITY_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextmemorypriority_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_MEMORY_PRIORITY_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextmeshshader_info = {
+const ExtensionInfo VK_EXT_MESH_SHADER_INFO = {
     VK_EXT_MESH_SHADER_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextmeshshader_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_MESH_SHADER_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkextmeshshader_properties, 1),
-    std::span<const vk::StructureType>(vkextmeshshader_features, 1),
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_EXT_MESH_SHADER_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextmultidraw_info = {
+const ExtensionInfo VK_EXT_MULTI_DRAW_INFO = {
     VK_EXT_MULTI_DRAW_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextmultidraw_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_MULTI_DRAW_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkextmultidraw_properties, 1),
-    std::span<const vk::StructureType>(vkextmultidraw_features, 1),
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_EXT_MULTI_DRAW_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextmultisampledrendertosinglesampled_info = {
+const ExtensionInfo VK_EXT_MULTISAMPLED_RENDER_TO_SINGLE_SAMPLED_INFO = {
     VK_EXT_MULTISAMPLED_RENDER_TO_SINGLE_SAMPLED_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextmultisampledrendertosinglesampled_deps, 2),
+    std::span<const ExtensionInfo* const>(VK_EXT_MULTISAMPLED_RENDER_TO_SINGLE_SAMPLED_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextmultisampledrendertosinglesampled_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_MULTISAMPLED_RENDER_TO_SINGLE_SAMPLED_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextmutabledescriptortype_info = {
+const ExtensionInfo VK_EXT_MUTABLE_DESCRIPTOR_TYPE_INFO = {
     VK_EXT_MUTABLE_DESCRIPTOR_TYPE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextmutabledescriptortype_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_MUTABLE_DESCRIPTOR_TYPE_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextmutabledescriptortype_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_MUTABLE_DESCRIPTOR_TYPE_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextnestedcommandbuffer_info = {
+const ExtensionInfo VK_EXT_NESTED_COMMAND_BUFFER_INFO = {
     VK_EXT_NESTED_COMMAND_BUFFER_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextnestedcommandbuffer_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_NESTED_COMMAND_BUFFER_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkextnestedcommandbuffer_properties, 1),
-    std::span<const vk::StructureType>(vkextnestedcommandbuffer_features, 1),
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_EXT_NESTED_COMMAND_BUFFER_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextnonseamlesscubemap_info = {
+const ExtensionInfo VK_EXT_NON_SEAMLESS_CUBE_MAP_INFO = {
     VK_EXT_NON_SEAMLESS_CUBE_MAP_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextnonseamlesscubemap_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_NON_SEAMLESS_CUBE_MAP_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextnonseamlesscubemap_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_NON_SEAMLESS_CUBE_MAP_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextopacitymicromap_info = {
+const ExtensionInfo VK_EXT_OPACITY_MICROMAP_INFO = {
     VK_EXT_OPACITY_MICROMAP_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextopacitymicromap_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_OPACITY_MICROMAP_INFO_DEPS, 2),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkextopacitymicromap_properties, 1),
-    std::span<const vk::StructureType>(vkextopacitymicromap_features, 1),
+    {},
+    {},
+    {},
 };
-const ExtensionInfo vkextpageabledevicelocalmemory_info = {
+const ExtensionInfo VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_INFO = {
     VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextpageabledevicelocalmemory_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextpageabledevicelocalmemory_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextpcibusinfo_info = {
+const ExtensionInfo VK_EXT_PCI_BUS_INFO_INFO = {
     VK_EXT_PCI_BUS_INFO_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextpcibusinfo_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_PCI_BUS_INFO_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkextpcibusinfo_properties, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_PCI_BUS_INFO_INFO_PROPERTIES, 1),
     {},
 };
-const ExtensionInfo vkextphysicaldevicedrm_info = {
+const ExtensionInfo VK_EXT_PHYSICAL_DEVICE_DRM_INFO = {
     VK_EXT_PHYSICAL_DEVICE_DRM_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextphysicaldevicedrm_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_PHYSICAL_DEVICE_DRM_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkextphysicaldevicedrm_properties, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_PHYSICAL_DEVICE_DRM_INFO_PROPERTIES, 1),
     {},
 };
-const ExtensionInfo vkextpipelinecreationcachecontrol_info = {
+const ExtensionInfo VK_EXT_PIPELINE_CREATION_CACHE_CONTROL_INFO = {
     VK_EXT_PIPELINE_CREATION_CACHE_CONTROL_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextpipelinecreationcachecontrol_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_PIPELINE_CREATION_CACHE_CONTROL_INFO_DEPS, 1),
     VK_API_VERSION_1_3,
     {},
     {},
+    std::span<const vk::StructureType>(VK_EXT_PIPELINE_CREATION_CACHE_CONTROL_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextpipelinecreationfeedback_info = {
+const ExtensionInfo VK_EXT_PIPELINE_CREATION_FEEDBACK_INFO = {
     VK_EXT_PIPELINE_CREATION_FEEDBACK_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     VK_API_VERSION_1_3,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkextpipelinelibrarygrouphandles_info = {
+const ExtensionInfo VK_EXT_PIPELINE_LIBRARY_GROUP_HANDLES_INFO = {
     VK_EXT_PIPELINE_LIBRARY_GROUP_HANDLES_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextpipelinelibrarygrouphandles_deps, 2),
+    std::span<const ExtensionInfo* const>(VK_EXT_PIPELINE_LIBRARY_GROUP_HANDLES_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextpipelinelibrarygrouphandles_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_PIPELINE_LIBRARY_GROUP_HANDLES_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextpipelineproperties_info = {
+const ExtensionInfo VK_EXT_PIPELINE_PROPERTIES_INFO = {
     VK_EXT_PIPELINE_PROPERTIES_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextpipelineproperties_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_PIPELINE_PROPERTIES_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextpipelineproperties_features, 1),
+    {},
+    {},
 };
-const ExtensionInfo vkextpipelineprotectedaccess_info = {
+const ExtensionInfo VK_EXT_PIPELINE_PROTECTED_ACCESS_INFO = {
     VK_EXT_PIPELINE_PROTECTED_ACCESS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextpipelineprotectedaccess_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_PIPELINE_PROTECTED_ACCESS_INFO_DEPS, 1),
     VK_API_VERSION_1_4,
     {},
     {},
+    std::span<const vk::StructureType>(VK_EXT_PIPELINE_PROTECTED_ACCESS_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextpipelinerobustness_info = {
+const ExtensionInfo VK_EXT_PIPELINE_ROBUSTNESS_INFO = {
     VK_EXT_PIPELINE_ROBUSTNESS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextpipelinerobustness_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_PIPELINE_ROBUSTNESS_INFO_DEPS, 1),
     VK_API_VERSION_1_4,
     {},
     {},
+    std::span<const vk::StructureType>(VK_EXT_PIPELINE_ROBUSTNESS_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextpostdepthcoverage_info = {
+const ExtensionInfo VK_EXT_POST_DEPTH_COVERAGE_INFO = {
     VK_EXT_POST_DEPTH_COVERAGE_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkextpresentmodefifolatestready_info = {
+const ExtensionInfo VK_EXT_PRESENT_MODE_FIFO_LATEST_READY_INFO = {
     VK_EXT_PRESENT_MODE_FIFO_LATEST_READY_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextpresentmodefifolatestready_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_PRESENT_MODE_FIFO_LATEST_READY_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    std::span<const vk::StructureType>(VK_EXT_PRESENT_MODE_FIFO_LATEST_READY_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextpresenttiming_info = {
+const ExtensionInfo VK_EXT_PRESENT_TIMING_INFO = {
     VK_EXT_PRESENT_TIMING_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextpresenttiming_deps, 4),
+    std::span<const ExtensionInfo* const>(VK_EXT_PRESENT_TIMING_INFO_DEPS, 4),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextpresenttiming_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_PRESENT_TIMING_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextprimitivetopologylistrestart_info = {
+const ExtensionInfo VK_EXT_PRIMITIVE_TOPOLOGY_LIST_RESTART_INFO = {
     VK_EXT_PRIMITIVE_TOPOLOGY_LIST_RESTART_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextprimitivetopologylistrestart_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_PRIMITIVE_TOPOLOGY_LIST_RESTART_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextprimitivetopologylistrestart_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_PRIMITIVE_TOPOLOGY_LIST_RESTART_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextprimitivesgeneratedquery_info = {
+const ExtensionInfo VK_EXT_PRIMITIVES_GENERATED_QUERY_INFO = {
     VK_EXT_PRIMITIVES_GENERATED_QUERY_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextprimitivesgeneratedquery_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_PRIMITIVES_GENERATED_QUERY_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextprimitivesgeneratedquery_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_PRIMITIVES_GENERATED_QUERY_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextprivatedata_info = {
+const ExtensionInfo VK_EXT_PRIVATE_DATA_INFO = {
     VK_EXT_PRIVATE_DATA_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextprivatedata_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_PRIVATE_DATA_INFO_DEPS, 1),
     VK_API_VERSION_1_3,
     {},
     {},
+    std::span<const vk::StructureType>(VK_EXT_PRIVATE_DATA_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextprovokingvertex_info = {
+const ExtensionInfo VK_EXT_PROVOKING_VERTEX_INFO = {
     VK_EXT_PROVOKING_VERTEX_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextprovokingvertex_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_PROVOKING_VERTEX_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkextprovokingvertex_properties, 1),
-    std::span<const vk::StructureType>(vkextprovokingvertex_features, 1),
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_EXT_PROVOKING_VERTEX_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextqueuefamilyforeign_info = {
+const ExtensionInfo VK_EXT_QUEUE_FAMILY_FOREIGN_INFO = {
     VK_EXT_QUEUE_FAMILY_FOREIGN_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextqueuefamilyforeign_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_QUEUE_FAMILY_FOREIGN_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkextrasterizationorderattachmentaccess_info = {
+const ExtensionInfo VK_EXT_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_INFO = {
     VK_EXT_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextrasterizationorderattachmentaccess_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextrasterizationorderattachmentaccess_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextraytracinginvocationreorder_info = {
+const ExtensionInfo VK_EXT_RAY_TRACING_INVOCATION_REORDER_INFO = {
     VK_EXT_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextraytracinginvocationreorder_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_RAY_TRACING_INVOCATION_REORDER_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkextraytracinginvocationreorder_properties, 1),
-    std::span<const vk::StructureType>(vkextraytracinginvocationreorder_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_RAY_TRACING_INVOCATION_REORDER_INFO_PROPERTIES, 1),
+    {},
 };
-const ExtensionInfo vkextrgba10x6formats_info = {
+const ExtensionInfo VK_EXT_RGBA10X6_FORMATS_INFO = {
     VK_EXT_RGBA10X6_FORMATS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextrgba10x6formats_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_RGBA10X6_FORMATS_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextrgba10x6formats_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_RGBA10X6_FORMATS_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextrobustness2_info = {
+const ExtensionInfo VK_EXT_ROBUSTNESS2_INFO = {
     VK_EXT_ROBUSTNESS_2_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextrobustness2_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_ROBUSTNESS2_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    std::span<const vk::StructureType>(VK_EXT_ROBUSTNESS2_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextsamplelocations_info = {
+const ExtensionInfo VK_EXT_SAMPLE_LOCATIONS_INFO = {
     VK_EXT_SAMPLE_LOCATIONS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextsamplelocations_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_SAMPLE_LOCATIONS_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkextsamplelocations_properties, 1),
+    {},
+    {},
     {},
 };
-const ExtensionInfo vkextsamplerfilterminmax_info = {
+const ExtensionInfo VK_EXT_SAMPLER_FILTER_MINMAX_INFO = {
     VK_EXT_SAMPLER_FILTER_MINMAX_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextsamplerfilterminmax_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_SAMPLER_FILTER_MINMAX_INFO_DEPS, 1),
     VK_API_VERSION_1_2,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkextscalarblocklayout_info = {
+const ExtensionInfo VK_EXT_SCALAR_BLOCK_LAYOUT_INFO = {
     VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextscalarblocklayout_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_SCALAR_BLOCK_LAYOUT_INFO_DEPS, 1),
     VK_API_VERSION_1_2,
     {},
     {},
+    std::span<const vk::StructureType>(VK_EXT_SCALAR_BLOCK_LAYOUT_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextseparatestencilusage_info = {
+const ExtensionInfo VK_EXT_SEPARATE_STENCIL_USAGE_INFO = {
     VK_EXT_SEPARATE_STENCIL_USAGE_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     VK_API_VERSION_1_2,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkextshader64bitindexing_info = {
+const ExtensionInfo VK_EXT_SHADER_64BIT_INDEXING_INFO = {
     VK_EXT_SHADER_64BIT_INDEXING_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextshader64bitindexing_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_SHADER_64BIT_INDEXING_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextshader64bitindexing_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_SHADER_64BIT_INDEXING_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextshaderatomicfloat_info = {
+const ExtensionInfo VK_EXT_SHADER_ATOMIC_FLOAT_INFO = {
     VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextshaderatomicfloat_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_SHADER_ATOMIC_FLOAT_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextshaderatomicfloat_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_SHADER_ATOMIC_FLOAT_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextshaderatomicfloat2_info = {
+const ExtensionInfo VK_EXT_SHADER_ATOMIC_FLOAT2_INFO = {
     VK_EXT_SHADER_ATOMIC_FLOAT_2_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextshaderatomicfloat2_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_SHADER_ATOMIC_FLOAT2_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextshaderatomicfloat2_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_SHADER_ATOMIC_FLOAT2_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextshaderdemotetohelperinvocation_info = {
+const ExtensionInfo VK_EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION_INFO = {
     VK_EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextshaderdemotetohelperinvocation_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION_INFO_DEPS, 1),
     VK_API_VERSION_1_3,
     {},
     {},
+    std::span<const vk::StructureType>(VK_EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextshaderfloat8_info = {
+const ExtensionInfo VK_EXT_SHADER_FLOAT8_INFO = {
     VK_EXT_SHADER_FLOAT8_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextshaderfloat8_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_SHADER_FLOAT8_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextshaderfloat8_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_SHADER_FLOAT8_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextshaderimageatomicint64_info = {
+const ExtensionInfo VK_EXT_SHADER_IMAGE_ATOMIC_INT64_INFO = {
     VK_EXT_SHADER_IMAGE_ATOMIC_INT64_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextshaderimageatomicint64_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_SHADER_IMAGE_ATOMIC_INT64_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextshaderimageatomicint64_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_SHADER_IMAGE_ATOMIC_INT64_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextshaderlongvector_info = {
+const ExtensionInfo VK_EXT_SHADER_LONG_VECTOR_INFO = {
     VK_EXT_SHADER_LONG_VECTOR_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkextshaderlongvector_properties, 1),
-    std::span<const vk::StructureType>(vkextshaderlongvector_features, 1),
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_EXT_SHADER_LONG_VECTOR_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextshadermoduleidentifier_info = {
+const ExtensionInfo VK_EXT_SHADER_MODULE_IDENTIFIER_INFO = {
     VK_EXT_SHADER_MODULE_IDENTIFIER_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextshadermoduleidentifier_deps, 1),
-    (uint32_t)-1,
-    std::span<const vk::StructureType>(vkextshadermoduleidentifier_properties, 1),
-    std::span<const vk::StructureType>(vkextshadermoduleidentifier_features, 1),
-};
-const ExtensionInfo vkextshaderobject_info = {
-    VK_EXT_SHADER_OBJECT_EXTENSION_NAME,
-    ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextshaderobject_deps, 1),
-    (uint32_t)-1,
-    std::span<const vk::StructureType>(vkextshaderobject_properties, 1),
-    std::span<const vk::StructureType>(vkextshaderobject_features, 1),
-};
-const ExtensionInfo vkextshaderreplicatedcomposites_info = {
-    VK_EXT_SHADER_REPLICATED_COMPOSITES_EXTENSION_NAME,
-    ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextshaderreplicatedcomposites_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_SHADER_MODULE_IDENTIFIER_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextshaderreplicatedcomposites_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_SHADER_MODULE_IDENTIFIER_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextshaderstencilexport_info = {
+const ExtensionInfo VK_EXT_SHADER_OBJECT_INFO = {
+    VK_EXT_SHADER_OBJECT_EXTENSION_NAME,
+    ExtensionType::Device,
+    std::span<const ExtensionInfo* const>(VK_EXT_SHADER_OBJECT_INFO_DEPS, 2),
+    (uint32_t)-1,
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_EXT_SHADER_OBJECT_INFO_FEATURES, 1),
+};
+const ExtensionInfo VK_EXT_SHADER_REPLICATED_COMPOSITES_INFO = {
+    VK_EXT_SHADER_REPLICATED_COMPOSITES_EXTENSION_NAME,
+    ExtensionType::Device,
+    std::span<const ExtensionInfo* const>(VK_EXT_SHADER_REPLICATED_COMPOSITES_INFO_DEPS, 1),
+    (uint32_t)-1,
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_EXT_SHADER_REPLICATED_COMPOSITES_INFO_FEATURES, 1),
+};
+const ExtensionInfo VK_EXT_SHADER_STENCIL_EXPORT_INFO = {
     VK_EXT_SHADER_STENCIL_EXPORT_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkextshadersubgroupballot_info = {
+const ExtensionInfo VK_EXT_SHADER_SUBGROUP_BALLOT_INFO = {
     VK_EXT_SHADER_SUBGROUP_BALLOT_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkextshadersubgrouppartitioned_info = {
+const ExtensionInfo VK_EXT_SHADER_SUBGROUP_PARTITIONED_INFO = {
     VK_EXT_SHADER_SUBGROUP_PARTITIONED_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextshadersubgrouppartitioned_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_SHADER_SUBGROUP_PARTITIONED_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextshadersubgrouppartitioned_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_SHADER_SUBGROUP_PARTITIONED_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextshadersubgroupvote_info = {
+const ExtensionInfo VK_EXT_SHADER_SUBGROUP_VOTE_INFO = {
     VK_EXT_SHADER_SUBGROUP_VOTE_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkextshadertileimage_info = {
+const ExtensionInfo VK_EXT_SHADER_TILE_IMAGE_INFO = {
     VK_EXT_SHADER_TILE_IMAGE_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkextshadertileimage_properties, 1),
-    std::span<const vk::StructureType>(vkextshadertileimage_features, 1),
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_EXT_SHADER_TILE_IMAGE_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextshaderuniformbufferunsizedarray_info = {
+const ExtensionInfo VK_EXT_SHADER_UNIFORM_BUFFER_UNSIZED_ARRAY_INFO = {
     VK_EXT_SHADER_UNIFORM_BUFFER_UNSIZED_ARRAY_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextshaderuniformbufferunsizedarray_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_SHADER_UNIFORM_BUFFER_UNSIZED_ARRAY_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextshaderuniformbufferunsizedarray_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_SHADER_UNIFORM_BUFFER_UNSIZED_ARRAY_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextshaderviewportindexlayer_info = {
+const ExtensionInfo VK_EXT_SHADER_VIEWPORT_INDEX_LAYER_INFO = {
     VK_EXT_SHADER_VIEWPORT_INDEX_LAYER_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     VK_API_VERSION_1_2,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkextsubgroupsizecontrol_info = {
+const ExtensionInfo VK_EXT_SUBGROUP_SIZE_CONTROL_INFO = {
     VK_EXT_SUBGROUP_SIZE_CONTROL_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     VK_API_VERSION_1_3,
     {},
     {},
+    std::span<const vk::StructureType>(VK_EXT_SUBGROUP_SIZE_CONTROL_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextsubpassmergefeedback_info = {
+const ExtensionInfo VK_EXT_SUBPASS_MERGE_FEEDBACK_INFO = {
     VK_EXT_SUBPASS_MERGE_FEEDBACK_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextsubpassmergefeedback_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_SUBPASS_MERGE_FEEDBACK_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextsubpassmergefeedback_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_SUBPASS_MERGE_FEEDBACK_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextsurfacemaintenance1_info = {
+const ExtensionInfo VK_EXT_SURFACE_MAINTENANCE1_INFO = {
     VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME,
     ExtensionType::Instance,
-    std::span<const ExtensionInfo* const>(vkextsurfacemaintenance1_deps, 2),
+    std::span<const ExtensionInfo* const>(VK_EXT_SURFACE_MAINTENANCE1_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkextswapchaincolorspace_info = {
+const ExtensionInfo VK_EXT_SWAPCHAIN_COLORSPACE_INFO = {
     VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME,
     ExtensionType::Instance,
-    std::span<const ExtensionInfo* const>(vkextswapchaincolorspace_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_SWAPCHAIN_COLORSPACE_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkextswapchainmaintenance1_info = {
+const ExtensionInfo VK_EXT_SWAPCHAIN_MAINTENANCE1_INFO = {
     VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextswapchainmaintenance1_deps, 2),
+    std::span<const ExtensionInfo* const>(VK_EXT_SWAPCHAIN_MAINTENANCE1_INFO_DEPS, 3),
     (uint32_t)-1,
     {},
     {},
+    std::span<const vk::StructureType>(VK_EXT_SWAPCHAIN_MAINTENANCE1_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkexttexelbufferalignment_info = {
+const ExtensionInfo VK_EXT_TEXEL_BUFFER_ALIGNMENT_INFO = {
     VK_EXT_TEXEL_BUFFER_ALIGNMENT_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkexttexelbufferalignment_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_TEXEL_BUFFER_ALIGNMENT_INFO_DEPS, 1),
     VK_API_VERSION_1_3,
     {},
-    std::span<const vk::StructureType>(vkexttexelbufferalignment_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_TEXEL_BUFFER_ALIGNMENT_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkexttexturecompressionastc3d_info = {
+const ExtensionInfo VK_EXT_TEXTURE_COMPRESSION_ASTC_3D_INFO = {
     VK_EXT_TEXTURE_COMPRESSION_ASTC_3D_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkexttexturecompressionastc3d_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_TEXTURE_COMPRESSION_ASTC_3D_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkexttexturecompressionastc3d_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_TEXTURE_COMPRESSION_ASTC_3D_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkexttexturecompressionastchdr_info = {
+const ExtensionInfo VK_EXT_TEXTURE_COMPRESSION_ASTC_HDR_INFO = {
     VK_EXT_TEXTURE_COMPRESSION_ASTC_HDR_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkexttexturecompressionastchdr_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_TEXTURE_COMPRESSION_ASTC_HDR_INFO_DEPS, 1),
     VK_API_VERSION_1_3,
     {},
     {},
+    std::span<const vk::StructureType>(VK_EXT_TEXTURE_COMPRESSION_ASTC_HDR_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkexttoolinginfo_info = {
+const ExtensionInfo VK_EXT_TOOLING_INFO_INFO = {
     VK_EXT_TOOLING_INFO_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     VK_API_VERSION_1_3,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkexttransformfeedback_info = {
+const ExtensionInfo VK_EXT_TRANSFORM_FEEDBACK_INFO = {
     VK_EXT_TRANSFORM_FEEDBACK_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkexttransformfeedback_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_TRANSFORM_FEEDBACK_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkexttransformfeedback_properties, 1),
-    std::span<const vk::StructureType>(vkexttransformfeedback_features, 1),
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_EXT_TRANSFORM_FEEDBACK_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextvalidationcache_info = {
+const ExtensionInfo VK_EXT_VALIDATION_CACHE_INFO = {
     VK_EXT_VALIDATION_CACHE_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkextvalidationfeatures_info = {
+const ExtensionInfo VK_EXT_VALIDATION_FEATURES_INFO = {
     VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME,
     ExtensionType::Instance,
     {},
-    (uint32_t)-1,
+    VK_EXT_layer_settings,
+    &VK_EXT_LAYER_SETTINGS_INFO,
     {},
     {},
 };
-const ExtensionInfo vkextvalidationflags_info = {
+const ExtensionInfo VK_EXT_VALIDATION_FLAGS_INFO = {
     VK_EXT_VALIDATION_FLAGS_EXTENSION_NAME,
     ExtensionType::Instance,
     {},
-    (uint32_t)-1,
+    VK_EXT_layer_settings,
+    &VK_EXT_LAYER_SETTINGS_INFO,
     {},
     {},
 };
-const ExtensionInfo vkextvertexattributedivisor_info = {
+const ExtensionInfo VK_EXT_VERTEX_ATTRIBUTE_DIVISOR_INFO = {
     VK_EXT_VERTEX_ATTRIBUTE_DIVISOR_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextvertexattributedivisor_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_VERTEX_ATTRIBUTE_DIVISOR_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkextvertexattributedivisor_properties, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_VERTEX_ATTRIBUTE_DIVISOR_INFO_PROPERTIES, 1),
     {},
 };
-const ExtensionInfo vkextvertexattributerobustness_info = {
+const ExtensionInfo VK_EXT_VERTEX_ATTRIBUTE_ROBUSTNESS_INFO = {
     VK_EXT_VERTEX_ATTRIBUTE_ROBUSTNESS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextvertexattributerobustness_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_VERTEX_ATTRIBUTE_ROBUSTNESS_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextvertexattributerobustness_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_VERTEX_ATTRIBUTE_ROBUSTNESS_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextvertexinputdynamicstate_info = {
+const ExtensionInfo VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_INFO = {
     VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextvertexinputdynamicstate_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextvertexinputdynamicstate_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextycbcr2plane444formats_info = {
+const ExtensionInfo VK_EXT_YCBCR_2PLANE_444_FORMATS_INFO = {
     VK_EXT_YCBCR_2PLANE_444_FORMATS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextycbcr2plane444formats_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_YCBCR_2PLANE_444_FORMATS_INFO_DEPS, 1),
     VK_API_VERSION_1_3,
     {},
-    std::span<const vk::StructureType>(vkextycbcr2plane444formats_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_YCBCR_2PLANE_444_FORMATS_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextycbcrimagearrays_info = {
+const ExtensionInfo VK_EXT_YCBCR_IMAGE_ARRAYS_INFO = {
     VK_EXT_YCBCR_IMAGE_ARRAYS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextycbcrimagearrays_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_YCBCR_IMAGE_ARRAYS_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextycbcrimagearrays_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_YCBCR_IMAGE_ARRAYS_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkextzeroinitializedevicememory_info = {
+const ExtensionInfo VK_EXT_ZERO_INITIALIZE_DEVICE_MEMORY_INFO = {
     VK_EXT_ZERO_INITIALIZE_DEVICE_MEMORY_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkextzeroinitializedevicememory_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_EXT_ZERO_INITIALIZE_DEVICE_MEMORY_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkextzeroinitializedevicememory_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_EXT_ZERO_INITIALIZE_DEVICE_MEMORY_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkgoogledecoratestring_info = {
+const ExtensionInfo VK_GOOGLE_DECORATE_STRING_INFO = {
     VK_GOOGLE_DECORATE_STRING_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkgoogledisplaytiming_info = {
+const ExtensionInfo VK_GOOGLE_DISPLAY_TIMING_INFO = {
     VK_GOOGLE_DISPLAY_TIMING_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkgoogledisplaytiming_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_GOOGLE_DISPLAY_TIMING_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkgooglehlslfunctionality1_info = {
+const ExtensionInfo VK_GOOGLE_HLSL_FUNCTIONALITY1_INFO = {
     VK_GOOGLE_HLSL_FUNCTIONALITY_1_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkgooglesurfacelessquery_info = {
+const ExtensionInfo VK_GOOGLE_SURFACELESS_QUERY_INFO = {
     VK_GOOGLE_SURFACELESS_QUERY_EXTENSION_NAME,
     ExtensionType::Instance,
-    std::span<const ExtensionInfo* const>(vkgooglesurfacelessquery_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_GOOGLE_SURFACELESS_QUERY_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkgoogleusertype_info = {
+const ExtensionInfo VK_GOOGLE_USER_TYPE_INFO = {
     VK_GOOGLE_USER_TYPE_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkhuaweiclustercullingshader_info = {
+const ExtensionInfo VK_HUAWEI_CLUSTER_CULLING_SHADER_INFO = {
     VK_HUAWEI_CLUSTER_CULLING_SHADER_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkhuaweiclustercullingshader_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_HUAWEI_CLUSTER_CULLING_SHADER_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkhuaweiclustercullingshader_properties, 1),
-    std::span<const vk::StructureType>(vkhuaweiclustercullingshader_features, 1),
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_HUAWEI_CLUSTER_CULLING_SHADER_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkhuaweihdrvivid_info = {
+const ExtensionInfo VK_HUAWEI_HDR_VIVID_INFO = {
     VK_HUAWEI_HDR_VIVID_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkhuaweihdrvivid_deps, 2),
+    std::span<const ExtensionInfo* const>(VK_HUAWEI_HDR_VIVID_INFO_DEPS, 3),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkhuaweihdrvivid_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_HUAWEI_HDR_VIVID_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkhuaweiinvocationmask_info = {
+const ExtensionInfo VK_HUAWEI_INVOCATION_MASK_INFO = {
     VK_HUAWEI_INVOCATION_MASK_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkhuaweiinvocationmask_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_HUAWEI_INVOCATION_MASK_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkhuaweiinvocationmask_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_HUAWEI_INVOCATION_MASK_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkhuaweisubpassshading_info = {
+const ExtensionInfo VK_HUAWEI_SUBPASS_SHADING_INFO = {
     VK_HUAWEI_SUBPASS_SHADING_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkhuaweisubpassshading_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_HUAWEI_SUBPASS_SHADING_INFO_DEPS, 2),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkhuaweisubpassshading_properties, 1),
-    std::span<const vk::StructureType>(vkhuaweisubpassshading_features, 1),
+    {},
+    {},
+    {},
 };
-const ExtensionInfo vkimgfiltercubic_info = {
+const ExtensionInfo VK_IMG_FILTER_CUBIC_INFO = {
     VK_IMG_FILTER_CUBIC_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkimgformatpvrtc_info = {
+const ExtensionInfo VK_IMG_FORMAT_PVRTC_INFO = {
     VK_IMG_FORMAT_PVRTC_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkimgrelaxedlinerasterization_info = {
+const ExtensionInfo VK_IMG_RELAXED_LINE_RASTERIZATION_INFO = {
     VK_IMG_RELAXED_LINE_RASTERIZATION_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkimgrelaxedlinerasterization_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_IMG_RELAXED_LINE_RASTERIZATION_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkimgrelaxedlinerasterization_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_IMG_RELAXED_LINE_RASTERIZATION_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkintelperformancequery_info = {
+const ExtensionInfo VK_INTEL_PERFORMANCE_QUERY_INFO = {
     VK_INTEL_PERFORMANCE_QUERY_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkintelshaderintegerfunctions2_info = {
+const ExtensionInfo VK_INTEL_SHADER_INTEGER_FUNCTIONS2_INFO = {
     VK_INTEL_SHADER_INTEGER_FUNCTIONS_2_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkintelshaderintegerfunctions2_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_INTEL_SHADER_INTEGER_FUNCTIONS2_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkintelshaderintegerfunctions2_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_INTEL_SHADER_INTEGER_FUNCTIONS2_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhr16bitstorage_info = {
+const ExtensionInfo VK_KHR_16BIT_STORAGE_INFO = {
     VK_KHR_16BIT_STORAGE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhr16bitstorage_deps, 2),
+    std::span<const ExtensionInfo* const>(VK_KHR_16BIT_STORAGE_INFO_DEPS, 2),
     VK_API_VERSION_1_1,
     {},
     {},
+    std::span<const vk::StructureType>(VK_KHR_16BIT_STORAGE_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhr8bitstorage_info = {
+const ExtensionInfo VK_KHR_8BIT_STORAGE_INFO = {
     VK_KHR_8BIT_STORAGE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhr8bitstorage_deps, 2),
+    std::span<const ExtensionInfo* const>(VK_KHR_8BIT_STORAGE_INFO_DEPS, 2),
     VK_API_VERSION_1_2,
     {},
     {},
+    std::span<const vk::StructureType>(VK_KHR_8BIT_STORAGE_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhraccelerationstructure_info = {
+const ExtensionInfo VK_KHR_ACCELERATION_STRUCTURE_INFO = {
     VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhraccelerationstructure_deps, 2),
+    std::span<const ExtensionInfo* const>(VK_KHR_ACCELERATION_STRUCTURE_INFO_DEPS, 3),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkkhraccelerationstructure_properties, 1),
-    std::span<const vk::StructureType>(vkkhraccelerationstructure_features, 1),
+    {},
+    {},
+    {},
 };
-const ExtensionInfo vkkhrbindmemory2_info = {
+const ExtensionInfo VK_KHR_BIND_MEMORY2_INFO = {
     VK_KHR_BIND_MEMORY_2_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     VK_API_VERSION_1_1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrbufferdeviceaddress_info = {
+const ExtensionInfo VK_KHR_BUFFER_DEVICE_ADDRESS_INFO = {
     VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrbufferdeviceaddress_deps, 2),
+    std::span<const ExtensionInfo* const>(VK_KHR_BUFFER_DEVICE_ADDRESS_INFO_DEPS, 2),
     VK_API_VERSION_1_2,
     {},
     {},
+    std::span<const vk::StructureType>(VK_KHR_BUFFER_DEVICE_ADDRESS_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrcalibratedtimestamps_info = {
+const ExtensionInfo VK_KHR_CALIBRATED_TIMESTAMPS_INFO = {
     VK_KHR_CALIBRATED_TIMESTAMPS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrcalibratedtimestamps_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_CALIBRATED_TIMESTAMPS_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrcomputeshaderderivatives_info = {
+const ExtensionInfo VK_KHR_COMPUTE_SHADER_DERIVATIVES_INFO = {
     VK_KHR_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrcomputeshaderderivatives_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_COMPUTE_SHADER_DERIVATIVES_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkkhrcomputeshaderderivatives_properties, 1),
-    std::span<const vk::StructureType>(vkkhrcomputeshaderderivatives_features, 1),
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_KHR_COMPUTE_SHADER_DERIVATIVES_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrcooperativematrix_info = {
+const ExtensionInfo VK_KHR_COOPERATIVE_MATRIX_INFO = {
     VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrcooperativematrix_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_COOPERATIVE_MATRIX_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkkhrcooperativematrix_properties, 1),
-    std::span<const vk::StructureType>(vkkhrcooperativematrix_features, 1),
+    {},
+    {},
+    {},
 };
-const ExtensionInfo vkkhrcopycommands2_info = {
+const ExtensionInfo VK_KHR_COPY_COMMANDS2_INFO = {
     VK_KHR_COPY_COMMANDS_2_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrcopycommands2_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_COPY_COMMANDS2_INFO_DEPS, 1),
     VK_API_VERSION_1_3,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrcopymemoryindirect_info = {
+const ExtensionInfo VK_KHR_COPY_MEMORY_INDIRECT_INFO = {
     VK_KHR_COPY_MEMORY_INDIRECT_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrcopymemoryindirect_deps, 2),
+    std::span<const ExtensionInfo* const>(VK_KHR_COPY_MEMORY_INDIRECT_INFO_DEPS, 2),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkkhrcopymemoryindirect_properties, 1),
-    std::span<const vk::StructureType>(vkkhrcopymemoryindirect_features, 1),
+    {},
+    {},
+    {},
 };
-const ExtensionInfo vkkhrcreaterenderpass2_info = {
+const ExtensionInfo VK_KHR_CREATE_RENDERPASS2_INFO = {
     VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrcreaterenderpass2_deps, 2),
+    std::span<const ExtensionInfo* const>(VK_KHR_CREATE_RENDERPASS2_INFO_DEPS, 2),
     VK_API_VERSION_1_2,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrdedicatedallocation_info = {
+const ExtensionInfo VK_KHR_DEDICATED_ALLOCATION_INFO = {
     VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrdedicatedallocation_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_DEDICATED_ALLOCATION_INFO_DEPS, 1),
     VK_API_VERSION_1_1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrdeferredhostoperations_info = {
+const ExtensionInfo VK_KHR_DEFERRED_HOST_OPERATIONS_INFO = {
     VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrdepthclampzeroone_info = {
+const ExtensionInfo VK_KHR_DEPTH_CLAMP_ZERO_ONE_INFO = {
     VK_KHR_DEPTH_CLAMP_ZERO_ONE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrdepthclampzeroone_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_DEPTH_CLAMP_ZERO_ONE_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkkhrdepthclampzeroone_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_KHR_DEPTH_CLAMP_ZERO_ONE_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrdepthstencilresolve_info = {
+const ExtensionInfo VK_KHR_DEPTH_STENCIL_RESOLVE_INFO = {
     VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrdepthstencilresolve_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_DEPTH_STENCIL_RESOLVE_INFO_DEPS, 1),
     VK_API_VERSION_1_2,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrdescriptorupdatetemplate_info = {
+const ExtensionInfo VK_KHR_DESCRIPTOR_UPDATE_TEMPLATE_INFO = {
     VK_KHR_DESCRIPTOR_UPDATE_TEMPLATE_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     VK_API_VERSION_1_1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrdevicegroup_info = {
+const ExtensionInfo VK_KHR_DEVICE_GROUP_INFO = {
     VK_KHR_DEVICE_GROUP_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrdevicegroup_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_DEVICE_GROUP_INFO_DEPS, 1),
     VK_API_VERSION_1_1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrdevicegroupcreation_info = {
+const ExtensionInfo VK_KHR_DEVICE_GROUP_CREATION_INFO = {
     VK_KHR_DEVICE_GROUP_CREATION_EXTENSION_NAME,
     ExtensionType::Instance,
     {},
     VK_API_VERSION_1_1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrdisplay_info = {
+const ExtensionInfo VK_KHR_DISPLAY_INFO = {
     VK_KHR_DISPLAY_EXTENSION_NAME,
     ExtensionType::Instance,
-    std::span<const ExtensionInfo* const>(vkkhrdisplay_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_DISPLAY_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrdisplayswapchain_info = {
+const ExtensionInfo VK_KHR_DISPLAY_SWAPCHAIN_INFO = {
     VK_KHR_DISPLAY_SWAPCHAIN_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrdisplayswapchain_deps, 2),
+    std::span<const ExtensionInfo* const>(VK_KHR_DISPLAY_SWAPCHAIN_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrdrawindirectcount_info = {
+const ExtensionInfo VK_KHR_DRAW_INDIRECT_COUNT_INFO = {
     VK_KHR_DRAW_INDIRECT_COUNT_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     VK_API_VERSION_1_2,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrdriverproperties_info = {
+const ExtensionInfo VK_KHR_DRIVER_PROPERTIES_INFO = {
     VK_KHR_DRIVER_PROPERTIES_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrdriverproperties_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_DRIVER_PROPERTIES_INFO_DEPS, 1),
     VK_API_VERSION_1_2,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrdynamicrendering_info = {
+const ExtensionInfo VK_KHR_DYNAMIC_RENDERING_INFO = {
     VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrdynamicrendering_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_DYNAMIC_RENDERING_INFO_DEPS, 2),
     VK_API_VERSION_1_3,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrdynamicrenderinglocalread_info = {
+const ExtensionInfo VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_INFO = {
     VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrdynamicrenderinglocalread_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_INFO_DEPS, 1),
     VK_API_VERSION_1_4,
     {},
     {},
+    std::span<const vk::StructureType>(VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrexternalfence_info = {
+const ExtensionInfo VK_KHR_EXTERNAL_FENCE_INFO = {
     VK_KHR_EXTERNAL_FENCE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrexternalfence_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_EXTERNAL_FENCE_INFO_DEPS, 1),
     VK_API_VERSION_1_1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrexternalfencecapabilities_info = {
+const ExtensionInfo VK_KHR_EXTERNAL_FENCE_CAPABILITIES_INFO = {
     VK_KHR_EXTERNAL_FENCE_CAPABILITIES_EXTENSION_NAME,
     ExtensionType::Instance,
-    std::span<const ExtensionInfo* const>(vkkhrexternalfencecapabilities_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_EXTERNAL_FENCE_CAPABILITIES_INFO_DEPS, 1),
     VK_API_VERSION_1_1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrexternalfencefd_info = {
+const ExtensionInfo VK_KHR_EXTERNAL_FENCE_FD_INFO = {
     VK_KHR_EXTERNAL_FENCE_FD_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrexternalfencefd_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_EXTERNAL_FENCE_FD_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrexternalmemory_info = {
+const ExtensionInfo VK_KHR_EXTERNAL_MEMORY_INFO = {
     VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrexternalmemory_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_EXTERNAL_MEMORY_INFO_DEPS, 1),
     VK_API_VERSION_1_1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrexternalmemorycapabilities_info = {
+const ExtensionInfo VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_INFO = {
     VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME,
     ExtensionType::Instance,
-    std::span<const ExtensionInfo* const>(vkkhrexternalmemorycapabilities_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_INFO_DEPS, 1),
     VK_API_VERSION_1_1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrexternalmemoryfd_info = {
+const ExtensionInfo VK_KHR_EXTERNAL_MEMORY_FD_INFO = {
     VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrexternalmemoryfd_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_EXTERNAL_MEMORY_FD_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrexternalsemaphore_info = {
+const ExtensionInfo VK_KHR_EXTERNAL_SEMAPHORE_INFO = {
     VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrexternalsemaphore_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_EXTERNAL_SEMAPHORE_INFO_DEPS, 1),
     VK_API_VERSION_1_1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrexternalsemaphorecapabilities_info = {
+const ExtensionInfo VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_INFO = {
     VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME,
     ExtensionType::Instance,
-    std::span<const ExtensionInfo* const>(vkkhrexternalsemaphorecapabilities_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_INFO_DEPS, 1),
     VK_API_VERSION_1_1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrexternalsemaphorefd_info = {
+const ExtensionInfo VK_KHR_EXTERNAL_SEMAPHORE_FD_INFO = {
     VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrexternalsemaphorefd_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_EXTERNAL_SEMAPHORE_FD_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrformatfeatureflags2_info = {
+const ExtensionInfo VK_KHR_FORMAT_FEATURE_FLAGS2_INFO = {
     VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrformatfeatureflags2_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_FORMAT_FEATURE_FLAGS2_INFO_DEPS, 1),
     VK_API_VERSION_1_3,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrfragmentshaderbarycentric_info = {
+const ExtensionInfo VK_KHR_FRAGMENT_SHADER_BARYCENTRIC_INFO = {
     VK_KHR_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrfragmentshaderbarycentric_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_FRAGMENT_SHADER_BARYCENTRIC_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkkhrfragmentshaderbarycentric_properties, 1),
-    std::span<const vk::StructureType>(vkkhrfragmentshaderbarycentric_features, 1),
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_KHR_FRAGMENT_SHADER_BARYCENTRIC_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrfragmentshadingrate_info = {
+const ExtensionInfo VK_KHR_FRAGMENT_SHADING_RATE_INFO = {
     VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrfragmentshadingrate_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_FRAGMENT_SHADING_RATE_INFO_DEPS, 2),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkkhrfragmentshadingrate_properties, 1),
-    std::span<const vk::StructureType>(vkkhrfragmentshadingrate_features, 1),
+    {},
+    {},
+    {},
 };
-const ExtensionInfo vkkhrgetdisplayproperties2_info = {
+const ExtensionInfo VK_KHR_GET_DISPLAY_PROPERTIES2_INFO = {
     VK_KHR_GET_DISPLAY_PROPERTIES_2_EXTENSION_NAME,
     ExtensionType::Instance,
-    std::span<const ExtensionInfo* const>(vkkhrgetdisplayproperties2_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_GET_DISPLAY_PROPERTIES2_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrgetmemoryrequirements2_info = {
+const ExtensionInfo VK_KHR_GET_MEMORY_REQUIREMENTS2_INFO = {
     VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     VK_API_VERSION_1_1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrgetphysicaldeviceproperties2_info = {
+const ExtensionInfo VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO = {
     VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
     ExtensionType::Instance,
     {},
     VK_API_VERSION_1_1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrgetsurfacecapabilities2_info = {
+const ExtensionInfo VK_KHR_GET_SURFACE_CAPABILITIES2_INFO = {
     VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME,
     ExtensionType::Instance,
-    std::span<const ExtensionInfo* const>(vkkhrgetsurfacecapabilities2_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_GET_SURFACE_CAPABILITIES2_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrglobalpriority_info = {
+const ExtensionInfo VK_KHR_GLOBAL_PRIORITY_INFO = {
     VK_KHR_GLOBAL_PRIORITY_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrglobalpriority_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_GLOBAL_PRIORITY_INFO_DEPS, 1),
     VK_API_VERSION_1_4,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrimageformatlist_info = {
+const ExtensionInfo VK_KHR_IMAGE_FORMAT_LIST_INFO = {
     VK_KHR_IMAGE_FORMAT_LIST_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     VK_API_VERSION_1_2,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrimagelessframebuffer_info = {
+const ExtensionInfo VK_KHR_IMAGELESS_FRAMEBUFFER_INFO = {
     VK_KHR_IMAGELESS_FRAMEBUFFER_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrimagelessframebuffer_deps, 2),
+    std::span<const ExtensionInfo* const>(VK_KHR_IMAGELESS_FRAMEBUFFER_INFO_DEPS, 3),
     VK_API_VERSION_1_2,
     {},
     {},
+    std::span<const vk::StructureType>(VK_KHR_IMAGELESS_FRAMEBUFFER_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrincrementalpresent_info = {
+const ExtensionInfo VK_KHR_INCREMENTAL_PRESENT_INFO = {
     VK_KHR_INCREMENTAL_PRESENT_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrincrementalpresent_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_INCREMENTAL_PRESENT_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrindextypeuint8_info = {
+const ExtensionInfo VK_KHR_INDEX_TYPE_UINT8_INFO = {
     VK_KHR_INDEX_TYPE_UINT8_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrindextypeuint8_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_INDEX_TYPE_UINT8_INFO_DEPS, 1),
     VK_API_VERSION_1_4,
     {},
     {},
+    std::span<const vk::StructureType>(VK_KHR_INDEX_TYPE_UINT8_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrinternallysynchronizedqueues_info = {
+const ExtensionInfo VK_KHR_INTERNALLY_SYNCHRONIZED_QUEUES_INFO = {
     VK_KHR_INTERNALLY_SYNCHRONIZED_QUEUES_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkkhrinternallysynchronizedqueues_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_KHR_INTERNALLY_SYNCHRONIZED_QUEUES_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrlinerasterization_info = {
+const ExtensionInfo VK_KHR_LINE_RASTERIZATION_INFO = {
     VK_KHR_LINE_RASTERIZATION_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrlinerasterization_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_LINE_RASTERIZATION_INFO_DEPS, 1),
     VK_API_VERSION_1_4,
     {},
     {},
+    std::span<const vk::StructureType>(VK_KHR_LINE_RASTERIZATION_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrloadstoreopnone_info = {
+const ExtensionInfo VK_KHR_LOAD_STORE_OP_NONE_INFO = {
     VK_KHR_LOAD_STORE_OP_NONE_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     VK_API_VERSION_1_4,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrmaintenance1_info = {
+const ExtensionInfo VK_KHR_MAINTENANCE1_INFO = {
     VK_KHR_MAINTENANCE_1_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     VK_API_VERSION_1_1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrmaintenance10_info = {
+const ExtensionInfo VK_KHR_MAINTENANCE10_INFO = {
     VK_KHR_MAINTENANCE_10_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrmaintenance10_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_MAINTENANCE10_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkkhrmaintenance10_properties, 1),
-    std::span<const vk::StructureType>(vkkhrmaintenance10_features, 1),
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_KHR_MAINTENANCE10_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrmaintenance2_info = {
+const ExtensionInfo VK_KHR_MAINTENANCE2_INFO = {
     VK_KHR_MAINTENANCE_2_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     VK_API_VERSION_1_1,
     {},
+    std::span<const vk::StructureType>(VK_KHR_MAINTENANCE2_INFO_PROPERTIES, 1),
     {},
 };
-const ExtensionInfo vkkhrmaintenance3_info = {
+const ExtensionInfo VK_KHR_MAINTENANCE3_INFO = {
     VK_KHR_MAINTENANCE_3_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrmaintenance3_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_MAINTENANCE3_INFO_DEPS, 1),
     VK_API_VERSION_1_1,
     {},
+    std::span<const vk::StructureType>(VK_KHR_MAINTENANCE3_INFO_PROPERTIES, 1),
     {},
 };
-const ExtensionInfo vkkhrmaintenance4_info = {
+const ExtensionInfo VK_KHR_MAINTENANCE4_INFO = {
     VK_KHR_MAINTENANCE_4_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     VK_API_VERSION_1_3,
     {},
     {},
+    std::span<const vk::StructureType>(VK_KHR_MAINTENANCE4_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrmaintenance5_info = {
+const ExtensionInfo VK_KHR_MAINTENANCE5_INFO = {
     VK_KHR_MAINTENANCE_5_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrmaintenance5_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_MAINTENANCE5_INFO_DEPS, 1),
     VK_API_VERSION_1_4,
     {},
     {},
+    std::span<const vk::StructureType>(VK_KHR_MAINTENANCE5_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrmaintenance6_info = {
+const ExtensionInfo VK_KHR_MAINTENANCE6_INFO = {
     VK_KHR_MAINTENANCE_6_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     VK_API_VERSION_1_4,
     {},
     {},
+    std::span<const vk::StructureType>(VK_KHR_MAINTENANCE6_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrmaintenance7_info = {
+const ExtensionInfo VK_KHR_MAINTENANCE7_INFO = {
     VK_KHR_MAINTENANCE_7_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkkhrmaintenance7_properties, 2),
-    std::span<const vk::StructureType>(vkkhrmaintenance7_features, 1),
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_KHR_MAINTENANCE7_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrmaintenance8_info = {
+const ExtensionInfo VK_KHR_MAINTENANCE8_INFO = {
     VK_KHR_MAINTENANCE_8_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkkhrmaintenance8_features, 1),
+    {},
+    {},
 };
-const ExtensionInfo vkkhrmaintenance9_info = {
+const ExtensionInfo VK_KHR_MAINTENANCE9_INFO = {
     VK_KHR_MAINTENANCE_9_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrmaintenance9_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_MAINTENANCE9_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkkhrmaintenance9_properties, 1),
-    std::span<const vk::StructureType>(vkkhrmaintenance9_features, 1),
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_KHR_MAINTENANCE9_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrmapmemory2_info = {
+const ExtensionInfo VK_KHR_MAP_MEMORY2_INFO = {
     VK_KHR_MAP_MEMORY_2_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     VK_API_VERSION_1_4,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrmultiview_info = {
+const ExtensionInfo VK_KHR_MULTIVIEW_INFO = {
     VK_KHR_MULTIVIEW_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrmultiview_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_MULTIVIEW_INFO_DEPS, 1),
     VK_API_VERSION_1_1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrperformancequery_info = {
+const ExtensionInfo VK_KHR_PERFORMANCE_QUERY_INFO = {
     VK_KHR_PERFORMANCE_QUERY_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrperformancequery_deps, 1),
-    (uint32_t)-1,
-    std::span<const vk::StructureType>(vkkhrperformancequery_properties, 1),
-    std::span<const vk::StructureType>(vkkhrperformancequery_features, 1),
-};
-const ExtensionInfo vkkhrpipelinebinary_info = {
-    VK_KHR_PIPELINE_BINARY_EXTENSION_NAME,
-    ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrpipelinebinary_deps, 1),
-    (uint32_t)-1,
-    std::span<const vk::StructureType>(vkkhrpipelinebinary_properties, 1),
-    std::span<const vk::StructureType>(vkkhrpipelinebinary_features, 1),
-};
-const ExtensionInfo vkkhrpipelineexecutableproperties_info = {
-    VK_KHR_PIPELINE_EXECUTABLE_PROPERTIES_EXTENSION_NAME,
-    ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrpipelineexecutableproperties_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_PERFORMANCE_QUERY_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkkhrpipelineexecutableproperties_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_KHR_PERFORMANCE_QUERY_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrpipelinelibrary_info = {
+const ExtensionInfo VK_KHR_PIPELINE_BINARY_INFO = {
+    VK_KHR_PIPELINE_BINARY_EXTENSION_NAME,
+    ExtensionType::Device,
+    std::span<const ExtensionInfo* const>(VK_KHR_PIPELINE_BINARY_INFO_DEPS, 1),
+    (uint32_t)-1,
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_KHR_PIPELINE_BINARY_INFO_FEATURES, 1),
+};
+const ExtensionInfo VK_KHR_PIPELINE_EXECUTABLE_PROPERTIES_INFO = {
+    VK_KHR_PIPELINE_EXECUTABLE_PROPERTIES_EXTENSION_NAME,
+    ExtensionType::Device,
+    std::span<const ExtensionInfo* const>(VK_KHR_PIPELINE_EXECUTABLE_PROPERTIES_INFO_DEPS, 1),
+    (uint32_t)-1,
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_KHR_PIPELINE_EXECUTABLE_PROPERTIES_INFO_FEATURES, 1),
+};
+const ExtensionInfo VK_KHR_PIPELINE_LIBRARY_INFO = {
     VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrportabilityenumeration_info = {
+const ExtensionInfo VK_KHR_PORTABILITY_ENUMERATION_INFO = {
     VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME,
     ExtensionType::Instance,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrpresentid_info = {
+const ExtensionInfo VK_KHR_PRESENT_ID_INFO = {
     VK_KHR_PRESENT_ID_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrpresentid_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_PRESENT_ID_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkkhrpresentid_features, 1),
+    {},
+    {},
 };
-const ExtensionInfo vkkhrpresentid2_info = {
+const ExtensionInfo VK_KHR_PRESENT_ID2_INFO = {
     VK_KHR_PRESENT_ID_2_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrpresentid2_deps, 3),
+    std::span<const ExtensionInfo* const>(VK_KHR_PRESENT_ID2_INFO_DEPS, 3),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkkhrpresentid2_features, 1),
+    {},
+    {},
 };
-const ExtensionInfo vkkhrpresentmodefifolatestready_info = {
+const ExtensionInfo VK_KHR_PRESENT_MODE_FIFO_LATEST_READY_INFO = {
     VK_KHR_PRESENT_MODE_FIFO_LATEST_READY_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrpresentmodefifolatestready_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_PRESENT_MODE_FIFO_LATEST_READY_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkkhrpresentmodefifolatestready_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_KHR_PRESENT_MODE_FIFO_LATEST_READY_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrpresentwait_info = {
+const ExtensionInfo VK_KHR_PRESENT_WAIT_INFO = {
     VK_KHR_PRESENT_WAIT_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrpresentwait_deps, 2),
+    std::span<const ExtensionInfo* const>(VK_KHR_PRESENT_WAIT_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkkhrpresentwait_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_KHR_PRESENT_WAIT_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrpresentwait2_info = {
+const ExtensionInfo VK_KHR_PRESENT_WAIT2_INFO = {
     VK_KHR_PRESENT_WAIT_2_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrpresentwait2_deps, 4),
+    std::span<const ExtensionInfo* const>(VK_KHR_PRESENT_WAIT2_INFO_DEPS, 4),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkkhrpresentwait2_features, 1),
+    {},
+    {},
 };
-const ExtensionInfo vkkhrpushdescriptor_info = {
+const ExtensionInfo VK_KHR_PUSH_DESCRIPTOR_INFO = {
     VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrpushdescriptor_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_PUSH_DESCRIPTOR_INFO_DEPS, 1),
     VK_API_VERSION_1_4,
     {},
+    std::span<const vk::StructureType>(VK_KHR_PUSH_DESCRIPTOR_INFO_PROPERTIES, 1),
     {},
 };
-const ExtensionInfo vkkhrrayquery_info = {
+const ExtensionInfo VK_KHR_RAY_QUERY_INFO = {
     VK_KHR_RAY_QUERY_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrrayquery_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_RAY_QUERY_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkkhrrayquery_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_KHR_RAY_QUERY_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrraytracingmaintenance1_info = {
+const ExtensionInfo VK_KHR_RAY_TRACING_MAINTENANCE1_INFO = {
     VK_KHR_RAY_TRACING_MAINTENANCE_1_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrraytracingmaintenance1_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_RAY_TRACING_MAINTENANCE1_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkkhrraytracingmaintenance1_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_KHR_RAY_TRACING_MAINTENANCE1_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrraytracingpipeline_info = {
+const ExtensionInfo VK_KHR_RAY_TRACING_PIPELINE_INFO = {
     VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrraytracingpipeline_deps, 1),
-    (uint32_t)-1,
-    std::span<const vk::StructureType>(vkkhrraytracingpipeline_properties, 1),
-    std::span<const vk::StructureType>(vkkhrraytracingpipeline_features, 1),
-};
-const ExtensionInfo vkkhrraytracingpositionfetch_info = {
-    VK_KHR_RAY_TRACING_POSITION_FETCH_EXTENSION_NAME,
-    ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrraytracingpositionfetch_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_RAY_TRACING_PIPELINE_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkkhrraytracingpositionfetch_features, 1),
+    {},
+    {},
 };
-const ExtensionInfo vkkhrrelaxedblocklayout_info = {
+const ExtensionInfo VK_KHR_RAY_TRACING_POSITION_FETCH_INFO = {
+    VK_KHR_RAY_TRACING_POSITION_FETCH_EXTENSION_NAME,
+    ExtensionType::Device,
+    std::span<const ExtensionInfo* const>(VK_KHR_RAY_TRACING_POSITION_FETCH_INFO_DEPS, 1),
+    (uint32_t)-1,
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_KHR_RAY_TRACING_POSITION_FETCH_INFO_FEATURES, 1),
+};
+const ExtensionInfo VK_KHR_RELAXED_BLOCK_LAYOUT_INFO = {
     VK_KHR_RELAXED_BLOCK_LAYOUT_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     VK_API_VERSION_1_1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrrobustness2_info = {
+const ExtensionInfo VK_KHR_ROBUSTNESS2_INFO = {
     VK_KHR_ROBUSTNESS_2_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrrobustness2_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_ROBUSTNESS2_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkkhrrobustness2_properties, 1),
-    std::span<const vk::StructureType>(vkkhrrobustness2_features, 1),
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_KHR_ROBUSTNESS2_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrsamplermirrorclamptoedge_info = {
+const ExtensionInfo VK_KHR_SAMPLER_MIRROR_CLAMP_TO_EDGE_INFO = {
     VK_KHR_SAMPLER_MIRROR_CLAMP_TO_EDGE_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     VK_API_VERSION_1_2,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrsamplerycbcrconversion_info = {
+const ExtensionInfo VK_KHR_SAMPLER_YCBCR_CONVERSION_INFO = {
     VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrsamplerycbcrconversion_deps, 4),
+    std::span<const ExtensionInfo* const>(VK_KHR_SAMPLER_YCBCR_CONVERSION_INFO_DEPS, 4),
     VK_API_VERSION_1_1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrseparatedepthstencillayouts_info = {
+const ExtensionInfo VK_KHR_SEPARATE_DEPTH_STENCIL_LAYOUTS_INFO = {
     VK_KHR_SEPARATE_DEPTH_STENCIL_LAYOUTS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrseparatedepthstencillayouts_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_SEPARATE_DEPTH_STENCIL_LAYOUTS_INFO_DEPS, 2),
     VK_API_VERSION_1_2,
     {},
     {},
+    std::span<const vk::StructureType>(VK_KHR_SEPARATE_DEPTH_STENCIL_LAYOUTS_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrshaderatomicint64_info = {
+const ExtensionInfo VK_KHR_SHADER_ATOMIC_INT64_INFO = {
     VK_KHR_SHADER_ATOMIC_INT64_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrshaderatomicint64_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_SHADER_ATOMIC_INT64_INFO_DEPS, 1),
     VK_API_VERSION_1_2,
     {},
     {},
+    std::span<const vk::StructureType>(VK_KHR_SHADER_ATOMIC_INT64_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrshaderbfloat16_info = {
+const ExtensionInfo VK_KHR_SHADER_BFLOAT16_INFO = {
     VK_KHR_SHADER_BFLOAT16_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrshaderbfloat16_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_SHADER_BFLOAT16_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkkhrshaderbfloat16_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_KHR_SHADER_BFLOAT16_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrshaderclock_info = {
+const ExtensionInfo VK_KHR_SHADER_CLOCK_INFO = {
     VK_KHR_SHADER_CLOCK_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrshaderclock_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_SHADER_CLOCK_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkkhrshaderclock_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_KHR_SHADER_CLOCK_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrshaderdrawparameters_info = {
+const ExtensionInfo VK_KHR_SHADER_DRAW_PARAMETERS_INFO = {
     VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     VK_API_VERSION_1_1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrshaderexpectassume_info = {
+const ExtensionInfo VK_KHR_SHADER_EXPECT_ASSUME_INFO = {
     VK_KHR_SHADER_EXPECT_ASSUME_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrshaderexpectassume_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_SHADER_EXPECT_ASSUME_INFO_DEPS, 1),
     VK_API_VERSION_1_4,
     {},
     {},
+    std::span<const vk::StructureType>(VK_KHR_SHADER_EXPECT_ASSUME_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrshaderfloat16int8_info = {
+const ExtensionInfo VK_KHR_SHADER_FLOAT16_INT8_INFO = {
     VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrshaderfloat16int8_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_SHADER_FLOAT16_INT8_INFO_DEPS, 1),
     VK_API_VERSION_1_2,
     {},
     {},
+    std::span<const vk::StructureType>(VK_KHR_SHADER_FLOAT16_INT8_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrshaderfloatcontrols_info = {
+const ExtensionInfo VK_KHR_SHADER_FLOAT_CONTROLS_INFO = {
     VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrshaderfloatcontrols_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_SHADER_FLOAT_CONTROLS_INFO_DEPS, 1),
     VK_API_VERSION_1_2,
     {},
+    std::span<const vk::StructureType>(VK_KHR_SHADER_FLOAT_CONTROLS_INFO_PROPERTIES, 1),
     {},
 };
-const ExtensionInfo vkkhrshaderfloatcontrols2_info = {
+const ExtensionInfo VK_KHR_SHADER_FLOAT_CONTROLS2_INFO = {
     VK_KHR_SHADER_FLOAT_CONTROLS_2_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrshaderfloatcontrols2_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_SHADER_FLOAT_CONTROLS2_INFO_DEPS, 1),
     VK_API_VERSION_1_4,
     {},
     {},
+    std::span<const vk::StructureType>(VK_KHR_SHADER_FLOAT_CONTROLS2_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrshaderfma_info = {
+const ExtensionInfo VK_KHR_SHADER_FMA_INFO = {
     VK_KHR_SHADER_FMA_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrshaderfma_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_SHADER_FMA_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkkhrshaderfma_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_KHR_SHADER_FMA_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrshaderintegerdotproduct_info = {
+const ExtensionInfo VK_KHR_SHADER_INTEGER_DOT_PRODUCT_INFO = {
     VK_KHR_SHADER_INTEGER_DOT_PRODUCT_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrshaderintegerdotproduct_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_SHADER_INTEGER_DOT_PRODUCT_INFO_DEPS, 1),
     VK_API_VERSION_1_3,
     {},
     {},
+    std::span<const vk::StructureType>(VK_KHR_SHADER_INTEGER_DOT_PRODUCT_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrshadermaximalreconvergence_info = {
+const ExtensionInfo VK_KHR_SHADER_MAXIMAL_RECONVERGENCE_INFO = {
     VK_KHR_SHADER_MAXIMAL_RECONVERGENCE_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkkhrshadermaximalreconvergence_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_KHR_SHADER_MAXIMAL_RECONVERGENCE_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrshadernonsemanticinfo_info = {
+const ExtensionInfo VK_KHR_SHADER_NON_SEMANTIC_INFO_INFO = {
     VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     VK_API_VERSION_1_3,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrshaderquadcontrol_info = {
+const ExtensionInfo VK_KHR_SHADER_QUAD_CONTROL_INFO = {
     VK_KHR_SHADER_QUAD_CONTROL_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrshaderquadcontrol_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_SHADER_QUAD_CONTROL_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkkhrshaderquadcontrol_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_KHR_SHADER_QUAD_CONTROL_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrshaderrelaxedextendedinstruction_info = {
+const ExtensionInfo VK_KHR_SHADER_RELAXED_EXTENDED_INSTRUCTION_INFO = {
     VK_KHR_SHADER_RELAXED_EXTENDED_INSTRUCTION_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrshaderrelaxedextendedinstruction_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_SHADER_RELAXED_EXTENDED_INSTRUCTION_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkkhrshaderrelaxedextendedinstruction_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_KHR_SHADER_RELAXED_EXTENDED_INSTRUCTION_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrshadersubgroupextendedtypes_info = {
+const ExtensionInfo VK_KHR_SHADER_SUBGROUP_EXTENDED_TYPES_INFO = {
     VK_KHR_SHADER_SUBGROUP_EXTENDED_TYPES_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     VK_API_VERSION_1_2,
     {},
     {},
+    std::span<const vk::StructureType>(VK_KHR_SHADER_SUBGROUP_EXTENDED_TYPES_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrshadersubgrouprotate_info = {
+const ExtensionInfo VK_KHR_SHADER_SUBGROUP_ROTATE_INFO = {
     VK_KHR_SHADER_SUBGROUP_ROTATE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrshadersubgrouprotate_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_SHADER_SUBGROUP_ROTATE_INFO_DEPS, 1),
     VK_API_VERSION_1_4,
     {},
     {},
+    std::span<const vk::StructureType>(VK_KHR_SHADER_SUBGROUP_ROTATE_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrshadersubgroupuniformcontrolflow_info = {
+const ExtensionInfo VK_KHR_SHADER_SUBGROUP_UNIFORM_CONTROL_FLOW_INFO = {
     VK_KHR_SHADER_SUBGROUP_UNIFORM_CONTROL_FLOW_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkkhrshadersubgroupuniformcontrolflow_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_KHR_SHADER_SUBGROUP_UNIFORM_CONTROL_FLOW_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrshaderterminateinvocation_info = {
+const ExtensionInfo VK_KHR_SHADER_TERMINATE_INVOCATION_INFO = {
     VK_KHR_SHADER_TERMINATE_INVOCATION_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrshaderterminateinvocation_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_SHADER_TERMINATE_INVOCATION_INFO_DEPS, 1),
     VK_API_VERSION_1_3,
     {},
     {},
+    std::span<const vk::StructureType>(VK_KHR_SHADER_TERMINATE_INVOCATION_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrshaderuntypedpointers_info = {
+const ExtensionInfo VK_KHR_SHADER_UNTYPED_POINTERS_INFO = {
     VK_KHR_SHADER_UNTYPED_POINTERS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrshaderuntypedpointers_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_SHADER_UNTYPED_POINTERS_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkkhrshaderuntypedpointers_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_KHR_SHADER_UNTYPED_POINTERS_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrsharedpresentableimage_info = {
+const ExtensionInfo VK_KHR_SHARED_PRESENTABLE_IMAGE_INFO = {
     VK_KHR_SHARED_PRESENTABLE_IMAGE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrsharedpresentableimage_deps, 2),
+    std::span<const ExtensionInfo* const>(VK_KHR_SHARED_PRESENTABLE_IMAGE_INFO_DEPS, 3),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrspirv14_info = {
+const ExtensionInfo VK_KHR_SPIRV_1_4_INFO = {
     VK_KHR_SPIRV_1_4_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrspirv14_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_SPIRV_1_4_INFO_DEPS, 1),
     VK_API_VERSION_1_2,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrstoragebufferstorageclass_info = {
+const ExtensionInfo VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_INFO = {
     VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     VK_API_VERSION_1_1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrsurface_info = {
+const ExtensionInfo VK_KHR_SURFACE_INFO = {
     VK_KHR_SURFACE_EXTENSION_NAME,
     ExtensionType::Instance,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrsurfacemaintenance1_info = {
+const ExtensionInfo VK_KHR_SURFACE_MAINTENANCE1_INFO = {
     VK_KHR_SURFACE_MAINTENANCE_1_EXTENSION_NAME,
     ExtensionType::Instance,
-    std::span<const ExtensionInfo* const>(vkkhrsurfacemaintenance1_deps, 2),
+    std::span<const ExtensionInfo* const>(VK_KHR_SURFACE_MAINTENANCE1_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrsurfaceprotectedcapabilities_info = {
+const ExtensionInfo VK_KHR_SURFACE_PROTECTED_CAPABILITIES_INFO = {
     VK_KHR_SURFACE_PROTECTED_CAPABILITIES_EXTENSION_NAME,
     ExtensionType::Instance,
-    std::span<const ExtensionInfo* const>(vkkhrsurfaceprotectedcapabilities_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_SURFACE_PROTECTED_CAPABILITIES_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrswapchain_info = {
+const ExtensionInfo VK_KHR_SWAPCHAIN_INFO = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrswapchain_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_SWAPCHAIN_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrswapchainmaintenance1_info = {
+const ExtensionInfo VK_KHR_SWAPCHAIN_MAINTENANCE1_INFO = {
     VK_KHR_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrswapchainmaintenance1_deps, 2),
+    std::span<const ExtensionInfo* const>(VK_KHR_SWAPCHAIN_MAINTENANCE1_INFO_DEPS, 3),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkkhrswapchainmaintenance1_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_KHR_SWAPCHAIN_MAINTENANCE1_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrswapchainmutableformat_info = {
+const ExtensionInfo VK_KHR_SWAPCHAIN_MUTABLE_FORMAT_INFO = {
     VK_KHR_SWAPCHAIN_MUTABLE_FORMAT_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrswapchainmutableformat_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_SWAPCHAIN_MUTABLE_FORMAT_INFO_DEPS, 3),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrsynchronization2_info = {
+const ExtensionInfo VK_KHR_SYNCHRONIZATION2_INFO = {
     VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrsynchronization2_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_SYNCHRONIZATION2_INFO_DEPS, 1),
     VK_API_VERSION_1_3,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrtimelinesemaphore_info = {
+const ExtensionInfo VK_KHR_TIMELINE_SEMAPHORE_INFO = {
     VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrtimelinesemaphore_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_TIMELINE_SEMAPHORE_INFO_DEPS, 1),
     VK_API_VERSION_1_2,
     {},
     {},
+    std::span<const vk::StructureType>(VK_KHR_TIMELINE_SEMAPHORE_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrunifiedimagelayouts_info = {
+const ExtensionInfo VK_KHR_UNIFIED_IMAGE_LAYOUTS_INFO = {
     VK_KHR_UNIFIED_IMAGE_LAYOUTS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrunifiedimagelayouts_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_UNIFIED_IMAGE_LAYOUTS_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkkhrunifiedimagelayouts_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_KHR_UNIFIED_IMAGE_LAYOUTS_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhruniformbufferstandardlayout_info = {
+const ExtensionInfo VK_KHR_UNIFORM_BUFFER_STANDARD_LAYOUT_INFO = {
     VK_KHR_UNIFORM_BUFFER_STANDARD_LAYOUT_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhruniformbufferstandardlayout_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_UNIFORM_BUFFER_STANDARD_LAYOUT_INFO_DEPS, 1),
     VK_API_VERSION_1_2,
     {},
     {},
+    std::span<const vk::StructureType>(VK_KHR_UNIFORM_BUFFER_STANDARD_LAYOUT_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrvariablepointers_info = {
+const ExtensionInfo VK_KHR_VARIABLE_POINTERS_INFO = {
     VK_KHR_VARIABLE_POINTERS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrvariablepointers_deps, 2),
+    std::span<const ExtensionInfo* const>(VK_KHR_VARIABLE_POINTERS_INFO_DEPS, 2),
     VK_API_VERSION_1_1,
     {},
     {},
+    std::span<const vk::StructureType>(VK_KHR_VARIABLE_POINTERS_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrvertexattributedivisor_info = {
+const ExtensionInfo VK_KHR_VERTEX_ATTRIBUTE_DIVISOR_INFO = {
     VK_KHR_VERTEX_ATTRIBUTE_DIVISOR_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrvertexattributedivisor_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_VERTEX_ATTRIBUTE_DIVISOR_INFO_DEPS, 1),
     VK_API_VERSION_1_4,
     {},
+    std::span<const vk::StructureType>(VK_KHR_VERTEX_ATTRIBUTE_DIVISOR_INFO_PROPERTIES, 1),
     {},
 };
-const ExtensionInfo vkkhrvideodecodeav1_info = {
+const ExtensionInfo VK_KHR_VIDEO_DECODE_AV1_INFO = {
     VK_KHR_VIDEO_DECODE_AV1_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrvideodecodeav1_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_DECODE_AV1_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrvideodecodeh264_info = {
+const ExtensionInfo VK_KHR_VIDEO_DECODE_H264_INFO = {
     VK_KHR_VIDEO_DECODE_H264_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrvideodecodeh264_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_DECODE_H264_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrvideodecodeh265_info = {
+const ExtensionInfo VK_KHR_VIDEO_DECODE_H265_INFO = {
     VK_KHR_VIDEO_DECODE_H265_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrvideodecodeh265_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_DECODE_H265_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrvideodecodequeue_info = {
+const ExtensionInfo VK_KHR_VIDEO_DECODE_QUEUE_INFO = {
     VK_KHR_VIDEO_DECODE_QUEUE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrvideodecodequeue_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_DECODE_QUEUE_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrvideodecodevp9_info = {
+const ExtensionInfo VK_KHR_VIDEO_DECODE_VP9_INFO = {
     VK_KHR_VIDEO_DECODE_VP9_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrvideodecodevp9_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_DECODE_VP9_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkkhrvideodecodevp9_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_KHR_VIDEO_DECODE_VP9_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrvideoencodeav1_info = {
+const ExtensionInfo VK_KHR_VIDEO_ENCODE_AV1_INFO = {
     VK_KHR_VIDEO_ENCODE_AV1_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrvideoencodeav1_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_ENCODE_AV1_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkkhrvideoencodeav1_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_KHR_VIDEO_ENCODE_AV1_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrvideoencodeh264_info = {
+const ExtensionInfo VK_KHR_VIDEO_ENCODE_H264_INFO = {
     VK_KHR_VIDEO_ENCODE_H264_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrvideoencodeh264_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_ENCODE_H264_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrvideoencodeh265_info = {
+const ExtensionInfo VK_KHR_VIDEO_ENCODE_H265_INFO = {
     VK_KHR_VIDEO_ENCODE_H265_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrvideoencodeh265_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_ENCODE_H265_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrvideoencodeintrarefresh_info = {
+const ExtensionInfo VK_KHR_VIDEO_ENCODE_INTRA_REFRESH_INFO = {
     VK_KHR_VIDEO_ENCODE_INTRA_REFRESH_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrvideoencodeintrarefresh_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_ENCODE_INTRA_REFRESH_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkkhrvideoencodeintrarefresh_features, 1),
+    {},
+    {},
 };
-const ExtensionInfo vkkhrvideoencodequantizationmap_info = {
+const ExtensionInfo VK_KHR_VIDEO_ENCODE_QUANTIZATION_MAP_INFO = {
     VK_KHR_VIDEO_ENCODE_QUANTIZATION_MAP_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrvideoencodequantizationmap_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_ENCODE_QUANTIZATION_MAP_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkkhrvideoencodequantizationmap_features, 1),
+    {},
+    {},
 };
-const ExtensionInfo vkkhrvideoencodequeue_info = {
+const ExtensionInfo VK_KHR_VIDEO_ENCODE_QUEUE_INFO = {
     VK_KHR_VIDEO_ENCODE_QUEUE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrvideoencodequeue_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_ENCODE_QUEUE_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrvideomaintenance1_info = {
+const ExtensionInfo VK_KHR_VIDEO_MAINTENANCE1_INFO = {
     VK_KHR_VIDEO_MAINTENANCE_1_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrvideomaintenance1_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_MAINTENANCE1_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkkhrvideomaintenance1_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_KHR_VIDEO_MAINTENANCE1_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrvideomaintenance2_info = {
+const ExtensionInfo VK_KHR_VIDEO_MAINTENANCE2_INFO = {
     VK_KHR_VIDEO_MAINTENANCE_2_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrvideomaintenance2_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_MAINTENANCE2_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkkhrvideomaintenance2_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_KHR_VIDEO_MAINTENANCE2_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrvideoqueue_info = {
+const ExtensionInfo VK_KHR_VIDEO_QUEUE_INFO = {
     VK_KHR_VIDEO_QUEUE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrvideoqueue_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_QUEUE_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkkhrvulkanmemorymodel_info = {
+const ExtensionInfo VK_KHR_VULKAN_MEMORY_MODEL_INFO = {
     VK_KHR_VULKAN_MEMORY_MODEL_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrvulkanmemorymodel_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_VULKAN_MEMORY_MODEL_INFO_DEPS, 1),
     VK_API_VERSION_1_2,
     {},
     {},
+    std::span<const vk::StructureType>(VK_KHR_VULKAN_MEMORY_MODEL_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrworkgroupmemoryexplicitlayout_info = {
+const ExtensionInfo VK_KHR_WORKGROUP_MEMORY_EXPLICIT_LAYOUT_INFO = {
     VK_KHR_WORKGROUP_MEMORY_EXPLICIT_LAYOUT_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrworkgroupmemoryexplicitlayout_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_WORKGROUP_MEMORY_EXPLICIT_LAYOUT_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkkhrworkgroupmemoryexplicitlayout_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_KHR_WORKGROUP_MEMORY_EXPLICIT_LAYOUT_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkkhrzeroinitializeworkgroupmemory_info = {
+const ExtensionInfo VK_KHR_ZERO_INITIALIZE_WORKGROUP_MEMORY_INFO = {
     VK_KHR_ZERO_INITIALIZE_WORKGROUP_MEMORY_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkkhrzeroinitializeworkgroupmemory_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_KHR_ZERO_INITIALIZE_WORKGROUP_MEMORY_INFO_DEPS, 1),
     VK_API_VERSION_1_3,
     {},
     {},
+    std::span<const vk::StructureType>(VK_KHR_ZERO_INITIALIZE_WORKGROUP_MEMORY_INFO_FEATURES, 1),
 };
-const ExtensionInfo vklunargdirectdriverloading_info = {
+const ExtensionInfo VK_LUNARG_DIRECT_DRIVER_LOADING_INFO = {
     VK_LUNARG_DIRECT_DRIVER_LOADING_EXTENSION_NAME,
     ExtensionType::Instance,
     {},
     (uint32_t)-1,
     {},
     {},
-};
-const ExtensionInfo vkmesaimagealignmentcontrol_info = {
-    VK_MESA_IMAGE_ALIGNMENT_CONTROL_EXTENSION_NAME,
-    ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkmesaimagealignmentcontrol_deps, 1),
-    (uint32_t)-1,
-    std::span<const vk::StructureType>(vkmesaimagealignmentcontrol_properties, 1),
-    std::span<const vk::StructureType>(vkmesaimagealignmentcontrol_features, 1),
-};
-const ExtensionInfo vkmsftlayereddriver_info = {
-    VK_MSFT_LAYERED_DRIVER_EXTENSION_NAME,
-    ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkmsftlayereddriver_deps, 1),
-    (uint32_t)-1,
-    std::span<const vk::StructureType>(vkmsftlayereddriver_properties, 1),
     {},
 };
-const ExtensionInfo vknvxbinaryimport_info = {
+const ExtensionInfo VK_MESA_IMAGE_ALIGNMENT_CONTROL_INFO = {
+    VK_MESA_IMAGE_ALIGNMENT_CONTROL_EXTENSION_NAME,
+    ExtensionType::Device,
+    std::span<const ExtensionInfo* const>(VK_MESA_IMAGE_ALIGNMENT_CONTROL_INFO_DEPS, 1),
+    (uint32_t)-1,
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_MESA_IMAGE_ALIGNMENT_CONTROL_INFO_FEATURES, 1),
+};
+const ExtensionInfo VK_MSFT_LAYERED_DRIVER_INFO = {
+    VK_MSFT_LAYERED_DRIVER_EXTENSION_NAME,
+    ExtensionType::Device,
+    std::span<const ExtensionInfo* const>(VK_MSFT_LAYERED_DRIVER_INFO_DEPS, 1),
+    (uint32_t)-1,
+    {},
+    std::span<const vk::StructureType>(VK_MSFT_LAYERED_DRIVER_INFO_PROPERTIES, 1),
+    {},
+};
+const ExtensionInfo VK_NVX_BINARY_IMPORT_INFO = {
     VK_NVX_BINARY_IMPORT_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vknvximageviewhandle_info = {
+const ExtensionInfo VK_NVX_IMAGE_VIEW_HANDLE_INFO = {
     VK_NVX_IMAGE_VIEW_HANDLE_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
-};
-const ExtensionInfo vknvxmultiviewperviewattributes_info = {
-    VK_NVX_MULTIVIEW_PER_VIEW_ATTRIBUTES_EXTENSION_NAME,
-    ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvxmultiviewperviewattributes_deps, 1),
-    (uint32_t)-1,
-    std::span<const vk::StructureType>(vknvxmultiviewperviewattributes_properties, 1),
     {},
 };
-const ExtensionInfo vknvclipspacewscaling_info = {
+const ExtensionInfo VK_NVX_MULTIVIEW_PER_VIEW_ATTRIBUTES_INFO = {
+    VK_NVX_MULTIVIEW_PER_VIEW_ATTRIBUTES_EXTENSION_NAME,
+    ExtensionType::Device,
+    std::span<const ExtensionInfo* const>(VK_NVX_MULTIVIEW_PER_VIEW_ATTRIBUTES_INFO_DEPS, 1),
+    (uint32_t)-1,
+    {},
+    std::span<const vk::StructureType>(VK_NVX_MULTIVIEW_PER_VIEW_ATTRIBUTES_INFO_PROPERTIES, 1),
+    {},
+};
+const ExtensionInfo VK_NV_CLIP_SPACE_W_SCALING_INFO = {
     VK_NV_CLIP_SPACE_W_SCALING_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vknvclusteraccelerationstructure_info = {
+const ExtensionInfo VK_NV_CLUSTER_ACCELERATION_STRUCTURE_INFO = {
     VK_NV_CLUSTER_ACCELERATION_STRUCTURE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvclusteraccelerationstructure_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_NV_CLUSTER_ACCELERATION_STRUCTURE_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vknvclusteraccelerationstructure_properties, 1),
-    std::span<const vk::StructureType>(vknvclusteraccelerationstructure_features, 1),
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_NV_CLUSTER_ACCELERATION_STRUCTURE_INFO_FEATURES, 1),
 };
-const ExtensionInfo vknvcommandbufferinheritance_info = {
+const ExtensionInfo VK_NV_COMMAND_BUFFER_INHERITANCE_INFO = {
     VK_NV_COMMAND_BUFFER_INHERITANCE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvcommandbufferinheritance_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_NV_COMMAND_BUFFER_INHERITANCE_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vknvcommandbufferinheritance_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_NV_COMMAND_BUFFER_INHERITANCE_INFO_FEATURES, 1),
 };
-const ExtensionInfo vknvcomputeoccupancypriority_info = {
+const ExtensionInfo VK_NV_COMPUTE_OCCUPANCY_PRIORITY_INFO = {
     VK_NV_COMPUTE_OCCUPANCY_PRIORITY_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvcomputeoccupancypriority_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_NV_COMPUTE_OCCUPANCY_PRIORITY_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vknvcomputeoccupancypriority_features, 1),
+    {},
+    {},
 };
-const ExtensionInfo vknvcomputeshaderderivatives_info = {
+const ExtensionInfo VK_NV_COMPUTE_SHADER_DERIVATIVES_INFO = {
     VK_NV_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvcomputeshaderderivatives_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_NV_COMPUTE_SHADER_DERIVATIVES_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    std::span<const vk::StructureType>(VK_NV_COMPUTE_SHADER_DERIVATIVES_INFO_FEATURES, 1),
 };
-const ExtensionInfo vknvcooperativematrix_info = {
+const ExtensionInfo VK_NV_COOPERATIVE_MATRIX_INFO = {
     VK_NV_COOPERATIVE_MATRIX_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvcooperativematrix_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_NV_COOPERATIVE_MATRIX_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vknvcooperativematrix_properties, 1),
-    std::span<const vk::StructureType>(vknvcooperativematrix_features, 1),
+    {},
+    {},
+    {},
 };
-const ExtensionInfo vknvcooperativematrix2_info = {
+const ExtensionInfo VK_NV_COOPERATIVE_MATRIX2_INFO = {
     VK_NV_COOPERATIVE_MATRIX_2_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvcooperativematrix2_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_NV_COOPERATIVE_MATRIX2_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vknvcooperativematrix2_properties, 1),
-    std::span<const vk::StructureType>(vknvcooperativematrix2_features, 1),
+    {},
+    {},
+    {},
 };
-const ExtensionInfo vknvcooperativevector_info = {
+const ExtensionInfo VK_NV_COOPERATIVE_VECTOR_INFO = {
     VK_NV_COOPERATIVE_VECTOR_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvcooperativevector_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_NV_COOPERATIVE_VECTOR_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vknvcooperativevector_properties, 1),
-    std::span<const vk::StructureType>(vknvcooperativevector_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_NV_COOPERATIVE_VECTOR_INFO_PROPERTIES, 1),
+    {},
 };
-const ExtensionInfo vknvcopymemoryindirect_info = {
+const ExtensionInfo VK_NV_COPY_MEMORY_INDIRECT_INFO = {
     VK_NV_COPY_MEMORY_INDIRECT_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvcopymemoryindirect_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_NV_COPY_MEMORY_INDIRECT_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vknvcopymemoryindirect_features, 1),
+    {},
+    {},
 };
-const ExtensionInfo vknvcornersampledimage_info = {
+const ExtensionInfo VK_NV_CORNER_SAMPLED_IMAGE_INFO = {
     VK_NV_CORNER_SAMPLED_IMAGE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvcornersampledimage_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_NV_CORNER_SAMPLED_IMAGE_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vknvcornersampledimage_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_NV_CORNER_SAMPLED_IMAGE_INFO_FEATURES, 1),
 };
-const ExtensionInfo vknvcoveragereductionmode_info = {
+const ExtensionInfo VK_NV_COVERAGE_REDUCTION_MODE_INFO = {
     VK_NV_COVERAGE_REDUCTION_MODE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvcoveragereductionmode_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_NV_COVERAGE_REDUCTION_MODE_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vknvcoveragereductionmode_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_NV_COVERAGE_REDUCTION_MODE_INFO_FEATURES, 1),
 };
-const ExtensionInfo vknvdedicatedallocation_info = {
+const ExtensionInfo VK_NV_DEDICATED_ALLOCATION_INFO = {
     VK_NV_DEDICATED_ALLOCATION_EXTENSION_NAME,
     ExtensionType::Device,
     {},
-    (uint32_t)-1,
+    VK_KHR_dedicated_allocation,
+    &VK_KHR_DEDICATED_ALLOCATION_INFO,
     {},
     {},
 };
-const ExtensionInfo vknvdedicatedallocationimagealiasing_info = {
+const ExtensionInfo VK_NV_DEDICATED_ALLOCATION_IMAGE_ALIASING_INFO = {
     VK_NV_DEDICATED_ALLOCATION_IMAGE_ALIASING_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvdedicatedallocationimagealiasing_deps, 2),
+    std::span<const ExtensionInfo* const>(VK_NV_DEDICATED_ALLOCATION_IMAGE_ALIASING_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vknvdedicatedallocationimagealiasing_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_NV_DEDICATED_ALLOCATION_IMAGE_ALIASING_INFO_FEATURES, 1),
 };
-const ExtensionInfo vknvdescriptorpooloverallocation_info = {
+const ExtensionInfo VK_NV_DESCRIPTOR_POOL_OVERALLOCATION_INFO = {
     VK_NV_DESCRIPTOR_POOL_OVERALLOCATION_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vknvdescriptorpooloverallocation_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_NV_DESCRIPTOR_POOL_OVERALLOCATION_INFO_FEATURES, 1),
 };
-const ExtensionInfo vknvdevicediagnosticcheckpoints_info = {
+const ExtensionInfo VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_INFO = {
     VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvdevicediagnosticcheckpoints_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vknvdevicediagnosticsconfig_info = {
+const ExtensionInfo VK_NV_DEVICE_DIAGNOSTICS_CONFIG_INFO = {
     VK_NV_DEVICE_DIAGNOSTICS_CONFIG_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvdevicediagnosticsconfig_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_NV_DEVICE_DIAGNOSTICS_CONFIG_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vknvdevicediagnosticsconfig_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_NV_DEVICE_DIAGNOSTICS_CONFIG_INFO_FEATURES, 1),
 };
-const ExtensionInfo vknvdevicegeneratedcommands_info = {
+const ExtensionInfo VK_NV_DEVICE_GENERATED_COMMANDS_INFO = {
     VK_NV_DEVICE_GENERATED_COMMANDS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvdevicegeneratedcommands_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_NV_DEVICE_GENERATED_COMMANDS_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vknvdevicegeneratedcommands_properties, 1),
-    std::span<const vk::StructureType>(vknvdevicegeneratedcommands_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_NV_DEVICE_GENERATED_COMMANDS_INFO_PROPERTIES, 1),
+    {},
 };
-const ExtensionInfo vknvdevicegeneratedcommandscompute_info = {
+const ExtensionInfo VK_NV_DEVICE_GENERATED_COMMANDS_COMPUTE_INFO = {
     VK_NV_DEVICE_GENERATED_COMMANDS_COMPUTE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvdevicegeneratedcommandscompute_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_NV_DEVICE_GENERATED_COMMANDS_COMPUTE_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vknvdevicegeneratedcommandscompute_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_NV_DEVICE_GENERATED_COMMANDS_COMPUTE_INFO_FEATURES, 1),
 };
-const ExtensionInfo vknvdisplaystereo_info = {
+const ExtensionInfo VK_NV_DISPLAY_STEREO_INFO = {
     VK_NV_DISPLAY_STEREO_EXTENSION_NAME,
     ExtensionType::Instance,
-    std::span<const ExtensionInfo* const>(vknvdisplaystereo_deps, 2),
+    std::span<const ExtensionInfo* const>(VK_NV_DISPLAY_STEREO_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vknvextendedsparseaddressspace_info = {
+const ExtensionInfo VK_NV_EXTENDED_SPARSE_ADDRESS_SPACE_INFO = {
     VK_NV_EXTENDED_SPARSE_ADDRESS_SPACE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvextendedsparseaddressspace_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_NV_EXTENDED_SPARSE_ADDRESS_SPACE_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vknvextendedsparseaddressspace_properties, 1),
-    std::span<const vk::StructureType>(vknvextendedsparseaddressspace_features, 1),
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_NV_EXTENDED_SPARSE_ADDRESS_SPACE_INFO_FEATURES, 1),
 };
-const ExtensionInfo vknvexternalcomputequeue_info = {
+const ExtensionInfo VK_NV_EXTERNAL_COMPUTE_QUEUE_INFO = {
     VK_NV_EXTERNAL_COMPUTE_QUEUE_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vknvexternalcomputequeue_properties, 1),
+    {},
+    {},
     {},
 };
-const ExtensionInfo vknvexternalmemory_info = {
+const ExtensionInfo VK_NV_EXTERNAL_MEMORY_INFO = {
     VK_NV_EXTERNAL_MEMORY_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvexternalmemory_deps, 1),
-    (uint32_t)-1,
+    std::span<const ExtensionInfo* const>(VK_NV_EXTERNAL_MEMORY_INFO_DEPS, 1),
+    VK_KHR_external_memory,
+    &VK_KHR_EXTERNAL_MEMORY_INFO,
     {},
     {},
 };
-const ExtensionInfo vknvexternalmemorycapabilities_info = {
+const ExtensionInfo VK_NV_EXTERNAL_MEMORY_CAPABILITIES_INFO = {
     VK_NV_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME,
     ExtensionType::Instance,
     {},
-    (uint32_t)-1,
+    VK_KHR_external_memory_capabilities,
+    &VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_INFO,
     {},
     {},
 };
-const ExtensionInfo vknvexternalmemoryrdma_info = {
+const ExtensionInfo VK_NV_EXTERNAL_MEMORY_RDMA_INFO = {
     VK_NV_EXTERNAL_MEMORY_RDMA_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvexternalmemoryrdma_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_NV_EXTERNAL_MEMORY_RDMA_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vknvexternalmemoryrdma_features, 1),
+    {},
+    {},
 };
-const ExtensionInfo vknvfillrectangle_info = {
+const ExtensionInfo VK_NV_FILL_RECTANGLE_INFO = {
     VK_NV_FILL_RECTANGLE_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vknvfragmentcoveragetocolor_info = {
+const ExtensionInfo VK_NV_FRAGMENT_COVERAGE_TO_COLOR_INFO = {
     VK_NV_FRAGMENT_COVERAGE_TO_COLOR_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vknvfragmentshaderbarycentric_info = {
+const ExtensionInfo VK_NV_FRAGMENT_SHADER_BARYCENTRIC_INFO = {
     VK_NV_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvfragmentshaderbarycentric_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_NV_FRAGMENT_SHADER_BARYCENTRIC_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    std::span<const vk::StructureType>(VK_NV_FRAGMENT_SHADER_BARYCENTRIC_INFO_FEATURES, 1),
 };
-const ExtensionInfo vknvfragmentshadingrateenums_info = {
+const ExtensionInfo VK_NV_FRAGMENT_SHADING_RATE_ENUMS_INFO = {
     VK_NV_FRAGMENT_SHADING_RATE_ENUMS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvfragmentshadingrateenums_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_NV_FRAGMENT_SHADING_RATE_ENUMS_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vknvfragmentshadingrateenums_properties, 1),
-    std::span<const vk::StructureType>(vknvfragmentshadingrateenums_features, 1),
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_NV_FRAGMENT_SHADING_RATE_ENUMS_INFO_FEATURES, 1),
 };
-const ExtensionInfo vknvframebuffermixedsamples_info = {
+const ExtensionInfo VK_NV_FRAMEBUFFER_MIXED_SAMPLES_INFO = {
     VK_NV_FRAMEBUFFER_MIXED_SAMPLES_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vknvgeometryshaderpassthrough_info = {
+const ExtensionInfo VK_NV_GEOMETRY_SHADER_PASSTHROUGH_INFO = {
     VK_NV_GEOMETRY_SHADER_PASSTHROUGH_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vknvglslshader_info = {
+const ExtensionInfo VK_NV_GLSL_SHADER_INFO = {
     VK_NV_GLSL_SHADER_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vknvinheritedviewportscissor_info = {
+const ExtensionInfo VK_NV_INHERITED_VIEWPORT_SCISSOR_INFO = {
     VK_NV_INHERITED_VIEWPORT_SCISSOR_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvinheritedviewportscissor_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_NV_INHERITED_VIEWPORT_SCISSOR_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vknvinheritedviewportscissor_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_NV_INHERITED_VIEWPORT_SCISSOR_INFO_FEATURES, 1),
 };
-const ExtensionInfo vknvlinearcolorattachment_info = {
+const ExtensionInfo VK_NV_LINEAR_COLOR_ATTACHMENT_INFO = {
     VK_NV_LINEAR_COLOR_ATTACHMENT_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvlinearcolorattachment_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_NV_LINEAR_COLOR_ATTACHMENT_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vknvlinearcolorattachment_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_NV_LINEAR_COLOR_ATTACHMENT_INFO_FEATURES, 1),
 };
-const ExtensionInfo vknvlowlatency_info = {
+const ExtensionInfo VK_NV_LOW_LATENCY_INFO = {
     VK_NV_LOW_LATENCY_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vknvlowlatency2_info = {
+const ExtensionInfo VK_NV_LOW_LATENCY2_INFO = {
     VK_NV_LOW_LATENCY_2_EXTENSION_NAME,
     ExtensionType::Device,
-    {},
+    std::span<const ExtensionInfo* const>(VK_NV_LOW_LATENCY2_INFO_DEPS, 3),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vknvmemorydecompression_info = {
+const ExtensionInfo VK_NV_MEMORY_DECOMPRESSION_INFO = {
     VK_NV_MEMORY_DECOMPRESSION_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvmemorydecompression_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_NV_MEMORY_DECOMPRESSION_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vknvmeshshader_info = {
+const ExtensionInfo VK_NV_MESH_SHADER_INFO = {
     VK_NV_MESH_SHADER_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvmeshshader_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_NV_MESH_SHADER_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vknvmeshshader_properties, 1),
-    std::span<const vk::StructureType>(vknvmeshshader_features, 1),
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_NV_MESH_SHADER_INFO_FEATURES, 1),
 };
-const ExtensionInfo vknvopticalflow_info = {
+const ExtensionInfo VK_NV_OPTICAL_FLOW_INFO = {
     VK_NV_OPTICAL_FLOW_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvopticalflow_deps, 2),
+    std::span<const ExtensionInfo* const>(VK_NV_OPTICAL_FLOW_INFO_DEPS, 3),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vknvopticalflow_properties, 1),
-    std::span<const vk::StructureType>(vknvopticalflow_features, 1),
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_NV_OPTICAL_FLOW_INFO_FEATURES, 1),
 };
-const ExtensionInfo vknvpartitionedaccelerationstructure_info = {
+const ExtensionInfo VK_NV_PARTITIONED_ACCELERATION_STRUCTURE_INFO = {
     VK_NV_PARTITIONED_ACCELERATION_STRUCTURE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvpartitionedaccelerationstructure_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_NV_PARTITIONED_ACCELERATION_STRUCTURE_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vknvpartitionedaccelerationstructure_properties, 1),
-    std::span<const vk::StructureType>(vknvpartitionedaccelerationstructure_features, 1),
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_NV_PARTITIONED_ACCELERATION_STRUCTURE_INFO_FEATURES, 1),
 };
-const ExtensionInfo vknvperstagedescriptorset_info = {
+const ExtensionInfo VK_NV_PER_STAGE_DESCRIPTOR_SET_INFO = {
     VK_NV_PER_STAGE_DESCRIPTOR_SET_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvperstagedescriptorset_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_NV_PER_STAGE_DESCRIPTOR_SET_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vknvperstagedescriptorset_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_NV_PER_STAGE_DESCRIPTOR_SET_INFO_FEATURES, 1),
 };
-const ExtensionInfo vknvpresentbarrier_info = {
+const ExtensionInfo VK_NV_PRESENT_BARRIER_INFO = {
     VK_NV_PRESENT_BARRIER_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvpresentbarrier_deps, 3),
+    std::span<const ExtensionInfo* const>(VK_NV_PRESENT_BARRIER_INFO_DEPS, 4),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vknvpresentbarrier_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_NV_PRESENT_BARRIER_INFO_FEATURES, 1),
 };
-const ExtensionInfo vknvpushconstantbank_info = {
+const ExtensionInfo VK_NV_PUSH_CONSTANT_BANK_INFO = {
     VK_NV_PUSH_CONSTANT_BANK_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vknvpushconstantbank_properties, 1),
-    std::span<const vk::StructureType>(vknvpushconstantbank_features, 1),
+    {},
+    {},
+    {},
 };
-const ExtensionInfo vknvrawaccesschains_info = {
+const ExtensionInfo VK_NV_RAW_ACCESS_CHAINS_INFO = {
     VK_NV_RAW_ACCESS_CHAINS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvrawaccesschains_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_NV_RAW_ACCESS_CHAINS_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vknvrawaccesschains_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_NV_RAW_ACCESS_CHAINS_INFO_FEATURES, 1),
 };
-const ExtensionInfo vknvraytracing_info = {
+const ExtensionInfo VK_NV_RAY_TRACING_INFO = {
     VK_NV_RAY_TRACING_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvraytracing_deps, 2),
-    (uint32_t)-1,
-    std::span<const vk::StructureType>(vknvraytracing_properties, 1),
+    std::span<const ExtensionInfo* const>(VK_NV_RAY_TRACING_INFO_DEPS, 2),
+    VK_KHR_ray_tracing_pipeline,
+    &VK_KHR_RAY_TRACING_PIPELINE_INFO,
+    {},
     {},
 };
-const ExtensionInfo vknvraytracinginvocationreorder_info = {
+const ExtensionInfo VK_NV_RAY_TRACING_INVOCATION_REORDER_INFO = {
     VK_NV_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvraytracinginvocationreorder_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_NV_RAY_TRACING_INVOCATION_REORDER_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vknvraytracinginvocationreorder_properties, 1),
-    std::span<const vk::StructureType>(vknvraytracinginvocationreorder_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_NV_RAY_TRACING_INVOCATION_REORDER_INFO_PROPERTIES, 1),
+    {},
 };
-const ExtensionInfo vknvraytracinglinearsweptspheres_info = {
+const ExtensionInfo VK_NV_RAY_TRACING_LINEAR_SWEPT_SPHERES_INFO = {
     VK_NV_RAY_TRACING_LINEAR_SWEPT_SPHERES_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvraytracinglinearsweptspheres_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_NV_RAY_TRACING_LINEAR_SWEPT_SPHERES_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vknvraytracinglinearsweptspheres_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_NV_RAY_TRACING_LINEAR_SWEPT_SPHERES_INFO_FEATURES, 1),
 };
-const ExtensionInfo vknvraytracingmotionblur_info = {
+const ExtensionInfo VK_NV_RAY_TRACING_MOTION_BLUR_INFO = {
     VK_NV_RAY_TRACING_MOTION_BLUR_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvraytracingmotionblur_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_NV_RAY_TRACING_MOTION_BLUR_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vknvraytracingmotionblur_features, 1),
+    {},
+    {},
 };
-const ExtensionInfo vknvraytracingvalidation_info = {
+const ExtensionInfo VK_NV_RAY_TRACING_VALIDATION_INFO = {
     VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvraytracingvalidation_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_NV_RAY_TRACING_VALIDATION_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vknvraytracingvalidation_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_NV_RAY_TRACING_VALIDATION_INFO_FEATURES, 1),
 };
-const ExtensionInfo vknvrepresentativefragmenttest_info = {
+const ExtensionInfo VK_NV_REPRESENTATIVE_FRAGMENT_TEST_INFO = {
     VK_NV_REPRESENTATIVE_FRAGMENT_TEST_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvrepresentativefragmenttest_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_NV_REPRESENTATIVE_FRAGMENT_TEST_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vknvrepresentativefragmenttest_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_NV_REPRESENTATIVE_FRAGMENT_TEST_INFO_FEATURES, 1),
 };
-const ExtensionInfo vknvsamplemaskoverridecoverage_info = {
+const ExtensionInfo VK_NV_SAMPLE_MASK_OVERRIDE_COVERAGE_INFO = {
     VK_NV_SAMPLE_MASK_OVERRIDE_COVERAGE_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vknvscissorexclusive_info = {
+const ExtensionInfo VK_NV_SCISSOR_EXCLUSIVE_INFO = {
     VK_NV_SCISSOR_EXCLUSIVE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvscissorexclusive_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_NV_SCISSOR_EXCLUSIVE_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vknvscissorexclusive_features, 1),
+    {},
+    {},
 };
-const ExtensionInfo vknvshaderatomicfloat16vector_info = {
+const ExtensionInfo VK_NV_SHADER_ATOMIC_FLOAT16_VECTOR_INFO = {
     VK_NV_SHADER_ATOMIC_FLOAT16_VECTOR_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvshaderatomicfloat16vector_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_NV_SHADER_ATOMIC_FLOAT16_VECTOR_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vknvshaderatomicfloat16vector_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_NV_SHADER_ATOMIC_FLOAT16_VECTOR_INFO_FEATURES, 1),
 };
-const ExtensionInfo vknvshaderimagefootprint_info = {
+const ExtensionInfo VK_NV_SHADER_IMAGE_FOOTPRINT_INFO = {
     VK_NV_SHADER_IMAGE_FOOTPRINT_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvshaderimagefootprint_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_NV_SHADER_IMAGE_FOOTPRINT_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vknvshaderimagefootprint_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_NV_SHADER_IMAGE_FOOTPRINT_INFO_FEATURES, 1),
 };
-const ExtensionInfo vknvshadersmbuiltins_info = {
+const ExtensionInfo VK_NV_SHADER_SM_BUILTINS_INFO = {
     VK_NV_SHADER_SM_BUILTINS_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vknvshadersmbuiltins_properties, 1),
-    std::span<const vk::StructureType>(vknvshadersmbuiltins_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_NV_SHADER_SM_BUILTINS_INFO_PROPERTIES, 1),
+    {},
 };
-const ExtensionInfo vknvshadersubgrouppartitioned_info = {
+const ExtensionInfo VK_NV_SHADER_SUBGROUP_PARTITIONED_INFO = {
     VK_NV_SHADER_SUBGROUP_PARTITIONED_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vknvshadingrateimage_info = {
+const ExtensionInfo VK_NV_SHADING_RATE_IMAGE_INFO = {
     VK_NV_SHADING_RATE_IMAGE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vknvshadingrateimage_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_NV_SHADING_RATE_IMAGE_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vknvshadingrateimage_properties, 1),
-    std::span<const vk::StructureType>(vknvshadingrateimage_features, 1),
+    {},
+    {},
+    {},
 };
-const ExtensionInfo vknvviewportarray2_info = {
+const ExtensionInfo VK_NV_VIEWPORT_ARRAY2_INFO = {
     VK_NV_VIEWPORT_ARRAY_2_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vknvviewportswizzle_info = {
+const ExtensionInfo VK_NV_VIEWPORT_SWIZZLE_INFO = {
     VK_NV_VIEWPORT_SWIZZLE_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkqcomcooperativematrixconversion_info = {
+const ExtensionInfo VK_QCOM_COOPERATIVE_MATRIX_CONVERSION_INFO = {
     VK_QCOM_COOPERATIVE_MATRIX_CONVERSION_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkqcomcooperativematrixconversion_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_QCOM_COOPERATIVE_MATRIX_CONVERSION_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkqcomcooperativematrixconversion_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_QCOM_COOPERATIVE_MATRIX_CONVERSION_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkqcomdatagraphmodel_info = {
+const ExtensionInfo VK_QCOM_DATA_GRAPH_MODEL_INFO = {
     VK_QCOM_DATA_GRAPH_MODEL_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkqcomdatagraphmodel_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_QCOM_DATA_GRAPH_MODEL_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkqcomdatagraphmodel_features, 1),
+    {},
+    {},
 };
-const ExtensionInfo vkqcomfiltercubicclamp_info = {
+const ExtensionInfo VK_QCOM_FILTER_CUBIC_CLAMP_INFO = {
     VK_QCOM_FILTER_CUBIC_CLAMP_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkqcomfiltercubicclamp_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_QCOM_FILTER_CUBIC_CLAMP_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkqcomfiltercubicclamp_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_QCOM_FILTER_CUBIC_CLAMP_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkqcomfiltercubicweights_info = {
+const ExtensionInfo VK_QCOM_FILTER_CUBIC_WEIGHTS_INFO = {
     VK_QCOM_FILTER_CUBIC_WEIGHTS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkqcomfiltercubicweights_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_QCOM_FILTER_CUBIC_WEIGHTS_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkqcomfiltercubicweights_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_QCOM_FILTER_CUBIC_WEIGHTS_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkqcomfragmentdensitymapoffset_info = {
+const ExtensionInfo VK_QCOM_FRAGMENT_DENSITY_MAP_OFFSET_INFO = {
     VK_QCOM_FRAGMENT_DENSITY_MAP_OFFSET_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkqcomfragmentdensitymapoffset_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_QCOM_FRAGMENT_DENSITY_MAP_OFFSET_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
+    std::span<const vk::StructureType>(VK_QCOM_FRAGMENT_DENSITY_MAP_OFFSET_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkqcomimageprocessing_info = {
+const ExtensionInfo VK_QCOM_IMAGE_PROCESSING_INFO = {
     VK_QCOM_IMAGE_PROCESSING_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkqcomimageprocessing_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_QCOM_IMAGE_PROCESSING_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkqcomimageprocessing_properties, 1),
-    std::span<const vk::StructureType>(vkqcomimageprocessing_features, 1),
+    {},
+    {},
+    {},
 };
-const ExtensionInfo vkqcomimageprocessing2_info = {
+const ExtensionInfo VK_QCOM_IMAGE_PROCESSING2_INFO = {
     VK_QCOM_IMAGE_PROCESSING_2_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkqcomimageprocessing2_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_QCOM_IMAGE_PROCESSING2_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkqcomimageprocessing2_properties, 1),
-    std::span<const vk::StructureType>(vkqcomimageprocessing2_features, 1),
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_QCOM_IMAGE_PROCESSING2_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkqcommultiviewperviewrenderareas_info = {
+const ExtensionInfo VK_QCOM_MULTIVIEW_PER_VIEW_RENDER_AREAS_INFO = {
     VK_QCOM_MULTIVIEW_PER_VIEW_RENDER_AREAS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkqcommultiviewperviewrenderareas_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_QCOM_MULTIVIEW_PER_VIEW_RENDER_AREAS_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkqcommultiviewperviewrenderareas_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_QCOM_MULTIVIEW_PER_VIEW_RENDER_AREAS_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkqcommultiviewperviewviewports_info = {
+const ExtensionInfo VK_QCOM_MULTIVIEW_PER_VIEW_VIEWPORTS_INFO = {
     VK_QCOM_MULTIVIEW_PER_VIEW_VIEWPORTS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkqcommultiviewperviewviewports_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_QCOM_MULTIVIEW_PER_VIEW_VIEWPORTS_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkqcommultiviewperviewviewports_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_QCOM_MULTIVIEW_PER_VIEW_VIEWPORTS_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkqcomrenderpassshaderresolve_info = {
+const ExtensionInfo VK_QCOM_RENDER_PASS_SHADER_RESOLVE_INFO = {
     VK_QCOM_RENDER_PASS_SHADER_RESOLVE_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkqcomrenderpassstoreops_info = {
+const ExtensionInfo VK_QCOM_RENDER_PASS_STORE_OPS_INFO = {
     VK_QCOM_RENDER_PASS_STORE_OPS_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkqcomrenderpasstransform_info = {
+const ExtensionInfo VK_QCOM_RENDER_PASS_TRANSFORM_INFO = {
     VK_QCOM_RENDER_PASS_TRANSFORM_EXTENSION_NAME,
     ExtensionType::Device,
     {},
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkqcomrotatedcopycommands_info = {
+const ExtensionInfo VK_QCOM_ROTATED_COPY_COMMANDS_INFO = {
     VK_QCOM_ROTATED_COPY_COMMANDS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkqcomrotatedcopycommands_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_QCOM_ROTATED_COPY_COMMANDS_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    {},
 };
-const ExtensionInfo vkqcomtilememoryheap_info = {
+const ExtensionInfo VK_QCOM_TILE_MEMORY_HEAP_INFO = {
     VK_QCOM_TILE_MEMORY_HEAP_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkqcomtilememoryheap_deps, 2),
+    std::span<const ExtensionInfo* const>(VK_QCOM_TILE_MEMORY_HEAP_INFO_DEPS, 2),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkqcomtilememoryheap_properties, 1),
-    std::span<const vk::StructureType>(vkqcomtilememoryheap_features, 1),
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_QCOM_TILE_MEMORY_HEAP_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkqcomtileproperties_info = {
+const ExtensionInfo VK_QCOM_TILE_PROPERTIES_INFO = {
     VK_QCOM_TILE_PROPERTIES_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkqcomtileproperties_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_QCOM_TILE_PROPERTIES_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkqcomtileproperties_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_QCOM_TILE_PROPERTIES_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkqcomtileshading_info = {
+const ExtensionInfo VK_QCOM_TILE_SHADING_INFO = {
     VK_QCOM_TILE_SHADING_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkqcomtileshading_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_QCOM_TILE_SHADING_INFO_DEPS, 1),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkqcomtileshading_properties, 1),
-    std::span<const vk::StructureType>(vkqcomtileshading_features, 1),
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_QCOM_TILE_SHADING_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkqcomycbcrdegamma_info = {
+const ExtensionInfo VK_QCOM_YCBCR_DEGAMMA_INFO = {
     VK_QCOM_YCBCR_DEGAMMA_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkqcomycbcrdegamma_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_QCOM_YCBCR_DEGAMMA_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkqcomycbcrdegamma_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_QCOM_YCBCR_DEGAMMA_INFO_FEATURES, 1),
 };
-const ExtensionInfo vksecamigoprofiling_info = {
+const ExtensionInfo VK_SEC_AMIGO_PROFILING_INFO = {
     VK_SEC_AMIGO_PROFILING_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vksecamigoprofiling_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_SEC_AMIGO_PROFILING_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vksecamigoprofiling_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_SEC_AMIGO_PROFILING_INFO_FEATURES, 1),
 };
-const ExtensionInfo vksecpipelinecacheincrementalmode_info = {
+const ExtensionInfo VK_SEC_PIPELINE_CACHE_INCREMENTAL_MODE_INFO = {
     VK_SEC_PIPELINE_CACHE_INCREMENTAL_MODE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vksecpipelinecacheincrementalmode_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_SEC_PIPELINE_CACHE_INCREMENTAL_MODE_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vksecpipelinecacheincrementalmode_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_SEC_PIPELINE_CACHE_INCREMENTAL_MODE_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkvalvedescriptorsethostmapping_info = {
+const ExtensionInfo VK_VALVE_DESCRIPTOR_SET_HOST_MAPPING_INFO = {
     VK_VALVE_DESCRIPTOR_SET_HOST_MAPPING_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkvalvedescriptorsethostmapping_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_VALVE_DESCRIPTOR_SET_HOST_MAPPING_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkvalvedescriptorsethostmapping_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_VALVE_DESCRIPTOR_SET_HOST_MAPPING_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkvalvefragmentdensitymaplayered_info = {
+const ExtensionInfo VK_VALVE_FRAGMENT_DENSITY_MAP_LAYERED_INFO = {
     VK_VALVE_FRAGMENT_DENSITY_MAP_LAYERED_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkvalvefragmentdensitymaplayered_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_VALVE_FRAGMENT_DENSITY_MAP_LAYERED_INFO_DEPS, 2),
     (uint32_t)-1,
-    std::span<const vk::StructureType>(vkvalvefragmentdensitymaplayered_properties, 1),
-    std::span<const vk::StructureType>(vkvalvefragmentdensitymaplayered_features, 1),
+    {},
+    {},
+    std::span<const vk::StructureType>(VK_VALVE_FRAGMENT_DENSITY_MAP_LAYERED_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkvalvemutabledescriptortype_info = {
+const ExtensionInfo VK_VALVE_MUTABLE_DESCRIPTOR_TYPE_INFO = {
     VK_VALVE_MUTABLE_DESCRIPTOR_TYPE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkvalvemutabledescriptortype_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_VALVE_MUTABLE_DESCRIPTOR_TYPE_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
+    std::span<const vk::StructureType>(VK_VALVE_MUTABLE_DESCRIPTOR_TYPE_INFO_FEATURES, 1),
 };
-const ExtensionInfo vkvalvevideoencodergbconversion_info = {
+const ExtensionInfo VK_VALVE_VIDEO_ENCODE_RGB_CONVERSION_INFO = {
     VK_VALVE_VIDEO_ENCODE_RGB_CONVERSION_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(vkvalvevideoencodergbconversion_deps, 1),
+    std::span<const ExtensionInfo* const>(VK_VALVE_VIDEO_ENCODE_RGB_CONVERSION_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
-    std::span<const vk::StructureType>(vkvalvevideoencodergbconversion_features, 1),
+    {},
+    std::span<const vk::StructureType>(VK_VALVE_VIDEO_ENCODE_RGB_CONVERSION_INFO_FEATURES, 1),
 };
 
 const ExtensionInfo* get_extension_info(const char* name) {
     if (std::strcmp(name, VK_AMD_ANTI_LAG_EXTENSION_NAME) == 0) {
-        return &vkamdantilag_info;
+        return &VK_AMD_ANTI_LAG_INFO;
     }
     if (std::strcmp(name, VK_AMD_BUFFER_MARKER_EXTENSION_NAME) == 0) {
-        return &vkamdbuffermarker_info;
+        return &VK_AMD_BUFFER_MARKER_INFO;
     }
     if (std::strcmp(name, VK_AMD_DEVICE_COHERENT_MEMORY_EXTENSION_NAME) == 0) {
-        return &vkamddevicecoherentmemory_info;
+        return &VK_AMD_DEVICE_COHERENT_MEMORY_INFO;
     }
     if (std::strcmp(name, VK_AMD_DISPLAY_NATIVE_HDR_EXTENSION_NAME) == 0) {
-        return &vkamddisplaynativehdr_info;
+        return &VK_AMD_DISPLAY_NATIVE_HDR_INFO;
     }
     if (std::strcmp(name, VK_AMD_DRAW_INDIRECT_COUNT_EXTENSION_NAME) == 0) {
-        return &vkamddrawindirectcount_info;
+        return &VK_AMD_DRAW_INDIRECT_COUNT_INFO;
     }
     if (std::strcmp(name, VK_AMD_GCN_SHADER_EXTENSION_NAME) == 0) {
-        return &vkamdgcnshader_info;
+        return &VK_AMD_GCN_SHADER_INFO;
     }
     if (std::strcmp(name, VK_AMD_GPU_SHADER_HALF_FLOAT_EXTENSION_NAME) == 0) {
-        return &vkamdgpushaderhalffloat_info;
+        return &VK_AMD_GPU_SHADER_HALF_FLOAT_INFO;
     }
     if (std::strcmp(name, VK_AMD_GPU_SHADER_INT16_EXTENSION_NAME) == 0) {
-        return &vkamdgpushaderint16_info;
+        return &VK_AMD_GPU_SHADER_INT16_INFO;
     }
     if (std::strcmp(name, VK_AMD_MEMORY_OVERALLOCATION_BEHAVIOR_EXTENSION_NAME) == 0) {
-        return &vkamdmemoryoverallocationbehavior_info;
+        return &VK_AMD_MEMORY_OVERALLOCATION_BEHAVIOR_INFO;
     }
     if (std::strcmp(name, VK_AMD_MIXED_ATTACHMENT_SAMPLES_EXTENSION_NAME) == 0) {
-        return &vkamdmixedattachmentsamples_info;
+        return &VK_AMD_MIXED_ATTACHMENT_SAMPLES_INFO;
     }
     if (std::strcmp(name, VK_AMD_NEGATIVE_VIEWPORT_HEIGHT_EXTENSION_NAME) == 0) {
-        return &vkamdnegativeviewportheight_info;
+        return &VK_AMD_NEGATIVE_VIEWPORT_HEIGHT_INFO;
     }
     if (std::strcmp(name, VK_AMD_PIPELINE_COMPILER_CONTROL_EXTENSION_NAME) == 0) {
-        return &vkamdpipelinecompilercontrol_info;
+        return &VK_AMD_PIPELINE_COMPILER_CONTROL_INFO;
     }
     if (std::strcmp(name, VK_AMD_RASTERIZATION_ORDER_EXTENSION_NAME) == 0) {
-        return &vkamdrasterizationorder_info;
+        return &VK_AMD_RASTERIZATION_ORDER_INFO;
     }
     if (std::strcmp(name, VK_AMD_SHADER_BALLOT_EXTENSION_NAME) == 0) {
-        return &vkamdshaderballot_info;
+        return &VK_AMD_SHADER_BALLOT_INFO;
     }
     if (std::strcmp(name, VK_AMD_SHADER_CORE_PROPERTIES_EXTENSION_NAME) == 0) {
-        return &vkamdshadercoreproperties_info;
+        return &VK_AMD_SHADER_CORE_PROPERTIES_INFO;
     }
     if (std::strcmp(name, VK_AMD_SHADER_CORE_PROPERTIES_2_EXTENSION_NAME) == 0) {
-        return &vkamdshadercoreproperties2_info;
+        return &VK_AMD_SHADER_CORE_PROPERTIES2_INFO;
     }
     if (std::strcmp(name, VK_AMD_SHADER_EARLY_AND_LATE_FRAGMENT_TESTS_EXTENSION_NAME) == 0) {
-        return &vkamdshaderearlyandlatefragmenttests_info;
+        return &VK_AMD_SHADER_EARLY_AND_LATE_FRAGMENT_TESTS_INFO;
     }
     if (std::strcmp(name, VK_AMD_SHADER_EXPLICIT_VERTEX_PARAMETER_EXTENSION_NAME) == 0) {
-        return &vkamdshaderexplicitvertexparameter_info;
+        return &VK_AMD_SHADER_EXPLICIT_VERTEX_PARAMETER_INFO;
     }
     if (std::strcmp(name, VK_AMD_SHADER_FRAGMENT_MASK_EXTENSION_NAME) == 0) {
-        return &vkamdshaderfragmentmask_info;
+        return &VK_AMD_SHADER_FRAGMENT_MASK_INFO;
     }
     if (std::strcmp(name, VK_AMD_SHADER_IMAGE_LOAD_STORE_LOD_EXTENSION_NAME) == 0) {
-        return &vkamdshaderimageloadstorelod_info;
+        return &VK_AMD_SHADER_IMAGE_LOAD_STORE_LOD_INFO;
     }
     if (std::strcmp(name, VK_AMD_SHADER_INFO_EXTENSION_NAME) == 0) {
-        return &vkamdshaderinfo_info;
+        return &VK_AMD_SHADER_INFO_INFO;
     }
     if (std::strcmp(name, VK_AMD_SHADER_TRINARY_MINMAX_EXTENSION_NAME) == 0) {
-        return &vkamdshadertrinaryminmax_info;
+        return &VK_AMD_SHADER_TRINARY_MINMAX_INFO;
     }
     if (std::strcmp(name, VK_AMD_TEXTURE_GATHER_BIAS_LOD_EXTENSION_NAME) == 0) {
-        return &vkamdtexturegatherbiaslod_info;
+        return &VK_AMD_TEXTURE_GATHER_BIAS_LOD_INFO;
     }
     if (std::strcmp(name, VK_ARM_DATA_GRAPH_EXTENSION_NAME) == 0) {
-        return &vkarmdatagraph_info;
+        return &VK_ARM_DATA_GRAPH_INFO;
     }
     if (std::strcmp(name, VK_ARM_FORMAT_PACK_EXTENSION_NAME) == 0) {
-        return &vkarmformatpack_info;
+        return &VK_ARM_FORMAT_PACK_INFO;
     }
     if (std::strcmp(name, VK_ARM_PERFORMANCE_COUNTERS_BY_REGION_EXTENSION_NAME) == 0) {
-        return &vkarmperformancecountersbyregion_info;
+        return &VK_ARM_PERFORMANCE_COUNTERS_BY_REGION_INFO;
     }
     if (std::strcmp(name, VK_ARM_PIPELINE_OPACITY_MICROMAP_EXTENSION_NAME) == 0) {
-        return &vkarmpipelineopacitymicromap_info;
+        return &VK_ARM_PIPELINE_OPACITY_MICROMAP_INFO;
     }
     if (std::strcmp(name, VK_ARM_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_EXTENSION_NAME) == 0) {
-        return &vkarmrasterizationorderattachmentaccess_info;
+        return &VK_ARM_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_INFO;
     }
     if (std::strcmp(name, VK_ARM_RENDER_PASS_STRIPED_EXTENSION_NAME) == 0) {
-        return &vkarmrenderpassstriped_info;
+        return &VK_ARM_RENDER_PASS_STRIPED_INFO;
     }
     if (std::strcmp(name, VK_ARM_SCHEDULING_CONTROLS_EXTENSION_NAME) == 0) {
-        return &vkarmschedulingcontrols_info;
+        return &VK_ARM_SCHEDULING_CONTROLS_INFO;
     }
     if (std::strcmp(name, VK_ARM_SHADER_CORE_BUILTINS_EXTENSION_NAME) == 0) {
-        return &vkarmshadercorebuiltins_info;
+        return &VK_ARM_SHADER_CORE_BUILTINS_INFO;
     }
     if (std::strcmp(name, VK_ARM_SHADER_CORE_PROPERTIES_EXTENSION_NAME) == 0) {
-        return &vkarmshadercoreproperties_info;
+        return &VK_ARM_SHADER_CORE_PROPERTIES_INFO;
     }
     if (std::strcmp(name, VK_ARM_TENSORS_EXTENSION_NAME) == 0) {
-        return &vkarmtensors_info;
+        return &VK_ARM_TENSORS_INFO;
     }
     if (std::strcmp(name, VK_EXT_4444_FORMATS_EXTENSION_NAME) == 0) {
-        return &vkext4444formats_info;
+        return &VK_EXT_4444_FORMATS_INFO;
     }
     if (std::strcmp(name, VK_EXT_ACQUIRE_DRM_DISPLAY_EXTENSION_NAME) == 0) {
-        return &vkextacquiredrmdisplay_info;
+        return &VK_EXT_ACQUIRE_DRM_DISPLAY_INFO;
     }
     if (std::strcmp(name, VK_EXT_ASTC_DECODE_MODE_EXTENSION_NAME) == 0) {
-        return &vkextastcdecodemode_info;
+        return &VK_EXT_ASTC_DECODE_MODE_INFO;
     }
     if (std::strcmp(name, VK_EXT_ATTACHMENT_FEEDBACK_LOOP_DYNAMIC_STATE_EXTENSION_NAME) == 0) {
-        return &vkextattachmentfeedbackloopdynamicstate_info;
+        return &VK_EXT_ATTACHMENT_FEEDBACK_LOOP_DYNAMIC_STATE_INFO;
     }
     if (std::strcmp(name, VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_EXTENSION_NAME) == 0) {
-        return &vkextattachmentfeedbacklooplayout_info;
+        return &VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_INFO;
     }
     if (std::strcmp(name, VK_EXT_BLEND_OPERATION_ADVANCED_EXTENSION_NAME) == 0) {
-        return &vkextblendoperationadvanced_info;
+        return &VK_EXT_BLEND_OPERATION_ADVANCED_INFO;
     }
     if (std::strcmp(name, VK_EXT_BORDER_COLOR_SWIZZLE_EXTENSION_NAME) == 0) {
-        return &vkextbordercolorswizzle_info;
+        return &VK_EXT_BORDER_COLOR_SWIZZLE_INFO;
     }
     if (std::strcmp(name, VK_EXT_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME) == 0) {
-        return &vkextbufferdeviceaddress_info;
+        return &VK_EXT_BUFFER_DEVICE_ADDRESS_INFO;
     }
     if (std::strcmp(name, VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME) == 0) {
-        return &vkextcalibratedtimestamps_info;
+        return &VK_EXT_CALIBRATED_TIMESTAMPS_INFO;
     }
     if (std::strcmp(name, VK_EXT_COLOR_WRITE_ENABLE_EXTENSION_NAME) == 0) {
-        return &vkextcolorwriteenable_info;
+        return &VK_EXT_COLOR_WRITE_ENABLE_INFO;
     }
     if (std::strcmp(name, VK_EXT_CONDITIONAL_RENDERING_EXTENSION_NAME) == 0) {
-        return &vkextconditionalrendering_info;
+        return &VK_EXT_CONDITIONAL_RENDERING_INFO;
     }
     if (std::strcmp(name, VK_EXT_CONSERVATIVE_RASTERIZATION_EXTENSION_NAME) == 0) {
-        return &vkextconservativerasterization_info;
+        return &VK_EXT_CONSERVATIVE_RASTERIZATION_INFO;
     }
     if (std::strcmp(name, VK_EXT_CUSTOM_BORDER_COLOR_EXTENSION_NAME) == 0) {
-        return &vkextcustombordercolor_info;
+        return &VK_EXT_CUSTOM_BORDER_COLOR_INFO;
     }
     if (std::strcmp(name, VK_EXT_CUSTOM_RESOLVE_EXTENSION_NAME) == 0) {
-        return &vkextcustomresolve_info;
+        return &VK_EXT_CUSTOM_RESOLVE_INFO;
     }
     if (std::strcmp(name, VK_EXT_DEBUG_MARKER_EXTENSION_NAME) == 0) {
-        return &vkextdebugmarker_info;
+        return &VK_EXT_DEBUG_MARKER_INFO;
     }
     if (std::strcmp(name, VK_EXT_DEBUG_REPORT_EXTENSION_NAME) == 0) {
-        return &vkextdebugreport_info;
+        return &VK_EXT_DEBUG_REPORT_INFO;
     }
     if (std::strcmp(name, VK_EXT_DEBUG_UTILS_EXTENSION_NAME) == 0) {
-        return &vkextdebugutils_info;
+        return &VK_EXT_DEBUG_UTILS_INFO;
     }
     if (std::strcmp(name, VK_EXT_DEPTH_BIAS_CONTROL_EXTENSION_NAME) == 0) {
-        return &vkextdepthbiascontrol_info;
+        return &VK_EXT_DEPTH_BIAS_CONTROL_INFO;
     }
     if (std::strcmp(name, VK_EXT_DEPTH_CLAMP_CONTROL_EXTENSION_NAME) == 0) {
-        return &vkextdepthclampcontrol_info;
+        return &VK_EXT_DEPTH_CLAMP_CONTROL_INFO;
     }
     if (std::strcmp(name, VK_EXT_DEPTH_CLAMP_ZERO_ONE_EXTENSION_NAME) == 0) {
-        return &vkextdepthclampzeroone_info;
+        return &VK_EXT_DEPTH_CLAMP_ZERO_ONE_INFO;
     }
     if (std::strcmp(name, VK_EXT_DEPTH_CLIP_CONTROL_EXTENSION_NAME) == 0) {
-        return &vkextdepthclipcontrol_info;
+        return &VK_EXT_DEPTH_CLIP_CONTROL_INFO;
     }
     if (std::strcmp(name, VK_EXT_DEPTH_CLIP_ENABLE_EXTENSION_NAME) == 0) {
-        return &vkextdepthclipenable_info;
+        return &VK_EXT_DEPTH_CLIP_ENABLE_INFO;
     }
     if (std::strcmp(name, VK_EXT_DEPTH_RANGE_UNRESTRICTED_EXTENSION_NAME) == 0) {
-        return &vkextdepthrangeunrestricted_info;
+        return &VK_EXT_DEPTH_RANGE_UNRESTRICTED_INFO;
     }
     if (std::strcmp(name, VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME) == 0) {
-        return &vkextdescriptorbuffer_info;
+        return &VK_EXT_DESCRIPTOR_BUFFER_INFO;
     }
     if (std::strcmp(name, VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME) == 0) {
-        return &vkextdescriptorheap_info;
+        return &VK_EXT_DESCRIPTOR_HEAP_INFO;
     }
     if (std::strcmp(name, VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME) == 0) {
-        return &vkextdescriptorindexing_info;
+        return &VK_EXT_DESCRIPTOR_INDEXING_INFO;
     }
     if (std::strcmp(name, VK_EXT_DEVICE_ADDRESS_BINDING_REPORT_EXTENSION_NAME) == 0) {
-        return &vkextdeviceaddressbindingreport_info;
+        return &VK_EXT_DEVICE_ADDRESS_BINDING_REPORT_INFO;
     }
     if (std::strcmp(name, VK_EXT_DEVICE_FAULT_EXTENSION_NAME) == 0) {
-        return &vkextdevicefault_info;
+        return &VK_EXT_DEVICE_FAULT_INFO;
     }
     if (std::strcmp(name, VK_EXT_DEVICE_GENERATED_COMMANDS_EXTENSION_NAME) == 0) {
-        return &vkextdevicegeneratedcommands_info;
+        return &VK_EXT_DEVICE_GENERATED_COMMANDS_INFO;
     }
     if (std::strcmp(name, VK_EXT_DEVICE_MEMORY_REPORT_EXTENSION_NAME) == 0) {
-        return &vkextdevicememoryreport_info;
+        return &VK_EXT_DEVICE_MEMORY_REPORT_INFO;
     }
     if (std::strcmp(name, VK_EXT_DIRECT_MODE_DISPLAY_EXTENSION_NAME) == 0) {
-        return &vkextdirectmodedisplay_info;
+        return &VK_EXT_DIRECT_MODE_DISPLAY_INFO;
     }
     if (std::strcmp(name, VK_EXT_DISCARD_RECTANGLES_EXTENSION_NAME) == 0) {
-        return &vkextdiscardrectangles_info;
+        return &VK_EXT_DISCARD_RECTANGLES_INFO;
     }
     if (std::strcmp(name, VK_EXT_DISPLAY_CONTROL_EXTENSION_NAME) == 0) {
-        return &vkextdisplaycontrol_info;
+        return &VK_EXT_DISPLAY_CONTROL_INFO;
     }
     if (std::strcmp(name, VK_EXT_DISPLAY_SURFACE_COUNTER_EXTENSION_NAME) == 0) {
-        return &vkextdisplaysurfacecounter_info;
+        return &VK_EXT_DISPLAY_SURFACE_COUNTER_INFO;
     }
     if (std::strcmp(name, VK_EXT_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_EXTENSION_NAME) == 0) {
-        return &vkextdynamicrenderingunusedattachments_info;
+        return &VK_EXT_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_INFO;
     }
     if (std::strcmp(name, VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME) == 0) {
-        return &vkextextendeddynamicstate_info;
+        return &VK_EXT_EXTENDED_DYNAMIC_STATE_INFO;
     }
     if (std::strcmp(name, VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME) == 0) {
-        return &vkextextendeddynamicstate2_info;
+        return &VK_EXT_EXTENDED_DYNAMIC_STATE2_INFO;
     }
     if (std::strcmp(name, VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME) == 0) {
-        return &vkextextendeddynamicstate3_info;
+        return &VK_EXT_EXTENDED_DYNAMIC_STATE3_INFO;
     }
     if (std::strcmp(name, VK_EXT_EXTERNAL_MEMORY_ACQUIRE_UNMODIFIED_EXTENSION_NAME) == 0) {
-        return &vkextexternalmemoryacquireunmodified_info;
+        return &VK_EXT_EXTERNAL_MEMORY_ACQUIRE_UNMODIFIED_INFO;
     }
     if (std::strcmp(name, VK_EXT_EXTERNAL_MEMORY_DMA_BUF_EXTENSION_NAME) == 0) {
-        return &vkextexternalmemorydmabuf_info;
+        return &VK_EXT_EXTERNAL_MEMORY_DMA_BUF_INFO;
     }
     if (std::strcmp(name, VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME) == 0) {
-        return &vkextexternalmemoryhost_info;
+        return &VK_EXT_EXTERNAL_MEMORY_HOST_INFO;
     }
     if (std::strcmp(name, VK_EXT_FILTER_CUBIC_EXTENSION_NAME) == 0) {
-        return &vkextfiltercubic_info;
+        return &VK_EXT_FILTER_CUBIC_INFO;
     }
     if (std::strcmp(name, VK_EXT_FRAGMENT_DENSITY_MAP_EXTENSION_NAME) == 0) {
-        return &vkextfragmentdensitymap_info;
+        return &VK_EXT_FRAGMENT_DENSITY_MAP_INFO;
     }
     if (std::strcmp(name, VK_EXT_FRAGMENT_DENSITY_MAP_2_EXTENSION_NAME) == 0) {
-        return &vkextfragmentdensitymap2_info;
+        return &VK_EXT_FRAGMENT_DENSITY_MAP2_INFO;
     }
     if (std::strcmp(name, VK_EXT_FRAGMENT_DENSITY_MAP_OFFSET_EXTENSION_NAME) == 0) {
-        return &vkextfragmentdensitymapoffset_info;
+        return &VK_EXT_FRAGMENT_DENSITY_MAP_OFFSET_INFO;
     }
     if (std::strcmp(name, VK_EXT_FRAGMENT_SHADER_INTERLOCK_EXTENSION_NAME) == 0) {
-        return &vkextfragmentshaderinterlock_info;
+        return &VK_EXT_FRAGMENT_SHADER_INTERLOCK_INFO;
     }
     if (std::strcmp(name, VK_EXT_FRAME_BOUNDARY_EXTENSION_NAME) == 0) {
-        return &vkextframeboundary_info;
+        return &VK_EXT_FRAME_BOUNDARY_INFO;
     }
     if (std::strcmp(name, VK_EXT_GLOBAL_PRIORITY_EXTENSION_NAME) == 0) {
-        return &vkextglobalpriority_info;
+        return &VK_EXT_GLOBAL_PRIORITY_INFO;
     }
     if (std::strcmp(name, VK_EXT_GLOBAL_PRIORITY_QUERY_EXTENSION_NAME) == 0) {
-        return &vkextglobalpriorityquery_info;
+        return &VK_EXT_GLOBAL_PRIORITY_QUERY_INFO;
     }
     if (std::strcmp(name, VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME) == 0) {
-        return &vkextgraphicspipelinelibrary_info;
+        return &VK_EXT_GRAPHICS_PIPELINE_LIBRARY_INFO;
     }
     if (std::strcmp(name, VK_EXT_HDR_METADATA_EXTENSION_NAME) == 0) {
-        return &vkexthdrmetadata_info;
+        return &VK_EXT_HDR_METADATA_INFO;
     }
     if (std::strcmp(name, VK_EXT_HEADLESS_SURFACE_EXTENSION_NAME) == 0) {
-        return &vkextheadlesssurface_info;
+        return &VK_EXT_HEADLESS_SURFACE_INFO;
     }
     if (std::strcmp(name, VK_EXT_HOST_IMAGE_COPY_EXTENSION_NAME) == 0) {
-        return &vkexthostimagecopy_info;
+        return &VK_EXT_HOST_IMAGE_COPY_INFO;
     }
     if (std::strcmp(name, VK_EXT_HOST_QUERY_RESET_EXTENSION_NAME) == 0) {
-        return &vkexthostqueryreset_info;
+        return &VK_EXT_HOST_QUERY_RESET_INFO;
     }
     if (std::strcmp(name, VK_EXT_IMAGE_2D_VIEW_OF_3D_EXTENSION_NAME) == 0) {
-        return &vkextimage2dviewof3d_info;
+        return &VK_EXT_IMAGE_2D_VIEW_OF_3D_INFO;
     }
     if (std::strcmp(name, VK_EXT_IMAGE_COMPRESSION_CONTROL_EXTENSION_NAME) == 0) {
-        return &vkextimagecompressioncontrol_info;
+        return &VK_EXT_IMAGE_COMPRESSION_CONTROL_INFO;
     }
     if (std::strcmp(name, VK_EXT_IMAGE_COMPRESSION_CONTROL_SWAPCHAIN_EXTENSION_NAME) == 0) {
-        return &vkextimagecompressioncontrolswapchain_info;
+        return &VK_EXT_IMAGE_COMPRESSION_CONTROL_SWAPCHAIN_INFO;
     }
     if (std::strcmp(name, VK_EXT_IMAGE_DRM_FORMAT_MODIFIER_EXTENSION_NAME) == 0) {
-        return &vkextimagedrmformatmodifier_info;
+        return &VK_EXT_IMAGE_DRM_FORMAT_MODIFIER_INFO;
     }
     if (std::strcmp(name, VK_EXT_IMAGE_ROBUSTNESS_EXTENSION_NAME) == 0) {
-        return &vkextimagerobustness_info;
+        return &VK_EXT_IMAGE_ROBUSTNESS_INFO;
     }
     if (std::strcmp(name, VK_EXT_IMAGE_SLICED_VIEW_OF_3D_EXTENSION_NAME) == 0) {
-        return &vkextimageslicedviewof3d_info;
+        return &VK_EXT_IMAGE_SLICED_VIEW_OF_3D_INFO;
     }
     if (std::strcmp(name, VK_EXT_IMAGE_VIEW_MIN_LOD_EXTENSION_NAME) == 0) {
-        return &vkextimageviewminlod_info;
+        return &VK_EXT_IMAGE_VIEW_MIN_LOD_INFO;
     }
     if (std::strcmp(name, VK_EXT_INDEX_TYPE_UINT8_EXTENSION_NAME) == 0) {
-        return &vkextindextypeuint8_info;
+        return &VK_EXT_INDEX_TYPE_UINT8_INFO;
     }
     if (std::strcmp(name, VK_EXT_INLINE_UNIFORM_BLOCK_EXTENSION_NAME) == 0) {
-        return &vkextinlineuniformblock_info;
+        return &VK_EXT_INLINE_UNIFORM_BLOCK_INFO;
     }
     if (std::strcmp(name, VK_EXT_LAYER_SETTINGS_EXTENSION_NAME) == 0) {
-        return &vkextlayersettings_info;
+        return &VK_EXT_LAYER_SETTINGS_INFO;
     }
     if (std::strcmp(name, VK_EXT_LEGACY_DITHERING_EXTENSION_NAME) == 0) {
-        return &vkextlegacydithering_info;
+        return &VK_EXT_LEGACY_DITHERING_INFO;
     }
     if (std::strcmp(name, VK_EXT_LEGACY_VERTEX_ATTRIBUTES_EXTENSION_NAME) == 0) {
-        return &vkextlegacyvertexattributes_info;
+        return &VK_EXT_LEGACY_VERTEX_ATTRIBUTES_INFO;
     }
     if (std::strcmp(name, VK_EXT_LINE_RASTERIZATION_EXTENSION_NAME) == 0) {
-        return &vkextlinerasterization_info;
+        return &VK_EXT_LINE_RASTERIZATION_INFO;
     }
     if (std::strcmp(name, VK_EXT_LOAD_STORE_OP_NONE_EXTENSION_NAME) == 0) {
-        return &vkextloadstoreopnone_info;
+        return &VK_EXT_LOAD_STORE_OP_NONE_INFO;
     }
     if (std::strcmp(name, VK_EXT_MAP_MEMORY_PLACED_EXTENSION_NAME) == 0) {
-        return &vkextmapmemoryplaced_info;
+        return &VK_EXT_MAP_MEMORY_PLACED_INFO;
     }
     if (std::strcmp(name, VK_EXT_MEMORY_BUDGET_EXTENSION_NAME) == 0) {
-        return &vkextmemorybudget_info;
+        return &VK_EXT_MEMORY_BUDGET_INFO;
     }
     if (std::strcmp(name, VK_EXT_MEMORY_DECOMPRESSION_EXTENSION_NAME) == 0) {
-        return &vkextmemorydecompression_info;
+        return &VK_EXT_MEMORY_DECOMPRESSION_INFO;
     }
     if (std::strcmp(name, VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME) == 0) {
-        return &vkextmemorypriority_info;
+        return &VK_EXT_MEMORY_PRIORITY_INFO;
     }
     if (std::strcmp(name, VK_EXT_MESH_SHADER_EXTENSION_NAME) == 0) {
-        return &vkextmeshshader_info;
+        return &VK_EXT_MESH_SHADER_INFO;
     }
     if (std::strcmp(name, VK_EXT_MULTI_DRAW_EXTENSION_NAME) == 0) {
-        return &vkextmultidraw_info;
+        return &VK_EXT_MULTI_DRAW_INFO;
     }
     if (std::strcmp(name, VK_EXT_MULTISAMPLED_RENDER_TO_SINGLE_SAMPLED_EXTENSION_NAME) == 0) {
-        return &vkextmultisampledrendertosinglesampled_info;
+        return &VK_EXT_MULTISAMPLED_RENDER_TO_SINGLE_SAMPLED_INFO;
     }
     if (std::strcmp(name, VK_EXT_MUTABLE_DESCRIPTOR_TYPE_EXTENSION_NAME) == 0) {
-        return &vkextmutabledescriptortype_info;
+        return &VK_EXT_MUTABLE_DESCRIPTOR_TYPE_INFO;
     }
     if (std::strcmp(name, VK_EXT_NESTED_COMMAND_BUFFER_EXTENSION_NAME) == 0) {
-        return &vkextnestedcommandbuffer_info;
+        return &VK_EXT_NESTED_COMMAND_BUFFER_INFO;
     }
     if (std::strcmp(name, VK_EXT_NON_SEAMLESS_CUBE_MAP_EXTENSION_NAME) == 0) {
-        return &vkextnonseamlesscubemap_info;
+        return &VK_EXT_NON_SEAMLESS_CUBE_MAP_INFO;
     }
     if (std::strcmp(name, VK_EXT_OPACITY_MICROMAP_EXTENSION_NAME) == 0) {
-        return &vkextopacitymicromap_info;
+        return &VK_EXT_OPACITY_MICROMAP_INFO;
     }
     if (std::strcmp(name, VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME) == 0) {
-        return &vkextpageabledevicelocalmemory_info;
+        return &VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_INFO;
     }
     if (std::strcmp(name, VK_EXT_PCI_BUS_INFO_EXTENSION_NAME) == 0) {
-        return &vkextpcibusinfo_info;
+        return &VK_EXT_PCI_BUS_INFO_INFO;
     }
     if (std::strcmp(name, VK_EXT_PHYSICAL_DEVICE_DRM_EXTENSION_NAME) == 0) {
-        return &vkextphysicaldevicedrm_info;
+        return &VK_EXT_PHYSICAL_DEVICE_DRM_INFO;
     }
     if (std::strcmp(name, VK_EXT_PIPELINE_CREATION_CACHE_CONTROL_EXTENSION_NAME) == 0) {
-        return &vkextpipelinecreationcachecontrol_info;
+        return &VK_EXT_PIPELINE_CREATION_CACHE_CONTROL_INFO;
     }
     if (std::strcmp(name, VK_EXT_PIPELINE_CREATION_FEEDBACK_EXTENSION_NAME) == 0) {
-        return &vkextpipelinecreationfeedback_info;
+        return &VK_EXT_PIPELINE_CREATION_FEEDBACK_INFO;
     }
     if (std::strcmp(name, VK_EXT_PIPELINE_LIBRARY_GROUP_HANDLES_EXTENSION_NAME) == 0) {
-        return &vkextpipelinelibrarygrouphandles_info;
+        return &VK_EXT_PIPELINE_LIBRARY_GROUP_HANDLES_INFO;
     }
     if (std::strcmp(name, VK_EXT_PIPELINE_PROPERTIES_EXTENSION_NAME) == 0) {
-        return &vkextpipelineproperties_info;
+        return &VK_EXT_PIPELINE_PROPERTIES_INFO;
     }
     if (std::strcmp(name, VK_EXT_PIPELINE_PROTECTED_ACCESS_EXTENSION_NAME) == 0) {
-        return &vkextpipelineprotectedaccess_info;
+        return &VK_EXT_PIPELINE_PROTECTED_ACCESS_INFO;
     }
     if (std::strcmp(name, VK_EXT_PIPELINE_ROBUSTNESS_EXTENSION_NAME) == 0) {
-        return &vkextpipelinerobustness_info;
+        return &VK_EXT_PIPELINE_ROBUSTNESS_INFO;
     }
     if (std::strcmp(name, VK_EXT_POST_DEPTH_COVERAGE_EXTENSION_NAME) == 0) {
-        return &vkextpostdepthcoverage_info;
+        return &VK_EXT_POST_DEPTH_COVERAGE_INFO;
     }
     if (std::strcmp(name, VK_EXT_PRESENT_MODE_FIFO_LATEST_READY_EXTENSION_NAME) == 0) {
-        return &vkextpresentmodefifolatestready_info;
+        return &VK_EXT_PRESENT_MODE_FIFO_LATEST_READY_INFO;
     }
     if (std::strcmp(name, VK_EXT_PRESENT_TIMING_EXTENSION_NAME) == 0) {
-        return &vkextpresenttiming_info;
+        return &VK_EXT_PRESENT_TIMING_INFO;
     }
     if (std::strcmp(name, VK_EXT_PRIMITIVE_TOPOLOGY_LIST_RESTART_EXTENSION_NAME) == 0) {
-        return &vkextprimitivetopologylistrestart_info;
+        return &VK_EXT_PRIMITIVE_TOPOLOGY_LIST_RESTART_INFO;
     }
     if (std::strcmp(name, VK_EXT_PRIMITIVES_GENERATED_QUERY_EXTENSION_NAME) == 0) {
-        return &vkextprimitivesgeneratedquery_info;
+        return &VK_EXT_PRIMITIVES_GENERATED_QUERY_INFO;
     }
     if (std::strcmp(name, VK_EXT_PRIVATE_DATA_EXTENSION_NAME) == 0) {
-        return &vkextprivatedata_info;
+        return &VK_EXT_PRIVATE_DATA_INFO;
     }
     if (std::strcmp(name, VK_EXT_PROVOKING_VERTEX_EXTENSION_NAME) == 0) {
-        return &vkextprovokingvertex_info;
+        return &VK_EXT_PROVOKING_VERTEX_INFO;
     }
     if (std::strcmp(name, VK_EXT_QUEUE_FAMILY_FOREIGN_EXTENSION_NAME) == 0) {
-        return &vkextqueuefamilyforeign_info;
+        return &VK_EXT_QUEUE_FAMILY_FOREIGN_INFO;
     }
     if (std::strcmp(name, VK_EXT_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_EXTENSION_NAME) == 0) {
-        return &vkextrasterizationorderattachmentaccess_info;
+        return &VK_EXT_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_INFO;
     }
     if (std::strcmp(name, VK_EXT_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME) == 0) {
-        return &vkextraytracinginvocationreorder_info;
+        return &VK_EXT_RAY_TRACING_INVOCATION_REORDER_INFO;
     }
     if (std::strcmp(name, VK_EXT_RGBA10X6_FORMATS_EXTENSION_NAME) == 0) {
-        return &vkextrgba10x6formats_info;
+        return &VK_EXT_RGBA10X6_FORMATS_INFO;
     }
     if (std::strcmp(name, VK_EXT_ROBUSTNESS_2_EXTENSION_NAME) == 0) {
-        return &vkextrobustness2_info;
+        return &VK_EXT_ROBUSTNESS2_INFO;
     }
     if (std::strcmp(name, VK_EXT_SAMPLE_LOCATIONS_EXTENSION_NAME) == 0) {
-        return &vkextsamplelocations_info;
+        return &VK_EXT_SAMPLE_LOCATIONS_INFO;
     }
     if (std::strcmp(name, VK_EXT_SAMPLER_FILTER_MINMAX_EXTENSION_NAME) == 0) {
-        return &vkextsamplerfilterminmax_info;
+        return &VK_EXT_SAMPLER_FILTER_MINMAX_INFO;
     }
     if (std::strcmp(name, VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME) == 0) {
-        return &vkextscalarblocklayout_info;
+        return &VK_EXT_SCALAR_BLOCK_LAYOUT_INFO;
     }
     if (std::strcmp(name, VK_EXT_SEPARATE_STENCIL_USAGE_EXTENSION_NAME) == 0) {
-        return &vkextseparatestencilusage_info;
+        return &VK_EXT_SEPARATE_STENCIL_USAGE_INFO;
     }
     if (std::strcmp(name, VK_EXT_SHADER_64BIT_INDEXING_EXTENSION_NAME) == 0) {
-        return &vkextshader64bitindexing_info;
+        return &VK_EXT_SHADER_64BIT_INDEXING_INFO;
     }
     if (std::strcmp(name, VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME) == 0) {
-        return &vkextshaderatomicfloat_info;
+        return &VK_EXT_SHADER_ATOMIC_FLOAT_INFO;
     }
     if (std::strcmp(name, VK_EXT_SHADER_ATOMIC_FLOAT_2_EXTENSION_NAME) == 0) {
-        return &vkextshaderatomicfloat2_info;
+        return &VK_EXT_SHADER_ATOMIC_FLOAT2_INFO;
     }
     if (std::strcmp(name, VK_EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION_EXTENSION_NAME) == 0) {
-        return &vkextshaderdemotetohelperinvocation_info;
+        return &VK_EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION_INFO;
     }
     if (std::strcmp(name, VK_EXT_SHADER_FLOAT8_EXTENSION_NAME) == 0) {
-        return &vkextshaderfloat8_info;
+        return &VK_EXT_SHADER_FLOAT8_INFO;
     }
     if (std::strcmp(name, VK_EXT_SHADER_IMAGE_ATOMIC_INT64_EXTENSION_NAME) == 0) {
-        return &vkextshaderimageatomicint64_info;
+        return &VK_EXT_SHADER_IMAGE_ATOMIC_INT64_INFO;
     }
     if (std::strcmp(name, VK_EXT_SHADER_LONG_VECTOR_EXTENSION_NAME) == 0) {
-        return &vkextshaderlongvector_info;
+        return &VK_EXT_SHADER_LONG_VECTOR_INFO;
     }
     if (std::strcmp(name, VK_EXT_SHADER_MODULE_IDENTIFIER_EXTENSION_NAME) == 0) {
-        return &vkextshadermoduleidentifier_info;
+        return &VK_EXT_SHADER_MODULE_IDENTIFIER_INFO;
     }
     if (std::strcmp(name, VK_EXT_SHADER_OBJECT_EXTENSION_NAME) == 0) {
-        return &vkextshaderobject_info;
+        return &VK_EXT_SHADER_OBJECT_INFO;
     }
     if (std::strcmp(name, VK_EXT_SHADER_REPLICATED_COMPOSITES_EXTENSION_NAME) == 0) {
-        return &vkextshaderreplicatedcomposites_info;
+        return &VK_EXT_SHADER_REPLICATED_COMPOSITES_INFO;
     }
     if (std::strcmp(name, VK_EXT_SHADER_STENCIL_EXPORT_EXTENSION_NAME) == 0) {
-        return &vkextshaderstencilexport_info;
+        return &VK_EXT_SHADER_STENCIL_EXPORT_INFO;
     }
     if (std::strcmp(name, VK_EXT_SHADER_SUBGROUP_BALLOT_EXTENSION_NAME) == 0) {
-        return &vkextshadersubgroupballot_info;
+        return &VK_EXT_SHADER_SUBGROUP_BALLOT_INFO;
     }
     if (std::strcmp(name, VK_EXT_SHADER_SUBGROUP_PARTITIONED_EXTENSION_NAME) == 0) {
-        return &vkextshadersubgrouppartitioned_info;
+        return &VK_EXT_SHADER_SUBGROUP_PARTITIONED_INFO;
     }
     if (std::strcmp(name, VK_EXT_SHADER_SUBGROUP_VOTE_EXTENSION_NAME) == 0) {
-        return &vkextshadersubgroupvote_info;
+        return &VK_EXT_SHADER_SUBGROUP_VOTE_INFO;
     }
     if (std::strcmp(name, VK_EXT_SHADER_TILE_IMAGE_EXTENSION_NAME) == 0) {
-        return &vkextshadertileimage_info;
+        return &VK_EXT_SHADER_TILE_IMAGE_INFO;
     }
     if (std::strcmp(name, VK_EXT_SHADER_UNIFORM_BUFFER_UNSIZED_ARRAY_EXTENSION_NAME) == 0) {
-        return &vkextshaderuniformbufferunsizedarray_info;
+        return &VK_EXT_SHADER_UNIFORM_BUFFER_UNSIZED_ARRAY_INFO;
     }
     if (std::strcmp(name, VK_EXT_SHADER_VIEWPORT_INDEX_LAYER_EXTENSION_NAME) == 0) {
-        return &vkextshaderviewportindexlayer_info;
+        return &VK_EXT_SHADER_VIEWPORT_INDEX_LAYER_INFO;
     }
     if (std::strcmp(name, VK_EXT_SUBGROUP_SIZE_CONTROL_EXTENSION_NAME) == 0) {
-        return &vkextsubgroupsizecontrol_info;
+        return &VK_EXT_SUBGROUP_SIZE_CONTROL_INFO;
     }
     if (std::strcmp(name, VK_EXT_SUBPASS_MERGE_FEEDBACK_EXTENSION_NAME) == 0) {
-        return &vkextsubpassmergefeedback_info;
+        return &VK_EXT_SUBPASS_MERGE_FEEDBACK_INFO;
     }
     if (std::strcmp(name, VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME) == 0) {
-        return &vkextsurfacemaintenance1_info;
+        return &VK_EXT_SURFACE_MAINTENANCE1_INFO;
     }
     if (std::strcmp(name, VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME) == 0) {
-        return &vkextswapchaincolorspace_info;
+        return &VK_EXT_SWAPCHAIN_COLORSPACE_INFO;
     }
     if (std::strcmp(name, VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME) == 0) {
-        return &vkextswapchainmaintenance1_info;
+        return &VK_EXT_SWAPCHAIN_MAINTENANCE1_INFO;
     }
     if (std::strcmp(name, VK_EXT_TEXEL_BUFFER_ALIGNMENT_EXTENSION_NAME) == 0) {
-        return &vkexttexelbufferalignment_info;
+        return &VK_EXT_TEXEL_BUFFER_ALIGNMENT_INFO;
     }
     if (std::strcmp(name, VK_EXT_TEXTURE_COMPRESSION_ASTC_3D_EXTENSION_NAME) == 0) {
-        return &vkexttexturecompressionastc3d_info;
+        return &VK_EXT_TEXTURE_COMPRESSION_ASTC_3D_INFO;
     }
     if (std::strcmp(name, VK_EXT_TEXTURE_COMPRESSION_ASTC_HDR_EXTENSION_NAME) == 0) {
-        return &vkexttexturecompressionastchdr_info;
+        return &VK_EXT_TEXTURE_COMPRESSION_ASTC_HDR_INFO;
     }
     if (std::strcmp(name, VK_EXT_TOOLING_INFO_EXTENSION_NAME) == 0) {
-        return &vkexttoolinginfo_info;
+        return &VK_EXT_TOOLING_INFO_INFO;
     }
     if (std::strcmp(name, VK_EXT_TRANSFORM_FEEDBACK_EXTENSION_NAME) == 0) {
-        return &vkexttransformfeedback_info;
+        return &VK_EXT_TRANSFORM_FEEDBACK_INFO;
     }
     if (std::strcmp(name, VK_EXT_VALIDATION_CACHE_EXTENSION_NAME) == 0) {
-        return &vkextvalidationcache_info;
+        return &VK_EXT_VALIDATION_CACHE_INFO;
     }
     if (std::strcmp(name, VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME) == 0) {
-        return &vkextvalidationfeatures_info;
+        return &VK_EXT_VALIDATION_FEATURES_INFO;
     }
     if (std::strcmp(name, VK_EXT_VALIDATION_FLAGS_EXTENSION_NAME) == 0) {
-        return &vkextvalidationflags_info;
+        return &VK_EXT_VALIDATION_FLAGS_INFO;
     }
     if (std::strcmp(name, VK_EXT_VERTEX_ATTRIBUTE_DIVISOR_EXTENSION_NAME) == 0) {
-        return &vkextvertexattributedivisor_info;
+        return &VK_EXT_VERTEX_ATTRIBUTE_DIVISOR_INFO;
     }
     if (std::strcmp(name, VK_EXT_VERTEX_ATTRIBUTE_ROBUSTNESS_EXTENSION_NAME) == 0) {
-        return &vkextvertexattributerobustness_info;
+        return &VK_EXT_VERTEX_ATTRIBUTE_ROBUSTNESS_INFO;
     }
     if (std::strcmp(name, VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME) == 0) {
-        return &vkextvertexinputdynamicstate_info;
+        return &VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_INFO;
     }
     if (std::strcmp(name, VK_EXT_YCBCR_2PLANE_444_FORMATS_EXTENSION_NAME) == 0) {
-        return &vkextycbcr2plane444formats_info;
+        return &VK_EXT_YCBCR_2PLANE_444_FORMATS_INFO;
     }
     if (std::strcmp(name, VK_EXT_YCBCR_IMAGE_ARRAYS_EXTENSION_NAME) == 0) {
-        return &vkextycbcrimagearrays_info;
+        return &VK_EXT_YCBCR_IMAGE_ARRAYS_INFO;
     }
     if (std::strcmp(name, VK_EXT_ZERO_INITIALIZE_DEVICE_MEMORY_EXTENSION_NAME) == 0) {
-        return &vkextzeroinitializedevicememory_info;
+        return &VK_EXT_ZERO_INITIALIZE_DEVICE_MEMORY_INFO;
     }
     if (std::strcmp(name, VK_GOOGLE_DECORATE_STRING_EXTENSION_NAME) == 0) {
-        return &vkgoogledecoratestring_info;
+        return &VK_GOOGLE_DECORATE_STRING_INFO;
     }
     if (std::strcmp(name, VK_GOOGLE_DISPLAY_TIMING_EXTENSION_NAME) == 0) {
-        return &vkgoogledisplaytiming_info;
+        return &VK_GOOGLE_DISPLAY_TIMING_INFO;
     }
     if (std::strcmp(name, VK_GOOGLE_HLSL_FUNCTIONALITY_1_EXTENSION_NAME) == 0) {
-        return &vkgooglehlslfunctionality1_info;
+        return &VK_GOOGLE_HLSL_FUNCTIONALITY1_INFO;
     }
     if (std::strcmp(name, VK_GOOGLE_SURFACELESS_QUERY_EXTENSION_NAME) == 0) {
-        return &vkgooglesurfacelessquery_info;
+        return &VK_GOOGLE_SURFACELESS_QUERY_INFO;
     }
     if (std::strcmp(name, VK_GOOGLE_USER_TYPE_EXTENSION_NAME) == 0) {
-        return &vkgoogleusertype_info;
+        return &VK_GOOGLE_USER_TYPE_INFO;
     }
     if (std::strcmp(name, VK_HUAWEI_CLUSTER_CULLING_SHADER_EXTENSION_NAME) == 0) {
-        return &vkhuaweiclustercullingshader_info;
+        return &VK_HUAWEI_CLUSTER_CULLING_SHADER_INFO;
     }
     if (std::strcmp(name, VK_HUAWEI_HDR_VIVID_EXTENSION_NAME) == 0) {
-        return &vkhuaweihdrvivid_info;
+        return &VK_HUAWEI_HDR_VIVID_INFO;
     }
     if (std::strcmp(name, VK_HUAWEI_INVOCATION_MASK_EXTENSION_NAME) == 0) {
-        return &vkhuaweiinvocationmask_info;
+        return &VK_HUAWEI_INVOCATION_MASK_INFO;
     }
     if (std::strcmp(name, VK_HUAWEI_SUBPASS_SHADING_EXTENSION_NAME) == 0) {
-        return &vkhuaweisubpassshading_info;
+        return &VK_HUAWEI_SUBPASS_SHADING_INFO;
     }
     if (std::strcmp(name, VK_IMG_FILTER_CUBIC_EXTENSION_NAME) == 0) {
-        return &vkimgfiltercubic_info;
+        return &VK_IMG_FILTER_CUBIC_INFO;
     }
     if (std::strcmp(name, VK_IMG_FORMAT_PVRTC_EXTENSION_NAME) == 0) {
-        return &vkimgformatpvrtc_info;
+        return &VK_IMG_FORMAT_PVRTC_INFO;
     }
     if (std::strcmp(name, VK_IMG_RELAXED_LINE_RASTERIZATION_EXTENSION_NAME) == 0) {
-        return &vkimgrelaxedlinerasterization_info;
+        return &VK_IMG_RELAXED_LINE_RASTERIZATION_INFO;
     }
     if (std::strcmp(name, VK_INTEL_PERFORMANCE_QUERY_EXTENSION_NAME) == 0) {
-        return &vkintelperformancequery_info;
+        return &VK_INTEL_PERFORMANCE_QUERY_INFO;
     }
     if (std::strcmp(name, VK_INTEL_SHADER_INTEGER_FUNCTIONS_2_EXTENSION_NAME) == 0) {
-        return &vkintelshaderintegerfunctions2_info;
+        return &VK_INTEL_SHADER_INTEGER_FUNCTIONS2_INFO;
     }
     if (std::strcmp(name, VK_KHR_16BIT_STORAGE_EXTENSION_NAME) == 0) {
-        return &vkkhr16bitstorage_info;
+        return &VK_KHR_16BIT_STORAGE_INFO;
     }
     if (std::strcmp(name, VK_KHR_8BIT_STORAGE_EXTENSION_NAME) == 0) {
-        return &vkkhr8bitstorage_info;
+        return &VK_KHR_8BIT_STORAGE_INFO;
     }
     if (std::strcmp(name, VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME) == 0) {
-        return &vkkhraccelerationstructure_info;
+        return &VK_KHR_ACCELERATION_STRUCTURE_INFO;
     }
     if (std::strcmp(name, VK_KHR_BIND_MEMORY_2_EXTENSION_NAME) == 0) {
-        return &vkkhrbindmemory2_info;
+        return &VK_KHR_BIND_MEMORY2_INFO;
     }
     if (std::strcmp(name, VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME) == 0) {
-        return &vkkhrbufferdeviceaddress_info;
+        return &VK_KHR_BUFFER_DEVICE_ADDRESS_INFO;
     }
     if (std::strcmp(name, VK_KHR_CALIBRATED_TIMESTAMPS_EXTENSION_NAME) == 0) {
-        return &vkkhrcalibratedtimestamps_info;
+        return &VK_KHR_CALIBRATED_TIMESTAMPS_INFO;
     }
     if (std::strcmp(name, VK_KHR_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME) == 0) {
-        return &vkkhrcomputeshaderderivatives_info;
+        return &VK_KHR_COMPUTE_SHADER_DERIVATIVES_INFO;
     }
     if (std::strcmp(name, VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME) == 0) {
-        return &vkkhrcooperativematrix_info;
+        return &VK_KHR_COOPERATIVE_MATRIX_INFO;
     }
     if (std::strcmp(name, VK_KHR_COPY_COMMANDS_2_EXTENSION_NAME) == 0) {
-        return &vkkhrcopycommands2_info;
+        return &VK_KHR_COPY_COMMANDS2_INFO;
     }
     if (std::strcmp(name, VK_KHR_COPY_MEMORY_INDIRECT_EXTENSION_NAME) == 0) {
-        return &vkkhrcopymemoryindirect_info;
+        return &VK_KHR_COPY_MEMORY_INDIRECT_INFO;
     }
     if (std::strcmp(name, VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME) == 0) {
-        return &vkkhrcreaterenderpass2_info;
+        return &VK_KHR_CREATE_RENDERPASS2_INFO;
     }
     if (std::strcmp(name, VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME) == 0) {
-        return &vkkhrdedicatedallocation_info;
+        return &VK_KHR_DEDICATED_ALLOCATION_INFO;
     }
     if (std::strcmp(name, VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME) == 0) {
-        return &vkkhrdeferredhostoperations_info;
+        return &VK_KHR_DEFERRED_HOST_OPERATIONS_INFO;
     }
     if (std::strcmp(name, VK_KHR_DEPTH_CLAMP_ZERO_ONE_EXTENSION_NAME) == 0) {
-        return &vkkhrdepthclampzeroone_info;
+        return &VK_KHR_DEPTH_CLAMP_ZERO_ONE_INFO;
     }
     if (std::strcmp(name, VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME) == 0) {
-        return &vkkhrdepthstencilresolve_info;
+        return &VK_KHR_DEPTH_STENCIL_RESOLVE_INFO;
     }
     if (std::strcmp(name, VK_KHR_DESCRIPTOR_UPDATE_TEMPLATE_EXTENSION_NAME) == 0) {
-        return &vkkhrdescriptorupdatetemplate_info;
+        return &VK_KHR_DESCRIPTOR_UPDATE_TEMPLATE_INFO;
     }
     if (std::strcmp(name, VK_KHR_DEVICE_GROUP_EXTENSION_NAME) == 0) {
-        return &vkkhrdevicegroup_info;
+        return &VK_KHR_DEVICE_GROUP_INFO;
     }
     if (std::strcmp(name, VK_KHR_DEVICE_GROUP_CREATION_EXTENSION_NAME) == 0) {
-        return &vkkhrdevicegroupcreation_info;
+        return &VK_KHR_DEVICE_GROUP_CREATION_INFO;
     }
     if (std::strcmp(name, VK_KHR_DISPLAY_EXTENSION_NAME) == 0) {
-        return &vkkhrdisplay_info;
+        return &VK_KHR_DISPLAY_INFO;
     }
     if (std::strcmp(name, VK_KHR_DISPLAY_SWAPCHAIN_EXTENSION_NAME) == 0) {
-        return &vkkhrdisplayswapchain_info;
+        return &VK_KHR_DISPLAY_SWAPCHAIN_INFO;
     }
     if (std::strcmp(name, VK_KHR_DRAW_INDIRECT_COUNT_EXTENSION_NAME) == 0) {
-        return &vkkhrdrawindirectcount_info;
+        return &VK_KHR_DRAW_INDIRECT_COUNT_INFO;
     }
     if (std::strcmp(name, VK_KHR_DRIVER_PROPERTIES_EXTENSION_NAME) == 0) {
-        return &vkkhrdriverproperties_info;
+        return &VK_KHR_DRIVER_PROPERTIES_INFO;
     }
     if (std::strcmp(name, VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME) == 0) {
-        return &vkkhrdynamicrendering_info;
+        return &VK_KHR_DYNAMIC_RENDERING_INFO;
     }
     if (std::strcmp(name, VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_EXTENSION_NAME) == 0) {
-        return &vkkhrdynamicrenderinglocalread_info;
+        return &VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_INFO;
     }
     if (std::strcmp(name, VK_KHR_EXTERNAL_FENCE_EXTENSION_NAME) == 0) {
-        return &vkkhrexternalfence_info;
+        return &VK_KHR_EXTERNAL_FENCE_INFO;
     }
     if (std::strcmp(name, VK_KHR_EXTERNAL_FENCE_CAPABILITIES_EXTENSION_NAME) == 0) {
-        return &vkkhrexternalfencecapabilities_info;
+        return &VK_KHR_EXTERNAL_FENCE_CAPABILITIES_INFO;
     }
     if (std::strcmp(name, VK_KHR_EXTERNAL_FENCE_FD_EXTENSION_NAME) == 0) {
-        return &vkkhrexternalfencefd_info;
+        return &VK_KHR_EXTERNAL_FENCE_FD_INFO;
     }
     if (std::strcmp(name, VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME) == 0) {
-        return &vkkhrexternalmemory_info;
+        return &VK_KHR_EXTERNAL_MEMORY_INFO;
     }
     if (std::strcmp(name, VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME) == 0) {
-        return &vkkhrexternalmemorycapabilities_info;
+        return &VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_INFO;
     }
     if (std::strcmp(name, VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME) == 0) {
-        return &vkkhrexternalmemoryfd_info;
+        return &VK_KHR_EXTERNAL_MEMORY_FD_INFO;
     }
     if (std::strcmp(name, VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME) == 0) {
-        return &vkkhrexternalsemaphore_info;
+        return &VK_KHR_EXTERNAL_SEMAPHORE_INFO;
     }
     if (std::strcmp(name, VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME) == 0) {
-        return &vkkhrexternalsemaphorecapabilities_info;
+        return &VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_INFO;
     }
     if (std::strcmp(name, VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME) == 0) {
-        return &vkkhrexternalsemaphorefd_info;
+        return &VK_KHR_EXTERNAL_SEMAPHORE_FD_INFO;
     }
     if (std::strcmp(name, VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME) == 0) {
-        return &vkkhrformatfeatureflags2_info;
+        return &VK_KHR_FORMAT_FEATURE_FLAGS2_INFO;
     }
     if (std::strcmp(name, VK_KHR_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME) == 0) {
-        return &vkkhrfragmentshaderbarycentric_info;
+        return &VK_KHR_FRAGMENT_SHADER_BARYCENTRIC_INFO;
     }
     if (std::strcmp(name, VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME) == 0) {
-        return &vkkhrfragmentshadingrate_info;
+        return &VK_KHR_FRAGMENT_SHADING_RATE_INFO;
     }
     if (std::strcmp(name, VK_KHR_GET_DISPLAY_PROPERTIES_2_EXTENSION_NAME) == 0) {
-        return &vkkhrgetdisplayproperties2_info;
+        return &VK_KHR_GET_DISPLAY_PROPERTIES2_INFO;
     }
     if (std::strcmp(name, VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME) == 0) {
-        return &vkkhrgetmemoryrequirements2_info;
+        return &VK_KHR_GET_MEMORY_REQUIREMENTS2_INFO;
     }
     if (std::strcmp(name, VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME) == 0) {
-        return &vkkhrgetphysicaldeviceproperties2_info;
+        return &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO;
     }
     if (std::strcmp(name, VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME) == 0) {
-        return &vkkhrgetsurfacecapabilities2_info;
+        return &VK_KHR_GET_SURFACE_CAPABILITIES2_INFO;
     }
     if (std::strcmp(name, VK_KHR_GLOBAL_PRIORITY_EXTENSION_NAME) == 0) {
-        return &vkkhrglobalpriority_info;
+        return &VK_KHR_GLOBAL_PRIORITY_INFO;
     }
     if (std::strcmp(name, VK_KHR_IMAGE_FORMAT_LIST_EXTENSION_NAME) == 0) {
-        return &vkkhrimageformatlist_info;
+        return &VK_KHR_IMAGE_FORMAT_LIST_INFO;
     }
     if (std::strcmp(name, VK_KHR_IMAGELESS_FRAMEBUFFER_EXTENSION_NAME) == 0) {
-        return &vkkhrimagelessframebuffer_info;
+        return &VK_KHR_IMAGELESS_FRAMEBUFFER_INFO;
     }
     if (std::strcmp(name, VK_KHR_INCREMENTAL_PRESENT_EXTENSION_NAME) == 0) {
-        return &vkkhrincrementalpresent_info;
+        return &VK_KHR_INCREMENTAL_PRESENT_INFO;
     }
     if (std::strcmp(name, VK_KHR_INDEX_TYPE_UINT8_EXTENSION_NAME) == 0) {
-        return &vkkhrindextypeuint8_info;
+        return &VK_KHR_INDEX_TYPE_UINT8_INFO;
     }
     if (std::strcmp(name, VK_KHR_INTERNALLY_SYNCHRONIZED_QUEUES_EXTENSION_NAME) == 0) {
-        return &vkkhrinternallysynchronizedqueues_info;
+        return &VK_KHR_INTERNALLY_SYNCHRONIZED_QUEUES_INFO;
     }
     if (std::strcmp(name, VK_KHR_LINE_RASTERIZATION_EXTENSION_NAME) == 0) {
-        return &vkkhrlinerasterization_info;
+        return &VK_KHR_LINE_RASTERIZATION_INFO;
     }
     if (std::strcmp(name, VK_KHR_LOAD_STORE_OP_NONE_EXTENSION_NAME) == 0) {
-        return &vkkhrloadstoreopnone_info;
+        return &VK_KHR_LOAD_STORE_OP_NONE_INFO;
     }
     if (std::strcmp(name, VK_KHR_MAINTENANCE_1_EXTENSION_NAME) == 0) {
-        return &vkkhrmaintenance1_info;
+        return &VK_KHR_MAINTENANCE1_INFO;
     }
     if (std::strcmp(name, VK_KHR_MAINTENANCE_10_EXTENSION_NAME) == 0) {
-        return &vkkhrmaintenance10_info;
+        return &VK_KHR_MAINTENANCE10_INFO;
     }
     if (std::strcmp(name, VK_KHR_MAINTENANCE_2_EXTENSION_NAME) == 0) {
-        return &vkkhrmaintenance2_info;
+        return &VK_KHR_MAINTENANCE2_INFO;
     }
     if (std::strcmp(name, VK_KHR_MAINTENANCE_3_EXTENSION_NAME) == 0) {
-        return &vkkhrmaintenance3_info;
+        return &VK_KHR_MAINTENANCE3_INFO;
     }
     if (std::strcmp(name, VK_KHR_MAINTENANCE_4_EXTENSION_NAME) == 0) {
-        return &vkkhrmaintenance4_info;
+        return &VK_KHR_MAINTENANCE4_INFO;
     }
     if (std::strcmp(name, VK_KHR_MAINTENANCE_5_EXTENSION_NAME) == 0) {
-        return &vkkhrmaintenance5_info;
+        return &VK_KHR_MAINTENANCE5_INFO;
     }
     if (std::strcmp(name, VK_KHR_MAINTENANCE_6_EXTENSION_NAME) == 0) {
-        return &vkkhrmaintenance6_info;
+        return &VK_KHR_MAINTENANCE6_INFO;
     }
     if (std::strcmp(name, VK_KHR_MAINTENANCE_7_EXTENSION_NAME) == 0) {
-        return &vkkhrmaintenance7_info;
+        return &VK_KHR_MAINTENANCE7_INFO;
     }
     if (std::strcmp(name, VK_KHR_MAINTENANCE_8_EXTENSION_NAME) == 0) {
-        return &vkkhrmaintenance8_info;
+        return &VK_KHR_MAINTENANCE8_INFO;
     }
     if (std::strcmp(name, VK_KHR_MAINTENANCE_9_EXTENSION_NAME) == 0) {
-        return &vkkhrmaintenance9_info;
+        return &VK_KHR_MAINTENANCE9_INFO;
     }
     if (std::strcmp(name, VK_KHR_MAP_MEMORY_2_EXTENSION_NAME) == 0) {
-        return &vkkhrmapmemory2_info;
+        return &VK_KHR_MAP_MEMORY2_INFO;
     }
     if (std::strcmp(name, VK_KHR_MULTIVIEW_EXTENSION_NAME) == 0) {
-        return &vkkhrmultiview_info;
+        return &VK_KHR_MULTIVIEW_INFO;
     }
     if (std::strcmp(name, VK_KHR_PERFORMANCE_QUERY_EXTENSION_NAME) == 0) {
-        return &vkkhrperformancequery_info;
+        return &VK_KHR_PERFORMANCE_QUERY_INFO;
     }
     if (std::strcmp(name, VK_KHR_PIPELINE_BINARY_EXTENSION_NAME) == 0) {
-        return &vkkhrpipelinebinary_info;
+        return &VK_KHR_PIPELINE_BINARY_INFO;
     }
     if (std::strcmp(name, VK_KHR_PIPELINE_EXECUTABLE_PROPERTIES_EXTENSION_NAME) == 0) {
-        return &vkkhrpipelineexecutableproperties_info;
+        return &VK_KHR_PIPELINE_EXECUTABLE_PROPERTIES_INFO;
     }
     if (std::strcmp(name, VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME) == 0) {
-        return &vkkhrpipelinelibrary_info;
+        return &VK_KHR_PIPELINE_LIBRARY_INFO;
     }
     if (std::strcmp(name, VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME) == 0) {
-        return &vkkhrportabilityenumeration_info;
+        return &VK_KHR_PORTABILITY_ENUMERATION_INFO;
     }
     if (std::strcmp(name, VK_KHR_PRESENT_ID_EXTENSION_NAME) == 0) {
-        return &vkkhrpresentid_info;
+        return &VK_KHR_PRESENT_ID_INFO;
     }
     if (std::strcmp(name, VK_KHR_PRESENT_ID_2_EXTENSION_NAME) == 0) {
-        return &vkkhrpresentid2_info;
+        return &VK_KHR_PRESENT_ID2_INFO;
     }
     if (std::strcmp(name, VK_KHR_PRESENT_MODE_FIFO_LATEST_READY_EXTENSION_NAME) == 0) {
-        return &vkkhrpresentmodefifolatestready_info;
+        return &VK_KHR_PRESENT_MODE_FIFO_LATEST_READY_INFO;
     }
     if (std::strcmp(name, VK_KHR_PRESENT_WAIT_EXTENSION_NAME) == 0) {
-        return &vkkhrpresentwait_info;
+        return &VK_KHR_PRESENT_WAIT_INFO;
     }
     if (std::strcmp(name, VK_KHR_PRESENT_WAIT_2_EXTENSION_NAME) == 0) {
-        return &vkkhrpresentwait2_info;
+        return &VK_KHR_PRESENT_WAIT2_INFO;
     }
     if (std::strcmp(name, VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME) == 0) {
-        return &vkkhrpushdescriptor_info;
+        return &VK_KHR_PUSH_DESCRIPTOR_INFO;
     }
     if (std::strcmp(name, VK_KHR_RAY_QUERY_EXTENSION_NAME) == 0) {
-        return &vkkhrrayquery_info;
+        return &VK_KHR_RAY_QUERY_INFO;
     }
     if (std::strcmp(name, VK_KHR_RAY_TRACING_MAINTENANCE_1_EXTENSION_NAME) == 0) {
-        return &vkkhrraytracingmaintenance1_info;
+        return &VK_KHR_RAY_TRACING_MAINTENANCE1_INFO;
     }
     if (std::strcmp(name, VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME) == 0) {
-        return &vkkhrraytracingpipeline_info;
+        return &VK_KHR_RAY_TRACING_PIPELINE_INFO;
     }
     if (std::strcmp(name, VK_KHR_RAY_TRACING_POSITION_FETCH_EXTENSION_NAME) == 0) {
-        return &vkkhrraytracingpositionfetch_info;
+        return &VK_KHR_RAY_TRACING_POSITION_FETCH_INFO;
     }
     if (std::strcmp(name, VK_KHR_RELAXED_BLOCK_LAYOUT_EXTENSION_NAME) == 0) {
-        return &vkkhrrelaxedblocklayout_info;
+        return &VK_KHR_RELAXED_BLOCK_LAYOUT_INFO;
     }
     if (std::strcmp(name, VK_KHR_ROBUSTNESS_2_EXTENSION_NAME) == 0) {
-        return &vkkhrrobustness2_info;
+        return &VK_KHR_ROBUSTNESS2_INFO;
     }
     if (std::strcmp(name, VK_KHR_SAMPLER_MIRROR_CLAMP_TO_EDGE_EXTENSION_NAME) == 0) {
-        return &vkkhrsamplermirrorclamptoedge_info;
+        return &VK_KHR_SAMPLER_MIRROR_CLAMP_TO_EDGE_INFO;
     }
     if (std::strcmp(name, VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME) == 0) {
-        return &vkkhrsamplerycbcrconversion_info;
+        return &VK_KHR_SAMPLER_YCBCR_CONVERSION_INFO;
     }
     if (std::strcmp(name, VK_KHR_SEPARATE_DEPTH_STENCIL_LAYOUTS_EXTENSION_NAME) == 0) {
-        return &vkkhrseparatedepthstencillayouts_info;
+        return &VK_KHR_SEPARATE_DEPTH_STENCIL_LAYOUTS_INFO;
     }
     if (std::strcmp(name, VK_KHR_SHADER_ATOMIC_INT64_EXTENSION_NAME) == 0) {
-        return &vkkhrshaderatomicint64_info;
+        return &VK_KHR_SHADER_ATOMIC_INT64_INFO;
     }
     if (std::strcmp(name, VK_KHR_SHADER_BFLOAT16_EXTENSION_NAME) == 0) {
-        return &vkkhrshaderbfloat16_info;
+        return &VK_KHR_SHADER_BFLOAT16_INFO;
     }
     if (std::strcmp(name, VK_KHR_SHADER_CLOCK_EXTENSION_NAME) == 0) {
-        return &vkkhrshaderclock_info;
+        return &VK_KHR_SHADER_CLOCK_INFO;
     }
     if (std::strcmp(name, VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME) == 0) {
-        return &vkkhrshaderdrawparameters_info;
+        return &VK_KHR_SHADER_DRAW_PARAMETERS_INFO;
     }
     if (std::strcmp(name, VK_KHR_SHADER_EXPECT_ASSUME_EXTENSION_NAME) == 0) {
-        return &vkkhrshaderexpectassume_info;
+        return &VK_KHR_SHADER_EXPECT_ASSUME_INFO;
     }
     if (std::strcmp(name, VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME) == 0) {
-        return &vkkhrshaderfloat16int8_info;
+        return &VK_KHR_SHADER_FLOAT16_INT8_INFO;
     }
     if (std::strcmp(name, VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME) == 0) {
-        return &vkkhrshaderfloatcontrols_info;
+        return &VK_KHR_SHADER_FLOAT_CONTROLS_INFO;
     }
     if (std::strcmp(name, VK_KHR_SHADER_FLOAT_CONTROLS_2_EXTENSION_NAME) == 0) {
-        return &vkkhrshaderfloatcontrols2_info;
+        return &VK_KHR_SHADER_FLOAT_CONTROLS2_INFO;
     }
     if (std::strcmp(name, VK_KHR_SHADER_FMA_EXTENSION_NAME) == 0) {
-        return &vkkhrshaderfma_info;
+        return &VK_KHR_SHADER_FMA_INFO;
     }
     if (std::strcmp(name, VK_KHR_SHADER_INTEGER_DOT_PRODUCT_EXTENSION_NAME) == 0) {
-        return &vkkhrshaderintegerdotproduct_info;
+        return &VK_KHR_SHADER_INTEGER_DOT_PRODUCT_INFO;
     }
     if (std::strcmp(name, VK_KHR_SHADER_MAXIMAL_RECONVERGENCE_EXTENSION_NAME) == 0) {
-        return &vkkhrshadermaximalreconvergence_info;
+        return &VK_KHR_SHADER_MAXIMAL_RECONVERGENCE_INFO;
     }
     if (std::strcmp(name, VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME) == 0) {
-        return &vkkhrshadernonsemanticinfo_info;
+        return &VK_KHR_SHADER_NON_SEMANTIC_INFO_INFO;
     }
     if (std::strcmp(name, VK_KHR_SHADER_QUAD_CONTROL_EXTENSION_NAME) == 0) {
-        return &vkkhrshaderquadcontrol_info;
+        return &VK_KHR_SHADER_QUAD_CONTROL_INFO;
     }
     if (std::strcmp(name, VK_KHR_SHADER_RELAXED_EXTENDED_INSTRUCTION_EXTENSION_NAME) == 0) {
-        return &vkkhrshaderrelaxedextendedinstruction_info;
+        return &VK_KHR_SHADER_RELAXED_EXTENDED_INSTRUCTION_INFO;
     }
     if (std::strcmp(name, VK_KHR_SHADER_SUBGROUP_EXTENDED_TYPES_EXTENSION_NAME) == 0) {
-        return &vkkhrshadersubgroupextendedtypes_info;
+        return &VK_KHR_SHADER_SUBGROUP_EXTENDED_TYPES_INFO;
     }
     if (std::strcmp(name, VK_KHR_SHADER_SUBGROUP_ROTATE_EXTENSION_NAME) == 0) {
-        return &vkkhrshadersubgrouprotate_info;
+        return &VK_KHR_SHADER_SUBGROUP_ROTATE_INFO;
     }
     if (std::strcmp(name, VK_KHR_SHADER_SUBGROUP_UNIFORM_CONTROL_FLOW_EXTENSION_NAME) == 0) {
-        return &vkkhrshadersubgroupuniformcontrolflow_info;
+        return &VK_KHR_SHADER_SUBGROUP_UNIFORM_CONTROL_FLOW_INFO;
     }
     if (std::strcmp(name, VK_KHR_SHADER_TERMINATE_INVOCATION_EXTENSION_NAME) == 0) {
-        return &vkkhrshaderterminateinvocation_info;
+        return &VK_KHR_SHADER_TERMINATE_INVOCATION_INFO;
     }
     if (std::strcmp(name, VK_KHR_SHADER_UNTYPED_POINTERS_EXTENSION_NAME) == 0) {
-        return &vkkhrshaderuntypedpointers_info;
+        return &VK_KHR_SHADER_UNTYPED_POINTERS_INFO;
     }
     if (std::strcmp(name, VK_KHR_SHARED_PRESENTABLE_IMAGE_EXTENSION_NAME) == 0) {
-        return &vkkhrsharedpresentableimage_info;
+        return &VK_KHR_SHARED_PRESENTABLE_IMAGE_INFO;
     }
     if (std::strcmp(name, VK_KHR_SPIRV_1_4_EXTENSION_NAME) == 0) {
-        return &vkkhrspirv14_info;
+        return &VK_KHR_SPIRV_1_4_INFO;
     }
     if (std::strcmp(name, VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_EXTENSION_NAME) == 0) {
-        return &vkkhrstoragebufferstorageclass_info;
+        return &VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_INFO;
     }
     if (std::strcmp(name, VK_KHR_SURFACE_EXTENSION_NAME) == 0) {
-        return &vkkhrsurface_info;
+        return &VK_KHR_SURFACE_INFO;
     }
     if (std::strcmp(name, VK_KHR_SURFACE_MAINTENANCE_1_EXTENSION_NAME) == 0) {
-        return &vkkhrsurfacemaintenance1_info;
+        return &VK_KHR_SURFACE_MAINTENANCE1_INFO;
     }
     if (std::strcmp(name, VK_KHR_SURFACE_PROTECTED_CAPABILITIES_EXTENSION_NAME) == 0) {
-        return &vkkhrsurfaceprotectedcapabilities_info;
+        return &VK_KHR_SURFACE_PROTECTED_CAPABILITIES_INFO;
     }
     if (std::strcmp(name, VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0) {
-        return &vkkhrswapchain_info;
+        return &VK_KHR_SWAPCHAIN_INFO;
     }
     if (std::strcmp(name, VK_KHR_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME) == 0) {
-        return &vkkhrswapchainmaintenance1_info;
+        return &VK_KHR_SWAPCHAIN_MAINTENANCE1_INFO;
     }
     if (std::strcmp(name, VK_KHR_SWAPCHAIN_MUTABLE_FORMAT_EXTENSION_NAME) == 0) {
-        return &vkkhrswapchainmutableformat_info;
+        return &VK_KHR_SWAPCHAIN_MUTABLE_FORMAT_INFO;
     }
     if (std::strcmp(name, VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME) == 0) {
-        return &vkkhrsynchronization2_info;
+        return &VK_KHR_SYNCHRONIZATION2_INFO;
     }
     if (std::strcmp(name, VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME) == 0) {
-        return &vkkhrtimelinesemaphore_info;
+        return &VK_KHR_TIMELINE_SEMAPHORE_INFO;
     }
     if (std::strcmp(name, VK_KHR_UNIFIED_IMAGE_LAYOUTS_EXTENSION_NAME) == 0) {
-        return &vkkhrunifiedimagelayouts_info;
+        return &VK_KHR_UNIFIED_IMAGE_LAYOUTS_INFO;
     }
     if (std::strcmp(name, VK_KHR_UNIFORM_BUFFER_STANDARD_LAYOUT_EXTENSION_NAME) == 0) {
-        return &vkkhruniformbufferstandardlayout_info;
+        return &VK_KHR_UNIFORM_BUFFER_STANDARD_LAYOUT_INFO;
     }
     if (std::strcmp(name, VK_KHR_VARIABLE_POINTERS_EXTENSION_NAME) == 0) {
-        return &vkkhrvariablepointers_info;
+        return &VK_KHR_VARIABLE_POINTERS_INFO;
     }
     if (std::strcmp(name, VK_KHR_VERTEX_ATTRIBUTE_DIVISOR_EXTENSION_NAME) == 0) {
-        return &vkkhrvertexattributedivisor_info;
+        return &VK_KHR_VERTEX_ATTRIBUTE_DIVISOR_INFO;
     }
     if (std::strcmp(name, VK_KHR_VIDEO_DECODE_AV1_EXTENSION_NAME) == 0) {
-        return &vkkhrvideodecodeav1_info;
+        return &VK_KHR_VIDEO_DECODE_AV1_INFO;
     }
     if (std::strcmp(name, VK_KHR_VIDEO_DECODE_H264_EXTENSION_NAME) == 0) {
-        return &vkkhrvideodecodeh264_info;
+        return &VK_KHR_VIDEO_DECODE_H264_INFO;
     }
     if (std::strcmp(name, VK_KHR_VIDEO_DECODE_H265_EXTENSION_NAME) == 0) {
-        return &vkkhrvideodecodeh265_info;
+        return &VK_KHR_VIDEO_DECODE_H265_INFO;
     }
     if (std::strcmp(name, VK_KHR_VIDEO_DECODE_QUEUE_EXTENSION_NAME) == 0) {
-        return &vkkhrvideodecodequeue_info;
+        return &VK_KHR_VIDEO_DECODE_QUEUE_INFO;
     }
     if (std::strcmp(name, VK_KHR_VIDEO_DECODE_VP9_EXTENSION_NAME) == 0) {
-        return &vkkhrvideodecodevp9_info;
+        return &VK_KHR_VIDEO_DECODE_VP9_INFO;
     }
     if (std::strcmp(name, VK_KHR_VIDEO_ENCODE_AV1_EXTENSION_NAME) == 0) {
-        return &vkkhrvideoencodeav1_info;
+        return &VK_KHR_VIDEO_ENCODE_AV1_INFO;
     }
     if (std::strcmp(name, VK_KHR_VIDEO_ENCODE_H264_EXTENSION_NAME) == 0) {
-        return &vkkhrvideoencodeh264_info;
+        return &VK_KHR_VIDEO_ENCODE_H264_INFO;
     }
     if (std::strcmp(name, VK_KHR_VIDEO_ENCODE_H265_EXTENSION_NAME) == 0) {
-        return &vkkhrvideoencodeh265_info;
+        return &VK_KHR_VIDEO_ENCODE_H265_INFO;
     }
     if (std::strcmp(name, VK_KHR_VIDEO_ENCODE_INTRA_REFRESH_EXTENSION_NAME) == 0) {
-        return &vkkhrvideoencodeintrarefresh_info;
+        return &VK_KHR_VIDEO_ENCODE_INTRA_REFRESH_INFO;
     }
     if (std::strcmp(name, VK_KHR_VIDEO_ENCODE_QUANTIZATION_MAP_EXTENSION_NAME) == 0) {
-        return &vkkhrvideoencodequantizationmap_info;
+        return &VK_KHR_VIDEO_ENCODE_QUANTIZATION_MAP_INFO;
     }
     if (std::strcmp(name, VK_KHR_VIDEO_ENCODE_QUEUE_EXTENSION_NAME) == 0) {
-        return &vkkhrvideoencodequeue_info;
+        return &VK_KHR_VIDEO_ENCODE_QUEUE_INFO;
     }
     if (std::strcmp(name, VK_KHR_VIDEO_MAINTENANCE_1_EXTENSION_NAME) == 0) {
-        return &vkkhrvideomaintenance1_info;
+        return &VK_KHR_VIDEO_MAINTENANCE1_INFO;
     }
     if (std::strcmp(name, VK_KHR_VIDEO_MAINTENANCE_2_EXTENSION_NAME) == 0) {
-        return &vkkhrvideomaintenance2_info;
+        return &VK_KHR_VIDEO_MAINTENANCE2_INFO;
     }
     if (std::strcmp(name, VK_KHR_VIDEO_QUEUE_EXTENSION_NAME) == 0) {
-        return &vkkhrvideoqueue_info;
+        return &VK_KHR_VIDEO_QUEUE_INFO;
     }
     if (std::strcmp(name, VK_KHR_VULKAN_MEMORY_MODEL_EXTENSION_NAME) == 0) {
-        return &vkkhrvulkanmemorymodel_info;
+        return &VK_KHR_VULKAN_MEMORY_MODEL_INFO;
     }
     if (std::strcmp(name, VK_KHR_WORKGROUP_MEMORY_EXPLICIT_LAYOUT_EXTENSION_NAME) == 0) {
-        return &vkkhrworkgroupmemoryexplicitlayout_info;
+        return &VK_KHR_WORKGROUP_MEMORY_EXPLICIT_LAYOUT_INFO;
     }
     if (std::strcmp(name, VK_KHR_ZERO_INITIALIZE_WORKGROUP_MEMORY_EXTENSION_NAME) == 0) {
-        return &vkkhrzeroinitializeworkgroupmemory_info;
+        return &VK_KHR_ZERO_INITIALIZE_WORKGROUP_MEMORY_INFO;
     }
     if (std::strcmp(name, VK_LUNARG_DIRECT_DRIVER_LOADING_EXTENSION_NAME) == 0) {
-        return &vklunargdirectdriverloading_info;
+        return &VK_LUNARG_DIRECT_DRIVER_LOADING_INFO;
     }
     if (std::strcmp(name, VK_MESA_IMAGE_ALIGNMENT_CONTROL_EXTENSION_NAME) == 0) {
-        return &vkmesaimagealignmentcontrol_info;
+        return &VK_MESA_IMAGE_ALIGNMENT_CONTROL_INFO;
     }
     if (std::strcmp(name, VK_MSFT_LAYERED_DRIVER_EXTENSION_NAME) == 0) {
-        return &vkmsftlayereddriver_info;
+        return &VK_MSFT_LAYERED_DRIVER_INFO;
     }
     if (std::strcmp(name, VK_NVX_BINARY_IMPORT_EXTENSION_NAME) == 0) {
-        return &vknvxbinaryimport_info;
+        return &VK_NVX_BINARY_IMPORT_INFO;
     }
     if (std::strcmp(name, VK_NVX_IMAGE_VIEW_HANDLE_EXTENSION_NAME) == 0) {
-        return &vknvximageviewhandle_info;
+        return &VK_NVX_IMAGE_VIEW_HANDLE_INFO;
     }
     if (std::strcmp(name, VK_NVX_MULTIVIEW_PER_VIEW_ATTRIBUTES_EXTENSION_NAME) == 0) {
-        return &vknvxmultiviewperviewattributes_info;
+        return &VK_NVX_MULTIVIEW_PER_VIEW_ATTRIBUTES_INFO;
     }
     if (std::strcmp(name, VK_NV_CLIP_SPACE_W_SCALING_EXTENSION_NAME) == 0) {
-        return &vknvclipspacewscaling_info;
+        return &VK_NV_CLIP_SPACE_W_SCALING_INFO;
     }
     if (std::strcmp(name, VK_NV_CLUSTER_ACCELERATION_STRUCTURE_EXTENSION_NAME) == 0) {
-        return &vknvclusteraccelerationstructure_info;
+        return &VK_NV_CLUSTER_ACCELERATION_STRUCTURE_INFO;
     }
     if (std::strcmp(name, VK_NV_COMMAND_BUFFER_INHERITANCE_EXTENSION_NAME) == 0) {
-        return &vknvcommandbufferinheritance_info;
+        return &VK_NV_COMMAND_BUFFER_INHERITANCE_INFO;
     }
     if (std::strcmp(name, VK_NV_COMPUTE_OCCUPANCY_PRIORITY_EXTENSION_NAME) == 0) {
-        return &vknvcomputeoccupancypriority_info;
+        return &VK_NV_COMPUTE_OCCUPANCY_PRIORITY_INFO;
     }
     if (std::strcmp(name, VK_NV_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME) == 0) {
-        return &vknvcomputeshaderderivatives_info;
+        return &VK_NV_COMPUTE_SHADER_DERIVATIVES_INFO;
     }
     if (std::strcmp(name, VK_NV_COOPERATIVE_MATRIX_EXTENSION_NAME) == 0) {
-        return &vknvcooperativematrix_info;
+        return &VK_NV_COOPERATIVE_MATRIX_INFO;
     }
     if (std::strcmp(name, VK_NV_COOPERATIVE_MATRIX_2_EXTENSION_NAME) == 0) {
-        return &vknvcooperativematrix2_info;
+        return &VK_NV_COOPERATIVE_MATRIX2_INFO;
     }
     if (std::strcmp(name, VK_NV_COOPERATIVE_VECTOR_EXTENSION_NAME) == 0) {
-        return &vknvcooperativevector_info;
+        return &VK_NV_COOPERATIVE_VECTOR_INFO;
     }
     if (std::strcmp(name, VK_NV_COPY_MEMORY_INDIRECT_EXTENSION_NAME) == 0) {
-        return &vknvcopymemoryindirect_info;
+        return &VK_NV_COPY_MEMORY_INDIRECT_INFO;
     }
     if (std::strcmp(name, VK_NV_CORNER_SAMPLED_IMAGE_EXTENSION_NAME) == 0) {
-        return &vknvcornersampledimage_info;
+        return &VK_NV_CORNER_SAMPLED_IMAGE_INFO;
     }
     if (std::strcmp(name, VK_NV_COVERAGE_REDUCTION_MODE_EXTENSION_NAME) == 0) {
-        return &vknvcoveragereductionmode_info;
+        return &VK_NV_COVERAGE_REDUCTION_MODE_INFO;
     }
     if (std::strcmp(name, VK_NV_DEDICATED_ALLOCATION_EXTENSION_NAME) == 0) {
-        return &vknvdedicatedallocation_info;
+        return &VK_NV_DEDICATED_ALLOCATION_INFO;
     }
     if (std::strcmp(name, VK_NV_DEDICATED_ALLOCATION_IMAGE_ALIASING_EXTENSION_NAME) == 0) {
-        return &vknvdedicatedallocationimagealiasing_info;
+        return &VK_NV_DEDICATED_ALLOCATION_IMAGE_ALIASING_INFO;
     }
     if (std::strcmp(name, VK_NV_DESCRIPTOR_POOL_OVERALLOCATION_EXTENSION_NAME) == 0) {
-        return &vknvdescriptorpooloverallocation_info;
+        return &VK_NV_DESCRIPTOR_POOL_OVERALLOCATION_INFO;
     }
     if (std::strcmp(name, VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_EXTENSION_NAME) == 0) {
-        return &vknvdevicediagnosticcheckpoints_info;
+        return &VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_INFO;
     }
     if (std::strcmp(name, VK_NV_DEVICE_DIAGNOSTICS_CONFIG_EXTENSION_NAME) == 0) {
-        return &vknvdevicediagnosticsconfig_info;
+        return &VK_NV_DEVICE_DIAGNOSTICS_CONFIG_INFO;
     }
     if (std::strcmp(name, VK_NV_DEVICE_GENERATED_COMMANDS_EXTENSION_NAME) == 0) {
-        return &vknvdevicegeneratedcommands_info;
+        return &VK_NV_DEVICE_GENERATED_COMMANDS_INFO;
     }
     if (std::strcmp(name, VK_NV_DEVICE_GENERATED_COMMANDS_COMPUTE_EXTENSION_NAME) == 0) {
-        return &vknvdevicegeneratedcommandscompute_info;
+        return &VK_NV_DEVICE_GENERATED_COMMANDS_COMPUTE_INFO;
     }
     if (std::strcmp(name, VK_NV_DISPLAY_STEREO_EXTENSION_NAME) == 0) {
-        return &vknvdisplaystereo_info;
+        return &VK_NV_DISPLAY_STEREO_INFO;
     }
     if (std::strcmp(name, VK_NV_EXTENDED_SPARSE_ADDRESS_SPACE_EXTENSION_NAME) == 0) {
-        return &vknvextendedsparseaddressspace_info;
+        return &VK_NV_EXTENDED_SPARSE_ADDRESS_SPACE_INFO;
     }
     if (std::strcmp(name, VK_NV_EXTERNAL_COMPUTE_QUEUE_EXTENSION_NAME) == 0) {
-        return &vknvexternalcomputequeue_info;
+        return &VK_NV_EXTERNAL_COMPUTE_QUEUE_INFO;
     }
     if (std::strcmp(name, VK_NV_EXTERNAL_MEMORY_EXTENSION_NAME) == 0) {
-        return &vknvexternalmemory_info;
+        return &VK_NV_EXTERNAL_MEMORY_INFO;
     }
     if (std::strcmp(name, VK_NV_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME) == 0) {
-        return &vknvexternalmemorycapabilities_info;
+        return &VK_NV_EXTERNAL_MEMORY_CAPABILITIES_INFO;
     }
     if (std::strcmp(name, VK_NV_EXTERNAL_MEMORY_RDMA_EXTENSION_NAME) == 0) {
-        return &vknvexternalmemoryrdma_info;
+        return &VK_NV_EXTERNAL_MEMORY_RDMA_INFO;
     }
     if (std::strcmp(name, VK_NV_FILL_RECTANGLE_EXTENSION_NAME) == 0) {
-        return &vknvfillrectangle_info;
+        return &VK_NV_FILL_RECTANGLE_INFO;
     }
     if (std::strcmp(name, VK_NV_FRAGMENT_COVERAGE_TO_COLOR_EXTENSION_NAME) == 0) {
-        return &vknvfragmentcoveragetocolor_info;
+        return &VK_NV_FRAGMENT_COVERAGE_TO_COLOR_INFO;
     }
     if (std::strcmp(name, VK_NV_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME) == 0) {
-        return &vknvfragmentshaderbarycentric_info;
+        return &VK_NV_FRAGMENT_SHADER_BARYCENTRIC_INFO;
     }
     if (std::strcmp(name, VK_NV_FRAGMENT_SHADING_RATE_ENUMS_EXTENSION_NAME) == 0) {
-        return &vknvfragmentshadingrateenums_info;
+        return &VK_NV_FRAGMENT_SHADING_RATE_ENUMS_INFO;
     }
     if (std::strcmp(name, VK_NV_FRAMEBUFFER_MIXED_SAMPLES_EXTENSION_NAME) == 0) {
-        return &vknvframebuffermixedsamples_info;
+        return &VK_NV_FRAMEBUFFER_MIXED_SAMPLES_INFO;
     }
     if (std::strcmp(name, VK_NV_GEOMETRY_SHADER_PASSTHROUGH_EXTENSION_NAME) == 0) {
-        return &vknvgeometryshaderpassthrough_info;
+        return &VK_NV_GEOMETRY_SHADER_PASSTHROUGH_INFO;
     }
     if (std::strcmp(name, VK_NV_GLSL_SHADER_EXTENSION_NAME) == 0) {
-        return &vknvglslshader_info;
+        return &VK_NV_GLSL_SHADER_INFO;
     }
     if (std::strcmp(name, VK_NV_INHERITED_VIEWPORT_SCISSOR_EXTENSION_NAME) == 0) {
-        return &vknvinheritedviewportscissor_info;
+        return &VK_NV_INHERITED_VIEWPORT_SCISSOR_INFO;
     }
     if (std::strcmp(name, VK_NV_LINEAR_COLOR_ATTACHMENT_EXTENSION_NAME) == 0) {
-        return &vknvlinearcolorattachment_info;
+        return &VK_NV_LINEAR_COLOR_ATTACHMENT_INFO;
     }
     if (std::strcmp(name, VK_NV_LOW_LATENCY_EXTENSION_NAME) == 0) {
-        return &vknvlowlatency_info;
+        return &VK_NV_LOW_LATENCY_INFO;
     }
     if (std::strcmp(name, VK_NV_LOW_LATENCY_2_EXTENSION_NAME) == 0) {
-        return &vknvlowlatency2_info;
+        return &VK_NV_LOW_LATENCY2_INFO;
     }
     if (std::strcmp(name, VK_NV_MEMORY_DECOMPRESSION_EXTENSION_NAME) == 0) {
-        return &vknvmemorydecompression_info;
+        return &VK_NV_MEMORY_DECOMPRESSION_INFO;
     }
     if (std::strcmp(name, VK_NV_MESH_SHADER_EXTENSION_NAME) == 0) {
-        return &vknvmeshshader_info;
+        return &VK_NV_MESH_SHADER_INFO;
     }
     if (std::strcmp(name, VK_NV_OPTICAL_FLOW_EXTENSION_NAME) == 0) {
-        return &vknvopticalflow_info;
+        return &VK_NV_OPTICAL_FLOW_INFO;
     }
     if (std::strcmp(name, VK_NV_PARTITIONED_ACCELERATION_STRUCTURE_EXTENSION_NAME) == 0) {
-        return &vknvpartitionedaccelerationstructure_info;
+        return &VK_NV_PARTITIONED_ACCELERATION_STRUCTURE_INFO;
     }
     if (std::strcmp(name, VK_NV_PER_STAGE_DESCRIPTOR_SET_EXTENSION_NAME) == 0) {
-        return &vknvperstagedescriptorset_info;
+        return &VK_NV_PER_STAGE_DESCRIPTOR_SET_INFO;
     }
     if (std::strcmp(name, VK_NV_PRESENT_BARRIER_EXTENSION_NAME) == 0) {
-        return &vknvpresentbarrier_info;
+        return &VK_NV_PRESENT_BARRIER_INFO;
     }
     if (std::strcmp(name, VK_NV_PUSH_CONSTANT_BANK_EXTENSION_NAME) == 0) {
-        return &vknvpushconstantbank_info;
+        return &VK_NV_PUSH_CONSTANT_BANK_INFO;
     }
     if (std::strcmp(name, VK_NV_RAW_ACCESS_CHAINS_EXTENSION_NAME) == 0) {
-        return &vknvrawaccesschains_info;
+        return &VK_NV_RAW_ACCESS_CHAINS_INFO;
     }
     if (std::strcmp(name, VK_NV_RAY_TRACING_EXTENSION_NAME) == 0) {
-        return &vknvraytracing_info;
+        return &VK_NV_RAY_TRACING_INFO;
     }
     if (std::strcmp(name, VK_NV_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME) == 0) {
-        return &vknvraytracinginvocationreorder_info;
+        return &VK_NV_RAY_TRACING_INVOCATION_REORDER_INFO;
     }
     if (std::strcmp(name, VK_NV_RAY_TRACING_LINEAR_SWEPT_SPHERES_EXTENSION_NAME) == 0) {
-        return &vknvraytracinglinearsweptspheres_info;
+        return &VK_NV_RAY_TRACING_LINEAR_SWEPT_SPHERES_INFO;
     }
     if (std::strcmp(name, VK_NV_RAY_TRACING_MOTION_BLUR_EXTENSION_NAME) == 0) {
-        return &vknvraytracingmotionblur_info;
+        return &VK_NV_RAY_TRACING_MOTION_BLUR_INFO;
     }
     if (std::strcmp(name, VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME) == 0) {
-        return &vknvraytracingvalidation_info;
+        return &VK_NV_RAY_TRACING_VALIDATION_INFO;
     }
     if (std::strcmp(name, VK_NV_REPRESENTATIVE_FRAGMENT_TEST_EXTENSION_NAME) == 0) {
-        return &vknvrepresentativefragmenttest_info;
+        return &VK_NV_REPRESENTATIVE_FRAGMENT_TEST_INFO;
     }
     if (std::strcmp(name, VK_NV_SAMPLE_MASK_OVERRIDE_COVERAGE_EXTENSION_NAME) == 0) {
-        return &vknvsamplemaskoverridecoverage_info;
+        return &VK_NV_SAMPLE_MASK_OVERRIDE_COVERAGE_INFO;
     }
     if (std::strcmp(name, VK_NV_SCISSOR_EXCLUSIVE_EXTENSION_NAME) == 0) {
-        return &vknvscissorexclusive_info;
+        return &VK_NV_SCISSOR_EXCLUSIVE_INFO;
     }
     if (std::strcmp(name, VK_NV_SHADER_ATOMIC_FLOAT16_VECTOR_EXTENSION_NAME) == 0) {
-        return &vknvshaderatomicfloat16vector_info;
+        return &VK_NV_SHADER_ATOMIC_FLOAT16_VECTOR_INFO;
     }
     if (std::strcmp(name, VK_NV_SHADER_IMAGE_FOOTPRINT_EXTENSION_NAME) == 0) {
-        return &vknvshaderimagefootprint_info;
+        return &VK_NV_SHADER_IMAGE_FOOTPRINT_INFO;
     }
     if (std::strcmp(name, VK_NV_SHADER_SM_BUILTINS_EXTENSION_NAME) == 0) {
-        return &vknvshadersmbuiltins_info;
+        return &VK_NV_SHADER_SM_BUILTINS_INFO;
     }
     if (std::strcmp(name, VK_NV_SHADER_SUBGROUP_PARTITIONED_EXTENSION_NAME) == 0) {
-        return &vknvshadersubgrouppartitioned_info;
+        return &VK_NV_SHADER_SUBGROUP_PARTITIONED_INFO;
     }
     if (std::strcmp(name, VK_NV_SHADING_RATE_IMAGE_EXTENSION_NAME) == 0) {
-        return &vknvshadingrateimage_info;
+        return &VK_NV_SHADING_RATE_IMAGE_INFO;
     }
     if (std::strcmp(name, VK_NV_VIEWPORT_ARRAY_2_EXTENSION_NAME) == 0) {
-        return &vknvviewportarray2_info;
+        return &VK_NV_VIEWPORT_ARRAY2_INFO;
     }
     if (std::strcmp(name, VK_NV_VIEWPORT_SWIZZLE_EXTENSION_NAME) == 0) {
-        return &vknvviewportswizzle_info;
+        return &VK_NV_VIEWPORT_SWIZZLE_INFO;
     }
     if (std::strcmp(name, VK_QCOM_COOPERATIVE_MATRIX_CONVERSION_EXTENSION_NAME) == 0) {
-        return &vkqcomcooperativematrixconversion_info;
+        return &VK_QCOM_COOPERATIVE_MATRIX_CONVERSION_INFO;
     }
     if (std::strcmp(name, VK_QCOM_DATA_GRAPH_MODEL_EXTENSION_NAME) == 0) {
-        return &vkqcomdatagraphmodel_info;
+        return &VK_QCOM_DATA_GRAPH_MODEL_INFO;
     }
     if (std::strcmp(name, VK_QCOM_FILTER_CUBIC_CLAMP_EXTENSION_NAME) == 0) {
-        return &vkqcomfiltercubicclamp_info;
+        return &VK_QCOM_FILTER_CUBIC_CLAMP_INFO;
     }
     if (std::strcmp(name, VK_QCOM_FILTER_CUBIC_WEIGHTS_EXTENSION_NAME) == 0) {
-        return &vkqcomfiltercubicweights_info;
+        return &VK_QCOM_FILTER_CUBIC_WEIGHTS_INFO;
     }
     if (std::strcmp(name, VK_QCOM_FRAGMENT_DENSITY_MAP_OFFSET_EXTENSION_NAME) == 0) {
-        return &vkqcomfragmentdensitymapoffset_info;
+        return &VK_QCOM_FRAGMENT_DENSITY_MAP_OFFSET_INFO;
     }
     if (std::strcmp(name, VK_QCOM_IMAGE_PROCESSING_EXTENSION_NAME) == 0) {
-        return &vkqcomimageprocessing_info;
+        return &VK_QCOM_IMAGE_PROCESSING_INFO;
     }
     if (std::strcmp(name, VK_QCOM_IMAGE_PROCESSING_2_EXTENSION_NAME) == 0) {
-        return &vkqcomimageprocessing2_info;
+        return &VK_QCOM_IMAGE_PROCESSING2_INFO;
     }
     if (std::strcmp(name, VK_QCOM_MULTIVIEW_PER_VIEW_RENDER_AREAS_EXTENSION_NAME) == 0) {
-        return &vkqcommultiviewperviewrenderareas_info;
+        return &VK_QCOM_MULTIVIEW_PER_VIEW_RENDER_AREAS_INFO;
     }
     if (std::strcmp(name, VK_QCOM_MULTIVIEW_PER_VIEW_VIEWPORTS_EXTENSION_NAME) == 0) {
-        return &vkqcommultiviewperviewviewports_info;
+        return &VK_QCOM_MULTIVIEW_PER_VIEW_VIEWPORTS_INFO;
     }
     if (std::strcmp(name, VK_QCOM_RENDER_PASS_SHADER_RESOLVE_EXTENSION_NAME) == 0) {
-        return &vkqcomrenderpassshaderresolve_info;
+        return &VK_QCOM_RENDER_PASS_SHADER_RESOLVE_INFO;
     }
     if (std::strcmp(name, VK_QCOM_RENDER_PASS_STORE_OPS_EXTENSION_NAME) == 0) {
-        return &vkqcomrenderpassstoreops_info;
+        return &VK_QCOM_RENDER_PASS_STORE_OPS_INFO;
     }
     if (std::strcmp(name, VK_QCOM_RENDER_PASS_TRANSFORM_EXTENSION_NAME) == 0) {
-        return &vkqcomrenderpasstransform_info;
+        return &VK_QCOM_RENDER_PASS_TRANSFORM_INFO;
     }
     if (std::strcmp(name, VK_QCOM_ROTATED_COPY_COMMANDS_EXTENSION_NAME) == 0) {
-        return &vkqcomrotatedcopycommands_info;
+        return &VK_QCOM_ROTATED_COPY_COMMANDS_INFO;
     }
     if (std::strcmp(name, VK_QCOM_TILE_MEMORY_HEAP_EXTENSION_NAME) == 0) {
-        return &vkqcomtilememoryheap_info;
+        return &VK_QCOM_TILE_MEMORY_HEAP_INFO;
     }
     if (std::strcmp(name, VK_QCOM_TILE_PROPERTIES_EXTENSION_NAME) == 0) {
-        return &vkqcomtileproperties_info;
+        return &VK_QCOM_TILE_PROPERTIES_INFO;
     }
     if (std::strcmp(name, VK_QCOM_TILE_SHADING_EXTENSION_NAME) == 0) {
-        return &vkqcomtileshading_info;
+        return &VK_QCOM_TILE_SHADING_INFO;
     }
     if (std::strcmp(name, VK_QCOM_YCBCR_DEGAMMA_EXTENSION_NAME) == 0) {
-        return &vkqcomycbcrdegamma_info;
+        return &VK_QCOM_YCBCR_DEGAMMA_INFO;
     }
     if (std::strcmp(name, VK_SEC_AMIGO_PROFILING_EXTENSION_NAME) == 0) {
-        return &vksecamigoprofiling_info;
+        return &VK_SEC_AMIGO_PROFILING_INFO;
     }
     if (std::strcmp(name, VK_SEC_PIPELINE_CACHE_INCREMENTAL_MODE_EXTENSION_NAME) == 0) {
-        return &vksecpipelinecacheincrementalmode_info;
+        return &VK_SEC_PIPELINE_CACHE_INCREMENTAL_MODE_INFO;
     }
     if (std::strcmp(name, VK_VALVE_DESCRIPTOR_SET_HOST_MAPPING_EXTENSION_NAME) == 0) {
-        return &vkvalvedescriptorsethostmapping_info;
+        return &VK_VALVE_DESCRIPTOR_SET_HOST_MAPPING_INFO;
     }
     if (std::strcmp(name, VK_VALVE_FRAGMENT_DENSITY_MAP_LAYERED_EXTENSION_NAME) == 0) {
-        return &vkvalvefragmentdensitymaplayered_info;
+        return &VK_VALVE_FRAGMENT_DENSITY_MAP_LAYERED_INFO;
     }
     if (std::strcmp(name, VK_VALVE_MUTABLE_DESCRIPTOR_TYPE_EXTENSION_NAME) == 0) {
-        return &vkvalvemutabledescriptortype_info;
+        return &VK_VALVE_MUTABLE_DESCRIPTOR_TYPE_INFO;
     }
     if (std::strcmp(name, VK_VALVE_VIDEO_ENCODE_RGB_CONVERSION_EXTENSION_NAME) == 0) {
-        return &vkvalvevideoencodergbconversion_info;
+        return &VK_VALVE_VIDEO_ENCODE_RGB_CONVERSION_INFO;
     }
     return nullptr;
 }

@@ -95,6 +95,7 @@ concept VulkanPropertyStruct = (
     std::same_as<T, vk::PhysicalDevicePipelineBinaryPropertiesKHR> ||
     std::same_as<T, vk::PhysicalDevicePipelineRobustnessProperties> ||
     std::same_as<T, vk::PhysicalDevicePointClippingProperties> ||
+    std::same_as<T, vk::PhysicalDeviceProperties2> ||
     std::same_as<T, vk::PhysicalDeviceProtectedMemoryProperties> ||
     std::same_as<T, vk::PhysicalDeviceProvokingVertexPropertiesEXT> ||
     std::same_as<T, vk::PhysicalDevicePushConstantBankPropertiesNV> ||
@@ -168,8 +169,6 @@ class VulkanProperties {
     // Named getters for each property struct
     const vk::PhysicalDeviceProperties& get_properties() const;
     operator const vk::PhysicalDeviceProperties&() const;
-    const vk::PhysicalDeviceProperties2& get_properties2() const;
-    operator const vk::PhysicalDeviceProperties2&() const;
     const vk::PhysicalDeviceAccelerationStructurePropertiesKHR& get_acceleration_structure_properties_khr() const;
     operator const vk::PhysicalDeviceAccelerationStructurePropertiesKHR&() const;
     const vk::PhysicalDeviceBlendOperationAdvancedPropertiesEXT& get_blend_operation_advanced_properties_ext() const;
@@ -312,6 +311,8 @@ class VulkanProperties {
     operator const vk::PhysicalDevicePipelineRobustnessProperties&() const;
     const vk::PhysicalDevicePointClippingProperties& get_point_clipping_properties() const;
     operator const vk::PhysicalDevicePointClippingProperties&() const;
+    const vk::PhysicalDeviceProperties2& get_properties2() const;
+    operator const vk::PhysicalDeviceProperties2&() const;
     const vk::PhysicalDeviceProtectedMemoryProperties& get_protected_memory_properties() const;
     operator const vk::PhysicalDeviceProtectedMemoryProperties&() const;
     const vk::PhysicalDeviceProvokingVertexPropertiesEXT& get_provoking_vertex_properties_ext() const;
@@ -390,6 +391,36 @@ class VulkanProperties {
     operator const vk::PhysicalDeviceVulkan13Properties&() const;
     const vk::PhysicalDeviceVulkan14Properties& get_vulkan14_properties() const;
     operator const vk::PhysicalDeviceVulkan14Properties&() const;
+
+    // Alias getters (for backwards compatibility)
+    const vk::PhysicalDeviceCopyMemoryIndirectPropertiesKHR& get_copy_memory_indirect_properties_nv() const;  // Alias for PhysicalDeviceCopyMemoryIndirectPropertiesKHR
+    const vk::PhysicalDeviceDepthStencilResolveProperties& get_depth_stencil_resolve_properties_khr() const;  // Alias for PhysicalDeviceDepthStencilResolveProperties
+    const vk::PhysicalDeviceDescriptorIndexingProperties& get_descriptor_indexing_properties_ext() const;  // Alias for PhysicalDeviceDescriptorIndexingProperties
+    const vk::PhysicalDeviceDriverProperties& get_driver_properties_khr() const;  // Alias for PhysicalDeviceDriverProperties
+    const vk::PhysicalDeviceFloatControlsProperties& get_float_controls_properties_khr() const;  // Alias for PhysicalDeviceFloatControlsProperties
+    const vk::PhysicalDeviceFragmentDensityMapOffsetPropertiesEXT& get_fragment_density_map_offset_properties_qcom() const;  // Alias for PhysicalDeviceFragmentDensityMapOffsetPropertiesEXT
+    const vk::PhysicalDeviceHostImageCopyProperties& get_host_image_copy_properties_ext() const;  // Alias for PhysicalDeviceHostImageCopyProperties
+    const vk::PhysicalDeviceIDProperties& get_id_properties_khr() const;  // Alias for PhysicalDeviceIDProperties
+    const vk::PhysicalDeviceInlineUniformBlockProperties& get_inline_uniform_block_properties_ext() const;  // Alias for PhysicalDeviceInlineUniformBlockProperties
+    const vk::PhysicalDeviceLineRasterizationProperties& get_line_rasterization_properties_khr() const;  // Alias for PhysicalDeviceLineRasterizationProperties
+    const vk::PhysicalDeviceLineRasterizationProperties& get_line_rasterization_properties_ext() const;  // Alias for PhysicalDeviceLineRasterizationProperties
+    const vk::PhysicalDeviceMaintenance3Properties& get_maintenance3_properties_khr() const;  // Alias for PhysicalDeviceMaintenance3Properties
+    const vk::PhysicalDeviceMaintenance4Properties& get_maintenance4_properties_khr() const;  // Alias for PhysicalDeviceMaintenance4Properties
+    const vk::PhysicalDeviceMaintenance5Properties& get_maintenance5_properties_khr() const;  // Alias for PhysicalDeviceMaintenance5Properties
+    const vk::PhysicalDeviceMaintenance6Properties& get_maintenance6_properties_khr() const;  // Alias for PhysicalDeviceMaintenance6Properties
+    const vk::PhysicalDeviceMemoryDecompressionPropertiesEXT& get_memory_decompression_properties_nv() const;  // Alias for PhysicalDeviceMemoryDecompressionPropertiesEXT
+    const vk::PhysicalDeviceMultiviewProperties& get_multiview_properties_khr() const;  // Alias for PhysicalDeviceMultiviewProperties
+    const vk::PhysicalDevicePipelineRobustnessProperties& get_pipeline_robustness_properties_ext() const;  // Alias for PhysicalDevicePipelineRobustnessProperties
+    const vk::PhysicalDevicePointClippingProperties& get_point_clipping_properties_khr() const;  // Alias for PhysicalDevicePointClippingProperties
+    const vk::PhysicalDeviceProperties2& get_properties2_khr() const;  // Alias for PhysicalDeviceProperties2
+    const vk::PhysicalDevicePushDescriptorProperties& get_push_descriptor_properties_khr() const;  // Alias for PhysicalDevicePushDescriptorProperties
+    const vk::PhysicalDeviceRobustness2PropertiesKHR& get_robustness2_properties_ext() const;  // Alias for PhysicalDeviceRobustness2PropertiesKHR
+    const vk::PhysicalDeviceSamplerFilterMinmaxProperties& get_sampler_filter_minmax_properties_ext() const;  // Alias for PhysicalDeviceSamplerFilterMinmaxProperties
+    const vk::PhysicalDeviceShaderIntegerDotProductProperties& get_shader_integer_dot_product_properties_khr() const;  // Alias for PhysicalDeviceShaderIntegerDotProductProperties
+    const vk::PhysicalDeviceSubgroupSizeControlProperties& get_subgroup_size_control_properties_ext() const;  // Alias for PhysicalDeviceSubgroupSizeControlProperties
+    const vk::PhysicalDeviceTexelBufferAlignmentProperties& get_texel_buffer_alignment_properties_ext() const;  // Alias for PhysicalDeviceTexelBufferAlignmentProperties
+    const vk::PhysicalDeviceTimelineSemaphoreProperties& get_timeline_semaphore_properties_khr() const;  // Alias for PhysicalDeviceTimelineSemaphoreProperties
+    const vk::PhysicalDeviceVertexAttributeDivisorProperties& get_vertex_attribute_divisor_properties_khr() const;  // Alias for PhysicalDeviceVertexAttributeDivisorProperties
 
     /// Check if property struct is available (only valid after physical_device constructor)
     bool is_available(vk::StructureType stype) const;
@@ -487,6 +518,7 @@ class VulkanProperties {
     vk::PhysicalDevicePipelineBinaryPropertiesKHR m_pipeline_binary_properties_khr{};
     vk::PhysicalDevicePipelineRobustnessProperties m_pipeline_robustness_properties{};
     vk::PhysicalDevicePointClippingProperties m_point_clipping_properties{};
+    vk::PhysicalDeviceProperties2 m_properties2{};
     vk::PhysicalDeviceProtectedMemoryProperties m_protected_memory_properties{};
     vk::PhysicalDeviceProvokingVertexPropertiesEXT m_provoking_vertex_properties_ext{};
     vk::PhysicalDevicePushConstantBankPropertiesNV m_push_constant_bank_properties_nv{};
@@ -527,7 +559,6 @@ class VulkanProperties {
     vk::PhysicalDeviceVulkan13Properties m_vulkan13_properties{};
     vk::PhysicalDeviceVulkan14Properties m_vulkan14_properties{};
 
-    vk::PhysicalDeviceProperties2 m_properties2{};
 
     /// Track which structs are available via extensions or API version
     std::unordered_set<vk::StructureType> available_structs;

@@ -27,8 +27,7 @@ class ExtensionMitigations : public ContextExtension {
             SPDLOG_WARN("Mitigation: Detected AMDVLK driver. ExtensionVkRayTracingPositionFetch is "
                         "broken (last checked: 2025/07/14) - disabling!");
 
-            features.get_ray_tracing_position_fetch_features_khr().rayTracingPositionFetch =
-                VK_FALSE;
+            features.set_feature("rayTracingPositionFetch", false);
             auto it = extensions.begin();
             while (it != extensions.end()) {
                 if (strcmp(*it, VK_KHR_RAY_TRACING_POSITION_FETCH_EXTENSION_NAME) == 0) {

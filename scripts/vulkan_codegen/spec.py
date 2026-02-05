@@ -1,13 +1,58 @@
 """Vulkan specification loading and parsing utilities."""
 
+import json
 import os
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from urllib.request import urlopen
 
-# Read version from environment variable, fallback to default
-VULKAN_SPEC_VERSION = os.environ.get("VULKAN_SPEC_VERSION", "v1.4.338")
+
+def get_latest_vulkan_spec_version(use_tags: bool = True) -> str:
+    """
+    Get the latest Vulkan specification version from GitHub.
+
+    Args:
+        use_tags: If True, get latest tag (may include prereleases).
+                  If False, get latest official release.
+
+    Returns the latest tag/release name (e.g., 'v1.4.342').
+    Falls back to a known version if the query fails.
+    """
+    try:
+        if use_tags:
+            # Query GitHub API for latest tag (most recent)
+            api_url = "https://api.github.com/repos/KhronosGroup/Vulkan-Docs/tags"
+            with urlopen(api_url) as response:
+                data = json.loads(response.read())
+                if data and len(data) > 0:
+                    return data[0]['name']
+        else:
+            # Query GitHub API for latest release (stable)
+            api_url = "https://api.github.com/repos/KhronosGroup/Vulkan-Docs/releases/latest"
+            with urlopen(api_url) as response:
+                data = json.loads(response.read())
+                return data['tag_name']
+    except Exception:
+        # Fallback to a known version if GitHub API fails
+        return "v1.4.338"
+
+    # Should not reach here
+    return "v1.4.338"
+
+
+# Read version from environment variable, fallback to latest from GitHub
+# Set VULKAN_SPEC_VERSION environment variable to override (e.g., "v1.4.338")
+# By default, uses latest tag from GitHub (may be newer than latest release)
+VULKAN_SPEC_VERSION = os.environ.get("VULKAN_SPEC_VERSION") or get_latest_vulkan_spec_version(use_tags=True)
 VULKAN_SPEC_URL = f"https://raw.githubusercontent.com/KhronosGroup/Vulkan-Docs/{VULKAN_SPEC_VERSION}/xml/vk.xml"
+
+# Constants for Vulkan struct names (avoid hardcoded strings throughout codebase)
+PHYSICAL_DEVICE_PREFIX = "VkPhysicalDevice"
+FEATURE_STRUCT_BASE = "VkPhysicalDeviceFeatures2"
+PROPERTY_STRUCT_BASE = "VkPhysicalDeviceProperties2"
+DEVICE_CREATE_INFO = "VkDeviceCreateInfo"
+
+print(f"Using Vulkan spec version: {VULKAN_SPEC_VERSION}")
 
 
 def load_vulkan_spec() -> ET.Element:
