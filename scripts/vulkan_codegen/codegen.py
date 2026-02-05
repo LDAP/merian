@@ -1,6 +1,23 @@
 """Code generation helper utilities."""
 
 import re
+from typing import Any
+
+
+def get_extension(struct: Any, extension_map: dict):
+    """
+    Get Extension object for a struct (feature or property), or None if not from an extension.
+
+    Args:
+        struct: FeatureStruct or PropertyStruct with extension_name attribute
+        extension_map: Map of extension_name -> Extension object
+
+    Returns:
+        Extension object or None
+    """
+    if hasattr(struct, 'extension_name') and struct.extension_name and struct.extension_name in extension_map:
+        return extension_map[struct.extension_name]
+    return None
 
 
 def version_to_api_version(version_str: str) -> str | None:
@@ -56,6 +73,24 @@ def build_extension_name_map(xml_root):
             ext_name_map[ext_name] = ext_name_macro
 
     return ext_name_map
+
+
+def build_extension_deprecation_map(xml_root):
+    """
+    Build map of extension_name -> deprecatedby_extension_name.
+
+    Returns a dict mapping extension names to the extension that deprecated them.
+    """
+    deprecation_map = {}
+
+    for ext in xml_root.findall("extensions/extension"):
+        ext_name = ext.get("name")
+        deprecatedby = ext.get("deprecatedby")
+
+        if ext_name and deprecatedby:
+            deprecation_map[ext_name] = deprecatedby
+
+    return deprecation_map
 
 
 def build_alias_maps(xml_root):

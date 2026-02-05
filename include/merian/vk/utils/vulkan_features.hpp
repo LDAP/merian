@@ -1169,7 +1169,7 @@ class VulkanFeatures {
     const vk::PhysicalDeviceZeroInitializeWorkgroupMemoryFeatures& get_zero_initialize_workgroup_memory_features_khr() const;
 
     /// Feature-name-only API (simplified, version-portable)
-    void set_feature(const std::string& feature_name, bool enable);
+    bool set_feature(const std::string& feature_name, bool enable);
     bool get_feature(const std::string& feature_name) const;
 
     /// Enable multiple features by name

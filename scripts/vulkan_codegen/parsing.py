@@ -3,86 +3,40 @@
 import re
 import xml.etree.ElementTree as ET
 
-from .codegen import build_extension_name_map
-from .models import Extension, ExtensionDep
+from .codegen import build_extension_name_map, version_to_api_version
+from .models import Extension
 from .naming import to_camel_case
+from .spec import FEATURE_STRUCT_BASE, PROPERTY_STRUCT_BASE
 
 
 def parse_depends(
-    depends: str, ext_name_map: dict[str, str]
-) -> list[list[ExtensionDep]]:
+    depends: str
+) -> list[str]:
     """
     Parse the depends attribute into a list of OR'd dependencies,
     where each OR'd item is a list of AND'd dependencies.
 
     Examples:
-    - "VK_KHR_get_physical_device_properties2,VK_VERSION_1_1" -> [[dep1], [ver1_1]]
-    - "(VK_KHR_a+VK_KHR_b),VK_VERSION_1_2" -> [[dep_a, dep_b], [ver1_2]]
+    - "VK_KHR_get_physical_device_properties2,VK_VERSION_1_1" -> [VK_KHR_get_physical_device_properties2]
+    - "(VK_KHR_a+VK_KHR_b),VK_VERSION_1_2" -> [VK_KHR_a, VK_KHR_b]
 
     Args:
         depends: The depends attribute string from the Vulkan spec
-        ext_name_map: Map of extension names to EXTENSION_NAME macros
 
     Returns:
-        List of OR groups, where each group is a list of AND'ed dependencies
+        Only the extensions from the arithmetic expression. The ORs can be reconstructed by checking the promoted version.
     """
     if not depends:
         return []
 
     result = []
 
-    # Split by comma for OR (but not inside parentheses)
-    or_parts = []
-    depth = 0
-    current = ""
-    for c in depends:
-        if c == "(":
-            depth += 1
-            current += c
-        elif c == ")":
-            depth -= 1
-            current += c
-        elif c == "," and depth == 0:
-            or_parts.append(current.strip())
-            current = ""
-        else:
-            current += c
-    if current.strip():
-        or_parts.append(current.strip())
+    parts = re.split(r"[(),+]", depends)
+    for part in parts:
+        if part and not part.startswith("VK_VERSION"):
+            result.append(part)
 
-    for or_part in or_parts:
-        # Remove outer parentheses if present
-        or_part = or_part.strip()
-        if or_part.startswith("(") and or_part.endswith(")"):
-            or_part = or_part[1:-1]
-
-        # Split by '+' for AND
-        and_parts = or_part.split("+")
-        and_deps = []
-
-        for and_part in and_parts:
-            and_part = and_part.strip()
-            # Remove any remaining parentheses
-            and_part = and_part.strip("()")
-
-            if and_part.startswith("VK_VERSION_"):
-                # It's a version requirement
-                match = re.match(r"VK_VERSION_(\d+)_(\d+)", and_part)
-                if match:
-                    major, minor = match.groups()
-                    and_deps.append(
-                        ExtensionDep(version=f"VK_API_VERSION_{major}_{minor}")
-                    )
-            elif and_part.startswith("VK_"):
-                # It's an extension requirement
-                ext_macro = ext_name_map.get(and_part)
-                if ext_macro:
-                    and_deps.append(ExtensionDep(extension=ext_macro))
-
-        if and_deps:
-            result.append(and_deps)
-
-    return result
+    return list(set(result))
 
 
 def find_extensions(xml_root: ET.Element) -> list[Extension]:
@@ -118,28 +72,69 @@ def find_extensions(xml_root: ET.Element) -> list[Extension]:
         if not ext_name_macro:
             continue
 
-        depends = ext.get("depends", "")
-        dependencies = parse_depends(depends, ext_name_map)
+        # Parse extension number
+        ext_number = ext.get("number")
+        extension_number = None
+        if ext_number:
+            try:
+                extension_number = int(ext_number)
+            except ValueError:
+                pass
 
+        # Parse dependencies
+        depends = ext.get("depends", "")
+        dependencies = parse_depends(depends)
+
+        # Parse promoted version
         promotedto = ext.get("promotedto", "")
-        promoted_version = None
-        if promotedto:
-            match = re.match(r"VK_VERSION_(\d+)_(\d+)", promotedto)
-            if match:
-                major, minor = match.groups()
-                promoted_version = f"VK_API_VERSION_{major}_{minor}"
+        promotedto = version_to_api_version(promotedto)
+
+        # Parse deprecatedby
+        deprecatedby = ext.get("deprecatedby", "")
+        if deprecatedby.startswith("VK_VERSION"):
+            deprecatedby = version_to_api_version(deprecatedby)
 
         extensions.append(
             Extension(
                 name=ext_name,
                 name_macro=ext_name_macro,
                 type=type,
+                extension_number=extension_number,
                 dependencies=dependencies,
-                promotedto=promoted_version,
+                promotedto=promotedto,
+                deprecatedby=deprecatedby,
             )
         )
 
     return extensions
+
+
+def _resolve_type_alias(xml_root: ET.Element, type_name: str) -> ET.Element | None:
+    """
+    Resolve a type to its actual definition, following aliases if necessary.
+
+    Args:
+        xml_root: Root element of the Vulkan spec XML
+        type_name: Name of the type to resolve
+
+    Returns:
+        The type definition element, or None if not found
+    """
+    typedef = None
+    for t in xml_root.findall("types/type"):
+        if t.get("name") == type_name:
+            typedef = t
+            break
+
+    if typedef is None:
+        return None
+
+    # If this is an alias, follow it to the target
+    alias_target = typedef.get("alias")
+    if alias_target:
+        return _resolve_type_alias(xml_root, alias_target)
+
+    return typedef
 
 
 def enrich_extensions_with_struct_types(
@@ -147,6 +142,8 @@ def enrich_extensions_with_struct_types(
 ) -> None:
     """
     Enrich Extension objects with property and feature structure types.
+
+    Handles type aliases by resolving them to their target definitions.
 
     Args:
         extensions: List of Extension objects to enrich (modified in place)
@@ -185,25 +182,41 @@ def enrich_extensions_with_struct_types(
                 if not type_name:
                     continue
 
-                # Find the type definition
-                for typedef in xml_root.findall("types/type"):
-                    if typedef.get("name") != type_name:
-                        continue
+                # Find the type definition (follow aliases)
+                typedef = _resolve_type_alias(xml_root, type_name)
+                if not typedef:
+                    continue
 
-                    struct_extends = typedef.get("structextends", "")
+                struct_extends = typedef.get("structextends", "")
 
-                    # Check if it's a property struct
-                    if "VkPhysicalDeviceProperties2" in struct_extends:
-                        stype = _extract_stype(typedef, type_name, tags)
-                        if stype and stype not in ext_obj.property_types:
-                            ext_obj.property_types.append(stype)
+                # Check if it's a property struct
+                if PROPERTY_STRUCT_BASE in struct_extends:
+                    stype = _extract_stype(typedef, typedef.get("name"), tags)
+                    if stype and stype not in ext_obj.property_types:
+                        ext_obj.property_types.append(stype)
 
-                    # Check if it's a feature struct
-                    if "VkPhysicalDeviceFeatures2" in struct_extends:
-                        stype = _extract_stype(typedef, type_name, tags)
-                        if stype and stype not in ext_obj.feature_types:
-                            ext_obj.feature_types.append(stype)
-                    break
+                # Check if it's a feature struct
+                if FEATURE_STRUCT_BASE in struct_extends:
+                    stype = _extract_stype(typedef, typedef.get("name"), tags)
+                    if stype and stype not in ext_obj.feature_types:
+                        ext_obj.feature_types.append(stype)
+                break
+
+
+def build_extension_map(xml_root: ET.Element, tags: list[str]) -> dict[str, Extension]:
+    """
+    Build a map of extension_name -> Extension object.
+
+    Args:
+        xml_root: Root element of the Vulkan spec XML
+        tags: List of vendor tags for proper casing
+
+    Returns:
+        Dict mapping extension names (e.g., "VK_KHR_swapchain") to Extension objects
+    """
+    extensions = find_extensions(xml_root)
+    enrich_extensions_with_struct_types(extensions, xml_root, tags)
+    return {ext.name: ext for ext in extensions}
 
 
 def _extract_stype(typedef: ET.Element, type_name: str, tags: list[str]) -> str | None:

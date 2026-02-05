@@ -160,7 +160,11 @@ void Context::create_instance(const uint32_t targeted_vk_api_version,
         device_extensions.emplace_back(ext);
     }
     const auto add_instance_extensions = [&](const auto& self, const char* ext) -> void {
-        for (const ExtensionInfo* dep : get_extension_info(ext)->dependencies) {
+        const ExtensionInfo* const ext_info = get_extension_info(ext);
+        if (ext_info == nullptr) {
+            throw std::invalid_argument{fmt::format("extension {} unknown", ext)};
+        }
+        for (const ExtensionInfo* dep : ext_info->dependencies) {
             if (dep->is_instance_extension() &&
                 dep->promoted_to_version > effective_vk_instance_api_version) {
                 if (supported_instance_extensions.contains(dep->name)) {

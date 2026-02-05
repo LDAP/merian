@@ -813,7 +813,7 @@ VulkanProperties::VulkanProperties(const vk::PhysicalDevice& physical_device,
     }
 
     // PhysicalDeviceVulkan11Properties
-    if (effective_vk_api_version >= VK_API_VERSION_1_1) {
+    if (effective_vk_api_version >= VK_API_VERSION_1_2) {
         m_vulkan11_properties.pNext = chain_tail;
         chain_tail = &m_vulkan11_properties;
         available_structs.insert(m_vulkan11_properties.sType);

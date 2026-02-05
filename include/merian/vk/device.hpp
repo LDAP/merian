@@ -51,6 +51,10 @@ class Device : public std::enable_shared_from_this<Device> {
                 SPDLOG_DEBUG("{} skipped (provided by API version)", ext_info->name);
                 return {true, ""};
             }
+            if (ext_info->deprecated_by != nullptr && physical_device->extension_supported(ext_info->deprecated_by->name)) {
+                SPDLOG_DEBUG("{} skipped (deprecated by {})", ext_info->name, ext_info->deprecated_by->name);
+                return self(self, ext_info->deprecated_by);
+            }
 
             if (!physical_device->extension_supported(ext_info->name)) {
                 return {false, fmt::format("{} not supported by physical device!", ext_info->name)};

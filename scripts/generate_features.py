@@ -17,12 +17,13 @@ import re
 from pprint import pprint
 from vulkan_codegen.codegen import (
     build_alias_maps,
-    build_extension_number_map,
     build_extension_type_map,
     build_feature_version_map,
     generate_file_header,
+    get_extension,
 )
 from vulkan_codegen.models import FeatureMember, FeatureStruct
+from vulkan_codegen.parsing import build_extension_map
 from vulkan_codegen.naming import (
     generate_getter_name,
     generate_member_name,
@@ -32,6 +33,8 @@ from vulkan_codegen.naming import (
     vk_name_to_cpp_name,
 )
 from vulkan_codegen.spec import (
+    FEATURE_STRUCT_BASE,
+    PHYSICAL_DEVICE_PREFIX,
     VULKAN_SPEC_VERSION,
     build_skiplist,
     get_output_paths,
@@ -40,6 +43,9 @@ from vulkan_codegen.spec import (
 )
 
 out_path, include_path = get_output_paths()
+
+# Global extension map for accessing extension properties
+_extension_map = {}
 
 
 def extract_feature_members(type_elem) -> tuple[str | None, list[FeatureMember]]:
@@ -83,7 +89,7 @@ def find_vk_physical_device_features2(xml_root) -> FeatureStruct | None:
 
             if vk_features_members:
                 return FeatureStruct(
-                    vk_name="VkPhysicalDeviceFeatures2",
+                    vk_name=FEATURE_STRUCT_BASE,
                     cpp_name="PhysicalDeviceFeatures2",
                     stype="VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2",
                     members=vk_features_members,
@@ -104,10 +110,14 @@ def find_feature_structures(xml_root, tags) -> list[FeatureStruct]:
     """Find all structures that extend VkPhysicalDeviceFeatures2."""
     features = []
     skiplist = build_skiplist(xml_root)
-    # Extension map now handles aliases internally during building
-    extension_map = build_extension_type_map(xml_root)
+
+    # Build full extension map with all properties
+    global _extension_map
+    _extension_map = build_extension_map(xml_root, tags)
+
+    # Build type -> extension_name map (still needed for struct association)
+    extension_type_map = build_extension_type_map(xml_root)
     version_map = build_feature_version_map(xml_root)
-    extension_number_map = build_extension_number_map(xml_root)
     _, canonical_to_aliases = build_alias_maps(xml_root)
 
     for type_elem in xml_root.findall("types/type"):
@@ -115,7 +125,7 @@ def find_feature_structures(xml_root, tags) -> list[FeatureStruct]:
             continue
 
         struct_extends = type_elem.get("structextends", "")
-        if "VkPhysicalDeviceFeatures2" not in struct_extends.split(","):
+        if FEATURE_STRUCT_BASE not in struct_extends.split(","):
             continue
 
         vk_name = type_elem.get("name")
@@ -127,12 +137,11 @@ def find_feature_structures(xml_root, tags) -> list[FeatureStruct]:
             stype = get_stype_from_name(vk_name)
 
         cpp_name = vk_name_to_cpp_name(vk_name)
-        ext_info = extension_map.get(vk_name)
-        extension = ext_info[0] if ext_info else None
+
+        # Get extension_name from type map
+        ext_info = extension_type_map.get(vk_name)
         extension_name = ext_info[1] if ext_info else None
-        promotion_version = ext_info[2] if ext_info else None
         required_version = version_map.get(vk_name)
-        extension_number = extension_number_map.get(extension_name) if extension_name else None
 
         features.append(
             FeatureStruct(
@@ -140,9 +149,7 @@ def find_feature_structures(xml_root, tags) -> list[FeatureStruct]:
                 cpp_name=cpp_name,
                 stype=stype,
                 members=members,
-                extension=extension,
-                extension_number=extension_number,
-                promotion_version=promotion_version,
+                extension_name=extension_name,
                 required_version=required_version,
                 structextends=struct_extends.split(",") if struct_extends else [],
             )
@@ -279,7 +286,7 @@ def generate_header(features: list[FeatureStruct]) -> str:
         [
             "",
             "    /// Feature-name-only API (simplified, version-portable)",
-            "    void set_feature(const std::string& feature_name, bool enable);",
+            "    bool set_feature(const std::string& feature_name, bool enable);",
             "    bool get_feature(const std::string& feature_name) const;",
             "",
             "    /// Enable multiple features by name",
@@ -370,19 +377,21 @@ def generate_constructor(features: list[FeatureStruct], tags) -> list[str]:
         # For VulkanXXFeatures structs, use required_version since they have no extension
         conditions = []
 
+        # Get extension info if this struct is from an extension
+        ext = get_extension(feat, _extension_map)
+
         # Prefer promotion_version over required_version to avoid duplicates
         # (e.g., a struct promoted in 1.2 shouldn't check both required_version=1.2 and promotion_version=1.2)
-        if feat.promotion_version:
+        if ext and ext.promotedto:
             # Struct was promoted from an extension - check promotion version OR extension
-            conditions.append(f"vk_api_version >= {feat.promotion_version}")
-            if feat.extension:
-                conditions.append(f"device_extensions.contains({feat.extension})")
+            conditions.append(f"vk_api_version >= {ext.promotedto}")
+            conditions.append(f"device_extensions.contains({ext.name_macro})")
         elif feat.required_version:
             # Core struct (like VulkanXXFeatures) - only check required version
             conditions.append(f"vk_api_version >= {feat.required_version}")
-        elif feat.extension:
+        elif ext:
             # Extension-only struct - check extension
-            conditions.append(f"device_extensions.contains({feat.extension})")
+            conditions.append(f"device_extensions.contains({ext.name_macro})")
 
         if conditions:
             condition = " || ".join(conditions)
@@ -609,17 +618,13 @@ def build_feature_to_structs_map(features: list[FeatureStruct]) -> dict:
 def generate_set_feature(feature_map: dict) -> list[str]:
     """Generate set_feature implementation with type-safe if/else chain."""
     lines = [
-        "void VulkanFeatures::set_feature(const std::string& feature_name, bool enable) {",
+        "bool VulkanFeatures::set_feature(const std::string& feature_name, bool enable) {",
         "    const VkBool32 value = enable ? VK_TRUE : VK_FALSE;",
         "",
     ]
 
-    first = True
     for feature_name, struct_list in sorted(feature_map.items()):
-        if_keyword = "if" if first else "else if"
-        first = False
-
-        lines.append(f'    {if_keyword} (feature_name == "{feature_name}") {{')
+        lines.append(f'    if (feature_name == "{feature_name}") {{')
 
         # Set in ALL structs that contain this feature
         for entry in struct_list:
@@ -628,14 +633,14 @@ def generate_set_feature(feature_map: dict) -> list[str]:
             feat_name = entry["member"].name
             lines.append(f"        {member_name}.{prefix}{feat_name} = value;")
 
+        lines.append(f"        return true;")
         lines.append("    }")
 
     lines.extend(
         [
-            "    else {",
-            "        throw std::invalid_argument(",
-            "            fmt::format(\"Unknown feature: '{}'\", feature_name));",
-            "    }",
+            "    ",
+            "    return false;",
+            "    ",
             "}",
             "",
         ]
@@ -668,8 +673,7 @@ def generate_get_feature(feature_map: dict) -> list[str]:
     lines.extend(
         [
             "    else {",
-            "        throw std::invalid_argument(",
-            "            fmt::format(\"Unknown feature: '{}'\", feature_name));",
+            "        return false;",
             "    }",
             "}",
             "",
@@ -688,21 +692,22 @@ def compute_priority_score(feat: FeatureStruct) -> tuple:
     """Compute priority score for sorting. Higher = better priority.
 
     1. Supersets (more features) come first
-    2. Then prefer promoted/newer extensions
+    2. Then prefer non-deprecated over deprecated structs
+    3. Then prefer newer extensions (higher extension number)
     """
-    # Extract version number for comparison (e.g., VK_API_VERSION_1_3 -> (1, 3))
-    def version_to_tuple(version_str):
-        if not version_str:
-            return (0, 0)
-        match = re.match(r"VK_API_VERSION_(\d+)_(\d+)", version_str)
-        if match:
-            return (int(match.group(1)), int(match.group(2)))
-        return (0, 0)
+    # Look up extension properties
+    is_deprecated = 0
+    extension_number = 0
+
+    if feat.extension_name and feat.extension_name in _extension_map:
+        ext = _extension_map[feat.extension_name]
+        is_deprecated = 1 if ext.deprecatedby else 0
+        extension_number = ext.extension_number or 0
 
     return (
         len(feat.members),  # More features = superset = higher priority
-        version_to_tuple(feat.promotion_version),  # Higher promotion version = newer
-        feat.extension_number or 0,  # Higher extension number = newer
+        -is_deprecated,  # Non-deprecated (0) > deprecated (1), so negate for sorting
+        extension_number,  # Higher extension number = newer
         feat.vk_name,  # Stable tie-breaker
     )
 
@@ -802,15 +807,17 @@ def generate_support_assertion(feat: FeatureStruct) -> list[str]:
     """Generate assertion for extension/version support."""
     lines = []
 
-    if feat.extension and feat.promotion_version:
+    ext = get_extension(feat, _extension_map)
+
+    if ext and ext.promotedto:
         lines.extend([
-            f"        assert((physical_device->extension_supported({feat.extension}) ||",
-            f"                vk_api_version >= {feat.promotion_version}) &&",
+            f"        assert((physical_device->extension_supported({ext.name_macro}) ||",
+            f"                vk_api_version >= {ext.promotedto}) &&",
             f'               "Feature enabled but neither extension nor promoted version supported");',
         ])
-    elif feat.extension:
+    elif ext:
         lines.extend([
-            f"        assert(physical_device->extension_supported({feat.extension}) &&",
+            f"        assert(physical_device->extension_supported({ext.name_macro}) &&",
             f'               "Feature enabled but required extension not supported");',
         ])
     elif feat.required_version:
@@ -855,11 +862,13 @@ def generate_single_feature(feat: FeatureStruct, indent: str) -> list[str]:
     member_name = generate_member_name(feat.cpp_name)
     feature_condition = generate_feature_enabled_condition(feat)
 
+    ext = get_extension(feat, _extension_map)
+
     support_conditions = []
-    if feat.promotion_version:
-        support_conditions.append(f"vk_api_version >= {feat.promotion_version}")
-    if feat.extension:
-        support_conditions.append(f"physical_device->extension_supported({feat.extension})")
+    if ext and ext.promotedto:
+        support_conditions.append(f"vk_api_version >= {ext.promotedto}")
+    if ext:
+        support_conditions.append(f"physical_device->extension_supported({ext.name_macro})")
     support_condition = " || ".join(support_conditions) if support_conditions else "true"
 
     lines.extend([
@@ -883,13 +892,15 @@ def generate_aliases(aliases: list[FeatureStruct], indent: str) -> list[str]:
         feature_condition = generate_feature_enabled_condition(feat)
         if_keyword = "if" if i == 0 else "else if"
 
+        ext = get_extension(feat, _extension_map)
+
         support_conditions = []
         if feat.required_version:
             support_conditions.append(f"vk_api_version >= {feat.required_version}")
-        elif feat.promotion_version:
-            support_conditions.append(f"vk_api_version >= {feat.promotion_version}")
-        if feat.extension:
-            support_conditions.append(f"physical_device->extension_supported({feat.extension})")
+        elif ext and ext.promotedto:
+            support_conditions.append(f"vk_api_version >= {ext.promotedto}")
+        if ext:
+            support_conditions.append(f"physical_device->extension_supported({ext.name_macro})")
         support_condition = " || ".join(support_conditions) if support_conditions else "true"
 
         lines.extend([
@@ -913,13 +924,15 @@ def generate_parent_child(parent: FeatureStruct, children: list, indent: str) ->
     parent_member = generate_member_name(parent.cpp_name)
     parent_feature_cond = generate_feature_enabled_condition(parent)
 
+    parent_ext = get_extension(parent, _extension_map)
+
     parent_support_cond = []
     if parent.required_version:
         parent_support_cond.append(f"vk_api_version >= {parent.required_version}")
-    elif parent.promotion_version:
-        parent_support_cond.append(f"vk_api_version >= {parent.promotion_version}")
-    if parent.extension:
-        parent_support_cond.append(f"physical_device->extension_supported({parent.extension})")
+    elif parent_ext and parent_ext.promotedto:
+        parent_support_cond.append(f"vk_api_version >= {parent_ext.promotedto}")
+    if parent_ext:
+        parent_support_cond.append(f"physical_device->extension_supported({parent_ext.name_macro})")
     parent_support = " || ".join(parent_support_cond) if parent_support_cond else "true"
 
     lines.extend([
@@ -1012,7 +1025,7 @@ def generate_helper_functions(features: list[FeatureStruct], tags) -> list[str]:
     # Filter to only features that extend VkPhysicalDeviceFeatures2 and have members
     relevant_features = [
         f for f in features
-        if f.members and "VkPhysicalDeviceFeatures2" in f.structextends
+        if f.members and FEATURE_STRUCT_BASE in f.structextends
     ]
 
     # Group features by their relationships
@@ -1061,7 +1074,8 @@ def generate_helper_functions(features: list[FeatureStruct], tags) -> list[str]:
     )
 
     for feat in sorted(features, key=lambda f: f.cpp_name):
-        if not feat.extension or not feat.members:
+        ext = get_extension(feat, _extension_map)
+        if not ext or not feat.members:
             continue
 
         member_name = generate_member_name(feat.cpp_name)
@@ -1074,7 +1088,7 @@ def generate_helper_functions(features: list[FeatureStruct], tags) -> list[str]:
         lines.extend(
             [
                 f"    if ({condition_str}) {{",
-                f"        extensions.insert({feat.extension});",
+                f"        extensions.insert({ext.name_macro});",
                 "    }",
             ]
         )

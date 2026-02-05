@@ -24,14 +24,15 @@ from vulkan_codegen.naming import (
     to_camel_case,
     vk_name_to_cpp_name,
 )
-from vulkan_codegen.parsing import find_extensions
+from vulkan_codegen.parsing import find_extensions, build_extension_map
 from vulkan_codegen.codegen import (
-    build_extension_number_map,
     build_extension_type_map,
     build_feature_version_map,
     generate_file_header,
+    get_extension,
 )
 from vulkan_codegen.spec import (
+    PROPERTY_STRUCT_BASE,
     VULKAN_SPEC_VERSION,
     build_skiplist,
     get_output_paths,
@@ -40,6 +41,9 @@ from vulkan_codegen.spec import (
 )
 
 out_path, include_path = get_output_paths()
+
+# Global extension map for accessing extension properties
+_extension_map = {}
 
 
 def determine_property_metadata(vk_name, ext_type_map, feature_version_map, ext_number_map):
@@ -74,12 +78,15 @@ def find_property_structures(xml_root, tags) -> list[PropertyStruct]:
     properties = []
     skiplist = build_skiplist(xml_root)
 
-    # Extension map now handles aliases internally during building
+    # Build full extension map with all properties
+    global _extension_map
+    _extension_map = build_extension_map(xml_root, tags)
+
+    # Build type -> extension_name map (still needed for struct association)
     ext_type_map = build_extension_type_map(xml_root)
     feature_version_map = build_feature_version_map(xml_root)
-    ext_number_map = build_extension_number_map(xml_root)
 
-    accepted_extends = {"VkPhysicalDeviceProperties2"}
+    accepted_extends = {PROPERTY_STRUCT_BASE}
 
     for type_elem in xml_root.findall("types/type"):
         if type_elem.get("category") != "struct":
@@ -112,19 +119,21 @@ def find_property_structures(xml_root, tags) -> list[PropertyStruct]:
             stype = get_stype_from_name(vk_name)
 
         cpp_name = vk_name_to_cpp_name(vk_name)
-        extension, extension_number, core_version, promotion_version = determine_property_metadata(
-            vk_name, ext_type_map, feature_version_map, ext_number_map
-        )
+
+        # Get extension_name from type map
+        ext_info = ext_type_map.get(vk_name)
+        extension_name = ext_info[1] if ext_info else None
+
+        # Determine if this is a core struct (introduced in a Vulkan version)
+        core_version = feature_version_map.get(vk_name)
 
         properties.append(
             PropertyStruct(
                 vk_name=vk_name,
                 cpp_name=cpp_name,
                 stype=stype,
-                extension=extension,
-                extension_number=extension_number,
+                extension_name=extension_name,
                 core_version=core_version,
-                promotion_version=promotion_version,
             )
         )
 
@@ -315,18 +324,19 @@ def generate_constructor(properties: list[PropertyStruct]) -> list[str]:
         # For VulkanXXProperties structs, use core_version since they have no extension
         conditions = []
 
+        ext = get_extension(prop, _extension_map)
+
         # Prefer promotion_version over core_version to avoid duplicates
-        if prop.promotion_version:
+        if ext and ext.promotedto:
             # Struct was promoted from an extension - check promotion version OR extension
-            conditions.append(f"effective_vk_api_version >= {prop.promotion_version}")
-            if prop.extension:
-                conditions.append(f"extensions.contains({prop.extension})")
+            conditions.append(f"effective_vk_api_version >= {ext.promotedto}")
+            conditions.append(f"extensions.contains({ext.name_macro})")
         elif prop.core_version:
             # Core struct (like VulkanXXProperties) - only check core version
             conditions.append(f"effective_vk_api_version >= {prop.core_version}")
-        elif prop.extension:
+        elif ext:
             # Extension-only struct - check extension
-            conditions.append(f"extensions.contains({prop.extension})")
+            conditions.append(f"extensions.contains({ext.name_macro})")
 
         if conditions:
             condition = " || ".join(conditions)
@@ -509,7 +519,7 @@ def generate_api_version_property_types(xml_root, tags) -> list[str]:
                 for typedef in xml_root.findall("types/type"):
                     if typedef.get("name") == type_name:
                         struct_extends = typedef.get("structextends", "")
-                        if "VkPhysicalDeviceProperties2" in struct_extends:
+                        if PROPERTY_STRUCT_BASE in struct_extends:
                             for member in typedef.findall("member"):
                                 member_name_elem = member.find("name")
                                 if (
@@ -600,7 +610,7 @@ def main():
     properties = find_property_structures(xml_root, tags)
     print(f"Found {len(properties)} property structures")
 
-    with_ext = [p for p in properties if p.extension]
+    with_ext = [p for p in properties if p.extension_name]
     with_version = [p for p in properties if p.core_version]
     print(f"  With extension: {len(with_ext)}")
     print(f"  With core version: {len(with_version)}")

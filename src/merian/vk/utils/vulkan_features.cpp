@@ -6310,1606 +6310,2104 @@ const void* VulkanFeatures::get_struct_ptr(vk::StructureType stype) const {
     }
 }
 
-void VulkanFeatures::set_feature(const std::string& feature_name, bool enable) {
+bool VulkanFeatures::set_feature(const std::string& feature_name, bool enable) {
     const VkBool32 value = enable ? VK_TRUE : VK_FALSE;
 
     if (feature_name == "accelerationStructure") {
         m_acceleration_structure_features_khr.accelerationStructure = value;
+        return true;
     }
-    else if (feature_name == "accelerationStructureCaptureReplay") {
+    if (feature_name == "accelerationStructureCaptureReplay") {
         m_acceleration_structure_features_khr.accelerationStructureCaptureReplay = value;
+        return true;
     }
-    else if (feature_name == "accelerationStructureHostCommands") {
+    if (feature_name == "accelerationStructureHostCommands") {
         m_acceleration_structure_features_khr.accelerationStructureHostCommands = value;
+        return true;
     }
-    else if (feature_name == "accelerationStructureIndirectBuild") {
+    if (feature_name == "accelerationStructureIndirectBuild") {
         m_acceleration_structure_features_khr.accelerationStructureIndirectBuild = value;
+        return true;
     }
-    else if (feature_name == "advancedBlendCoherentOperations") {
+    if (feature_name == "advancedBlendCoherentOperations") {
         m_blend_operation_advanced_features_ext.advancedBlendCoherentOperations = value;
+        return true;
     }
-    else if (feature_name == "alphaToOne") {
+    if (feature_name == "alphaToOne") {
         m_features2.features.alphaToOne = value;
+        return true;
     }
-    else if (feature_name == "amigoProfiling") {
+    if (feature_name == "amigoProfiling") {
         m_amigo_profiling_features_sec.amigoProfiling = value;
+        return true;
     }
-    else if (feature_name == "antiLag") {
+    if (feature_name == "antiLag") {
         m_anti_lag_features_amd.antiLag = value;
+        return true;
     }
-    else if (feature_name == "attachmentFeedbackLoopDynamicState") {
+    if (feature_name == "attachmentFeedbackLoopDynamicState") {
         m_attachment_feedback_loop_dynamic_state_features_ext.attachmentFeedbackLoopDynamicState = value;
+        return true;
     }
-    else if (feature_name == "attachmentFeedbackLoopLayout") {
+    if (feature_name == "attachmentFeedbackLoopLayout") {
         m_attachment_feedback_loop_layout_features_ext.attachmentFeedbackLoopLayout = value;
+        return true;
     }
-    else if (feature_name == "attachmentFragmentShadingRate") {
+    if (feature_name == "attachmentFragmentShadingRate") {
         m_fragment_shading_rate_features_khr.attachmentFragmentShadingRate = value;
+        return true;
     }
-    else if (feature_name == "borderColorSwizzle") {
+    if (feature_name == "borderColorSwizzle") {
         m_border_color_swizzle_features_ext.borderColorSwizzle = value;
+        return true;
     }
-    else if (feature_name == "borderColorSwizzleFromImage") {
+    if (feature_name == "borderColorSwizzleFromImage") {
         m_border_color_swizzle_features_ext.borderColorSwizzleFromImage = value;
+        return true;
     }
-    else if (feature_name == "bresenhamLines") {
+    if (feature_name == "bresenhamLines") {
         m_line_rasterization_features.bresenhamLines = value;
         m_vulkan14_features.bresenhamLines = value;
+        return true;
     }
-    else if (feature_name == "bufferDeviceAddress") {
+    if (feature_name == "bufferDeviceAddress") {
         m_buffer_device_address_features.bufferDeviceAddress = value;
         m_buffer_device_address_features_ext.bufferDeviceAddress = value;
         m_vulkan12_features.bufferDeviceAddress = value;
+        return true;
     }
-    else if (feature_name == "bufferDeviceAddressCaptureReplay") {
+    if (feature_name == "bufferDeviceAddressCaptureReplay") {
         m_buffer_device_address_features.bufferDeviceAddressCaptureReplay = value;
         m_buffer_device_address_features_ext.bufferDeviceAddressCaptureReplay = value;
         m_vulkan12_features.bufferDeviceAddressCaptureReplay = value;
+        return true;
     }
-    else if (feature_name == "bufferDeviceAddressMultiDevice") {
+    if (feature_name == "bufferDeviceAddressMultiDevice") {
         m_buffer_device_address_features.bufferDeviceAddressMultiDevice = value;
         m_buffer_device_address_features_ext.bufferDeviceAddressMultiDevice = value;
         m_vulkan12_features.bufferDeviceAddressMultiDevice = value;
+        return true;
     }
-    else if (feature_name == "clusterAccelerationStructure") {
+    if (feature_name == "clusterAccelerationStructure") {
         m_cluster_acceleration_structure_features_nv.clusterAccelerationStructure = value;
+        return true;
     }
-    else if (feature_name == "clustercullingShader") {
+    if (feature_name == "clustercullingShader") {
         m_cluster_culling_shader_features_huawei.clustercullingShader = value;
+        return true;
     }
-    else if (feature_name == "colorWriteEnable") {
+    if (feature_name == "colorWriteEnable") {
         m_color_write_enable_features_ext.colorWriteEnable = value;
+        return true;
     }
-    else if (feature_name == "commandBufferInheritance") {
+    if (feature_name == "commandBufferInheritance") {
         m_command_buffer_inheritance_features_nv.commandBufferInheritance = value;
+        return true;
     }
-    else if (feature_name == "computeDerivativeGroupLinear") {
+    if (feature_name == "computeDerivativeGroupLinear") {
         m_compute_shader_derivatives_features_khr.computeDerivativeGroupLinear = value;
+        return true;
     }
-    else if (feature_name == "computeDerivativeGroupQuads") {
+    if (feature_name == "computeDerivativeGroupQuads") {
         m_compute_shader_derivatives_features_khr.computeDerivativeGroupQuads = value;
+        return true;
     }
-    else if (feature_name == "computeFullSubgroups") {
+    if (feature_name == "computeFullSubgroups") {
         m_subgroup_size_control_features.computeFullSubgroups = value;
         m_vulkan13_features.computeFullSubgroups = value;
+        return true;
     }
-    else if (feature_name == "computeOccupancyPriority") {
+    if (feature_name == "computeOccupancyPriority") {
         m_compute_occupancy_priority_features_nv.computeOccupancyPriority = value;
+        return true;
     }
-    else if (feature_name == "conditionalRendering") {
+    if (feature_name == "conditionalRendering") {
         m_conditional_rendering_features_ext.conditionalRendering = value;
+        return true;
     }
-    else if (feature_name == "cooperativeMatrix") {
+    if (feature_name == "cooperativeMatrix") {
         m_cooperative_matrix_features_nv.cooperativeMatrix = value;
         m_cooperative_matrix_features_khr.cooperativeMatrix = value;
+        return true;
     }
-    else if (feature_name == "cooperativeMatrixBlockLoads") {
+    if (feature_name == "cooperativeMatrixBlockLoads") {
         m_cooperative_matrix2_features_nv.cooperativeMatrixBlockLoads = value;
+        return true;
     }
-    else if (feature_name == "cooperativeMatrixConversion") {
+    if (feature_name == "cooperativeMatrixConversion") {
         m_cooperative_matrix_conversion_features_qcom.cooperativeMatrixConversion = value;
+        return true;
     }
-    else if (feature_name == "cooperativeMatrixConversions") {
+    if (feature_name == "cooperativeMatrixConversions") {
         m_cooperative_matrix2_features_nv.cooperativeMatrixConversions = value;
+        return true;
     }
-    else if (feature_name == "cooperativeMatrixFlexibleDimensions") {
+    if (feature_name == "cooperativeMatrixFlexibleDimensions") {
         m_cooperative_matrix2_features_nv.cooperativeMatrixFlexibleDimensions = value;
+        return true;
     }
-    else if (feature_name == "cooperativeMatrixPerElementOperations") {
+    if (feature_name == "cooperativeMatrixPerElementOperations") {
         m_cooperative_matrix2_features_nv.cooperativeMatrixPerElementOperations = value;
+        return true;
     }
-    else if (feature_name == "cooperativeMatrixReductions") {
+    if (feature_name == "cooperativeMatrixReductions") {
         m_cooperative_matrix2_features_nv.cooperativeMatrixReductions = value;
+        return true;
     }
-    else if (feature_name == "cooperativeMatrixRobustBufferAccess") {
+    if (feature_name == "cooperativeMatrixRobustBufferAccess") {
         m_cooperative_matrix_features_nv.cooperativeMatrixRobustBufferAccess = value;
         m_cooperative_matrix_features_khr.cooperativeMatrixRobustBufferAccess = value;
+        return true;
     }
-    else if (feature_name == "cooperativeMatrixTensorAddressing") {
+    if (feature_name == "cooperativeMatrixTensorAddressing") {
         m_cooperative_matrix2_features_nv.cooperativeMatrixTensorAddressing = value;
+        return true;
     }
-    else if (feature_name == "cooperativeMatrixWorkgroupScope") {
+    if (feature_name == "cooperativeMatrixWorkgroupScope") {
         m_cooperative_matrix2_features_nv.cooperativeMatrixWorkgroupScope = value;
+        return true;
     }
-    else if (feature_name == "cooperativeVector") {
+    if (feature_name == "cooperativeVector") {
         m_cooperative_vector_features_nv.cooperativeVector = value;
+        return true;
     }
-    else if (feature_name == "cooperativeVectorTraining") {
+    if (feature_name == "cooperativeVectorTraining") {
         m_cooperative_vector_features_nv.cooperativeVectorTraining = value;
+        return true;
     }
-    else if (feature_name == "cornerSampledImage") {
+    if (feature_name == "cornerSampledImage") {
         m_corner_sampled_image_features_nv.cornerSampledImage = value;
+        return true;
     }
-    else if (feature_name == "coverageReductionMode") {
+    if (feature_name == "coverageReductionMode") {
         m_coverage_reduction_mode_features_nv.coverageReductionMode = value;
+        return true;
     }
-    else if (feature_name == "cubicRangeClamp") {
+    if (feature_name == "cubicRangeClamp") {
         m_cubic_clamp_features_qcom.cubicRangeClamp = value;
+        return true;
     }
-    else if (feature_name == "customBorderColorWithoutFormat") {
+    if (feature_name == "customBorderColorWithoutFormat") {
         m_custom_border_color_features_ext.customBorderColorWithoutFormat = value;
+        return true;
     }
-    else if (feature_name == "customBorderColors") {
+    if (feature_name == "customBorderColors") {
         m_custom_border_color_features_ext.customBorderColors = value;
+        return true;
     }
-    else if (feature_name == "customResolve") {
+    if (feature_name == "customResolve") {
         m_custom_resolve_features_ext.customResolve = value;
+        return true;
     }
-    else if (feature_name == "dataGraph") {
+    if (feature_name == "dataGraph") {
         m_data_graph_features_arm.dataGraph = value;
+        return true;
     }
-    else if (feature_name == "dataGraphDescriptorBuffer") {
+    if (feature_name == "dataGraphDescriptorBuffer") {
         m_data_graph_features_arm.dataGraphDescriptorBuffer = value;
+        return true;
     }
-    else if (feature_name == "dataGraphModel") {
+    if (feature_name == "dataGraphModel") {
         m_data_graph_model_features_qcom.dataGraphModel = value;
+        return true;
     }
-    else if (feature_name == "dataGraphShaderModule") {
+    if (feature_name == "dataGraphShaderModule") {
         m_data_graph_features_arm.dataGraphShaderModule = value;
+        return true;
     }
-    else if (feature_name == "dataGraphSpecializationConstants") {
+    if (feature_name == "dataGraphSpecializationConstants") {
         m_data_graph_features_arm.dataGraphSpecializationConstants = value;
+        return true;
     }
-    else if (feature_name == "dataGraphUpdateAfterBind") {
+    if (feature_name == "dataGraphUpdateAfterBind") {
         m_data_graph_features_arm.dataGraphUpdateAfterBind = value;
+        return true;
     }
-    else if (feature_name == "decodeModeSharedExponent") {
+    if (feature_name == "decodeModeSharedExponent") {
         m_astc_decode_features_ext.decodeModeSharedExponent = value;
+        return true;
     }
-    else if (feature_name == "dedicatedAllocationImageAliasing") {
+    if (feature_name == "dedicatedAllocationImageAliasing") {
         m_dedicated_allocation_image_aliasing_features_nv.dedicatedAllocationImageAliasing = value;
+        return true;
     }
-    else if (feature_name == "depthBiasClamp") {
+    if (feature_name == "depthBiasClamp") {
         m_features2.features.depthBiasClamp = value;
+        return true;
     }
-    else if (feature_name == "depthBiasControl") {
+    if (feature_name == "depthBiasControl") {
         m_depth_bias_control_features_ext.depthBiasControl = value;
+        return true;
     }
-    else if (feature_name == "depthBiasExact") {
+    if (feature_name == "depthBiasExact") {
         m_depth_bias_control_features_ext.depthBiasExact = value;
+        return true;
     }
-    else if (feature_name == "depthBounds") {
+    if (feature_name == "depthBounds") {
         m_features2.features.depthBounds = value;
+        return true;
     }
-    else if (feature_name == "depthClamp") {
+    if (feature_name == "depthClamp") {
         m_features2.features.depthClamp = value;
+        return true;
     }
-    else if (feature_name == "depthClampControl") {
+    if (feature_name == "depthClampControl") {
         m_depth_clamp_control_features_ext.depthClampControl = value;
+        return true;
     }
-    else if (feature_name == "depthClampZeroOne") {
+    if (feature_name == "depthClampZeroOne") {
         m_depth_clamp_zero_one_features_khr.depthClampZeroOne = value;
+        return true;
     }
-    else if (feature_name == "depthClipControl") {
+    if (feature_name == "depthClipControl") {
         m_depth_clip_control_features_ext.depthClipControl = value;
+        return true;
     }
-    else if (feature_name == "depthClipEnable") {
+    if (feature_name == "depthClipEnable") {
         m_depth_clip_enable_features_ext.depthClipEnable = value;
+        return true;
     }
-    else if (feature_name == "descriptorBindingAccelerationStructureUpdateAfterBind") {
+    if (feature_name == "descriptorBindingAccelerationStructureUpdateAfterBind") {
         m_acceleration_structure_features_khr.descriptorBindingAccelerationStructureUpdateAfterBind = value;
+        return true;
     }
-    else if (feature_name == "descriptorBindingInlineUniformBlockUpdateAfterBind") {
+    if (feature_name == "descriptorBindingInlineUniformBlockUpdateAfterBind") {
         m_inline_uniform_block_features.descriptorBindingInlineUniformBlockUpdateAfterBind = value;
         m_vulkan13_features.descriptorBindingInlineUniformBlockUpdateAfterBind = value;
+        return true;
     }
-    else if (feature_name == "descriptorBindingPartiallyBound") {
+    if (feature_name == "descriptorBindingPartiallyBound") {
         m_descriptor_indexing_features.descriptorBindingPartiallyBound = value;
         m_vulkan12_features.descriptorBindingPartiallyBound = value;
+        return true;
     }
-    else if (feature_name == "descriptorBindingSampledImageUpdateAfterBind") {
+    if (feature_name == "descriptorBindingSampledImageUpdateAfterBind") {
         m_descriptor_indexing_features.descriptorBindingSampledImageUpdateAfterBind = value;
         m_vulkan12_features.descriptorBindingSampledImageUpdateAfterBind = value;
+        return true;
     }
-    else if (feature_name == "descriptorBindingStorageBufferUpdateAfterBind") {
+    if (feature_name == "descriptorBindingStorageBufferUpdateAfterBind") {
         m_descriptor_indexing_features.descriptorBindingStorageBufferUpdateAfterBind = value;
         m_vulkan12_features.descriptorBindingStorageBufferUpdateAfterBind = value;
+        return true;
     }
-    else if (feature_name == "descriptorBindingStorageImageUpdateAfterBind") {
+    if (feature_name == "descriptorBindingStorageImageUpdateAfterBind") {
         m_descriptor_indexing_features.descriptorBindingStorageImageUpdateAfterBind = value;
         m_vulkan12_features.descriptorBindingStorageImageUpdateAfterBind = value;
+        return true;
     }
-    else if (feature_name == "descriptorBindingStorageTensorUpdateAfterBind") {
+    if (feature_name == "descriptorBindingStorageTensorUpdateAfterBind") {
         m_tensor_features_arm.descriptorBindingStorageTensorUpdateAfterBind = value;
+        return true;
     }
-    else if (feature_name == "descriptorBindingStorageTexelBufferUpdateAfterBind") {
+    if (feature_name == "descriptorBindingStorageTexelBufferUpdateAfterBind") {
         m_descriptor_indexing_features.descriptorBindingStorageTexelBufferUpdateAfterBind = value;
         m_vulkan12_features.descriptorBindingStorageTexelBufferUpdateAfterBind = value;
+        return true;
     }
-    else if (feature_name == "descriptorBindingUniformBufferUpdateAfterBind") {
+    if (feature_name == "descriptorBindingUniformBufferUpdateAfterBind") {
         m_descriptor_indexing_features.descriptorBindingUniformBufferUpdateAfterBind = value;
         m_vulkan12_features.descriptorBindingUniformBufferUpdateAfterBind = value;
+        return true;
     }
-    else if (feature_name == "descriptorBindingUniformTexelBufferUpdateAfterBind") {
+    if (feature_name == "descriptorBindingUniformTexelBufferUpdateAfterBind") {
         m_descriptor_indexing_features.descriptorBindingUniformTexelBufferUpdateAfterBind = value;
         m_vulkan12_features.descriptorBindingUniformTexelBufferUpdateAfterBind = value;
+        return true;
     }
-    else if (feature_name == "descriptorBindingUpdateUnusedWhilePending") {
+    if (feature_name == "descriptorBindingUpdateUnusedWhilePending") {
         m_descriptor_indexing_features.descriptorBindingUpdateUnusedWhilePending = value;
         m_vulkan12_features.descriptorBindingUpdateUnusedWhilePending = value;
+        return true;
     }
-    else if (feature_name == "descriptorBindingVariableDescriptorCount") {
+    if (feature_name == "descriptorBindingVariableDescriptorCount") {
         m_descriptor_indexing_features.descriptorBindingVariableDescriptorCount = value;
         m_vulkan12_features.descriptorBindingVariableDescriptorCount = value;
+        return true;
     }
-    else if (feature_name == "descriptorBuffer") {
+    if (feature_name == "descriptorBuffer") {
         m_descriptor_buffer_features_ext.descriptorBuffer = value;
+        return true;
     }
-    else if (feature_name == "descriptorBufferCaptureReplay") {
+    if (feature_name == "descriptorBufferCaptureReplay") {
         m_descriptor_buffer_features_ext.descriptorBufferCaptureReplay = value;
+        return true;
     }
-    else if (feature_name == "descriptorBufferImageLayoutIgnored") {
+    if (feature_name == "descriptorBufferImageLayoutIgnored") {
         m_descriptor_buffer_features_ext.descriptorBufferImageLayoutIgnored = value;
+        return true;
     }
-    else if (feature_name == "descriptorBufferPushDescriptors") {
+    if (feature_name == "descriptorBufferPushDescriptors") {
         m_descriptor_buffer_features_ext.descriptorBufferPushDescriptors = value;
+        return true;
     }
-    else if (feature_name == "descriptorBufferTensorDescriptors") {
+    if (feature_name == "descriptorBufferTensorDescriptors") {
         m_descriptor_buffer_tensor_features_arm.descriptorBufferTensorDescriptors = value;
+        return true;
     }
-    else if (feature_name == "descriptorHeap") {
+    if (feature_name == "descriptorHeap") {
         m_descriptor_heap_features_ext.descriptorHeap = value;
+        return true;
     }
-    else if (feature_name == "descriptorHeapCaptureReplay") {
+    if (feature_name == "descriptorHeapCaptureReplay") {
         m_descriptor_heap_features_ext.descriptorHeapCaptureReplay = value;
+        return true;
     }
-    else if (feature_name == "descriptorIndexing") {
+    if (feature_name == "descriptorIndexing") {
         m_vulkan12_features.descriptorIndexing = value;
+        return true;
     }
-    else if (feature_name == "descriptorPoolOverallocation") {
+    if (feature_name == "descriptorPoolOverallocation") {
         m_descriptor_pool_overallocation_features_nv.descriptorPoolOverallocation = value;
+        return true;
     }
-    else if (feature_name == "descriptorSetHostMapping") {
+    if (feature_name == "descriptorSetHostMapping") {
         m_descriptor_set_host_mapping_features_valve.descriptorSetHostMapping = value;
+        return true;
     }
-    else if (feature_name == "deviceCoherentMemory") {
+    if (feature_name == "deviceCoherentMemory") {
         m_coherent_memory_features_amd.deviceCoherentMemory = value;
+        return true;
     }
-    else if (feature_name == "deviceFault") {
+    if (feature_name == "deviceFault") {
         m_fault_features_ext.deviceFault = value;
+        return true;
     }
-    else if (feature_name == "deviceFaultVendorBinary") {
+    if (feature_name == "deviceFaultVendorBinary") {
         m_fault_features_ext.deviceFaultVendorBinary = value;
+        return true;
     }
-    else if (feature_name == "deviceGeneratedCommands") {
+    if (feature_name == "deviceGeneratedCommands") {
         m_device_generated_commands_features_nv.deviceGeneratedCommands = value;
         m_device_generated_commands_features_ext.deviceGeneratedCommands = value;
+        return true;
     }
-    else if (feature_name == "deviceGeneratedCompute") {
+    if (feature_name == "deviceGeneratedCompute") {
         m_device_generated_commands_compute_features_nv.deviceGeneratedCompute = value;
+        return true;
     }
-    else if (feature_name == "deviceGeneratedComputeCaptureReplay") {
+    if (feature_name == "deviceGeneratedComputeCaptureReplay") {
         m_device_generated_commands_compute_features_nv.deviceGeneratedComputeCaptureReplay = value;
+        return true;
     }
-    else if (feature_name == "deviceGeneratedComputePipelines") {
+    if (feature_name == "deviceGeneratedComputePipelines") {
         m_device_generated_commands_compute_features_nv.deviceGeneratedComputePipelines = value;
+        return true;
     }
-    else if (feature_name == "deviceMemoryReport") {
+    if (feature_name == "deviceMemoryReport") {
         m_device_memory_report_features_ext.deviceMemoryReport = value;
+        return true;
     }
-    else if (feature_name == "diagnosticsConfig") {
+    if (feature_name == "diagnosticsConfig") {
         m_diagnostics_config_features_nv.diagnosticsConfig = value;
+        return true;
     }
-    else if (feature_name == "drawIndirectCount") {
+    if (feature_name == "drawIndirectCount") {
         m_vulkan12_features.drawIndirectCount = value;
+        return true;
     }
-    else if (feature_name == "drawIndirectFirstInstance") {
+    if (feature_name == "drawIndirectFirstInstance") {
         m_features2.features.drawIndirectFirstInstance = value;
+        return true;
     }
-    else if (feature_name == "dualSrcBlend") {
+    if (feature_name == "dualSrcBlend") {
         m_features2.features.dualSrcBlend = value;
+        return true;
     }
-    else if (feature_name == "dynamicGeneratedPipelineLayout") {
+    if (feature_name == "dynamicGeneratedPipelineLayout") {
         m_device_generated_commands_features_ext.dynamicGeneratedPipelineLayout = value;
+        return true;
     }
-    else if (feature_name == "dynamicPipelineLayout") {
+    if (feature_name == "dynamicPipelineLayout") {
         m_per_stage_descriptor_set_features_nv.dynamicPipelineLayout = value;
+        return true;
     }
-    else if (feature_name == "dynamicRendering") {
+    if (feature_name == "dynamicRendering") {
         m_vulkan13_features.dynamicRendering = value;
         m_dynamic_rendering_features.dynamicRendering = value;
+        return true;
     }
-    else if (feature_name == "dynamicRenderingLocalRead") {
+    if (feature_name == "dynamicRenderingLocalRead") {
         m_vulkan14_features.dynamicRenderingLocalRead = value;
         m_dynamic_rendering_local_read_features.dynamicRenderingLocalRead = value;
+        return true;
     }
-    else if (feature_name == "dynamicRenderingUnusedAttachments") {
+    if (feature_name == "dynamicRenderingUnusedAttachments") {
         m_dynamic_rendering_unused_attachments_features_ext.dynamicRenderingUnusedAttachments = value;
+        return true;
     }
-    else if (feature_name == "exclusiveScissor") {
+    if (feature_name == "exclusiveScissor") {
         m_exclusive_scissor_features_nv.exclusiveScissor = value;
+        return true;
     }
-    else if (feature_name == "extendedDynamicState") {
+    if (feature_name == "extendedDynamicState") {
         m_extended_dynamic_state_features_ext.extendedDynamicState = value;
+        return true;
     }
-    else if (feature_name == "extendedDynamicState2") {
+    if (feature_name == "extendedDynamicState2") {
         m_extended_dynamic_state2_features_ext.extendedDynamicState2 = value;
+        return true;
     }
-    else if (feature_name == "extendedDynamicState2LogicOp") {
+    if (feature_name == "extendedDynamicState2LogicOp") {
         m_extended_dynamic_state2_features_ext.extendedDynamicState2LogicOp = value;
+        return true;
     }
-    else if (feature_name == "extendedDynamicState2PatchControlPoints") {
+    if (feature_name == "extendedDynamicState2PatchControlPoints") {
         m_extended_dynamic_state2_features_ext.extendedDynamicState2PatchControlPoints = value;
+        return true;
     }
-    else if (feature_name == "extendedDynamicState3AlphaToCoverageEnable") {
+    if (feature_name == "extendedDynamicState3AlphaToCoverageEnable") {
         m_extended_dynamic_state3_features_ext.extendedDynamicState3AlphaToCoverageEnable = value;
+        return true;
     }
-    else if (feature_name == "extendedDynamicState3AlphaToOneEnable") {
+    if (feature_name == "extendedDynamicState3AlphaToOneEnable") {
         m_extended_dynamic_state3_features_ext.extendedDynamicState3AlphaToOneEnable = value;
+        return true;
     }
-    else if (feature_name == "extendedDynamicState3ColorBlendAdvanced") {
+    if (feature_name == "extendedDynamicState3ColorBlendAdvanced") {
         m_extended_dynamic_state3_features_ext.extendedDynamicState3ColorBlendAdvanced = value;
+        return true;
     }
-    else if (feature_name == "extendedDynamicState3ColorBlendEnable") {
+    if (feature_name == "extendedDynamicState3ColorBlendEnable") {
         m_extended_dynamic_state3_features_ext.extendedDynamicState3ColorBlendEnable = value;
+        return true;
     }
-    else if (feature_name == "extendedDynamicState3ColorBlendEquation") {
+    if (feature_name == "extendedDynamicState3ColorBlendEquation") {
         m_extended_dynamic_state3_features_ext.extendedDynamicState3ColorBlendEquation = value;
+        return true;
     }
-    else if (feature_name == "extendedDynamicState3ColorWriteMask") {
+    if (feature_name == "extendedDynamicState3ColorWriteMask") {
         m_extended_dynamic_state3_features_ext.extendedDynamicState3ColorWriteMask = value;
+        return true;
     }
-    else if (feature_name == "extendedDynamicState3ConservativeRasterizationMode") {
+    if (feature_name == "extendedDynamicState3ConservativeRasterizationMode") {
         m_extended_dynamic_state3_features_ext.extendedDynamicState3ConservativeRasterizationMode = value;
+        return true;
     }
-    else if (feature_name == "extendedDynamicState3CoverageModulationMode") {
+    if (feature_name == "extendedDynamicState3CoverageModulationMode") {
         m_extended_dynamic_state3_features_ext.extendedDynamicState3CoverageModulationMode = value;
+        return true;
     }
-    else if (feature_name == "extendedDynamicState3CoverageModulationTable") {
+    if (feature_name == "extendedDynamicState3CoverageModulationTable") {
         m_extended_dynamic_state3_features_ext.extendedDynamicState3CoverageModulationTable = value;
+        return true;
     }
-    else if (feature_name == "extendedDynamicState3CoverageModulationTableEnable") {
+    if (feature_name == "extendedDynamicState3CoverageModulationTableEnable") {
         m_extended_dynamic_state3_features_ext.extendedDynamicState3CoverageModulationTableEnable = value;
+        return true;
     }
-    else if (feature_name == "extendedDynamicState3CoverageReductionMode") {
+    if (feature_name == "extendedDynamicState3CoverageReductionMode") {
         m_extended_dynamic_state3_features_ext.extendedDynamicState3CoverageReductionMode = value;
+        return true;
     }
-    else if (feature_name == "extendedDynamicState3CoverageToColorEnable") {
+    if (feature_name == "extendedDynamicState3CoverageToColorEnable") {
         m_extended_dynamic_state3_features_ext.extendedDynamicState3CoverageToColorEnable = value;
+        return true;
     }
-    else if (feature_name == "extendedDynamicState3CoverageToColorLocation") {
+    if (feature_name == "extendedDynamicState3CoverageToColorLocation") {
         m_extended_dynamic_state3_features_ext.extendedDynamicState3CoverageToColorLocation = value;
+        return true;
     }
-    else if (feature_name == "extendedDynamicState3DepthClampEnable") {
+    if (feature_name == "extendedDynamicState3DepthClampEnable") {
         m_extended_dynamic_state3_features_ext.extendedDynamicState3DepthClampEnable = value;
+        return true;
     }
-    else if (feature_name == "extendedDynamicState3DepthClipEnable") {
+    if (feature_name == "extendedDynamicState3DepthClipEnable") {
         m_extended_dynamic_state3_features_ext.extendedDynamicState3DepthClipEnable = value;
+        return true;
     }
-    else if (feature_name == "extendedDynamicState3DepthClipNegativeOneToOne") {
+    if (feature_name == "extendedDynamicState3DepthClipNegativeOneToOne") {
         m_extended_dynamic_state3_features_ext.extendedDynamicState3DepthClipNegativeOneToOne = value;
+        return true;
     }
-    else if (feature_name == "extendedDynamicState3ExtraPrimitiveOverestimationSize") {
+    if (feature_name == "extendedDynamicState3ExtraPrimitiveOverestimationSize") {
         m_extended_dynamic_state3_features_ext.extendedDynamicState3ExtraPrimitiveOverestimationSize = value;
+        return true;
     }
-    else if (feature_name == "extendedDynamicState3LineRasterizationMode") {
+    if (feature_name == "extendedDynamicState3LineRasterizationMode") {
         m_extended_dynamic_state3_features_ext.extendedDynamicState3LineRasterizationMode = value;
+        return true;
     }
-    else if (feature_name == "extendedDynamicState3LineStippleEnable") {
+    if (feature_name == "extendedDynamicState3LineStippleEnable") {
         m_extended_dynamic_state3_features_ext.extendedDynamicState3LineStippleEnable = value;
+        return true;
     }
-    else if (feature_name == "extendedDynamicState3LogicOpEnable") {
+    if (feature_name == "extendedDynamicState3LogicOpEnable") {
         m_extended_dynamic_state3_features_ext.extendedDynamicState3LogicOpEnable = value;
+        return true;
     }
-    else if (feature_name == "extendedDynamicState3PolygonMode") {
+    if (feature_name == "extendedDynamicState3PolygonMode") {
         m_extended_dynamic_state3_features_ext.extendedDynamicState3PolygonMode = value;
+        return true;
     }
-    else if (feature_name == "extendedDynamicState3ProvokingVertexMode") {
+    if (feature_name == "extendedDynamicState3ProvokingVertexMode") {
         m_extended_dynamic_state3_features_ext.extendedDynamicState3ProvokingVertexMode = value;
+        return true;
     }
-    else if (feature_name == "extendedDynamicState3RasterizationSamples") {
+    if (feature_name == "extendedDynamicState3RasterizationSamples") {
         m_extended_dynamic_state3_features_ext.extendedDynamicState3RasterizationSamples = value;
+        return true;
     }
-    else if (feature_name == "extendedDynamicState3RasterizationStream") {
+    if (feature_name == "extendedDynamicState3RasterizationStream") {
         m_extended_dynamic_state3_features_ext.extendedDynamicState3RasterizationStream = value;
+        return true;
     }
-    else if (feature_name == "extendedDynamicState3RepresentativeFragmentTestEnable") {
+    if (feature_name == "extendedDynamicState3RepresentativeFragmentTestEnable") {
         m_extended_dynamic_state3_features_ext.extendedDynamicState3RepresentativeFragmentTestEnable = value;
+        return true;
     }
-    else if (feature_name == "extendedDynamicState3SampleLocationsEnable") {
+    if (feature_name == "extendedDynamicState3SampleLocationsEnable") {
         m_extended_dynamic_state3_features_ext.extendedDynamicState3SampleLocationsEnable = value;
+        return true;
     }
-    else if (feature_name == "extendedDynamicState3SampleMask") {
+    if (feature_name == "extendedDynamicState3SampleMask") {
         m_extended_dynamic_state3_features_ext.extendedDynamicState3SampleMask = value;
+        return true;
     }
-    else if (feature_name == "extendedDynamicState3ShadingRateImageEnable") {
+    if (feature_name == "extendedDynamicState3ShadingRateImageEnable") {
         m_extended_dynamic_state3_features_ext.extendedDynamicState3ShadingRateImageEnable = value;
+        return true;
     }
-    else if (feature_name == "extendedDynamicState3TessellationDomainOrigin") {
+    if (feature_name == "extendedDynamicState3TessellationDomainOrigin") {
         m_extended_dynamic_state3_features_ext.extendedDynamicState3TessellationDomainOrigin = value;
+        return true;
     }
-    else if (feature_name == "extendedDynamicState3ViewportSwizzle") {
+    if (feature_name == "extendedDynamicState3ViewportSwizzle") {
         m_extended_dynamic_state3_features_ext.extendedDynamicState3ViewportSwizzle = value;
+        return true;
     }
-    else if (feature_name == "extendedDynamicState3ViewportWScalingEnable") {
+    if (feature_name == "extendedDynamicState3ViewportWScalingEnable") {
         m_extended_dynamic_state3_features_ext.extendedDynamicState3ViewportWScalingEnable = value;
+        return true;
     }
-    else if (feature_name == "extendedSparseAddressSpace") {
+    if (feature_name == "extendedSparseAddressSpace") {
         m_extended_sparse_address_space_features_nv.extendedSparseAddressSpace = value;
+        return true;
     }
-    else if (feature_name == "externalMemoryRDMA") {
+    if (feature_name == "externalMemoryRDMA") {
         m_external_memory_rdma_features_nv.externalMemoryRDMA = value;
+        return true;
     }
-    else if (feature_name == "fillModeNonSolid") {
+    if (feature_name == "fillModeNonSolid") {
         m_features2.features.fillModeNonSolid = value;
+        return true;
     }
-    else if (feature_name == "floatRepresentation") {
+    if (feature_name == "floatRepresentation") {
         m_depth_bias_control_features_ext.floatRepresentation = value;
+        return true;
     }
-    else if (feature_name == "formatA4B4G4R4") {
+    if (feature_name == "formatA4B4G4R4") {
         m_4444_formats_features_ext.formatA4B4G4R4 = value;
+        return true;
     }
-    else if (feature_name == "formatA4R4G4B4") {
+    if (feature_name == "formatA4R4G4B4") {
         m_4444_formats_features_ext.formatA4R4G4B4 = value;
+        return true;
     }
-    else if (feature_name == "formatPack") {
+    if (feature_name == "formatPack") {
         m_format_pack_features_arm.formatPack = value;
+        return true;
     }
-    else if (feature_name == "formatRgba10x6WithoutYCbCrSampler") {
+    if (feature_name == "formatRgba10x6WithoutYCbCrSampler") {
         m_rgba10_x6_formats_features_ext.formatRgba10x6WithoutYCbCrSampler = value;
+        return true;
     }
-    else if (feature_name == "fragmentDensityMap") {
+    if (feature_name == "fragmentDensityMap") {
         m_fragment_density_map_features_ext.fragmentDensityMap = value;
+        return true;
     }
-    else if (feature_name == "fragmentDensityMapDeferred") {
+    if (feature_name == "fragmentDensityMapDeferred") {
         m_fragment_density_map2_features_ext.fragmentDensityMapDeferred = value;
+        return true;
     }
-    else if (feature_name == "fragmentDensityMapDynamic") {
+    if (feature_name == "fragmentDensityMapDynamic") {
         m_fragment_density_map_features_ext.fragmentDensityMapDynamic = value;
+        return true;
     }
-    else if (feature_name == "fragmentDensityMapLayered") {
+    if (feature_name == "fragmentDensityMapLayered") {
         m_fragment_density_map_layered_features_valve.fragmentDensityMapLayered = value;
+        return true;
     }
-    else if (feature_name == "fragmentDensityMapNonSubsampledImages") {
+    if (feature_name == "fragmentDensityMapNonSubsampledImages") {
         m_fragment_density_map_features_ext.fragmentDensityMapNonSubsampledImages = value;
+        return true;
     }
-    else if (feature_name == "fragmentDensityMapOffset") {
+    if (feature_name == "fragmentDensityMapOffset") {
         m_fragment_density_map_offset_features_ext.fragmentDensityMapOffset = value;
+        return true;
     }
-    else if (feature_name == "fragmentShaderBarycentric") {
+    if (feature_name == "fragmentShaderBarycentric") {
         m_fragment_shader_barycentric_features_khr.fragmentShaderBarycentric = value;
+        return true;
     }
-    else if (feature_name == "fragmentShaderPixelInterlock") {
+    if (feature_name == "fragmentShaderPixelInterlock") {
         m_fragment_shader_interlock_features_ext.fragmentShaderPixelInterlock = value;
+        return true;
     }
-    else if (feature_name == "fragmentShaderSampleInterlock") {
+    if (feature_name == "fragmentShaderSampleInterlock") {
         m_fragment_shader_interlock_features_ext.fragmentShaderSampleInterlock = value;
+        return true;
     }
-    else if (feature_name == "fragmentShaderShadingRateInterlock") {
+    if (feature_name == "fragmentShaderShadingRateInterlock") {
         m_fragment_shader_interlock_features_ext.fragmentShaderShadingRateInterlock = value;
+        return true;
     }
-    else if (feature_name == "fragmentShadingRateEnums") {
+    if (feature_name == "fragmentShadingRateEnums") {
         m_fragment_shading_rate_enums_features_nv.fragmentShadingRateEnums = value;
+        return true;
     }
-    else if (feature_name == "fragmentStoresAndAtomics") {
+    if (feature_name == "fragmentStoresAndAtomics") {
         m_features2.features.fragmentStoresAndAtomics = value;
+        return true;
     }
-    else if (feature_name == "frameBoundary") {
+    if (feature_name == "frameBoundary") {
         m_frame_boundary_features_ext.frameBoundary = value;
+        return true;
     }
-    else if (feature_name == "fullDrawIndexUint32") {
+    if (feature_name == "fullDrawIndexUint32") {
         m_features2.features.fullDrawIndexUint32 = value;
+        return true;
     }
-    else if (feature_name == "geometryShader") {
+    if (feature_name == "geometryShader") {
         m_features2.features.geometryShader = value;
+        return true;
     }
-    else if (feature_name == "geometryStreams") {
+    if (feature_name == "geometryStreams") {
         m_transform_feedback_features_ext.geometryStreams = value;
+        return true;
     }
-    else if (feature_name == "globalPriorityQuery") {
+    if (feature_name == "globalPriorityQuery") {
         m_global_priority_query_features.globalPriorityQuery = value;
         m_vulkan14_features.globalPriorityQuery = value;
+        return true;
     }
-    else if (feature_name == "graphicsPipelineLibrary") {
+    if (feature_name == "graphicsPipelineLibrary") {
         m_graphics_pipeline_library_features_ext.graphicsPipelineLibrary = value;
+        return true;
     }
-    else if (feature_name == "hdrVivid") {
+    if (feature_name == "hdrVivid") {
         m_hdr_vivid_features_huawei.hdrVivid = value;
+        return true;
     }
-    else if (feature_name == "hostImageCopy") {
+    if (feature_name == "hostImageCopy") {
         m_vulkan14_features.hostImageCopy = value;
         m_host_image_copy_features.hostImageCopy = value;
+        return true;
     }
-    else if (feature_name == "hostQueryReset") {
+    if (feature_name == "hostQueryReset") {
         m_host_query_reset_features.hostQueryReset = value;
         m_vulkan12_features.hostQueryReset = value;
+        return true;
     }
-    else if (feature_name == "image2DViewOf3D") {
+    if (feature_name == "image2DViewOf3D") {
         m_image2_d_view_of3_d_features_ext.image2DViewOf3D = value;
+        return true;
     }
-    else if (feature_name == "imageAlignmentControl") {
+    if (feature_name == "imageAlignmentControl") {
         m_image_alignment_control_features_mesa.imageAlignmentControl = value;
+        return true;
     }
-    else if (feature_name == "imageCompressionControl") {
+    if (feature_name == "imageCompressionControl") {
         m_image_compression_control_features_ext.imageCompressionControl = value;
+        return true;
     }
-    else if (feature_name == "imageCompressionControlSwapchain") {
+    if (feature_name == "imageCompressionControlSwapchain") {
         m_image_compression_control_swapchain_features_ext.imageCompressionControlSwapchain = value;
+        return true;
     }
-    else if (feature_name == "imageCubeArray") {
+    if (feature_name == "imageCubeArray") {
         m_features2.features.imageCubeArray = value;
+        return true;
     }
-    else if (feature_name == "imageFootprint") {
+    if (feature_name == "imageFootprint") {
         m_shader_image_footprint_features_nv.imageFootprint = value;
+        return true;
     }
-    else if (feature_name == "imageSlicedViewOf3D") {
+    if (feature_name == "imageSlicedViewOf3D") {
         m_image_sliced_view_of3_d_features_ext.imageSlicedViewOf3D = value;
+        return true;
     }
-    else if (feature_name == "imagelessFramebuffer") {
+    if (feature_name == "imagelessFramebuffer") {
         m_imageless_framebuffer_features.imagelessFramebuffer = value;
         m_vulkan12_features.imagelessFramebuffer = value;
+        return true;
     }
-    else if (feature_name == "independentBlend") {
+    if (feature_name == "independentBlend") {
         m_features2.features.independentBlend = value;
+        return true;
     }
-    else if (feature_name == "indexTypeUint8") {
+    if (feature_name == "indexTypeUint8") {
         m_index_type_uint8_features.indexTypeUint8 = value;
         m_vulkan14_features.indexTypeUint8 = value;
+        return true;
     }
-    else if (feature_name == "indirectCopy") {
+    if (feature_name == "indirectCopy") {
         m_copy_memory_indirect_features_nv.indirectCopy = value;
+        return true;
     }
-    else if (feature_name == "indirectMemoryCopy") {
+    if (feature_name == "indirectMemoryCopy") {
         m_copy_memory_indirect_features_khr.indirectMemoryCopy = value;
+        return true;
     }
-    else if (feature_name == "indirectMemoryToImageCopy") {
+    if (feature_name == "indirectMemoryToImageCopy") {
         m_copy_memory_indirect_features_khr.indirectMemoryToImageCopy = value;
+        return true;
     }
-    else if (feature_name == "inheritedConditionalRendering") {
+    if (feature_name == "inheritedConditionalRendering") {
         m_conditional_rendering_features_ext.inheritedConditionalRendering = value;
+        return true;
     }
-    else if (feature_name == "inheritedQueries") {
+    if (feature_name == "inheritedQueries") {
         m_features2.features.inheritedQueries = value;
+        return true;
     }
-    else if (feature_name == "inheritedViewportScissor2D") {
+    if (feature_name == "inheritedViewportScissor2D") {
         m_inherited_viewport_scissor_features_nv.inheritedViewportScissor2D = value;
+        return true;
     }
-    else if (feature_name == "inlineUniformBlock") {
+    if (feature_name == "inlineUniformBlock") {
         m_inline_uniform_block_features.inlineUniformBlock = value;
         m_vulkan13_features.inlineUniformBlock = value;
+        return true;
     }
-    else if (feature_name == "internallySynchronizedQueues") {
+    if (feature_name == "internallySynchronizedQueues") {
         m_internally_synchronized_queues_features_khr.internallySynchronizedQueues = value;
+        return true;
     }
-    else if (feature_name == "invocationMask") {
+    if (feature_name == "invocationMask") {
         m_invocation_mask_features_huawei.invocationMask = value;
+        return true;
     }
-    else if (feature_name == "largePoints") {
+    if (feature_name == "largePoints") {
         m_features2.features.largePoints = value;
+        return true;
     }
-    else if (feature_name == "leastRepresentableValueForceUnormRepresentation") {
+    if (feature_name == "leastRepresentableValueForceUnormRepresentation") {
         m_depth_bias_control_features_ext.leastRepresentableValueForceUnormRepresentation = value;
+        return true;
     }
-    else if (feature_name == "legacyDithering") {
+    if (feature_name == "legacyDithering") {
         m_legacy_dithering_features_ext.legacyDithering = value;
+        return true;
     }
-    else if (feature_name == "legacyVertexAttributes") {
+    if (feature_name == "legacyVertexAttributes") {
         m_legacy_vertex_attributes_features_ext.legacyVertexAttributes = value;
+        return true;
     }
-    else if (feature_name == "linearColorAttachment") {
+    if (feature_name == "linearColorAttachment") {
         m_linear_color_attachment_features_nv.linearColorAttachment = value;
+        return true;
     }
-    else if (feature_name == "linearSweptSpheres") {
+    if (feature_name == "linearSweptSpheres") {
         m_ray_tracing_linear_swept_spheres_features_nv.linearSweptSpheres = value;
+        return true;
     }
-    else if (feature_name == "logicOp") {
+    if (feature_name == "logicOp") {
         m_features2.features.logicOp = value;
+        return true;
     }
-    else if (feature_name == "longVector") {
+    if (feature_name == "longVector") {
         m_shader_long_vector_features_ext.longVector = value;
+        return true;
     }
-    else if (feature_name == "maintenance10") {
+    if (feature_name == "maintenance10") {
         m_maintenance10_features_khr.maintenance10 = value;
+        return true;
     }
-    else if (feature_name == "maintenance4") {
+    if (feature_name == "maintenance4") {
         m_maintenance4_features.maintenance4 = value;
         m_vulkan13_features.maintenance4 = value;
+        return true;
     }
-    else if (feature_name == "maintenance5") {
+    if (feature_name == "maintenance5") {
         m_maintenance5_features.maintenance5 = value;
         m_vulkan14_features.maintenance5 = value;
+        return true;
     }
-    else if (feature_name == "maintenance6") {
+    if (feature_name == "maintenance6") {
         m_maintenance6_features.maintenance6 = value;
         m_vulkan14_features.maintenance6 = value;
+        return true;
     }
-    else if (feature_name == "maintenance7") {
+    if (feature_name == "maintenance7") {
         m_maintenance7_features_khr.maintenance7 = value;
+        return true;
     }
-    else if (feature_name == "maintenance8") {
+    if (feature_name == "maintenance8") {
         m_maintenance8_features_khr.maintenance8 = value;
+        return true;
     }
-    else if (feature_name == "maintenance9") {
+    if (feature_name == "maintenance9") {
         m_maintenance9_features_khr.maintenance9 = value;
+        return true;
     }
-    else if (feature_name == "memoryDecompression") {
+    if (feature_name == "memoryDecompression") {
         m_memory_decompression_features_ext.memoryDecompression = value;
+        return true;
     }
-    else if (feature_name == "memoryMapPlaced") {
+    if (feature_name == "memoryMapPlaced") {
         m_map_memory_placed_features_ext.memoryMapPlaced = value;
+        return true;
     }
-    else if (feature_name == "memoryMapRangePlaced") {
+    if (feature_name == "memoryMapRangePlaced") {
         m_map_memory_placed_features_ext.memoryMapRangePlaced = value;
+        return true;
     }
-    else if (feature_name == "memoryPriority") {
+    if (feature_name == "memoryPriority") {
         m_memory_priority_features_ext.memoryPriority = value;
+        return true;
     }
-    else if (feature_name == "memoryUnmapReserve") {
+    if (feature_name == "memoryUnmapReserve") {
         m_map_memory_placed_features_ext.memoryUnmapReserve = value;
+        return true;
     }
-    else if (feature_name == "meshShader") {
+    if (feature_name == "meshShader") {
         m_mesh_shader_features_nv.meshShader = value;
         m_mesh_shader_features_ext.meshShader = value;
+        return true;
     }
-    else if (feature_name == "meshShaderQueries") {
+    if (feature_name == "meshShaderQueries") {
         m_mesh_shader_features_ext.meshShaderQueries = value;
+        return true;
     }
-    else if (feature_name == "micromap") {
+    if (feature_name == "micromap") {
         m_opacity_micromap_features_ext.micromap = value;
+        return true;
     }
-    else if (feature_name == "micromapCaptureReplay") {
+    if (feature_name == "micromapCaptureReplay") {
         m_opacity_micromap_features_ext.micromapCaptureReplay = value;
+        return true;
     }
-    else if (feature_name == "micromapHostCommands") {
+    if (feature_name == "micromapHostCommands") {
         m_opacity_micromap_features_ext.micromapHostCommands = value;
+        return true;
     }
-    else if (feature_name == "minLod") {
+    if (feature_name == "minLod") {
         m_image_view_min_lod_features_ext.minLod = value;
+        return true;
     }
-    else if (feature_name == "multiDraw") {
+    if (feature_name == "multiDraw") {
         m_multi_draw_features_ext.multiDraw = value;
+        return true;
     }
-    else if (feature_name == "multiDrawIndirect") {
+    if (feature_name == "multiDrawIndirect") {
         m_features2.features.multiDrawIndirect = value;
+        return true;
     }
-    else if (feature_name == "multiViewport") {
+    if (feature_name == "multiViewport") {
         m_features2.features.multiViewport = value;
+        return true;
     }
-    else if (feature_name == "multisampledRenderToSingleSampled") {
+    if (feature_name == "multisampledRenderToSingleSampled") {
         m_multisampled_render_to_single_sampled_features_ext.multisampledRenderToSingleSampled = value;
+        return true;
     }
-    else if (feature_name == "multiview") {
+    if (feature_name == "multiview") {
         m_multiview_features.multiview = value;
         m_vulkan11_features.multiview = value;
+        return true;
     }
-    else if (feature_name == "multiviewClusterCullingShader") {
+    if (feature_name == "multiviewClusterCullingShader") {
         m_cluster_culling_shader_features_huawei.multiviewClusterCullingShader = value;
+        return true;
     }
-    else if (feature_name == "multiviewGeometryShader") {
+    if (feature_name == "multiviewGeometryShader") {
         m_multiview_features.multiviewGeometryShader = value;
         m_vulkan11_features.multiviewGeometryShader = value;
+        return true;
     }
-    else if (feature_name == "multiviewMeshShader") {
+    if (feature_name == "multiviewMeshShader") {
         m_mesh_shader_features_ext.multiviewMeshShader = value;
+        return true;
     }
-    else if (feature_name == "multiviewPerViewRenderAreas") {
+    if (feature_name == "multiviewPerViewRenderAreas") {
         m_multiview_per_view_render_areas_features_qcom.multiviewPerViewRenderAreas = value;
+        return true;
     }
-    else if (feature_name == "multiviewPerViewViewports") {
+    if (feature_name == "multiviewPerViewViewports") {
         m_multiview_per_view_viewports_features_qcom.multiviewPerViewViewports = value;
+        return true;
     }
-    else if (feature_name == "multiviewTessellationShader") {
+    if (feature_name == "multiviewTessellationShader") {
         m_multiview_features.multiviewTessellationShader = value;
         m_vulkan11_features.multiviewTessellationShader = value;
+        return true;
     }
-    else if (feature_name == "mutableDescriptorType") {
+    if (feature_name == "mutableDescriptorType") {
         m_mutable_descriptor_type_features_ext.mutableDescriptorType = value;
+        return true;
     }
-    else if (feature_name == "nestedCommandBuffer") {
+    if (feature_name == "nestedCommandBuffer") {
         m_nested_command_buffer_features_ext.nestedCommandBuffer = value;
+        return true;
     }
-    else if (feature_name == "nestedCommandBufferRendering") {
+    if (feature_name == "nestedCommandBufferRendering") {
         m_nested_command_buffer_features_ext.nestedCommandBufferRendering = value;
+        return true;
     }
-    else if (feature_name == "nestedCommandBufferSimultaneousUse") {
+    if (feature_name == "nestedCommandBufferSimultaneousUse") {
         m_nested_command_buffer_features_ext.nestedCommandBufferSimultaneousUse = value;
+        return true;
     }
-    else if (feature_name == "noInvocationFragmentShadingRates") {
+    if (feature_name == "noInvocationFragmentShadingRates") {
         m_fragment_shading_rate_enums_features_nv.noInvocationFragmentShadingRates = value;
+        return true;
     }
-    else if (feature_name == "nonSeamlessCubeMap") {
+    if (feature_name == "nonSeamlessCubeMap") {
         m_non_seamless_cube_map_features_ext.nonSeamlessCubeMap = value;
+        return true;
     }
-    else if (feature_name == "nullDescriptor") {
+    if (feature_name == "nullDescriptor") {
         m_robustness2_features_khr.nullDescriptor = value;
+        return true;
     }
-    else if (feature_name == "occlusionQueryPrecise") {
+    if (feature_name == "occlusionQueryPrecise") {
         m_features2.features.occlusionQueryPrecise = value;
+        return true;
     }
-    else if (feature_name == "opticalFlow") {
+    if (feature_name == "opticalFlow") {
         m_optical_flow_features_nv.opticalFlow = value;
+        return true;
     }
-    else if (feature_name == "pageableDeviceLocalMemory") {
+    if (feature_name == "pageableDeviceLocalMemory") {
         m_pageable_device_local_memory_features_ext.pageableDeviceLocalMemory = value;
+        return true;
     }
-    else if (feature_name == "partitionedAccelerationStructure") {
+    if (feature_name == "partitionedAccelerationStructure") {
         m_partitioned_acceleration_structure_features_nv.partitionedAccelerationStructure = value;
+        return true;
     }
-    else if (feature_name == "perStageDescriptorSet") {
+    if (feature_name == "perStageDescriptorSet") {
         m_per_stage_descriptor_set_features_nv.perStageDescriptorSet = value;
+        return true;
     }
-    else if (feature_name == "performanceCounterMultipleQueryPools") {
+    if (feature_name == "performanceCounterMultipleQueryPools") {
         m_performance_query_features_khr.performanceCounterMultipleQueryPools = value;
+        return true;
     }
-    else if (feature_name == "performanceCounterQueryPools") {
+    if (feature_name == "performanceCounterQueryPools") {
         m_performance_query_features_khr.performanceCounterQueryPools = value;
+        return true;
     }
-    else if (feature_name == "performanceCountersByRegion") {
+    if (feature_name == "performanceCountersByRegion") {
         m_performance_counters_by_region_features_arm.performanceCountersByRegion = value;
+        return true;
     }
-    else if (feature_name == "pipelineBinaries") {
+    if (feature_name == "pipelineBinaries") {
         m_pipeline_binary_features_khr.pipelineBinaries = value;
+        return true;
     }
-    else if (feature_name == "pipelineCacheIncrementalMode") {
+    if (feature_name == "pipelineCacheIncrementalMode") {
         m_pipeline_cache_incremental_mode_features_sec.pipelineCacheIncrementalMode = value;
+        return true;
     }
-    else if (feature_name == "pipelineCreationCacheControl") {
+    if (feature_name == "pipelineCreationCacheControl") {
         m_pipeline_creation_cache_control_features.pipelineCreationCacheControl = value;
         m_vulkan13_features.pipelineCreationCacheControl = value;
+        return true;
     }
-    else if (feature_name == "pipelineExecutableInfo") {
+    if (feature_name == "pipelineExecutableInfo") {
         m_pipeline_executable_properties_features_khr.pipelineExecutableInfo = value;
+        return true;
     }
-    else if (feature_name == "pipelineFragmentShadingRate") {
+    if (feature_name == "pipelineFragmentShadingRate") {
         m_fragment_shading_rate_features_khr.pipelineFragmentShadingRate = value;
+        return true;
     }
-    else if (feature_name == "pipelineLibraryGroupHandles") {
+    if (feature_name == "pipelineLibraryGroupHandles") {
         m_pipeline_library_group_handles_features_ext.pipelineLibraryGroupHandles = value;
+        return true;
     }
-    else if (feature_name == "pipelineOpacityMicromap") {
+    if (feature_name == "pipelineOpacityMicromap") {
         m_pipeline_opacity_micromap_features_arm.pipelineOpacityMicromap = value;
+        return true;
     }
-    else if (feature_name == "pipelinePropertiesIdentifier") {
+    if (feature_name == "pipelinePropertiesIdentifier") {
         m_pipeline_properties_features_ext.pipelinePropertiesIdentifier = value;
+        return true;
     }
-    else if (feature_name == "pipelineProtectedAccess") {
+    if (feature_name == "pipelineProtectedAccess") {
         m_vulkan14_features.pipelineProtectedAccess = value;
         m_pipeline_protected_access_features.pipelineProtectedAccess = value;
+        return true;
     }
-    else if (feature_name == "pipelineRobustness") {
+    if (feature_name == "pipelineRobustness") {
         m_vulkan14_features.pipelineRobustness = value;
         m_pipeline_robustness_features.pipelineRobustness = value;
+        return true;
     }
-    else if (feature_name == "pipelineStatisticsQuery") {
+    if (feature_name == "pipelineStatisticsQuery") {
         m_features2.features.pipelineStatisticsQuery = value;
+        return true;
     }
-    else if (feature_name == "presentAtAbsoluteTime") {
+    if (feature_name == "presentAtAbsoluteTime") {
         m_present_timing_features_ext.presentAtAbsoluteTime = value;
+        return true;
     }
-    else if (feature_name == "presentAtRelativeTime") {
+    if (feature_name == "presentAtRelativeTime") {
         m_present_timing_features_ext.presentAtRelativeTime = value;
+        return true;
     }
-    else if (feature_name == "presentBarrier") {
+    if (feature_name == "presentBarrier") {
         m_present_barrier_features_nv.presentBarrier = value;
+        return true;
     }
-    else if (feature_name == "presentId") {
+    if (feature_name == "presentId") {
         m_present_id_features_khr.presentId = value;
+        return true;
     }
-    else if (feature_name == "presentId2") {
+    if (feature_name == "presentId2") {
         m_present_id2_features_khr.presentId2 = value;
+        return true;
     }
-    else if (feature_name == "presentModeFifoLatestReady") {
+    if (feature_name == "presentModeFifoLatestReady") {
         m_present_mode_fifo_latest_ready_features_khr.presentModeFifoLatestReady = value;
+        return true;
     }
-    else if (feature_name == "presentTiming") {
+    if (feature_name == "presentTiming") {
         m_present_timing_features_ext.presentTiming = value;
+        return true;
     }
-    else if (feature_name == "presentWait") {
+    if (feature_name == "presentWait") {
         m_present_wait_features_khr.presentWait = value;
+        return true;
     }
-    else if (feature_name == "presentWait2") {
+    if (feature_name == "presentWait2") {
         m_present_wait2_features_khr.presentWait2 = value;
+        return true;
     }
-    else if (feature_name == "primitiveFragmentShadingRate") {
+    if (feature_name == "primitiveFragmentShadingRate") {
         m_fragment_shading_rate_features_khr.primitiveFragmentShadingRate = value;
+        return true;
     }
-    else if (feature_name == "primitiveFragmentShadingRateMeshShader") {
+    if (feature_name == "primitiveFragmentShadingRateMeshShader") {
         m_mesh_shader_features_ext.primitiveFragmentShadingRateMeshShader = value;
+        return true;
     }
-    else if (feature_name == "primitiveTopologyListRestart") {
+    if (feature_name == "primitiveTopologyListRestart") {
         m_primitive_topology_list_restart_features_ext.primitiveTopologyListRestart = value;
+        return true;
     }
-    else if (feature_name == "primitiveTopologyPatchListRestart") {
+    if (feature_name == "primitiveTopologyPatchListRestart") {
         m_primitive_topology_list_restart_features_ext.primitiveTopologyPatchListRestart = value;
+        return true;
     }
-    else if (feature_name == "primitivesGeneratedQuery") {
+    if (feature_name == "primitivesGeneratedQuery") {
         m_primitives_generated_query_features_ext.primitivesGeneratedQuery = value;
+        return true;
     }
-    else if (feature_name == "primitivesGeneratedQueryWithNonZeroStreams") {
+    if (feature_name == "primitivesGeneratedQueryWithNonZeroStreams") {
         m_primitives_generated_query_features_ext.primitivesGeneratedQueryWithNonZeroStreams = value;
+        return true;
     }
-    else if (feature_name == "primitivesGeneratedQueryWithRasterizerDiscard") {
+    if (feature_name == "primitivesGeneratedQueryWithRasterizerDiscard") {
         m_primitives_generated_query_features_ext.primitivesGeneratedQueryWithRasterizerDiscard = value;
+        return true;
     }
-    else if (feature_name == "privateData") {
+    if (feature_name == "privateData") {
         m_private_data_features.privateData = value;
         m_vulkan13_features.privateData = value;
+        return true;
     }
-    else if (feature_name == "protectedMemory") {
+    if (feature_name == "protectedMemory") {
         m_protected_memory_features.protectedMemory = value;
         m_vulkan11_features.protectedMemory = value;
+        return true;
     }
-    else if (feature_name == "provokingVertexLast") {
+    if (feature_name == "provokingVertexLast") {
         m_provoking_vertex_features_ext.provokingVertexLast = value;
+        return true;
     }
-    else if (feature_name == "pushConstantBank") {
+    if (feature_name == "pushConstantBank") {
         m_push_constant_bank_features_nv.pushConstantBank = value;
+        return true;
     }
-    else if (feature_name == "pushDescriptor") {
+    if (feature_name == "pushDescriptor") {
         m_vulkan14_features.pushDescriptor = value;
+        return true;
     }
-    else if (feature_name == "rasterizationOrderColorAttachmentAccess") {
+    if (feature_name == "rasterizationOrderColorAttachmentAccess") {
         m_rasterization_order_attachment_access_features_ext.rasterizationOrderColorAttachmentAccess = value;
+        return true;
     }
-    else if (feature_name == "rasterizationOrderDepthAttachmentAccess") {
+    if (feature_name == "rasterizationOrderDepthAttachmentAccess") {
         m_rasterization_order_attachment_access_features_ext.rasterizationOrderDepthAttachmentAccess = value;
+        return true;
     }
-    else if (feature_name == "rasterizationOrderStencilAttachmentAccess") {
+    if (feature_name == "rasterizationOrderStencilAttachmentAccess") {
         m_rasterization_order_attachment_access_features_ext.rasterizationOrderStencilAttachmentAccess = value;
+        return true;
     }
-    else if (feature_name == "rayQuery") {
+    if (feature_name == "rayQuery") {
         m_ray_query_features_khr.rayQuery = value;
+        return true;
     }
-    else if (feature_name == "rayTracingInvocationReorder") {
+    if (feature_name == "rayTracingInvocationReorder") {
         m_ray_tracing_invocation_reorder_features_ext.rayTracingInvocationReorder = value;
         m_ray_tracing_invocation_reorder_features_nv.rayTracingInvocationReorder = value;
+        return true;
     }
-    else if (feature_name == "rayTracingMaintenance1") {
+    if (feature_name == "rayTracingMaintenance1") {
         m_ray_tracing_maintenance1_features_khr.rayTracingMaintenance1 = value;
+        return true;
     }
-    else if (feature_name == "rayTracingMotionBlur") {
+    if (feature_name == "rayTracingMotionBlur") {
         m_ray_tracing_motion_blur_features_nv.rayTracingMotionBlur = value;
+        return true;
     }
-    else if (feature_name == "rayTracingMotionBlurPipelineTraceRaysIndirect") {
+    if (feature_name == "rayTracingMotionBlurPipelineTraceRaysIndirect") {
         m_ray_tracing_motion_blur_features_nv.rayTracingMotionBlurPipelineTraceRaysIndirect = value;
+        return true;
     }
-    else if (feature_name == "rayTracingPipeline") {
+    if (feature_name == "rayTracingPipeline") {
         m_ray_tracing_pipeline_features_khr.rayTracingPipeline = value;
+        return true;
     }
-    else if (feature_name == "rayTracingPipelineShaderGroupHandleCaptureReplay") {
+    if (feature_name == "rayTracingPipelineShaderGroupHandleCaptureReplay") {
         m_ray_tracing_pipeline_features_khr.rayTracingPipelineShaderGroupHandleCaptureReplay = value;
+        return true;
     }
-    else if (feature_name == "rayTracingPipelineShaderGroupHandleCaptureReplayMixed") {
+    if (feature_name == "rayTracingPipelineShaderGroupHandleCaptureReplayMixed") {
         m_ray_tracing_pipeline_features_khr.rayTracingPipelineShaderGroupHandleCaptureReplayMixed = value;
+        return true;
     }
-    else if (feature_name == "rayTracingPipelineTraceRaysIndirect") {
+    if (feature_name == "rayTracingPipelineTraceRaysIndirect") {
         m_ray_tracing_pipeline_features_khr.rayTracingPipelineTraceRaysIndirect = value;
+        return true;
     }
-    else if (feature_name == "rayTracingPipelineTraceRaysIndirect2") {
+    if (feature_name == "rayTracingPipelineTraceRaysIndirect2") {
         m_ray_tracing_maintenance1_features_khr.rayTracingPipelineTraceRaysIndirect2 = value;
+        return true;
     }
-    else if (feature_name == "rayTracingPositionFetch") {
+    if (feature_name == "rayTracingPositionFetch") {
         m_ray_tracing_position_fetch_features_khr.rayTracingPositionFetch = value;
+        return true;
     }
-    else if (feature_name == "rayTracingValidation") {
+    if (feature_name == "rayTracingValidation") {
         m_ray_tracing_validation_features_nv.rayTracingValidation = value;
+        return true;
     }
-    else if (feature_name == "rayTraversalPrimitiveCulling") {
+    if (feature_name == "rayTraversalPrimitiveCulling") {
         m_ray_tracing_pipeline_features_khr.rayTraversalPrimitiveCulling = value;
+        return true;
     }
-    else if (feature_name == "rectangularLines") {
+    if (feature_name == "rectangularLines") {
         m_line_rasterization_features.rectangularLines = value;
         m_vulkan14_features.rectangularLines = value;
+        return true;
     }
-    else if (feature_name == "relaxedLineRasterization") {
+    if (feature_name == "relaxedLineRasterization") {
         m_relaxed_line_rasterization_features_img.relaxedLineRasterization = value;
+        return true;
     }
-    else if (feature_name == "renderPassStriped") {
+    if (feature_name == "renderPassStriped") {
         m_render_pass_striped_features_arm.renderPassStriped = value;
+        return true;
     }
-    else if (feature_name == "reportAddressBinding") {
+    if (feature_name == "reportAddressBinding") {
         m_address_binding_report_features_ext.reportAddressBinding = value;
+        return true;
     }
-    else if (feature_name == "representativeFragmentTest") {
+    if (feature_name == "representativeFragmentTest") {
         m_representative_fragment_test_features_nv.representativeFragmentTest = value;
+        return true;
     }
-    else if (feature_name == "robustBufferAccess") {
+    if (feature_name == "robustBufferAccess") {
         m_features2.features.robustBufferAccess = value;
+        return true;
     }
-    else if (feature_name == "robustBufferAccess2") {
+    if (feature_name == "robustBufferAccess2") {
         m_robustness2_features_khr.robustBufferAccess2 = value;
+        return true;
     }
-    else if (feature_name == "robustImageAccess") {
+    if (feature_name == "robustImageAccess") {
         m_vulkan13_features.robustImageAccess = value;
         m_image_robustness_features.robustImageAccess = value;
+        return true;
     }
-    else if (feature_name == "robustImageAccess2") {
+    if (feature_name == "robustImageAccess2") {
         m_robustness2_features_khr.robustImageAccess2 = value;
+        return true;
     }
-    else if (feature_name == "runtimeDescriptorArray") {
+    if (feature_name == "runtimeDescriptorArray") {
         m_descriptor_indexing_features.runtimeDescriptorArray = value;
         m_vulkan12_features.runtimeDescriptorArray = value;
+        return true;
     }
-    else if (feature_name == "sampleRateShading") {
+    if (feature_name == "sampleRateShading") {
         m_features2.features.sampleRateShading = value;
+        return true;
     }
-    else if (feature_name == "sampler2DViewOf3D") {
+    if (feature_name == "sampler2DViewOf3D") {
         m_image2_d_view_of3_d_features_ext.sampler2DViewOf3D = value;
+        return true;
     }
-    else if (feature_name == "samplerAnisotropy") {
+    if (feature_name == "samplerAnisotropy") {
         m_features2.features.samplerAnisotropy = value;
+        return true;
     }
-    else if (feature_name == "samplerFilterMinmax") {
+    if (feature_name == "samplerFilterMinmax") {
         m_vulkan12_features.samplerFilterMinmax = value;
+        return true;
     }
-    else if (feature_name == "samplerMirrorClampToEdge") {
+    if (feature_name == "samplerMirrorClampToEdge") {
         m_vulkan12_features.samplerMirrorClampToEdge = value;
+        return true;
     }
-    else if (feature_name == "samplerYcbcrConversion") {
+    if (feature_name == "samplerYcbcrConversion") {
         m_sampler_ycbcr_conversion_features.samplerYcbcrConversion = value;
         m_vulkan11_features.samplerYcbcrConversion = value;
+        return true;
     }
-    else if (feature_name == "scalarBlockLayout") {
+    if (feature_name == "scalarBlockLayout") {
         m_scalar_block_layout_features.scalarBlockLayout = value;
         m_vulkan12_features.scalarBlockLayout = value;
+        return true;
     }
-    else if (feature_name == "schedulingControls") {
+    if (feature_name == "schedulingControls") {
         m_scheduling_controls_features_arm.schedulingControls = value;
+        return true;
     }
-    else if (feature_name == "selectableCubicWeights") {
+    if (feature_name == "selectableCubicWeights") {
         m_cubic_weights_features_qcom.selectableCubicWeights = value;
+        return true;
     }
-    else if (feature_name == "separateDepthStencilLayouts") {
+    if (feature_name == "separateDepthStencilLayouts") {
         m_separate_depth_stencil_layouts_features.separateDepthStencilLayouts = value;
         m_vulkan12_features.separateDepthStencilLayouts = value;
+        return true;
     }
-    else if (feature_name == "shader64BitIndexing") {
+    if (feature_name == "shader64BitIndexing") {
         m_shader64_bit_indexing_features_ext.shader64BitIndexing = value;
+        return true;
     }
-    else if (feature_name == "shaderBFloat16CooperativeMatrix") {
+    if (feature_name == "shaderBFloat16CooperativeMatrix") {
         m_shader_bfloat16_features_khr.shaderBFloat16CooperativeMatrix = value;
+        return true;
     }
-    else if (feature_name == "shaderBFloat16DotProduct") {
+    if (feature_name == "shaderBFloat16DotProduct") {
         m_shader_bfloat16_features_khr.shaderBFloat16DotProduct = value;
+        return true;
     }
-    else if (feature_name == "shaderBFloat16Type") {
+    if (feature_name == "shaderBFloat16Type") {
         m_shader_bfloat16_features_khr.shaderBFloat16Type = value;
+        return true;
     }
-    else if (feature_name == "shaderBufferFloat16AtomicAdd") {
+    if (feature_name == "shaderBufferFloat16AtomicAdd") {
         m_shader_atomic_float2_features_ext.shaderBufferFloat16AtomicAdd = value;
+        return true;
     }
-    else if (feature_name == "shaderBufferFloat16AtomicMinMax") {
+    if (feature_name == "shaderBufferFloat16AtomicMinMax") {
         m_shader_atomic_float2_features_ext.shaderBufferFloat16AtomicMinMax = value;
+        return true;
     }
-    else if (feature_name == "shaderBufferFloat16Atomics") {
+    if (feature_name == "shaderBufferFloat16Atomics") {
         m_shader_atomic_float2_features_ext.shaderBufferFloat16Atomics = value;
+        return true;
     }
-    else if (feature_name == "shaderBufferFloat32AtomicAdd") {
+    if (feature_name == "shaderBufferFloat32AtomicAdd") {
         m_shader_atomic_float_features_ext.shaderBufferFloat32AtomicAdd = value;
+        return true;
     }
-    else if (feature_name == "shaderBufferFloat32AtomicMinMax") {
+    if (feature_name == "shaderBufferFloat32AtomicMinMax") {
         m_shader_atomic_float2_features_ext.shaderBufferFloat32AtomicMinMax = value;
+        return true;
     }
-    else if (feature_name == "shaderBufferFloat32Atomics") {
+    if (feature_name == "shaderBufferFloat32Atomics") {
         m_shader_atomic_float_features_ext.shaderBufferFloat32Atomics = value;
+        return true;
     }
-    else if (feature_name == "shaderBufferFloat64AtomicAdd") {
+    if (feature_name == "shaderBufferFloat64AtomicAdd") {
         m_shader_atomic_float_features_ext.shaderBufferFloat64AtomicAdd = value;
+        return true;
     }
-    else if (feature_name == "shaderBufferFloat64AtomicMinMax") {
+    if (feature_name == "shaderBufferFloat64AtomicMinMax") {
         m_shader_atomic_float2_features_ext.shaderBufferFloat64AtomicMinMax = value;
+        return true;
     }
-    else if (feature_name == "shaderBufferFloat64Atomics") {
+    if (feature_name == "shaderBufferFloat64Atomics") {
         m_shader_atomic_float_features_ext.shaderBufferFloat64Atomics = value;
+        return true;
     }
-    else if (feature_name == "shaderBufferInt64Atomics") {
+    if (feature_name == "shaderBufferInt64Atomics") {
         m_shader_atomic_int64_features.shaderBufferInt64Atomics = value;
         m_vulkan12_features.shaderBufferInt64Atomics = value;
+        return true;
     }
-    else if (feature_name == "shaderClipDistance") {
+    if (feature_name == "shaderClipDistance") {
         m_features2.features.shaderClipDistance = value;
+        return true;
     }
-    else if (feature_name == "shaderCoreBuiltins") {
+    if (feature_name == "shaderCoreBuiltins") {
         m_shader_core_builtins_features_arm.shaderCoreBuiltins = value;
+        return true;
     }
-    else if (feature_name == "shaderCullDistance") {
+    if (feature_name == "shaderCullDistance") {
         m_features2.features.shaderCullDistance = value;
+        return true;
     }
-    else if (feature_name == "shaderDemoteToHelperInvocation") {
+    if (feature_name == "shaderDemoteToHelperInvocation") {
         m_shader_demote_to_helper_invocation_features.shaderDemoteToHelperInvocation = value;
         m_vulkan13_features.shaderDemoteToHelperInvocation = value;
+        return true;
     }
-    else if (feature_name == "shaderDeviceClock") {
+    if (feature_name == "shaderDeviceClock") {
         m_shader_clock_features_khr.shaderDeviceClock = value;
+        return true;
     }
-    else if (feature_name == "shaderDrawParameters") {
+    if (feature_name == "shaderDrawParameters") {
         m_shader_draw_parameters_features.shaderDrawParameters = value;
         m_vulkan11_features.shaderDrawParameters = value;
+        return true;
     }
-    else if (feature_name == "shaderEarlyAndLateFragmentTests") {
+    if (feature_name == "shaderEarlyAndLateFragmentTests") {
         m_shader_early_and_late_fragment_tests_features_amd.shaderEarlyAndLateFragmentTests = value;
+        return true;
     }
-    else if (feature_name == "shaderExpectAssume") {
+    if (feature_name == "shaderExpectAssume") {
         m_vulkan14_features.shaderExpectAssume = value;
         m_shader_expect_assume_features.shaderExpectAssume = value;
+        return true;
     }
-    else if (feature_name == "shaderFloat16") {
+    if (feature_name == "shaderFloat16") {
         m_shader_float16_int8_features.shaderFloat16 = value;
         m_vulkan12_features.shaderFloat16 = value;
+        return true;
     }
-    else if (feature_name == "shaderFloat16VectorAtomics") {
+    if (feature_name == "shaderFloat16VectorAtomics") {
         m_shader_atomic_float16_vector_features_nv.shaderFloat16VectorAtomics = value;
+        return true;
     }
-    else if (feature_name == "shaderFloat64") {
+    if (feature_name == "shaderFloat64") {
         m_features2.features.shaderFloat64 = value;
+        return true;
     }
-    else if (feature_name == "shaderFloat8") {
+    if (feature_name == "shaderFloat8") {
         m_shader_float8_features_ext.shaderFloat8 = value;
+        return true;
     }
-    else if (feature_name == "shaderFloat8CooperativeMatrix") {
+    if (feature_name == "shaderFloat8CooperativeMatrix") {
         m_shader_float8_features_ext.shaderFloat8CooperativeMatrix = value;
+        return true;
     }
-    else if (feature_name == "shaderFloatControls2") {
+    if (feature_name == "shaderFloatControls2") {
         m_vulkan14_features.shaderFloatControls2 = value;
         m_shader_float_controls2_features.shaderFloatControls2 = value;
+        return true;
     }
-    else if (feature_name == "shaderFmaFloat16") {
+    if (feature_name == "shaderFmaFloat16") {
         m_shader_fma_features_khr.shaderFmaFloat16 = value;
+        return true;
     }
-    else if (feature_name == "shaderFmaFloat32") {
+    if (feature_name == "shaderFmaFloat32") {
         m_shader_fma_features_khr.shaderFmaFloat32 = value;
+        return true;
     }
-    else if (feature_name == "shaderFmaFloat64") {
+    if (feature_name == "shaderFmaFloat64") {
         m_shader_fma_features_khr.shaderFmaFloat64 = value;
+        return true;
     }
-    else if (feature_name == "shaderImageFloat32AtomicAdd") {
+    if (feature_name == "shaderImageFloat32AtomicAdd") {
         m_shader_atomic_float_features_ext.shaderImageFloat32AtomicAdd = value;
+        return true;
     }
-    else if (feature_name == "shaderImageFloat32AtomicMinMax") {
+    if (feature_name == "shaderImageFloat32AtomicMinMax") {
         m_shader_atomic_float2_features_ext.shaderImageFloat32AtomicMinMax = value;
+        return true;
     }
-    else if (feature_name == "shaderImageFloat32Atomics") {
+    if (feature_name == "shaderImageFloat32Atomics") {
         m_shader_atomic_float_features_ext.shaderImageFloat32Atomics = value;
+        return true;
     }
-    else if (feature_name == "shaderImageGatherExtended") {
+    if (feature_name == "shaderImageGatherExtended") {
         m_features2.features.shaderImageGatherExtended = value;
+        return true;
     }
-    else if (feature_name == "shaderImageInt64Atomics") {
+    if (feature_name == "shaderImageInt64Atomics") {
         m_shader_image_atomic_int64_features_ext.shaderImageInt64Atomics = value;
+        return true;
     }
-    else if (feature_name == "shaderInputAttachmentArrayDynamicIndexing") {
+    if (feature_name == "shaderInputAttachmentArrayDynamicIndexing") {
         m_descriptor_indexing_features.shaderInputAttachmentArrayDynamicIndexing = value;
         m_vulkan12_features.shaderInputAttachmentArrayDynamicIndexing = value;
+        return true;
     }
-    else if (feature_name == "shaderInputAttachmentArrayNonUniformIndexing") {
+    if (feature_name == "shaderInputAttachmentArrayNonUniformIndexing") {
         m_descriptor_indexing_features.shaderInputAttachmentArrayNonUniformIndexing = value;
         m_vulkan12_features.shaderInputAttachmentArrayNonUniformIndexing = value;
+        return true;
     }
-    else if (feature_name == "shaderInt16") {
+    if (feature_name == "shaderInt16") {
         m_features2.features.shaderInt16 = value;
+        return true;
     }
-    else if (feature_name == "shaderInt64") {
+    if (feature_name == "shaderInt64") {
         m_features2.features.shaderInt64 = value;
+        return true;
     }
-    else if (feature_name == "shaderInt8") {
+    if (feature_name == "shaderInt8") {
         m_shader_float16_int8_features.shaderInt8 = value;
         m_vulkan12_features.shaderInt8 = value;
+        return true;
     }
-    else if (feature_name == "shaderIntegerDotProduct") {
+    if (feature_name == "shaderIntegerDotProduct") {
         m_vulkan13_features.shaderIntegerDotProduct = value;
         m_shader_integer_dot_product_features.shaderIntegerDotProduct = value;
+        return true;
     }
-    else if (feature_name == "shaderIntegerFunctions2") {
+    if (feature_name == "shaderIntegerFunctions2") {
         m_shader_integer_functions2_features_intel.shaderIntegerFunctions2 = value;
+        return true;
     }
-    else if (feature_name == "shaderMaximalReconvergence") {
+    if (feature_name == "shaderMaximalReconvergence") {
         m_shader_maximal_reconvergence_features_khr.shaderMaximalReconvergence = value;
+        return true;
     }
-    else if (feature_name == "shaderModuleIdentifier") {
+    if (feature_name == "shaderModuleIdentifier") {
         m_shader_module_identifier_features_ext.shaderModuleIdentifier = value;
+        return true;
     }
-    else if (feature_name == "shaderObject") {
+    if (feature_name == "shaderObject") {
         m_shader_object_features_ext.shaderObject = value;
+        return true;
     }
-    else if (feature_name == "shaderOutputLayer") {
+    if (feature_name == "shaderOutputLayer") {
         m_vulkan12_features.shaderOutputLayer = value;
+        return true;
     }
-    else if (feature_name == "shaderOutputViewportIndex") {
+    if (feature_name == "shaderOutputViewportIndex") {
         m_vulkan12_features.shaderOutputViewportIndex = value;
+        return true;
     }
-    else if (feature_name == "shaderQuadControl") {
+    if (feature_name == "shaderQuadControl") {
         m_shader_quad_control_features_khr.shaderQuadControl = value;
+        return true;
     }
-    else if (feature_name == "shaderRawAccessChains") {
+    if (feature_name == "shaderRawAccessChains") {
         m_raw_access_chains_features_nv.shaderRawAccessChains = value;
+        return true;
     }
-    else if (feature_name == "shaderRelaxedExtendedInstruction") {
+    if (feature_name == "shaderRelaxedExtendedInstruction") {
         m_shader_relaxed_extended_instruction_features_khr.shaderRelaxedExtendedInstruction = value;
+        return true;
     }
-    else if (feature_name == "shaderReplicatedComposites") {
+    if (feature_name == "shaderReplicatedComposites") {
         m_shader_replicated_composites_features_ext.shaderReplicatedComposites = value;
+        return true;
     }
-    else if (feature_name == "shaderResourceMinLod") {
+    if (feature_name == "shaderResourceMinLod") {
         m_features2.features.shaderResourceMinLod = value;
+        return true;
     }
-    else if (feature_name == "shaderResourceResidency") {
+    if (feature_name == "shaderResourceResidency") {
         m_features2.features.shaderResourceResidency = value;
+        return true;
     }
-    else if (feature_name == "shaderSMBuiltins") {
+    if (feature_name == "shaderSMBuiltins") {
         m_shader_sm_builtins_features_nv.shaderSMBuiltins = value;
+        return true;
     }
-    else if (feature_name == "shaderSampledImageArrayDynamicIndexing") {
+    if (feature_name == "shaderSampledImageArrayDynamicIndexing") {
         m_features2.features.shaderSampledImageArrayDynamicIndexing = value;
+        return true;
     }
-    else if (feature_name == "shaderSampledImageArrayNonUniformIndexing") {
+    if (feature_name == "shaderSampledImageArrayNonUniformIndexing") {
         m_descriptor_indexing_features.shaderSampledImageArrayNonUniformIndexing = value;
         m_vulkan12_features.shaderSampledImageArrayNonUniformIndexing = value;
+        return true;
     }
-    else if (feature_name == "shaderSharedFloat16AtomicAdd") {
+    if (feature_name == "shaderSharedFloat16AtomicAdd") {
         m_shader_atomic_float2_features_ext.shaderSharedFloat16AtomicAdd = value;
+        return true;
     }
-    else if (feature_name == "shaderSharedFloat16AtomicMinMax") {
+    if (feature_name == "shaderSharedFloat16AtomicMinMax") {
         m_shader_atomic_float2_features_ext.shaderSharedFloat16AtomicMinMax = value;
+        return true;
     }
-    else if (feature_name == "shaderSharedFloat16Atomics") {
+    if (feature_name == "shaderSharedFloat16Atomics") {
         m_shader_atomic_float2_features_ext.shaderSharedFloat16Atomics = value;
+        return true;
     }
-    else if (feature_name == "shaderSharedFloat32AtomicAdd") {
+    if (feature_name == "shaderSharedFloat32AtomicAdd") {
         m_shader_atomic_float_features_ext.shaderSharedFloat32AtomicAdd = value;
+        return true;
     }
-    else if (feature_name == "shaderSharedFloat32AtomicMinMax") {
+    if (feature_name == "shaderSharedFloat32AtomicMinMax") {
         m_shader_atomic_float2_features_ext.shaderSharedFloat32AtomicMinMax = value;
+        return true;
     }
-    else if (feature_name == "shaderSharedFloat32Atomics") {
+    if (feature_name == "shaderSharedFloat32Atomics") {
         m_shader_atomic_float_features_ext.shaderSharedFloat32Atomics = value;
+        return true;
     }
-    else if (feature_name == "shaderSharedFloat64AtomicAdd") {
+    if (feature_name == "shaderSharedFloat64AtomicAdd") {
         m_shader_atomic_float_features_ext.shaderSharedFloat64AtomicAdd = value;
+        return true;
     }
-    else if (feature_name == "shaderSharedFloat64AtomicMinMax") {
+    if (feature_name == "shaderSharedFloat64AtomicMinMax") {
         m_shader_atomic_float2_features_ext.shaderSharedFloat64AtomicMinMax = value;
+        return true;
     }
-    else if (feature_name == "shaderSharedFloat64Atomics") {
+    if (feature_name == "shaderSharedFloat64Atomics") {
         m_shader_atomic_float_features_ext.shaderSharedFloat64Atomics = value;
+        return true;
     }
-    else if (feature_name == "shaderSharedInt64Atomics") {
+    if (feature_name == "shaderSharedInt64Atomics") {
         m_shader_atomic_int64_features.shaderSharedInt64Atomics = value;
         m_vulkan12_features.shaderSharedInt64Atomics = value;
+        return true;
     }
-    else if (feature_name == "shaderStorageBufferArrayDynamicIndexing") {
+    if (feature_name == "shaderStorageBufferArrayDynamicIndexing") {
         m_features2.features.shaderStorageBufferArrayDynamicIndexing = value;
+        return true;
     }
-    else if (feature_name == "shaderStorageBufferArrayNonUniformIndexing") {
+    if (feature_name == "shaderStorageBufferArrayNonUniformIndexing") {
         m_descriptor_indexing_features.shaderStorageBufferArrayNonUniformIndexing = value;
         m_vulkan12_features.shaderStorageBufferArrayNonUniformIndexing = value;
+        return true;
     }
-    else if (feature_name == "shaderStorageImageArrayDynamicIndexing") {
+    if (feature_name == "shaderStorageImageArrayDynamicIndexing") {
         m_features2.features.shaderStorageImageArrayDynamicIndexing = value;
+        return true;
     }
-    else if (feature_name == "shaderStorageImageArrayNonUniformIndexing") {
+    if (feature_name == "shaderStorageImageArrayNonUniformIndexing") {
         m_descriptor_indexing_features.shaderStorageImageArrayNonUniformIndexing = value;
         m_vulkan12_features.shaderStorageImageArrayNonUniformIndexing = value;
+        return true;
     }
-    else if (feature_name == "shaderStorageImageExtendedFormats") {
+    if (feature_name == "shaderStorageImageExtendedFormats") {
         m_features2.features.shaderStorageImageExtendedFormats = value;
+        return true;
     }
-    else if (feature_name == "shaderStorageImageMultisample") {
+    if (feature_name == "shaderStorageImageMultisample") {
         m_features2.features.shaderStorageImageMultisample = value;
+        return true;
     }
-    else if (feature_name == "shaderStorageImageReadWithoutFormat") {
+    if (feature_name == "shaderStorageImageReadWithoutFormat") {
         m_features2.features.shaderStorageImageReadWithoutFormat = value;
+        return true;
     }
-    else if (feature_name == "shaderStorageImageWriteWithoutFormat") {
+    if (feature_name == "shaderStorageImageWriteWithoutFormat") {
         m_features2.features.shaderStorageImageWriteWithoutFormat = value;
+        return true;
     }
-    else if (feature_name == "shaderStorageTensorArrayDynamicIndexing") {
+    if (feature_name == "shaderStorageTensorArrayDynamicIndexing") {
         m_tensor_features_arm.shaderStorageTensorArrayDynamicIndexing = value;
+        return true;
     }
-    else if (feature_name == "shaderStorageTensorArrayNonUniformIndexing") {
+    if (feature_name == "shaderStorageTensorArrayNonUniformIndexing") {
         m_tensor_features_arm.shaderStorageTensorArrayNonUniformIndexing = value;
+        return true;
     }
-    else if (feature_name == "shaderStorageTexelBufferArrayDynamicIndexing") {
+    if (feature_name == "shaderStorageTexelBufferArrayDynamicIndexing") {
         m_descriptor_indexing_features.shaderStorageTexelBufferArrayDynamicIndexing = value;
         m_vulkan12_features.shaderStorageTexelBufferArrayDynamicIndexing = value;
+        return true;
     }
-    else if (feature_name == "shaderStorageTexelBufferArrayNonUniformIndexing") {
+    if (feature_name == "shaderStorageTexelBufferArrayNonUniformIndexing") {
         m_descriptor_indexing_features.shaderStorageTexelBufferArrayNonUniformIndexing = value;
         m_vulkan12_features.shaderStorageTexelBufferArrayNonUniformIndexing = value;
+        return true;
     }
-    else if (feature_name == "shaderSubgroupClock") {
+    if (feature_name == "shaderSubgroupClock") {
         m_shader_clock_features_khr.shaderSubgroupClock = value;
+        return true;
     }
-    else if (feature_name == "shaderSubgroupExtendedTypes") {
+    if (feature_name == "shaderSubgroupExtendedTypes") {
         m_shader_subgroup_extended_types_features.shaderSubgroupExtendedTypes = value;
         m_vulkan12_features.shaderSubgroupExtendedTypes = value;
+        return true;
     }
-    else if (feature_name == "shaderSubgroupPartitioned") {
+    if (feature_name == "shaderSubgroupPartitioned") {
         m_shader_subgroup_partitioned_features_ext.shaderSubgroupPartitioned = value;
+        return true;
     }
-    else if (feature_name == "shaderSubgroupRotate") {
+    if (feature_name == "shaderSubgroupRotate") {
         m_vulkan14_features.shaderSubgroupRotate = value;
         m_shader_subgroup_rotate_features.shaderSubgroupRotate = value;
+        return true;
     }
-    else if (feature_name == "shaderSubgroupRotateClustered") {
+    if (feature_name == "shaderSubgroupRotateClustered") {
         m_vulkan14_features.shaderSubgroupRotateClustered = value;
         m_shader_subgroup_rotate_features.shaderSubgroupRotateClustered = value;
+        return true;
     }
-    else if (feature_name == "shaderSubgroupUniformControlFlow") {
+    if (feature_name == "shaderSubgroupUniformControlFlow") {
         m_shader_subgroup_uniform_control_flow_features_khr.shaderSubgroupUniformControlFlow = value;
+        return true;
     }
-    else if (feature_name == "shaderTensorAccess") {
+    if (feature_name == "shaderTensorAccess") {
         m_tensor_features_arm.shaderTensorAccess = value;
+        return true;
     }
-    else if (feature_name == "shaderTerminateInvocation") {
+    if (feature_name == "shaderTerminateInvocation") {
         m_vulkan13_features.shaderTerminateInvocation = value;
         m_shader_terminate_invocation_features.shaderTerminateInvocation = value;
+        return true;
     }
-    else if (feature_name == "shaderTessellationAndGeometryPointSize") {
+    if (feature_name == "shaderTessellationAndGeometryPointSize") {
         m_features2.features.shaderTessellationAndGeometryPointSize = value;
+        return true;
     }
-    else if (feature_name == "shaderTileImageColorReadAccess") {
+    if (feature_name == "shaderTileImageColorReadAccess") {
         m_shader_tile_image_features_ext.shaderTileImageColorReadAccess = value;
+        return true;
     }
-    else if (feature_name == "shaderTileImageDepthReadAccess") {
+    if (feature_name == "shaderTileImageDepthReadAccess") {
         m_shader_tile_image_features_ext.shaderTileImageDepthReadAccess = value;
+        return true;
     }
-    else if (feature_name == "shaderTileImageStencilReadAccess") {
+    if (feature_name == "shaderTileImageStencilReadAccess") {
         m_shader_tile_image_features_ext.shaderTileImageStencilReadAccess = value;
+        return true;
     }
-    else if (feature_name == "shaderUniformBufferArrayDynamicIndexing") {
+    if (feature_name == "shaderUniformBufferArrayDynamicIndexing") {
         m_features2.features.shaderUniformBufferArrayDynamicIndexing = value;
+        return true;
     }
-    else if (feature_name == "shaderUniformBufferArrayNonUniformIndexing") {
+    if (feature_name == "shaderUniformBufferArrayNonUniformIndexing") {
         m_descriptor_indexing_features.shaderUniformBufferArrayNonUniformIndexing = value;
         m_vulkan12_features.shaderUniformBufferArrayNonUniformIndexing = value;
+        return true;
     }
-    else if (feature_name == "shaderUniformBufferUnsizedArray") {
+    if (feature_name == "shaderUniformBufferUnsizedArray") {
         m_shader_uniform_buffer_unsized_array_features_ext.shaderUniformBufferUnsizedArray = value;
+        return true;
     }
-    else if (feature_name == "shaderUniformTexelBufferArrayDynamicIndexing") {
+    if (feature_name == "shaderUniformTexelBufferArrayDynamicIndexing") {
         m_descriptor_indexing_features.shaderUniformTexelBufferArrayDynamicIndexing = value;
         m_vulkan12_features.shaderUniformTexelBufferArrayDynamicIndexing = value;
+        return true;
     }
-    else if (feature_name == "shaderUniformTexelBufferArrayNonUniformIndexing") {
+    if (feature_name == "shaderUniformTexelBufferArrayNonUniformIndexing") {
         m_descriptor_indexing_features.shaderUniformTexelBufferArrayNonUniformIndexing = value;
         m_vulkan12_features.shaderUniformTexelBufferArrayNonUniformIndexing = value;
+        return true;
     }
-    else if (feature_name == "shaderUntypedPointers") {
+    if (feature_name == "shaderUntypedPointers") {
         m_shader_untyped_pointers_features_khr.shaderUntypedPointers = value;
+        return true;
     }
-    else if (feature_name == "shaderZeroInitializeWorkgroupMemory") {
+    if (feature_name == "shaderZeroInitializeWorkgroupMemory") {
         m_vulkan13_features.shaderZeroInitializeWorkgroupMemory = value;
         m_zero_initialize_workgroup_memory_features.shaderZeroInitializeWorkgroupMemory = value;
+        return true;
     }
-    else if (feature_name == "shadingRateCoarseSampleOrder") {
+    if (feature_name == "shadingRateCoarseSampleOrder") {
         m_shading_rate_image_features_nv.shadingRateCoarseSampleOrder = value;
+        return true;
     }
-    else if (feature_name == "shadingRateImage") {
+    if (feature_name == "shadingRateImage") {
         m_shading_rate_image_features_nv.shadingRateImage = value;
+        return true;
     }
-    else if (feature_name == "smoothLines") {
+    if (feature_name == "smoothLines") {
         m_line_rasterization_features.smoothLines = value;
         m_vulkan14_features.smoothLines = value;
+        return true;
     }
-    else if (feature_name == "sparseBinding") {
+    if (feature_name == "sparseBinding") {
         m_features2.features.sparseBinding = value;
+        return true;
     }
-    else if (feature_name == "sparseImageFloat32AtomicAdd") {
+    if (feature_name == "sparseImageFloat32AtomicAdd") {
         m_shader_atomic_float_features_ext.sparseImageFloat32AtomicAdd = value;
+        return true;
     }
-    else if (feature_name == "sparseImageFloat32AtomicMinMax") {
+    if (feature_name == "sparseImageFloat32AtomicMinMax") {
         m_shader_atomic_float2_features_ext.sparseImageFloat32AtomicMinMax = value;
+        return true;
     }
-    else if (feature_name == "sparseImageFloat32Atomics") {
+    if (feature_name == "sparseImageFloat32Atomics") {
         m_shader_atomic_float_features_ext.sparseImageFloat32Atomics = value;
+        return true;
     }
-    else if (feature_name == "sparseImageInt64Atomics") {
+    if (feature_name == "sparseImageInt64Atomics") {
         m_shader_image_atomic_int64_features_ext.sparseImageInt64Atomics = value;
+        return true;
     }
-    else if (feature_name == "sparseResidency16Samples") {
+    if (feature_name == "sparseResidency16Samples") {
         m_features2.features.sparseResidency16Samples = value;
+        return true;
     }
-    else if (feature_name == "sparseResidency2Samples") {
+    if (feature_name == "sparseResidency2Samples") {
         m_features2.features.sparseResidency2Samples = value;
+        return true;
     }
-    else if (feature_name == "sparseResidency4Samples") {
+    if (feature_name == "sparseResidency4Samples") {
         m_features2.features.sparseResidency4Samples = value;
+        return true;
     }
-    else if (feature_name == "sparseResidency8Samples") {
+    if (feature_name == "sparseResidency8Samples") {
         m_features2.features.sparseResidency8Samples = value;
+        return true;
     }
-    else if (feature_name == "sparseResidencyAliased") {
+    if (feature_name == "sparseResidencyAliased") {
         m_features2.features.sparseResidencyAliased = value;
+        return true;
     }
-    else if (feature_name == "sparseResidencyBuffer") {
+    if (feature_name == "sparseResidencyBuffer") {
         m_features2.features.sparseResidencyBuffer = value;
+        return true;
     }
-    else if (feature_name == "sparseResidencyImage2D") {
+    if (feature_name == "sparseResidencyImage2D") {
         m_features2.features.sparseResidencyImage2D = value;
+        return true;
     }
-    else if (feature_name == "sparseResidencyImage3D") {
+    if (feature_name == "sparseResidencyImage3D") {
         m_features2.features.sparseResidencyImage3D = value;
+        return true;
     }
-    else if (feature_name == "spheres") {
+    if (feature_name == "spheres") {
         m_ray_tracing_linear_swept_spheres_features_nv.spheres = value;
+        return true;
     }
-    else if (feature_name == "stippledBresenhamLines") {
+    if (feature_name == "stippledBresenhamLines") {
         m_line_rasterization_features.stippledBresenhamLines = value;
         m_vulkan14_features.stippledBresenhamLines = value;
+        return true;
     }
-    else if (feature_name == "stippledRectangularLines") {
+    if (feature_name == "stippledRectangularLines") {
         m_line_rasterization_features.stippledRectangularLines = value;
         m_vulkan14_features.stippledRectangularLines = value;
+        return true;
     }
-    else if (feature_name == "stippledSmoothLines") {
+    if (feature_name == "stippledSmoothLines") {
         m_line_rasterization_features.stippledSmoothLines = value;
         m_vulkan14_features.stippledSmoothLines = value;
+        return true;
     }
-    else if (feature_name == "storageBuffer16BitAccess") {
+    if (feature_name == "storageBuffer16BitAccess") {
         m_16_bit_storage_features.storageBuffer16BitAccess = value;
         m_vulkan11_features.storageBuffer16BitAccess = value;
+        return true;
     }
-    else if (feature_name == "storageBuffer8BitAccess") {
+    if (feature_name == "storageBuffer8BitAccess") {
         m_8_bit_storage_features.storageBuffer8BitAccess = value;
         m_vulkan12_features.storageBuffer8BitAccess = value;
+        return true;
     }
-    else if (feature_name == "storageInputOutput16") {
+    if (feature_name == "storageInputOutput16") {
         m_16_bit_storage_features.storageInputOutput16 = value;
         m_vulkan11_features.storageInputOutput16 = value;
+        return true;
     }
-    else if (feature_name == "storagePushConstant16") {
+    if (feature_name == "storagePushConstant16") {
         m_16_bit_storage_features.storagePushConstant16 = value;
         m_vulkan11_features.storagePushConstant16 = value;
+        return true;
     }
-    else if (feature_name == "storagePushConstant8") {
+    if (feature_name == "storagePushConstant8") {
         m_8_bit_storage_features.storagePushConstant8 = value;
         m_vulkan12_features.storagePushConstant8 = value;
+        return true;
     }
-    else if (feature_name == "subgroupBroadcastDynamicId") {
+    if (feature_name == "subgroupBroadcastDynamicId") {
         m_vulkan12_features.subgroupBroadcastDynamicId = value;
+        return true;
     }
-    else if (feature_name == "subgroupSizeControl") {
+    if (feature_name == "subgroupSizeControl") {
         m_subgroup_size_control_features.subgroupSizeControl = value;
         m_vulkan13_features.subgroupSizeControl = value;
+        return true;
     }
-    else if (feature_name == "subpassMergeFeedback") {
+    if (feature_name == "subpassMergeFeedback") {
         m_subpass_merge_feedback_features_ext.subpassMergeFeedback = value;
+        return true;
     }
-    else if (feature_name == "subpassShading") {
+    if (feature_name == "subpassShading") {
         m_subpass_shading_features_huawei.subpassShading = value;
+        return true;
     }
-    else if (feature_name == "supersampleFragmentShadingRates") {
+    if (feature_name == "supersampleFragmentShadingRates") {
         m_fragment_shading_rate_enums_features_nv.supersampleFragmentShadingRates = value;
+        return true;
     }
-    else if (feature_name == "swapchainMaintenance1") {
+    if (feature_name == "swapchainMaintenance1") {
         m_swapchain_maintenance1_features_khr.swapchainMaintenance1 = value;
+        return true;
     }
-    else if (feature_name == "synchronization2") {
+    if (feature_name == "synchronization2") {
         m_vulkan13_features.synchronization2 = value;
         m_synchronization2_features.synchronization2 = value;
+        return true;
     }
-    else if (feature_name == "taskShader") {
+    if (feature_name == "taskShader") {
         m_mesh_shader_features_nv.taskShader = value;
         m_mesh_shader_features_ext.taskShader = value;
+        return true;
     }
-    else if (feature_name == "tensorNonPacked") {
+    if (feature_name == "tensorNonPacked") {
         m_tensor_features_arm.tensorNonPacked = value;
+        return true;
     }
-    else if (feature_name == "tensors") {
+    if (feature_name == "tensors") {
         m_tensor_features_arm.tensors = value;
+        return true;
     }
-    else if (feature_name == "tessellationShader") {
+    if (feature_name == "tessellationShader") {
         m_features2.features.tessellationShader = value;
+        return true;
     }
-    else if (feature_name == "texelBufferAlignment") {
+    if (feature_name == "texelBufferAlignment") {
         m_texel_buffer_alignment_features_ext.texelBufferAlignment = value;
+        return true;
     }
-    else if (feature_name == "textureBlockMatch") {
+    if (feature_name == "textureBlockMatch") {
         m_image_processing_features_qcom.textureBlockMatch = value;
+        return true;
     }
-    else if (feature_name == "textureBlockMatch2") {
+    if (feature_name == "textureBlockMatch2") {
         m_image_processing2_features_qcom.textureBlockMatch2 = value;
+        return true;
     }
-    else if (feature_name == "textureBoxFilter") {
+    if (feature_name == "textureBoxFilter") {
         m_image_processing_features_qcom.textureBoxFilter = value;
+        return true;
     }
-    else if (feature_name == "textureCompressionASTC_3D") {
+    if (feature_name == "textureCompressionASTC_3D") {
         m_texture_compression_astc3_d_features_ext.textureCompressionASTC_3D = value;
+        return true;
     }
-    else if (feature_name == "textureCompressionASTC_HDR") {
+    if (feature_name == "textureCompressionASTC_HDR") {
         m_texture_compression_astchdr_features.textureCompressionASTC_HDR = value;
         m_vulkan13_features.textureCompressionASTC_HDR = value;
+        return true;
     }
-    else if (feature_name == "textureCompressionASTC_LDR") {
+    if (feature_name == "textureCompressionASTC_LDR") {
         m_features2.features.textureCompressionASTC_LDR = value;
+        return true;
     }
-    else if (feature_name == "textureCompressionBC") {
+    if (feature_name == "textureCompressionBC") {
         m_features2.features.textureCompressionBC = value;
+        return true;
     }
-    else if (feature_name == "textureCompressionETC2") {
+    if (feature_name == "textureCompressionETC2") {
         m_features2.features.textureCompressionETC2 = value;
+        return true;
     }
-    else if (feature_name == "textureSampleWeighted") {
+    if (feature_name == "textureSampleWeighted") {
         m_image_processing_features_qcom.textureSampleWeighted = value;
+        return true;
     }
-    else if (feature_name == "tileMemoryHeap") {
+    if (feature_name == "tileMemoryHeap") {
         m_tile_memory_heap_features_qcom.tileMemoryHeap = value;
+        return true;
     }
-    else if (feature_name == "tileProperties") {
+    if (feature_name == "tileProperties") {
         m_tile_properties_features_qcom.tileProperties = value;
+        return true;
     }
-    else if (feature_name == "tileShading") {
+    if (feature_name == "tileShading") {
         m_tile_shading_features_qcom.tileShading = value;
+        return true;
     }
-    else if (feature_name == "tileShadingAnisotropicApron") {
+    if (feature_name == "tileShadingAnisotropicApron") {
         m_tile_shading_features_qcom.tileShadingAnisotropicApron = value;
+        return true;
     }
-    else if (feature_name == "tileShadingApron") {
+    if (feature_name == "tileShadingApron") {
         m_tile_shading_features_qcom.tileShadingApron = value;
+        return true;
     }
-    else if (feature_name == "tileShadingAtomicOps") {
+    if (feature_name == "tileShadingAtomicOps") {
         m_tile_shading_features_qcom.tileShadingAtomicOps = value;
+        return true;
     }
-    else if (feature_name == "tileShadingColorAttachments") {
+    if (feature_name == "tileShadingColorAttachments") {
         m_tile_shading_features_qcom.tileShadingColorAttachments = value;
+        return true;
     }
-    else if (feature_name == "tileShadingDepthAttachments") {
+    if (feature_name == "tileShadingDepthAttachments") {
         m_tile_shading_features_qcom.tileShadingDepthAttachments = value;
+        return true;
     }
-    else if (feature_name == "tileShadingDispatchTile") {
+    if (feature_name == "tileShadingDispatchTile") {
         m_tile_shading_features_qcom.tileShadingDispatchTile = value;
+        return true;
     }
-    else if (feature_name == "tileShadingFragmentStage") {
+    if (feature_name == "tileShadingFragmentStage") {
         m_tile_shading_features_qcom.tileShadingFragmentStage = value;
+        return true;
     }
-    else if (feature_name == "tileShadingImageProcessing") {
+    if (feature_name == "tileShadingImageProcessing") {
         m_tile_shading_features_qcom.tileShadingImageProcessing = value;
+        return true;
     }
-    else if (feature_name == "tileShadingInputAttachments") {
+    if (feature_name == "tileShadingInputAttachments") {
         m_tile_shading_features_qcom.tileShadingInputAttachments = value;
+        return true;
     }
-    else if (feature_name == "tileShadingPerTileDispatch") {
+    if (feature_name == "tileShadingPerTileDispatch") {
         m_tile_shading_features_qcom.tileShadingPerTileDispatch = value;
+        return true;
     }
-    else if (feature_name == "tileShadingPerTileDraw") {
+    if (feature_name == "tileShadingPerTileDraw") {
         m_tile_shading_features_qcom.tileShadingPerTileDraw = value;
+        return true;
     }
-    else if (feature_name == "tileShadingSampledAttachments") {
+    if (feature_name == "tileShadingSampledAttachments") {
         m_tile_shading_features_qcom.tileShadingSampledAttachments = value;
+        return true;
     }
-    else if (feature_name == "tileShadingStencilAttachments") {
+    if (feature_name == "tileShadingStencilAttachments") {
         m_tile_shading_features_qcom.tileShadingStencilAttachments = value;
+        return true;
     }
-    else if (feature_name == "timelineSemaphore") {
+    if (feature_name == "timelineSemaphore") {
         m_timeline_semaphore_features.timelineSemaphore = value;
         m_vulkan12_features.timelineSemaphore = value;
+        return true;
     }
-    else if (feature_name == "transformFeedback") {
+    if (feature_name == "transformFeedback") {
         m_transform_feedback_features_ext.transformFeedback = value;
+        return true;
     }
-    else if (feature_name == "transformFeedbackPreservesProvokingVertex") {
+    if (feature_name == "transformFeedbackPreservesProvokingVertex") {
         m_provoking_vertex_features_ext.transformFeedbackPreservesProvokingVertex = value;
+        return true;
     }
-    else if (feature_name == "unifiedImageLayouts") {
+    if (feature_name == "unifiedImageLayouts") {
         m_unified_image_layouts_features_khr.unifiedImageLayouts = value;
+        return true;
     }
-    else if (feature_name == "unifiedImageLayoutsVideo") {
+    if (feature_name == "unifiedImageLayoutsVideo") {
         m_unified_image_layouts_features_khr.unifiedImageLayoutsVideo = value;
+        return true;
     }
-    else if (feature_name == "uniformAndStorageBuffer16BitAccess") {
+    if (feature_name == "uniformAndStorageBuffer16BitAccess") {
         m_16_bit_storage_features.uniformAndStorageBuffer16BitAccess = value;
         m_vulkan11_features.uniformAndStorageBuffer16BitAccess = value;
+        return true;
     }
-    else if (feature_name == "uniformAndStorageBuffer8BitAccess") {
+    if (feature_name == "uniformAndStorageBuffer8BitAccess") {
         m_8_bit_storage_features.uniformAndStorageBuffer8BitAccess = value;
         m_vulkan12_features.uniformAndStorageBuffer8BitAccess = value;
+        return true;
     }
-    else if (feature_name == "uniformBufferStandardLayout") {
+    if (feature_name == "uniformBufferStandardLayout") {
         m_uniform_buffer_standard_layout_features.uniformBufferStandardLayout = value;
         m_vulkan12_features.uniformBufferStandardLayout = value;
+        return true;
     }
-    else if (feature_name == "variableMultisampleRate") {
+    if (feature_name == "variableMultisampleRate") {
         m_features2.features.variableMultisampleRate = value;
+        return true;
     }
-    else if (feature_name == "variablePointers") {
+    if (feature_name == "variablePointers") {
         m_variable_pointers_features.variablePointers = value;
         m_vulkan11_features.variablePointers = value;
+        return true;
     }
-    else if (feature_name == "variablePointersStorageBuffer") {
+    if (feature_name == "variablePointersStorageBuffer") {
         m_variable_pointers_features.variablePointersStorageBuffer = value;
         m_vulkan11_features.variablePointersStorageBuffer = value;
+        return true;
     }
-    else if (feature_name == "vertexAttributeInstanceRateDivisor") {
+    if (feature_name == "vertexAttributeInstanceRateDivisor") {
         m_vertex_attribute_divisor_features.vertexAttributeInstanceRateDivisor = value;
         m_vulkan14_features.vertexAttributeInstanceRateDivisor = value;
+        return true;
     }
-    else if (feature_name == "vertexAttributeInstanceRateZeroDivisor") {
+    if (feature_name == "vertexAttributeInstanceRateZeroDivisor") {
         m_vertex_attribute_divisor_features.vertexAttributeInstanceRateZeroDivisor = value;
         m_vulkan14_features.vertexAttributeInstanceRateZeroDivisor = value;
+        return true;
     }
-    else if (feature_name == "vertexAttributeRobustness") {
+    if (feature_name == "vertexAttributeRobustness") {
         m_vertex_attribute_robustness_features_ext.vertexAttributeRobustness = value;
+        return true;
     }
-    else if (feature_name == "vertexInputDynamicState") {
+    if (feature_name == "vertexInputDynamicState") {
         m_vertex_input_dynamic_state_features_ext.vertexInputDynamicState = value;
+        return true;
     }
-    else if (feature_name == "vertexPipelineStoresAndAtomics") {
+    if (feature_name == "vertexPipelineStoresAndAtomics") {
         m_features2.features.vertexPipelineStoresAndAtomics = value;
+        return true;
     }
-    else if (feature_name == "videoDecodeVP9") {
+    if (feature_name == "videoDecodeVP9") {
         m_video_decode_vp9_features_khr.videoDecodeVP9 = value;
+        return true;
     }
-    else if (feature_name == "videoEncodeAV1") {
+    if (feature_name == "videoEncodeAV1") {
         m_video_encode_av1_features_khr.videoEncodeAV1 = value;
+        return true;
     }
-    else if (feature_name == "videoEncodeIntraRefresh") {
+    if (feature_name == "videoEncodeIntraRefresh") {
         m_video_encode_intra_refresh_features_khr.videoEncodeIntraRefresh = value;
+        return true;
     }
-    else if (feature_name == "videoEncodeQuantizationMap") {
+    if (feature_name == "videoEncodeQuantizationMap") {
         m_video_encode_quantization_map_features_khr.videoEncodeQuantizationMap = value;
+        return true;
     }
-    else if (feature_name == "videoEncodeRgbConversion") {
+    if (feature_name == "videoEncodeRgbConversion") {
         m_video_encode_rgb_conversion_features_valve.videoEncodeRgbConversion = value;
+        return true;
     }
-    else if (feature_name == "videoMaintenance1") {
+    if (feature_name == "videoMaintenance1") {
         m_video_maintenance1_features_khr.videoMaintenance1 = value;
+        return true;
     }
-    else if (feature_name == "videoMaintenance2") {
+    if (feature_name == "videoMaintenance2") {
         m_video_maintenance2_features_khr.videoMaintenance2 = value;
+        return true;
     }
-    else if (feature_name == "vulkanMemoryModel") {
+    if (feature_name == "vulkanMemoryModel") {
         m_vulkan_memory_model_features.vulkanMemoryModel = value;
         m_vulkan12_features.vulkanMemoryModel = value;
+        return true;
     }
-    else if (feature_name == "vulkanMemoryModelAvailabilityVisibilityChains") {
+    if (feature_name == "vulkanMemoryModelAvailabilityVisibilityChains") {
         m_vulkan_memory_model_features.vulkanMemoryModelAvailabilityVisibilityChains = value;
         m_vulkan12_features.vulkanMemoryModelAvailabilityVisibilityChains = value;
+        return true;
     }
-    else if (feature_name == "vulkanMemoryModelDeviceScope") {
+    if (feature_name == "vulkanMemoryModelDeviceScope") {
         m_vulkan_memory_model_features.vulkanMemoryModelDeviceScope = value;
         m_vulkan12_features.vulkanMemoryModelDeviceScope = value;
+        return true;
     }
-    else if (feature_name == "wideLines") {
+    if (feature_name == "wideLines") {
         m_features2.features.wideLines = value;
+        return true;
     }
-    else if (feature_name == "workgroupMemoryExplicitLayout") {
+    if (feature_name == "workgroupMemoryExplicitLayout") {
         m_workgroup_memory_explicit_layout_features_khr.workgroupMemoryExplicitLayout = value;
+        return true;
     }
-    else if (feature_name == "workgroupMemoryExplicitLayout16BitAccess") {
+    if (feature_name == "workgroupMemoryExplicitLayout16BitAccess") {
         m_workgroup_memory_explicit_layout_features_khr.workgroupMemoryExplicitLayout16BitAccess = value;
+        return true;
     }
-    else if (feature_name == "workgroupMemoryExplicitLayout8BitAccess") {
+    if (feature_name == "workgroupMemoryExplicitLayout8BitAccess") {
         m_workgroup_memory_explicit_layout_features_khr.workgroupMemoryExplicitLayout8BitAccess = value;
+        return true;
     }
-    else if (feature_name == "workgroupMemoryExplicitLayoutScalarBlockLayout") {
+    if (feature_name == "workgroupMemoryExplicitLayoutScalarBlockLayout") {
         m_workgroup_memory_explicit_layout_features_khr.workgroupMemoryExplicitLayoutScalarBlockLayout = value;
+        return true;
     }
-    else if (feature_name == "ycbcr2plane444Formats") {
+    if (feature_name == "ycbcr2plane444Formats") {
         m_ycbcr2_plane444_formats_features_ext.ycbcr2plane444Formats = value;
+        return true;
     }
-    else if (feature_name == "ycbcrDegamma") {
+    if (feature_name == "ycbcrDegamma") {
         m_ycbcr_degamma_features_qcom.ycbcrDegamma = value;
+        return true;
     }
-    else if (feature_name == "ycbcrImageArrays") {
+    if (feature_name == "ycbcrImageArrays") {
         m_ycbcr_image_arrays_features_ext.ycbcrImageArrays = value;
+        return true;
     }
-    else if (feature_name == "zeroInitializeDeviceMemory") {
+    if (feature_name == "zeroInitializeDeviceMemory") {
         m_zero_initialize_device_memory_features_ext.zeroInitializeDeviceMemory = value;
+        return true;
     }
-    else {
-        throw std::invalid_argument(
-            fmt::format("Unknown feature: '{}'", feature_name));
-    }
+    
+    return false;
+    
 }
 
 bool VulkanFeatures::get_feature(const std::string& feature_name) const {
@@ -9411,8 +9909,7 @@ bool VulkanFeatures::get_feature(const std::string& feature_name) const {
         return m_zero_initialize_device_memory_features_ext.zeroInitializeDeviceMemory == VK_TRUE;
     }
     else {
-        throw std::invalid_argument(
-            fmt::format("Unknown feature: '{}'", feature_name));
+        return false;
     }
 }
 

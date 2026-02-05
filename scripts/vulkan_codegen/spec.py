@@ -46,6 +46,12 @@ def get_latest_vulkan_spec_version(use_tags: bool = True) -> str:
 VULKAN_SPEC_VERSION = os.environ.get("VULKAN_SPEC_VERSION") or get_latest_vulkan_spec_version(use_tags=True)
 VULKAN_SPEC_URL = f"https://raw.githubusercontent.com/KhronosGroup/Vulkan-Docs/{VULKAN_SPEC_VERSION}/xml/vk.xml"
 
+# Constants for Vulkan struct names (avoid hardcoded strings throughout codebase)
+PHYSICAL_DEVICE_PREFIX = "VkPhysicalDevice"
+FEATURE_STRUCT_BASE = "VkPhysicalDeviceFeatures2"
+PROPERTY_STRUCT_BASE = "VkPhysicalDeviceProperties2"
+DEVICE_CREATE_INFO = "VkDeviceCreateInfo"
+
 print(f"Using Vulkan spec version: {VULKAN_SPEC_VERSION}")
 
 
