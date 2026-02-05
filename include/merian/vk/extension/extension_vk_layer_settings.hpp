@@ -7,7 +7,7 @@
 
 namespace merian {
 
-class ExtensionVkLayerSettings : public Extension {
+class ExtensionVkLayerSettings : public ContextExtension {
   public:
     inline static const vk::LayerSettingEXT ENABLE_VALIDATION_LAYER_PRINTF{
         "VK_LAYER_KHRONOS_validation",
@@ -19,14 +19,16 @@ class ExtensionVkLayerSettings : public Extension {
 
   public:
     ExtensionVkLayerSettings(const vk::ArrayProxy<vk::LayerSettingEXT>& settings)
-        : Extension("ExtensionVkLayerSettings"), settings(settings.begin(), settings.end()) {}
+        : ContextExtension("ExtensionVkLayerSettings"), settings(settings.begin(), settings.end()) {}
 
     // Overrides
     ~ExtensionVkLayerSettings() {}
-    std::vector<const char*> required_instance_extension_names() const override {
-        return {
+    InstanceSupportInfo query_instance_support(const InstanceSupportQueryInfo& /*query_info*/) override {
+        InstanceSupportInfo info;
+        info.required_extensions = {
             VK_EXT_LAYER_SETTINGS_EXTENSION_NAME,
         };
+        return info;
     }
 
     void* pnext_instance_create_info(void* const p_next) override {

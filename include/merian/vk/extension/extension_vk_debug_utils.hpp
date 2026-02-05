@@ -32,18 +32,17 @@ class ExtensionVkDebugUtils : public ContextExtension {
         (**instance).destroyDebugUtilsMessengerEXT(messenger);
     }
 
-    std::vector<const char*> enable_instance_extension_names(
-        const std::unordered_set<std::string>& /*supported_extensions*/) const override {
-        return {
+    InstanceSupportInfo query_instance_support(const InstanceSupportQueryInfo& query_info) override {
+        InstanceSupportInfo info;
+        info.required_extensions = {
             VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
             VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
         };
-    }
-    std::vector<const char*> enable_instance_layer_names(
-        const std::unordered_set<std::string>& /*supported_layers*/) const override {
-        return {
+        info.required_layers = {
             "VK_LAYER_KHRONOS_validation",
         };
+        info.supported = query_info.supported_extensions.contains(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+        return info;
     }
 
     void on_instance_created(const InstanceHandle& /*unused*/) override;

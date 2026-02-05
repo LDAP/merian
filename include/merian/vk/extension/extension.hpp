@@ -1,11 +1,62 @@
 #pragma once
 
 #include "merian/vk/context.hpp"
-#include <map>
 #include <spdlog/spdlog.h>
 #include <vector>
 
 namespace merian {
+
+class ExtensionContainer;
+
+/**
+ * @brief Result of instance-level support query.
+ *
+ * Contains whether the extension is supported and what instance-level
+ * requirements it needs (extensions and validation layers).
+ */
+struct InstanceSupportInfo {
+    bool supported = true;                          ///< Whether extension is supported
+    std::vector<const char*> required_extensions{}; ///< Required instance extensions
+    std::vector<const char*> required_layers{};     ///< Required validation layers
+};
+
+/**
+ * @brief Context for instance-level support queries.
+ *
+ * Provides information about what instance extensions and layers are available,
+ * and access to other loaded extensions for coordination.
+ */
+struct InstanceSupportQueryInfo {
+    const std::unordered_set<std::string>& supported_extensions; ///< Available instance extensions
+    const std::unordered_set<std::string>& supported_layers;     ///< Available validation layers
+    const ExtensionContainer& extension_container;               ///< Access to loaded extensions
+};
+
+/**
+ * @brief Result of device-level support query.
+ *
+ * Contains whether the extension is supported on the device and what device-level
+ * requirements it needs (features, extensions, SPIR-V capabilities).
+ */
+struct DeviceSupportInfo {
+    bool supported = true;                          ///< Whether extension is supported on device
+    std::vector<const char*> required_features{};   ///< Required Vulkan features (by name)
+    std::vector<const char*> required_extensions{}; ///< Required device extensions
+    std::vector<const char*> required_spirv_capabilities{}; ///< Required SPIR-V capabilities
+    std::vector<const char*> required_spirv_extensions{};   ///< Required SPIR-V extensions
+};
+
+/**
+ * @brief Context for device-level support queries.
+ *
+ * Provides information about the physical device, queue topology,
+ * and access to other loaded extensions for coordination.
+ */
+struct DeviceSupportQueryInfo {
+    const PhysicalDeviceHandle& physical_device;   ///< Physical device being queried
+    const QueueInfo& queue_info;                   ///< Queue family information
+    const ExtensionContainer& extension_container; ///< Access to loaded extensions
+};
 
 /**
  * @brief      An extension to the Vulkan Context.
@@ -26,46 +77,53 @@ class ContextExtension {
 
     virtual ~ContextExtension() = 0;
 
-    // REQUIREMENTS
-
-    /* Extensions that should be enabled instance-wide. The context attempts to enable as many as
-     * possible. */
-    virtual std::vector<const char*> enable_instance_extension_names(
-        const std::unordered_set<std::string>& /*supported_extensions*/) const {
-        return {};
-    }
-    /* Layers that should be enabled instance-wide. The context attempts to enable as many as
-     * possible. */
-    virtual std::vector<const char*>
-    enable_instance_layer_names(const std::unordered_set<std::string>& /*supported_layers*/) const {
-        return {};
-    }
-
-    /* Extensions that should be enabled device-wide. The context attempts to enable as many as
-     * possible. */
-    virtual std::vector<const char*>
-    enable_device_extension_names(const PhysicalDeviceHandle& /*unused*/) const {
+    /**
+     * @brief Request other extensions that this extension depends on.
+     *
+     * Called during context initialization before instance creation. Extensions can request
+     * other extensions by name, which will be loaded from the extension registry and have
+     * their dependencies resolved recursively.
+     *
+     * @return Vector of extension names to be loaded (e.g., {"glfw", "vk_debug_utils"})
+     */
+    virtual std::vector<std::string> request_extensions() {
         return {};
     }
 
-    /* Features that should be enabled device-wide (return a featureStructName/featureName pattern).
-     * The context attempts to enable as
-     * many as possible. */
-    virtual std::vector<std::string>
-    enable_device_features(const PhysicalDeviceHandle& /*unused*/) const {
-        return {};
+    /**
+     * @brief Query instance-level support and requirements.
+     *
+     * Called during instance creation to determine if this extension is supported and what
+     * instance extensions and layers it requires. The extension should check the
+     * query_info.supported_extensions and query_info.supported_layers to verify its
+     * requirements are available.
+     *
+     * @param query_info Context containing supported extensions/layers and extension container
+     * @return InstanceSupportInfo with supported flag and required extensions/layers
+     */
+    virtual InstanceSupportInfo
+    query_instance_support(const InstanceSupportQueryInfo& /*query_info*/) {
+        return InstanceSupportInfo{true};
+    }
+
+    /**
+     * @brief Query device-level support and requirements.
+     *
+     * Called during physical device selection to determine if this extension is supported on
+     * the device and what device extensions, features, and SPIR-V capabilities it requires.
+     * The extension should check the physical_device to verify its requirements are available.
+     *
+     * @param query_info Context containing physical device, queue info, and extension container
+     * @return DeviceSupportInfo with supported flag and required extensions/features/SPIR-V
+     */
+    virtual DeviceSupportInfo query_device_support(const DeviceSupportQueryInfo& /*query_info*/) {
+        return DeviceSupportInfo{true};
     }
 
     // LIFECYCLE (in order)
 
-    /**
-     * Notifies the extensions that the context is starting and allows extensions to communicate.
-     *
-     * Note, this are the desired extensions and support is yet to be determined.
-     */
     virtual void
-    on_context_initializing([[maybe_unused]] const ExtensionContainer& extension_container,
-                            [[maybe_unused]] const vk::detail::DispatchLoaderDynamic& loader) {}
+    on_context_initializing([[maybe_unused]] const vk::detail::DispatchLoaderDynamic& loader) {}
 
     /**
      * Append structs to vkInstanceCreateInfo to enable features of extensions.
@@ -84,74 +142,12 @@ class ContextExtension {
      * compatibility and check_support is called.*/
     virtual void on_physical_device_selected(const PhysicalDeviceHandle& /*unused*/) {}
 
-    /* E.g. to dismiss a queue that does not support present-to-surface. Similar to
-     * accpet_physical_device, the context attempt to select a graphics queue that is accepted by
-     * most extensions.
-     */
     virtual bool accept_graphics_queue([[maybe_unused]] const InstanceHandle& instance,
                                        [[maybe_unused]] const PhysicalDeviceHandle& physical_device,
                                        [[maybe_unused]] std::size_t queue_family_index) {
         return true;
     }
 
-    /* Check if this extension is supported with the supplied instance layers and extensions.
-     *
-     * If this returned false, then on_unsupported is called.
-     *
-     * The default implementation returns false if any instance layer or extension is missing.
-     */
-    virtual bool
-    extension_supported(const std::unordered_set<std::string>& supported_instance_extensions,
-                        const std::unordered_set<std::string>& supported_instance_layers) {
-        for (const auto& req_instance_ext :
-             enable_instance_extension_names(supported_instance_extensions)) {
-            if (!supported_instance_extensions.contains(req_instance_ext)) {
-                SPDLOG_WARN("extension {} requested instance extension {} is not available", name,
-                            req_instance_ext);
-                return false;
-            }
-        }
-        for (const auto& req_instance_layer :
-             enable_instance_layer_names(supported_instance_layers)) {
-            if (!supported_instance_layers.contains(req_instance_layer)) {
-                SPDLOG_WARN("extension {} requested instance layer {} is not available", name,
-                            req_instance_layer);
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    /* Check if this extension is supported with the supplied instance layers, extensions, and
-     * device extensions and features.
-     *
-     * If a device is selected where this function returned false, on_unsupported is called.
-     *
-     * The default implementation returns false if any instance layer or extension or device
-     * extension or feature is missing.
-     */
-    virtual bool extension_supported(const PhysicalDeviceHandle& physical_device,
-                                     [[maybe_unused]] const QueueInfo& queue_info) {
-
-        for (const auto& req_device_ext : enable_device_extension_names(physical_device)) {
-            if (!physical_device->extension_supported(req_device_ext)) {
-                return false;
-            }
-        }
-        for (const auto& req_device_feature : enable_device_features(physical_device)) {
-            if (!physical_device->get_supported_features().get_feature(req_device_feature)) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    /**
-     * Called when extension support is confirmed for all extensions. Can be used to communicate
-     * with other extensions.
-     */
     virtual void
     on_extension_support_confirmed([[maybe_unused]] const ExtensionContainer& extension_container) {
     }

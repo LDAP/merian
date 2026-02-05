@@ -6,35 +6,32 @@
 
 namespace merian {
 
-std::vector<const char*> ExtensionResources::enable_device_extension_names(
-    const PhysicalDeviceHandle& physical_device) const {
-    std::vector<const char*> extensions;
+DeviceSupportInfo
+ExtensionResources::query_device_support(const DeviceSupportQueryInfo& query_info) {
+    DeviceSupportInfo info;
+    info.supported = true; // This extension has no hard requirements
+
+    const auto& physical_device = query_info.physical_device;
+
+    // Add optional extensions if supported
     if (physical_device->extension_supported(VK_KHR_MAINTENANCE_4_EXTENSION_NAME)) {
-        extensions.emplace_back(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
+        info.required_extensions.emplace_back(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
     }
     if (physical_device->extension_supported(VK_KHR_MAINTENANCE_5_EXTENSION_NAME)) {
-        extensions.emplace_back(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
+        info.required_extensions.emplace_back(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
     }
     if (physical_device->extension_supported(VK_AMD_DEVICE_COHERENT_MEMORY_EXTENSION_NAME)) {
-        extensions.emplace_back(VK_AMD_DEVICE_COHERENT_MEMORY_EXTENSION_NAME);
+        info.required_extensions.emplace_back(VK_AMD_DEVICE_COHERENT_MEMORY_EXTENSION_NAME);
     }
 
-    return extensions;
-}
-
-std::vector<std::string>
-ExtensionResources::enable_device_features(const PhysicalDeviceHandle& physical_device) const {
+    // Add optional features if supported
     if (physical_device->get_supported_features()
             .get_buffer_device_address_features()
             .bufferDeviceAddress == VK_TRUE) {
-        return {"bufferDeviceAddress"};
+        info.required_features.emplace_back("bufferDeviceAddress");
     }
-    return {};
-}
 
-bool ExtensionResources::extension_supported(const PhysicalDeviceHandle& /*physical_device*/,
-                                             const QueueInfo& /*queue_info*/) {
-    return true;
+    return info;
 }
 
 void ExtensionResources::on_physical_device_selected(const PhysicalDeviceHandle& physical_device) {

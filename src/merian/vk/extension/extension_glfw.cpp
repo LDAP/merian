@@ -23,9 +23,7 @@ ExtensionGLFW::~ExtensionGLFW() {
         glfwTerminate();
 }
 
-void ExtensionGLFW::on_context_initializing(
-    [[maybe_unused]] const ExtensionContainer& extension_container,
-    const vk::detail::DispatchLoaderDynamic& loader) {
+void ExtensionGLFW::on_context_initializing(const vk::detail::DispatchLoaderDynamic& loader) {
 
     SPDLOG_DEBUG("Querying Vulkan support");
     glfwInitVulkanLoader(loader.vkGetInstanceProcAddr);
@@ -37,28 +35,40 @@ void ExtensionGLFW::on_context_initializing(
     }
 }
 
-std::vector<const char*> ExtensionGLFW::enable_instance_extension_names(
-    const std::unordered_set<std::string>& /*supported_instance_extensions*/) const {
-    if (glfw_vulkan_support == GLFW_FALSE) {
-        return {};
+InstanceSupportInfo
+ExtensionGLFW::query_instance_support(const InstanceSupportQueryInfo& /*query_info*/) {
+    InstanceSupportInfo info;
+    info.supported = (glfw_vulkan_support == GLFW_TRUE);
+
+    if (glfw_vulkan_support == GLFW_TRUE) {
+        uint32_t count;
+        const char** extensions = glfwGetRequiredInstanceExtensions(&count);
+        info.required_extensions.insert(info.required_extensions.end(), extensions,
+                                        extensions + count);
     }
 
-    std::vector<const char*> required_extensions;
-    uint32_t count;
-    const char** extensions = glfwGetRequiredInstanceExtensions(&count);
-    required_extensions.insert(required_extensions.end(), extensions, extensions + count);
-    return required_extensions;
+    return info;
 }
 
-std::vector<const char*>
-ExtensionGLFW::enable_device_extension_names(const PhysicalDeviceHandle& /*unused*/) const {
+DeviceSupportInfo ExtensionGLFW::query_device_support(const DeviceSupportQueryInfo& query_info) {
+    DeviceSupportInfo info;
+
     if (glfw_vulkan_support == GLFW_FALSE) {
-        return {};
+        info.supported = false;
+        return info;
     }
 
-    return {
+    info.required_extensions = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
     };
+
+    // Check presentation support
+    info.supported = glfwGetPhysicalDevicePresentationSupport(
+                         **(query_info.physical_device->get_instance()),
+                         **query_info.physical_device,
+                         query_info.queue_info.queue_family_idx_GCT) == GLFW_TRUE;
+
+    return info;
 }
 
 bool ExtensionGLFW::accept_graphics_queue(const InstanceHandle& instance,
@@ -67,17 +77,6 @@ bool ExtensionGLFW::accept_graphics_queue(const InstanceHandle& instance,
     return glfw_vulkan_support == GLFW_FALSE ||
            glfwGetPhysicalDevicePresentationSupport(**instance, **physical_device,
                                                     queue_family_index) == GLFW_TRUE;
-}
-
-bool ExtensionGLFW::extension_supported(const PhysicalDeviceHandle& physical_device,
-                                        [[maybe_unused]] const QueueInfo& queue_info) {
-    if (ContextExtension::extension_supported(physical_device, queue_info)) {
-        return glfw_vulkan_support == GLFW_TRUE &&
-               glfwGetPhysicalDevicePresentationSupport(
-                   **(physical_device->get_instance()), **physical_device,
-                   queue_info.queue_family_idx_GCT) == GLFW_TRUE;
-    }
-    return false;
 }
 
 void ExtensionGLFW::on_context_created(const ContextHandle& context,

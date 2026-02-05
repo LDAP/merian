@@ -85,6 +85,18 @@ class ExtensionContainer {
     std::unordered_map<std::type_index, std::shared_ptr<ContextExtension>> context_extensions;
 };
 
+struct ContextCreateInfo {
+    VulkanFeatures desired_features;
+    std::vector<const char*> additional_extensions;
+    std::vector<std::string> context_extensions;
+    std::string application_name = "";
+    uint32_t application_vk_version = VK_MAKE_VERSION(1, 0, 0);
+    uint32_t preferred_number_compute_queues = 1;
+    uint32_t filter_vendor_id = -1;
+    uint32_t filter_device_id = -1;
+    std::string filter_device_name = "";
+};
+
 struct QueueInfo {
     // A queue family index guaranteed to support graphics+compute+transfer (or -1)
     int32_t queue_family_idx_GCT = -1;
@@ -130,36 +142,16 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
     static constexpr uint32_t BUILD_OPTIMIZATION_LEVEL = 1;
 #endif
 
-    /**
-     * @brief      Use this method to create the context.
-     *
-     */
-    static ContextHandle
-    create(const VulkanFeatures& desired_features,
-           const std::vector<const char*>& desired_additional_extensions,
-           const std::vector<std::shared_ptr<ContextExtension>>& desired_context_extensions,
-           const std::string& application_name = "",
-           const uint32_t application_vk_version = VK_MAKE_VERSION(1, 0, 0),
-           const uint32_t preffered_number_compute_queues = 1, // Additionally to the GCT queue
-           const uint32_t filter_vendor_id = -1,
-           const uint32_t filter_device_id = -1,
-           const std::string& filter_device_name = "");
+    static ContextHandle create(const ContextCreateInfo& create_info);
 
   private:
-    Context(const VulkanFeatures& desired_features,
-            const std::vector<const char*>& desired_additional_extensions,
-            const std::vector<std::shared_ptr<ContextExtension>>& desired_context_extensions,
-            const std::string& application_name,
-            const uint32_t application_vk_version,
-            const uint32_t preffered_number_compute_queues,
-            const uint32_t filter_vendor_id,
-            const uint32_t filter_device_id,
-            const std::string& filter_device_name);
+    Context(const ContextCreateInfo& create_info);
 
   public:
     ~Context();
 
   private: // Vulkan initialization
+    void load_extensions(const std::vector<std::string>& extension_names);
     void create_instance(const uint32_t targeted_vk_api_version,
                          const VulkanFeatures& desired_features,
                          const std::vector<const char*>& desired_additional_extensions);

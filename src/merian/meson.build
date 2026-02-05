@@ -30,6 +30,7 @@ merian_src = files(
     'vk/instance.cpp',
     'vk/physical_device.cpp',
     'vk/extension/extension.cpp',
+    'vk/extension/extension_registry.cpp',
     'vk/extension/extension_glfw.cpp',
     'vk/extension/extension_resources.cpp',
     'vk/extension/extension_vk_debug_utils.cpp',

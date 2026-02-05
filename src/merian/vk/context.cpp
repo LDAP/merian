@@ -4,10 +4,11 @@
 #include "merian/utils/stopwatch.hpp"
 #include "merian/utils/vector.hpp"
 #include "merian/vk/extension/extension.hpp"
-#include "merian/vk/utils/vulkan_spirv.hpp"
+#include "merian/vk/extension/extension_registry.hpp"
 
 #include <fmt/ranges.h>
 #include <numeric>
+#include <queue>
 #include <spdlog/spdlog.h>
 #include <tuple>
 
@@ -15,22 +16,8 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
 namespace merian {
 
-ContextHandle
-Context::create(const VulkanFeatures& desired_features,
-                const std::vector<const char*>& desired_additional_extensions,
-                const std::vector<std::shared_ptr<ContextExtension>>& desired_context_extensions,
-                const std::string& application_name,
-                const uint32_t application_vk_version,
-                const uint32_t preffered_number_compute_queues,
-                const uint32_t filter_vendor_id,
-                const uint32_t filter_device_id,
-                const std::string& filter_device_name) {
-
-    // call constructor manually since its private for make_shared...
-    const ContextHandle context = std::shared_ptr<Context>(
-        new Context(desired_features, desired_additional_extensions, desired_context_extensions,
-                    application_name, application_vk_version, preffered_number_compute_queues,
-                    filter_vendor_id, filter_device_id, filter_device_name));
+ContextHandle Context::create(const ContextCreateInfo& create_info) {
+    const ContextHandle context = std::shared_ptr<Context>(new Context(create_info));
 
     for (auto& ext : context->context_extensions) {
         ext.second->on_context_created(context, *context);
@@ -39,16 +26,48 @@ Context::create(const VulkanFeatures& desired_features,
     return context;
 }
 
-Context::Context(const VulkanFeatures& desired_features,
-                 const std::vector<const char*>& desired_additional_extensions,
-                 const std::vector<std::shared_ptr<ContextExtension>>& desired_context_extensions,
-                 const std::string& application_name,
-                 const uint32_t application_vk_version,
-                 const uint32_t preffered_number_compute_queues,
-                 const uint32_t filter_vendor_id,
-                 const uint32_t filter_device_id,
-                 const std::string& filter_device_name)
-    : application_name(application_name), application_vk_version(application_vk_version) {
+void Context::load_extensions(const std::vector<std::string>& extension_names) {
+    std::unordered_set<std::string> loaded_extensions;
+    std::queue<std::string> extension_names_to_process;
+
+    // Add user-provided extension names to queue
+    for (const auto& ext_name : extension_names) {
+        extension_names_to_process.push(ext_name);
+    }
+
+    context_extensions.clear();
+
+    while (!extension_names_to_process.empty()) {
+        const std::string ext_name = extension_names_to_process.front();
+        extension_names_to_process.pop();
+
+        // Skip if already loaded
+        if (loaded_extensions.contains(ext_name)) {
+            continue;
+        }
+
+        // Create extension from registry
+        auto ext = ExtensionRegistry::get_instance().create(ext_name);
+        if (!ext) {
+            SPDLOG_WARN("Extension '{}' not found in registry", ext_name);
+            continue;
+        }
+
+        SPDLOG_DEBUG("Loading extension: {}", ext_name);
+        loaded_extensions.insert(ext_name);
+        context_extensions[typeindex_from_pointer(ext)] = ext;
+
+        // Add requested dependencies to queue
+        auto requested = ext->request_extensions();
+        for (const auto& dep_name : requested) {
+            extension_names_to_process.push(dep_name);
+        }
+    }
+}
+
+Context::Context(const ContextCreateInfo& create_info)
+    : application_name(create_info.application_name),
+      application_vk_version(create_info.application_vk_version) {
     merian::Stopwatch sw;
 
     SPDLOG_INFO("\n\n\
@@ -68,32 +87,26 @@ Version: {}\n\n",
     SPDLOG_DEBUG("initializing dynamic loader");
     VULKAN_HPP_DEFAULT_DISPATCHER.init();
 
-    SPDLOG_DEBUG("supplied extensions:");
-    for (const auto& ext : desired_context_extensions) {
-        SPDLOG_DEBUG("{}", ext->name);
-        if (this->context_extensions.contains(typeindex_from_pointer(ext))) {
-            throw std::runtime_error{"A extension type can only be added once."};
-        }
-        this->context_extensions[typeindex_from_pointer(ext)] = ext;
-    }
+    load_extensions(create_info.context_extensions);
 
     for (const auto& ext : context_extensions) {
-        ext.second->on_context_initializing(*this, VULKAN_HPP_DEFAULT_DISPATCHER);
+        ext.second->on_context_initializing(VULKAN_HPP_DEFAULT_DISPATCHER);
     }
 
-    // attempt to target the latest version
     const uint32_t target_vk_api_version = VK_HEADER_VERSION_COMPLETE;
-    create_instance(target_vk_api_version, desired_features, desired_additional_extensions);
+    create_instance(target_vk_api_version, create_info.desired_features,
+                    create_info.additional_extensions);
 
-    select_physical_device(filter_vendor_id, filter_device_id, filter_device_name, desired_features,
-                           desired_additional_extensions);
+    select_physical_device(create_info.filter_vendor_id, create_info.filter_device_id,
+                           create_info.filter_device_name, create_info.desired_features,
+                           create_info.additional_extensions);
 
     for (auto& ext : this->context_extensions) {
         ext.second->on_extension_support_confirmed(*this);
     }
 
-    create_device_and_queues(preffered_number_compute_queues, desired_features,
-                             desired_additional_extensions);
+    create_device_and_queues(create_info.preferred_number_compute_queues,
+                             create_info.desired_features, create_info.additional_extensions);
 
     prepare_shader_include_defines();
 
@@ -123,13 +136,12 @@ void Context::create_instance(const uint32_t targeted_vk_api_version,
         supported_instance_extensions.emplace(instance_ext.extensionName);
     }
 
-    // -----------------
-    // Remove unsupported extensions
-
     auto it = context_extensions.begin();
     while (it != context_extensions.end()) {
-        if (it->second->extension_supported(supported_instance_extensions,
-                                            supported_instance_layers)) {
+        InstanceSupportQueryInfo query_info{supported_instance_extensions,
+                                             supported_instance_layers, *this};
+        auto support_info = it->second->query_instance_support(query_info);
+        if (support_info.supported) {
             it++;
         } else {
             it->second->on_unsupported("extension instance support check failed.");
@@ -181,12 +193,12 @@ void Context::create_instance(const uint32_t targeted_vk_api_version,
         add_instance_extensions(add_instance_extensions, ext);
     }
 
-    // from context extensions:
     for (auto& ext : context_extensions) {
-        insert_all(instance_layer_names,
-                   ext.second->enable_instance_layer_names(supported_instance_layers));
-        insert_all(instance_extension_names,
-                   ext.second->enable_instance_extension_names(supported_instance_extensions));
+        InstanceSupportQueryInfo query_info{supported_instance_extensions,
+                                             supported_instance_layers, *this};
+        auto support_info = ext.second->query_instance_support(query_info);
+        insert_all(instance_layer_names, support_info.required_layers);
+        insert_all(instance_extension_names, support_info.required_extensions);
     }
     remove_duplicates(instance_layer_names);
     remove_duplicates(instance_extension_names);
@@ -266,8 +278,9 @@ void Context::select_physical_device(
 
             uint32_t context_extensions_supported = 0;
             for (const auto& ext : context_extensions) {
-                context_extensions_supported += static_cast<uint32_t>(
-                    ext.second->extension_supported(physical_devices[i], q_info));
+                DeviceSupportQueryInfo query_info{physical_devices[i], q_info, *this};
+                auto support_info = ext.second->query_device_support(query_info);
+                context_extensions_supported += static_cast<uint32_t>(support_info.supported);
             }
 
             uint32_t extensions_supported = 0;
@@ -352,7 +365,9 @@ void Context::select_physical_device(
 
     auto it = context_extensions.begin();
     while (it != context_extensions.end()) {
-        if (it->second->extension_supported(physical_device, queue_info)) {
+        DeviceSupportQueryInfo query_info{physical_device, queue_info, *this};
+        auto support_info = it->second->query_device_support(query_info);
+        if (support_info.supported) {
             it++;
         } else {
             it->second->on_unsupported("extension device support check failed.");
@@ -535,12 +550,12 @@ void Context::create_device_and_queues(
     std::vector<const char*> extensions = desired_additional_extensions;
 
     for (const auto& ext : context_extensions) {
-        insert_all(extensions, ext.second->enable_device_extension_names(physical_device));
-    }
-
-    // FEATURES
-    for (const auto& ext : context_extensions) {
-        features.enable_features(ext.second->enable_device_features(physical_device));
+        DeviceSupportQueryInfo query_info{physical_device, queue_info, *this};
+        auto support_info = ext.second->query_device_support(query_info);
+        insert_all(extensions, support_info.required_extensions);
+        for (const auto* feature_name : support_info.required_features) {
+            features.set_feature(feature_name, true);
+        }
     }
 
     // -------------------------------

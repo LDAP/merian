@@ -16,14 +16,7 @@ class ExtensionResources : public ContextExtension {
     ExtensionResources() : ContextExtension("ExtensionResources") {}
     ~ExtensionResources() {}
 
-    std::vector<const char*>
-    enable_device_extension_names(const PhysicalDeviceHandle& /*unused*/) const override;
-
-    std::vector<std::string>
-    enable_device_features(const PhysicalDeviceHandle& /*unused*/) const override;
-
-    bool extension_supported(const PhysicalDeviceHandle& physical_device,
-                             [[maybe_unused]] const QueueInfo& queue_info) override;
+    DeviceSupportInfo query_device_support(const DeviceSupportQueryInfo& query_info) override;
 
     void on_physical_device_selected(const PhysicalDeviceHandle& /*unused*/) override;
 

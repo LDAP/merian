@@ -10,6 +10,7 @@
 #include "merian/utils/properties.hpp"
 #include "merian/vk/descriptors/descriptor_set.hpp"
 #include "merian/vk/descriptors/descriptor_set_layout.hpp"
+#include "merian/vk/extension/extension.hpp"
 
 #include <memory>
 
@@ -31,14 +32,6 @@ class Node : public std::enable_shared_from_this<Node> {
         REMOVE_NODE = 0b100,
     };
 
-    struct DeviceSupportInfo {
-        bool supported = true;
-        std::vector<const char*> required_features{};
-        std::vector<const char*> required_extensions{};
-        std::vector<const char*> required_spirv_capabilities{};
-        std::vector<const char*> required_spirv_extensions{};
-    };
-
   public:
     Node() {}
 
@@ -46,11 +39,45 @@ class Node : public std::enable_shared_from_this<Node> {
 
     // -----------------------------------------------------------
 
-    // Query if the node is able to run on the supplied physical_device and which features,
-    // extensions and capabilities are required on this device (these must be supported, otherwise
-    // you need to return false!).
-    virtual DeviceSupportInfo
-    query_device_support(const PhysicalDeviceHandle& /*physical_device*/) {
+    /**
+     * @brief Request context extensions that this node requires.
+     *
+     * Called during graph initialization to determine which context extensions the node needs.
+     * The graph will ensure these extensions are loaded from the registry before context creation.
+     * Extensions can have dependencies on other extensions which will be resolved automatically.
+     *
+     * @return Vector of extension names to be loaded (e.g., {"glfw", "resources"})
+     */
+    virtual std::vector<std::string> request_context_extensions() {
+        return {};
+    }
+
+    /**
+     * @brief Query instance-level requirements.
+     *
+     * Called during context creation to determine what instance extensions and validation layers
+     * this node requires. The node should check query_info.supported_extensions and
+     * query_info.supported_layers to verify requirements are available.
+     *
+     * @param query_info Context containing supported extensions/layers and extension container
+     * @return InstanceSupportInfo with supported flag and required extensions/layers
+     */
+    virtual InstanceSupportInfo
+    query_instance_support(const InstanceSupportQueryInfo& /*query_info*/) {
+        return InstanceSupportInfo{true};
+    }
+
+    /**
+     * @brief Query if the node can run on a device and what it requires.
+     *
+     * Called during physical device selection to determine if this node is supported on the
+     * device and what device extensions, features, and SPIR-V capabilities it requires.
+     * If the node cannot run on the device, return supported=false.
+     *
+     * @param query_info Context containing physical device, queue info, and extension container
+     * @return DeviceSupportInfo with supported flag and required extensions/features/SPIR-V
+     */
+    virtual DeviceSupportInfo query_device_support(const DeviceSupportQueryInfo& /*query_info*/) {
         return DeviceSupportInfo{true};
     }
 
