@@ -16,7 +16,7 @@ class ExtensionRegistry {
 
     static ExtensionRegistry& get_instance();
 
-    void register_extension(const std::string& name, ExtensionFactory factory);
+    void register_extension(const std::string& name, const ExtensionFactory& factory);
 
     std::shared_ptr<ContextExtension> create(const std::string& name) const;
 

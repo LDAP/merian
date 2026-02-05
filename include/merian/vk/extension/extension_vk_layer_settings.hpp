@@ -18,8 +18,17 @@ class ExtensionVkLayerSettings : public ContextExtension {
     };
 
   public:
+    // Default constructor for registry
+    ExtensionVkLayerSettings() : ContextExtension("ExtensionVkLayerSettings") {}
+
+    // Parameterized constructor (for direct instantiation)
     ExtensionVkLayerSettings(const vk::ArrayProxy<vk::LayerSettingEXT>& settings)
         : ContextExtension("ExtensionVkLayerSettings"), settings(settings.begin(), settings.end()) {}
+
+    // Configuration method (called after construction from registry)
+    void set_layer_settings(const vk::ArrayProxy<vk::LayerSettingEXT>& layer_settings) {
+        settings = std::vector<vk::LayerSettingEXT>(layer_settings.begin(), layer_settings.end());
+    }
 
     // Overrides
     ~ExtensionVkLayerSettings() {}
@@ -32,6 +41,9 @@ class ExtensionVkLayerSettings : public ContextExtension {
     }
 
     void* pnext_instance_create_info(void* const p_next) override {
+        if (settings.empty()) {
+            return p_next;  // No settings configured, skip
+        }
         layer_settings_create_info.settingCount = settings.size();
         layer_settings_create_info.setSettings(settings);
         layer_settings_create_info.setPNext(p_next);
@@ -40,7 +52,7 @@ class ExtensionVkLayerSettings : public ContextExtension {
     }
 
   private:
-    const std::vector<vk::LayerSettingEXT> settings;
+    std::vector<vk::LayerSettingEXT> settings;
     vk::LayerSettingsCreateInfoEXT layer_settings_create_info;
 };
 

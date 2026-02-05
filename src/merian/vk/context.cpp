@@ -89,6 +89,11 @@ Version: {}\n\n",
 
     load_extensions(create_info.context_extensions);
 
+    // Invoke configuration callback if provided
+    if (create_info.configure_extensions_callback) {
+        (*create_info.configure_extensions_callback)(*this);
+    }
+
     for (const auto& ext : context_extensions) {
         ext.second->on_context_initializing(VULKAN_HPP_DEFAULT_DISPATCHER);
     }

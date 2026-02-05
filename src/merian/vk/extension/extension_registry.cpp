@@ -4,6 +4,7 @@
 #include "merian/vk/extension/extension_mitigations.hpp"
 #include "merian/vk/extension/extension_resources.hpp"
 #include "merian/vk/extension/extension_vk_debug_utils.hpp"
+#include "merian/vk/extension/extension_vk_layer_settings.hpp"
 
 namespace merian {
 
@@ -17,11 +18,10 @@ ExtensionRegistry::ExtensionRegistry() {
     register_extension("mitigations", create_extension<ExtensionMitigations>);
     register_extension("resources", create_extension<ExtensionResources>);
     register_extension("vk_debug_utils", create_extension<ExtensionVkDebugUtils>);
-    // Note: ExtensionVkLayerSettings requires constructor parameters, so it can't be
-    // instantiated by name through the registry
+    register_extension("vk_layer_settings", create_extension<ExtensionVkLayerSettings>);
 }
 
-void ExtensionRegistry::register_extension(const std::string& name, ExtensionFactory factory) {
+void ExtensionRegistry::register_extension(const std::string& name, const ExtensionFactory& factory) {
     registry[name] = factory;
 }
 

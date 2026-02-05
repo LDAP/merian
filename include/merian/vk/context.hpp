@@ -85,10 +85,13 @@ class ExtensionContainer {
     std::unordered_map<std::type_index, std::shared_ptr<ContextExtension>> context_extensions;
 };
 
+using ConfigureExtensionsCallback = std::function<void(ExtensionContainer&)>;
+
 struct ContextCreateInfo {
     VulkanFeatures desired_features;
     std::vector<const char*> additional_extensions;
     std::vector<std::string> context_extensions;
+    std::optional<ConfigureExtensionsCallback> configure_extensions_callback;
     std::string application_name = "";
     uint32_t application_vk_version = VK_MAKE_VERSION(1, 0, 0);
     uint32_t preferred_number_compute_queues = 1;
