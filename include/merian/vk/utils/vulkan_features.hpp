@@ -307,866 +307,559 @@ class VulkanFeatures {
     const T& get() const;
 
     // Named getters for each feature struct
-    vk::PhysicalDeviceFeatures& get_features();
     const vk::PhysicalDeviceFeatures& get_features() const;
     operator const vk::PhysicalDeviceFeatures&() const;
-    vk::PhysicalDevice16BitStorageFeatures& get_16_bit_storage_features();
     const vk::PhysicalDevice16BitStorageFeatures& get_16_bit_storage_features() const;
     operator const vk::PhysicalDevice16BitStorageFeatures&() const;
-    vk::PhysicalDevice4444FormatsFeaturesEXT& get_4444_formats_features_ext();
     const vk::PhysicalDevice4444FormatsFeaturesEXT& get_4444_formats_features_ext() const;
     operator const vk::PhysicalDevice4444FormatsFeaturesEXT&() const;
-    vk::PhysicalDevice8BitStorageFeatures& get_8_bit_storage_features();
     const vk::PhysicalDevice8BitStorageFeatures& get_8_bit_storage_features() const;
     operator const vk::PhysicalDevice8BitStorageFeatures&() const;
-    vk::PhysicalDeviceASTCDecodeFeaturesEXT& get_astc_decode_features_ext();
     const vk::PhysicalDeviceASTCDecodeFeaturesEXT& get_astc_decode_features_ext() const;
     operator const vk::PhysicalDeviceASTCDecodeFeaturesEXT&() const;
-    vk::PhysicalDeviceAccelerationStructureFeaturesKHR& get_acceleration_structure_features_khr();
     const vk::PhysicalDeviceAccelerationStructureFeaturesKHR& get_acceleration_structure_features_khr() const;
     operator const vk::PhysicalDeviceAccelerationStructureFeaturesKHR&() const;
-    vk::PhysicalDeviceAddressBindingReportFeaturesEXT& get_address_binding_report_features_ext();
     const vk::PhysicalDeviceAddressBindingReportFeaturesEXT& get_address_binding_report_features_ext() const;
     operator const vk::PhysicalDeviceAddressBindingReportFeaturesEXT&() const;
-    vk::PhysicalDeviceAmigoProfilingFeaturesSEC& get_amigo_profiling_features_sec();
     const vk::PhysicalDeviceAmigoProfilingFeaturesSEC& get_amigo_profiling_features_sec() const;
     operator const vk::PhysicalDeviceAmigoProfilingFeaturesSEC&() const;
-    vk::PhysicalDeviceAntiLagFeaturesAMD& get_anti_lag_features_amd();
     const vk::PhysicalDeviceAntiLagFeaturesAMD& get_anti_lag_features_amd() const;
     operator const vk::PhysicalDeviceAntiLagFeaturesAMD&() const;
-    vk::PhysicalDeviceAttachmentFeedbackLoopDynamicStateFeaturesEXT& get_attachment_feedback_loop_dynamic_state_features_ext();
     const vk::PhysicalDeviceAttachmentFeedbackLoopDynamicStateFeaturesEXT& get_attachment_feedback_loop_dynamic_state_features_ext() const;
     operator const vk::PhysicalDeviceAttachmentFeedbackLoopDynamicStateFeaturesEXT&() const;
-    vk::PhysicalDeviceAttachmentFeedbackLoopLayoutFeaturesEXT& get_attachment_feedback_loop_layout_features_ext();
     const vk::PhysicalDeviceAttachmentFeedbackLoopLayoutFeaturesEXT& get_attachment_feedback_loop_layout_features_ext() const;
     operator const vk::PhysicalDeviceAttachmentFeedbackLoopLayoutFeaturesEXT&() const;
-    vk::PhysicalDeviceBlendOperationAdvancedFeaturesEXT& get_blend_operation_advanced_features_ext();
     const vk::PhysicalDeviceBlendOperationAdvancedFeaturesEXT& get_blend_operation_advanced_features_ext() const;
     operator const vk::PhysicalDeviceBlendOperationAdvancedFeaturesEXT&() const;
-    vk::PhysicalDeviceBorderColorSwizzleFeaturesEXT& get_border_color_swizzle_features_ext();
     const vk::PhysicalDeviceBorderColorSwizzleFeaturesEXT& get_border_color_swizzle_features_ext() const;
     operator const vk::PhysicalDeviceBorderColorSwizzleFeaturesEXT&() const;
-    vk::PhysicalDeviceBufferDeviceAddressFeatures& get_buffer_device_address_features();
     const vk::PhysicalDeviceBufferDeviceAddressFeatures& get_buffer_device_address_features() const;
     operator const vk::PhysicalDeviceBufferDeviceAddressFeatures&() const;
-    vk::PhysicalDeviceBufferDeviceAddressFeaturesEXT& get_buffer_device_address_features_ext();
     const vk::PhysicalDeviceBufferDeviceAddressFeaturesEXT& get_buffer_device_address_features_ext() const;
     operator const vk::PhysicalDeviceBufferDeviceAddressFeaturesEXT&() const;
-    vk::PhysicalDeviceClusterAccelerationStructureFeaturesNV& get_cluster_acceleration_structure_features_nv();
     const vk::PhysicalDeviceClusterAccelerationStructureFeaturesNV& get_cluster_acceleration_structure_features_nv() const;
     operator const vk::PhysicalDeviceClusterAccelerationStructureFeaturesNV&() const;
-    vk::PhysicalDeviceClusterCullingShaderFeaturesHUAWEI& get_cluster_culling_shader_features_huawei();
     const vk::PhysicalDeviceClusterCullingShaderFeaturesHUAWEI& get_cluster_culling_shader_features_huawei() const;
     operator const vk::PhysicalDeviceClusterCullingShaderFeaturesHUAWEI&() const;
-    vk::PhysicalDeviceCoherentMemoryFeaturesAMD& get_coherent_memory_features_amd();
     const vk::PhysicalDeviceCoherentMemoryFeaturesAMD& get_coherent_memory_features_amd() const;
     operator const vk::PhysicalDeviceCoherentMemoryFeaturesAMD&() const;
-    vk::PhysicalDeviceColorWriteEnableFeaturesEXT& get_color_write_enable_features_ext();
     const vk::PhysicalDeviceColorWriteEnableFeaturesEXT& get_color_write_enable_features_ext() const;
     operator const vk::PhysicalDeviceColorWriteEnableFeaturesEXT&() const;
-    vk::PhysicalDeviceCommandBufferInheritanceFeaturesNV& get_command_buffer_inheritance_features_nv();
     const vk::PhysicalDeviceCommandBufferInheritanceFeaturesNV& get_command_buffer_inheritance_features_nv() const;
     operator const vk::PhysicalDeviceCommandBufferInheritanceFeaturesNV&() const;
-    vk::PhysicalDeviceComputeOccupancyPriorityFeaturesNV& get_compute_occupancy_priority_features_nv();
     const vk::PhysicalDeviceComputeOccupancyPriorityFeaturesNV& get_compute_occupancy_priority_features_nv() const;
     operator const vk::PhysicalDeviceComputeOccupancyPriorityFeaturesNV&() const;
-    vk::PhysicalDeviceComputeShaderDerivativesFeaturesKHR& get_compute_shader_derivatives_features_khr();
     const vk::PhysicalDeviceComputeShaderDerivativesFeaturesKHR& get_compute_shader_derivatives_features_khr() const;
     operator const vk::PhysicalDeviceComputeShaderDerivativesFeaturesKHR&() const;
-    vk::PhysicalDeviceConditionalRenderingFeaturesEXT& get_conditional_rendering_features_ext();
     const vk::PhysicalDeviceConditionalRenderingFeaturesEXT& get_conditional_rendering_features_ext() const;
     operator const vk::PhysicalDeviceConditionalRenderingFeaturesEXT&() const;
-    vk::PhysicalDeviceCooperativeMatrix2FeaturesNV& get_cooperative_matrix2_features_nv();
     const vk::PhysicalDeviceCooperativeMatrix2FeaturesNV& get_cooperative_matrix2_features_nv() const;
     operator const vk::PhysicalDeviceCooperativeMatrix2FeaturesNV&() const;
-    vk::PhysicalDeviceCooperativeMatrixConversionFeaturesQCOM& get_cooperative_matrix_conversion_features_qcom();
     const vk::PhysicalDeviceCooperativeMatrixConversionFeaturesQCOM& get_cooperative_matrix_conversion_features_qcom() const;
     operator const vk::PhysicalDeviceCooperativeMatrixConversionFeaturesQCOM&() const;
-    vk::PhysicalDeviceCooperativeMatrixFeaturesKHR& get_cooperative_matrix_features_khr();
     const vk::PhysicalDeviceCooperativeMatrixFeaturesKHR& get_cooperative_matrix_features_khr() const;
     operator const vk::PhysicalDeviceCooperativeMatrixFeaturesKHR&() const;
-    vk::PhysicalDeviceCooperativeMatrixFeaturesNV& get_cooperative_matrix_features_nv();
     const vk::PhysicalDeviceCooperativeMatrixFeaturesNV& get_cooperative_matrix_features_nv() const;
     operator const vk::PhysicalDeviceCooperativeMatrixFeaturesNV&() const;
-    vk::PhysicalDeviceCooperativeVectorFeaturesNV& get_cooperative_vector_features_nv();
     const vk::PhysicalDeviceCooperativeVectorFeaturesNV& get_cooperative_vector_features_nv() const;
     operator const vk::PhysicalDeviceCooperativeVectorFeaturesNV&() const;
-    vk::PhysicalDeviceCopyMemoryIndirectFeaturesKHR& get_copy_memory_indirect_features_khr();
     const vk::PhysicalDeviceCopyMemoryIndirectFeaturesKHR& get_copy_memory_indirect_features_khr() const;
     operator const vk::PhysicalDeviceCopyMemoryIndirectFeaturesKHR&() const;
-    vk::PhysicalDeviceCopyMemoryIndirectFeaturesNV& get_copy_memory_indirect_features_nv();
     const vk::PhysicalDeviceCopyMemoryIndirectFeaturesNV& get_copy_memory_indirect_features_nv() const;
     operator const vk::PhysicalDeviceCopyMemoryIndirectFeaturesNV&() const;
-    vk::PhysicalDeviceCornerSampledImageFeaturesNV& get_corner_sampled_image_features_nv();
     const vk::PhysicalDeviceCornerSampledImageFeaturesNV& get_corner_sampled_image_features_nv() const;
     operator const vk::PhysicalDeviceCornerSampledImageFeaturesNV&() const;
-    vk::PhysicalDeviceCoverageReductionModeFeaturesNV& get_coverage_reduction_mode_features_nv();
     const vk::PhysicalDeviceCoverageReductionModeFeaturesNV& get_coverage_reduction_mode_features_nv() const;
     operator const vk::PhysicalDeviceCoverageReductionModeFeaturesNV&() const;
-    vk::PhysicalDeviceCubicClampFeaturesQCOM& get_cubic_clamp_features_qcom();
     const vk::PhysicalDeviceCubicClampFeaturesQCOM& get_cubic_clamp_features_qcom() const;
     operator const vk::PhysicalDeviceCubicClampFeaturesQCOM&() const;
-    vk::PhysicalDeviceCubicWeightsFeaturesQCOM& get_cubic_weights_features_qcom();
     const vk::PhysicalDeviceCubicWeightsFeaturesQCOM& get_cubic_weights_features_qcom() const;
     operator const vk::PhysicalDeviceCubicWeightsFeaturesQCOM&() const;
-    vk::PhysicalDeviceCustomBorderColorFeaturesEXT& get_custom_border_color_features_ext();
     const vk::PhysicalDeviceCustomBorderColorFeaturesEXT& get_custom_border_color_features_ext() const;
     operator const vk::PhysicalDeviceCustomBorderColorFeaturesEXT&() const;
-    vk::PhysicalDeviceCustomResolveFeaturesEXT& get_custom_resolve_features_ext();
     const vk::PhysicalDeviceCustomResolveFeaturesEXT& get_custom_resolve_features_ext() const;
     operator const vk::PhysicalDeviceCustomResolveFeaturesEXT&() const;
-    vk::PhysicalDeviceDataGraphFeaturesARM& get_data_graph_features_arm();
     const vk::PhysicalDeviceDataGraphFeaturesARM& get_data_graph_features_arm() const;
     operator const vk::PhysicalDeviceDataGraphFeaturesARM&() const;
-    vk::PhysicalDeviceDataGraphModelFeaturesQCOM& get_data_graph_model_features_qcom();
     const vk::PhysicalDeviceDataGraphModelFeaturesQCOM& get_data_graph_model_features_qcom() const;
     operator const vk::PhysicalDeviceDataGraphModelFeaturesQCOM&() const;
-    vk::PhysicalDeviceDedicatedAllocationImageAliasingFeaturesNV& get_dedicated_allocation_image_aliasing_features_nv();
     const vk::PhysicalDeviceDedicatedAllocationImageAliasingFeaturesNV& get_dedicated_allocation_image_aliasing_features_nv() const;
     operator const vk::PhysicalDeviceDedicatedAllocationImageAliasingFeaturesNV&() const;
-    vk::PhysicalDeviceDepthBiasControlFeaturesEXT& get_depth_bias_control_features_ext();
     const vk::PhysicalDeviceDepthBiasControlFeaturesEXT& get_depth_bias_control_features_ext() const;
     operator const vk::PhysicalDeviceDepthBiasControlFeaturesEXT&() const;
-    vk::PhysicalDeviceDepthClampControlFeaturesEXT& get_depth_clamp_control_features_ext();
     const vk::PhysicalDeviceDepthClampControlFeaturesEXT& get_depth_clamp_control_features_ext() const;
     operator const vk::PhysicalDeviceDepthClampControlFeaturesEXT&() const;
-    vk::PhysicalDeviceDepthClampZeroOneFeaturesKHR& get_depth_clamp_zero_one_features_khr();
     const vk::PhysicalDeviceDepthClampZeroOneFeaturesKHR& get_depth_clamp_zero_one_features_khr() const;
     operator const vk::PhysicalDeviceDepthClampZeroOneFeaturesKHR&() const;
-    vk::PhysicalDeviceDepthClipControlFeaturesEXT& get_depth_clip_control_features_ext();
     const vk::PhysicalDeviceDepthClipControlFeaturesEXT& get_depth_clip_control_features_ext() const;
     operator const vk::PhysicalDeviceDepthClipControlFeaturesEXT&() const;
-    vk::PhysicalDeviceDepthClipEnableFeaturesEXT& get_depth_clip_enable_features_ext();
     const vk::PhysicalDeviceDepthClipEnableFeaturesEXT& get_depth_clip_enable_features_ext() const;
     operator const vk::PhysicalDeviceDepthClipEnableFeaturesEXT&() const;
-    vk::PhysicalDeviceDescriptorBufferFeaturesEXT& get_descriptor_buffer_features_ext();
     const vk::PhysicalDeviceDescriptorBufferFeaturesEXT& get_descriptor_buffer_features_ext() const;
     operator const vk::PhysicalDeviceDescriptorBufferFeaturesEXT&() const;
-    vk::PhysicalDeviceDescriptorBufferTensorFeaturesARM& get_descriptor_buffer_tensor_features_arm();
     const vk::PhysicalDeviceDescriptorBufferTensorFeaturesARM& get_descriptor_buffer_tensor_features_arm() const;
     operator const vk::PhysicalDeviceDescriptorBufferTensorFeaturesARM&() const;
-    vk::PhysicalDeviceDescriptorHeapFeaturesEXT& get_descriptor_heap_features_ext();
     const vk::PhysicalDeviceDescriptorHeapFeaturesEXT& get_descriptor_heap_features_ext() const;
     operator const vk::PhysicalDeviceDescriptorHeapFeaturesEXT&() const;
-    vk::PhysicalDeviceDescriptorIndexingFeatures& get_descriptor_indexing_features();
     const vk::PhysicalDeviceDescriptorIndexingFeatures& get_descriptor_indexing_features() const;
     operator const vk::PhysicalDeviceDescriptorIndexingFeatures&() const;
-    vk::PhysicalDeviceDescriptorPoolOverallocationFeaturesNV& get_descriptor_pool_overallocation_features_nv();
     const vk::PhysicalDeviceDescriptorPoolOverallocationFeaturesNV& get_descriptor_pool_overallocation_features_nv() const;
     operator const vk::PhysicalDeviceDescriptorPoolOverallocationFeaturesNV&() const;
-    vk::PhysicalDeviceDescriptorSetHostMappingFeaturesVALVE& get_descriptor_set_host_mapping_features_valve();
     const vk::PhysicalDeviceDescriptorSetHostMappingFeaturesVALVE& get_descriptor_set_host_mapping_features_valve() const;
     operator const vk::PhysicalDeviceDescriptorSetHostMappingFeaturesVALVE&() const;
-    vk::PhysicalDeviceDeviceGeneratedCommandsComputeFeaturesNV& get_device_generated_commands_compute_features_nv();
     const vk::PhysicalDeviceDeviceGeneratedCommandsComputeFeaturesNV& get_device_generated_commands_compute_features_nv() const;
     operator const vk::PhysicalDeviceDeviceGeneratedCommandsComputeFeaturesNV&() const;
-    vk::PhysicalDeviceDeviceGeneratedCommandsFeaturesEXT& get_device_generated_commands_features_ext();
     const vk::PhysicalDeviceDeviceGeneratedCommandsFeaturesEXT& get_device_generated_commands_features_ext() const;
     operator const vk::PhysicalDeviceDeviceGeneratedCommandsFeaturesEXT&() const;
-    vk::PhysicalDeviceDeviceGeneratedCommandsFeaturesNV& get_device_generated_commands_features_nv();
     const vk::PhysicalDeviceDeviceGeneratedCommandsFeaturesNV& get_device_generated_commands_features_nv() const;
     operator const vk::PhysicalDeviceDeviceGeneratedCommandsFeaturesNV&() const;
-    vk::PhysicalDeviceDeviceMemoryReportFeaturesEXT& get_device_memory_report_features_ext();
     const vk::PhysicalDeviceDeviceMemoryReportFeaturesEXT& get_device_memory_report_features_ext() const;
     operator const vk::PhysicalDeviceDeviceMemoryReportFeaturesEXT&() const;
-    vk::PhysicalDeviceDiagnosticsConfigFeaturesNV& get_diagnostics_config_features_nv();
     const vk::PhysicalDeviceDiagnosticsConfigFeaturesNV& get_diagnostics_config_features_nv() const;
     operator const vk::PhysicalDeviceDiagnosticsConfigFeaturesNV&() const;
-    vk::PhysicalDeviceDynamicRenderingFeatures& get_dynamic_rendering_features();
     const vk::PhysicalDeviceDynamicRenderingFeatures& get_dynamic_rendering_features() const;
     operator const vk::PhysicalDeviceDynamicRenderingFeatures&() const;
-    vk::PhysicalDeviceDynamicRenderingLocalReadFeatures& get_dynamic_rendering_local_read_features();
     const vk::PhysicalDeviceDynamicRenderingLocalReadFeatures& get_dynamic_rendering_local_read_features() const;
     operator const vk::PhysicalDeviceDynamicRenderingLocalReadFeatures&() const;
-    vk::PhysicalDeviceDynamicRenderingUnusedAttachmentsFeaturesEXT& get_dynamic_rendering_unused_attachments_features_ext();
     const vk::PhysicalDeviceDynamicRenderingUnusedAttachmentsFeaturesEXT& get_dynamic_rendering_unused_attachments_features_ext() const;
     operator const vk::PhysicalDeviceDynamicRenderingUnusedAttachmentsFeaturesEXT&() const;
-    vk::PhysicalDeviceExclusiveScissorFeaturesNV& get_exclusive_scissor_features_nv();
     const vk::PhysicalDeviceExclusiveScissorFeaturesNV& get_exclusive_scissor_features_nv() const;
     operator const vk::PhysicalDeviceExclusiveScissorFeaturesNV&() const;
-    vk::PhysicalDeviceExtendedDynamicState2FeaturesEXT& get_extended_dynamic_state2_features_ext();
     const vk::PhysicalDeviceExtendedDynamicState2FeaturesEXT& get_extended_dynamic_state2_features_ext() const;
     operator const vk::PhysicalDeviceExtendedDynamicState2FeaturesEXT&() const;
-    vk::PhysicalDeviceExtendedDynamicState3FeaturesEXT& get_extended_dynamic_state3_features_ext();
     const vk::PhysicalDeviceExtendedDynamicState3FeaturesEXT& get_extended_dynamic_state3_features_ext() const;
     operator const vk::PhysicalDeviceExtendedDynamicState3FeaturesEXT&() const;
-    vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT& get_extended_dynamic_state_features_ext();
     const vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT& get_extended_dynamic_state_features_ext() const;
     operator const vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT&() const;
-    vk::PhysicalDeviceExtendedSparseAddressSpaceFeaturesNV& get_extended_sparse_address_space_features_nv();
     const vk::PhysicalDeviceExtendedSparseAddressSpaceFeaturesNV& get_extended_sparse_address_space_features_nv() const;
     operator const vk::PhysicalDeviceExtendedSparseAddressSpaceFeaturesNV&() const;
-    vk::PhysicalDeviceExternalMemoryRDMAFeaturesNV& get_external_memory_rdma_features_nv();
     const vk::PhysicalDeviceExternalMemoryRDMAFeaturesNV& get_external_memory_rdma_features_nv() const;
     operator const vk::PhysicalDeviceExternalMemoryRDMAFeaturesNV&() const;
-    vk::PhysicalDeviceFaultFeaturesEXT& get_fault_features_ext();
     const vk::PhysicalDeviceFaultFeaturesEXT& get_fault_features_ext() const;
     operator const vk::PhysicalDeviceFaultFeaturesEXT&() const;
-    vk::PhysicalDeviceFeatures2& get_features2();
     const vk::PhysicalDeviceFeatures2& get_features2() const;
     operator const vk::PhysicalDeviceFeatures2&() const;
-    vk::PhysicalDeviceFormatPackFeaturesARM& get_format_pack_features_arm();
     const vk::PhysicalDeviceFormatPackFeaturesARM& get_format_pack_features_arm() const;
     operator const vk::PhysicalDeviceFormatPackFeaturesARM&() const;
-    vk::PhysicalDeviceFragmentDensityMap2FeaturesEXT& get_fragment_density_map2_features_ext();
     const vk::PhysicalDeviceFragmentDensityMap2FeaturesEXT& get_fragment_density_map2_features_ext() const;
     operator const vk::PhysicalDeviceFragmentDensityMap2FeaturesEXT&() const;
-    vk::PhysicalDeviceFragmentDensityMapFeaturesEXT& get_fragment_density_map_features_ext();
     const vk::PhysicalDeviceFragmentDensityMapFeaturesEXT& get_fragment_density_map_features_ext() const;
     operator const vk::PhysicalDeviceFragmentDensityMapFeaturesEXT&() const;
-    vk::PhysicalDeviceFragmentDensityMapLayeredFeaturesVALVE& get_fragment_density_map_layered_features_valve();
     const vk::PhysicalDeviceFragmentDensityMapLayeredFeaturesVALVE& get_fragment_density_map_layered_features_valve() const;
     operator const vk::PhysicalDeviceFragmentDensityMapLayeredFeaturesVALVE&() const;
-    vk::PhysicalDeviceFragmentDensityMapOffsetFeaturesEXT& get_fragment_density_map_offset_features_ext();
     const vk::PhysicalDeviceFragmentDensityMapOffsetFeaturesEXT& get_fragment_density_map_offset_features_ext() const;
     operator const vk::PhysicalDeviceFragmentDensityMapOffsetFeaturesEXT&() const;
-    vk::PhysicalDeviceFragmentShaderBarycentricFeaturesKHR& get_fragment_shader_barycentric_features_khr();
     const vk::PhysicalDeviceFragmentShaderBarycentricFeaturesKHR& get_fragment_shader_barycentric_features_khr() const;
     operator const vk::PhysicalDeviceFragmentShaderBarycentricFeaturesKHR&() const;
-    vk::PhysicalDeviceFragmentShaderInterlockFeaturesEXT& get_fragment_shader_interlock_features_ext();
     const vk::PhysicalDeviceFragmentShaderInterlockFeaturesEXT& get_fragment_shader_interlock_features_ext() const;
     operator const vk::PhysicalDeviceFragmentShaderInterlockFeaturesEXT&() const;
-    vk::PhysicalDeviceFragmentShadingRateEnumsFeaturesNV& get_fragment_shading_rate_enums_features_nv();
     const vk::PhysicalDeviceFragmentShadingRateEnumsFeaturesNV& get_fragment_shading_rate_enums_features_nv() const;
     operator const vk::PhysicalDeviceFragmentShadingRateEnumsFeaturesNV&() const;
-    vk::PhysicalDeviceFragmentShadingRateFeaturesKHR& get_fragment_shading_rate_features_khr();
     const vk::PhysicalDeviceFragmentShadingRateFeaturesKHR& get_fragment_shading_rate_features_khr() const;
     operator const vk::PhysicalDeviceFragmentShadingRateFeaturesKHR&() const;
-    vk::PhysicalDeviceFrameBoundaryFeaturesEXT& get_frame_boundary_features_ext();
     const vk::PhysicalDeviceFrameBoundaryFeaturesEXT& get_frame_boundary_features_ext() const;
     operator const vk::PhysicalDeviceFrameBoundaryFeaturesEXT&() const;
-    vk::PhysicalDeviceGlobalPriorityQueryFeatures& get_global_priority_query_features();
     const vk::PhysicalDeviceGlobalPriorityQueryFeatures& get_global_priority_query_features() const;
     operator const vk::PhysicalDeviceGlobalPriorityQueryFeatures&() const;
-    vk::PhysicalDeviceGraphicsPipelineLibraryFeaturesEXT& get_graphics_pipeline_library_features_ext();
     const vk::PhysicalDeviceGraphicsPipelineLibraryFeaturesEXT& get_graphics_pipeline_library_features_ext() const;
     operator const vk::PhysicalDeviceGraphicsPipelineLibraryFeaturesEXT&() const;
-    vk::PhysicalDeviceHdrVividFeaturesHUAWEI& get_hdr_vivid_features_huawei();
     const vk::PhysicalDeviceHdrVividFeaturesHUAWEI& get_hdr_vivid_features_huawei() const;
     operator const vk::PhysicalDeviceHdrVividFeaturesHUAWEI&() const;
-    vk::PhysicalDeviceHostImageCopyFeatures& get_host_image_copy_features();
     const vk::PhysicalDeviceHostImageCopyFeatures& get_host_image_copy_features() const;
     operator const vk::PhysicalDeviceHostImageCopyFeatures&() const;
-    vk::PhysicalDeviceHostQueryResetFeatures& get_host_query_reset_features();
     const vk::PhysicalDeviceHostQueryResetFeatures& get_host_query_reset_features() const;
     operator const vk::PhysicalDeviceHostQueryResetFeatures&() const;
-    vk::PhysicalDeviceImage2DViewOf3DFeaturesEXT& get_image2_d_view_of3_d_features_ext();
     const vk::PhysicalDeviceImage2DViewOf3DFeaturesEXT& get_image2_d_view_of3_d_features_ext() const;
     operator const vk::PhysicalDeviceImage2DViewOf3DFeaturesEXT&() const;
-    vk::PhysicalDeviceImageAlignmentControlFeaturesMESA& get_image_alignment_control_features_mesa();
     const vk::PhysicalDeviceImageAlignmentControlFeaturesMESA& get_image_alignment_control_features_mesa() const;
     operator const vk::PhysicalDeviceImageAlignmentControlFeaturesMESA&() const;
-    vk::PhysicalDeviceImageCompressionControlFeaturesEXT& get_image_compression_control_features_ext();
     const vk::PhysicalDeviceImageCompressionControlFeaturesEXT& get_image_compression_control_features_ext() const;
     operator const vk::PhysicalDeviceImageCompressionControlFeaturesEXT&() const;
-    vk::PhysicalDeviceImageCompressionControlSwapchainFeaturesEXT& get_image_compression_control_swapchain_features_ext();
     const vk::PhysicalDeviceImageCompressionControlSwapchainFeaturesEXT& get_image_compression_control_swapchain_features_ext() const;
     operator const vk::PhysicalDeviceImageCompressionControlSwapchainFeaturesEXT&() const;
-    vk::PhysicalDeviceImageProcessing2FeaturesQCOM& get_image_processing2_features_qcom();
     const vk::PhysicalDeviceImageProcessing2FeaturesQCOM& get_image_processing2_features_qcom() const;
     operator const vk::PhysicalDeviceImageProcessing2FeaturesQCOM&() const;
-    vk::PhysicalDeviceImageProcessingFeaturesQCOM& get_image_processing_features_qcom();
     const vk::PhysicalDeviceImageProcessingFeaturesQCOM& get_image_processing_features_qcom() const;
     operator const vk::PhysicalDeviceImageProcessingFeaturesQCOM&() const;
-    vk::PhysicalDeviceImageRobustnessFeatures& get_image_robustness_features();
     const vk::PhysicalDeviceImageRobustnessFeatures& get_image_robustness_features() const;
     operator const vk::PhysicalDeviceImageRobustnessFeatures&() const;
-    vk::PhysicalDeviceImageSlicedViewOf3DFeaturesEXT& get_image_sliced_view_of3_d_features_ext();
     const vk::PhysicalDeviceImageSlicedViewOf3DFeaturesEXT& get_image_sliced_view_of3_d_features_ext() const;
     operator const vk::PhysicalDeviceImageSlicedViewOf3DFeaturesEXT&() const;
-    vk::PhysicalDeviceImageViewMinLodFeaturesEXT& get_image_view_min_lod_features_ext();
     const vk::PhysicalDeviceImageViewMinLodFeaturesEXT& get_image_view_min_lod_features_ext() const;
     operator const vk::PhysicalDeviceImageViewMinLodFeaturesEXT&() const;
-    vk::PhysicalDeviceImagelessFramebufferFeatures& get_imageless_framebuffer_features();
     const vk::PhysicalDeviceImagelessFramebufferFeatures& get_imageless_framebuffer_features() const;
     operator const vk::PhysicalDeviceImagelessFramebufferFeatures&() const;
-    vk::PhysicalDeviceIndexTypeUint8Features& get_index_type_uint8_features();
     const vk::PhysicalDeviceIndexTypeUint8Features& get_index_type_uint8_features() const;
     operator const vk::PhysicalDeviceIndexTypeUint8Features&() const;
-    vk::PhysicalDeviceInheritedViewportScissorFeaturesNV& get_inherited_viewport_scissor_features_nv();
     const vk::PhysicalDeviceInheritedViewportScissorFeaturesNV& get_inherited_viewport_scissor_features_nv() const;
     operator const vk::PhysicalDeviceInheritedViewportScissorFeaturesNV&() const;
-    vk::PhysicalDeviceInlineUniformBlockFeatures& get_inline_uniform_block_features();
     const vk::PhysicalDeviceInlineUniformBlockFeatures& get_inline_uniform_block_features() const;
     operator const vk::PhysicalDeviceInlineUniformBlockFeatures&() const;
-    vk::PhysicalDeviceInternallySynchronizedQueuesFeaturesKHR& get_internally_synchronized_queues_features_khr();
     const vk::PhysicalDeviceInternallySynchronizedQueuesFeaturesKHR& get_internally_synchronized_queues_features_khr() const;
     operator const vk::PhysicalDeviceInternallySynchronizedQueuesFeaturesKHR&() const;
-    vk::PhysicalDeviceInvocationMaskFeaturesHUAWEI& get_invocation_mask_features_huawei();
     const vk::PhysicalDeviceInvocationMaskFeaturesHUAWEI& get_invocation_mask_features_huawei() const;
     operator const vk::PhysicalDeviceInvocationMaskFeaturesHUAWEI&() const;
-    vk::PhysicalDeviceLegacyDitheringFeaturesEXT& get_legacy_dithering_features_ext();
     const vk::PhysicalDeviceLegacyDitheringFeaturesEXT& get_legacy_dithering_features_ext() const;
     operator const vk::PhysicalDeviceLegacyDitheringFeaturesEXT&() const;
-    vk::PhysicalDeviceLegacyVertexAttributesFeaturesEXT& get_legacy_vertex_attributes_features_ext();
     const vk::PhysicalDeviceLegacyVertexAttributesFeaturesEXT& get_legacy_vertex_attributes_features_ext() const;
     operator const vk::PhysicalDeviceLegacyVertexAttributesFeaturesEXT&() const;
-    vk::PhysicalDeviceLineRasterizationFeatures& get_line_rasterization_features();
     const vk::PhysicalDeviceLineRasterizationFeatures& get_line_rasterization_features() const;
     operator const vk::PhysicalDeviceLineRasterizationFeatures&() const;
-    vk::PhysicalDeviceLinearColorAttachmentFeaturesNV& get_linear_color_attachment_features_nv();
     const vk::PhysicalDeviceLinearColorAttachmentFeaturesNV& get_linear_color_attachment_features_nv() const;
     operator const vk::PhysicalDeviceLinearColorAttachmentFeaturesNV&() const;
-    vk::PhysicalDeviceMaintenance10FeaturesKHR& get_maintenance10_features_khr();
     const vk::PhysicalDeviceMaintenance10FeaturesKHR& get_maintenance10_features_khr() const;
     operator const vk::PhysicalDeviceMaintenance10FeaturesKHR&() const;
-    vk::PhysicalDeviceMaintenance4Features& get_maintenance4_features();
     const vk::PhysicalDeviceMaintenance4Features& get_maintenance4_features() const;
     operator const vk::PhysicalDeviceMaintenance4Features&() const;
-    vk::PhysicalDeviceMaintenance5Features& get_maintenance5_features();
     const vk::PhysicalDeviceMaintenance5Features& get_maintenance5_features() const;
     operator const vk::PhysicalDeviceMaintenance5Features&() const;
-    vk::PhysicalDeviceMaintenance6Features& get_maintenance6_features();
     const vk::PhysicalDeviceMaintenance6Features& get_maintenance6_features() const;
     operator const vk::PhysicalDeviceMaintenance6Features&() const;
-    vk::PhysicalDeviceMaintenance7FeaturesKHR& get_maintenance7_features_khr();
     const vk::PhysicalDeviceMaintenance7FeaturesKHR& get_maintenance7_features_khr() const;
     operator const vk::PhysicalDeviceMaintenance7FeaturesKHR&() const;
-    vk::PhysicalDeviceMaintenance8FeaturesKHR& get_maintenance8_features_khr();
     const vk::PhysicalDeviceMaintenance8FeaturesKHR& get_maintenance8_features_khr() const;
     operator const vk::PhysicalDeviceMaintenance8FeaturesKHR&() const;
-    vk::PhysicalDeviceMaintenance9FeaturesKHR& get_maintenance9_features_khr();
     const vk::PhysicalDeviceMaintenance9FeaturesKHR& get_maintenance9_features_khr() const;
     operator const vk::PhysicalDeviceMaintenance9FeaturesKHR&() const;
-    vk::PhysicalDeviceMapMemoryPlacedFeaturesEXT& get_map_memory_placed_features_ext();
     const vk::PhysicalDeviceMapMemoryPlacedFeaturesEXT& get_map_memory_placed_features_ext() const;
     operator const vk::PhysicalDeviceMapMemoryPlacedFeaturesEXT&() const;
-    vk::PhysicalDeviceMemoryDecompressionFeaturesEXT& get_memory_decompression_features_ext();
     const vk::PhysicalDeviceMemoryDecompressionFeaturesEXT& get_memory_decompression_features_ext() const;
     operator const vk::PhysicalDeviceMemoryDecompressionFeaturesEXT&() const;
-    vk::PhysicalDeviceMemoryPriorityFeaturesEXT& get_memory_priority_features_ext();
     const vk::PhysicalDeviceMemoryPriorityFeaturesEXT& get_memory_priority_features_ext() const;
     operator const vk::PhysicalDeviceMemoryPriorityFeaturesEXT&() const;
-    vk::PhysicalDeviceMeshShaderFeaturesEXT& get_mesh_shader_features_ext();
     const vk::PhysicalDeviceMeshShaderFeaturesEXT& get_mesh_shader_features_ext() const;
     operator const vk::PhysicalDeviceMeshShaderFeaturesEXT&() const;
-    vk::PhysicalDeviceMeshShaderFeaturesNV& get_mesh_shader_features_nv();
     const vk::PhysicalDeviceMeshShaderFeaturesNV& get_mesh_shader_features_nv() const;
     operator const vk::PhysicalDeviceMeshShaderFeaturesNV&() const;
-    vk::PhysicalDeviceMultiDrawFeaturesEXT& get_multi_draw_features_ext();
     const vk::PhysicalDeviceMultiDrawFeaturesEXT& get_multi_draw_features_ext() const;
     operator const vk::PhysicalDeviceMultiDrawFeaturesEXT&() const;
-    vk::PhysicalDeviceMultisampledRenderToSingleSampledFeaturesEXT& get_multisampled_render_to_single_sampled_features_ext();
     const vk::PhysicalDeviceMultisampledRenderToSingleSampledFeaturesEXT& get_multisampled_render_to_single_sampled_features_ext() const;
     operator const vk::PhysicalDeviceMultisampledRenderToSingleSampledFeaturesEXT&() const;
-    vk::PhysicalDeviceMultiviewFeatures& get_multiview_features();
     const vk::PhysicalDeviceMultiviewFeatures& get_multiview_features() const;
     operator const vk::PhysicalDeviceMultiviewFeatures&() const;
-    vk::PhysicalDeviceMultiviewPerViewRenderAreasFeaturesQCOM& get_multiview_per_view_render_areas_features_qcom();
     const vk::PhysicalDeviceMultiviewPerViewRenderAreasFeaturesQCOM& get_multiview_per_view_render_areas_features_qcom() const;
     operator const vk::PhysicalDeviceMultiviewPerViewRenderAreasFeaturesQCOM&() const;
-    vk::PhysicalDeviceMultiviewPerViewViewportsFeaturesQCOM& get_multiview_per_view_viewports_features_qcom();
     const vk::PhysicalDeviceMultiviewPerViewViewportsFeaturesQCOM& get_multiview_per_view_viewports_features_qcom() const;
     operator const vk::PhysicalDeviceMultiviewPerViewViewportsFeaturesQCOM&() const;
-    vk::PhysicalDeviceMutableDescriptorTypeFeaturesEXT& get_mutable_descriptor_type_features_ext();
     const vk::PhysicalDeviceMutableDescriptorTypeFeaturesEXT& get_mutable_descriptor_type_features_ext() const;
     operator const vk::PhysicalDeviceMutableDescriptorTypeFeaturesEXT&() const;
-    vk::PhysicalDeviceNestedCommandBufferFeaturesEXT& get_nested_command_buffer_features_ext();
     const vk::PhysicalDeviceNestedCommandBufferFeaturesEXT& get_nested_command_buffer_features_ext() const;
     operator const vk::PhysicalDeviceNestedCommandBufferFeaturesEXT&() const;
-    vk::PhysicalDeviceNonSeamlessCubeMapFeaturesEXT& get_non_seamless_cube_map_features_ext();
     const vk::PhysicalDeviceNonSeamlessCubeMapFeaturesEXT& get_non_seamless_cube_map_features_ext() const;
     operator const vk::PhysicalDeviceNonSeamlessCubeMapFeaturesEXT&() const;
-    vk::PhysicalDeviceOpacityMicromapFeaturesEXT& get_opacity_micromap_features_ext();
     const vk::PhysicalDeviceOpacityMicromapFeaturesEXT& get_opacity_micromap_features_ext() const;
     operator const vk::PhysicalDeviceOpacityMicromapFeaturesEXT&() const;
-    vk::PhysicalDeviceOpticalFlowFeaturesNV& get_optical_flow_features_nv();
     const vk::PhysicalDeviceOpticalFlowFeaturesNV& get_optical_flow_features_nv() const;
     operator const vk::PhysicalDeviceOpticalFlowFeaturesNV&() const;
-    vk::PhysicalDevicePageableDeviceLocalMemoryFeaturesEXT& get_pageable_device_local_memory_features_ext();
     const vk::PhysicalDevicePageableDeviceLocalMemoryFeaturesEXT& get_pageable_device_local_memory_features_ext() const;
     operator const vk::PhysicalDevicePageableDeviceLocalMemoryFeaturesEXT&() const;
-    vk::PhysicalDevicePartitionedAccelerationStructureFeaturesNV& get_partitioned_acceleration_structure_features_nv();
     const vk::PhysicalDevicePartitionedAccelerationStructureFeaturesNV& get_partitioned_acceleration_structure_features_nv() const;
     operator const vk::PhysicalDevicePartitionedAccelerationStructureFeaturesNV&() const;
-    vk::PhysicalDevicePerStageDescriptorSetFeaturesNV& get_per_stage_descriptor_set_features_nv();
     const vk::PhysicalDevicePerStageDescriptorSetFeaturesNV& get_per_stage_descriptor_set_features_nv() const;
     operator const vk::PhysicalDevicePerStageDescriptorSetFeaturesNV&() const;
-    vk::PhysicalDevicePerformanceCountersByRegionFeaturesARM& get_performance_counters_by_region_features_arm();
     const vk::PhysicalDevicePerformanceCountersByRegionFeaturesARM& get_performance_counters_by_region_features_arm() const;
     operator const vk::PhysicalDevicePerformanceCountersByRegionFeaturesARM&() const;
-    vk::PhysicalDevicePerformanceQueryFeaturesKHR& get_performance_query_features_khr();
     const vk::PhysicalDevicePerformanceQueryFeaturesKHR& get_performance_query_features_khr() const;
     operator const vk::PhysicalDevicePerformanceQueryFeaturesKHR&() const;
-    vk::PhysicalDevicePipelineBinaryFeaturesKHR& get_pipeline_binary_features_khr();
     const vk::PhysicalDevicePipelineBinaryFeaturesKHR& get_pipeline_binary_features_khr() const;
     operator const vk::PhysicalDevicePipelineBinaryFeaturesKHR&() const;
-    vk::PhysicalDevicePipelineCacheIncrementalModeFeaturesSEC& get_pipeline_cache_incremental_mode_features_sec();
     const vk::PhysicalDevicePipelineCacheIncrementalModeFeaturesSEC& get_pipeline_cache_incremental_mode_features_sec() const;
     operator const vk::PhysicalDevicePipelineCacheIncrementalModeFeaturesSEC&() const;
-    vk::PhysicalDevicePipelineCreationCacheControlFeatures& get_pipeline_creation_cache_control_features();
     const vk::PhysicalDevicePipelineCreationCacheControlFeatures& get_pipeline_creation_cache_control_features() const;
     operator const vk::PhysicalDevicePipelineCreationCacheControlFeatures&() const;
-    vk::PhysicalDevicePipelineExecutablePropertiesFeaturesKHR& get_pipeline_executable_properties_features_khr();
     const vk::PhysicalDevicePipelineExecutablePropertiesFeaturesKHR& get_pipeline_executable_properties_features_khr() const;
     operator const vk::PhysicalDevicePipelineExecutablePropertiesFeaturesKHR&() const;
-    vk::PhysicalDevicePipelineLibraryGroupHandlesFeaturesEXT& get_pipeline_library_group_handles_features_ext();
     const vk::PhysicalDevicePipelineLibraryGroupHandlesFeaturesEXT& get_pipeline_library_group_handles_features_ext() const;
     operator const vk::PhysicalDevicePipelineLibraryGroupHandlesFeaturesEXT&() const;
-    vk::PhysicalDevicePipelineOpacityMicromapFeaturesARM& get_pipeline_opacity_micromap_features_arm();
     const vk::PhysicalDevicePipelineOpacityMicromapFeaturesARM& get_pipeline_opacity_micromap_features_arm() const;
     operator const vk::PhysicalDevicePipelineOpacityMicromapFeaturesARM&() const;
-    vk::PhysicalDevicePipelinePropertiesFeaturesEXT& get_pipeline_properties_features_ext();
     const vk::PhysicalDevicePipelinePropertiesFeaturesEXT& get_pipeline_properties_features_ext() const;
     operator const vk::PhysicalDevicePipelinePropertiesFeaturesEXT&() const;
-    vk::PhysicalDevicePipelineProtectedAccessFeatures& get_pipeline_protected_access_features();
     const vk::PhysicalDevicePipelineProtectedAccessFeatures& get_pipeline_protected_access_features() const;
     operator const vk::PhysicalDevicePipelineProtectedAccessFeatures&() const;
-    vk::PhysicalDevicePipelineRobustnessFeatures& get_pipeline_robustness_features();
     const vk::PhysicalDevicePipelineRobustnessFeatures& get_pipeline_robustness_features() const;
     operator const vk::PhysicalDevicePipelineRobustnessFeatures&() const;
-    vk::PhysicalDevicePresentBarrierFeaturesNV& get_present_barrier_features_nv();
     const vk::PhysicalDevicePresentBarrierFeaturesNV& get_present_barrier_features_nv() const;
     operator const vk::PhysicalDevicePresentBarrierFeaturesNV&() const;
-    vk::PhysicalDevicePresentId2FeaturesKHR& get_present_id2_features_khr();
     const vk::PhysicalDevicePresentId2FeaturesKHR& get_present_id2_features_khr() const;
     operator const vk::PhysicalDevicePresentId2FeaturesKHR&() const;
-    vk::PhysicalDevicePresentIdFeaturesKHR& get_present_id_features_khr();
     const vk::PhysicalDevicePresentIdFeaturesKHR& get_present_id_features_khr() const;
     operator const vk::PhysicalDevicePresentIdFeaturesKHR&() const;
-    vk::PhysicalDevicePresentModeFifoLatestReadyFeaturesKHR& get_present_mode_fifo_latest_ready_features_khr();
     const vk::PhysicalDevicePresentModeFifoLatestReadyFeaturesKHR& get_present_mode_fifo_latest_ready_features_khr() const;
     operator const vk::PhysicalDevicePresentModeFifoLatestReadyFeaturesKHR&() const;
-    vk::PhysicalDevicePresentTimingFeaturesEXT& get_present_timing_features_ext();
     const vk::PhysicalDevicePresentTimingFeaturesEXT& get_present_timing_features_ext() const;
     operator const vk::PhysicalDevicePresentTimingFeaturesEXT&() const;
-    vk::PhysicalDevicePresentWait2FeaturesKHR& get_present_wait2_features_khr();
     const vk::PhysicalDevicePresentWait2FeaturesKHR& get_present_wait2_features_khr() const;
     operator const vk::PhysicalDevicePresentWait2FeaturesKHR&() const;
-    vk::PhysicalDevicePresentWaitFeaturesKHR& get_present_wait_features_khr();
     const vk::PhysicalDevicePresentWaitFeaturesKHR& get_present_wait_features_khr() const;
     operator const vk::PhysicalDevicePresentWaitFeaturesKHR&() const;
-    vk::PhysicalDevicePrimitiveTopologyListRestartFeaturesEXT& get_primitive_topology_list_restart_features_ext();
     const vk::PhysicalDevicePrimitiveTopologyListRestartFeaturesEXT& get_primitive_topology_list_restart_features_ext() const;
     operator const vk::PhysicalDevicePrimitiveTopologyListRestartFeaturesEXT&() const;
-    vk::PhysicalDevicePrimitivesGeneratedQueryFeaturesEXT& get_primitives_generated_query_features_ext();
     const vk::PhysicalDevicePrimitivesGeneratedQueryFeaturesEXT& get_primitives_generated_query_features_ext() const;
     operator const vk::PhysicalDevicePrimitivesGeneratedQueryFeaturesEXT&() const;
-    vk::PhysicalDevicePrivateDataFeatures& get_private_data_features();
     const vk::PhysicalDevicePrivateDataFeatures& get_private_data_features() const;
     operator const vk::PhysicalDevicePrivateDataFeatures&() const;
-    vk::PhysicalDeviceProtectedMemoryFeatures& get_protected_memory_features();
     const vk::PhysicalDeviceProtectedMemoryFeatures& get_protected_memory_features() const;
     operator const vk::PhysicalDeviceProtectedMemoryFeatures&() const;
-    vk::PhysicalDeviceProvokingVertexFeaturesEXT& get_provoking_vertex_features_ext();
     const vk::PhysicalDeviceProvokingVertexFeaturesEXT& get_provoking_vertex_features_ext() const;
     operator const vk::PhysicalDeviceProvokingVertexFeaturesEXT&() const;
-    vk::PhysicalDevicePushConstantBankFeaturesNV& get_push_constant_bank_features_nv();
     const vk::PhysicalDevicePushConstantBankFeaturesNV& get_push_constant_bank_features_nv() const;
     operator const vk::PhysicalDevicePushConstantBankFeaturesNV&() const;
-    vk::PhysicalDeviceRGBA10X6FormatsFeaturesEXT& get_rgba10_x6_formats_features_ext();
     const vk::PhysicalDeviceRGBA10X6FormatsFeaturesEXT& get_rgba10_x6_formats_features_ext() const;
     operator const vk::PhysicalDeviceRGBA10X6FormatsFeaturesEXT&() const;
-    vk::PhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT& get_rasterization_order_attachment_access_features_ext();
     const vk::PhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT& get_rasterization_order_attachment_access_features_ext() const;
     operator const vk::PhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT&() const;
-    vk::PhysicalDeviceRawAccessChainsFeaturesNV& get_raw_access_chains_features_nv();
     const vk::PhysicalDeviceRawAccessChainsFeaturesNV& get_raw_access_chains_features_nv() const;
     operator const vk::PhysicalDeviceRawAccessChainsFeaturesNV&() const;
-    vk::PhysicalDeviceRayQueryFeaturesKHR& get_ray_query_features_khr();
     const vk::PhysicalDeviceRayQueryFeaturesKHR& get_ray_query_features_khr() const;
     operator const vk::PhysicalDeviceRayQueryFeaturesKHR&() const;
-    vk::PhysicalDeviceRayTracingInvocationReorderFeaturesEXT& get_ray_tracing_invocation_reorder_features_ext();
     const vk::PhysicalDeviceRayTracingInvocationReorderFeaturesEXT& get_ray_tracing_invocation_reorder_features_ext() const;
     operator const vk::PhysicalDeviceRayTracingInvocationReorderFeaturesEXT&() const;
-    vk::PhysicalDeviceRayTracingInvocationReorderFeaturesNV& get_ray_tracing_invocation_reorder_features_nv();
     const vk::PhysicalDeviceRayTracingInvocationReorderFeaturesNV& get_ray_tracing_invocation_reorder_features_nv() const;
     operator const vk::PhysicalDeviceRayTracingInvocationReorderFeaturesNV&() const;
-    vk::PhysicalDeviceRayTracingLinearSweptSpheresFeaturesNV& get_ray_tracing_linear_swept_spheres_features_nv();
     const vk::PhysicalDeviceRayTracingLinearSweptSpheresFeaturesNV& get_ray_tracing_linear_swept_spheres_features_nv() const;
     operator const vk::PhysicalDeviceRayTracingLinearSweptSpheresFeaturesNV&() const;
-    vk::PhysicalDeviceRayTracingMaintenance1FeaturesKHR& get_ray_tracing_maintenance1_features_khr();
     const vk::PhysicalDeviceRayTracingMaintenance1FeaturesKHR& get_ray_tracing_maintenance1_features_khr() const;
     operator const vk::PhysicalDeviceRayTracingMaintenance1FeaturesKHR&() const;
-    vk::PhysicalDeviceRayTracingMotionBlurFeaturesNV& get_ray_tracing_motion_blur_features_nv();
     const vk::PhysicalDeviceRayTracingMotionBlurFeaturesNV& get_ray_tracing_motion_blur_features_nv() const;
     operator const vk::PhysicalDeviceRayTracingMotionBlurFeaturesNV&() const;
-    vk::PhysicalDeviceRayTracingPipelineFeaturesKHR& get_ray_tracing_pipeline_features_khr();
     const vk::PhysicalDeviceRayTracingPipelineFeaturesKHR& get_ray_tracing_pipeline_features_khr() const;
     operator const vk::PhysicalDeviceRayTracingPipelineFeaturesKHR&() const;
-    vk::PhysicalDeviceRayTracingPositionFetchFeaturesKHR& get_ray_tracing_position_fetch_features_khr();
     const vk::PhysicalDeviceRayTracingPositionFetchFeaturesKHR& get_ray_tracing_position_fetch_features_khr() const;
     operator const vk::PhysicalDeviceRayTracingPositionFetchFeaturesKHR&() const;
-    vk::PhysicalDeviceRayTracingValidationFeaturesNV& get_ray_tracing_validation_features_nv();
     const vk::PhysicalDeviceRayTracingValidationFeaturesNV& get_ray_tracing_validation_features_nv() const;
     operator const vk::PhysicalDeviceRayTracingValidationFeaturesNV&() const;
-    vk::PhysicalDeviceRelaxedLineRasterizationFeaturesIMG& get_relaxed_line_rasterization_features_img();
     const vk::PhysicalDeviceRelaxedLineRasterizationFeaturesIMG& get_relaxed_line_rasterization_features_img() const;
     operator const vk::PhysicalDeviceRelaxedLineRasterizationFeaturesIMG&() const;
-    vk::PhysicalDeviceRenderPassStripedFeaturesARM& get_render_pass_striped_features_arm();
     const vk::PhysicalDeviceRenderPassStripedFeaturesARM& get_render_pass_striped_features_arm() const;
     operator const vk::PhysicalDeviceRenderPassStripedFeaturesARM&() const;
-    vk::PhysicalDeviceRepresentativeFragmentTestFeaturesNV& get_representative_fragment_test_features_nv();
     const vk::PhysicalDeviceRepresentativeFragmentTestFeaturesNV& get_representative_fragment_test_features_nv() const;
     operator const vk::PhysicalDeviceRepresentativeFragmentTestFeaturesNV&() const;
-    vk::PhysicalDeviceRobustness2FeaturesKHR& get_robustness2_features_khr();
     const vk::PhysicalDeviceRobustness2FeaturesKHR& get_robustness2_features_khr() const;
     operator const vk::PhysicalDeviceRobustness2FeaturesKHR&() const;
-    vk::PhysicalDeviceSamplerYcbcrConversionFeatures& get_sampler_ycbcr_conversion_features();
     const vk::PhysicalDeviceSamplerYcbcrConversionFeatures& get_sampler_ycbcr_conversion_features() const;
     operator const vk::PhysicalDeviceSamplerYcbcrConversionFeatures&() const;
-    vk::PhysicalDeviceScalarBlockLayoutFeatures& get_scalar_block_layout_features();
     const vk::PhysicalDeviceScalarBlockLayoutFeatures& get_scalar_block_layout_features() const;
     operator const vk::PhysicalDeviceScalarBlockLayoutFeatures&() const;
-    vk::PhysicalDeviceSchedulingControlsFeaturesARM& get_scheduling_controls_features_arm();
     const vk::PhysicalDeviceSchedulingControlsFeaturesARM& get_scheduling_controls_features_arm() const;
     operator const vk::PhysicalDeviceSchedulingControlsFeaturesARM&() const;
-    vk::PhysicalDeviceSeparateDepthStencilLayoutsFeatures& get_separate_depth_stencil_layouts_features();
     const vk::PhysicalDeviceSeparateDepthStencilLayoutsFeatures& get_separate_depth_stencil_layouts_features() const;
     operator const vk::PhysicalDeviceSeparateDepthStencilLayoutsFeatures&() const;
-    vk::PhysicalDeviceShader64BitIndexingFeaturesEXT& get_shader64_bit_indexing_features_ext();
     const vk::PhysicalDeviceShader64BitIndexingFeaturesEXT& get_shader64_bit_indexing_features_ext() const;
     operator const vk::PhysicalDeviceShader64BitIndexingFeaturesEXT&() const;
-    vk::PhysicalDeviceShaderAtomicFloat16VectorFeaturesNV& get_shader_atomic_float16_vector_features_nv();
     const vk::PhysicalDeviceShaderAtomicFloat16VectorFeaturesNV& get_shader_atomic_float16_vector_features_nv() const;
     operator const vk::PhysicalDeviceShaderAtomicFloat16VectorFeaturesNV&() const;
-    vk::PhysicalDeviceShaderAtomicFloat2FeaturesEXT& get_shader_atomic_float2_features_ext();
     const vk::PhysicalDeviceShaderAtomicFloat2FeaturesEXT& get_shader_atomic_float2_features_ext() const;
     operator const vk::PhysicalDeviceShaderAtomicFloat2FeaturesEXT&() const;
-    vk::PhysicalDeviceShaderAtomicFloatFeaturesEXT& get_shader_atomic_float_features_ext();
     const vk::PhysicalDeviceShaderAtomicFloatFeaturesEXT& get_shader_atomic_float_features_ext() const;
     operator const vk::PhysicalDeviceShaderAtomicFloatFeaturesEXT&() const;
-    vk::PhysicalDeviceShaderAtomicInt64Features& get_shader_atomic_int64_features();
     const vk::PhysicalDeviceShaderAtomicInt64Features& get_shader_atomic_int64_features() const;
     operator const vk::PhysicalDeviceShaderAtomicInt64Features&() const;
-    vk::PhysicalDeviceShaderBfloat16FeaturesKHR& get_shader_bfloat16_features_khr();
     const vk::PhysicalDeviceShaderBfloat16FeaturesKHR& get_shader_bfloat16_features_khr() const;
     operator const vk::PhysicalDeviceShaderBfloat16FeaturesKHR&() const;
-    vk::PhysicalDeviceShaderClockFeaturesKHR& get_shader_clock_features_khr();
     const vk::PhysicalDeviceShaderClockFeaturesKHR& get_shader_clock_features_khr() const;
     operator const vk::PhysicalDeviceShaderClockFeaturesKHR&() const;
-    vk::PhysicalDeviceShaderCoreBuiltinsFeaturesARM& get_shader_core_builtins_features_arm();
     const vk::PhysicalDeviceShaderCoreBuiltinsFeaturesARM& get_shader_core_builtins_features_arm() const;
     operator const vk::PhysicalDeviceShaderCoreBuiltinsFeaturesARM&() const;
-    vk::PhysicalDeviceShaderDemoteToHelperInvocationFeatures& get_shader_demote_to_helper_invocation_features();
     const vk::PhysicalDeviceShaderDemoteToHelperInvocationFeatures& get_shader_demote_to_helper_invocation_features() const;
     operator const vk::PhysicalDeviceShaderDemoteToHelperInvocationFeatures&() const;
-    vk::PhysicalDeviceShaderDrawParametersFeatures& get_shader_draw_parameters_features();
     const vk::PhysicalDeviceShaderDrawParametersFeatures& get_shader_draw_parameters_features() const;
     operator const vk::PhysicalDeviceShaderDrawParametersFeatures&() const;
-    vk::PhysicalDeviceShaderEarlyAndLateFragmentTestsFeaturesAMD& get_shader_early_and_late_fragment_tests_features_amd();
     const vk::PhysicalDeviceShaderEarlyAndLateFragmentTestsFeaturesAMD& get_shader_early_and_late_fragment_tests_features_amd() const;
     operator const vk::PhysicalDeviceShaderEarlyAndLateFragmentTestsFeaturesAMD&() const;
-    vk::PhysicalDeviceShaderExpectAssumeFeatures& get_shader_expect_assume_features();
     const vk::PhysicalDeviceShaderExpectAssumeFeatures& get_shader_expect_assume_features() const;
     operator const vk::PhysicalDeviceShaderExpectAssumeFeatures&() const;
-    vk::PhysicalDeviceShaderFloat16Int8Features& get_shader_float16_int8_features();
     const vk::PhysicalDeviceShaderFloat16Int8Features& get_shader_float16_int8_features() const;
     operator const vk::PhysicalDeviceShaderFloat16Int8Features&() const;
-    vk::PhysicalDeviceShaderFloat8FeaturesEXT& get_shader_float8_features_ext();
     const vk::PhysicalDeviceShaderFloat8FeaturesEXT& get_shader_float8_features_ext() const;
     operator const vk::PhysicalDeviceShaderFloat8FeaturesEXT&() const;
-    vk::PhysicalDeviceShaderFloatControls2Features& get_shader_float_controls2_features();
     const vk::PhysicalDeviceShaderFloatControls2Features& get_shader_float_controls2_features() const;
     operator const vk::PhysicalDeviceShaderFloatControls2Features&() const;
-    vk::PhysicalDeviceShaderFmaFeaturesKHR& get_shader_fma_features_khr();
     const vk::PhysicalDeviceShaderFmaFeaturesKHR& get_shader_fma_features_khr() const;
     operator const vk::PhysicalDeviceShaderFmaFeaturesKHR&() const;
-    vk::PhysicalDeviceShaderImageAtomicInt64FeaturesEXT& get_shader_image_atomic_int64_features_ext();
     const vk::PhysicalDeviceShaderImageAtomicInt64FeaturesEXT& get_shader_image_atomic_int64_features_ext() const;
     operator const vk::PhysicalDeviceShaderImageAtomicInt64FeaturesEXT&() const;
-    vk::PhysicalDeviceShaderImageFootprintFeaturesNV& get_shader_image_footprint_features_nv();
     const vk::PhysicalDeviceShaderImageFootprintFeaturesNV& get_shader_image_footprint_features_nv() const;
     operator const vk::PhysicalDeviceShaderImageFootprintFeaturesNV&() const;
-    vk::PhysicalDeviceShaderIntegerDotProductFeatures& get_shader_integer_dot_product_features();
     const vk::PhysicalDeviceShaderIntegerDotProductFeatures& get_shader_integer_dot_product_features() const;
     operator const vk::PhysicalDeviceShaderIntegerDotProductFeatures&() const;
-    vk::PhysicalDeviceShaderIntegerFunctions2FeaturesINTEL& get_shader_integer_functions2_features_intel();
     const vk::PhysicalDeviceShaderIntegerFunctions2FeaturesINTEL& get_shader_integer_functions2_features_intel() const;
     operator const vk::PhysicalDeviceShaderIntegerFunctions2FeaturesINTEL&() const;
-    vk::PhysicalDeviceShaderLongVectorFeaturesEXT& get_shader_long_vector_features_ext();
     const vk::PhysicalDeviceShaderLongVectorFeaturesEXT& get_shader_long_vector_features_ext() const;
     operator const vk::PhysicalDeviceShaderLongVectorFeaturesEXT&() const;
-    vk::PhysicalDeviceShaderMaximalReconvergenceFeaturesKHR& get_shader_maximal_reconvergence_features_khr();
     const vk::PhysicalDeviceShaderMaximalReconvergenceFeaturesKHR& get_shader_maximal_reconvergence_features_khr() const;
     operator const vk::PhysicalDeviceShaderMaximalReconvergenceFeaturesKHR&() const;
-    vk::PhysicalDeviceShaderModuleIdentifierFeaturesEXT& get_shader_module_identifier_features_ext();
     const vk::PhysicalDeviceShaderModuleIdentifierFeaturesEXT& get_shader_module_identifier_features_ext() const;
     operator const vk::PhysicalDeviceShaderModuleIdentifierFeaturesEXT&() const;
-    vk::PhysicalDeviceShaderObjectFeaturesEXT& get_shader_object_features_ext();
     const vk::PhysicalDeviceShaderObjectFeaturesEXT& get_shader_object_features_ext() const;
     operator const vk::PhysicalDeviceShaderObjectFeaturesEXT&() const;
-    vk::PhysicalDeviceShaderQuadControlFeaturesKHR& get_shader_quad_control_features_khr();
     const vk::PhysicalDeviceShaderQuadControlFeaturesKHR& get_shader_quad_control_features_khr() const;
     operator const vk::PhysicalDeviceShaderQuadControlFeaturesKHR&() const;
-    vk::PhysicalDeviceShaderRelaxedExtendedInstructionFeaturesKHR& get_shader_relaxed_extended_instruction_features_khr();
     const vk::PhysicalDeviceShaderRelaxedExtendedInstructionFeaturesKHR& get_shader_relaxed_extended_instruction_features_khr() const;
     operator const vk::PhysicalDeviceShaderRelaxedExtendedInstructionFeaturesKHR&() const;
-    vk::PhysicalDeviceShaderReplicatedCompositesFeaturesEXT& get_shader_replicated_composites_features_ext();
     const vk::PhysicalDeviceShaderReplicatedCompositesFeaturesEXT& get_shader_replicated_composites_features_ext() const;
     operator const vk::PhysicalDeviceShaderReplicatedCompositesFeaturesEXT&() const;
-    vk::PhysicalDeviceShaderSMBuiltinsFeaturesNV& get_shader_sm_builtins_features_nv();
     const vk::PhysicalDeviceShaderSMBuiltinsFeaturesNV& get_shader_sm_builtins_features_nv() const;
     operator const vk::PhysicalDeviceShaderSMBuiltinsFeaturesNV&() const;
-    vk::PhysicalDeviceShaderSubgroupExtendedTypesFeatures& get_shader_subgroup_extended_types_features();
     const vk::PhysicalDeviceShaderSubgroupExtendedTypesFeatures& get_shader_subgroup_extended_types_features() const;
     operator const vk::PhysicalDeviceShaderSubgroupExtendedTypesFeatures&() const;
-    vk::PhysicalDeviceShaderSubgroupPartitionedFeaturesEXT& get_shader_subgroup_partitioned_features_ext();
     const vk::PhysicalDeviceShaderSubgroupPartitionedFeaturesEXT& get_shader_subgroup_partitioned_features_ext() const;
     operator const vk::PhysicalDeviceShaderSubgroupPartitionedFeaturesEXT&() const;
-    vk::PhysicalDeviceShaderSubgroupRotateFeatures& get_shader_subgroup_rotate_features();
     const vk::PhysicalDeviceShaderSubgroupRotateFeatures& get_shader_subgroup_rotate_features() const;
     operator const vk::PhysicalDeviceShaderSubgroupRotateFeatures&() const;
-    vk::PhysicalDeviceShaderSubgroupUniformControlFlowFeaturesKHR& get_shader_subgroup_uniform_control_flow_features_khr();
     const vk::PhysicalDeviceShaderSubgroupUniformControlFlowFeaturesKHR& get_shader_subgroup_uniform_control_flow_features_khr() const;
     operator const vk::PhysicalDeviceShaderSubgroupUniformControlFlowFeaturesKHR&() const;
-    vk::PhysicalDeviceShaderTerminateInvocationFeatures& get_shader_terminate_invocation_features();
     const vk::PhysicalDeviceShaderTerminateInvocationFeatures& get_shader_terminate_invocation_features() const;
     operator const vk::PhysicalDeviceShaderTerminateInvocationFeatures&() const;
-    vk::PhysicalDeviceShaderTileImageFeaturesEXT& get_shader_tile_image_features_ext();
     const vk::PhysicalDeviceShaderTileImageFeaturesEXT& get_shader_tile_image_features_ext() const;
     operator const vk::PhysicalDeviceShaderTileImageFeaturesEXT&() const;
-    vk::PhysicalDeviceShaderUniformBufferUnsizedArrayFeaturesEXT& get_shader_uniform_buffer_unsized_array_features_ext();
     const vk::PhysicalDeviceShaderUniformBufferUnsizedArrayFeaturesEXT& get_shader_uniform_buffer_unsized_array_features_ext() const;
     operator const vk::PhysicalDeviceShaderUniformBufferUnsizedArrayFeaturesEXT&() const;
-    vk::PhysicalDeviceShaderUntypedPointersFeaturesKHR& get_shader_untyped_pointers_features_khr();
     const vk::PhysicalDeviceShaderUntypedPointersFeaturesKHR& get_shader_untyped_pointers_features_khr() const;
     operator const vk::PhysicalDeviceShaderUntypedPointersFeaturesKHR&() const;
-    vk::PhysicalDeviceShadingRateImageFeaturesNV& get_shading_rate_image_features_nv();
     const vk::PhysicalDeviceShadingRateImageFeaturesNV& get_shading_rate_image_features_nv() const;
     operator const vk::PhysicalDeviceShadingRateImageFeaturesNV&() const;
-    vk::PhysicalDeviceSubgroupSizeControlFeatures& get_subgroup_size_control_features();
     const vk::PhysicalDeviceSubgroupSizeControlFeatures& get_subgroup_size_control_features() const;
     operator const vk::PhysicalDeviceSubgroupSizeControlFeatures&() const;
-    vk::PhysicalDeviceSubpassMergeFeedbackFeaturesEXT& get_subpass_merge_feedback_features_ext();
     const vk::PhysicalDeviceSubpassMergeFeedbackFeaturesEXT& get_subpass_merge_feedback_features_ext() const;
     operator const vk::PhysicalDeviceSubpassMergeFeedbackFeaturesEXT&() const;
-    vk::PhysicalDeviceSubpassShadingFeaturesHUAWEI& get_subpass_shading_features_huawei();
     const vk::PhysicalDeviceSubpassShadingFeaturesHUAWEI& get_subpass_shading_features_huawei() const;
     operator const vk::PhysicalDeviceSubpassShadingFeaturesHUAWEI&() const;
-    vk::PhysicalDeviceSwapchainMaintenance1FeaturesKHR& get_swapchain_maintenance1_features_khr();
     const vk::PhysicalDeviceSwapchainMaintenance1FeaturesKHR& get_swapchain_maintenance1_features_khr() const;
     operator const vk::PhysicalDeviceSwapchainMaintenance1FeaturesKHR&() const;
-    vk::PhysicalDeviceSynchronization2Features& get_synchronization2_features();
     const vk::PhysicalDeviceSynchronization2Features& get_synchronization2_features() const;
     operator const vk::PhysicalDeviceSynchronization2Features&() const;
-    vk::PhysicalDeviceTensorFeaturesARM& get_tensor_features_arm();
     const vk::PhysicalDeviceTensorFeaturesARM& get_tensor_features_arm() const;
     operator const vk::PhysicalDeviceTensorFeaturesARM&() const;
-    vk::PhysicalDeviceTexelBufferAlignmentFeaturesEXT& get_texel_buffer_alignment_features_ext();
     const vk::PhysicalDeviceTexelBufferAlignmentFeaturesEXT& get_texel_buffer_alignment_features_ext() const;
     operator const vk::PhysicalDeviceTexelBufferAlignmentFeaturesEXT&() const;
-    vk::PhysicalDeviceTextureCompressionASTC3DFeaturesEXT& get_texture_compression_astc3_d_features_ext();
     const vk::PhysicalDeviceTextureCompressionASTC3DFeaturesEXT& get_texture_compression_astc3_d_features_ext() const;
     operator const vk::PhysicalDeviceTextureCompressionASTC3DFeaturesEXT&() const;
-    vk::PhysicalDeviceTextureCompressionASTCHDRFeatures& get_texture_compression_astchdr_features();
     const vk::PhysicalDeviceTextureCompressionASTCHDRFeatures& get_texture_compression_astchdr_features() const;
     operator const vk::PhysicalDeviceTextureCompressionASTCHDRFeatures&() const;
-    vk::PhysicalDeviceTileMemoryHeapFeaturesQCOM& get_tile_memory_heap_features_qcom();
     const vk::PhysicalDeviceTileMemoryHeapFeaturesQCOM& get_tile_memory_heap_features_qcom() const;
     operator const vk::PhysicalDeviceTileMemoryHeapFeaturesQCOM&() const;
-    vk::PhysicalDeviceTilePropertiesFeaturesQCOM& get_tile_properties_features_qcom();
     const vk::PhysicalDeviceTilePropertiesFeaturesQCOM& get_tile_properties_features_qcom() const;
     operator const vk::PhysicalDeviceTilePropertiesFeaturesQCOM&() const;
-    vk::PhysicalDeviceTileShadingFeaturesQCOM& get_tile_shading_features_qcom();
     const vk::PhysicalDeviceTileShadingFeaturesQCOM& get_tile_shading_features_qcom() const;
     operator const vk::PhysicalDeviceTileShadingFeaturesQCOM&() const;
-    vk::PhysicalDeviceTimelineSemaphoreFeatures& get_timeline_semaphore_features();
     const vk::PhysicalDeviceTimelineSemaphoreFeatures& get_timeline_semaphore_features() const;
     operator const vk::PhysicalDeviceTimelineSemaphoreFeatures&() const;
-    vk::PhysicalDeviceTransformFeedbackFeaturesEXT& get_transform_feedback_features_ext();
     const vk::PhysicalDeviceTransformFeedbackFeaturesEXT& get_transform_feedback_features_ext() const;
     operator const vk::PhysicalDeviceTransformFeedbackFeaturesEXT&() const;
-    vk::PhysicalDeviceUnifiedImageLayoutsFeaturesKHR& get_unified_image_layouts_features_khr();
     const vk::PhysicalDeviceUnifiedImageLayoutsFeaturesKHR& get_unified_image_layouts_features_khr() const;
     operator const vk::PhysicalDeviceUnifiedImageLayoutsFeaturesKHR&() const;
-    vk::PhysicalDeviceUniformBufferStandardLayoutFeatures& get_uniform_buffer_standard_layout_features();
     const vk::PhysicalDeviceUniformBufferStandardLayoutFeatures& get_uniform_buffer_standard_layout_features() const;
     operator const vk::PhysicalDeviceUniformBufferStandardLayoutFeatures&() const;
-    vk::PhysicalDeviceVariablePointersFeatures& get_variable_pointers_features();
     const vk::PhysicalDeviceVariablePointersFeatures& get_variable_pointers_features() const;
     operator const vk::PhysicalDeviceVariablePointersFeatures&() const;
-    vk::PhysicalDeviceVertexAttributeDivisorFeatures& get_vertex_attribute_divisor_features();
     const vk::PhysicalDeviceVertexAttributeDivisorFeatures& get_vertex_attribute_divisor_features() const;
     operator const vk::PhysicalDeviceVertexAttributeDivisorFeatures&() const;
-    vk::PhysicalDeviceVertexAttributeRobustnessFeaturesEXT& get_vertex_attribute_robustness_features_ext();
     const vk::PhysicalDeviceVertexAttributeRobustnessFeaturesEXT& get_vertex_attribute_robustness_features_ext() const;
     operator const vk::PhysicalDeviceVertexAttributeRobustnessFeaturesEXT&() const;
-    vk::PhysicalDeviceVertexInputDynamicStateFeaturesEXT& get_vertex_input_dynamic_state_features_ext();
     const vk::PhysicalDeviceVertexInputDynamicStateFeaturesEXT& get_vertex_input_dynamic_state_features_ext() const;
     operator const vk::PhysicalDeviceVertexInputDynamicStateFeaturesEXT&() const;
-    vk::PhysicalDeviceVideoDecodeVP9FeaturesKHR& get_video_decode_vp9_features_khr();
     const vk::PhysicalDeviceVideoDecodeVP9FeaturesKHR& get_video_decode_vp9_features_khr() const;
     operator const vk::PhysicalDeviceVideoDecodeVP9FeaturesKHR&() const;
-    vk::PhysicalDeviceVideoEncodeAV1FeaturesKHR& get_video_encode_av1_features_khr();
     const vk::PhysicalDeviceVideoEncodeAV1FeaturesKHR& get_video_encode_av1_features_khr() const;
     operator const vk::PhysicalDeviceVideoEncodeAV1FeaturesKHR&() const;
-    vk::PhysicalDeviceVideoEncodeIntraRefreshFeaturesKHR& get_video_encode_intra_refresh_features_khr();
     const vk::PhysicalDeviceVideoEncodeIntraRefreshFeaturesKHR& get_video_encode_intra_refresh_features_khr() const;
     operator const vk::PhysicalDeviceVideoEncodeIntraRefreshFeaturesKHR&() const;
-    vk::PhysicalDeviceVideoEncodeQuantizationMapFeaturesKHR& get_video_encode_quantization_map_features_khr();
     const vk::PhysicalDeviceVideoEncodeQuantizationMapFeaturesKHR& get_video_encode_quantization_map_features_khr() const;
     operator const vk::PhysicalDeviceVideoEncodeQuantizationMapFeaturesKHR&() const;
-    vk::PhysicalDeviceVideoEncodeRgbConversionFeaturesVALVE& get_video_encode_rgb_conversion_features_valve();
     const vk::PhysicalDeviceVideoEncodeRgbConversionFeaturesVALVE& get_video_encode_rgb_conversion_features_valve() const;
     operator const vk::PhysicalDeviceVideoEncodeRgbConversionFeaturesVALVE&() const;
-    vk::PhysicalDeviceVideoMaintenance1FeaturesKHR& get_video_maintenance1_features_khr();
     const vk::PhysicalDeviceVideoMaintenance1FeaturesKHR& get_video_maintenance1_features_khr() const;
     operator const vk::PhysicalDeviceVideoMaintenance1FeaturesKHR&() const;
-    vk::PhysicalDeviceVideoMaintenance2FeaturesKHR& get_video_maintenance2_features_khr();
     const vk::PhysicalDeviceVideoMaintenance2FeaturesKHR& get_video_maintenance2_features_khr() const;
     operator const vk::PhysicalDeviceVideoMaintenance2FeaturesKHR&() const;
-    vk::PhysicalDeviceVulkan11Features& get_vulkan11_features();
     const vk::PhysicalDeviceVulkan11Features& get_vulkan11_features() const;
     operator const vk::PhysicalDeviceVulkan11Features&() const;
-    vk::PhysicalDeviceVulkan12Features& get_vulkan12_features();
     const vk::PhysicalDeviceVulkan12Features& get_vulkan12_features() const;
     operator const vk::PhysicalDeviceVulkan12Features&() const;
-    vk::PhysicalDeviceVulkan13Features& get_vulkan13_features();
     const vk::PhysicalDeviceVulkan13Features& get_vulkan13_features() const;
     operator const vk::PhysicalDeviceVulkan13Features&() const;
-    vk::PhysicalDeviceVulkan14Features& get_vulkan14_features();
     const vk::PhysicalDeviceVulkan14Features& get_vulkan14_features() const;
     operator const vk::PhysicalDeviceVulkan14Features&() const;
-    vk::PhysicalDeviceVulkanMemoryModelFeatures& get_vulkan_memory_model_features();
     const vk::PhysicalDeviceVulkanMemoryModelFeatures& get_vulkan_memory_model_features() const;
     operator const vk::PhysicalDeviceVulkanMemoryModelFeatures&() const;
-    vk::PhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR& get_workgroup_memory_explicit_layout_features_khr();
     const vk::PhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR& get_workgroup_memory_explicit_layout_features_khr() const;
     operator const vk::PhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR&() const;
-    vk::PhysicalDeviceYcbcr2Plane444FormatsFeaturesEXT& get_ycbcr2_plane444_formats_features_ext();
     const vk::PhysicalDeviceYcbcr2Plane444FormatsFeaturesEXT& get_ycbcr2_plane444_formats_features_ext() const;
     operator const vk::PhysicalDeviceYcbcr2Plane444FormatsFeaturesEXT&() const;
-    vk::PhysicalDeviceYcbcrDegammaFeaturesQCOM& get_ycbcr_degamma_features_qcom();
     const vk::PhysicalDeviceYcbcrDegammaFeaturesQCOM& get_ycbcr_degamma_features_qcom() const;
     operator const vk::PhysicalDeviceYcbcrDegammaFeaturesQCOM&() const;
-    vk::PhysicalDeviceYcbcrImageArraysFeaturesEXT& get_ycbcr_image_arrays_features_ext();
     const vk::PhysicalDeviceYcbcrImageArraysFeaturesEXT& get_ycbcr_image_arrays_features_ext() const;
     operator const vk::PhysicalDeviceYcbcrImageArraysFeaturesEXT&() const;
-    vk::PhysicalDeviceZeroInitializeDeviceMemoryFeaturesEXT& get_zero_initialize_device_memory_features_ext();
     const vk::PhysicalDeviceZeroInitializeDeviceMemoryFeaturesEXT& get_zero_initialize_device_memory_features_ext() const;
     operator const vk::PhysicalDeviceZeroInitializeDeviceMemoryFeaturesEXT&() const;
-    vk::PhysicalDeviceZeroInitializeWorkgroupMemoryFeatures& get_zero_initialize_workgroup_memory_features();
     const vk::PhysicalDeviceZeroInitializeWorkgroupMemoryFeatures& get_zero_initialize_workgroup_memory_features() const;
     operator const vk::PhysicalDeviceZeroInitializeWorkgroupMemoryFeatures&() const;
 
     // Alias getters (for backwards compatibility)
-    vk::PhysicalDevice16BitStorageFeatures& get_16_bit_storage_features_khr();  // Alias for PhysicalDevice16BitStorageFeatures
-    const vk::PhysicalDevice16BitStorageFeatures& get_16_bit_storage_features_khr() const;
-    vk::PhysicalDevice8BitStorageFeatures& get_8_bit_storage_features_khr();  // Alias for PhysicalDevice8BitStorageFeatures
-    const vk::PhysicalDevice8BitStorageFeatures& get_8_bit_storage_features_khr() const;
-    vk::PhysicalDeviceBufferDeviceAddressFeatures& get_buffer_device_address_features_khr();  // Alias for PhysicalDeviceBufferDeviceAddressFeatures
-    const vk::PhysicalDeviceBufferDeviceAddressFeatures& get_buffer_device_address_features_khr() const;
-    vk::PhysicalDeviceBufferDeviceAddressFeaturesEXT& get_buffer_address_features_ext();  // Alias for PhysicalDeviceBufferDeviceAddressFeaturesEXT
-    const vk::PhysicalDeviceBufferDeviceAddressFeaturesEXT& get_buffer_address_features_ext() const;
-    vk::PhysicalDeviceComputeShaderDerivativesFeaturesKHR& get_compute_shader_derivatives_features_nv();  // Alias for PhysicalDeviceComputeShaderDerivativesFeaturesKHR
-    const vk::PhysicalDeviceComputeShaderDerivativesFeaturesKHR& get_compute_shader_derivatives_features_nv() const;
-    vk::PhysicalDeviceDepthClampZeroOneFeaturesKHR& get_depth_clamp_zero_one_features_ext();  // Alias for PhysicalDeviceDepthClampZeroOneFeaturesKHR
-    const vk::PhysicalDeviceDepthClampZeroOneFeaturesKHR& get_depth_clamp_zero_one_features_ext() const;
-    vk::PhysicalDeviceDescriptorIndexingFeatures& get_descriptor_indexing_features_ext();  // Alias for PhysicalDeviceDescriptorIndexingFeatures
-    const vk::PhysicalDeviceDescriptorIndexingFeatures& get_descriptor_indexing_features_ext() const;
-    vk::PhysicalDeviceDynamicRenderingFeatures& get_dynamic_rendering_features_khr();  // Alias for PhysicalDeviceDynamicRenderingFeatures
-    const vk::PhysicalDeviceDynamicRenderingFeatures& get_dynamic_rendering_features_khr() const;
-    vk::PhysicalDeviceDynamicRenderingLocalReadFeatures& get_dynamic_rendering_local_read_features_khr();  // Alias for PhysicalDeviceDynamicRenderingLocalReadFeatures
-    const vk::PhysicalDeviceDynamicRenderingLocalReadFeatures& get_dynamic_rendering_local_read_features_khr() const;
-    vk::PhysicalDeviceFeatures2& get_features2_khr();  // Alias for PhysicalDeviceFeatures2
-    const vk::PhysicalDeviceFeatures2& get_features2_khr() const;
-    vk::PhysicalDeviceFragmentDensityMapOffsetFeaturesEXT& get_fragment_density_map_offset_features_qcom();  // Alias for PhysicalDeviceFragmentDensityMapOffsetFeaturesEXT
-    const vk::PhysicalDeviceFragmentDensityMapOffsetFeaturesEXT& get_fragment_density_map_offset_features_qcom() const;
-    vk::PhysicalDeviceFragmentShaderBarycentricFeaturesKHR& get_fragment_shader_barycentric_features_nv();  // Alias for PhysicalDeviceFragmentShaderBarycentricFeaturesKHR
-    const vk::PhysicalDeviceFragmentShaderBarycentricFeaturesKHR& get_fragment_shader_barycentric_features_nv() const;
-    vk::PhysicalDeviceGlobalPriorityQueryFeatures& get_global_priority_query_features_khr();  // Alias for PhysicalDeviceGlobalPriorityQueryFeatures
-    const vk::PhysicalDeviceGlobalPriorityQueryFeatures& get_global_priority_query_features_khr() const;
-    vk::PhysicalDeviceGlobalPriorityQueryFeatures& get_global_priority_query_features_ext();  // Alias for PhysicalDeviceGlobalPriorityQueryFeatures
-    const vk::PhysicalDeviceGlobalPriorityQueryFeatures& get_global_priority_query_features_ext() const;
-    vk::PhysicalDeviceHostImageCopyFeatures& get_host_image_copy_features_ext();  // Alias for PhysicalDeviceHostImageCopyFeatures
-    const vk::PhysicalDeviceHostImageCopyFeatures& get_host_image_copy_features_ext() const;
-    vk::PhysicalDeviceHostQueryResetFeatures& get_host_query_reset_features_ext();  // Alias for PhysicalDeviceHostQueryResetFeatures
-    const vk::PhysicalDeviceHostQueryResetFeatures& get_host_query_reset_features_ext() const;
-    vk::PhysicalDeviceImageRobustnessFeatures& get_image_robustness_features_ext();  // Alias for PhysicalDeviceImageRobustnessFeatures
-    const vk::PhysicalDeviceImageRobustnessFeatures& get_image_robustness_features_ext() const;
-    vk::PhysicalDeviceImagelessFramebufferFeatures& get_imageless_framebuffer_features_khr();  // Alias for PhysicalDeviceImagelessFramebufferFeatures
-    const vk::PhysicalDeviceImagelessFramebufferFeatures& get_imageless_framebuffer_features_khr() const;
-    vk::PhysicalDeviceIndexTypeUint8Features& get_index_type_uint8_features_khr();  // Alias for PhysicalDeviceIndexTypeUint8Features
-    const vk::PhysicalDeviceIndexTypeUint8Features& get_index_type_uint8_features_khr() const;
-    vk::PhysicalDeviceIndexTypeUint8Features& get_index_type_uint8_features_ext();  // Alias for PhysicalDeviceIndexTypeUint8Features
-    const vk::PhysicalDeviceIndexTypeUint8Features& get_index_type_uint8_features_ext() const;
-    vk::PhysicalDeviceInlineUniformBlockFeatures& get_inline_uniform_block_features_ext();  // Alias for PhysicalDeviceInlineUniformBlockFeatures
-    const vk::PhysicalDeviceInlineUniformBlockFeatures& get_inline_uniform_block_features_ext() const;
-    vk::PhysicalDeviceLineRasterizationFeatures& get_line_rasterization_features_khr();  // Alias for PhysicalDeviceLineRasterizationFeatures
-    const vk::PhysicalDeviceLineRasterizationFeatures& get_line_rasterization_features_khr() const;
-    vk::PhysicalDeviceLineRasterizationFeatures& get_line_rasterization_features_ext();  // Alias for PhysicalDeviceLineRasterizationFeatures
-    const vk::PhysicalDeviceLineRasterizationFeatures& get_line_rasterization_features_ext() const;
-    vk::PhysicalDeviceMaintenance4Features& get_maintenance4_features_khr();  // Alias for PhysicalDeviceMaintenance4Features
-    const vk::PhysicalDeviceMaintenance4Features& get_maintenance4_features_khr() const;
-    vk::PhysicalDeviceMaintenance5Features& get_maintenance5_features_khr();  // Alias for PhysicalDeviceMaintenance5Features
-    const vk::PhysicalDeviceMaintenance5Features& get_maintenance5_features_khr() const;
-    vk::PhysicalDeviceMaintenance6Features& get_maintenance6_features_khr();  // Alias for PhysicalDeviceMaintenance6Features
-    const vk::PhysicalDeviceMaintenance6Features& get_maintenance6_features_khr() const;
-    vk::PhysicalDeviceMemoryDecompressionFeaturesEXT& get_memory_decompression_features_nv();  // Alias for PhysicalDeviceMemoryDecompressionFeaturesEXT
-    const vk::PhysicalDeviceMemoryDecompressionFeaturesEXT& get_memory_decompression_features_nv() const;
-    vk::PhysicalDeviceMultiviewFeatures& get_multiview_features_khr();  // Alias for PhysicalDeviceMultiviewFeatures
-    const vk::PhysicalDeviceMultiviewFeatures& get_multiview_features_khr() const;
-    vk::PhysicalDeviceMutableDescriptorTypeFeaturesEXT& get_mutable_descriptor_type_features_valve();  // Alias for PhysicalDeviceMutableDescriptorTypeFeaturesEXT
-    const vk::PhysicalDeviceMutableDescriptorTypeFeaturesEXT& get_mutable_descriptor_type_features_valve() const;
-    vk::PhysicalDevicePipelineCreationCacheControlFeatures& get_pipeline_creation_cache_control_features_ext();  // Alias for PhysicalDevicePipelineCreationCacheControlFeatures
-    const vk::PhysicalDevicePipelineCreationCacheControlFeatures& get_pipeline_creation_cache_control_features_ext() const;
-    vk::PhysicalDevicePipelineProtectedAccessFeatures& get_pipeline_protected_access_features_ext();  // Alias for PhysicalDevicePipelineProtectedAccessFeatures
-    const vk::PhysicalDevicePipelineProtectedAccessFeatures& get_pipeline_protected_access_features_ext() const;
-    vk::PhysicalDevicePipelineRobustnessFeatures& get_pipeline_robustness_features_ext();  // Alias for PhysicalDevicePipelineRobustnessFeatures
-    const vk::PhysicalDevicePipelineRobustnessFeatures& get_pipeline_robustness_features_ext() const;
-    vk::PhysicalDevicePresentModeFifoLatestReadyFeaturesKHR& get_present_mode_fifo_latest_ready_features_ext();  // Alias for PhysicalDevicePresentModeFifoLatestReadyFeaturesKHR
-    const vk::PhysicalDevicePresentModeFifoLatestReadyFeaturesKHR& get_present_mode_fifo_latest_ready_features_ext() const;
-    vk::PhysicalDevicePrivateDataFeatures& get_private_data_features_ext();  // Alias for PhysicalDevicePrivateDataFeatures
-    const vk::PhysicalDevicePrivateDataFeatures& get_private_data_features_ext() const;
-    vk::PhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT& get_rasterization_order_attachment_access_features_arm();  // Alias for PhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT
-    const vk::PhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT& get_rasterization_order_attachment_access_features_arm() const;
-    vk::PhysicalDeviceRobustness2FeaturesKHR& get_robustness2_features_ext();  // Alias for PhysicalDeviceRobustness2FeaturesKHR
-    const vk::PhysicalDeviceRobustness2FeaturesKHR& get_robustness2_features_ext() const;
-    vk::PhysicalDeviceSamplerYcbcrConversionFeatures& get_sampler_ycbcr_conversion_features_khr();  // Alias for PhysicalDeviceSamplerYcbcrConversionFeatures
-    const vk::PhysicalDeviceSamplerYcbcrConversionFeatures& get_sampler_ycbcr_conversion_features_khr() const;
-    vk::PhysicalDeviceScalarBlockLayoutFeatures& get_scalar_block_layout_features_ext();  // Alias for PhysicalDeviceScalarBlockLayoutFeatures
-    const vk::PhysicalDeviceScalarBlockLayoutFeatures& get_scalar_block_layout_features_ext() const;
-    vk::PhysicalDeviceSeparateDepthStencilLayoutsFeatures& get_separate_depth_stencil_layouts_features_khr();  // Alias for PhysicalDeviceSeparateDepthStencilLayoutsFeatures
-    const vk::PhysicalDeviceSeparateDepthStencilLayoutsFeatures& get_separate_depth_stencil_layouts_features_khr() const;
-    vk::PhysicalDeviceShaderAtomicInt64Features& get_shader_atomic_int64_features_khr();  // Alias for PhysicalDeviceShaderAtomicInt64Features
-    const vk::PhysicalDeviceShaderAtomicInt64Features& get_shader_atomic_int64_features_khr() const;
-    vk::PhysicalDeviceShaderDemoteToHelperInvocationFeatures& get_shader_demote_to_helper_invocation_features_ext();  // Alias for PhysicalDeviceShaderDemoteToHelperInvocationFeatures
-    const vk::PhysicalDeviceShaderDemoteToHelperInvocationFeatures& get_shader_demote_to_helper_invocation_features_ext() const;
-    vk::PhysicalDeviceShaderDrawParametersFeatures& get_shader_draw_parameter_features();  // Alias for PhysicalDeviceShaderDrawParametersFeatures
-    const vk::PhysicalDeviceShaderDrawParametersFeatures& get_shader_draw_parameter_features() const;
-    vk::PhysicalDeviceShaderExpectAssumeFeatures& get_shader_expect_assume_features_khr();  // Alias for PhysicalDeviceShaderExpectAssumeFeatures
-    const vk::PhysicalDeviceShaderExpectAssumeFeatures& get_shader_expect_assume_features_khr() const;
-    vk::PhysicalDeviceShaderFloat16Int8Features& get_shader_float16_int8_features_khr();  // Alias for PhysicalDeviceShaderFloat16Int8Features
-    const vk::PhysicalDeviceShaderFloat16Int8Features& get_shader_float16_int8_features_khr() const;
-    vk::PhysicalDeviceShaderFloat16Int8Features& get_float16_int8_features_khr();  // Alias for PhysicalDeviceShaderFloat16Int8Features
-    const vk::PhysicalDeviceShaderFloat16Int8Features& get_float16_int8_features_khr() const;
-    vk::PhysicalDeviceShaderFloatControls2Features& get_shader_float_controls2_features_khr();  // Alias for PhysicalDeviceShaderFloatControls2Features
-    const vk::PhysicalDeviceShaderFloatControls2Features& get_shader_float_controls2_features_khr() const;
-    vk::PhysicalDeviceShaderIntegerDotProductFeatures& get_shader_integer_dot_product_features_khr();  // Alias for PhysicalDeviceShaderIntegerDotProductFeatures
-    const vk::PhysicalDeviceShaderIntegerDotProductFeatures& get_shader_integer_dot_product_features_khr() const;
-    vk::PhysicalDeviceShaderSubgroupExtendedTypesFeatures& get_shader_subgroup_extended_types_features_khr();  // Alias for PhysicalDeviceShaderSubgroupExtendedTypesFeatures
-    const vk::PhysicalDeviceShaderSubgroupExtendedTypesFeatures& get_shader_subgroup_extended_types_features_khr() const;
-    vk::PhysicalDeviceShaderSubgroupRotateFeatures& get_shader_subgroup_rotate_features_khr();  // Alias for PhysicalDeviceShaderSubgroupRotateFeatures
-    const vk::PhysicalDeviceShaderSubgroupRotateFeatures& get_shader_subgroup_rotate_features_khr() const;
-    vk::PhysicalDeviceShaderTerminateInvocationFeatures& get_shader_terminate_invocation_features_khr();  // Alias for PhysicalDeviceShaderTerminateInvocationFeatures
-    const vk::PhysicalDeviceShaderTerminateInvocationFeatures& get_shader_terminate_invocation_features_khr() const;
-    vk::PhysicalDeviceSubgroupSizeControlFeatures& get_subgroup_size_control_features_ext();  // Alias for PhysicalDeviceSubgroupSizeControlFeatures
-    const vk::PhysicalDeviceSubgroupSizeControlFeatures& get_subgroup_size_control_features_ext() const;
-    vk::PhysicalDeviceSwapchainMaintenance1FeaturesKHR& get_swapchain_maintenance1_features_ext();  // Alias for PhysicalDeviceSwapchainMaintenance1FeaturesKHR
-    const vk::PhysicalDeviceSwapchainMaintenance1FeaturesKHR& get_swapchain_maintenance1_features_ext() const;
-    vk::PhysicalDeviceSynchronization2Features& get_synchronization2_features_khr();  // Alias for PhysicalDeviceSynchronization2Features
-    const vk::PhysicalDeviceSynchronization2Features& get_synchronization2_features_khr() const;
-    vk::PhysicalDeviceTextureCompressionASTCHDRFeatures& get_texture_compression_astchdr_features_ext();  // Alias for PhysicalDeviceTextureCompressionASTCHDRFeatures
-    const vk::PhysicalDeviceTextureCompressionASTCHDRFeatures& get_texture_compression_astchdr_features_ext() const;
-    vk::PhysicalDeviceTimelineSemaphoreFeatures& get_timeline_semaphore_features_khr();  // Alias for PhysicalDeviceTimelineSemaphoreFeatures
-    const vk::PhysicalDeviceTimelineSemaphoreFeatures& get_timeline_semaphore_features_khr() const;
-    vk::PhysicalDeviceUniformBufferStandardLayoutFeatures& get_uniform_buffer_standard_layout_features_khr();  // Alias for PhysicalDeviceUniformBufferStandardLayoutFeatures
-    const vk::PhysicalDeviceUniformBufferStandardLayoutFeatures& get_uniform_buffer_standard_layout_features_khr() const;
-    vk::PhysicalDeviceVariablePointersFeatures& get_variable_pointers_features_khr();  // Alias for PhysicalDeviceVariablePointersFeatures
-    const vk::PhysicalDeviceVariablePointersFeatures& get_variable_pointers_features_khr() const;
-    vk::PhysicalDeviceVariablePointersFeatures& get_variable_pointer_features_khr();  // Alias for PhysicalDeviceVariablePointersFeatures
-    const vk::PhysicalDeviceVariablePointersFeatures& get_variable_pointer_features_khr() const;
-    vk::PhysicalDeviceVariablePointersFeatures& get_variable_pointer_features();  // Alias for PhysicalDeviceVariablePointersFeatures
-    const vk::PhysicalDeviceVariablePointersFeatures& get_variable_pointer_features() const;
-    vk::PhysicalDeviceVertexAttributeDivisorFeatures& get_vertex_attribute_divisor_features_khr();  // Alias for PhysicalDeviceVertexAttributeDivisorFeatures
-    const vk::PhysicalDeviceVertexAttributeDivisorFeatures& get_vertex_attribute_divisor_features_khr() const;
-    vk::PhysicalDeviceVertexAttributeDivisorFeatures& get_vertex_attribute_divisor_features_ext();  // Alias for PhysicalDeviceVertexAttributeDivisorFeatures
-    const vk::PhysicalDeviceVertexAttributeDivisorFeatures& get_vertex_attribute_divisor_features_ext() const;
-    vk::PhysicalDeviceVulkanMemoryModelFeatures& get_vulkan_memory_model_features_khr();  // Alias for PhysicalDeviceVulkanMemoryModelFeatures
-    const vk::PhysicalDeviceVulkanMemoryModelFeatures& get_vulkan_memory_model_features_khr() const;
-    vk::PhysicalDeviceZeroInitializeWorkgroupMemoryFeatures& get_zero_initialize_workgroup_memory_features_khr();  // Alias for PhysicalDeviceZeroInitializeWorkgroupMemoryFeatures
-    const vk::PhysicalDeviceZeroInitializeWorkgroupMemoryFeatures& get_zero_initialize_workgroup_memory_features_khr() const;
+    const vk::PhysicalDevice16BitStorageFeatures& get_16_bit_storage_features_khr() const;  // Alias for PhysicalDevice16BitStorageFeatures
+    const vk::PhysicalDevice8BitStorageFeatures& get_8_bit_storage_features_khr() const;  // Alias for PhysicalDevice8BitStorageFeatures
+    const vk::PhysicalDeviceBufferDeviceAddressFeatures& get_buffer_device_address_features_khr() const;  // Alias for PhysicalDeviceBufferDeviceAddressFeatures
+    const vk::PhysicalDeviceBufferDeviceAddressFeaturesEXT& get_buffer_address_features_ext() const;  // Alias for PhysicalDeviceBufferDeviceAddressFeaturesEXT
+    const vk::PhysicalDeviceComputeShaderDerivativesFeaturesKHR& get_compute_shader_derivatives_features_nv() const;  // Alias for PhysicalDeviceComputeShaderDerivativesFeaturesKHR
+    const vk::PhysicalDeviceDepthClampZeroOneFeaturesKHR& get_depth_clamp_zero_one_features_ext() const;  // Alias for PhysicalDeviceDepthClampZeroOneFeaturesKHR
+    const vk::PhysicalDeviceDescriptorIndexingFeatures& get_descriptor_indexing_features_ext() const;  // Alias for PhysicalDeviceDescriptorIndexingFeatures
+    const vk::PhysicalDeviceDynamicRenderingFeatures& get_dynamic_rendering_features_khr() const;  // Alias for PhysicalDeviceDynamicRenderingFeatures
+    const vk::PhysicalDeviceDynamicRenderingLocalReadFeatures& get_dynamic_rendering_local_read_features_khr() const;  // Alias for PhysicalDeviceDynamicRenderingLocalReadFeatures
+    const vk::PhysicalDeviceFeatures2& get_features2_khr() const;  // Alias for PhysicalDeviceFeatures2
+    const vk::PhysicalDeviceFragmentDensityMapOffsetFeaturesEXT& get_fragment_density_map_offset_features_qcom() const;  // Alias for PhysicalDeviceFragmentDensityMapOffsetFeaturesEXT
+    const vk::PhysicalDeviceFragmentShaderBarycentricFeaturesKHR& get_fragment_shader_barycentric_features_nv() const;  // Alias for PhysicalDeviceFragmentShaderBarycentricFeaturesKHR
+    const vk::PhysicalDeviceGlobalPriorityQueryFeatures& get_global_priority_query_features_khr() const;  // Alias for PhysicalDeviceGlobalPriorityQueryFeatures
+    const vk::PhysicalDeviceGlobalPriorityQueryFeatures& get_global_priority_query_features_ext() const;  // Alias for PhysicalDeviceGlobalPriorityQueryFeatures
+    const vk::PhysicalDeviceHostImageCopyFeatures& get_host_image_copy_features_ext() const;  // Alias for PhysicalDeviceHostImageCopyFeatures
+    const vk::PhysicalDeviceHostQueryResetFeatures& get_host_query_reset_features_ext() const;  // Alias for PhysicalDeviceHostQueryResetFeatures
+    const vk::PhysicalDeviceImageRobustnessFeatures& get_image_robustness_features_ext() const;  // Alias for PhysicalDeviceImageRobustnessFeatures
+    const vk::PhysicalDeviceImagelessFramebufferFeatures& get_imageless_framebuffer_features_khr() const;  // Alias for PhysicalDeviceImagelessFramebufferFeatures
+    const vk::PhysicalDeviceIndexTypeUint8Features& get_index_type_uint8_features_khr() const;  // Alias for PhysicalDeviceIndexTypeUint8Features
+    const vk::PhysicalDeviceIndexTypeUint8Features& get_index_type_uint8_features_ext() const;  // Alias for PhysicalDeviceIndexTypeUint8Features
+    const vk::PhysicalDeviceInlineUniformBlockFeatures& get_inline_uniform_block_features_ext() const;  // Alias for PhysicalDeviceInlineUniformBlockFeatures
+    const vk::PhysicalDeviceLineRasterizationFeatures& get_line_rasterization_features_khr() const;  // Alias for PhysicalDeviceLineRasterizationFeatures
+    const vk::PhysicalDeviceLineRasterizationFeatures& get_line_rasterization_features_ext() const;  // Alias for PhysicalDeviceLineRasterizationFeatures
+    const vk::PhysicalDeviceMaintenance4Features& get_maintenance4_features_khr() const;  // Alias for PhysicalDeviceMaintenance4Features
+    const vk::PhysicalDeviceMaintenance5Features& get_maintenance5_features_khr() const;  // Alias for PhysicalDeviceMaintenance5Features
+    const vk::PhysicalDeviceMaintenance6Features& get_maintenance6_features_khr() const;  // Alias for PhysicalDeviceMaintenance6Features
+    const vk::PhysicalDeviceMemoryDecompressionFeaturesEXT& get_memory_decompression_features_nv() const;  // Alias for PhysicalDeviceMemoryDecompressionFeaturesEXT
+    const vk::PhysicalDeviceMultiviewFeatures& get_multiview_features_khr() const;  // Alias for PhysicalDeviceMultiviewFeatures
+    const vk::PhysicalDeviceMutableDescriptorTypeFeaturesEXT& get_mutable_descriptor_type_features_valve() const;  // Alias for PhysicalDeviceMutableDescriptorTypeFeaturesEXT
+    const vk::PhysicalDevicePipelineCreationCacheControlFeatures& get_pipeline_creation_cache_control_features_ext() const;  // Alias for PhysicalDevicePipelineCreationCacheControlFeatures
+    const vk::PhysicalDevicePipelineProtectedAccessFeatures& get_pipeline_protected_access_features_ext() const;  // Alias for PhysicalDevicePipelineProtectedAccessFeatures
+    const vk::PhysicalDevicePipelineRobustnessFeatures& get_pipeline_robustness_features_ext() const;  // Alias for PhysicalDevicePipelineRobustnessFeatures
+    const vk::PhysicalDevicePresentModeFifoLatestReadyFeaturesKHR& get_present_mode_fifo_latest_ready_features_ext() const;  // Alias for PhysicalDevicePresentModeFifoLatestReadyFeaturesKHR
+    const vk::PhysicalDevicePrivateDataFeatures& get_private_data_features_ext() const;  // Alias for PhysicalDevicePrivateDataFeatures
+    const vk::PhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT& get_rasterization_order_attachment_access_features_arm() const;  // Alias for PhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT
+    const vk::PhysicalDeviceRobustness2FeaturesKHR& get_robustness2_features_ext() const;  // Alias for PhysicalDeviceRobustness2FeaturesKHR
+    const vk::PhysicalDeviceSamplerYcbcrConversionFeatures& get_sampler_ycbcr_conversion_features_khr() const;  // Alias for PhysicalDeviceSamplerYcbcrConversionFeatures
+    const vk::PhysicalDeviceScalarBlockLayoutFeatures& get_scalar_block_layout_features_ext() const;  // Alias for PhysicalDeviceScalarBlockLayoutFeatures
+    const vk::PhysicalDeviceSeparateDepthStencilLayoutsFeatures& get_separate_depth_stencil_layouts_features_khr() const;  // Alias for PhysicalDeviceSeparateDepthStencilLayoutsFeatures
+    const vk::PhysicalDeviceShaderAtomicInt64Features& get_shader_atomic_int64_features_khr() const;  // Alias for PhysicalDeviceShaderAtomicInt64Features
+    const vk::PhysicalDeviceShaderDemoteToHelperInvocationFeatures& get_shader_demote_to_helper_invocation_features_ext() const;  // Alias for PhysicalDeviceShaderDemoteToHelperInvocationFeatures
+    const vk::PhysicalDeviceShaderDrawParametersFeatures& get_shader_draw_parameter_features() const;  // Alias for PhysicalDeviceShaderDrawParametersFeatures
+    const vk::PhysicalDeviceShaderExpectAssumeFeatures& get_shader_expect_assume_features_khr() const;  // Alias for PhysicalDeviceShaderExpectAssumeFeatures
+    const vk::PhysicalDeviceShaderFloat16Int8Features& get_shader_float16_int8_features_khr() const;  // Alias for PhysicalDeviceShaderFloat16Int8Features
+    const vk::PhysicalDeviceShaderFloat16Int8Features& get_float16_int8_features_khr() const;  // Alias for PhysicalDeviceShaderFloat16Int8Features
+    const vk::PhysicalDeviceShaderFloatControls2Features& get_shader_float_controls2_features_khr() const;  // Alias for PhysicalDeviceShaderFloatControls2Features
+    const vk::PhysicalDeviceShaderIntegerDotProductFeatures& get_shader_integer_dot_product_features_khr() const;  // Alias for PhysicalDeviceShaderIntegerDotProductFeatures
+    const vk::PhysicalDeviceShaderSubgroupExtendedTypesFeatures& get_shader_subgroup_extended_types_features_khr() const;  // Alias for PhysicalDeviceShaderSubgroupExtendedTypesFeatures
+    const vk::PhysicalDeviceShaderSubgroupRotateFeatures& get_shader_subgroup_rotate_features_khr() const;  // Alias for PhysicalDeviceShaderSubgroupRotateFeatures
+    const vk::PhysicalDeviceShaderTerminateInvocationFeatures& get_shader_terminate_invocation_features_khr() const;  // Alias for PhysicalDeviceShaderTerminateInvocationFeatures
+    const vk::PhysicalDeviceSubgroupSizeControlFeatures& get_subgroup_size_control_features_ext() const;  // Alias for PhysicalDeviceSubgroupSizeControlFeatures
+    const vk::PhysicalDeviceSwapchainMaintenance1FeaturesKHR& get_swapchain_maintenance1_features_ext() const;  // Alias for PhysicalDeviceSwapchainMaintenance1FeaturesKHR
+    const vk::PhysicalDeviceSynchronization2Features& get_synchronization2_features_khr() const;  // Alias for PhysicalDeviceSynchronization2Features
+    const vk::PhysicalDeviceTextureCompressionASTCHDRFeatures& get_texture_compression_astchdr_features_ext() const;  // Alias for PhysicalDeviceTextureCompressionASTCHDRFeatures
+    const vk::PhysicalDeviceTimelineSemaphoreFeatures& get_timeline_semaphore_features_khr() const;  // Alias for PhysicalDeviceTimelineSemaphoreFeatures
+    const vk::PhysicalDeviceUniformBufferStandardLayoutFeatures& get_uniform_buffer_standard_layout_features_khr() const;  // Alias for PhysicalDeviceUniformBufferStandardLayoutFeatures
+    const vk::PhysicalDeviceVariablePointersFeatures& get_variable_pointers_features_khr() const;  // Alias for PhysicalDeviceVariablePointersFeatures
+    const vk::PhysicalDeviceVariablePointersFeatures& get_variable_pointer_features_khr() const;  // Alias for PhysicalDeviceVariablePointersFeatures
+    const vk::PhysicalDeviceVariablePointersFeatures& get_variable_pointer_features() const;  // Alias for PhysicalDeviceVariablePointersFeatures
+    const vk::PhysicalDeviceVertexAttributeDivisorFeatures& get_vertex_attribute_divisor_features_khr() const;  // Alias for PhysicalDeviceVertexAttributeDivisorFeatures
+    const vk::PhysicalDeviceVertexAttributeDivisorFeatures& get_vertex_attribute_divisor_features_ext() const;  // Alias for PhysicalDeviceVertexAttributeDivisorFeatures
+    const vk::PhysicalDeviceVulkanMemoryModelFeatures& get_vulkan_memory_model_features_khr() const;  // Alias for PhysicalDeviceVulkanMemoryModelFeatures
+    const vk::PhysicalDeviceZeroInitializeWorkgroupMemoryFeatures& get_zero_initialize_workgroup_memory_features_khr() const;  // Alias for PhysicalDeviceZeroInitializeWorkgroupMemoryFeatures
 
     /// Feature-name-only API (simplified, version-portable)
     bool set_feature(const std::string& feature_name, bool enable);

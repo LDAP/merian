@@ -3240,17 +3240,11 @@ template const vk::PhysicalDeviceZeroInitializeDeviceMemoryFeaturesEXT& VulkanFe
 template const vk::PhysicalDeviceZeroInitializeWorkgroupMemoryFeatures& VulkanFeatures::get<vk::PhysicalDeviceZeroInitializeWorkgroupMemoryFeatures>() const;
 
 // Named getter implementations
-vk::PhysicalDeviceFeatures& VulkanFeatures::get_features() {
-    return m_features2.features;
-}
 const vk::PhysicalDeviceFeatures& VulkanFeatures::get_features() const {
     return m_features2.features;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceFeatures&() const {
     return m_features2.features;
-}
-vk::PhysicalDevice16BitStorageFeatures& VulkanFeatures::get_16_bit_storage_features() {
-    return m_16_bit_storage_features;
 }
 const vk::PhysicalDevice16BitStorageFeatures& VulkanFeatures::get_16_bit_storage_features() const {
     return m_16_bit_storage_features;
@@ -3258,17 +3252,11 @@ const vk::PhysicalDevice16BitStorageFeatures& VulkanFeatures::get_16_bit_storage
 VulkanFeatures::operator const vk::PhysicalDevice16BitStorageFeatures&() const {
     return m_16_bit_storage_features;
 }
-vk::PhysicalDevice4444FormatsFeaturesEXT& VulkanFeatures::get_4444_formats_features_ext() {
-    return m_4444_formats_features_ext;
-}
 const vk::PhysicalDevice4444FormatsFeaturesEXT& VulkanFeatures::get_4444_formats_features_ext() const {
     return m_4444_formats_features_ext;
 }
 VulkanFeatures::operator const vk::PhysicalDevice4444FormatsFeaturesEXT&() const {
     return m_4444_formats_features_ext;
-}
-vk::PhysicalDevice8BitStorageFeatures& VulkanFeatures::get_8_bit_storage_features() {
-    return m_8_bit_storage_features;
 }
 const vk::PhysicalDevice8BitStorageFeatures& VulkanFeatures::get_8_bit_storage_features() const {
     return m_8_bit_storage_features;
@@ -3276,17 +3264,11 @@ const vk::PhysicalDevice8BitStorageFeatures& VulkanFeatures::get_8_bit_storage_f
 VulkanFeatures::operator const vk::PhysicalDevice8BitStorageFeatures&() const {
     return m_8_bit_storage_features;
 }
-vk::PhysicalDeviceASTCDecodeFeaturesEXT& VulkanFeatures::get_astc_decode_features_ext() {
-    return m_astc_decode_features_ext;
-}
 const vk::PhysicalDeviceASTCDecodeFeaturesEXT& VulkanFeatures::get_astc_decode_features_ext() const {
     return m_astc_decode_features_ext;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceASTCDecodeFeaturesEXT&() const {
     return m_astc_decode_features_ext;
-}
-vk::PhysicalDeviceAccelerationStructureFeaturesKHR& VulkanFeatures::get_acceleration_structure_features_khr() {
-    return m_acceleration_structure_features_khr;
 }
 const vk::PhysicalDeviceAccelerationStructureFeaturesKHR& VulkanFeatures::get_acceleration_structure_features_khr() const {
     return m_acceleration_structure_features_khr;
@@ -3294,17 +3276,11 @@ const vk::PhysicalDeviceAccelerationStructureFeaturesKHR& VulkanFeatures::get_ac
 VulkanFeatures::operator const vk::PhysicalDeviceAccelerationStructureFeaturesKHR&() const {
     return m_acceleration_structure_features_khr;
 }
-vk::PhysicalDeviceAddressBindingReportFeaturesEXT& VulkanFeatures::get_address_binding_report_features_ext() {
-    return m_address_binding_report_features_ext;
-}
 const vk::PhysicalDeviceAddressBindingReportFeaturesEXT& VulkanFeatures::get_address_binding_report_features_ext() const {
     return m_address_binding_report_features_ext;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceAddressBindingReportFeaturesEXT&() const {
     return m_address_binding_report_features_ext;
-}
-vk::PhysicalDeviceAmigoProfilingFeaturesSEC& VulkanFeatures::get_amigo_profiling_features_sec() {
-    return m_amigo_profiling_features_sec;
 }
 const vk::PhysicalDeviceAmigoProfilingFeaturesSEC& VulkanFeatures::get_amigo_profiling_features_sec() const {
     return m_amigo_profiling_features_sec;
@@ -3312,17 +3288,11 @@ const vk::PhysicalDeviceAmigoProfilingFeaturesSEC& VulkanFeatures::get_amigo_pro
 VulkanFeatures::operator const vk::PhysicalDeviceAmigoProfilingFeaturesSEC&() const {
     return m_amigo_profiling_features_sec;
 }
-vk::PhysicalDeviceAntiLagFeaturesAMD& VulkanFeatures::get_anti_lag_features_amd() {
-    return m_anti_lag_features_amd;
-}
 const vk::PhysicalDeviceAntiLagFeaturesAMD& VulkanFeatures::get_anti_lag_features_amd() const {
     return m_anti_lag_features_amd;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceAntiLagFeaturesAMD&() const {
     return m_anti_lag_features_amd;
-}
-vk::PhysicalDeviceAttachmentFeedbackLoopDynamicStateFeaturesEXT& VulkanFeatures::get_attachment_feedback_loop_dynamic_state_features_ext() {
-    return m_attachment_feedback_loop_dynamic_state_features_ext;
 }
 const vk::PhysicalDeviceAttachmentFeedbackLoopDynamicStateFeaturesEXT& VulkanFeatures::get_attachment_feedback_loop_dynamic_state_features_ext() const {
     return m_attachment_feedback_loop_dynamic_state_features_ext;
@@ -3330,17 +3300,11 @@ const vk::PhysicalDeviceAttachmentFeedbackLoopDynamicStateFeaturesEXT& VulkanFea
 VulkanFeatures::operator const vk::PhysicalDeviceAttachmentFeedbackLoopDynamicStateFeaturesEXT&() const {
     return m_attachment_feedback_loop_dynamic_state_features_ext;
 }
-vk::PhysicalDeviceAttachmentFeedbackLoopLayoutFeaturesEXT& VulkanFeatures::get_attachment_feedback_loop_layout_features_ext() {
-    return m_attachment_feedback_loop_layout_features_ext;
-}
 const vk::PhysicalDeviceAttachmentFeedbackLoopLayoutFeaturesEXT& VulkanFeatures::get_attachment_feedback_loop_layout_features_ext() const {
     return m_attachment_feedback_loop_layout_features_ext;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceAttachmentFeedbackLoopLayoutFeaturesEXT&() const {
     return m_attachment_feedback_loop_layout_features_ext;
-}
-vk::PhysicalDeviceBlendOperationAdvancedFeaturesEXT& VulkanFeatures::get_blend_operation_advanced_features_ext() {
-    return m_blend_operation_advanced_features_ext;
 }
 const vk::PhysicalDeviceBlendOperationAdvancedFeaturesEXT& VulkanFeatures::get_blend_operation_advanced_features_ext() const {
     return m_blend_operation_advanced_features_ext;
@@ -3348,17 +3312,11 @@ const vk::PhysicalDeviceBlendOperationAdvancedFeaturesEXT& VulkanFeatures::get_b
 VulkanFeatures::operator const vk::PhysicalDeviceBlendOperationAdvancedFeaturesEXT&() const {
     return m_blend_operation_advanced_features_ext;
 }
-vk::PhysicalDeviceBorderColorSwizzleFeaturesEXT& VulkanFeatures::get_border_color_swizzle_features_ext() {
-    return m_border_color_swizzle_features_ext;
-}
 const vk::PhysicalDeviceBorderColorSwizzleFeaturesEXT& VulkanFeatures::get_border_color_swizzle_features_ext() const {
     return m_border_color_swizzle_features_ext;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceBorderColorSwizzleFeaturesEXT&() const {
     return m_border_color_swizzle_features_ext;
-}
-vk::PhysicalDeviceBufferDeviceAddressFeatures& VulkanFeatures::get_buffer_device_address_features() {
-    return m_buffer_device_address_features;
 }
 const vk::PhysicalDeviceBufferDeviceAddressFeatures& VulkanFeatures::get_buffer_device_address_features() const {
     return m_buffer_device_address_features;
@@ -3366,17 +3324,11 @@ const vk::PhysicalDeviceBufferDeviceAddressFeatures& VulkanFeatures::get_buffer_
 VulkanFeatures::operator const vk::PhysicalDeviceBufferDeviceAddressFeatures&() const {
     return m_buffer_device_address_features;
 }
-vk::PhysicalDeviceBufferDeviceAddressFeaturesEXT& VulkanFeatures::get_buffer_device_address_features_ext() {
-    return m_buffer_device_address_features_ext;
-}
 const vk::PhysicalDeviceBufferDeviceAddressFeaturesEXT& VulkanFeatures::get_buffer_device_address_features_ext() const {
     return m_buffer_device_address_features_ext;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceBufferDeviceAddressFeaturesEXT&() const {
     return m_buffer_device_address_features_ext;
-}
-vk::PhysicalDeviceClusterAccelerationStructureFeaturesNV& VulkanFeatures::get_cluster_acceleration_structure_features_nv() {
-    return m_cluster_acceleration_structure_features_nv;
 }
 const vk::PhysicalDeviceClusterAccelerationStructureFeaturesNV& VulkanFeatures::get_cluster_acceleration_structure_features_nv() const {
     return m_cluster_acceleration_structure_features_nv;
@@ -3384,17 +3336,11 @@ const vk::PhysicalDeviceClusterAccelerationStructureFeaturesNV& VulkanFeatures::
 VulkanFeatures::operator const vk::PhysicalDeviceClusterAccelerationStructureFeaturesNV&() const {
     return m_cluster_acceleration_structure_features_nv;
 }
-vk::PhysicalDeviceClusterCullingShaderFeaturesHUAWEI& VulkanFeatures::get_cluster_culling_shader_features_huawei() {
-    return m_cluster_culling_shader_features_huawei;
-}
 const vk::PhysicalDeviceClusterCullingShaderFeaturesHUAWEI& VulkanFeatures::get_cluster_culling_shader_features_huawei() const {
     return m_cluster_culling_shader_features_huawei;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceClusterCullingShaderFeaturesHUAWEI&() const {
     return m_cluster_culling_shader_features_huawei;
-}
-vk::PhysicalDeviceCoherentMemoryFeaturesAMD& VulkanFeatures::get_coherent_memory_features_amd() {
-    return m_coherent_memory_features_amd;
 }
 const vk::PhysicalDeviceCoherentMemoryFeaturesAMD& VulkanFeatures::get_coherent_memory_features_amd() const {
     return m_coherent_memory_features_amd;
@@ -3402,17 +3348,11 @@ const vk::PhysicalDeviceCoherentMemoryFeaturesAMD& VulkanFeatures::get_coherent_
 VulkanFeatures::operator const vk::PhysicalDeviceCoherentMemoryFeaturesAMD&() const {
     return m_coherent_memory_features_amd;
 }
-vk::PhysicalDeviceColorWriteEnableFeaturesEXT& VulkanFeatures::get_color_write_enable_features_ext() {
-    return m_color_write_enable_features_ext;
-}
 const vk::PhysicalDeviceColorWriteEnableFeaturesEXT& VulkanFeatures::get_color_write_enable_features_ext() const {
     return m_color_write_enable_features_ext;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceColorWriteEnableFeaturesEXT&() const {
     return m_color_write_enable_features_ext;
-}
-vk::PhysicalDeviceCommandBufferInheritanceFeaturesNV& VulkanFeatures::get_command_buffer_inheritance_features_nv() {
-    return m_command_buffer_inheritance_features_nv;
 }
 const vk::PhysicalDeviceCommandBufferInheritanceFeaturesNV& VulkanFeatures::get_command_buffer_inheritance_features_nv() const {
     return m_command_buffer_inheritance_features_nv;
@@ -3420,17 +3360,11 @@ const vk::PhysicalDeviceCommandBufferInheritanceFeaturesNV& VulkanFeatures::get_
 VulkanFeatures::operator const vk::PhysicalDeviceCommandBufferInheritanceFeaturesNV&() const {
     return m_command_buffer_inheritance_features_nv;
 }
-vk::PhysicalDeviceComputeOccupancyPriorityFeaturesNV& VulkanFeatures::get_compute_occupancy_priority_features_nv() {
-    return m_compute_occupancy_priority_features_nv;
-}
 const vk::PhysicalDeviceComputeOccupancyPriorityFeaturesNV& VulkanFeatures::get_compute_occupancy_priority_features_nv() const {
     return m_compute_occupancy_priority_features_nv;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceComputeOccupancyPriorityFeaturesNV&() const {
     return m_compute_occupancy_priority_features_nv;
-}
-vk::PhysicalDeviceComputeShaderDerivativesFeaturesKHR& VulkanFeatures::get_compute_shader_derivatives_features_khr() {
-    return m_compute_shader_derivatives_features_khr;
 }
 const vk::PhysicalDeviceComputeShaderDerivativesFeaturesKHR& VulkanFeatures::get_compute_shader_derivatives_features_khr() const {
     return m_compute_shader_derivatives_features_khr;
@@ -3438,17 +3372,11 @@ const vk::PhysicalDeviceComputeShaderDerivativesFeaturesKHR& VulkanFeatures::get
 VulkanFeatures::operator const vk::PhysicalDeviceComputeShaderDerivativesFeaturesKHR&() const {
     return m_compute_shader_derivatives_features_khr;
 }
-vk::PhysicalDeviceConditionalRenderingFeaturesEXT& VulkanFeatures::get_conditional_rendering_features_ext() {
-    return m_conditional_rendering_features_ext;
-}
 const vk::PhysicalDeviceConditionalRenderingFeaturesEXT& VulkanFeatures::get_conditional_rendering_features_ext() const {
     return m_conditional_rendering_features_ext;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceConditionalRenderingFeaturesEXT&() const {
     return m_conditional_rendering_features_ext;
-}
-vk::PhysicalDeviceCooperativeMatrix2FeaturesNV& VulkanFeatures::get_cooperative_matrix2_features_nv() {
-    return m_cooperative_matrix2_features_nv;
 }
 const vk::PhysicalDeviceCooperativeMatrix2FeaturesNV& VulkanFeatures::get_cooperative_matrix2_features_nv() const {
     return m_cooperative_matrix2_features_nv;
@@ -3456,17 +3384,11 @@ const vk::PhysicalDeviceCooperativeMatrix2FeaturesNV& VulkanFeatures::get_cooper
 VulkanFeatures::operator const vk::PhysicalDeviceCooperativeMatrix2FeaturesNV&() const {
     return m_cooperative_matrix2_features_nv;
 }
-vk::PhysicalDeviceCooperativeMatrixConversionFeaturesQCOM& VulkanFeatures::get_cooperative_matrix_conversion_features_qcom() {
-    return m_cooperative_matrix_conversion_features_qcom;
-}
 const vk::PhysicalDeviceCooperativeMatrixConversionFeaturesQCOM& VulkanFeatures::get_cooperative_matrix_conversion_features_qcom() const {
     return m_cooperative_matrix_conversion_features_qcom;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceCooperativeMatrixConversionFeaturesQCOM&() const {
     return m_cooperative_matrix_conversion_features_qcom;
-}
-vk::PhysicalDeviceCooperativeMatrixFeaturesKHR& VulkanFeatures::get_cooperative_matrix_features_khr() {
-    return m_cooperative_matrix_features_khr;
 }
 const vk::PhysicalDeviceCooperativeMatrixFeaturesKHR& VulkanFeatures::get_cooperative_matrix_features_khr() const {
     return m_cooperative_matrix_features_khr;
@@ -3474,17 +3396,11 @@ const vk::PhysicalDeviceCooperativeMatrixFeaturesKHR& VulkanFeatures::get_cooper
 VulkanFeatures::operator const vk::PhysicalDeviceCooperativeMatrixFeaturesKHR&() const {
     return m_cooperative_matrix_features_khr;
 }
-vk::PhysicalDeviceCooperativeMatrixFeaturesNV& VulkanFeatures::get_cooperative_matrix_features_nv() {
-    return m_cooperative_matrix_features_nv;
-}
 const vk::PhysicalDeviceCooperativeMatrixFeaturesNV& VulkanFeatures::get_cooperative_matrix_features_nv() const {
     return m_cooperative_matrix_features_nv;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceCooperativeMatrixFeaturesNV&() const {
     return m_cooperative_matrix_features_nv;
-}
-vk::PhysicalDeviceCooperativeVectorFeaturesNV& VulkanFeatures::get_cooperative_vector_features_nv() {
-    return m_cooperative_vector_features_nv;
 }
 const vk::PhysicalDeviceCooperativeVectorFeaturesNV& VulkanFeatures::get_cooperative_vector_features_nv() const {
     return m_cooperative_vector_features_nv;
@@ -3492,17 +3408,11 @@ const vk::PhysicalDeviceCooperativeVectorFeaturesNV& VulkanFeatures::get_coopera
 VulkanFeatures::operator const vk::PhysicalDeviceCooperativeVectorFeaturesNV&() const {
     return m_cooperative_vector_features_nv;
 }
-vk::PhysicalDeviceCopyMemoryIndirectFeaturesKHR& VulkanFeatures::get_copy_memory_indirect_features_khr() {
-    return m_copy_memory_indirect_features_khr;
-}
 const vk::PhysicalDeviceCopyMemoryIndirectFeaturesKHR& VulkanFeatures::get_copy_memory_indirect_features_khr() const {
     return m_copy_memory_indirect_features_khr;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceCopyMemoryIndirectFeaturesKHR&() const {
     return m_copy_memory_indirect_features_khr;
-}
-vk::PhysicalDeviceCopyMemoryIndirectFeaturesNV& VulkanFeatures::get_copy_memory_indirect_features_nv() {
-    return m_copy_memory_indirect_features_nv;
 }
 const vk::PhysicalDeviceCopyMemoryIndirectFeaturesNV& VulkanFeatures::get_copy_memory_indirect_features_nv() const {
     return m_copy_memory_indirect_features_nv;
@@ -3510,17 +3420,11 @@ const vk::PhysicalDeviceCopyMemoryIndirectFeaturesNV& VulkanFeatures::get_copy_m
 VulkanFeatures::operator const vk::PhysicalDeviceCopyMemoryIndirectFeaturesNV&() const {
     return m_copy_memory_indirect_features_nv;
 }
-vk::PhysicalDeviceCornerSampledImageFeaturesNV& VulkanFeatures::get_corner_sampled_image_features_nv() {
-    return m_corner_sampled_image_features_nv;
-}
 const vk::PhysicalDeviceCornerSampledImageFeaturesNV& VulkanFeatures::get_corner_sampled_image_features_nv() const {
     return m_corner_sampled_image_features_nv;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceCornerSampledImageFeaturesNV&() const {
     return m_corner_sampled_image_features_nv;
-}
-vk::PhysicalDeviceCoverageReductionModeFeaturesNV& VulkanFeatures::get_coverage_reduction_mode_features_nv() {
-    return m_coverage_reduction_mode_features_nv;
 }
 const vk::PhysicalDeviceCoverageReductionModeFeaturesNV& VulkanFeatures::get_coverage_reduction_mode_features_nv() const {
     return m_coverage_reduction_mode_features_nv;
@@ -3528,17 +3432,11 @@ const vk::PhysicalDeviceCoverageReductionModeFeaturesNV& VulkanFeatures::get_cov
 VulkanFeatures::operator const vk::PhysicalDeviceCoverageReductionModeFeaturesNV&() const {
     return m_coverage_reduction_mode_features_nv;
 }
-vk::PhysicalDeviceCubicClampFeaturesQCOM& VulkanFeatures::get_cubic_clamp_features_qcom() {
-    return m_cubic_clamp_features_qcom;
-}
 const vk::PhysicalDeviceCubicClampFeaturesQCOM& VulkanFeatures::get_cubic_clamp_features_qcom() const {
     return m_cubic_clamp_features_qcom;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceCubicClampFeaturesQCOM&() const {
     return m_cubic_clamp_features_qcom;
-}
-vk::PhysicalDeviceCubicWeightsFeaturesQCOM& VulkanFeatures::get_cubic_weights_features_qcom() {
-    return m_cubic_weights_features_qcom;
 }
 const vk::PhysicalDeviceCubicWeightsFeaturesQCOM& VulkanFeatures::get_cubic_weights_features_qcom() const {
     return m_cubic_weights_features_qcom;
@@ -3546,17 +3444,11 @@ const vk::PhysicalDeviceCubicWeightsFeaturesQCOM& VulkanFeatures::get_cubic_weig
 VulkanFeatures::operator const vk::PhysicalDeviceCubicWeightsFeaturesQCOM&() const {
     return m_cubic_weights_features_qcom;
 }
-vk::PhysicalDeviceCustomBorderColorFeaturesEXT& VulkanFeatures::get_custom_border_color_features_ext() {
-    return m_custom_border_color_features_ext;
-}
 const vk::PhysicalDeviceCustomBorderColorFeaturesEXT& VulkanFeatures::get_custom_border_color_features_ext() const {
     return m_custom_border_color_features_ext;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceCustomBorderColorFeaturesEXT&() const {
     return m_custom_border_color_features_ext;
-}
-vk::PhysicalDeviceCustomResolveFeaturesEXT& VulkanFeatures::get_custom_resolve_features_ext() {
-    return m_custom_resolve_features_ext;
 }
 const vk::PhysicalDeviceCustomResolveFeaturesEXT& VulkanFeatures::get_custom_resolve_features_ext() const {
     return m_custom_resolve_features_ext;
@@ -3564,17 +3456,11 @@ const vk::PhysicalDeviceCustomResolveFeaturesEXT& VulkanFeatures::get_custom_res
 VulkanFeatures::operator const vk::PhysicalDeviceCustomResolveFeaturesEXT&() const {
     return m_custom_resolve_features_ext;
 }
-vk::PhysicalDeviceDataGraphFeaturesARM& VulkanFeatures::get_data_graph_features_arm() {
-    return m_data_graph_features_arm;
-}
 const vk::PhysicalDeviceDataGraphFeaturesARM& VulkanFeatures::get_data_graph_features_arm() const {
     return m_data_graph_features_arm;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceDataGraphFeaturesARM&() const {
     return m_data_graph_features_arm;
-}
-vk::PhysicalDeviceDataGraphModelFeaturesQCOM& VulkanFeatures::get_data_graph_model_features_qcom() {
-    return m_data_graph_model_features_qcom;
 }
 const vk::PhysicalDeviceDataGraphModelFeaturesQCOM& VulkanFeatures::get_data_graph_model_features_qcom() const {
     return m_data_graph_model_features_qcom;
@@ -3582,17 +3468,11 @@ const vk::PhysicalDeviceDataGraphModelFeaturesQCOM& VulkanFeatures::get_data_gra
 VulkanFeatures::operator const vk::PhysicalDeviceDataGraphModelFeaturesQCOM&() const {
     return m_data_graph_model_features_qcom;
 }
-vk::PhysicalDeviceDedicatedAllocationImageAliasingFeaturesNV& VulkanFeatures::get_dedicated_allocation_image_aliasing_features_nv() {
-    return m_dedicated_allocation_image_aliasing_features_nv;
-}
 const vk::PhysicalDeviceDedicatedAllocationImageAliasingFeaturesNV& VulkanFeatures::get_dedicated_allocation_image_aliasing_features_nv() const {
     return m_dedicated_allocation_image_aliasing_features_nv;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceDedicatedAllocationImageAliasingFeaturesNV&() const {
     return m_dedicated_allocation_image_aliasing_features_nv;
-}
-vk::PhysicalDeviceDepthBiasControlFeaturesEXT& VulkanFeatures::get_depth_bias_control_features_ext() {
-    return m_depth_bias_control_features_ext;
 }
 const vk::PhysicalDeviceDepthBiasControlFeaturesEXT& VulkanFeatures::get_depth_bias_control_features_ext() const {
     return m_depth_bias_control_features_ext;
@@ -3600,17 +3480,11 @@ const vk::PhysicalDeviceDepthBiasControlFeaturesEXT& VulkanFeatures::get_depth_b
 VulkanFeatures::operator const vk::PhysicalDeviceDepthBiasControlFeaturesEXT&() const {
     return m_depth_bias_control_features_ext;
 }
-vk::PhysicalDeviceDepthClampControlFeaturesEXT& VulkanFeatures::get_depth_clamp_control_features_ext() {
-    return m_depth_clamp_control_features_ext;
-}
 const vk::PhysicalDeviceDepthClampControlFeaturesEXT& VulkanFeatures::get_depth_clamp_control_features_ext() const {
     return m_depth_clamp_control_features_ext;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceDepthClampControlFeaturesEXT&() const {
     return m_depth_clamp_control_features_ext;
-}
-vk::PhysicalDeviceDepthClampZeroOneFeaturesKHR& VulkanFeatures::get_depth_clamp_zero_one_features_khr() {
-    return m_depth_clamp_zero_one_features_khr;
 }
 const vk::PhysicalDeviceDepthClampZeroOneFeaturesKHR& VulkanFeatures::get_depth_clamp_zero_one_features_khr() const {
     return m_depth_clamp_zero_one_features_khr;
@@ -3618,17 +3492,11 @@ const vk::PhysicalDeviceDepthClampZeroOneFeaturesKHR& VulkanFeatures::get_depth_
 VulkanFeatures::operator const vk::PhysicalDeviceDepthClampZeroOneFeaturesKHR&() const {
     return m_depth_clamp_zero_one_features_khr;
 }
-vk::PhysicalDeviceDepthClipControlFeaturesEXT& VulkanFeatures::get_depth_clip_control_features_ext() {
-    return m_depth_clip_control_features_ext;
-}
 const vk::PhysicalDeviceDepthClipControlFeaturesEXT& VulkanFeatures::get_depth_clip_control_features_ext() const {
     return m_depth_clip_control_features_ext;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceDepthClipControlFeaturesEXT&() const {
     return m_depth_clip_control_features_ext;
-}
-vk::PhysicalDeviceDepthClipEnableFeaturesEXT& VulkanFeatures::get_depth_clip_enable_features_ext() {
-    return m_depth_clip_enable_features_ext;
 }
 const vk::PhysicalDeviceDepthClipEnableFeaturesEXT& VulkanFeatures::get_depth_clip_enable_features_ext() const {
     return m_depth_clip_enable_features_ext;
@@ -3636,17 +3504,11 @@ const vk::PhysicalDeviceDepthClipEnableFeaturesEXT& VulkanFeatures::get_depth_cl
 VulkanFeatures::operator const vk::PhysicalDeviceDepthClipEnableFeaturesEXT&() const {
     return m_depth_clip_enable_features_ext;
 }
-vk::PhysicalDeviceDescriptorBufferFeaturesEXT& VulkanFeatures::get_descriptor_buffer_features_ext() {
-    return m_descriptor_buffer_features_ext;
-}
 const vk::PhysicalDeviceDescriptorBufferFeaturesEXT& VulkanFeatures::get_descriptor_buffer_features_ext() const {
     return m_descriptor_buffer_features_ext;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceDescriptorBufferFeaturesEXT&() const {
     return m_descriptor_buffer_features_ext;
-}
-vk::PhysicalDeviceDescriptorBufferTensorFeaturesARM& VulkanFeatures::get_descriptor_buffer_tensor_features_arm() {
-    return m_descriptor_buffer_tensor_features_arm;
 }
 const vk::PhysicalDeviceDescriptorBufferTensorFeaturesARM& VulkanFeatures::get_descriptor_buffer_tensor_features_arm() const {
     return m_descriptor_buffer_tensor_features_arm;
@@ -3654,17 +3516,11 @@ const vk::PhysicalDeviceDescriptorBufferTensorFeaturesARM& VulkanFeatures::get_d
 VulkanFeatures::operator const vk::PhysicalDeviceDescriptorBufferTensorFeaturesARM&() const {
     return m_descriptor_buffer_tensor_features_arm;
 }
-vk::PhysicalDeviceDescriptorHeapFeaturesEXT& VulkanFeatures::get_descriptor_heap_features_ext() {
-    return m_descriptor_heap_features_ext;
-}
 const vk::PhysicalDeviceDescriptorHeapFeaturesEXT& VulkanFeatures::get_descriptor_heap_features_ext() const {
     return m_descriptor_heap_features_ext;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceDescriptorHeapFeaturesEXT&() const {
     return m_descriptor_heap_features_ext;
-}
-vk::PhysicalDeviceDescriptorIndexingFeatures& VulkanFeatures::get_descriptor_indexing_features() {
-    return m_descriptor_indexing_features;
 }
 const vk::PhysicalDeviceDescriptorIndexingFeatures& VulkanFeatures::get_descriptor_indexing_features() const {
     return m_descriptor_indexing_features;
@@ -3672,17 +3528,11 @@ const vk::PhysicalDeviceDescriptorIndexingFeatures& VulkanFeatures::get_descript
 VulkanFeatures::operator const vk::PhysicalDeviceDescriptorIndexingFeatures&() const {
     return m_descriptor_indexing_features;
 }
-vk::PhysicalDeviceDescriptorPoolOverallocationFeaturesNV& VulkanFeatures::get_descriptor_pool_overallocation_features_nv() {
-    return m_descriptor_pool_overallocation_features_nv;
-}
 const vk::PhysicalDeviceDescriptorPoolOverallocationFeaturesNV& VulkanFeatures::get_descriptor_pool_overallocation_features_nv() const {
     return m_descriptor_pool_overallocation_features_nv;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceDescriptorPoolOverallocationFeaturesNV&() const {
     return m_descriptor_pool_overallocation_features_nv;
-}
-vk::PhysicalDeviceDescriptorSetHostMappingFeaturesVALVE& VulkanFeatures::get_descriptor_set_host_mapping_features_valve() {
-    return m_descriptor_set_host_mapping_features_valve;
 }
 const vk::PhysicalDeviceDescriptorSetHostMappingFeaturesVALVE& VulkanFeatures::get_descriptor_set_host_mapping_features_valve() const {
     return m_descriptor_set_host_mapping_features_valve;
@@ -3690,17 +3540,11 @@ const vk::PhysicalDeviceDescriptorSetHostMappingFeaturesVALVE& VulkanFeatures::g
 VulkanFeatures::operator const vk::PhysicalDeviceDescriptorSetHostMappingFeaturesVALVE&() const {
     return m_descriptor_set_host_mapping_features_valve;
 }
-vk::PhysicalDeviceDeviceGeneratedCommandsComputeFeaturesNV& VulkanFeatures::get_device_generated_commands_compute_features_nv() {
-    return m_device_generated_commands_compute_features_nv;
-}
 const vk::PhysicalDeviceDeviceGeneratedCommandsComputeFeaturesNV& VulkanFeatures::get_device_generated_commands_compute_features_nv() const {
     return m_device_generated_commands_compute_features_nv;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceDeviceGeneratedCommandsComputeFeaturesNV&() const {
     return m_device_generated_commands_compute_features_nv;
-}
-vk::PhysicalDeviceDeviceGeneratedCommandsFeaturesEXT& VulkanFeatures::get_device_generated_commands_features_ext() {
-    return m_device_generated_commands_features_ext;
 }
 const vk::PhysicalDeviceDeviceGeneratedCommandsFeaturesEXT& VulkanFeatures::get_device_generated_commands_features_ext() const {
     return m_device_generated_commands_features_ext;
@@ -3708,17 +3552,11 @@ const vk::PhysicalDeviceDeviceGeneratedCommandsFeaturesEXT& VulkanFeatures::get_
 VulkanFeatures::operator const vk::PhysicalDeviceDeviceGeneratedCommandsFeaturesEXT&() const {
     return m_device_generated_commands_features_ext;
 }
-vk::PhysicalDeviceDeviceGeneratedCommandsFeaturesNV& VulkanFeatures::get_device_generated_commands_features_nv() {
-    return m_device_generated_commands_features_nv;
-}
 const vk::PhysicalDeviceDeviceGeneratedCommandsFeaturesNV& VulkanFeatures::get_device_generated_commands_features_nv() const {
     return m_device_generated_commands_features_nv;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceDeviceGeneratedCommandsFeaturesNV&() const {
     return m_device_generated_commands_features_nv;
-}
-vk::PhysicalDeviceDeviceMemoryReportFeaturesEXT& VulkanFeatures::get_device_memory_report_features_ext() {
-    return m_device_memory_report_features_ext;
 }
 const vk::PhysicalDeviceDeviceMemoryReportFeaturesEXT& VulkanFeatures::get_device_memory_report_features_ext() const {
     return m_device_memory_report_features_ext;
@@ -3726,17 +3564,11 @@ const vk::PhysicalDeviceDeviceMemoryReportFeaturesEXT& VulkanFeatures::get_devic
 VulkanFeatures::operator const vk::PhysicalDeviceDeviceMemoryReportFeaturesEXT&() const {
     return m_device_memory_report_features_ext;
 }
-vk::PhysicalDeviceDiagnosticsConfigFeaturesNV& VulkanFeatures::get_diagnostics_config_features_nv() {
-    return m_diagnostics_config_features_nv;
-}
 const vk::PhysicalDeviceDiagnosticsConfigFeaturesNV& VulkanFeatures::get_diagnostics_config_features_nv() const {
     return m_diagnostics_config_features_nv;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceDiagnosticsConfigFeaturesNV&() const {
     return m_diagnostics_config_features_nv;
-}
-vk::PhysicalDeviceDynamicRenderingFeatures& VulkanFeatures::get_dynamic_rendering_features() {
-    return m_dynamic_rendering_features;
 }
 const vk::PhysicalDeviceDynamicRenderingFeatures& VulkanFeatures::get_dynamic_rendering_features() const {
     return m_dynamic_rendering_features;
@@ -3744,17 +3576,11 @@ const vk::PhysicalDeviceDynamicRenderingFeatures& VulkanFeatures::get_dynamic_re
 VulkanFeatures::operator const vk::PhysicalDeviceDynamicRenderingFeatures&() const {
     return m_dynamic_rendering_features;
 }
-vk::PhysicalDeviceDynamicRenderingLocalReadFeatures& VulkanFeatures::get_dynamic_rendering_local_read_features() {
-    return m_dynamic_rendering_local_read_features;
-}
 const vk::PhysicalDeviceDynamicRenderingLocalReadFeatures& VulkanFeatures::get_dynamic_rendering_local_read_features() const {
     return m_dynamic_rendering_local_read_features;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceDynamicRenderingLocalReadFeatures&() const {
     return m_dynamic_rendering_local_read_features;
-}
-vk::PhysicalDeviceDynamicRenderingUnusedAttachmentsFeaturesEXT& VulkanFeatures::get_dynamic_rendering_unused_attachments_features_ext() {
-    return m_dynamic_rendering_unused_attachments_features_ext;
 }
 const vk::PhysicalDeviceDynamicRenderingUnusedAttachmentsFeaturesEXT& VulkanFeatures::get_dynamic_rendering_unused_attachments_features_ext() const {
     return m_dynamic_rendering_unused_attachments_features_ext;
@@ -3762,17 +3588,11 @@ const vk::PhysicalDeviceDynamicRenderingUnusedAttachmentsFeaturesEXT& VulkanFeat
 VulkanFeatures::operator const vk::PhysicalDeviceDynamicRenderingUnusedAttachmentsFeaturesEXT&() const {
     return m_dynamic_rendering_unused_attachments_features_ext;
 }
-vk::PhysicalDeviceExclusiveScissorFeaturesNV& VulkanFeatures::get_exclusive_scissor_features_nv() {
-    return m_exclusive_scissor_features_nv;
-}
 const vk::PhysicalDeviceExclusiveScissorFeaturesNV& VulkanFeatures::get_exclusive_scissor_features_nv() const {
     return m_exclusive_scissor_features_nv;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceExclusiveScissorFeaturesNV&() const {
     return m_exclusive_scissor_features_nv;
-}
-vk::PhysicalDeviceExtendedDynamicState2FeaturesEXT& VulkanFeatures::get_extended_dynamic_state2_features_ext() {
-    return m_extended_dynamic_state2_features_ext;
 }
 const vk::PhysicalDeviceExtendedDynamicState2FeaturesEXT& VulkanFeatures::get_extended_dynamic_state2_features_ext() const {
     return m_extended_dynamic_state2_features_ext;
@@ -3780,17 +3600,11 @@ const vk::PhysicalDeviceExtendedDynamicState2FeaturesEXT& VulkanFeatures::get_ex
 VulkanFeatures::operator const vk::PhysicalDeviceExtendedDynamicState2FeaturesEXT&() const {
     return m_extended_dynamic_state2_features_ext;
 }
-vk::PhysicalDeviceExtendedDynamicState3FeaturesEXT& VulkanFeatures::get_extended_dynamic_state3_features_ext() {
-    return m_extended_dynamic_state3_features_ext;
-}
 const vk::PhysicalDeviceExtendedDynamicState3FeaturesEXT& VulkanFeatures::get_extended_dynamic_state3_features_ext() const {
     return m_extended_dynamic_state3_features_ext;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceExtendedDynamicState3FeaturesEXT&() const {
     return m_extended_dynamic_state3_features_ext;
-}
-vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT& VulkanFeatures::get_extended_dynamic_state_features_ext() {
-    return m_extended_dynamic_state_features_ext;
 }
 const vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT& VulkanFeatures::get_extended_dynamic_state_features_ext() const {
     return m_extended_dynamic_state_features_ext;
@@ -3798,17 +3612,11 @@ const vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT& VulkanFeatures::get_ext
 VulkanFeatures::operator const vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT&() const {
     return m_extended_dynamic_state_features_ext;
 }
-vk::PhysicalDeviceExtendedSparseAddressSpaceFeaturesNV& VulkanFeatures::get_extended_sparse_address_space_features_nv() {
-    return m_extended_sparse_address_space_features_nv;
-}
 const vk::PhysicalDeviceExtendedSparseAddressSpaceFeaturesNV& VulkanFeatures::get_extended_sparse_address_space_features_nv() const {
     return m_extended_sparse_address_space_features_nv;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceExtendedSparseAddressSpaceFeaturesNV&() const {
     return m_extended_sparse_address_space_features_nv;
-}
-vk::PhysicalDeviceExternalMemoryRDMAFeaturesNV& VulkanFeatures::get_external_memory_rdma_features_nv() {
-    return m_external_memory_rdma_features_nv;
 }
 const vk::PhysicalDeviceExternalMemoryRDMAFeaturesNV& VulkanFeatures::get_external_memory_rdma_features_nv() const {
     return m_external_memory_rdma_features_nv;
@@ -3816,17 +3624,11 @@ const vk::PhysicalDeviceExternalMemoryRDMAFeaturesNV& VulkanFeatures::get_extern
 VulkanFeatures::operator const vk::PhysicalDeviceExternalMemoryRDMAFeaturesNV&() const {
     return m_external_memory_rdma_features_nv;
 }
-vk::PhysicalDeviceFaultFeaturesEXT& VulkanFeatures::get_fault_features_ext() {
-    return m_fault_features_ext;
-}
 const vk::PhysicalDeviceFaultFeaturesEXT& VulkanFeatures::get_fault_features_ext() const {
     return m_fault_features_ext;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceFaultFeaturesEXT&() const {
     return m_fault_features_ext;
-}
-vk::PhysicalDeviceFeatures2& VulkanFeatures::get_features2() {
-    return m_features2;
 }
 const vk::PhysicalDeviceFeatures2& VulkanFeatures::get_features2() const {
     return m_features2;
@@ -3834,17 +3636,11 @@ const vk::PhysicalDeviceFeatures2& VulkanFeatures::get_features2() const {
 VulkanFeatures::operator const vk::PhysicalDeviceFeatures2&() const {
     return m_features2;
 }
-vk::PhysicalDeviceFormatPackFeaturesARM& VulkanFeatures::get_format_pack_features_arm() {
-    return m_format_pack_features_arm;
-}
 const vk::PhysicalDeviceFormatPackFeaturesARM& VulkanFeatures::get_format_pack_features_arm() const {
     return m_format_pack_features_arm;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceFormatPackFeaturesARM&() const {
     return m_format_pack_features_arm;
-}
-vk::PhysicalDeviceFragmentDensityMap2FeaturesEXT& VulkanFeatures::get_fragment_density_map2_features_ext() {
-    return m_fragment_density_map2_features_ext;
 }
 const vk::PhysicalDeviceFragmentDensityMap2FeaturesEXT& VulkanFeatures::get_fragment_density_map2_features_ext() const {
     return m_fragment_density_map2_features_ext;
@@ -3852,17 +3648,11 @@ const vk::PhysicalDeviceFragmentDensityMap2FeaturesEXT& VulkanFeatures::get_frag
 VulkanFeatures::operator const vk::PhysicalDeviceFragmentDensityMap2FeaturesEXT&() const {
     return m_fragment_density_map2_features_ext;
 }
-vk::PhysicalDeviceFragmentDensityMapFeaturesEXT& VulkanFeatures::get_fragment_density_map_features_ext() {
-    return m_fragment_density_map_features_ext;
-}
 const vk::PhysicalDeviceFragmentDensityMapFeaturesEXT& VulkanFeatures::get_fragment_density_map_features_ext() const {
     return m_fragment_density_map_features_ext;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceFragmentDensityMapFeaturesEXT&() const {
     return m_fragment_density_map_features_ext;
-}
-vk::PhysicalDeviceFragmentDensityMapLayeredFeaturesVALVE& VulkanFeatures::get_fragment_density_map_layered_features_valve() {
-    return m_fragment_density_map_layered_features_valve;
 }
 const vk::PhysicalDeviceFragmentDensityMapLayeredFeaturesVALVE& VulkanFeatures::get_fragment_density_map_layered_features_valve() const {
     return m_fragment_density_map_layered_features_valve;
@@ -3870,17 +3660,11 @@ const vk::PhysicalDeviceFragmentDensityMapLayeredFeaturesVALVE& VulkanFeatures::
 VulkanFeatures::operator const vk::PhysicalDeviceFragmentDensityMapLayeredFeaturesVALVE&() const {
     return m_fragment_density_map_layered_features_valve;
 }
-vk::PhysicalDeviceFragmentDensityMapOffsetFeaturesEXT& VulkanFeatures::get_fragment_density_map_offset_features_ext() {
-    return m_fragment_density_map_offset_features_ext;
-}
 const vk::PhysicalDeviceFragmentDensityMapOffsetFeaturesEXT& VulkanFeatures::get_fragment_density_map_offset_features_ext() const {
     return m_fragment_density_map_offset_features_ext;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceFragmentDensityMapOffsetFeaturesEXT&() const {
     return m_fragment_density_map_offset_features_ext;
-}
-vk::PhysicalDeviceFragmentShaderBarycentricFeaturesKHR& VulkanFeatures::get_fragment_shader_barycentric_features_khr() {
-    return m_fragment_shader_barycentric_features_khr;
 }
 const vk::PhysicalDeviceFragmentShaderBarycentricFeaturesKHR& VulkanFeatures::get_fragment_shader_barycentric_features_khr() const {
     return m_fragment_shader_barycentric_features_khr;
@@ -3888,17 +3672,11 @@ const vk::PhysicalDeviceFragmentShaderBarycentricFeaturesKHR& VulkanFeatures::ge
 VulkanFeatures::operator const vk::PhysicalDeviceFragmentShaderBarycentricFeaturesKHR&() const {
     return m_fragment_shader_barycentric_features_khr;
 }
-vk::PhysicalDeviceFragmentShaderInterlockFeaturesEXT& VulkanFeatures::get_fragment_shader_interlock_features_ext() {
-    return m_fragment_shader_interlock_features_ext;
-}
 const vk::PhysicalDeviceFragmentShaderInterlockFeaturesEXT& VulkanFeatures::get_fragment_shader_interlock_features_ext() const {
     return m_fragment_shader_interlock_features_ext;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceFragmentShaderInterlockFeaturesEXT&() const {
     return m_fragment_shader_interlock_features_ext;
-}
-vk::PhysicalDeviceFragmentShadingRateEnumsFeaturesNV& VulkanFeatures::get_fragment_shading_rate_enums_features_nv() {
-    return m_fragment_shading_rate_enums_features_nv;
 }
 const vk::PhysicalDeviceFragmentShadingRateEnumsFeaturesNV& VulkanFeatures::get_fragment_shading_rate_enums_features_nv() const {
     return m_fragment_shading_rate_enums_features_nv;
@@ -3906,17 +3684,11 @@ const vk::PhysicalDeviceFragmentShadingRateEnumsFeaturesNV& VulkanFeatures::get_
 VulkanFeatures::operator const vk::PhysicalDeviceFragmentShadingRateEnumsFeaturesNV&() const {
     return m_fragment_shading_rate_enums_features_nv;
 }
-vk::PhysicalDeviceFragmentShadingRateFeaturesKHR& VulkanFeatures::get_fragment_shading_rate_features_khr() {
-    return m_fragment_shading_rate_features_khr;
-}
 const vk::PhysicalDeviceFragmentShadingRateFeaturesKHR& VulkanFeatures::get_fragment_shading_rate_features_khr() const {
     return m_fragment_shading_rate_features_khr;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceFragmentShadingRateFeaturesKHR&() const {
     return m_fragment_shading_rate_features_khr;
-}
-vk::PhysicalDeviceFrameBoundaryFeaturesEXT& VulkanFeatures::get_frame_boundary_features_ext() {
-    return m_frame_boundary_features_ext;
 }
 const vk::PhysicalDeviceFrameBoundaryFeaturesEXT& VulkanFeatures::get_frame_boundary_features_ext() const {
     return m_frame_boundary_features_ext;
@@ -3924,17 +3696,11 @@ const vk::PhysicalDeviceFrameBoundaryFeaturesEXT& VulkanFeatures::get_frame_boun
 VulkanFeatures::operator const vk::PhysicalDeviceFrameBoundaryFeaturesEXT&() const {
     return m_frame_boundary_features_ext;
 }
-vk::PhysicalDeviceGlobalPriorityQueryFeatures& VulkanFeatures::get_global_priority_query_features() {
-    return m_global_priority_query_features;
-}
 const vk::PhysicalDeviceGlobalPriorityQueryFeatures& VulkanFeatures::get_global_priority_query_features() const {
     return m_global_priority_query_features;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceGlobalPriorityQueryFeatures&() const {
     return m_global_priority_query_features;
-}
-vk::PhysicalDeviceGraphicsPipelineLibraryFeaturesEXT& VulkanFeatures::get_graphics_pipeline_library_features_ext() {
-    return m_graphics_pipeline_library_features_ext;
 }
 const vk::PhysicalDeviceGraphicsPipelineLibraryFeaturesEXT& VulkanFeatures::get_graphics_pipeline_library_features_ext() const {
     return m_graphics_pipeline_library_features_ext;
@@ -3942,17 +3708,11 @@ const vk::PhysicalDeviceGraphicsPipelineLibraryFeaturesEXT& VulkanFeatures::get_
 VulkanFeatures::operator const vk::PhysicalDeviceGraphicsPipelineLibraryFeaturesEXT&() const {
     return m_graphics_pipeline_library_features_ext;
 }
-vk::PhysicalDeviceHdrVividFeaturesHUAWEI& VulkanFeatures::get_hdr_vivid_features_huawei() {
-    return m_hdr_vivid_features_huawei;
-}
 const vk::PhysicalDeviceHdrVividFeaturesHUAWEI& VulkanFeatures::get_hdr_vivid_features_huawei() const {
     return m_hdr_vivid_features_huawei;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceHdrVividFeaturesHUAWEI&() const {
     return m_hdr_vivid_features_huawei;
-}
-vk::PhysicalDeviceHostImageCopyFeatures& VulkanFeatures::get_host_image_copy_features() {
-    return m_host_image_copy_features;
 }
 const vk::PhysicalDeviceHostImageCopyFeatures& VulkanFeatures::get_host_image_copy_features() const {
     return m_host_image_copy_features;
@@ -3960,17 +3720,11 @@ const vk::PhysicalDeviceHostImageCopyFeatures& VulkanFeatures::get_host_image_co
 VulkanFeatures::operator const vk::PhysicalDeviceHostImageCopyFeatures&() const {
     return m_host_image_copy_features;
 }
-vk::PhysicalDeviceHostQueryResetFeatures& VulkanFeatures::get_host_query_reset_features() {
-    return m_host_query_reset_features;
-}
 const vk::PhysicalDeviceHostQueryResetFeatures& VulkanFeatures::get_host_query_reset_features() const {
     return m_host_query_reset_features;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceHostQueryResetFeatures&() const {
     return m_host_query_reset_features;
-}
-vk::PhysicalDeviceImage2DViewOf3DFeaturesEXT& VulkanFeatures::get_image2_d_view_of3_d_features_ext() {
-    return m_image2_d_view_of3_d_features_ext;
 }
 const vk::PhysicalDeviceImage2DViewOf3DFeaturesEXT& VulkanFeatures::get_image2_d_view_of3_d_features_ext() const {
     return m_image2_d_view_of3_d_features_ext;
@@ -3978,17 +3732,11 @@ const vk::PhysicalDeviceImage2DViewOf3DFeaturesEXT& VulkanFeatures::get_image2_d
 VulkanFeatures::operator const vk::PhysicalDeviceImage2DViewOf3DFeaturesEXT&() const {
     return m_image2_d_view_of3_d_features_ext;
 }
-vk::PhysicalDeviceImageAlignmentControlFeaturesMESA& VulkanFeatures::get_image_alignment_control_features_mesa() {
-    return m_image_alignment_control_features_mesa;
-}
 const vk::PhysicalDeviceImageAlignmentControlFeaturesMESA& VulkanFeatures::get_image_alignment_control_features_mesa() const {
     return m_image_alignment_control_features_mesa;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceImageAlignmentControlFeaturesMESA&() const {
     return m_image_alignment_control_features_mesa;
-}
-vk::PhysicalDeviceImageCompressionControlFeaturesEXT& VulkanFeatures::get_image_compression_control_features_ext() {
-    return m_image_compression_control_features_ext;
 }
 const vk::PhysicalDeviceImageCompressionControlFeaturesEXT& VulkanFeatures::get_image_compression_control_features_ext() const {
     return m_image_compression_control_features_ext;
@@ -3996,17 +3744,11 @@ const vk::PhysicalDeviceImageCompressionControlFeaturesEXT& VulkanFeatures::get_
 VulkanFeatures::operator const vk::PhysicalDeviceImageCompressionControlFeaturesEXT&() const {
     return m_image_compression_control_features_ext;
 }
-vk::PhysicalDeviceImageCompressionControlSwapchainFeaturesEXT& VulkanFeatures::get_image_compression_control_swapchain_features_ext() {
-    return m_image_compression_control_swapchain_features_ext;
-}
 const vk::PhysicalDeviceImageCompressionControlSwapchainFeaturesEXT& VulkanFeatures::get_image_compression_control_swapchain_features_ext() const {
     return m_image_compression_control_swapchain_features_ext;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceImageCompressionControlSwapchainFeaturesEXT&() const {
     return m_image_compression_control_swapchain_features_ext;
-}
-vk::PhysicalDeviceImageProcessing2FeaturesQCOM& VulkanFeatures::get_image_processing2_features_qcom() {
-    return m_image_processing2_features_qcom;
 }
 const vk::PhysicalDeviceImageProcessing2FeaturesQCOM& VulkanFeatures::get_image_processing2_features_qcom() const {
     return m_image_processing2_features_qcom;
@@ -4014,17 +3756,11 @@ const vk::PhysicalDeviceImageProcessing2FeaturesQCOM& VulkanFeatures::get_image_
 VulkanFeatures::operator const vk::PhysicalDeviceImageProcessing2FeaturesQCOM&() const {
     return m_image_processing2_features_qcom;
 }
-vk::PhysicalDeviceImageProcessingFeaturesQCOM& VulkanFeatures::get_image_processing_features_qcom() {
-    return m_image_processing_features_qcom;
-}
 const vk::PhysicalDeviceImageProcessingFeaturesQCOM& VulkanFeatures::get_image_processing_features_qcom() const {
     return m_image_processing_features_qcom;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceImageProcessingFeaturesQCOM&() const {
     return m_image_processing_features_qcom;
-}
-vk::PhysicalDeviceImageRobustnessFeatures& VulkanFeatures::get_image_robustness_features() {
-    return m_image_robustness_features;
 }
 const vk::PhysicalDeviceImageRobustnessFeatures& VulkanFeatures::get_image_robustness_features() const {
     return m_image_robustness_features;
@@ -4032,17 +3768,11 @@ const vk::PhysicalDeviceImageRobustnessFeatures& VulkanFeatures::get_image_robus
 VulkanFeatures::operator const vk::PhysicalDeviceImageRobustnessFeatures&() const {
     return m_image_robustness_features;
 }
-vk::PhysicalDeviceImageSlicedViewOf3DFeaturesEXT& VulkanFeatures::get_image_sliced_view_of3_d_features_ext() {
-    return m_image_sliced_view_of3_d_features_ext;
-}
 const vk::PhysicalDeviceImageSlicedViewOf3DFeaturesEXT& VulkanFeatures::get_image_sliced_view_of3_d_features_ext() const {
     return m_image_sliced_view_of3_d_features_ext;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceImageSlicedViewOf3DFeaturesEXT&() const {
     return m_image_sliced_view_of3_d_features_ext;
-}
-vk::PhysicalDeviceImageViewMinLodFeaturesEXT& VulkanFeatures::get_image_view_min_lod_features_ext() {
-    return m_image_view_min_lod_features_ext;
 }
 const vk::PhysicalDeviceImageViewMinLodFeaturesEXT& VulkanFeatures::get_image_view_min_lod_features_ext() const {
     return m_image_view_min_lod_features_ext;
@@ -4050,17 +3780,11 @@ const vk::PhysicalDeviceImageViewMinLodFeaturesEXT& VulkanFeatures::get_image_vi
 VulkanFeatures::operator const vk::PhysicalDeviceImageViewMinLodFeaturesEXT&() const {
     return m_image_view_min_lod_features_ext;
 }
-vk::PhysicalDeviceImagelessFramebufferFeatures& VulkanFeatures::get_imageless_framebuffer_features() {
-    return m_imageless_framebuffer_features;
-}
 const vk::PhysicalDeviceImagelessFramebufferFeatures& VulkanFeatures::get_imageless_framebuffer_features() const {
     return m_imageless_framebuffer_features;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceImagelessFramebufferFeatures&() const {
     return m_imageless_framebuffer_features;
-}
-vk::PhysicalDeviceIndexTypeUint8Features& VulkanFeatures::get_index_type_uint8_features() {
-    return m_index_type_uint8_features;
 }
 const vk::PhysicalDeviceIndexTypeUint8Features& VulkanFeatures::get_index_type_uint8_features() const {
     return m_index_type_uint8_features;
@@ -4068,17 +3792,11 @@ const vk::PhysicalDeviceIndexTypeUint8Features& VulkanFeatures::get_index_type_u
 VulkanFeatures::operator const vk::PhysicalDeviceIndexTypeUint8Features&() const {
     return m_index_type_uint8_features;
 }
-vk::PhysicalDeviceInheritedViewportScissorFeaturesNV& VulkanFeatures::get_inherited_viewport_scissor_features_nv() {
-    return m_inherited_viewport_scissor_features_nv;
-}
 const vk::PhysicalDeviceInheritedViewportScissorFeaturesNV& VulkanFeatures::get_inherited_viewport_scissor_features_nv() const {
     return m_inherited_viewport_scissor_features_nv;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceInheritedViewportScissorFeaturesNV&() const {
     return m_inherited_viewport_scissor_features_nv;
-}
-vk::PhysicalDeviceInlineUniformBlockFeatures& VulkanFeatures::get_inline_uniform_block_features() {
-    return m_inline_uniform_block_features;
 }
 const vk::PhysicalDeviceInlineUniformBlockFeatures& VulkanFeatures::get_inline_uniform_block_features() const {
     return m_inline_uniform_block_features;
@@ -4086,17 +3804,11 @@ const vk::PhysicalDeviceInlineUniformBlockFeatures& VulkanFeatures::get_inline_u
 VulkanFeatures::operator const vk::PhysicalDeviceInlineUniformBlockFeatures&() const {
     return m_inline_uniform_block_features;
 }
-vk::PhysicalDeviceInternallySynchronizedQueuesFeaturesKHR& VulkanFeatures::get_internally_synchronized_queues_features_khr() {
-    return m_internally_synchronized_queues_features_khr;
-}
 const vk::PhysicalDeviceInternallySynchronizedQueuesFeaturesKHR& VulkanFeatures::get_internally_synchronized_queues_features_khr() const {
     return m_internally_synchronized_queues_features_khr;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceInternallySynchronizedQueuesFeaturesKHR&() const {
     return m_internally_synchronized_queues_features_khr;
-}
-vk::PhysicalDeviceInvocationMaskFeaturesHUAWEI& VulkanFeatures::get_invocation_mask_features_huawei() {
-    return m_invocation_mask_features_huawei;
 }
 const vk::PhysicalDeviceInvocationMaskFeaturesHUAWEI& VulkanFeatures::get_invocation_mask_features_huawei() const {
     return m_invocation_mask_features_huawei;
@@ -4104,17 +3816,11 @@ const vk::PhysicalDeviceInvocationMaskFeaturesHUAWEI& VulkanFeatures::get_invoca
 VulkanFeatures::operator const vk::PhysicalDeviceInvocationMaskFeaturesHUAWEI&() const {
     return m_invocation_mask_features_huawei;
 }
-vk::PhysicalDeviceLegacyDitheringFeaturesEXT& VulkanFeatures::get_legacy_dithering_features_ext() {
-    return m_legacy_dithering_features_ext;
-}
 const vk::PhysicalDeviceLegacyDitheringFeaturesEXT& VulkanFeatures::get_legacy_dithering_features_ext() const {
     return m_legacy_dithering_features_ext;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceLegacyDitheringFeaturesEXT&() const {
     return m_legacy_dithering_features_ext;
-}
-vk::PhysicalDeviceLegacyVertexAttributesFeaturesEXT& VulkanFeatures::get_legacy_vertex_attributes_features_ext() {
-    return m_legacy_vertex_attributes_features_ext;
 }
 const vk::PhysicalDeviceLegacyVertexAttributesFeaturesEXT& VulkanFeatures::get_legacy_vertex_attributes_features_ext() const {
     return m_legacy_vertex_attributes_features_ext;
@@ -4122,17 +3828,11 @@ const vk::PhysicalDeviceLegacyVertexAttributesFeaturesEXT& VulkanFeatures::get_l
 VulkanFeatures::operator const vk::PhysicalDeviceLegacyVertexAttributesFeaturesEXT&() const {
     return m_legacy_vertex_attributes_features_ext;
 }
-vk::PhysicalDeviceLineRasterizationFeatures& VulkanFeatures::get_line_rasterization_features() {
-    return m_line_rasterization_features;
-}
 const vk::PhysicalDeviceLineRasterizationFeatures& VulkanFeatures::get_line_rasterization_features() const {
     return m_line_rasterization_features;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceLineRasterizationFeatures&() const {
     return m_line_rasterization_features;
-}
-vk::PhysicalDeviceLinearColorAttachmentFeaturesNV& VulkanFeatures::get_linear_color_attachment_features_nv() {
-    return m_linear_color_attachment_features_nv;
 }
 const vk::PhysicalDeviceLinearColorAttachmentFeaturesNV& VulkanFeatures::get_linear_color_attachment_features_nv() const {
     return m_linear_color_attachment_features_nv;
@@ -4140,17 +3840,11 @@ const vk::PhysicalDeviceLinearColorAttachmentFeaturesNV& VulkanFeatures::get_lin
 VulkanFeatures::operator const vk::PhysicalDeviceLinearColorAttachmentFeaturesNV&() const {
     return m_linear_color_attachment_features_nv;
 }
-vk::PhysicalDeviceMaintenance10FeaturesKHR& VulkanFeatures::get_maintenance10_features_khr() {
-    return m_maintenance10_features_khr;
-}
 const vk::PhysicalDeviceMaintenance10FeaturesKHR& VulkanFeatures::get_maintenance10_features_khr() const {
     return m_maintenance10_features_khr;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceMaintenance10FeaturesKHR&() const {
     return m_maintenance10_features_khr;
-}
-vk::PhysicalDeviceMaintenance4Features& VulkanFeatures::get_maintenance4_features() {
-    return m_maintenance4_features;
 }
 const vk::PhysicalDeviceMaintenance4Features& VulkanFeatures::get_maintenance4_features() const {
     return m_maintenance4_features;
@@ -4158,17 +3852,11 @@ const vk::PhysicalDeviceMaintenance4Features& VulkanFeatures::get_maintenance4_f
 VulkanFeatures::operator const vk::PhysicalDeviceMaintenance4Features&() const {
     return m_maintenance4_features;
 }
-vk::PhysicalDeviceMaintenance5Features& VulkanFeatures::get_maintenance5_features() {
-    return m_maintenance5_features;
-}
 const vk::PhysicalDeviceMaintenance5Features& VulkanFeatures::get_maintenance5_features() const {
     return m_maintenance5_features;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceMaintenance5Features&() const {
     return m_maintenance5_features;
-}
-vk::PhysicalDeviceMaintenance6Features& VulkanFeatures::get_maintenance6_features() {
-    return m_maintenance6_features;
 }
 const vk::PhysicalDeviceMaintenance6Features& VulkanFeatures::get_maintenance6_features() const {
     return m_maintenance6_features;
@@ -4176,17 +3864,11 @@ const vk::PhysicalDeviceMaintenance6Features& VulkanFeatures::get_maintenance6_f
 VulkanFeatures::operator const vk::PhysicalDeviceMaintenance6Features&() const {
     return m_maintenance6_features;
 }
-vk::PhysicalDeviceMaintenance7FeaturesKHR& VulkanFeatures::get_maintenance7_features_khr() {
-    return m_maintenance7_features_khr;
-}
 const vk::PhysicalDeviceMaintenance7FeaturesKHR& VulkanFeatures::get_maintenance7_features_khr() const {
     return m_maintenance7_features_khr;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceMaintenance7FeaturesKHR&() const {
     return m_maintenance7_features_khr;
-}
-vk::PhysicalDeviceMaintenance8FeaturesKHR& VulkanFeatures::get_maintenance8_features_khr() {
-    return m_maintenance8_features_khr;
 }
 const vk::PhysicalDeviceMaintenance8FeaturesKHR& VulkanFeatures::get_maintenance8_features_khr() const {
     return m_maintenance8_features_khr;
@@ -4194,17 +3876,11 @@ const vk::PhysicalDeviceMaintenance8FeaturesKHR& VulkanFeatures::get_maintenance
 VulkanFeatures::operator const vk::PhysicalDeviceMaintenance8FeaturesKHR&() const {
     return m_maintenance8_features_khr;
 }
-vk::PhysicalDeviceMaintenance9FeaturesKHR& VulkanFeatures::get_maintenance9_features_khr() {
-    return m_maintenance9_features_khr;
-}
 const vk::PhysicalDeviceMaintenance9FeaturesKHR& VulkanFeatures::get_maintenance9_features_khr() const {
     return m_maintenance9_features_khr;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceMaintenance9FeaturesKHR&() const {
     return m_maintenance9_features_khr;
-}
-vk::PhysicalDeviceMapMemoryPlacedFeaturesEXT& VulkanFeatures::get_map_memory_placed_features_ext() {
-    return m_map_memory_placed_features_ext;
 }
 const vk::PhysicalDeviceMapMemoryPlacedFeaturesEXT& VulkanFeatures::get_map_memory_placed_features_ext() const {
     return m_map_memory_placed_features_ext;
@@ -4212,17 +3888,11 @@ const vk::PhysicalDeviceMapMemoryPlacedFeaturesEXT& VulkanFeatures::get_map_memo
 VulkanFeatures::operator const vk::PhysicalDeviceMapMemoryPlacedFeaturesEXT&() const {
     return m_map_memory_placed_features_ext;
 }
-vk::PhysicalDeviceMemoryDecompressionFeaturesEXT& VulkanFeatures::get_memory_decompression_features_ext() {
-    return m_memory_decompression_features_ext;
-}
 const vk::PhysicalDeviceMemoryDecompressionFeaturesEXT& VulkanFeatures::get_memory_decompression_features_ext() const {
     return m_memory_decompression_features_ext;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceMemoryDecompressionFeaturesEXT&() const {
     return m_memory_decompression_features_ext;
-}
-vk::PhysicalDeviceMemoryPriorityFeaturesEXT& VulkanFeatures::get_memory_priority_features_ext() {
-    return m_memory_priority_features_ext;
 }
 const vk::PhysicalDeviceMemoryPriorityFeaturesEXT& VulkanFeatures::get_memory_priority_features_ext() const {
     return m_memory_priority_features_ext;
@@ -4230,17 +3900,11 @@ const vk::PhysicalDeviceMemoryPriorityFeaturesEXT& VulkanFeatures::get_memory_pr
 VulkanFeatures::operator const vk::PhysicalDeviceMemoryPriorityFeaturesEXT&() const {
     return m_memory_priority_features_ext;
 }
-vk::PhysicalDeviceMeshShaderFeaturesEXT& VulkanFeatures::get_mesh_shader_features_ext() {
-    return m_mesh_shader_features_ext;
-}
 const vk::PhysicalDeviceMeshShaderFeaturesEXT& VulkanFeatures::get_mesh_shader_features_ext() const {
     return m_mesh_shader_features_ext;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceMeshShaderFeaturesEXT&() const {
     return m_mesh_shader_features_ext;
-}
-vk::PhysicalDeviceMeshShaderFeaturesNV& VulkanFeatures::get_mesh_shader_features_nv() {
-    return m_mesh_shader_features_nv;
 }
 const vk::PhysicalDeviceMeshShaderFeaturesNV& VulkanFeatures::get_mesh_shader_features_nv() const {
     return m_mesh_shader_features_nv;
@@ -4248,17 +3912,11 @@ const vk::PhysicalDeviceMeshShaderFeaturesNV& VulkanFeatures::get_mesh_shader_fe
 VulkanFeatures::operator const vk::PhysicalDeviceMeshShaderFeaturesNV&() const {
     return m_mesh_shader_features_nv;
 }
-vk::PhysicalDeviceMultiDrawFeaturesEXT& VulkanFeatures::get_multi_draw_features_ext() {
-    return m_multi_draw_features_ext;
-}
 const vk::PhysicalDeviceMultiDrawFeaturesEXT& VulkanFeatures::get_multi_draw_features_ext() const {
     return m_multi_draw_features_ext;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceMultiDrawFeaturesEXT&() const {
     return m_multi_draw_features_ext;
-}
-vk::PhysicalDeviceMultisampledRenderToSingleSampledFeaturesEXT& VulkanFeatures::get_multisampled_render_to_single_sampled_features_ext() {
-    return m_multisampled_render_to_single_sampled_features_ext;
 }
 const vk::PhysicalDeviceMultisampledRenderToSingleSampledFeaturesEXT& VulkanFeatures::get_multisampled_render_to_single_sampled_features_ext() const {
     return m_multisampled_render_to_single_sampled_features_ext;
@@ -4266,17 +3924,11 @@ const vk::PhysicalDeviceMultisampledRenderToSingleSampledFeaturesEXT& VulkanFeat
 VulkanFeatures::operator const vk::PhysicalDeviceMultisampledRenderToSingleSampledFeaturesEXT&() const {
     return m_multisampled_render_to_single_sampled_features_ext;
 }
-vk::PhysicalDeviceMultiviewFeatures& VulkanFeatures::get_multiview_features() {
-    return m_multiview_features;
-}
 const vk::PhysicalDeviceMultiviewFeatures& VulkanFeatures::get_multiview_features() const {
     return m_multiview_features;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceMultiviewFeatures&() const {
     return m_multiview_features;
-}
-vk::PhysicalDeviceMultiviewPerViewRenderAreasFeaturesQCOM& VulkanFeatures::get_multiview_per_view_render_areas_features_qcom() {
-    return m_multiview_per_view_render_areas_features_qcom;
 }
 const vk::PhysicalDeviceMultiviewPerViewRenderAreasFeaturesQCOM& VulkanFeatures::get_multiview_per_view_render_areas_features_qcom() const {
     return m_multiview_per_view_render_areas_features_qcom;
@@ -4284,17 +3936,11 @@ const vk::PhysicalDeviceMultiviewPerViewRenderAreasFeaturesQCOM& VulkanFeatures:
 VulkanFeatures::operator const vk::PhysicalDeviceMultiviewPerViewRenderAreasFeaturesQCOM&() const {
     return m_multiview_per_view_render_areas_features_qcom;
 }
-vk::PhysicalDeviceMultiviewPerViewViewportsFeaturesQCOM& VulkanFeatures::get_multiview_per_view_viewports_features_qcom() {
-    return m_multiview_per_view_viewports_features_qcom;
-}
 const vk::PhysicalDeviceMultiviewPerViewViewportsFeaturesQCOM& VulkanFeatures::get_multiview_per_view_viewports_features_qcom() const {
     return m_multiview_per_view_viewports_features_qcom;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceMultiviewPerViewViewportsFeaturesQCOM&() const {
     return m_multiview_per_view_viewports_features_qcom;
-}
-vk::PhysicalDeviceMutableDescriptorTypeFeaturesEXT& VulkanFeatures::get_mutable_descriptor_type_features_ext() {
-    return m_mutable_descriptor_type_features_ext;
 }
 const vk::PhysicalDeviceMutableDescriptorTypeFeaturesEXT& VulkanFeatures::get_mutable_descriptor_type_features_ext() const {
     return m_mutable_descriptor_type_features_ext;
@@ -4302,17 +3948,11 @@ const vk::PhysicalDeviceMutableDescriptorTypeFeaturesEXT& VulkanFeatures::get_mu
 VulkanFeatures::operator const vk::PhysicalDeviceMutableDescriptorTypeFeaturesEXT&() const {
     return m_mutable_descriptor_type_features_ext;
 }
-vk::PhysicalDeviceNestedCommandBufferFeaturesEXT& VulkanFeatures::get_nested_command_buffer_features_ext() {
-    return m_nested_command_buffer_features_ext;
-}
 const vk::PhysicalDeviceNestedCommandBufferFeaturesEXT& VulkanFeatures::get_nested_command_buffer_features_ext() const {
     return m_nested_command_buffer_features_ext;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceNestedCommandBufferFeaturesEXT&() const {
     return m_nested_command_buffer_features_ext;
-}
-vk::PhysicalDeviceNonSeamlessCubeMapFeaturesEXT& VulkanFeatures::get_non_seamless_cube_map_features_ext() {
-    return m_non_seamless_cube_map_features_ext;
 }
 const vk::PhysicalDeviceNonSeamlessCubeMapFeaturesEXT& VulkanFeatures::get_non_seamless_cube_map_features_ext() const {
     return m_non_seamless_cube_map_features_ext;
@@ -4320,17 +3960,11 @@ const vk::PhysicalDeviceNonSeamlessCubeMapFeaturesEXT& VulkanFeatures::get_non_s
 VulkanFeatures::operator const vk::PhysicalDeviceNonSeamlessCubeMapFeaturesEXT&() const {
     return m_non_seamless_cube_map_features_ext;
 }
-vk::PhysicalDeviceOpacityMicromapFeaturesEXT& VulkanFeatures::get_opacity_micromap_features_ext() {
-    return m_opacity_micromap_features_ext;
-}
 const vk::PhysicalDeviceOpacityMicromapFeaturesEXT& VulkanFeatures::get_opacity_micromap_features_ext() const {
     return m_opacity_micromap_features_ext;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceOpacityMicromapFeaturesEXT&() const {
     return m_opacity_micromap_features_ext;
-}
-vk::PhysicalDeviceOpticalFlowFeaturesNV& VulkanFeatures::get_optical_flow_features_nv() {
-    return m_optical_flow_features_nv;
 }
 const vk::PhysicalDeviceOpticalFlowFeaturesNV& VulkanFeatures::get_optical_flow_features_nv() const {
     return m_optical_flow_features_nv;
@@ -4338,17 +3972,11 @@ const vk::PhysicalDeviceOpticalFlowFeaturesNV& VulkanFeatures::get_optical_flow_
 VulkanFeatures::operator const vk::PhysicalDeviceOpticalFlowFeaturesNV&() const {
     return m_optical_flow_features_nv;
 }
-vk::PhysicalDevicePageableDeviceLocalMemoryFeaturesEXT& VulkanFeatures::get_pageable_device_local_memory_features_ext() {
-    return m_pageable_device_local_memory_features_ext;
-}
 const vk::PhysicalDevicePageableDeviceLocalMemoryFeaturesEXT& VulkanFeatures::get_pageable_device_local_memory_features_ext() const {
     return m_pageable_device_local_memory_features_ext;
 }
 VulkanFeatures::operator const vk::PhysicalDevicePageableDeviceLocalMemoryFeaturesEXT&() const {
     return m_pageable_device_local_memory_features_ext;
-}
-vk::PhysicalDevicePartitionedAccelerationStructureFeaturesNV& VulkanFeatures::get_partitioned_acceleration_structure_features_nv() {
-    return m_partitioned_acceleration_structure_features_nv;
 }
 const vk::PhysicalDevicePartitionedAccelerationStructureFeaturesNV& VulkanFeatures::get_partitioned_acceleration_structure_features_nv() const {
     return m_partitioned_acceleration_structure_features_nv;
@@ -4356,17 +3984,11 @@ const vk::PhysicalDevicePartitionedAccelerationStructureFeaturesNV& VulkanFeatur
 VulkanFeatures::operator const vk::PhysicalDevicePartitionedAccelerationStructureFeaturesNV&() const {
     return m_partitioned_acceleration_structure_features_nv;
 }
-vk::PhysicalDevicePerStageDescriptorSetFeaturesNV& VulkanFeatures::get_per_stage_descriptor_set_features_nv() {
-    return m_per_stage_descriptor_set_features_nv;
-}
 const vk::PhysicalDevicePerStageDescriptorSetFeaturesNV& VulkanFeatures::get_per_stage_descriptor_set_features_nv() const {
     return m_per_stage_descriptor_set_features_nv;
 }
 VulkanFeatures::operator const vk::PhysicalDevicePerStageDescriptorSetFeaturesNV&() const {
     return m_per_stage_descriptor_set_features_nv;
-}
-vk::PhysicalDevicePerformanceCountersByRegionFeaturesARM& VulkanFeatures::get_performance_counters_by_region_features_arm() {
-    return m_performance_counters_by_region_features_arm;
 }
 const vk::PhysicalDevicePerformanceCountersByRegionFeaturesARM& VulkanFeatures::get_performance_counters_by_region_features_arm() const {
     return m_performance_counters_by_region_features_arm;
@@ -4374,17 +3996,11 @@ const vk::PhysicalDevicePerformanceCountersByRegionFeaturesARM& VulkanFeatures::
 VulkanFeatures::operator const vk::PhysicalDevicePerformanceCountersByRegionFeaturesARM&() const {
     return m_performance_counters_by_region_features_arm;
 }
-vk::PhysicalDevicePerformanceQueryFeaturesKHR& VulkanFeatures::get_performance_query_features_khr() {
-    return m_performance_query_features_khr;
-}
 const vk::PhysicalDevicePerformanceQueryFeaturesKHR& VulkanFeatures::get_performance_query_features_khr() const {
     return m_performance_query_features_khr;
 }
 VulkanFeatures::operator const vk::PhysicalDevicePerformanceQueryFeaturesKHR&() const {
     return m_performance_query_features_khr;
-}
-vk::PhysicalDevicePipelineBinaryFeaturesKHR& VulkanFeatures::get_pipeline_binary_features_khr() {
-    return m_pipeline_binary_features_khr;
 }
 const vk::PhysicalDevicePipelineBinaryFeaturesKHR& VulkanFeatures::get_pipeline_binary_features_khr() const {
     return m_pipeline_binary_features_khr;
@@ -4392,17 +4008,11 @@ const vk::PhysicalDevicePipelineBinaryFeaturesKHR& VulkanFeatures::get_pipeline_
 VulkanFeatures::operator const vk::PhysicalDevicePipelineBinaryFeaturesKHR&() const {
     return m_pipeline_binary_features_khr;
 }
-vk::PhysicalDevicePipelineCacheIncrementalModeFeaturesSEC& VulkanFeatures::get_pipeline_cache_incremental_mode_features_sec() {
-    return m_pipeline_cache_incremental_mode_features_sec;
-}
 const vk::PhysicalDevicePipelineCacheIncrementalModeFeaturesSEC& VulkanFeatures::get_pipeline_cache_incremental_mode_features_sec() const {
     return m_pipeline_cache_incremental_mode_features_sec;
 }
 VulkanFeatures::operator const vk::PhysicalDevicePipelineCacheIncrementalModeFeaturesSEC&() const {
     return m_pipeline_cache_incremental_mode_features_sec;
-}
-vk::PhysicalDevicePipelineCreationCacheControlFeatures& VulkanFeatures::get_pipeline_creation_cache_control_features() {
-    return m_pipeline_creation_cache_control_features;
 }
 const vk::PhysicalDevicePipelineCreationCacheControlFeatures& VulkanFeatures::get_pipeline_creation_cache_control_features() const {
     return m_pipeline_creation_cache_control_features;
@@ -4410,17 +4020,11 @@ const vk::PhysicalDevicePipelineCreationCacheControlFeatures& VulkanFeatures::ge
 VulkanFeatures::operator const vk::PhysicalDevicePipelineCreationCacheControlFeatures&() const {
     return m_pipeline_creation_cache_control_features;
 }
-vk::PhysicalDevicePipelineExecutablePropertiesFeaturesKHR& VulkanFeatures::get_pipeline_executable_properties_features_khr() {
-    return m_pipeline_executable_properties_features_khr;
-}
 const vk::PhysicalDevicePipelineExecutablePropertiesFeaturesKHR& VulkanFeatures::get_pipeline_executable_properties_features_khr() const {
     return m_pipeline_executable_properties_features_khr;
 }
 VulkanFeatures::operator const vk::PhysicalDevicePipelineExecutablePropertiesFeaturesKHR&() const {
     return m_pipeline_executable_properties_features_khr;
-}
-vk::PhysicalDevicePipelineLibraryGroupHandlesFeaturesEXT& VulkanFeatures::get_pipeline_library_group_handles_features_ext() {
-    return m_pipeline_library_group_handles_features_ext;
 }
 const vk::PhysicalDevicePipelineLibraryGroupHandlesFeaturesEXT& VulkanFeatures::get_pipeline_library_group_handles_features_ext() const {
     return m_pipeline_library_group_handles_features_ext;
@@ -4428,17 +4032,11 @@ const vk::PhysicalDevicePipelineLibraryGroupHandlesFeaturesEXT& VulkanFeatures::
 VulkanFeatures::operator const vk::PhysicalDevicePipelineLibraryGroupHandlesFeaturesEXT&() const {
     return m_pipeline_library_group_handles_features_ext;
 }
-vk::PhysicalDevicePipelineOpacityMicromapFeaturesARM& VulkanFeatures::get_pipeline_opacity_micromap_features_arm() {
-    return m_pipeline_opacity_micromap_features_arm;
-}
 const vk::PhysicalDevicePipelineOpacityMicromapFeaturesARM& VulkanFeatures::get_pipeline_opacity_micromap_features_arm() const {
     return m_pipeline_opacity_micromap_features_arm;
 }
 VulkanFeatures::operator const vk::PhysicalDevicePipelineOpacityMicromapFeaturesARM&() const {
     return m_pipeline_opacity_micromap_features_arm;
-}
-vk::PhysicalDevicePipelinePropertiesFeaturesEXT& VulkanFeatures::get_pipeline_properties_features_ext() {
-    return m_pipeline_properties_features_ext;
 }
 const vk::PhysicalDevicePipelinePropertiesFeaturesEXT& VulkanFeatures::get_pipeline_properties_features_ext() const {
     return m_pipeline_properties_features_ext;
@@ -4446,17 +4044,11 @@ const vk::PhysicalDevicePipelinePropertiesFeaturesEXT& VulkanFeatures::get_pipel
 VulkanFeatures::operator const vk::PhysicalDevicePipelinePropertiesFeaturesEXT&() const {
     return m_pipeline_properties_features_ext;
 }
-vk::PhysicalDevicePipelineProtectedAccessFeatures& VulkanFeatures::get_pipeline_protected_access_features() {
-    return m_pipeline_protected_access_features;
-}
 const vk::PhysicalDevicePipelineProtectedAccessFeatures& VulkanFeatures::get_pipeline_protected_access_features() const {
     return m_pipeline_protected_access_features;
 }
 VulkanFeatures::operator const vk::PhysicalDevicePipelineProtectedAccessFeatures&() const {
     return m_pipeline_protected_access_features;
-}
-vk::PhysicalDevicePipelineRobustnessFeatures& VulkanFeatures::get_pipeline_robustness_features() {
-    return m_pipeline_robustness_features;
 }
 const vk::PhysicalDevicePipelineRobustnessFeatures& VulkanFeatures::get_pipeline_robustness_features() const {
     return m_pipeline_robustness_features;
@@ -4464,17 +4056,11 @@ const vk::PhysicalDevicePipelineRobustnessFeatures& VulkanFeatures::get_pipeline
 VulkanFeatures::operator const vk::PhysicalDevicePipelineRobustnessFeatures&() const {
     return m_pipeline_robustness_features;
 }
-vk::PhysicalDevicePresentBarrierFeaturesNV& VulkanFeatures::get_present_barrier_features_nv() {
-    return m_present_barrier_features_nv;
-}
 const vk::PhysicalDevicePresentBarrierFeaturesNV& VulkanFeatures::get_present_barrier_features_nv() const {
     return m_present_barrier_features_nv;
 }
 VulkanFeatures::operator const vk::PhysicalDevicePresentBarrierFeaturesNV&() const {
     return m_present_barrier_features_nv;
-}
-vk::PhysicalDevicePresentId2FeaturesKHR& VulkanFeatures::get_present_id2_features_khr() {
-    return m_present_id2_features_khr;
 }
 const vk::PhysicalDevicePresentId2FeaturesKHR& VulkanFeatures::get_present_id2_features_khr() const {
     return m_present_id2_features_khr;
@@ -4482,17 +4068,11 @@ const vk::PhysicalDevicePresentId2FeaturesKHR& VulkanFeatures::get_present_id2_f
 VulkanFeatures::operator const vk::PhysicalDevicePresentId2FeaturesKHR&() const {
     return m_present_id2_features_khr;
 }
-vk::PhysicalDevicePresentIdFeaturesKHR& VulkanFeatures::get_present_id_features_khr() {
-    return m_present_id_features_khr;
-}
 const vk::PhysicalDevicePresentIdFeaturesKHR& VulkanFeatures::get_present_id_features_khr() const {
     return m_present_id_features_khr;
 }
 VulkanFeatures::operator const vk::PhysicalDevicePresentIdFeaturesKHR&() const {
     return m_present_id_features_khr;
-}
-vk::PhysicalDevicePresentModeFifoLatestReadyFeaturesKHR& VulkanFeatures::get_present_mode_fifo_latest_ready_features_khr() {
-    return m_present_mode_fifo_latest_ready_features_khr;
 }
 const vk::PhysicalDevicePresentModeFifoLatestReadyFeaturesKHR& VulkanFeatures::get_present_mode_fifo_latest_ready_features_khr() const {
     return m_present_mode_fifo_latest_ready_features_khr;
@@ -4500,17 +4080,11 @@ const vk::PhysicalDevicePresentModeFifoLatestReadyFeaturesKHR& VulkanFeatures::g
 VulkanFeatures::operator const vk::PhysicalDevicePresentModeFifoLatestReadyFeaturesKHR&() const {
     return m_present_mode_fifo_latest_ready_features_khr;
 }
-vk::PhysicalDevicePresentTimingFeaturesEXT& VulkanFeatures::get_present_timing_features_ext() {
-    return m_present_timing_features_ext;
-}
 const vk::PhysicalDevicePresentTimingFeaturesEXT& VulkanFeatures::get_present_timing_features_ext() const {
     return m_present_timing_features_ext;
 }
 VulkanFeatures::operator const vk::PhysicalDevicePresentTimingFeaturesEXT&() const {
     return m_present_timing_features_ext;
-}
-vk::PhysicalDevicePresentWait2FeaturesKHR& VulkanFeatures::get_present_wait2_features_khr() {
-    return m_present_wait2_features_khr;
 }
 const vk::PhysicalDevicePresentWait2FeaturesKHR& VulkanFeatures::get_present_wait2_features_khr() const {
     return m_present_wait2_features_khr;
@@ -4518,17 +4092,11 @@ const vk::PhysicalDevicePresentWait2FeaturesKHR& VulkanFeatures::get_present_wai
 VulkanFeatures::operator const vk::PhysicalDevicePresentWait2FeaturesKHR&() const {
     return m_present_wait2_features_khr;
 }
-vk::PhysicalDevicePresentWaitFeaturesKHR& VulkanFeatures::get_present_wait_features_khr() {
-    return m_present_wait_features_khr;
-}
 const vk::PhysicalDevicePresentWaitFeaturesKHR& VulkanFeatures::get_present_wait_features_khr() const {
     return m_present_wait_features_khr;
 }
 VulkanFeatures::operator const vk::PhysicalDevicePresentWaitFeaturesKHR&() const {
     return m_present_wait_features_khr;
-}
-vk::PhysicalDevicePrimitiveTopologyListRestartFeaturesEXT& VulkanFeatures::get_primitive_topology_list_restart_features_ext() {
-    return m_primitive_topology_list_restart_features_ext;
 }
 const vk::PhysicalDevicePrimitiveTopologyListRestartFeaturesEXT& VulkanFeatures::get_primitive_topology_list_restart_features_ext() const {
     return m_primitive_topology_list_restart_features_ext;
@@ -4536,17 +4104,11 @@ const vk::PhysicalDevicePrimitiveTopologyListRestartFeaturesEXT& VulkanFeatures:
 VulkanFeatures::operator const vk::PhysicalDevicePrimitiveTopologyListRestartFeaturesEXT&() const {
     return m_primitive_topology_list_restart_features_ext;
 }
-vk::PhysicalDevicePrimitivesGeneratedQueryFeaturesEXT& VulkanFeatures::get_primitives_generated_query_features_ext() {
-    return m_primitives_generated_query_features_ext;
-}
 const vk::PhysicalDevicePrimitivesGeneratedQueryFeaturesEXT& VulkanFeatures::get_primitives_generated_query_features_ext() const {
     return m_primitives_generated_query_features_ext;
 }
 VulkanFeatures::operator const vk::PhysicalDevicePrimitivesGeneratedQueryFeaturesEXT&() const {
     return m_primitives_generated_query_features_ext;
-}
-vk::PhysicalDevicePrivateDataFeatures& VulkanFeatures::get_private_data_features() {
-    return m_private_data_features;
 }
 const vk::PhysicalDevicePrivateDataFeatures& VulkanFeatures::get_private_data_features() const {
     return m_private_data_features;
@@ -4554,17 +4116,11 @@ const vk::PhysicalDevicePrivateDataFeatures& VulkanFeatures::get_private_data_fe
 VulkanFeatures::operator const vk::PhysicalDevicePrivateDataFeatures&() const {
     return m_private_data_features;
 }
-vk::PhysicalDeviceProtectedMemoryFeatures& VulkanFeatures::get_protected_memory_features() {
-    return m_protected_memory_features;
-}
 const vk::PhysicalDeviceProtectedMemoryFeatures& VulkanFeatures::get_protected_memory_features() const {
     return m_protected_memory_features;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceProtectedMemoryFeatures&() const {
     return m_protected_memory_features;
-}
-vk::PhysicalDeviceProvokingVertexFeaturesEXT& VulkanFeatures::get_provoking_vertex_features_ext() {
-    return m_provoking_vertex_features_ext;
 }
 const vk::PhysicalDeviceProvokingVertexFeaturesEXT& VulkanFeatures::get_provoking_vertex_features_ext() const {
     return m_provoking_vertex_features_ext;
@@ -4572,17 +4128,11 @@ const vk::PhysicalDeviceProvokingVertexFeaturesEXT& VulkanFeatures::get_provokin
 VulkanFeatures::operator const vk::PhysicalDeviceProvokingVertexFeaturesEXT&() const {
     return m_provoking_vertex_features_ext;
 }
-vk::PhysicalDevicePushConstantBankFeaturesNV& VulkanFeatures::get_push_constant_bank_features_nv() {
-    return m_push_constant_bank_features_nv;
-}
 const vk::PhysicalDevicePushConstantBankFeaturesNV& VulkanFeatures::get_push_constant_bank_features_nv() const {
     return m_push_constant_bank_features_nv;
 }
 VulkanFeatures::operator const vk::PhysicalDevicePushConstantBankFeaturesNV&() const {
     return m_push_constant_bank_features_nv;
-}
-vk::PhysicalDeviceRGBA10X6FormatsFeaturesEXT& VulkanFeatures::get_rgba10_x6_formats_features_ext() {
-    return m_rgba10_x6_formats_features_ext;
 }
 const vk::PhysicalDeviceRGBA10X6FormatsFeaturesEXT& VulkanFeatures::get_rgba10_x6_formats_features_ext() const {
     return m_rgba10_x6_formats_features_ext;
@@ -4590,17 +4140,11 @@ const vk::PhysicalDeviceRGBA10X6FormatsFeaturesEXT& VulkanFeatures::get_rgba10_x
 VulkanFeatures::operator const vk::PhysicalDeviceRGBA10X6FormatsFeaturesEXT&() const {
     return m_rgba10_x6_formats_features_ext;
 }
-vk::PhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT& VulkanFeatures::get_rasterization_order_attachment_access_features_ext() {
-    return m_rasterization_order_attachment_access_features_ext;
-}
 const vk::PhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT& VulkanFeatures::get_rasterization_order_attachment_access_features_ext() const {
     return m_rasterization_order_attachment_access_features_ext;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT&() const {
     return m_rasterization_order_attachment_access_features_ext;
-}
-vk::PhysicalDeviceRawAccessChainsFeaturesNV& VulkanFeatures::get_raw_access_chains_features_nv() {
-    return m_raw_access_chains_features_nv;
 }
 const vk::PhysicalDeviceRawAccessChainsFeaturesNV& VulkanFeatures::get_raw_access_chains_features_nv() const {
     return m_raw_access_chains_features_nv;
@@ -4608,17 +4152,11 @@ const vk::PhysicalDeviceRawAccessChainsFeaturesNV& VulkanFeatures::get_raw_acces
 VulkanFeatures::operator const vk::PhysicalDeviceRawAccessChainsFeaturesNV&() const {
     return m_raw_access_chains_features_nv;
 }
-vk::PhysicalDeviceRayQueryFeaturesKHR& VulkanFeatures::get_ray_query_features_khr() {
-    return m_ray_query_features_khr;
-}
 const vk::PhysicalDeviceRayQueryFeaturesKHR& VulkanFeatures::get_ray_query_features_khr() const {
     return m_ray_query_features_khr;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceRayQueryFeaturesKHR&() const {
     return m_ray_query_features_khr;
-}
-vk::PhysicalDeviceRayTracingInvocationReorderFeaturesEXT& VulkanFeatures::get_ray_tracing_invocation_reorder_features_ext() {
-    return m_ray_tracing_invocation_reorder_features_ext;
 }
 const vk::PhysicalDeviceRayTracingInvocationReorderFeaturesEXT& VulkanFeatures::get_ray_tracing_invocation_reorder_features_ext() const {
     return m_ray_tracing_invocation_reorder_features_ext;
@@ -4626,17 +4164,11 @@ const vk::PhysicalDeviceRayTracingInvocationReorderFeaturesEXT& VulkanFeatures::
 VulkanFeatures::operator const vk::PhysicalDeviceRayTracingInvocationReorderFeaturesEXT&() const {
     return m_ray_tracing_invocation_reorder_features_ext;
 }
-vk::PhysicalDeviceRayTracingInvocationReorderFeaturesNV& VulkanFeatures::get_ray_tracing_invocation_reorder_features_nv() {
-    return m_ray_tracing_invocation_reorder_features_nv;
-}
 const vk::PhysicalDeviceRayTracingInvocationReorderFeaturesNV& VulkanFeatures::get_ray_tracing_invocation_reorder_features_nv() const {
     return m_ray_tracing_invocation_reorder_features_nv;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceRayTracingInvocationReorderFeaturesNV&() const {
     return m_ray_tracing_invocation_reorder_features_nv;
-}
-vk::PhysicalDeviceRayTracingLinearSweptSpheresFeaturesNV& VulkanFeatures::get_ray_tracing_linear_swept_spheres_features_nv() {
-    return m_ray_tracing_linear_swept_spheres_features_nv;
 }
 const vk::PhysicalDeviceRayTracingLinearSweptSpheresFeaturesNV& VulkanFeatures::get_ray_tracing_linear_swept_spheres_features_nv() const {
     return m_ray_tracing_linear_swept_spheres_features_nv;
@@ -4644,17 +4176,11 @@ const vk::PhysicalDeviceRayTracingLinearSweptSpheresFeaturesNV& VulkanFeatures::
 VulkanFeatures::operator const vk::PhysicalDeviceRayTracingLinearSweptSpheresFeaturesNV&() const {
     return m_ray_tracing_linear_swept_spheres_features_nv;
 }
-vk::PhysicalDeviceRayTracingMaintenance1FeaturesKHR& VulkanFeatures::get_ray_tracing_maintenance1_features_khr() {
-    return m_ray_tracing_maintenance1_features_khr;
-}
 const vk::PhysicalDeviceRayTracingMaintenance1FeaturesKHR& VulkanFeatures::get_ray_tracing_maintenance1_features_khr() const {
     return m_ray_tracing_maintenance1_features_khr;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceRayTracingMaintenance1FeaturesKHR&() const {
     return m_ray_tracing_maintenance1_features_khr;
-}
-vk::PhysicalDeviceRayTracingMotionBlurFeaturesNV& VulkanFeatures::get_ray_tracing_motion_blur_features_nv() {
-    return m_ray_tracing_motion_blur_features_nv;
 }
 const vk::PhysicalDeviceRayTracingMotionBlurFeaturesNV& VulkanFeatures::get_ray_tracing_motion_blur_features_nv() const {
     return m_ray_tracing_motion_blur_features_nv;
@@ -4662,17 +4188,11 @@ const vk::PhysicalDeviceRayTracingMotionBlurFeaturesNV& VulkanFeatures::get_ray_
 VulkanFeatures::operator const vk::PhysicalDeviceRayTracingMotionBlurFeaturesNV&() const {
     return m_ray_tracing_motion_blur_features_nv;
 }
-vk::PhysicalDeviceRayTracingPipelineFeaturesKHR& VulkanFeatures::get_ray_tracing_pipeline_features_khr() {
-    return m_ray_tracing_pipeline_features_khr;
-}
 const vk::PhysicalDeviceRayTracingPipelineFeaturesKHR& VulkanFeatures::get_ray_tracing_pipeline_features_khr() const {
     return m_ray_tracing_pipeline_features_khr;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceRayTracingPipelineFeaturesKHR&() const {
     return m_ray_tracing_pipeline_features_khr;
-}
-vk::PhysicalDeviceRayTracingPositionFetchFeaturesKHR& VulkanFeatures::get_ray_tracing_position_fetch_features_khr() {
-    return m_ray_tracing_position_fetch_features_khr;
 }
 const vk::PhysicalDeviceRayTracingPositionFetchFeaturesKHR& VulkanFeatures::get_ray_tracing_position_fetch_features_khr() const {
     return m_ray_tracing_position_fetch_features_khr;
@@ -4680,17 +4200,11 @@ const vk::PhysicalDeviceRayTracingPositionFetchFeaturesKHR& VulkanFeatures::get_
 VulkanFeatures::operator const vk::PhysicalDeviceRayTracingPositionFetchFeaturesKHR&() const {
     return m_ray_tracing_position_fetch_features_khr;
 }
-vk::PhysicalDeviceRayTracingValidationFeaturesNV& VulkanFeatures::get_ray_tracing_validation_features_nv() {
-    return m_ray_tracing_validation_features_nv;
-}
 const vk::PhysicalDeviceRayTracingValidationFeaturesNV& VulkanFeatures::get_ray_tracing_validation_features_nv() const {
     return m_ray_tracing_validation_features_nv;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceRayTracingValidationFeaturesNV&() const {
     return m_ray_tracing_validation_features_nv;
-}
-vk::PhysicalDeviceRelaxedLineRasterizationFeaturesIMG& VulkanFeatures::get_relaxed_line_rasterization_features_img() {
-    return m_relaxed_line_rasterization_features_img;
 }
 const vk::PhysicalDeviceRelaxedLineRasterizationFeaturesIMG& VulkanFeatures::get_relaxed_line_rasterization_features_img() const {
     return m_relaxed_line_rasterization_features_img;
@@ -4698,17 +4212,11 @@ const vk::PhysicalDeviceRelaxedLineRasterizationFeaturesIMG& VulkanFeatures::get
 VulkanFeatures::operator const vk::PhysicalDeviceRelaxedLineRasterizationFeaturesIMG&() const {
     return m_relaxed_line_rasterization_features_img;
 }
-vk::PhysicalDeviceRenderPassStripedFeaturesARM& VulkanFeatures::get_render_pass_striped_features_arm() {
-    return m_render_pass_striped_features_arm;
-}
 const vk::PhysicalDeviceRenderPassStripedFeaturesARM& VulkanFeatures::get_render_pass_striped_features_arm() const {
     return m_render_pass_striped_features_arm;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceRenderPassStripedFeaturesARM&() const {
     return m_render_pass_striped_features_arm;
-}
-vk::PhysicalDeviceRepresentativeFragmentTestFeaturesNV& VulkanFeatures::get_representative_fragment_test_features_nv() {
-    return m_representative_fragment_test_features_nv;
 }
 const vk::PhysicalDeviceRepresentativeFragmentTestFeaturesNV& VulkanFeatures::get_representative_fragment_test_features_nv() const {
     return m_representative_fragment_test_features_nv;
@@ -4716,17 +4224,11 @@ const vk::PhysicalDeviceRepresentativeFragmentTestFeaturesNV& VulkanFeatures::ge
 VulkanFeatures::operator const vk::PhysicalDeviceRepresentativeFragmentTestFeaturesNV&() const {
     return m_representative_fragment_test_features_nv;
 }
-vk::PhysicalDeviceRobustness2FeaturesKHR& VulkanFeatures::get_robustness2_features_khr() {
-    return m_robustness2_features_khr;
-}
 const vk::PhysicalDeviceRobustness2FeaturesKHR& VulkanFeatures::get_robustness2_features_khr() const {
     return m_robustness2_features_khr;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceRobustness2FeaturesKHR&() const {
     return m_robustness2_features_khr;
-}
-vk::PhysicalDeviceSamplerYcbcrConversionFeatures& VulkanFeatures::get_sampler_ycbcr_conversion_features() {
-    return m_sampler_ycbcr_conversion_features;
 }
 const vk::PhysicalDeviceSamplerYcbcrConversionFeatures& VulkanFeatures::get_sampler_ycbcr_conversion_features() const {
     return m_sampler_ycbcr_conversion_features;
@@ -4734,17 +4236,11 @@ const vk::PhysicalDeviceSamplerYcbcrConversionFeatures& VulkanFeatures::get_samp
 VulkanFeatures::operator const vk::PhysicalDeviceSamplerYcbcrConversionFeatures&() const {
     return m_sampler_ycbcr_conversion_features;
 }
-vk::PhysicalDeviceScalarBlockLayoutFeatures& VulkanFeatures::get_scalar_block_layout_features() {
-    return m_scalar_block_layout_features;
-}
 const vk::PhysicalDeviceScalarBlockLayoutFeatures& VulkanFeatures::get_scalar_block_layout_features() const {
     return m_scalar_block_layout_features;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceScalarBlockLayoutFeatures&() const {
     return m_scalar_block_layout_features;
-}
-vk::PhysicalDeviceSchedulingControlsFeaturesARM& VulkanFeatures::get_scheduling_controls_features_arm() {
-    return m_scheduling_controls_features_arm;
 }
 const vk::PhysicalDeviceSchedulingControlsFeaturesARM& VulkanFeatures::get_scheduling_controls_features_arm() const {
     return m_scheduling_controls_features_arm;
@@ -4752,17 +4248,11 @@ const vk::PhysicalDeviceSchedulingControlsFeaturesARM& VulkanFeatures::get_sched
 VulkanFeatures::operator const vk::PhysicalDeviceSchedulingControlsFeaturesARM&() const {
     return m_scheduling_controls_features_arm;
 }
-vk::PhysicalDeviceSeparateDepthStencilLayoutsFeatures& VulkanFeatures::get_separate_depth_stencil_layouts_features() {
-    return m_separate_depth_stencil_layouts_features;
-}
 const vk::PhysicalDeviceSeparateDepthStencilLayoutsFeatures& VulkanFeatures::get_separate_depth_stencil_layouts_features() const {
     return m_separate_depth_stencil_layouts_features;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceSeparateDepthStencilLayoutsFeatures&() const {
     return m_separate_depth_stencil_layouts_features;
-}
-vk::PhysicalDeviceShader64BitIndexingFeaturesEXT& VulkanFeatures::get_shader64_bit_indexing_features_ext() {
-    return m_shader64_bit_indexing_features_ext;
 }
 const vk::PhysicalDeviceShader64BitIndexingFeaturesEXT& VulkanFeatures::get_shader64_bit_indexing_features_ext() const {
     return m_shader64_bit_indexing_features_ext;
@@ -4770,17 +4260,11 @@ const vk::PhysicalDeviceShader64BitIndexingFeaturesEXT& VulkanFeatures::get_shad
 VulkanFeatures::operator const vk::PhysicalDeviceShader64BitIndexingFeaturesEXT&() const {
     return m_shader64_bit_indexing_features_ext;
 }
-vk::PhysicalDeviceShaderAtomicFloat16VectorFeaturesNV& VulkanFeatures::get_shader_atomic_float16_vector_features_nv() {
-    return m_shader_atomic_float16_vector_features_nv;
-}
 const vk::PhysicalDeviceShaderAtomicFloat16VectorFeaturesNV& VulkanFeatures::get_shader_atomic_float16_vector_features_nv() const {
     return m_shader_atomic_float16_vector_features_nv;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceShaderAtomicFloat16VectorFeaturesNV&() const {
     return m_shader_atomic_float16_vector_features_nv;
-}
-vk::PhysicalDeviceShaderAtomicFloat2FeaturesEXT& VulkanFeatures::get_shader_atomic_float2_features_ext() {
-    return m_shader_atomic_float2_features_ext;
 }
 const vk::PhysicalDeviceShaderAtomicFloat2FeaturesEXT& VulkanFeatures::get_shader_atomic_float2_features_ext() const {
     return m_shader_atomic_float2_features_ext;
@@ -4788,17 +4272,11 @@ const vk::PhysicalDeviceShaderAtomicFloat2FeaturesEXT& VulkanFeatures::get_shade
 VulkanFeatures::operator const vk::PhysicalDeviceShaderAtomicFloat2FeaturesEXT&() const {
     return m_shader_atomic_float2_features_ext;
 }
-vk::PhysicalDeviceShaderAtomicFloatFeaturesEXT& VulkanFeatures::get_shader_atomic_float_features_ext() {
-    return m_shader_atomic_float_features_ext;
-}
 const vk::PhysicalDeviceShaderAtomicFloatFeaturesEXT& VulkanFeatures::get_shader_atomic_float_features_ext() const {
     return m_shader_atomic_float_features_ext;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceShaderAtomicFloatFeaturesEXT&() const {
     return m_shader_atomic_float_features_ext;
-}
-vk::PhysicalDeviceShaderAtomicInt64Features& VulkanFeatures::get_shader_atomic_int64_features() {
-    return m_shader_atomic_int64_features;
 }
 const vk::PhysicalDeviceShaderAtomicInt64Features& VulkanFeatures::get_shader_atomic_int64_features() const {
     return m_shader_atomic_int64_features;
@@ -4806,17 +4284,11 @@ const vk::PhysicalDeviceShaderAtomicInt64Features& VulkanFeatures::get_shader_at
 VulkanFeatures::operator const vk::PhysicalDeviceShaderAtomicInt64Features&() const {
     return m_shader_atomic_int64_features;
 }
-vk::PhysicalDeviceShaderBfloat16FeaturesKHR& VulkanFeatures::get_shader_bfloat16_features_khr() {
-    return m_shader_bfloat16_features_khr;
-}
 const vk::PhysicalDeviceShaderBfloat16FeaturesKHR& VulkanFeatures::get_shader_bfloat16_features_khr() const {
     return m_shader_bfloat16_features_khr;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceShaderBfloat16FeaturesKHR&() const {
     return m_shader_bfloat16_features_khr;
-}
-vk::PhysicalDeviceShaderClockFeaturesKHR& VulkanFeatures::get_shader_clock_features_khr() {
-    return m_shader_clock_features_khr;
 }
 const vk::PhysicalDeviceShaderClockFeaturesKHR& VulkanFeatures::get_shader_clock_features_khr() const {
     return m_shader_clock_features_khr;
@@ -4824,17 +4296,11 @@ const vk::PhysicalDeviceShaderClockFeaturesKHR& VulkanFeatures::get_shader_clock
 VulkanFeatures::operator const vk::PhysicalDeviceShaderClockFeaturesKHR&() const {
     return m_shader_clock_features_khr;
 }
-vk::PhysicalDeviceShaderCoreBuiltinsFeaturesARM& VulkanFeatures::get_shader_core_builtins_features_arm() {
-    return m_shader_core_builtins_features_arm;
-}
 const vk::PhysicalDeviceShaderCoreBuiltinsFeaturesARM& VulkanFeatures::get_shader_core_builtins_features_arm() const {
     return m_shader_core_builtins_features_arm;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceShaderCoreBuiltinsFeaturesARM&() const {
     return m_shader_core_builtins_features_arm;
-}
-vk::PhysicalDeviceShaderDemoteToHelperInvocationFeatures& VulkanFeatures::get_shader_demote_to_helper_invocation_features() {
-    return m_shader_demote_to_helper_invocation_features;
 }
 const vk::PhysicalDeviceShaderDemoteToHelperInvocationFeatures& VulkanFeatures::get_shader_demote_to_helper_invocation_features() const {
     return m_shader_demote_to_helper_invocation_features;
@@ -4842,17 +4308,11 @@ const vk::PhysicalDeviceShaderDemoteToHelperInvocationFeatures& VulkanFeatures::
 VulkanFeatures::operator const vk::PhysicalDeviceShaderDemoteToHelperInvocationFeatures&() const {
     return m_shader_demote_to_helper_invocation_features;
 }
-vk::PhysicalDeviceShaderDrawParametersFeatures& VulkanFeatures::get_shader_draw_parameters_features() {
-    return m_shader_draw_parameters_features;
-}
 const vk::PhysicalDeviceShaderDrawParametersFeatures& VulkanFeatures::get_shader_draw_parameters_features() const {
     return m_shader_draw_parameters_features;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceShaderDrawParametersFeatures&() const {
     return m_shader_draw_parameters_features;
-}
-vk::PhysicalDeviceShaderEarlyAndLateFragmentTestsFeaturesAMD& VulkanFeatures::get_shader_early_and_late_fragment_tests_features_amd() {
-    return m_shader_early_and_late_fragment_tests_features_amd;
 }
 const vk::PhysicalDeviceShaderEarlyAndLateFragmentTestsFeaturesAMD& VulkanFeatures::get_shader_early_and_late_fragment_tests_features_amd() const {
     return m_shader_early_and_late_fragment_tests_features_amd;
@@ -4860,17 +4320,11 @@ const vk::PhysicalDeviceShaderEarlyAndLateFragmentTestsFeaturesAMD& VulkanFeatur
 VulkanFeatures::operator const vk::PhysicalDeviceShaderEarlyAndLateFragmentTestsFeaturesAMD&() const {
     return m_shader_early_and_late_fragment_tests_features_amd;
 }
-vk::PhysicalDeviceShaderExpectAssumeFeatures& VulkanFeatures::get_shader_expect_assume_features() {
-    return m_shader_expect_assume_features;
-}
 const vk::PhysicalDeviceShaderExpectAssumeFeatures& VulkanFeatures::get_shader_expect_assume_features() const {
     return m_shader_expect_assume_features;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceShaderExpectAssumeFeatures&() const {
     return m_shader_expect_assume_features;
-}
-vk::PhysicalDeviceShaderFloat16Int8Features& VulkanFeatures::get_shader_float16_int8_features() {
-    return m_shader_float16_int8_features;
 }
 const vk::PhysicalDeviceShaderFloat16Int8Features& VulkanFeatures::get_shader_float16_int8_features() const {
     return m_shader_float16_int8_features;
@@ -4878,17 +4332,11 @@ const vk::PhysicalDeviceShaderFloat16Int8Features& VulkanFeatures::get_shader_fl
 VulkanFeatures::operator const vk::PhysicalDeviceShaderFloat16Int8Features&() const {
     return m_shader_float16_int8_features;
 }
-vk::PhysicalDeviceShaderFloat8FeaturesEXT& VulkanFeatures::get_shader_float8_features_ext() {
-    return m_shader_float8_features_ext;
-}
 const vk::PhysicalDeviceShaderFloat8FeaturesEXT& VulkanFeatures::get_shader_float8_features_ext() const {
     return m_shader_float8_features_ext;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceShaderFloat8FeaturesEXT&() const {
     return m_shader_float8_features_ext;
-}
-vk::PhysicalDeviceShaderFloatControls2Features& VulkanFeatures::get_shader_float_controls2_features() {
-    return m_shader_float_controls2_features;
 }
 const vk::PhysicalDeviceShaderFloatControls2Features& VulkanFeatures::get_shader_float_controls2_features() const {
     return m_shader_float_controls2_features;
@@ -4896,17 +4344,11 @@ const vk::PhysicalDeviceShaderFloatControls2Features& VulkanFeatures::get_shader
 VulkanFeatures::operator const vk::PhysicalDeviceShaderFloatControls2Features&() const {
     return m_shader_float_controls2_features;
 }
-vk::PhysicalDeviceShaderFmaFeaturesKHR& VulkanFeatures::get_shader_fma_features_khr() {
-    return m_shader_fma_features_khr;
-}
 const vk::PhysicalDeviceShaderFmaFeaturesKHR& VulkanFeatures::get_shader_fma_features_khr() const {
     return m_shader_fma_features_khr;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceShaderFmaFeaturesKHR&() const {
     return m_shader_fma_features_khr;
-}
-vk::PhysicalDeviceShaderImageAtomicInt64FeaturesEXT& VulkanFeatures::get_shader_image_atomic_int64_features_ext() {
-    return m_shader_image_atomic_int64_features_ext;
 }
 const vk::PhysicalDeviceShaderImageAtomicInt64FeaturesEXT& VulkanFeatures::get_shader_image_atomic_int64_features_ext() const {
     return m_shader_image_atomic_int64_features_ext;
@@ -4914,17 +4356,11 @@ const vk::PhysicalDeviceShaderImageAtomicInt64FeaturesEXT& VulkanFeatures::get_s
 VulkanFeatures::operator const vk::PhysicalDeviceShaderImageAtomicInt64FeaturesEXT&() const {
     return m_shader_image_atomic_int64_features_ext;
 }
-vk::PhysicalDeviceShaderImageFootprintFeaturesNV& VulkanFeatures::get_shader_image_footprint_features_nv() {
-    return m_shader_image_footprint_features_nv;
-}
 const vk::PhysicalDeviceShaderImageFootprintFeaturesNV& VulkanFeatures::get_shader_image_footprint_features_nv() const {
     return m_shader_image_footprint_features_nv;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceShaderImageFootprintFeaturesNV&() const {
     return m_shader_image_footprint_features_nv;
-}
-vk::PhysicalDeviceShaderIntegerDotProductFeatures& VulkanFeatures::get_shader_integer_dot_product_features() {
-    return m_shader_integer_dot_product_features;
 }
 const vk::PhysicalDeviceShaderIntegerDotProductFeatures& VulkanFeatures::get_shader_integer_dot_product_features() const {
     return m_shader_integer_dot_product_features;
@@ -4932,17 +4368,11 @@ const vk::PhysicalDeviceShaderIntegerDotProductFeatures& VulkanFeatures::get_sha
 VulkanFeatures::operator const vk::PhysicalDeviceShaderIntegerDotProductFeatures&() const {
     return m_shader_integer_dot_product_features;
 }
-vk::PhysicalDeviceShaderIntegerFunctions2FeaturesINTEL& VulkanFeatures::get_shader_integer_functions2_features_intel() {
-    return m_shader_integer_functions2_features_intel;
-}
 const vk::PhysicalDeviceShaderIntegerFunctions2FeaturesINTEL& VulkanFeatures::get_shader_integer_functions2_features_intel() const {
     return m_shader_integer_functions2_features_intel;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceShaderIntegerFunctions2FeaturesINTEL&() const {
     return m_shader_integer_functions2_features_intel;
-}
-vk::PhysicalDeviceShaderLongVectorFeaturesEXT& VulkanFeatures::get_shader_long_vector_features_ext() {
-    return m_shader_long_vector_features_ext;
 }
 const vk::PhysicalDeviceShaderLongVectorFeaturesEXT& VulkanFeatures::get_shader_long_vector_features_ext() const {
     return m_shader_long_vector_features_ext;
@@ -4950,17 +4380,11 @@ const vk::PhysicalDeviceShaderLongVectorFeaturesEXT& VulkanFeatures::get_shader_
 VulkanFeatures::operator const vk::PhysicalDeviceShaderLongVectorFeaturesEXT&() const {
     return m_shader_long_vector_features_ext;
 }
-vk::PhysicalDeviceShaderMaximalReconvergenceFeaturesKHR& VulkanFeatures::get_shader_maximal_reconvergence_features_khr() {
-    return m_shader_maximal_reconvergence_features_khr;
-}
 const vk::PhysicalDeviceShaderMaximalReconvergenceFeaturesKHR& VulkanFeatures::get_shader_maximal_reconvergence_features_khr() const {
     return m_shader_maximal_reconvergence_features_khr;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceShaderMaximalReconvergenceFeaturesKHR&() const {
     return m_shader_maximal_reconvergence_features_khr;
-}
-vk::PhysicalDeviceShaderModuleIdentifierFeaturesEXT& VulkanFeatures::get_shader_module_identifier_features_ext() {
-    return m_shader_module_identifier_features_ext;
 }
 const vk::PhysicalDeviceShaderModuleIdentifierFeaturesEXT& VulkanFeatures::get_shader_module_identifier_features_ext() const {
     return m_shader_module_identifier_features_ext;
@@ -4968,17 +4392,11 @@ const vk::PhysicalDeviceShaderModuleIdentifierFeaturesEXT& VulkanFeatures::get_s
 VulkanFeatures::operator const vk::PhysicalDeviceShaderModuleIdentifierFeaturesEXT&() const {
     return m_shader_module_identifier_features_ext;
 }
-vk::PhysicalDeviceShaderObjectFeaturesEXT& VulkanFeatures::get_shader_object_features_ext() {
-    return m_shader_object_features_ext;
-}
 const vk::PhysicalDeviceShaderObjectFeaturesEXT& VulkanFeatures::get_shader_object_features_ext() const {
     return m_shader_object_features_ext;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceShaderObjectFeaturesEXT&() const {
     return m_shader_object_features_ext;
-}
-vk::PhysicalDeviceShaderQuadControlFeaturesKHR& VulkanFeatures::get_shader_quad_control_features_khr() {
-    return m_shader_quad_control_features_khr;
 }
 const vk::PhysicalDeviceShaderQuadControlFeaturesKHR& VulkanFeatures::get_shader_quad_control_features_khr() const {
     return m_shader_quad_control_features_khr;
@@ -4986,17 +4404,11 @@ const vk::PhysicalDeviceShaderQuadControlFeaturesKHR& VulkanFeatures::get_shader
 VulkanFeatures::operator const vk::PhysicalDeviceShaderQuadControlFeaturesKHR&() const {
     return m_shader_quad_control_features_khr;
 }
-vk::PhysicalDeviceShaderRelaxedExtendedInstructionFeaturesKHR& VulkanFeatures::get_shader_relaxed_extended_instruction_features_khr() {
-    return m_shader_relaxed_extended_instruction_features_khr;
-}
 const vk::PhysicalDeviceShaderRelaxedExtendedInstructionFeaturesKHR& VulkanFeatures::get_shader_relaxed_extended_instruction_features_khr() const {
     return m_shader_relaxed_extended_instruction_features_khr;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceShaderRelaxedExtendedInstructionFeaturesKHR&() const {
     return m_shader_relaxed_extended_instruction_features_khr;
-}
-vk::PhysicalDeviceShaderReplicatedCompositesFeaturesEXT& VulkanFeatures::get_shader_replicated_composites_features_ext() {
-    return m_shader_replicated_composites_features_ext;
 }
 const vk::PhysicalDeviceShaderReplicatedCompositesFeaturesEXT& VulkanFeatures::get_shader_replicated_composites_features_ext() const {
     return m_shader_replicated_composites_features_ext;
@@ -5004,17 +4416,11 @@ const vk::PhysicalDeviceShaderReplicatedCompositesFeaturesEXT& VulkanFeatures::g
 VulkanFeatures::operator const vk::PhysicalDeviceShaderReplicatedCompositesFeaturesEXT&() const {
     return m_shader_replicated_composites_features_ext;
 }
-vk::PhysicalDeviceShaderSMBuiltinsFeaturesNV& VulkanFeatures::get_shader_sm_builtins_features_nv() {
-    return m_shader_sm_builtins_features_nv;
-}
 const vk::PhysicalDeviceShaderSMBuiltinsFeaturesNV& VulkanFeatures::get_shader_sm_builtins_features_nv() const {
     return m_shader_sm_builtins_features_nv;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceShaderSMBuiltinsFeaturesNV&() const {
     return m_shader_sm_builtins_features_nv;
-}
-vk::PhysicalDeviceShaderSubgroupExtendedTypesFeatures& VulkanFeatures::get_shader_subgroup_extended_types_features() {
-    return m_shader_subgroup_extended_types_features;
 }
 const vk::PhysicalDeviceShaderSubgroupExtendedTypesFeatures& VulkanFeatures::get_shader_subgroup_extended_types_features() const {
     return m_shader_subgroup_extended_types_features;
@@ -5022,17 +4428,11 @@ const vk::PhysicalDeviceShaderSubgroupExtendedTypesFeatures& VulkanFeatures::get
 VulkanFeatures::operator const vk::PhysicalDeviceShaderSubgroupExtendedTypesFeatures&() const {
     return m_shader_subgroup_extended_types_features;
 }
-vk::PhysicalDeviceShaderSubgroupPartitionedFeaturesEXT& VulkanFeatures::get_shader_subgroup_partitioned_features_ext() {
-    return m_shader_subgroup_partitioned_features_ext;
-}
 const vk::PhysicalDeviceShaderSubgroupPartitionedFeaturesEXT& VulkanFeatures::get_shader_subgroup_partitioned_features_ext() const {
     return m_shader_subgroup_partitioned_features_ext;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceShaderSubgroupPartitionedFeaturesEXT&() const {
     return m_shader_subgroup_partitioned_features_ext;
-}
-vk::PhysicalDeviceShaderSubgroupRotateFeatures& VulkanFeatures::get_shader_subgroup_rotate_features() {
-    return m_shader_subgroup_rotate_features;
 }
 const vk::PhysicalDeviceShaderSubgroupRotateFeatures& VulkanFeatures::get_shader_subgroup_rotate_features() const {
     return m_shader_subgroup_rotate_features;
@@ -5040,17 +4440,11 @@ const vk::PhysicalDeviceShaderSubgroupRotateFeatures& VulkanFeatures::get_shader
 VulkanFeatures::operator const vk::PhysicalDeviceShaderSubgroupRotateFeatures&() const {
     return m_shader_subgroup_rotate_features;
 }
-vk::PhysicalDeviceShaderSubgroupUniformControlFlowFeaturesKHR& VulkanFeatures::get_shader_subgroup_uniform_control_flow_features_khr() {
-    return m_shader_subgroup_uniform_control_flow_features_khr;
-}
 const vk::PhysicalDeviceShaderSubgroupUniformControlFlowFeaturesKHR& VulkanFeatures::get_shader_subgroup_uniform_control_flow_features_khr() const {
     return m_shader_subgroup_uniform_control_flow_features_khr;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceShaderSubgroupUniformControlFlowFeaturesKHR&() const {
     return m_shader_subgroup_uniform_control_flow_features_khr;
-}
-vk::PhysicalDeviceShaderTerminateInvocationFeatures& VulkanFeatures::get_shader_terminate_invocation_features() {
-    return m_shader_terminate_invocation_features;
 }
 const vk::PhysicalDeviceShaderTerminateInvocationFeatures& VulkanFeatures::get_shader_terminate_invocation_features() const {
     return m_shader_terminate_invocation_features;
@@ -5058,17 +4452,11 @@ const vk::PhysicalDeviceShaderTerminateInvocationFeatures& VulkanFeatures::get_s
 VulkanFeatures::operator const vk::PhysicalDeviceShaderTerminateInvocationFeatures&() const {
     return m_shader_terminate_invocation_features;
 }
-vk::PhysicalDeviceShaderTileImageFeaturesEXT& VulkanFeatures::get_shader_tile_image_features_ext() {
-    return m_shader_tile_image_features_ext;
-}
 const vk::PhysicalDeviceShaderTileImageFeaturesEXT& VulkanFeatures::get_shader_tile_image_features_ext() const {
     return m_shader_tile_image_features_ext;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceShaderTileImageFeaturesEXT&() const {
     return m_shader_tile_image_features_ext;
-}
-vk::PhysicalDeviceShaderUniformBufferUnsizedArrayFeaturesEXT& VulkanFeatures::get_shader_uniform_buffer_unsized_array_features_ext() {
-    return m_shader_uniform_buffer_unsized_array_features_ext;
 }
 const vk::PhysicalDeviceShaderUniformBufferUnsizedArrayFeaturesEXT& VulkanFeatures::get_shader_uniform_buffer_unsized_array_features_ext() const {
     return m_shader_uniform_buffer_unsized_array_features_ext;
@@ -5076,17 +4464,11 @@ const vk::PhysicalDeviceShaderUniformBufferUnsizedArrayFeaturesEXT& VulkanFeatur
 VulkanFeatures::operator const vk::PhysicalDeviceShaderUniformBufferUnsizedArrayFeaturesEXT&() const {
     return m_shader_uniform_buffer_unsized_array_features_ext;
 }
-vk::PhysicalDeviceShaderUntypedPointersFeaturesKHR& VulkanFeatures::get_shader_untyped_pointers_features_khr() {
-    return m_shader_untyped_pointers_features_khr;
-}
 const vk::PhysicalDeviceShaderUntypedPointersFeaturesKHR& VulkanFeatures::get_shader_untyped_pointers_features_khr() const {
     return m_shader_untyped_pointers_features_khr;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceShaderUntypedPointersFeaturesKHR&() const {
     return m_shader_untyped_pointers_features_khr;
-}
-vk::PhysicalDeviceShadingRateImageFeaturesNV& VulkanFeatures::get_shading_rate_image_features_nv() {
-    return m_shading_rate_image_features_nv;
 }
 const vk::PhysicalDeviceShadingRateImageFeaturesNV& VulkanFeatures::get_shading_rate_image_features_nv() const {
     return m_shading_rate_image_features_nv;
@@ -5094,17 +4476,11 @@ const vk::PhysicalDeviceShadingRateImageFeaturesNV& VulkanFeatures::get_shading_
 VulkanFeatures::operator const vk::PhysicalDeviceShadingRateImageFeaturesNV&() const {
     return m_shading_rate_image_features_nv;
 }
-vk::PhysicalDeviceSubgroupSizeControlFeatures& VulkanFeatures::get_subgroup_size_control_features() {
-    return m_subgroup_size_control_features;
-}
 const vk::PhysicalDeviceSubgroupSizeControlFeatures& VulkanFeatures::get_subgroup_size_control_features() const {
     return m_subgroup_size_control_features;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceSubgroupSizeControlFeatures&() const {
     return m_subgroup_size_control_features;
-}
-vk::PhysicalDeviceSubpassMergeFeedbackFeaturesEXT& VulkanFeatures::get_subpass_merge_feedback_features_ext() {
-    return m_subpass_merge_feedback_features_ext;
 }
 const vk::PhysicalDeviceSubpassMergeFeedbackFeaturesEXT& VulkanFeatures::get_subpass_merge_feedback_features_ext() const {
     return m_subpass_merge_feedback_features_ext;
@@ -5112,17 +4488,11 @@ const vk::PhysicalDeviceSubpassMergeFeedbackFeaturesEXT& VulkanFeatures::get_sub
 VulkanFeatures::operator const vk::PhysicalDeviceSubpassMergeFeedbackFeaturesEXT&() const {
     return m_subpass_merge_feedback_features_ext;
 }
-vk::PhysicalDeviceSubpassShadingFeaturesHUAWEI& VulkanFeatures::get_subpass_shading_features_huawei() {
-    return m_subpass_shading_features_huawei;
-}
 const vk::PhysicalDeviceSubpassShadingFeaturesHUAWEI& VulkanFeatures::get_subpass_shading_features_huawei() const {
     return m_subpass_shading_features_huawei;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceSubpassShadingFeaturesHUAWEI&() const {
     return m_subpass_shading_features_huawei;
-}
-vk::PhysicalDeviceSwapchainMaintenance1FeaturesKHR& VulkanFeatures::get_swapchain_maintenance1_features_khr() {
-    return m_swapchain_maintenance1_features_khr;
 }
 const vk::PhysicalDeviceSwapchainMaintenance1FeaturesKHR& VulkanFeatures::get_swapchain_maintenance1_features_khr() const {
     return m_swapchain_maintenance1_features_khr;
@@ -5130,17 +4500,11 @@ const vk::PhysicalDeviceSwapchainMaintenance1FeaturesKHR& VulkanFeatures::get_sw
 VulkanFeatures::operator const vk::PhysicalDeviceSwapchainMaintenance1FeaturesKHR&() const {
     return m_swapchain_maintenance1_features_khr;
 }
-vk::PhysicalDeviceSynchronization2Features& VulkanFeatures::get_synchronization2_features() {
-    return m_synchronization2_features;
-}
 const vk::PhysicalDeviceSynchronization2Features& VulkanFeatures::get_synchronization2_features() const {
     return m_synchronization2_features;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceSynchronization2Features&() const {
     return m_synchronization2_features;
-}
-vk::PhysicalDeviceTensorFeaturesARM& VulkanFeatures::get_tensor_features_arm() {
-    return m_tensor_features_arm;
 }
 const vk::PhysicalDeviceTensorFeaturesARM& VulkanFeatures::get_tensor_features_arm() const {
     return m_tensor_features_arm;
@@ -5148,17 +4512,11 @@ const vk::PhysicalDeviceTensorFeaturesARM& VulkanFeatures::get_tensor_features_a
 VulkanFeatures::operator const vk::PhysicalDeviceTensorFeaturesARM&() const {
     return m_tensor_features_arm;
 }
-vk::PhysicalDeviceTexelBufferAlignmentFeaturesEXT& VulkanFeatures::get_texel_buffer_alignment_features_ext() {
-    return m_texel_buffer_alignment_features_ext;
-}
 const vk::PhysicalDeviceTexelBufferAlignmentFeaturesEXT& VulkanFeatures::get_texel_buffer_alignment_features_ext() const {
     return m_texel_buffer_alignment_features_ext;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceTexelBufferAlignmentFeaturesEXT&() const {
     return m_texel_buffer_alignment_features_ext;
-}
-vk::PhysicalDeviceTextureCompressionASTC3DFeaturesEXT& VulkanFeatures::get_texture_compression_astc3_d_features_ext() {
-    return m_texture_compression_astc3_d_features_ext;
 }
 const vk::PhysicalDeviceTextureCompressionASTC3DFeaturesEXT& VulkanFeatures::get_texture_compression_astc3_d_features_ext() const {
     return m_texture_compression_astc3_d_features_ext;
@@ -5166,17 +4524,11 @@ const vk::PhysicalDeviceTextureCompressionASTC3DFeaturesEXT& VulkanFeatures::get
 VulkanFeatures::operator const vk::PhysicalDeviceTextureCompressionASTC3DFeaturesEXT&() const {
     return m_texture_compression_astc3_d_features_ext;
 }
-vk::PhysicalDeviceTextureCompressionASTCHDRFeatures& VulkanFeatures::get_texture_compression_astchdr_features() {
-    return m_texture_compression_astchdr_features;
-}
 const vk::PhysicalDeviceTextureCompressionASTCHDRFeatures& VulkanFeatures::get_texture_compression_astchdr_features() const {
     return m_texture_compression_astchdr_features;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceTextureCompressionASTCHDRFeatures&() const {
     return m_texture_compression_astchdr_features;
-}
-vk::PhysicalDeviceTileMemoryHeapFeaturesQCOM& VulkanFeatures::get_tile_memory_heap_features_qcom() {
-    return m_tile_memory_heap_features_qcom;
 }
 const vk::PhysicalDeviceTileMemoryHeapFeaturesQCOM& VulkanFeatures::get_tile_memory_heap_features_qcom() const {
     return m_tile_memory_heap_features_qcom;
@@ -5184,17 +4536,11 @@ const vk::PhysicalDeviceTileMemoryHeapFeaturesQCOM& VulkanFeatures::get_tile_mem
 VulkanFeatures::operator const vk::PhysicalDeviceTileMemoryHeapFeaturesQCOM&() const {
     return m_tile_memory_heap_features_qcom;
 }
-vk::PhysicalDeviceTilePropertiesFeaturesQCOM& VulkanFeatures::get_tile_properties_features_qcom() {
-    return m_tile_properties_features_qcom;
-}
 const vk::PhysicalDeviceTilePropertiesFeaturesQCOM& VulkanFeatures::get_tile_properties_features_qcom() const {
     return m_tile_properties_features_qcom;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceTilePropertiesFeaturesQCOM&() const {
     return m_tile_properties_features_qcom;
-}
-vk::PhysicalDeviceTileShadingFeaturesQCOM& VulkanFeatures::get_tile_shading_features_qcom() {
-    return m_tile_shading_features_qcom;
 }
 const vk::PhysicalDeviceTileShadingFeaturesQCOM& VulkanFeatures::get_tile_shading_features_qcom() const {
     return m_tile_shading_features_qcom;
@@ -5202,17 +4548,11 @@ const vk::PhysicalDeviceTileShadingFeaturesQCOM& VulkanFeatures::get_tile_shadin
 VulkanFeatures::operator const vk::PhysicalDeviceTileShadingFeaturesQCOM&() const {
     return m_tile_shading_features_qcom;
 }
-vk::PhysicalDeviceTimelineSemaphoreFeatures& VulkanFeatures::get_timeline_semaphore_features() {
-    return m_timeline_semaphore_features;
-}
 const vk::PhysicalDeviceTimelineSemaphoreFeatures& VulkanFeatures::get_timeline_semaphore_features() const {
     return m_timeline_semaphore_features;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceTimelineSemaphoreFeatures&() const {
     return m_timeline_semaphore_features;
-}
-vk::PhysicalDeviceTransformFeedbackFeaturesEXT& VulkanFeatures::get_transform_feedback_features_ext() {
-    return m_transform_feedback_features_ext;
 }
 const vk::PhysicalDeviceTransformFeedbackFeaturesEXT& VulkanFeatures::get_transform_feedback_features_ext() const {
     return m_transform_feedback_features_ext;
@@ -5220,17 +4560,11 @@ const vk::PhysicalDeviceTransformFeedbackFeaturesEXT& VulkanFeatures::get_transf
 VulkanFeatures::operator const vk::PhysicalDeviceTransformFeedbackFeaturesEXT&() const {
     return m_transform_feedback_features_ext;
 }
-vk::PhysicalDeviceUnifiedImageLayoutsFeaturesKHR& VulkanFeatures::get_unified_image_layouts_features_khr() {
-    return m_unified_image_layouts_features_khr;
-}
 const vk::PhysicalDeviceUnifiedImageLayoutsFeaturesKHR& VulkanFeatures::get_unified_image_layouts_features_khr() const {
     return m_unified_image_layouts_features_khr;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceUnifiedImageLayoutsFeaturesKHR&() const {
     return m_unified_image_layouts_features_khr;
-}
-vk::PhysicalDeviceUniformBufferStandardLayoutFeatures& VulkanFeatures::get_uniform_buffer_standard_layout_features() {
-    return m_uniform_buffer_standard_layout_features;
 }
 const vk::PhysicalDeviceUniformBufferStandardLayoutFeatures& VulkanFeatures::get_uniform_buffer_standard_layout_features() const {
     return m_uniform_buffer_standard_layout_features;
@@ -5238,17 +4572,11 @@ const vk::PhysicalDeviceUniformBufferStandardLayoutFeatures& VulkanFeatures::get
 VulkanFeatures::operator const vk::PhysicalDeviceUniformBufferStandardLayoutFeatures&() const {
     return m_uniform_buffer_standard_layout_features;
 }
-vk::PhysicalDeviceVariablePointersFeatures& VulkanFeatures::get_variable_pointers_features() {
-    return m_variable_pointers_features;
-}
 const vk::PhysicalDeviceVariablePointersFeatures& VulkanFeatures::get_variable_pointers_features() const {
     return m_variable_pointers_features;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceVariablePointersFeatures&() const {
     return m_variable_pointers_features;
-}
-vk::PhysicalDeviceVertexAttributeDivisorFeatures& VulkanFeatures::get_vertex_attribute_divisor_features() {
-    return m_vertex_attribute_divisor_features;
 }
 const vk::PhysicalDeviceVertexAttributeDivisorFeatures& VulkanFeatures::get_vertex_attribute_divisor_features() const {
     return m_vertex_attribute_divisor_features;
@@ -5256,17 +4584,11 @@ const vk::PhysicalDeviceVertexAttributeDivisorFeatures& VulkanFeatures::get_vert
 VulkanFeatures::operator const vk::PhysicalDeviceVertexAttributeDivisorFeatures&() const {
     return m_vertex_attribute_divisor_features;
 }
-vk::PhysicalDeviceVertexAttributeRobustnessFeaturesEXT& VulkanFeatures::get_vertex_attribute_robustness_features_ext() {
-    return m_vertex_attribute_robustness_features_ext;
-}
 const vk::PhysicalDeviceVertexAttributeRobustnessFeaturesEXT& VulkanFeatures::get_vertex_attribute_robustness_features_ext() const {
     return m_vertex_attribute_robustness_features_ext;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceVertexAttributeRobustnessFeaturesEXT&() const {
     return m_vertex_attribute_robustness_features_ext;
-}
-vk::PhysicalDeviceVertexInputDynamicStateFeaturesEXT& VulkanFeatures::get_vertex_input_dynamic_state_features_ext() {
-    return m_vertex_input_dynamic_state_features_ext;
 }
 const vk::PhysicalDeviceVertexInputDynamicStateFeaturesEXT& VulkanFeatures::get_vertex_input_dynamic_state_features_ext() const {
     return m_vertex_input_dynamic_state_features_ext;
@@ -5274,17 +4596,11 @@ const vk::PhysicalDeviceVertexInputDynamicStateFeaturesEXT& VulkanFeatures::get_
 VulkanFeatures::operator const vk::PhysicalDeviceVertexInputDynamicStateFeaturesEXT&() const {
     return m_vertex_input_dynamic_state_features_ext;
 }
-vk::PhysicalDeviceVideoDecodeVP9FeaturesKHR& VulkanFeatures::get_video_decode_vp9_features_khr() {
-    return m_video_decode_vp9_features_khr;
-}
 const vk::PhysicalDeviceVideoDecodeVP9FeaturesKHR& VulkanFeatures::get_video_decode_vp9_features_khr() const {
     return m_video_decode_vp9_features_khr;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceVideoDecodeVP9FeaturesKHR&() const {
     return m_video_decode_vp9_features_khr;
-}
-vk::PhysicalDeviceVideoEncodeAV1FeaturesKHR& VulkanFeatures::get_video_encode_av1_features_khr() {
-    return m_video_encode_av1_features_khr;
 }
 const vk::PhysicalDeviceVideoEncodeAV1FeaturesKHR& VulkanFeatures::get_video_encode_av1_features_khr() const {
     return m_video_encode_av1_features_khr;
@@ -5292,17 +4608,11 @@ const vk::PhysicalDeviceVideoEncodeAV1FeaturesKHR& VulkanFeatures::get_video_enc
 VulkanFeatures::operator const vk::PhysicalDeviceVideoEncodeAV1FeaturesKHR&() const {
     return m_video_encode_av1_features_khr;
 }
-vk::PhysicalDeviceVideoEncodeIntraRefreshFeaturesKHR& VulkanFeatures::get_video_encode_intra_refresh_features_khr() {
-    return m_video_encode_intra_refresh_features_khr;
-}
 const vk::PhysicalDeviceVideoEncodeIntraRefreshFeaturesKHR& VulkanFeatures::get_video_encode_intra_refresh_features_khr() const {
     return m_video_encode_intra_refresh_features_khr;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceVideoEncodeIntraRefreshFeaturesKHR&() const {
     return m_video_encode_intra_refresh_features_khr;
-}
-vk::PhysicalDeviceVideoEncodeQuantizationMapFeaturesKHR& VulkanFeatures::get_video_encode_quantization_map_features_khr() {
-    return m_video_encode_quantization_map_features_khr;
 }
 const vk::PhysicalDeviceVideoEncodeQuantizationMapFeaturesKHR& VulkanFeatures::get_video_encode_quantization_map_features_khr() const {
     return m_video_encode_quantization_map_features_khr;
@@ -5310,17 +4620,11 @@ const vk::PhysicalDeviceVideoEncodeQuantizationMapFeaturesKHR& VulkanFeatures::g
 VulkanFeatures::operator const vk::PhysicalDeviceVideoEncodeQuantizationMapFeaturesKHR&() const {
     return m_video_encode_quantization_map_features_khr;
 }
-vk::PhysicalDeviceVideoEncodeRgbConversionFeaturesVALVE& VulkanFeatures::get_video_encode_rgb_conversion_features_valve() {
-    return m_video_encode_rgb_conversion_features_valve;
-}
 const vk::PhysicalDeviceVideoEncodeRgbConversionFeaturesVALVE& VulkanFeatures::get_video_encode_rgb_conversion_features_valve() const {
     return m_video_encode_rgb_conversion_features_valve;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceVideoEncodeRgbConversionFeaturesVALVE&() const {
     return m_video_encode_rgb_conversion_features_valve;
-}
-vk::PhysicalDeviceVideoMaintenance1FeaturesKHR& VulkanFeatures::get_video_maintenance1_features_khr() {
-    return m_video_maintenance1_features_khr;
 }
 const vk::PhysicalDeviceVideoMaintenance1FeaturesKHR& VulkanFeatures::get_video_maintenance1_features_khr() const {
     return m_video_maintenance1_features_khr;
@@ -5328,17 +4632,11 @@ const vk::PhysicalDeviceVideoMaintenance1FeaturesKHR& VulkanFeatures::get_video_
 VulkanFeatures::operator const vk::PhysicalDeviceVideoMaintenance1FeaturesKHR&() const {
     return m_video_maintenance1_features_khr;
 }
-vk::PhysicalDeviceVideoMaintenance2FeaturesKHR& VulkanFeatures::get_video_maintenance2_features_khr() {
-    return m_video_maintenance2_features_khr;
-}
 const vk::PhysicalDeviceVideoMaintenance2FeaturesKHR& VulkanFeatures::get_video_maintenance2_features_khr() const {
     return m_video_maintenance2_features_khr;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceVideoMaintenance2FeaturesKHR&() const {
     return m_video_maintenance2_features_khr;
-}
-vk::PhysicalDeviceVulkan11Features& VulkanFeatures::get_vulkan11_features() {
-    return m_vulkan11_features;
 }
 const vk::PhysicalDeviceVulkan11Features& VulkanFeatures::get_vulkan11_features() const {
     return m_vulkan11_features;
@@ -5346,17 +4644,11 @@ const vk::PhysicalDeviceVulkan11Features& VulkanFeatures::get_vulkan11_features(
 VulkanFeatures::operator const vk::PhysicalDeviceVulkan11Features&() const {
     return m_vulkan11_features;
 }
-vk::PhysicalDeviceVulkan12Features& VulkanFeatures::get_vulkan12_features() {
-    return m_vulkan12_features;
-}
 const vk::PhysicalDeviceVulkan12Features& VulkanFeatures::get_vulkan12_features() const {
     return m_vulkan12_features;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceVulkan12Features&() const {
     return m_vulkan12_features;
-}
-vk::PhysicalDeviceVulkan13Features& VulkanFeatures::get_vulkan13_features() {
-    return m_vulkan13_features;
 }
 const vk::PhysicalDeviceVulkan13Features& VulkanFeatures::get_vulkan13_features() const {
     return m_vulkan13_features;
@@ -5364,17 +4656,11 @@ const vk::PhysicalDeviceVulkan13Features& VulkanFeatures::get_vulkan13_features(
 VulkanFeatures::operator const vk::PhysicalDeviceVulkan13Features&() const {
     return m_vulkan13_features;
 }
-vk::PhysicalDeviceVulkan14Features& VulkanFeatures::get_vulkan14_features() {
-    return m_vulkan14_features;
-}
 const vk::PhysicalDeviceVulkan14Features& VulkanFeatures::get_vulkan14_features() const {
     return m_vulkan14_features;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceVulkan14Features&() const {
     return m_vulkan14_features;
-}
-vk::PhysicalDeviceVulkanMemoryModelFeatures& VulkanFeatures::get_vulkan_memory_model_features() {
-    return m_vulkan_memory_model_features;
 }
 const vk::PhysicalDeviceVulkanMemoryModelFeatures& VulkanFeatures::get_vulkan_memory_model_features() const {
     return m_vulkan_memory_model_features;
@@ -5382,17 +4668,11 @@ const vk::PhysicalDeviceVulkanMemoryModelFeatures& VulkanFeatures::get_vulkan_me
 VulkanFeatures::operator const vk::PhysicalDeviceVulkanMemoryModelFeatures&() const {
     return m_vulkan_memory_model_features;
 }
-vk::PhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR& VulkanFeatures::get_workgroup_memory_explicit_layout_features_khr() {
-    return m_workgroup_memory_explicit_layout_features_khr;
-}
 const vk::PhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR& VulkanFeatures::get_workgroup_memory_explicit_layout_features_khr() const {
     return m_workgroup_memory_explicit_layout_features_khr;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR&() const {
     return m_workgroup_memory_explicit_layout_features_khr;
-}
-vk::PhysicalDeviceYcbcr2Plane444FormatsFeaturesEXT& VulkanFeatures::get_ycbcr2_plane444_formats_features_ext() {
-    return m_ycbcr2_plane444_formats_features_ext;
 }
 const vk::PhysicalDeviceYcbcr2Plane444FormatsFeaturesEXT& VulkanFeatures::get_ycbcr2_plane444_formats_features_ext() const {
     return m_ycbcr2_plane444_formats_features_ext;
@@ -5400,17 +4680,11 @@ const vk::PhysicalDeviceYcbcr2Plane444FormatsFeaturesEXT& VulkanFeatures::get_yc
 VulkanFeatures::operator const vk::PhysicalDeviceYcbcr2Plane444FormatsFeaturesEXT&() const {
     return m_ycbcr2_plane444_formats_features_ext;
 }
-vk::PhysicalDeviceYcbcrDegammaFeaturesQCOM& VulkanFeatures::get_ycbcr_degamma_features_qcom() {
-    return m_ycbcr_degamma_features_qcom;
-}
 const vk::PhysicalDeviceYcbcrDegammaFeaturesQCOM& VulkanFeatures::get_ycbcr_degamma_features_qcom() const {
     return m_ycbcr_degamma_features_qcom;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceYcbcrDegammaFeaturesQCOM&() const {
     return m_ycbcr_degamma_features_qcom;
-}
-vk::PhysicalDeviceYcbcrImageArraysFeaturesEXT& VulkanFeatures::get_ycbcr_image_arrays_features_ext() {
-    return m_ycbcr_image_arrays_features_ext;
 }
 const vk::PhysicalDeviceYcbcrImageArraysFeaturesEXT& VulkanFeatures::get_ycbcr_image_arrays_features_ext() const {
     return m_ycbcr_image_arrays_features_ext;
@@ -5418,17 +4692,11 @@ const vk::PhysicalDeviceYcbcrImageArraysFeaturesEXT& VulkanFeatures::get_ycbcr_i
 VulkanFeatures::operator const vk::PhysicalDeviceYcbcrImageArraysFeaturesEXT&() const {
     return m_ycbcr_image_arrays_features_ext;
 }
-vk::PhysicalDeviceZeroInitializeDeviceMemoryFeaturesEXT& VulkanFeatures::get_zero_initialize_device_memory_features_ext() {
-    return m_zero_initialize_device_memory_features_ext;
-}
 const vk::PhysicalDeviceZeroInitializeDeviceMemoryFeaturesEXT& VulkanFeatures::get_zero_initialize_device_memory_features_ext() const {
     return m_zero_initialize_device_memory_features_ext;
 }
 VulkanFeatures::operator const vk::PhysicalDeviceZeroInitializeDeviceMemoryFeaturesEXT&() const {
     return m_zero_initialize_device_memory_features_ext;
-}
-vk::PhysicalDeviceZeroInitializeWorkgroupMemoryFeatures& VulkanFeatures::get_zero_initialize_workgroup_memory_features() {
-    return m_zero_initialize_workgroup_memory_features;
 }
 const vk::PhysicalDeviceZeroInitializeWorkgroupMemoryFeatures& VulkanFeatures::get_zero_initialize_workgroup_memory_features() const {
     return m_zero_initialize_workgroup_memory_features;
@@ -5438,383 +4706,194 @@ VulkanFeatures::operator const vk::PhysicalDeviceZeroInitializeWorkgroupMemoryFe
 }
 
 // Alias getter implementations (for backwards compatibility)
-vk::PhysicalDevice16BitStorageFeatures& VulkanFeatures::get_16_bit_storage_features_khr() {
-    return m_16_bit_storage_features;  // Alias for PhysicalDevice16BitStorageFeatures
-}
 const vk::PhysicalDevice16BitStorageFeatures& VulkanFeatures::get_16_bit_storage_features_khr() const {
-    return m_16_bit_storage_features;
-}
-vk::PhysicalDevice8BitStorageFeatures& VulkanFeatures::get_8_bit_storage_features_khr() {
-    return m_8_bit_storage_features;  // Alias for PhysicalDevice8BitStorageFeatures
+    return get_16_bit_storage_features();  // Alias for PhysicalDevice16BitStorageFeatures
 }
 const vk::PhysicalDevice8BitStorageFeatures& VulkanFeatures::get_8_bit_storage_features_khr() const {
-    return m_8_bit_storage_features;
-}
-vk::PhysicalDeviceBufferDeviceAddressFeatures& VulkanFeatures::get_buffer_device_address_features_khr() {
-    return m_buffer_device_address_features;  // Alias for PhysicalDeviceBufferDeviceAddressFeatures
+    return get_8_bit_storage_features();  // Alias for PhysicalDevice8BitStorageFeatures
 }
 const vk::PhysicalDeviceBufferDeviceAddressFeatures& VulkanFeatures::get_buffer_device_address_features_khr() const {
-    return m_buffer_device_address_features;
-}
-vk::PhysicalDeviceBufferDeviceAddressFeaturesEXT& VulkanFeatures::get_buffer_address_features_ext() {
-    return m_buffer_device_address_features_ext;  // Alias for PhysicalDeviceBufferDeviceAddressFeaturesEXT
+    return get_buffer_device_address_features();  // Alias for PhysicalDeviceBufferDeviceAddressFeatures
 }
 const vk::PhysicalDeviceBufferDeviceAddressFeaturesEXT& VulkanFeatures::get_buffer_address_features_ext() const {
-    return m_buffer_device_address_features_ext;
-}
-vk::PhysicalDeviceComputeShaderDerivativesFeaturesKHR& VulkanFeatures::get_compute_shader_derivatives_features_nv() {
-    return m_compute_shader_derivatives_features_khr;  // Alias for PhysicalDeviceComputeShaderDerivativesFeaturesKHR
+    return get_buffer_device_address_features_ext();  // Alias for PhysicalDeviceBufferDeviceAddressFeaturesEXT
 }
 const vk::PhysicalDeviceComputeShaderDerivativesFeaturesKHR& VulkanFeatures::get_compute_shader_derivatives_features_nv() const {
-    return m_compute_shader_derivatives_features_khr;
-}
-vk::PhysicalDeviceDepthClampZeroOneFeaturesKHR& VulkanFeatures::get_depth_clamp_zero_one_features_ext() {
-    return m_depth_clamp_zero_one_features_khr;  // Alias for PhysicalDeviceDepthClampZeroOneFeaturesKHR
+    return get_compute_shader_derivatives_features_khr();  // Alias for PhysicalDeviceComputeShaderDerivativesFeaturesKHR
 }
 const vk::PhysicalDeviceDepthClampZeroOneFeaturesKHR& VulkanFeatures::get_depth_clamp_zero_one_features_ext() const {
-    return m_depth_clamp_zero_one_features_khr;
-}
-vk::PhysicalDeviceDescriptorIndexingFeatures& VulkanFeatures::get_descriptor_indexing_features_ext() {
-    return m_descriptor_indexing_features;  // Alias for PhysicalDeviceDescriptorIndexingFeatures
+    return get_depth_clamp_zero_one_features_khr();  // Alias for PhysicalDeviceDepthClampZeroOneFeaturesKHR
 }
 const vk::PhysicalDeviceDescriptorIndexingFeatures& VulkanFeatures::get_descriptor_indexing_features_ext() const {
-    return m_descriptor_indexing_features;
-}
-vk::PhysicalDeviceDynamicRenderingFeatures& VulkanFeatures::get_dynamic_rendering_features_khr() {
-    return m_dynamic_rendering_features;  // Alias for PhysicalDeviceDynamicRenderingFeatures
+    return get_descriptor_indexing_features();  // Alias for PhysicalDeviceDescriptorIndexingFeatures
 }
 const vk::PhysicalDeviceDynamicRenderingFeatures& VulkanFeatures::get_dynamic_rendering_features_khr() const {
-    return m_dynamic_rendering_features;
-}
-vk::PhysicalDeviceDynamicRenderingLocalReadFeatures& VulkanFeatures::get_dynamic_rendering_local_read_features_khr() {
-    return m_dynamic_rendering_local_read_features;  // Alias for PhysicalDeviceDynamicRenderingLocalReadFeatures
+    return get_dynamic_rendering_features();  // Alias for PhysicalDeviceDynamicRenderingFeatures
 }
 const vk::PhysicalDeviceDynamicRenderingLocalReadFeatures& VulkanFeatures::get_dynamic_rendering_local_read_features_khr() const {
-    return m_dynamic_rendering_local_read_features;
-}
-vk::PhysicalDeviceFeatures2& VulkanFeatures::get_features2_khr() {
-    return m_features2;  // Alias for PhysicalDeviceFeatures2
+    return get_dynamic_rendering_local_read_features();  // Alias for PhysicalDeviceDynamicRenderingLocalReadFeatures
 }
 const vk::PhysicalDeviceFeatures2& VulkanFeatures::get_features2_khr() const {
-    return m_features2;
-}
-vk::PhysicalDeviceFragmentDensityMapOffsetFeaturesEXT& VulkanFeatures::get_fragment_density_map_offset_features_qcom() {
-    return m_fragment_density_map_offset_features_ext;  // Alias for PhysicalDeviceFragmentDensityMapOffsetFeaturesEXT
+    return get_features2();  // Alias for PhysicalDeviceFeatures2
 }
 const vk::PhysicalDeviceFragmentDensityMapOffsetFeaturesEXT& VulkanFeatures::get_fragment_density_map_offset_features_qcom() const {
-    return m_fragment_density_map_offset_features_ext;
-}
-vk::PhysicalDeviceFragmentShaderBarycentricFeaturesKHR& VulkanFeatures::get_fragment_shader_barycentric_features_nv() {
-    return m_fragment_shader_barycentric_features_khr;  // Alias for PhysicalDeviceFragmentShaderBarycentricFeaturesKHR
+    return get_fragment_density_map_offset_features_ext();  // Alias for PhysicalDeviceFragmentDensityMapOffsetFeaturesEXT
 }
 const vk::PhysicalDeviceFragmentShaderBarycentricFeaturesKHR& VulkanFeatures::get_fragment_shader_barycentric_features_nv() const {
-    return m_fragment_shader_barycentric_features_khr;
-}
-vk::PhysicalDeviceGlobalPriorityQueryFeatures& VulkanFeatures::get_global_priority_query_features_khr() {
-    return m_global_priority_query_features;  // Alias for PhysicalDeviceGlobalPriorityQueryFeatures
+    return get_fragment_shader_barycentric_features_khr();  // Alias for PhysicalDeviceFragmentShaderBarycentricFeaturesKHR
 }
 const vk::PhysicalDeviceGlobalPriorityQueryFeatures& VulkanFeatures::get_global_priority_query_features_khr() const {
-    return m_global_priority_query_features;
-}
-vk::PhysicalDeviceGlobalPriorityQueryFeatures& VulkanFeatures::get_global_priority_query_features_ext() {
-    return m_global_priority_query_features;  // Alias for PhysicalDeviceGlobalPriorityQueryFeatures
+    return get_global_priority_query_features();  // Alias for PhysicalDeviceGlobalPriorityQueryFeatures
 }
 const vk::PhysicalDeviceGlobalPriorityQueryFeatures& VulkanFeatures::get_global_priority_query_features_ext() const {
-    return m_global_priority_query_features;
-}
-vk::PhysicalDeviceHostImageCopyFeatures& VulkanFeatures::get_host_image_copy_features_ext() {
-    return m_host_image_copy_features;  // Alias for PhysicalDeviceHostImageCopyFeatures
+    return get_global_priority_query_features();  // Alias for PhysicalDeviceGlobalPriorityQueryFeatures
 }
 const vk::PhysicalDeviceHostImageCopyFeatures& VulkanFeatures::get_host_image_copy_features_ext() const {
-    return m_host_image_copy_features;
-}
-vk::PhysicalDeviceHostQueryResetFeatures& VulkanFeatures::get_host_query_reset_features_ext() {
-    return m_host_query_reset_features;  // Alias for PhysicalDeviceHostQueryResetFeatures
+    return get_host_image_copy_features();  // Alias for PhysicalDeviceHostImageCopyFeatures
 }
 const vk::PhysicalDeviceHostQueryResetFeatures& VulkanFeatures::get_host_query_reset_features_ext() const {
-    return m_host_query_reset_features;
-}
-vk::PhysicalDeviceImageRobustnessFeatures& VulkanFeatures::get_image_robustness_features_ext() {
-    return m_image_robustness_features;  // Alias for PhysicalDeviceImageRobustnessFeatures
+    return get_host_query_reset_features();  // Alias for PhysicalDeviceHostQueryResetFeatures
 }
 const vk::PhysicalDeviceImageRobustnessFeatures& VulkanFeatures::get_image_robustness_features_ext() const {
-    return m_image_robustness_features;
-}
-vk::PhysicalDeviceImagelessFramebufferFeatures& VulkanFeatures::get_imageless_framebuffer_features_khr() {
-    return m_imageless_framebuffer_features;  // Alias for PhysicalDeviceImagelessFramebufferFeatures
+    return get_image_robustness_features();  // Alias for PhysicalDeviceImageRobustnessFeatures
 }
 const vk::PhysicalDeviceImagelessFramebufferFeatures& VulkanFeatures::get_imageless_framebuffer_features_khr() const {
-    return m_imageless_framebuffer_features;
-}
-vk::PhysicalDeviceIndexTypeUint8Features& VulkanFeatures::get_index_type_uint8_features_khr() {
-    return m_index_type_uint8_features;  // Alias for PhysicalDeviceIndexTypeUint8Features
+    return get_imageless_framebuffer_features();  // Alias for PhysicalDeviceImagelessFramebufferFeatures
 }
 const vk::PhysicalDeviceIndexTypeUint8Features& VulkanFeatures::get_index_type_uint8_features_khr() const {
-    return m_index_type_uint8_features;
-}
-vk::PhysicalDeviceIndexTypeUint8Features& VulkanFeatures::get_index_type_uint8_features_ext() {
-    return m_index_type_uint8_features;  // Alias for PhysicalDeviceIndexTypeUint8Features
+    return get_index_type_uint8_features();  // Alias for PhysicalDeviceIndexTypeUint8Features
 }
 const vk::PhysicalDeviceIndexTypeUint8Features& VulkanFeatures::get_index_type_uint8_features_ext() const {
-    return m_index_type_uint8_features;
-}
-vk::PhysicalDeviceInlineUniformBlockFeatures& VulkanFeatures::get_inline_uniform_block_features_ext() {
-    return m_inline_uniform_block_features;  // Alias for PhysicalDeviceInlineUniformBlockFeatures
+    return get_index_type_uint8_features();  // Alias for PhysicalDeviceIndexTypeUint8Features
 }
 const vk::PhysicalDeviceInlineUniformBlockFeatures& VulkanFeatures::get_inline_uniform_block_features_ext() const {
-    return m_inline_uniform_block_features;
-}
-vk::PhysicalDeviceLineRasterizationFeatures& VulkanFeatures::get_line_rasterization_features_khr() {
-    return m_line_rasterization_features;  // Alias for PhysicalDeviceLineRasterizationFeatures
+    return get_inline_uniform_block_features();  // Alias for PhysicalDeviceInlineUniformBlockFeatures
 }
 const vk::PhysicalDeviceLineRasterizationFeatures& VulkanFeatures::get_line_rasterization_features_khr() const {
-    return m_line_rasterization_features;
-}
-vk::PhysicalDeviceLineRasterizationFeatures& VulkanFeatures::get_line_rasterization_features_ext() {
-    return m_line_rasterization_features;  // Alias for PhysicalDeviceLineRasterizationFeatures
+    return get_line_rasterization_features();  // Alias for PhysicalDeviceLineRasterizationFeatures
 }
 const vk::PhysicalDeviceLineRasterizationFeatures& VulkanFeatures::get_line_rasterization_features_ext() const {
-    return m_line_rasterization_features;
-}
-vk::PhysicalDeviceMaintenance4Features& VulkanFeatures::get_maintenance4_features_khr() {
-    return m_maintenance4_features;  // Alias for PhysicalDeviceMaintenance4Features
+    return get_line_rasterization_features();  // Alias for PhysicalDeviceLineRasterizationFeatures
 }
 const vk::PhysicalDeviceMaintenance4Features& VulkanFeatures::get_maintenance4_features_khr() const {
-    return m_maintenance4_features;
-}
-vk::PhysicalDeviceMaintenance5Features& VulkanFeatures::get_maintenance5_features_khr() {
-    return m_maintenance5_features;  // Alias for PhysicalDeviceMaintenance5Features
+    return get_maintenance4_features();  // Alias for PhysicalDeviceMaintenance4Features
 }
 const vk::PhysicalDeviceMaintenance5Features& VulkanFeatures::get_maintenance5_features_khr() const {
-    return m_maintenance5_features;
-}
-vk::PhysicalDeviceMaintenance6Features& VulkanFeatures::get_maintenance6_features_khr() {
-    return m_maintenance6_features;  // Alias for PhysicalDeviceMaintenance6Features
+    return get_maintenance5_features();  // Alias for PhysicalDeviceMaintenance5Features
 }
 const vk::PhysicalDeviceMaintenance6Features& VulkanFeatures::get_maintenance6_features_khr() const {
-    return m_maintenance6_features;
-}
-vk::PhysicalDeviceMemoryDecompressionFeaturesEXT& VulkanFeatures::get_memory_decompression_features_nv() {
-    return m_memory_decompression_features_ext;  // Alias for PhysicalDeviceMemoryDecompressionFeaturesEXT
+    return get_maintenance6_features();  // Alias for PhysicalDeviceMaintenance6Features
 }
 const vk::PhysicalDeviceMemoryDecompressionFeaturesEXT& VulkanFeatures::get_memory_decompression_features_nv() const {
-    return m_memory_decompression_features_ext;
-}
-vk::PhysicalDeviceMultiviewFeatures& VulkanFeatures::get_multiview_features_khr() {
-    return m_multiview_features;  // Alias for PhysicalDeviceMultiviewFeatures
+    return get_memory_decompression_features_ext();  // Alias for PhysicalDeviceMemoryDecompressionFeaturesEXT
 }
 const vk::PhysicalDeviceMultiviewFeatures& VulkanFeatures::get_multiview_features_khr() const {
-    return m_multiview_features;
-}
-vk::PhysicalDeviceMutableDescriptorTypeFeaturesEXT& VulkanFeatures::get_mutable_descriptor_type_features_valve() {
-    return m_mutable_descriptor_type_features_ext;  // Alias for PhysicalDeviceMutableDescriptorTypeFeaturesEXT
+    return get_multiview_features();  // Alias for PhysicalDeviceMultiviewFeatures
 }
 const vk::PhysicalDeviceMutableDescriptorTypeFeaturesEXT& VulkanFeatures::get_mutable_descriptor_type_features_valve() const {
-    return m_mutable_descriptor_type_features_ext;
-}
-vk::PhysicalDevicePipelineCreationCacheControlFeatures& VulkanFeatures::get_pipeline_creation_cache_control_features_ext() {
-    return m_pipeline_creation_cache_control_features;  // Alias for PhysicalDevicePipelineCreationCacheControlFeatures
+    return get_mutable_descriptor_type_features_ext();  // Alias for PhysicalDeviceMutableDescriptorTypeFeaturesEXT
 }
 const vk::PhysicalDevicePipelineCreationCacheControlFeatures& VulkanFeatures::get_pipeline_creation_cache_control_features_ext() const {
-    return m_pipeline_creation_cache_control_features;
-}
-vk::PhysicalDevicePipelineProtectedAccessFeatures& VulkanFeatures::get_pipeline_protected_access_features_ext() {
-    return m_pipeline_protected_access_features;  // Alias for PhysicalDevicePipelineProtectedAccessFeatures
+    return get_pipeline_creation_cache_control_features();  // Alias for PhysicalDevicePipelineCreationCacheControlFeatures
 }
 const vk::PhysicalDevicePipelineProtectedAccessFeatures& VulkanFeatures::get_pipeline_protected_access_features_ext() const {
-    return m_pipeline_protected_access_features;
-}
-vk::PhysicalDevicePipelineRobustnessFeatures& VulkanFeatures::get_pipeline_robustness_features_ext() {
-    return m_pipeline_robustness_features;  // Alias for PhysicalDevicePipelineRobustnessFeatures
+    return get_pipeline_protected_access_features();  // Alias for PhysicalDevicePipelineProtectedAccessFeatures
 }
 const vk::PhysicalDevicePipelineRobustnessFeatures& VulkanFeatures::get_pipeline_robustness_features_ext() const {
-    return m_pipeline_robustness_features;
-}
-vk::PhysicalDevicePresentModeFifoLatestReadyFeaturesKHR& VulkanFeatures::get_present_mode_fifo_latest_ready_features_ext() {
-    return m_present_mode_fifo_latest_ready_features_khr;  // Alias for PhysicalDevicePresentModeFifoLatestReadyFeaturesKHR
+    return get_pipeline_robustness_features();  // Alias for PhysicalDevicePipelineRobustnessFeatures
 }
 const vk::PhysicalDevicePresentModeFifoLatestReadyFeaturesKHR& VulkanFeatures::get_present_mode_fifo_latest_ready_features_ext() const {
-    return m_present_mode_fifo_latest_ready_features_khr;
-}
-vk::PhysicalDevicePrivateDataFeatures& VulkanFeatures::get_private_data_features_ext() {
-    return m_private_data_features;  // Alias for PhysicalDevicePrivateDataFeatures
+    return get_present_mode_fifo_latest_ready_features_khr();  // Alias for PhysicalDevicePresentModeFifoLatestReadyFeaturesKHR
 }
 const vk::PhysicalDevicePrivateDataFeatures& VulkanFeatures::get_private_data_features_ext() const {
-    return m_private_data_features;
-}
-vk::PhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT& VulkanFeatures::get_rasterization_order_attachment_access_features_arm() {
-    return m_rasterization_order_attachment_access_features_ext;  // Alias for PhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT
+    return get_private_data_features();  // Alias for PhysicalDevicePrivateDataFeatures
 }
 const vk::PhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT& VulkanFeatures::get_rasterization_order_attachment_access_features_arm() const {
-    return m_rasterization_order_attachment_access_features_ext;
-}
-vk::PhysicalDeviceRobustness2FeaturesKHR& VulkanFeatures::get_robustness2_features_ext() {
-    return m_robustness2_features_khr;  // Alias for PhysicalDeviceRobustness2FeaturesKHR
+    return get_rasterization_order_attachment_access_features_ext();  // Alias for PhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT
 }
 const vk::PhysicalDeviceRobustness2FeaturesKHR& VulkanFeatures::get_robustness2_features_ext() const {
-    return m_robustness2_features_khr;
-}
-vk::PhysicalDeviceSamplerYcbcrConversionFeatures& VulkanFeatures::get_sampler_ycbcr_conversion_features_khr() {
-    return m_sampler_ycbcr_conversion_features;  // Alias for PhysicalDeviceSamplerYcbcrConversionFeatures
+    return get_robustness2_features_khr();  // Alias for PhysicalDeviceRobustness2FeaturesKHR
 }
 const vk::PhysicalDeviceSamplerYcbcrConversionFeatures& VulkanFeatures::get_sampler_ycbcr_conversion_features_khr() const {
-    return m_sampler_ycbcr_conversion_features;
-}
-vk::PhysicalDeviceScalarBlockLayoutFeatures& VulkanFeatures::get_scalar_block_layout_features_ext() {
-    return m_scalar_block_layout_features;  // Alias for PhysicalDeviceScalarBlockLayoutFeatures
+    return get_sampler_ycbcr_conversion_features();  // Alias for PhysicalDeviceSamplerYcbcrConversionFeatures
 }
 const vk::PhysicalDeviceScalarBlockLayoutFeatures& VulkanFeatures::get_scalar_block_layout_features_ext() const {
-    return m_scalar_block_layout_features;
-}
-vk::PhysicalDeviceSeparateDepthStencilLayoutsFeatures& VulkanFeatures::get_separate_depth_stencil_layouts_features_khr() {
-    return m_separate_depth_stencil_layouts_features;  // Alias for PhysicalDeviceSeparateDepthStencilLayoutsFeatures
+    return get_scalar_block_layout_features();  // Alias for PhysicalDeviceScalarBlockLayoutFeatures
 }
 const vk::PhysicalDeviceSeparateDepthStencilLayoutsFeatures& VulkanFeatures::get_separate_depth_stencil_layouts_features_khr() const {
-    return m_separate_depth_stencil_layouts_features;
-}
-vk::PhysicalDeviceShaderAtomicInt64Features& VulkanFeatures::get_shader_atomic_int64_features_khr() {
-    return m_shader_atomic_int64_features;  // Alias for PhysicalDeviceShaderAtomicInt64Features
+    return get_separate_depth_stencil_layouts_features();  // Alias for PhysicalDeviceSeparateDepthStencilLayoutsFeatures
 }
 const vk::PhysicalDeviceShaderAtomicInt64Features& VulkanFeatures::get_shader_atomic_int64_features_khr() const {
-    return m_shader_atomic_int64_features;
-}
-vk::PhysicalDeviceShaderDemoteToHelperInvocationFeatures& VulkanFeatures::get_shader_demote_to_helper_invocation_features_ext() {
-    return m_shader_demote_to_helper_invocation_features;  // Alias for PhysicalDeviceShaderDemoteToHelperInvocationFeatures
+    return get_shader_atomic_int64_features();  // Alias for PhysicalDeviceShaderAtomicInt64Features
 }
 const vk::PhysicalDeviceShaderDemoteToHelperInvocationFeatures& VulkanFeatures::get_shader_demote_to_helper_invocation_features_ext() const {
-    return m_shader_demote_to_helper_invocation_features;
-}
-vk::PhysicalDeviceShaderDrawParametersFeatures& VulkanFeatures::get_shader_draw_parameter_features() {
-    return m_shader_draw_parameters_features;  // Alias for PhysicalDeviceShaderDrawParametersFeatures
+    return get_shader_demote_to_helper_invocation_features();  // Alias for PhysicalDeviceShaderDemoteToHelperInvocationFeatures
 }
 const vk::PhysicalDeviceShaderDrawParametersFeatures& VulkanFeatures::get_shader_draw_parameter_features() const {
-    return m_shader_draw_parameters_features;
-}
-vk::PhysicalDeviceShaderExpectAssumeFeatures& VulkanFeatures::get_shader_expect_assume_features_khr() {
-    return m_shader_expect_assume_features;  // Alias for PhysicalDeviceShaderExpectAssumeFeatures
+    return get_shader_draw_parameters_features();  // Alias for PhysicalDeviceShaderDrawParametersFeatures
 }
 const vk::PhysicalDeviceShaderExpectAssumeFeatures& VulkanFeatures::get_shader_expect_assume_features_khr() const {
-    return m_shader_expect_assume_features;
-}
-vk::PhysicalDeviceShaderFloat16Int8Features& VulkanFeatures::get_shader_float16_int8_features_khr() {
-    return m_shader_float16_int8_features;  // Alias for PhysicalDeviceShaderFloat16Int8Features
+    return get_shader_expect_assume_features();  // Alias for PhysicalDeviceShaderExpectAssumeFeatures
 }
 const vk::PhysicalDeviceShaderFloat16Int8Features& VulkanFeatures::get_shader_float16_int8_features_khr() const {
-    return m_shader_float16_int8_features;
-}
-vk::PhysicalDeviceShaderFloat16Int8Features& VulkanFeatures::get_float16_int8_features_khr() {
-    return m_shader_float16_int8_features;  // Alias for PhysicalDeviceShaderFloat16Int8Features
+    return get_shader_float16_int8_features();  // Alias for PhysicalDeviceShaderFloat16Int8Features
 }
 const vk::PhysicalDeviceShaderFloat16Int8Features& VulkanFeatures::get_float16_int8_features_khr() const {
-    return m_shader_float16_int8_features;
-}
-vk::PhysicalDeviceShaderFloatControls2Features& VulkanFeatures::get_shader_float_controls2_features_khr() {
-    return m_shader_float_controls2_features;  // Alias for PhysicalDeviceShaderFloatControls2Features
+    return get_shader_float16_int8_features();  // Alias for PhysicalDeviceShaderFloat16Int8Features
 }
 const vk::PhysicalDeviceShaderFloatControls2Features& VulkanFeatures::get_shader_float_controls2_features_khr() const {
-    return m_shader_float_controls2_features;
-}
-vk::PhysicalDeviceShaderIntegerDotProductFeatures& VulkanFeatures::get_shader_integer_dot_product_features_khr() {
-    return m_shader_integer_dot_product_features;  // Alias for PhysicalDeviceShaderIntegerDotProductFeatures
+    return get_shader_float_controls2_features();  // Alias for PhysicalDeviceShaderFloatControls2Features
 }
 const vk::PhysicalDeviceShaderIntegerDotProductFeatures& VulkanFeatures::get_shader_integer_dot_product_features_khr() const {
-    return m_shader_integer_dot_product_features;
-}
-vk::PhysicalDeviceShaderSubgroupExtendedTypesFeatures& VulkanFeatures::get_shader_subgroup_extended_types_features_khr() {
-    return m_shader_subgroup_extended_types_features;  // Alias for PhysicalDeviceShaderSubgroupExtendedTypesFeatures
+    return get_shader_integer_dot_product_features();  // Alias for PhysicalDeviceShaderIntegerDotProductFeatures
 }
 const vk::PhysicalDeviceShaderSubgroupExtendedTypesFeatures& VulkanFeatures::get_shader_subgroup_extended_types_features_khr() const {
-    return m_shader_subgroup_extended_types_features;
-}
-vk::PhysicalDeviceShaderSubgroupRotateFeatures& VulkanFeatures::get_shader_subgroup_rotate_features_khr() {
-    return m_shader_subgroup_rotate_features;  // Alias for PhysicalDeviceShaderSubgroupRotateFeatures
+    return get_shader_subgroup_extended_types_features();  // Alias for PhysicalDeviceShaderSubgroupExtendedTypesFeatures
 }
 const vk::PhysicalDeviceShaderSubgroupRotateFeatures& VulkanFeatures::get_shader_subgroup_rotate_features_khr() const {
-    return m_shader_subgroup_rotate_features;
-}
-vk::PhysicalDeviceShaderTerminateInvocationFeatures& VulkanFeatures::get_shader_terminate_invocation_features_khr() {
-    return m_shader_terminate_invocation_features;  // Alias for PhysicalDeviceShaderTerminateInvocationFeatures
+    return get_shader_subgroup_rotate_features();  // Alias for PhysicalDeviceShaderSubgroupRotateFeatures
 }
 const vk::PhysicalDeviceShaderTerminateInvocationFeatures& VulkanFeatures::get_shader_terminate_invocation_features_khr() const {
-    return m_shader_terminate_invocation_features;
-}
-vk::PhysicalDeviceSubgroupSizeControlFeatures& VulkanFeatures::get_subgroup_size_control_features_ext() {
-    return m_subgroup_size_control_features;  // Alias for PhysicalDeviceSubgroupSizeControlFeatures
+    return get_shader_terminate_invocation_features();  // Alias for PhysicalDeviceShaderTerminateInvocationFeatures
 }
 const vk::PhysicalDeviceSubgroupSizeControlFeatures& VulkanFeatures::get_subgroup_size_control_features_ext() const {
-    return m_subgroup_size_control_features;
-}
-vk::PhysicalDeviceSwapchainMaintenance1FeaturesKHR& VulkanFeatures::get_swapchain_maintenance1_features_ext() {
-    return m_swapchain_maintenance1_features_khr;  // Alias for PhysicalDeviceSwapchainMaintenance1FeaturesKHR
+    return get_subgroup_size_control_features();  // Alias for PhysicalDeviceSubgroupSizeControlFeatures
 }
 const vk::PhysicalDeviceSwapchainMaintenance1FeaturesKHR& VulkanFeatures::get_swapchain_maintenance1_features_ext() const {
-    return m_swapchain_maintenance1_features_khr;
-}
-vk::PhysicalDeviceSynchronization2Features& VulkanFeatures::get_synchronization2_features_khr() {
-    return m_synchronization2_features;  // Alias for PhysicalDeviceSynchronization2Features
+    return get_swapchain_maintenance1_features_khr();  // Alias for PhysicalDeviceSwapchainMaintenance1FeaturesKHR
 }
 const vk::PhysicalDeviceSynchronization2Features& VulkanFeatures::get_synchronization2_features_khr() const {
-    return m_synchronization2_features;
-}
-vk::PhysicalDeviceTextureCompressionASTCHDRFeatures& VulkanFeatures::get_texture_compression_astchdr_features_ext() {
-    return m_texture_compression_astchdr_features;  // Alias for PhysicalDeviceTextureCompressionASTCHDRFeatures
+    return get_synchronization2_features();  // Alias for PhysicalDeviceSynchronization2Features
 }
 const vk::PhysicalDeviceTextureCompressionASTCHDRFeatures& VulkanFeatures::get_texture_compression_astchdr_features_ext() const {
-    return m_texture_compression_astchdr_features;
-}
-vk::PhysicalDeviceTimelineSemaphoreFeatures& VulkanFeatures::get_timeline_semaphore_features_khr() {
-    return m_timeline_semaphore_features;  // Alias for PhysicalDeviceTimelineSemaphoreFeatures
+    return get_texture_compression_astchdr_features();  // Alias for PhysicalDeviceTextureCompressionASTCHDRFeatures
 }
 const vk::PhysicalDeviceTimelineSemaphoreFeatures& VulkanFeatures::get_timeline_semaphore_features_khr() const {
-    return m_timeline_semaphore_features;
-}
-vk::PhysicalDeviceUniformBufferStandardLayoutFeatures& VulkanFeatures::get_uniform_buffer_standard_layout_features_khr() {
-    return m_uniform_buffer_standard_layout_features;  // Alias for PhysicalDeviceUniformBufferStandardLayoutFeatures
+    return get_timeline_semaphore_features();  // Alias for PhysicalDeviceTimelineSemaphoreFeatures
 }
 const vk::PhysicalDeviceUniformBufferStandardLayoutFeatures& VulkanFeatures::get_uniform_buffer_standard_layout_features_khr() const {
-    return m_uniform_buffer_standard_layout_features;
-}
-vk::PhysicalDeviceVariablePointersFeatures& VulkanFeatures::get_variable_pointers_features_khr() {
-    return m_variable_pointers_features;  // Alias for PhysicalDeviceVariablePointersFeatures
+    return get_uniform_buffer_standard_layout_features();  // Alias for PhysicalDeviceUniformBufferStandardLayoutFeatures
 }
 const vk::PhysicalDeviceVariablePointersFeatures& VulkanFeatures::get_variable_pointers_features_khr() const {
-    return m_variable_pointers_features;
-}
-vk::PhysicalDeviceVariablePointersFeatures& VulkanFeatures::get_variable_pointer_features_khr() {
-    return m_variable_pointers_features;  // Alias for PhysicalDeviceVariablePointersFeatures
+    return get_variable_pointers_features();  // Alias for PhysicalDeviceVariablePointersFeatures
 }
 const vk::PhysicalDeviceVariablePointersFeatures& VulkanFeatures::get_variable_pointer_features_khr() const {
-    return m_variable_pointers_features;
-}
-vk::PhysicalDeviceVariablePointersFeatures& VulkanFeatures::get_variable_pointer_features() {
-    return m_variable_pointers_features;  // Alias for PhysicalDeviceVariablePointersFeatures
+    return get_variable_pointers_features();  // Alias for PhysicalDeviceVariablePointersFeatures
 }
 const vk::PhysicalDeviceVariablePointersFeatures& VulkanFeatures::get_variable_pointer_features() const {
-    return m_variable_pointers_features;
-}
-vk::PhysicalDeviceVertexAttributeDivisorFeatures& VulkanFeatures::get_vertex_attribute_divisor_features_khr() {
-    return m_vertex_attribute_divisor_features;  // Alias for PhysicalDeviceVertexAttributeDivisorFeatures
+    return get_variable_pointers_features();  // Alias for PhysicalDeviceVariablePointersFeatures
 }
 const vk::PhysicalDeviceVertexAttributeDivisorFeatures& VulkanFeatures::get_vertex_attribute_divisor_features_khr() const {
-    return m_vertex_attribute_divisor_features;
-}
-vk::PhysicalDeviceVertexAttributeDivisorFeatures& VulkanFeatures::get_vertex_attribute_divisor_features_ext() {
-    return m_vertex_attribute_divisor_features;  // Alias for PhysicalDeviceVertexAttributeDivisorFeatures
+    return get_vertex_attribute_divisor_features();  // Alias for PhysicalDeviceVertexAttributeDivisorFeatures
 }
 const vk::PhysicalDeviceVertexAttributeDivisorFeatures& VulkanFeatures::get_vertex_attribute_divisor_features_ext() const {
-    return m_vertex_attribute_divisor_features;
-}
-vk::PhysicalDeviceVulkanMemoryModelFeatures& VulkanFeatures::get_vulkan_memory_model_features_khr() {
-    return m_vulkan_memory_model_features;  // Alias for PhysicalDeviceVulkanMemoryModelFeatures
+    return get_vertex_attribute_divisor_features();  // Alias for PhysicalDeviceVertexAttributeDivisorFeatures
 }
 const vk::PhysicalDeviceVulkanMemoryModelFeatures& VulkanFeatures::get_vulkan_memory_model_features_khr() const {
-    return m_vulkan_memory_model_features;
-}
-vk::PhysicalDeviceZeroInitializeWorkgroupMemoryFeatures& VulkanFeatures::get_zero_initialize_workgroup_memory_features_khr() {
-    return m_zero_initialize_workgroup_memory_features;  // Alias for PhysicalDeviceZeroInitializeWorkgroupMemoryFeatures
+    return get_vulkan_memory_model_features();  // Alias for PhysicalDeviceVulkanMemoryModelFeatures
 }
 const vk::PhysicalDeviceZeroInitializeWorkgroupMemoryFeatures& VulkanFeatures::get_zero_initialize_workgroup_memory_features_khr() const {
-    return m_zero_initialize_workgroup_memory_features;
+    return get_zero_initialize_workgroup_memory_features();  // Alias for PhysicalDeviceZeroInitializeWorkgroupMemoryFeatures
 }
 
 const void* VulkanFeatures::get_struct_ptr(vk::StructureType stype) const {

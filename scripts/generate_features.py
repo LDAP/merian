@@ -182,10 +182,7 @@ def generate_class_methods_declaration(features: list[FeatureStruct]) -> list[st
         for alias_vk_name in feat.aliases:
             alias_cpp_name = vk_name_to_cpp_name(alias_vk_name)
             alias_getter_name = generate_getter_name(alias_cpp_name)
-            lines.append(
-                f"    vk::{feat.cpp_name}& {alias_getter_name}();  // Alias for {feat.cpp_name}"
-            )
-            lines.append(f"    const vk::{feat.cpp_name}& {alias_getter_name}() const;")
+            lines.append(f"    const vk::{feat.cpp_name}& {alias_getter_name}() const;  // Alias for {feat.cpp_name}")
 
     return lines
 
@@ -492,9 +489,6 @@ def generate_named_getters(features: list[FeatureStruct]) -> list[str]:
 
     lines.extend(
         [
-            "vk::PhysicalDeviceFeatures& VulkanFeatures::get_features() {",
-            "    return m_features2.features;",
-            "}",
             "const vk::PhysicalDeviceFeatures& VulkanFeatures::get_features() const {",
             "    return m_features2.features;",
             "}",
@@ -511,9 +505,6 @@ def generate_named_getters(features: list[FeatureStruct]) -> list[str]:
         getter_name = generate_getter_name(feat.cpp_name)
         lines.extend(
             [
-                f"vk::{feat.cpp_name}& VulkanFeatures::{getter_name}() {{",
-                f"    return {member_name};",
-                "}",
                 f"const vk::{feat.cpp_name}& VulkanFeatures::{getter_name}() const {{",
                 f"    return {member_name};",
                 "}",
@@ -540,9 +531,6 @@ def generate_alias_getters(features: list[FeatureStruct]) -> list[str]:
             alias_getter_name = generate_getter_name(alias_cpp_name)
             lines.extend(
                 [
-                    f"vk::{feat.cpp_name}& VulkanFeatures::{alias_getter_name}() {{",
-                    f"    return {canonical_getter_name}();  // Alias for {feat.cpp_name}",
-                    "}",
                     f"const vk::{feat.cpp_name}& VulkanFeatures::{alias_getter_name}() const {{",
                     f"    return {canonical_getter_name}();  // Alias for {feat.cpp_name}",
                     "}",
