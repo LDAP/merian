@@ -189,16 +189,6 @@ class ContextExtension {
         spdlog::warn("extension {} not supported ({})", name, reason);
     }
 
-    // OTHER
-
-    // return strings that should be defined when compiling shaders with Merians shader compiler.
-    // Note that device, instance and Merian context extensions are automatically defined as
-    // MERIAN_DEVICE_EXT_ENABLED_<NAME>, MERIAN_INSTANCE_EXT_ENABLED_<NAME>,
-    // MERIAN_CONTEXT_EXT_ENABLED_
-    virtual std::map<std::string, std::string> shader_macro_definitions() {
-        return {};
-    }
-
   public:
     const std::string name;
 };

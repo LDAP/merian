@@ -604,13 +604,6 @@ void Context::prepare_shader_include_defines() {
     }
 
     // add macro definitions from context extensions and enabled instance and device extensions.
-    for (const auto& ext : context_extensions) {
-        const auto extension_macro_definitions = ext.second->shader_macro_definitions();
-        default_shader_macro_definitions.insert(extension_macro_definitions.begin(),
-                                                extension_macro_definitions.end());
-        default_shader_macro_definitions.emplace("MERIAN_CONTEXT_EXT_ENABLED_" + ext.second->name,
-                                                 "1");
-    }
     const std::string instance_ext_define_prefix = "MERIAN_INSTANCE_EXT_ENABLED_";
     for (const auto& ext : instance->get_enabled_extensions()) {
         default_shader_macro_definitions.emplace(instance_ext_define_prefix + ext, "1");

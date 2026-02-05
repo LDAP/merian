@@ -59,7 +59,8 @@ class Node : public std::enable_shared_from_this<Node> {
     // query_device_support returned true and all requirements are enabled.
     //
     // Use the allocator to allocate static data, that does not depend on graph configuration.
-    virtual void initialize(const ContextHandle context, const ResourceAllocatorHandle& allocator);
+    virtual void initialize(const ContextHandle& /*context*/,
+                            const ResourceAllocatorHandle& /*allocator*/) {}
 
     // This might be called at any time of the graph lifecycle. Must be consistent with dump_config.
     virtual NodeStatusFlags load_config(const nlohmann::json& json);
