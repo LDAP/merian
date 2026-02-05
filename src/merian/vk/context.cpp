@@ -5,6 +5,7 @@
 #include "merian/utils/vector.hpp"
 #include "merian/vk/extension/extension.hpp"
 #include "merian/vk/extension/extension_registry.hpp"
+#include "merian/vk/utils/vulkan_spirv.hpp"
 
 #include <fmt/ranges.h>
 #include <numeric>
@@ -141,11 +142,12 @@ void Context::create_instance(const uint32_t targeted_vk_api_version,
         supported_instance_extensions.emplace(instance_ext.extensionName);
     }
 
+    InstanceSupportQueryInfo instance_query_info{supported_instance_extensions,
+                                                  supported_instance_layers, *this};
+
     auto it = context_extensions.begin();
     while (it != context_extensions.end()) {
-        InstanceSupportQueryInfo query_info{supported_instance_extensions,
-                                             supported_instance_layers, *this};
-        auto support_info = it->second->query_instance_support(query_info);
+        auto support_info = it->second->query_instance_support(instance_query_info);
         if (support_info.supported) {
             it++;
         } else {
@@ -199,9 +201,7 @@ void Context::create_instance(const uint32_t targeted_vk_api_version,
     }
 
     for (auto& ext : context_extensions) {
-        InstanceSupportQueryInfo query_info{supported_instance_extensions,
-                                             supported_instance_layers, *this};
-        auto support_info = ext.second->query_instance_support(query_info);
+        auto support_info = ext.second->query_instance_support(instance_query_info);
         insert_all(instance_layer_names, support_info.required_layers);
         insert_all(instance_extension_names, support_info.required_extensions);
     }
@@ -281,10 +281,11 @@ void Context::select_physical_device(
 
             QueueInfo q_info = determine_queues(physical_devices[i]);
 
+            DeviceSupportQueryInfo device_query_info{physical_devices[i], q_info, *this};
+
             uint32_t context_extensions_supported = 0;
             for (const auto& ext : context_extensions) {
-                DeviceSupportQueryInfo query_info{physical_devices[i], q_info, *this};
-                auto support_info = ext.second->query_device_support(query_info);
+                auto support_info = ext.second->query_device_support(device_query_info);
                 context_extensions_supported += static_cast<uint32_t>(support_info.supported);
             }
 
@@ -368,10 +369,11 @@ void Context::select_physical_device(
                 props.deviceName.data(), props.vendorID, props.deviceID,
                 vk::to_string(props12.driverID), props12.driverInfo.data());
 
+    DeviceSupportQueryInfo device_query_info{physical_device, queue_info, *this};
+
     auto it = context_extensions.begin();
     while (it != context_extensions.end()) {
-        DeviceSupportQueryInfo query_info{physical_device, queue_info, *this};
-        auto support_info = it->second->query_device_support(query_info);
+        auto support_info = it->second->query_device_support(device_query_info);
         if (support_info.supported) {
             it++;
         } else {
@@ -554,12 +556,30 @@ void Context::create_device_and_queues(
     VulkanFeatures features = desired_features;
     std::vector<const char*> extensions = desired_additional_extensions;
 
+    DeviceSupportQueryInfo device_query_info{physical_device, queue_info, *this};
+
+    const uint32_t vk_api_version = VK_HEADER_VERSION_COMPLETE;
+
     for (const auto& ext : context_extensions) {
-        DeviceSupportQueryInfo query_info{physical_device, queue_info, *this};
-        auto support_info = ext.second->query_device_support(query_info);
+        auto support_info = ext.second->query_device_support(device_query_info);
+
+        // Add required Vulkan extensions
         insert_all(extensions, support_info.required_extensions);
+
+        // Add required Vulkan features
         for (const auto* feature_name : support_info.required_features) {
             features.set_feature(feature_name, true);
+        }
+
+        // Add Vulkan extensions required by SPIR-V extensions
+        for (const auto* spirv_ext : support_info.required_spirv_extensions) {
+            insert_all(extensions, get_spirv_extension_requirements(spirv_ext, vk_api_version));
+        }
+
+        // Add Vulkan extensions and features required by SPIR-V capabilities
+        for (const auto* spirv_cap : support_info.required_spirv_capabilities) {
+            insert_all(extensions, get_spirv_capability_extensions(spirv_cap, vk_api_version));
+            features.enable_features(get_spirv_capability_features(spirv_cap, vk_api_version));
         }
     }
 
