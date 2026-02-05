@@ -62,7 +62,7 @@ if not vulkan.found()
     # version specifier is broken for vulkan in older meson versions. https://github.com/mesonbuild/meson/issues/12072
     vulkan = dependency('vulkan')
 endif
-vulkan = vulkan.partial_dependency(compile_args: true, link_args: true, links: true)
+vulkan = vulkan.partial_dependency(compile_args: false, link_args: true, links: true)
 vulkanheaders_subp = subproject('vulkanheaders', version: ['>=' + vulkan_target_api_version])
 vulkanheaders = vulkanheaders_subp.get_variable('vulkanheaders_dep')
 glfw = dependency('glfw3', version: ['>=3.4.0'], fallback: ['glfw', 'glfw_dep'])
