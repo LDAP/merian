@@ -13,6 +13,12 @@
 
 #include <vulkan/vulkan.hpp>
 
+// Windows defines this as __faststorefence() 
+// https://learn.microsoft.com/en-us/windows/win32/api/winnt/nf-winnt-memorybarrier
+#ifdef MemoryBarrier
+#undef MemoryBarrier
+#endif
+
 namespace merian {
 
 class CommandBuffer;
