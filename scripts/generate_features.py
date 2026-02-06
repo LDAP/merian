@@ -618,26 +618,20 @@ def generate_get_feature(feature_map: dict) -> list[str]:
         "bool VulkanFeatures::get_feature(const std::string& feature_name) const {",
     ]
 
-    first = True
     for feature_name, struct_list in sorted(feature_map.items()):
-        if_keyword = "if" if first else "else if"
-        first = False
-
         # Return from first struct (all aliases must be consistent per Vulkan spec)
         entry = struct_list[0]
         member_name = generate_member_name(entry["struct"].cpp_name)
         prefix = entry["struct"].feature_member_prefix
         feat_name = entry["member"].name
 
-        lines.append(f'    {if_keyword} (feature_name == "{feature_name}") {{')
+        lines.append(f'    if (feature_name == "{feature_name}") {{')
         lines.append(f"        return {member_name}.{prefix}{feat_name} == VK_TRUE;")
         lines.append("    }")
 
     lines.extend(
         [
-            "    else {",
-            "        return false;",
-            "    }",
+            "    return false;",
             "}",
             "",
         ]
