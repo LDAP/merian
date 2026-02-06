@@ -38,6 +38,8 @@ jobs:
           sudo apt-get -y install \
             libxkbcommon-dev \
             xorg-dev
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
       - name: Setup Project
         run: meson setup build --buildtype=${{ matrix.buildtype }}
       - name: Compile Project
