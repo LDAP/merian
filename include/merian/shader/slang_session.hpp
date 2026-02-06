@@ -71,9 +71,17 @@ class SlangSession {
         slang_session_desc.preprocessorMacros = preprocessor_macros.data();
         slang_session_desc.preprocessorMacroCount = (SlangInt)preprocessor_macros.size();
 
+        std::vector<std::string> str_search_paths;
         std::vector<const char*> search_paths;
-        search_paths.reserve(shader_compile_context->get_preprocessor_macros().size());
+        search_paths.reserve(
+            shader_compile_context->get_search_path_file_loader().get_search_paths().size());
+        str_search_paths.reserve(
+            shader_compile_context->get_search_path_file_loader().get_search_paths().size());
+        // conversion for Windows...
         for (const auto& search_path : shader_compile_context->get_search_path_file_loader()) {
+            str_search_paths.emplace_back(search_path.string());
+        }
+        for (const auto& search_path : str_search_paths) {
             search_paths.emplace_back(search_path.c_str());
         }
         slang_session_desc.searchPaths = search_paths.data();

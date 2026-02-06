@@ -103,6 +103,10 @@ class FileLoader {
         return search_paths.end();
     }
 
+    const std::set<std::filesystem::path>& get_search_paths() const {
+        return search_paths;
+    }
+
   private:
     std::set<std::filesystem::path> search_paths;
     bool enable_search_cwd_parents = true;

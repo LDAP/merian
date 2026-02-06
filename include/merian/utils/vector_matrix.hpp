@@ -242,25 +242,25 @@ inline int4 as_int4(const int32_t f[4]) {
     return v;
 }
 
-inline uint1 as_int1(const uint32_t f[1]) {
+inline uint1 as_uint1(const uint32_t f[1]) {
     static_assert(sizeof(uint1) == sizeof(uint32_t));
     uint1 v;
     memcpy(&v.x, f, sizeof(uint1));
     return v;
 }
-inline uint2 as_int2(const uint32_t f[2]) {
+inline uint2 as_uint2(const uint32_t f[2]) {
     static_assert(sizeof(uint2) == 2 * sizeof(uint32_t));
     uint2 v;
     memcpy(&v.x, f, sizeof(uint2));
     return v;
 }
-inline uint3 as_int3(const uint32_t f[3]) {
+inline uint3 as_uint3(const uint32_t f[3]) {
     static_assert(sizeof(uint3) == 3 * sizeof(uint32_t));
     uint3 v;
     memcpy(&v.x, f, sizeof(uint3));
     return v;
 }
-inline uint4 as_int4(const uint32_t f[4]) {
+inline uint4 as_uint4(const uint32_t f[4]) {
     static_assert(sizeof(uint4) == 4 * sizeof(uint32_t));
     uint4 v;
     memcpy(&v.x, f, sizeof(uint4));
