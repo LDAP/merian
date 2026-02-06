@@ -75,8 +75,6 @@ class Graph : public std::enable_shared_from_this<Graph> {
 
     // --- add / remove nodes and connections ---
 
-    NodeRegistry& get_registry();
-
     // Adds a node to the graph.
     //
     // The node_name must be a known type to the registry.
@@ -306,9 +304,10 @@ class Graph : public std::enable_shared_from_this<Graph> {
     const QueueHandle queue;
     std::shared_ptr<ExtensionVkDebugUtils> debug_utils = nullptr;
 
-    NodeRegistry registry;
     ThreadPoolHandle thread_pool;
     CPUQueueHandle cpu_queue;
+
+    NodeRegistry& registry;
 
     // Outside callbacks
     // clang-format off

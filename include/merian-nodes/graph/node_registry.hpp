@@ -6,13 +6,20 @@
 
 namespace merian {
 
+template <typename NodeClass>
+NodeHandle create_node() {
+    return std::make_shared<NodeClass>();
+}
+
 class NodeRegistry {
 
   public:
+    using NodeFactory = std::function<NodeHandle()>;
+
     struct NodeTypeInfo {
         const std::string node_type_name;
         const std::string description;
-        const std::function<NodeHandle()> factory;
+        const NodeFactory factory;
     };
 
     struct NodeInfo {
@@ -23,7 +30,18 @@ class NodeRegistry {
     };
 
   public:
-    NodeRegistry(const ContextHandle& context, const ResourceAllocatorHandle& allocator);
+    static NodeRegistry& get_instance();
+
+    // Adds a new node type to this registy.
+    //
+    // If add_default_config is true a node with empty config is added.
+    template <typename NODE_TYPE>
+    void register_node_type(const std::string& node_type_name,
+                            const std::string& description,
+                            const bool add_default_config = true) {
+        register_node_type<NODE_TYPE>(
+            NodeTypeInfo{node_type_name, description, create_node<NODE_TYPE>}, add_default_config);
+    }
 
     // Adds a new node type to this registy.
     //
@@ -163,6 +181,8 @@ class NodeRegistry {
     }
 
   private:
+    NodeRegistry();
+
     void assert_node_name_exists(const std::string& node_name) const {
         if (!node_name_to_node_info.contains(node_name)) {
             throw std::invalid_argument{

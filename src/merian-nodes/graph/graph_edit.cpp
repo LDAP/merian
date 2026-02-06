@@ -15,10 +15,10 @@ const std::string& Graph::add_node(const std::string& node_name,
             node_identifier = fmt::format("{} {}", node_name, i++);
         } while (node_for_identifier.contains(node_identifier));
 
-        return add_node(registry.create_node_from_name(node_name), node_identifier);
+        return add_node(NodeRegistry::get_instance().create_node_from_name(node_name), node_identifier);
     }
 
-    return add_node(registry.create_node_from_name(node_name), identifier);
+    return add_node(NodeRegistry::get_instance().create_node_from_name(node_name), identifier);
 }
 
 NodeHandle Graph::find_node_for_identifier(const std::string& identifier) const {
@@ -80,7 +80,7 @@ bool Graph::remove_node(const std::string& identifier) {
             in_flight_data.in_flight_data.erase(node);
         }
 
-        SPDLOG_DEBUG("removed node {} ({})", node_identifier, registry.node_type_name(node));
+        SPDLOG_DEBUG("removed node {} ({})", node_identifier, NodeRegistry::get_instance().node_type_name(node));
         needs_reconnect = true;
     };
 
@@ -120,7 +120,7 @@ const std::string& Graph::add_node(const std::shared_ptr<Node>& node,
     } else {
         uint32_t i = 0;
         do {
-            node_identifier = fmt::format("{} {}", registry.node_type_name(node), i++);
+            node_identifier = fmt::format("{} {}", NodeRegistry::get_instance().node_type_name(node), i++);
         } while (node_for_identifier.contains(node_identifier));
     }
 
@@ -131,7 +131,7 @@ const std::string& Graph::add_node(const std::shared_ptr<Node>& node,
     node->initialize(context, resource_allocator);
 
     needs_reconnect = true;
-    SPDLOG_DEBUG("added node {} ({})", node_identifier, registry.node_type_name(node));
+    SPDLOG_DEBUG("added node {} ({})", node_identifier, NodeRegistry::get_instance().node_type_name(node));
 
     return it->second.identifier;
 }
@@ -151,8 +151,8 @@ void Graph::add_connection(const NodeHandle& src,
         const auto& [old_src, old_src_output] = dst_data.desired_incoming_connections.at(dst_input);
         [[maybe_unused]] const NodeData& old_src_data = node_data.at(old_src);
         SPDLOG_DEBUG("remove conflicting connection {}, {} ({}) -> {}, {} ({})", old_src_output,
-                     old_src_data.identifier, registry.node_type_name(old_src), dst_input,
-                     dst_data.identifier, registry.node_type_name(dst));
+                     old_src_data.identifier, NodeRegistry::get_instance().node_type_name(old_src), dst_input,
+                     dst_data.identifier, NodeRegistry::get_instance().node_type_name(dst));
         remove_connection(old_src, dst, dst_input);
     }
 
@@ -172,8 +172,8 @@ void Graph::add_connection(const NodeHandle& src,
 
     needs_reconnect = true;
     SPDLOG_DEBUG("added connection {}, {} ({}) -> {}, {} ({})", src_output, src_data.identifier,
-                 registry.node_type_name(src), dst_input, dst_data.identifier,
-                 registry.node_type_name(dst));
+                 NodeRegistry::get_instance().node_type_name(src), dst_input, dst_data.identifier,
+                 NodeRegistry::get_instance().node_type_name(dst));
 }
 
 bool Graph::remove_connection(const NodeHandle src,
@@ -191,8 +191,8 @@ bool Graph::remove_connection(const NodeHandle src,
     const auto it = dst_data.desired_incoming_connections.find(dst_input);
     if (it == dst_data.desired_incoming_connections.end()) {
         SPDLOG_WARN("connection {} ({}) -> {}, {} ({}) does not exist and cannot be removed.",
-                    src_data.identifier, registry.node_type_name(src), dst_input,
-                    dst_data.identifier, registry.node_type_name(dst));
+                    src_data.identifier, NodeRegistry::get_instance().node_type_name(src), dst_input,
+                    dst_data.identifier, NodeRegistry::get_instance().node_type_name(dst));
         return false;
     }
 
@@ -204,8 +204,8 @@ bool Graph::remove_connection(const NodeHandle src,
     assert(out_it != src_data.desired_outgoing_connections.end());
     src_data.desired_outgoing_connections.erase(out_it);
     SPDLOG_DEBUG("removed connection {}, {} ({}) -> {}, {} ({})", src_output, src_data.identifier,
-                 registry.node_type_name(src), dst_input, dst_data.identifier,
-                 registry.node_type_name(dst));
+                 NodeRegistry::get_instance().node_type_name(src), dst_input, dst_data.identifier,
+                 NodeRegistry::get_instance().node_type_name(dst));
 
     needs_reconnect = true;
     return true;

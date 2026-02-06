@@ -10,8 +10,9 @@ using namespace std::literals::chrono_literals;
 
 Graph::Graph(const ContextHandle& context, const ResourceAllocatorHandle& resource_allocator)
     : context(context), resource_allocator(resource_allocator), queue(context->get_queue_GCT()),
-      registry(context, resource_allocator), thread_pool(std::make_shared<ThreadPool>()),
+      thread_pool(std::make_shared<ThreadPool>()),
       cpu_queue(std::make_shared<CPUQueue>(context, thread_pool)),
+      registry(NodeRegistry::get_instance()),
       ring_fences(context,
                   2,
                   [context, this](const uint32_t /*index*/) {
@@ -39,10 +40,6 @@ Graph::Graph(const ContextHandle& context, const ResourceAllocatorHandle& resour
 
 Graph::~Graph() {
     wait();
-}
-
-NodeRegistry& Graph::get_registry() {
-    return registry;
 }
 
 void Graph::run() {
