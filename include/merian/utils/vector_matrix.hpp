@@ -72,13 +72,6 @@ concept NumericOrGlm = std::is_arithmetic_v<std::remove_cvref_t<T>> || GlmType<T
 template <typename... Args>
 concept AllNumericOrGlm = (NumericOrGlm<Args> && ...);
 
-#define FUNCTION_ALIAS(ALIAS, FUNC)                                                                \
-    template <typename... Args>                                                                    \
-        requires AllNumericOrGlm<Args...>                                                          \
-    auto ALIAS(Args&&... args) -> decltype(FUNC(std::forward<Args>(args)...)) {                    \
-        return FUNC(std::forward<Args>(args)...);                                                  \
-    }
-
 template <int R, int C, int D, typename T>
 matRxC<R, D, T> constexpr mul(const matRxC<R, C, T>& m1, const matRxC<C, D, T>& m2) {
     // see above: glm is column-major so we need to adapt the operations to our row-major view.
@@ -98,8 +91,6 @@ vecL<C, T> constexpr mul(const vecL<R, T>& v, const matRxC<R, C, T>& m) {
 }
 
 using glm::normalize;
-
-FUNCTION_ALIAS(lerp, glm::mix)
 
 using glm::dot;
 
@@ -122,6 +113,12 @@ using glm::radians;
 using glm::any;
 
 using glm::value_ptr;
+
+template <typename... Args>
+    requires AllNumericOrGlm<Args...>
+auto lerp(Args&&... args) -> decltype(glm::mix(std::forward<Args>(args)...)) {
+    return glm::mix(std::forward<Args>(args)...);
+}
 
 template <typename genType = merian::float4x4>
     requires((NumericOrGlm<genType>))
@@ -289,22 +286,24 @@ constexpr auto format_as(const glm::mat<R, C, T, Q>& m) {
 
 } // namespace glm
 
+template <typename T> constexpr bool ALWAYS_FALSE = false;
+
 namespace {
 template <int R1, int C1, int R2, int C2, typename T>
 inline auto operator*(const merian::matRxC<R1, C1, T>& m1, const merian::matRxC<R2, C2, T>& m2) {
-    static_assert(false, "use merian::mul(..) instead!");
+    static_assert(ALWAYS_FALSE<T>, "use merian::mul(..) instead!");
     return m1 * m2;
 }
 
 template <int R, int C, int L, typename T>
 inline merian::vecL<R, T> operator*(const merian::matRxC<R, C, T>& m, const merian::vecL<L, T>& v) {
-    static_assert(false, "use merian::mul(..) instead!");
+    static_assert(ALWAYS_FALSE<T>, "use merian::mul(..) instead!");
     return m * v;
 }
 
 template <int R, int C, int L, typename T>
 inline merian::vecL<C, T> operator*(const merian::vecL<L, T>& v, const merian::matRxC<R, C, T>& m) {
-    static_assert(false, "use merian::mul(..) instead!");
+    static_assert(ALWAYS_FALSE<T>, "use merian::mul(..) instead!");
     return v * m;
 }
 
