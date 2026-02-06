@@ -4,7 +4,7 @@ project(
     version : run_command(['git', 'describe', '--tags', '--abbrev=0'], check: true).stdout().strip(),
     default_options : [
         'warning_level=3',
-        'cpp_std=c++23',
+        'cpp_std=c++20',
         'b_lto=true',
         'b_ndebug=if-release',
     ],
