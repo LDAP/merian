@@ -72,6 +72,13 @@ concept NumericOrGlm = std::is_arithmetic_v<std::remove_cvref_t<T>> || GlmType<T
 template <typename... Args>
 concept AllNumericOrGlm = (NumericOrGlm<Args> && ...);
 
+#define FUNCTION_ALIAS(ALIAS, FUNC)                                                                \
+    template <typename... Args>                                                                    \
+        requires AllNumericOrGlm<Args...>                                                          \
+    auto ALIAS(Args&&... args) -> decltype(FUNC(std::forward<Args>(args)...)) {                    \
+        return FUNC(std::forward<Args>(args)...);                                                  \
+    }
+
 template <int R, int C, int D, typename T>
 matRxC<R, D, T> constexpr mul(const matRxC<R, C, T>& m1, const matRxC<C, D, T>& m2) {
     // see above: glm is column-major so we need to adapt the operations to our row-major view.
@@ -91,6 +98,8 @@ vecL<C, T> constexpr mul(const vecL<R, T>& v, const matRxC<R, C, T>& m) {
 }
 
 using glm::normalize;
+
+FUNCTION_ALIAS(lerp, glm::mix)
 
 using glm::dot;
 
@@ -113,12 +122,6 @@ using glm::radians;
 using glm::any;
 
 using glm::value_ptr;
-
-template <typename... Args>
-    requires AllNumericOrGlm<Args...>
-auto lerp(Args&&... args) -> decltype(glm::mix(std::forward<Args>(args)...)) {
-    return glm::mix(std::forward<Args>(args)...);
-}
 
 template <typename genType = merian::float4x4>
     requires((NumericOrGlm<genType>))
@@ -185,8 +188,8 @@ inline float4x4 look_at(const float3& position, const float3& target, const floa
 }
 
 inline float4x4
-perspective(const float fovy, const float aspect, const float near, const float far) {
-    return transpose(glm::perspective(fovy, aspect, near, far));
+perspective(const float fovy, const float aspect, const float z_near, const float z_far) {
+    return transpose(glm::perspective(fovy, aspect, z_near, z_far));
 }
 
 inline float1 as_float1(const float f[1]) {
