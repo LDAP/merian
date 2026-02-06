@@ -82,9 +82,12 @@ class ShadertoyInjectCompiler : public GLSLShaderCompiler {
     const GLSLShaderCompilerHandle forwarding_compiler;
 };
 
-Shadertoy::Shadertoy(const ContextHandle& context)
-    : AbstractCompute(context, sizeof(PushConstant)), shader_glsl(default_shader),
-      compile_context(ShaderCompileContext::create(context)) {
+Shadertoy::Shadertoy() : AbstractCompute(sizeof(PushConstant)), shader_glsl(default_shader) {}
+
+void Shadertoy::initialize(const ContextHandle& context, const ResourceAllocatorHandle& allocator) {
+    AbstractCompute::initialize(context, allocator);
+
+    compile_context = ShaderCompileContext::create(context);
 
     GLSLShaderCompilerHandle forwarding_compiler = GLSLShaderCompiler::get();
 

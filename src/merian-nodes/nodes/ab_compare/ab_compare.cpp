@@ -3,21 +3,11 @@
 
 namespace merian {
 
-AbstractABCompare::AbstractABCompare(const std::optional<vk::Format> output_format,
-                                     const std::optional<vk::Extent2D> output_extent)
-    : Node(), output_format(output_format), output_extent(output_extent) {}
-
 AbstractABCompare::~AbstractABCompare() {}
 
 std::vector<InputConnectorHandle> AbstractABCompare::describe_inputs() {
     return {con_in_a, con_in_b};
 }
-
-// --------------------------------------------------------------------------------
-
-ABSplit::ABSplit(const std::optional<vk::Format> output_format,
-                 const std::optional<vk::Extent2D> output_extent)
-    : AbstractABCompare(output_format, output_extent) {}
 
 std::vector<OutputConnectorHandle> ABSplit::describe_outputs(const NodeIOLayout& io_layout) {
     const vk::ImageCreateInfo create_info = io_layout[con_in_a]->get_create_info_or_throw();
@@ -52,10 +42,6 @@ void ABSplit::process([[maybe_unused]] GraphRun& run,
 }
 
 // --------------------------------------------------------------------------------
-
-ABSideBySide::ABSideBySide(const std::optional<vk::Format> output_format,
-                           const std::optional<vk::Extent2D> output_extent)
-    : AbstractABCompare(output_format, output_extent) {}
 
 std::vector<OutputConnectorHandle> ABSideBySide::describe_outputs(const NodeIOLayout& io_layout) {
     const vk::ImageCreateInfo create_info = io_layout[con_in_a]->get_create_info_or_throw();

@@ -40,9 +40,12 @@ class AutoExposure : public Node {
     };
 
   public:
-    AutoExposure(const ContextHandle& context);
+    AutoExposure();
 
     virtual ~AutoExposure();
+
+    void initialize(const ContextHandle& context,
+                    const ResourceAllocatorHandle& allocator) override;
 
     std::vector<InputConnectorHandle> describe_inputs() override;
 
@@ -57,7 +60,7 @@ class AutoExposure : public Node {
     NodeStatusFlags properties(Properties& config) override;
 
   private:
-    const ContextHandle context;
+    ContextHandle context;
 
     VkSampledImageInHandle con_src = VkSampledImageIn::compute_read("src");
 

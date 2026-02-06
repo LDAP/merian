@@ -13,10 +13,12 @@ namespace merian {
 class AbstractCompute : public Node {
 
   public:
-    AbstractCompute(const ContextHandle& context,
-                    const std::optional<uint32_t> push_constant_size = std::nullopt);
+    AbstractCompute(const std::optional<uint32_t> push_constant_size = std::nullopt);
 
-    virtual ~AbstractCompute() {}
+    virtual ~AbstractCompute() = default;
+
+    void initialize(const ContextHandle& context,
+                    const ResourceAllocatorHandle& allocator) override;
 
     // Return a pointer to your push constant if push_constant_size is not std::nullop
     // In every run (rebuilds the pipeline if handle changed.)
@@ -43,7 +45,7 @@ class AbstractCompute : public Node {
                          const NodeIO& io) override final;
 
   protected:
-    const ContextHandle context;
+    ContextHandle context;
     const std::optional<uint32_t> push_constant_size;
 
   private:
@@ -55,8 +57,7 @@ class AbstractCompute : public Node {
 
 template <class PushConstant> class TypedPCAbstractCompute : public AbstractCompute {
   public:
-    TypedPCAbstractCompute(const ContextHandle& context)
-        : AbstractCompute(context, sizeof(PushConstant)) {}
+    TypedPCAbstractCompute() : AbstractCompute(sizeof(PushConstant)) {}
 
     virtual const void* get_push_constant([[maybe_unused]] GraphRun& run,
                                           [[maybe_unused]] const NodeIO& io) final {

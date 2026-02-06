@@ -18,12 +18,14 @@ namespace merian {
 static const std::unordered_map<uint32_t, std::string> FILE_EXTENSIONS = {
     {FORMAT_PNG, ".png"}, {FORMAT_JPG, ".jpg"}, {FORMAT_HDR, ".hdr"}};
 
-ImageWrite::ImageWrite(const ContextHandle& context,
-                       const ResourceAllocatorHandle& allocator,
-                       const std::string& filename_format)
-    : Node(), context(context), allocator(allocator), filename_format(filename_format) {}
+ImageWrite::ImageWrite() {}
 
 ImageWrite::~ImageWrite() {}
+
+void ImageWrite::initialize(const ContextHandle& context, const ResourceAllocatorHandle& allocator) {
+    this->context = context;
+    this->allocator = allocator;
+}
 
 std::vector<InputConnectorHandle> ImageWrite::describe_inputs() {
     return {con_src};

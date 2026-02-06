@@ -9,7 +9,13 @@
 
 namespace merian {
 
-MedianApproxNode::MedianApproxNode(const ContextHandle& context) : Node(), context(context) {
+MedianApproxNode::MedianApproxNode() {}
+
+MedianApproxNode::~MedianApproxNode() {}
+
+void MedianApproxNode::initialize(const ContextHandle& context,
+                                  const ResourceAllocatorHandle& /*allocator*/) {
+    this->context = context;
 
     histogram = EntryPoint::create(context, merian_median_histogram_comp_spv(),
                                    merian_median_histogram_comp_spv_size(), "main",
@@ -18,8 +24,6 @@ MedianApproxNode::MedianApproxNode(const ContextHandle& context) : Node(), conte
                                 merian_median_reduce_comp_spv_size(), "main",
                                 vk::ShaderStageFlagBits::eCompute);
 }
-
-MedianApproxNode::~MedianApproxNode() {}
 
 std::vector<InputConnectorHandle> MedianApproxNode::describe_inputs() {
     return {con_src};

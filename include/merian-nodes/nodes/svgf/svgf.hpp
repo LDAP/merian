@@ -35,11 +35,12 @@ class SVGF : public Node {
     };
 
   public:
-    SVGF(const ContextHandle& context,
-         const ResourceAllocatorHandle& allocator,
-         const std::optional<vk::Format> output_format = std::nullopt);
+    SVGF();
 
     ~SVGF();
+
+    void initialize(const ContextHandle& context,
+                    const ResourceAllocatorHandle& allocator) override;
 
     std::vector<InputConnectorHandle> describe_inputs() override;
 
@@ -54,9 +55,9 @@ class SVGF : public Node {
     NodeStatusFlags properties(Properties& config) override;
 
   private:
-    const ContextHandle context;
-    const ResourceAllocatorHandle allocator;
-    const std::optional<vk::Format> output_format;
+    ContextHandle context;
+    ResourceAllocatorHandle allocator;
+    std::optional<vk::Format> output_format = std::nullopt;
 
     // depends on available shared memory
     uint32_t variance_estimate_local_size;

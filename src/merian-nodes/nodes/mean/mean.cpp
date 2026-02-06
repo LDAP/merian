@@ -9,7 +9,13 @@
 
 namespace merian {
 
-MeanToBuffer::MeanToBuffer(const ContextHandle& context) : Node(), context(context) {
+MeanToBuffer::MeanToBuffer() {}
+
+MeanToBuffer::~MeanToBuffer() {}
+
+void MeanToBuffer::initialize(const ContextHandle& context,
+                              const ResourceAllocatorHandle& /*allocator*/) {
+    this->context = context;
 
     image_to_buffer_shader = EntryPoint::create(context, merian_image_to_buffer_comp_spv(),
                                                 merian_image_to_buffer_comp_spv_size(), "main",
@@ -18,8 +24,6 @@ MeanToBuffer::MeanToBuffer(const ContextHandle& context) : Node(), context(conte
                                               merian_reduce_buffer_comp_spv_size(), "main",
                                               vk::ShaderStageFlagBits::eCompute);
 }
-
-MeanToBuffer::~MeanToBuffer() {}
 
 std::vector<InputConnectorHandle> MeanToBuffer::describe_inputs() {
     return {con_src};

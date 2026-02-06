@@ -10,12 +10,14 @@
 
 namespace merian {
 
-SVGF::SVGF(const ContextHandle& context,
-           const ResourceAllocatorHandle& allocator,
-           const std::optional<vk::Format> output_format)
-    : Node(), context(context), allocator(allocator), output_format(output_format) {}
+SVGF::SVGF() {}
 
 SVGF::~SVGF() {}
+
+void SVGF::initialize(const ContextHandle& context, const ResourceAllocatorHandle& allocator) {
+    this->context = context;
+    this->allocator = allocator;
+}
 
 std::vector<InputConnectorHandle> SVGF::describe_inputs() {
     return {

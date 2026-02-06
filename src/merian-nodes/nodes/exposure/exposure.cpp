@@ -10,7 +10,13 @@
 
 namespace merian {
 
-AutoExposure::AutoExposure(const ContextHandle& context) : Node(), context(context) {
+AutoExposure::AutoExposure() {}
+
+AutoExposure::~AutoExposure() {}
+
+void AutoExposure::initialize(const ContextHandle& context,
+                              const ResourceAllocatorHandle& /*allocator*/) {
+    this->context = context;
 
     histogram_module =
         EntryPoint::create(context, merian_histogram_slang_spv(), merian_histogram_slang_spv_size(),
@@ -22,8 +28,6 @@ AutoExposure::AutoExposure(const ContextHandle& context) : Node(), context(conte
         EntryPoint::create(context, merian_exposure_slang_spv(), merian_exposure_slang_spv_size(),
                            "main", vk::ShaderStageFlagBits::eCompute);
 }
-
-AutoExposure::~AutoExposure() {}
 
 std::vector<InputConnectorHandle> AutoExposure::describe_inputs() {
     return {con_src};

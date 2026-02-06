@@ -20,9 +20,12 @@ class MedianApproxNode : public Node {
     };
 
   public:
-    MedianApproxNode(const ContextHandle& context);
+    MedianApproxNode();
 
     virtual ~MedianApproxNode();
+
+    void initialize(const ContextHandle& context,
+                    const ResourceAllocatorHandle& allocator) override;
 
     std::vector<InputConnectorHandle> describe_inputs() override;
 
@@ -37,7 +40,7 @@ class MedianApproxNode : public Node {
     NodeStatusFlags properties(Properties& config) override;
 
   private:
-    const ContextHandle context;
+    ContextHandle context;
     int component;
 
     VkSampledImageInHandle con_src = VkSampledImageIn::compute_read("src");

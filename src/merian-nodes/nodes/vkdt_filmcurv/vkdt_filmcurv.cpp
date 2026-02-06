@@ -6,13 +6,11 @@
 
 namespace merian {
 
-VKDTFilmcurv::VKDTFilmcurv(const ContextHandle& context,
-                           const std::optional<VKDTFilmcurvePushConstant> options,
-                           const std::optional<vk::Format> output_format)
-    : TypedPCAbstractCompute(context), output_format(output_format) {
-    if (options) {
-        pc = options.value();
-    }
+VKDTFilmcurv::VKDTFilmcurv() : TypedPCAbstractCompute() {}
+
+void VKDTFilmcurv::initialize(const ContextHandle& context,
+                              const ResourceAllocatorHandle& allocator) {
+    TypedPCAbstractCompute::initialize(context, allocator);
 
     auto spec_builder = SpecializationInfoBuilder();
     spec_builder.add_entry(local_size_x, local_size_y);

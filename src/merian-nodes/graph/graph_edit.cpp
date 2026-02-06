@@ -128,6 +128,8 @@ const std::string& Graph::add_node(const std::shared_ptr<Node>& node,
     auto [it, inserted] = node_data.try_emplace(node, node_identifier);
     assert(inserted);
 
+    node->initialize(context, resource_allocator);
+
     needs_reconnect = true;
     SPDLOG_DEBUG("added node {} ({})", node_identifier, registry.node_type_name(node));
 

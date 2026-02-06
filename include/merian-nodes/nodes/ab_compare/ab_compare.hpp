@@ -11,16 +11,15 @@ namespace merian {
 class AbstractABCompare : public Node {
 
   protected:
-    AbstractABCompare(const std::optional<vk::Format> output_format = std::nullopt,
-                      const std::optional<vk::Extent2D> output_extent = std::nullopt);
+    AbstractABCompare() = default;
 
     virtual ~AbstractABCompare();
 
     std::vector<InputConnectorHandle> describe_inputs() override final;
 
   protected:
-    const std::optional<vk::Format> output_format;
-    const std::optional<vk::Extent2D> output_extent;
+    std::optional<vk::Format> output_format = std::nullopt;
+    std::optional<vk::Extent2D> output_extent = std::nullopt;
 
     const VkImageInHandle con_in_a = VkImageIn::transfer_src("a");
     const VkImageInHandle con_in_b = VkImageIn::transfer_src("b");
@@ -29,8 +28,7 @@ class AbstractABCompare : public Node {
 class ABSplit : public AbstractABCompare {
 
   public:
-    ABSplit(const std::optional<vk::Format> output_format = std::nullopt,
-            const std::optional<vk::Extent2D> output_extent = std::nullopt);
+    ABSplit() = default;
 
     std::vector<OutputConnectorHandle> describe_outputs(const NodeIOLayout& io_layout) override;
 
@@ -44,8 +42,7 @@ class ABSplit : public AbstractABCompare {
 class ABSideBySide : public AbstractABCompare {
 
   public:
-    ABSideBySide(const std::optional<vk::Format> output_format = std::nullopt,
-                 const std::optional<vk::Extent2D> output_extent = std::nullopt);
+    ABSideBySide() = default;
 
     std::vector<OutputConnectorHandle> describe_outputs(const NodeIOLayout& io_layout) override;
 

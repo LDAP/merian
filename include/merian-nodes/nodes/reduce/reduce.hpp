@@ -12,10 +12,12 @@ class Reduce : public AbstractCompute {
     static constexpr uint32_t local_size_y = 32;
 
   public:
-    Reduce(const ContextHandle& context,
-           const std::optional<vk::Format>& output_format = std::nullopt);
+    Reduce();
 
     ~Reduce();
+
+    void initialize(const ContextHandle& context,
+                    const ResourceAllocatorHandle& allocator) override;
 
     std::vector<InputConnectorHandle> describe_inputs() override;
 
@@ -29,7 +31,7 @@ class Reduce : public AbstractCompute {
     NodeStatusFlags properties(Properties& props) override;
 
   private:
-    const std::optional<vk::Format> output_format;
+    std::optional<vk::Format> output_format = std::nullopt;
 
     std::string source;
 

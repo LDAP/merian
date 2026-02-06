@@ -10,10 +10,13 @@
 
 namespace merian {
 
-Reduce::Reduce(const ContextHandle& context, const std::optional<vk::Format>& output_format)
-    : AbstractCompute(context), output_format(output_format) {}
+Reduce::Reduce() : AbstractCompute() {}
 
 Reduce::~Reduce() {}
+
+void Reduce::initialize(const ContextHandle& context, const ResourceAllocatorHandle& allocator) {
+    AbstractCompute::initialize(context, allocator);
+}
 
 std::vector<InputConnectorHandle> Reduce::describe_inputs() {
     if (input_connectors.size() != number_inputs) {

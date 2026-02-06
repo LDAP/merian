@@ -8,15 +8,20 @@
 
 namespace merian {
 
-TAA::TAA(const ContextHandle& context) : AbstractCompute(context, sizeof(PushConstant)) {
+TAA::TAA() : AbstractCompute(sizeof(PushConstant)) {
+    pc.temporal_alpha = 0.;
+    pc.clamp_method = MERIAN_NODES_TAA_CLAMP_MIN_MAX;
+}
+
+void TAA::initialize(const ContextHandle& context, const ResourceAllocatorHandle& allocator) {
+    AbstractCompute::initialize(context, allocator);
+
     auto spec_builder = SpecializationInfoBuilder();
     spec_builder.add_entry(local_size_x, local_size_y, inverse_motion);
     spec_info = spec_builder.build();
 
     shader = EntryPoint::create(context, merian_taa_slang_spv(), merian_taa_slang_spv_size(),
                                 "main", vk::ShaderStageFlagBits::eCompute, spec_info);
-    pc.temporal_alpha = 0.;
-    pc.clamp_method = MERIAN_NODES_TAA_CLAMP_MIN_MAX;
 }
 
 std::vector<InputConnectorHandle> TAA::describe_inputs() {

@@ -7,12 +7,14 @@
 
 namespace merian {
 
-Tonemap::Tonemap(const ContextHandle& context, const std::optional<vk::Format> output_format)
-    : AbstractCompute(context, sizeof(PushConstant)), output_format(output_format) {
-    make_spec_info();
-}
+Tonemap::Tonemap() : AbstractCompute(sizeof(PushConstant)) {}
 
 Tonemap::~Tonemap() {}
+
+void Tonemap::initialize(const ContextHandle& context, const ResourceAllocatorHandle& allocator) {
+    AbstractCompute::initialize(context, allocator);
+    make_spec_info();
+}
 
 void Tonemap::make_spec_info() {
     auto spec_builder = SpecializationInfoBuilder();

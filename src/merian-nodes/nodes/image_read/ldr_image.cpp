@@ -7,7 +7,12 @@
 
 namespace merian {
 
-LDRImageRead::LDRImageRead(const ContextHandle& context) : Node(), context(context) {}
+LDRImageRead::LDRImageRead() {}
+
+void LDRImageRead::initialize(const ContextHandle& context,
+                              const ResourceAllocatorHandle& /*allocator*/) {
+    this->context = context;
+}
 
 LDRImageRead::~LDRImageRead() {
     if (image != nullptr) {

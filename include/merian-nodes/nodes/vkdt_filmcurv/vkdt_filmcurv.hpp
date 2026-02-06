@@ -19,9 +19,10 @@ class VKDTFilmcurv : public TypedPCAbstractCompute<VKDTFilmcurvePushConstant> {
     static constexpr uint32_t local_size_y = 16;
 
   public:
-    VKDTFilmcurv(const ContextHandle& context,
-                 const std::optional<VKDTFilmcurvePushConstant> options = std::nullopt,
-                 const std::optional<vk::Format> output_format = std::nullopt);
+    VKDTFilmcurv();
+
+    void initialize(const ContextHandle& context,
+                    const ResourceAllocatorHandle& allocator) override;
 
     std::vector<InputConnectorHandle> describe_inputs() override;
 
@@ -38,7 +39,7 @@ class VKDTFilmcurv : public TypedPCAbstractCompute<VKDTFilmcurvePushConstant> {
     NodeStatusFlags properties(Properties& config) override;
 
   private:
-    const std::optional<vk::Format> output_format;
+    std::optional<vk::Format> output_format = std::nullopt;
 
     VkSampledImageInHandle con_src = VkSampledImageIn::compute_read("src");
     vk::Extent3D extent;

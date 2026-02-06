@@ -218,8 +218,14 @@ class DeviceASBuilder : public Node {
     };
 
   public:
-    DeviceASBuilder(const ContextHandle& context, const ResourceAllocatorHandle& allocator)
-        : Node(), context(context), allocator(allocator), as_builder(context, allocator) {}
+    DeviceASBuilder() = default;
+
+    void initialize(const ContextHandle& context,
+                    const ResourceAllocatorHandle& allocator) override {
+        this->context = context;
+        this->allocator = allocator;
+        as_builder.emplace(context, allocator);
+    }
 
     std::vector<InputConnectorHandle> describe_inputs() override {
         return {
@@ -266,7 +272,7 @@ class DeviceASBuilder : public Node {
 
             if (!blas_info.blas) {
                 // build
-                blas_info.blas = as_builder.queue_build(blas_info.geometries, blas_info.range_infos,
+                blas_info.blas = as_builder->queue_build(blas_info.geometries, blas_info.range_infos,
                                                         blas_info.build_flags);
                 tlas_build_info.rebuild = true;
                 any_release_scratch_buffer_after |= blas_info.release_scratch_buffer_after;
@@ -276,7 +282,7 @@ class DeviceASBuilder : public Node {
             } else if (blas_info.rebuild) {
                 // build reusing existing buffers and acceleration structures
                 pre_build_barriers.push_back(blas_info.blas->blas_build_barrier2());
-                as_builder.queue_build(blas_info.geometries, blas_info.range_infos, blas_info.blas,
+                as_builder->queue_build(blas_info.geometries, blas_info.range_infos, blas_info.blas,
                                        blas_info.build_flags);
                 tlas_build_info.rebuild = true;
                 any_release_scratch_buffer_after |= blas_info.release_scratch_buffer_after;
@@ -285,7 +291,7 @@ class DeviceASBuilder : public Node {
             } else if (blas_info.update) {
                 // update
                 pre_build_barriers.push_back(blas_info.blas->blas_build_barrier2());
-                as_builder.queue_update(blas_info.geometries, blas_info.range_infos, blas_info.blas,
+                as_builder->queue_update(blas_info.geometries, blas_info.range_infos, blas_info.blas,
                                         blas_info.build_flags);
                 tlas_build_info.rebuild = true;
                 any_release_scratch_buffer_after |= blas_info.release_scratch_buffer_after;
@@ -332,13 +338,13 @@ class DeviceASBuilder : public Node {
 
         // 3. Queue TLAS build
         if (!tlas_build_info.tlas) {
-            tlas_build_info.tlas = as_builder.queue_build(tlas_build_info.instances.size(),
+            tlas_build_info.tlas = as_builder->queue_build(tlas_build_info.instances.size(),
                                                           tlas_build_info.instances_buffer,
                                                           tlas_build_info.build_flags);
         } else if (tlas_build_info.rebuild) {
             pre_build_barriers.push_back(
                 tlas_build_info.tlas->tlas_build_barrier2(io[con_out_tlas].input_pipeline_stages));
-            tlas_build_info.tlas = as_builder.queue_build(tlas_build_info.instances.size(),
+            tlas_build_info.tlas = as_builder->queue_build(tlas_build_info.instances.size(),
                                                           tlas_build_info.instances_buffer,
                                                           tlas_build_info.build_flags);
         }
@@ -346,7 +352,7 @@ class DeviceASBuilder : public Node {
         run.get_cmd()->barrier(pre_build_barriers);
 
         // 4. Run builds (reusing the same scratch buffer)
-        as_builder.get_cmds(run.get_cmd(), scratch_buffer, run.get_profiler());
+        as_builder->get_cmds(run.get_cmd(), scratch_buffer, run.get_profiler());
 
         // 5. Prevent object destruction
         in_flight_data.build_buffers.emplace_back(scratch_buffer);
@@ -359,9 +365,9 @@ class DeviceASBuilder : public Node {
     }
 
   private:
-    const ContextHandle context;
-    const ResourceAllocatorHandle allocator;
-    ASBuilder as_builder;
+    ContextHandle context;
+    ResourceAllocatorHandle allocator;
+    std::optional<ASBuilder> as_builder;
 
     // clang-format off
     PtrInHandle<TlasBuildInfo> con_in_instance_info = PtrIn<TlasBuildInfo>::create("tlas_info");

@@ -41,11 +41,12 @@ class Accumulate : public Node {
     };
 
   public:
-    Accumulate(const ContextHandle& context,
-               const ResourceAllocatorHandle& allocator,
-               const std::optional<vk::Format> format = vk::Format::eR32G32B32A32Sfloat);
+    Accumulate();
 
     ~Accumulate();
+
+    void initialize(const ContextHandle& context,
+                    const ResourceAllocatorHandle& allocator) override;
 
     std::vector<InputConnectorHandle> describe_inputs() override;
 
@@ -63,9 +64,9 @@ class Accumulate : public Node {
     void request_clear();
 
   private:
-    const ContextHandle context;
-    const ResourceAllocatorHandle allocator;
-    const std::optional<vk::Format> format;
+    ContextHandle context;
+    ResourceAllocatorHandle allocator;
+    std::optional<vk::Format> format = vk::Format::eR32G32B32A32Sfloat;
 
     static constexpr uint32_t PERCENTILE_LOCAL_SIZE_X = 8;
     static constexpr uint32_t PERCENTILE_LOCAL_SIZE_Y = 8;

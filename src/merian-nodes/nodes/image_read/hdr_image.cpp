@@ -7,7 +7,12 @@
 
 namespace merian {
 
-HDRImageRead::HDRImageRead(const ContextHandle& context) : Node(), context(context) {}
+HDRImageRead::HDRImageRead() {}
+
+void HDRImageRead::initialize(const ContextHandle& context,
+                              const ResourceAllocatorHandle& /*allocator*/) {
+    this->context = context;
+}
 
 HDRImageRead::~HDRImageRead() {
     if (image != nullptr) {

@@ -5,9 +5,13 @@
 
 namespace merian {
 
-AbstractCompute::AbstractCompute(const ContextHandle& context,
-                                 const std::optional<uint32_t> push_constant_size)
-    : Node(), context(context), push_constant_size(push_constant_size) {}
+AbstractCompute::AbstractCompute(const std::optional<uint32_t> push_constant_size)
+    : push_constant_size(push_constant_size) {}
+
+void AbstractCompute::initialize(const ContextHandle& context,
+                                 const ResourceAllocatorHandle& /*allocator*/) {
+    this->context = context;
+}
 
 AbstractCompute::NodeStatusFlags
 AbstractCompute::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,

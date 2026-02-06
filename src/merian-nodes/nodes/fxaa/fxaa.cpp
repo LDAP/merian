@@ -7,7 +7,11 @@
 
 namespace merian {
 
-FXAA::FXAA(const ContextHandle& context) : AbstractCompute(context, sizeof(PushConstant)) {
+FXAA::FXAA() : AbstractCompute(sizeof(PushConstant)) {}
+
+void FXAA::initialize(const ContextHandle& context, const ResourceAllocatorHandle& allocator) {
+    AbstractCompute::initialize(context, allocator);
+
     auto spec_builder = SpecializationInfoBuilder();
     spec_builder.add_entry(local_size_x, local_size_y);
     spec_info = spec_builder.build();

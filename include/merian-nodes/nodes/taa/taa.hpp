@@ -19,7 +19,10 @@ class TAA : public AbstractCompute {
     };
 
   public:
-    TAA(const ContextHandle& context);
+    TAA();
+
+    void initialize(const ContextHandle& context,
+                    const ResourceAllocatorHandle& allocator) override;
 
     std::vector<InputConnectorHandle> describe_inputs() override;
 

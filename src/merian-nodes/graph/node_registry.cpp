@@ -23,7 +23,8 @@
 
 namespace merian {
 
-NodeRegistry::NodeRegistry(const ContextHandle& context, const ResourceAllocatorHandle& allocator) {
+NodeRegistry::NodeRegistry([[maybe_unused]] const ContextHandle& context,
+                           [[maybe_unused]] const ResourceAllocatorHandle& allocator) {
     register_node_type<ABSplit>(NodeTypeInfo{"AB Split", "Compare two inputs in a split-view.",
                                              []() { return std::make_shared<ABSplit>(); }});
     register_node_type<ABSideBySide>(
@@ -31,62 +32,62 @@ NodeRegistry::NodeRegistry(const ContextHandle& context, const ResourceAllocator
                      []() { return std::make_shared<ABSideBySide>(); }});
     register_node_type<Accumulate>(
         NodeTypeInfo{"Accumulate", "Accumulate values across multiple iterations.",
-                     [=]() { return std::make_shared<Accumulate>(context, allocator); }});
+                     []() { return std::make_shared<Accumulate>(); }});
     register_node_type<DeviceASBuilder>(
         NodeTypeInfo{"Acceleration Structure Builder",
                      "Build acceleration structures from geometry on the device.",
-                     [=]() { return std::make_shared<DeviceASBuilder>(context, allocator); }});
+                     []() { return std::make_shared<DeviceASBuilder>(); }});
     register_node_type<Bloom>(NodeTypeInfo{"Bloom",
                                            "Selectively blurs pixels that surpass a threshold.",
-                                           [=]() { return std::make_shared<Bloom>(context); }});
+                                           []() { return std::make_shared<Bloom>(); }});
     register_node_type<ColorImage>(
         NodeTypeInfo{"Color", "Outputs a image filled cleared with the selected color.",
-                     [=]() { return std::make_shared<ColorImage>(); }});
+                     []() { return std::make_shared<ColorImage>(); }});
     register_node_type<AutoExposure>(NodeTypeInfo{
         "Exposure", "Exposure with camera-like controls. Includes a robust auto-exposure mode",
-        [=]() { return std::make_shared<AutoExposure>(context); }});
+        []() { return std::make_shared<AutoExposure>(); }});
     register_node_type<FXAA>(
         NodeTypeInfo{"FXAA",
                      "Fast approximate anti-aliasing (FXAA) is a screen-space "
                      "anti-aliasing algorithm created by Timothy Lottes at NVIDIA.",
-                     [=]() { return std::make_shared<FXAA>(context); }});
+                     []() { return std::make_shared<FXAA>(); }});
     register_node_type<GBufferRTNode>(NodeTypeInfo{
         "GBuffer (Raytraced)", "Creates a GBuffer for the Merian scene format using Raytracing.",
-        [=]() { return std::make_shared<GBufferRTNode>(); }});
+        []() { return std::make_shared<GBufferRTNode>(); }});
     register_node_type<GLFWWindowNode>(
         NodeTypeInfo{"Window (GLFW)", "Outputs to a window created with GLFW.",
-                     [=]() { return std::make_shared<GLFWWindowNode>(context); }});
+                     []() { return std::make_shared<GLFWWindowNode>(); }});
     register_node_type<HDRImageRead>(
         NodeTypeInfo{"HDR Image", "Loads an HDR image.",
-                     [=]() { return std::make_shared<HDRImageRead>(context); }});
+                     []() { return std::make_shared<HDRImageRead>(); }});
     register_node_type<LDRImageRead>(
         NodeTypeInfo{"LDR Image", "Loads a LDR image.",
-                     [=]() { return std::make_shared<LDRImageRead>(context); }});
+                     []() { return std::make_shared<LDRImageRead>(); }});
     register_node_type<ImageWrite>(
         NodeTypeInfo{"Image Write", "Stores a graph output as image file.",
-                     [=]() { return std::make_shared<ImageWrite>(context, allocator); }});
+                     []() { return std::make_shared<ImageWrite>(); }});
     register_node_type<MeanToBuffer>(NodeTypeInfo{
         "Mean", "Computes the mean of an image and outputs it as a single buffer element.",
-        [=]() { return std::make_shared<MeanToBuffer>(context); }});
+        []() { return std::make_shared<MeanToBuffer>(); }});
     register_node_type<MedianApproxNode>(NodeTypeInfo{
         "Median (Approximation)", "Computes an approximation of the median of a component.",
-        [=]() { return std::make_shared<MedianApproxNode>(context); }});
+        []() { return std::make_shared<MedianApproxNode>(); }});
     register_node_type<Reduce>(NodeTypeInfo{"Reduce", "Reduce values of multiple input images.",
-                                            [=]() { return std::make_shared<Reduce>(context); }});
+                                            []() { return std::make_shared<Reduce>(); }});
     register_node_type<Shadertoy>(
         NodeTypeInfo{"Shadertoy", "Execute Shadertoy-like shaders (Limited implementation).",
-                     [=]() { return std::make_shared<Shadertoy>(context); }});
+                     []() { return std::make_shared<Shadertoy>(); }});
     register_node_type<SVGF>(
         NodeTypeInfo{"Denoiser (SVGF)", "Spatiotemporal Variance-Guided Filtering.",
-                     [=]() { return std::make_shared<SVGF>(context, allocator); }});
+                     []() { return std::make_shared<SVGF>(); }});
     register_node_type<TAA>(NodeTypeInfo{"TAA", "Temporal Anti-Aliasing.",
-                                         [=]() { return std::make_shared<TAA>(context); }});
+                                         []() { return std::make_shared<TAA>(); }});
     register_node_type<Tonemap>(NodeTypeInfo{"Tonemap",
                                              "Convert a HDR image to LDR using various tonemaps.",
-                                             [=]() { return std::make_shared<Tonemap>(context); }});
+                                             []() { return std::make_shared<Tonemap>(); }});
     register_node_type<VKDTFilmcurv>(
         NodeTypeInfo{"Curves", "Adjust brightness and contrast. Ported from VKDT.",
-                     [=]() { return std::make_shared<VKDTFilmcurv>(context); }});
+                     []() { return std::make_shared<VKDTFilmcurv>(); }});
 
     register_node<Reduce>(
         "Add", "Add values of multiple input images.",

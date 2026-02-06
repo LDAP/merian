@@ -14,16 +14,12 @@ class ImageWrite : public Node {
     };
 
   public:
-    /**
-     * @brief      Constructs a new instance.
-     *
-     * @param      allocator      The allocator used to create copies of the input.
-     */
-    ImageWrite(const ContextHandle& context,
-               const ResourceAllocatorHandle& allocator,
-               const std::string& filename_format = "image_{image_index_total:04}");
+    ImageWrite();
 
     virtual ~ImageWrite();
+
+    void initialize(const ContextHandle& context,
+                    const ResourceAllocatorHandle& allocator) override;
 
     virtual std::vector<InputConnectorHandle> describe_inputs() override;
 
@@ -67,14 +63,14 @@ class ImageWrite : public Node {
     }
 
   private:
-    const ContextHandle context;
-    const ResourceAllocatorHandle allocator;
+    ContextHandle context;
+    ResourceAllocatorHandle allocator;
 
     VkImageInHandle con_src = VkImageIn::transfer_src("src");
 
     std::function<void()> callback;
 
-    std::string filename_format;
+    std::string filename_format = "image_{image_index_total:04}";
 
     float scale = 1;
     int64_t iteration = 0;

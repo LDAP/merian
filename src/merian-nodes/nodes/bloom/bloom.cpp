@@ -9,7 +9,13 @@
 
 namespace merian {
 
-Bloom::Bloom(const ContextHandle& context) : Node(), context(context) {
+Bloom::Bloom() {}
+
+Bloom::~Bloom() {}
+
+void Bloom::initialize(const ContextHandle& context, const ResourceAllocatorHandle& /*allocator*/) {
+    this->context = context;
+
     separate_module = EntryPoint::create(context, merian_bloom_separate_slang_spv(),
                                          merian_bloom_separate_slang_spv_size(), "main",
                                          vk::ShaderStageFlagBits::eCompute);
@@ -17,8 +23,6 @@ Bloom::Bloom(const ContextHandle& context) : Node(), context(context) {
                                           merian_bloom_composite_slang_spv_size(), "main",
                                           vk::ShaderStageFlagBits::eCompute);
 }
-
-Bloom::~Bloom() {}
 
 std::vector<InputConnectorHandle> Bloom::describe_inputs() {
     return {con_src};

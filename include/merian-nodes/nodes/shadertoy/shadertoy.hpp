@@ -24,7 +24,10 @@ class Shadertoy : public AbstractCompute {
     };
 
   public:
-    Shadertoy(const ContextHandle& context);
+    Shadertoy();
+
+    void initialize(const ContextHandle& context,
+                    const ResourceAllocatorHandle& allocator) override;
 
     std::vector<OutputConnectorHandle> describe_outputs(const NodeIOLayout& io_layout) override;
 

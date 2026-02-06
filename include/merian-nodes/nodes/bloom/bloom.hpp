@@ -21,9 +21,12 @@ class Bloom : public Node {
     };
 
   public:
-    Bloom(const ContextHandle& context);
+    Bloom();
 
     virtual ~Bloom();
+
+    void initialize(const ContextHandle& context,
+                    const ResourceAllocatorHandle& allocator) override;
 
     std::vector<InputConnectorHandle> describe_inputs() override;
 
@@ -38,7 +41,7 @@ class Bloom : public Node {
     NodeStatusFlags properties(Properties& config) override;
 
   private:
-    const ContextHandle context;
+    ContextHandle context;
 
     VkSampledImageInHandle con_src = VkSampledImageIn::compute_read("src");
     ManagedVkImageOutHandle con_out;

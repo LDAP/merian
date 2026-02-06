@@ -9,10 +9,15 @@
 
 namespace merian {
 
-Accumulate::Accumulate(const ContextHandle& context,
-                       const ResourceAllocatorHandle& allocator,
-                       const std::optional<vk::Format> format)
-    : Node(), context(context), allocator(allocator), format(format) {
+Accumulate::Accumulate() {}
+
+Accumulate::~Accumulate() {}
+
+void Accumulate::initialize(const ContextHandle& context,
+                            const ResourceAllocatorHandle& allocator) {
+    this->context = context;
+    this->allocator = allocator;
+
     percentile_module = EntryPoint::create(context, merian_calculate_percentiles_slang_spv(),
                                            merian_calculate_percentiles_slang_spv_size(), "main",
                                            vk::ShaderStageFlagBits::eCompute);
@@ -20,8 +25,6 @@ Accumulate::Accumulate(const ContextHandle& context,
                                            merian_accumulate_slang_spv_size(), "main",
                                            vk::ShaderStageFlagBits::eCompute);
 }
-
-Accumulate::~Accumulate() {}
 
 std::vector<InputConnectorHandle> Accumulate::describe_inputs() {
     return {

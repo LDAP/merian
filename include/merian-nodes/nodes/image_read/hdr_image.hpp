@@ -10,14 +10,12 @@ namespace merian {
 class HDRImageRead : public Node {
 
   public:
-    // By default images are interpretet as sRGB, turn on linear if you want to load images for
-    // normal maps, depth, and such.
-    //
-    // Set keep_on_host to keep a copy in host memory, otherwise the image is reloaded from disk
-    // everytime the graph reconnects.
-    HDRImageRead(const ContextHandle& context);
+    HDRImageRead();
 
     ~HDRImageRead();
+
+    void initialize(const ContextHandle& context,
+                    const ResourceAllocatorHandle& allocator) override;
 
     std::vector<OutputConnectorHandle> describe_outputs(const NodeIOLayout& io_layout) override;
 
@@ -27,7 +25,7 @@ class HDRImageRead : public Node {
     NodeStatusFlags properties(Properties& config) override;
 
   private:
-    const ContextHandle context;
+    ContextHandle context;
     bool keep_on_host = false;
 
     ManagedVkImageOutHandle con_out;

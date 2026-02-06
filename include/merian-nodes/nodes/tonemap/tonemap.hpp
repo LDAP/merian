@@ -22,10 +22,12 @@ class Tonemap : public AbstractCompute {
     };
 
   public:
-    Tonemap(const ContextHandle& context,
-            const std::optional<vk::Format> output_format = std::nullopt);
+    Tonemap();
 
     ~Tonemap();
+
+    void initialize(const ContextHandle& context,
+                    const ResourceAllocatorHandle& allocator) override;
 
     std::vector<InputConnectorHandle> describe_inputs() override;
 
@@ -43,7 +45,7 @@ class Tonemap : public AbstractCompute {
   private:
     void make_spec_info();
 
-    const std::optional<vk::Format> output_format;
+    std::optional<vk::Format> output_format = std::nullopt;
 
     VkSampledImageInHandle con_src = VkSampledImageIn::compute_read("src");
 
