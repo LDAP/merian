@@ -26,12 +26,7 @@ Graph::Graph(const ContextHandle& context, const ResourceAllocatorHandle& resour
                       return in_flight_data;
                   }),
       run_profiler(std::make_shared<merian::Profiler>(context)),
-      graph_run(thread_pool,
-                cpu_queue,
-                run_profiler,
-                resource_allocator,
-                queue,
-                GLSLShaderCompiler::get()) {
+      graph_run(thread_pool, cpu_queue, resource_allocator, queue, GLSLShaderCompiler::get()) {
 
     debug_utils = context->get_context_extension<ExtensionVkDebugUtils>();
     time_connect_reference = time_reference = std::chrono::high_resolution_clock::now();
@@ -124,7 +119,7 @@ void Graph::run() {
 
         graph_run.begin_run(ring_fences.size(), cmd_cache, run_iteration, total_iteration,
                             ring_fences.current_cycle_index(), time_delta, duration_elapsed,
-                            duration_elapsed_since_connect);
+                            duration_elapsed_since_connect, profiler);
 
         // While preprocessing nodes can signalize that they need to reconnect as well
         {

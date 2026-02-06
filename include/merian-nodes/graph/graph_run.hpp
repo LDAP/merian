@@ -25,12 +25,11 @@ class GraphRun {
   public:
     GraphRun(const ThreadPoolHandle& thread_pool,
              const CPUQueueHandle& cpu_queue,
-             const ProfilerHandle& profiler,
              const ResourceAllocatorHandle& allocator,
              const QueueHandle& queue,
              const GLSLShaderCompilerHandle& shader_compiler)
-        : thread_pool(thread_pool), cpu_queue(cpu_queue), profiler(profiler), allocator(allocator),
-          queue(queue), shader_compiler(shader_compiler) {}
+        : thread_pool(thread_pool), cpu_queue(cpu_queue), allocator(allocator), queue(queue),
+          shader_compiler(shader_compiler) {}
 
     GraphRun(GraphRun& graph_run) = delete;
     GraphRun(GraphRun&& graph_run) = delete;
@@ -264,7 +263,8 @@ class GraphRun {
                    const uint32_t in_flight_index,
                    const std::chrono::nanoseconds& time_delta,
                    const std::chrono::nanoseconds& elapsed,
-                   const std::chrono::nanoseconds& elapsed_since_connect) {
+                   const std::chrono::nanoseconds& elapsed_since_connect,
+                   const ProfilerHandle& profiler) {
 
         if (semaphores.size() != iterations_in_flight) {
             semaphores.resize(iterations_in_flight);
@@ -286,6 +286,7 @@ class GraphRun {
         this->time_delta = time_delta;
         this->elapsed = elapsed;
         this->elapsed_since_connect = elapsed_since_connect;
+        this->profiler = profiler;
 
         external_wait_time = 0ns;
         needs_reconnect = false;
@@ -331,13 +332,13 @@ class GraphRun {
   private:
     const ThreadPoolHandle thread_pool;
     const CPUQueueHandle cpu_queue;
-    const ProfilerHandle profiler;
     const ResourceAllocatorHandle allocator;
     const QueueHandle queue;
     const GLSLShaderCompilerHandle shader_compiler;
 
     TimelineSemaphoreHandle iteration_semaphore;
 
+    ProfilerHandle profiler;
     uint32_t iterations_in_flight;
 
     std::shared_ptr<CachingCommandPool> cmd_cache = nullptr;
