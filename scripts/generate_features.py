@@ -13,27 +13,23 @@ Replaces the old polymorphic Feature class hierarchy with a more efficient
 aggregate design that eliminates unsafe casting and map lookups.
 """
 
-import re
-from pprint import pprint
 from vulkan_codegen.codegen import (
     generate_file_header,
     generate_stype_switch,
     get_extension,
 )
 from vulkan_codegen.models import FeatureMember, FeatureStruct
-from vulkan_codegen.parsing import build_extension_map, find_all_structures
 from vulkan_codegen.naming import (
     generate_getter_name,
     generate_member_name,
     get_short_feature_name,
-    get_stype_from_name,
     to_camel_case,
     vk_name_to_cpp_name,
 )
+from vulkan_codegen.parsing import build_extension_map, find_all_structures
 from vulkan_codegen.spec import (
-    FEATURE_STRUCT_BASE,
     DEVICE_CREATE_INFO,
-    PHYSICAL_DEVICE_PREFIX,
+    FEATURE_STRUCT_BASE,
     VULKAN_SPEC_VERSION,
     build_skiplist,
     get_output_paths,
@@ -47,7 +43,9 @@ out_path, include_path = get_output_paths()
 _extension_map = {}
 
 
-def _extract_feature_members(vulkan_struct, struct_map: dict) -> tuple[list[FeatureMember], str]:
+def _extract_feature_members(
+    vulkan_struct, struct_map: dict
+) -> tuple[list[FeatureMember], str]:
     """
     Extract VkBool32 feature members from VulkanStruct.
 
@@ -68,13 +66,17 @@ def _extract_feature_members(vulkan_struct, struct_map: dict) -> tuple[list[Feat
             if base_struct := struct_map.get("VkPhysicalDeviceFeatures"):
                 for base_type, base_name, base_comment in base_struct.members:
                     if base_type == "VkBool32":
-                        feature_members.append(FeatureMember(name=base_name, comment=base_comment))
+                        feature_members.append(
+                            FeatureMember(name=base_name, comment=base_comment)
+                        )
             return feature_members, feature_member_prefix
 
     # Regular case: extract VkBool32 members directly
     for member_type, member_name, member_comment in vulkan_struct.members:
         if member_type == "VkBool32":
-            feature_members.append(FeatureMember(name=member_name, comment=member_comment))
+            feature_members.append(
+                FeatureMember(name=member_name, comment=member_comment)
+            )
 
     return feature_members, feature_member_prefix
 
@@ -92,7 +94,8 @@ def find_feature_structures(xml_root, tags) -> list[FeatureStruct]:
 
     # Filter for feature structs (includes base struct and all extensions)
     feature_structs = [
-        s for s in all_structs
+        s
+        for s in all_structs
         if s.vk_name == FEATURE_STRUCT_BASE  # Include VkPhysicalDeviceFeatures2 itself
         or FEATURE_STRUCT_BASE in s.structextends  # Or structs that extend it
     ]
@@ -103,26 +106,31 @@ def find_feature_structures(xml_root, tags) -> list[FeatureStruct]:
     features = []
     for vulkan_struct in feature_structs:
         # Extract VkBool32 members and determine prefix
-        feature_members, feature_member_prefix = _extract_feature_members(vulkan_struct, struct_map)
+        feature_members, feature_member_prefix = _extract_feature_members(
+            vulkan_struct, struct_map
+        )
 
         # Get required_version from version map for core structs
         from vulkan_codegen.codegen import build_feature_version_map
+
         version_map = build_feature_version_map(xml_root)
         required_version = version_map.get(vulkan_struct.vk_name)
 
-        features.append(FeatureStruct(
-            vk_name=vulkan_struct.vk_name,
-            cpp_name=vulkan_struct.cpp_name,
-            stype=vulkan_struct.stype,
-            extension_name=vulkan_struct.extension_name,
-            structextends=vulkan_struct.structextends,
-            aliases=vulkan_struct.aliases,
-            is_alias=vulkan_struct.is_alias,
-            members=vulkan_struct.members,  # Keep raw members from base class
-            feature_members=feature_members,  # Filtered VkBool32 members
-            required_version=required_version,
-            feature_member_prefix=feature_member_prefix,  # From recursive lookup
-        ))
+        features.append(
+            FeatureStruct(
+                vk_name=vulkan_struct.vk_name,
+                cpp_name=vulkan_struct.cpp_name,
+                stype=vulkan_struct.stype,
+                extension_name=vulkan_struct.extension_name,
+                structextends=vulkan_struct.structextends,
+                aliases=vulkan_struct.aliases,
+                is_alias=vulkan_struct.is_alias,
+                members=vulkan_struct.members,  # Keep raw members from base class
+                feature_members=feature_members,  # Filtered VkBool32 members
+                required_version=required_version,
+                feature_member_prefix=feature_member_prefix,  # From recursive lookup
+            )
+        )
 
     return features
 
@@ -182,7 +190,9 @@ def generate_class_methods_declaration(features: list[FeatureStruct]) -> list[st
         for alias_vk_name in feat.aliases:
             alias_cpp_name = vk_name_to_cpp_name(alias_vk_name)
             alias_getter_name = generate_getter_name(alias_cpp_name)
-            lines.append(f"    const vk::{feat.cpp_name}& {alias_getter_name}() const;  // Alias for {feat.cpp_name}")
+            lines.append(
+                f"    const vk::{feat.cpp_name}& {alias_getter_name}() const;  // Alias for {feat.cpp_name}"
+            )
 
     return lines
 
@@ -194,10 +204,9 @@ def generate_header(features: list[FeatureStruct]) -> str:
         "",
         '#include "vulkan/vulkan.hpp"',
         "",
-        "#include <cstdint>",
         "#include <memory>",
         "#include <string>",
-        "#include <unordered_set>",
+        "#include <optional>",
         "#include <vector>",
         "",
         "namespace merian {",
@@ -336,7 +345,9 @@ def generate_constructor(features: list[FeatureStruct], tags) -> list[str]:
 
     # Only canonical features (no aliases) that extend the base struct
     canonical = _canonical_features_only(features)
-    extending_features = [f for f in canonical if FEATURE_STRUCT_BASE in f.structextends]
+    extending_features = [
+        f for f in canonical if FEATURE_STRUCT_BASE in f.structextends
+    ]
     sorted_features = sorted(extending_features, key=lambda f: f.cpp_name)
 
     for feat in sorted_features:
@@ -365,20 +376,24 @@ def generate_constructor(features: list[FeatureStruct], tags) -> list[str]:
 
         if conditions:
             condition = " || ".join(conditions)
-            lines.extend([
-                f"    if ({condition}) {{",
-                f"        {member_name}.pNext = feat_p_next;",
-                f"        feat_p_next = &{member_name};",
-                "    }",
-                "",
-            ])
+            lines.extend(
+                [
+                    f"    if ({condition}) {{",
+                    f"        {member_name}.pNext = feat_p_next;",
+                    f"        feat_p_next = &{member_name};",
+                    "    }",
+                    "",
+                ]
+            )
         else:
             # No conditions - always available
-            lines.extend([
-                f"    {member_name}.pNext = feat_p_next;",
-                f"    feat_p_next = &{member_name};",
-                "",
-            ])
+            lines.extend(
+                [
+                    f"    {member_name}.pNext = feat_p_next;",
+                    f"    feat_p_next = &{member_name};",
+                    "",
+                ]
+            )
 
     features2 = next(
         (f for f in features if f.cpp_name == "PhysicalDeviceFeatures2"), None
@@ -477,7 +492,9 @@ def generate_template_get(features: list[FeatureStruct]) -> list[str]:
     # Only canonical structs get template instantiations (no aliases)
     canonical = _canonical_features_only(features)
     for feat in sorted(canonical, key=lambda f: f.cpp_name):
-        lines.append(f"template const vk::{feat.cpp_name}& VulkanFeatures::get<vk::{feat.cpp_name}>() const;")
+        lines.append(
+            f"template const vk::{feat.cpp_name}& VulkanFeatures::get<vk::{feat.cpp_name}>() const;"
+        )
 
     lines.append("")
     return lines
@@ -579,7 +596,7 @@ def generate_set_feature(feature_map: dict) -> list[str]:
             feat_name = entry["member"].name
             lines.append(f"        {member_name}.{prefix}{feat_name} = value;")
 
-        lines.append(f"        return true;")
+        lines.append("        return true;")
         lines.append("    }")
 
     lines.extend(
@@ -747,7 +764,9 @@ def generate_feature_enabled_condition(feat: FeatureStruct) -> str:
 
     member_name = generate_member_name(feat.cpp_name)
     prefix = feat.feature_member_prefix
-    conditions = [f"{member_name}.{prefix}{m.name} == VK_TRUE" for m in feat.feature_members]
+    conditions = [
+        f"{member_name}.{prefix}{m.name} == VK_TRUE" for m in feat.feature_members
+    ]
     return " ||\n        ".join(conditions)
 
 
@@ -758,21 +777,27 @@ def generate_support_assertion(feat: FeatureStruct) -> list[str]:
     ext = get_extension(feat, _extension_map)
 
     if ext and ext.promotedto:
-        lines.extend([
-            f"        assert((physical_device->extension_supported({ext.name_macro}) ||",
-            f"                vk_api_version >= {ext.promotedto}) &&",
-            f'               "Feature enabled but neither extension nor promoted version supported");',
-        ])
+        lines.extend(
+            [
+                f"        assert((physical_device->extension_supported({ext.name_macro}) ||",
+                f"                vk_api_version >= {ext.promotedto}) &&",
+                '               "Feature enabled but neither extension nor promoted version supported");',
+            ]
+        )
     elif ext:
-        lines.extend([
-            f"        assert(physical_device->extension_supported({ext.name_macro}) &&",
-            f'               "Feature enabled but required extension not supported");',
-        ])
+        lines.extend(
+            [
+                f"        assert(physical_device->extension_supported({ext.name_macro}) &&",
+                '               "Feature enabled but required extension not supported");',
+            ]
+        )
     elif feat.required_version:
-        lines.extend([
-            f"        assert(vk_api_version >= {feat.required_version} &&",
-            f'               "Feature enabled but required Vulkan version not supported");',
-        ])
+        lines.extend(
+            [
+                f"        assert(vk_api_version >= {feat.required_version} &&",
+                '               "Feature enabled but required Vulkan version not supported");',
+            ]
+        )
 
     return lines
 
@@ -816,19 +841,27 @@ def generate_single_feature(feat: FeatureStruct, indent: str) -> list[str]:
     if ext and ext.promotedto:
         support_conditions.append(f"vk_api_version >= {ext.promotedto}")
     if ext:
-        support_conditions.append(f"physical_device->extension_supported({ext.name_macro})")
-    support_condition = " || ".join(support_conditions) if support_conditions else "true"
+        support_conditions.append(
+            f"physical_device->extension_supported({ext.name_macro})"
+        )
+    support_condition = (
+        " || ".join(support_conditions) if support_conditions else "true"
+    )
 
-    lines.extend([
-        f"{indent}if (({feature_condition}) &&",
-        f"{indent}    ({support_condition})) {{",
-    ])
+    lines.extend(
+        [
+            f"{indent}if (({feature_condition}) &&",
+            f"{indent}    ({support_condition})) {{",
+        ]
+    )
     lines.extend([indent + "    " + line for line in generate_support_assertion(feat)])
-    lines.extend([
-        f"{indent}    {member_name}.pNext = chain_head;",
-        f"{indent}    chain_head = &{member_name};",
-        f"{indent}}}",
-    ])
+    lines.extend(
+        [
+            f"{indent}    {member_name}.pNext = chain_head;",
+            f"{indent}    chain_head = &{member_name};",
+            f"{indent}}}",
+        ]
+    )
     return lines
 
 
@@ -848,23 +881,35 @@ def generate_aliases(aliases: list[FeatureStruct], indent: str) -> list[str]:
         elif ext and ext.promotedto:
             support_conditions.append(f"vk_api_version >= {ext.promotedto}")
         if ext:
-            support_conditions.append(f"physical_device->extension_supported({ext.name_macro})")
-        support_condition = " || ".join(support_conditions) if support_conditions else "true"
+            support_conditions.append(
+                f"physical_device->extension_supported({ext.name_macro})"
+            )
+        support_condition = (
+            " || ".join(support_conditions) if support_conditions else "true"
+        )
 
-        lines.extend([
-            f"{indent}{if_keyword} (({feature_condition}) &&",
-            f"{indent}    ({support_condition})) {{",
-        ])
-        lines.extend([indent + "    " + line for line in generate_support_assertion(feat)])
-        lines.extend([
-            f"{indent}    {member_name}.pNext = chain_head;",
-            f"{indent}    chain_head = &{member_name};",
-            f"{indent}}}",
-        ])
+        lines.extend(
+            [
+                f"{indent}{if_keyword} (({feature_condition}) &&",
+                f"{indent}    ({support_condition})) {{",
+            ]
+        )
+        lines.extend(
+            [indent + "    " + line for line in generate_support_assertion(feat)]
+        )
+        lines.extend(
+            [
+                f"{indent}    {member_name}.pNext = chain_head;",
+                f"{indent}    chain_head = &{member_name};",
+                f"{indent}}}",
+            ]
+        )
     return lines
 
 
-def generate_parent_child(parent: FeatureStruct, children: list, indent: str) -> list[str]:
+def generate_parent_child(
+    parent: FeatureStruct, children: list, indent: str
+) -> list[str]:
     """Generate if (parent) {...} else { children } with recursive nesting."""
     lines = []
 
@@ -880,19 +925,27 @@ def generate_parent_child(parent: FeatureStruct, children: list, indent: str) ->
     elif parent_ext and parent_ext.promotedto:
         parent_support_cond.append(f"vk_api_version >= {parent_ext.promotedto}")
     if parent_ext:
-        parent_support_cond.append(f"physical_device->extension_supported({parent_ext.name_macro})")
+        parent_support_cond.append(
+            f"physical_device->extension_supported({parent_ext.name_macro})"
+        )
     parent_support = " || ".join(parent_support_cond) if parent_support_cond else "true"
 
-    lines.extend([
-        f"{indent}if (({parent_feature_cond}) &&",
-        f"{indent}    ({parent_support})) {{",
-    ])
-    lines.extend([indent + "    " + line for line in generate_support_assertion(parent)])
-    lines.extend([
-        f"{indent}    {parent_member}.pNext = chain_head;",
-        f"{indent}    chain_head = &{parent_member};",
-        f"{indent}}} else {{",
-    ])
+    lines.extend(
+        [
+            f"{indent}if (({parent_feature_cond}) &&",
+            f"{indent}    ({parent_support})) {{",
+        ]
+    )
+    lines.extend(
+        [indent + "    " + line for line in generate_support_assertion(parent)]
+    )
+    lines.extend(
+        [
+            f"{indent}    {parent_member}.pNext = chain_head;",
+            f"{indent}    chain_head = &{parent_member};",
+            f"{indent}}} else {{",
+        ]
+    )
 
     # Recursively generate children
     for child in children:
@@ -917,9 +970,15 @@ def generate_device_creation_for_group(group, group_idx: int) -> list[str]:
     lines = []
 
     # Add comment
-    if isinstance(group, list) and len(group) > 0 and isinstance(group[0], FeatureStruct):
+    if (
+        isinstance(group, list)
+        and len(group) > 0
+        and isinstance(group[0], FeatureStruct)
+    ):
         total = count_features_recursive(group)
-        lines.append(f"    // Group {group_idx}: {group[0].cpp_name} and {total-1} related struct(s)")
+        lines.append(
+            f"    // Group {group_idx}: {group[0].cpp_name} and {total - 1} related struct(s)"
+        )
 
     # Generate recursive code
     item_lines = generate_device_creation_for_item(group)
@@ -935,21 +994,25 @@ def generate_device_creation_for_independent(feat: FeatureStruct) -> list[str]:
     member_name = generate_member_name(feat.cpp_name)
     feature_condition = generate_feature_enabled_condition(feat)
 
-    lines.extend([
-        f"    // {feat.cpp_name}",
-        f"    if ({feature_condition}) {{",
-    ])
+    lines.extend(
+        [
+            f"    // {feat.cpp_name}",
+            f"    if ({feature_condition}) {{",
+        ]
+    )
 
     # Add assertion
     lines.extend(["    " + line for line in generate_support_assertion(feat)])
 
     # Add to chain
-    lines.extend([
-        f"        {member_name}.pNext = chain_head;",
-        f"        chain_head = &{member_name};",
-        "    }",
-        "",
-    ])
+    lines.extend(
+        [
+            f"        {member_name}.pNext = chain_head;",
+            f"        chain_head = &{member_name};",
+            "    }",
+            "",
+        ]
+    )
 
     return lines
 
@@ -973,7 +1036,8 @@ def generate_helper_functions(features: list[FeatureStruct], tags) -> list[str]:
     # Filter to only canonical features that extend VkPhysicalDeviceFeatures2 and have members (no aliases)
     canonical = _canonical_features_only(features)
     relevant_features = [
-        f for f in canonical
+        f
+        for f in canonical
         if f.feature_members and DEVICE_CREATE_INFO in f.structextends
     ]
 
@@ -1001,12 +1065,15 @@ def generate_helper_functions(features: list[FeatureStruct], tags) -> list[str]:
 
     # Generate simple if blocks for independent features
     independent = [
-        f for f in sorted(relevant_features, key=lambda f: f.cpp_name)
+        f
+        for f in sorted(relevant_features, key=lambda f: f.cpp_name)
         if f.vk_name not in grouped_features
     ]
 
     if independent:
-        lines.append("    // Independent features (no aliases or aggregation relationships)")
+        lines.append(
+            "    // Independent features (no aliases or aggregation relationships)"
+        )
         lines.append("")
         for feat in independent:
             lines.extend(generate_device_creation_for_independent(feat))

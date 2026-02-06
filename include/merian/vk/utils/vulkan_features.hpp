@@ -5,10 +5,9 @@
 
 #include "vulkan/vulkan.hpp"
 
-#include <cstdint>
 #include <memory>
 #include <string>
-#include <unordered_set>
+#include <optional>
 #include <vector>
 
 namespace merian {
