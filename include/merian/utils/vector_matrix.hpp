@@ -69,9 +69,12 @@ concept GlmType = requires {
 template <typename T>
 concept NumericOrGlm = std::is_arithmetic_v<std::remove_cvref_t<T>> || GlmType<T>;
 
+template <typename... Args>
+concept AllNumericOrGlm = (NumericOrGlm<Args> && ...);
+
 #define FUNCTION_ALIAS(ALIAS, FUNC)                                                                \
     template <typename... Args>                                                                    \
-        requires((NumericOrGlm<Args>) && ...)                                                      \
+        requires AllNumericOrGlm<Args...>                                                          \
     auto ALIAS(Args&&... args) -> decltype(FUNC(std::forward<Args>(args)...)) {                    \
         return FUNC(std::forward<Args>(args)...);                                                  \
     }
