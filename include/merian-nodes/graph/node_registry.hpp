@@ -134,6 +134,10 @@ class NodeRegistry {
         return nodes;
     }
 
+    auto node_type_names() const {
+        return std::views::keys(type_name_to_type);
+    }
+
     NodeHandle create_node_from_name(const std::string& name) {
         assert_node_name_exists(name);
         NodeInfo& node_info = node_name_to_node_info.at(name);
@@ -141,6 +145,19 @@ class NodeRegistry {
 
         if (node_info.config) {
             node->load_config(*node_info.config);
+        }
+
+        return node;
+    }
+
+    NodeHandle create_node_from_type(const std::string& type_name,
+                                     const std::optional<nlohmann::json>& config = std::nullopt) {
+        assert_node_type_exists(type_name);
+        const std::type_index& type = type_name_to_type.at(type_name);
+        NodeHandle node = type_to_type_info.at(type).factory();
+
+        if (config) {
+            node->load_config(*config);
         }
 
         return node;
