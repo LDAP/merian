@@ -50,6 +50,8 @@ ShaderObject::initialize_as_parameter_block(ShaderObjectAllocator& allocator) {
     // descriptor_set->update();
 
     // return descriptor_set;
+
+    return nullptr;
 }
 
 void ShaderObject::bind_to(ShaderCursor& cursor, ShaderObjectAllocator& allocator) {
