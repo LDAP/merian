@@ -9,7 +9,6 @@ This script parses the Vulkan XML specification and generates:
 4. Feature requirement retrieval for enabling capabilities
 """
 
-import re
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -18,7 +17,7 @@ from vulkan_codegen.codegen import (
     generate_file_header,
     version_to_api_version,
 )
-from vulkan_codegen.naming import get_short_feature_name, vk_name_to_cpp_name
+from vulkan_codegen.naming import vk_name_to_cpp_name
 from vulkan_codegen.spec import (
     VULKAN_SPEC_VERSION,
     get_output_paths,
@@ -153,7 +152,9 @@ def get_short_property_struct_name(vk_name: str, tags: list[str]) -> str:
     return short_name + tag_suffix
 
 
-def parse_requires(requires_str: str, ext_name_map: dict[str, str]) -> tuple[Optional[str], list[str]]:
+def parse_requires(
+    requires_str: str, ext_name_map: dict[str, str]
+) -> tuple[Optional[str], list[str]]:
     """
     Parse the 'requires' attribute into version and extensions.
 
@@ -207,7 +208,7 @@ def generate_header(
         " * If the SPIR-V extension is satisfied by the given Vulkan API version,",
         " * returns an empty vector.",
         " *",
-        " * @param spirv_extension The SPIR-V extension name (e.g., \"SPV_KHR_variable_pointers\")",
+        ' * @param spirv_extension The SPIR-V extension name (e.g., "SPV_KHR_variable_pointers")',
         " * @param vk_api_version The Vulkan API version (e.g., VK_API_VERSION_1_1)",
         " * @return Vector of required Vulkan extension name macros, or empty if satisfied by version",
         " */",
@@ -227,7 +228,7 @@ def generate_header(
         " * Checks if any of the enable conditions for the capability are satisfied.",
         " * This includes checking version requirements, features, and properties.",
         " *",
-        " * @param capability The SPIR-V capability name (e.g., \"Geometry\")",
+        ' * @param capability The SPIR-V capability name (e.g., "Geometry")',
         " * @param vk_api_version The Vulkan API version",
         " * @param features The device features",
         " * @param properties The device properties",
@@ -256,7 +257,7 @@ def generate_header(
         "/**",
         " * @brief Get features required for a SPIR-V capability.",
         " *",
-        " * Returns feature requirement names (e.g., \"rayTracingPipeline\")",
+        ' * Returns feature requirement names (e.g., "rayTracingPipeline")',
         " * that can be passed directly to VulkanFeatures::enable_features().",
         " *",
         " * @param capability The SPIR-V capability name",
@@ -299,47 +300,56 @@ def generate_spirv_extension_requirements_impl(
     extensions: list[SpirvExtension],
     ext_name_map: dict[str, str],
 ) -> list[str]:
-    """Generate get_spirv_extension_requirements() implementation."""
+    """Generate get_spirv_extension_requirements() implementation using map lookup."""
     lines = [
-        "std::vector<const char*> get_spirv_extension_requirements(",
-        "    const char* spirv_extension,",
-        "    uint32_t vk_api_version) {",
-        "    ",
-        "    const std::string_view ext_name{spirv_extension};",
-        "    ",
+        "namespace {",
+        "struct SpirvExtReq {",
+        "    uint32_t satisfied_by_version;",
+        "    std::vector<const char*> extensions;",
+        "};",
+        "",
+        "// NOLINTNEXTLINE(cert-err58-cpp)",
+        "const std::unordered_map<std::string_view, SpirvExtReq> spirv_ext_req_map = {",
     ]
 
-    first = True
     for ext in sorted(extensions, key=lambda e: e.name):
-        keyword = "if" if first else "} else if"
-        first = False
-
-        lines.append(f'    {keyword} (ext_name == "{ext.name}") {{')
-
-        # Check if any enable is a version enable
         version_enables = [e for e in ext.enables if e.version]
-        extension_enables = [e for e in ext.enables if e.extension and e.extension in ext_name_map]
+        extension_enables = [
+            e for e in ext.enables if e.extension and e.extension in ext_name_map
+        ]
 
-        if version_enables:
-            # If version requirement is met, no extensions needed
-            version = version_to_api_version(version_enables[0].version)
-            lines.append(f"        if (vk_api_version >= {version}) {{")
-            lines.append("            return {};")
-            lines.append("        }")
-
+        version_str = (
+            version_to_api_version(version_enables[0].version)
+            if version_enables
+            else "0"
+        )
         if extension_enables:
             ext_list = ", ".join(
                 ext_name_map[e.extension] for e in extension_enables
             )
-            lines.append(f"        return {{{ext_list}}};")
         else:
-            lines.append("        return {};")
+            ext_list = ""
+
+        lines.append(f'    {{"{ext.name}", {{{version_str}, {{{ext_list}}}}}}},')
 
     lines.extend(
         [
+            "};",
+            "} // namespace",
+            "",
+            "std::vector<const char*> get_spirv_extension_requirements(",
+            "    const char* spirv_extension,",
+            "    uint32_t vk_api_version) {",
+            "",
+            "    const auto it = spirv_ext_req_map.find(spirv_extension);",
+            "    if (it == spirv_ext_req_map.end()) {",
+            "        return {};",
             "    }",
-            "    ",
-            "    return {};",
+            "    if (it->second.satisfied_by_version != 0 &&",
+            "        vk_api_version >= it->second.satisfied_by_version) {",
+            "        return {};",
+            "    }",
+            "    return it->second.extensions;",
             "}",
             "",
         ]
@@ -372,32 +382,20 @@ def generate_spirv_capabilities_impl(capabilities: list[SpirvCapability]) -> lis
 def generate_is_capability_supported_impl(
     capabilities: list[SpirvCapability], tags: list[str]
 ) -> list[str]:
-    """Generate is_spirv_capability_supported() implementation."""
+    """Generate is_spirv_capability_supported() implementation using function pointer map."""
     lines = [
-        "bool is_spirv_capability_supported(",
-        "    const char* capability,",
-        "    uint32_t vk_api_version,",
-        "    const VulkanFeatures& features,",
-        "    const VulkanProperties& properties) {",
-        "    ",
-        "    const std::string_view cap_name{capability};",
-        "    ",
+        "namespace {",
+        "",
+        "using CapSupportCheckFn = bool(*)(uint32_t, const VulkanFeatures&, const VulkanProperties&);",
+        "",
     ]
 
-    first = True
-    for cap in sorted(capabilities, key=lambda c: c.name):
-        keyword = "if" if first else "} else if"
-        first = False
+    # Generate a check function for each capability that has checkable conditions
+    map_entries = []
 
-        lines.append(f'    {keyword} (cap_name == "{cap.name}") {{')
-
-        if not cap.enables:
-            lines.append("        return false;")
-            continue
-
-        # Generate check for each enable condition (any one being true is sufficient)
+    for idx, cap in enumerate(sorted(capabilities, key=lambda c: c.name)):
         conditions = []
-        seen_features = set()  # Track seen feature names to avoid duplicates
+        seen_features = set()
 
         for enable in cap.enables:
             if enable.version:
@@ -406,54 +404,86 @@ def generate_is_capability_supported_impl(
 
             elif enable.extension:
                 # Extension-only enables - caller tracks available extensions
-                # We can't check this without an extension list parameter
                 pass
 
             elif enable.feature_struct and enable.feature_name:
-                # Skip if we've already seen this feature name
                 if enable.feature_name in seen_features:
                     continue
                 seen_features.add(enable.feature_name)
+                conditions.append(f'features.get_feature("{enable.feature_name}")')
 
-                # Use new feature-name-only API
-                conditions.append(
-                    f'features.get_feature("{enable.feature_name}")'
-                )
-
-            elif enable.property_struct and enable.property_member and enable.property_value:
+            elif (
+                enable.property_struct
+                and enable.property_member
+                and enable.property_value
+            ):
                 cpp_struct_name = vk_name_to_cpp_name(enable.property_struct)
                 member = enable.property_member
                 value = enable.property_value
 
-                # Handle different property value types
                 if value == "VK_TRUE":
                     conditions.append(
                         f"(properties.get<vk::{cpp_struct_name}>().{member} == VK_TRUE)"
                     )
                 elif value.startswith("VK_"):
-                    # It's a flags/enum value - check if the bit is set
-                    # Cast to uint32_t to work with vulkan-hpp's vk::Flags wrapper
                     conditions.append(
                         f"(static_cast<uint32_t>(properties.get<vk::{cpp_struct_name}>().{member}) & {value})"
                     )
                 else:
-                    # Numeric value
                     conditions.append(
                         f"(properties.get<vk::{cpp_struct_name}>().{member} >= {value})"
                     )
 
-        if conditions:
-            # Join with || - any condition being true means supported
-            condition_str = " ||\n            ".join(conditions)
-            lines.append(f"        return {condition_str};")
-        else:
-            lines.append("        return false;")
+        if not conditions:
+            continue
 
+        condition_str = " ||\n        ".join(conditions)
+        lines.extend(
+            [
+                f"// {cap.name}",
+                f"bool spirv_cap_check_{idx}(",
+                "    [[maybe_unused]] uint32_t vk_api_version,",
+                "    [[maybe_unused]] const VulkanFeatures& features,",
+                "    [[maybe_unused]] const VulkanProperties& properties) {",
+                f"    return {condition_str};",
+                "}",
+                "",
+            ]
+        )
+        map_entries.append((cap.name, f"spirv_cap_check_{idx}"))
+
+    # Generate the map
     lines.extend(
         [
+            "// NOLINTNEXTLINE(cert-err58-cpp)",
+            "const std::unordered_map<std::string_view, CapSupportCheckFn> cap_supported_map = {",
+        ]
+    )
+    for name, fn in map_entries:
+        lines.append(f'    {{"{name}", {fn}}},')
+    lines.extend(
+        [
+            "};",
+            "",
+            "} // namespace",
+            "",
+        ]
+    )
+
+    # Generate the main function
+    lines.extend(
+        [
+            "bool is_spirv_capability_supported(",
+            "    const char* capability,",
+            "    uint32_t vk_api_version,",
+            "    const VulkanFeatures& features,",
+            "    const VulkanProperties& properties) {",
+            "",
+            "    const auto it = cap_supported_map.find(capability);",
+            "    if (it == cap_supported_map.end()) {",
+            "        return false;",
             "    }",
-            "    ",
-            "    return false;",
+            "    return it->second(vk_api_version, features, properties);",
             "}",
             "",
         ]
@@ -466,24 +496,20 @@ def generate_capability_extensions_impl(
     capabilities: list[SpirvCapability],
     ext_name_map: dict[str, str],
 ) -> list[str]:
-    """Generate get_spirv_capability_extensions() implementation."""
+    """Generate get_spirv_capability_extensions() implementation using map lookup."""
     lines = [
-        "std::vector<const char*> get_spirv_capability_extensions(",
-        "    const char* capability,",
-        "    uint32_t vk_api_version) {",
-        "    ",
-        "    const std::string_view cap_name{capability};",
-        "    std::vector<const char*> result;",
-        "    ",
+        "namespace {",
+        "struct CapExtEntry {",
+        "    const char* ext;",
+        "    uint32_t below_version;",
+        "};",
+        "",
+        "// NOLINTNEXTLINE(cert-err58-cpp)",
+        "const std::unordered_map<std::string_view, std::vector<CapExtEntry>> cap_ext_map = {",
     ]
 
-    first = True
     for cap in sorted(capabilities, key=lambda c: c.name):
-        keyword = "if" if first else "} else if"
-        first = False
-
-        lines.append(f'    {keyword} (cap_name == "{cap.name}") {{')
-
+        entries = []
         extensions_added = set()
 
         for enable in cap.enables:
@@ -492,26 +518,45 @@ def generate_capability_extensions_impl(
                 ext_macro = ext_name_map[enable.extension]
                 if ext_macro not in extensions_added:
                     extensions_added.add(ext_macro)
-                    lines.append(f"        result.push_back({ext_macro});")
+                    entries.append((ext_macro, "0"))
 
             # Extensions from requires attribute
             if enable.requires:
-                req_version, req_extensions = parse_requires(enable.requires, ext_name_map)
+                req_version, req_extensions = parse_requires(
+                    enable.requires, ext_name_map
+                )
                 for ext_macro in req_extensions:
                     if ext_macro not in extensions_added:
                         extensions_added.add(ext_macro)
-                        # Only add if version doesn't satisfy
-                        if req_version:
-                            lines.append(f"        if (vk_api_version < {req_version}) {{")
-                            lines.append(f"            result.push_back({ext_macro});")
-                            lines.append("        }")
-                        else:
-                            lines.append(f"        result.push_back({ext_macro});")
+                        entries.append(
+                            (ext_macro, req_version if req_version else "0")
+                        )
+
+        if not entries:
+            continue
+
+        entry_strs = ", ".join(f"{{{ext}, {ver}}}" for ext, ver in entries)
+        lines.append(f'    {{"{cap.name}", {{{entry_strs}}}}},')
 
     lines.extend(
         [
+            "};",
+            "} // namespace",
+            "",
+            "std::vector<const char*> get_spirv_capability_extensions(",
+            "    const char* capability,",
+            "    uint32_t vk_api_version) {",
+            "",
+            "    const auto it = cap_ext_map.find(capability);",
+            "    if (it == cap_ext_map.end()) {",
+            "        return {};",
             "    }",
-            "    ",
+            "    std::vector<const char*> result;",
+            "    for (const auto& entry : it->second) {",
+            "        if (entry.below_version == 0 || vk_api_version < entry.below_version) {",
+            "            result.push_back(entry.ext);",
+            "        }",
+            "    }",
             "    return result;",
             "}",
             "",
@@ -524,19 +569,14 @@ def generate_capability_extensions_impl(
 def generate_capability_features_impl(
     capabilities: list[SpirvCapability], tags: list[str]
 ) -> list[str]:
-    """Generate get_spirv_capability_features() implementation."""
+    """Generate get_spirv_capability_features() implementation using map lookup."""
     lines = [
-        "std::vector<std::string> get_spirv_capability_features(",
-        "    const char* capability,",
-        "    [[maybe_unused]] uint32_t vk_api_version) {",
-        "    ",
-        "    const std::string_view cap_name{capability};",
-        "    ",
+        "namespace {",
+        "// NOLINTNEXTLINE(cert-err58-cpp)",
+        "const std::unordered_map<std::string_view, std::vector<const char*>> cap_feature_map = {",
     ]
 
-    first = True
     for cap in sorted(capabilities, key=lambda c: c.name):
-        # Collect feature enables
         feature_enables = [
             e for e in cap.enables if e.feature_struct and e.feature_name
         ]
@@ -544,32 +584,31 @@ def generate_capability_features_impl(
         if not feature_enables:
             continue
 
-        keyword = "if" if first else "} else if"
-        first = False
-
-        lines.append(f'    {keyword} (cap_name == "{cap.name}") {{')
-        lines.append("        return {")
-
-        # Track seen feature names to avoid duplicates
         seen_features = set()
+        feature_names = []
         for enable in feature_enables:
-            # Skip if we've already seen this feature name
             if enable.feature_name in seen_features:
                 continue
             seen_features.add(enable.feature_name)
+            feature_names.append(f'"{enable.feature_name}"')
 
-            # Use new feature-name-only API
-            lines.append(f'            "{enable.feature_name}",')
-
-        lines.append("        };")
-
-    if not first:
-        lines.append("    }")
+        feature_list = ", ".join(feature_names)
+        lines.append(f'    {{"{cap.name}", {{{feature_list}}}}},')
 
     lines.extend(
         [
-            "    ",
-            "    return {};",
+            "};",
+            "} // namespace",
+            "",
+            "std::vector<std::string> get_spirv_capability_features(",
+            "    const char* capability,",
+            "    [[maybe_unused]] uint32_t vk_api_version) {",
+            "",
+            "    const auto it = cap_feature_map.find(capability);",
+            "    if (it == cap_feature_map.end()) {",
+            "        return {};",
+            "    }",
+            "    return {it->second.begin(), it->second.end()};",
             "}",
             "",
         ]
@@ -589,6 +628,7 @@ def generate_implementation(
         '#include "merian/vk/utils/vulkan_spirv.hpp"',
         "",
         "#include <string_view>",
+        "#include <unordered_map>",
         "",
         "namespace merian {",
         "",
