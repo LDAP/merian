@@ -136,14 +136,14 @@ void Context::create_instance(const uint32_t targeted_vk_api_version,
     std::unordered_set<std::string> supported_instance_layers;
     std::unordered_set<std::string> supported_instance_extensions;
     for (const auto& instance_layer : vk::enumerateInstanceLayerProperties()) {
-        supported_instance_layers.emplace(instance_layer.layerName);
+        supported_instance_layers.emplace(instance_layer.layerName.data());
     }
     for (const auto& instance_ext : vk::enumerateInstanceExtensionProperties()) {
-        supported_instance_extensions.emplace(instance_ext.extensionName);
+        supported_instance_extensions.emplace(instance_ext.extensionName.data());
     }
 
     InstanceSupportQueryInfo instance_query_info{supported_instance_extensions,
-                                                  supported_instance_layers, *this};
+                                                 supported_instance_layers, *this};
 
     auto it = context_extensions.begin();
     while (it != context_extensions.end()) {

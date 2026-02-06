@@ -10,8 +10,7 @@ static bool spirv_extension_supported_by_physical_device(
     uint32_t vk_api_version,
     const std::unordered_set<std::string>& supported_extensions) {
 
-    const auto device_extension_deps =
-        get_spirv_extension_requirements(extension, vk_api_version);
+    const auto device_extension_deps = get_spirv_extension_requirements(extension, vk_api_version);
     bool all_supported = true;
     for (const auto& dep : device_extension_deps) {
         all_supported &= supported_extensions.contains(dep);
@@ -21,12 +20,11 @@ static bool spirv_extension_supported_by_physical_device(
 
 PhysicalDevice::PhysicalDevice(const InstanceHandle& instance,
                                const vk::PhysicalDevice& physical_device)
-    : instance(instance), physical_device(physical_device),
-      properties(physical_device, instance),
+    : instance(instance), physical_device(physical_device), properties(physical_device, instance),
       supported_features(physical_device, properties) {
 
     for (const auto& ext : physical_device.enumerateDeviceExtensionProperties()) {
-        supported_extensions.emplace(ext.extensionName);
+        supported_extensions.emplace(ext.extensionName.data());
     }
 
     physical_device_memory_properties = physical_device.getMemoryProperties2();
@@ -34,14 +32,14 @@ PhysicalDevice::PhysicalDevice(const InstanceHandle& instance,
 
     for (const auto& ext : get_spirv_extensions()) {
         if (spirv_extension_supported_by_physical_device(ext, get_vk_api_version(),
-                                                          supported_extensions)) {
+                                                         supported_extensions)) {
             supported_spirv_extensions.push_back(ext);
         }
     }
 
     for (const auto& cap : get_spirv_capabilities()) {
         if (is_spirv_capability_supported(cap, get_vk_api_version(), supported_features,
-                                           properties)) {
+                                          properties)) {
             supported_spirv_capabilities.push_back(cap);
         }
     }
