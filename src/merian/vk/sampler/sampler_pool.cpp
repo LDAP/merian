@@ -77,6 +77,16 @@ SamplerHandle SamplerPool::acquire_sampler(const vk::Filter mag_filter,
                                            const vk::SamplerMipmapMode mipmap_mode,
                                            const bool anisotropy,
                                            const vk::BorderColor border_color) {
+    VkBool32 anisotropy_val = VK_FALSE;
+    if (anisotropy) {
+        if (context->get_device()->get_enabled_features().get_features().samplerAnisotropy ==
+            VK_TRUE) {
+            anisotropy_val = VK_TRUE;
+        } else {
+            SPDLOG_WARN("requested sampler with anisotropy = true but feature is not enabled.");
+        }
+    }
+
     const vk::SamplerCreateInfo info{
         {},
         mag_filter,
@@ -86,7 +96,7 @@ SamplerHandle SamplerPool::acquire_sampler(const vk::Filter mag_filter,
         address_mode_v,
         address_mode_w,
         {},
-        anisotropy ? VK_TRUE : VK_FALSE,
+        anisotropy_val,
         context->get_physical_device()->get_device_limits().maxSamplerAnisotropy,
         VK_FALSE,
         {},

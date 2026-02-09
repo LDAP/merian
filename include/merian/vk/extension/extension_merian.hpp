@@ -24,7 +24,8 @@ class ExtensionMerian : public ContextExtension {
                                             "synchronization2", // for all kinds of sync
                                         },
                                         {
-                                            "maintenance4", // for memory allocator
+                                            "maintenance4",     // for memory allocator
+                                            "samplerAnisotropy" // for sampler pool
 
                                         },
                                         {},
