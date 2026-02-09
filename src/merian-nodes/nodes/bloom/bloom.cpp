@@ -13,7 +13,8 @@ Bloom::Bloom() {}
 
 Bloom::~Bloom() {}
 
-void Bloom::initialize(const ContextHandle& context, const ResourceAllocatorHandle& /*allocator*/) {
+void Bloom::initialize(const ContextHandle& context, const ResourceAllocatorHandle& allocator) {
+    Node::initialize(context, allocator);
     this->context = context;
 
     separate_module = EntryPoint::create(context, merian_bloom_separate_slang_spv(),

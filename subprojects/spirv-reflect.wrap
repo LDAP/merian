@@ -1,0 +1,11 @@
+[wrap-git]
+directory = spirv-reflect
+
+url = https://github.com/KhronosGroup/SPIRV-Reflect
+revision = vulkan-sdk-1.4.341.0
+depth = 1
+
+patch_directory = spirv-reflect
+
+[provide]
+spirv-reflect = spirv-reflect_dep

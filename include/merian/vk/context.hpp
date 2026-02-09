@@ -1,10 +1,8 @@
 #pragma once
 
-#include <map>
 #include <spdlog/logger.h>
 
 #include <typeindex>
-#include <unordered_set>
 
 #include "merian/vk/device.hpp"
 #include "merian/vk/instance.hpp"
@@ -19,6 +17,11 @@ namespace merian {
 class MerianException : public std::runtime_error {
   public:
     MerianException(const std::string& reason) : std::runtime_error(reason) {}
+};
+
+class MissingExtension : public MerianException {
+  public:
+    MissingExtension(const std::string& reason) : MerianException(reason) {}
 };
 
 class VulkanException : public MerianException {
@@ -72,13 +75,19 @@ class VulkanException : public MerianException {
 class ExtensionContainer {
 
   public:
+    // returns the context extension if loaded, otherwise nullptr (if null_ok == true) or throws
+    // MissingExtension.
     template <class ContextExtension>
-    std::shared_ptr<ContextExtension> get_context_extension() const {
+    std::shared_ptr<ContextExtension> get_context_extension(const bool null_ok = false) const {
         if (context_extensions.contains(typeid(ContextExtension))) {
             return std::static_pointer_cast<ContextExtension>(
                 context_extensions.at(typeid(ContextExtension)));
         }
-        return nullptr;
+        if (null_ok) {
+            return nullptr;
+        }
+        throw MissingExtension{fmt::format("context extension with type {} not loaded.",
+                                           typeid(ContextExtension).name())};
     }
 
   protected:
@@ -216,6 +225,8 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
     const DeviceHandle& get_device() const;
 
     FileLoader& get_file_loader();
+
+    const QueueInfo& get_queue_info() const;
 
   private:
     // in create_device_and_queues

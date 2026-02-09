@@ -15,6 +15,7 @@ SVGF::SVGF() {}
 SVGF::~SVGF() {}
 
 void SVGF::initialize(const ContextHandle& context, const ResourceAllocatorHandle& allocator) {
+    Node::initialize(context, allocator);
     this->context = context;
     this->allocator = allocator;
 }

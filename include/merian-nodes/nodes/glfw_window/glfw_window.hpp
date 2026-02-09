@@ -23,7 +23,8 @@ class GLFWWindowNode : public Node {
     GLFWWindowNode() = default;
 
     void initialize(const ContextHandle& context,
-                    const ResourceAllocatorHandle& /*allocator*/) override {
+                    const ResourceAllocatorHandle& allocator) override {
+        Node::initialize(context, allocator);
         const auto glfw_ext = context->get_context_extension<ExtensionGLFW>();
         if (glfw_ext) {
             window = glfw_ext->create_window();

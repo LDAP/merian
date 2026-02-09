@@ -65,6 +65,7 @@ endif
 vulkan = vulkan.partial_dependency(compile_args: false, link_args: true, links: true)
 vulkanheaders_subp = subproject('vulkanheaders', version: ['>=' + vulkan_target_api_version])
 vulkanheaders = vulkanheaders_subp.get_variable('vulkanheaders_dep')
+spirv_reflect = dependency('spirv-reflect', fallback: ['spirv-reflect', 'spirv_reflect_dep'])
 glfw = dependency('glfw3', version: ['>=3.4.0'], fallback: ['glfw', 'glfw_dep'])
 subprocess = dependency('subprocess', version: ['>=0.4.0'], fallback: ['subprocess', 'subprocess_dep'])
 glm = dependency('glm', fallback : ['glm', 'glm_dep'], version: ['>=1.0.2'])
@@ -203,6 +204,7 @@ merian_dep = declare_dependency(
         shaderc,
         slang,
         spdlog,
+        spirv_reflect,
         tinybvh,
         tol,
         vma,

@@ -76,6 +76,7 @@ merian_lib = static_library(
         shaderc,
         slang,
         spdlog,
+        spirv_reflect,
         subprocess,
         tgltf,
         tol,

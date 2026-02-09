@@ -23,6 +23,7 @@ ImageWrite::ImageWrite() {}
 ImageWrite::~ImageWrite() {}
 
 void ImageWrite::initialize(const ContextHandle& context, const ResourceAllocatorHandle& allocator) {
+    Node::initialize(context, allocator);
     this->context = context;
     this->allocator = allocator;
 }

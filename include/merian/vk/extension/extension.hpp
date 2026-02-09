@@ -1,7 +1,11 @@
 #pragma once
 
+#include "merian/utils/vector.hpp"
 #include "merian/vk/context.hpp"
+#include <fmt/format.h>
+#include <fmt/ranges.h>
 #include <spdlog/spdlog.h>
+#include <string>
 #include <vector>
 
 namespace merian {
@@ -13,9 +17,14 @@ class ExtensionContainer;
  *
  * Contains whether the extension is supported and what instance-level
  * requirements it needs (extensions and validation layers).
+ *
+ * The extension must guarantee that all required resources are available when it returns true. If
+ * it returns false, the extension may still populate the requirements with the resources that would
+ * have been needed, for the purpose of generating error messages.
  */
 struct InstanceSupportInfo {
     bool supported = true;                          ///< Whether extension is supported
+    std::string unsupported_reason{};               ///< Optional custom reason if unsupported
     std::vector<const char*> required_extensions{}; ///< Required instance extensions
     std::vector<const char*> required_layers{};     ///< Required validation layers
 };
@@ -37,13 +46,63 @@ struct InstanceSupportQueryInfo {
  *
  * Contains whether the extension is supported on the device and what device-level
  * requirements it needs (features, extensions, SPIR-V capabilities).
+ *
+ * The extension must guarantee that all required resources are available when it returns true. If
+ * it returns false, the extension may still populate the requirements with the resources that would
+ * have been needed, for the purpose of generating error messages.
  */
+struct DeviceSupportQueryInfo;
+
 struct DeviceSupportInfo {
     bool supported = true;                          ///< Whether extension is supported on device
+    std::string unsupported_reason{};               ///< Optional custom reason if unsupported
     std::vector<const char*> required_features{};   ///< Required Vulkan features (by name)
     std::vector<const char*> required_extensions{}; ///< Required device extensions
     std::vector<const char*> required_spirv_capabilities{}; ///< Required SPIR-V capabilities
     std::vector<const char*> required_spirv_extensions{};   ///< Required SPIR-V extensions
+
+    // Checks required and optional requirements against the physical device.
+    // Returns supported=false with a reason if any required item is missing.
+    // Optional items are included in the requirements only if supported.
+    static DeviceSupportInfo check(const DeviceSupportQueryInfo& query_info,
+                                   const std::vector<const char*>& required_features = {},
+                                   const std::vector<const char*>& optional_features = {},
+                                   const std::vector<const char*>& required_extensions = {},
+                                   const std::vector<const char*>& optional_extensions = {},
+                                   const std::vector<const char*>& required_spirv_capabilities = {},
+                                   const std::vector<const char*>& optional_spirv_capabilities = {},
+                                   const std::vector<const char*>& required_spirv_extensions = {},
+                                   const std::vector<const char*>& optional_spirv_extensions = {});
+
+    // Combines two DeviceSupportInfo: ANDs supported, concatenates reasons and all requirement
+    // vectors.
+    friend DeviceSupportInfo operator&(const DeviceSupportInfo& a, const DeviceSupportInfo& b) {
+        DeviceSupportInfo result;
+        result.supported = a.supported && b.supported;
+
+        if (!a.unsupported_reason.empty() && !b.unsupported_reason.empty()) {
+            result.unsupported_reason = a.unsupported_reason + "; " + b.unsupported_reason;
+        } else if (!a.unsupported_reason.empty()) {
+            result.unsupported_reason = a.unsupported_reason;
+        } else {
+            result.unsupported_reason = b.unsupported_reason;
+        }
+
+        result.required_features = a.required_features;
+        insert_all(result.required_features, b.required_features);
+        result.required_extensions = a.required_extensions;
+        insert_all(result.required_extensions, b.required_extensions);
+        result.required_spirv_capabilities = a.required_spirv_capabilities;
+        insert_all(result.required_spirv_capabilities, b.required_spirv_capabilities);
+        result.required_spirv_extensions = a.required_spirv_extensions;
+        insert_all(result.required_spirv_extensions, b.required_spirv_extensions);
+        return result;
+    }
+
+    DeviceSupportInfo& operator&=(const DeviceSupportInfo& other) {
+        *this = *this & other;
+        return *this;
+    }
 };
 
 /**
@@ -57,6 +116,41 @@ struct DeviceSupportQueryInfo {
     const QueueInfo& queue_info;                   ///< Queue family information
     const ExtensionContainer& extension_container; ///< Access to loaded extensions
 };
+
+inline std::string format_as(const InstanceSupportInfo& info) {
+    if (info.supported && info.required_extensions.empty() && info.required_layers.empty())
+        return "supported";
+
+    std::string result = info.supported ? "supported" : "UNSUPPORTED";
+    if (!info.unsupported_reason.empty())
+        result += fmt::format(" ({})", info.unsupported_reason);
+    if (!info.required_extensions.empty())
+        result += fmt::format(", extensions: [{}]", fmt::join(info.required_extensions, ", "));
+    if (!info.required_layers.empty())
+        result += fmt::format(", layers: [{}]", fmt::join(info.required_layers, ", "));
+    return result;
+}
+
+inline std::string format_as(const DeviceSupportInfo& info) {
+    if (info.supported && info.required_features.empty() && info.required_extensions.empty() &&
+        info.required_spirv_capabilities.empty() && info.required_spirv_extensions.empty())
+        return "supported";
+
+    std::string result = info.supported ? "supported" : "UNSUPPORTED";
+    if (!info.unsupported_reason.empty())
+        result += fmt::format(" ({})", info.unsupported_reason);
+    if (!info.required_features.empty())
+        result += fmt::format(", features: [{}]", fmt::join(info.required_features, ", "));
+    if (!info.required_extensions.empty())
+        result += fmt::format(", extensions: [{}]", fmt::join(info.required_extensions, ", "));
+    if (!info.required_spirv_capabilities.empty())
+        result +=
+            fmt::format(", spirv caps: [{}]", fmt::join(info.required_spirv_capabilities, ", "));
+    if (!info.required_spirv_extensions.empty())
+        result +=
+            fmt::format(", spirv exts: [{}]", fmt::join(info.required_spirv_extensions, ", "));
+    return result;
+}
 
 /**
  * @brief      An extension to the Vulkan Context.

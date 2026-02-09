@@ -252,7 +252,9 @@ void Graph::properties(Properties& props) {
                 const NodeHandle& node = node_for_identifier.at(identifier);
                 const auto& data = node_data.at(node);
                 std::string state = "OK";
-                if (data.disable) {
+                if (data.unsupported) {
+                    state = "UNSUPPORTED";
+                } else if (data.disable) {
                     state = "DISABLED";
                 } else if (!data.errors.empty()) {
                     state = "ERROR";
@@ -288,6 +290,10 @@ void Graph::properties(Properties& props) {
                     props.output_text(
                         fmt::format("Errors:\n  - {}", fmt::join(data.errors, "\n   - ")));
                 }
+                if (data.unsupported) {
+                    props.output_text("Unsupported: {}", data.unsupported_reason);
+                }
+
                 props.st_separate();
                 if (props.st_begin_child("properties", "Properties",
                                          Properties::ChildFlagBits::DEFAULT_OPEN)) {

@@ -32,6 +32,7 @@ void Context::load_extensions(const std::vector<std::string>& extension_names) {
     std::queue<std::string> extension_names_to_process;
 
     // Add user-provided extension names to queue
+    extension_names_to_process.push("merian");
     for (const auto& ext_name : extension_names) {
         extension_names_to_process.push(ext_name);
     }
@@ -50,8 +51,7 @@ void Context::load_extensions(const std::vector<std::string>& extension_names) {
         // Create extension from registry
         auto ext = ExtensionRegistry::get_instance().create(ext_name);
         if (!ext) {
-            SPDLOG_WARN("Extension '{}' not found in registry", ext_name);
-            continue;
+            throw MerianException{fmt::format("Extension '{}' not found in registry", ext_name)};
         }
 
         SPDLOG_DEBUG("Loading extension: {}", ext_name);
@@ -151,7 +151,9 @@ void Context::create_instance(const uint32_t targeted_vk_api_version,
         if (support_info.supported) {
             it++;
         } else {
-            it->second->on_unsupported("extension instance support check failed.");
+            it->second->on_unsupported(support_info.unsupported_reason.empty()
+                                           ? "extension instance support check failed."
+                                           : support_info.unsupported_reason);
             it = context_extensions.erase(it);
         }
     }
@@ -377,7 +379,9 @@ void Context::select_physical_device(
         if (support_info.supported) {
             it++;
         } else {
-            it->second->on_unsupported("extension device support check failed.");
+            it->second->on_unsupported(support_info.unsupported_reason.empty()
+                                           ? "extension device support check failed."
+                                           : support_info.unsupported_reason);
             it = context_extensions.erase(it);
         }
     }
@@ -764,6 +768,10 @@ const DeviceHandle& Context::get_device() const {
 
 FileLoader& Context::get_file_loader() {
     return file_loader;
+}
+
+const QueueInfo& Context::get_queue_info() const {
+    return queue_info;
 }
 
 } // namespace merian

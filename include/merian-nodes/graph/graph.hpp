@@ -37,10 +37,13 @@ using namespace merian;
 using namespace graph_internal;
 using namespace std::literals::chrono_literals;
 
+struct GraphCreateInfo {
+    const ContextHandle context;
+    const ResourceAllocatorHandle resource_allocator;
+};
+
 /**
  * @brief      A Vulkan processing graph.
- *
- * @tparam     RING_SIZE  Controls the amount of in-flight processing (frames-in-flight).
  *
  * Implementation is split across multiple files:
  * - graph.cpp: Core execution (constructor, destructor, run, wait, reset)
@@ -69,7 +72,7 @@ class Graph : public std::enable_shared_from_this<Graph> {
     };
 
   public:
-    Graph(const ContextHandle& context, const ResourceAllocatorHandle& resource_allocator);
+    Graph(const GraphCreateInfo& create_info);
 
     ~Graph();
 

@@ -2,6 +2,7 @@
 
 #include "accumulate.slang.spv.h"
 #include "calculate_percentiles.slang.spv.h"
+#include "merian/shader/spriv_reflect.hpp"
 #include "merian/vk/descriptors/descriptor_set_layout_builder.hpp"
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
@@ -13,8 +14,19 @@ Accumulate::Accumulate() {}
 
 Accumulate::~Accumulate() {}
 
+DeviceSupportInfo Accumulate::query_device_support(const DeviceSupportQueryInfo& query_info) {
+    // SPV data from generated headers is static, so const char* pointers into it are always valid.
+    SpirvReflect reflect_accum(merian_accumulate_slang_spv(), merian_accumulate_slang_spv_size());
+    SpirvReflect reflect_perc(merian_calculate_percentiles_slang_spv(),
+                              merian_calculate_percentiles_slang_spv_size());
+
+    return reflect_accum.query_device_support(query_info) &
+           reflect_perc.query_device_support(query_info);
+}
+
 void Accumulate::initialize(const ContextHandle& context,
                             const ResourceAllocatorHandle& allocator) {
+    Node::initialize(context, allocator);
     this->context = context;
     this->allocator = allocator;
 

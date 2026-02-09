@@ -14,6 +14,7 @@ merian_nodes_lib = static_library(
         nlohmann_json,
         slang,
         spdlog,
+        spirv_reflect,
         stb,
         vma,
         vulkan,

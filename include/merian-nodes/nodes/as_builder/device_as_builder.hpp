@@ -220,8 +220,15 @@ class DeviceASBuilder : public Node {
   public:
     DeviceASBuilder() = default;
 
+    virtual DeviceSupportInfo
+    query_device_support(const DeviceSupportQueryInfo& query_info) override {
+        return DeviceSupportInfo::check(query_info, {"accelerationStructure"});
+    }
+
     void initialize(const ContextHandle& context,
                     const ResourceAllocatorHandle& allocator) override {
+        Node::initialize(context, allocator);
+
         this->context = context;
         this->allocator = allocator;
         as_builder.emplace(context, allocator);
@@ -237,15 +244,6 @@ class DeviceASBuilder : public Node {
 
     std::vector<OutputConnectorHandle>
     describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) override {
-        if (context->get_device()
-                ->get_enabled_features()
-                .get_acceleration_structure_features_khr()
-                .accelerationStructure == VK_FALSE) {
-            throw graph_errors::node_error{
-                "context extension AccelerationStructure/accelerationStructure feature is "
-                "required."};
-        }
-
         return {
             con_out_tlas,
         };
@@ -272,8 +270,8 @@ class DeviceASBuilder : public Node {
 
             if (!blas_info.blas) {
                 // build
-                blas_info.blas = as_builder->queue_build(blas_info.geometries, blas_info.range_infos,
-                                                        blas_info.build_flags);
+                blas_info.blas = as_builder->queue_build(
+                    blas_info.geometries, blas_info.range_infos, blas_info.build_flags);
                 tlas_build_info.rebuild = true;
                 any_release_scratch_buffer_after |= blas_info.release_scratch_buffer_after;
                 merian::insert_all(in_flight_data.build_buffers, blas_info.vtx_buffers);
@@ -283,7 +281,7 @@ class DeviceASBuilder : public Node {
                 // build reusing existing buffers and acceleration structures
                 pre_build_barriers.push_back(blas_info.blas->blas_build_barrier2());
                 as_builder->queue_build(blas_info.geometries, blas_info.range_infos, blas_info.blas,
-                                       blas_info.build_flags);
+                                        blas_info.build_flags);
                 tlas_build_info.rebuild = true;
                 any_release_scratch_buffer_after |= blas_info.release_scratch_buffer_after;
                 merian::insert_all(in_flight_data.build_buffers, blas_info.vtx_buffers);
@@ -291,8 +289,8 @@ class DeviceASBuilder : public Node {
             } else if (blas_info.update) {
                 // update
                 pre_build_barriers.push_back(blas_info.blas->blas_build_barrier2());
-                as_builder->queue_update(blas_info.geometries, blas_info.range_infos, blas_info.blas,
-                                        blas_info.build_flags);
+                as_builder->queue_update(blas_info.geometries, blas_info.range_infos,
+                                         blas_info.blas, blas_info.build_flags);
                 tlas_build_info.rebuild = true;
                 any_release_scratch_buffer_after |= blas_info.release_scratch_buffer_after;
                 merian::insert_all(in_flight_data.build_buffers, blas_info.vtx_buffers);
@@ -339,14 +337,14 @@ class DeviceASBuilder : public Node {
         // 3. Queue TLAS build
         if (!tlas_build_info.tlas) {
             tlas_build_info.tlas = as_builder->queue_build(tlas_build_info.instances.size(),
-                                                          tlas_build_info.instances_buffer,
-                                                          tlas_build_info.build_flags);
+                                                           tlas_build_info.instances_buffer,
+                                                           tlas_build_info.build_flags);
         } else if (tlas_build_info.rebuild) {
             pre_build_barriers.push_back(
                 tlas_build_info.tlas->tlas_build_barrier2(io[con_out_tlas].input_pipeline_stages));
             tlas_build_info.tlas = as_builder->queue_build(tlas_build_info.instances.size(),
-                                                          tlas_build_info.instances_buffer,
-                                                          tlas_build_info.build_flags);
+                                                           tlas_build_info.instances_buffer,
+                                                           tlas_build_info.build_flags);
         }
         tlas_build_info.rebuild = false;
         run.get_cmd()->barrier(pre_build_barriers);

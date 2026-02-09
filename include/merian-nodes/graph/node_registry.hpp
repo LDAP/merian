@@ -6,8 +6,7 @@
 
 namespace merian {
 
-template <typename NodeClass>
-NodeHandle create_node() {
+template <typename NodeClass> NodeHandle create_node() {
     return std::make_shared<NodeClass>();
 }
 

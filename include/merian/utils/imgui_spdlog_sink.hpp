@@ -1,6 +1,5 @@
 #pragma once
 
-#include "merian/utils/ring_buffer.hpp"
 #include <spdlog/sinks/base_sink.h>
 
 namespace merian {

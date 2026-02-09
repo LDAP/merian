@@ -33,6 +33,9 @@ struct NodeData {
 
     // User disabled
     bool disable{};
+    // Device does not support this node
+    bool unsupported{};
+    std::string unsupported_reason{};
     // Errors during build / connect
     std::vector<std::string> errors{};
     // Errors in on_connected and while run.

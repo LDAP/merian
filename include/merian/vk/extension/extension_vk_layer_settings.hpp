@@ -23,7 +23,8 @@ class ExtensionVkLayerSettings : public ContextExtension {
 
     // Parameterized constructor (for direct instantiation)
     ExtensionVkLayerSettings(const vk::ArrayProxy<vk::LayerSettingEXT>& settings)
-        : ContextExtension("ExtensionVkLayerSettings"), settings(settings.begin(), settings.end()) {}
+        : ContextExtension("ExtensionVkLayerSettings"), settings(settings.begin(), settings.end()) {
+    }
 
     // Configuration method (called after construction from registry)
     void set_layer_settings(const vk::ArrayProxy<vk::LayerSettingEXT>& layer_settings) {
@@ -32,7 +33,8 @@ class ExtensionVkLayerSettings : public ContextExtension {
 
     // Overrides
     ~ExtensionVkLayerSettings() {}
-    InstanceSupportInfo query_instance_support(const InstanceSupportQueryInfo& /*query_info*/) override {
+    InstanceSupportInfo
+    query_instance_support(const InstanceSupportQueryInfo& /*query_info*/) override {
         InstanceSupportInfo info;
         info.required_extensions = {
             VK_EXT_LAYER_SETTINGS_EXTENSION_NAME,
@@ -42,7 +44,7 @@ class ExtensionVkLayerSettings : public ContextExtension {
 
     void* pnext_instance_create_info(void* const p_next) override {
         if (settings.empty()) {
-            return p_next;  // No settings configured, skip
+            return p_next; // No settings configured, skip
         }
         layer_settings_create_info.settingCount = settings.size();
         layer_settings_create_info.setSettings(settings);

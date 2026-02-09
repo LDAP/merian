@@ -3,8 +3,6 @@
 #include "connector_input.hpp"
 #include "connector_output.hpp"
 #include "graph_run.hpp"
-#include "merian/utils/properties_json_dump.hpp"
-#include "merian/utils/properties_json_load.hpp"
 #include "node_io.hpp"
 
 #include "merian/utils/properties.hpp"
@@ -61,6 +59,10 @@ class Node : public std::enable_shared_from_this<Node> {
      *
      * @param query_info Context containing supported extensions/layers and extension container
      * @return InstanceSupportInfo with supported flag and required extensions/layers
+     *
+     * The node must guarantee that all required resources are available when it returns true.
+     * If it returns false, the node may still populate the requirements with the resources
+     * that would have been needed, for the purpose of generating error messages.
      */
     virtual InstanceSupportInfo
     query_instance_support(const InstanceSupportQueryInfo& /*query_info*/) {
@@ -75,7 +77,11 @@ class Node : public std::enable_shared_from_this<Node> {
      * If the node cannot run on the device, return supported=false.
      *
      * @param query_info Context containing physical device, queue info, and extension container
-     * @return DeviceSupportInfo with supported flag and required extensions/features/SPIR-V
+     * @return DeviceSupportInfo with supported flag and required extensions/features/SPIR-V.
+     *
+     * The node must guarantee that all required resources are available when it returns true.
+     * If it returns false, the node may still populate the requirements with the resources
+     * that would have been needed, for the purpose of generating error messages.
      */
     virtual DeviceSupportInfo query_device_support(const DeviceSupportQueryInfo& /*query_info*/) {
         return DeviceSupportInfo{true};
@@ -86,8 +92,8 @@ class Node : public std::enable_shared_from_this<Node> {
     // query_device_support returned true and all requirements are enabled.
     //
     // Use the allocator to allocate static data, that does not depend on graph configuration.
-    virtual void initialize(const ContextHandle& /*context*/,
-                            const ResourceAllocatorHandle& /*allocator*/) {}
+    virtual void initialize(const ContextHandle& context,
+                            const ResourceAllocatorHandle& allocator);
 
     // This might be called at any time of the graph lifecycle. Must be consistent with dump_config.
     virtual NodeStatusFlags load_config(const nlohmann::json& json);

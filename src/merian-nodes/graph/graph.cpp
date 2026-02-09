@@ -8,14 +8,14 @@ using namespace merian;
 using namespace graph_internal;
 using namespace std::literals::chrono_literals;
 
-Graph::Graph(const ContextHandle& context, const ResourceAllocatorHandle& resource_allocator)
-    : context(context), resource_allocator(resource_allocator), queue(context->get_queue_GCT()),
-      thread_pool(std::make_shared<ThreadPool>()),
+Graph::Graph(const GraphCreateInfo& create_info)
+    : context(create_info.context), resource_allocator(create_info.resource_allocator),
+      queue(context->get_queue_GCT()), thread_pool(std::make_shared<ThreadPool>()),
       cpu_queue(std::make_shared<CPUQueue>(context, thread_pool)),
       registry(NodeRegistry::get_instance()),
       ring_fences(context,
                   2,
-                  [context, this](const uint32_t /*index*/) {
+                  [this](const uint32_t /*index*/) {
                       InFlightData in_flight_data;
                       in_flight_data.command_pool = std::make_shared<CommandPool>(queue);
                       in_flight_data.command_buffer_cache =

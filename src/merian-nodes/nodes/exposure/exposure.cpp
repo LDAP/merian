@@ -15,7 +15,8 @@ AutoExposure::AutoExposure() {}
 AutoExposure::~AutoExposure() {}
 
 void AutoExposure::initialize(const ContextHandle& context,
-                              const ResourceAllocatorHandle& /*allocator*/) {
+                              const ResourceAllocatorHandle& allocator) {
+    Node::initialize(context, allocator);
     this->context = context;
 
     histogram_module =

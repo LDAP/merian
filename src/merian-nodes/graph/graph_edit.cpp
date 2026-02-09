@@ -128,7 +128,14 @@ const std::string& Graph::add_node(const std::shared_ptr<Node>& node,
     auto [it, inserted] = node_data.try_emplace(node, node_identifier);
     assert(inserted);
 
-    node->initialize(context, resource_allocator);
+    try {
+        node->initialize(context, resource_allocator);
+    } catch (const graph_errors::node_error& e) {
+        it->second.unsupported = true;
+        it->second.unsupported_reason = e.what();
+        SPDLOG_WARN("node {} ({}) is unsupported: {}", node_identifier,
+                    NodeRegistry::get_instance().node_type_name(node), e.what());
+    }
 
     needs_reconnect = true;
     SPDLOG_DEBUG("added node {} ({})", node_identifier, NodeRegistry::get_instance().node_type_name(node));

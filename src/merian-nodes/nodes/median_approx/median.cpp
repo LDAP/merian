@@ -14,7 +14,8 @@ MedianApproxNode::MedianApproxNode() {}
 MedianApproxNode::~MedianApproxNode() {}
 
 void MedianApproxNode::initialize(const ContextHandle& context,
-                                  const ResourceAllocatorHandle& /*allocator*/) {
+                                  const ResourceAllocatorHandle& allocator) {
+    Node::initialize(context, allocator);
     this->context = context;
 
     histogram = EntryPoint::create(context, merian_median_histogram_comp_spv(),

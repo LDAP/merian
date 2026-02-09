@@ -32,7 +32,8 @@ class ExtensionVkDebugUtils : public ContextExtension {
         (**instance).destroyDebugUtilsMessengerEXT(messenger);
     }
 
-    InstanceSupportInfo query_instance_support(const InstanceSupportQueryInfo& query_info) override {
+    InstanceSupportInfo
+    query_instance_support(const InstanceSupportQueryInfo& query_info) override {
         InstanceSupportInfo info;
         info.required_extensions = {
             VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
@@ -41,7 +42,8 @@ class ExtensionVkDebugUtils : public ContextExtension {
         info.required_layers = {
             "VK_LAYER_KHRONOS_validation",
         };
-        info.supported = query_info.supported_extensions.contains(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+        info.supported =
+            query_info.supported_extensions.contains(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
         return info;
     }
 

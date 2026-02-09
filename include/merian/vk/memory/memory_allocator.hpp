@@ -93,13 +93,11 @@ class MemoryAllocator : public std::enable_shared_from_this<MemoryAllocator> {
     virtual ~MemoryAllocator();
 
   public:
-    // Used to get memory requirements for create infos. Attemps to get the requirements without
-    // actually creating the image.
+    // Used to get memory requirements for create infos.
     vk::MemoryRequirements
     get_image_memory_requirements(const vk::ImageCreateInfo& image_create_info);
 
-    // Used to get memory requirements for create infos. Attemps to get the requirements without
-    // actually creating the image.
+    // Used to get memory requirements for create infos.
     vk::MemoryRequirements
     get_buffer_memory_requirements(const vk::BufferCreateInfo& buffer_create_info);
 
@@ -139,7 +137,11 @@ class MemoryAllocator : public std::enable_shared_from_this<MemoryAllocator> {
 
   private:
     const ContextHandle context;
-    bool supports_memory_requirements_without_object;
+
+    std::function<vk::MemoryRequirements(const vk::ImageCreateInfo& image_create_info)>
+        get_image_memory_requirements_func;
+    std::function<vk::MemoryRequirements(const vk::BufferCreateInfo& buffer_create_info)>
+        get_buffer_memory_requirements_func;
 };
 
 struct MemoryAllocationInfo {
