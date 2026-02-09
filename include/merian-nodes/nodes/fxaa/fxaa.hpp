@@ -21,6 +21,8 @@ class FXAA : public AbstractCompute {
   public:
     FXAA();
 
+    DeviceSupportInfo query_device_support(const DeviceSupportQueryInfo& query_info) override;
+
     void initialize(const ContextHandle& context,
                     const ResourceAllocatorHandle& allocator) override;
 

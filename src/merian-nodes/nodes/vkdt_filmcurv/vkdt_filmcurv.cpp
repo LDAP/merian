@@ -4,9 +4,16 @@
 
 #include "vkdt_filmcurv.slang.spv.h"
 
+#include "merian/shader/spriv_reflect.hpp"
+
 namespace merian {
 
 VKDTFilmcurv::VKDTFilmcurv() : TypedPCAbstractCompute() {}
+
+DeviceSupportInfo VKDTFilmcurv::query_device_support(const DeviceSupportQueryInfo& query_info) {
+    SpirvReflect reflect(merian_vkdt_filmcurv_slang_spv(), merian_vkdt_filmcurv_slang_spv_size());
+    return reflect.query_device_support(query_info);
+}
 
 void VKDTFilmcurv::initialize(const ContextHandle& context,
                               const ResourceAllocatorHandle& allocator) {

@@ -7,11 +7,22 @@
 #include "bloom_composite.slang.spv.h"
 #include "bloom_separate.slang.spv.h"
 
+#include "merian/shader/spriv_reflect.hpp"
+
 namespace merian {
 
 Bloom::Bloom() {}
 
 Bloom::~Bloom() {}
+
+DeviceSupportInfo Bloom::query_device_support(const DeviceSupportQueryInfo& query_info) {
+    SpirvReflect reflect_sep(merian_bloom_separate_slang_spv(),
+                             merian_bloom_separate_slang_spv_size());
+    SpirvReflect reflect_comp(merian_bloom_composite_slang_spv(),
+                              merian_bloom_composite_slang_spv_size());
+    return reflect_sep.query_device_support(query_info) &
+           reflect_comp.query_device_support(query_info);
+}
 
 void Bloom::initialize(const ContextHandle& context, const ResourceAllocatorHandle& allocator) {
     Node::initialize(context, allocator);

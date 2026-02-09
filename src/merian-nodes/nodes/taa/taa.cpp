@@ -6,7 +6,14 @@
 #include "config.h"
 #include "taa.slang.spv.h"
 
+#include "merian/shader/spriv_reflect.hpp"
+
 namespace merian {
+
+DeviceSupportInfo TAA::query_device_support(const DeviceSupportQueryInfo& query_info) {
+    SpirvReflect reflect(merian_taa_slang_spv(), merian_taa_slang_spv_size());
+    return reflect.query_device_support(query_info);
+}
 
 TAA::TAA() : AbstractCompute(sizeof(PushConstant)) {
     pc.temporal_alpha = 0.;

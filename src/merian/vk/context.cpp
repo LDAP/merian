@@ -589,6 +589,9 @@ void Context::create_device_and_queues(
 
     // -------------------------------
 
+    std::sort(extensions.begin(), extensions.end());
+    remove_duplicates(extensions);
+
     // Setup p_next for extensions
     // Extensions can enable features of their extensions
     void* extensions_device_create_p_next = nullptr;

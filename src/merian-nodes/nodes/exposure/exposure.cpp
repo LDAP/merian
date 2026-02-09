@@ -8,11 +8,22 @@
 #include "histogram.slang.spv.h"
 #include "luminance.slang.spv.h"
 
+#include "merian/shader/spriv_reflect.hpp"
+
 namespace merian {
 
 AutoExposure::AutoExposure() {}
 
 AutoExposure::~AutoExposure() {}
+
+DeviceSupportInfo AutoExposure::query_device_support(const DeviceSupportQueryInfo& query_info) {
+    SpirvReflect reflect_hist(merian_histogram_slang_spv(), merian_histogram_slang_spv_size());
+    SpirvReflect reflect_lum(merian_luminance_slang_spv(), merian_luminance_slang_spv_size());
+    SpirvReflect reflect_exp(merian_exposure_slang_spv(), merian_exposure_slang_spv_size());
+    return reflect_hist.query_device_support(query_info) &
+           reflect_lum.query_device_support(query_info) &
+           reflect_exp.query_device_support(query_info);
+}
 
 void AutoExposure::initialize(const ContextHandle& context,
                               const ResourceAllocatorHandle& allocator) {

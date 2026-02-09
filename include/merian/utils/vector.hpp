@@ -6,7 +6,9 @@
 
 namespace merian {
 
-template <class T> void insert_all(std::vector<T>& to, const std::vector<T>& from) {
+template <class T, class F>
+std::enable_if_t<std::convertible_to<F, T>> insert_all(std::vector<T>& to,
+                                                       const std::vector<F>& from) {
     to.insert(to.end(), from.begin(), from.end());
 }
 

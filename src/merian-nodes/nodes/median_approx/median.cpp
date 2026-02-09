@@ -7,11 +7,23 @@
 #include "median_histogram.comp.spv.h"
 #include "median_reduce.comp.spv.h"
 
+#include "merian/shader/spriv_reflect.hpp"
+
 namespace merian {
 
 MedianApproxNode::MedianApproxNode() {}
 
 MedianApproxNode::~MedianApproxNode() {}
+
+DeviceSupportInfo
+MedianApproxNode::query_device_support(const DeviceSupportQueryInfo& query_info) {
+    SpirvReflect reflect_hist(merian_median_histogram_comp_spv(),
+                              merian_median_histogram_comp_spv_size());
+    SpirvReflect reflect_reduce(merian_median_reduce_comp_spv(),
+                                merian_median_reduce_comp_spv_size());
+    return reflect_hist.query_device_support(query_info) &
+           reflect_reduce.query_device_support(query_info);
+}
 
 void MedianApproxNode::initialize(const ContextHandle& context,
                                   const ResourceAllocatorHandle& allocator) {

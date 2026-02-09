@@ -26,6 +26,8 @@ class Tonemap : public AbstractCompute {
 
     ~Tonemap();
 
+    DeviceSupportInfo query_device_support(const DeviceSupportQueryInfo& query_info) override;
+
     void initialize(const ContextHandle& context,
                     const ResourceAllocatorHandle& allocator) override;
 

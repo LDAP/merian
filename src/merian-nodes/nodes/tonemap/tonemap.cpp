@@ -5,11 +5,18 @@
 
 #include "tonemap.slang.spv.h"
 
+#include "merian/shader/spriv_reflect.hpp"
+
 namespace merian {
 
 Tonemap::Tonemap() : AbstractCompute(sizeof(PushConstant)) {}
 
 Tonemap::~Tonemap() {}
+
+DeviceSupportInfo Tonemap::query_device_support(const DeviceSupportQueryInfo& query_info) {
+    SpirvReflect reflect(merian_tonemap_slang_spv(), merian_tonemap_slang_spv_size());
+    return reflect.query_device_support(query_info);
+}
 
 void Tonemap::initialize(const ContextHandle& context, const ResourceAllocatorHandle& allocator) {
     AbstractCompute::initialize(context, allocator);

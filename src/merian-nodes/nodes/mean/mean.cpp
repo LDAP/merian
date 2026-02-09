@@ -7,11 +7,22 @@
 #include "image_to_buffer.comp.spv.h"
 #include "reduce_buffer.comp.spv.h"
 
+#include "merian/shader/spriv_reflect.hpp"
+
 namespace merian {
 
 MeanToBuffer::MeanToBuffer() {}
 
 MeanToBuffer::~MeanToBuffer() {}
+
+DeviceSupportInfo MeanToBuffer::query_device_support(const DeviceSupportQueryInfo& query_info) {
+    SpirvReflect reflect_i2b(merian_image_to_buffer_comp_spv(),
+                             merian_image_to_buffer_comp_spv_size());
+    SpirvReflect reflect_reduce(merian_reduce_buffer_comp_spv(),
+                                merian_reduce_buffer_comp_spv_size());
+    return reflect_i2b.query_device_support(query_info) &
+           reflect_reduce.query_device_support(query_info);
+}
 
 void MeanToBuffer::initialize(const ContextHandle& context,
                               const ResourceAllocatorHandle& allocator) {
