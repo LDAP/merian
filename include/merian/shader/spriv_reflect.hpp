@@ -53,7 +53,7 @@ class SpirvReflect {
 
         // Skip the 5-word SPIR-V header.
         uint32_t offset = 5;
-        while (offset < spv_size) {
+        while (offset < spv_size / 4) {
             const uint32_t instruction = spv[offset];
             const uint32_t op = instruction & 0xFFFF;
             const uint32_t len = instruction >> 16;
