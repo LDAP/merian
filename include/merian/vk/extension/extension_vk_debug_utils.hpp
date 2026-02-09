@@ -14,7 +14,7 @@ using MESSAGE = vk::DebugUtilsMessageTypeFlagBitsEXT;
 class ExtensionVkDebugUtils : public ContextExtension {
   public:
     // Set assert_message to true to throw if an message with severity error is emitted.
-    ExtensionVkDebugUtils(bool assert_message = false,
+    ExtensionVkDebugUtils(bool assert_message = true,
                           const std::unordered_set<int32_t>& ignore_message_ids = {648835635,
                                                                                    767975156})
         : ContextExtension("ExtensionVkDebugUtils"), user_data(ignore_message_ids, assert_message) {
