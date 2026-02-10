@@ -33,15 +33,28 @@ PhysicalDevice::PhysicalDevice(const InstanceHandle& instance,
     for (const auto& ext : get_spirv_extensions()) {
         if (spirv_extension_supported_by_physical_device(ext, get_vk_api_version(),
                                                          supported_extensions)) {
-            supported_spirv_extensions.push_back(ext);
+            supported_spirv_extensions.insert(ext);
         }
     }
 
     for (const auto& cap : get_spirv_capabilities()) {
         if (is_spirv_capability_supported(cap, get_vk_api_version(), supported_features,
                                           properties)) {
-            supported_spirv_capabilities.push_back(cap);
+            supported_spirv_capabilities.insert(cap);
         }
+    }
+
+    // Precompute shader defines
+    for (const auto& ext : supported_extensions) {
+        shader_defines.emplace(std::string(SHADER_DEFINE_PREFIX_DEVICE_EXT) + ext, "1");
+    }
+
+    for (const auto& ext : supported_spirv_extensions) {
+        shader_defines.emplace(std::string(SHADER_DEFINE_PREFIX_SPIRV_EXT) + ext, "1");
+    }
+
+    for (const auto& cap : supported_spirv_capabilities) {
+        shader_defines.emplace(std::string(SHADER_DEFINE_PREFIX_SPIRV_CAP) + cap, "1");
     }
 }
 
@@ -50,30 +63,16 @@ PhysicalDeviceHandle PhysicalDevice::create(const InstanceHandle& instance,
     return PhysicalDeviceHandle(new PhysicalDevice(instance, physical_device));
 }
 
-const std::vector<const char*>& PhysicalDevice::get_supported_spirv_extensions() const {
+const std::unordered_set<std::string>& PhysicalDevice::get_supported_spirv_extensions() const {
     return supported_spirv_extensions;
 }
 
-const std::vector<const char*>& PhysicalDevice::get_supported_spirv_capabilities() const {
+const std::unordered_set<std::string>& PhysicalDevice::get_supported_spirv_capabilities() const {
     return supported_spirv_capabilities;
 }
 
-std::map<std::string, std::string> PhysicalDevice::get_shader_defines() const {
-    std::map<std::string, std::string> defines;
-
-    for (const auto& ext : supported_extensions) {
-        defines.emplace(std::string(SHADER_DEFINE_PREFIX_DEVICE_EXT) + ext, "1");
-    }
-
-    for (const auto& ext : supported_spirv_extensions) {
-        defines.emplace(std::string(SHADER_DEFINE_PREFIX_SPIRV_EXT) + ext, "1");
-    }
-
-    for (const auto& cap : supported_spirv_capabilities) {
-        defines.emplace(std::string(SHADER_DEFINE_PREFIX_SPIRV_CAP) + cap, "1");
-    }
-
-    return defines;
+const std::map<std::string, std::string>& PhysicalDevice::get_shader_defines() const {
+    return shader_defines;
 }
 
 } // namespace merian

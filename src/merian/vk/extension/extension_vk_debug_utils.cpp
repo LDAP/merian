@@ -112,7 +112,9 @@ void* ExtensionVkDebugUtils::pnext_instance_create_info(void* p_next) {
     return &validation_features;
 }
 
-void ExtensionVkDebugUtils::on_instance_created(const InstanceHandle& instance) {
+void ExtensionVkDebugUtils::on_instance_created(
+    const InstanceHandle& instance,
+    [[maybe_unused]] const ExtensionContainer& extension_container) {
     this->create_info.setPNext(nullptr);
     messenger = (**instance).createDebugUtilsMessengerEXT(create_info);
     assert(this->instance == nullptr);

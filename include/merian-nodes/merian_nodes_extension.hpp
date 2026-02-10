@@ -1,17 +1,24 @@
 #pragma once
 
+#include "merian-nodes/graph/graph.hpp"
 #include "merian-nodes/graph/node_registry.hpp"
 #include "merian/utils/vector.hpp"
 #include "merian/vk/extension/extension.hpp"
+#include "merian/vk/extension/extension_glsl_compiler.hpp"
+#include "merian/vk/extension/extension_slang_compiler.hpp"
 
 namespace merian {
 
-class ExtensionGraph : public ContextExtension {
+class MerianNodesExtension : public ContextExtension {
   public:
-    ExtensionGraph() : ContextExtension("ExtensionGraph") {}
+    MerianNodesExtension() : ContextExtension() {}
 
     std::vector<std::string> request_extensions() override {
         std::vector<std::string> aggregated;
+
+        // Request compiler extensions for nodes that need shader compilation
+        aggregated.push_back("merian-glsl-compiler");
+        aggregated.push_back("merian-slang-session");
 
         auto& registry = NodeRegistry::get_instance();
         for (const auto& type_name : registry.node_type_names()) {
@@ -41,8 +48,17 @@ class ExtensionGraph : public ContextExtension {
     }
 
     DeviceSupportInfo query_device_support(const DeviceSupportQueryInfo& query_info) override {
-        DeviceSupportInfo aggregated;
-        aggregated.supported = true;
+        DeviceSupportInfo aggregated = DeviceSupportInfo::check(query_info, {
+                                                                                "timelineSemaphore",
+                                                                                "hostQueryReset",
+                                                                            });
+
+        aggregated.supported &=
+            query_info.extension_container.get_context_extension<ExtensionSlangCompiler>(true) !=
+            nullptr;
+        aggregated.supported &=
+            query_info.extension_container.get_context_extension<ExtensionGLSLCompiler>(true) !=
+            nullptr;
 
         auto& registry = NodeRegistry::get_instance();
         for (const auto& type_name : registry.node_type_names()) {
@@ -59,6 +75,10 @@ class ExtensionGraph : public ContextExtension {
         }
 
         return aggregated;
+    }
+
+    GraphHandle create(const GraphCreateInfo& graph_create_info) const {
+        return GraphHandle(new Graph(graph_create_info));
     }
 };
 

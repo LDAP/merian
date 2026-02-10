@@ -5,7 +5,7 @@
 
 namespace merian {
 
-ExtensionGLFW::ExtensionGLFW() : ContextExtension("ExtensionGLFW") {
+ExtensionGLFW::ExtensionGLFW() : ContextExtension() {
     glfwSetErrorCallback(glfw_error_callback);
 
     SPDLOG_DEBUG("Initialize GLFW");
@@ -23,7 +23,9 @@ ExtensionGLFW::~ExtensionGLFW() {
         glfwTerminate();
 }
 
-void ExtensionGLFW::on_context_initializing(const vk::detail::DispatchLoaderDynamic& loader) {
+void ExtensionGLFW::on_context_initializing(const vk::detail::DispatchLoaderDynamic& loader,
+                                            [[maybe_unused]] const FileLoader& file_loader,
+                                            [[maybe_unused]] const ContextCreateInfo& create_info) {
 
     SPDLOG_DEBUG("Querying Vulkan support");
     glfwInitVulkanLoader(loader.vkGetInstanceProcAddr);
@@ -63,10 +65,10 @@ DeviceSupportInfo ExtensionGLFW::query_device_support(const DeviceSupportQueryIn
     };
 
     // Check presentation support
-    info.supported = glfwGetPhysicalDevicePresentationSupport(
-                         **(query_info.physical_device->get_instance()),
-                         **query_info.physical_device,
-                         query_info.queue_info.queue_family_idx_GCT) == GLFW_TRUE;
+    info.supported =
+        glfwGetPhysicalDevicePresentationSupport(
+            **(query_info.physical_device->get_instance()), **query_info.physical_device,
+            query_info.queue_info.queue_family_idx_GCT) == GLFW_TRUE;
 
     return info;
 }

@@ -6,7 +6,10 @@ project(
   meson_version: '>=0.64.0',
 )
 
-vulkan = dependency('vulkan')
+vulkanheaders = dependency('vulkanheaders')
+if not vulkanheaders.found()
+    vulkanheaders = dependency('vulkan')
+endif
 include_dirs = include_directories('include')
 
 implementation = import('fs').copyfile('include/vk_mem_alloc.h', 'vk_mem_alloc.cpp')
@@ -14,7 +17,7 @@ implementation = import('fs').copyfile('include/vk_mem_alloc.h', 'vk_mem_alloc.c
 vma = static_library(
   'vma',
   [implementation],
-  dependencies: [vulkan],
+  dependencies: [vulkanheaders],
   cpp_args: ['-DVMA_IMPLEMENTATION'],
   include_directories: include_dirs,
   install: true,

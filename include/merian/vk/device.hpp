@@ -67,10 +67,11 @@ class Device : public std::enable_shared_from_this<Device> {
         return enabled_features;
     }
 
-    const std::vector<const char*>& get_enabled_spirv_extensions() const;
-    const std::vector<const char*>& get_enabled_spirv_capabilities() const;
+    const std::unordered_set<std::string>& get_enabled_spirv_extensions() const;
 
-    std::map<std::string, std::string> get_shader_defines(const InstanceHandle& instance) const;
+    const std::unordered_set<std::string>& get_enabled_spirv_capabilities() const;
+
+    const std::map<std::string, std::string>& get_shader_defines() const;
 
     // Shortcut for get_physical_device()->get_vk_api_version()
     // Returns the effective API version of the physical device, that is the minimum of the
@@ -101,8 +102,10 @@ class Device : public std::enable_shared_from_this<Device> {
     vk::PipelineStageFlags supported_pipeline_stages;
     vk::PipelineStageFlags2 supported_pipeline_stages2;
 
-    std::vector<const char*> enabled_spirv_extensions;
-    std::vector<const char*> enabled_spirv_capabilities;
+    std::unordered_set<std::string> enabled_spirv_extensions;
+    std::unordered_set<std::string> enabled_spirv_capabilities;
+
+    std::map<std::string, std::string> shader_defines;
 };
 
 using DeviceHandle = std::shared_ptr<Device>;

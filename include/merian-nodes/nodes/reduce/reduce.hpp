@@ -16,6 +16,8 @@ class Reduce : public AbstractCompute {
 
     ~Reduce();
 
+    DeviceSupportInfo query_device_support(const DeviceSupportQueryInfo& query_info) override;
+
     void initialize(const ContextHandle& context,
                     const ResourceAllocatorHandle& allocator) override;
 

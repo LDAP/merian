@@ -167,7 +167,7 @@ class ContextExtension {
     friend Context;
 
   public:
-    ContextExtension(const std::string& name) : name(name) {}
+    ContextExtension() {}
 
     virtual ~ContextExtension() = 0;
 
@@ -217,7 +217,9 @@ class ContextExtension {
     // LIFECYCLE (in order)
 
     virtual void
-    on_context_initializing([[maybe_unused]] const vk::detail::DispatchLoaderDynamic& loader) {}
+    on_context_initializing([[maybe_unused]] const vk::detail::DispatchLoaderDynamic& loader,
+                            [[maybe_unused]] const FileLoader& file_loader,
+                            [[maybe_unused]] const ContextCreateInfo& create_info) {}
 
     /**
      * Append structs to vkInstanceCreateInfo to enable features of extensions.
@@ -230,11 +232,13 @@ class ContextExtension {
         return p_next;
     }
 
-    virtual void on_instance_created(const InstanceHandle& /*unused*/) {}
+    virtual void on_instance_created(const InstanceHandle& /*unused*/,
+                                     const ExtensionContainer& /*extension_container*/) {}
 
     /* Called after the physical device was select and before extensions are checked for
      * compatibility and check_support is called.*/
-    virtual void on_physical_device_selected(const PhysicalDeviceHandle& /*unused*/) {}
+    virtual void on_physical_device_selected(const PhysicalDeviceHandle& /*unused*/,
+                                             const ExtensionContainer& /*extension_container*/) {}
 
     virtual bool accept_graphics_queue([[maybe_unused]] const InstanceHandle& instance,
                                        [[maybe_unused]] const PhysicalDeviceHandle& physical_device,
@@ -266,7 +270,8 @@ class ContextExtension {
                                   VulkanFeatures& /*features*/,
                                   std::vector<const char*>& /*extensions*/) {}
 
-    virtual void on_device_created(const DeviceHandle& /*unused*/) {}
+    virtual void on_device_created(const DeviceHandle& /*unused*/,
+                                   const ExtensionContainer& /*extension_container*/) {}
 
     /* Called right before context constructor returns. */
     virtual void
@@ -275,12 +280,7 @@ class ContextExtension {
 
     // Called by context if extension was determined as unsupported. The extension might not receive
     // further callbacks.
-    virtual void on_unsupported([[maybe_unused]] const std::string& reason) {
-        spdlog::warn("extension {} not supported ({})", name, reason);
-    }
-
-  public:
-    const std::string name;
+    virtual void on_unsupported([[maybe_unused]] const std::string& reason);
 };
 
 } // namespace merian

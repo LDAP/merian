@@ -48,15 +48,17 @@ class ShaderCompileContext {
         file_loader.add_search_path(search_paths);
     }
 
-    ShaderCompileContext(const ContextHandle& context) : ShaderCompileContext(*context) {}
-
-    ShaderCompileContext(const Context& context)
-        : preprocessor_macros(context.get_device()->get_shader_defines(context.get_instance())),
+    ShaderCompileContext(const ContextHandle& context)
+        : preprocessor_macros(context->get_device()->get_shader_defines()),
           debug_info(Context::IS_DEBUG_BUILD),
           optimization_level(Context::BUILD_OPTIMIZATION_LEVEL),
-          target(spirv_target_for_vulkan_api_version(context.get_device()->get_vk_api_version())),
-          target_vk_api_version(context.get_device()->get_vk_api_version()) {
-        file_loader.add_search_path(context.get_default_shader_include_paths());
+          target(spirv_target_for_vulkan_api_version(context->get_device()->get_vk_api_version())),
+          target_vk_api_version(context->get_device()->get_vk_api_version()) {
+        // Add search paths from context's file loader
+        const auto& context_file_loader = context->get_file_loader();
+        for (const auto& path : context_file_loader) {
+            file_loader.add_search_path(path);
+        }
     }
 
   public:
@@ -140,8 +142,32 @@ class ShaderCompileContext {
         return ShaderCompileContextHandle(new ShaderCompileContext(context));
     }
 
-    static ShaderCompileContextHandle create(const Context& context) {
-        return ShaderCompileContextHandle(new ShaderCompileContext(context));
+    static ShaderCompileContextHandle create(const FileLoader& file_loader,
+                                             const PhysicalDeviceHandle& physical_device) {
+        std::vector<std::filesystem::path> empty_paths;
+        auto context = ShaderCompileContextHandle(new ShaderCompileContext(
+            empty_paths, physical_device->get_shader_defines(), Context::IS_DEBUG_BUILD,
+            Context::BUILD_OPTIMIZATION_LEVEL,
+            spirv_target_for_vulkan_api_version(physical_device->get_vk_api_version()),
+            physical_device->get_vk_api_version()));
+        for (const auto& path : file_loader) {
+            context->file_loader.add_search_path(path);
+        }
+        return context;
+    }
+
+    static ShaderCompileContextHandle create(const FileLoader& file_loader,
+                                             const DeviceHandle& device) {
+        std::vector<std::filesystem::path> empty_paths;
+        auto context = ShaderCompileContextHandle(new ShaderCompileContext(
+            empty_paths, device->get_shader_defines(), Context::IS_DEBUG_BUILD,
+            Context::BUILD_OPTIMIZATION_LEVEL,
+            spirv_target_for_vulkan_api_version(device->get_vk_api_version()),
+            device->get_vk_api_version()));
+        for (const auto& path : file_loader) {
+            context->file_loader.add_search_path(path);
+        }
+        return context;
     }
 
   private:

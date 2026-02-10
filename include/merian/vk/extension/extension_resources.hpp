@@ -13,12 +13,13 @@ namespace merian {
  */
 class ExtensionResources : public ContextExtension {
   public:
-    ExtensionResources() : ContextExtension("ExtensionResources") {}
+    ExtensionResources() : ContextExtension() {}
     ~ExtensionResources() {}
 
     DeviceSupportInfo query_device_support(const DeviceSupportQueryInfo& query_info) override;
 
-    void on_physical_device_selected(const PhysicalDeviceHandle& /*unused*/) override;
+    void on_physical_device_selected(const PhysicalDeviceHandle& /*unused*/,
+                                     const ExtensionContainer& /*extension_container*/) override;
 
     void on_context_created(const ContextHandle& context,
                             const ExtensionContainer& extension_container) override;

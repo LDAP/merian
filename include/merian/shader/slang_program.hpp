@@ -26,6 +26,8 @@ class SlangProgram : public std::enable_shared_from_this<SlangProgram> {
   public:
     ShaderModuleHandle get_shader_module(const ContextHandle& context);
 
+    Slang::ComPtr<slang::IBlob> get_binary();
+
     slang::ProgramLayout* get_program_reflection() const;
 
     const Slang::ComPtr<slang::IComponentType>& get_program() const;
@@ -51,6 +53,7 @@ class SlangProgram : public std::enable_shared_from_this<SlangProgram> {
     Slang::ComPtr<slang::IComponentType> program; // linked composition
 
     // lazyly compiled
+    Slang::ComPtr<slang::IBlob> binary;
     ShaderModuleHandle shader_module{nullptr};
 };
 

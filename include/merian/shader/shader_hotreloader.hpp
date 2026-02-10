@@ -12,9 +12,8 @@ class HotReloader {
   public:
     HotReloader(const ContextHandle& context,
                 const ShaderCompileContextHandle& shader_compile_context,
-                const std::optional<GLSLShaderCompilerHandle>& compiler = std::nullopt)
-        : context(context), shader_compile_context(shader_compile_context),
-          compiler(compiler.value_or(GLSLShaderCompiler::get())) {}
+                const GLSLShaderCompilerHandle& compiler)
+        : context(context), shader_compile_context(shader_compile_context), compiler(compiler) {}
 
     // Compiles the shader at the specified path and returns a ShaderModule.
     // If this method is called multiple times the shader is automatically recompiled if the file

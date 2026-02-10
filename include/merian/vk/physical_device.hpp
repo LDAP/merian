@@ -50,6 +50,10 @@ class PhysicalDevice : public std::enable_shared_from_this<PhysicalDevice> {
         return supported_extensions;
     }
 
+    const std::unordered_set<std::string>& get_supported_spirv_extensions() const;
+
+    const std::unordered_set<std::string>& get_supported_spirv_capabilities() const;
+
     // ----------------------------------------
 
     // Get reference to VulkanProperties aggregate containing all property structs
@@ -90,10 +94,7 @@ class PhysicalDevice : public std::enable_shared_from_this<PhysicalDevice> {
 
     // ----------------------------------------
 
-    const std::vector<const char*>& get_supported_spirv_extensions() const;
-    const std::vector<const char*>& get_supported_spirv_capabilities() const;
-
-    std::map<std::string, std::string> get_shader_defines() const;
+    const std::map<std::string, std::string>& get_shader_defines() const;
 
     // ----------------------------------------
 
@@ -110,8 +111,10 @@ class PhysicalDevice : public std::enable_shared_from_this<PhysicalDevice> {
 
     std::vector<vk::ExtensionProperties> physical_device_extension_properties;
 
-    std::vector<const char*> supported_spirv_extensions;
-    std::vector<const char*> supported_spirv_capabilities;
+    std::unordered_set<std::string> supported_spirv_extensions;
+    std::unordered_set<std::string> supported_spirv_capabilities;
+
+    std::map<std::string, std::string> shader_defines;
 };
 
 using PhysicalDeviceHandle = std::shared_ptr<PhysicalDevice>;

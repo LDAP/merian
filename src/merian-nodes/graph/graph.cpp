@@ -1,4 +1,7 @@
 #include "merian-nodes/graph/graph.hpp"
+#include "merian-nodes/merian_nodes_extension.hpp"
+#include "merian/vk/extension/extension_glsl_compiler.hpp"
+#include "merian/vk/extension/extension_registry.hpp"
 
 #include <spdlog/spdlog.h>
 
@@ -8,9 +11,18 @@ using namespace merian;
 using namespace graph_internal;
 using namespace std::literals::chrono_literals;
 
+const ContextHandle& check_requirements_and_get_context(const ContextHandle& context) {
+    if (context->get_context_extension<MerianNodesExtension>(true) == nullptr) {
+        throw graph_errors::graph_error{
+            "The merian-nodes context extension must be enabled and supported."};
+    }
+    return context;
+}
+
 Graph::Graph(const GraphCreateInfo& create_info)
-    : context(create_info.context), resource_allocator(create_info.resource_allocator),
-      queue(context->get_queue_GCT()), thread_pool(std::make_shared<ThreadPool>()),
+    : context(check_requirements_and_get_context(create_info.context)),
+      resource_allocator(create_info.resource_allocator), queue(context->get_queue_GCT()),
+      thread_pool(std::make_shared<ThreadPool>()),
       cpu_queue(std::make_shared<CPUQueue>(context, thread_pool)),
       registry(NodeRegistry::get_instance()),
       ring_fences(context,
@@ -26,9 +38,10 @@ Graph::Graph(const GraphCreateInfo& create_info)
                       return in_flight_data;
                   }),
       run_profiler(std::make_shared<merian::Profiler>(context)),
-      graph_run(thread_pool, cpu_queue, resource_allocator, queue, GLSLShaderCompiler::get()) {
+      graph_run(thread_pool, cpu_queue, resource_allocator, queue,
+                context->get_context_extension<ExtensionGLSLCompiler>()->get_compiler()) {
 
-    debug_utils = context->get_context_extension<ExtensionVkDebugUtils>();
+    debug_utils = context->get_context_extension<ExtensionVkDebugUtils>(true);
     time_connect_reference = time_reference = std::chrono::high_resolution_clock::now();
     duration_elapsed = 0ns;
 }
@@ -406,3 +419,5 @@ void Graph::record_descriptor_updates(NodeData& src_data,
 }
 
 } // namespace merian
+
+REGISTER_CONTEXT_EXTENSION(merian::MerianNodesExtension, "merian-nodes");

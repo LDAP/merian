@@ -1,5 +1,5 @@
 #include "merian/vk/extension/extension.hpp"
-
+#include "merian/vk/extension/extension_registry.hpp"
 #include "merian/vk/physical_device.hpp"
 
 #include <cstring>
@@ -23,12 +23,6 @@ DeviceSupportInfo::check(const DeviceSupportQueryInfo& query_info,
                          const std::vector<const char*>& optional_spirv_extensions) {
     DeviceSupportInfo info;
     const auto& pd = query_info.physical_device;
-
-    const auto str_in = [](const std::vector<const char*>& haystack, const char* needle) {
-        return std::find_if(haystack.begin(), haystack.end(), [needle](const char* s) {
-                   return std::strcmp(s, needle) == 0;
-               }) != haystack.end();
-    };
 
     struct Category {
         const char* label;
@@ -58,18 +52,14 @@ DeviceSupportInfo::check(const DeviceSupportQueryInfo& query_info,
             required_spirv_capabilities,
             optional_spirv_capabilities,
             info.required_spirv_capabilities,
-            [&, &caps = pd->get_supported_spirv_capabilities()](const char* n) {
-                return str_in(caps, n);
-            },
+            [&](const char* n) { return pd->get_supported_spirv_capabilities().contains(n); },
         },
         {
             "SPIR-V extensions",
             required_spirv_extensions,
             optional_spirv_extensions,
             info.required_spirv_extensions,
-            [&, &exts = pd->get_supported_spirv_extensions()](const char* n) {
-                return str_in(exts, n);
-            },
+            [&](const char* n) { return pd->get_supported_spirv_extensions().contains(n); },
         },
     };
 
@@ -97,6 +87,12 @@ DeviceSupportInfo::check(const DeviceSupportQueryInfo& query_info,
     }
 
     return info;
+}
+
+void ContextExtension::on_unsupported([[maybe_unused]] const std::string& reason) {
+    auto& registry = ExtensionRegistry::get_instance();
+    std::string name = registry.get_name(this);
+    spdlog::warn("extension {} not supported ({})", name, reason);
 }
 
 } // namespace merian

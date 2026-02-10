@@ -19,12 +19,11 @@ class ExtensionVkLayerSettings : public ContextExtension {
 
   public:
     // Default constructor for registry
-    ExtensionVkLayerSettings() : ContextExtension("ExtensionVkLayerSettings") {}
+    ExtensionVkLayerSettings() : ContextExtension() {}
 
     // Parameterized constructor (for direct instantiation)
     ExtensionVkLayerSettings(const vk::ArrayProxy<vk::LayerSettingEXT>& settings)
-        : ContextExtension("ExtensionVkLayerSettings"), settings(settings.begin(), settings.end()) {
-    }
+        : ContextExtension(), settings(settings.begin(), settings.end()) {}
 
     // Configuration method (called after construction from registry)
     void set_layer_settings(const vk::ArrayProxy<vk::LayerSettingEXT>& layer_settings) {

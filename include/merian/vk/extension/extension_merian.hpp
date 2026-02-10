@@ -9,12 +9,12 @@ namespace merian {
  */
 class ExtensionMerian : public ContextExtension {
   public:
-    ExtensionMerian() : ContextExtension("ExtensionMerian") {}
+    ExtensionMerian() : ContextExtension() {}
     ~ExtensionMerian() {}
 
     std::vector<std::string> request_extensions() override {
         return {
-            "mitigations",
+            "merian-mitigations",
         };
     }
 

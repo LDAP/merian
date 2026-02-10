@@ -16,7 +16,7 @@ namespace merian {
  * @brief Get list of all SPIR-V extension names.
  * @return Vector of SPIR-V extension name strings.
  */
-std::vector<const char*> get_spirv_extensions();
+const std::vector<const char*>& get_spirv_extensions();
 
 /**
  * @brief Get Vulkan extension requirements for a SPIR-V extension.
@@ -37,7 +37,7 @@ std::vector<const char*> get_spirv_extension_requirements(
  * @brief Get list of all SPIR-V capability names.
  * @return Vector of SPIR-V capability name strings.
  */
-std::vector<const char*> get_spirv_capabilities();
+const std::vector<const char*>& get_spirv_capabilities();
 
 /**
  * @brief Check if a SPIR-V capability is supported.

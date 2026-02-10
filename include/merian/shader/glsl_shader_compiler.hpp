@@ -59,9 +59,6 @@ class GLSLShaderCompiler : public ShaderCompiler {
         };
 
   public:
-    // Returns any of the available shader compilers. Returns a stub compiler if none is available.
-    static GLSLShaderCompilerHandle get();
-
     GLSLShaderCompiler();
 
     virtual ~GLSLShaderCompiler() = default;

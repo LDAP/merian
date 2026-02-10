@@ -199,7 +199,7 @@ def generate_header(
         " * @brief Get list of all SPIR-V extension names.",
         " * @return Vector of SPIR-V extension name strings.",
         " */",
-        "std::vector<const char*> get_spirv_extensions();",
+        "const std::vector<const char*>& get_spirv_extensions();",
         "",
         "/**",
         " * @brief Get Vulkan extension requirements for a SPIR-V extension.",
@@ -220,7 +220,7 @@ def generate_header(
         " * @brief Get list of all SPIR-V capability names.",
         " * @return Vector of SPIR-V capability name strings.",
         " */",
-        "std::vector<const char*> get_spirv_capabilities();",
+        "const std::vector<const char*>& get_spirv_capabilities();",
         "",
         "/**",
         " * @brief Check if a SPIR-V capability is supported.",
@@ -278,8 +278,8 @@ def generate_header(
 def generate_spirv_extensions_impl(extensions: list[SpirvExtension]) -> list[str]:
     """Generate get_spirv_extensions() implementation."""
     lines = [
-        "std::vector<const char*> get_spirv_extensions() {",
-        "    return {",
+        "const std::vector<const char*>& get_spirv_extensions() {",
+        "    static const std::vector<const char*> extensions = {",
     ]
 
     for ext in sorted(extensions, key=lambda e: e.name):
@@ -288,6 +288,7 @@ def generate_spirv_extensions_impl(extensions: list[SpirvExtension]) -> list[str
     lines.extend(
         [
             "    };",
+            "    return extensions;",
             "}",
             "",
         ]
@@ -361,8 +362,8 @@ def generate_spirv_extension_requirements_impl(
 def generate_spirv_capabilities_impl(capabilities: list[SpirvCapability]) -> list[str]:
     """Generate get_spirv_capabilities() implementation."""
     lines = [
-        "std::vector<const char*> get_spirv_capabilities() {",
-        "    return {",
+        "const std::vector<const char*>& get_spirv_capabilities() {",
+        "    static const std::vector<const char*> capabilities = {",
     ]
 
     for cap in sorted(capabilities, key=lambda c: c.name):
@@ -371,6 +372,7 @@ def generate_spirv_capabilities_impl(capabilities: list[SpirvCapability]) -> lis
     lines.extend(
         [
             "    };",
+            "    return capabilities;",
             "}",
             "",
         ]

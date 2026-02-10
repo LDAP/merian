@@ -1,9 +1,12 @@
 #include "merian/vk/extension/extension_registry.hpp"
 
+#include "merian/vk/extension/extension_compile_context.hpp"
 #include "merian/vk/extension/extension_glfw.hpp"
+#include "merian/vk/extension/extension_glsl_compiler.hpp"
 #include "merian/vk/extension/extension_merian.hpp"
 #include "merian/vk/extension/extension_mitigations.hpp"
 #include "merian/vk/extension/extension_resources.hpp"
+#include "merian/vk/extension/extension_slang_compiler.hpp"
 #include "merian/vk/extension/extension_vk_debug_utils.hpp"
 #include "merian/vk/extension/extension_vk_layer_settings.hpp"
 
@@ -15,35 +18,33 @@ ExtensionRegistry& ExtensionRegistry::get_instance() {
 }
 
 ExtensionRegistry::ExtensionRegistry() {
-    register_extension("glfw", create_extension<ExtensionGLFW>);
-    register_extension("merian", create_extension<ExtensionMerian>);
-    register_extension("mitigations", create_extension<ExtensionMitigations>);
-    register_extension("resources", create_extension<ExtensionResources>);
-    register_extension("vk_debug_utils", create_extension<ExtensionVkDebugUtils>);
-    register_extension("vk_layer_settings", create_extension<ExtensionVkLayerSettings>);
-}
-
-void ExtensionRegistry::register_extension(const std::string& name,
-                                           const ExtensionFactory& factory) {
-    registry[name] = factory;
+    register_extension<ExtensionCompileContext>("merian-compile-context");
+    register_extension<ExtensionGLFW>("merian-glfw");
+    register_extension<ExtensionGLSLCompiler>("merian-glsl-compiler");
+    register_extension<ExtensionMerian>("merian");
+    register_extension<ExtensionMitigations>("merian-mitigations");
+    register_extension<ExtensionResources>("merian-resources");
+    register_extension<ExtensionSlangCompiler>("merian-slang-session");
+    register_extension<ExtensionVkDebugUtils>("vk_debug_utils");
+    register_extension<ExtensionVkLayerSettings>("vk_layer_settings");
 }
 
 std::shared_ptr<ContextExtension> ExtensionRegistry::create(const std::string& name) const {
-    auto it = registry.find(name);
-    if (it != registry.end()) {
+    auto it = name_to_factory.find(name);
+    if (it != name_to_factory.end()) {
         return it->second();
     }
     return nullptr;
 }
 
 bool ExtensionRegistry::is_registered(const std::string& name) const {
-    return registry.contains(name);
+    return name_to_factory.contains(name);
 }
 
 std::vector<std::string> ExtensionRegistry::get_registered_extensions() const {
     std::vector<std::string> names;
-    names.reserve(registry.size());
-    for (const auto& [name, _] : registry) {
+    names.reserve(name_to_factory.size());
+    for (const auto& [name, _] : name_to_factory) {
         names.push_back(name);
     }
     return names;

@@ -6,11 +6,12 @@
 
 namespace merian {
 
-Device::Device(const PhysicalDeviceHandle& physical_device,
-               const VulkanFeatures& features,
-               const vk::ArrayProxyNoTemporaries<const char*>& additional_extensions,
-               const vk::ArrayProxyNoTemporaries<const vk::DeviceQueueCreateInfo>& queue_create_infos,
-               void* p_next)
+Device::Device(
+    const PhysicalDeviceHandle& physical_device,
+    const VulkanFeatures& features,
+    const vk::ArrayProxyNoTemporaries<const char*>& additional_extensions,
+    const vk::ArrayProxyNoTemporaries<const vk::DeviceQueueCreateInfo>& queue_create_infos,
+    void* p_next)
     : physical_device(physical_device) {
 
     SPDLOG_DEBUG("create device");
@@ -27,8 +28,7 @@ Device::Device(const PhysicalDeviceHandle& physical_device,
 
     SPDLOG_DEBUG("...with extensions:");
     const uint32_t device_vk_api_version = physical_device->get_vk_api_version();
-    const uint32_t instance_vk_api_version =
-        physical_device->get_instance()->get_vk_api_version();
+    const uint32_t instance_vk_api_version = physical_device->get_instance()->get_vk_api_version();
 
     const auto feature_extensions = enabled_features.get_required_extensions();
     std::vector<const char*> all_extensions;
@@ -151,15 +151,32 @@ Device::Device(const PhysicalDeviceHandle& physical_device,
             all_enabled &= enabled_extensions.contains(dep);
         }
         if (all_enabled) {
-            enabled_spirv_extensions.push_back(ext);
+            enabled_spirv_extensions.insert(ext);
         }
     }
 
     for (const auto& cap : get_spirv_capabilities()) {
         if (is_spirv_capability_supported(cap, physical_device->get_vk_api_version(),
-                                           enabled_features, physical_device->get_properties())) {
-            enabled_spirv_capabilities.push_back(cap);
+                                          enabled_features, physical_device->get_properties())) {
+            enabled_spirv_capabilities.insert(cap);
         }
+    }
+
+    // Precompute shader defines
+    for (const auto& ext : physical_device->get_instance()->get_enabled_extensions()) {
+        shader_defines.emplace(std::string(SHADER_DEFINE_PREFIX_INSTANCE_EXT) + ext, "1");
+    }
+
+    for (const auto& ext : enabled_extensions) {
+        shader_defines.emplace(std::string(SHADER_DEFINE_PREFIX_DEVICE_EXT) + ext, "1");
+    }
+
+    for (const auto& ext : enabled_spirv_extensions) {
+        shader_defines.emplace(std::string(SHADER_DEFINE_PREFIX_SPIRV_EXT) + ext, "1");
+    }
+
+    for (const auto& cap : enabled_spirv_capabilities) {
+        shader_defines.emplace(std::string(SHADER_DEFINE_PREFIX_SPIRV_CAP) + cap, "1");
     }
 }
 
@@ -173,34 +190,16 @@ Device::~Device() {
     device.destroy();
 }
 
-const std::vector<const char*>& Device::get_enabled_spirv_extensions() const {
+const std::unordered_set<std::string>& Device::get_enabled_spirv_extensions() const {
     return enabled_spirv_extensions;
 }
 
-const std::vector<const char*>& Device::get_enabled_spirv_capabilities() const {
+const std::unordered_set<std::string>& Device::get_enabled_spirv_capabilities() const {
     return enabled_spirv_capabilities;
 }
 
-std::map<std::string, std::string> Device::get_shader_defines(const InstanceHandle& instance) const {
-    std::map<std::string, std::string> defines;
-
-    for (const auto& ext : instance->get_enabled_extensions()) {
-        defines.emplace(std::string(SHADER_DEFINE_PREFIX_INSTANCE_EXT) + ext, "1");
-    }
-
-    for (const auto& ext : enabled_extensions) {
-        defines.emplace(std::string(SHADER_DEFINE_PREFIX_DEVICE_EXT) + ext, "1");
-    }
-
-    for (const auto& ext : enabled_spirv_extensions) {
-        defines.emplace(std::string(SHADER_DEFINE_PREFIX_SPIRV_EXT) + ext, "1");
-    }
-
-    for (const auto& cap : enabled_spirv_capabilities) {
-        defines.emplace(std::string(SHADER_DEFINE_PREFIX_SPIRV_CAP) + cap, "1");
-    }
-
-    return defines;
+const std::map<std::string, std::string>& Device::get_shader_defines() const {
+    return shader_defines;
 }
 
 } // namespace merian

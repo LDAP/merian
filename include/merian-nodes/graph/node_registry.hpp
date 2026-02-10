@@ -31,6 +31,9 @@ class NodeRegistry {
   public:
     static NodeRegistry& get_instance();
 
+    NodeRegistry& operator=(const NodeRegistry&) = delete;
+    NodeRegistry(const NodeRegistry&) = delete;
+
     // Adds a new node type to this registy.
     //
     // If add_default_config is true a node with empty config is added.

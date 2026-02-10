@@ -91,7 +91,18 @@ class ExtensionContainer {
     }
 
   protected:
+    // returns the extensions ordered by their requirements
+    const std::vector<std::shared_ptr<ContextExtension>>& get_extensions() const {
+        return ordered_extensions;
+    }
+
+    void add_extension(const std::shared_ptr<ContextExtension>& extension);
+
+    void remove_extension(const std::type_index& type);
+
+  private:
     std::unordered_map<std::type_index, std::shared_ptr<ContextExtension>> context_extensions;
+    std::vector<std::shared_ptr<ContextExtension>> ordered_extensions;
 };
 
 using ConfigureExtensionsCallback = std::function<void(ExtensionContainer&)>;
@@ -101,6 +112,7 @@ struct ContextCreateInfo {
     std::vector<const char*> additional_extensions{};
     std::vector<std::string> context_extensions{};
     std::optional<ConfigureExtensionsCallback> configure_extensions_callback{};
+    std::vector<std::filesystem::path> additional_search_paths{};
     std::string application_name = "";
     uint32_t application_vk_version = VK_MAKE_VERSION(1, 0, 0);
     uint32_t preferred_number_compute_queues = 1;
@@ -176,8 +188,7 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
     void create_device_and_queues(uint32_t preffered_number_compute_queues,
                                   const VulkanFeatures& desired_features,
                                   const std::vector<const char*>& desired_additional_extensions);
-    void prepare_shader_include_defines();
-    void prepare_file_loader();
+    void prepare_file_loader(const ContextCreateInfo& create_info);
 
   public: // Getter
     // The actual number of compute queues (< preffered_number_compute_queues).
@@ -214,10 +225,6 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
     // Make sure to keep a reference, else the pool and its buffers are destroyed
     std::shared_ptr<CommandPool> get_cmd_pool_C();
 
-    const std::vector<std::filesystem::path>& get_default_shader_include_paths() const;
-
-    const SlangSessionHandle& get_slang_session() const;
-
     const InstanceHandle& get_instance() const;
 
     const PhysicalDeviceHandle& get_physical_device() const;
@@ -225,6 +232,8 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
     const DeviceHandle& get_device() const;
 
     FileLoader& get_file_loader();
+
+    const FileLoader& get_file_loader() const;
 
     const QueueInfo& get_queue_info() const;
 
@@ -272,10 +281,6 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
     std::weak_ptr<CommandPool> cmd_pool_T;
     // Convenience command pool for compute (can be nullptr in very rare occasions)
     std::weak_ptr<CommandPool> cmd_pool_C;
-
-    std::vector<std::filesystem::path> default_shader_include_paths;
-
-    SlangSessionHandle slang_session;
 };
 
 } // namespace merian

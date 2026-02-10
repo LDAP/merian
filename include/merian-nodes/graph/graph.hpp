@@ -53,6 +53,8 @@ struct GraphCreateInfo {
  * - graph_events.cpp: Event system
  */
 class Graph : public std::enable_shared_from_this<Graph> {
+    friend class MerianNodesExtension;
+
     // Data that is stored for every iteration in flight.
     // Created for each iteration in flight in Graph::Graph.
     struct InFlightData {
@@ -71,9 +73,10 @@ class Graph : public std::enable_shared_from_this<Graph> {
         std::chrono::duration<double> cpu_sleep_time = 0ns;
     };
 
-  public:
+  private:
     Graph(const GraphCreateInfo& create_info);
 
+  public:
     ~Graph();
 
     // --- add / remove nodes and connections ---
@@ -396,5 +399,7 @@ class Graph : public std::enable_shared_from_this<Graph> {
 
     GraphRun graph_run;
 };
+
+using GraphHandle = std::shared_ptr<Graph>;
 
 } // namespace merian

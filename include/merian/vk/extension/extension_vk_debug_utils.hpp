@@ -17,7 +17,7 @@ class ExtensionVkDebugUtils : public ContextExtension {
     ExtensionVkDebugUtils(bool assert_message = true,
                           const std::unordered_set<int32_t>& ignore_message_ids = {648835635,
                                                                                    767975156})
-        : ContextExtension("ExtensionVkDebugUtils"), user_data(ignore_message_ids, assert_message) {
+        : ContextExtension(), user_data(ignore_message_ids, assert_message) {
         create_info = {
             {},
             SEVERITY::eError | SEVERITY::eWarning | SEVERITY::eInfo | SEVERITY::eVerbose,
@@ -47,7 +47,8 @@ class ExtensionVkDebugUtils : public ContextExtension {
         return info;
     }
 
-    void on_instance_created(const InstanceHandle& /*unused*/) override;
+    void on_instance_created(const InstanceHandle& /*unused*/,
+                            const ExtensionContainer& /*extension_container*/) override;
 
     void* pnext_instance_create_info(void* const p_next) override;
 

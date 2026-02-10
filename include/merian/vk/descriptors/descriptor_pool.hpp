@@ -62,16 +62,26 @@ class DescriptorPool : public DescriptorSetAllocator {
         return allocate_descriptor_sets(device, pool, layout)[0];
     }
 
-    static const inline std::vector<vk::DescriptorPoolSize> DEFAULT_POOL_SIZES = {
-        {vk::DescriptorType::eCombinedImageSampler, 65536},
-        {vk::DescriptorType::eSampledImage, 16384},
-        {vk::DescriptorType::eSampler, 16384},
-        {vk::DescriptorType::eUniformBuffer, 16384},
-        {vk::DescriptorType::eStorageBuffer, 32768},
-        {vk::DescriptorType::eStorageImage, 16384},
-        {vk::DescriptorType::eAccelerationStructureKHR, 4096},
-        {vk::DescriptorType::eInputAttachment, 4096},
-    };
+    static std::vector<vk::DescriptorPoolSize> default_pool_sizes(const DeviceHandle& device) {
+
+        std::vector<vk::DescriptorPoolSize> pool_sizes = {
+            {vk::DescriptorType::eCombinedImageSampler, 65536},
+            {vk::DescriptorType::eSampledImage, 16384},
+            {vk::DescriptorType::eSampler, 16384},
+            {vk::DescriptorType::eUniformBuffer, 16384},
+            {vk::DescriptorType::eStorageBuffer, 32768},
+            {vk::DescriptorType::eStorageImage, 16384},
+            {vk::DescriptorType::eInputAttachment, 4096}};
+
+        if (device->get_enabled_features()
+                .get_acceleration_structure_features_khr()
+                .accelerationStructure == VK_TRUE) {
+            pool_sizes.emplace_back(
+                vk::DescriptorPoolSize{vk::DescriptorType::eAccelerationStructureKHR, 4096});
+        }
+
+        return pool_sizes;
+    }
     static const inline uint32_t DEFAULT_POOL_MAX_SETS = 4096;
 
   private:
@@ -81,19 +91,17 @@ class DescriptorPool : public DescriptorSetAllocator {
      *
      */
     DescriptorPool(const DescriptorSetLayoutHandle& layout,
-                         const uint32_t set_count = 1,
-                         const vk::DescriptorPoolCreateFlags flags = {})
+                   const uint32_t set_count = 1,
+                   const vk::DescriptorPoolCreateFlags flags = {})
         : merian::DescriptorPool(layout->get_context(),
-                                       layout->get_pool_sizes_as_vector(set_count),
-                                       set_count,
-                                       flags) {}
+                                 layout->get_pool_sizes_as_vector(set_count),
+                                 set_count,
+                                 flags) {}
 
-    DescriptorPool(
-        const ContextHandle& context,
-        const vk::ArrayProxy<vk::DescriptorPoolSize>& pool_sizes = DEFAULT_POOL_SIZES,
-        const uint32_t max_sets = DEFAULT_POOL_MAX_SETS,
-        const vk::DescriptorPoolCreateFlags flags =
-            vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet)
+    DescriptorPool(const ContextHandle& context,
+                   const vk::ArrayProxy<vk::DescriptorPoolSize>& pool_sizes,
+                   const uint32_t max_sets,
+                   const vk::DescriptorPoolCreateFlags flags)
         : context(context), flags(flags), remaining_set_count(max_sets) {
 
         remaining_pool_descriptors.reserve(pool_sizes.size());
@@ -109,19 +117,20 @@ class DescriptorPool : public DescriptorSetAllocator {
 
   public:
     static DescriptorPoolHandle create(const DescriptorSetLayoutHandle& layout,
-                                             const uint32_t set_count = 1,
-                                             const vk::DescriptorPoolCreateFlags flags = {}) {
+                                       const uint32_t set_count = 1,
+                                       const vk::DescriptorPoolCreateFlags flags = {}) {
         return DescriptorPoolHandle(new DescriptorPool(layout, set_count, flags));
     }
 
     static DescriptorPoolHandle
     create(const ContextHandle& context,
-           const vk::ArrayProxy<vk::DescriptorPoolSize>& pool_sizes = DEFAULT_POOL_SIZES,
+           const std::optional<const vk::ArrayProxy<vk::DescriptorPoolSize>>& pool_sizes = {},
            const uint32_t max_sets = DEFAULT_POOL_MAX_SETS,
            const vk::DescriptorPoolCreateFlags flags =
                vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet) {
-        return DescriptorPoolHandle(
-            new DescriptorPool(context, pool_sizes, max_sets, flags));
+        return DescriptorPoolHandle(new DescriptorPool(
+            context, pool_sizes.value_or(default_pool_sizes(context->get_device())), max_sets,
+            flags));
     }
 
   public:

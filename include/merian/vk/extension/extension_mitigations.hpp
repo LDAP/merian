@@ -9,7 +9,7 @@ namespace merian {
  */
 class ExtensionMitigations : public ContextExtension {
   public:
-    ExtensionMitigations() : ContextExtension("ExtensionMitigations") {}
+    ExtensionMitigations() : ContextExtension() {}
     ~ExtensionMitigations() {}
 
     void on_create_device(const PhysicalDeviceHandle& physical_device,

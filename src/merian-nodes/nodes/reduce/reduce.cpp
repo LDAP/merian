@@ -3,6 +3,7 @@
 #include "merian-nodes/connectors/image/vk_image_out_managed.hpp"
 
 #include "merian-nodes/graph/errors.hpp"
+#include "merian/vk/extension/extension_glsl_compiler.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 #include "merian/vk/utils/math.hpp"
 
@@ -13,6 +14,19 @@ namespace merian {
 Reduce::Reduce() : AbstractCompute() {}
 
 Reduce::~Reduce() {}
+
+DeviceSupportInfo Reduce::query_device_support(const DeviceSupportQueryInfo& query_info) {
+    return DeviceSupportInfo::check(
+        query_info,
+        {},
+        {},
+        {},
+        {},
+        {"Shader", "ImageQuery", "Sampled1D"},
+        {},
+        {},
+        {});
+}
 
 void Reduce::initialize(const ContextHandle& context, const ResourceAllocatorHandle& allocator) {
     AbstractCompute::initialize(context, allocator);
@@ -106,10 +120,11 @@ void main() {
 }
 )");
 
-    const auto& shader_compiler = GLSLShaderCompiler::get();
-    ShaderCompileContextHandle compilation_session_desc = ShaderCompileContext::create(context);
+    auto glsl_compiler_ext = context->get_context_extension<ExtensionGLSLCompiler>();
+    ShaderCompileContextHandle compilation_session_desc =
+        ShaderCompileContext::create(context);
     shader = EntryPoint::create("main", vk::ShaderStageFlagBits::eCompute,
-                                shader_compiler->compile_glsl_to_shadermodule(
+                                glsl_compiler_ext->get_compiler()->compile_glsl_to_shadermodule(
                                     context, source, "<memory>add.comp",
                                     vk::ShaderStageFlagBits::eCompute, compilation_session_desc),
                                 spec_info);

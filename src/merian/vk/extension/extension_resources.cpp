@@ -34,7 +34,9 @@ ExtensionResources::query_device_support(const DeviceSupportQueryInfo& query_inf
     return info;
 }
 
-void ExtensionResources::on_physical_device_selected(const PhysicalDeviceHandle& physical_device) {
+void ExtensionResources::on_physical_device_selected(
+    const PhysicalDeviceHandle& physical_device,
+    [[maybe_unused]] const ExtensionContainer& extension_container) {
     flags = {};
     if (physical_device->extension_supported(VK_KHR_MAINTENANCE_4_EXTENSION_NAME)) {
         flags |= VMA_ALLOCATOR_CREATE_KHR_MAINTENANCE4_BIT;

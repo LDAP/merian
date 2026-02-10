@@ -33,7 +33,6 @@ class SpirvReflect {
     // ---------------------------------------------------------
 
     // Returns SPIR-V capability name strings (e.g. "RayTracingKHR").
-    // Compatible with DeviceSupportInfo::required_spirv_capabilities.
     // The returned pointers are string literals (always valid).
     std::vector<const char*> get_capabilities() const {
         std::vector<const char*> result;
@@ -45,9 +44,7 @@ class SpirvReflect {
     }
 
     // Returns SPIR-V extension name strings (e.g. "SPV_KHR_ray_tracing").
-    // Compatible with DeviceSupportInfo::required_spirv_extensions.
     // The returned pointers point into the original SPV data passed to the constructor;
-    // the caller must ensure that data outlives the returned pointers.
     std::vector<const char*> get_extensions() const {
         std::vector<const char*> result;
 
@@ -81,28 +78,28 @@ class SpirvReflect {
     // extensions populated.
     DeviceSupportInfo query_device_support(const DeviceSupportQueryInfo& query_info) const {
         DeviceSupportInfo info;
-        info.required_spirv_capabilities = get_capabilities();
-        info.required_spirv_extensions = get_extensions();
 
         const auto& supported_caps = query_info.physical_device->get_supported_spirv_capabilities();
         const auto& supported_exts = query_info.physical_device->get_supported_spirv_extensions();
 
-        const auto is_supported = [](const std::vector<const char*>& supported, const char* name) {
-            return std::find_if(supported.begin(), supported.end(), [name](const char* s) {
-                       return std::strcmp(s, name) == 0;
-                   }) != supported.end();
-        };
-
         std::vector<const char*> missing_caps;
-        for (const char* cap : info.required_spirv_capabilities) {
-            if (!is_supported(supported_caps, cap))
+        for (const char* cap : get_capabilities()) {
+            auto it = supported_caps.find(cap);
+            if (it != supported_caps.end()) {
+                info.required_spirv_capabilities.emplace_back(it->c_str());
+            } else {
                 missing_caps.emplace_back(cap);
+            }
         }
 
         std::vector<const char*> missing_exts;
-        for (const char* ext : info.required_spirv_extensions) {
-            if (!is_supported(supported_exts, ext))
+        for (const char* ext : get_extensions()) {
+            auto it = supported_exts.find(ext);
+            if (it != supported_exts.end()) {
+                info.required_spirv_extensions.emplace_back(it->c_str());
+            } else {
                 missing_exts.emplace_back(ext);
+            }
         }
 
         if (!missing_caps.empty() || !missing_exts.empty()) {

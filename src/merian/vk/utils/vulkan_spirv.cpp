@@ -8,8 +8,8 @@
 
 namespace merian {
 
-std::vector<const char*> get_spirv_extensions() {
-    return {
+const std::vector<const char*>& get_spirv_extensions() {
+    static const std::vector<const char*> extensions = {
         "SPV_AMD_gcn_shader",
         "SPV_AMD_gpu_shader_half_float",
         "SPV_AMD_gpu_shader_int16",
@@ -114,6 +114,7 @@ std::vector<const char*> get_spirv_extensions() {
         "SPV_QCOM_image_processing2",
         "SPV_QCOM_tile_shading",
     };
+    return extensions;
 }
 
 namespace {
@@ -245,8 +246,8 @@ std::vector<const char*> get_spirv_extension_requirements(
     return it->second.extensions;
 }
 
-std::vector<const char*> get_spirv_capabilities() {
-    return {
+const std::vector<const char*>& get_spirv_capabilities() {
+    static const std::vector<const char*> capabilities = {
         "AtomicFloat16AddEXT",
         "AtomicFloat16MinMaxEXT",
         "AtomicFloat16VectorNV",
@@ -431,6 +432,7 @@ std::vector<const char*> get_spirv_capabilities() {
         "WorkgroupMemoryExplicitLayout8BitAccessKHR",
         "WorkgroupMemoryExplicitLayoutKHR",
     };
+    return capabilities;
 }
 
 namespace {

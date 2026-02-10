@@ -472,28 +472,14 @@ class SlangSession {
         return compiled;
     }
 
+    // Shortcut for compile() then ShaderModule::create.
+    // 
     // This compiles all entrypoints in the linked programm. You can skip compose and directly link
     // the module.
-    //
-    // Should only be used for very simple shader. Otherwise use the SlangComposition class.
     static ShaderModuleHandle
     compile_to_shadermodule(const ContextHandle& context,
                             const Slang::ComPtr<slang::IComponentType>& linked_programm) {
-        Slang::ComPtr<slang::IBlob> compiled;
-        Slang::ComPtr<slang::IBlob> diagnostics_blob;
-
-        SlangResult result =
-            linked_programm->getTargetCode(0, // targetIndex, currently only one supported,
-                                           compiled.writeRef(), diagnostics_blob.writeRef());
-
-        if (SLANG_FAILED(result)) {
-            throw ShaderCompiler::compilation_failed(diagnostics_as_string(diagnostics_blob));
-        }
-
-        if (diagnostics_blob != nullptr) {
-            SPDLOG_DEBUG("Slang compiling. Diagnostics: {}",
-                         diagnostics_as_string(diagnostics_blob));
-        }
+        Slang::ComPtr<slang::IBlob> compiled = compile(linked_programm);
 
         return ShaderModule::create(context, compiled->getBufferPointer(),
                                     compiled->getBufferSize());

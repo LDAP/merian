@@ -1,5 +1,4 @@
 #include "merian/vk/context.hpp"
-#include "merian/shader/slang_session.hpp"
 #include "merian/utils/pointer.hpp"
 #include "merian/utils/stopwatch.hpp"
 #include "merian/utils/vector.hpp"
@@ -20,49 +19,89 @@ namespace merian {
 ContextHandle Context::create(const ContextCreateInfo& create_info) {
     const ContextHandle context = std::shared_ptr<Context>(new Context(create_info));
 
-    for (auto& ext : context->context_extensions) {
-        ext.second->on_context_created(context, *context);
+    for (const auto& ext : context->get_extensions()) {
+        ext->on_context_created(context, *context);
     }
 
     return context;
 }
 
+void ExtensionContainer::add_extension(const std::shared_ptr<ContextExtension>& extension) {
+    const std::type_index type_idx = typeindex_from_pointer(extension);
+    context_extensions[type_idx] = extension;
+    ordered_extensions.push_back(extension);
+}
+
+void ExtensionContainer::remove_extension(const std::type_index& type) {
+    // Remove from map
+    context_extensions.erase(type);
+
+    auto it =
+        std::remove_if(ordered_extensions.begin(), ordered_extensions.end(),
+                       [&type](const auto& ext) { return std::type_index(typeid(*ext)) == type; });
+    ordered_extensions.erase(it, ordered_extensions.end());
+
+    assert(ordered_extensions.size() == context_extensions.size());
+}
+
 void Context::load_extensions(const std::vector<std::string>& extension_names) {
     std::unordered_set<std::string> loaded_extensions;
-    std::queue<std::string> extension_names_to_process;
+    std::unordered_map<std::string, std::shared_ptr<ContextExtension>> pending_extensions;
+    std::queue<std::string> to_process;
 
-    // Add user-provided extension names to queue
-    extension_names_to_process.push("merian");
+    // Queue initial extensions
+    to_process.push("merian");
     for (const auto& ext_name : extension_names) {
-        extension_names_to_process.push(ext_name);
+        to_process.push(ext_name);
     }
 
-    context_extensions.clear();
-
-    while (!extension_names_to_process.empty()) {
-        const std::string ext_name = extension_names_to_process.front();
-        extension_names_to_process.pop();
+    // Process extensions, ensuring dependencies are loaded first
+    while (!to_process.empty()) {
+        const std::string ext_name = to_process.front();
+        to_process.pop();
 
         // Skip if already loaded
         if (loaded_extensions.contains(ext_name)) {
             continue;
         }
 
-        // Create extension from registry
-        auto ext = ExtensionRegistry::get_instance().create(ext_name);
-        if (!ext) {
-            throw MerianException{fmt::format("Extension '{}' not found in registry", ext_name)};
+        // Get or create extension
+        std::shared_ptr<ContextExtension> ext;
+        if (pending_extensions.contains(ext_name)) {
+            ext = pending_extensions[ext_name];
+        } else {
+            ext = ExtensionRegistry::get_instance().create(ext_name);
+            if (!ext) {
+                throw MerianException{
+                    fmt::format("Extension '{}' not found in registry", ext_name)};
+            }
+            pending_extensions[ext_name] = ext;
         }
 
+        // Check if all dependencies are loaded
+        auto requested = ext->request_extensions();
+        bool all_deps_loaded = true;
+        for (const auto& dep_name : requested) {
+            if (!loaded_extensions.contains(dep_name)) {
+                all_deps_loaded = false;
+                // Queue dependency if not already queued or loaded
+                if (!pending_extensions.contains(dep_name)) {
+                    to_process.push(dep_name);
+                }
+            }
+        }
+
+        // If dependencies not ready, re-queue this extension for later
+        if (!all_deps_loaded) {
+            to_process.push(ext_name);
+            continue;
+        }
+
+        // All dependencies loaded, add this extension
         SPDLOG_DEBUG("Loading extension: {}", ext_name);
         loaded_extensions.insert(ext_name);
-        context_extensions[typeindex_from_pointer(ext)] = ext;
-
-        // Add requested dependencies to queue
-        auto requested = ext->request_extensions();
-        for (const auto& dep_name : requested) {
-            extension_names_to_process.push(dep_name);
-        }
+        pending_extensions.erase(ext_name);
+        add_extension(ext);
     }
 }
 
@@ -95,8 +134,11 @@ Version: {}\n\n",
         (*create_info.configure_extensions_callback)(*this);
     }
 
-    for (const auto& ext : context_extensions) {
-        ext.second->on_context_initializing(VULKAN_HPP_DEFAULT_DISPATCHER);
+    // Initialize file loader early so extensions can use it
+    prepare_file_loader(create_info);
+
+    for (const auto& ext : get_extensions()) {
+        ext->on_context_initializing(VULKAN_HPP_DEFAULT_DISPATCHER, file_loader, create_info);
     }
 
     const uint32_t target_vk_api_version = VK_HEADER_VERSION_COMPLETE;
@@ -107,18 +149,12 @@ Version: {}\n\n",
                            create_info.filter_device_name, create_info.desired_features,
                            create_info.additional_extensions);
 
-    for (auto& ext : this->context_extensions) {
-        ext.second->on_extension_support_confirmed(*this);
+    for (const auto& ext : get_extensions()) {
+        ext->on_extension_support_confirmed(*this);
     }
 
     create_device_and_queues(create_info.preferred_number_compute_queues,
                              create_info.desired_features, create_info.additional_extensions);
-
-    prepare_shader_include_defines();
-
-    prepare_file_loader();
-
-    slang_session = SlangSession::get_or_create(ShaderCompileContext::create(*this));
 
     SPDLOG_INFO("context ready. (took: {})", format_duration(sw.nanos()));
 }
@@ -145,17 +181,21 @@ void Context::create_instance(const uint32_t targeted_vk_api_version,
     InstanceSupportQueryInfo instance_query_info{supported_instance_extensions,
                                                  supported_instance_layers, *this};
 
-    auto it = context_extensions.begin();
-    while (it != context_extensions.end()) {
-        auto support_info = it->second->query_instance_support(instance_query_info);
-        if (support_info.supported) {
-            it++;
-        } else {
-            it->second->on_unsupported(support_info.unsupported_reason.empty()
-                                           ? "extension instance support check failed."
-                                           : support_info.unsupported_reason);
-            it = context_extensions.erase(it);
+    // Check instance support and collect unsupported extensions
+    std::vector<std::type_index> unsupported_extensions;
+    for (const auto& ext : get_extensions()) {
+        auto support_info = ext->query_instance_support(instance_query_info);
+        if (!support_info.supported) {
+            ext->on_unsupported(support_info.unsupported_reason.empty()
+                                    ? "extension instance support check failed."
+                                    : support_info.unsupported_reason);
+            unsupported_extensions.push_back(typeid(*ext));
         }
+    }
+
+    // Remove unsupported extensions
+    for (const auto& type_idx : unsupported_extensions) {
+        remove_extension(type_idx);
     }
 
     // -----------------
@@ -202,8 +242,8 @@ void Context::create_instance(const uint32_t targeted_vk_api_version,
         add_instance_extensions(add_instance_extensions, ext);
     }
 
-    for (auto& ext : context_extensions) {
-        auto support_info = ext.second->query_instance_support(instance_query_info);
+    for (const auto& ext : get_extensions()) {
+        auto support_info = ext->query_instance_support(instance_query_info);
         insert_all(instance_layer_names, support_info.required_layers);
         insert_all(instance_extension_names, support_info.required_extensions);
     }
@@ -217,8 +257,8 @@ void Context::create_instance(const uint32_t targeted_vk_api_version,
     SPDLOG_DEBUG("enabling instance extensions: [{}]", fmt::join(instance_extension_names, ", "));
 
     void* p_next = nullptr;
-    for (auto& ext : context_extensions) {
-        p_next = ext.second->pnext_instance_create_info(p_next);
+    for (const auto& ext : get_extensions()) {
+        p_next = ext->pnext_instance_create_info(p_next);
     }
 
     vk::ApplicationInfo application_info{
@@ -237,8 +277,8 @@ void Context::create_instance(const uint32_t targeted_vk_api_version,
 
     // Must happen before on_instance_created since it requires dynamic loading
     VULKAN_HPP_DEFAULT_DISPATCHER.init(**instance);
-    for (auto& ext : context_extensions) {
-        ext.second->on_instance_created(instance);
+    for (auto& ext : get_extensions()) {
+        ext->on_instance_created(instance, *this);
     }
 }
 
@@ -286,8 +326,8 @@ void Context::select_physical_device(
             DeviceSupportQueryInfo device_query_info{physical_devices[i], q_info, *this};
 
             uint32_t context_extensions_supported = 0;
-            for (const auto& ext : context_extensions) {
-                auto support_info = ext.second->query_device_support(device_query_info);
+            for (const auto& ext : get_extensions()) {
+                auto support_info = ext->query_device_support(device_query_info);
                 context_extensions_supported += static_cast<uint32_t>(support_info.supported);
             }
 
@@ -310,7 +350,7 @@ void Context::select_physical_device(
             SPDLOG_DEBUG(
                 "device supports {}/{} context extensions, {}/{} requested additional extensions, "
                 "{}/{} requested features.",
-                context_extensions_supported, context_extensions.size(), extensions_supported,
+                context_extensions_supported, get_extensions().size(), extensions_supported,
                 extensions_total, features_supported, features_total);
 
             matches.emplace_back(physical_devices[i], std::move(q_info),
@@ -373,21 +413,25 @@ void Context::select_physical_device(
 
     DeviceSupportQueryInfo device_query_info{physical_device, queue_info, *this};
 
-    auto it = context_extensions.begin();
-    while (it != context_extensions.end()) {
-        auto support_info = it->second->query_device_support(device_query_info);
-        if (support_info.supported) {
-            it++;
-        } else {
-            it->second->on_unsupported(support_info.unsupported_reason.empty()
-                                           ? "extension device support check failed."
-                                           : support_info.unsupported_reason);
-            it = context_extensions.erase(it);
+    // Check device support and collect unsupported extensions
+    std::vector<std::type_index> unsupported_extensions;
+    for (const auto& ext : get_extensions()) {
+        auto support_info = ext->query_device_support(device_query_info);
+        if (!support_info.supported) {
+            ext->on_unsupported(support_info.unsupported_reason.empty()
+                                    ? "extension device support check failed."
+                                    : support_info.unsupported_reason);
+            unsupported_extensions.push_back(typeid(*ext));
         }
     }
 
-    for (auto& ext : context_extensions) {
-        ext.second->on_physical_device_selected(physical_device);
+    // Remove unsupported extensions
+    for (const auto& type_idx : unsupported_extensions) {
+        remove_extension(type_idx);
+    }
+
+    for (const auto& ext : get_extensions()) {
+        ext->on_physical_device_selected(physical_device, *this);
     }
 }
 
@@ -451,15 +495,15 @@ QueueInfo Context::determine_queues(const PhysicalDeviceHandle& physical_device)
                     remaining_queue_count[queue_family_idx_GCT]--;
                 }
                 // Prio 2: GCT accepted by extensions
+                const auto& extensions = get_extensions();
                 uint32_t GCT_accepts =
-                    !found_GCT
-                        ? 0
-                        : std::accumulate(context_extensions.begin(), context_extensions.end(), 0,
-                                          [&](uint32_t accum, auto& ext) {
-                                              return accum + ext.second->accept_graphics_queue(
-                                                                 instance, physical_device,
-                                                                 queue_family_idx_GCT);
-                                          });
+                    !found_GCT ? 0
+                               : std::accumulate(extensions.begin(), extensions.end(), 0,
+                                                 [&](uint32_t accum, const auto& ext) {
+                                                     return accum + ext->accept_graphics_queue(
+                                                                        instance, physical_device,
+                                                                        queue_family_idx_GCT);
+                                                 });
                 // Prio 2: T (additional)
                 if ((queue_family_props[queue_family_idx_T].queueFlags & Flags::eTransfer) &&
                     remaining_queue_count[queue_family_idx_T] > 0) {
@@ -501,7 +545,7 @@ QueueInfo Context::determine_queues(const PhysicalDeviceHandle& physical_device)
 
     SPDLOG_DEBUG("determined queue families indices: GCT: {} ({}/{} accept votes), T: {} C: {}",
                  q_info.queue_family_idx_GCT, std::get<1>(best),
-                 found_GCT ? context_extensions.size() : 0, q_info.queue_family_idx_T,
+                 found_GCT ? get_extensions().size() : 0, q_info.queue_family_idx_T,
                  q_info.queue_family_idx_C);
 
     return q_info;
@@ -564,8 +608,8 @@ void Context::create_device_and_queues(
 
     const uint32_t vk_api_version = VK_HEADER_VERSION_COMPLETE;
 
-    for (const auto& ext : context_extensions) {
-        auto support_info = ext.second->query_device_support(device_query_info);
+    for (const auto& ext : get_extensions()) {
+        auto support_info = ext->query_device_support(device_query_info);
 
         // Add required Vulkan extensions
         insert_all(extensions, support_info.required_extensions);
@@ -595,13 +639,13 @@ void Context::create_device_and_queues(
     // Setup p_next for extensions
     // Extensions can enable features of their extensions
     void* extensions_device_create_p_next = nullptr;
-    for (auto& ext : context_extensions) {
+    for (const auto& ext : get_extensions()) {
         extensions_device_create_p_next =
-            ext.second->pnext_device_create_info(extensions_device_create_p_next);
+            ext->pnext_device_create_info(extensions_device_create_p_next);
     }
 
-    for (auto& ext : context_extensions) {
-        ext.second->on_create_device(physical_device, features, extensions);
+    for (const auto& ext : get_extensions()) {
+        ext->on_create_device(physical_device, features, extensions);
     }
 
     device = Device::create(physical_device, features, extensions, queue_create_infos,
@@ -609,43 +653,40 @@ void Context::create_device_and_queues(
     SPDLOG_DEBUG("device created and queues created");
 
     VULKAN_HPP_DEFAULT_DISPATCHER.init(**device);
-    for (auto& ext : context_extensions) {
-        ext.second->on_device_created(device);
+    for (auto& ext : get_extensions()) {
+        ext->on_device_created(device, *this);
     }
 }
 
-void Context::prepare_shader_include_defines() {
-    // search merian-shaders
+void Context::prepare_file_loader(const ContextCreateInfo& create_info) {
+    // Add additional search paths first (highest priority)
+    file_loader.add_search_path(create_info.additional_search_paths);
+
+    // Search for merian-shaders includes
     const std::filesystem::path development_headers =
         std::filesystem::path(MERIAN_DEVELOPMENT_INCLUDE_DIR);
     const std::filesystem::path installed_headers =
         std::filesystem::path(FileLoader::install_includedir_name());
 
     if (FileLoader::exists(development_headers / "merian-shaders")) {
-        SPDLOG_DEBUG("found merian-shaders development headers headers at {}",
+        SPDLOG_DEBUG("found merian-shaders development headers at {}",
                      development_headers.string());
-        default_shader_include_paths.emplace_back(
+        file_loader.add_search_path(
             std::filesystem::weakly_canonical(development_headers.string()));
     } else if (FileLoader::exists(installed_headers / "merian-shaders")) {
         SPDLOG_DEBUG("found merian-shaders installed at {}", installed_headers.string());
-        default_shader_include_paths.emplace_back(
-            std::filesystem::weakly_canonical(installed_headers.string()));
+        file_loader.add_search_path(std::filesystem::weakly_canonical(installed_headers.string()));
     } else if (const std::optional<std::filesystem::path> headers =
                    FileLoader::search_cwd_parents("include/merian-shaders");
                headers.has_value()) {
         SPDLOG_DEBUG("found merian-shaders at {}", headers->parent_path().string());
-        default_shader_include_paths.emplace_back(
+        file_loader.add_search_path(
             std::filesystem::weakly_canonical(headers->parent_path().string()));
     } else {
         SPDLOG_ERROR("merian-shaders header not found! Shader compilers will not work correctly");
     }
-}
 
-void Context::prepare_file_loader() {
-    // add those first => prefer development headers.
-    file_loader.add_search_path(default_shader_include_paths);
-
-    // add common folders to file loader
+    // Add common folders to file loader
     if (const auto portable_prefix = FileLoader::portable_prefix(); portable_prefix) {
         file_loader.add_search_path(*portable_prefix);
     }
@@ -749,14 +790,6 @@ std::shared_ptr<CommandPool> Context::get_cmd_pool_C() {
     return cmd;
 }
 
-const std::vector<std::filesystem::path>& Context::get_default_shader_include_paths() const {
-    return default_shader_include_paths;
-}
-
-const SlangSessionHandle& Context::get_slang_session() const {
-    return slang_session;
-}
-
 const InstanceHandle& Context::get_instance() const {
     return instance;
 }
@@ -770,6 +803,10 @@ const DeviceHandle& Context::get_device() const {
 }
 
 FileLoader& Context::get_file_loader() {
+    return file_loader;
+}
+
+const FileLoader& Context::get_file_loader() const {
     return file_loader;
 }
 

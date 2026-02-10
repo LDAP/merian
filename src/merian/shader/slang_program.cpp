@@ -12,10 +12,19 @@ SlangProgram::SlangProgram(const ShaderCompileContextHandle& compile_context,
 
 ShaderModuleHandle SlangProgram::get_shader_module(const ContextHandle& context) {
     if (!shader_module) {
-        shader_module = merian::SlangSession::compile_to_shadermodule(context, program);
+        Slang::ComPtr<slang::IBlob> binary = get_binary();
+        shader_module =
+            ShaderModule::create(context, binary->getBufferPointer(), binary->getBufferSize());
     }
 
     return shader_module;
+}
+
+Slang::ComPtr<slang::IBlob> SlangProgram::get_binary() {
+    if (binary == nullptr) {
+        binary = merian::SlangSession::compile(program);
+    }
+    return binary;
 }
 
 slang::ProgramLayout* SlangProgram::get_program_reflection() const {

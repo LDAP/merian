@@ -2,6 +2,7 @@
 
 #include "merian-nodes/connectors/image/vk_image_out_managed.hpp"
 #include "merian-nodes/graph/errors.hpp"
+#include "merian/vk/extension/extension_glsl_compiler.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 
 namespace merian {
@@ -84,13 +85,27 @@ class ShadertoyInjectCompiler : public GLSLShaderCompiler {
 
 Shadertoy::Shadertoy() : AbstractCompute(sizeof(PushConstant)), shader_glsl(default_shader) {}
 
+DeviceSupportInfo Shadertoy::query_device_support(const DeviceSupportQueryInfo& query_info) {
+    if (query_info.extension_container.get_context_extension<ExtensionGLSLCompiler>(true) ==
+        nullptr) {
+        return DeviceSupportInfo{false, "No GLSL compiler available"};
+    }
+
+    return DeviceSupportInfo::check(query_info, {}, {}, {}, {}, {"Shader", "ImageQuery"}, {}, {},
+                                    {});
+}
+
 void Shadertoy::initialize(const ContextHandle& context, const ResourceAllocatorHandle& allocator) {
     AbstractCompute::initialize(context, allocator);
 
     compile_context = ShaderCompileContext::create(context);
 
-    GLSLShaderCompilerHandle forwarding_compiler = GLSLShaderCompiler::get();
+    auto glsl_compiler_ext = context->get_context_extension<ExtensionGLSLCompiler>(true);
+    if (!glsl_compiler_ext) {
+        return;
+    }
 
+    GLSLShaderCompilerHandle forwarding_compiler = glsl_compiler_ext->get_compiler();
     if (!forwarding_compiler->available()) {
         return;
     }
