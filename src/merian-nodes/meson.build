@@ -17,6 +17,7 @@ merian_nodes_lib = static_library(
         spirv_reflect,
         stb,
         vma,
+        vulkan,
         vulkanheaders,
     ],
     include_directories: inc_dirs,

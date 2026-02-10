@@ -57,6 +57,12 @@ add_project_arguments('-DMERIAN_DEVELOPMENT_INCLUDE_DIR="@0@"'.format(join_paths
 # Dependencies
 fmt = dependency('fmt', version : ['>=12.1.0'], fallback : ['fmt', 'fmt_dep'])
 spdlog = dependency('spdlog', version : ['>=1.17.0'], fallback : ['spdlog', 'spdlog_dep'], default_options : ['external_fmt=enabled'])
+vulkan = dependency('vulkan', version: ['>=1.0.0'], required: false)
+if not vulkan.found()
+    # version specifier is broken for vulkan in older meson versions. https://github.com/mesonbuild/meson/issues/12072
+    vulkan = dependency('vulkan')
+endif
+vulkan = vulkan.partial_dependency(compile_args: false, link_args: true, links: true)
 vulkanheaders_subp = subproject('vulkanheaders', version: ['>=' + vulkan_target_api_version])
 vulkanheaders = vulkanheaders_subp.get_variable('vulkanheaders_dep')
 spirv_reflect = dependency('spirv-reflect', fallback: ['spirv-reflect', 'spirv_reflect_dep'])
@@ -202,6 +208,7 @@ merian_dep = declare_dependency(
         tinybvh,
         tol,
         vma,
+        vulkan,
         vulkanheaders,
     ]
 )

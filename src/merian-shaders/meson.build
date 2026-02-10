@@ -10,6 +10,7 @@ merian_shaders_lib = static_library(
         spdlog,
         stb,
         vma,
+        vulkan,
         vulkanheaders,
     ],
     include_directories: inc_dirs,

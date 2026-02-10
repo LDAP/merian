@@ -84,6 +84,7 @@ merian_lib = static_library(
         tgltf,
         tol,
         vma,
+        vulkan,
         vulkanheaders,
     ],
     include_directories: inc_dirs,
