@@ -17,7 +17,7 @@ std::vector<std::string> ExtensionGLSLCompiler::request_extensions() {
 
 void ExtensionGLSLCompiler::on_context_initializing(
     [[maybe_unused]] const vk::detail::DispatchLoaderDynamic& loader,
-    [[maybe_unused]] const FileLoader& file_loader,
+    [[maybe_unused]] const FileLoaderHandle& file_loader,
     [[maybe_unused]] const ContextCreateInfo& create_info) {
 
     // Try to use shaderc (preferred)

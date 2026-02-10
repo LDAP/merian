@@ -5,7 +5,7 @@
 namespace merian {
 
 /**
- * Hooks into context to prevent known driver bugs.
+ * Enables all extensions and features that are required to use merian.
  */
 class ExtensionMerian : public ContextExtension {
   public:

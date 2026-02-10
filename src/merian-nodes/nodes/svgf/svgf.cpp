@@ -19,29 +19,21 @@ SVGF::~SVGF() {}
 
 DeviceSupportInfo SVGF::query_device_support(const DeviceSupportQueryInfo& query_info) {
     // Get the compile context extension to compile shaders
-    auto compile_ctx_ext = query_info.extension_container.get_context_extension<ExtensionCompileContext>(true);
+    auto compile_ctx_ext =
+        query_info.extension_container.get_context_extension<ExtensionCompileContext>(true);
 
-    if (!compile_ctx_ext || !compile_ctx_ext->has_compile_context()) {
-        // Fallback to hardcoded capabilities if compilation not available yet
-        return DeviceSupportInfo::check(
-            query_info,
-            {},
-            {},
-            {},
-            {},
-            {"Shader", "ImageQuery", "Sampled1D"},
-            {},
-            {},
-            {});
+    if (!compile_ctx_ext) {
+        return DeviceSupportInfo{false, "extension merian-compile-context unavailable"};
     }
 
     // Compile shaders and use SPIR-V reflection to determine device support
-    ShaderCompileContextHandle compilation_ctx = compile_ctx_ext->get_compile_context();
+    ShaderCompileContextHandle compilation_ctx = compile_ctx_ext->get_early_compile_context();
     compilation_ctx->add_search_path("merian-nodes/nodes/svgf");
 
     // Compile the three SVGF shaders
     auto filter_program = SlangProgramEntryPoint::create(compilation_ctx, "svgf_filter.slang");
-    auto variance_program = SlangProgramEntryPoint::create(compilation_ctx, "svgf_variance_estimate.slang");
+    auto variance_program =
+        SlangProgramEntryPoint::create(compilation_ctx, "svgf_variance_estimate.slang");
     auto taa_program = SlangProgramEntryPoint::create(compilation_ctx, "svgf_taa.slang");
 
     // Get SPIR-V binaries and reflect to determine requirements
@@ -49,15 +41,12 @@ DeviceSupportInfo SVGF::query_device_support(const DeviceSupportQueryInfo& query
     auto variance_binary = variance_program->get_program()->get_binary();
     auto taa_binary = taa_program->get_program()->get_binary();
 
-    SpirvReflect filter_reflect(
-        static_cast<const uint32_t*>(filter_binary->getBufferPointer()),
-        filter_binary->getBufferSize());
-    SpirvReflect variance_reflect(
-        static_cast<const uint32_t*>(variance_binary->getBufferPointer()),
-        variance_binary->getBufferSize());
-    SpirvReflect taa_reflect(
-        static_cast<const uint32_t*>(taa_binary->getBufferPointer()),
-        taa_binary->getBufferSize());
+    SpirvReflect filter_reflect(static_cast<const uint32_t*>(filter_binary->getBufferPointer()),
+                                filter_binary->getBufferSize());
+    SpirvReflect variance_reflect(static_cast<const uint32_t*>(variance_binary->getBufferPointer()),
+                                  variance_binary->getBufferSize());
+    SpirvReflect taa_reflect(static_cast<const uint32_t*>(taa_binary->getBufferPointer()),
+                             taa_binary->getBufferSize());
 
     // Combine support requirements from all three shaders
     return filter_reflect.query_device_support(query_info) &
@@ -158,8 +147,7 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
     }
 
     {
-        ShaderCompileContextHandle compilation_session_desc =
-            ShaderCompileContext::create(context);
+        ShaderCompileContextHandle compilation_session_desc = ShaderCompileContext::create(context);
         compilation_session_desc->set_preprocessor_macro("FILTER_TYPE",
                                                          std::to_string(filter_type));
         if (kaleidoscope) {

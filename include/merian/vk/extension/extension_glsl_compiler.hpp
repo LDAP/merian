@@ -22,7 +22,7 @@ class ExtensionGLSLCompiler : public ContextExtension {
     DeviceSupportInfo query_device_support(const DeviceSupportQueryInfo& query_info) override;
 
     void on_context_initializing(const vk::detail::DispatchLoaderDynamic& loader,
-                                 const FileLoader& file_loader,
+                                 const FileLoaderHandle& file_loader,
                                  const ContextCreateInfo& create_info) override;
 
     const GLSLShaderCompilerHandle& get_compiler() const;

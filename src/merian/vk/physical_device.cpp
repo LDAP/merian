@@ -45,6 +45,9 @@ PhysicalDevice::PhysicalDevice(const InstanceHandle& instance,
     }
 
     // Precompute shader defines
+    for (const auto& ext : instance->get_enabled_extensions()) {
+        shader_defines.emplace(std::string(SHADER_DEFINE_PREFIX_INSTANCE_EXT) + ext, "1");
+    }
     for (const auto& ext : supported_extensions) {
         shader_defines.emplace(std::string(SHADER_DEFINE_PREFIX_DEVICE_EXT) + ext, "1");
     }

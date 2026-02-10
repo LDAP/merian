@@ -103,7 +103,8 @@ class GLSLShaderCompiler : public ShaderCompiler {
         const ShaderCompileContextHandle& shader_compile_context,
         const std::optional<vk::ShaderStageFlagBits> optional_shader_kind = std::nullopt) const {
 
-        const std::optional<std::filesystem::path> resolved = context->get_file_loader().find_file(path);
+        const std::optional<std::filesystem::path> resolved =
+            context->get_file_loader()->find_file(path);
         if (!resolved) {
             throw compilation_failed{fmt::format("file {} not found", path.string())};
         }
@@ -122,7 +123,8 @@ class GLSLShaderCompiler : public ShaderCompiler {
         const std::string& entry_point_name = "main",
         const std::optional<vk::ShaderStageFlagBits> optional_shader_kind = std::nullopt) const {
 
-        const std::optional<std::filesystem::path> resolved = context->get_file_loader().find_file(path);
+        const std::optional<std::filesystem::path> resolved =
+            context->get_file_loader()->find_file(path);
         if (!resolved) {
             throw compilation_failed{fmt::format("file {} not found", path.string())};
         }

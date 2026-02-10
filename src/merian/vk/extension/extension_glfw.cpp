@@ -24,7 +24,7 @@ ExtensionGLFW::~ExtensionGLFW() {
 }
 
 void ExtensionGLFW::on_context_initializing(const vk::detail::DispatchLoaderDynamic& loader,
-                                            [[maybe_unused]] const FileLoader& file_loader,
+                                            [[maybe_unused]] const FileLoaderHandle& file_loader,
                                             [[maybe_unused]] const ContextCreateInfo& create_info) {
 
     SPDLOG_DEBUG("Querying Vulkan support");

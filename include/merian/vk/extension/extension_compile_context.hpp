@@ -1,7 +1,7 @@
 #pragma once
 
-#include "merian/vk/extension/extension.hpp"
 #include "merian/shader/shader_compile_context.hpp"
+#include "merian/vk/extension/extension.hpp"
 
 namespace merian {
 
@@ -19,14 +19,14 @@ class ExtensionCompileContext : public ContextExtension {
     ~ExtensionCompileContext() override;
 
     void on_context_initializing(const vk::detail::DispatchLoaderDynamic& loader,
-                                 const FileLoader& file_loader,
+                                 const FileLoaderHandle& file_loader,
                                  const ContextCreateInfo& create_info) override;
 
     void on_physical_device_selected(const PhysicalDeviceHandle& physical_device,
                                      const ExtensionContainer& extension_container) override;
 
     void on_device_created(const DeviceHandle& device,
-                          const ExtensionContainer& extension_container) override;
+                           const ExtensionContainer& extension_container) override;
 
     const ShaderCompileContextHandle& get_early_compile_context() const;
 
@@ -37,7 +37,7 @@ class ExtensionCompileContext : public ContextExtension {
     bool has_compile_context() const;
 
   private:
-    FileLoader stored_file_loader;
+    FileLoaderHandle file_loader;
     ShaderCompileContextHandle early_compile_context;
     ShaderCompileContextHandle compile_context;
 };

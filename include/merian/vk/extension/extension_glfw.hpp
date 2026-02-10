@@ -33,7 +33,7 @@ class ExtensionGLFW : public ContextExtension {
     ~ExtensionGLFW();
 
     void on_context_initializing(const vk::detail::DispatchLoaderDynamic& loader,
-                                 const FileLoader& file_loader,
+                                 const FileLoaderHandle& file_loader,
                                  const ContextCreateInfo& create_info) override;
 
     InstanceSupportInfo query_instance_support(const InstanceSupportQueryInfo& query_info) override;

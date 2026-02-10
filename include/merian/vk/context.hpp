@@ -231,9 +231,7 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
 
     const DeviceHandle& get_device() const;
 
-    FileLoader& get_file_loader();
-
-    const FileLoader& get_file_loader() const;
+    const FileLoaderHandle& get_file_loader() const;
 
     const QueueInfo& get_queue_info() const;
 
@@ -260,7 +258,7 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
     // -----------------
 
     // A shared file_loader for convenience.
-    FileLoader file_loader;
+    FileLoaderHandle file_loader;
 
     // in find_queues. Indexes are -1 if no suitable queue was found!
 

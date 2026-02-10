@@ -9,24 +9,22 @@ ExtensionCompileContext::~ExtensionCompileContext() = default;
 
 void ExtensionCompileContext::on_context_initializing(
     [[maybe_unused]] const vk::detail::DispatchLoaderDynamic& loader,
-    const FileLoader& file_loader,
+    const FileLoaderHandle& file_loader,
     [[maybe_unused]] const ContextCreateInfo& create_info) {
-    // Store file loader for later use
-    stored_file_loader = file_loader;
-    SPDLOG_DEBUG("ExtensionCompileContext: file loader stored");
+    this->file_loader = file_loader;
 }
 
 void ExtensionCompileContext::on_physical_device_selected(
     const PhysicalDeviceHandle& physical_device,
     [[maybe_unused]] const ExtensionContainer& extension_container) {
     // Create early compile context with physical device defines
-    early_compile_context = ShaderCompileContext::create(stored_file_loader, physical_device);
+    early_compile_context = ShaderCompileContext::create(*file_loader, physical_device);
 }
 
 void ExtensionCompileContext::on_device_created(
     const DeviceHandle& device, [[maybe_unused]] const ExtensionContainer& extension_container) {
     // Create compile context with device defines
-    compile_context = ShaderCompileContext::create(stored_file_loader, device);
+    compile_context = ShaderCompileContext::create(*file_loader, device);
 }
 
 const ShaderCompileContextHandle& ExtensionCompileContext::get_early_compile_context() const {

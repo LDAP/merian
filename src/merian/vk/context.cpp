@@ -277,7 +277,7 @@ void Context::create_instance(const uint32_t targeted_vk_api_version,
 
     // Must happen before on_instance_created since it requires dynamic loading
     VULKAN_HPP_DEFAULT_DISPATCHER.init(**instance);
-    for (auto& ext : get_extensions()) {
+    for (const auto& ext : get_extensions()) {
         ext->on_instance_created(instance, *this);
     }
 }
@@ -653,14 +653,13 @@ void Context::create_device_and_queues(
     SPDLOG_DEBUG("device created and queues created");
 
     VULKAN_HPP_DEFAULT_DISPATCHER.init(**device);
-    for (auto& ext : get_extensions()) {
+    for (const auto& ext : get_extensions()) {
         ext->on_device_created(device, *this);
     }
 }
 
 void Context::prepare_file_loader(const ContextCreateInfo& create_info) {
-    // Add additional search paths first (highest priority)
-    file_loader.add_search_path(create_info.additional_search_paths);
+    file_loader = std::make_shared<FileLoader>();
 
     // Search for merian-shaders includes
     const std::filesystem::path development_headers =
@@ -671,16 +670,16 @@ void Context::prepare_file_loader(const ContextCreateInfo& create_info) {
     if (FileLoader::exists(development_headers / "merian-shaders")) {
         SPDLOG_DEBUG("found merian-shaders development headers at {}",
                      development_headers.string());
-        file_loader.add_search_path(
+        file_loader->add_search_path(
             std::filesystem::weakly_canonical(development_headers.string()));
     } else if (FileLoader::exists(installed_headers / "merian-shaders")) {
         SPDLOG_DEBUG("found merian-shaders installed at {}", installed_headers.string());
-        file_loader.add_search_path(std::filesystem::weakly_canonical(installed_headers.string()));
+        file_loader->add_search_path(std::filesystem::weakly_canonical(installed_headers.string()));
     } else if (const std::optional<std::filesystem::path> headers =
                    FileLoader::search_cwd_parents("include/merian-shaders");
                headers.has_value()) {
         SPDLOG_DEBUG("found merian-shaders at {}", headers->parent_path().string());
-        file_loader.add_search_path(
+        file_loader->add_search_path(
             std::filesystem::weakly_canonical(headers->parent_path().string()));
     } else {
         SPDLOG_ERROR("merian-shaders header not found! Shader compilers will not work correctly");
@@ -688,14 +687,16 @@ void Context::prepare_file_loader(const ContextCreateInfo& create_info) {
 
     // Add common folders to file loader
     if (const auto portable_prefix = FileLoader::portable_prefix(); portable_prefix) {
-        file_loader.add_search_path(*portable_prefix);
+        file_loader->add_search_path(*portable_prefix);
     }
     if (const auto install_prefix = FileLoader::install_prefix(); install_prefix) {
-        file_loader.add_search_path(*install_prefix);
+        file_loader->add_search_path(*install_prefix);
     }
-    file_loader.add_search_path(FileLoader::install_datadir_name());
-    file_loader.add_search_path(FileLoader::install_datadir_name() / MERIAN_PROJECT_NAME);
-    file_loader.add_search_path(FileLoader::install_includedir_name());
+    file_loader->add_search_path(FileLoader::install_datadir_name());
+    file_loader->add_search_path(FileLoader::install_datadir_name() / MERIAN_PROJECT_NAME);
+    file_loader->add_search_path(FileLoader::install_includedir_name());
+
+    file_loader->add_search_path(create_info.additional_search_paths);
 }
 
 ///////////////
@@ -802,11 +803,7 @@ const DeviceHandle& Context::get_device() const {
     return device;
 }
 
-FileLoader& Context::get_file_loader() {
-    return file_loader;
-}
-
-const FileLoader& Context::get_file_loader() const {
+const FileLoaderHandle& Context::get_file_loader() const {
     return file_loader;
 }
 

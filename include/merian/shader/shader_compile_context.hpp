@@ -56,7 +56,7 @@ class ShaderCompileContext {
           target_vk_api_version(context->get_device()->get_vk_api_version()) {
         // Add search paths from context's file loader
         const auto& context_file_loader = context->get_file_loader();
-        for (const auto& path : context_file_loader) {
+        for (const auto& path : *context_file_loader) {
             file_loader.add_search_path(path);
         }
     }

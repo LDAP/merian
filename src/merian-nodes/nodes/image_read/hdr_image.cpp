@@ -71,7 +71,7 @@ HDRImageRead::NodeStatusFlags HDRImageRead::properties(Properties& config) {
 
     if (config.config_text("path", config_filename, true)) {
         needs_rebuild = true;
-        filename = context->get_file_loader().find_file(config_filename).value_or(config_filename);
+        filename = context->get_file_loader()->find_file(config_filename).value_or(config_filename);
         if (image != nullptr) {
             stbi_image_free(image);
             image = nullptr;

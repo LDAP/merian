@@ -21,7 +21,6 @@ DeviceSupportInfo ExtensionSlangCompiler::query_device_support(
 void ExtensionSlangCompiler::on_physical_device_selected(
     [[maybe_unused]] const PhysicalDeviceHandle& physical_device,
     const ExtensionContainer& extension_container) {
-    // Get the early compile context from ExtensionCompileContext
     auto compile_context_ext = extension_container.get_context_extension<ExtensionCompileContext>();
     const auto& early_compile_context = compile_context_ext->get_early_compile_context();
 
@@ -31,7 +30,6 @@ void ExtensionSlangCompiler::on_physical_device_selected(
 
 void ExtensionSlangCompiler::on_device_created([[maybe_unused]] const DeviceHandle& device,
                                                const ExtensionContainer& extension_container) {
-    // Get the compile context from ExtensionCompileContext
     auto compile_context_ext = extension_container.get_context_extension<ExtensionCompileContext>();
     const auto& compile_context = compile_context_ext->get_compile_context();
 

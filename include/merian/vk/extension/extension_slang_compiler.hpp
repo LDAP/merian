@@ -1,8 +1,7 @@
 #pragma once
 
-#include "merian/vk/extension/extension.hpp"
 #include "merian/shader/slang_session.hpp"
-#include "merian/shader/shader_compile_context.hpp"
+#include "merian/vk/extension/extension.hpp"
 
 namespace merian {
 
@@ -28,7 +27,7 @@ class ExtensionSlangCompiler : public ContextExtension {
                                      const ExtensionContainer& extension_container) override;
 
     void on_device_created(const DeviceHandle& device,
-                          const ExtensionContainer& extension_container) override;
+                           const ExtensionContainer& extension_container) override;
 
     const SlangSessionHandle& get_early_session() const;
 
