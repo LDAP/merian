@@ -59,8 +59,6 @@ fmt = dependency('fmt', version : ['>=12.1.0'], fallback : ['fmt', 'fmt_dep'])
 spdlog = dependency('spdlog', version : ['>=1.17.0'], fallback : ['spdlog', 'spdlog_dep'], default_options : ['external_fmt=enabled'])
 vulkanheaders_subp = subproject('vulkanheaders', version: ['>=' + vulkan_target_api_version])
 vulkanheaders = vulkanheaders_subp.get_variable('vulkanheaders_dep')
-# Override system Vulkan with subproject headers to prevent ODR violations
-meson.override_dependency('vulkan', vulkanheaders)
 spirv_reflect = dependency('spirv-reflect', fallback: ['spirv-reflect', 'spirv_reflect_dep'])
 glfw = dependency('glfw3', version: ['>=3.4.0'], fallback: ['glfw', 'glfw_dep'])
 subprocess = dependency('subprocess', version: ['>=0.4.0'], fallback: ['subprocess', 'subprocess_dep'])
