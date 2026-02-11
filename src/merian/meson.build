@@ -85,7 +85,6 @@ merian_lib = static_library(
         tol,
         vma,
         vulkan,
-        vulkanheaders,
     ],
     include_directories: inc_dirs,
     install : true

@@ -18,7 +18,6 @@ merian_nodes_lib = static_library(
         stb,
         vma,
         vulkan,
-        vulkanheaders,
     ],
     include_directories: inc_dirs,
     link_with: merian_lib,

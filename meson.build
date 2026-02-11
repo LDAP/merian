@@ -55,16 +55,17 @@ add_project_arguments('-DMERIAN_DEVELOPMENT_INCLUDE_DIR="@0@"'.format(join_paths
 
 
 # Dependencies
-fmt = dependency('fmt', version : ['>=12.1.0'], fallback : ['fmt', 'fmt_dep'])
-spdlog = dependency('spdlog', version : ['>=1.17.0'], fallback : ['spdlog', 'spdlog_dep'], default_options : ['external_fmt=enabled'])
-vulkan = dependency('vulkan', version: ['>=1.0.0'], required: false)
-if not vulkan.found()
-    # version specifier is broken for vulkan in older meson versions. https://github.com/mesonbuild/meson/issues/12072
-    vulkan = dependency('vulkan')
-endif
-vulkan = vulkan.partial_dependency(compile_args: false, link_args: true, links: true)
+vulkan_loader = ccx.find_library('vulkan', required: true)
 vulkanheaders_subp = subproject('vulkanheaders', version: ['>=' + vulkan_target_api_version])
 vulkanheaders = vulkanheaders_subp.get_variable('vulkanheaders_dep')
+vulkan = declare_dependency(
+    dependencies: [vulkanheaders, vulkan_loader],
+)
+# ensure subprojects are using the same version of the header!
+meson.override_dependency('vulkan', vulkan)
+
+fmt = dependency('fmt', version : ['>=12.1.0'], fallback : ['fmt', 'fmt_dep'])
+spdlog = dependency('spdlog', version : ['>=1.17.0'], fallback : ['spdlog', 'spdlog_dep'], default_options : ['external_fmt=enabled'])
 spirv_reflect = dependency('spirv-reflect', fallback: ['spirv-reflect', 'spirv_reflect_dep'])
 glfw = dependency('glfw3', version: ['>=3.4.0'], fallback: ['glfw', 'glfw_dep'])
 subprocess = dependency('subprocess', version: ['>=0.4.0'], fallback: ['subprocess', 'subprocess_dep'])
@@ -209,7 +210,6 @@ merian_dep = declare_dependency(
         tol,
         vma,
         vulkan,
-        vulkanheaders,
     ]
 )
 
