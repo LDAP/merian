@@ -5,7 +5,6 @@
 #include "merian/utils/vector.hpp"
 #include "merian/vk/extension/extension.hpp"
 #include "merian/vk/extension/extension_glsl_compiler.hpp"
-#include "merian/vk/extension/extension_slang_compiler.hpp"
 
 namespace merian {
 
@@ -18,7 +17,6 @@ class MerianNodesExtension : public ContextExtension {
 
         // Request compiler extensions for nodes that need shader compilation
         aggregated.push_back("merian-glsl-compiler");
-        aggregated.push_back("merian-slang-session");
 
         auto& registry = NodeRegistry::get_instance();
         for (const auto& type_name : registry.node_type_names()) {
@@ -53,12 +51,14 @@ class MerianNodesExtension : public ContextExtension {
                                                                                 "hostQueryReset",
                                                                             });
 
-        aggregated.supported &=
-            query_info.extension_container.get_context_extension<ExtensionSlangCompiler>(true) !=
-            nullptr;
-        aggregated.supported &=
-            query_info.extension_container.get_context_extension<ExtensionGLSLCompiler>(true) !=
-            nullptr;
+        if (!aggregated.supported) {
+            return aggregated;
+        }
+
+        if (query_info.extension_container.get_context_extension<ExtensionGLSLCompiler>(true) ==
+            nullptr) {
+            return DeviceSupportInfo{false, "merian-glsl-compiler must be supported."};
+        }
 
         auto& registry = NodeRegistry::get_instance();
         for (const auto& type_name : registry.node_type_names()) {

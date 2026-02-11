@@ -1,4 +1,5 @@
 #include "merian/shader/shader_module.hpp"
+#include "merian/utils/blob.hpp"
 
 namespace merian {
 
@@ -39,6 +40,10 @@ ShaderModuleHandle ShaderModule::create(const ContextHandle& context,
 ShaderModuleHandle ShaderModule::create(const ContextHandle& context,
                                         const std::vector<uint32_t>& spv) {
     return create(context, spv.data(), spv.size() * sizeof(uint32_t));
+}
+
+ShaderModuleHandle ShaderModule::create(const ContextHandle& context, const BlobHandle& spv) {
+    return create(context, spv->get_data(), spv->get_size());
 }
 
 ShaderModuleHandle ShaderModule::create(const ContextHandle& context,

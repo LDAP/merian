@@ -12,11 +12,11 @@ class SystemGlslangValidatorCompiler : public GLSLShaderCompiler {
 
     ~SystemGlslangValidatorCompiler();
 
-    std::vector<uint32_t> compile_glsl(
-        const std::string& source,
-        const std::string& source_name,
-        const vk::ShaderStageFlagBits shader_kind,
-        const ShaderCompileContextHandle& shader_compile_context) const override;
+    BlobHandle
+    compile_glsl(const std::string& source,
+                 const std::string& source_name,
+                 const vk::ShaderStageFlagBits shader_kind,
+                 const ShaderCompileContextHandle& shader_compile_context) const override;
 
     bool available() const override;
 

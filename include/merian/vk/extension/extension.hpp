@@ -1,5 +1,6 @@
 #pragma once
 
+#include "merian/shader/shader_compile_context.hpp"
 #include "merian/utils/vector.hpp"
 #include "merian/vk/context.hpp"
 #include <fmt/format.h>
@@ -36,6 +37,7 @@ struct InstanceSupportInfo {
  * and access to other loaded extensions for coordination.
  */
 struct InstanceSupportQueryInfo {
+    const FileLoaderHandle file_loader;
     const std::unordered_set<std::string>& supported_extensions; ///< Available instance extensions
     const std::unordered_set<std::string>& supported_layers;     ///< Available validation layers
     const ExtensionContainer& extension_container;               ///< Access to loaded extensions
@@ -112,9 +114,11 @@ struct DeviceSupportInfo {
  * and access to other loaded extensions for coordination.
  */
 struct DeviceSupportQueryInfo {
-    const PhysicalDeviceHandle& physical_device;   ///< Physical device being queried
-    const QueueInfo& queue_info;                   ///< Queue family information
-    const ExtensionContainer& extension_container; ///< Access to loaded extensions
+    const FileLoaderHandle file_loader;
+    const PhysicalDeviceHandle& physical_device;
+    const QueueInfo& queue_info;
+    const ExtensionContainer& extension_container;
+    const ShaderCompileContextHandle compile_context;
 };
 
 inline std::string format_as(const InstanceSupportInfo& info) {
@@ -216,10 +220,9 @@ class ContextExtension {
 
     // LIFECYCLE (in order)
 
-    virtual void
-    on_context_initializing([[maybe_unused]] const vk::detail::DispatchLoaderDynamic& loader,
-                            [[maybe_unused]] const FileLoaderHandle& file_loader,
-                            [[maybe_unused]] const ContextCreateInfo& create_info) {}
+    virtual void on_context_initializing([[maybe_unused]] const PFN_vkGetInstanceProcAddr loader,
+                                         [[maybe_unused]] const FileLoaderHandle& file_loader,
+                                         [[maybe_unused]] const ContextCreateInfo& create_info) {}
 
     /**
      * Append structs to vkInstanceCreateInfo to enable features of extensions.

@@ -5,11 +5,10 @@
 #include "merian/shader/shader_compile_context.hpp"
 #include "merian/shader/shader_compiler.hpp"
 #include "merian/shader/shader_module.hpp"
+#include "merian/utils/blob.hpp"
 
-#include <cstdint>
 #include <filesystem>
 #include <string>
-#include <vector>
 
 namespace merian {
 
@@ -68,17 +67,17 @@ class GLSLShaderCompiler : public ShaderCompiler {
     // Attempt to guess the shader_kind from the file extension if shader_kind = std::nullopt.
     //
     // May throw compilation_failed.
-    virtual std::vector<uint32_t> compile_glsl(
+    virtual BlobHandle compile_glsl(
         const std::filesystem::path& path,
         const ShaderCompileContextHandle& shader_compile_context,
         const std::optional<vk::ShaderStageFlagBits> optional_shader_kind = std::nullopt) const {
-        return compile_glsl(FileLoader::load_file(path), path.string(),
+        return compile_glsl(FileLoader::load_file_as_string(path), path.string(),
                             optional_shader_kind.value_or(guess_kind(path)),
                             shader_compile_context);
     }
 
     // May throw compilation_failed.
-    virtual std::vector<uint32_t>
+    virtual BlobHandle
     compile_glsl(const std::string& source,
                  const std::string& source_name,
                  const vk::ShaderStageFlagBits shader_kind,
@@ -86,13 +85,29 @@ class GLSLShaderCompiler : public ShaderCompiler {
 
     // ------------------------------------------------
 
+    BlobHandle find_compile_glsl(
+        const FileLoaderHandle& file_loader,
+        const std::filesystem::path& path,
+        const ShaderCompileContextHandle& shader_compile_context,
+        const std::optional<vk::ShaderStageFlagBits> optional_shader_kind = std::nullopt) const {
+
+        const std::optional<std::filesystem::path> resolved = file_loader->find_file(path);
+        if (!resolved) {
+            throw compilation_failed{fmt::format("file {} not found", path.string())};
+        }
+
+        const vk::ShaderStageFlagBits shader_kind =
+            optional_shader_kind.value_or(guess_kind(*resolved));
+        return compile_glsl(*resolved, shader_compile_context, shader_kind);
+    }
+
     ShaderModuleHandle compile_glsl_to_shadermodule(
         const ContextHandle& context,
         const std::filesystem::path& path,
         const ShaderCompileContextHandle& shader_compile_context,
         const std::optional<vk::ShaderStageFlagBits> optional_shader_kind = std::nullopt) const {
         const vk::ShaderStageFlagBits shader_kind = optional_shader_kind.value_or(guess_kind(path));
-        std::vector<uint32_t> spv = compile_glsl(path, shader_compile_context, shader_kind);
+        BlobHandle spv = compile_glsl(path, shader_compile_context, shader_kind);
         return ShaderModule::create(context, spv);
     }
 
@@ -103,15 +118,9 @@ class GLSLShaderCompiler : public ShaderCompiler {
         const ShaderCompileContextHandle& shader_compile_context,
         const std::optional<vk::ShaderStageFlagBits> optional_shader_kind = std::nullopt) const {
 
-        const std::optional<std::filesystem::path> resolved =
-            context->get_file_loader()->find_file(path);
-        if (!resolved) {
-            throw compilation_failed{fmt::format("file {} not found", path.string())};
-        }
+        const BlobHandle spv = find_compile_glsl(context->get_file_loader(), path,
+                                                 shader_compile_context, optional_shader_kind);
 
-        const vk::ShaderStageFlagBits shader_kind =
-            optional_shader_kind.value_or(guess_kind(*resolved));
-        std::vector<uint32_t> spv = compile_glsl(*resolved, shader_compile_context, shader_kind);
         return ShaderModule::create(context, spv);
     }
 
@@ -131,8 +140,8 @@ class GLSLShaderCompiler : public ShaderCompiler {
 
         const vk::ShaderStageFlagBits shader_kind =
             optional_shader_kind.value_or(guess_kind(*resolved));
-        std::vector<uint32_t> spv = compile_glsl(*resolved, shader_compile_context, shader_kind);
-        ShaderModuleHandle shader_module = ShaderModule::create(context, spv);
+        BlobHandle spv = compile_glsl(*resolved, shader_compile_context, shader_kind);
+        const ShaderModuleHandle shader_module = ShaderModule::create(context, spv);
 
         return EntryPoint::create(entry_point_name, shader_kind, shader_module);
     }
@@ -143,8 +152,7 @@ class GLSLShaderCompiler : public ShaderCompiler {
                                  const std::string& source_name,
                                  const vk::ShaderStageFlagBits shader_kind,
                                  const ShaderCompileContextHandle& shader_compile_context) const {
-        std::vector<uint32_t> spv =
-            compile_glsl(source, source_name, shader_kind, shader_compile_context);
+        BlobHandle spv = compile_glsl(source, source_name, shader_kind, shader_compile_context);
         return ShaderModule::create(context, spv);
     }
 

@@ -1,14 +1,13 @@
 #include "merian/vk/extension/extension_registry.hpp"
 
-#include "merian/vk/extension/extension_compile_context.hpp"
 #include "merian/vk/extension/extension_glfw.hpp"
 #include "merian/vk/extension/extension_glsl_compiler.hpp"
 #include "merian/vk/extension/extension_merian.hpp"
 #include "merian/vk/extension/extension_mitigations.hpp"
 #include "merian/vk/extension/extension_resources.hpp"
-#include "merian/vk/extension/extension_slang_compiler.hpp"
 #include "merian/vk/extension/extension_vk_debug_utils.hpp"
 #include "merian/vk/extension/extension_vk_layer_settings.hpp"
+#include "merian/vk/extension/extension_vma.hpp"
 
 namespace merian {
 
@@ -18,15 +17,14 @@ ExtensionRegistry& ExtensionRegistry::get_instance() {
 }
 
 ExtensionRegistry::ExtensionRegistry() {
-    register_extension<ExtensionCompileContext>("merian-compile-context");
     register_extension<ExtensionGLFW>("merian-glfw");
     register_extension<ExtensionGLSLCompiler>("merian-glsl-compiler");
     register_extension<ExtensionMerian>("merian");
     register_extension<ExtensionMitigations>("merian-mitigations");
     register_extension<ExtensionResources>("merian-resources");
-    register_extension<ExtensionSlangCompiler>("merian-slang-session");
     register_extension<ExtensionVkDebugUtils>("vk_debug_utils");
     register_extension<ExtensionVkLayerSettings>("vk_layer_settings");
+    register_extension<ExtensionVMA>("merian-vma");
 }
 
 std::shared_ptr<ContextExtension> ExtensionRegistry::create(const std::string& name) const {

@@ -14,7 +14,7 @@ SystemGlslangValidatorCompiler::SystemGlslangValidatorCompiler()
 
 SystemGlslangValidatorCompiler::~SystemGlslangValidatorCompiler() {}
 
-std::vector<uint32_t> SystemGlslangValidatorCompiler::compile_glsl(
+BlobHandle SystemGlslangValidatorCompiler::compile_glsl(
     const std::string& source,
     const std::string& source_name,
     const vk::ShaderStageFlagBits shader_kind,
@@ -79,7 +79,7 @@ std::vector<uint32_t> SystemGlslangValidatorCompiler::compile_glsl(
                         source_name, process.cout, process.cerr, fmt::join(command, " "))};
     }
 
-    std::vector<uint32_t> spv = FileLoader::load_file<uint32_t>(output_file);
+    const auto spv = FileLoader::load_file_as_blob(output_file);
 
     std::filesystem::remove(output_file);
 

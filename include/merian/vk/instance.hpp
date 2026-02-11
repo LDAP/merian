@@ -81,6 +81,12 @@ class Instance : public std::enable_shared_from_this<Instance> {
     // this also queries all extensions, features and such, can be expensive to call!
     std::vector<PhysicalDeviceHandle> get_physical_devices();
 
+    // --------------------------------------
+
+    PFN_vkGetInstanceProcAddr get_vkGetInstanceProcAddr() const {
+        return vk_get_instance_proc_addr;
+    }
+
   private:
     const vk::Instance instance;
     const uint32_t effective_vk_api_version;
@@ -88,6 +94,8 @@ class Instance : public std::enable_shared_from_this<Instance> {
 
     const std::unordered_set<std::string> enabled_layers;
     const std::unordered_set<std::string> enabled_extensions;
+
+    PFN_vkGetInstanceProcAddr vk_get_instance_proc_addr;
 };
 
 using InstanceHandle = std::shared_ptr<Instance>;

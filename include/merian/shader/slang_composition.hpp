@@ -1,8 +1,8 @@
 #pragma once
 
 #include "merian/io/file_loader.hpp"
-#include "merian/utils/hash.hpp"
 #include "merian/shader/shader_compiler.hpp"
+#include "merian/utils/hash.hpp"
 
 #include "slang-com-ptr.h"
 #include "slang.h"
@@ -10,6 +10,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 
 namespace merian {

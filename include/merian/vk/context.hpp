@@ -235,6 +235,8 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
 
     const QueueInfo& get_queue_info() const;
 
+    const ShaderCompileContextHandle& get_shader_compile_context() const;
+
   private:
     // in create_device_and_queues
 
@@ -279,6 +281,8 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
     std::weak_ptr<CommandPool> cmd_pool_T;
     // Convenience command pool for compute (can be nullptr in very rare occasions)
     std::weak_ptr<CommandPool> cmd_pool_C;
+
+    ShaderCompileContextHandle shader_compile_context;
 };
 
 } // namespace merian

@@ -1,6 +1,7 @@
 #include "merian/vk/device.hpp"
 
 #include "merian/shader/shader_defines.hpp"
+#include "merian/vk/utils/vulkan_extensions.hpp"
 #include "merian/vk/utils/vulkan_spirv.hpp"
 #include "spdlog/spdlog.h"
 
@@ -178,6 +179,9 @@ Device::Device(
     for (const auto& cap : enabled_spirv_capabilities) {
         shader_defines.emplace(std::string(SHADER_DEFINE_PREFIX_SPIRV_CAP) + cap, "1");
     }
+
+    vk_get_device_proc_addr =
+        PFN_vkGetDeviceProcAddr(vkGetDeviceProcAddr(device, "vkGetDeviceProcAddr"));
 }
 
 Device::~Device() {

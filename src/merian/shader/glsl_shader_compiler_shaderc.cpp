@@ -56,7 +56,7 @@ class FileIncluder final : public shaderc::CompileOptions::IncluderInterface {
     struct ShadercIncludeInformation {
 
         ShadercIncludeInformation(const std::filesystem::path& full_path)
-            : full_path(full_path.string()), content(FileLoader::load_file(full_path)) {
+            : full_path(full_path.string()), content(FileLoader::load_file_as_string(full_path)) {
             include_result.source_name = this->full_path.c_str();
             include_result.source_name_length = this->full_path.size();
             include_result.content = content.c_str();
@@ -117,11 +117,28 @@ ShadercCompiler::ShadercCompiler() : GLSLShaderCompiler() {}
 
 ShadercCompiler::~ShadercCompiler() {}
 
-std::vector<uint32_t> ShadercCompiler::compile_glsl(
-    const std::string& source,
-    const std::string& source_name,
-    const vk::ShaderStageFlagBits shader_kind,
-    const ShaderCompileContextHandle& shader_compile_context) const {
+class SpvCompilationResultBlob : public Blob {
+    friend ShadercCompiler;
+
+  public:
+    virtual void* get_data() {
+        return (void*)result.cbegin();
+    }
+
+    virtual std::size_t get_size() {
+        return (result.cend() - result.cbegin()) *
+               sizeof(shaderc::SpvCompilationResult::element_type);
+    }
+
+  private:
+    shaderc::SpvCompilationResult result;
+};
+
+BlobHandle
+ShadercCompiler::compile_glsl(const std::string& source,
+                              const std::string& source_name,
+                              const vk::ShaderStageFlagBits shader_kind,
+                              const ShaderCompileContextHandle& shader_compile_context) const {
     const shaderc_shader_kind kind = shaderc_shader_kind_for_stage_flag_bit(shader_kind);
 
     shaderc::CompileOptions compile_options;
@@ -132,8 +149,8 @@ std::vector<uint32_t> ShadercCompiler::compile_glsl(
         compile_options.AddMacroDefinition(key, value);
     }
 
-    auto includer = std::make_unique<FileIncluder>(
-        shader_compile_context->get_search_path_file_loader());
+    auto includer =
+        std::make_unique<FileIncluder>(shader_compile_context->get_search_path_file_loader());
     compile_options.SetIncluder(std::move(includer));
     if (shader_compile_context->get_optimization_level() > 0) {
         compile_options.SetOptimizationLevel(
@@ -157,6 +174,31 @@ std::vector<uint32_t> ShadercCompiler::compile_glsl(
                                              shaderc_env_version_vulkan_1_4);
     }
 
+    switch (shader_compile_context->get_target()) {
+    case CompilationTarget::SPIRV_1_0:
+        compile_options.SetTargetSpirv(shaderc_spirv_version_1_0);
+        break;
+    case CompilationTarget::SPIRV_1_1:
+        compile_options.SetTargetSpirv(shaderc_spirv_version_1_1);
+        break;
+    case CompilationTarget::SPIRV_1_2:
+        compile_options.SetTargetSpirv(shaderc_spirv_version_1_2);
+        break;
+    case CompilationTarget::SPIRV_1_3:
+        compile_options.SetTargetSpirv(shaderc_spirv_version_1_3);
+        break;
+    case CompilationTarget::SPIRV_1_4:
+        compile_options.SetTargetSpirv(shaderc_spirv_version_1_4);
+        break;
+    case CompilationTarget::SPIRV_1_5:
+        compile_options.SetTargetSpirv(shaderc_spirv_version_1_5);
+        break;
+    case CompilationTarget::SPIRV_1_6:
+    default:
+        compile_options.SetTargetSpirv(shaderc_spirv_version_1_6);
+        break;
+    }
+
     SPDLOG_DEBUG("preprocess {}", source_name);
     const auto preprocess_result =
         shader_compiler.PreprocessGlsl(source, kind, source_name.c_str(), compile_options);
@@ -165,14 +207,15 @@ std::vector<uint32_t> ShadercCompiler::compile_glsl(
     }
 
     SPDLOG_DEBUG("compile and assemble {}", source_name);
-    const auto binary_result = shader_compiler.CompileGlslToSpv(
+    const auto blob = std::make_shared<SpvCompilationResultBlob>();
+    blob->result = shader_compiler.CompileGlslToSpv(
         preprocess_result.begin(), preprocess_result.end() - preprocess_result.begin(), kind,
         source_name.data(), compile_options);
-    if (binary_result.GetCompilationStatus() != shaderc_compilation_status_success) {
-        throw compilation_failed{binary_result.GetErrorMessage()};
+    if (blob->result.GetCompilationStatus() != shaderc_compilation_status_success) {
+        throw compilation_failed{blob->result.GetErrorMessage()};
     }
 
-    return std::vector<uint32_t>(binary_result.begin(), binary_result.end());
+    return blob;
 }
 
 bool ShadercCompiler::available() const {

@@ -4,6 +4,7 @@
 #include "merian/utils/vector.hpp"
 #include "merian/vk/extension/extension.hpp"
 #include "merian/vk/extension/extension_registry.hpp"
+#include "merian/vk/utils/vulkan_extensions.hpp"
 #include "merian/vk/utils/vulkan_spirv.hpp"
 
 #include <fmt/ranges.h>
@@ -138,7 +139,8 @@ Version: {}\n\n",
     prepare_file_loader(create_info);
 
     for (const auto& ext : get_extensions()) {
-        ext->on_context_initializing(VULKAN_HPP_DEFAULT_DISPATCHER, file_loader, create_info);
+        ext->on_context_initializing(VULKAN_HPP_DEFAULT_DISPATCHER.vkGetInstanceProcAddr,
+                                     file_loader, create_info);
     }
 
     const uint32_t target_vk_api_version = VK_HEADER_VERSION_COMPLETE;
@@ -155,6 +157,8 @@ Version: {}\n\n",
 
     create_device_and_queues(create_info.preferred_number_compute_queues,
                              create_info.desired_features, create_info.additional_extensions);
+
+    shader_compile_context = ShaderCompileContext::create(file_loader->get_search_paths(), device);
 
     SPDLOG_INFO("context ready. (took: {})", format_duration(sw.nanos()));
 }
@@ -178,7 +182,7 @@ void Context::create_instance(const uint32_t targeted_vk_api_version,
         supported_instance_extensions.emplace(instance_ext.extensionName.data());
     }
 
-    InstanceSupportQueryInfo instance_query_info{supported_instance_extensions,
+    InstanceSupportQueryInfo instance_query_info{file_loader, supported_instance_extensions,
                                                  supported_instance_layers, *this};
 
     // Check instance support and collect unsupported extensions
@@ -323,7 +327,9 @@ void Context::select_physical_device(
 
             QueueInfo q_info = determine_queues(physical_devices[i]);
 
-            DeviceSupportQueryInfo device_query_info{physical_devices[i], q_info, *this};
+            DeviceSupportQueryInfo device_query_info{
+                file_loader, physical_devices[i], q_info, *this,
+                ShaderCompileContext::create(file_loader->get_search_paths(), physical_devices[i])};
 
             uint32_t context_extensions_supported = 0;
             for (const auto& ext : get_extensions()) {
@@ -411,7 +417,9 @@ void Context::select_physical_device(
                 props.deviceName.data(), props.vendorID, props.deviceID,
                 vk::to_string(props12.driverID), props12.driverInfo.data());
 
-    DeviceSupportQueryInfo device_query_info{physical_device, queue_info, *this};
+    DeviceSupportQueryInfo device_query_info{
+        file_loader, physical_device, queue_info, *this,
+        ShaderCompileContext::create(file_loader->get_search_paths(), physical_device)};
 
     // Check device support and collect unsupported extensions
     std::vector<std::type_index> unsupported_extensions;
@@ -604,7 +612,9 @@ void Context::create_device_and_queues(
     VulkanFeatures features = desired_features;
     std::vector<const char*> extensions = desired_additional_extensions;
 
-    DeviceSupportQueryInfo device_query_info{physical_device, queue_info, *this};
+    DeviceSupportQueryInfo device_query_info{
+        file_loader, physical_device, queue_info, *this,
+        ShaderCompileContext::create(file_loader->get_search_paths(), physical_device)};
 
     const uint32_t vk_api_version = VK_HEADER_VERSION_COMPLETE;
 
@@ -809,6 +819,10 @@ const FileLoaderHandle& Context::get_file_loader() const {
 
 const QueueInfo& Context::get_queue_info() const {
     return queue_info;
+}
+
+const ShaderCompileContextHandle& Context::get_shader_compile_context() const {
+    return shader_compile_context;
 }
 
 } // namespace merian

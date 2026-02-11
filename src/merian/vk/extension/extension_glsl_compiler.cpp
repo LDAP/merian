@@ -11,12 +11,8 @@ ExtensionGLSLCompiler::ExtensionGLSLCompiler() : ContextExtension() {}
 
 ExtensionGLSLCompiler::~ExtensionGLSLCompiler() = default;
 
-std::vector<std::string> ExtensionGLSLCompiler::request_extensions() {
-    return {"merian-compile-context"};
-}
-
 void ExtensionGLSLCompiler::on_context_initializing(
-    [[maybe_unused]] const vk::detail::DispatchLoaderDynamic& loader,
+    [[maybe_unused]] const PFN_vkGetInstanceProcAddr loader,
     [[maybe_unused]] const FileLoaderHandle& file_loader,
     [[maybe_unused]] const ContextCreateInfo& create_info) {
 
@@ -60,6 +56,7 @@ DeviceSupportInfo ExtensionGLSLCompiler::query_device_support(
 }
 
 const GLSLShaderCompilerHandle& ExtensionGLSLCompiler::get_compiler() const {
+    assert(compiler != nullptr);
     return compiler;
 }
 

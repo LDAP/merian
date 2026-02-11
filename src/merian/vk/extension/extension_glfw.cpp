@@ -23,12 +23,12 @@ ExtensionGLFW::~ExtensionGLFW() {
         glfwTerminate();
 }
 
-void ExtensionGLFW::on_context_initializing(const vk::detail::DispatchLoaderDynamic& loader,
+void ExtensionGLFW::on_context_initializing(const PFN_vkGetInstanceProcAddr loader,
                                             [[maybe_unused]] const FileLoaderHandle& file_loader,
                                             [[maybe_unused]] const ContextCreateInfo& create_info) {
 
     SPDLOG_DEBUG("Querying Vulkan support");
-    glfwInitVulkanLoader(loader.vkGetInstanceProcAddr);
+    glfwInitVulkanLoader(loader);
     glfw_vulkan_support = glfwVulkanSupported();
     if (glfw_vulkan_support == GLFW_FALSE) {
         SPDLOG_WARN("...failed! GLFW reports to have no Vulkan support!");

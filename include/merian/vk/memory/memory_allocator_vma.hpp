@@ -83,13 +83,16 @@ class VMAMemoryAllocation : public MemoryAllocation {
     uint32_t map_count = 0;
 };
 
+/**
+ * @brief      A memory allocator using VulkanMemoryAllocator. Needs the merian-vma extension to be
+ * enabled.
+ */
 class VMAMemoryAllocator : public MemoryAllocator {
   private:
     friend class VMAMemoryAllocation;
 
     VMAMemoryAllocator() = delete;
-    explicit VMAMemoryAllocator(const ContextHandle& context,
-                                const VmaAllocatorCreateFlags flags = {});
+    explicit VMAMemoryAllocator(const ContextHandle& context);
 
   public:
     ~VMAMemoryAllocator();
@@ -121,10 +124,7 @@ class VMAMemoryAllocator : public MemoryAllocator {
     VmaAllocator vma_allocator;
 
   public:
-    // E.g. supply VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT if you want to use the device
-    // address feature
-    static std::shared_ptr<VMAMemoryAllocator> create(const ContextHandle& context,
-                                                      const VmaAllocatorCreateFlags flags = {});
+    static std::shared_ptr<VMAMemoryAllocator> create(const ContextHandle& context);
 };
 
 } // namespace merian

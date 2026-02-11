@@ -36,7 +36,7 @@ using ShaderCompileContextHandle = std::shared_ptr<ShaderCompileContext>;
 
 class ShaderCompileContext {
   protected:
-    ShaderCompileContext(const std::vector<std::filesystem::path>& search_paths = {},
+    ShaderCompileContext(const vk::ArrayProxy<std::filesystem::path>& search_paths = {},
                          const std::map<std::string, std::string>& preprocessor_macros = {},
                          const bool generate_debug_info = Context::IS_DEBUG_BUILD,
                          const uint32_t optimization_level = Context::BUILD_OPTIMIZATION_LEVEL,
@@ -142,31 +142,24 @@ class ShaderCompileContext {
         return ShaderCompileContextHandle(new ShaderCompileContext(context));
     }
 
-    static ShaderCompileContextHandle create(const FileLoader& file_loader,
-                                             const PhysicalDeviceHandle& physical_device) {
-        std::vector<std::filesystem::path> empty_paths;
+    static ShaderCompileContextHandle
+    create(const vk::ArrayProxy<std::filesystem::path>& search_paths,
+           const PhysicalDeviceHandle& physical_device) {
         auto context = ShaderCompileContextHandle(new ShaderCompileContext(
-            empty_paths, physical_device->get_shader_defines(), Context::IS_DEBUG_BUILD,
+            search_paths, physical_device->get_shader_defines(), Context::IS_DEBUG_BUILD,
             Context::BUILD_OPTIMIZATION_LEVEL,
             spirv_target_for_vulkan_api_version(physical_device->get_vk_api_version()),
             physical_device->get_vk_api_version()));
-        for (const auto& path : file_loader) {
-            context->file_loader.add_search_path(path);
-        }
         return context;
     }
 
-    static ShaderCompileContextHandle create(const FileLoader& file_loader,
-                                             const DeviceHandle& device) {
-        std::vector<std::filesystem::path> empty_paths;
+    static ShaderCompileContextHandle
+    create(const vk::ArrayProxy<std::filesystem::path>& search_paths, const DeviceHandle& device) {
         auto context = ShaderCompileContextHandle(new ShaderCompileContext(
-            empty_paths, device->get_shader_defines(), Context::IS_DEBUG_BUILD,
+            search_paths, device->get_shader_defines(), Context::IS_DEBUG_BUILD,
             Context::BUILD_OPTIMIZATION_LEVEL,
             spirv_target_for_vulkan_api_version(device->get_vk_api_version()),
             device->get_vk_api_version()));
-        for (const auto& path : file_loader) {
-            context->file_loader.add_search_path(path);
-        }
         return context;
     }
 

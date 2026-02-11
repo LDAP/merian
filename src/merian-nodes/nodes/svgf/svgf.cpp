@@ -5,8 +5,6 @@
 
 #include "merian/shader/slang_entry_point.hpp"
 #include "merian/shader/spriv_reflect.hpp"
-#include "merian/vk/extension/extension_compile_context.hpp"
-#include "merian/vk/extension/extension_slang_compiler.hpp"
 #include "merian/vk/pipeline/pipeline_compute.hpp"
 #include "merian/vk/pipeline/pipeline_layout_builder.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
@@ -18,16 +16,8 @@ SVGF::SVGF() {}
 SVGF::~SVGF() {}
 
 DeviceSupportInfo SVGF::query_device_support(const DeviceSupportQueryInfo& query_info) {
-    // Get the compile context extension to compile shaders
-    auto compile_ctx_ext =
-        query_info.extension_container.get_context_extension<ExtensionCompileContext>(true);
-
-    if (!compile_ctx_ext) {
-        return DeviceSupportInfo{false, "extension merian-compile-context unavailable"};
-    }
-
-    // Compile shaders and use SPIR-V reflection to determine device support
-    ShaderCompileContextHandle compilation_ctx = compile_ctx_ext->get_early_compile_context();
+    ShaderCompileContextHandle compilation_ctx = ShaderCompileContext::create(
+        query_info.file_loader->get_search_paths(), query_info.physical_device);
     compilation_ctx->add_search_path("merian-nodes/nodes/svgf");
 
     // Compile the three SVGF shaders

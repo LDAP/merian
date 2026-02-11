@@ -14,7 +14,7 @@ SystemGlslcCompiler::SystemGlslcCompiler()
 
 SystemGlslcCompiler::~SystemGlslcCompiler() {}
 
-std::vector<uint32_t>
+BlobHandle
 SystemGlslcCompiler::compile_glsl(const std::string& source,
                                   const std::string& source_name,
                                   const vk::ShaderStageFlagBits shader_kind,
@@ -87,7 +87,7 @@ SystemGlslcCompiler::compile_glsl(const std::string& source,
     std::vector<uint32_t> spv((process.cout.size() + sizeof(uint32_t) - 1) / sizeof(uint32_t));
     memcpy(spv.data(), process.cout.data(), process.cout.size());
 
-    return spv;
+    return std::make_shared<VectorBlob<uint32_t>>(std::move(spv));
 }
 
 bool SystemGlslcCompiler::available() const {

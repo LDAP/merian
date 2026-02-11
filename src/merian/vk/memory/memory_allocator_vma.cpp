@@ -1,4 +1,5 @@
 #include "merian/vk/memory/memory_allocator_vma.hpp"
+#include "merian/vk/extension/extension_vma.hpp"
 #include "merian/vk/memory/resource_allocations.hpp"
 #include <spdlog/spdlog.h>
 
@@ -188,18 +189,22 @@ void VMAMemoryAllocation::properties(Properties& props) {
 
 // ALLOCATOR
 
-VMAMemoryAllocator::VMAMemoryAllocator(const ContextHandle& context,
-                                       const VmaAllocatorCreateFlags flags)
-    : MemoryAllocator(context) {
+VMAMemoryAllocator::VMAMemoryAllocator(const ContextHandle& context) : MemoryAllocator(context) {
+    const auto& vma_ext = context->get_context_extension<ExtensionVMA>();
+
+    VmaVulkanFunctions vulkan_functions = {};
+    vulkan_functions.vkGetInstanceProcAddr = context->get_instance()->get_vkGetInstanceProcAddr();
+    vulkan_functions.vkGetDeviceProcAddr = context->get_device()->get_vkGetDeviceProcAddr();
+
     VmaAllocatorCreateInfo allocator_info = {
-        .flags = flags,
+        .flags = vma_ext->get_create_flags(),
         .physicalDevice = context->get_physical_device()->get_physical_device(),
         .device = context->get_device()->get_device(),
         .preferredLargeHeapBlockSize = 0,
         .pAllocationCallbacks = nullptr,
         .pDeviceMemoryCallbacks = nullptr,
         .pHeapSizeLimit = nullptr,
-        .pVulkanFunctions = nullptr,
+        .pVulkanFunctions = &vulkan_functions,
         .instance = context->get_instance()->get_instance(),
         .vulkanApiVersion = std::min(
             context->get_device()->get_physical_device()->get_vk_api_version(),
@@ -308,10 +313,9 @@ ImageHandle VMAMemoryAllocator::create_image(const vk::ImageCreateInfo image_cre
     return image_handle;
 }
 
-std::shared_ptr<VMAMemoryAllocator>
-VMAMemoryAllocator::create(const ContextHandle& context, const VmaAllocatorCreateFlags flags) {
+std::shared_ptr<VMAMemoryAllocator> VMAMemoryAllocator::create(const ContextHandle& context) {
     std::shared_ptr<VMAMemoryAllocator> allocator =
-        std::shared_ptr<VMAMemoryAllocator>(new VMAMemoryAllocator(context, flags));
+        std::shared_ptr<VMAMemoryAllocator>(new VMAMemoryAllocator(context));
     return allocator;
 }
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "merian/utils/blob.hpp"
 #include "merian/vk/context.hpp"
 #include "merian/vk/object.hpp"
 
@@ -41,6 +42,8 @@ class ShaderModule : public std::enable_shared_from_this<ShaderModule>, public O
 
     static ShaderModuleHandle create(const ContextHandle& context,
                                      const std::vector<uint32_t>& spv);
+
+    static ShaderModuleHandle create(const ContextHandle& context, const BlobHandle& spv);
 
     static ShaderModuleHandle
     create(const ContextHandle& context, const void* spv, const std::size_t spv_size_bytes);

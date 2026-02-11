@@ -7,8 +7,8 @@ namespace merian {
 
 Instance::Instance(const vk::InstanceCreateInfo& instance_create_info)
     : instance(vk::createInstance(instance_create_info)),
-      effective_vk_api_version(
-          std::min(get_instance_vk_api_version(), instance_create_info.pApplicationInfo->apiVersion)),
+      effective_vk_api_version(std::min(get_instance_vk_api_version(),
+                                        instance_create_info.pApplicationInfo->apiVersion)),
       target_vk_api_version(instance_create_info.pApplicationInfo->apiVersion),
       enabled_layers(instance_create_info.ppEnabledLayerNames,
                      instance_create_info.ppEnabledLayerNames +
@@ -26,6 +26,8 @@ Instance::Instance(const vk::InstanceCreateInfo& instance_create_info)
         VK_API_VERSION_PATCH(target_vk_api_version), VK_API_VERSION_MAJOR(effective_vk_api_version),
         VK_API_VERSION_MINOR(effective_vk_api_version),
         VK_API_VERSION_PATCH(effective_vk_api_version));
+
+    vk_get_instance_proc_addr = VULKAN_HPP_DEFAULT_DISPATCHER.vkGetInstanceProcAddr;
 }
 
 InstanceHandle Instance::create(const vk::InstanceCreateInfo& instance_create_info) {

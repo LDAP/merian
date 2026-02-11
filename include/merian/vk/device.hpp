@@ -1,13 +1,10 @@
 #pragma once
 
 #include "merian/vk/physical_device.hpp"
-#include "merian/vk/utils/vulkan_extensions.hpp"
-#include "spdlog/spdlog.h"
 
 #include <map>
 #include <memory>
 #include <string>
-#include <vector>
 
 namespace merian {
 
@@ -90,6 +87,12 @@ class Device : public std::enable_shared_from_this<Device> {
         return supported_pipeline_stages2;
     }
 
+    // ---------------------------------------------
+
+    PFN_vkGetDeviceProcAddr get_vkGetDeviceProcAddr() const {
+        return vk_get_device_proc_addr;
+    }
+
   private:
     const PhysicalDeviceHandle physical_device;
 
@@ -106,6 +109,8 @@ class Device : public std::enable_shared_from_this<Device> {
     std::unordered_set<std::string> enabled_spirv_capabilities;
 
     std::map<std::string, std::string> shader_defines;
+
+    PFN_vkGetDeviceProcAddr vk_get_device_proc_addr;
 };
 
 using DeviceHandle = std::shared_ptr<Device>;

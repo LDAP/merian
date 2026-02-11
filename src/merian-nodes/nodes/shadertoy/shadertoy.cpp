@@ -65,7 +65,7 @@ class ShadertoyInjectCompiler : public GLSLShaderCompiler {
 
     ~ShadertoyInjectCompiler() {}
 
-    std::vector<uint32_t>
+    BlobHandle
     compile_glsl(const std::string& source,
                  const std::string& source_name,
                  const vk::ShaderStageFlagBits shader_kind,
@@ -223,7 +223,7 @@ AbstractCompute::NodeStatusFlags Shadertoy::properties(Properties& config) {
         if (std::filesystem::exists(resolved_shader_path)) {
             if (config.config_bool("convert to inline")) {
                 shader_source_selector = 0;
-                shader_glsl = FileLoader::load_file(resolved_shader_path);
+                shader_glsl = FileLoader::load_file_as_string(resolved_shader_path);
                 needs_compile = true;
             }
         }

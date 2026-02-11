@@ -1,0 +1,12 @@
+option(
+    'static_functions',
+    type: 'boolean',
+    value: true,
+    description: 'Link with Vulkan static library'
+)
+option(
+    'dynamic_functions',
+    type: 'boolean',
+    value: false,
+    description: 'Tell VMA to fetch pointers to Vulkan functions dynamically using vkGetInstanceProcAddr, vkGetDeviceProcAddr'
+)

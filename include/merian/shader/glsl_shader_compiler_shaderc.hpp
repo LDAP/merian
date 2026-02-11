@@ -14,7 +14,7 @@ class ShadercCompiler : public GLSLShaderCompiler {
 
     ~ShadercCompiler();
 
-    std::vector<uint32_t>
+    BlobHandle
     compile_glsl(const std::string& source,
                  const std::string& source_name,
                  const vk::ShaderStageFlagBits shader_kind,

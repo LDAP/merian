@@ -26,6 +26,12 @@ class SpirvReflect {
         assert(result == SPV_REFLECT_RESULT_SUCCESS);
     }
 
+    SpirvReflect(const BlobHandle& blob)
+        : spv(blob->get_data<uint32_t>()), spv_size(blob->get_size()) {
+        SpvReflectResult result = spvReflectCreateShaderModule(spv_size, spv, &module);
+        assert(result == SPV_REFLECT_RESULT_SUCCESS);
+    }
+
     ~SpirvReflect() {
         spvReflectDestroyShaderModule(&module);
     }
@@ -120,7 +126,7 @@ class SpirvReflect {
   private:
     const uint32_t* spv;
     std::size_t spv_size;
-    SpvReflectShaderModule module;
+    SpvReflectShaderModule module{};
 };
 
 } // namespace merian

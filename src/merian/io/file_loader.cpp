@@ -1,5 +1,6 @@
 #include "merian/io/file_loader.hpp"
 #include "merian/utils/string.hpp"
+#include "merian/utils/vector.hpp"
 
 #include <filesystem>
 #include <fmt/ranges.h>
@@ -31,7 +32,7 @@ bool FileLoader::exists(const std::filesystem::path& path,
                                                        : std::filesystem::exists(path));
 }
 
-std::string FileLoader::load_file(const std::filesystem::path& path) {
+std::string FileLoader::load_file_as_string(const std::filesystem::path& path) {
     if (!exists(path)) {
         throw std::runtime_error{fmt::format("failed to load {} (does not exist)", path.string())};
     }
@@ -183,7 +184,7 @@ FileLoader::find_and_load_file(const std::filesystem::path& filename) const {
     if (!full_path.has_value()) {
         return std::nullopt;
     }
-    return load_file(full_path.value());
+    return load_file_as_string(full_path.value());
 }
 
 std::optional<std::string>
@@ -194,35 +195,56 @@ FileLoader::find_and_load_file(const std::filesystem::path& filename,
     if (!full_path.has_value()) {
         return std::nullopt;
     }
-    return load_file(full_path.value());
+    return load_file_as_string(full_path.value());
 }
 
-void FileLoader::add_search_path(const std::filesystem::path& path) {
-    auto resolved = find_file(path);
-    if (resolved) {
-        search_paths.insert(*resolved);
-        SPDLOG_DEBUG("added search path {}", resolved->string());
-        return;
-    }
-
-    SPDLOG_DEBUG("path {} could not be found in search path and was not added as new search path.",
-                 path.string());
-}
-
-void FileLoader::add_search_path(const std::vector<std::filesystem::path>& paths) {
+void FileLoader::add_search_path(const vk::ArrayProxy<std::filesystem::path>& paths) {
     for (const std::filesystem::path& path : paths) {
-        add_search_path(path);
+        auto resolved = find_file(path);
+        if (resolved) {
+            search_paths.push_back(*resolved);
+            SPDLOG_DEBUG("added search path {}", resolved->string());
+            continue;
+        }
+
+        SPDLOG_DEBUG(
+            "path {} could not be found in search path and was not added as new search path.",
+            path.string());
     }
+
+    std::sort(search_paths.begin(), search_paths.end());
+    remove_duplicates(search_paths);
 }
 
-void FileLoader::add_search_path(const std::vector<std::string>& paths) {
-    for (const std::string& path : paths) {
-        add_search_path(path);
+void FileLoader::add_search_path(const vk::ArrayProxy<std::string>& paths) {
+    for (const auto& path : paths) {
+        auto resolved = find_file(path);
+        if (resolved) {
+            search_paths.push_back(*resolved);
+            SPDLOG_DEBUG("added search path {}", resolved->string());
+            continue;
+        }
+
+        SPDLOG_DEBUG(
+            "path {} could not be found in search path and was not added as new search path.",
+            path);
     }
+
+    std::sort(search_paths.begin(), search_paths.end());
+    remove_duplicates(search_paths);
 }
 
 bool FileLoader::remove_search_path(const std::filesystem::path& path) {
-    return search_paths.erase(std::filesystem::weakly_canonical(path)) > 0;
+    const auto p = std::filesystem::weakly_canonical(path);
+    const auto it = std::remove_if(search_paths.begin(), search_paths.end(),
+                                   [&p](const auto& entry) { return entry == p; });
+
+    if (it != search_paths.end()) {
+        search_paths.erase(it, search_paths.end());
+        return true;
+    }
+
+    return false;
 }
 
 void FileLoader::set_cwd_search_parents(const bool search_parents) {

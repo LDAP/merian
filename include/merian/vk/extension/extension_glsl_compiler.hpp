@@ -17,11 +17,9 @@ class ExtensionGLSLCompiler : public ContextExtension {
 
     ~ExtensionGLSLCompiler() override;
 
-    std::vector<std::string> request_extensions() override;
-
     DeviceSupportInfo query_device_support(const DeviceSupportQueryInfo& query_info) override;
 
-    void on_context_initializing(const vk::detail::DispatchLoaderDynamic& loader,
+    void on_context_initializing(const PFN_vkGetInstanceProcAddr loader,
                                  const FileLoaderHandle& file_loader,
                                  const ContextCreateInfo& create_info) override;
 

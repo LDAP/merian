@@ -74,7 +74,7 @@ tol = dependency('tinyobjloader', fallback : ['tinyobjloader', 'tinyobjloader_de
 tgltf = dependency('tinygltf', required: get_option('tinygltf'), fallback: ['tinygltf', 'tinygltf_dep'])
 imgui = dependency('imgui', version: ['>=1.90.9'], fallback: ['imgui', 'imgui_dep'], static: true)
 nlohmann_json = dependency('nlohmann_json', version: ['>=3.11.3'], fallback: ['nlohmann_json', 'nlohmann_json_dep'])
-vma = dependency('VulkanMemoryAllocator', version: ['>=3.3.0'], fallback: ['VulkanMemoryAllocator', 'VulkanMemoryAllocator_dep'])
+vma = dependency('VulkanMemoryAllocator', version: ['>=3.3.0'], fallback: ['VulkanMemoryAllocator', 'VulkanMemoryAllocator_dep'], default_options : ['static_functions=false', 'dynamic_functions=true'])
 stb = dependency('stb', fallback: ['stb', 'stb_dep'], default_options : ['stb_libraries=[\'stb_image\', \'stb_image_write\']'])
 tinybvh = dependency('tinybvh', fallback: ['tinybvh', 'tinybvh_dep'])
 sdl2 = dependency('sdl2', required: false)

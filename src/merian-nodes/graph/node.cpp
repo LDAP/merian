@@ -7,8 +7,9 @@
 namespace merian {
 
 void Node::initialize(const ContextHandle& context, const ResourceAllocatorHandle& /*allocator*/) {
-    const DeviceSupportQueryInfo query_info{context->get_physical_device(),
-                                            context->get_queue_info(), *context};
+    const DeviceSupportQueryInfo query_info{
+        context->get_file_loader(), context->get_physical_device(), context->get_queue_info(),
+        *context, context->get_shader_compile_context()};
     const DeviceSupportInfo support_info = query_device_support(query_info);
 
     if (support_info.supported) {

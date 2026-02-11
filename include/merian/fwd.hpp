@@ -94,12 +94,14 @@ class EntryPoint;
 class SlangProgram;
 class SlangEntryPoint;
 class SlangComposition;
+class ShaderCompileContext;
 using ShaderModuleHandle = std::shared_ptr<ShaderModule>;
 using ShaderObjectHandle = std::shared_ptr<ShaderObject>;
 using EntryPointHandle = std::shared_ptr<EntryPoint>;
 using SlangProgramHandle = std::shared_ptr<SlangProgram>;
 using SlangEntryPointHandle = std::shared_ptr<SlangEntryPoint>;
 using SlangCompositionHandle = std::shared_ptr<SlangComposition>;
+using ShaderCompileContextHandle = std::shared_ptr<ShaderCompileContext>;
 
 // Memory Allocation
 class MemoryAllocation;
