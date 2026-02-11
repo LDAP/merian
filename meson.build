@@ -55,12 +55,8 @@ add_project_arguments('-DMERIAN_DEVELOPMENT_INCLUDE_DIR="@0@"'.format(join_paths
 
 
 # Dependencies
-vulkan_loader = ccx.find_library('vulkan', required: true)
-vulkanheaders_subp = subproject('vulkanheaders', version: ['>=' + vulkan_target_api_version])
-vulkanheaders = vulkanheaders_subp.get_variable('vulkanheaders_dep')
-vulkan = declare_dependency(
-    dependencies: [vulkanheaders, vulkan_loader],
-)
+vulkan_subp = subproject('vulkan', version: ['>=' + vulkan_target_api_version])
+vulkan = vulkan_subp.get_variable('vulkan_dep')
 # ensure subprojects are using the same version of the header!
 meson.override_dependency('vulkan', vulkan)
 
