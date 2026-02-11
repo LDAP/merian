@@ -1,35 +1,12 @@
 #pragma once
 
+#include "merian/shader/spirv_utils.hpp"
 #include "merian/vk/context.hpp"
+
 #include "vulkan/vulkan_core.h"
 
 #include <cstdint>
-#include <stdexcept>
-
 namespace merian {
-
-enum class CompilationTarget {
-    SPIRV_1_0,
-    SPIRV_1_1,
-    SPIRV_1_2,
-    SPIRV_1_3,
-    SPIRV_1_4,
-    SPIRV_1_5,
-    SPIRV_1_6,
-};
-
-inline CompilationTarget spirv_target_for_vulkan_api_version(const uint32_t vulkan_api_version) {
-    if (vulkan_api_version >= VK_API_VERSION_1_3) {
-        return CompilationTarget::SPIRV_1_6;
-    }
-    if (vulkan_api_version >= VK_API_VERSION_1_2) {
-        return CompilationTarget::SPIRV_1_5;
-    }
-    if (vulkan_api_version >= VK_API_VERSION_1_1) {
-        return CompilationTarget::SPIRV_1_3;
-    }
-    return CompilationTarget::SPIRV_1_0;
-}
 
 class ShaderCompileContext;
 using ShaderCompileContextHandle = std::shared_ptr<ShaderCompileContext>;
@@ -40,7 +17,7 @@ class ShaderCompileContext {
                          const std::map<std::string, std::string>& preprocessor_macros = {},
                          const bool generate_debug_info = Context::IS_DEBUG_BUILD,
                          const uint32_t optimization_level = Context::BUILD_OPTIMIZATION_LEVEL,
-                         const CompilationTarget target = CompilationTarget::SPIRV_1_6,
+                         const SpirvVersion target = MERIAN_SPIRV_VERSION_LATEST,
                          const uint32_t target_vk_api_version = VK_API_VERSION_1_4)
         : preprocessor_macros(preprocessor_macros), debug_info(generate_debug_info),
           optimization_level(optimization_level), target(target),
@@ -102,7 +79,7 @@ class ShaderCompileContext {
         optimization_level = level;
     }
 
-    void set_target(const CompilationTarget target) {
+    void set_target(const SpirvVersion target) {
         this->target = target;
     }
 
@@ -124,7 +101,7 @@ class ShaderCompileContext {
         return optimization_level;
     }
 
-    const CompilationTarget& get_target() const {
+    const SpirvVersion& get_target() const {
         return target;
     }
 
@@ -169,7 +146,7 @@ class ShaderCompileContext {
     std::map<std::string, std::string> preprocessor_macros;
     bool debug_info;
     uint32_t optimization_level;
-    CompilationTarget target;
+    SpirvVersion target;
     uint32_t target_vk_api_version;
 };
 

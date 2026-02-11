@@ -26,14 +26,14 @@ BlobHandle SystemGlslangValidatorCompiler::compile_glsl(
     std::vector<std::string> command = {compiler_executable};
 
     command.emplace_back("--target-env");
-    if (shader_compile_context->get_target_vk_api_version() == VK_API_VERSION_1_0) {
-        command.emplace_back("vulkan1.0");
-    } else if (shader_compile_context->get_target_vk_api_version() == VK_API_VERSION_1_1) {
-        command.emplace_back("vulkan1.1");
-    } else if (shader_compile_context->get_target_vk_api_version() == VK_API_VERSION_1_2) {
-        command.emplace_back("vulkan1.2");
-    } else {
+    if (shader_compile_context->get_target_vk_api_version() >= VK_API_VERSION_1_3) {
         command.emplace_back("vulkan1.3");
+    } else if (shader_compile_context->get_target_vk_api_version() >= VK_API_VERSION_1_2) {
+        command.emplace_back("vulkan1.2");
+    } else if (shader_compile_context->get_target_vk_api_version() >= VK_API_VERSION_1_1) {
+        command.emplace_back("vulkan1.1");
+    } else {
+        command.emplace_back("vulkan1.0");
     }
 
     command.emplace_back("--stdin");

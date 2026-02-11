@@ -1,5 +1,8 @@
 #pragma once
 
+#include "merian/utils/blob.hpp"
+#include "merian/vk/extension/extension.hpp"
+
 #include <cassert>
 
 // Enable SpvCapabilityToString and friends in spirv.h (must be before include).
@@ -8,8 +11,6 @@
 #endif
 
 #include <spirv_reflect.h>
-
-#include "merian/vk/extension/extension.hpp"
 
 #include <cstdint>
 #include <cstring>
@@ -79,11 +80,24 @@ class SpirvReflect {
         return result;
     }
 
+    SpirvVersion get_spirv_version() const {
+        assert(spv_size >= 8);
+        return spv[1];
+    }
+
     // Checks if the SPIR-V module's capabilities and extensions are supported by the physical
     // device. Returns a DeviceSupportInfo with the supported flag and required capabilities/
     // extensions populated.
     DeviceSupportInfo query_device_support(const DeviceSupportQueryInfo& query_info) const {
         DeviceSupportInfo info;
+
+        const uint32_t vk_api_version = vulkan_api_version_for_spriv_version(get_spirv_version());
+        if (vk_api_version > query_info.physical_device->get_vk_api_version()) {
+            return DeviceSupportInfo{false, fmt::format("Requires Vulkan {}.{}.{}",
+                                                        VK_API_VERSION_MAJOR(vk_api_version),
+                                                        VK_API_VERSION_MINOR(vk_api_version),
+                                                        VK_API_VERSION_PATCH(vk_api_version))};
+        }
 
         const auto& supported_caps = query_info.physical_device->get_supported_spirv_capabilities();
         const auto& supported_exts = query_info.physical_device->get_supported_spirv_extensions();

@@ -36,7 +36,7 @@ def compile_glsl_shader(args, user_compiler_args: List[str]) -> bytes:
 
     if args.depfile:
         compiler_args += ["--depfile", args.depfile]
-    compiler_args += ["--target-env", "vulkan1.0", "-V"]
+    compiler_args += ["--target-env", args.target_env, "-V"]
 
     with tempfile.TemporaryDirectory() as tempdir:
         shader = Path(tempdir) / "shader.spv"
@@ -86,6 +86,7 @@ def main():
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--name")
     parser.add_argument("--prefix", default="merian")
+    parser.add_argument("--target_env", default="vulkan1.0")
     parser.add_argument("--glslc_path", default="glslangValidator")
     parser.add_argument("--slangc_path", default="slangc")
     parser.add_argument("--optimization", default="1")

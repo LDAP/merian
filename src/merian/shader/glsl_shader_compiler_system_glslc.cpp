@@ -25,15 +25,15 @@ SystemGlslcCompiler::compile_glsl(const std::string& source,
 
     std::vector<std::string> command = {compiler_executable};
 
-    if (shader_compile_context->get_target_vk_api_version() == VK_API_VERSION_1_0) {
-        command.emplace_back("--target-env=vulkan1.0");
-    } else if (shader_compile_context->get_target_vk_api_version() == VK_API_VERSION_1_1) {
-        command.emplace_back("--target-env=vulkan1.1");
-    } else if (shader_compile_context->get_target_vk_api_version() == VK_API_VERSION_1_2) {
-        command.emplace_back("--target-env=vulkan1.2");
-    } else {
+    if (shader_compile_context->get_target_vk_api_version() >= VK_API_VERSION_1_3) {
         command.emplace_back("--target-env=vulkan1.3");
-    };
+    } else if (shader_compile_context->get_target_vk_api_version() >= VK_API_VERSION_1_2) {
+        command.emplace_back("--target-env=vulkan1.2");
+    } else if (shader_compile_context->get_target_vk_api_version() >= VK_API_VERSION_1_1) {
+        command.emplace_back("--target-env=vulkan1.1");
+    } else {
+        command.emplace_back("--target-env=vulkan1.0");
+    }
 
     if (!SHADER_STAGE_EXTENSION_MAP.contains(shader_kind)) {
         throw compilation_failed{

@@ -27,36 +27,39 @@ class SlangSession {
 
         slang::TargetDesc target_desc = {};
         switch (shader_compile_context->get_target()) {
-        case CompilationTarget::SPIRV_1_0:
+        case MERIAN_SPIRV_VERSION_1_0:
             target_desc.format = SLANG_SPIRV;
             target_desc.profile = global_session->findProfile("spirv_1_0");
             break;
-        case CompilationTarget::SPIRV_1_1:
+        case MERIAN_SPIRV_VERSION_1_1:
             target_desc.format = SLANG_SPIRV;
             target_desc.profile = global_session->findProfile("spirv_1_1");
             break;
-        case CompilationTarget::SPIRV_1_2:
+        case MERIAN_SPIRV_VERSION_1_2:
             target_desc.format = SLANG_SPIRV;
             target_desc.profile = global_session->findProfile("spirv_1_2");
             break;
-        case CompilationTarget::SPIRV_1_3:
+        case MERIAN_SPIRV_VERSION_1_3:
             target_desc.format = SLANG_SPIRV;
             target_desc.profile = global_session->findProfile("spirv_1_3");
             break;
-        case CompilationTarget::SPIRV_1_4:
+        case MERIAN_SPIRV_VERSION_1_4:
             target_desc.format = SLANG_SPIRV;
             target_desc.profile = global_session->findProfile("spirv_1_4");
             break;
-        case CompilationTarget::SPIRV_1_5:
+        case MERIAN_SPIRV_VERSION_1_5:
             target_desc.format = SLANG_SPIRV;
             target_desc.profile = global_session->findProfile("spirv_1_5");
             break;
-        case CompilationTarget::SPIRV_1_6:
+        case MERIAN_SPIRV_VERSION_1_6:
             target_desc.format = SLANG_SPIRV;
             target_desc.profile = global_session->findProfile("spirv_1_6");
             break;
         default:
-            throw std::runtime_error{"Target not supported"};
+            SPDLOG_WARN("Target not unknown!");
+            target_desc.format = SLANG_SPIRV;
+            target_desc.profile = global_session->findProfile("spirv_1_6");
+            break;
         }
 
         slang_session_desc.targets = &target_desc;
@@ -473,7 +476,7 @@ class SlangSession {
     }
 
     // Shortcut for compile() then ShaderModule::create.
-    // 
+    //
     // This compiles all entrypoints in the linked programm. You can skip compose and directly link
     // the module.
     static ShaderModuleHandle

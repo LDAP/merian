@@ -174,31 +174,6 @@ ShadercCompiler::compile_glsl(const std::string& source,
                                              shaderc_env_version_vulkan_1_4);
     }
 
-    switch (shader_compile_context->get_target()) {
-    case CompilationTarget::SPIRV_1_0:
-        compile_options.SetTargetSpirv(shaderc_spirv_version_1_0);
-        break;
-    case CompilationTarget::SPIRV_1_1:
-        compile_options.SetTargetSpirv(shaderc_spirv_version_1_1);
-        break;
-    case CompilationTarget::SPIRV_1_2:
-        compile_options.SetTargetSpirv(shaderc_spirv_version_1_2);
-        break;
-    case CompilationTarget::SPIRV_1_3:
-        compile_options.SetTargetSpirv(shaderc_spirv_version_1_3);
-        break;
-    case CompilationTarget::SPIRV_1_4:
-        compile_options.SetTargetSpirv(shaderc_spirv_version_1_4);
-        break;
-    case CompilationTarget::SPIRV_1_5:
-        compile_options.SetTargetSpirv(shaderc_spirv_version_1_5);
-        break;
-    case CompilationTarget::SPIRV_1_6:
-    default:
-        compile_options.SetTargetSpirv(shaderc_spirv_version_1_6);
-        break;
-    }
-
     SPDLOG_DEBUG("preprocess {}", source_name);
     const auto preprocess_result =
         shader_compiler.PreprocessGlsl(source, kind, source_name.c_str(), compile_options);
