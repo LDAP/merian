@@ -36,7 +36,7 @@ def compile_glsl_shader(args, user_compiler_args: List[str]) -> bytes:
 
     if args.depfile:
         compiler_args += ["--depfile", args.depfile]
-    compiler_args += ["--target-env", "vulkan1.3", "-V"]
+    compiler_args += ["--target-env", "vulkan1.0", "-V"]
 
     with tempfile.TemporaryDirectory() as tempdir:
         shader = Path(tempdir) / "shader.spv"
