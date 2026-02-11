@@ -128,30 +128,6 @@ def parse_spirv_capabilities(xml_root) -> list[SpirvCapability]:
     return capabilities
 
 
-def get_short_property_struct_name(vk_name: str, tags: list[str]) -> str:
-    """
-    Convert VkPhysicalDevice*Properties* struct name to short form.
-
-    e.g., VkPhysicalDeviceVulkan11Properties -> Vulkan11
-          VkPhysicalDeviceSubgroupProperties -> Subgroup
-    """
-    cpp_name = vk_name_to_cpp_name(vk_name)
-    short_name = cpp_name
-
-    # Remove vendor tags temporarily for suffix removal
-    tag_suffix = ""
-    for tag in tags:
-        if short_name.endswith(tag):
-            tag_suffix = tag
-            short_name = short_name[: -len(tag)]
-            break
-
-    short_name = short_name.removesuffix("Properties")
-    short_name = short_name.removeprefix("PhysicalDevice")
-
-    return short_name + tag_suffix
-
-
 def parse_requires(
     requires_str: str, ext_name_map: dict[str, str]
 ) -> tuple[Optional[str], list[str]]:
@@ -325,9 +301,7 @@ def generate_spirv_extension_requirements_impl(
             else "0"
         )
         if extension_enables:
-            ext_list = ", ".join(
-                ext_name_map[e.extension] for e in extension_enables
-            )
+            ext_list = ", ".join(ext_name_map[e.extension] for e in extension_enables)
         else:
             ext_list = ""
 
@@ -530,9 +504,7 @@ def generate_capability_extensions_impl(
                 for ext_macro in req_extensions:
                     if ext_macro not in extensions_added:
                         extensions_added.add(ext_macro)
-                        entries.append(
-                            (ext_macro, req_version if req_version else "0")
-                        )
+                        entries.append((ext_macro, req_version if req_version else "0"))
 
         if not entries:
             continue
