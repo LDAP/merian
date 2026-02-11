@@ -28,6 +28,10 @@ search_paths = []
 lib_name = 'vulkan'
 
 if vulkan_sdk != ''
+    if not fs.is_dir(vulkan_sdk)
+        error('VULKAN_SDK points to an invalid directory: @0@.'.format(vulkan_sdk))
+    endif
+
     if host_machine.system() == 'windows'
         lib_name = 'vulkan-1'
         inc_dir = 'Include'
@@ -40,7 +44,7 @@ if vulkan_sdk != ''
         elif host_cpu == 'x86'
             lib_dir = 'Lib32'
         else
-            error('Architecture @0@'.format(host_cpu))
+            error('Architecture @0@ not supported.'.format(host_cpu))
         endif
     else
         lib_dir = 'lib'
@@ -49,8 +53,10 @@ if vulkan_sdk != ''
     lib_path = vulkan_sdk / lib_dir
 
     if not fs.is_dir(lib_path)
-        error('VULKAN_SDK points to an invalid directory: ' + vulkan_sdk)
+        error('Vulkan loader expected at @0@.'.format(lib_path))
     endif
+
+    message('Found Vulkan SDK at: @0@.'.format(vulkan_sdk))
     search_paths += lib_path
 endif
 
