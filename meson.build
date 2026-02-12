@@ -60,6 +60,9 @@ vulkan = vulkan_subp.get_variable('vulkan_dep')
 # ensure subprojects are using the same version of the header!
 meson.override_dependency('vulkan', vulkan)
 
+spirv_headers = subproject('SPIRV-Headers', version : ['>=1.3.341.0']).get_variable('SPIRV_Headers_dep')
+meson.override_dependency('SPIRV-Headers', spirv_headers)
+
 fmt = dependency('fmt', version : ['>=12.1.0'], fallback : ['fmt', 'fmt_dep'])
 spdlog = dependency('spdlog', version : ['>=1.17.0'], fallback : ['spdlog', 'spdlog_dep'], default_options : ['external_fmt=enabled'])
 spirv_reflect = dependency('spirv-reflect', fallback: ['spirv-reflect', 'spirv_reflect_dep'])
