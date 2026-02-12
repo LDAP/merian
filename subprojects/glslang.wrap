@@ -2,7 +2,7 @@
 directory = glslang
 
 url = https://github.com/KhronosGroup/glslang
-revision = 14.3.0
+revision = 16.2.0
 depth = 1
 
 patch_directory = glslang
