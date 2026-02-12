@@ -14,6 +14,8 @@ project(
 vulkan_target_api_version = '1.4.342'
 
 cmake = import('cmake')
+py = import('python').find_installation('python3')
+fs = import('fs')
 
 ccx = meson.get_compiler('cpp')
 
@@ -60,7 +62,8 @@ vulkan = vulkan_subp.get_variable('vulkan_dep')
 # ensure subprojects are using the same version of the header!
 meson.override_dependency('vulkan', vulkan)
 
-spirv_headers = subproject('SPIRV-Headers', version : ['>=1.3.341.0']).get_variable('SPIRV_Headers_dep')
+spirv_headers_subp = cmake.subproject('SPIRV-Headers')
+spirv_headers = spirv_headers_subp.dependency('SPIRV-Headers')
 meson.override_dependency('SPIRV-Headers', spirv_headers)
 
 fmt = dependency('fmt', version : ['>=12.1.0'], fallback : ['fmt', 'fmt_dep'])
@@ -113,8 +116,6 @@ if shaderc.found()
     global_args += ['-DMERIAN_SHADERC_AVAILABLE']
 endif
 slang = dependency('slang', version: ['>=2025.14.3'], fallback: ['slang', 'slang_dep'])
-
-py = import('python').find_installation('python3')
 
 generator_scripts = [
     'scripts/generate_enum_string_map.py',
