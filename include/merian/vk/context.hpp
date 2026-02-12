@@ -179,15 +179,19 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
     void create_instance(const uint32_t targeted_vk_api_version,
                          const VulkanFeatures& desired_features,
                          const std::vector<const char*>& desired_additional_extensions);
-    void select_physical_device(uint32_t filter_vendor_id,
-                                uint32_t filter_device_id,
-                                std::string filter_device_name,
-                                const VulkanFeatures& desired_features,
-                                const std::vector<const char*>& desired_additional_extensions);
+    struct DeviceSupportCache;
+
+    DeviceSupportCache
+    select_physical_device(uint32_t filter_vendor_id,
+                           uint32_t filter_device_id,
+                           std::string filter_device_name,
+                           const VulkanFeatures& desired_features,
+                           const std::vector<const char*>& desired_additional_extensions);
     QueueInfo determine_queues(const PhysicalDeviceHandle& physical_device);
-    void create_device_and_queues(uint32_t preffered_number_compute_queues,
+    void create_device_and_queues(uint32_t preferred_number_compute_queues,
                                   const VulkanFeatures& desired_features,
-                                  const std::vector<const char*>& desired_additional_extensions);
+                                  const std::vector<const char*>& desired_additional_extensions,
+                                  const DeviceSupportCache& support_cache);
     void prepare_file_loader(const ContextCreateInfo& create_info);
 
   public: // Getter
