@@ -151,10 +151,9 @@ Version: {}\n\n",
     create_instance(target_vk_api_version, create_info.desired_features,
                     create_info.additional_extensions);
 
-    auto support_cache =
-        select_physical_device(create_info.filter_vendor_id, create_info.filter_device_id,
-                               create_info.filter_device_name, create_info.desired_features,
-                               create_info.additional_extensions);
+    auto support_cache = select_physical_device(
+        create_info.filter_vendor_id, create_info.filter_device_id, create_info.filter_device_name,
+        create_info.desired_features, create_info.additional_extensions);
 
     for (const auto& ext : get_extensions()) {
         ext->on_extension_support_confirmed(*this);
@@ -292,12 +291,12 @@ void Context::create_instance(const uint32_t targeted_vk_api_version,
     }
 }
 
-Context::DeviceSupportCache Context::select_physical_device(
-    uint32_t filter_vendor_id,
-    uint32_t filter_device_id,
-    std::string filter_device_name,
-    const VulkanFeatures& desired_features,
-    const std::vector<const char*>& desired_additional_extensions) {
+Context::DeviceSupportCache
+Context::select_physical_device(uint32_t filter_vendor_id,
+                                uint32_t filter_device_id,
+                                std::string filter_device_name,
+                                const VulkanFeatures& desired_features,
+                                const std::vector<const char*>& desired_additional_extensions) {
     const std::vector<PhysicalDeviceHandle> physical_devices = instance->get_physical_devices();
     if (physical_devices.empty()) {
         throw MerianException("No vulkan device found!");
@@ -321,9 +320,9 @@ Context::DeviceSupportCache Context::select_physical_device(
     for (std::size_t i = 0; i < physical_devices.size(); i++) {
         vk::PhysicalDeviceProperties2 props = physical_devices[i]->get_properties();
         SPDLOG_INFO("found {} {}, vendor id: {}, device id: {}, Vulkan: {}.{}.{}",
-                    vk::to_string(props.properties.deviceType),
-                    props.properties.deviceName.data(), props.properties.vendorID,
-                    props.properties.deviceID, VK_API_VERSION_MAJOR(props.properties.apiVersion),
+                    vk::to_string(props.properties.deviceType), props.properties.deviceName.data(),
+                    props.properties.vendorID, props.properties.deviceID,
+                    VK_API_VERSION_MAJOR(props.properties.apiVersion),
                     VK_API_VERSION_MINOR(props.properties.apiVersion),
                     VK_API_VERSION_PATCH(props.properties.apiVersion));
 
@@ -345,8 +344,8 @@ Context::DeviceSupportCache Context::select_physical_device(
     }
 
     std::unordered_map<PhysicalDeviceHandle, DeviceSupportCache> support_cache;
-    auto query_support = [&](const std::pair<PhysicalDeviceHandle, QueueInfo>& match)
-        -> const DeviceSupportCache& {
+    auto query_support =
+        [&](const std::pair<PhysicalDeviceHandle, QueueInfo>& match) -> const DeviceSupportCache& {
         if (auto it = support_cache.find(match.first); it != support_cache.end())
             return it->second;
 
@@ -384,45 +383,52 @@ Context::DeviceSupportCache Context::select_physical_device(
         [&](const std::pair<PhysicalDeviceHandle, QueueInfo>& match) -> uint32_t {
         uint32_t count = 0;
         for (const auto& name : desired_features.get_enabled_features())
-            count += static_cast<uint32_t>(
-                match.first->get_supported_features().get_feature(name));
+            count += static_cast<uint32_t>(match.first->get_supported_features().get_feature(name));
         for (const auto& [_, result] : query_support(match).results)
             for (const auto& feat : result.required_features)
-                count += static_cast<uint32_t>(
-                    match.first->get_supported_features().get_feature(feat));
+                count +=
+                    static_cast<uint32_t>(match.first->get_supported_features().get_feature(feat));
         return count;
     };
 
-    auto best = std::max_element(matches.begin(), matches.end(),
-        [&](const auto& a, const auto& b) {
-            const vk::PhysicalDeviceProperties& props_a = a.first->get_properties();
-            const vk::PhysicalDeviceProperties& props_b = b.first->get_properties();
-            if (props_a.deviceType != props_b.deviceType)
-                return rank_device_type(props_a.deviceType) < rank_device_type(props_b.deviceType);
+    auto best = std::max_element(matches.begin(), matches.end(), [&](const auto& a, const auto& b) {
+        const vk::PhysicalDeviceProperties& props_a = a.first->get_properties();
+        const vk::PhysicalDeviceProperties& props_b = b.first->get_properties();
+        if (props_a.deviceType != props_b.deviceType)
+            return rank_device_type(props_a.deviceType) < rank_device_type(props_b.deviceType);
 
-            uint32_t ext_a = count_extensions_supported(a);
-            uint32_t ext_b = count_extensions_supported(b);
-            if (ext_a != ext_b)
-                return ext_a < ext_b;
+        uint32_t ext_a = count_extensions_supported(a);
+        uint32_t ext_b = count_extensions_supported(b);
+        if (ext_a != ext_b)
+            return ext_a < ext_b;
 
-            uint32_t feat_a = count_features_supported(a);
-            uint32_t feat_b = count_features_supported(b);
-            if (feat_a != feat_b)
-                return feat_a < feat_b;
+        uint32_t feat_a = count_features_supported(a);
+        uint32_t feat_b = count_features_supported(b);
+        if (feat_a != feat_b)
+            return feat_a < feat_b;
 
-            return a.first->get_supported_extensions().size() <
-                   b.first->get_supported_extensions().size();
-        });
+        return a.first->get_supported_extensions().size() <
+               b.first->get_supported_extensions().size();
+    });
 
     physical_device = best->first;
     queue_info = std::move(best->second);
 
-    const vk::PhysicalDeviceProperties& props = physical_device->get_properties();
-    const vk::PhysicalDeviceVulkan12Properties& props12 = physical_device->get_properties();
+    
+    std::string driver_id;
+    const char* driver_info;
+    if (physical_device->get_properties().is_available<vk::PhysicalDeviceDriverProperties>()) {
+        const vk::PhysicalDeviceDriverProperties& driver_props = physical_device->get_properties();
+        driver_id = vk::to_string(driver_props.driverID);
+        driver_info = driver_props.driverInfo.data();
+    } else {
+        driver_id = fmt::format("<{} not supported>", VK_KHR_DRIVER_PROPERTIES_EXTENSION_NAME);
+        driver_info = driver_id.c_str();
+    }
 
+    const vk::PhysicalDeviceProperties& props = physical_device->get_properties();
     SPDLOG_INFO("selected physical device {}, vendor id: {}, device id: {}, driver: {}, {}",
-                props.deviceName.data(), props.vendorID, props.deviceID,
-                vk::to_string(props12.driverID), props12.driverInfo.data());
+                props.deviceName.data(), props.vendorID, props.deviceID, driver_id, driver_info);
 
     auto selected_support = query_support(*best);
     std::vector<std::type_index> unsupported_extensions;
