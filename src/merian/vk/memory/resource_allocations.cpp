@@ -16,12 +16,12 @@ Resource::~Resource() {}
 
 Sampler::Sampler(const ContextHandle& context, const vk::SamplerCreateInfo& create_info)
     : context(context) {
-    SPDLOG_DEBUG("create sampler ({})", fmt::ptr(this));
     sampler = context->get_device()->get_device().createSampler(create_info);
+    SPDLOG_DEBUG("created sampler ({})", fmt::ptr(VkSampler(sampler)));
 }
 
 Sampler::~Sampler() {
-    SPDLOG_DEBUG("destroy sampler ({})", fmt::ptr(this));
+    SPDLOG_DEBUG("destroy sampler ({})", fmt::ptr(VkSampler(sampler)));
     context->get_device()->get_device().destroySampler(sampler);
 }
 
@@ -40,10 +40,12 @@ Buffer::Buffer(const vk::Buffer& buffer,
 
 Buffer::Buffer(const ContextHandle& context, const vk::BufferCreateInfo& create_info)
     : context(context), buffer(context->get_device()->get_device().createBuffer(create_info)),
-      create_info(create_info) {}
+      create_info(create_info) {
+    SPDLOG_TRACE("created buffer ({})", fmt::ptr(VkBuffer(buffer)));
+}
 
 Buffer::~Buffer() {
-    SPDLOG_TRACE("destroy buffer ({})", fmt::ptr(static_cast<VkBuffer>(buffer)));
+    SPDLOG_TRACE("destroy buffer ({})", fmt::ptr(VkBuffer(buffer)));
     context->get_device()->get_device().destroyBuffer(buffer);
 }
 
@@ -57,7 +59,7 @@ vk::DescriptorBufferInfo Buffer::get_descriptor_info(const vk::DeviceSize offset
 }
 
 vk::DescriptorAddressInfoEXT Buffer::get_descriptor_address_info(const vk::DeviceSize offset,
-                                                                  const vk::DeviceSize range) const {
+                                                                 const vk::DeviceSize range) const {
     assert(offset < get_size());
     return vk::DescriptorAddressInfoEXT{get_device_address() + offset,
                                         range == VK_WHOLE_SIZE ? get_size() - offset : range};
@@ -151,10 +153,12 @@ Image::Image(const ContextHandle& context,
 
 Image::Image(const ContextHandle& context, const vk::ImageCreateInfo create_info)
     : context(context), image(context->get_device()->get_device().createImage(create_info)),
-      create_info(create_info), current_layout(create_info.initialLayout) {}
+      create_info(create_info), current_layout(create_info.initialLayout) {
+    SPDLOG_TRACE("created image ({})", fmt::ptr(VkImage(image)));
+}
 
 Image::~Image() {
-    SPDLOG_TRACE("destroy image ({})", fmt::ptr(static_cast<VkImage>(image)));
+    SPDLOG_TRACE("destroy image ({})", fmt::ptr(VkImage(image)));
     context->get_device()->get_device().destroyImage(image);
 }
 
@@ -173,15 +177,15 @@ vk::ImageViewCreateInfo Image::make_view_create_info(const bool is_cube) const {
 
     switch (create_info.imageType) {
     case vk::ImageType::e1D:
-        view_info.viewType = (create_info.arrayLayers > 1 ? vk::ImageViewType::e1DArray
-                                                          : vk::ImageViewType::e1D);
+        view_info.viewType =
+            (create_info.arrayLayers > 1 ? vk::ImageViewType::e1DArray : vk::ImageViewType::e1D);
         break;
     case vk::ImageType::e2D:
         if (is_cube) {
             view_info.viewType = vk::ImageViewType::eCube;
         } else {
-            view_info.viewType = create_info.arrayLayers > 1 ? vk::ImageViewType::e2DArray
-                                                             : vk::ImageViewType::e2D;
+            view_info.viewType =
+                create_info.arrayLayers > 1 ? vk::ImageViewType::e2DArray : vk::ImageViewType::e2D;
         }
         break;
     case vk::ImageType::e3D:
@@ -587,8 +591,7 @@ vk::DeviceAddress AccelerationStructure::get_acceleration_structure_device_addre
 vk::BufferMemoryBarrier2
 AccelerationStructure::tlas_read_barrier2(const vk::PipelineStageFlags2 read_stages) const {
     return buffer->buffer_barrier2(vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
-                                   read_stages,
-                                   vk::AccessFlagBits2::eAccelerationStructureWriteKHR,
+                                   read_stages, vk::AccessFlagBits2::eAccelerationStructureWriteKHR,
                                    vk::AccessFlagBits2::eAccelerationStructureReadKHR);
 }
 
