@@ -44,10 +44,8 @@ Device::Device(
             }
             if (physical_device->get_instance()->extension_enabled(ext_info->name)) {
                 return {true, ""};
-            } else {
-                return {false,
-                        fmt::format("instance extension {} is not enabled!", ext_info->name)};
             }
+            return {false, fmt::format("instance extension {} is not enabled!", ext_info->name)};
         }
 
         // already enabled or not necessary
@@ -106,7 +104,20 @@ Device::Device(
                                                   {}, p_next_chain};
 
     device = physical_device->get_physical_device().createDevice(device_create_info);
-    SPDLOG_DEBUG("device ({}) created", fmt::ptr(VkDevice(device)));
+
+    [[maybe_unused]] const uint32_t physical_device_vk_api_version =
+        physical_device->get_physical_device_vk_api_version();
+    [[maybe_unused]] const uint32_t target_vk_api_version =
+        physical_device->get_instance()->get_target_vk_api_version();
+    SPDLOG_INFO(
+        "device ({}) created. (Vulkan supported: {}.{}.{}, target: {}.{}.{}, effective: "
+        "{}.{}.{})",
+        fmt::ptr(VkDevice(device)), VK_API_VERSION_MAJOR(physical_device_vk_api_version),
+        VK_API_VERSION_MINOR(physical_device_vk_api_version),
+        VK_API_VERSION_PATCH(physical_device_vk_api_version),
+        VK_API_VERSION_MAJOR(target_vk_api_version), VK_API_VERSION_MINOR(target_vk_api_version),
+        VK_API_VERSION_PATCH(target_vk_api_version), VK_API_VERSION_MAJOR(device_vk_api_version),
+        VK_API_VERSION_MINOR(device_vk_api_version), VK_API_VERSION_PATCH(device_vk_api_version));
 
     SPDLOG_DEBUG("create pipeline cache");
     vk::PipelineCacheCreateInfo pipeline_cache_create_info{};

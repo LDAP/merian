@@ -16,9 +16,9 @@ Instance::Instance(const vk::InstanceCreateInfo& instance_create_info)
       enabled_extensions(instance_create_info.ppEnabledExtensionNames,
                          instance_create_info.ppEnabledExtensionNames +
                              instance_create_info.enabledExtensionCount) {
-    const uint32_t vk_instance_version = get_instance_vk_api_version();
-    SPDLOG_DEBUG(
-        "instance ({}) created (instance version: {}.{}.{}, target version: {}.{}.{}, effective: "
+    [[maybe_unused]] const uint32_t vk_instance_version = get_instance_vk_api_version();
+    SPDLOG_INFO(
+        "instance ({}) created. (Vulkan supported: {}.{}.{}, target: {}.{}.{}, effective: "
         "{}.{}.{})",
         fmt::ptr(VkInstance(instance)), VK_API_VERSION_MAJOR(vk_instance_version),
         VK_API_VERSION_MINOR(vk_instance_version), VK_API_VERSION_PATCH(vk_instance_version),
