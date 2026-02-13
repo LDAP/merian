@@ -187,6 +187,7 @@ ShadercCompiler::compile_glsl(const std::string& source,
         preprocess_result.begin(), preprocess_result.end() - preprocess_result.begin(), kind,
         source_name.data(), compile_options);
     if (blob->result.GetCompilationStatus() != shaderc_compilation_status_success) {
+        SPDLOG_ERROR("compilation failed for {}: {}", source_name, blob->result.GetErrorMessage());
         throw compilation_failed{blob->result.GetErrorMessage()};
     }
 
