@@ -8,6 +8,7 @@
 
 #include <cstdint>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 namespace merian {
@@ -47,6 +48,7 @@ const std::vector<const char*>& get_spirv_capabilities();
  *
  * @param capability The SPIR-V capability name (e.g., "Geometry")
  * @param vk_api_version The Vulkan API version
+ * @param enabled_extensions Set of enabled Vulkan extension names
  * @param features The device features
  * @param properties The device properties
  * @return true if the capability is supported
@@ -54,6 +56,7 @@ const std::vector<const char*>& get_spirv_capabilities();
 bool is_spirv_capability_supported(
     const char* capability,
     uint32_t vk_api_version,
+    const std::unordered_set<std::string>& enabled_extensions,
     const VulkanFeatures& features,
     const VulkanProperties& properties);
 

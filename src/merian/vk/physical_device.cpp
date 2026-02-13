@@ -38,8 +38,8 @@ PhysicalDevice::PhysicalDevice(const InstanceHandle& instance,
     }
 
     for (const auto& cap : get_spirv_capabilities()) {
-        if (is_spirv_capability_supported(cap, get_vk_api_version(), supported_features,
-                                          properties)) {
+        if (is_spirv_capability_supported(cap, get_vk_api_version(), supported_extensions,
+                                          supported_features, properties)) {
             supported_spirv_capabilities.insert(cap);
         }
     }

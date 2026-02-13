@@ -158,7 +158,8 @@ Device::Device(
 
     for (const auto& cap : get_spirv_capabilities()) {
         if (is_spirv_capability_supported(cap, physical_device->get_vk_api_version(),
-                                          enabled_features, physical_device->get_properties())) {
+                                          enabled_extensions, enabled_features,
+                                          physical_device->get_properties())) {
             enabled_spirv_capabilities.insert(cap);
         }
     }

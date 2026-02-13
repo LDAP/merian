@@ -5,6 +5,7 @@
 
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace merian {
 
@@ -437,1507 +438,3502 @@ const std::vector<const char*>& get_spirv_capabilities() {
 
 namespace {
 
-using CapSupportCheckFn = bool(*)(uint32_t, const VulkanFeatures&, const VulkanProperties&);
-
 // AtomicFloat16AddEXT
-bool spirv_cap_check_0(
+bool check_capability_AtomicFloat16AddEXT(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderBufferFloat16AtomicAdd") ||
-        features.get_feature("shaderSharedFloat16AtomicAdd");
+
+    // Enable: requires (VK_EXT_shader_atomic_float2)
+    if (enabled_extensions.contains(VK_EXT_SHADER_ATOMIC_FLOAT_2_EXTENSION_NAME)) {
+        if (features.get_feature("shaderBufferFloat16AtomicAdd") ||
+            features.get_feature("shaderSharedFloat16AtomicAdd")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // AtomicFloat16MinMaxEXT
-bool spirv_cap_check_1(
+bool check_capability_AtomicFloat16MinMaxEXT(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderBufferFloat16AtomicMinMax") ||
-        features.get_feature("shaderSharedFloat16AtomicMinMax");
+
+    // Enable: requires (VK_EXT_shader_atomic_float2)
+    if (enabled_extensions.contains(VK_EXT_SHADER_ATOMIC_FLOAT_2_EXTENSION_NAME)) {
+        if (features.get_feature("shaderBufferFloat16AtomicMinMax") ||
+            features.get_feature("shaderSharedFloat16AtomicMinMax")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // AtomicFloat16VectorNV
-bool spirv_cap_check_2(
+bool check_capability_AtomicFloat16VectorNV(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderFloat16VectorAtomics");
+
+    // Enable: requires (VK_NV_shader_atomic_float16_vector)
+    if (enabled_extensions.contains(VK_NV_SHADER_ATOMIC_FLOAT16_VECTOR_EXTENSION_NAME)) {
+        if (features.get_feature("shaderFloat16VectorAtomics")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // AtomicFloat32AddEXT
-bool spirv_cap_check_3(
+bool check_capability_AtomicFloat32AddEXT(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderBufferFloat32AtomicAdd") ||
-        features.get_feature("shaderSharedFloat32AtomicAdd") ||
-        features.get_feature("shaderImageFloat32AtomicAdd");
+
+    // Enable: requires (VK_EXT_shader_atomic_float)
+    if (enabled_extensions.contains(VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME)) {
+        if (features.get_feature("shaderBufferFloat32AtomicAdd") ||
+            features.get_feature("shaderSharedFloat32AtomicAdd") ||
+            features.get_feature("shaderImageFloat32AtomicAdd")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // AtomicFloat32MinMaxEXT
-bool spirv_cap_check_4(
+bool check_capability_AtomicFloat32MinMaxEXT(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderBufferFloat32AtomicMinMax") ||
-        features.get_feature("shaderSharedFloat32AtomicMinMax") ||
-        features.get_feature("shaderImageFloat32AtomicMinMax");
+
+    // Enable: requires (VK_EXT_shader_atomic_float2)
+    if (enabled_extensions.contains(VK_EXT_SHADER_ATOMIC_FLOAT_2_EXTENSION_NAME)) {
+        if (features.get_feature("shaderBufferFloat32AtomicMinMax") ||
+            features.get_feature("shaderSharedFloat32AtomicMinMax") ||
+            features.get_feature("shaderImageFloat32AtomicMinMax")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // AtomicFloat64AddEXT
-bool spirv_cap_check_5(
+bool check_capability_AtomicFloat64AddEXT(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderBufferFloat64AtomicAdd") ||
-        features.get_feature("shaderSharedFloat64AtomicAdd");
+
+    // Enable: requires (VK_EXT_shader_atomic_float)
+    if (enabled_extensions.contains(VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME)) {
+        if (features.get_feature("shaderBufferFloat64AtomicAdd") ||
+            features.get_feature("shaderSharedFloat64AtomicAdd")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // AtomicFloat64MinMaxEXT
-bool spirv_cap_check_6(
+bool check_capability_AtomicFloat64MinMaxEXT(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderBufferFloat64AtomicMinMax") ||
-        features.get_feature("shaderSharedFloat64AtomicMinMax");
+
+    // Enable: requires (VK_EXT_shader_atomic_float2)
+    if (enabled_extensions.contains(VK_EXT_SHADER_ATOMIC_FLOAT_2_EXTENSION_NAME)) {
+        if (features.get_feature("shaderBufferFloat64AtomicMinMax") ||
+            features.get_feature("shaderSharedFloat64AtomicMinMax")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // BFloat16CooperativeMatrixKHR
-bool spirv_cap_check_7(
+bool check_capability_BFloat16CooperativeMatrixKHR(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderBFloat16CooperativeMatrix");
+
+    // Enable: requires (VK_KHR_shader_bfloat16)
+    if (enabled_extensions.contains(VK_KHR_SHADER_BFLOAT16_EXTENSION_NAME)) {
+        if (features.get_feature("shaderBFloat16CooperativeMatrix")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // BFloat16DotProductKHR
-bool spirv_cap_check_8(
+bool check_capability_BFloat16DotProductKHR(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderBFloat16DotProduct");
+
+    // Enable: requires (VK_KHR_shader_bfloat16)
+    if (enabled_extensions.contains(VK_KHR_SHADER_BFLOAT16_EXTENSION_NAME)) {
+        if (features.get_feature("shaderBFloat16DotProduct")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // BFloat16TypeKHR
-bool spirv_cap_check_9(
+bool check_capability_BFloat16TypeKHR(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderBFloat16Type");
+
+    // Enable: requires (VK_KHR_shader_bfloat16)
+    if (enabled_extensions.contains(VK_KHR_SHADER_BFLOAT16_EXTENSION_NAME)) {
+        if (features.get_feature("shaderBFloat16Type")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // ClipDistance
-bool spirv_cap_check_10(
+bool check_capability_ClipDistance(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderClipDistance");
+
+    // Enable: requires (VK_VERSION_1_0)
+    if (vk_api_version >= VK_API_VERSION_1_0) {
+        if (features.get_feature("shaderClipDistance")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // ClusterCullingShadingHUAWEI
-bool spirv_cap_check_11(
+bool check_capability_ClusterCullingShadingHUAWEI(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("clustercullingShader");
+
+    // Enable: requires (VK_HUAWEI_cluster_culling_shader)
+    if (enabled_extensions.contains(VK_HUAWEI_CLUSTER_CULLING_SHADER_EXTENSION_NAME)) {
+        if (features.get_feature("clustercullingShader")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // ComputeDerivativeGroupLinearKHR
-bool spirv_cap_check_12(
+bool check_capability_ComputeDerivativeGroupLinearKHR(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("computeDerivativeGroupLinear");
+
+    // Enable: requires (VK_KHR_compute_shader_derivatives)
+    if (enabled_extensions.contains(VK_KHR_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME)) {
+        if (features.get_feature("computeDerivativeGroupLinear")) {
+            return true;
+        }
+    }
+
+    // Enable: requires (VK_NV_compute_shader_derivatives)
+    if (enabled_extensions.contains(VK_NV_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME)) {
+        if (features.get_feature("computeDerivativeGroupLinear")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // ComputeDerivativeGroupQuadsKHR
-bool spirv_cap_check_13(
+bool check_capability_ComputeDerivativeGroupQuadsKHR(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("computeDerivativeGroupQuads");
+
+    // Enable: requires (VK_KHR_compute_shader_derivatives)
+    if (enabled_extensions.contains(VK_KHR_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME)) {
+        if (features.get_feature("computeDerivativeGroupQuads")) {
+            return true;
+        }
+    }
+
+    // Enable: requires (VK_NV_compute_shader_derivatives)
+    if (enabled_extensions.contains(VK_NV_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME)) {
+        if (features.get_feature("computeDerivativeGroupQuads")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // CooperativeMatrixBlockLoadsNV
-bool spirv_cap_check_14(
+bool check_capability_CooperativeMatrixBlockLoadsNV(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("cooperativeMatrixBlockLoads");
+
+    // Enable: requires (VK_NV_cooperative_matrix2)
+    if (enabled_extensions.contains(VK_NV_COOPERATIVE_MATRIX_2_EXTENSION_NAME)) {
+        if (features.get_feature("cooperativeMatrixBlockLoads")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // CooperativeMatrixConversionQCOM
-bool spirv_cap_check_15(
+bool check_capability_CooperativeMatrixConversionQCOM(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("cooperativeMatrixConversion");
+
+    // Enable: requires (VK_QCOM_cooperative_matrix_conversion)
+    if (enabled_extensions.contains(VK_QCOM_COOPERATIVE_MATRIX_CONVERSION_EXTENSION_NAME)) {
+        if (features.get_feature("cooperativeMatrixConversion")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // CooperativeMatrixConversionsNV
-bool spirv_cap_check_16(
+bool check_capability_CooperativeMatrixConversionsNV(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("cooperativeMatrixConversions");
+
+    // Enable: requires (VK_NV_cooperative_matrix2)
+    if (enabled_extensions.contains(VK_NV_COOPERATIVE_MATRIX_2_EXTENSION_NAME)) {
+        if (features.get_feature("cooperativeMatrixConversions")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // CooperativeMatrixKHR
-bool spirv_cap_check_17(
+bool check_capability_CooperativeMatrixKHR(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("cooperativeMatrix");
+
+    // Enable: requires (VK_KHR_cooperative_matrix)
+    if (enabled_extensions.contains(VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME)) {
+        if (features.get_feature("cooperativeMatrix")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // CooperativeMatrixNV
-bool spirv_cap_check_18(
+bool check_capability_CooperativeMatrixNV(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("cooperativeMatrix");
+
+    // Enable: requires (VK_NV_cooperative_matrix)
+    if (enabled_extensions.contains(VK_NV_COOPERATIVE_MATRIX_EXTENSION_NAME)) {
+        if (features.get_feature("cooperativeMatrix")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // CooperativeMatrixPerElementOperationsNV
-bool spirv_cap_check_19(
+bool check_capability_CooperativeMatrixPerElementOperationsNV(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("cooperativeMatrixPerElementOperations");
+
+    // Enable: requires (VK_NV_cooperative_matrix2)
+    if (enabled_extensions.contains(VK_NV_COOPERATIVE_MATRIX_2_EXTENSION_NAME)) {
+        if (features.get_feature("cooperativeMatrixPerElementOperations")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // CooperativeMatrixReductionsNV
-bool spirv_cap_check_20(
+bool check_capability_CooperativeMatrixReductionsNV(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("cooperativeMatrixReductions");
+
+    // Enable: requires (VK_NV_cooperative_matrix2)
+    if (enabled_extensions.contains(VK_NV_COOPERATIVE_MATRIX_2_EXTENSION_NAME)) {
+        if (features.get_feature("cooperativeMatrixReductions")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // CooperativeMatrixTensorAddressingNV
-bool spirv_cap_check_21(
+bool check_capability_CooperativeMatrixTensorAddressingNV(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("cooperativeMatrixTensorAddressing");
+
+    // Enable: requires (VK_NV_cooperative_matrix2)
+    if (enabled_extensions.contains(VK_NV_COOPERATIVE_MATRIX_2_EXTENSION_NAME)) {
+        if (features.get_feature("cooperativeMatrixTensorAddressing")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // CooperativeVectorNV
-bool spirv_cap_check_22(
+bool check_capability_CooperativeVectorNV(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("cooperativeVector");
+
+    // Enable: requires (VK_NV_cooperative_vector)
+    if (enabled_extensions.contains(VK_NV_COOPERATIVE_VECTOR_EXTENSION_NAME)) {
+        if (features.get_feature("cooperativeVector")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // CooperativeVectorTrainingNV
-bool spirv_cap_check_23(
+bool check_capability_CooperativeVectorTrainingNV(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("cooperativeVectorTraining");
+
+    // Enable: requires (VK_NV_cooperative_vector)
+    if (enabled_extensions.contains(VK_NV_COOPERATIVE_VECTOR_EXTENSION_NAME)) {
+        if (features.get_feature("cooperativeVectorTraining")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // CoreBuiltinsARM
-bool spirv_cap_check_24(
+bool check_capability_CoreBuiltinsARM(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderCoreBuiltins");
+
+    // Enable: requires (VK_ARM_shader_core_builtins)
+    if (enabled_extensions.contains(VK_ARM_SHADER_CORE_BUILTINS_EXTENSION_NAME)) {
+        if (features.get_feature("shaderCoreBuiltins")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // CullDistance
-bool spirv_cap_check_25(
+bool check_capability_CullDistance(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderCullDistance");
+
+    // Enable: requires (VK_VERSION_1_0)
+    if (vk_api_version >= VK_API_VERSION_1_0) {
+        if (features.get_feature("shaderCullDistance")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // DemoteToHelperInvocation
-bool spirv_cap_check_26(
+bool check_capability_DemoteToHelperInvocation(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderDemoteToHelperInvocation");
+
+    // Enable: requires (VK_VERSION_1_3,VK_EXT_shader_demote_to_helper_invocation)
+    if (vk_api_version >= VK_API_VERSION_1_3 || enabled_extensions.contains(VK_EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION_EXTENSION_NAME)) {
+        if (features.get_feature("shaderDemoteToHelperInvocation")) {
+            return true;
+        }
+    }
+
+    // Enable: requires (VK_EXT_shader_demote_to_helper_invocation)
+    if (enabled_extensions.contains(VK_EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION_EXTENSION_NAME)) {
+        if (features.get_feature("shaderDemoteToHelperInvocation")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // DenormFlushToZero
-bool spirv_cap_check_27(
+bool check_capability_DenormFlushToZero(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return (properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderDenormFlushToZeroFloat16 == VK_TRUE) ||
-        (properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderDenormFlushToZeroFloat32 == VK_TRUE) ||
-        (properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderDenormFlushToZeroFloat64 == VK_TRUE);
+
+    // Enable: requires (VK_VERSION_1_2,VK_KHR_shader_float_controls)
+    if (vk_api_version >= VK_API_VERSION_1_2 || enabled_extensions.contains(VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME)) {
+        if ((properties.is_available<vk::PhysicalDeviceFloatControlsProperties>() && properties.get<vk::PhysicalDeviceFloatControlsProperties>().shaderDenormFlushToZeroFloat16 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceFloatControlsPropertiesKHR>() && properties.get<vk::PhysicalDeviceFloatControlsPropertiesKHR>().shaderDenormFlushToZeroFloat16 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceVulkan12Properties>() && properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderDenormFlushToZeroFloat16 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceFloatControlsProperties>() && properties.get<vk::PhysicalDeviceFloatControlsProperties>().shaderDenormFlushToZeroFloat32 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceFloatControlsPropertiesKHR>() && properties.get<vk::PhysicalDeviceFloatControlsPropertiesKHR>().shaderDenormFlushToZeroFloat32 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceVulkan12Properties>() && properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderDenormFlushToZeroFloat32 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceFloatControlsProperties>() && properties.get<vk::PhysicalDeviceFloatControlsProperties>().shaderDenormFlushToZeroFloat64 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceFloatControlsPropertiesKHR>() && properties.get<vk::PhysicalDeviceFloatControlsPropertiesKHR>().shaderDenormFlushToZeroFloat64 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceVulkan12Properties>() && properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderDenormFlushToZeroFloat64 == VK_TRUE)) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // DenormPreserve
-bool spirv_cap_check_28(
+bool check_capability_DenormPreserve(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return (properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderDenormPreserveFloat16 == VK_TRUE) ||
-        (properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderDenormPreserveFloat32 == VK_TRUE) ||
-        (properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderDenormPreserveFloat64 == VK_TRUE);
+
+    // Enable: requires (VK_VERSION_1_2,VK_KHR_shader_float_controls)
+    if (vk_api_version >= VK_API_VERSION_1_2 || enabled_extensions.contains(VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME)) {
+        if ((properties.is_available<vk::PhysicalDeviceFloatControlsProperties>() && properties.get<vk::PhysicalDeviceFloatControlsProperties>().shaderDenormPreserveFloat16 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceFloatControlsPropertiesKHR>() && properties.get<vk::PhysicalDeviceFloatControlsPropertiesKHR>().shaderDenormPreserveFloat16 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceVulkan12Properties>() && properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderDenormPreserveFloat16 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceFloatControlsProperties>() && properties.get<vk::PhysicalDeviceFloatControlsProperties>().shaderDenormPreserveFloat32 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceFloatControlsPropertiesKHR>() && properties.get<vk::PhysicalDeviceFloatControlsPropertiesKHR>().shaderDenormPreserveFloat32 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceVulkan12Properties>() && properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderDenormPreserveFloat32 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceFloatControlsProperties>() && properties.get<vk::PhysicalDeviceFloatControlsProperties>().shaderDenormPreserveFloat64 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceFloatControlsPropertiesKHR>() && properties.get<vk::PhysicalDeviceFloatControlsPropertiesKHR>().shaderDenormPreserveFloat64 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceVulkan12Properties>() && properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderDenormPreserveFloat64 == VK_TRUE)) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // DerivativeControl
-bool spirv_cap_check_29(
+bool check_capability_DerivativeControl(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return (vk_api_version >= VK_API_VERSION_1_0);
+
+    // Enable: no requires
+    if (vk_api_version >= VK_API_VERSION_1_0) {
+        return true;
+    }
+
+    return false;
 }
 
 // DescriptorHeapEXT
-bool spirv_cap_check_30(
+bool check_capability_DescriptorHeapEXT(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("descriptorHeap");
+
+    // Enable: requires (VK_EXT_descriptor_heap)
+    if (enabled_extensions.contains(VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME)) {
+        if (features.get_feature("descriptorHeap")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // DeviceGroup
-bool spirv_cap_check_31(
+bool check_capability_DeviceGroup(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return (vk_api_version >= VK_API_VERSION_1_1);
+
+    // Enable: no requires
+    if (vk_api_version >= VK_API_VERSION_1_1 ||
+        enabled_extensions.contains(VK_KHR_DEVICE_GROUP_EXTENSION_NAME)) {
+        return true;
+    }
+
+    return false;
 }
 
 // DotProduct
-bool spirv_cap_check_32(
+bool check_capability_DotProduct(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderIntegerDotProduct");
+
+    // Enable: requires (VK_VERSION_1_3,VK_KHR_shader_integer_dot_product)
+    if (vk_api_version >= VK_API_VERSION_1_3 || enabled_extensions.contains(VK_KHR_SHADER_INTEGER_DOT_PRODUCT_EXTENSION_NAME)) {
+        if (features.get_feature("shaderIntegerDotProduct")) {
+            return true;
+        }
+    }
+
+    // Enable: requires (VK_KHR_shader_integer_dot_product)
+    if (enabled_extensions.contains(VK_KHR_SHADER_INTEGER_DOT_PRODUCT_EXTENSION_NAME)) {
+        if (features.get_feature("shaderIntegerDotProduct")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // DotProductInput4x8Bit
-bool spirv_cap_check_33(
+bool check_capability_DotProductInput4x8Bit(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderIntegerDotProduct");
+
+    // Enable: requires (VK_VERSION_1_3,VK_KHR_shader_integer_dot_product)
+    if (vk_api_version >= VK_API_VERSION_1_3 || enabled_extensions.contains(VK_KHR_SHADER_INTEGER_DOT_PRODUCT_EXTENSION_NAME)) {
+        if (features.get_feature("shaderIntegerDotProduct")) {
+            return true;
+        }
+    }
+
+    // Enable: requires (VK_KHR_shader_integer_dot_product)
+    if (enabled_extensions.contains(VK_KHR_SHADER_INTEGER_DOT_PRODUCT_EXTENSION_NAME)) {
+        if (features.get_feature("shaderIntegerDotProduct")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // DotProductInput4x8BitPacked
-bool spirv_cap_check_34(
+bool check_capability_DotProductInput4x8BitPacked(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderIntegerDotProduct");
+
+    // Enable: requires (VK_VERSION_1_3,VK_KHR_shader_integer_dot_product)
+    if (vk_api_version >= VK_API_VERSION_1_3 || enabled_extensions.contains(VK_KHR_SHADER_INTEGER_DOT_PRODUCT_EXTENSION_NAME)) {
+        if (features.get_feature("shaderIntegerDotProduct")) {
+            return true;
+        }
+    }
+
+    // Enable: requires (VK_KHR_shader_integer_dot_product)
+    if (enabled_extensions.contains(VK_KHR_SHADER_INTEGER_DOT_PRODUCT_EXTENSION_NAME)) {
+        if (features.get_feature("shaderIntegerDotProduct")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // DotProductInputAll
-bool spirv_cap_check_35(
+bool check_capability_DotProductInputAll(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderIntegerDotProduct");
+
+    // Enable: requires (VK_VERSION_1_3,VK_KHR_shader_integer_dot_product)
+    if (vk_api_version >= VK_API_VERSION_1_3 || enabled_extensions.contains(VK_KHR_SHADER_INTEGER_DOT_PRODUCT_EXTENSION_NAME)) {
+        if (features.get_feature("shaderIntegerDotProduct")) {
+            return true;
+        }
+    }
+
+    // Enable: requires (VK_KHR_shader_integer_dot_product)
+    if (enabled_extensions.contains(VK_KHR_SHADER_INTEGER_DOT_PRODUCT_EXTENSION_NAME)) {
+        if (features.get_feature("shaderIntegerDotProduct")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // DrawParameters
-bool spirv_cap_check_36(
+bool check_capability_DrawParameters(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderDrawParameters");
+
+    // Enable: requires (VK_VERSION_1_2)
+    if (vk_api_version >= VK_API_VERSION_1_2) {
+        if (features.get_feature("shaderDrawParameters")) {
+            return true;
+        }
+    }
+
+    // Enable: requires (VK_VERSION_1_1)
+    if (vk_api_version >= VK_API_VERSION_1_1) {
+        if (features.get_feature("shaderDrawParameters")) {
+            return true;
+        }
+    }
+
+    // Enable: no requires
+    if (enabled_extensions.contains(VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME)) {
+        return true;
+    }
+
+    return false;
 }
 
 // ExpectAssumeKHR
-bool spirv_cap_check_37(
+bool check_capability_ExpectAssumeKHR(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderExpectAssume");
+
+    // Enable: requires (VK_VERSION_1_4,VK_KHR_shader_expect_assume)
+    if (vk_api_version >= VK_API_VERSION_1_4 || enabled_extensions.contains(VK_KHR_SHADER_EXPECT_ASSUME_EXTENSION_NAME)) {
+        if (features.get_feature("shaderExpectAssume")) {
+            return true;
+        }
+    }
+
+    // Enable: requires (VK_KHR_shader_expect_assume)
+    if (enabled_extensions.contains(VK_KHR_SHADER_EXPECT_ASSUME_EXTENSION_NAME)) {
+        if (features.get_feature("shaderExpectAssume")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // FMAKHR
-bool spirv_cap_check_38(
+bool check_capability_FMAKHR(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderFmaFloat16") ||
-        features.get_feature("shaderFmaFloat32") ||
-        features.get_feature("shaderFmaFloat64");
+
+    // Enable: requires (VK_KHR_shader_fma)
+    if (enabled_extensions.contains(VK_KHR_SHADER_FMA_EXTENSION_NAME)) {
+        if (features.get_feature("shaderFmaFloat16") ||
+            features.get_feature("shaderFmaFloat32") ||
+            features.get_feature("shaderFmaFloat64")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // Float16
-bool spirv_cap_check_39(
+bool check_capability_Float16(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderFloat16");
+
+    // Enable: requires (VK_VERSION_1_2,VK_KHR_shader_float16_int8)
+    if (vk_api_version >= VK_API_VERSION_1_2 || enabled_extensions.contains(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME)) {
+        if (features.get_feature("shaderFloat16")) {
+            return true;
+        }
+    }
+
+    // Enable: no requires
+    if (enabled_extensions.contains(VK_AMD_GPU_SHADER_HALF_FLOAT_EXTENSION_NAME)) {
+        return true;
+    }
+
+    return false;
 }
 
 // Float64
-bool spirv_cap_check_40(
+bool check_capability_Float64(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderFloat64");
+
+    // Enable: requires (VK_VERSION_1_0)
+    if (vk_api_version >= VK_API_VERSION_1_0) {
+        if (features.get_feature("shaderFloat64")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // Float8CooperativeMatrixEXT
-bool spirv_cap_check_41(
+bool check_capability_Float8CooperativeMatrixEXT(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderFloat8CooperativeMatrix");
+
+    // Enable: requires (VK_EXT_shader_float8)
+    if (enabled_extensions.contains(VK_EXT_SHADER_FLOAT8_EXTENSION_NAME)) {
+        if (features.get_feature("shaderFloat8CooperativeMatrix")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // Float8EXT
-bool spirv_cap_check_42(
+bool check_capability_Float8EXT(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderFloat8");
+
+    // Enable: requires (VK_EXT_shader_float8)
+    if (enabled_extensions.contains(VK_EXT_SHADER_FLOAT8_EXTENSION_NAME)) {
+        if (features.get_feature("shaderFloat8")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // FloatControls2
-bool spirv_cap_check_43(
+bool check_capability_FloatControls2(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderFloatControls2");
+
+    // Enable: requires (VK_VERSION_1_4,VK_KHR_shader_float_controls2)
+    if (vk_api_version >= VK_API_VERSION_1_4 || enabled_extensions.contains(VK_KHR_SHADER_FLOAT_CONTROLS_2_EXTENSION_NAME)) {
+        if (features.get_feature("shaderFloatControls2")) {
+            return true;
+        }
+    }
+
+    // Enable: requires (VK_KHR_shader_float_controls2)
+    if (enabled_extensions.contains(VK_KHR_SHADER_FLOAT_CONTROLS_2_EXTENSION_NAME)) {
+        if (features.get_feature("shaderFloatControls2")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // FragmentBarycentricKHR
-bool spirv_cap_check_44(
+bool check_capability_FragmentBarycentricKHR(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("fragmentShaderBarycentric");
+
+    // Enable: requires (VK_KHR_fragment_shader_barycentric)
+    if (enabled_extensions.contains(VK_KHR_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME)) {
+        if (features.get_feature("fragmentShaderBarycentric")) {
+            return true;
+        }
+    }
+
+    // Enable: requires (VK_NV_fragment_shader_barycentric)
+    if (enabled_extensions.contains(VK_NV_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME)) {
+        if (features.get_feature("fragmentShaderBarycentric")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // FragmentDensityEXT
-bool spirv_cap_check_45(
+bool check_capability_FragmentDensityEXT(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("fragmentDensityMap") ||
-        features.get_feature("shadingRateImage");
+
+    // Enable: requires (VK_EXT_fragment_density_map)
+    if (enabled_extensions.contains(VK_EXT_FRAGMENT_DENSITY_MAP_EXTENSION_NAME)) {
+        if (features.get_feature("fragmentDensityMap")) {
+            return true;
+        }
+    }
+
+    // Enable: requires (VK_NV_shading_rate_image)
+    if (enabled_extensions.contains(VK_NV_SHADING_RATE_IMAGE_EXTENSION_NAME)) {
+        if (features.get_feature("shadingRateImage")) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+// FragmentFullyCoveredEXT
+bool check_capability_FragmentFullyCoveredEXT(
+    [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
+    [[maybe_unused]] const VulkanFeatures& features,
+    [[maybe_unused]] const VulkanProperties& properties) {
+
+    // Enable: no requires
+    if (enabled_extensions.contains(VK_EXT_CONSERVATIVE_RASTERIZATION_EXTENSION_NAME)) {
+        return true;
+    }
+
+    return false;
+}
+
+// FragmentMaskAMD
+bool check_capability_FragmentMaskAMD(
+    [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
+    [[maybe_unused]] const VulkanFeatures& features,
+    [[maybe_unused]] const VulkanProperties& properties) {
+
+    // Enable: no requires
+    if (enabled_extensions.contains(VK_AMD_SHADER_FRAGMENT_MASK_EXTENSION_NAME)) {
+        return true;
+    }
+
+    return false;
 }
 
 // FragmentShaderPixelInterlockEXT
-bool spirv_cap_check_48(
+bool check_capability_FragmentShaderPixelInterlockEXT(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("fragmentShaderPixelInterlock");
+
+    // Enable: requires (VK_EXT_fragment_shader_interlock)
+    if (enabled_extensions.contains(VK_EXT_FRAGMENT_SHADER_INTERLOCK_EXTENSION_NAME)) {
+        if (features.get_feature("fragmentShaderPixelInterlock")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // FragmentShaderSampleInterlockEXT
-bool spirv_cap_check_49(
+bool check_capability_FragmentShaderSampleInterlockEXT(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("fragmentShaderSampleInterlock");
+
+    // Enable: requires (VK_EXT_fragment_shader_interlock)
+    if (enabled_extensions.contains(VK_EXT_FRAGMENT_SHADER_INTERLOCK_EXTENSION_NAME)) {
+        if (features.get_feature("fragmentShaderSampleInterlock")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // FragmentShaderShadingRateInterlockEXT
-bool spirv_cap_check_50(
+bool check_capability_FragmentShaderShadingRateInterlockEXT(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("fragmentShaderShadingRateInterlock") ||
-        features.get_feature("shadingRateImage");
+
+    // Enable: requires (VK_EXT_fragment_shader_interlock)
+    if (enabled_extensions.contains(VK_EXT_FRAGMENT_SHADER_INTERLOCK_EXTENSION_NAME)) {
+        if (features.get_feature("fragmentShaderShadingRateInterlock")) {
+            return true;
+        }
+    }
+
+    // Enable: requires (VK_NV_shading_rate_image)
+    if (enabled_extensions.contains(VK_NV_SHADING_RATE_IMAGE_EXTENSION_NAME)) {
+        if (features.get_feature("shadingRateImage")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // FragmentShadingRateKHR
-bool spirv_cap_check_51(
+bool check_capability_FragmentShadingRateKHR(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("pipelineFragmentShadingRate") ||
-        features.get_feature("primitiveFragmentShadingRate") ||
-        features.get_feature("attachmentFragmentShadingRate");
+
+    // Enable: requires (VK_KHR_fragment_shading_rate)
+    if (enabled_extensions.contains(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME)) {
+        if (features.get_feature("pipelineFragmentShadingRate") ||
+            features.get_feature("primitiveFragmentShadingRate") ||
+            features.get_feature("attachmentFragmentShadingRate")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // Geometry
-bool spirv_cap_check_52(
+bool check_capability_Geometry(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("geometryShader");
+
+    // Enable: requires (VK_VERSION_1_0)
+    if (vk_api_version >= VK_API_VERSION_1_0) {
+        if (features.get_feature("geometryShader")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // GeometryPointSize
-bool spirv_cap_check_53(
+bool check_capability_GeometryPointSize(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderTessellationAndGeometryPointSize");
+
+    // Enable: requires (VK_VERSION_1_0)
+    if (vk_api_version >= VK_API_VERSION_1_0) {
+        if (features.get_feature("shaderTessellationAndGeometryPointSize")) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+// GeometryShaderPassthroughNV
+bool check_capability_GeometryShaderPassthroughNV(
+    [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
+    [[maybe_unused]] const VulkanFeatures& features,
+    [[maybe_unused]] const VulkanProperties& properties) {
+
+    // Enable: no requires
+    if (enabled_extensions.contains(VK_NV_GEOMETRY_SHADER_PASSTHROUGH_EXTENSION_NAME)) {
+        return true;
+    }
+
+    return false;
 }
 
 // GeometryStreams
-bool spirv_cap_check_55(
+bool check_capability_GeometryStreams(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("geometryStreams");
+
+    // Enable: requires (VK_EXT_transform_feedback)
+    if (enabled_extensions.contains(VK_EXT_TRANSFORM_FEEDBACK_EXTENSION_NAME)) {
+        if (features.get_feature("geometryStreams")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // GraphARM
-bool spirv_cap_check_56(
+bool check_capability_GraphARM(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("dataGraph");
+
+    // Enable: requires (VK_ARM_data_graph)
+    if (enabled_extensions.contains(VK_ARM_DATA_GRAPH_EXTENSION_NAME)) {
+        if (features.get_feature("dataGraph")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // GroupNonUniform
-bool spirv_cap_check_57(
+bool check_capability_GroupNonUniform(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return (static_cast<uint32_t>(properties.get<vk::PhysicalDeviceVulkan11Properties>().subgroupSupportedOperations) & VK_SUBGROUP_FEATURE_BASIC_BIT);
+
+    // Enable: requires (VK_VERSION_1_1)
+    if (vk_api_version >= VK_API_VERSION_1_1) {
+        if ((properties.is_available<vk::PhysicalDeviceSubgroupProperties>() && (static_cast<uint32_t>(properties.get<vk::PhysicalDeviceSubgroupProperties>().supportedOperations) & VK_SUBGROUP_FEATURE_BASIC_BIT)) ||
+            (properties.is_available<vk::PhysicalDeviceVulkan11Properties>() && (static_cast<uint32_t>(properties.get<vk::PhysicalDeviceVulkan11Properties>().subgroupSupportedOperations) & VK_SUBGROUP_FEATURE_BASIC_BIT))) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // GroupNonUniformArithmetic
-bool spirv_cap_check_58(
+bool check_capability_GroupNonUniformArithmetic(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return (static_cast<uint32_t>(properties.get<vk::PhysicalDeviceVulkan11Properties>().subgroupSupportedOperations) & VK_SUBGROUP_FEATURE_ARITHMETIC_BIT);
+
+    // Enable: requires (VK_VERSION_1_1)
+    if (vk_api_version >= VK_API_VERSION_1_1) {
+        if ((properties.is_available<vk::PhysicalDeviceSubgroupProperties>() && (static_cast<uint32_t>(properties.get<vk::PhysicalDeviceSubgroupProperties>().supportedOperations) & VK_SUBGROUP_FEATURE_ARITHMETIC_BIT)) ||
+            (properties.is_available<vk::PhysicalDeviceVulkan11Properties>() && (static_cast<uint32_t>(properties.get<vk::PhysicalDeviceVulkan11Properties>().subgroupSupportedOperations) & VK_SUBGROUP_FEATURE_ARITHMETIC_BIT))) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // GroupNonUniformBallot
-bool spirv_cap_check_59(
+bool check_capability_GroupNonUniformBallot(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return (static_cast<uint32_t>(properties.get<vk::PhysicalDeviceVulkan11Properties>().subgroupSupportedOperations) & VK_SUBGROUP_FEATURE_BALLOT_BIT);
+
+    // Enable: requires (VK_VERSION_1_1)
+    if (vk_api_version >= VK_API_VERSION_1_1) {
+        if ((properties.is_available<vk::PhysicalDeviceSubgroupProperties>() && (static_cast<uint32_t>(properties.get<vk::PhysicalDeviceSubgroupProperties>().supportedOperations) & VK_SUBGROUP_FEATURE_BALLOT_BIT)) ||
+            (properties.is_available<vk::PhysicalDeviceVulkan11Properties>() && (static_cast<uint32_t>(properties.get<vk::PhysicalDeviceVulkan11Properties>().subgroupSupportedOperations) & VK_SUBGROUP_FEATURE_BALLOT_BIT))) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // GroupNonUniformClustered
-bool spirv_cap_check_60(
+bool check_capability_GroupNonUniformClustered(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return (static_cast<uint32_t>(properties.get<vk::PhysicalDeviceVulkan11Properties>().subgroupSupportedOperations) & VK_SUBGROUP_FEATURE_CLUSTERED_BIT);
+
+    // Enable: requires (VK_VERSION_1_1)
+    if (vk_api_version >= VK_API_VERSION_1_1) {
+        if ((properties.is_available<vk::PhysicalDeviceSubgroupProperties>() && (static_cast<uint32_t>(properties.get<vk::PhysicalDeviceSubgroupProperties>().supportedOperations) & VK_SUBGROUP_FEATURE_CLUSTERED_BIT)) ||
+            (properties.is_available<vk::PhysicalDeviceVulkan11Properties>() && (static_cast<uint32_t>(properties.get<vk::PhysicalDeviceVulkan11Properties>().subgroupSupportedOperations) & VK_SUBGROUP_FEATURE_CLUSTERED_BIT))) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // GroupNonUniformPartitionedEXT
-bool spirv_cap_check_61(
+bool check_capability_GroupNonUniformPartitionedEXT(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderSubgroupPartitioned") ||
-        (static_cast<uint32_t>(properties.get<vk::PhysicalDeviceVulkan11Properties>().subgroupSupportedOperations) & VK_SUBGROUP_FEATURE_PARTITIONED_BIT_NV);
+
+    // Enable: requires (VK_EXT_shader_subgroup_partitioned)
+    if (enabled_extensions.contains(VK_EXT_SHADER_SUBGROUP_PARTITIONED_EXTENSION_NAME)) {
+        if (features.get_feature("shaderSubgroupPartitioned")) {
+            return true;
+        }
+    }
+
+    // Enable: requires (VK_NV_shader_subgroup_partitioned)
+    if (enabled_extensions.contains(VK_NV_SHADER_SUBGROUP_PARTITIONED_EXTENSION_NAME)) {
+        if ((properties.is_available<vk::PhysicalDeviceSubgroupProperties>() && (static_cast<uint32_t>(properties.get<vk::PhysicalDeviceSubgroupProperties>().supportedOperations) & VK_SUBGROUP_FEATURE_PARTITIONED_BIT_NV)) ||
+            (properties.is_available<vk::PhysicalDeviceVulkan11Properties>() && (static_cast<uint32_t>(properties.get<vk::PhysicalDeviceVulkan11Properties>().subgroupSupportedOperations) & VK_SUBGROUP_FEATURE_PARTITIONED_BIT_NV))) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // GroupNonUniformQuad
-bool spirv_cap_check_62(
+bool check_capability_GroupNonUniformQuad(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return (static_cast<uint32_t>(properties.get<vk::PhysicalDeviceVulkan11Properties>().subgroupSupportedOperations) & VK_SUBGROUP_FEATURE_QUAD_BIT);
+
+    // Enable: requires (VK_VERSION_1_1)
+    if (vk_api_version >= VK_API_VERSION_1_1) {
+        if ((properties.is_available<vk::PhysicalDeviceSubgroupProperties>() && (static_cast<uint32_t>(properties.get<vk::PhysicalDeviceSubgroupProperties>().supportedOperations) & VK_SUBGROUP_FEATURE_QUAD_BIT)) ||
+            (properties.is_available<vk::PhysicalDeviceVulkan11Properties>() && (static_cast<uint32_t>(properties.get<vk::PhysicalDeviceVulkan11Properties>().subgroupSupportedOperations) & VK_SUBGROUP_FEATURE_QUAD_BIT))) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // GroupNonUniformRotateKHR
-bool spirv_cap_check_63(
+bool check_capability_GroupNonUniformRotateKHR(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderSubgroupRotate");
+
+    // Enable: requires (VK_VERSION_1_4,VK_KHR_shader_subgroup_rotate)
+    if (vk_api_version >= VK_API_VERSION_1_4 || enabled_extensions.contains(VK_KHR_SHADER_SUBGROUP_ROTATE_EXTENSION_NAME)) {
+        if (features.get_feature("shaderSubgroupRotate")) {
+            return true;
+        }
+    }
+
+    // Enable: requires (VK_KHR_shader_subgroup_rotate)
+    if (enabled_extensions.contains(VK_KHR_SHADER_SUBGROUP_ROTATE_EXTENSION_NAME)) {
+        if (features.get_feature("shaderSubgroupRotate")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // GroupNonUniformShuffle
-bool spirv_cap_check_64(
+bool check_capability_GroupNonUniformShuffle(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return (static_cast<uint32_t>(properties.get<vk::PhysicalDeviceVulkan11Properties>().subgroupSupportedOperations) & VK_SUBGROUP_FEATURE_SHUFFLE_BIT);
+
+    // Enable: requires (VK_VERSION_1_1)
+    if (vk_api_version >= VK_API_VERSION_1_1) {
+        if ((properties.is_available<vk::PhysicalDeviceSubgroupProperties>() && (static_cast<uint32_t>(properties.get<vk::PhysicalDeviceSubgroupProperties>().supportedOperations) & VK_SUBGROUP_FEATURE_SHUFFLE_BIT)) ||
+            (properties.is_available<vk::PhysicalDeviceVulkan11Properties>() && (static_cast<uint32_t>(properties.get<vk::PhysicalDeviceVulkan11Properties>().subgroupSupportedOperations) & VK_SUBGROUP_FEATURE_SHUFFLE_BIT))) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // GroupNonUniformShuffleRelative
-bool spirv_cap_check_65(
+bool check_capability_GroupNonUniformShuffleRelative(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return (static_cast<uint32_t>(properties.get<vk::PhysicalDeviceVulkan11Properties>().subgroupSupportedOperations) & VK_SUBGROUP_FEATURE_SHUFFLE_RELATIVE_BIT);
+
+    // Enable: requires (VK_VERSION_1_1)
+    if (vk_api_version >= VK_API_VERSION_1_1) {
+        if ((properties.is_available<vk::PhysicalDeviceSubgroupProperties>() && (static_cast<uint32_t>(properties.get<vk::PhysicalDeviceSubgroupProperties>().supportedOperations) & VK_SUBGROUP_FEATURE_SHUFFLE_RELATIVE_BIT)) ||
+            (properties.is_available<vk::PhysicalDeviceVulkan11Properties>() && (static_cast<uint32_t>(properties.get<vk::PhysicalDeviceVulkan11Properties>().subgroupSupportedOperations) & VK_SUBGROUP_FEATURE_SHUFFLE_RELATIVE_BIT))) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // GroupNonUniformVote
-bool spirv_cap_check_66(
+bool check_capability_GroupNonUniformVote(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return (static_cast<uint32_t>(properties.get<vk::PhysicalDeviceVulkan11Properties>().subgroupSupportedOperations) & VK_SUBGROUP_FEATURE_VOTE_BIT);
+
+    // Enable: requires (VK_VERSION_1_1)
+    if (vk_api_version >= VK_API_VERSION_1_1) {
+        if ((properties.is_available<vk::PhysicalDeviceSubgroupProperties>() && (static_cast<uint32_t>(properties.get<vk::PhysicalDeviceSubgroupProperties>().supportedOperations) & VK_SUBGROUP_FEATURE_VOTE_BIT)) ||
+            (properties.is_available<vk::PhysicalDeviceVulkan11Properties>() && (static_cast<uint32_t>(properties.get<vk::PhysicalDeviceVulkan11Properties>().subgroupSupportedOperations) & VK_SUBGROUP_FEATURE_VOTE_BIT))) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // Image1D
-bool spirv_cap_check_67(
+bool check_capability_Image1D(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return (vk_api_version >= VK_API_VERSION_1_0);
+
+    // Enable: no requires
+    if (vk_api_version >= VK_API_VERSION_1_0) {
+        return true;
+    }
+
+    return false;
 }
 
 // ImageBuffer
-bool spirv_cap_check_68(
+bool check_capability_ImageBuffer(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return (vk_api_version >= VK_API_VERSION_1_0);
+
+    // Enable: no requires
+    if (vk_api_version >= VK_API_VERSION_1_0) {
+        return true;
+    }
+
+    return false;
 }
 
 // ImageCubeArray
-bool spirv_cap_check_69(
+bool check_capability_ImageCubeArray(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("imageCubeArray");
+
+    // Enable: requires (VK_VERSION_1_0)
+    if (vk_api_version >= VK_API_VERSION_1_0) {
+        if (features.get_feature("imageCubeArray")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // ImageFootprintNV
-bool spirv_cap_check_70(
+bool check_capability_ImageFootprintNV(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("imageFootprint");
+
+    // Enable: requires (VK_NV_shader_image_footprint)
+    if (enabled_extensions.contains(VK_NV_SHADER_IMAGE_FOOTPRINT_EXTENSION_NAME)) {
+        if (features.get_feature("imageFootprint")) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+// ImageGatherBiasLodAMD
+bool check_capability_ImageGatherBiasLodAMD(
+    [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
+    [[maybe_unused]] const VulkanFeatures& features,
+    [[maybe_unused]] const VulkanProperties& properties) {
+
+    // Enable: no requires
+    if (enabled_extensions.contains(VK_AMD_TEXTURE_GATHER_BIAS_LOD_EXTENSION_NAME)) {
+        return true;
+    }
+
+    return false;
 }
 
 // ImageGatherExtended
-bool spirv_cap_check_72(
+bool check_capability_ImageGatherExtended(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderImageGatherExtended");
+
+    // Enable: requires (VK_VERSION_1_0)
+    if (vk_api_version >= VK_API_VERSION_1_0) {
+        if (features.get_feature("shaderImageGatherExtended")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // ImageMSArray
-bool spirv_cap_check_73(
+bool check_capability_ImageMSArray(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderStorageImageMultisample");
+
+    // Enable: requires (VK_VERSION_1_0)
+    if (vk_api_version >= VK_API_VERSION_1_0) {
+        if (features.get_feature("shaderStorageImageMultisample")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // ImageQuery
-bool spirv_cap_check_74(
+bool check_capability_ImageQuery(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return (vk_api_version >= VK_API_VERSION_1_0);
+
+    // Enable: no requires
+    if (vk_api_version >= VK_API_VERSION_1_0) {
+        return true;
+    }
+
+    return false;
+}
+
+// ImageReadWriteLodAMD
+bool check_capability_ImageReadWriteLodAMD(
+    [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
+    [[maybe_unused]] const VulkanFeatures& features,
+    [[maybe_unused]] const VulkanProperties& properties) {
+
+    // Enable: no requires
+    if (enabled_extensions.contains(VK_AMD_SHADER_IMAGE_LOAD_STORE_LOD_EXTENSION_NAME)) {
+        return true;
+    }
+
+    return false;
 }
 
 // InputAttachment
-bool spirv_cap_check_76(
+bool check_capability_InputAttachment(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return (vk_api_version >= VK_API_VERSION_1_0);
+
+    // Enable: no requires
+    if (vk_api_version >= VK_API_VERSION_1_0) {
+        return true;
+    }
+
+    return false;
 }
 
 // InputAttachmentArrayDynamicIndexing
-bool spirv_cap_check_77(
+bool check_capability_InputAttachmentArrayDynamicIndexing(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderInputAttachmentArrayDynamicIndexing");
+
+    // Enable: requires (VK_VERSION_1_2,VK_EXT_descriptor_indexing)
+    if (vk_api_version >= VK_API_VERSION_1_2 || enabled_extensions.contains(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME)) {
+        if (features.get_feature("shaderInputAttachmentArrayDynamicIndexing")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // InputAttachmentArrayNonUniformIndexing
-bool spirv_cap_check_78(
+bool check_capability_InputAttachmentArrayNonUniformIndexing(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderInputAttachmentArrayNonUniformIndexing");
+
+    // Enable: requires (VK_VERSION_1_2,VK_EXT_descriptor_indexing)
+    if (vk_api_version >= VK_API_VERSION_1_2 || enabled_extensions.contains(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME)) {
+        if (features.get_feature("shaderInputAttachmentArrayNonUniformIndexing")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // Int16
-bool spirv_cap_check_79(
+bool check_capability_Int16(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderInt16");
+
+    // Enable: requires (VK_VERSION_1_0)
+    if (vk_api_version >= VK_API_VERSION_1_0) {
+        if (features.get_feature("shaderInt16")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // Int64
-bool spirv_cap_check_80(
+bool check_capability_Int64(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderInt64");
+
+    // Enable: requires (VK_VERSION_1_0)
+    if (vk_api_version >= VK_API_VERSION_1_0) {
+        if (features.get_feature("shaderInt64")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // Int64Atomics
-bool spirv_cap_check_81(
+bool check_capability_Int64Atomics(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderBufferInt64Atomics") ||
-        features.get_feature("shaderSharedInt64Atomics") ||
-        features.get_feature("shaderImageInt64Atomics");
+
+    // Enable: requires (VK_VERSION_1_2,VK_KHR_shader_atomic_int64)
+    if (vk_api_version >= VK_API_VERSION_1_2 || enabled_extensions.contains(VK_KHR_SHADER_ATOMIC_INT64_EXTENSION_NAME)) {
+        if (features.get_feature("shaderBufferInt64Atomics") ||
+            features.get_feature("shaderSharedInt64Atomics")) {
+            return true;
+        }
+    }
+
+    // Enable: requires (VK_EXT_shader_image_atomic_int64)
+    if (enabled_extensions.contains(VK_EXT_SHADER_IMAGE_ATOMIC_INT64_EXTENSION_NAME)) {
+        if (features.get_feature("shaderImageInt64Atomics")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // Int64ImageEXT
-bool spirv_cap_check_82(
+bool check_capability_Int64ImageEXT(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderImageInt64Atomics");
+
+    // Enable: requires (VK_EXT_shader_image_atomic_int64)
+    if (enabled_extensions.contains(VK_EXT_SHADER_IMAGE_ATOMIC_INT64_EXTENSION_NAME)) {
+        if (features.get_feature("shaderImageInt64Atomics")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // Int8
-bool spirv_cap_check_83(
+bool check_capability_Int8(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderInt8");
+
+    // Enable: requires (VK_VERSION_1_2,VK_KHR_shader_float16_int8)
+    if (vk_api_version >= VK_API_VERSION_1_2 || enabled_extensions.contains(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME)) {
+        if (features.get_feature("shaderInt8")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // IntegerFunctions2INTEL
-bool spirv_cap_check_84(
+bool check_capability_IntegerFunctions2INTEL(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderIntegerFunctions2");
+
+    // Enable: requires (VK_INTEL_shader_integer_functions2)
+    if (enabled_extensions.contains(VK_INTEL_SHADER_INTEGER_FUNCTIONS_2_EXTENSION_NAME)) {
+        if (features.get_feature("shaderIntegerFunctions2")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // InterpolationFunction
-bool spirv_cap_check_85(
+bool check_capability_InterpolationFunction(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("sampleRateShading");
+
+    // Enable: requires (VK_VERSION_1_0)
+    if (vk_api_version >= VK_API_VERSION_1_0) {
+        if (features.get_feature("sampleRateShading")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // LongVectorEXT
-bool spirv_cap_check_86(
+bool check_capability_LongVectorEXT(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("longVector");
+
+    // Enable: requires (VK_EXT_shader_long_vector)
+    if (enabled_extensions.contains(VK_EXT_SHADER_LONG_VECTOR_EXTENSION_NAME)) {
+        if (features.get_feature("longVector")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // Matrix
-bool spirv_cap_check_87(
+bool check_capability_Matrix(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return (vk_api_version >= VK_API_VERSION_1_0);
+
+    // Enable: no requires
+    if (vk_api_version >= VK_API_VERSION_1_0) {
+        return true;
+    }
+
+    return false;
+}
+
+// MeshShadingEXT
+bool check_capability_MeshShadingEXT(
+    [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
+    [[maybe_unused]] const VulkanFeatures& features,
+    [[maybe_unused]] const VulkanProperties& properties) {
+
+    // Enable: no requires
+    if (enabled_extensions.contains(VK_EXT_MESH_SHADER_EXTENSION_NAME)) {
+        return true;
+    }
+
+    return false;
+}
+
+// MeshShadingNV
+bool check_capability_MeshShadingNV(
+    [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
+    [[maybe_unused]] const VulkanFeatures& features,
+    [[maybe_unused]] const VulkanProperties& properties) {
+
+    // Enable: no requires
+    if (enabled_extensions.contains(VK_NV_MESH_SHADER_EXTENSION_NAME)) {
+        return true;
+    }
+
+    return false;
 }
 
 // MinLod
-bool spirv_cap_check_90(
+bool check_capability_MinLod(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderResourceMinLod");
+
+    // Enable: requires (VK_VERSION_1_0)
+    if (vk_api_version >= VK_API_VERSION_1_0) {
+        if (features.get_feature("shaderResourceMinLod")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // MultiView
-bool spirv_cap_check_91(
+bool check_capability_MultiView(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("multiview");
+
+    // Enable: requires (VK_VERSION_1_2)
+    if (vk_api_version >= VK_API_VERSION_1_2) {
+        if (features.get_feature("multiview")) {
+            return true;
+        }
+    }
+
+    // Enable: requires (VK_KHR_multiview)
+    if (enabled_extensions.contains(VK_KHR_MULTIVIEW_EXTENSION_NAME)) {
+        if (features.get_feature("multiview")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // MultiViewport
-bool spirv_cap_check_92(
+bool check_capability_MultiViewport(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("multiViewport");
+
+    // Enable: requires (VK_VERSION_1_0)
+    if (vk_api_version >= VK_API_VERSION_1_0) {
+        if (features.get_feature("multiViewport")) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+// PerViewAttributesNV
+bool check_capability_PerViewAttributesNV(
+    [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
+    [[maybe_unused]] const VulkanFeatures& features,
+    [[maybe_unused]] const VulkanProperties& properties) {
+
+    // Enable: no requires
+    if (enabled_extensions.contains(VK_NVX_MULTIVIEW_PER_VIEW_ATTRIBUTES_EXTENSION_NAME)) {
+        return true;
+    }
+
+    return false;
 }
 
 // PhysicalStorageBufferAddresses
-bool spirv_cap_check_94(
+bool check_capability_PhysicalStorageBufferAddresses(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("bufferDeviceAddress");
+
+    // Enable: requires (VK_VERSION_1_2,VK_KHR_buffer_device_address)
+    if (vk_api_version >= VK_API_VERSION_1_2 || enabled_extensions.contains(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME)) {
+        if (features.get_feature("bufferDeviceAddress")) {
+            return true;
+        }
+    }
+
+    // Enable: requires (VK_EXT_buffer_device_address)
+    if (enabled_extensions.contains(VK_EXT_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME)) {
+        if (features.get_feature("bufferDeviceAddress")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // PushConstantBanksNV
-bool spirv_cap_check_95(
+bool check_capability_PushConstantBanksNV(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("pushConstantBank");
+
+    // Enable: requires (VK_NV_push_constant_bank)
+    if (enabled_extensions.contains(VK_NV_PUSH_CONSTANT_BANK_EXTENSION_NAME)) {
+        if (features.get_feature("pushConstantBank")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // QuadControlKHR
-bool spirv_cap_check_96(
+bool check_capability_QuadControlKHR(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderQuadControl");
+
+    // Enable: requires (VK_KHR_shader_quad_control)
+    if (enabled_extensions.contains(VK_KHR_SHADER_QUAD_CONTROL_EXTENSION_NAME)) {
+        if (features.get_feature("shaderQuadControl")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // RawAccessChainsNV
-bool spirv_cap_check_97(
+bool check_capability_RawAccessChainsNV(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderRawAccessChains");
+
+    // Enable: requires (VK_NV_raw_access_chains)
+    if (enabled_extensions.contains(VK_NV_RAW_ACCESS_CHAINS_EXTENSION_NAME)) {
+        if (features.get_feature("shaderRawAccessChains")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // RayCullMaskKHR
-bool spirv_cap_check_98(
+bool check_capability_RayCullMaskKHR(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("rayTracingMaintenance1");
+
+    // Enable: requires (VK_KHR_ray_tracing_maintenance1)
+    if (enabled_extensions.contains(VK_KHR_RAY_TRACING_MAINTENANCE_1_EXTENSION_NAME)) {
+        if (features.get_feature("rayTracingMaintenance1")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // RayQueryKHR
-bool spirv_cap_check_99(
+bool check_capability_RayQueryKHR(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("rayQuery");
+
+    // Enable: requires (VK_KHR_ray_query)
+    if (enabled_extensions.contains(VK_KHR_RAY_QUERY_EXTENSION_NAME)) {
+        if (features.get_feature("rayQuery")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // RayQueryPositionFetchKHR
-bool spirv_cap_check_100(
+bool check_capability_RayQueryPositionFetchKHR(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("rayTracingPositionFetch");
+
+    // Enable: requires (VK_KHR_ray_tracing_position_fetch)
+    if (enabled_extensions.contains(VK_KHR_RAY_TRACING_POSITION_FETCH_EXTENSION_NAME)) {
+        if (features.get_feature("rayTracingPositionFetch")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // RayTracingClusterAccelerationStructureNV
-bool spirv_cap_check_101(
+bool check_capability_RayTracingClusterAccelerationStructureNV(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("clusterAccelerationStructure");
+
+    // Enable: requires (VK_NV_cluster_acceleration_structure)
+    if (enabled_extensions.contains(VK_NV_CLUSTER_ACCELERATION_STRUCTURE_EXTENSION_NAME)) {
+        if (features.get_feature("clusterAccelerationStructure")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // RayTracingKHR
-bool spirv_cap_check_102(
+bool check_capability_RayTracingKHR(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("rayTracingPipeline");
+
+    // Enable: requires (VK_KHR_ray_tracing_pipeline)
+    if (enabled_extensions.contains(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME)) {
+        if (features.get_feature("rayTracingPipeline")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // RayTracingLinearSweptSpheresGeometryNV
-bool spirv_cap_check_103(
+bool check_capability_RayTracingLinearSweptSpheresGeometryNV(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("linearSweptSpheres");
+
+    // Enable: requires (VK_NV_ray_tracing_linear_swept_spheres)
+    if (enabled_extensions.contains(VK_NV_RAY_TRACING_LINEAR_SWEPT_SPHERES_EXTENSION_NAME)) {
+        if (features.get_feature("linearSweptSpheres")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // RayTracingMotionBlurNV
-bool spirv_cap_check_104(
+bool check_capability_RayTracingMotionBlurNV(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("rayTracingMotionBlur");
+
+    // Enable: requires (VK_NV_ray_tracing_motion_blur)
+    if (enabled_extensions.contains(VK_NV_RAY_TRACING_MOTION_BLUR_EXTENSION_NAME)) {
+        if (features.get_feature("rayTracingMotionBlur")) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+// RayTracingNV
+bool check_capability_RayTracingNV(
+    [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
+    [[maybe_unused]] const VulkanFeatures& features,
+    [[maybe_unused]] const VulkanProperties& properties) {
+
+    // Enable: no requires
+    if (enabled_extensions.contains(VK_NV_RAY_TRACING_EXTENSION_NAME)) {
+        return true;
+    }
+
+    return false;
+}
+
+// RayTracingOpacityMicromapEXT
+bool check_capability_RayTracingOpacityMicromapEXT(
+    [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
+    [[maybe_unused]] const VulkanFeatures& features,
+    [[maybe_unused]] const VulkanProperties& properties) {
+
+    // Enable: no requires
+    if (enabled_extensions.contains(VK_EXT_OPACITY_MICROMAP_EXTENSION_NAME)) {
+        return true;
+    }
+
+    return false;
 }
 
 // RayTracingPositionFetchKHR
-bool spirv_cap_check_107(
+bool check_capability_RayTracingPositionFetchKHR(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("rayTracingPositionFetch");
+
+    // Enable: requires (VK_KHR_ray_tracing_position_fetch)
+    if (enabled_extensions.contains(VK_KHR_RAY_TRACING_POSITION_FETCH_EXTENSION_NAME)) {
+        if (features.get_feature("rayTracingPositionFetch")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // RayTracingSpheresGeometryNV
-bool spirv_cap_check_108(
+bool check_capability_RayTracingSpheresGeometryNV(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("spheres");
+
+    // Enable: requires (VK_NV_ray_tracing_linear_swept_spheres)
+    if (enabled_extensions.contains(VK_NV_RAY_TRACING_LINEAR_SWEPT_SPHERES_EXTENSION_NAME)) {
+        if (features.get_feature("spheres")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // RayTraversalPrimitiveCullingKHR
-bool spirv_cap_check_109(
+bool check_capability_RayTraversalPrimitiveCullingKHR(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("rayTraversalPrimitiveCulling") ||
-        features.get_feature("rayQuery");
+
+    // Enable: requires (VK_KHR_ray_tracing_pipeline)
+    if (enabled_extensions.contains(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME)) {
+        if (features.get_feature("rayTraversalPrimitiveCulling")) {
+            return true;
+        }
+    }
+
+    // Enable: requires (VK_KHR_ray_query)
+    if (enabled_extensions.contains(VK_KHR_RAY_QUERY_EXTENSION_NAME)) {
+        if (features.get_feature("rayQuery")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // ReplicatedCompositesEXT
-bool spirv_cap_check_110(
+bool check_capability_ReplicatedCompositesEXT(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderReplicatedComposites");
+
+    // Enable: requires (VK_EXT_shader_replicated_composites)
+    if (enabled_extensions.contains(VK_EXT_SHADER_REPLICATED_COMPOSITES_EXTENSION_NAME)) {
+        if (features.get_feature("shaderReplicatedComposites")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // RoundingModeRTE
-bool spirv_cap_check_111(
+bool check_capability_RoundingModeRTE(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return (properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderRoundingModeRTEFloat16 == VK_TRUE) ||
-        (properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderRoundingModeRTEFloat32 == VK_TRUE) ||
-        (properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderRoundingModeRTEFloat64 == VK_TRUE);
+
+    // Enable: requires (VK_VERSION_1_2,VK_KHR_shader_float_controls)
+    if (vk_api_version >= VK_API_VERSION_1_2 || enabled_extensions.contains(VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME)) {
+        if ((properties.is_available<vk::PhysicalDeviceFloatControlsProperties>() && properties.get<vk::PhysicalDeviceFloatControlsProperties>().shaderRoundingModeRTEFloat16 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceFloatControlsPropertiesKHR>() && properties.get<vk::PhysicalDeviceFloatControlsPropertiesKHR>().shaderRoundingModeRTEFloat16 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceVulkan12Properties>() && properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderRoundingModeRTEFloat16 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceFloatControlsProperties>() && properties.get<vk::PhysicalDeviceFloatControlsProperties>().shaderRoundingModeRTEFloat32 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceFloatControlsPropertiesKHR>() && properties.get<vk::PhysicalDeviceFloatControlsPropertiesKHR>().shaderRoundingModeRTEFloat32 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceVulkan12Properties>() && properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderRoundingModeRTEFloat32 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceFloatControlsProperties>() && properties.get<vk::PhysicalDeviceFloatControlsProperties>().shaderRoundingModeRTEFloat64 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceFloatControlsPropertiesKHR>() && properties.get<vk::PhysicalDeviceFloatControlsPropertiesKHR>().shaderRoundingModeRTEFloat64 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceVulkan12Properties>() && properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderRoundingModeRTEFloat64 == VK_TRUE)) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // RoundingModeRTZ
-bool spirv_cap_check_112(
+bool check_capability_RoundingModeRTZ(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return (properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderRoundingModeRTZFloat16 == VK_TRUE) ||
-        (properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderRoundingModeRTZFloat32 == VK_TRUE) ||
-        (properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderRoundingModeRTZFloat64 == VK_TRUE);
+
+    // Enable: requires (VK_VERSION_1_2,VK_KHR_shader_float_controls)
+    if (vk_api_version >= VK_API_VERSION_1_2 || enabled_extensions.contains(VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME)) {
+        if ((properties.is_available<vk::PhysicalDeviceFloatControlsProperties>() && properties.get<vk::PhysicalDeviceFloatControlsProperties>().shaderRoundingModeRTZFloat16 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceFloatControlsPropertiesKHR>() && properties.get<vk::PhysicalDeviceFloatControlsPropertiesKHR>().shaderRoundingModeRTZFloat16 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceVulkan12Properties>() && properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderRoundingModeRTZFloat16 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceFloatControlsProperties>() && properties.get<vk::PhysicalDeviceFloatControlsProperties>().shaderRoundingModeRTZFloat32 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceFloatControlsPropertiesKHR>() && properties.get<vk::PhysicalDeviceFloatControlsPropertiesKHR>().shaderRoundingModeRTZFloat32 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceVulkan12Properties>() && properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderRoundingModeRTZFloat32 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceFloatControlsProperties>() && properties.get<vk::PhysicalDeviceFloatControlsProperties>().shaderRoundingModeRTZFloat64 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceFloatControlsPropertiesKHR>() && properties.get<vk::PhysicalDeviceFloatControlsPropertiesKHR>().shaderRoundingModeRTZFloat64 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceVulkan12Properties>() && properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderRoundingModeRTZFloat64 == VK_TRUE)) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // RuntimeDescriptorArray
-bool spirv_cap_check_113(
+bool check_capability_RuntimeDescriptorArray(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("runtimeDescriptorArray");
+
+    // Enable: requires (VK_VERSION_1_2,VK_EXT_descriptor_indexing)
+    if (vk_api_version >= VK_API_VERSION_1_2 || enabled_extensions.contains(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME)) {
+        if (features.get_feature("runtimeDescriptorArray")) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+// SampleMaskOverrideCoverageNV
+bool check_capability_SampleMaskOverrideCoverageNV(
+    [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
+    [[maybe_unused]] const VulkanFeatures& features,
+    [[maybe_unused]] const VulkanProperties& properties) {
+
+    // Enable: no requires
+    if (enabled_extensions.contains(VK_NV_SAMPLE_MASK_OVERRIDE_COVERAGE_EXTENSION_NAME)) {
+        return true;
+    }
+
+    return false;
+}
+
+// SampleMaskPostDepthCoverage
+bool check_capability_SampleMaskPostDepthCoverage(
+    [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
+    [[maybe_unused]] const VulkanFeatures& features,
+    [[maybe_unused]] const VulkanProperties& properties) {
+
+    // Enable: no requires
+    if (enabled_extensions.contains(VK_EXT_POST_DEPTH_COVERAGE_EXTENSION_NAME)) {
+        return true;
+    }
+
+    return false;
 }
 
 // SampleRateShading
-bool spirv_cap_check_116(
+bool check_capability_SampleRateShading(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("sampleRateShading");
+
+    // Enable: requires (VK_VERSION_1_0)
+    if (vk_api_version >= VK_API_VERSION_1_0) {
+        if (features.get_feature("sampleRateShading")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // Sampled1D
-bool spirv_cap_check_117(
+bool check_capability_Sampled1D(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return (vk_api_version >= VK_API_VERSION_1_0);
+
+    // Enable: no requires
+    if (vk_api_version >= VK_API_VERSION_1_0) {
+        return true;
+    }
+
+    return false;
 }
 
 // SampledBuffer
-bool spirv_cap_check_118(
+bool check_capability_SampledBuffer(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return (vk_api_version >= VK_API_VERSION_1_0);
+
+    // Enable: no requires
+    if (vk_api_version >= VK_API_VERSION_1_0) {
+        return true;
+    }
+
+    return false;
 }
 
 // SampledCubeArray
-bool spirv_cap_check_119(
+bool check_capability_SampledCubeArray(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("imageCubeArray");
+
+    // Enable: requires (VK_VERSION_1_0)
+    if (vk_api_version >= VK_API_VERSION_1_0) {
+        if (features.get_feature("imageCubeArray")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // SampledImageArrayDynamicIndexing
-bool spirv_cap_check_120(
+bool check_capability_SampledImageArrayDynamicIndexing(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderSampledImageArrayDynamicIndexing");
+
+    // Enable: requires (VK_VERSION_1_0)
+    if (vk_api_version >= VK_API_VERSION_1_0) {
+        if (features.get_feature("shaderSampledImageArrayDynamicIndexing")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // SampledImageArrayNonUniformIndexing
-bool spirv_cap_check_121(
+bool check_capability_SampledImageArrayNonUniformIndexing(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderSampledImageArrayNonUniformIndexing");
+
+    // Enable: requires (VK_VERSION_1_2,VK_EXT_descriptor_indexing)
+    if (vk_api_version >= VK_API_VERSION_1_2 || enabled_extensions.contains(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME)) {
+        if (features.get_feature("shaderSampledImageArrayNonUniformIndexing")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // Shader
-bool spirv_cap_check_122(
+bool check_capability_Shader(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return (vk_api_version >= VK_API_VERSION_1_0);
+
+    // Enable: no requires
+    if (vk_api_version >= VK_API_VERSION_1_0) {
+        return true;
+    }
+
+    return false;
 }
 
 // Shader64BitIndexingEXT
-bool spirv_cap_check_123(
+bool check_capability_Shader64BitIndexingEXT(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shader64BitIndexing");
+
+    // Enable: requires (VK_EXT_shader_64bit_indexing)
+    if (enabled_extensions.contains(VK_EXT_SHADER_64BIT_INDEXING_EXTENSION_NAME)) {
+        if (features.get_feature("shader64BitIndexing")) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+// ShaderClockKHR
+bool check_capability_ShaderClockKHR(
+    [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
+    [[maybe_unused]] const VulkanFeatures& features,
+    [[maybe_unused]] const VulkanProperties& properties) {
+
+    // Enable: no requires
+    if (enabled_extensions.contains(VK_KHR_SHADER_CLOCK_EXTENSION_NAME)) {
+        return true;
+    }
+
+    return false;
 }
 
 // ShaderEnqueueAMDX
-bool spirv_cap_check_125(
+bool check_capability_ShaderEnqueueAMDX(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderEnqueue");
+
+    // Enable: no requires
+    if (features.get_feature("shaderEnqueue")) {
+        return true;
+    }
+
+    return false;
+}
+
+// ShaderInvocationReorderEXT
+bool check_capability_ShaderInvocationReorderEXT(
+    [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
+    [[maybe_unused]] const VulkanFeatures& features,
+    [[maybe_unused]] const VulkanProperties& properties) {
+
+    // Enable: no requires
+    if (enabled_extensions.contains(VK_EXT_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME)) {
+        return true;
+    }
+
+    return false;
+}
+
+// ShaderInvocationReorderNV
+bool check_capability_ShaderInvocationReorderNV(
+    [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
+    [[maybe_unused]] const VulkanFeatures& features,
+    [[maybe_unused]] const VulkanProperties& properties) {
+
+    // Enable: no requires
+    if (enabled_extensions.contains(VK_NV_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME)) {
+        return true;
+    }
+
+    return false;
 }
 
 // ShaderLayer
-bool spirv_cap_check_128(
+bool check_capability_ShaderLayer(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderOutputLayer");
+
+    // Enable: requires (VK_VERSION_1_2)
+    if (vk_api_version >= VK_API_VERSION_1_2) {
+        if (features.get_feature("shaderOutputLayer")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // ShaderNonUniform
-bool spirv_cap_check_129(
+bool check_capability_ShaderNonUniform(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return (vk_api_version >= VK_API_VERSION_1_2);
+
+    // Enable: no requires
+    if (vk_api_version >= VK_API_VERSION_1_2 ||
+        enabled_extensions.contains(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME)) {
+        return true;
+    }
+
+    return false;
 }
 
 // ShaderSMBuiltinsNV
-bool spirv_cap_check_130(
+bool check_capability_ShaderSMBuiltinsNV(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderSMBuiltins");
+
+    // Enable: requires (VK_NV_shader_sm_builtins)
+    if (enabled_extensions.contains(VK_NV_SHADER_SM_BUILTINS_EXTENSION_NAME)) {
+        if (features.get_feature("shaderSMBuiltins")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // ShaderViewportIndex
-bool spirv_cap_check_131(
+bool check_capability_ShaderViewportIndex(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderOutputViewportIndex");
+
+    // Enable: requires (VK_VERSION_1_2)
+    if (vk_api_version >= VK_API_VERSION_1_2) {
+        if (features.get_feature("shaderOutputViewportIndex")) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+// ShaderViewportIndexLayerEXT
+bool check_capability_ShaderViewportIndexLayerEXT(
+    [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
+    [[maybe_unused]] const VulkanFeatures& features,
+    [[maybe_unused]] const VulkanProperties& properties) {
+
+    // Enable: no requires
+    if (enabled_extensions.contains(VK_EXT_SHADER_VIEWPORT_INDEX_LAYER_EXTENSION_NAME) ||
+        enabled_extensions.contains(VK_NV_VIEWPORT_ARRAY_2_EXTENSION_NAME)) {
+        return true;
+    }
+
+    return false;
+}
+
+// ShaderViewportMaskNV
+bool check_capability_ShaderViewportMaskNV(
+    [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
+    [[maybe_unused]] const VulkanFeatures& features,
+    [[maybe_unused]] const VulkanProperties& properties) {
+
+    // Enable: no requires
+    if (enabled_extensions.contains(VK_NV_VIEWPORT_ARRAY_2_EXTENSION_NAME)) {
+        return true;
+    }
+
+    return false;
 }
 
 // SignedZeroInfNanPreserve
-bool spirv_cap_check_134(
+bool check_capability_SignedZeroInfNanPreserve(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return (properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderSignedZeroInfNanPreserveFloat16 == VK_TRUE) ||
-        (properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderSignedZeroInfNanPreserveFloat32 == VK_TRUE) ||
-        (properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderSignedZeroInfNanPreserveFloat64 == VK_TRUE);
+
+    // Enable: requires (VK_VERSION_1_2,VK_KHR_shader_float_controls)
+    if (vk_api_version >= VK_API_VERSION_1_2 || enabled_extensions.contains(VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME)) {
+        if ((properties.is_available<vk::PhysicalDeviceFloatControlsProperties>() && properties.get<vk::PhysicalDeviceFloatControlsProperties>().shaderSignedZeroInfNanPreserveFloat16 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceFloatControlsPropertiesKHR>() && properties.get<vk::PhysicalDeviceFloatControlsPropertiesKHR>().shaderSignedZeroInfNanPreserveFloat16 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceVulkan12Properties>() && properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderSignedZeroInfNanPreserveFloat16 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceFloatControlsProperties>() && properties.get<vk::PhysicalDeviceFloatControlsProperties>().shaderSignedZeroInfNanPreserveFloat32 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceFloatControlsPropertiesKHR>() && properties.get<vk::PhysicalDeviceFloatControlsPropertiesKHR>().shaderSignedZeroInfNanPreserveFloat32 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceVulkan12Properties>() && properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderSignedZeroInfNanPreserveFloat32 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceFloatControlsProperties>() && properties.get<vk::PhysicalDeviceFloatControlsProperties>().shaderSignedZeroInfNanPreserveFloat64 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceFloatControlsPropertiesKHR>() && properties.get<vk::PhysicalDeviceFloatControlsPropertiesKHR>().shaderSignedZeroInfNanPreserveFloat64 == VK_TRUE) ||
+            (properties.is_available<vk::PhysicalDeviceVulkan12Properties>() && properties.get<vk::PhysicalDeviceVulkan12Properties>().shaderSignedZeroInfNanPreserveFloat64 == VK_TRUE)) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // SparseResidency
-bool spirv_cap_check_135(
+bool check_capability_SparseResidency(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderResourceResidency");
+
+    // Enable: requires (VK_VERSION_1_0)
+    if (vk_api_version >= VK_API_VERSION_1_0) {
+        if (features.get_feature("shaderResourceResidency")) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+// StencilExportEXT
+bool check_capability_StencilExportEXT(
+    [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
+    [[maybe_unused]] const VulkanFeatures& features,
+    [[maybe_unused]] const VulkanProperties& properties) {
+
+    // Enable: no requires
+    if (enabled_extensions.contains(VK_EXT_SHADER_STENCIL_EXPORT_EXTENSION_NAME)) {
+        return true;
+    }
+
+    return false;
 }
 
 // StorageBuffer16BitAccess
-bool spirv_cap_check_137(
+bool check_capability_StorageBuffer16BitAccess(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("storageBuffer16BitAccess");
+
+    // Enable: requires (VK_VERSION_1_2)
+    if (vk_api_version >= VK_API_VERSION_1_2) {
+        if (features.get_feature("storageBuffer16BitAccess")) {
+            return true;
+        }
+    }
+
+    // Enable: requires (VK_KHR_16bit_storage)
+    if (enabled_extensions.contains(VK_KHR_16BIT_STORAGE_EXTENSION_NAME)) {
+        if (features.get_feature("storageBuffer16BitAccess")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // StorageBuffer8BitAccess
-bool spirv_cap_check_138(
+bool check_capability_StorageBuffer8BitAccess(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("storageBuffer8BitAccess");
+
+    // Enable: requires (VK_VERSION_1_2,VK_KHR_8bit_storage)
+    if (vk_api_version >= VK_API_VERSION_1_2 || enabled_extensions.contains(VK_KHR_8BIT_STORAGE_EXTENSION_NAME)) {
+        if (features.get_feature("storageBuffer8BitAccess")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // StorageBufferArrayDynamicIndexing
-bool spirv_cap_check_139(
+bool check_capability_StorageBufferArrayDynamicIndexing(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderStorageBufferArrayDynamicIndexing");
+
+    // Enable: requires (VK_VERSION_1_0)
+    if (vk_api_version >= VK_API_VERSION_1_0) {
+        if (features.get_feature("shaderStorageBufferArrayDynamicIndexing")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // StorageBufferArrayNonUniformIndexing
-bool spirv_cap_check_140(
+bool check_capability_StorageBufferArrayNonUniformIndexing(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderStorageBufferArrayNonUniformIndexing");
+
+    // Enable: requires (VK_VERSION_1_2,VK_EXT_descriptor_indexing)
+    if (vk_api_version >= VK_API_VERSION_1_2 || enabled_extensions.contains(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME)) {
+        if (features.get_feature("shaderStorageBufferArrayNonUniformIndexing")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // StorageImageArrayDynamicIndexing
-bool spirv_cap_check_141(
+bool check_capability_StorageImageArrayDynamicIndexing(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderStorageImageArrayDynamicIndexing");
+
+    // Enable: requires (VK_VERSION_1_0)
+    if (vk_api_version >= VK_API_VERSION_1_0) {
+        if (features.get_feature("shaderStorageImageArrayDynamicIndexing")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // StorageImageArrayNonUniformIndexing
-bool spirv_cap_check_142(
+bool check_capability_StorageImageArrayNonUniformIndexing(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderStorageImageArrayNonUniformIndexing");
+
+    // Enable: requires (VK_VERSION_1_2,VK_EXT_descriptor_indexing)
+    if (vk_api_version >= VK_API_VERSION_1_2 || enabled_extensions.contains(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME)) {
+        if (features.get_feature("shaderStorageImageArrayNonUniformIndexing")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // StorageImageExtendedFormats
-bool spirv_cap_check_143(
+bool check_capability_StorageImageExtendedFormats(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return (vk_api_version >= VK_API_VERSION_1_0);
+
+    // Enable: no requires
+    if (vk_api_version >= VK_API_VERSION_1_0) {
+        return true;
+    }
+
+    return false;
 }
 
 // StorageImageMultisample
-bool spirv_cap_check_144(
+bool check_capability_StorageImageMultisample(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderStorageImageMultisample");
+
+    // Enable: requires (VK_VERSION_1_0)
+    if (vk_api_version >= VK_API_VERSION_1_0) {
+        if (features.get_feature("shaderStorageImageMultisample")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // StorageImageReadWithoutFormat
-bool spirv_cap_check_145(
+bool check_capability_StorageImageReadWithoutFormat(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderStorageImageReadWithoutFormat") ||
-        (vk_api_version >= VK_API_VERSION_1_3);
+
+    // Enable: requires (VK_VERSION_1_0)
+    if (vk_api_version >= VK_API_VERSION_1_0) {
+        if (features.get_feature("shaderStorageImageReadWithoutFormat")) {
+            return true;
+        }
+    }
+
+    // Enable: no requires
+    if (vk_api_version >= VK_API_VERSION_1_3 ||
+        enabled_extensions.contains(VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME)) {
+        return true;
+    }
+
+    return false;
 }
 
 // StorageImageWriteWithoutFormat
-bool spirv_cap_check_146(
+bool check_capability_StorageImageWriteWithoutFormat(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderStorageImageWriteWithoutFormat") ||
-        (vk_api_version >= VK_API_VERSION_1_3);
+
+    // Enable: requires (VK_VERSION_1_0)
+    if (vk_api_version >= VK_API_VERSION_1_0) {
+        if (features.get_feature("shaderStorageImageWriteWithoutFormat")) {
+            return true;
+        }
+    }
+
+    // Enable: no requires
+    if (vk_api_version >= VK_API_VERSION_1_3 ||
+        enabled_extensions.contains(VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME)) {
+        return true;
+    }
+
+    return false;
 }
 
 // StorageInputOutput16
-bool spirv_cap_check_147(
+bool check_capability_StorageInputOutput16(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("storageInputOutput16");
+
+    // Enable: requires (VK_VERSION_1_2)
+    if (vk_api_version >= VK_API_VERSION_1_2) {
+        if (features.get_feature("storageInputOutput16")) {
+            return true;
+        }
+    }
+
+    // Enable: requires (VK_KHR_16bit_storage)
+    if (enabled_extensions.contains(VK_KHR_16BIT_STORAGE_EXTENSION_NAME)) {
+        if (features.get_feature("storageInputOutput16")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // StoragePushConstant16
-bool spirv_cap_check_148(
+bool check_capability_StoragePushConstant16(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("storagePushConstant16");
+
+    // Enable: requires (VK_VERSION_1_2)
+    if (vk_api_version >= VK_API_VERSION_1_2) {
+        if (features.get_feature("storagePushConstant16")) {
+            return true;
+        }
+    }
+
+    // Enable: requires (VK_KHR_16bit_storage)
+    if (enabled_extensions.contains(VK_KHR_16BIT_STORAGE_EXTENSION_NAME)) {
+        if (features.get_feature("storagePushConstant16")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // StoragePushConstant8
-bool spirv_cap_check_149(
+bool check_capability_StoragePushConstant8(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("storagePushConstant8");
+
+    // Enable: requires (VK_VERSION_1_2,VK_KHR_8bit_storage)
+    if (vk_api_version >= VK_API_VERSION_1_2 || enabled_extensions.contains(VK_KHR_8BIT_STORAGE_EXTENSION_NAME)) {
+        if (features.get_feature("storagePushConstant8")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // StorageTensorArrayDynamicIndexingARM
-bool spirv_cap_check_150(
+bool check_capability_StorageTensorArrayDynamicIndexingARM(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderStorageTensorArrayDynamicIndexing");
+
+    // Enable: requires (VK_ARM_tensors)
+    if (enabled_extensions.contains(VK_ARM_TENSORS_EXTENSION_NAME)) {
+        if (features.get_feature("shaderStorageTensorArrayDynamicIndexing")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // StorageTensorArrayNonUniformIndexingARM
-bool spirv_cap_check_151(
+bool check_capability_StorageTensorArrayNonUniformIndexingARM(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderStorageTensorArrayNonUniformIndexing");
+
+    // Enable: requires (VK_ARM_tensors)
+    if (enabled_extensions.contains(VK_ARM_TENSORS_EXTENSION_NAME)) {
+        if (features.get_feature("shaderStorageTensorArrayNonUniformIndexing")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // StorageTexelBufferArrayDynamicIndexing
-bool spirv_cap_check_152(
+bool check_capability_StorageTexelBufferArrayDynamicIndexing(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderStorageTexelBufferArrayDynamicIndexing");
+
+    // Enable: requires (VK_VERSION_1_2,VK_EXT_descriptor_indexing)
+    if (vk_api_version >= VK_API_VERSION_1_2 || enabled_extensions.contains(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME)) {
+        if (features.get_feature("shaderStorageTexelBufferArrayDynamicIndexing")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // StorageTexelBufferArrayNonUniformIndexing
-bool spirv_cap_check_153(
+bool check_capability_StorageTexelBufferArrayNonUniformIndexing(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderStorageTexelBufferArrayNonUniformIndexing");
+
+    // Enable: requires (VK_VERSION_1_2,VK_EXT_descriptor_indexing)
+    if (vk_api_version >= VK_API_VERSION_1_2 || enabled_extensions.contains(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME)) {
+        if (features.get_feature("shaderStorageTexelBufferArrayNonUniformIndexing")) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+// SubgroupBallotKHR
+bool check_capability_SubgroupBallotKHR(
+    [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
+    [[maybe_unused]] const VulkanFeatures& features,
+    [[maybe_unused]] const VulkanProperties& properties) {
+
+    // Enable: no requires
+    if (enabled_extensions.contains(VK_EXT_SHADER_SUBGROUP_BALLOT_EXTENSION_NAME)) {
+        return true;
+    }
+
+    return false;
+}
+
+// SubgroupVoteKHR
+bool check_capability_SubgroupVoteKHR(
+    [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
+    [[maybe_unused]] const VulkanFeatures& features,
+    [[maybe_unused]] const VulkanProperties& properties) {
+
+    // Enable: no requires
+    if (enabled_extensions.contains(VK_EXT_SHADER_SUBGROUP_VOTE_EXTENSION_NAME)) {
+        return true;
+    }
+
+    return false;
 }
 
 // TensorAddressingNV
-bool spirv_cap_check_156(
+bool check_capability_TensorAddressingNV(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("cooperativeMatrixTensorAddressing");
+
+    // Enable: requires (VK_NV_cooperative_matrix2)
+    if (enabled_extensions.contains(VK_NV_COOPERATIVE_MATRIX_2_EXTENSION_NAME)) {
+        if (features.get_feature("cooperativeMatrixTensorAddressing")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // TensorsARM
-bool spirv_cap_check_157(
+bool check_capability_TensorsARM(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderTensorAccess");
+
+    // Enable: requires (VK_ARM_tensors)
+    if (enabled_extensions.contains(VK_ARM_TENSORS_EXTENSION_NAME)) {
+        if (features.get_feature("shaderTensorAccess")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // Tessellation
-bool spirv_cap_check_158(
+bool check_capability_Tessellation(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("tessellationShader");
+
+    // Enable: requires (VK_VERSION_1_0)
+    if (vk_api_version >= VK_API_VERSION_1_0) {
+        if (features.get_feature("tessellationShader")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // TessellationPointSize
-bool spirv_cap_check_159(
+bool check_capability_TessellationPointSize(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderTessellationAndGeometryPointSize");
+
+    // Enable: requires (VK_VERSION_1_0)
+    if (vk_api_version >= VK_API_VERSION_1_0) {
+        if (features.get_feature("shaderTessellationAndGeometryPointSize")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // TextureBlockMatch2QCOM
-bool spirv_cap_check_160(
+bool check_capability_TextureBlockMatch2QCOM(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("textureBlockMatch2");
+
+    // Enable: requires (VK_QCOM_image_processing2)
+    if (enabled_extensions.contains(VK_QCOM_IMAGE_PROCESSING_2_EXTENSION_NAME)) {
+        if (features.get_feature("textureBlockMatch2")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // TextureBlockMatchQCOM
-bool spirv_cap_check_161(
+bool check_capability_TextureBlockMatchQCOM(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("textureBlockMatch");
+
+    // Enable: requires (VK_QCOM_image_processing)
+    if (enabled_extensions.contains(VK_QCOM_IMAGE_PROCESSING_EXTENSION_NAME)) {
+        if (features.get_feature("textureBlockMatch")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // TextureBoxFilterQCOM
-bool spirv_cap_check_162(
+bool check_capability_TextureBoxFilterQCOM(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("textureBoxFilter");
+
+    // Enable: requires (VK_QCOM_image_processing)
+    if (enabled_extensions.contains(VK_QCOM_IMAGE_PROCESSING_EXTENSION_NAME)) {
+        if (features.get_feature("textureBoxFilter")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // TextureSampleWeightedQCOM
-bool spirv_cap_check_163(
+bool check_capability_TextureSampleWeightedQCOM(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("textureSampleWeighted");
+
+    // Enable: requires (VK_QCOM_image_processing)
+    if (enabled_extensions.contains(VK_QCOM_IMAGE_PROCESSING_EXTENSION_NAME)) {
+        if (features.get_feature("textureSampleWeighted")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // TileImageColorReadAccessEXT
-bool spirv_cap_check_164(
+bool check_capability_TileImageColorReadAccessEXT(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderTileImageColorReadAccess");
+
+    // Enable: requires (VK_EXT_shader_tile_image)
+    if (enabled_extensions.contains(VK_EXT_SHADER_TILE_IMAGE_EXTENSION_NAME)) {
+        if (features.get_feature("shaderTileImageColorReadAccess")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // TileImageDepthReadAccessEXT
-bool spirv_cap_check_165(
+bool check_capability_TileImageDepthReadAccessEXT(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderTileImageDepthReadAccess");
+
+    // Enable: requires (VK_EXT_shader_tile_image)
+    if (enabled_extensions.contains(VK_EXT_SHADER_TILE_IMAGE_EXTENSION_NAME)) {
+        if (features.get_feature("shaderTileImageDepthReadAccess")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // TileImageStencilReadAccessEXT
-bool spirv_cap_check_166(
+bool check_capability_TileImageStencilReadAccessEXT(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderTileImageStencilReadAccess");
+
+    // Enable: requires (VK_EXT_shader_tile_image)
+    if (enabled_extensions.contains(VK_EXT_SHADER_TILE_IMAGE_EXTENSION_NAME)) {
+        if (features.get_feature("shaderTileImageStencilReadAccess")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // TileShadingQCOM
-bool spirv_cap_check_167(
+bool check_capability_TileShadingQCOM(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("tileShading");
+
+    // Enable: requires (VK_QCOM_tile_shading)
+    if (enabled_extensions.contains(VK_QCOM_TILE_SHADING_EXTENSION_NAME)) {
+        if (features.get_feature("tileShading")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // TransformFeedback
-bool spirv_cap_check_168(
+bool check_capability_TransformFeedback(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("transformFeedback");
+
+    // Enable: requires (VK_EXT_transform_feedback)
+    if (enabled_extensions.contains(VK_EXT_TRANSFORM_FEEDBACK_EXTENSION_NAME)) {
+        if (features.get_feature("transformFeedback")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // UniformAndStorageBuffer16BitAccess
-bool spirv_cap_check_169(
+bool check_capability_UniformAndStorageBuffer16BitAccess(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("uniformAndStorageBuffer16BitAccess");
+
+    // Enable: requires (VK_VERSION_1_2)
+    if (vk_api_version >= VK_API_VERSION_1_2) {
+        if (features.get_feature("uniformAndStorageBuffer16BitAccess")) {
+            return true;
+        }
+    }
+
+    // Enable: requires (VK_KHR_16bit_storage)
+    if (enabled_extensions.contains(VK_KHR_16BIT_STORAGE_EXTENSION_NAME)) {
+        if (features.get_feature("uniformAndStorageBuffer16BitAccess")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // UniformAndStorageBuffer8BitAccess
-bool spirv_cap_check_170(
+bool check_capability_UniformAndStorageBuffer8BitAccess(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("uniformAndStorageBuffer8BitAccess");
+
+    // Enable: requires (VK_VERSION_1_2,VK_KHR_8bit_storage)
+    if (vk_api_version >= VK_API_VERSION_1_2 || enabled_extensions.contains(VK_KHR_8BIT_STORAGE_EXTENSION_NAME)) {
+        if (features.get_feature("uniformAndStorageBuffer8BitAccess")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // UniformBufferArrayDynamicIndexing
-bool spirv_cap_check_171(
+bool check_capability_UniformBufferArrayDynamicIndexing(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderUniformBufferArrayDynamicIndexing");
+
+    // Enable: requires (VK_VERSION_1_0)
+    if (vk_api_version >= VK_API_VERSION_1_0) {
+        if (features.get_feature("shaderUniformBufferArrayDynamicIndexing")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // UniformBufferArrayNonUniformIndexing
-bool spirv_cap_check_172(
+bool check_capability_UniformBufferArrayNonUniformIndexing(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderUniformBufferArrayNonUniformIndexing");
+
+    // Enable: requires (VK_VERSION_1_2,VK_EXT_descriptor_indexing)
+    if (vk_api_version >= VK_API_VERSION_1_2 || enabled_extensions.contains(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME)) {
+        if (features.get_feature("shaderUniformBufferArrayNonUniformIndexing")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // UniformTexelBufferArrayDynamicIndexing
-bool spirv_cap_check_173(
+bool check_capability_UniformTexelBufferArrayDynamicIndexing(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderUniformTexelBufferArrayDynamicIndexing");
+
+    // Enable: requires (VK_VERSION_1_2,VK_EXT_descriptor_indexing)
+    if (vk_api_version >= VK_API_VERSION_1_2 || enabled_extensions.contains(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME)) {
+        if (features.get_feature("shaderUniformTexelBufferArrayDynamicIndexing")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // UniformTexelBufferArrayNonUniformIndexing
-bool spirv_cap_check_174(
+bool check_capability_UniformTexelBufferArrayNonUniformIndexing(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderUniformTexelBufferArrayNonUniformIndexing");
+
+    // Enable: requires (VK_VERSION_1_2,VK_EXT_descriptor_indexing)
+    if (vk_api_version >= VK_API_VERSION_1_2 || enabled_extensions.contains(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME)) {
+        if (features.get_feature("shaderUniformTexelBufferArrayNonUniformIndexing")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // UntypedPointersKHR
-bool spirv_cap_check_175(
+bool check_capability_UntypedPointersKHR(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("shaderUntypedPointers");
+
+    // Enable: requires (VK_KHR_shader_untyped_pointers)
+    if (enabled_extensions.contains(VK_KHR_SHADER_UNTYPED_POINTERS_EXTENSION_NAME)) {
+        if (features.get_feature("shaderUntypedPointers")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // VariablePointers
-bool spirv_cap_check_176(
+bool check_capability_VariablePointers(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("variablePointers");
+
+    // Enable: requires (VK_VERSION_1_2)
+    if (vk_api_version >= VK_API_VERSION_1_2) {
+        if (features.get_feature("variablePointers")) {
+            return true;
+        }
+    }
+
+    // Enable: requires (VK_KHR_variable_pointers)
+    if (enabled_extensions.contains(VK_KHR_VARIABLE_POINTERS_EXTENSION_NAME)) {
+        if (features.get_feature("variablePointers")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // VariablePointersStorageBuffer
-bool spirv_cap_check_177(
+bool check_capability_VariablePointersStorageBuffer(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("variablePointersStorageBuffer");
+
+    // Enable: requires (VK_VERSION_1_2)
+    if (vk_api_version >= VK_API_VERSION_1_2) {
+        if (features.get_feature("variablePointersStorageBuffer")) {
+            return true;
+        }
+    }
+
+    // Enable: requires (VK_KHR_variable_pointers)
+    if (enabled_extensions.contains(VK_KHR_VARIABLE_POINTERS_EXTENSION_NAME)) {
+        if (features.get_feature("variablePointersStorageBuffer")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // VulkanMemoryModel
-bool spirv_cap_check_178(
+bool check_capability_VulkanMemoryModel(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("vulkanMemoryModel");
+
+    // Enable: requires (VK_VERSION_1_2,VK_KHR_vulkan_memory_model)
+    if (vk_api_version >= VK_API_VERSION_1_2 || enabled_extensions.contains(VK_KHR_VULKAN_MEMORY_MODEL_EXTENSION_NAME)) {
+        if (features.get_feature("vulkanMemoryModel")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // VulkanMemoryModelDeviceScope
-bool spirv_cap_check_179(
+bool check_capability_VulkanMemoryModelDeviceScope(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("vulkanMemoryModelDeviceScope");
+
+    // Enable: requires (VK_VERSION_1_2,VK_KHR_vulkan_memory_model)
+    if (vk_api_version >= VK_API_VERSION_1_2 || enabled_extensions.contains(VK_KHR_VULKAN_MEMORY_MODEL_EXTENSION_NAME)) {
+        if (features.get_feature("vulkanMemoryModelDeviceScope")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // WorkgroupMemoryExplicitLayout16BitAccessKHR
-bool spirv_cap_check_180(
+bool check_capability_WorkgroupMemoryExplicitLayout16BitAccessKHR(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("workgroupMemoryExplicitLayout16BitAccess");
+
+    // Enable: requires (VK_KHR_workgroup_memory_explicit_layout)
+    if (enabled_extensions.contains(VK_KHR_WORKGROUP_MEMORY_EXPLICIT_LAYOUT_EXTENSION_NAME)) {
+        if (features.get_feature("workgroupMemoryExplicitLayout16BitAccess")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // WorkgroupMemoryExplicitLayout8BitAccessKHR
-bool spirv_cap_check_181(
+bool check_capability_WorkgroupMemoryExplicitLayout8BitAccessKHR(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("workgroupMemoryExplicitLayout8BitAccess");
+
+    // Enable: requires (VK_KHR_workgroup_memory_explicit_layout)
+    if (enabled_extensions.contains(VK_KHR_WORKGROUP_MEMORY_EXPLICIT_LAYOUT_EXTENSION_NAME)) {
+        if (features.get_feature("workgroupMemoryExplicitLayout8BitAccess")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // WorkgroupMemoryExplicitLayoutKHR
-bool spirv_cap_check_182(
+bool check_capability_WorkgroupMemoryExplicitLayoutKHR(
     [[maybe_unused]] uint32_t vk_api_version,
+    [[maybe_unused]] const std::unordered_set<std::string>& enabled_extensions,
     [[maybe_unused]] const VulkanFeatures& features,
     [[maybe_unused]] const VulkanProperties& properties) {
-    return features.get_feature("workgroupMemoryExplicitLayout");
+
+    // Enable: requires (VK_KHR_workgroup_memory_explicit_layout)
+    if (enabled_extensions.contains(VK_KHR_WORKGROUP_MEMORY_EXPLICIT_LAYOUT_EXTENSION_NAME)) {
+        if (features.get_feature("workgroupMemoryExplicitLayout")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
+// Capability dispatch map
+using CapCheckFn = bool(*)(uint32_t, const std::unordered_set<std::string>&,
+                           const VulkanFeatures&, const VulkanProperties&);
+
 // NOLINTNEXTLINE(cert-err58-cpp)
-const std::unordered_map<std::string_view, CapSupportCheckFn> cap_supported_map = {
-    {"AtomicFloat16AddEXT", spirv_cap_check_0},
-    {"AtomicFloat16MinMaxEXT", spirv_cap_check_1},
-    {"AtomicFloat16VectorNV", spirv_cap_check_2},
-    {"AtomicFloat32AddEXT", spirv_cap_check_3},
-    {"AtomicFloat32MinMaxEXT", spirv_cap_check_4},
-    {"AtomicFloat64AddEXT", spirv_cap_check_5},
-    {"AtomicFloat64MinMaxEXT", spirv_cap_check_6},
-    {"BFloat16CooperativeMatrixKHR", spirv_cap_check_7},
-    {"BFloat16DotProductKHR", spirv_cap_check_8},
-    {"BFloat16TypeKHR", spirv_cap_check_9},
-    {"ClipDistance", spirv_cap_check_10},
-    {"ClusterCullingShadingHUAWEI", spirv_cap_check_11},
-    {"ComputeDerivativeGroupLinearKHR", spirv_cap_check_12},
-    {"ComputeDerivativeGroupQuadsKHR", spirv_cap_check_13},
-    {"CooperativeMatrixBlockLoadsNV", spirv_cap_check_14},
-    {"CooperativeMatrixConversionQCOM", spirv_cap_check_15},
-    {"CooperativeMatrixConversionsNV", spirv_cap_check_16},
-    {"CooperativeMatrixKHR", spirv_cap_check_17},
-    {"CooperativeMatrixNV", spirv_cap_check_18},
-    {"CooperativeMatrixPerElementOperationsNV", spirv_cap_check_19},
-    {"CooperativeMatrixReductionsNV", spirv_cap_check_20},
-    {"CooperativeMatrixTensorAddressingNV", spirv_cap_check_21},
-    {"CooperativeVectorNV", spirv_cap_check_22},
-    {"CooperativeVectorTrainingNV", spirv_cap_check_23},
-    {"CoreBuiltinsARM", spirv_cap_check_24},
-    {"CullDistance", spirv_cap_check_25},
-    {"DemoteToHelperInvocation", spirv_cap_check_26},
-    {"DenormFlushToZero", spirv_cap_check_27},
-    {"DenormPreserve", spirv_cap_check_28},
-    {"DerivativeControl", spirv_cap_check_29},
-    {"DescriptorHeapEXT", spirv_cap_check_30},
-    {"DeviceGroup", spirv_cap_check_31},
-    {"DotProduct", spirv_cap_check_32},
-    {"DotProductInput4x8Bit", spirv_cap_check_33},
-    {"DotProductInput4x8BitPacked", spirv_cap_check_34},
-    {"DotProductInputAll", spirv_cap_check_35},
-    {"DrawParameters", spirv_cap_check_36},
-    {"ExpectAssumeKHR", spirv_cap_check_37},
-    {"FMAKHR", spirv_cap_check_38},
-    {"Float16", spirv_cap_check_39},
-    {"Float64", spirv_cap_check_40},
-    {"Float8CooperativeMatrixEXT", spirv_cap_check_41},
-    {"Float8EXT", spirv_cap_check_42},
-    {"FloatControls2", spirv_cap_check_43},
-    {"FragmentBarycentricKHR", spirv_cap_check_44},
-    {"FragmentDensityEXT", spirv_cap_check_45},
-    {"FragmentShaderPixelInterlockEXT", spirv_cap_check_48},
-    {"FragmentShaderSampleInterlockEXT", spirv_cap_check_49},
-    {"FragmentShaderShadingRateInterlockEXT", spirv_cap_check_50},
-    {"FragmentShadingRateKHR", spirv_cap_check_51},
-    {"Geometry", spirv_cap_check_52},
-    {"GeometryPointSize", spirv_cap_check_53},
-    {"GeometryStreams", spirv_cap_check_55},
-    {"GraphARM", spirv_cap_check_56},
-    {"GroupNonUniform", spirv_cap_check_57},
-    {"GroupNonUniformArithmetic", spirv_cap_check_58},
-    {"GroupNonUniformBallot", spirv_cap_check_59},
-    {"GroupNonUniformClustered", spirv_cap_check_60},
-    {"GroupNonUniformPartitionedEXT", spirv_cap_check_61},
-    {"GroupNonUniformQuad", spirv_cap_check_62},
-    {"GroupNonUniformRotateKHR", spirv_cap_check_63},
-    {"GroupNonUniformShuffle", spirv_cap_check_64},
-    {"GroupNonUniformShuffleRelative", spirv_cap_check_65},
-    {"GroupNonUniformVote", spirv_cap_check_66},
-    {"Image1D", spirv_cap_check_67},
-    {"ImageBuffer", spirv_cap_check_68},
-    {"ImageCubeArray", spirv_cap_check_69},
-    {"ImageFootprintNV", spirv_cap_check_70},
-    {"ImageGatherExtended", spirv_cap_check_72},
-    {"ImageMSArray", spirv_cap_check_73},
-    {"ImageQuery", spirv_cap_check_74},
-    {"InputAttachment", spirv_cap_check_76},
-    {"InputAttachmentArrayDynamicIndexing", spirv_cap_check_77},
-    {"InputAttachmentArrayNonUniformIndexing", spirv_cap_check_78},
-    {"Int16", spirv_cap_check_79},
-    {"Int64", spirv_cap_check_80},
-    {"Int64Atomics", spirv_cap_check_81},
-    {"Int64ImageEXT", spirv_cap_check_82},
-    {"Int8", spirv_cap_check_83},
-    {"IntegerFunctions2INTEL", spirv_cap_check_84},
-    {"InterpolationFunction", spirv_cap_check_85},
-    {"LongVectorEXT", spirv_cap_check_86},
-    {"Matrix", spirv_cap_check_87},
-    {"MinLod", spirv_cap_check_90},
-    {"MultiView", spirv_cap_check_91},
-    {"MultiViewport", spirv_cap_check_92},
-    {"PhysicalStorageBufferAddresses", spirv_cap_check_94},
-    {"PushConstantBanksNV", spirv_cap_check_95},
-    {"QuadControlKHR", spirv_cap_check_96},
-    {"RawAccessChainsNV", spirv_cap_check_97},
-    {"RayCullMaskKHR", spirv_cap_check_98},
-    {"RayQueryKHR", spirv_cap_check_99},
-    {"RayQueryPositionFetchKHR", spirv_cap_check_100},
-    {"RayTracingClusterAccelerationStructureNV", spirv_cap_check_101},
-    {"RayTracingKHR", spirv_cap_check_102},
-    {"RayTracingLinearSweptSpheresGeometryNV", spirv_cap_check_103},
-    {"RayTracingMotionBlurNV", spirv_cap_check_104},
-    {"RayTracingPositionFetchKHR", spirv_cap_check_107},
-    {"RayTracingSpheresGeometryNV", spirv_cap_check_108},
-    {"RayTraversalPrimitiveCullingKHR", spirv_cap_check_109},
-    {"ReplicatedCompositesEXT", spirv_cap_check_110},
-    {"RoundingModeRTE", spirv_cap_check_111},
-    {"RoundingModeRTZ", spirv_cap_check_112},
-    {"RuntimeDescriptorArray", spirv_cap_check_113},
-    {"SampleRateShading", spirv_cap_check_116},
-    {"Sampled1D", spirv_cap_check_117},
-    {"SampledBuffer", spirv_cap_check_118},
-    {"SampledCubeArray", spirv_cap_check_119},
-    {"SampledImageArrayDynamicIndexing", spirv_cap_check_120},
-    {"SampledImageArrayNonUniformIndexing", spirv_cap_check_121},
-    {"Shader", spirv_cap_check_122},
-    {"Shader64BitIndexingEXT", spirv_cap_check_123},
-    {"ShaderEnqueueAMDX", spirv_cap_check_125},
-    {"ShaderLayer", spirv_cap_check_128},
-    {"ShaderNonUniform", spirv_cap_check_129},
-    {"ShaderSMBuiltinsNV", spirv_cap_check_130},
-    {"ShaderViewportIndex", spirv_cap_check_131},
-    {"SignedZeroInfNanPreserve", spirv_cap_check_134},
-    {"SparseResidency", spirv_cap_check_135},
-    {"StorageBuffer16BitAccess", spirv_cap_check_137},
-    {"StorageBuffer8BitAccess", spirv_cap_check_138},
-    {"StorageBufferArrayDynamicIndexing", spirv_cap_check_139},
-    {"StorageBufferArrayNonUniformIndexing", spirv_cap_check_140},
-    {"StorageImageArrayDynamicIndexing", spirv_cap_check_141},
-    {"StorageImageArrayNonUniformIndexing", spirv_cap_check_142},
-    {"StorageImageExtendedFormats", spirv_cap_check_143},
-    {"StorageImageMultisample", spirv_cap_check_144},
-    {"StorageImageReadWithoutFormat", spirv_cap_check_145},
-    {"StorageImageWriteWithoutFormat", spirv_cap_check_146},
-    {"StorageInputOutput16", spirv_cap_check_147},
-    {"StoragePushConstant16", spirv_cap_check_148},
-    {"StoragePushConstant8", spirv_cap_check_149},
-    {"StorageTensorArrayDynamicIndexingARM", spirv_cap_check_150},
-    {"StorageTensorArrayNonUniformIndexingARM", spirv_cap_check_151},
-    {"StorageTexelBufferArrayDynamicIndexing", spirv_cap_check_152},
-    {"StorageTexelBufferArrayNonUniformIndexing", spirv_cap_check_153},
-    {"TensorAddressingNV", spirv_cap_check_156},
-    {"TensorsARM", spirv_cap_check_157},
-    {"Tessellation", spirv_cap_check_158},
-    {"TessellationPointSize", spirv_cap_check_159},
-    {"TextureBlockMatch2QCOM", spirv_cap_check_160},
-    {"TextureBlockMatchQCOM", spirv_cap_check_161},
-    {"TextureBoxFilterQCOM", spirv_cap_check_162},
-    {"TextureSampleWeightedQCOM", spirv_cap_check_163},
-    {"TileImageColorReadAccessEXT", spirv_cap_check_164},
-    {"TileImageDepthReadAccessEXT", spirv_cap_check_165},
-    {"TileImageStencilReadAccessEXT", spirv_cap_check_166},
-    {"TileShadingQCOM", spirv_cap_check_167},
-    {"TransformFeedback", spirv_cap_check_168},
-    {"UniformAndStorageBuffer16BitAccess", spirv_cap_check_169},
-    {"UniformAndStorageBuffer8BitAccess", spirv_cap_check_170},
-    {"UniformBufferArrayDynamicIndexing", spirv_cap_check_171},
-    {"UniformBufferArrayNonUniformIndexing", spirv_cap_check_172},
-    {"UniformTexelBufferArrayDynamicIndexing", spirv_cap_check_173},
-    {"UniformTexelBufferArrayNonUniformIndexing", spirv_cap_check_174},
-    {"UntypedPointersKHR", spirv_cap_check_175},
-    {"VariablePointers", spirv_cap_check_176},
-    {"VariablePointersStorageBuffer", spirv_cap_check_177},
-    {"VulkanMemoryModel", spirv_cap_check_178},
-    {"VulkanMemoryModelDeviceScope", spirv_cap_check_179},
-    {"WorkgroupMemoryExplicitLayout16BitAccessKHR", spirv_cap_check_180},
-    {"WorkgroupMemoryExplicitLayout8BitAccessKHR", spirv_cap_check_181},
-    {"WorkgroupMemoryExplicitLayoutKHR", spirv_cap_check_182},
+const std::unordered_map<std::string_view, CapCheckFn> capability_check_map = {
+    {"AtomicFloat16AddEXT", check_capability_AtomicFloat16AddEXT},
+    {"AtomicFloat16MinMaxEXT", check_capability_AtomicFloat16MinMaxEXT},
+    {"AtomicFloat16VectorNV", check_capability_AtomicFloat16VectorNV},
+    {"AtomicFloat32AddEXT", check_capability_AtomicFloat32AddEXT},
+    {"AtomicFloat32MinMaxEXT", check_capability_AtomicFloat32MinMaxEXT},
+    {"AtomicFloat64AddEXT", check_capability_AtomicFloat64AddEXT},
+    {"AtomicFloat64MinMaxEXT", check_capability_AtomicFloat64MinMaxEXT},
+    {"BFloat16CooperativeMatrixKHR", check_capability_BFloat16CooperativeMatrixKHR},
+    {"BFloat16DotProductKHR", check_capability_BFloat16DotProductKHR},
+    {"BFloat16TypeKHR", check_capability_BFloat16TypeKHR},
+    {"ClipDistance", check_capability_ClipDistance},
+    {"ClusterCullingShadingHUAWEI", check_capability_ClusterCullingShadingHUAWEI},
+    {"ComputeDerivativeGroupLinearKHR", check_capability_ComputeDerivativeGroupLinearKHR},
+    {"ComputeDerivativeGroupQuadsKHR", check_capability_ComputeDerivativeGroupQuadsKHR},
+    {"CooperativeMatrixBlockLoadsNV", check_capability_CooperativeMatrixBlockLoadsNV},
+    {"CooperativeMatrixConversionQCOM", check_capability_CooperativeMatrixConversionQCOM},
+    {"CooperativeMatrixConversionsNV", check_capability_CooperativeMatrixConversionsNV},
+    {"CooperativeMatrixKHR", check_capability_CooperativeMatrixKHR},
+    {"CooperativeMatrixNV", check_capability_CooperativeMatrixNV},
+    {"CooperativeMatrixPerElementOperationsNV", check_capability_CooperativeMatrixPerElementOperationsNV},
+    {"CooperativeMatrixReductionsNV", check_capability_CooperativeMatrixReductionsNV},
+    {"CooperativeMatrixTensorAddressingNV", check_capability_CooperativeMatrixTensorAddressingNV},
+    {"CooperativeVectorNV", check_capability_CooperativeVectorNV},
+    {"CooperativeVectorTrainingNV", check_capability_CooperativeVectorTrainingNV},
+    {"CoreBuiltinsARM", check_capability_CoreBuiltinsARM},
+    {"CullDistance", check_capability_CullDistance},
+    {"DemoteToHelperInvocation", check_capability_DemoteToHelperInvocation},
+    {"DenormFlushToZero", check_capability_DenormFlushToZero},
+    {"DenormPreserve", check_capability_DenormPreserve},
+    {"DerivativeControl", check_capability_DerivativeControl},
+    {"DescriptorHeapEXT", check_capability_DescriptorHeapEXT},
+    {"DeviceGroup", check_capability_DeviceGroup},
+    {"DotProduct", check_capability_DotProduct},
+    {"DotProductInput4x8Bit", check_capability_DotProductInput4x8Bit},
+    {"DotProductInput4x8BitPacked", check_capability_DotProductInput4x8BitPacked},
+    {"DotProductInputAll", check_capability_DotProductInputAll},
+    {"DrawParameters", check_capability_DrawParameters},
+    {"ExpectAssumeKHR", check_capability_ExpectAssumeKHR},
+    {"FMAKHR", check_capability_FMAKHR},
+    {"Float16", check_capability_Float16},
+    {"Float64", check_capability_Float64},
+    {"Float8CooperativeMatrixEXT", check_capability_Float8CooperativeMatrixEXT},
+    {"Float8EXT", check_capability_Float8EXT},
+    {"FloatControls2", check_capability_FloatControls2},
+    {"FragmentBarycentricKHR", check_capability_FragmentBarycentricKHR},
+    {"FragmentDensityEXT", check_capability_FragmentDensityEXT},
+    {"FragmentFullyCoveredEXT", check_capability_FragmentFullyCoveredEXT},
+    {"FragmentMaskAMD", check_capability_FragmentMaskAMD},
+    {"FragmentShaderPixelInterlockEXT", check_capability_FragmentShaderPixelInterlockEXT},
+    {"FragmentShaderSampleInterlockEXT", check_capability_FragmentShaderSampleInterlockEXT},
+    {"FragmentShaderShadingRateInterlockEXT", check_capability_FragmentShaderShadingRateInterlockEXT},
+    {"FragmentShadingRateKHR", check_capability_FragmentShadingRateKHR},
+    {"Geometry", check_capability_Geometry},
+    {"GeometryPointSize", check_capability_GeometryPointSize},
+    {"GeometryShaderPassthroughNV", check_capability_GeometryShaderPassthroughNV},
+    {"GeometryStreams", check_capability_GeometryStreams},
+    {"GraphARM", check_capability_GraphARM},
+    {"GroupNonUniform", check_capability_GroupNonUniform},
+    {"GroupNonUniformArithmetic", check_capability_GroupNonUniformArithmetic},
+    {"GroupNonUniformBallot", check_capability_GroupNonUniformBallot},
+    {"GroupNonUniformClustered", check_capability_GroupNonUniformClustered},
+    {"GroupNonUniformPartitionedEXT", check_capability_GroupNonUniformPartitionedEXT},
+    {"GroupNonUniformQuad", check_capability_GroupNonUniformQuad},
+    {"GroupNonUniformRotateKHR", check_capability_GroupNonUniformRotateKHR},
+    {"GroupNonUniformShuffle", check_capability_GroupNonUniformShuffle},
+    {"GroupNonUniformShuffleRelative", check_capability_GroupNonUniformShuffleRelative},
+    {"GroupNonUniformVote", check_capability_GroupNonUniformVote},
+    {"Image1D", check_capability_Image1D},
+    {"ImageBuffer", check_capability_ImageBuffer},
+    {"ImageCubeArray", check_capability_ImageCubeArray},
+    {"ImageFootprintNV", check_capability_ImageFootprintNV},
+    {"ImageGatherBiasLodAMD", check_capability_ImageGatherBiasLodAMD},
+    {"ImageGatherExtended", check_capability_ImageGatherExtended},
+    {"ImageMSArray", check_capability_ImageMSArray},
+    {"ImageQuery", check_capability_ImageQuery},
+    {"ImageReadWriteLodAMD", check_capability_ImageReadWriteLodAMD},
+    {"InputAttachment", check_capability_InputAttachment},
+    {"InputAttachmentArrayDynamicIndexing", check_capability_InputAttachmentArrayDynamicIndexing},
+    {"InputAttachmentArrayNonUniformIndexing", check_capability_InputAttachmentArrayNonUniformIndexing},
+    {"Int16", check_capability_Int16},
+    {"Int64", check_capability_Int64},
+    {"Int64Atomics", check_capability_Int64Atomics},
+    {"Int64ImageEXT", check_capability_Int64ImageEXT},
+    {"Int8", check_capability_Int8},
+    {"IntegerFunctions2INTEL", check_capability_IntegerFunctions2INTEL},
+    {"InterpolationFunction", check_capability_InterpolationFunction},
+    {"LongVectorEXT", check_capability_LongVectorEXT},
+    {"Matrix", check_capability_Matrix},
+    {"MeshShadingEXT", check_capability_MeshShadingEXT},
+    {"MeshShadingNV", check_capability_MeshShadingNV},
+    {"MinLod", check_capability_MinLod},
+    {"MultiView", check_capability_MultiView},
+    {"MultiViewport", check_capability_MultiViewport},
+    {"PerViewAttributesNV", check_capability_PerViewAttributesNV},
+    {"PhysicalStorageBufferAddresses", check_capability_PhysicalStorageBufferAddresses},
+    {"PushConstantBanksNV", check_capability_PushConstantBanksNV},
+    {"QuadControlKHR", check_capability_QuadControlKHR},
+    {"RawAccessChainsNV", check_capability_RawAccessChainsNV},
+    {"RayCullMaskKHR", check_capability_RayCullMaskKHR},
+    {"RayQueryKHR", check_capability_RayQueryKHR},
+    {"RayQueryPositionFetchKHR", check_capability_RayQueryPositionFetchKHR},
+    {"RayTracingClusterAccelerationStructureNV", check_capability_RayTracingClusterAccelerationStructureNV},
+    {"RayTracingKHR", check_capability_RayTracingKHR},
+    {"RayTracingLinearSweptSpheresGeometryNV", check_capability_RayTracingLinearSweptSpheresGeometryNV},
+    {"RayTracingMotionBlurNV", check_capability_RayTracingMotionBlurNV},
+    {"RayTracingNV", check_capability_RayTracingNV},
+    {"RayTracingOpacityMicromapEXT", check_capability_RayTracingOpacityMicromapEXT},
+    {"RayTracingPositionFetchKHR", check_capability_RayTracingPositionFetchKHR},
+    {"RayTracingSpheresGeometryNV", check_capability_RayTracingSpheresGeometryNV},
+    {"RayTraversalPrimitiveCullingKHR", check_capability_RayTraversalPrimitiveCullingKHR},
+    {"ReplicatedCompositesEXT", check_capability_ReplicatedCompositesEXT},
+    {"RoundingModeRTE", check_capability_RoundingModeRTE},
+    {"RoundingModeRTZ", check_capability_RoundingModeRTZ},
+    {"RuntimeDescriptorArray", check_capability_RuntimeDescriptorArray},
+    {"SampleMaskOverrideCoverageNV", check_capability_SampleMaskOverrideCoverageNV},
+    {"SampleMaskPostDepthCoverage", check_capability_SampleMaskPostDepthCoverage},
+    {"SampleRateShading", check_capability_SampleRateShading},
+    {"Sampled1D", check_capability_Sampled1D},
+    {"SampledBuffer", check_capability_SampledBuffer},
+    {"SampledCubeArray", check_capability_SampledCubeArray},
+    {"SampledImageArrayDynamicIndexing", check_capability_SampledImageArrayDynamicIndexing},
+    {"SampledImageArrayNonUniformIndexing", check_capability_SampledImageArrayNonUniformIndexing},
+    {"Shader", check_capability_Shader},
+    {"Shader64BitIndexingEXT", check_capability_Shader64BitIndexingEXT},
+    {"ShaderClockKHR", check_capability_ShaderClockKHR},
+    {"ShaderEnqueueAMDX", check_capability_ShaderEnqueueAMDX},
+    {"ShaderInvocationReorderEXT", check_capability_ShaderInvocationReorderEXT},
+    {"ShaderInvocationReorderNV", check_capability_ShaderInvocationReorderNV},
+    {"ShaderLayer", check_capability_ShaderLayer},
+    {"ShaderNonUniform", check_capability_ShaderNonUniform},
+    {"ShaderSMBuiltinsNV", check_capability_ShaderSMBuiltinsNV},
+    {"ShaderViewportIndex", check_capability_ShaderViewportIndex},
+    {"ShaderViewportIndexLayerEXT", check_capability_ShaderViewportIndexLayerEXT},
+    {"ShaderViewportMaskNV", check_capability_ShaderViewportMaskNV},
+    {"SignedZeroInfNanPreserve", check_capability_SignedZeroInfNanPreserve},
+    {"SparseResidency", check_capability_SparseResidency},
+    {"StencilExportEXT", check_capability_StencilExportEXT},
+    {"StorageBuffer16BitAccess", check_capability_StorageBuffer16BitAccess},
+    {"StorageBuffer8BitAccess", check_capability_StorageBuffer8BitAccess},
+    {"StorageBufferArrayDynamicIndexing", check_capability_StorageBufferArrayDynamicIndexing},
+    {"StorageBufferArrayNonUniformIndexing", check_capability_StorageBufferArrayNonUniformIndexing},
+    {"StorageImageArrayDynamicIndexing", check_capability_StorageImageArrayDynamicIndexing},
+    {"StorageImageArrayNonUniformIndexing", check_capability_StorageImageArrayNonUniformIndexing},
+    {"StorageImageExtendedFormats", check_capability_StorageImageExtendedFormats},
+    {"StorageImageMultisample", check_capability_StorageImageMultisample},
+    {"StorageImageReadWithoutFormat", check_capability_StorageImageReadWithoutFormat},
+    {"StorageImageWriteWithoutFormat", check_capability_StorageImageWriteWithoutFormat},
+    {"StorageInputOutput16", check_capability_StorageInputOutput16},
+    {"StoragePushConstant16", check_capability_StoragePushConstant16},
+    {"StoragePushConstant8", check_capability_StoragePushConstant8},
+    {"StorageTensorArrayDynamicIndexingARM", check_capability_StorageTensorArrayDynamicIndexingARM},
+    {"StorageTensorArrayNonUniformIndexingARM", check_capability_StorageTensorArrayNonUniformIndexingARM},
+    {"StorageTexelBufferArrayDynamicIndexing", check_capability_StorageTexelBufferArrayDynamicIndexing},
+    {"StorageTexelBufferArrayNonUniformIndexing", check_capability_StorageTexelBufferArrayNonUniformIndexing},
+    {"SubgroupBallotKHR", check_capability_SubgroupBallotKHR},
+    {"SubgroupVoteKHR", check_capability_SubgroupVoteKHR},
+    {"TensorAddressingNV", check_capability_TensorAddressingNV},
+    {"TensorsARM", check_capability_TensorsARM},
+    {"Tessellation", check_capability_Tessellation},
+    {"TessellationPointSize", check_capability_TessellationPointSize},
+    {"TextureBlockMatch2QCOM", check_capability_TextureBlockMatch2QCOM},
+    {"TextureBlockMatchQCOM", check_capability_TextureBlockMatchQCOM},
+    {"TextureBoxFilterQCOM", check_capability_TextureBoxFilterQCOM},
+    {"TextureSampleWeightedQCOM", check_capability_TextureSampleWeightedQCOM},
+    {"TileImageColorReadAccessEXT", check_capability_TileImageColorReadAccessEXT},
+    {"TileImageDepthReadAccessEXT", check_capability_TileImageDepthReadAccessEXT},
+    {"TileImageStencilReadAccessEXT", check_capability_TileImageStencilReadAccessEXT},
+    {"TileShadingQCOM", check_capability_TileShadingQCOM},
+    {"TransformFeedback", check_capability_TransformFeedback},
+    {"UniformAndStorageBuffer16BitAccess", check_capability_UniformAndStorageBuffer16BitAccess},
+    {"UniformAndStorageBuffer8BitAccess", check_capability_UniformAndStorageBuffer8BitAccess},
+    {"UniformBufferArrayDynamicIndexing", check_capability_UniformBufferArrayDynamicIndexing},
+    {"UniformBufferArrayNonUniformIndexing", check_capability_UniformBufferArrayNonUniformIndexing},
+    {"UniformTexelBufferArrayDynamicIndexing", check_capability_UniformTexelBufferArrayDynamicIndexing},
+    {"UniformTexelBufferArrayNonUniformIndexing", check_capability_UniformTexelBufferArrayNonUniformIndexing},
+    {"UntypedPointersKHR", check_capability_UntypedPointersKHR},
+    {"VariablePointers", check_capability_VariablePointers},
+    {"VariablePointersStorageBuffer", check_capability_VariablePointersStorageBuffer},
+    {"VulkanMemoryModel", check_capability_VulkanMemoryModel},
+    {"VulkanMemoryModelDeviceScope", check_capability_VulkanMemoryModelDeviceScope},
+    {"WorkgroupMemoryExplicitLayout16BitAccessKHR", check_capability_WorkgroupMemoryExplicitLayout16BitAccessKHR},
+    {"WorkgroupMemoryExplicitLayout8BitAccessKHR", check_capability_WorkgroupMemoryExplicitLayout8BitAccessKHR},
+    {"WorkgroupMemoryExplicitLayoutKHR", check_capability_WorkgroupMemoryExplicitLayoutKHR},
 };
 
 } // namespace
@@ -1945,14 +3941,15 @@ const std::unordered_map<std::string_view, CapSupportCheckFn> cap_supported_map 
 bool is_spirv_capability_supported(
     const char* capability,
     uint32_t vk_api_version,
+    const std::unordered_set<std::string>& enabled_extensions,
     const VulkanFeatures& features,
     const VulkanProperties& properties) {
 
-    const auto it = cap_supported_map.find(capability);
-    if (it == cap_supported_map.end()) {
+    const auto it = capability_check_map.find(capability);
+    if (it == capability_check_map.end()) {
         return false;
     }
-    return it->second(vk_api_version, features, properties);
+    return it->second(vk_api_version, enabled_extensions, features, properties);
 }
 
 namespace {
