@@ -63,7 +63,12 @@ class MerianNodesExtension : public ContextExtension {
         auto& registry = NodeRegistry::get_instance();
         for (const auto& type_name : registry.node_type_names()) {
             auto node = registry.create_node_from_type(type_name);
-            auto support_info = node->query_device_support(query_info);
+            DeviceSupportInfo support_info;
+            try {
+                support_info = node->query_device_support(query_info);
+            } catch (const ShaderCompiler::compilation_failed& e) {
+                support_info = DeviceSupportInfo{false, e.what()};
+            }
             SPDLOG_DEBUG("node {} device support: {}", type_name, support_info);
 
             insert_all(aggregated.required_extensions, support_info.required_extensions);

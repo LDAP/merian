@@ -82,6 +82,8 @@ class Node : public std::enable_shared_from_this<Node> {
      * The node must guarantee that all required resources are available when it returns true.
      * If it returns false, the node may still populate the requirements with the resources
      * that would have been needed, for the purpose of generating error messages.
+     *
+     * This method may throw compilation_failed.
      */
     virtual DeviceSupportInfo query_device_support(const DeviceSupportQueryInfo& /*query_info*/) {
         return DeviceSupportInfo{true};
@@ -92,8 +94,7 @@ class Node : public std::enable_shared_from_this<Node> {
     // query_device_support returned true and all requirements are enabled.
     //
     // Use the allocator to allocate static data, that does not depend on graph configuration.
-    virtual void initialize(const ContextHandle& context,
-                            const ResourceAllocatorHandle& allocator);
+    virtual void initialize(const ContextHandle& context, const ResourceAllocatorHandle& allocator);
 
     // This might be called at any time of the graph lifecycle. Must be consistent with dump_config.
     virtual NodeStatusFlags load_config(const nlohmann::json& json);
