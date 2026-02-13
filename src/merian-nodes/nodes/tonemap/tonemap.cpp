@@ -24,6 +24,10 @@ void Tonemap::initialize(const ContextHandle& context, const ResourceAllocatorHa
 }
 
 void Tonemap::make_spec_info() {
+    if (context == nullptr) {
+        return;
+    }
+
     auto spec_builder = SpecializationInfoBuilder();
     spec_builder.add_entry(local_size_x, local_size_y, tonemap, alpha_mode, clamp_output);
     spec_info = spec_builder.build();
