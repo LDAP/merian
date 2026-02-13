@@ -47,6 +47,7 @@ Graph::Graph(const GraphCreateInfo& create_info)
     debug_utils = context->get_context_extension<ExtensionVkDebugUtils>(true);
     time_connect_reference = time_reference = std::chrono::high_resolution_clock::now();
     duration_elapsed = 0ns;
+    context_extension = context->get_context_extension<MerianNodesExtension>();
 }
 
 Graph::~Graph() {

@@ -227,8 +227,6 @@ class DeviceASBuilder : public Node {
 
     void initialize(const ContextHandle& context,
                     const ResourceAllocatorHandle& allocator) override {
-        Node::initialize(context, allocator);
-
         this->context = context;
         this->allocator = allocator;
         as_builder.emplace(context, allocator);

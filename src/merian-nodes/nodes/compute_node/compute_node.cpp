@@ -9,8 +9,7 @@ AbstractCompute::AbstractCompute(const std::optional<uint32_t> push_constant_siz
     : push_constant_size(push_constant_size) {}
 
 void AbstractCompute::initialize(const ContextHandle& context,
-                                 const ResourceAllocatorHandle& allocator) {
-    Node::initialize(context, allocator);
+                                 const ResourceAllocatorHandle& /*allocator*/) {
     this->context = context;
 }
 

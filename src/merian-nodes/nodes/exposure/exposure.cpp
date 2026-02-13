@@ -26,8 +26,7 @@ DeviceSupportInfo AutoExposure::query_device_support(const DeviceSupportQueryInf
 }
 
 void AutoExposure::initialize(const ContextHandle& context,
-                              const ResourceAllocatorHandle& allocator) {
-    Node::initialize(context, allocator);
+                              const ResourceAllocatorHandle& /*allocator*/) {
     this->context = context;
 
     histogram_module =

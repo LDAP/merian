@@ -26,7 +26,6 @@ DeviceSupportInfo Accumulate::query_device_support(const DeviceSupportQueryInfo&
 
 void Accumulate::initialize(const ContextHandle& context,
                             const ResourceAllocatorHandle& allocator) {
-    Node::initialize(context, allocator);
     this->context = context;
     this->allocator = allocator;
 

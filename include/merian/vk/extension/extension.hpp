@@ -119,6 +119,12 @@ struct DeviceSupportQueryInfo {
     const QueueInfo& queue_info;
     const ExtensionContainer& extension_container;
     const ShaderCompileContextHandle compile_context;
+
+    static DeviceSupportQueryInfo from_context(const ContextHandle& context) {
+        return DeviceSupportQueryInfo{context->get_file_loader(), context->get_physical_device(),
+                                      context->get_queue_info(), *context,
+                                      context->get_shader_compile_context()};
+    }
 };
 
 inline std::string format_as(const InstanceSupportInfo& info) {

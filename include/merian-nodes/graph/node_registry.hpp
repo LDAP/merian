@@ -12,6 +12,8 @@ template <typename NodeClass> NodeHandle create_node() {
 
 class NodeRegistry {
 
+    using NodeType = std::type_index;
+
   public:
     using NodeFactory = std::function<NodeHandle()>;
 
@@ -22,7 +24,7 @@ class NodeRegistry {
     };
 
     struct NodeInfo {
-        const std::type_index type;
+        const NodeType type;
         const std::string name;
         const std::string description;
         const std::optional<nlohmann::json> config = std::nullopt;
@@ -50,7 +52,7 @@ class NodeRegistry {
     // If add_default_config is true a node with empty config is added.
     template <typename NODE_TYPE>
     void register_node_type(const NodeTypeInfo& node_info, const bool add_default_config = true) {
-        const std::type_index type = typeid(std::remove_pointer_t<NODE_TYPE>);
+        const NodeType type = typeid(std::remove_pointer_t<NODE_TYPE>);
         if (type_name_to_type.contains(node_info.node_type_name)) {
             throw std::invalid_argument{
                 fmt::format("node with name {} already exists.", node_info.node_type_name)};
@@ -83,7 +85,7 @@ class NodeRegistry {
     void register_node_type(NodeTypeInfo&& node_info, const bool add_default_config = true)
         requires(std::is_base_of_v<Node, NODE_TYPE>)
     {
-        const std::type_index type = typeid(std::remove_pointer_t<NODE_TYPE>);
+        const NodeType type = typeid(std::remove_pointer_t<NODE_TYPE>);
         if (type_name_to_type.contains(node_info.node_type_name)) {
             throw std::invalid_argument{
                 fmt::format("node with type name {} already exists.", node_info.node_type_name)};
@@ -140,6 +142,10 @@ class NodeRegistry {
         return std::views::keys(type_name_to_type);
     }
 
+    auto node_types() const {
+        return std::views::keys(type_to_type_info);
+    }
+
     NodeHandle create_node_from_name(const std::string& name) {
         assert_node_name_exists(name);
         NodeInfo& node_info = node_name_to_node_info.at(name);
@@ -152,10 +158,9 @@ class NodeRegistry {
         return node;
     }
 
-    NodeHandle create_node_from_type(const std::string& type_name,
+    NodeHandle create_node_from_type(const NodeType& type,
                                      const std::optional<nlohmann::json>& config = std::nullopt) {
-        assert_node_type_exists(type_name);
-        const std::type_index& type = type_name_to_type.at(type_name);
+        assert_node_type_exists(type);
         NodeHandle node = type_to_type_info.at(type).factory();
 
         if (config) {
@@ -165,9 +170,25 @@ class NodeRegistry {
         return node;
     }
 
-    // shortcut for node_info(node).name;
+    NodeHandle create_node_from_type(const std::string& type_name,
+                                     const std::optional<nlohmann::json>& config = std::nullopt) {
+        assert_node_type_exists(type_name);
+        const NodeType& type = type_name_to_type.at(type_name);
+        return create_node_from_type(type, config);
+    }
+
+    NodeType node_type(const NodeHandle& node) const {
+        assert_node_type_exists(node);
+        return typeindex_from_pointer(node);
+    }
+
+    // shortcut for node_info(node).node_type_name;
     const std::string& node_type_name(const NodeHandle& node) const {
         return node_type_info(node).node_type_name;
+    }
+
+    const std::string& node_type_name(const NodeType& type) const {
+        return node_type_info(type).node_type_name;
     }
 
     const NodeTypeInfo& node_type_info(const NodeHandle& node) const {
@@ -185,13 +206,17 @@ class NodeRegistry {
         return node_name_to_node_info.at(node_name);
     }
 
-    template <typename NODE_TYPE> const NodeTypeInfo& node_type_info() const {
-        const std::type_index type = typeid(std::remove_pointer_t<NODE_TYPE>);
+    const NodeTypeInfo& node_type_info(const NodeType& type) const {
         if (!type_to_type_info.contains(type)) {
             throw std::invalid_argument{
                 fmt::format("node with type {} was not registered.", type.name())};
         }
         return type_to_type_info.at(type);
+    }
+
+    template <typename NODE_TYPE> const NodeTypeInfo& node_type_info() const {
+        const NodeType type = typeid(std::remove_pointer_t<NODE_TYPE>);
+        return node_type_info(type);
     }
 
     // shortcut for node_info<TYPE>().node_type_name;
@@ -220,13 +245,19 @@ class NodeRegistry {
                                                     typeindex_from_pointer(node).name())};
         }
     }
+    void assert_node_type_exists(const NodeType& type) const {
+        if (!type_to_type_info.contains(type)) {
+            throw std::invalid_argument{
+                fmt::format("node with type {} was not registered.", type.name())};
+        }
+    }
 
   private:
     std::vector<std::string> nodes;
     std::map<std::string, NodeInfo> node_name_to_node_info;
 
-    std::map<std::string, std::type_index> type_name_to_type;
-    std::map<std::type_index, NodeTypeInfo> type_to_type_info;
+    std::map<std::string, NodeType> type_name_to_type;
+    std::map<NodeType, NodeTypeInfo> type_to_type_info;
 };
 
 } // namespace merian

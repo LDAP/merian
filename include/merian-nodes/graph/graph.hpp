@@ -42,6 +42,8 @@ struct GraphCreateInfo {
     const ResourceAllocatorHandle resource_allocator;
 };
 
+class MerianNodesExtension;
+
 /**
  * @brief      A Vulkan processing graph.
  *
@@ -53,7 +55,7 @@ struct GraphCreateInfo {
  * - graph_events.cpp: Event system
  */
 class Graph : public std::enable_shared_from_this<Graph> {
-    friend class MerianNodesExtension;
+    friend MerianNodesExtension;
 
     // Data that is stored for every iteration in flight.
     // Created for each iteration in flight in Graph::Graph.
@@ -398,6 +400,8 @@ class Graph : public std::enable_shared_from_this<Graph> {
     int add_connection_selected_dst_input = 0;
 
     GraphRun graph_run;
+
+    std::shared_ptr<MerianNodesExtension> context_extension;
 };
 
 using GraphHandle = std::shared_ptr<Graph>;

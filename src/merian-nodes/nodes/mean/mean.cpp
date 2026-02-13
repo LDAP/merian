@@ -25,8 +25,7 @@ DeviceSupportInfo MeanToBuffer::query_device_support(const DeviceSupportQueryInf
 }
 
 void MeanToBuffer::initialize(const ContextHandle& context,
-                              const ResourceAllocatorHandle& allocator) {
-    Node::initialize(context, allocator);
+                              const ResourceAllocatorHandle& /*allocator*/) {
     this->context = context;
 
     image_to_buffer_shader = EntryPoint::create(context, merian_image_to_buffer_comp_spv(),

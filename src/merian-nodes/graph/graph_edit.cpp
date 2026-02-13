@@ -1,4 +1,5 @@
 #include "merian-nodes/graph/graph.hpp"
+#include "merian-nodes/merian_nodes_extension.hpp"
 
 #include <spdlog/spdlog.h>
 
@@ -15,7 +16,8 @@ const std::string& Graph::add_node(const std::string& node_name,
             node_identifier = fmt::format("{} {}", node_name, i++);
         } while (node_for_identifier.contains(node_identifier));
 
-        return add_node(NodeRegistry::get_instance().create_node_from_name(node_name), node_identifier);
+        return add_node(NodeRegistry::get_instance().create_node_from_name(node_name),
+                        node_identifier);
     }
 
     return add_node(NodeRegistry::get_instance().create_node_from_name(node_name), identifier);
@@ -80,7 +82,8 @@ bool Graph::remove_node(const std::string& identifier) {
             in_flight_data.in_flight_data.erase(node);
         }
 
-        SPDLOG_DEBUG("removed node {} ({})", node_identifier, NodeRegistry::get_instance().node_type_name(node));
+        SPDLOG_DEBUG("removed node {} ({})", node_identifier,
+                     NodeRegistry::get_instance().node_type_name(node));
         needs_reconnect = true;
     };
 
@@ -120,7 +123,8 @@ const std::string& Graph::add_node(const std::shared_ptr<Node>& node,
     } else {
         uint32_t i = 0;
         do {
-            node_identifier = fmt::format("{} {}", NodeRegistry::get_instance().node_type_name(node), i++);
+            node_identifier =
+                fmt::format("{} {}", NodeRegistry::get_instance().node_type_name(node), i++);
         } while (node_for_identifier.contains(node_identifier));
     }
 
@@ -128,17 +132,30 @@ const std::string& Graph::add_node(const std::shared_ptr<Node>& node,
     auto [it, inserted] = node_data.try_emplace(node, node_identifier);
     assert(inserted);
 
+    const InstanceSupportInfo& instance_support = context_extension->get_instance_support(node);
+    if (instance_support.supported) {
+        const DeviceSupportInfo& device_support = context_extension->get_device_support(node);
+        it->second.unsupported = !device_support.supported;
+        it->second.unsupported_reason = device_support.unsupported_reason;
+    } else {
+        it->second.unsupported = !instance_support.supported;
+        it->second.unsupported_reason = instance_support.unsupported_reason;
+    }
+
     try {
-        node->initialize(context, resource_allocator);
+        if (!it->second.unsupported) {
+            node->initialize(context, resource_allocator);
+        }
     } catch (const graph_errors::node_error& e) {
         it->second.unsupported = true;
         it->second.unsupported_reason = e.what();
-        SPDLOG_WARN("node {} ({}) is unsupported: {}", node_identifier,
+        SPDLOG_WARN("node {} ({}) initialize failed: {}", node_identifier,
                     NodeRegistry::get_instance().node_type_name(node), e.what());
     }
 
     needs_reconnect = true;
-    SPDLOG_DEBUG("added node {} ({})", node_identifier, NodeRegistry::get_instance().node_type_name(node));
+    SPDLOG_DEBUG("added node {} ({})", node_identifier,
+                 NodeRegistry::get_instance().node_type_name(node));
 
     return it->second.identifier;
 }
@@ -158,8 +175,9 @@ void Graph::add_connection(const NodeHandle& src,
         const auto& [old_src, old_src_output] = dst_data.desired_incoming_connections.at(dst_input);
         [[maybe_unused]] const NodeData& old_src_data = node_data.at(old_src);
         SPDLOG_DEBUG("remove conflicting connection {}, {} ({}) -> {}, {} ({})", old_src_output,
-                     old_src_data.identifier, NodeRegistry::get_instance().node_type_name(old_src), dst_input,
-                     dst_data.identifier, NodeRegistry::get_instance().node_type_name(dst));
+                     old_src_data.identifier, NodeRegistry::get_instance().node_type_name(old_src),
+                     dst_input, dst_data.identifier,
+                     NodeRegistry::get_instance().node_type_name(dst));
         remove_connection(old_src, dst, dst_input);
     }
 
@@ -198,8 +216,9 @@ bool Graph::remove_connection(const NodeHandle src,
     const auto it = dst_data.desired_incoming_connections.find(dst_input);
     if (it == dst_data.desired_incoming_connections.end()) {
         SPDLOG_WARN("connection {} ({}) -> {}, {} ({}) does not exist and cannot be removed.",
-                    src_data.identifier, NodeRegistry::get_instance().node_type_name(src), dst_input,
-                    dst_data.identifier, NodeRegistry::get_instance().node_type_name(dst));
+                    src_data.identifier, NodeRegistry::get_instance().node_type_name(src),
+                    dst_input, dst_data.identifier,
+                    NodeRegistry::get_instance().node_type_name(dst));
         return false;
     }
 

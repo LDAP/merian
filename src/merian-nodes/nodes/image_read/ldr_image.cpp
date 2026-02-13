@@ -10,8 +10,7 @@ namespace merian {
 LDRImageRead::LDRImageRead() {}
 
 void LDRImageRead::initialize(const ContextHandle& context,
-                              const ResourceAllocatorHandle& allocator) {
-    Node::initialize(context, allocator);
+                              const ResourceAllocatorHandle& /*allocator*/) {
     this->context = context;
 }
 
