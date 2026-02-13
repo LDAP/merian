@@ -5,8 +5,7 @@
 #include "merian/vk/utils/vulkan_extensions.hpp"
 #include "merian/vk/instance.hpp"
 
-#include <fmt/format.h>
-#include <stdexcept>
+#include <cassert>
 #include <vulkan/vulkan.h>
 
 namespace merian {
@@ -849,17 +848,9 @@ VulkanProperties::VulkanProperties(const vk::PhysicalDevice& physical_device,
 // Template get<T>() implementation
 template<typename T> requires VulkanPropertyStruct<T>
 const T& VulkanProperties::get() const {
-    const auto stype = T::structureType;
-    if (!is_available(stype)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct {} not available (extension not supported)", 
-            vk::to_string(stype)));
-    }
-    const void* ptr = get_struct_ptr(stype);
-    if (!ptr) {
-        throw std::runtime_error(fmt::format(
-            "Unknown property struct type: {}", vk::to_string(stype)));
-    }
+    assert(is_available(T::structureType));
+    const void* ptr = get_struct_ptr(T::structureType);
+    assert(ptr);
     return *reinterpret_cast<const T*>(ptr);
 }
 
@@ -985,1110 +976,777 @@ VulkanProperties::operator const vk::PhysicalDeviceProperties&() const {
     return get_properties();
 }
 const vk::PhysicalDeviceAccelerationStructurePropertiesKHR& VulkanProperties::get_acceleration_structure_properties_khr() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceAccelerationStructurePropertiesKHR)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceAccelerationStructurePropertiesKHR not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceAccelerationStructurePropertiesKHR));
     return m_acceleration_structure_properties_khr;
 }
 VulkanProperties::operator const vk::PhysicalDeviceAccelerationStructurePropertiesKHR&() const {
     return get_acceleration_structure_properties_khr();
 }
 const vk::PhysicalDeviceBlendOperationAdvancedPropertiesEXT& VulkanProperties::get_blend_operation_advanced_properties_ext() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceBlendOperationAdvancedPropertiesEXT)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceBlendOperationAdvancedPropertiesEXT not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceBlendOperationAdvancedPropertiesEXT));
     return m_blend_operation_advanced_properties_ext;
 }
 VulkanProperties::operator const vk::PhysicalDeviceBlendOperationAdvancedPropertiesEXT&() const {
     return get_blend_operation_advanced_properties_ext();
 }
 const vk::PhysicalDeviceClusterAccelerationStructurePropertiesNV& VulkanProperties::get_cluster_acceleration_structure_properties_nv() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceClusterAccelerationStructurePropertiesNV)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceClusterAccelerationStructurePropertiesNV not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceClusterAccelerationStructurePropertiesNV));
     return m_cluster_acceleration_structure_properties_nv;
 }
 VulkanProperties::operator const vk::PhysicalDeviceClusterAccelerationStructurePropertiesNV&() const {
     return get_cluster_acceleration_structure_properties_nv();
 }
 const vk::PhysicalDeviceClusterCullingShaderPropertiesHUAWEI& VulkanProperties::get_cluster_culling_shader_properties_huawei() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceClusterCullingShaderPropertiesHUAWEI)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceClusterCullingShaderPropertiesHUAWEI not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceClusterCullingShaderPropertiesHUAWEI));
     return m_cluster_culling_shader_properties_huawei;
 }
 VulkanProperties::operator const vk::PhysicalDeviceClusterCullingShaderPropertiesHUAWEI&() const {
     return get_cluster_culling_shader_properties_huawei();
 }
 const vk::PhysicalDeviceComputeShaderDerivativesPropertiesKHR& VulkanProperties::get_compute_shader_derivatives_properties_khr() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceComputeShaderDerivativesPropertiesKHR)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceComputeShaderDerivativesPropertiesKHR not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceComputeShaderDerivativesPropertiesKHR));
     return m_compute_shader_derivatives_properties_khr;
 }
 VulkanProperties::operator const vk::PhysicalDeviceComputeShaderDerivativesPropertiesKHR&() const {
     return get_compute_shader_derivatives_properties_khr();
 }
 const vk::PhysicalDeviceConservativeRasterizationPropertiesEXT& VulkanProperties::get_conservative_rasterization_properties_ext() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceConservativeRasterizationPropertiesEXT)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceConservativeRasterizationPropertiesEXT not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceConservativeRasterizationPropertiesEXT));
     return m_conservative_rasterization_properties_ext;
 }
 VulkanProperties::operator const vk::PhysicalDeviceConservativeRasterizationPropertiesEXT&() const {
     return get_conservative_rasterization_properties_ext();
 }
 const vk::PhysicalDeviceCooperativeMatrix2PropertiesNV& VulkanProperties::get_cooperative_matrix2_properties_nv() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceCooperativeMatrix2PropertiesNV)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceCooperativeMatrix2PropertiesNV not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceCooperativeMatrix2PropertiesNV));
     return m_cooperative_matrix2_properties_nv;
 }
 VulkanProperties::operator const vk::PhysicalDeviceCooperativeMatrix2PropertiesNV&() const {
     return get_cooperative_matrix2_properties_nv();
 }
 const vk::PhysicalDeviceCooperativeMatrixPropertiesKHR& VulkanProperties::get_cooperative_matrix_properties_khr() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceCooperativeMatrixPropertiesKHR)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceCooperativeMatrixPropertiesKHR not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceCooperativeMatrixPropertiesKHR));
     return m_cooperative_matrix_properties_khr;
 }
 VulkanProperties::operator const vk::PhysicalDeviceCooperativeMatrixPropertiesKHR&() const {
     return get_cooperative_matrix_properties_khr();
 }
 const vk::PhysicalDeviceCooperativeMatrixPropertiesNV& VulkanProperties::get_cooperative_matrix_properties_nv() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceCooperativeMatrixPropertiesNV)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceCooperativeMatrixPropertiesNV not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceCooperativeMatrixPropertiesNV));
     return m_cooperative_matrix_properties_nv;
 }
 VulkanProperties::operator const vk::PhysicalDeviceCooperativeMatrixPropertiesNV&() const {
     return get_cooperative_matrix_properties_nv();
 }
 const vk::PhysicalDeviceCooperativeVectorPropertiesNV& VulkanProperties::get_cooperative_vector_properties_nv() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceCooperativeVectorPropertiesNV)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceCooperativeVectorPropertiesNV not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceCooperativeVectorPropertiesNV));
     return m_cooperative_vector_properties_nv;
 }
 VulkanProperties::operator const vk::PhysicalDeviceCooperativeVectorPropertiesNV&() const {
     return get_cooperative_vector_properties_nv();
 }
 const vk::PhysicalDeviceCopyMemoryIndirectPropertiesKHR& VulkanProperties::get_copy_memory_indirect_properties_khr() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceCopyMemoryIndirectPropertiesKHR)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceCopyMemoryIndirectPropertiesKHR not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceCopyMemoryIndirectPropertiesKHR));
     return m_copy_memory_indirect_properties_khr;
 }
 VulkanProperties::operator const vk::PhysicalDeviceCopyMemoryIndirectPropertiesKHR&() const {
     return get_copy_memory_indirect_properties_khr();
 }
 const vk::PhysicalDeviceCustomBorderColorPropertiesEXT& VulkanProperties::get_custom_border_color_properties_ext() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceCustomBorderColorPropertiesEXT)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceCustomBorderColorPropertiesEXT not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceCustomBorderColorPropertiesEXT));
     return m_custom_border_color_properties_ext;
 }
 VulkanProperties::operator const vk::PhysicalDeviceCustomBorderColorPropertiesEXT&() const {
     return get_custom_border_color_properties_ext();
 }
 const vk::PhysicalDeviceDepthStencilResolveProperties& VulkanProperties::get_depth_stencil_resolve_properties() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceDepthStencilResolveProperties)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceDepthStencilResolveProperties not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceDepthStencilResolveProperties));
     return m_depth_stencil_resolve_properties;
 }
 VulkanProperties::operator const vk::PhysicalDeviceDepthStencilResolveProperties&() const {
     return get_depth_stencil_resolve_properties();
 }
 const vk::PhysicalDeviceDescriptorBufferDensityMapPropertiesEXT& VulkanProperties::get_descriptor_buffer_density_map_properties_ext() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceDescriptorBufferDensityMapPropertiesEXT)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceDescriptorBufferDensityMapPropertiesEXT not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceDescriptorBufferDensityMapPropertiesEXT));
     return m_descriptor_buffer_density_map_properties_ext;
 }
 VulkanProperties::operator const vk::PhysicalDeviceDescriptorBufferDensityMapPropertiesEXT&() const {
     return get_descriptor_buffer_density_map_properties_ext();
 }
 const vk::PhysicalDeviceDescriptorBufferPropertiesEXT& VulkanProperties::get_descriptor_buffer_properties_ext() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceDescriptorBufferPropertiesEXT)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceDescriptorBufferPropertiesEXT not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceDescriptorBufferPropertiesEXT));
     return m_descriptor_buffer_properties_ext;
 }
 VulkanProperties::operator const vk::PhysicalDeviceDescriptorBufferPropertiesEXT&() const {
     return get_descriptor_buffer_properties_ext();
 }
 const vk::PhysicalDeviceDescriptorBufferTensorPropertiesARM& VulkanProperties::get_descriptor_buffer_tensor_properties_arm() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceDescriptorBufferTensorPropertiesARM)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceDescriptorBufferTensorPropertiesARM not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceDescriptorBufferTensorPropertiesARM));
     return m_descriptor_buffer_tensor_properties_arm;
 }
 VulkanProperties::operator const vk::PhysicalDeviceDescriptorBufferTensorPropertiesARM&() const {
     return get_descriptor_buffer_tensor_properties_arm();
 }
 const vk::PhysicalDeviceDescriptorHeapPropertiesEXT& VulkanProperties::get_descriptor_heap_properties_ext() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceDescriptorHeapPropertiesEXT)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceDescriptorHeapPropertiesEXT not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceDescriptorHeapPropertiesEXT));
     return m_descriptor_heap_properties_ext;
 }
 VulkanProperties::operator const vk::PhysicalDeviceDescriptorHeapPropertiesEXT&() const {
     return get_descriptor_heap_properties_ext();
 }
 const vk::PhysicalDeviceDescriptorHeapTensorPropertiesARM& VulkanProperties::get_descriptor_heap_tensor_properties_arm() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceDescriptorHeapTensorPropertiesARM)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceDescriptorHeapTensorPropertiesARM not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceDescriptorHeapTensorPropertiesARM));
     return m_descriptor_heap_tensor_properties_arm;
 }
 VulkanProperties::operator const vk::PhysicalDeviceDescriptorHeapTensorPropertiesARM&() const {
     return get_descriptor_heap_tensor_properties_arm();
 }
 const vk::PhysicalDeviceDescriptorIndexingProperties& VulkanProperties::get_descriptor_indexing_properties() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceDescriptorIndexingProperties)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceDescriptorIndexingProperties not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceDescriptorIndexingProperties));
     return m_descriptor_indexing_properties;
 }
 VulkanProperties::operator const vk::PhysicalDeviceDescriptorIndexingProperties&() const {
     return get_descriptor_indexing_properties();
 }
 const vk::PhysicalDeviceDeviceGeneratedCommandsPropertiesEXT& VulkanProperties::get_device_generated_commands_properties_ext() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceDeviceGeneratedCommandsPropertiesEXT)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceDeviceGeneratedCommandsPropertiesEXT not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceDeviceGeneratedCommandsPropertiesEXT));
     return m_device_generated_commands_properties_ext;
 }
 VulkanProperties::operator const vk::PhysicalDeviceDeviceGeneratedCommandsPropertiesEXT&() const {
     return get_device_generated_commands_properties_ext();
 }
 const vk::PhysicalDeviceDeviceGeneratedCommandsPropertiesNV& VulkanProperties::get_device_generated_commands_properties_nv() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceDeviceGeneratedCommandsPropertiesNV)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceDeviceGeneratedCommandsPropertiesNV not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceDeviceGeneratedCommandsPropertiesNV));
     return m_device_generated_commands_properties_nv;
 }
 VulkanProperties::operator const vk::PhysicalDeviceDeviceGeneratedCommandsPropertiesNV&() const {
     return get_device_generated_commands_properties_nv();
 }
 const vk::PhysicalDeviceDiscardRectanglePropertiesEXT& VulkanProperties::get_discard_rectangle_properties_ext() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceDiscardRectanglePropertiesEXT)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceDiscardRectanglePropertiesEXT not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceDiscardRectanglePropertiesEXT));
     return m_discard_rectangle_properties_ext;
 }
 VulkanProperties::operator const vk::PhysicalDeviceDiscardRectanglePropertiesEXT&() const {
     return get_discard_rectangle_properties_ext();
 }
 const vk::PhysicalDeviceDriverProperties& VulkanProperties::get_driver_properties() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceDriverProperties)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceDriverProperties not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceDriverProperties));
     return m_driver_properties;
 }
 VulkanProperties::operator const vk::PhysicalDeviceDriverProperties&() const {
     return get_driver_properties();
 }
 const vk::PhysicalDeviceDrmPropertiesEXT& VulkanProperties::get_drm_properties_ext() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceDrmPropertiesEXT)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceDrmPropertiesEXT not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceDrmPropertiesEXT));
     return m_drm_properties_ext;
 }
 VulkanProperties::operator const vk::PhysicalDeviceDrmPropertiesEXT&() const {
     return get_drm_properties_ext();
 }
 const vk::PhysicalDeviceExtendedDynamicState3PropertiesEXT& VulkanProperties::get_extended_dynamic_state3_properties_ext() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceExtendedDynamicState3PropertiesEXT)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceExtendedDynamicState3PropertiesEXT not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceExtendedDynamicState3PropertiesEXT));
     return m_extended_dynamic_state3_properties_ext;
 }
 VulkanProperties::operator const vk::PhysicalDeviceExtendedDynamicState3PropertiesEXT&() const {
     return get_extended_dynamic_state3_properties_ext();
 }
 const vk::PhysicalDeviceExtendedSparseAddressSpacePropertiesNV& VulkanProperties::get_extended_sparse_address_space_properties_nv() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceExtendedSparseAddressSpacePropertiesNV)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceExtendedSparseAddressSpacePropertiesNV not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceExtendedSparseAddressSpacePropertiesNV));
     return m_extended_sparse_address_space_properties_nv;
 }
 VulkanProperties::operator const vk::PhysicalDeviceExtendedSparseAddressSpacePropertiesNV&() const {
     return get_extended_sparse_address_space_properties_nv();
 }
 const vk::PhysicalDeviceExternalComputeQueuePropertiesNV& VulkanProperties::get_external_compute_queue_properties_nv() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceExternalComputeQueuePropertiesNV)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceExternalComputeQueuePropertiesNV not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceExternalComputeQueuePropertiesNV));
     return m_external_compute_queue_properties_nv;
 }
 VulkanProperties::operator const vk::PhysicalDeviceExternalComputeQueuePropertiesNV&() const {
     return get_external_compute_queue_properties_nv();
 }
 const vk::PhysicalDeviceExternalMemoryHostPropertiesEXT& VulkanProperties::get_external_memory_host_properties_ext() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceExternalMemoryHostPropertiesEXT)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceExternalMemoryHostPropertiesEXT not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceExternalMemoryHostPropertiesEXT));
     return m_external_memory_host_properties_ext;
 }
 VulkanProperties::operator const vk::PhysicalDeviceExternalMemoryHostPropertiesEXT&() const {
     return get_external_memory_host_properties_ext();
 }
 const vk::PhysicalDeviceFloatControlsProperties& VulkanProperties::get_float_controls_properties() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceFloatControlsProperties)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceFloatControlsProperties not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceFloatControlsProperties));
     return m_float_controls_properties;
 }
 VulkanProperties::operator const vk::PhysicalDeviceFloatControlsProperties&() const {
     return get_float_controls_properties();
 }
 const vk::PhysicalDeviceFragmentDensityMap2PropertiesEXT& VulkanProperties::get_fragment_density_map2_properties_ext() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceFragmentDensityMap2PropertiesEXT)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceFragmentDensityMap2PropertiesEXT not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceFragmentDensityMap2PropertiesEXT));
     return m_fragment_density_map2_properties_ext;
 }
 VulkanProperties::operator const vk::PhysicalDeviceFragmentDensityMap2PropertiesEXT&() const {
     return get_fragment_density_map2_properties_ext();
 }
 const vk::PhysicalDeviceFragmentDensityMapLayeredPropertiesVALVE& VulkanProperties::get_fragment_density_map_layered_properties_valve() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceFragmentDensityMapLayeredPropertiesVALVE)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceFragmentDensityMapLayeredPropertiesVALVE not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceFragmentDensityMapLayeredPropertiesVALVE));
     return m_fragment_density_map_layered_properties_valve;
 }
 VulkanProperties::operator const vk::PhysicalDeviceFragmentDensityMapLayeredPropertiesVALVE&() const {
     return get_fragment_density_map_layered_properties_valve();
 }
 const vk::PhysicalDeviceFragmentDensityMapOffsetPropertiesEXT& VulkanProperties::get_fragment_density_map_offset_properties_ext() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceFragmentDensityMapOffsetPropertiesEXT)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceFragmentDensityMapOffsetPropertiesEXT not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceFragmentDensityMapOffsetPropertiesEXT));
     return m_fragment_density_map_offset_properties_ext;
 }
 VulkanProperties::operator const vk::PhysicalDeviceFragmentDensityMapOffsetPropertiesEXT&() const {
     return get_fragment_density_map_offset_properties_ext();
 }
 const vk::PhysicalDeviceFragmentDensityMapPropertiesEXT& VulkanProperties::get_fragment_density_map_properties_ext() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceFragmentDensityMapPropertiesEXT)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceFragmentDensityMapPropertiesEXT not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceFragmentDensityMapPropertiesEXT));
     return m_fragment_density_map_properties_ext;
 }
 VulkanProperties::operator const vk::PhysicalDeviceFragmentDensityMapPropertiesEXT&() const {
     return get_fragment_density_map_properties_ext();
 }
 const vk::PhysicalDeviceFragmentShaderBarycentricPropertiesKHR& VulkanProperties::get_fragment_shader_barycentric_properties_khr() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceFragmentShaderBarycentricPropertiesKHR)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceFragmentShaderBarycentricPropertiesKHR not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceFragmentShaderBarycentricPropertiesKHR));
     return m_fragment_shader_barycentric_properties_khr;
 }
 VulkanProperties::operator const vk::PhysicalDeviceFragmentShaderBarycentricPropertiesKHR&() const {
     return get_fragment_shader_barycentric_properties_khr();
 }
 const vk::PhysicalDeviceFragmentShadingRateEnumsPropertiesNV& VulkanProperties::get_fragment_shading_rate_enums_properties_nv() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceFragmentShadingRateEnumsPropertiesNV)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceFragmentShadingRateEnumsPropertiesNV not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceFragmentShadingRateEnumsPropertiesNV));
     return m_fragment_shading_rate_enums_properties_nv;
 }
 VulkanProperties::operator const vk::PhysicalDeviceFragmentShadingRateEnumsPropertiesNV&() const {
     return get_fragment_shading_rate_enums_properties_nv();
 }
 const vk::PhysicalDeviceFragmentShadingRatePropertiesKHR& VulkanProperties::get_fragment_shading_rate_properties_khr() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceFragmentShadingRatePropertiesKHR)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceFragmentShadingRatePropertiesKHR not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceFragmentShadingRatePropertiesKHR));
     return m_fragment_shading_rate_properties_khr;
 }
 VulkanProperties::operator const vk::PhysicalDeviceFragmentShadingRatePropertiesKHR&() const {
     return get_fragment_shading_rate_properties_khr();
 }
 const vk::PhysicalDeviceGraphicsPipelineLibraryPropertiesEXT& VulkanProperties::get_graphics_pipeline_library_properties_ext() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceGraphicsPipelineLibraryPropertiesEXT)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceGraphicsPipelineLibraryPropertiesEXT not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceGraphicsPipelineLibraryPropertiesEXT));
     return m_graphics_pipeline_library_properties_ext;
 }
 VulkanProperties::operator const vk::PhysicalDeviceGraphicsPipelineLibraryPropertiesEXT&() const {
     return get_graphics_pipeline_library_properties_ext();
 }
 const vk::PhysicalDeviceHostImageCopyProperties& VulkanProperties::get_host_image_copy_properties() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceHostImageCopyProperties)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceHostImageCopyProperties not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceHostImageCopyProperties));
     return m_host_image_copy_properties;
 }
 VulkanProperties::operator const vk::PhysicalDeviceHostImageCopyProperties&() const {
     return get_host_image_copy_properties();
 }
 const vk::PhysicalDeviceIDProperties& VulkanProperties::get_id_properties() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceIdProperties)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceIDProperties not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceIdProperties));
     return m_id_properties;
 }
 VulkanProperties::operator const vk::PhysicalDeviceIDProperties&() const {
     return get_id_properties();
 }
 const vk::PhysicalDeviceImageAlignmentControlPropertiesMESA& VulkanProperties::get_image_alignment_control_properties_mesa() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceImageAlignmentControlPropertiesMESA)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceImageAlignmentControlPropertiesMESA not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceImageAlignmentControlPropertiesMESA));
     return m_image_alignment_control_properties_mesa;
 }
 VulkanProperties::operator const vk::PhysicalDeviceImageAlignmentControlPropertiesMESA&() const {
     return get_image_alignment_control_properties_mesa();
 }
 const vk::PhysicalDeviceImageProcessing2PropertiesQCOM& VulkanProperties::get_image_processing2_properties_qcom() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceImageProcessing2PropertiesQCOM)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceImageProcessing2PropertiesQCOM not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceImageProcessing2PropertiesQCOM));
     return m_image_processing2_properties_qcom;
 }
 VulkanProperties::operator const vk::PhysicalDeviceImageProcessing2PropertiesQCOM&() const {
     return get_image_processing2_properties_qcom();
 }
 const vk::PhysicalDeviceImageProcessingPropertiesQCOM& VulkanProperties::get_image_processing_properties_qcom() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceImageProcessingPropertiesQCOM)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceImageProcessingPropertiesQCOM not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceImageProcessingPropertiesQCOM));
     return m_image_processing_properties_qcom;
 }
 VulkanProperties::operator const vk::PhysicalDeviceImageProcessingPropertiesQCOM&() const {
     return get_image_processing_properties_qcom();
 }
 const vk::PhysicalDeviceInlineUniformBlockProperties& VulkanProperties::get_inline_uniform_block_properties() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceInlineUniformBlockProperties)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceInlineUniformBlockProperties not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceInlineUniformBlockProperties));
     return m_inline_uniform_block_properties;
 }
 VulkanProperties::operator const vk::PhysicalDeviceInlineUniformBlockProperties&() const {
     return get_inline_uniform_block_properties();
 }
 const vk::PhysicalDeviceLayeredApiPropertiesListKHR& VulkanProperties::get_layered_api_properties_list_khr() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceLayeredApiPropertiesListKHR)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceLayeredApiPropertiesListKHR not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceLayeredApiPropertiesListKHR));
     return m_layered_api_properties_list_khr;
 }
 VulkanProperties::operator const vk::PhysicalDeviceLayeredApiPropertiesListKHR&() const {
     return get_layered_api_properties_list_khr();
 }
 const vk::PhysicalDeviceLayeredDriverPropertiesMSFT& VulkanProperties::get_layered_driver_properties_msft() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceLayeredDriverPropertiesMSFT)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceLayeredDriverPropertiesMSFT not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceLayeredDriverPropertiesMSFT));
     return m_layered_driver_properties_msft;
 }
 VulkanProperties::operator const vk::PhysicalDeviceLayeredDriverPropertiesMSFT&() const {
     return get_layered_driver_properties_msft();
 }
 const vk::PhysicalDeviceLegacyVertexAttributesPropertiesEXT& VulkanProperties::get_legacy_vertex_attributes_properties_ext() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceLegacyVertexAttributesPropertiesEXT)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceLegacyVertexAttributesPropertiesEXT not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceLegacyVertexAttributesPropertiesEXT));
     return m_legacy_vertex_attributes_properties_ext;
 }
 VulkanProperties::operator const vk::PhysicalDeviceLegacyVertexAttributesPropertiesEXT&() const {
     return get_legacy_vertex_attributes_properties_ext();
 }
 const vk::PhysicalDeviceLineRasterizationProperties& VulkanProperties::get_line_rasterization_properties() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceLineRasterizationProperties)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceLineRasterizationProperties not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceLineRasterizationProperties));
     return m_line_rasterization_properties;
 }
 VulkanProperties::operator const vk::PhysicalDeviceLineRasterizationProperties&() const {
     return get_line_rasterization_properties();
 }
 const vk::PhysicalDeviceMaintenance10PropertiesKHR& VulkanProperties::get_maintenance10_properties_khr() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceMaintenance10PropertiesKHR)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceMaintenance10PropertiesKHR not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceMaintenance10PropertiesKHR));
     return m_maintenance10_properties_khr;
 }
 VulkanProperties::operator const vk::PhysicalDeviceMaintenance10PropertiesKHR&() const {
     return get_maintenance10_properties_khr();
 }
 const vk::PhysicalDeviceMaintenance3Properties& VulkanProperties::get_maintenance3_properties() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceMaintenance3Properties)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceMaintenance3Properties not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceMaintenance3Properties));
     return m_maintenance3_properties;
 }
 VulkanProperties::operator const vk::PhysicalDeviceMaintenance3Properties&() const {
     return get_maintenance3_properties();
 }
 const vk::PhysicalDeviceMaintenance4Properties& VulkanProperties::get_maintenance4_properties() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceMaintenance4Properties)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceMaintenance4Properties not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceMaintenance4Properties));
     return m_maintenance4_properties;
 }
 VulkanProperties::operator const vk::PhysicalDeviceMaintenance4Properties&() const {
     return get_maintenance4_properties();
 }
 const vk::PhysicalDeviceMaintenance5Properties& VulkanProperties::get_maintenance5_properties() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceMaintenance5Properties)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceMaintenance5Properties not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceMaintenance5Properties));
     return m_maintenance5_properties;
 }
 VulkanProperties::operator const vk::PhysicalDeviceMaintenance5Properties&() const {
     return get_maintenance5_properties();
 }
 const vk::PhysicalDeviceMaintenance6Properties& VulkanProperties::get_maintenance6_properties() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceMaintenance6Properties)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceMaintenance6Properties not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceMaintenance6Properties));
     return m_maintenance6_properties;
 }
 VulkanProperties::operator const vk::PhysicalDeviceMaintenance6Properties&() const {
     return get_maintenance6_properties();
 }
 const vk::PhysicalDeviceMaintenance7PropertiesKHR& VulkanProperties::get_maintenance7_properties_khr() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceMaintenance7PropertiesKHR)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceMaintenance7PropertiesKHR not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceMaintenance7PropertiesKHR));
     return m_maintenance7_properties_khr;
 }
 VulkanProperties::operator const vk::PhysicalDeviceMaintenance7PropertiesKHR&() const {
     return get_maintenance7_properties_khr();
 }
 const vk::PhysicalDeviceMaintenance9PropertiesKHR& VulkanProperties::get_maintenance9_properties_khr() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceMaintenance9PropertiesKHR)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceMaintenance9PropertiesKHR not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceMaintenance9PropertiesKHR));
     return m_maintenance9_properties_khr;
 }
 VulkanProperties::operator const vk::PhysicalDeviceMaintenance9PropertiesKHR&() const {
     return get_maintenance9_properties_khr();
 }
 const vk::PhysicalDeviceMapMemoryPlacedPropertiesEXT& VulkanProperties::get_map_memory_placed_properties_ext() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceMapMemoryPlacedPropertiesEXT)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceMapMemoryPlacedPropertiesEXT not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceMapMemoryPlacedPropertiesEXT));
     return m_map_memory_placed_properties_ext;
 }
 VulkanProperties::operator const vk::PhysicalDeviceMapMemoryPlacedPropertiesEXT&() const {
     return get_map_memory_placed_properties_ext();
 }
 const vk::PhysicalDeviceMemoryDecompressionPropertiesEXT& VulkanProperties::get_memory_decompression_properties_ext() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceMemoryDecompressionPropertiesEXT)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceMemoryDecompressionPropertiesEXT not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceMemoryDecompressionPropertiesEXT));
     return m_memory_decompression_properties_ext;
 }
 VulkanProperties::operator const vk::PhysicalDeviceMemoryDecompressionPropertiesEXT&() const {
     return get_memory_decompression_properties_ext();
 }
 const vk::PhysicalDeviceMeshShaderPropertiesEXT& VulkanProperties::get_mesh_shader_properties_ext() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceMeshShaderPropertiesEXT)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceMeshShaderPropertiesEXT not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceMeshShaderPropertiesEXT));
     return m_mesh_shader_properties_ext;
 }
 VulkanProperties::operator const vk::PhysicalDeviceMeshShaderPropertiesEXT&() const {
     return get_mesh_shader_properties_ext();
 }
 const vk::PhysicalDeviceMeshShaderPropertiesNV& VulkanProperties::get_mesh_shader_properties_nv() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceMeshShaderPropertiesNV)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceMeshShaderPropertiesNV not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceMeshShaderPropertiesNV));
     return m_mesh_shader_properties_nv;
 }
 VulkanProperties::operator const vk::PhysicalDeviceMeshShaderPropertiesNV&() const {
     return get_mesh_shader_properties_nv();
 }
 const vk::PhysicalDeviceMultiDrawPropertiesEXT& VulkanProperties::get_multi_draw_properties_ext() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceMultiDrawPropertiesEXT)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceMultiDrawPropertiesEXT not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceMultiDrawPropertiesEXT));
     return m_multi_draw_properties_ext;
 }
 VulkanProperties::operator const vk::PhysicalDeviceMultiDrawPropertiesEXT&() const {
     return get_multi_draw_properties_ext();
 }
 const vk::PhysicalDeviceMultiviewPerViewAttributesPropertiesNVX& VulkanProperties::get_multiview_per_view_attributes_properties_nvx() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceMultiviewPerViewAttributesPropertiesNVX)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceMultiviewPerViewAttributesPropertiesNVX not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceMultiviewPerViewAttributesPropertiesNVX));
     return m_multiview_per_view_attributes_properties_nvx;
 }
 VulkanProperties::operator const vk::PhysicalDeviceMultiviewPerViewAttributesPropertiesNVX&() const {
     return get_multiview_per_view_attributes_properties_nvx();
 }
 const vk::PhysicalDeviceMultiviewProperties& VulkanProperties::get_multiview_properties() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceMultiviewProperties)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceMultiviewProperties not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceMultiviewProperties));
     return m_multiview_properties;
 }
 VulkanProperties::operator const vk::PhysicalDeviceMultiviewProperties&() const {
     return get_multiview_properties();
 }
 const vk::PhysicalDeviceNestedCommandBufferPropertiesEXT& VulkanProperties::get_nested_command_buffer_properties_ext() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceNestedCommandBufferPropertiesEXT)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceNestedCommandBufferPropertiesEXT not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceNestedCommandBufferPropertiesEXT));
     return m_nested_command_buffer_properties_ext;
 }
 VulkanProperties::operator const vk::PhysicalDeviceNestedCommandBufferPropertiesEXT&() const {
     return get_nested_command_buffer_properties_ext();
 }
 const vk::PhysicalDeviceOpacityMicromapPropertiesEXT& VulkanProperties::get_opacity_micromap_properties_ext() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceOpacityMicromapPropertiesEXT)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceOpacityMicromapPropertiesEXT not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceOpacityMicromapPropertiesEXT));
     return m_opacity_micromap_properties_ext;
 }
 VulkanProperties::operator const vk::PhysicalDeviceOpacityMicromapPropertiesEXT&() const {
     return get_opacity_micromap_properties_ext();
 }
 const vk::PhysicalDeviceOpticalFlowPropertiesNV& VulkanProperties::get_optical_flow_properties_nv() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceOpticalFlowPropertiesNV)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceOpticalFlowPropertiesNV not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceOpticalFlowPropertiesNV));
     return m_optical_flow_properties_nv;
 }
 VulkanProperties::operator const vk::PhysicalDeviceOpticalFlowPropertiesNV&() const {
     return get_optical_flow_properties_nv();
 }
 const vk::PhysicalDevicePCIBusInfoPropertiesEXT& VulkanProperties::get_pci_bus_info_properties_ext() const {
-    if (!is_available(vk::StructureType::ePhysicalDevicePciBusInfoPropertiesEXT)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDevicePCIBusInfoPropertiesEXT not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDevicePciBusInfoPropertiesEXT));
     return m_pci_bus_info_properties_ext;
 }
 VulkanProperties::operator const vk::PhysicalDevicePCIBusInfoPropertiesEXT&() const {
     return get_pci_bus_info_properties_ext();
 }
 const vk::PhysicalDevicePartitionedAccelerationStructurePropertiesNV& VulkanProperties::get_partitioned_acceleration_structure_properties_nv() const {
-    if (!is_available(vk::StructureType::ePhysicalDevicePartitionedAccelerationStructurePropertiesNV)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDevicePartitionedAccelerationStructurePropertiesNV not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDevicePartitionedAccelerationStructurePropertiesNV));
     return m_partitioned_acceleration_structure_properties_nv;
 }
 VulkanProperties::operator const vk::PhysicalDevicePartitionedAccelerationStructurePropertiesNV&() const {
     return get_partitioned_acceleration_structure_properties_nv();
 }
 const vk::PhysicalDevicePerformanceCountersByRegionPropertiesARM& VulkanProperties::get_performance_counters_by_region_properties_arm() const {
-    if (!is_available(vk::StructureType::ePhysicalDevicePerformanceCountersByRegionPropertiesARM)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDevicePerformanceCountersByRegionPropertiesARM not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDevicePerformanceCountersByRegionPropertiesARM));
     return m_performance_counters_by_region_properties_arm;
 }
 VulkanProperties::operator const vk::PhysicalDevicePerformanceCountersByRegionPropertiesARM&() const {
     return get_performance_counters_by_region_properties_arm();
 }
 const vk::PhysicalDevicePerformanceQueryPropertiesKHR& VulkanProperties::get_performance_query_properties_khr() const {
-    if (!is_available(vk::StructureType::ePhysicalDevicePerformanceQueryPropertiesKHR)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDevicePerformanceQueryPropertiesKHR not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDevicePerformanceQueryPropertiesKHR));
     return m_performance_query_properties_khr;
 }
 VulkanProperties::operator const vk::PhysicalDevicePerformanceQueryPropertiesKHR&() const {
     return get_performance_query_properties_khr();
 }
 const vk::PhysicalDevicePipelineBinaryPropertiesKHR& VulkanProperties::get_pipeline_binary_properties_khr() const {
-    if (!is_available(vk::StructureType::ePhysicalDevicePipelineBinaryPropertiesKHR)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDevicePipelineBinaryPropertiesKHR not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDevicePipelineBinaryPropertiesKHR));
     return m_pipeline_binary_properties_khr;
 }
 VulkanProperties::operator const vk::PhysicalDevicePipelineBinaryPropertiesKHR&() const {
     return get_pipeline_binary_properties_khr();
 }
 const vk::PhysicalDevicePipelineRobustnessProperties& VulkanProperties::get_pipeline_robustness_properties() const {
-    if (!is_available(vk::StructureType::ePhysicalDevicePipelineRobustnessProperties)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDevicePipelineRobustnessProperties not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDevicePipelineRobustnessProperties));
     return m_pipeline_robustness_properties;
 }
 VulkanProperties::operator const vk::PhysicalDevicePipelineRobustnessProperties&() const {
     return get_pipeline_robustness_properties();
 }
 const vk::PhysicalDevicePointClippingProperties& VulkanProperties::get_point_clipping_properties() const {
-    if (!is_available(vk::StructureType::ePhysicalDevicePointClippingProperties)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDevicePointClippingProperties not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDevicePointClippingProperties));
     return m_point_clipping_properties;
 }
 VulkanProperties::operator const vk::PhysicalDevicePointClippingProperties&() const {
     return get_point_clipping_properties();
 }
 const vk::PhysicalDeviceProperties2& VulkanProperties::get_properties2() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceProperties2)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceProperties2 not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceProperties2));
     return m_properties2;
 }
 VulkanProperties::operator const vk::PhysicalDeviceProperties2&() const {
     return get_properties2();
 }
 const vk::PhysicalDeviceProtectedMemoryProperties& VulkanProperties::get_protected_memory_properties() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceProtectedMemoryProperties)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceProtectedMemoryProperties not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceProtectedMemoryProperties));
     return m_protected_memory_properties;
 }
 VulkanProperties::operator const vk::PhysicalDeviceProtectedMemoryProperties&() const {
     return get_protected_memory_properties();
 }
 const vk::PhysicalDeviceProvokingVertexPropertiesEXT& VulkanProperties::get_provoking_vertex_properties_ext() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceProvokingVertexPropertiesEXT)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceProvokingVertexPropertiesEXT not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceProvokingVertexPropertiesEXT));
     return m_provoking_vertex_properties_ext;
 }
 VulkanProperties::operator const vk::PhysicalDeviceProvokingVertexPropertiesEXT&() const {
     return get_provoking_vertex_properties_ext();
 }
 const vk::PhysicalDevicePushConstantBankPropertiesNV& VulkanProperties::get_push_constant_bank_properties_nv() const {
-    if (!is_available(vk::StructureType::ePhysicalDevicePushConstantBankPropertiesNV)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDevicePushConstantBankPropertiesNV not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDevicePushConstantBankPropertiesNV));
     return m_push_constant_bank_properties_nv;
 }
 VulkanProperties::operator const vk::PhysicalDevicePushConstantBankPropertiesNV&() const {
     return get_push_constant_bank_properties_nv();
 }
 const vk::PhysicalDevicePushDescriptorProperties& VulkanProperties::get_push_descriptor_properties() const {
-    if (!is_available(vk::StructureType::ePhysicalDevicePushDescriptorProperties)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDevicePushDescriptorProperties not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDevicePushDescriptorProperties));
     return m_push_descriptor_properties;
 }
 VulkanProperties::operator const vk::PhysicalDevicePushDescriptorProperties&() const {
     return get_push_descriptor_properties();
 }
 const vk::PhysicalDeviceRayTracingInvocationReorderPropertiesEXT& VulkanProperties::get_ray_tracing_invocation_reorder_properties_ext() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceRayTracingInvocationReorderPropertiesEXT)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceRayTracingInvocationReorderPropertiesEXT not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceRayTracingInvocationReorderPropertiesEXT));
     return m_ray_tracing_invocation_reorder_properties_ext;
 }
 VulkanProperties::operator const vk::PhysicalDeviceRayTracingInvocationReorderPropertiesEXT&() const {
     return get_ray_tracing_invocation_reorder_properties_ext();
 }
 const vk::PhysicalDeviceRayTracingInvocationReorderPropertiesNV& VulkanProperties::get_ray_tracing_invocation_reorder_properties_nv() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceRayTracingInvocationReorderPropertiesNV)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceRayTracingInvocationReorderPropertiesNV not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceRayTracingInvocationReorderPropertiesNV));
     return m_ray_tracing_invocation_reorder_properties_nv;
 }
 VulkanProperties::operator const vk::PhysicalDeviceRayTracingInvocationReorderPropertiesNV&() const {
     return get_ray_tracing_invocation_reorder_properties_nv();
 }
 const vk::PhysicalDeviceRayTracingPipelinePropertiesKHR& VulkanProperties::get_ray_tracing_pipeline_properties_khr() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceRayTracingPipelinePropertiesKHR)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceRayTracingPipelinePropertiesKHR not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceRayTracingPipelinePropertiesKHR));
     return m_ray_tracing_pipeline_properties_khr;
 }
 VulkanProperties::operator const vk::PhysicalDeviceRayTracingPipelinePropertiesKHR&() const {
     return get_ray_tracing_pipeline_properties_khr();
 }
 const vk::PhysicalDeviceRayTracingPropertiesNV& VulkanProperties::get_ray_tracing_properties_nv() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceRayTracingPropertiesNV)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceRayTracingPropertiesNV not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceRayTracingPropertiesNV));
     return m_ray_tracing_properties_nv;
 }
 VulkanProperties::operator const vk::PhysicalDeviceRayTracingPropertiesNV&() const {
     return get_ray_tracing_properties_nv();
 }
 const vk::PhysicalDeviceRenderPassStripedPropertiesARM& VulkanProperties::get_render_pass_striped_properties_arm() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceRenderPassStripedPropertiesARM)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceRenderPassStripedPropertiesARM not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceRenderPassStripedPropertiesARM));
     return m_render_pass_striped_properties_arm;
 }
 VulkanProperties::operator const vk::PhysicalDeviceRenderPassStripedPropertiesARM&() const {
     return get_render_pass_striped_properties_arm();
 }
 const vk::PhysicalDeviceRobustness2PropertiesKHR& VulkanProperties::get_robustness2_properties_khr() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceRobustness2PropertiesKHR)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceRobustness2PropertiesKHR not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceRobustness2PropertiesKHR));
     return m_robustness2_properties_khr;
 }
 VulkanProperties::operator const vk::PhysicalDeviceRobustness2PropertiesKHR&() const {
     return get_robustness2_properties_khr();
 }
 const vk::PhysicalDeviceSampleLocationsPropertiesEXT& VulkanProperties::get_sample_locations_properties_ext() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceSampleLocationsPropertiesEXT)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceSampleLocationsPropertiesEXT not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceSampleLocationsPropertiesEXT));
     return m_sample_locations_properties_ext;
 }
 VulkanProperties::operator const vk::PhysicalDeviceSampleLocationsPropertiesEXT&() const {
     return get_sample_locations_properties_ext();
 }
 const vk::PhysicalDeviceSamplerFilterMinmaxProperties& VulkanProperties::get_sampler_filter_minmax_properties() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceSamplerFilterMinmaxProperties)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceSamplerFilterMinmaxProperties not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceSamplerFilterMinmaxProperties));
     return m_sampler_filter_minmax_properties;
 }
 VulkanProperties::operator const vk::PhysicalDeviceSamplerFilterMinmaxProperties&() const {
     return get_sampler_filter_minmax_properties();
 }
 const vk::PhysicalDeviceSchedulingControlsPropertiesARM& VulkanProperties::get_scheduling_controls_properties_arm() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceSchedulingControlsPropertiesARM)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceSchedulingControlsPropertiesARM not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceSchedulingControlsPropertiesARM));
     return m_scheduling_controls_properties_arm;
 }
 VulkanProperties::operator const vk::PhysicalDeviceSchedulingControlsPropertiesARM&() const {
     return get_scheduling_controls_properties_arm();
 }
 const vk::PhysicalDeviceShaderCoreBuiltinsPropertiesARM& VulkanProperties::get_shader_core_builtins_properties_arm() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceShaderCoreBuiltinsPropertiesARM)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceShaderCoreBuiltinsPropertiesARM not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceShaderCoreBuiltinsPropertiesARM));
     return m_shader_core_builtins_properties_arm;
 }
 VulkanProperties::operator const vk::PhysicalDeviceShaderCoreBuiltinsPropertiesARM&() const {
     return get_shader_core_builtins_properties_arm();
 }
 const vk::PhysicalDeviceShaderCoreProperties2AMD& VulkanProperties::get_shader_core_properties2_amd() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceShaderCoreProperties2AMD)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceShaderCoreProperties2AMD not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceShaderCoreProperties2AMD));
     return m_shader_core_properties2_amd;
 }
 VulkanProperties::operator const vk::PhysicalDeviceShaderCoreProperties2AMD&() const {
     return get_shader_core_properties2_amd();
 }
 const vk::PhysicalDeviceShaderCorePropertiesAMD& VulkanProperties::get_shader_core_properties_amd() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceShaderCorePropertiesAMD)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceShaderCorePropertiesAMD not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceShaderCorePropertiesAMD));
     return m_shader_core_properties_amd;
 }
 VulkanProperties::operator const vk::PhysicalDeviceShaderCorePropertiesAMD&() const {
     return get_shader_core_properties_amd();
 }
 const vk::PhysicalDeviceShaderCorePropertiesARM& VulkanProperties::get_shader_core_properties_arm() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceShaderCorePropertiesARM)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceShaderCorePropertiesARM not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceShaderCorePropertiesARM));
     return m_shader_core_properties_arm;
 }
 VulkanProperties::operator const vk::PhysicalDeviceShaderCorePropertiesARM&() const {
     return get_shader_core_properties_arm();
 }
 const vk::PhysicalDeviceShaderIntegerDotProductProperties& VulkanProperties::get_shader_integer_dot_product_properties() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceShaderIntegerDotProductProperties)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceShaderIntegerDotProductProperties not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceShaderIntegerDotProductProperties));
     return m_shader_integer_dot_product_properties;
 }
 VulkanProperties::operator const vk::PhysicalDeviceShaderIntegerDotProductProperties&() const {
     return get_shader_integer_dot_product_properties();
 }
 const vk::PhysicalDeviceShaderLongVectorPropertiesEXT& VulkanProperties::get_shader_long_vector_properties_ext() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceShaderLongVectorPropertiesEXT)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceShaderLongVectorPropertiesEXT not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceShaderLongVectorPropertiesEXT));
     return m_shader_long_vector_properties_ext;
 }
 VulkanProperties::operator const vk::PhysicalDeviceShaderLongVectorPropertiesEXT&() const {
     return get_shader_long_vector_properties_ext();
 }
 const vk::PhysicalDeviceShaderModuleIdentifierPropertiesEXT& VulkanProperties::get_shader_module_identifier_properties_ext() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceShaderModuleIdentifierPropertiesEXT)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceShaderModuleIdentifierPropertiesEXT not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceShaderModuleIdentifierPropertiesEXT));
     return m_shader_module_identifier_properties_ext;
 }
 VulkanProperties::operator const vk::PhysicalDeviceShaderModuleIdentifierPropertiesEXT&() const {
     return get_shader_module_identifier_properties_ext();
 }
 const vk::PhysicalDeviceShaderObjectPropertiesEXT& VulkanProperties::get_shader_object_properties_ext() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceShaderObjectPropertiesEXT)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceShaderObjectPropertiesEXT not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceShaderObjectPropertiesEXT));
     return m_shader_object_properties_ext;
 }
 VulkanProperties::operator const vk::PhysicalDeviceShaderObjectPropertiesEXT&() const {
     return get_shader_object_properties_ext();
 }
 const vk::PhysicalDeviceShaderSMBuiltinsPropertiesNV& VulkanProperties::get_shader_sm_builtins_properties_nv() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceShaderSmBuiltinsPropertiesNV)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceShaderSMBuiltinsPropertiesNV not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceShaderSmBuiltinsPropertiesNV));
     return m_shader_sm_builtins_properties_nv;
 }
 VulkanProperties::operator const vk::PhysicalDeviceShaderSMBuiltinsPropertiesNV&() const {
     return get_shader_sm_builtins_properties_nv();
 }
 const vk::PhysicalDeviceShaderTileImagePropertiesEXT& VulkanProperties::get_shader_tile_image_properties_ext() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceShaderTileImagePropertiesEXT)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceShaderTileImagePropertiesEXT not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceShaderTileImagePropertiesEXT));
     return m_shader_tile_image_properties_ext;
 }
 VulkanProperties::operator const vk::PhysicalDeviceShaderTileImagePropertiesEXT&() const {
     return get_shader_tile_image_properties_ext();
 }
 const vk::PhysicalDeviceShadingRateImagePropertiesNV& VulkanProperties::get_shading_rate_image_properties_nv() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceShadingRateImagePropertiesNV)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceShadingRateImagePropertiesNV not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceShadingRateImagePropertiesNV));
     return m_shading_rate_image_properties_nv;
 }
 VulkanProperties::operator const vk::PhysicalDeviceShadingRateImagePropertiesNV&() const {
     return get_shading_rate_image_properties_nv();
 }
 const vk::PhysicalDeviceSubgroupProperties& VulkanProperties::get_subgroup_properties() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceSubgroupProperties)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceSubgroupProperties not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceSubgroupProperties));
     return m_subgroup_properties;
 }
 VulkanProperties::operator const vk::PhysicalDeviceSubgroupProperties&() const {
     return get_subgroup_properties();
 }
 const vk::PhysicalDeviceSubgroupSizeControlProperties& VulkanProperties::get_subgroup_size_control_properties() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceSubgroupSizeControlProperties)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceSubgroupSizeControlProperties not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceSubgroupSizeControlProperties));
     return m_subgroup_size_control_properties;
 }
 VulkanProperties::operator const vk::PhysicalDeviceSubgroupSizeControlProperties&() const {
     return get_subgroup_size_control_properties();
 }
 const vk::PhysicalDeviceSubpassShadingPropertiesHUAWEI& VulkanProperties::get_subpass_shading_properties_huawei() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceSubpassShadingPropertiesHUAWEI)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceSubpassShadingPropertiesHUAWEI not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceSubpassShadingPropertiesHUAWEI));
     return m_subpass_shading_properties_huawei;
 }
 VulkanProperties::operator const vk::PhysicalDeviceSubpassShadingPropertiesHUAWEI&() const {
     return get_subpass_shading_properties_huawei();
 }
 const vk::PhysicalDeviceTensorPropertiesARM& VulkanProperties::get_tensor_properties_arm() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceTensorPropertiesARM)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceTensorPropertiesARM not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceTensorPropertiesARM));
     return m_tensor_properties_arm;
 }
 VulkanProperties::operator const vk::PhysicalDeviceTensorPropertiesARM&() const {
     return get_tensor_properties_arm();
 }
 const vk::PhysicalDeviceTexelBufferAlignmentProperties& VulkanProperties::get_texel_buffer_alignment_properties() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceTexelBufferAlignmentProperties)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceTexelBufferAlignmentProperties not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceTexelBufferAlignmentProperties));
     return m_texel_buffer_alignment_properties;
 }
 VulkanProperties::operator const vk::PhysicalDeviceTexelBufferAlignmentProperties&() const {
     return get_texel_buffer_alignment_properties();
 }
 const vk::PhysicalDeviceTileMemoryHeapPropertiesQCOM& VulkanProperties::get_tile_memory_heap_properties_qcom() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceTileMemoryHeapPropertiesQCOM)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceTileMemoryHeapPropertiesQCOM not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceTileMemoryHeapPropertiesQCOM));
     return m_tile_memory_heap_properties_qcom;
 }
 VulkanProperties::operator const vk::PhysicalDeviceTileMemoryHeapPropertiesQCOM&() const {
     return get_tile_memory_heap_properties_qcom();
 }
 const vk::PhysicalDeviceTileShadingPropertiesQCOM& VulkanProperties::get_tile_shading_properties_qcom() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceTileShadingPropertiesQCOM)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceTileShadingPropertiesQCOM not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceTileShadingPropertiesQCOM));
     return m_tile_shading_properties_qcom;
 }
 VulkanProperties::operator const vk::PhysicalDeviceTileShadingPropertiesQCOM&() const {
     return get_tile_shading_properties_qcom();
 }
 const vk::PhysicalDeviceTimelineSemaphoreProperties& VulkanProperties::get_timeline_semaphore_properties() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceTimelineSemaphoreProperties)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceTimelineSemaphoreProperties not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceTimelineSemaphoreProperties));
     return m_timeline_semaphore_properties;
 }
 VulkanProperties::operator const vk::PhysicalDeviceTimelineSemaphoreProperties&() const {
     return get_timeline_semaphore_properties();
 }
 const vk::PhysicalDeviceTransformFeedbackPropertiesEXT& VulkanProperties::get_transform_feedback_properties_ext() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceTransformFeedbackPropertiesEXT)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceTransformFeedbackPropertiesEXT not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceTransformFeedbackPropertiesEXT));
     return m_transform_feedback_properties_ext;
 }
 VulkanProperties::operator const vk::PhysicalDeviceTransformFeedbackPropertiesEXT&() const {
     return get_transform_feedback_properties_ext();
 }
 const vk::PhysicalDeviceVertexAttributeDivisorProperties& VulkanProperties::get_vertex_attribute_divisor_properties() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceVertexAttributeDivisorProperties)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceVertexAttributeDivisorProperties not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceVertexAttributeDivisorProperties));
     return m_vertex_attribute_divisor_properties;
 }
 VulkanProperties::operator const vk::PhysicalDeviceVertexAttributeDivisorProperties&() const {
     return get_vertex_attribute_divisor_properties();
 }
 const vk::PhysicalDeviceVertexAttributeDivisorPropertiesEXT& VulkanProperties::get_vertex_attribute_divisor_properties_ext() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceVertexAttributeDivisorPropertiesEXT)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceVertexAttributeDivisorPropertiesEXT not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceVertexAttributeDivisorPropertiesEXT));
     return m_vertex_attribute_divisor_properties_ext;
 }
 VulkanProperties::operator const vk::PhysicalDeviceVertexAttributeDivisorPropertiesEXT&() const {
     return get_vertex_attribute_divisor_properties_ext();
 }
 const vk::PhysicalDeviceVulkan11Properties& VulkanProperties::get_vulkan11_properties() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceVulkan11Properties)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceVulkan11Properties not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceVulkan11Properties));
     return m_vulkan11_properties;
 }
 VulkanProperties::operator const vk::PhysicalDeviceVulkan11Properties&() const {
     return get_vulkan11_properties();
 }
 const vk::PhysicalDeviceVulkan12Properties& VulkanProperties::get_vulkan12_properties() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceVulkan12Properties)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceVulkan12Properties not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceVulkan12Properties));
     return m_vulkan12_properties;
 }
 VulkanProperties::operator const vk::PhysicalDeviceVulkan12Properties&() const {
     return get_vulkan12_properties();
 }
 const vk::PhysicalDeviceVulkan13Properties& VulkanProperties::get_vulkan13_properties() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceVulkan13Properties)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceVulkan13Properties not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceVulkan13Properties));
     return m_vulkan13_properties;
 }
 VulkanProperties::operator const vk::PhysicalDeviceVulkan13Properties&() const {
     return get_vulkan13_properties();
 }
 const vk::PhysicalDeviceVulkan14Properties& VulkanProperties::get_vulkan14_properties() const {
-    if (!is_available(vk::StructureType::ePhysicalDeviceVulkan14Properties)) {
-        throw std::runtime_error(fmt::format(
-            "Property struct PhysicalDeviceVulkan14Properties not available (extension not supported)"));
-    }
+    assert(is_available(vk::StructureType::ePhysicalDeviceVulkan14Properties));
     return m_vulkan14_properties;
 }
 VulkanProperties::operator const vk::PhysicalDeviceVulkan14Properties&() const {
