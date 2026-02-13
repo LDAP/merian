@@ -530,8 +530,9 @@ bool Graph::connect_nodes() {
                 if (!dst_data.errors.empty()) {
                     SPDLOG_TRACE("cleanup output connection to erroneous node: {}, {} ({}) -> "
                                  "{}, {} ({})",
-                                 src_output->name, src_data.name, src_node->name, dst_input->name,
-                                 dst_data.name, dst_node->name);
+                                 src_output->name, src_data.identifier,
+                                 registry.node_type_name(src_node), dst_input->name,
+                                 dst_data.identifier, registry.node_type_name(dst_node));
                     it = per_output_info.inputs.erase(it);
                 } else {
                     try {

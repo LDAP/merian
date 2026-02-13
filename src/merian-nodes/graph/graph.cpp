@@ -38,7 +38,10 @@ Graph::Graph(const GraphCreateInfo& create_info)
                       return in_flight_data;
                   }),
       run_profiler(std::make_shared<merian::Profiler>(context)),
-      graph_run(thread_pool, cpu_queue, resource_allocator, queue,
+      graph_run(thread_pool,
+                cpu_queue,
+                resource_allocator,
+                queue,
                 context->get_context_extension<ExtensionGLSLCompiler>()->get_compiler()) {
 
     debug_utils = context->get_context_extension<ExtensionVkDebugUtils>(true);
@@ -161,14 +164,19 @@ void Graph::run() {
     // RUN
     {
         MERIAN_PROFILE_SCOPE(profiler, "on_run_starting");
+        SPDLOG_TRACE("starting run: iteration: {}", graph_run.get_iteration());
         on_run_starting(graph_run);
     }
     {
         MERIAN_PROFILE_SCOPE_GPU(profiler, graph_run.get_cmd(), "Run nodes");
         for (auto& node : flat_topology) {
             NodeData& data = node_data.at(node);
-            if (debug_utils)
-                debug_utils->cmd_begin_label(*graph_run.get_cmd(), registry.node_type_name(node));
+            if (debug_utils) {
+                const std::string node_debug_name =
+                    fmt::format("{} ({})", data.identifier, registry.node_type_name(node));
+                debug_utils->cmd_begin_label(*graph_run.get_cmd(), node_debug_name);
+                SPDLOG_TRACE("running node: {}", node_debug_name);
+            }
 
             try {
                 run_node(graph_run, node, data, profiler);
@@ -337,7 +345,7 @@ void Graph::run_node(GraphRun& run,
         data.statistics.last_descriptor_set_updates = descriptor_set->update_count();
         if (descriptor_set->has_updates()) {
             SPDLOG_TRACE("applying {} descriptor set updates for node {}, set {}",
-                         descriptor_set.update->count(), data.name, set_idx);
+                         descriptor_set->update_count(), data.identifier, set_idx);
             descriptor_set->update();
         }
     }

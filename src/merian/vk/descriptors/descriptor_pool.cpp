@@ -131,7 +131,6 @@ ResizingDescriptorPool::allocate(const DescriptorSetLayoutHandle& layout,
         remaining_count -= allocate_from_pool(pools.back(), layout, result, remaining_count);
     }
 
-    SPDLOG_DEBUG("{} {}", result.size(), set_count);
     assert(result.size() == set_count);
     assert(remaining_count == 0);
     return result;

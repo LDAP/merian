@@ -10,11 +10,11 @@ void log_allocation([[maybe_unused]] const VmaAllocationInfo& info,
                     [[maybe_unused]] const std::string& name) {
 #if SPDLOG_ACTIVE_LEVEL <= SPDLOG_LEVEL_TRACE
     if (!name.empty())
-        SPDLOG_TRACE("allocated {} of memory at offset {} ({}, {})", format_size(info.size),
-                     format_size(info.offset), fmt::ptr(memory.get()), name);
+        SPDLOG_TRACE("allocated {} of memory at offset {} ({}, {})", merian::format_size(info.size),
+                     merian::format_size(info.offset), fmt::ptr(memory.get()), name);
     else
-        SPDLOG_TRACE("allocated {} of memory at offset {} ({})", format_size(info.size),
-                     format_size(info.offset), fmt::ptr(memory.get()));
+        SPDLOG_TRACE("allocated {} of memory at offset {} ({})", merian::format_size(info.size),
+                     merian::format_size(info.offset), fmt::ptr(memory.get()));
 #endif
 }
 
