@@ -126,13 +126,12 @@ generator_scripts = [
 ]
 message('Generating Vulkan code generators for version v@0@...'.format(vulkan_target_api_version))
 foreach script : generator_scripts
-    run_command(
+    message(run_command(
         py, meson.current_source_dir() / script,
         env: {'VULKAN_SPEC_VERSION': 'v' + vulkan_target_api_version},
         check: true
-    )
+    ).stdout())
 endforeach
-message('Vulkan code generation complete.')
 
 
 project_root = meson.current_source_dir()
