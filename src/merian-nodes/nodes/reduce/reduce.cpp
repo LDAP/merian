@@ -16,35 +16,30 @@ Reduce::Reduce() : AbstractCompute() {}
 Reduce::~Reduce() {}
 
 DeviceSupportInfo Reduce::query_device_support(const DeviceSupportQueryInfo& query_info) {
-    return DeviceSupportInfo::check(
-        query_info,
-        {},
-        {},
-        {},
-        {},
-        {"Shader", "ImageQuery", "Sampled1D"},
-        {},
-        {},
-        {});
+    return DeviceSupportInfo::check(query_info, {}, {}, {}, {},
+                                    {"Shader", "ImageQuery", "Sampled1D"}, {}, {}, {});
 }
 
 void Reduce::initialize(const ContextHandle& context, const ResourceAllocatorHandle& allocator) {
     AbstractCompute::initialize(context, allocator);
 }
 
-std::vector<InputConnectorHandle> Reduce::describe_inputs() {
+std::vector<InputConnectorDescriptor> Reduce::describe_inputs() {
     if (input_connectors.size() != number_inputs) {
         input_connectors.clear();
         for (uint32_t i = 0; i < number_inputs; i++) {
-            input_connectors.emplace_back(
-                VkSampledImageIn::compute_read(fmt::format("input_{}", i), 0, true));
+            input_connectors.emplace_back(VkSampledImageIn::compute_read(0, true));
         }
     }
 
-    return {input_connectors.begin(), input_connectors.end()};
+    std::vector<InputConnectorDescriptor> descriptors;
+    for (uint32_t i = 0; i < number_inputs; i++) {
+        descriptors.push_back({fmt::format("input_{}", i), input_connectors[i]});
+    }
+    return descriptors;
 }
 
-std::vector<OutputConnectorHandle> Reduce::describe_outputs(const NodeIOLayout& io_layout) {
+std::vector<OutputConnectorDescriptor> Reduce::describe_outputs(const NodeIOLayout& io_layout) {
     auto spec_builder = SpecializationInfoBuilder();
     spec_builder.add_entry(local_size_x, local_size_y);
 
@@ -121,8 +116,7 @@ void main() {
 )");
 
     auto glsl_compiler_ext = context->get_context_extension<ExtensionGLSLCompiler>();
-    ShaderCompileContextHandle compilation_session_desc =
-        ShaderCompileContext::create(context);
+    ShaderCompileContextHandle compilation_session_desc = ShaderCompileContext::create(context);
     shader = EntryPoint::create("main", vk::ShaderStageFlagBits::eCompute,
                                 glsl_compiler_ext->get_compiler()->compile_glsl_to_shadermodule(
                                     context, source, "<memory>add.comp",
@@ -132,7 +126,7 @@ void main() {
     // -------------------------------------------------------
 
     return {
-        ManagedVkImageOut::compute_write("out", format, extent),
+        {"out", ManagedVkImageOut::compute_write(format, extent)},
     };
 }
 

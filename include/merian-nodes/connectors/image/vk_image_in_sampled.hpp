@@ -10,7 +10,6 @@ using VkSampledImageInHandle = std::shared_ptr<VkSampledImageIn>;
 class VkSampledImageIn : public VkImageIn {
   public:
     VkSampledImageIn(
-        const std::string& name,
         const vk::AccessFlags2 access_flags,
         const vk::PipelineStageFlags2 pipeline_stages,
         const vk::ImageUsageFlags usage_flags,
@@ -31,13 +30,12 @@ class VkSampledImageIn : public VkImageIn {
 
   public:
     static VkSampledImageInHandle
-    compute_read(const std::string& name,
-                 const uint32_t delay = 0,
+    compute_read(const uint32_t delay = 0,
                  const bool optional = false,
                  const std::optional<SamplerHandle>& overwrite_sampler = std::nullopt);
 
-    static VkSampledImageInHandle
-    fragment_read(const std::string& name, const uint32_t delay = 0, const bool optional = false);
+    static VkSampledImageInHandle fragment_read(const uint32_t delay = 0,
+                                                const bool optional = false);
 
   private:
     const std::optional<SamplerHandle> overwrite_sampler;

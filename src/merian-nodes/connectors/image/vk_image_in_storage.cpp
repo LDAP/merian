@@ -2,16 +2,14 @@
 
 namespace merian {
 
-VkStorageImageIn::VkStorageImageIn(const std::string& name,
-                                   const vk::AccessFlags2 access_flags,
+VkStorageImageIn::VkStorageImageIn(const vk::AccessFlags2 access_flags,
                                    const vk::PipelineStageFlags2 pipeline_stages,
                                    const vk::ImageUsageFlags usage_flags,
                                    const vk::ShaderStageFlags stage_flags,
                                    const uint32_t delay,
                                    const bool optional,
                                    const vk::ImageLayout required_layout)
-    : VkImageIn(name,
-                access_flags,
+    : VkImageIn(access_flags,
                 pipeline_stages,
                 required_layout,
                 usage_flags,
@@ -55,12 +53,12 @@ void VkStorageImageIn::get_descriptor_update(const uint32_t binding,
     }
 }
 
-std::shared_ptr<VkStorageImageIn>
-VkStorageImageIn::compute_read(const std::string& name, const uint32_t delay, const bool optional) {
+std::shared_ptr<VkStorageImageIn> VkStorageImageIn::compute_read(const uint32_t delay,
+                                                                 const bool optional) {
     return std::make_shared<VkStorageImageIn>(
-        name, vk::AccessFlagBits2::eShaderRead, vk::PipelineStageFlagBits2::eComputeShader,
-        vk::ImageLayout::eShaderReadOnlyOptimal, vk::ImageUsageFlagBits::eStorage,
-        vk::ShaderStageFlagBits::eCompute, delay, optional);
+        vk::AccessFlagBits2::eShaderRead, vk::PipelineStageFlagBits2::eComputeShader,
+        vk::ImageUsageFlagBits::eStorage, vk::ShaderStageFlagBits::eCompute, delay, optional,
+        vk::ImageLayout::eShaderReadOnlyOptimal);
 }
 
 } // namespace merian

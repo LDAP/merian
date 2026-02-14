@@ -36,11 +36,12 @@ void MeanToBuffer::initialize(const ContextHandle& context,
                                               vk::ShaderStageFlagBits::eCompute);
 }
 
-std::vector<InputConnectorHandle> MeanToBuffer::describe_inputs() {
-    return {con_src};
+std::vector<InputConnectorDescriptor> MeanToBuffer::describe_inputs() {
+    return {{"src", con_src}};
 }
 
-std::vector<OutputConnectorHandle> MeanToBuffer::describe_outputs(const NodeIOLayout& io_layout) {
+std::vector<OutputConnectorDescriptor>
+MeanToBuffer::describe_outputs(const NodeIOLayout& io_layout) {
     vk::Extent3D extent = io_layout[con_src]->get_create_info_or_throw().extent;
 
     const auto group_count_x = (extent.width + local_size_x - 1) / local_size_x;
@@ -48,12 +49,12 @@ std::vector<OutputConnectorHandle> MeanToBuffer::describe_outputs(const NodeIOLa
     const std::size_t buffer_size = group_count_x * group_count_y;
 
     con_mean = std::make_shared<ManagedVkBufferOut>(
-        "mean", vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
+        vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
         vk::PipelineStageFlagBits2::eComputeShader, vk::ShaderStageFlagBits::eCompute,
         vk::BufferCreateInfo({}, buffer_size * sizeof(merian::float4),
                              vk::BufferUsageFlagBits::eStorageBuffer));
 
-    return {con_mean};
+    return {{"mean", con_mean}};
 }
 
 MeanToBuffer::NodeStatusFlags

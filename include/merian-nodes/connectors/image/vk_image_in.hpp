@@ -15,8 +15,7 @@ class VkImageIn : public InputConnector,
                   public OutputAccessibleInputConnector<VkImageOutHandle>,
                   public AccessibleConnector<const ImageArrayResource&> {
   public:
-    VkImageIn(const std::string& name,
-              const vk::AccessFlags2 access_flags,
+    VkImageIn(const vk::AccessFlags2 access_flags,
               const vk::PipelineStageFlags2 pipeline_stages,
               const vk::ImageLayout required_layout,
               const vk::ImageUsageFlags usage_flags,
@@ -62,8 +61,7 @@ class VkImageIn : public InputConnector,
     }
 
   public:
-    static VkImageInHandle
-    transfer_src(const std::string& name, const uint32_t delay = 0, const bool optional = false);
+    static VkImageInHandle transfer_src(const uint32_t delay = 0, const bool optional = false);
 
   private:
     const vk::AccessFlags2 access_flags;

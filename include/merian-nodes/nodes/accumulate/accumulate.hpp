@@ -4,9 +4,9 @@
 #include "merian-nodes/connectors/image/vk_image_in_sampled.hpp"
 
 #include "merian-nodes/graph/node.hpp"
+#include "merian/shader/entry_point.hpp"
 #include "merian/vk/memory/resource_allocator.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
-#include "merian/shader/entry_point.hpp"
 #include <optional>
 
 namespace merian {
@@ -50,9 +50,9 @@ class Accumulate : public Node {
     void initialize(const ContextHandle& context,
                     const ResourceAllocatorHandle& allocator) override;
 
-    std::vector<InputConnectorHandle> describe_inputs() override;
+    std::vector<InputConnectorDescriptor> describe_inputs() override;
 
-    std::vector<OutputConnectorHandle> describe_outputs(const NodeIOLayout& io_layout) override;
+    std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
 
     NodeStatusFlags on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
                                  const DescriptorSetLayoutHandle& descriptor_set_layout) override;
@@ -76,13 +76,13 @@ class Accumulate : public Node {
     static constexpr uint32_t FILTER_LOCAL_SIZE_Y = 16;
 
     // Graph IO
-    VkSampledImageInHandle con_src = VkSampledImageIn::compute_read("src");
-    GBufferInHandle con_gbuf = GBufferIn::compute_read("gbuffer");
-    VkSampledImageInHandle con_mv = VkSampledImageIn::compute_read("mv", 0, true);
+    VkSampledImageInHandle con_src = VkSampledImageIn::compute_read();
+    GBufferInHandle con_gbuf = GBufferIn::compute_read();
+    VkSampledImageInHandle con_mv = VkSampledImageIn::compute_read(0, true);
 
-    VkSampledImageInHandle con_prev_out = VkSampledImageIn::compute_read("prev_out", 1);
-    GBufferInHandle con_prev_gbuf = GBufferIn::compute_read("prev_gbuffer", 1);
-    VkSampledImageInHandle con_prev_history = VkSampledImageIn::compute_read("prev_history", 1);
+    VkSampledImageInHandle con_prev_out = VkSampledImageIn::compute_read(1);
+    GBufferInHandle con_prev_gbuf = GBufferIn::compute_read(1);
+    VkSampledImageInHandle con_prev_history = VkSampledImageIn::compute_read(1);
 
     ManagedVkImageOutHandle con_out;
     ManagedVkImageOutHandle con_history;

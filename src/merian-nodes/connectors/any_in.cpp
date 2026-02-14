@@ -8,7 +8,7 @@
 
 namespace merian {
 
-AnyIn::AnyIn(const std::string& name, const uint32_t delay) : InputConnector(name, delay) {}
+AnyIn::AnyIn(const uint32_t delay) : InputConnector(delay) {}
 
 const std::any& AnyIn::resource(const GraphResourceHandle& resource) {
     return debugable_ptr_cast<AnyResource>(resource)->any;
@@ -17,8 +17,7 @@ const std::any& AnyIn::resource(const GraphResourceHandle& resource) {
 void AnyIn::on_connect_output(const OutputConnectorHandle& output) {
     auto casted_output = std::dynamic_pointer_cast<AnyOut>(output);
     if (!casted_output) {
-        throw graph_errors::invalid_connection{
-            fmt::format("AnyIn {} cannot recive from {}.", Connector::name, output->name)};
+        throw graph_errors::invalid_connection{"AnyIn cannot receive from output."};
     }
 }
 
@@ -38,8 +37,8 @@ AnyIn::on_post_process([[maybe_unused]] GraphRun& run,
     return {};
 }
 
-AnyInHandle AnyIn::create(const std::string& name, const uint32_t delay) {
-    return std::make_shared<AnyIn>(name, delay);
+AnyInHandle AnyIn::create(const uint32_t delay) {
+    return std::make_shared<AnyIn>(delay);
 }
 
 } // namespace merian

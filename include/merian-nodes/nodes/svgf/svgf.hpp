@@ -44,9 +44,9 @@ class SVGF : public Node {
     void initialize(const ContextHandle& context,
                     const ResourceAllocatorHandle& allocator) override;
 
-    std::vector<InputConnectorHandle> describe_inputs() override;
+    std::vector<InputConnectorDescriptor> describe_inputs() override;
 
-    std::vector<OutputConnectorHandle> describe_outputs(const NodeIOLayout& io_layout) override;
+    std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
 
     NodeStatusFlags on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
                                  const DescriptorSetLayoutHandle& descriptor_set_layout) override;
@@ -67,13 +67,13 @@ class SVGF : public Node {
 
     const uint32_t taa_local_size = 32;
 
-    VkSampledImageInHandle con_prev_out = VkSampledImageIn::compute_read("prev_out", 1);
-    VkSampledImageInHandle con_src = VkSampledImageIn::compute_read("src");
-    VkSampledImageInHandle con_history = VkSampledImageIn::compute_read("history");
-    VkSampledImageInHandle con_albedo = VkSampledImageIn::compute_read("albedo");
-    VkSampledImageInHandle con_mv = VkSampledImageIn::compute_read("mv", 0, true);
-    GBufferInHandle con_gbuffer = GBufferIn::compute_read("gbuffer");
-    GBufferInHandle con_prev_gbuffer = GBufferIn::compute_read("prev_gbuffer", 1);
+    VkSampledImageInHandle con_prev_out = VkSampledImageIn::compute_read(1);
+    VkSampledImageInHandle con_src = VkSampledImageIn::compute_read();
+    VkSampledImageInHandle con_history = VkSampledImageIn::compute_read();
+    VkSampledImageInHandle con_albedo = VkSampledImageIn::compute_read();
+    VkSampledImageInHandle con_mv = VkSampledImageIn::compute_read(0, true);
+    GBufferInHandle con_gbuffer = GBufferIn::compute_read();
+    GBufferInHandle con_prev_gbuffer = GBufferIn::compute_read(1);
 
     ManagedVkImageOutHandle con_out;
 

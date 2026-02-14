@@ -40,18 +40,18 @@ void AutoExposure::initialize(const ContextHandle& context,
                            "main", vk::ShaderStageFlagBits::eCompute);
 }
 
-std::vector<InputConnectorHandle> AutoExposure::describe_inputs() {
-    return {con_src};
+std::vector<InputConnectorDescriptor> AutoExposure::describe_inputs() {
+    return {{"src", con_src}};
 }
 
-std::vector<OutputConnectorHandle> AutoExposure::describe_outputs(const NodeIOLayout& io_layout) {
+std::vector<OutputConnectorDescriptor>
+AutoExposure::describe_outputs(const NodeIOLayout& io_layout) {
     const vk::ImageCreateInfo create_info = io_layout[con_src]->get_create_info_or_throw();
     const vk::Format format = create_info.format;
     const vk::Extent3D extent = create_info.extent;
 
-    con_out = ManagedVkImageOut::compute_write("out", format, extent);
+    con_out = ManagedVkImageOut::compute_write(format, extent);
     con_hist = std::make_shared<ManagedVkBufferOut>(
-        "histogram",
         vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite |
             vk::AccessFlagBits2::eTransferWrite,
         vk::PipelineStageFlagBits2::eComputeShader | vk::PipelineStageFlagBits2::eTransfer,
@@ -60,11 +60,11 @@ std::vector<OutputConnectorHandle> AutoExposure::describe_outputs(const NodeIOLa
             {}, ((vk::DeviceSize)LOCAL_SIZE_X * LOCAL_SIZE_Y * sizeof(uint32_t)) + sizeof(uint32_t),
             vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst));
     con_luminance = std::make_shared<ManagedVkBufferOut>(
-        "avg_luminance", vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
+        vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
         vk::PipelineStageFlagBits2::eComputeShader, vk::ShaderStageFlagBits::eCompute,
         vk::BufferCreateInfo({}, sizeof(float), vk::BufferUsageFlagBits::eStorageBuffer), true);
 
-    return {con_out, con_hist, con_luminance};
+    return {{"out", con_out}, {"histogram", con_hist}, {"avg_luminance", con_luminance}};
 }
 
 AutoExposure::NodeStatusFlags

@@ -7,10 +7,9 @@
 
 namespace merian {
 
-UnmanagedVkBufferOut::UnmanagedVkBufferOut(const std::string& name,
-                                           const uint32_t array_size,
+UnmanagedVkBufferOut::UnmanagedVkBufferOut(const uint32_t array_size,
                                            const vk::BufferUsageFlags buffer_usage_flags)
-    : VkBufferOut(name, false, array_size), buffer_usage_flags(buffer_usage_flags) {}
+    : VkBufferOut(false, array_size), buffer_usage_flags(buffer_usage_flags) {}
 
 GraphResourceHandle UnmanagedVkBufferOut::create_resource(
     [[maybe_unused]] const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
@@ -36,10 +35,9 @@ GraphResourceHandle UnmanagedVkBufferOut::create_resource(
         for (const auto& buffer : buffers) {
             if (buffer &&
                 (buffer->get_usage_flags() & all_buffer_usage_flags) != all_buffer_usage_flags) {
-                throw graph_errors::invalid_connection{fmt::format(
-                    "buffers set for the unmanaged output connector {} are missing some "
-                    "usage flags for the new inputs.",
-                    name)};
+                throw graph_errors::invalid_connection{
+                    "buffers set for the unmanaged output connector are missing some "
+                    "usage flags for the new inputs."};
             }
         }
     }
@@ -72,10 +70,9 @@ Connector::ConnectorStatusFlags UnmanagedVkBufferOut::on_pre_process(
 }
 
 UnmanagedVkBufferOutHandle
-UnmanagedVkBufferOut::create(const std::string& name,
-                             const uint32_t array_size,
+UnmanagedVkBufferOut::create(const uint32_t array_size,
                              const vk::BufferUsageFlags buffer_usage_flags) {
-    return std::make_shared<UnmanagedVkBufferOut>(name, array_size, buffer_usage_flags);
+    return std::make_shared<UnmanagedVkBufferOut>(array_size, buffer_usage_flags);
 }
 
 } // namespace merian

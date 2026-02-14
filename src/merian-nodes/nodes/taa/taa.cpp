@@ -31,15 +31,15 @@ void TAA::initialize(const ContextHandle& context, const ResourceAllocatorHandle
                                 "main", vk::ShaderStageFlagBits::eCompute, spec_info);
 }
 
-std::vector<InputConnectorHandle> TAA::describe_inputs() {
+std::vector<InputConnectorDescriptor> TAA::describe_inputs() {
     return {
-        con_src,
-        VkSampledImageIn::compute_read("prev_src", 1),
-        con_mv,
+        {"src", con_src},
+        {"prev_src", VkSampledImageIn::compute_read(1)},
+        {"mv", con_mv},
     };
 }
 
-std::vector<OutputConnectorHandle>
+std::vector<OutputConnectorDescriptor>
 TAA::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
     const vk::ImageCreateInfo create_info = io_layout[con_src]->get_create_info_or_throw();
     width = create_info.extent.width;
@@ -47,7 +47,7 @@ TAA::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
 
     pc.enable_mv = static_cast<VkBool32>(io_layout.is_connected(con_mv));
     return {
-        ManagedVkImageOut::compute_write("out", create_info.format, width, height),
+        {"out", ManagedVkImageOut::compute_write(create_info.format, width, height)},
     };
 }
 

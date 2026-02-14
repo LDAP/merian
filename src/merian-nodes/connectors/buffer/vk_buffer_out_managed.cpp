@@ -7,14 +7,13 @@
 
 namespace merian {
 
-ManagedVkBufferOut::ManagedVkBufferOut(const std::string& name,
-                                       const vk::AccessFlags2& access_flags,
+ManagedVkBufferOut::ManagedVkBufferOut(const vk::AccessFlags2& access_flags,
                                        const vk::PipelineStageFlags2& pipeline_stages,
                                        const vk::ShaderStageFlags& stage_flags,
                                        const vk::BufferCreateInfo& create_info,
                                        const bool persistent,
                                        const uint32_t array_size)
-    : VkBufferOut(name, !persistent, array_size), access_flags(access_flags),
+    : VkBufferOut(!persistent, array_size), access_flags(access_flags),
       pipeline_stages(pipeline_stages), stage_flags(stage_flags), create_info(create_info),
       persistent(persistent) {}
 
@@ -124,7 +123,7 @@ GraphResourceHandle ManagedVkBufferOut::create_resource(
         get_array_size(), buffer_create_info.usage, input_pipeline_stages, input_access_flags);
 
     for (uint32_t i = 0; i < get_array_size(); i++) {
-        res->buffers[i] = alloc->create_buffer(buffer_create_info, MemoryMappingType::NONE, name);
+        res->buffers[i] = alloc->create_buffer(buffer_create_info, MemoryMappingType::NONE);
     }
 
     return res;
@@ -134,17 +133,17 @@ BufferArrayResource& ManagedVkBufferOut::resource(const GraphResourceHandle& res
     return *debugable_ptr_cast<BufferArrayResource>(resource);
 }
 
-std::shared_ptr<ManagedVkBufferOut> ManagedVkBufferOut::compute_write(
-    const std::string& name, const vk::BufferCreateInfo& create_info, const bool persistent) {
+std::shared_ptr<ManagedVkBufferOut>
+ManagedVkBufferOut::compute_write(const vk::BufferCreateInfo& create_info, const bool persistent) {
     return std::make_shared<ManagedVkBufferOut>(
-        name, vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
+        vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
         vk::PipelineStageFlagBits2::eComputeShader, vk::ShaderStageFlagBits::eCompute, create_info,
         persistent);
 }
 
-std::shared_ptr<ManagedVkBufferOut> ManagedVkBufferOut::transfer_write(
-    const std::string& name, const vk::BufferCreateInfo& create_info, const bool persistent) {
-    return std::make_shared<ManagedVkBufferOut>(name, vk::AccessFlagBits2::eTransferWrite,
+std::shared_ptr<ManagedVkBufferOut>
+ManagedVkBufferOut::transfer_write(const vk::BufferCreateInfo& create_info, const bool persistent) {
+    return std::make_shared<ManagedVkBufferOut>(vk::AccessFlagBits2::eTransferWrite,
                                                 vk::PipelineStageFlagBits2::eAllTransfer,
                                                 vk::ShaderStageFlags(), create_info, persistent);
 }

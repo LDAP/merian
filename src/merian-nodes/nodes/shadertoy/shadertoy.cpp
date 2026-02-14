@@ -124,7 +124,7 @@ void Shadertoy::initialize(const ContextHandle& context, const ResourceAllocator
         spec_info);
 }
 
-std::vector<OutputConnectorHandle>
+std::vector<OutputConnectorDescriptor>
 Shadertoy::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
     if (!reloader) {
         throw graph_errors::node_error{"no shader compiler available."};
@@ -145,7 +145,7 @@ Shadertoy::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
     }
 
     constant.iResolution = {extent.width, extent.height};
-    return {ManagedVkImageOut::compute_write("out", vk::Format::eR8G8B8A8Unorm, extent)};
+    return {{"out", ManagedVkImageOut::compute_write(vk::Format::eR8G8B8A8Unorm, extent)}};
 }
 
 const void* Shadertoy::get_push_constant([[maybe_unused]] GraphRun& run,

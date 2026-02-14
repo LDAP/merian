@@ -3,14 +3,13 @@
 
 namespace merian {
 
-VkBufferIn::VkBufferIn(const std::string& name,
-                       const vk::BufferUsageFlags usage_flags,
+VkBufferIn::VkBufferIn(const vk::BufferUsageFlags usage_flags,
                        const vk::ShaderStageFlags stage_flags,
                        const vk::AccessFlags2 access_flags,
                        const vk::PipelineStageFlags2 pipeline_stages,
                        const uint32_t delay,
                        const bool optional)
-    : InputConnector(name, delay, optional), usage_flags(usage_flags), stage_flags(stage_flags),
+    : InputConnector(delay, optional), usage_flags(usage_flags), stage_flags(stage_flags),
       access_flags(access_flags), pipeline_stages(pipeline_stages) {
 
     assert(access_flags && pipeline_stages);
@@ -59,8 +58,7 @@ const BufferArrayResource& VkBufferIn::resource(const GraphResourceHandle& resou
 void VkBufferIn::on_connect_output(const OutputConnectorHandle& output) {
     auto casted_output = std::dynamic_pointer_cast<VkBufferOut>(output);
     if (!casted_output) {
-        throw graph_errors::invalid_connection{
-            fmt::format("VkBufferIn {} cannot recive from {}.", name, output->name)};
+        throw graph_errors::invalid_connection{"VkBufferIn cannot receive from output."};
     }
 
     array_size = casted_output->get_array_size();
@@ -85,36 +83,32 @@ Connector::ConnectorStatusFlags VkBufferIn::on_pre_process(
     return flags;
 }
 
-VkBufferInHandle VkBufferIn::compute_read(const std::string& name,
-                                          const uint32_t delay,
+VkBufferInHandle VkBufferIn::compute_read(const uint32_t delay,
                                           const bool optional,
                                           const vk::BufferUsageFlags usage) {
     return std::make_shared<VkBufferIn>(
-        name, usage, vk::ShaderStageFlagBits::eCompute, vk::AccessFlagBits2::eShaderRead,
+        usage, vk::ShaderStageFlagBits::eCompute, vk::AccessFlagBits2::eShaderRead,
         vk::PipelineStageFlagBits2::eComputeShader, delay, optional);
 }
 
-VkBufferInHandle VkBufferIn::fragment_read(const std::string& name,
-                                           const uint32_t delay,
+VkBufferInHandle VkBufferIn::fragment_read(const uint32_t delay,
                                            const bool optional,
                                            const vk::BufferUsageFlags usage) {
     return std::make_shared<VkBufferIn>(
-        name, usage, vk::ShaderStageFlagBits::eFragment, vk::AccessFlagBits2::eShaderRead,
+        usage, vk::ShaderStageFlagBits::eFragment, vk::AccessFlagBits2::eShaderRead,
         vk::PipelineStageFlagBits2::eFragmentShader, delay, optional);
 }
 
-VkBufferInHandle VkBufferIn::acceleration_structure_read(const std::string& name,
-                                                         const uint32_t delay,
+VkBufferInHandle VkBufferIn::acceleration_structure_read(const uint32_t delay,
                                                          const bool optional) {
     return std::make_shared<VkBufferIn>(
-        name, vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR,
+        vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR,
         vk::ShaderStageFlags{}, vk::AccessFlagBits2::eShaderRead,
         vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR, delay, optional);
 }
 
-std::shared_ptr<VkBufferIn>
-VkBufferIn::transfer_src(const std::string& name, const uint32_t delay, const bool optional) {
-    return std::make_shared<VkBufferIn>(name, vk::BufferUsageFlagBits::eTransferSrc,
+std::shared_ptr<VkBufferIn> VkBufferIn::transfer_src(const uint32_t delay, const bool optional) {
+    return std::make_shared<VkBufferIn>(vk::BufferUsageFlagBits::eTransferSrc,
                                         vk::ShaderStageFlags(), vk::AccessFlagBits2::eTransferRead,
                                         vk::PipelineStageFlagBits2::eAllTransfer, delay, optional);
 }

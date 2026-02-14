@@ -9,8 +9,7 @@ using VkStorageImageInHandle = std::shared_ptr<VkStorageImageIn>;
 
 class VkStorageImageIn : public VkImageIn {
   public:
-    VkStorageImageIn(const std::string& name,
-                     const vk::AccessFlags2 access_flags,
+    VkStorageImageIn(const vk::AccessFlags2 access_flags,
                      const vk::PipelineStageFlags2 pipeline_stages,
                      const vk::ImageUsageFlags usage_flags,
                      const vk::ShaderStageFlags stage_flags,
@@ -28,8 +27,8 @@ class VkStorageImageIn : public VkImageIn {
                                        const ResourceAllocatorHandle& allocator) override;
 
   public:
-    static VkStorageImageInHandle
-    compute_read(const std::string& name, const uint32_t delay = 0, const bool optional = false);
+    static VkStorageImageInHandle compute_read(const uint32_t delay = 0,
+                                               const bool optional = false);
 };
 
 } // namespace merian

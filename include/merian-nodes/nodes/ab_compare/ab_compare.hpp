@@ -15,14 +15,14 @@ class AbstractABCompare : public Node {
 
     virtual ~AbstractABCompare();
 
-    std::vector<InputConnectorHandle> describe_inputs() override final;
+    std::vector<InputConnectorDescriptor> describe_inputs() override final;
 
   protected:
     std::optional<vk::Format> output_format = std::nullopt;
     std::optional<vk::Extent2D> output_extent = std::nullopt;
 
-    const VkImageInHandle con_in_a = VkImageIn::transfer_src("a");
-    const VkImageInHandle con_in_b = VkImageIn::transfer_src("b");
+    const VkImageInHandle con_in_a = VkImageIn::transfer_src();
+    const VkImageInHandle con_in_b = VkImageIn::transfer_src();
 };
 
 class ABSplit : public AbstractABCompare {
@@ -30,7 +30,7 @@ class ABSplit : public AbstractABCompare {
   public:
     ABSplit() = default;
 
-    std::vector<OutputConnectorHandle> describe_outputs(const NodeIOLayout& io_layout) override;
+    std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
 
     void
     process(GraphRun& run, const DescriptorSetHandle& descriptor_set, const NodeIO& io) override;
@@ -44,7 +44,7 @@ class ABSideBySide : public AbstractABCompare {
   public:
     ABSideBySide() = default;
 
-    std::vector<OutputConnectorHandle> describe_outputs(const NodeIOLayout& io_layout) override;
+    std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
 
     void
     process(GraphRun& run, const DescriptorSetHandle& descriptor_set, const NodeIO& io) override;

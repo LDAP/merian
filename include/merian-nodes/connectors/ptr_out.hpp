@@ -18,8 +18,7 @@ template <typename T>
 class PtrOut : public OutputConnector, public AccessibleConnector<std::shared_ptr<T>&> {
 
   public:
-    PtrOut(const std::string& name, const bool persistent)
-        : OutputConnector(name, !persistent), persistent(persistent) {}
+    PtrOut(const bool persistent) : OutputConnector(!persistent), persistent(persistent) {}
 
     GraphResourceHandle
     create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
@@ -43,8 +42,7 @@ class PtrOut : public OutputConnector, public AccessibleConnector<std::shared_pt
         [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) override {
         const auto& res = debugable_ptr_cast<PtrResource<T>>(resource);
         if (!res->ptr) {
-            throw graph_errors::connector_error{
-                fmt::format("Node did not set the resource for output {}.", Connector::name)};
+            throw graph_errors::connector_error{"Node did not set the resource for output."};
         }
         res->processed_inputs = 0;
 
@@ -52,8 +50,8 @@ class PtrOut : public OutputConnector, public AccessibleConnector<std::shared_pt
     }
 
   public:
-    static PtrOutHandle<T> create(const std::string& name, const bool persistent = false) {
-        return std::make_shared<PtrOut<T>>(name, persistent);
+    static PtrOutHandle<T> create(const bool persistent = false) {
+        return std::make_shared<PtrOut<T>>(persistent);
     }
 
   private:

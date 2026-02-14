@@ -36,7 +36,7 @@ class Connector : public std::enable_shared_from_this<Connector> {
     };
 
   public:
-    Connector(const std::string& name) : name(name) {}
+    Connector() = default;
 
     virtual ~Connector() {};
 
@@ -96,9 +96,6 @@ class Connector : public std::enable_shared_from_this<Connector> {
 
     // Mainly to describe yourself
     virtual void properties([[maybe_unused]] Properties& config) {}
-
-  public:
-    const std::string name;
 };
 
 using ConnectorHandle = std::shared_ptr<Connector>;

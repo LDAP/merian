@@ -24,7 +24,7 @@ DeviceSupportInfo Bloom::query_device_support(const DeviceSupportQueryInfo& quer
            reflect_comp.query_device_support(query_info);
 }
 
-void Bloom::initialize(const ContextHandle& context, const ResourceAllocatorHandle& allocator) {
+void Bloom::initialize(const ContextHandle& context, const ResourceAllocatorHandle& /*allocator*/) {
     this->context = context;
 
     separate_module = EntryPoint::create(context, merian_bloom_separate_slang_spv(),
@@ -35,22 +35,21 @@ void Bloom::initialize(const ContextHandle& context, const ResourceAllocatorHand
                                           vk::ShaderStageFlagBits::eCompute);
 }
 
-std::vector<InputConnectorHandle> Bloom::describe_inputs() {
-    return {con_src};
+std::vector<InputConnectorDescriptor> Bloom::describe_inputs() {
+    return {{"src", con_src}};
 }
 
-std::vector<OutputConnectorHandle> Bloom::describe_outputs(const NodeIOLayout& io_layout) {
+std::vector<OutputConnectorDescriptor> Bloom::describe_outputs(const NodeIOLayout& io_layout) {
     const vk::ImageCreateInfo create_info = io_layout[con_src]->get_create_info_or_throw();
     const vk::Format format = create_info.format;
     const vk::Extent3D extent = create_info.extent;
 
-    con_out = ManagedVkImageOut::compute_write("out", format, extent);
-    con_interm =
-        ManagedVkImageOut::compute_read_write("interm", vk::Format::eR16G16B16A16Sfloat, extent);
+    con_out = ManagedVkImageOut::compute_write(format, extent);
+    con_interm = ManagedVkImageOut::compute_read_write(vk::Format::eR16G16B16A16Sfloat, extent);
 
     return {
-        con_out,
-        con_interm,
+        {"out", con_out},
+        {"interm", con_interm},
     };
 }
 

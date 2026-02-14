@@ -19,13 +19,12 @@ class PtrIn : public InputConnector,
               public AccessibleConnector<const std::shared_ptr<T>&> {
 
   public:
-    PtrIn(const std::string& name, const uint32_t delay) : InputConnector(name, delay) {}
+    PtrIn(const uint32_t delay) : InputConnector(delay) {}
 
     void on_connect_output(const OutputConnectorHandle& output) override {
         auto casted_output = std::dynamic_pointer_cast<PtrOut<T>>(output);
         if (!casted_output) {
-            throw graph_errors::invalid_connection{
-                fmt::format("AnyIn {} cannot recive from {}.", Connector::name, output->name)};
+            throw graph_errors::invalid_connection{"PtrIn cannot receive from output."};
         }
     }
 
@@ -50,8 +49,8 @@ class PtrIn : public InputConnector,
     }
 
   public:
-    static PtrInHandle<T> create(const std::string& name, const uint32_t delay = 0) {
-        return std::make_shared<PtrIn<T>>(name, delay);
+    static PtrInHandle<T> create(const uint32_t delay = 0) {
+        return std::make_shared<PtrIn<T>>(delay);
     }
 };
 

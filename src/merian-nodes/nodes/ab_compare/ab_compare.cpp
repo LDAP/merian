@@ -5,20 +5,20 @@ namespace merian {
 
 AbstractABCompare::~AbstractABCompare() {}
 
-std::vector<InputConnectorHandle> AbstractABCompare::describe_inputs() {
-    return {con_in_a, con_in_b};
+std::vector<InputConnectorDescriptor> AbstractABCompare::describe_inputs() {
+    return {{"a", con_in_a}, {"b", con_in_b}};
 }
 
-std::vector<OutputConnectorHandle> ABSplit::describe_outputs(const NodeIOLayout& io_layout) {
+std::vector<OutputConnectorDescriptor> ABSplit::describe_outputs(const NodeIOLayout& io_layout) {
     const vk::ImageCreateInfo create_info = io_layout[con_in_a]->get_create_info_or_throw();
 
     vk::Format format = output_format.has_value() ? output_format.value() : create_info.format;
     vk::Extent3D extent =
         output_extent.has_value() ? vk::Extent3D(output_extent.value(), 1) : create_info.extent;
 
-    con_out = ManagedVkImageOut::transfer_write("out", format, extent.width, extent.height);
+    con_out = ManagedVkImageOut::transfer_write(format, extent.width, extent.height);
 
-    return {con_out};
+    return {{"out", con_out}};
 }
 
 void ABSplit::process([[maybe_unused]] GraphRun& run,
@@ -43,7 +43,8 @@ void ABSplit::process([[maybe_unused]] GraphRun& run,
 
 // --------------------------------------------------------------------------------
 
-std::vector<OutputConnectorHandle> ABSideBySide::describe_outputs(const NodeIOLayout& io_layout) {
+std::vector<OutputConnectorDescriptor>
+ABSideBySide::describe_outputs(const NodeIOLayout& io_layout) {
     const vk::ImageCreateInfo create_info = io_layout[con_in_a]->get_create_info_or_throw();
 
     vk::Format format = output_format.has_value() ? output_format.value() : create_info.format;
@@ -56,9 +57,9 @@ std::vector<OutputConnectorHandle> ABSideBySide::describe_outputs(const NodeIOLa
         extent.width *= 2;
     }
 
-    con_out = ManagedVkImageOut::transfer_write("out", format, extent.width, extent.height);
+    con_out = ManagedVkImageOut::transfer_write(format, extent.width, extent.height);
 
-    return {con_out};
+    return {{"out", con_out}};
 }
 
 void ABSideBySide::process([[maybe_unused]] GraphRun& run,

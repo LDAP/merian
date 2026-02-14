@@ -26,9 +26,9 @@ class TAA : public AbstractCompute {
     void initialize(const ContextHandle& context,
                     const ResourceAllocatorHandle& allocator) override;
 
-    std::vector<InputConnectorHandle> describe_inputs() override;
+    std::vector<InputConnectorDescriptor> describe_inputs() override;
 
-    std::vector<OutputConnectorHandle> describe_outputs(const NodeIOLayout& io_layout) override;
+    std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
 
     const void* get_push_constant([[maybe_unused]] GraphRun& run,
                                   [[maybe_unused]] const NodeIO& io) override;
@@ -45,8 +45,8 @@ class TAA : public AbstractCompute {
     VulkanEntryPointHandle shader;
     SpecializationInfoHandle spec_info;
 
-    VkSampledImageInHandle con_src = VkSampledImageIn::compute_read("src");
-    VkSampledImageInHandle con_mv = VkSampledImageIn::compute_read("mv", 0, true);
+    VkSampledImageInHandle con_src = VkSampledImageIn::compute_read();
+    VkSampledImageInHandle con_mv = VkSampledImageIn::compute_read(0, true);
 
     PushConstant pc;
     uint32_t width{};

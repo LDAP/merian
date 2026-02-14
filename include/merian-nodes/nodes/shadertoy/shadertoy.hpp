@@ -31,7 +31,7 @@ class Shadertoy : public AbstractCompute {
     void initialize(const ContextHandle& context,
                     const ResourceAllocatorHandle& allocator) override;
 
-    std::vector<OutputConnectorHandle> describe_outputs(const NodeIOLayout& io_layout) override;
+    std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
 
     const void* get_push_constant(GraphRun& run, const NodeIO& io) override;
 

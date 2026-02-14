@@ -3,10 +3,9 @@
 
 namespace merian {
 
-VkTLASIn::VkTLASIn(const std::string& name,
-                   const vk::ShaderStageFlags stage_flags,
+VkTLASIn::VkTLASIn(const vk::ShaderStageFlags stage_flags,
                    const vk::PipelineStageFlags2 pipeline_stages)
-    : InputConnector(name, 0), stage_flags(stage_flags), pipeline_stages(pipeline_stages) {
+    : InputConnector(0), stage_flags(stage_flags), pipeline_stages(pipeline_stages) {
     assert(stage_flags);
     assert(pipeline_stages);
 }
@@ -14,8 +13,7 @@ VkTLASIn::VkTLASIn(const std::string& name,
 void VkTLASIn::on_connect_output(const OutputConnectorHandle& output) {
     auto casted_output = std::dynamic_pointer_cast<VkTLASOut>(output);
     if (!casted_output) {
-        throw graph_errors::invalid_connection{
-            fmt::format("VkTLASIn {} cannot receive from {}.", name, output->name)};
+        throw graph_errors::invalid_connection{"VkTLASIn cannot receive from output."};
     }
 }
 
@@ -36,13 +34,13 @@ const AccelerationStructureHandle& VkTLASIn::resource(const GraphResourceHandle&
     return debugable_ptr_cast<TLASResource>(resource)->tlas;
 }
 
-VkTLASInHandle VkTLASIn::compute_read(const std::string& name) {
-    return std::make_shared<VkTLASIn>(name, vk::ShaderStageFlagBits::eCompute,
+VkTLASInHandle VkTLASIn::compute_read() {
+    return std::make_shared<VkTLASIn>(vk::ShaderStageFlagBits::eCompute,
                                       vk::PipelineStageFlagBits2::eComputeShader);
 }
 
-VkTLASInHandle VkTLASIn::fragment_read(const std::string& name) {
-    return std::make_shared<VkTLASIn>(name, vk::ShaderStageFlagBits::eFragment,
+VkTLASInHandle VkTLASIn::fragment_read() {
+    return std::make_shared<VkTLASIn>(vk::ShaderStageFlagBits::eFragment,
                                       vk::PipelineStageFlagBits2::eFragmentShader);
 }
 

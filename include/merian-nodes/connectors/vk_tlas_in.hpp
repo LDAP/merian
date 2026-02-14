@@ -17,9 +17,7 @@ class VkTLASIn : public InputConnector,
     friend class VkTLASOut;
 
   public:
-    VkTLASIn(const std::string& name,
-             const vk::ShaderStageFlags stage_flags,
-             const vk::PipelineStageFlags2 pipeline_stages);
+    VkTLASIn(const vk::ShaderStageFlags stage_flags, const vk::PipelineStageFlags2 pipeline_stages);
 
     void on_connect_output(const OutputConnectorHandle& output) override;
 
@@ -34,9 +32,9 @@ class VkTLASIn : public InputConnector,
 
   public:
     // Creates an output that has to set the TLAS and can it read in a shader.
-    static VkTLASInHandle compute_read(const std::string& name);
+    static VkTLASInHandle compute_read();
 
-    static VkTLASInHandle fragment_read(const std::string& name);
+    static VkTLASInHandle fragment_read();
 
   private:
     const vk::ShaderStageFlags stage_flags;

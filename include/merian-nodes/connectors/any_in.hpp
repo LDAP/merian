@@ -18,7 +18,7 @@ class AnyIn : public InputConnector,
               public AccessibleConnector<const std::any&> {
 
   public:
-    AnyIn(const std::string& name, const uint32_t delay);
+    AnyIn(const uint32_t delay);
 
     const std::any& resource(const GraphResourceHandle& resource) override;
 
@@ -33,7 +33,7 @@ class AnyIn : public InputConnector,
                     std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) override;
 
   public:
-    static AnyInHandle create(const std::string& name, const uint32_t delay = 0);
+    static AnyInHandle create(const uint32_t delay = 0);
 };
 
 } // namespace merian

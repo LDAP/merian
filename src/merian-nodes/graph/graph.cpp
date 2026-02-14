@@ -313,8 +313,8 @@ void Graph::run_node(GraphRun& run,
                                           resource_index);
             }
             if ((flags & Connector::ConnectorStatusFlagBits::NEEDS_RECONNECT) != 0u) {
-                SPDLOG_DEBUG("input connector {} at node {} requested reconnect.", input->name,
-                             data.identifier);
+                SPDLOG_DEBUG("input connector {} at node {} requested reconnect.",
+                             data.input_name_for_connector.at(input), data.identifier);
                 request_reconnect();
             }
         }
@@ -326,8 +326,8 @@ void Graph::run_node(GraphRun& run,
                 record_descriptor_updates(data, output, per_output_info, resource_index);
             }
             if ((flags & Connector::ConnectorStatusFlagBits::NEEDS_RECONNECT) != 0u) {
-                SPDLOG_DEBUG("output connector {} at node {} requested reconnect.", output->name,
-                             data.identifier);
+                SPDLOG_DEBUG("output connector {} at node {} requested reconnect.",
+                             data.output_name_for_connector.at(output), data.identifier);
                 request_reconnect();
             }
         }
@@ -379,8 +379,8 @@ void Graph::run_node(GraphRun& run,
                                           resource_index);
             }
             if ((flags & Connector::ConnectorStatusFlagBits::NEEDS_RECONNECT) != 0u) {
-                SPDLOG_DEBUG("input connector {} at node {} requested reconnect.", input->name,
-                             data.identifier);
+                SPDLOG_DEBUG("input connector {} at node {} requested reconnect.",
+                             data.input_name_for_connector.at(input), data.identifier);
                 request_reconnect();
             }
         }
@@ -392,8 +392,8 @@ void Graph::run_node(GraphRun& run,
                 record_descriptor_updates(data, output, per_output_info, resource_index);
             }
             if ((flags & Connector::ConnectorStatusFlagBits::NEEDS_RECONNECT) != 0u) {
-                SPDLOG_DEBUG("output connector {} at node {} requested reconnect.", output->name,
-                             data.identifier);
+                SPDLOG_DEBUG("output connector {} at node {} requested reconnect.",
+                             data.output_name_for_connector.at(output), data.identifier);
                 request_reconnect();
             }
         }

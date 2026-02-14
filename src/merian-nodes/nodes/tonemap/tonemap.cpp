@@ -37,13 +37,13 @@ void Tonemap::make_spec_info() {
                            "main", vk::ShaderStageFlagBits::eCompute, spec_info);
 }
 
-std::vector<InputConnectorHandle> Tonemap::describe_inputs() {
+std::vector<InputConnectorDescriptor> Tonemap::describe_inputs() {
     return {
-        con_src,
+        {"src", con_src},
     };
 }
 
-std::vector<OutputConnectorHandle>
+std::vector<OutputConnectorDescriptor>
 Tonemap::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
     const vk::ImageCreateInfo create_info = io_layout[con_src]->get_create_info_or_throw();
 
@@ -51,7 +51,7 @@ Tonemap::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
     const vk::Format format = output_format.value_or(create_info.format);
 
     return {
-        ManagedVkImageOut::compute_write("out", format, extent),
+        {"out", ManagedVkImageOut::compute_write(format, extent)},
     };
 }
 

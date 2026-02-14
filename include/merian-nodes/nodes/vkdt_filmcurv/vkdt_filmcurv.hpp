@@ -26,9 +26,9 @@ class VKDTFilmcurv : public TypedPCAbstractCompute<VKDTFilmcurvePushConstant> {
     void initialize(const ContextHandle& context,
                     const ResourceAllocatorHandle& allocator) override;
 
-    std::vector<InputConnectorHandle> describe_inputs() override;
+    std::vector<InputConnectorDescriptor> describe_inputs() override;
 
-    std::vector<OutputConnectorHandle> describe_outputs(const NodeIOLayout& io_layout) override;
+    std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
 
     const VKDTFilmcurvePushConstant& get_typed_push_constant(GraphRun& run,
                                                              const NodeIO& io) override;
@@ -43,7 +43,7 @@ class VKDTFilmcurv : public TypedPCAbstractCompute<VKDTFilmcurvePushConstant> {
   private:
     std::optional<vk::Format> output_format = std::nullopt;
 
-    VkSampledImageInHandle con_src = VkSampledImageIn::compute_read("src");
+    VkSampledImageInHandle con_src = VkSampledImageIn::compute_read();
     vk::Extent3D extent;
 
     VulkanEntryPointHandle shader;

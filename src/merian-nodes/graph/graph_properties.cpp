@@ -354,11 +354,14 @@ void Graph::io_props_for_node(Properties& config, NodeHandle& node, NodeData& da
     if (!needs_reconnect && !data.output_connections.empty() &&
         config.st_begin_child("outputs", "Outputs")) {
         for (auto& [output, per_output_info] : data.output_connections) {
-            if (config.st_begin_child(output->name, output->name)) {
+            const std::string& output_name = data.output_name_for_connector.at(output);
+            if (config.st_begin_child(output_name, output_name)) {
                 std::vector<std::string> receivers;
                 receivers.reserve(per_output_info.inputs.size());
                 for (auto& [node, input] : per_output_info.inputs) {
-                    receivers.emplace_back(fmt::format("({}, {} ({}))", input->name,
+                    const std::string& input_name =
+                        node_data.at(node).input_name_for_connector.at(input);
+                    receivers.emplace_back(fmt::format("({}, {} ({}))", input_name,
                                                        node_data.at(node).identifier,
                                                        registry.node_type_name(node)));
                 }
@@ -398,7 +401,8 @@ void Graph::io_props_for_node(Properties& config, NodeHandle& node, NodeData& da
     if (!needs_reconnect && !data.input_connectors.empty() &&
         config.st_begin_child("inputs", "Inputs")) {
         for (const auto& input : data.input_connectors) {
-            if (config.st_begin_child(input->name, input->name)) {
+            const std::string& input_name = data.input_name_for_connector.at(input);
+            if (config.st_begin_child(input_name, input_name)) {
                 config.st_separate("Input Properties");
                 input->properties(config);
                 config.st_separate("Connection");
@@ -411,8 +415,11 @@ void Graph::io_props_for_node(Properties& config, NodeHandle& node, NodeData& da
                                         ? "None"
                                         : std::to_string(per_input_info.descriptor_set_binding)));
                     if (per_input_info.output) {
+                        const std::string& src_output_name =
+                            node_data.at(per_input_info.node)
+                                .output_name_for_connector.at(per_input_info.output);
                         config.output_text(
-                            fmt::format("Receiving from: {}, {} ({})", per_input_info.output->name,
+                            fmt::format("Receiving from: {}, {} ({})", src_output_name,
                                         node_data.at(per_input_info.node).identifier,
                                         registry.node_type_name(per_input_info.node)));
                     } else {
@@ -422,10 +429,10 @@ void Graph::io_props_for_node(Properties& config, NodeHandle& node, NodeData& da
                     config.output_text("Input not connected.");
                 }
 
-                if (data.desired_incoming_connections.contains(input->name) &&
+                if (data.desired_incoming_connections.contains(input_name) &&
                     config.config_bool("Remove Connection")) {
-                    auto& incoming_conection = data.desired_incoming_connections.at(input->name);
-                    remove_connection(incoming_conection.first, node, input->name);
+                    auto& incoming_conection = data.desired_incoming_connections.at(input_name);
+                    remove_connection(incoming_conection.first, node, input_name);
                 }
 
                 config.st_end_child();

@@ -17,8 +17,7 @@ class SpecialStaticOut : public OutputConnector,
                          public AccessibleConnector<const ValueType&>,
                          public GraphResource {
   public:
-    SpecialStaticOut(const std::string& name, const ValueType& value)
-        : OutputConnector(name, false), connector_value(value) {}
+    SpecialStaticOut(const ValueType& value) : OutputConnector(false), connector_value(value) {}
 
     using ResourceType = SpecialStaticOut<ValueType>;
 
@@ -83,9 +82,8 @@ class SpecialStaticOut : public OutputConnector,
     }
 
   public:
-    static SpecialStaticOutHandle<ValueType> create(const std::string& name,
-                                                    const ValueType& value) {
-        return std::make_shared<SpecialStaticOut<ValueType>>(name, value);
+    static SpecialStaticOutHandle<ValueType> create(const ValueType& value) {
+        return std::make_shared<SpecialStaticOut<ValueType>>(value);
     }
 
   private:

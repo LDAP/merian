@@ -15,8 +15,7 @@ MedianApproxNode::MedianApproxNode() {}
 
 MedianApproxNode::~MedianApproxNode() {}
 
-DeviceSupportInfo
-MedianApproxNode::query_device_support(const DeviceSupportQueryInfo& query_info) {
+DeviceSupportInfo MedianApproxNode::query_device_support(const DeviceSupportQueryInfo& query_info) {
     SpirvReflect reflect_hist(merian_median_histogram_comp_spv(),
                               merian_median_histogram_comp_spv_size());
     SpirvReflect reflect_reduce(merian_median_reduce_comp_spv(),
@@ -37,23 +36,23 @@ void MedianApproxNode::initialize(const ContextHandle& context,
                                 vk::ShaderStageFlagBits::eCompute);
 }
 
-std::vector<InputConnectorHandle> MedianApproxNode::describe_inputs() {
-    return {con_src};
+std::vector<InputConnectorDescriptor> MedianApproxNode::describe_inputs() {
+    return {{"src", con_src}};
 }
 
-std::vector<OutputConnectorHandle>
+std::vector<OutputConnectorDescriptor>
 MedianApproxNode::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
 
     con_median = std::make_shared<ManagedVkBufferOut>(
-        "median", vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
+        vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
         vk::PipelineStageFlagBits2::eComputeShader, vk::ShaderStageFlagBits::eCompute,
         vk::BufferCreateInfo({}, sizeof(float), vk::BufferUsageFlagBits::eStorageBuffer));
     con_histogram = std::make_shared<ManagedVkBufferOut>(
-        "histogram", vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
+        vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
         vk::PipelineStageFlagBits2::eComputeShader, vk::ShaderStageFlagBits::eCompute,
         vk::BufferCreateInfo({}, local_size_x * local_size_y * sizeof(uint32_t),
                              vk::BufferUsageFlagBits::eStorageBuffer));
-    return {con_median, con_histogram};
+    return {{"median", con_median}, {"histogram", con_histogram}};
 }
 
 MedianApproxNode::NodeStatusFlags

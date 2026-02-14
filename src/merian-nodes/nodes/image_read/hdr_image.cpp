@@ -20,7 +20,7 @@ HDRImageRead::~HDRImageRead() {
     }
 }
 
-std::vector<OutputConnectorHandle>
+std::vector<OutputConnectorDescriptor>
 HDRImageRead::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
     if (filename.empty()) {
         throw graph_errors::node_error{"no file set"};
@@ -32,11 +32,11 @@ HDRImageRead::describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
         throw graph_errors::node_error{"format not supported!"};
     }
 
-    con_out = ManagedVkImageOut::transfer_write("out", vk::Format::eR32G32B32A32Sfloat, width,
-                                                height, 1, true);
+    con_out =
+        ManagedVkImageOut::transfer_write(vk::Format::eR32G32B32A32Sfloat, width, height, 1, true);
 
     needs_run = true;
-    return {con_out};
+    return {{"out", con_out}};
 }
 
 void HDRImageRead::process([[maybe_unused]] GraphRun& run,

@@ -19,9 +19,7 @@ class UnmanagedVkBufferOut : public VkBufferOut,
 
   public:
     // No descriptor binding is created.
-    UnmanagedVkBufferOut(const std::string& name,
-                         const uint32_t array_size,
-                         const vk::BufferUsageFlags buffer_usage_flags);
+    UnmanagedVkBufferOut(const uint32_t array_size, const vk::BufferUsageFlags buffer_usage_flags);
 
     GraphResourceHandle
     create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
@@ -41,8 +39,7 @@ class UnmanagedVkBufferOut : public VkBufferOut,
                    std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) override;
 
   public:
-    static UnmanagedVkBufferOutHandle create(const std::string& name,
-                                             const uint32_t array_size,
+    static UnmanagedVkBufferOutHandle create(const uint32_t array_size,
                                              const vk::BufferUsageFlags buffer_usage_flags);
 
   private:

@@ -232,18 +232,18 @@ class DeviceASBuilder : public Node {
         as_builder.emplace(context, allocator);
     }
 
-    std::vector<InputConnectorHandle> describe_inputs() override {
+    std::vector<InputConnectorDescriptor> describe_inputs() override {
         return {
-            con_in_instance_info,
-            con_in_vtx_buffers,
-            con_in_idx_buffers,
+            {"tlas_info", con_in_instance_info},
+            {"vtx", con_in_vtx_buffers},
+            {"idx", con_in_idx_buffers},
         };
     }
 
-    std::vector<OutputConnectorHandle>
+    std::vector<OutputConnectorDescriptor>
     describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) override {
         return {
-            con_out_tlas,
+            {"tlas", con_out_tlas},
         };
     }
 
@@ -366,13 +366,13 @@ class DeviceASBuilder : public Node {
     std::optional<ASBuilder> as_builder;
 
     // clang-format off
-    PtrInHandle<TlasBuildInfo> con_in_instance_info = PtrIn<TlasBuildInfo>::create("tlas_info");
+    PtrInHandle<TlasBuildInfo> con_in_instance_info = PtrIn<TlasBuildInfo>::create();
 
     // todo: Add those as optional inputs somehow to ensure proper synchronization.
-    VkBufferInHandle con_in_vtx_buffers = VkBufferIn::acceleration_structure_read("vtx");
-    VkBufferInHandle con_in_idx_buffers = VkBufferIn::acceleration_structure_read("idx");
+    VkBufferInHandle con_in_vtx_buffers = VkBufferIn::acceleration_structure_read();
+    VkBufferInHandle con_in_idx_buffers = VkBufferIn::acceleration_structure_read();
 
-    VkTLASOutHandle con_out_tlas = VkTLASOut::create("tlas");
+    VkTLASOutHandle con_out_tlas = VkTLASOut::create();
     // clang-format on
 
     BufferHandle scratch_buffer;

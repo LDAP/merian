@@ -13,9 +13,9 @@ class ColorImage : public Node {
 
     ~ColorImage();
 
-    std::vector<InputConnectorHandle> describe_inputs() override;
+    std::vector<InputConnectorDescriptor> describe_inputs() override;
 
-    std::vector<OutputConnectorHandle> describe_outputs(const NodeIOLayout& io_layout) override;
+    std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
 
     void
     process(GraphRun& run, const DescriptorSetHandle& descriptor_set, const NodeIO& io) override;
@@ -31,7 +31,7 @@ class ColorImage : public Node {
     bool needs_run = true;
     ManagedVkImageOutHandle con_out;
     SpecialStaticInHandle<vk::Extent3D> con_resolution =
-        SpecialStaticIn<vk::Extent3D>::create("resolution", true);
+        SpecialStaticIn<vk::Extent3D>::create(true);
 };
 
 } // namespace merian

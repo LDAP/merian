@@ -22,13 +22,14 @@ ImageWrite::ImageWrite() {}
 
 ImageWrite::~ImageWrite() {}
 
-void ImageWrite::initialize(const ContextHandle& context, const ResourceAllocatorHandle& allocator) {
+void ImageWrite::initialize(const ContextHandle& context,
+                            const ResourceAllocatorHandle& allocator) {
     this->context = context;
     this->allocator = allocator;
 }
 
-std::vector<InputConnectorHandle> ImageWrite::describe_inputs() {
-    return {con_src};
+std::vector<InputConnectorDescriptor> ImageWrite::describe_inputs() {
+    return {{"src", con_src}};
 }
 
 void ImageWrite::record(const std::chrono::nanoseconds& current_graph_time) {

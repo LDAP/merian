@@ -37,19 +37,23 @@ void Accumulate::initialize(const ContextHandle& context,
                                            vk::ShaderStageFlagBits::eCompute);
 }
 
-std::vector<InputConnectorHandle> Accumulate::describe_inputs() {
+std::vector<InputConnectorDescriptor> Accumulate::describe_inputs() {
     return {
-        con_src, con_gbuf, con_mv, con_prev_out, con_prev_gbuf, con_prev_history,
+        {"src", con_src},
+        {"gbuffer", con_gbuf},
+        {"mv", con_mv},
+        {"prev_out", con_prev_out},
+        {"prev_gbuffer", con_prev_gbuf},
+        {"prev_history", con_prev_history},
     };
 }
 
-std::vector<OutputConnectorHandle> Accumulate::describe_outputs(const NodeIOLayout& io_layout) {
+std::vector<OutputConnectorDescriptor> Accumulate::describe_outputs(const NodeIOLayout& io_layout) {
 
     irr_create_info = io_layout[con_src]->get_create_info_or_throw();
-    con_out = ManagedVkImageOut::compute_write("out", format.value_or(irr_create_info.format),
+    con_out = ManagedVkImageOut::compute_write(format.value_or(irr_create_info.format),
                                                irr_create_info.extent);
-    con_history =
-        ManagedVkImageOut::compute_write("history", vk::Format::eR32Sfloat, irr_create_info.extent);
+    con_history = ManagedVkImageOut::compute_write(vk::Format::eR32Sfloat, irr_create_info.extent);
 
     io_layout.register_event_listener(clear_event_listener_pattern,
                                       [this](const GraphEvent::Info&, const GraphEvent::Data&) {
@@ -58,8 +62,8 @@ std::vector<OutputConnectorHandle> Accumulate::describe_outputs(const NodeIOLayo
                                       });
 
     return {
-        con_out,
-        con_history,
+        {"out", con_out},
+        {"history", con_history},
 
     };
 }

@@ -9,9 +9,7 @@ using VkImageOutHandle = std::shared_ptr<VkImageOut>;
 
 class VkImageOut : public OutputConnector {
   public:
-    VkImageOut(const std::string& name,
-               const bool persistent = false,
-               const uint32_t array_size = 1);
+    VkImageOut(const bool persistent = false, const uint32_t array_size = 1);
 
     uint32_t get_array_size() const;
 

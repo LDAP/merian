@@ -34,12 +34,12 @@ class GLFWWindowNode : public Node {
         }
     }
 
-    virtual std::vector<InputConnectorHandle> describe_inputs() override {
+    virtual std::vector<InputConnectorDescriptor> describe_inputs() override {
         if (!window) {
             throw graph_errors::node_error{"node requires ExtensionVkGLFW context extension"};
         }
 
-        return {image_in};
+        return {{"src", image_in}};
     }
 
     virtual NodeStatusFlags pre_process([[maybe_unused]] const GraphRun& run,
@@ -279,7 +279,7 @@ class GLFWWindowNode : public Node {
         on_blit_completed = []([[maybe_unused]] const CommandBufferHandle& cmd,
                                [[maybe_unused]] const SwapchainAcquireResult& acquire_result) {};
 
-    VkImageInHandle image_in = VkImageIn::transfer_src("src", 0, true);
+    VkImageInHandle image_in = VkImageIn::transfer_src(0, true);
 
     std::array<int, 4> windowed_pos_size;
     bool request_rebuild_on_recreate = false;

@@ -77,11 +77,15 @@ void Graph::connect() {
 #ifndef NDEBUG
                         if (std::find(data.input_connectors.begin(), data.input_connectors.end(),
                                       input) == data.input_connectors.end()) {
+                            const std::string& input_name =
+                                data.input_name_for_connector.contains(input)
+                                    ? data.input_name_for_connector.at(input)
+                                    : "<unknown>";
                             throw std::runtime_error{fmt::format(
                                 "Node {} tried to get an output connector for an input {} "
                                 "which was not returned in describe_inputs (which is not "
                                 "how this works).",
-                                registry.node_type_name(node), input->name)};
+                                registry.node_type_name(node), input_name)};
                         }
 #endif
                         // for optional inputs we inserted a input connection with nullptr in
@@ -147,19 +151,21 @@ bool Graph::cache_node_input_connectors() {
     for (auto& [node, data] : node_data) {
         // Cache input connectors in node_data and check that there are no name conflicts.
         try {
-            data.input_connectors = node->describe_inputs();
+            auto input_descriptors = node->describe_inputs();
+            for (const auto& desc : input_descriptors) {
+                data.input_connectors.push_back(desc.connector);
+                if (data.input_connector_for_name.contains(desc.name)) {
+                    throw graph_errors::connector_error{
+                        fmt::format("node {} contains two input connectors with the same name {}",
+                                    registry.node_type_name(node), desc.name)};
+                }
+                data.input_connector_for_name[desc.name] = desc.connector;
+                data.input_name_for_connector[desc.connector] = desc.name;
+            }
         } catch (const graph_errors::node_error& e) {
             data.errors.emplace_back(fmt::format("node error: {}", e.what()));
         } catch (const GLSLShaderCompiler::compilation_failed& e) {
             data.errors.emplace_back(fmt::format("compilation failed: {}", e.what()));
-        }
-        for (const InputConnectorHandle& input : data.input_connectors) {
-            if (data.input_connector_for_name.contains(input->name)) {
-                throw graph_errors::connector_error{
-                    fmt::format("node {} contains two input connectors with the same name {}",
-                                registry.node_type_name(node), input->name)};
-            }
-            data.input_connector_for_name[input->name] = input;
         }
     }
 
@@ -206,15 +212,19 @@ bool Graph::cache_node_input_connectors() {
 
 void Graph::cache_node_output_connectors(const NodeHandle& node, NodeData& data) {
     try {
-        data.output_connectors = node->describe_outputs(NodeIOLayout(
+        auto output_descriptors = node->describe_outputs(NodeIOLayout(
             [&](const InputConnectorHandle& input) {
 #ifndef NDEBUG
+                const std::string& input_name = data.input_name_for_connector.contains(input)
+                                                    ? data.input_name_for_connector.at(input)
+                                                    : "<unknown>";
+
                 if (input->delay > 0) {
                     throw std::runtime_error{fmt::format(
                         "Node {} tried to access an output connector that is connected "
                         "through a delayed input {} (which is not allowed here but only in "
                         "on_connected).",
-                        registry.node_type_name(node), input->name)};
+                        registry.node_type_name(node), input_name)};
                 }
                 if (std::find(data.input_connectors.begin(), data.input_connectors.end(), input) ==
                     data.input_connectors.end()) {
@@ -222,7 +232,7 @@ void Graph::cache_node_output_connectors(const NodeHandle& node, NodeData& data)
                         fmt::format("Node {} tried to get an output connector for an input {} "
                                     "which was not returned in describe_inputs (which is not "
                                     "how this works).",
-                                    registry.node_type_name(node), input->name)};
+                                    registry.node_type_name(node), input_name)};
                 }
 #endif
                 // for optional inputs we inserted a input connection with nullptr in
@@ -232,27 +242,29 @@ void Graph::cache_node_output_connectors(const NodeHandle& node, NodeData& data)
             [&](const std::string& event_pattern, const GraphEvent::Listener& listener) {
                 register_event_listener_for_connect(event_pattern, listener);
             }));
+
+        for (const auto& desc : output_descriptors) {
+#ifndef NDEBUG
+            if (!desc.connector) {
+                SPDLOG_CRITICAL("node {} ({}) returned nullptr in describe_outputs",
+                                data.identifier, registry.node_type_name(node));
+                assert(desc.connector && "node returned nullptr in describe_outputs");
+            }
+#endif
+            if (data.output_connector_for_name.contains(desc.name)) {
+                throw graph_errors::connector_error{
+                    fmt::format("node {} contains two output connectors with the same name {}",
+                                registry.node_type_name(node), desc.name)};
+            }
+            data.output_connectors.push_back(desc.connector);
+            data.output_connector_for_name.try_emplace(desc.name, desc.connector);
+            data.output_name_for_connector[desc.connector] = desc.name;
+            data.output_connections.try_emplace(desc.connector);
+        }
     } catch (const graph_errors::node_error& e) {
         data.errors.emplace_back(fmt::format("node error: {}", e.what()));
     } catch (const GLSLShaderCompiler::compilation_failed& e) {
         data.errors.emplace_back(fmt::format("compilation failed: {}", e.what()));
-    }
-
-    for (const auto& output : data.output_connectors) {
-#ifndef NDEBUG
-        if (!output) {
-            SPDLOG_CRITICAL("node {} ({}) returned nullptr in describe_outputs", data.identifier,
-                            registry.node_type_name(node));
-            assert(output && "node returned nullptr in describe_outputs");
-        }
-#endif
-        if (data.output_connector_for_name.contains(output->name)) {
-            throw graph_errors::connector_error{
-                fmt::format("node {} contains two output connectors with the same name {}",
-                            registry.node_type_name(node), output->name)};
-        }
-        data.output_connector_for_name.try_emplace(output->name, output);
-        data.output_connections.try_emplace(output);
     }
 }
 
@@ -312,9 +324,9 @@ bool Graph::connect_node(const NodeHandle& node,
             SPDLOG_ERROR("input connector {} of node {} ({}) was connected to output "
                          "connector {} on node {} ({}) with delay {}, however the output "
                          "connector does not support delay. Removing connection.",
-                         dst_input->name, dst_data.identifier,
-                         registry.node_type_name(connection.dst), src_output->name, data.identifier,
-                         registry.node_type_name(node), dst_input->delay);
+                         connection.dst_input, dst_data.identifier,
+                         registry.node_type_name(connection.dst), connection.src_output,
+                         data.identifier, registry.node_type_name(node), dst_input->delay);
             remove_connection(node, connection.dst, connection.dst_input);
             return false;
         }
@@ -527,11 +539,16 @@ bool Graph::connect_nodes() {
 
                 const auto& [dst_node, dst_input] = *it;
                 const auto& dst_data = node_data.at(dst_node);
+
+                const std::string& src_output_name =
+                    src_data.output_name_for_connector.at(src_output);
+                const std::string& dst_input_name = dst_data.input_name_for_connector.at(dst_input);
+
                 if (!dst_data.errors.empty()) {
                     SPDLOG_TRACE("cleanup output connection to erroneous node: {}, {} ({}) -> "
                                  "{}, {} ({})",
-                                 src_output->name, src_data.identifier,
-                                 registry.node_type_name(src_node), dst_input->name,
+                                 src_output_name, src_data.identifier,
+                                 registry.node_type_name(src_node), dst_input_name,
                                  dst_data.identifier, registry.node_type_name(dst_node));
                     it = per_output_info.inputs.erase(it);
                 } else {
@@ -541,11 +558,11 @@ bool Graph::connect_nodes() {
                     } catch (const graph_errors::invalid_connection& e) {
                         SPDLOG_ERROR("Removing invalid connection {}, {} ({}) -> {}, {} ({}). "
                                      "Reason: {}",
-                                     src_output->name, src_data.identifier,
-                                     registry.node_type_name(src_node), dst_input->name,
+                                     src_output_name, src_data.identifier,
+                                     registry.node_type_name(src_node), dst_input_name,
                                      dst_data.identifier, registry.node_type_name(dst_node),
                                      e.what());
-                        remove_connection(src_node, dst_node, dst_input->name);
+                        remove_connection(src_node, dst_node, dst_input_name);
                         return false;
                     }
                     ++it;
@@ -566,9 +583,11 @@ void Graph::allocate_resources() {
                 max_delay = std::max(max_delay, std::get<1>(input)->delay);
             }
 
+            const std::string& output_name = data.output_name_for_connector.at(output);
+
             SPDLOG_DEBUG("creating, connecting and allocating {} resources for output {} on "
                          "node {} ({})",
-                         max_delay + 1, output->name, data.identifier,
+                         max_delay + 1, output_name, data.identifier,
                          registry.node_type_name(node));
             for (uint32_t i = 0; i <= max_delay; i++) {
                 const GraphResourceHandle res =
@@ -721,7 +740,8 @@ std::string Graph::make_error_input_not_connected(const InputConnectorHandle& in
                                                   const NodeData& data) {
     return fmt::format("the non-optional input {} on node {} ({}) is not "
                        "connected.",
-                       input->name, data.identifier, registry.node_type_name(node));
+                       data.input_name_for_connector.at(input), data.identifier,
+                       registry.node_type_name(node));
 }
 
 } // namespace merian

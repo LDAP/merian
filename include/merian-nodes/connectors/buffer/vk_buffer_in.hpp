@@ -16,8 +16,7 @@ class VkBufferIn : public InputConnector,
 
   public:
     // A descriptor binding is only created if stage flags are supplied.
-    VkBufferIn(const std::string& name,
-               const vk::BufferUsageFlags usage_flags = {},
+    VkBufferIn(const vk::BufferUsageFlags usage_flags = {},
                const vk::ShaderStageFlags stage_flags = {},
                const vk::AccessFlags2 access_flags = {},
                const vk::PipelineStageFlags2 pipeline_stages = {},
@@ -64,23 +63,19 @@ class VkBufferIn : public InputConnector,
 
   public:
     static VkBufferInHandle
-    compute_read(const std::string& name,
-                 const uint32_t delay = 0,
+    compute_read(const uint32_t delay = 0,
                  const bool optional = false,
                  const vk::BufferUsageFlags usage = vk::BufferUsageFlagBits::eStorageBuffer);
 
     static VkBufferInHandle
-    fragment_read(const std::string& name,
-                  const uint32_t delay = 0,
+    fragment_read(const uint32_t delay = 0,
                   const bool optional = false,
                   const vk::BufferUsageFlags usage = vk::BufferUsageFlagBits::eStorageBuffer);
 
-    static VkBufferInHandle acceleration_structure_read(const std::string& name,
-                                                        const uint32_t delay = 0,
+    static VkBufferInHandle acceleration_structure_read(const uint32_t delay = 0,
                                                         const bool optional = false);
 
-    static VkBufferInHandle
-    transfer_src(const std::string& name, const uint32_t delay = 0, const bool optional = false);
+    static VkBufferInHandle transfer_src(const uint32_t delay = 0, const bool optional = false);
 
   private:
     const vk::BufferUsageFlags usage_flags;

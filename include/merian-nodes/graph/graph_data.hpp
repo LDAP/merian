@@ -45,10 +45,12 @@ struct NodeData {
     // (on start_nodes added and checked for name conflicts)
     std::vector<InputConnectorHandle> input_connectors;
     std::unordered_map<std::string, InputConnectorHandle> input_connector_for_name;
+    std::unordered_map<InputConnectorHandle, std::string> input_name_for_connector;
     // Cache output connectors (node->describe_outputs())
     // (on conncet_nodes added and checked for name conflicts)
     std::vector<OutputConnectorHandle> output_connectors;
     std::unordered_map<std::string, OutputConnectorHandle> output_connector_for_name;
+    std::unordered_map<OutputConnectorHandle, std::string> output_name_for_connector;
 
     // --- Desired connections. ---
     // Set by the user using the public add_connection method.
@@ -126,6 +128,8 @@ struct NodeData {
 
         input_connector_for_name.clear();
         output_connector_for_name.clear();
+        input_name_for_connector.clear();
+        output_name_for_connector.clear();
 
         input_connections.clear();
         output_connections.clear();

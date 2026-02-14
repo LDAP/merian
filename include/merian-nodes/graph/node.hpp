@@ -16,6 +16,28 @@ namespace merian {
 
 class GraphInfo {};
 
+/**
+ * @brief Descriptor for a named input connector.
+ *
+ * Separates the connector definition from its name, allowing connectors to be reused
+ * across nodes with different names.
+ */
+struct InputConnectorDescriptor {
+    std::string name;
+    InputConnectorHandle connector;
+};
+
+/**
+ * @brief Descriptor for a named output connector.
+ *
+ * Separates the connector definition from its name, allowing connectors to be reused
+ * across nodes with different names.
+ */
+struct OutputConnectorDescriptor {
+    std::string name;
+    OutputConnectorHandle connector;
+};
+
 class Node : public std::enable_shared_from_this<Node> {
   public:
     using NodeStatusFlags = uint32_t;
@@ -114,7 +136,7 @@ class Node : public std::enable_shared_from_this<Node> {
     // If you throw node_error or compilation_failed the graph will disable the node for this
     // connect attempt and set the error state for this node. Your inputs will then be invisible.
     [[nodiscard]]
-    virtual std::vector<InputConnectorHandle> describe_inputs() {
+    virtual std::vector<InputConnectorDescriptor> describe_inputs() {
         return {};
     }
 
@@ -129,7 +151,7 @@ class Node : public std::enable_shared_from_this<Node> {
     // If you throw node_error or compilation_failed the graph will disable the node for this
     // connect attempt and set the error state for this node.
     [[nodiscard]]
-    virtual std::vector<OutputConnectorHandle>
+    virtual std::vector<OutputConnectorDescriptor>
     describe_outputs([[maybe_unused]] const NodeIOLayout& io_layout) {
         return {};
     }

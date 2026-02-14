@@ -7,7 +7,7 @@
 
 namespace merian {
 
-VkTLASOut::VkTLASOut(const std::string& name) : OutputConnector(name, true) {}
+VkTLASOut::VkTLASOut() : OutputConnector(true) {}
 
 GraphResourceHandle
 VkTLASOut::create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
@@ -55,8 +55,7 @@ Connector::ConnectorStatusFlags VkTLASOut::on_post_process(
     const auto& res = debugable_ptr_cast<TLASResource>(resource);
 
     if (!res->tlas) {
-        throw graph_errors::connector_error{
-            fmt::format("Node must set the TLAS for connector {}", name)};
+        throw graph_errors::connector_error{"Node must set the TLAS for connector"};
     }
 
     Connector::ConnectorStatusFlags flags{};
@@ -72,8 +71,8 @@ Connector::ConnectorStatusFlags VkTLASOut::on_post_process(
     return flags;
 }
 
-VkTLASOutHandle VkTLASOut::create(const std::string& name) {
-    return std::make_shared<VkTLASOut>(name);
+VkTLASOutHandle VkTLASOut::create() {
+    return std::make_shared<VkTLASOut>();
 }
 
 } // namespace merian

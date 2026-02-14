@@ -10,8 +10,8 @@ namespace merian {
 class InputConnector : public Connector {
 
   public:
-    InputConnector(const std::string& name, const uint32_t delay, const bool optional = false)
-        : Connector(name), delay(delay), optional(optional) {}
+    InputConnector(const uint32_t delay, const bool optional = false)
+        : delay(delay), optional(optional) {}
 
     virtual void properties(Properties& config) {
         config.output_text(fmt::format("delay: {}\noptional: {}", delay, optional));

@@ -5,17 +5,15 @@
 
 namespace merian {
 
-VkImageIn::VkImageIn(const std::string& name,
-                     const vk::AccessFlags2 access_flags,
+VkImageIn::VkImageIn(const vk::AccessFlags2 access_flags,
                      const vk::PipelineStageFlags2 pipeline_stages,
                      const vk::ImageLayout required_layout,
                      const vk::ImageUsageFlags usage_flags,
                      const vk::ShaderStageFlags stage_flags,
                      const uint32_t delay,
                      const bool optional)
-    : InputConnector(name, delay, optional), access_flags(access_flags),
-      pipeline_stages(pipeline_stages), required_layout(required_layout), usage_flags(usage_flags),
-      stage_flags(stage_flags) {}
+    : InputConnector(delay, optional), access_flags(access_flags), pipeline_stages(pipeline_stages),
+      required_layout(required_layout), usage_flags(usage_flags), stage_flags(stage_flags) {}
 
 Connector::ConnectorStatusFlags
 VkImageIn::on_pre_process([[maybe_unused]] GraphRun& run,
@@ -73,9 +71,8 @@ void VkImageIn::on_connect_output(const OutputConnectorHandle& output) {
 
     if (!casted_output) {
         throw graph_errors::invalid_connection{
-            fmt::format("This connector ({}) cannot receive recive from {}. Only connectors "
-                        "derived from VkImageOut are supported.",
-                        name, output->name)};
+            "This connector cannot receive from output. Only connectors "
+            "derived from VkImageOut are supported."};
     }
 
     array_size = casted_output->get_array_size();
@@ -85,10 +82,9 @@ const ImageArrayResource& VkImageIn::resource(const GraphResourceHandle& resourc
     return *debugable_ptr_cast<const ImageArrayResource>(resource);
 }
 
-std::shared_ptr<VkImageIn>
-VkImageIn::transfer_src(const std::string& name, const uint32_t delay, const bool optional) {
+std::shared_ptr<VkImageIn> VkImageIn::transfer_src(const uint32_t delay, const bool optional) {
     return std::make_shared<VkImageIn>(
-        name, vk::AccessFlagBits2::eTransferRead, vk::PipelineStageFlagBits2::eAllTransfer,
+        vk::AccessFlagBits2::eTransferRead, vk::PipelineStageFlagBits2::eAllTransfer,
         vk::ImageLayout::eTransferSrcOptimal, vk::ImageUsageFlagBits::eTransferSrc,
         vk::ShaderStageFlags(), delay, optional);
 }

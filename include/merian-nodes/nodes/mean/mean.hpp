@@ -4,8 +4,8 @@
 #include "merian-nodes/connectors/image/vk_image_in_sampled.hpp"
 #include "merian-nodes/graph/node.hpp"
 
-#include "merian/vk/pipeline/pipeline.hpp"
 #include "merian/shader/entry_point.hpp"
+#include "merian/vk/pipeline/pipeline.hpp"
 
 namespace merian {
 
@@ -33,9 +33,9 @@ class MeanToBuffer : public Node {
     void initialize(const ContextHandle& context,
                     const ResourceAllocatorHandle& allocator) override;
 
-    std::vector<InputConnectorHandle> describe_inputs() override;
+    std::vector<InputConnectorDescriptor> describe_inputs() override;
 
-    std::vector<OutputConnectorHandle> describe_outputs(const NodeIOLayout& io_layout) override;
+    std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
 
     NodeStatusFlags on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
                                  const DescriptorSetLayoutHandle& descriptor_set_layout) override;
@@ -46,7 +46,7 @@ class MeanToBuffer : public Node {
   private:
     ContextHandle context;
 
-    VkSampledImageInHandle con_src = VkSampledImageIn::compute_read("src");
+    VkSampledImageInHandle con_src = VkSampledImageIn::compute_read();
     ManagedVkBufferOutHandle con_mean;
 
     PushConstant pc;

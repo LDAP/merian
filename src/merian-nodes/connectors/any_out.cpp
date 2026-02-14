@@ -5,8 +5,7 @@
 
 namespace merian {
 
-AnyOut::AnyOut(const std::string& name, const bool persistent)
-    : OutputConnector(name, !persistent), persistent(persistent) {}
+AnyOut::AnyOut(const bool persistent) : OutputConnector(!persistent), persistent(persistent) {}
 
 GraphResourceHandle
 AnyOut::create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
@@ -46,16 +45,15 @@ AnyOut::on_post_process([[maybe_unused]] GraphRun& run,
                         [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) {
     const auto& res = debugable_ptr_cast<AnyResource>(resource);
     if (!res->any.has_value()) {
-        throw graph_errors::connector_error{
-            fmt::format("Node did not set the resource for output {}.", Connector::name)};
+        throw graph_errors::connector_error{"Node did not set the resource for output."};
     }
     res->processed_inputs = 0;
 
     return {};
 }
 
-AnyOutHandle AnyOut::create(const std::string& name, const bool persistent) {
-    return std::make_shared<AnyOut>(name, persistent);
+AnyOutHandle AnyOut::create(const bool persistent) {
+    return std::make_shared<AnyOut>(persistent);
 }
 
 } // namespace merian

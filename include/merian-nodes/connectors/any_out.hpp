@@ -14,7 +14,7 @@ using AnyOutHandle = std::shared_ptr<AnyOut>;
 class AnyOut : public OutputConnector, public AccessibleConnector<std::any&> {
 
   public:
-    AnyOut(const std::string& name, const bool persistent);
+    AnyOut(const bool persistent);
 
     GraphResourceHandle
     create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
@@ -42,7 +42,7 @@ class AnyOut : public OutputConnector, public AccessibleConnector<std::any&> {
         [[maybe_unused]] std::vector<vk::BufferMemoryBarrier2>& buffer_barriers) override;
 
   public:
-    static AnyOutHandle create(const std::string& name, const bool persistent = false);
+    static AnyOutHandle create(const bool persistent = false);
 
   private:
     const bool persistent;

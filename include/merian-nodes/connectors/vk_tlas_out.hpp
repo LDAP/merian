@@ -26,7 +26,7 @@ class VkTLASOut : public OutputConnector, public AccessibleConnector<TLASResourc
 
   public:
     // A descriptor binding is only created if stage_flags is not empty.
-    VkTLASOut(const std::string& name);
+    VkTLASOut();
 
     GraphResourceHandle
     create_resource(const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
@@ -55,7 +55,7 @@ class VkTLASOut : public OutputConnector, public AccessibleConnector<TLASResourc
 
   public:
     // Creates an output that has to set the TLAS.
-    static VkTLASOutHandle create(const std::string& name);
+    static VkTLASOutHandle create();
 };
 
 } // namespace merian

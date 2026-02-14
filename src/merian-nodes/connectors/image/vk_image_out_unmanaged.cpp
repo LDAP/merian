@@ -6,10 +6,9 @@
 
 namespace merian {
 
-UnmanagedVkImageOut::UnmanagedVkImageOut(const std::string& name,
-                                         const uint32_t array_size,
+UnmanagedVkImageOut::UnmanagedVkImageOut(const uint32_t array_size,
                                          const vk::ImageUsageFlags image_usage_flags)
-    : VkImageOut(name, false, array_size), image_usage_flags(image_usage_flags) {}
+    : VkImageOut(false, array_size), image_usage_flags(image_usage_flags) {}
 
 GraphResourceHandle UnmanagedVkImageOut::create_resource(
     [[maybe_unused]] const std::vector<std::tuple<NodeHandle, InputConnectorHandle>>& inputs,
@@ -45,9 +44,8 @@ GraphResourceHandle UnmanagedVkImageOut::create_resource(
         for (const auto& image : images) {
             if (image && (image->get_usage_flags() & all_usage_flags) != all_usage_flags) {
                 throw graph_errors::invalid_connection{
-                    fmt::format("images set for the unmanaged output connector {} are missing some "
-                                "usage flags for the new inputs.",
-                                name)};
+                    "images set for the unmanaged output connector are missing some "
+                    "usage flags for the new inputs."};
             }
         }
     }
@@ -79,10 +77,9 @@ Connector::ConnectorStatusFlags UnmanagedVkImageOut::on_pre_process(
     return {};
 }
 
-UnmanagedVkImageOutHandle UnmanagedVkImageOut::create(const std::string& name,
-                                                      const uint32_t array_size,
+UnmanagedVkImageOutHandle UnmanagedVkImageOut::create(const uint32_t array_size,
                                                       const vk::ImageUsageFlags image_usage_flags) {
-    return std::make_shared<UnmanagedVkImageOut>(name, array_size, image_usage_flags);
+    return std::make_shared<UnmanagedVkImageOut>(array_size, image_usage_flags);
 }
 
 } // namespace merian

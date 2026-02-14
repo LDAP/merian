@@ -17,7 +17,7 @@ class HDRImageRead : public Node {
     void initialize(const ContextHandle& context,
                     const ResourceAllocatorHandle& allocator) override;
 
-    std::vector<OutputConnectorHandle> describe_outputs(const NodeIOLayout& io_layout) override;
+    std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
 
     void
     process(GraphRun& run, const DescriptorSetHandle& descriptor_set, const NodeIO& io) override;

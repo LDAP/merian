@@ -13,8 +13,7 @@ using ManagedVkBufferOutHandle = std::shared_ptr<ManagedVkBufferOut>;
 class ManagedVkBufferOut : public VkBufferOut,
                            public AccessibleConnector<const BufferArrayResource&> {
   public:
-    ManagedVkBufferOut(const std::string& name,
-                       const vk::AccessFlags2& access_flags,
+    ManagedVkBufferOut(const vk::AccessFlags2& access_flags,
                        const vk::PipelineStageFlags2& pipeline_stages,
                        const vk::ShaderStageFlags& stage_flags,
                        const vk::BufferCreateInfo& create_info,
@@ -53,18 +52,14 @@ class ManagedVkBufferOut : public VkBufferOut,
 
     virtual BufferArrayResource& resource(const GraphResourceHandle& resource) override;
 
-
   public:
-    static ManagedVkBufferOutHandle compute_write(const std::string& name,
-                                                  const vk::BufferCreateInfo& create_info,
+    static ManagedVkBufferOutHandle compute_write(const vk::BufferCreateInfo& create_info,
                                                   const bool persistent = false);
 
-    static ManagedVkBufferOutHandle transfer_write(const std::string& name,
-                                                   const vk::BufferCreateInfo& create_info,
+    static ManagedVkBufferOutHandle transfer_write(const vk::BufferCreateInfo& create_info,
                                                    const bool persistent = false);
 
   private:
-
     const vk::AccessFlags2 access_flags;
     const vk::PipelineStageFlags2 pipeline_stages;
     const vk::ShaderStageFlags stage_flags;

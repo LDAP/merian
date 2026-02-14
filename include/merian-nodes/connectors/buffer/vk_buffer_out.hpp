@@ -9,9 +9,7 @@ using VkBufferOutHandle = std::shared_ptr<VkBufferOut>;
 
 class VkBufferOut : public OutputConnector {
   public:
-    VkBufferOut(const std::string& name,
-                const bool persistent = false,
-                const uint32_t array_size = 1);
+    VkBufferOut(const bool persistent = false, const uint32_t array_size = 1);
 
     uint32_t get_array_size() const;
 

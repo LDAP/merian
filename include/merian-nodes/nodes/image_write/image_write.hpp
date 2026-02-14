@@ -21,7 +21,7 @@ class ImageWrite : public Node {
     void initialize(const ContextHandle& context,
                     const ResourceAllocatorHandle& allocator) override;
 
-    virtual std::vector<InputConnectorHandle> describe_inputs() override;
+    virtual std::vector<InputConnectorDescriptor> describe_inputs() override;
 
     virtual NodeStatusFlags pre_process(const GraphRun& run, const NodeIO& io) override;
 
@@ -66,7 +66,7 @@ class ImageWrite : public Node {
     ContextHandle context;
     ResourceAllocatorHandle allocator;
 
-    VkImageInHandle con_src = VkImageIn::transfer_src("src");
+    VkImageInHandle con_src = VkImageIn::transfer_src();
 
     std::function<void()> callback;
 

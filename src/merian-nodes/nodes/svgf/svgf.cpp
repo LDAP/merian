@@ -49,21 +49,26 @@ void SVGF::initialize(const ContextHandle& context, const ResourceAllocatorHandl
     this->allocator = allocator;
 }
 
-std::vector<InputConnectorHandle> SVGF::describe_inputs() {
+std::vector<InputConnectorDescriptor> SVGF::describe_inputs() {
     return {
-        con_prev_out, con_src, con_history, con_albedo, con_mv, con_gbuffer, con_prev_gbuffer,
+        {"prev_out", con_prev_out},
+        {"src", con_src},
+        {"history", con_history},
+        {"albedo", con_albedo},
+        {"mv", con_mv},
+        {"gbuffer", con_gbuffer},
+        {"prev_gbuffer", con_prev_gbuffer},
     };
 }
 
-std::vector<OutputConnectorHandle> SVGF::describe_outputs(const NodeIOLayout& io_layout) {
+std::vector<OutputConnectorDescriptor> SVGF::describe_outputs(const NodeIOLayout& io_layout) {
     irr_create_info = io_layout[con_src]->get_create_info_or_throw();
     if (output_format)
         irr_create_info.format = output_format.value();
 
-    con_out =
-        ManagedVkImageOut::compute_write("out", irr_create_info.format, irr_create_info.extent);
+    con_out = ManagedVkImageOut::compute_write(irr_create_info.format, irr_create_info.extent);
 
-    return {con_out};
+    return {{"out", con_out}};
 }
 
 SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,

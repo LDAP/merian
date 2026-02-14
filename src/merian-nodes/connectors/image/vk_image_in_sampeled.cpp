@@ -2,8 +2,7 @@
 
 namespace merian {
 
-VkSampledImageIn::VkSampledImageIn(const std::string& name,
-                                   const vk::AccessFlags2 access_flags,
+VkSampledImageIn::VkSampledImageIn(const vk::AccessFlags2 access_flags,
                                    const vk::PipelineStageFlags2 pipeline_stages,
                                    const vk::ImageUsageFlags usage_flags,
                                    const vk::ShaderStageFlags stage_flags,
@@ -11,8 +10,7 @@ VkSampledImageIn::VkSampledImageIn(const std::string& name,
                                    const bool optional,
                                    const std::optional<SamplerHandle>& overwrite_sampler,
                                    const vk::ImageLayout required_layout)
-    : VkImageIn(name,
-                access_flags,
+    : VkImageIn(access_flags,
                 pipeline_stages,
                 required_layout,
                 usage_flags,
@@ -62,21 +60,19 @@ void VkSampledImageIn::get_descriptor_update(const uint32_t binding,
 }
 
 std::shared_ptr<VkSampledImageIn>
-VkSampledImageIn::compute_read(const std::string& name,
-                               const uint32_t delay,
+VkSampledImageIn::compute_read(const uint32_t delay,
                                const bool optional,
                                const std::optional<SamplerHandle>& overwrite_sampler) {
     return std::make_shared<VkSampledImageIn>(
-        name, vk::AccessFlagBits2::eShaderRead, vk::PipelineStageFlagBits2::eComputeShader,
+        vk::AccessFlagBits2::eShaderRead, vk::PipelineStageFlagBits2::eComputeShader,
         vk::ImageUsageFlagBits::eSampled, vk::ShaderStageFlagBits::eCompute, delay, optional,
         overwrite_sampler);
 }
 
-std::shared_ptr<VkSampledImageIn> VkSampledImageIn::fragment_read(const std::string& name,
-                                                                  const uint32_t delay,
+std::shared_ptr<VkSampledImageIn> VkSampledImageIn::fragment_read(const uint32_t delay,
                                                                   const bool optional) {
     return std::make_shared<VkSampledImageIn>(
-        name, vk::AccessFlagBits2::eShaderRead, vk::PipelineStageFlagBits2::eFragmentShader,
+        vk::AccessFlagBits2::eShaderRead, vk::PipelineStageFlagBits2::eFragmentShader,
         vk::ImageUsageFlagBits::eSampled, vk::ShaderStageFlagBits::eFragment, delay, optional);
 }
 

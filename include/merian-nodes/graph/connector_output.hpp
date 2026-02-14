@@ -12,8 +12,7 @@ using InputConnectorHandle = std::shared_ptr<InputConnector>;
 // The base class for all output connectors.
 class OutputConnector : public Connector {
   public:
-    OutputConnector(const std::string& name, const bool supports_delay)
-        : Connector(name), supports_delay(supports_delay) {}
+    OutputConnector(const bool supports_delay) : supports_delay(supports_delay) {}
 
     // Create the resource for this output. This is called max_delay + 1 times per graph build.
     //
