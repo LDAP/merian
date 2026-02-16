@@ -31,6 +31,10 @@
 
 #include <fmt/chrono.h>
 
+namespace merian_nodes {
+class GraphDescription;
+}
+
 namespace merian {
 
 using namespace merian;
@@ -186,7 +190,23 @@ class Graph : public std::enable_shared_from_this<Graph> {
     void register_event_listener(const std::string& event_pattern,
                                  const GraphEvent::Listener& event_listener);
 
-    // --- Properties / Graph (de)serialize ---
+    // --- Load/Store ---
+
+    // Load graph from JSON file or object
+    void load_from_file(const std::filesystem::path& path);
+    void load_from_json(const nlohmann::json& json);
+
+    // Store graph to JSON file or object
+    void store_to_file(const std::filesystem::path& path);
+    nlohmann::json store_to_json();
+
+    // Build graph from description
+    void from_description(const merian_nodes::GraphDescription& description);
+
+    // Create description from current graph state
+    merian_nodes::GraphDescription to_description();
+
+    // --- Properties / Graph UI ---
 
     void properties(Properties& props);
 
@@ -204,6 +224,8 @@ class Graph : public std::enable_shared_from_this<Graph> {
     bool remove_connection(const NodeHandle src, const NodeHandle dst, const std::string dst_input);
 
     /*--- Properties ---*/
+    void graph_properties(Properties& props);
+    void profiler_properties(Properties& props);
     void io_props_for_node(Properties& config, NodeHandle& node, NodeData& data);
 
     // --- Graph run sub-tasks ---

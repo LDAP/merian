@@ -272,7 +272,7 @@ bool Graph::connect_node(const NodeHandle& node,
                          NodeData& data,
                          const std::unordered_set<NodeHandle>& visited) {
     assert(visited.contains(node) && "necessary for self loop check");
-    assert(data.errors.empty() && !data.disable && !data.unsupported);
+    assert(data.errors.empty() && data.enabled && !data.unsupported);
 
     for (const OutgoingNodeConnection& connection : data.desired_outgoing_connections) {
         // since the node is not disabled and not in error state we know the outputs are valid.
@@ -285,7 +285,7 @@ bool Graph::connect_node(const NodeHandle& node,
         const OutputConnectorHandle src_output =
             data.output_connector_for_name[connection.src_output];
         NodeData& dst_data = node_data.at(connection.dst);
-        if (dst_data.disable || dst_data.unsupported) {
+        if (!dst_data.enabled || dst_data.unsupported) {
             SPDLOG_DEBUG("skipping connection to disabled node {}, {} ({})", connection.dst_input,
                          dst_data.identifier, registry.node_type_name(connection.dst));
             continue;
@@ -345,7 +345,7 @@ void Graph::search_satisfied_nodes(std::set<NodeHandle>& candidates,
     for (const NodeHandle& node : candidates) {
         NodeData& data = node_data.at(node);
 
-        if (data.disable || data.unsupported) {
+        if (!data.enabled || data.unsupported) {
             SPDLOG_DEBUG("node {} ({}) is disabled, skipping...", data.identifier,
                          registry.node_type_name(node));
             to_erase.push_back(node);
@@ -374,7 +374,7 @@ void Graph::search_satisfied_nodes(std::set<NodeHandle>& candidates,
                 const NodeHandle& connecting_node = maybe_connected_inputs[input];
                 const NodeData& connecting_node_data = node_data.at(connecting_node);
 
-                if (connecting_node_data.disable || connecting_node_data.unsupported ||
+                if (!connecting_node_data.enabled || connecting_node_data.unsupported ||
                     !connecting_node_data.errors.empty()) {
                     will_not_connect = true;
                 }
@@ -455,7 +455,7 @@ bool Graph::connect_nodes() {
             NodeData& data = node_data.at(node);
 
             {
-                assert(!data.disable && !data.unsupported && data.errors.empty());
+                assert(data.enabled && !data.unsupported && data.errors.empty());
                 SPDLOG_DEBUG("connecting {} ({})", data.identifier, registry.node_type_name(node));
 
                 // 1. Get node output connectors and check for name conflicts
@@ -491,7 +491,7 @@ bool Graph::connect_nodes() {
 
             for (const auto& node : flat_topology) {
                 NodeData& data = node_data.at(node);
-                assert(!data.disable && !data.unsupported);
+                assert(data.enabled && !data.unsupported);
                 for (const auto& input : data.input_connectors) {
                     if (!data.input_connections.contains(input)) {
                         if (input->optional) {
@@ -681,7 +681,7 @@ void Graph::prepare_descriptor_sets() {
                 } else {
                     NodeData& src_data = node_data.at(per_input_info.node);
                     assert(src_data.errors.empty());
-                    assert(!src_data.disable && !src_data.unsupported);
+                    assert(src_data.enabled && !src_data.unsupported);
                     auto& resources =
                         src_data.output_connections.at(per_input_info.output).resources;
                     const uint32_t num_resources = resources.size();

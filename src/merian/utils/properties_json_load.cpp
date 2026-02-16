@@ -6,7 +6,7 @@ using json = nlohmann::json;
 
 namespace merian {
 
-static float decode_float(json& j) {
+static float decode_float(const json& j) {
     if (j.type() == json::value_t::string) {
         std::string encoded = j.template get<std::string>();
         return std::atof(encoded.c_str());
@@ -18,12 +18,20 @@ template <typename T>
 static bool load_if_exist(json& j, const std::string& id, T* value, const int components) {
     bool changed = false;
     if (j.contains(id)) {
-        json::iterator it = j[id].begin();
-        for (int i = 0; i < components; i++, it++) {
-            assert(it != j[id].end());
-            const T new_value = *it;
-            changed |= (new_value != value[i]);
-            value[i] = new_value;
+        const auto& field = j[id];
+        if (field.is_array()) {
+            json::const_iterator it = j[id].begin();
+            for (int i = 0; i < components; i++, it++) {
+                assert(it != j[id].end());
+                const T new_value = *it;
+                changed |= (new_value != value[i]);
+                value[i] = new_value;
+            }
+        } else {
+            assert(components == 1);
+            const T new_value = field;
+            changed |= (new_value != value[0]);
+            value[0] = new_value;
         }
     }
     return changed;
@@ -32,12 +40,20 @@ static bool load_if_exist(json& j, const std::string& id, T* value, const int co
 static bool load_if_exist(json& j, const std::string& id, float* value, const int components) {
     bool changed = false;
     if (j.contains(id)) {
-        json::iterator it = j[id].begin();
-        for (int i = 0; i < components; i++, it++) {
-            assert(it != j[id].end());
-            const float new_value = decode_float(*it);
-            changed |= (new_value != value[i]);
-            value[i] = new_value;
+        const auto& field = j[id];
+        if (field.is_array()) {
+            json::const_iterator it = field.begin();
+            for (int i = 0; i < components; i++, it++) {
+                assert(it != field.end());
+                const float new_value = decode_float(*it);
+                changed |= (new_value != value[i]);
+                value[i] = new_value;
+            }
+        } else {
+            assert(components == 1);
+            const float new_value = decode_float(field);
+            changed |= (new_value != value[0]);
+            value[0] = new_value;
         }
     }
     return changed;

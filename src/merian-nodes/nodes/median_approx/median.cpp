@@ -25,7 +25,7 @@ DeviceSupportInfo MedianApproxNode::query_device_support(const DeviceSupportQuer
 }
 
 void MedianApproxNode::initialize(const ContextHandle& context,
-                                  const ResourceAllocatorHandle& allocator) {
+                                  const ResourceAllocatorHandle& /*allocator*/) {
     this->context = context;
 
     histogram = EntryPoint::create(context, merian_median_histogram_comp_spv(),

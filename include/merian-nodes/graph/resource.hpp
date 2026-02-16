@@ -8,7 +8,7 @@ namespace merian {
 
 class GraphResource {
   public:
-    virtual ~GraphResource(){};
+    virtual ~GraphResource() {};
 
     virtual void properties([[maybe_unused]] merian::Properties& props) {}
 };

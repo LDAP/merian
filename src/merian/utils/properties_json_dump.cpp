@@ -14,6 +14,10 @@ static json encode_float(float f) {
 }
 
 template <typename T> static json dump(T* v, const int components) {
+    if (components == 1) {
+        return *v;
+    }
+
     json j;
     for (int i = 0; i < components; i++) {
         j.push_back(v[i]);
@@ -22,6 +26,10 @@ template <typename T> static json dump(T* v, const int components) {
 }
 
 static json dump(float* v, const int components) {
+    if (components == 1) {
+        return encode_float(*v);
+    }
+
     json j;
     for (int i = 0; i < components; i++) {
         j.push_back(encode_float(v[i]));
