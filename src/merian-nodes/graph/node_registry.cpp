@@ -30,29 +30,33 @@ NodeRegistry& NodeRegistry::get_instance() {
 
 NodeRegistry::NodeRegistry() {
     register_node_type<ABSplit>("AB Split", "Compare two inputs in a split-view.");
-    register_node_type<ABSideBySide>("AB Side By Side", "Compare two inputs in a side by side view.");
+    register_node_type<ABSideBySide>("AB Side By Side",
+                                     "Compare two inputs in a side by side view.");
     register_node_type<Accumulate>("Accumulate", "Accumulate values across multiple iterations.");
-    register_node_type<DeviceASBuilder>("Acceleration Structure Builder",
-                                        "Build acceleration structures from geometry on the device.");
+    register_node_type<DeviceASBuilder>(
+        "Acceleration Structure Builder",
+        "Build acceleration structures from geometry on the device.");
     register_node_type<Bloom>("Bloom", "Selectively blurs pixels that surpass a threshold.");
-    register_node_type<ColorImage>("Color", "Outputs a image filled cleared with the selected color.");
-    register_node_type<AutoExposure>("Exposure",
-                                     "Exposure with camera-like controls. Includes a robust auto-exposure mode");
+    register_node_type<ColorImage>("Color",
+                                   "Outputs a image filled cleared with the selected color.");
+    register_node_type<AutoExposure>(
+        "Exposure", "Exposure with camera-like controls. Includes a robust auto-exposure mode");
     register_node_type<FXAA>("FXAA",
                              "Fast approximate anti-aliasing (FXAA) is a screen-space "
                              "anti-aliasing algorithm created by Timothy Lottes at NVIDIA.");
-    register_node_type<GBufferRTNode>("GBuffer (Raytraced)",
-                                      "Creates a GBuffer for the Merian scene format using Raytracing.");
+    register_node_type<GBufferRTNode>(
+        "GBuffer (Raytraced)", "Creates a GBuffer for the Merian scene format using Raytracing.");
     register_node_type<GLFWWindowNode>("Window (GLFW)", "Outputs to a window created with GLFW.");
     register_node_type<HDRImageRead>("HDR Image", "Loads an HDR image.");
     register_node_type<LDRImageRead>("LDR Image", "Loads a LDR image.");
     register_node_type<ImageWrite>("Image Write", "Stores a graph output as image file.");
-    register_node_type<MeanToBuffer>("Mean",
-                                     "Computes the mean of an image and outputs it as a single buffer element.");
+    register_node_type<MeanToBuffer>(
+        "Mean", "Computes the mean of an image and outputs it as a single buffer element.");
     register_node_type<MedianApproxNode>("Median (Approximation)",
                                          "Computes an approximation of the median of a component.");
     register_node_type<Reduce>("Reduce", "Reduce values of multiple input images.");
-    register_node_type<Shadertoy>("Shadertoy", "Execute Shadertoy-like shaders (Limited implementation).");
+    register_node_type<Shadertoy>("Shadertoy",
+                                  "Execute Shadertoy-like shaders (Limited implementation).");
     register_node_type<SVGF>("Denoiser (SVGF)", "Spatiotemporal Variance-Guided Filtering.");
     register_node_type<TAA>("TAA", "Temporal Anti-Aliasing.");
     register_node_type<Tonemap>("Tonemap", "Convert a HDR image to LDR using various tonemaps.");

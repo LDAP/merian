@@ -6,4 +6,6 @@ merian_nodes_src += files(
     'graph_connect.cpp',
     'graph_properties.cpp',
     'graph_events.cpp',
+    'graph_description.cpp',
+    'graph_load_store.cpp',
 )

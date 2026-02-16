@@ -1,4 +1,5 @@
 #include "merian-nodes/graph/graph.hpp"
+#include "merian-nodes/graph/graph_description.hpp"
 #include "merian-nodes/merian_nodes_extension.hpp"
 
 #include <spdlog/spdlog.h>
@@ -109,6 +110,7 @@ const std::string& Graph::add_node(const std::shared_ptr<Node>& node,
         if (identifier->empty()) {
             throw std::invalid_argument{"node identifier cannot be empty"};
         }
+        GraphDescription::validate_identifier(*identifier, "Node identifier");
         if (node_for_identifier.contains(identifier.value())) {
             throw std::invalid_argument{fmt::format(
                 "graph already contains a node with identifier '{}'", identifier.value())};

@@ -5,6 +5,124 @@
 
 namespace merian {
 
+void Graph::graph_properties(Properties& props) {
+    props.output_text("Run iteration: {}", run_iteration);
+    props.output_text("Run Elapsed: {:%H:%M:%S}s", duration_elapsed_since_connect);
+    props.output_text("Total iterations: {}", total_iteration);
+    props.output_text("Total Elapsed: {:%H:%M:%S}s", duration_elapsed);
+    props.output_text("Time delta: {:04f}ms", to_milliseconds(time_delta));
+    props.output_text("GPU wait: {:04f}ms", to_milliseconds(gpu_wait_time));
+    props.output_text("External wait: {:04f}ms", to_milliseconds(external_wait_time));
+    props.output_text("Iterations in flight {:02}/{:02}", ring_fences.count_waiting(),
+                      ring_fences.size());
+
+    props.st_separate();
+    if (props.config_uint("iterations in flight", desired_iterations_in_flight)) {
+        request_reconnect();
+    }
+    if (props.config_options("time overwrite", time_overwrite, {"None", "Time", "Delta"},
+                             Properties::OptionsStyle::COMBO)) {
+        if (time_overwrite == 0) {
+            // move reference to prevent jump
+            const auto now = std::chrono::high_resolution_clock::now();
+            time_reference = now - duration_elapsed;
+            time_connect_reference = now - duration_elapsed_since_connect;
+        }
+    }
+    if (time_overwrite == 1) {
+        float time_s = to_seconds(duration_elapsed);
+        props.config_float("time (s)", time_s, "", 0.1);
+        float delta_s = time_s - to_seconds(duration_elapsed);
+        props.config_float("offset (s)", delta_s, "", 0.01);
+        time_delta_overwrite_ms += delta_s * 1000.;
+    } else if (time_overwrite == 2) {
+        props.config_float("delta (ms)", time_delta_overwrite_ms, "", 0.001);
+        float fps = 1000. / time_delta_overwrite_ms;
+        props.config_float("fps", fps, "", 0.01);
+        time_delta_overwrite_ms = 1000 / fps;
+    }
+
+    props.st_separate();
+    if (props.config_bool("fps limiter", limit_fps) && limit_fps != 0) {
+        limit_fps = 60;
+    }
+    if (limit_fps != 0) {
+        if (props.config_int("fps limit", limit_fps, "")) {
+            limit_fps = std::max(1, limit_fps);
+        }
+    }
+    props.config_bool("low latency", low_latency_mode,
+                      "Experimental: Delays CPU processing to recude input latency in GPU bound "
+                      "applications. Might reduce framerate.");
+    if (low_latency_mode || limit_fps > 0) {
+        const InFlightData& in_flight_data = ring_fences.get().user_data;
+        props.output_text("CPU sleep time: {:04f}ms",
+                          to_milliseconds(in_flight_data.cpu_sleep_time));
+    }
+
+    props.st_separate();
+    props.config_bool("flush thread pool", flush_thread_pool_at_run_start,
+                      "If enabled, the tasks queue of the thread pool is flushed when a "
+                      "run starts. HIGHLY RECOOMMENDED as it limits memory allocations and "
+                      "prevents the queue to fill up indefinitely.");
+    props.output_text("tasks in queue: {}", thread_pool->queue_size());
+}
+
+void Graph::profiler_properties(Properties& props) {
+#ifdef MERIAN_PROFILER_ENABLE
+    props.config_bool("profiling", profiler_enable);
+#else
+    profiler_enable = false;
+    props.output_text("Profiler disabled at compile-time!\n\n Enable with 'meson configure "
+                      "<builddir> -Dmerian:performance_profiling=true'.");
+#endif
+
+    if (profiler_enable) {
+        props.st_no_space();
+        props.config_uint("report intervall", profiler_report_intervall_ms,
+                          "Set the time period for the profiler to update in ms. Meaning, "
+                          "averages and deviations are calculated over this this period.");
+
+        if (last_run_report &&
+            props.st_begin_child("run", "Graph Run", Properties::ChildFlagBits::DEFAULT_OPEN)) {
+            if (!last_run_report.cpu_report.empty()) {
+                props.st_separate("CPU");
+                const float* cpu_samples = &cpu_time_history[time_history_current + 1];
+                if (cpu_auto) {
+                    cpu_max =
+                        *std::max_element(cpu_samples, cpu_samples + cpu_time_history.size() - 1);
+                }
+
+                props.output_plot_line("", cpu_samples, cpu_time_history.size() - 1, 0, cpu_max);
+                cpu_auto &= !props.config_float("cpu max ms", cpu_max, 0, 1000);
+                props.st_no_space();
+                props.config_bool("cpu auto", cpu_auto);
+                Profiler::get_cpu_report_as_config(props, last_run_report);
+            }
+
+            if (!last_run_report.gpu_report.empty()) {
+                props.st_separate("GPU");
+                const float* gpu_samples = &gpu_time_history[time_history_current + 1];
+                if (gpu_auto) {
+                    gpu_max =
+                        *std::max_element(gpu_samples, gpu_samples + gpu_time_history.size() - 1);
+                }
+
+                props.output_plot_line("", gpu_samples, gpu_time_history.size() - 1, 0, gpu_max);
+                gpu_auto &= !props.config_float("gpu max ms", gpu_max, 0, 1000);
+                props.st_no_space();
+                props.config_bool("gpu auto", gpu_auto);
+                Profiler::get_gpu_report_as_config(props, last_run_report);
+            }
+            props.st_end_child();
+        }
+        if (last_build_report && props.st_begin_child("build", "Last Graph Build")) {
+            Profiler::get_report_as_config(props, last_build_report);
+            props.st_end_child();
+        }
+    }
+}
+
 void Graph::properties(Properties& props) {
     needs_reconnect |= props.config_bool("Rebuild");
     props.st_no_space();
@@ -16,68 +134,7 @@ void Graph::properties(Properties& props) {
     }
     if (props.st_begin_child("graph_properties", "Graph Properties",
                              Properties::ChildFlagBits::FRAMED)) {
-        props.output_text("Run iteration: {}", run_iteration);
-        props.output_text("Run Elapsed: {:%H:%M:%S}s", duration_elapsed_since_connect);
-        props.output_text("Total iterations: {}", total_iteration);
-        props.output_text("Total Elapsed: {:%H:%M:%S}s", duration_elapsed);
-        props.output_text("Time delta: {:04f}ms", to_milliseconds(time_delta));
-        props.output_text("GPU wait: {:04f}ms", to_milliseconds(gpu_wait_time));
-        props.output_text("External wait: {:04f}ms", to_milliseconds(external_wait_time));
-        props.output_text("Iterations in flight {:02}/{:02}", ring_fences.count_waiting(),
-                          ring_fences.size());
-
-        props.st_separate();
-        if (props.config_uint("iterations in flight", desired_iterations_in_flight)) {
-            request_reconnect();
-        }
-        if (props.config_options("time overwrite", time_overwrite, {"None", "Time", "Delta"},
-                                 Properties::OptionsStyle::COMBO)) {
-            if (time_overwrite == 0) {
-                // move reference to prevent jump
-                const auto now = std::chrono::high_resolution_clock::now();
-                time_reference = now - duration_elapsed;
-                time_connect_reference = now - duration_elapsed_since_connect;
-            }
-        }
-        if (time_overwrite == 1) {
-            float time_s = to_seconds(duration_elapsed);
-            props.config_float("time (s)", time_s, "", 0.1);
-            float delta_s = time_s - to_seconds(duration_elapsed);
-            props.config_float("offset (s)", delta_s, "", 0.01);
-            time_delta_overwrite_ms += delta_s * 1000.;
-        } else if (time_overwrite == 2) {
-            props.config_float("delta (ms)", time_delta_overwrite_ms, "", 0.001);
-            float fps = 1000. / time_delta_overwrite_ms;
-            props.config_float("fps", fps, "", 0.01);
-            time_delta_overwrite_ms = 1000 / fps;
-        }
-
-        props.st_separate();
-        if (props.config_bool("fps limiter", limit_fps) && limit_fps != 0) {
-            limit_fps = 60;
-        }
-        if (limit_fps != 0) {
-            if (props.config_int("fps limit", limit_fps, "")) {
-                limit_fps = std::max(1, limit_fps);
-            }
-        }
-        props.config_bool(
-            "low latency", low_latency_mode,
-            "Experimental: Delays CPU processing to recude input latency in GPU bound "
-            "applications. Might reduce framerate.");
-        if (low_latency_mode || limit_fps > 0) {
-            const InFlightData& in_flight_data = ring_fences.get().user_data;
-            props.output_text("CPU sleep time: {:04f}ms",
-                              to_milliseconds(in_flight_data.cpu_sleep_time));
-        }
-
-        props.st_separate();
-        props.config_bool("flush thread pool", flush_thread_pool_at_run_start,
-                          "If enabled, the tasks queue of the thread pool is flushed when a "
-                          "run starts. HIGHLY RECOOMMENDED as it limits memory allocations and "
-                          "prevents the queue to fill up indefinitely.");
-        props.output_text("tasks in queue: {}", thread_pool->queue_size());
-
+        graph_properties(props);
         props.st_end_child();
     }
 
@@ -170,116 +227,34 @@ void Graph::properties(Properties& props) {
     }
 
     if (props.st_begin_child("profiler", "Profiler", Properties::ChildFlagBits::FRAMED)) {
-#ifdef MERIAN_PROFILER_ENABLE
-        props.config_bool("profiling", profiler_enable);
-#else
-        profiler_enable = false;
-        props.output_text("Profiler disabled at compile-time!\n\n Enable with 'meson configure "
-                          "<builddir> -Dmerian:performance_profiling=true'.");
-#endif
-
-        if (profiler_enable) {
-            props.st_no_space();
-            props.config_uint("report intervall", profiler_report_intervall_ms,
-                              "Set the time period for the profiler to update in ms. Meaning, "
-                              "averages and deviations are calculated over this this period.");
-
-            if (last_run_report &&
-                props.st_begin_child("run", "Graph Run", Properties::ChildFlagBits::DEFAULT_OPEN)) {
-                if (!last_run_report.cpu_report.empty()) {
-                    props.st_separate("CPU");
-                    const float* cpu_samples = &cpu_time_history[time_history_current + 1];
-                    if (cpu_auto) {
-                        cpu_max = *std::max_element(cpu_samples,
-                                                    cpu_samples + cpu_time_history.size() - 1);
-                    }
-
-                    props.output_plot_line("", cpu_samples, cpu_time_history.size() - 1, 0,
-                                           cpu_max);
-                    cpu_auto &= !props.config_float("cpu max ms", cpu_max, 0, 1000);
-                    props.st_no_space();
-                    props.config_bool("cpu auto", cpu_auto);
-                    Profiler::get_cpu_report_as_config(props, last_run_report);
-                }
-
-                if (!last_run_report.gpu_report.empty()) {
-                    props.st_separate("GPU");
-                    const float* gpu_samples = &gpu_time_history[time_history_current + 1];
-                    if (gpu_auto) {
-                        gpu_max = *std::max_element(gpu_samples,
-                                                    gpu_samples + gpu_time_history.size() - 1);
-                    }
-
-                    props.output_plot_line("", gpu_samples, gpu_time_history.size() - 1, 0,
-                                           gpu_max);
-                    gpu_auto &= !props.config_float("gpu max ms", gpu_max, 0, 1000);
-                    props.st_no_space();
-                    props.config_bool("gpu auto", gpu_auto);
-                    Profiler::get_gpu_report_as_config(props, last_run_report);
-                }
-                props.st_end_child();
-            }
-            if (last_build_report && props.st_begin_child("build", "Last Graph Build")) {
-                Profiler::get_report_as_config(props, last_build_report);
-                props.st_end_child();
-            }
-        }
+        profiler_properties(props);
         props.st_end_child();
     }
 
-    bool loading = false;
     if (props.st_begin_child("nodes", "Nodes",
                              Properties::ChildFlagBits::DEFAULT_OPEN |
                                  Properties::ChildFlagBits::FRAMED)) {
         std::vector<std::string> nodes(identifiers().begin(), identifiers().end());
 
-        if (nodes.empty() && !props.is_ui()) {
-            nodes = props.st_list_children();
-
-            if (!nodes.empty()) {
-                // go into "loading" mode
-                SPDLOG_INFO("Reconstructing graph from properties.");
-                loading = true;
-                reset(); // never know...
-            }
-        }
-
         for (const auto& identifier : nodes) {
+            NodeHandle node = node_for_identifier.at(identifier);
+            NodeData& data = node_data.at(node);
 
-            std::string node_label;
-            if (!loading) {
-                // otherwise the node data does not exist!
-                const NodeHandle& node = node_for_identifier.at(identifier);
-                const auto& data = node_data.at(node);
-                std::string state = "OK";
-                if (data.unsupported) {
-                    state = "UNSUPPORTED";
-                } else if (data.disable) {
-                    state = "DISABLED";
-                } else if (!data.errors.empty()) {
-                    state = "ERROR";
-                }
-
-                node_label = fmt::format("[{}] {} ({})", state, data.identifier,
-                                         registry.node_type_name(node));
+            std::string state = "OK";
+            if (data.unsupported) {
+                state = "UNSUPPORTED";
+            } else if (!data.enabled) {
+                state = "DISABLED";
+            } else if (!data.errors.empty()) {
+                state = "ERROR";
             }
+
+            std::string node_label =
+                fmt::format("[{}] {} ({})", state, data.identifier, registry.node_type_name(node));
 
             if (props.st_begin_child(identifier, node_label)) {
-                NodeHandle node;
-                std::string type;
 
-                // Create Node
-                if (!loading) {
-                    node = node_for_identifier.at(identifier);
-                    type = registry.node_type_name(node);
-                }
-                props.serialize_string("type", type);
-                if (loading) {
-                    node = node_for_identifier.at(add_node(type, identifier));
-                }
-                NodeData& data = node_data.at(node);
-
-                if (props.config_bool("disable", data.disable))
+                if (props.config_bool("enabled", data.enabled))
                     request_reconnect();
                 props.st_no_space();
                 if (props.config_bool("Remove")) {
@@ -316,32 +291,6 @@ void Graph::properties(Properties& props) {
             }
         }
         props.st_end_child();
-    }
-
-    if (!props.is_ui()) {
-        nlohmann::json connections;
-        if (!loading) {
-            for (const auto& identifier : identifiers()) {
-                const NodeHandle& node = node_for_identifier.at(identifier);
-                const auto& data = node_data.at(node);
-                for (const OutgoingNodeConnection& con : data.desired_outgoing_connections) {
-                    nlohmann::json j_con;
-                    j_con["src"] = data.identifier;
-                    j_con["dst"] = node_data.at(con.dst).identifier;
-                    j_con["src_output"] = con.src_output;
-                    j_con["dst_input"] = con.dst_input;
-
-                    connections.push_back(j_con);
-                }
-            }
-        }
-        std::sort(connections.begin(), connections.end());
-        props.serialize_json("connections", connections);
-        if (loading) {
-            for (auto& j_con : connections) {
-                add_connection(j_con["src"], j_con["dst"], j_con["src_output"], j_con["dst_input"]);
-            }
-        }
     }
 }
 

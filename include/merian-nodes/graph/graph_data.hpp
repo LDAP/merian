@@ -31,8 +31,8 @@ struct NodeData {
     // (on add_node)
     std::string identifier;
 
-    // User disabled
-    bool disable{};
+    // User enabled
+    bool enabled{true};
     // Device does not support this node
     bool unsupported{};
     std::string unsupported_reason{};
