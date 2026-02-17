@@ -23,13 +23,15 @@ class SpirvReflect {
 
   public:
     SpirvReflect(const uint32_t spv[], const std::size_t spv_size) : spv(spv), spv_size(spv_size) {
-        SpvReflectResult result = spvReflectCreateShaderModule(spv_size, spv, &module);
+        [[maybe_unused]] SpvReflectResult result =
+            spvReflectCreateShaderModule(spv_size, spv, &module);
         assert(result == SPV_REFLECT_RESULT_SUCCESS);
     }
 
     SpirvReflect(const BlobHandle& blob)
         : spv(blob->get_data<uint32_t>()), spv_size(blob->get_size()) {
-        SpvReflectResult result = spvReflectCreateShaderModule(spv_size, spv, &module);
+        [[maybe_unused]] SpvReflectResult result =
+            spvReflectCreateShaderModule(spv_size, spv, &module);
         assert(result == SPV_REFLECT_RESULT_SUCCESS);
     }
 
