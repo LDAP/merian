@@ -40,6 +40,8 @@ class UnmanagedBufferArrayResource : public BufferArrayResource {
                                         prior_access_flags, get_input_access_flags());
 
             cmd->barrier(buf_bar);
+            // important if no node is actually using the resource...
+            cmd->keep_until_pool_reset(buffer);
         }
     }
 

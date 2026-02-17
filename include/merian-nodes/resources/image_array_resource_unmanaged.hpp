@@ -81,6 +81,8 @@ class UnmanagedImageArrayResource : public ImageArrayResource {
                 first_input_layout, prior_access_flags, get_input_access_flags(),
                 prior_pipeline_stages, get_input_stage_flags());
             cmd->barrier(img_bar);
+            // important if no node is actually using the resource...
+            cmd->keep_until_pool_reset(image);
         }
     }
 
