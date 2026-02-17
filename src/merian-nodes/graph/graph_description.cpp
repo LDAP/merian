@@ -66,7 +66,6 @@ void GraphDescription::add_connection(const std::string& src,
     src_node_it->second.outgoing_connections[src_output].target[dst].insert(dst_input);
 
     // Add to incoming connections of destination node
-
     const auto dst_node_it = nodes.find(dst);
     assert(dst_node_it != nodes.end());
     dst_node_it->second.incoming_connections[dst_input] = {src, src_output};
@@ -289,12 +288,14 @@ void GraphDescription::parse_graph_v3(const nlohmann::json& json, GraphDescripti
 
     if (json.contains("nodes")) {
         const auto& nodes_json = json["nodes"];
+        // Nodes with Metadata
         for (const auto& node_json : nodes_json) {
-            std::string identifier = node_json["id"].get<std::string>();
-            std::string node_type = node_json["type"].get<std::string>();
-            nlohmann::json config =
+            const std::string identifier = node_json["id"].get<std::string>();
+            const std::string node_type = node_json["type"].get<std::string>();
+            const nlohmann::json config =
                 node_json.contains("properties") ? node_json["properties"] : nlohmann::json{};
-            bool enabled = node_json.contains("enabled") ? node_json["enabled"].get<bool>() : true;
+            const bool enabled =
+                node_json.contains("enabled") ? node_json["enabled"].get<bool>() : true;
 
             description.add_node(node_type, identifier, config);
             description.set_node_enabled(identifier, enabled);
@@ -302,8 +303,11 @@ void GraphDescription::parse_graph_v3(const nlohmann::json& json, GraphDescripti
             if (node_json.contains("metadata")) {
                 description.set_node_metadata(identifier, node_json["metadata"]);
             }
-
+        }
+        // Connections
+        for (const auto& node_json : nodes_json) {
             if (node_json.contains("outputs")) {
+                const std::string identifier = node_json["id"].get<std::string>();
                 const auto& outputs_json = node_json["outputs"];
 
                 if (outputs_json.is_object()) {
