@@ -10150,7 +10150,7 @@ void* VulkanFeatures::build_chain_for_device_creation(
         m_features2.features.sparseResidencyAliased == VK_TRUE ||
         m_features2.features.variableMultisampleRate == VK_TRUE ||
         m_features2.features.inheritedQueries == VK_TRUE) {
-            assert((physical_device->extension_supported(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME) ||
+            assert((physical_device->get_instance()->extension_enabled(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME) ||
                     vk_api_version >= VK_API_VERSION_1_1) &&
                    "Feature enabled but neither extension nor promoted version supported");
         m_features2.pNext = chain_head;

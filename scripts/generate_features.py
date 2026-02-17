@@ -770,21 +770,27 @@ def generate_support_assertion(feat: FeatureStruct) -> list[str]:
 
     ext = get_extension(feat, _extension_map)
 
-    if ext and ext.promotedto:
-        lines.extend(
-            [
-                f"        assert((physical_device->extension_supported({ext.name_macro}) ||",
-                f"                vk_api_version >= {ext.promotedto}) &&",
-                '               "Feature enabled but neither extension nor promoted version supported");',
-            ]
+    if ext:
+        ext_supported_func = (
+            "physical_device->extension_supported"
+            if ext.type == "device"
+            else "physical_device->get_instance()->extension_enabled"
         )
-    elif ext:
-        lines.extend(
-            [
-                f"        assert(physical_device->extension_supported({ext.name_macro}) &&",
-                '               "Feature enabled but required extension not supported");',
-            ]
-        )
+        if ext.promotedto:
+            lines.extend(
+                [
+                    f"        assert(({ext_supported_func}({ext.name_macro}) ||",
+                    f"                vk_api_version >= {ext.promotedto}) &&",
+                    '               "Feature enabled but neither extension nor promoted version supported");',
+                ]
+            )
+        else:
+            lines.extend(
+                [
+                    f"        assert({ext_supported_func}({ext.name_macro}) &&",
+                    '               "Feature enabled but required extension not supported");',
+                ]
+            )
     elif feat.required_version:
         lines.extend(
             [
