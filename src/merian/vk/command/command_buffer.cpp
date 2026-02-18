@@ -165,8 +165,16 @@ void CommandBuffer::copy(const BufferHandle& src_buffer,
 void CommandBuffer::push_descriptor_set(const PipelineHandle& pipeline,
                                         const uint32_t set,
                                         const vk::ArrayProxy<vk::WriteDescriptorSet>& writes) {
-    cmd.pushDescriptorSetKHR(pipeline->get_pipeline_bind_point(), *pipeline->get_layout(), set,
-                             writes);
+    if (VULKAN_HPP_DEFAULT_DISPATCHER.vkCmdPushDescriptorSet) {
+        // Vulkan 1.4
+        cmd.pushDescriptorSet(pipeline->get_pipeline_bind_point(), *pipeline->get_layout(), set,
+                              writes);
+    } else {
+        // Try VK_KHR_push_descriptor
+        cmd.pushDescriptorSetKHR(pipeline->get_pipeline_bind_point(), *pipeline->get_layout(), set,
+                                 writes);
+    }
+
     keep_until_pool_reset(pipeline);
 }
 

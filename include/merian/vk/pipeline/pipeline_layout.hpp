@@ -37,6 +37,10 @@ class PipelineLayout : public std::enable_shared_from_this<PipelineLayout> {
         return pipeline_layout;
     }
 
+    const vk::PipelineLayout& operator*() const {
+        return pipeline_layout;
+    }
+
     const vk::PipelineLayout& get_pipeline_layout() const {
         return pipeline_layout;
     }

@@ -15,6 +15,7 @@ class ExtensionMerian : public ContextExtension {
     std::vector<std::string> request_extensions() override {
         return {
             "merian-mitigations",
+            "merian-compatibility",
         };
     }
 

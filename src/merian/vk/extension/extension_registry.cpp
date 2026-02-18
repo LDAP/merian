@@ -1,5 +1,6 @@
 #include "merian/vk/extension/extension_registry.hpp"
 
+#include "merian/vk/extension/extension_compatibility.hpp"
 #include "merian/vk/extension/extension_glfw.hpp"
 #include "merian/vk/extension/extension_glsl_compiler.hpp"
 #include "merian/vk/extension/extension_merian.hpp"
@@ -18,6 +19,7 @@ ExtensionRegistry& ExtensionRegistry::get_instance() {
 
 ExtensionRegistry::ExtensionRegistry() {
     register_extension<ExtensionGLFW>("merian-glfw");
+    register_extension<ExtensionCompatibility>("merian-compatibility");
     register_extension<ExtensionGLSLCompiler>("merian-glsl-compiler");
     register_extension<ExtensionMerian>("merian");
     register_extension<ExtensionMitigations>("merian-mitigations");
