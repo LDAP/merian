@@ -8,10 +8,16 @@ CommandBuffer::CommandBuffer(const CommandPoolHandle& pool, const vk::CommandBuf
     : pool(pool) {
 
     const vk::CommandBufferAllocateInfo info{*pool, level, 1};
-    check_result(pool->get_context()->get_device()->get_device().allocateCommandBuffers(&info, &cmd),
-                 "could not allocate command buffer");
+    check_result(
+        pool->get_context()->get_device()->get_device().allocateCommandBuffers(&info, &cmd),
+        "could not allocate command buffer");
 
     SPDLOG_DEBUG("allocate command buffer ({})", fmt::ptr(static_cast<VkCommandBuffer>(cmd)));
+}
+
+CommandBufferHandle CommandBuffer::create(const CommandPoolHandle& pool,
+                                          const vk::CommandBufferLevel level) {
+    return CommandBufferHandle(new CommandBuffer(pool, level));
 }
 
 CommandBuffer::~CommandBuffer() {

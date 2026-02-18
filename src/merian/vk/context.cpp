@@ -414,7 +414,6 @@ Context::select_physical_device(uint32_t filter_vendor_id,
     physical_device = best->first;
     queue_info = std::move(best->second);
 
-    
     std::string driver_id;
     const char* driver_info;
     if (physical_device->get_properties().is_available<vk::PhysicalDeviceDriverProperties>()) {
@@ -779,7 +778,7 @@ std::shared_ptr<CommandPool> Context::get_cmd_pool_GCT() {
     if (!cmd_pool_GCT.expired()) {
         return cmd_pool_GCT.lock();
     }
-    const auto cmd = std::make_shared<CommandPool>(get_queue_GCT());
+    const auto cmd = CommandPool::create(get_queue_GCT());
     cmd_pool_GCT = cmd;
     return cmd;
 }
@@ -788,7 +787,7 @@ std::shared_ptr<CommandPool> Context::get_cmd_pool_T() {
     if (!cmd_pool_T.expired()) {
         return cmd_pool_T.lock();
     }
-    const auto cmd = std::make_shared<CommandPool>(get_queue_T());
+    const auto cmd = CommandPool::create(get_queue_T());
     cmd_pool_T = cmd;
     return cmd;
 }
@@ -797,7 +796,7 @@ std::shared_ptr<CommandPool> Context::get_cmd_pool_C() {
     if (!cmd_pool_C.expired()) {
         return cmd_pool_C.lock();
     }
-    const auto cmd = std::make_shared<CommandPool>(get_queue_C());
+    const auto cmd = CommandPool::create(get_queue_C());
     cmd_pool_C = cmd;
     return cmd;
 }

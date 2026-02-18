@@ -29,7 +29,7 @@ Graph::Graph(const GraphCreateInfo& create_info)
                   2,
                   [this](const uint32_t /*index*/) {
                       InFlightData in_flight_data;
-                      in_flight_data.command_pool = std::make_shared<CommandPool>(queue);
+                      in_flight_data.command_pool = CommandPool::create(queue);
                       in_flight_data.command_buffer_cache =
                           std::make_shared<CachingCommandPool>(in_flight_data.command_pool);
                       in_flight_data.profiler_query_pool =

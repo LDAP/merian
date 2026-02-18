@@ -62,7 +62,7 @@ CommandBufferHandle CachingCommandPool::create(const vk::CommandBufferLevel leve
         in_use->push_back(std::move(cached->back()));
         cached->pop_back();
     } else {
-        in_use->emplace_back(std::make_shared<CommandBuffer>(pool, level));
+        in_use->emplace_back(CommandBuffer::create(pool, level));
     }
 
     return in_use->back();

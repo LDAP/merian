@@ -13,7 +13,7 @@
 
 #include <vulkan/vulkan.hpp>
 
-// Windows defines this as __faststorefence() 
+// Windows defines this as __faststorefence()
 // https://learn.microsoft.com/en-us/windows/win32/api/winnt/nf-winnt-memorybarrier
 #ifdef MemoryBarrier
 #undef MemoryBarrier
@@ -36,11 +36,17 @@ class CommandBuffer : public std::enable_shared_from_this<CommandBuffer> {
     CommandBuffer() = delete;
     CommandBuffer(const CommandBuffer&) = delete;
     CommandBuffer(const CommandBuffer&&) = delete;
+    ~CommandBuffer();
 
+  private:
     CommandBuffer(const CommandPoolHandle& pool,
                   const vk::CommandBufferLevel level = vk::CommandBufferLevel::ePrimary);
 
-    ~CommandBuffer();
+    // ------------------------------------------------------------
+  public:
+    static CommandBufferHandle
+    create(const CommandPoolHandle& pool,
+           const vk::CommandBufferLevel level = vk::CommandBufferLevel::ePrimary);
 
     // ------------------------------------------------------------
 
@@ -723,13 +729,6 @@ class CommandBuffer : public std::enable_shared_from_this<CommandBuffer> {
     std::unordered_map<BufferHandle, std::optional<uint32_t>> descriptor_buffer_bindings;
     std::unordered_map<PipelineHandle, std::map<uint32_t, BufferHandle>>
         pipeline_descriptor_buffer_set_offsets;
-
-  public:
-    static CommandBufferHandle
-    create(const CommandPoolHandle& pool,
-           const vk::CommandBufferLevel level = vk::CommandBufferLevel::ePrimary) {
-        return std::make_shared<CommandBuffer>(pool, level);
-    }
 };
 
 } // namespace merian

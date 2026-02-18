@@ -2,16 +2,17 @@
 #include "merian/vk/command/command_pool.hpp"
 #include "merian/vk/utils/check_result.hpp"
 
+#include <limits>
 #include <mutex>
 #include <optional>
-#include <limits>
 
 #include <vulkan/vulkan.hpp>
 
 namespace merian {
 
 Queue::Queue(const ContextHandle& context, uint32_t queue_family_index, uint32_t queue_index)
-    : context(context), queue(context->get_device()->get_device().getQueue(queue_family_index, queue_index)),
+    : context(context),
+      queue(context->get_device()->get_device().getQueue(queue_family_index, queue_index)),
       queue_family_index(queue_family_index) {}
 
 void Queue::submit(const vk::ArrayProxy<vk::SubmitInfo>& submit_infos, vk::Fence fence) {
@@ -57,9 +58,9 @@ void Queue::submit_wait(const vk::ArrayProxy<vk::SubmitInfo>& submit_infos, cons
     submit(submit_infos, fence);
 
     if (fence) {
-        check_result(
-            context->get_device()->get_device().waitForFences(fence, VK_TRUE, std::numeric_limits<uint64_t>::max()),
-            "failed waiting for fence");
+        check_result(context->get_device()->get_device().waitForFences(
+                         fence, VK_TRUE, std::numeric_limits<uint64_t>::max()),
+                     "failed waiting for fence");
     } else {
         wait_idle();
     }
@@ -101,7 +102,7 @@ void Queue::submit_wait(
 
 void Queue::submit_wait(const CommandPoolHandle& cmd_pool,
                         const std::function<void(const CommandBufferHandle& cmd)>& cmd_function) {
-    const CommandBufferHandle cmd = std::make_shared<CommandBuffer>(cmd_pool);
+    const CommandBufferHandle cmd = CommandBuffer::create(cmd_pool);
     cmd->begin();
     cmd_function(cmd);
     cmd->end();
@@ -111,7 +112,7 @@ void Queue::submit_wait(const CommandPoolHandle& cmd_pool,
 }
 
 void Queue::submit_wait(const std::function<void(const CommandBufferHandle& cmd)>& cmd_function) {
-    const CommandPoolHandle cmd_pool = std::make_shared<CommandPool>(shared_from_this());
+    const CommandPoolHandle cmd_pool = CommandPool::create(shared_from_this());
     submit_wait(cmd_pool, cmd_function);
 }
 

@@ -20,6 +20,17 @@ CommandPool::CommandPool(const ContextHandle& context,
     SPDLOG_DEBUG("create command pool ({})", fmt::ptr(static_cast<VkCommandPool>(pool)));
 };
 
+CommandPoolHandle CommandPool::create(const QueueHandle& queue,
+                                      const vk::CommandPoolCreateFlags create_flags) {
+    return CommandPoolHandle(new CommandPool(queue, create_flags));
+}
+
+CommandPoolHandle CommandPool::create(const ContextHandle& context,
+                                      const uint32_t queue_family_index,
+                                      const vk::CommandPoolCreateFlags create_flags) {
+    return CommandPoolHandle(new CommandPool(context, queue_family_index, create_flags));
+}
+
 CommandPool::~CommandPool() {
     if (pool) {
         // special case for Cachign Command Pool

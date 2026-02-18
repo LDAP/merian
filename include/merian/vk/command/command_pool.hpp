@@ -8,26 +8,22 @@ namespace merian {
 
 class CommandPool : public std::enable_shared_from_this<CommandPool> {
 
+    CommandPool() = delete;
+
   protected:
     // for Caching Command Pool; does not create a command pool
     CommandPool(const ContextHandle& context);
 
-  public:
-    CommandPool() = delete;
-
-    // Cache size is the number of primary command buffers that are kept on hand to prevent
-    // reallocation.
     CommandPool(
         const QueueHandle& queue,
         const vk::CommandPoolCreateFlags create_flags = vk::CommandPoolCreateFlagBits::eTransient);
 
-    // Cache size is the number of primary command buffers that are kept on hand to prevent
-    // reallocation.
     CommandPool(
         const ContextHandle& context,
         const uint32_t queue_family_index,
         const vk::CommandPoolCreateFlags create_flags = vk::CommandPoolCreateFlagBits::eTransient);
 
+  public:
     virtual ~CommandPool();
 
     // ------------------------------------------------------------
@@ -62,6 +58,16 @@ class CommandPool : public std::enable_shared_from_this<CommandPool> {
     const std::vector<ConstObjectHandle>& get_objects_in_use() const {
         return objects_in_use;
     }
+
+  public:
+    static CommandPoolHandle create(
+        const QueueHandle& queue,
+        const vk::CommandPoolCreateFlags create_flags = vk::CommandPoolCreateFlagBits::eTransient);
+
+    static CommandPoolHandle create(
+        const ContextHandle& context,
+        const uint32_t queue_family_index,
+        const vk::CommandPoolCreateFlags create_flags = vk::CommandPoolCreateFlagBits::eTransient);
 
   private:
     const ContextHandle context;
