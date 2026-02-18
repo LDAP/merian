@@ -108,16 +108,28 @@ class ExtensionContainer {
 using ConfigureExtensionsCallback = std::function<void(ExtensionContainer&)>;
 
 struct ContextCreateInfo {
-    VulkanFeatures desired_features{};
-    std::vector<const char*> additional_extensions{};
+    // Set your desired Vulkan features.
+    VulkanFeatures vulkan_features{};
+    // Set your desired Vulkan extensions, extension dependencies are added automatically.
+    std::vector<const char*> vulkan_extensions{};
+    // Set your desired merian Context extensions.
     std::vector<std::string> context_extensions{};
+    // Called when all extensions are loaded. You can get_context_extensions<>() to configure.
     std::optional<ConfigureExtensionsCallback> configure_extensions_callback{};
+    // Search paths for shader compiler and file loader.
     std::vector<std::filesystem::path> additional_search_paths{};
+    // Your application name.
     std::string application_name = "";
+    // Your application version.
     uint32_t application_vk_version = VK_MAKE_VERSION(1, 0, 0);
+    // Merian prepares a graphics+compute+transfer and a dedicated transfer queue, this sets the
+    // number of additional compute queues.
     uint32_t preferred_number_compute_queues = 1;
+    // Set to a number greater or equal to 0 to only consider devices with this vendor id.
     uint32_t filter_vendor_id = -1;
+    // Set to a number greater or equal to 0 to only consider devices with this device id.
     uint32_t filter_device_id = -1;
+    // Set to a nonempty string this name.
     std::string filter_device_name = "";
 };
 

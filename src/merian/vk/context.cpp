@@ -148,19 +148,19 @@ Version: {}\n\n",
     }
 
     const uint32_t target_vk_api_version = VK_HEADER_VERSION_COMPLETE;
-    create_instance(target_vk_api_version, create_info.desired_features,
-                    create_info.additional_extensions);
+    create_instance(target_vk_api_version, create_info.vulkan_features,
+                    create_info.vulkan_extensions);
 
     auto support_cache = select_physical_device(
         create_info.filter_vendor_id, create_info.filter_device_id, create_info.filter_device_name,
-        create_info.desired_features, create_info.additional_extensions);
+        create_info.vulkan_features, create_info.vulkan_extensions);
 
     for (const auto& ext : get_extensions()) {
         ext->on_extension_support_confirmed(*this);
     }
 
     create_device_and_queues(create_info.preferred_number_compute_queues,
-                             create_info.desired_features, create_info.additional_extensions,
+                             create_info.vulkan_features, create_info.vulkan_extensions,
                              support_cache);
 
     shader_compile_context = ShaderCompileContext::create(file_loader->get_search_paths(), device);
