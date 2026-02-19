@@ -1,4 +1,5 @@
 #include "merian/vk/command/command_buffer.hpp"
+#include "merian/vk/raytrace/shader_binding_table.hpp"
 
 #include <spdlog/spdlog.h>
 
@@ -250,6 +251,31 @@ void CommandBuffer::dispatch(const vk::Extent2D& extent,
                              const uint32_t local_size_y) {
     dispatch((extent.width + local_size_x - 1) / local_size_x,
              (extent.height + local_size_y - 1) / local_size_y, 1);
+}
+
+void CommandBuffer::trace_rays(const ShaderBindingTableHandle& sbt,
+                               uint32_t width,
+                               uint32_t height,
+                               uint32_t depth) {
+    if (current_pipeline->supports_descriptor_buffer()) {
+        update_descriptor_buffer_bindings(current_pipeline);
+    }
+
+    cmd.traceRaysKHR(sbt->get_raygen_region(),
+                     sbt->get_miss_region(),
+                     sbt->get_hit_region(),
+                     sbt->get_callable_region(),
+                     width, height, depth);
+
+    keep_until_pool_reset(sbt);
+}
+
+void CommandBuffer::trace_rays(const ShaderBindingTableHandle& sbt, const vk::Extent3D& extent) {
+    trace_rays(sbt, extent.width, extent.height, extent.depth);
+}
+
+void CommandBuffer::trace_rays(const ShaderBindingTableHandle& sbt, const vk::Extent2D& extent) {
+    trace_rays(sbt, extent.width, extent.height, 1);
 }
 
 void CommandBuffer::copy_acceleration_structure(const AccelerationStructureHandle& src,
