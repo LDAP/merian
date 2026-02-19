@@ -73,6 +73,10 @@ class PhysicalDevice : public std::enable_shared_from_this<PhysicalDevice> {
         return properties.get_properties2().properties.limits;
     }
 
+    const std::vector<vk::CooperativeMatrixPropertiesKHR>& get_cooperative_matrix_properties() {
+        return cooperative_matrix_properties;
+    }
+
     // ----------------------------------------
 
     // Get reference to VulkanFeatures aggregate containing all feature structs
@@ -110,6 +114,8 @@ class PhysicalDevice : public std::enable_shared_from_this<PhysicalDevice> {
     vk::PhysicalDeviceMemoryProperties2 physical_device_memory_properties;
 
     std::vector<vk::ExtensionProperties> physical_device_extension_properties;
+
+    std::vector<vk::CooperativeMatrixPropertiesKHR> cooperative_matrix_properties;
 
     std::unordered_set<std::string> supported_spirv_extensions;
     std::unordered_set<std::string> supported_spirv_capabilities;

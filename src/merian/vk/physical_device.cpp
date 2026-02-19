@@ -29,6 +29,9 @@ PhysicalDevice::PhysicalDevice(const InstanceHandle& instance,
 
     physical_device_memory_properties = physical_device.getMemoryProperties2();
     physical_device_extension_properties = physical_device.enumerateDeviceExtensionProperties();
+    if (supported_extensions.contains(VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME)) {
+        cooperative_matrix_properties = physical_device.getCooperativeMatrixPropertiesKHR();
+    }
 
     for (const auto& ext : get_spirv_extensions()) {
         if (spirv_extension_supported_by_physical_device(ext, get_vk_api_version(),
