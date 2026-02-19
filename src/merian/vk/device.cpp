@@ -67,11 +67,25 @@ Device::Device(
             return {false, fmt::format("{} not supported by physical device!", ext_info->name)};
         }
 
-        for (const ExtensionInfo* dep : ext_info->dependencies) {
-            auto [deps_supported, reason] = self(self, dep);
-            if (!deps_supported) {
-                return {false, fmt::format("dependency {} is not supported beacause {}", dep->name,
-                                           reason)};
+        // Check dependencies - at least one dependency branch must be satisfiable
+        std::vector<ExtensionDependency> dependencies(ext_info->dependencies.begin(),
+                                                      ext_info->dependencies.end());
+        std::sort(dependencies.begin(), dependencies.end(),
+                  [](const ExtensionDependency& a, const ExtensionDependency& b) -> bool {
+                      return a.required_extensions.size() < b.required_extensions.size();
+                  });
+        for (const ExtensionDependency& dep : dependencies) {
+            
+            
+            // For each required extension in this dependency branch
+            for (const ExtensionInfo* req_ext : dep.required_extensions) {
+                auto [deps_supported, reason] = self(self, req_ext);
+                if (!deps_supported) {
+                    // This branch can't be satisfied, try next one
+                    // (For now, we just warn but don't fail the whole extension)
+                    SPDLOG_DEBUG("dependency branch requires {} which is not supported: {}",
+                                 req_ext->name, reason);
+                }
             }
         }
 

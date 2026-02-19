@@ -234,17 +234,21 @@ void Context::create_instance(const uint32_t targeted_vk_api_version,
         if (ext_info == nullptr) {
             throw std::invalid_argument{fmt::format("extension {} unknown", ext)};
         }
-        for (const ExtensionInfo* dep : ext_info->dependencies) {
-            if (dep->is_instance_extension() &&
-                dep->promoted_to_version > effective_vk_instance_api_version) {
-                if (supported_instance_extensions.contains(dep->name)) {
-                    instance_extension_names.emplace_back(dep->name);
-                } else {
-                    SPDLOG_WARN("instance extension {} (indirectly) requested but not supported.",
-                                dep->name);
+        // Process dependencies - try to enable required instance extensions
+        for (const ExtensionDependency& dep : ext_info->dependencies) {
+            for (const ExtensionInfo* req_ext : dep.required_extensions) {
+                if (req_ext->is_instance_extension() &&
+                    req_ext->promoted_to_version > effective_vk_instance_api_version) {
+                    if (supported_instance_extensions.contains(req_ext->name)) {
+                        instance_extension_names.emplace_back(req_ext->name);
+                    } else {
+                        SPDLOG_WARN(
+                            "instance extension {} (indirectly) requested but not supported.",
+                            req_ext->name);
+                    }
                 }
+                self(self, req_ext->name);
             }
-            self(self, dep->name);
         }
     };
     for (const auto& ext : device_extensions) {

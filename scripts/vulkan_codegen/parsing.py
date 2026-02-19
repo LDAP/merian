@@ -5,39 +5,200 @@ import xml.etree.ElementTree as ET
 from dataclasses import replace
 
 from .codegen import build_extension_name_map, version_to_api_version
-from .models import Extension, VulkanStruct, FeatureMember
+from .models import Extension, VulkanStruct, FeatureMember, Dependency
 from .naming import to_camel_case
 from .spec import FEATURE_STRUCT_BASE, PROPERTY_STRUCT_BASE
 
 
-def parse_depends(
-    depends: str
-) -> list[str]:
+def parse_depends(depends: str) -> list[Dependency]:
     """
-    Parse the depends attribute into a list of OR'd dependencies,
-    where each OR'd item is a list of AND'd dependencies.
+    Parse the depends attribute into structured Dependency objects in DNF.
 
-    Examples:
-    - "VK_KHR_get_physical_device_properties2,VK_VERSION_1_1" -> [VK_KHR_get_physical_device_properties2]
-    - "(VK_KHR_a+VK_KHR_b),VK_VERSION_1_2" -> [VK_KHR_a, VK_KHR_b]
+    Boolean logic:
+    - Comma (,) = OR: "A,B" means at least one must be satisfied
+    - Plus (+) = AND: "A+B" means both must be satisfied
+    - Parentheses = grouping
 
-    Args:
-        depends: The depends attribute string from the Vulkan spec
+    Converts to Disjunctive Normal Form (DNF): OR of ANDs.
+    Example: "(A,B)+C" = "(A+C),(B+C)" = (A AND C) OR (B AND C)
 
     Returns:
-        Only the extensions from the arithmetic expression. The ORs can be reconstructed by checking the promoted version.
+        List of Dependency objects (OR'd branches, each containing ANDed requirements)
     """
     if not depends:
         return []
 
-    result = []
+    # Split by comma (OR operator) at top level
+    or_branches = _split_by_operator(depends, ',')
 
-    parts = re.split(r"[(),+]", depends)
-    for part in parts:
-        if part and not part.startswith("VK_VERSION"):
-            result.append(part)
+    # Parse each OR branch
+    all_dependencies = []
+    for branch in or_branches:
+        # Remove outer parentheses
+        branch = _remove_outer_parens(branch.strip())
 
-    return list(set(result))
+        # Check if still has commas (nested OR after removing parens)
+        if len(_split_by_operator(branch, ',')) > 1:
+            # Recursively parse
+            sub_deps = parse_depends(branch)
+            all_dependencies.extend(sub_deps)
+            continue
+
+        # Split by + (AND operator) to get AND'ed parts
+        and_parts = _split_by_operator(branch, '+')
+
+        # Each AND part might be a simple term or a parenthesized OR expression
+        # We need to expand into DNF: (A,B)+C -> (A+C),(B+C)
+        # Start with one "path" and cross-multiply for each AND part
+        result_paths = [[]]  # Start with one empty path
+
+        for part in and_parts:
+            part = _remove_outer_parens(part.strip())
+            if not part:
+                continue
+
+            # Check if this part is an OR expression
+            sub_or_parts = _split_by_operator(part, ',')
+
+            if len(sub_or_parts) > 1:
+                # This is an OR expression - need to cross-multiply
+                new_paths = []
+                for existing_path in result_paths:
+                    for or_option in sub_or_parts:
+                        or_option = _remove_outer_parens(or_option.strip())
+                        # Parse this OR option (which might have ANDs)
+                        sub_paths = _parse_and_expression(or_option)
+                        for sub_path in sub_paths:
+                            new_paths.append(existing_path + sub_path)
+                result_paths = new_paths
+            else:
+                # Single term or AND expression - parse it
+                sub_paths = _parse_and_expression(part)
+                # Cross-multiply with existing paths
+                new_paths = []
+                for existing_path in result_paths:
+                    for sub_path in sub_paths:
+                        new_paths.append(existing_path + sub_path)
+                result_paths = new_paths
+
+        # Convert each path to a Dependency
+        for path in result_paths:
+            extensions = []
+            version = None
+
+            for item in path:
+                item = item.strip()
+                if item.startswith("VK_VERSION"):
+                    api_version = version_to_api_version(item)
+                    if api_version:
+                        version = api_version
+                elif item:
+                    extensions.append(item)
+
+            all_dependencies.append(Dependency(extensions=extensions, version=version))
+
+    return all_dependencies
+
+
+def _parse_and_expression(expr: str) -> list[list[str]]:
+    """Parse an AND expression into a list of AND chains (DNF).
+
+    Returns a list of lists, where each inner list is an AND chain.
+    If the expression is simple (no nested ORs), returns a single AND chain.
+    If it contains nested ORs, expands into multiple AND chains (DNF).
+
+    Example:
+    - "A+B" -> [["A", "B"]]
+    - "(A,B)+C" -> [["A", "C"], ["B", "C"]]
+    """
+    if not expr:
+        return [[]]
+
+    expr = _remove_outer_parens(expr.strip())
+
+    # Split by + (AND operator)
+    and_parts = _split_by_operator(expr, '+')
+
+    # Start with one path
+    result_paths = [[]]
+
+    for part in and_parts:
+        part = _remove_outer_parens(part.strip())
+        if not part:
+            continue
+
+        # Check if this part contains an OR (comma)
+        or_parts = _split_by_operator(part, ',')
+
+        if len(or_parts) > 1:
+            # Cross-multiply: (A,B)+C -> (A+C),(B+C)
+            new_paths = []
+            for existing_path in result_paths:
+                for or_option in or_parts:
+                    or_option = _remove_outer_parens(or_option.strip())
+                    if not or_option:
+                        continue
+
+                    # Recursively expand this OR option
+                    sub_paths = _parse_and_expression(or_option)
+                    for sub_path in sub_paths:
+                        new_paths.append(existing_path + sub_path)
+            result_paths = new_paths
+        else:
+            # Simple term - add to all paths
+            for path in result_paths:
+                path.append(part)
+
+    return result_paths
+
+
+def _split_by_operator(expr: str, op: str) -> list[str]:
+    """Split expression by operator, respecting parentheses."""
+    parts = []
+    current = ""
+    depth = 0
+
+    for char in expr:
+        if char == '(':
+            depth += 1
+            current += char
+        elif char == ')':
+            depth -= 1
+            current += char
+        elif char == op and depth == 0:
+            parts.append(current)
+            current = ""
+        else:
+            current += char
+
+    if current:
+        parts.append(current)
+
+    return parts
+
+
+def _remove_outer_parens(expr: str) -> str:
+    """Remove outer balanced parentheses."""
+    expr = expr.strip()
+    while expr.startswith('(') and expr.endswith(')'):
+        # Check if outer parens are balanced (i.e., truly outer)
+        depth = 0
+        is_balanced = True
+        for i, char in enumerate(expr):
+            if char == '(':
+                depth += 1
+            elif char == ')':
+                depth -= 1
+                if depth == 0 and i < len(expr) - 1:
+                    is_balanced = False
+                    break
+
+        if is_balanced:
+            expr = expr[1:-1].strip()
+        else:
+            break
+
+    return expr
 
 
 def find_extensions(xml_root: ET.Element) -> list[Extension]:
