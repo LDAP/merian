@@ -7,8 +7,8 @@
 namespace merian {
 
 template <class T, class F>
-std::enable_if_t<std::convertible_to<F, T>> insert_all(std::vector<T>& to,
-                                                       const std::vector<F>& from) {
+std::enable_if_t<std::convertible_to<typename F::value_type, T>> insert_all(std::vector<T>& to,
+                                                                            const F& from) {
     to.insert(to.end(), from.begin(), from.end());
 }
 

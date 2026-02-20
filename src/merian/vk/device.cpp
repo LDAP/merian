@@ -1,6 +1,8 @@
 #include "merian/vk/device.hpp"
 
+#include "fmt/ranges.h"
 #include "merian/shader/shader_defines.hpp"
+#include "merian/utils/string.hpp"
 #include "merian/vk/utils/vulkan_extensions.hpp"
 #include "merian/vk/utils/vulkan_spirv.hpp"
 #include "spdlog/spdlog.h"
@@ -10,128 +12,26 @@ namespace merian {
 Device::Device(
     const PhysicalDeviceHandle& physical_device,
     const VulkanFeatures& features,
-    const vk::ArrayProxyNoTemporaries<const char*>& additional_extensions,
+    const vk::ArrayProxyNoTemporaries<const char*>& extensions,
     const vk::ArrayProxyNoTemporaries<const vk::DeviceQueueCreateInfo>& queue_create_infos,
     void* p_next)
-    : physical_device(physical_device) {
-
-    SPDLOG_DEBUG("create device");
-
-    SPDLOG_DEBUG("...with features:");
-    for (const auto& feature_name : features.get_enabled_features()) {
-        if (physical_device->get_supported_features().get_feature(feature_name)) {
-            SPDLOG_DEBUG("{}", feature_name);
-            enabled_features.set_feature(feature_name, true);
-        } else {
-            SPDLOG_WARN("{} requested but not supported", feature_name);
-        }
-    }
-
-    SPDLOG_DEBUG("...with extensions:");
-    const uint32_t device_vk_api_version = physical_device->get_vk_api_version();
-    const uint32_t instance_vk_api_version = physical_device->get_instance()->get_vk_api_version();
-
-    const auto feature_extensions = enabled_features.get_required_extensions();
-    std::vector<const char*> all_extensions;
-    all_extensions.reserve(additional_extensions.size() + feature_extensions.size());
-
-    const auto add_extension_recurse =
-        [&](const auto& self, const ExtensionInfo* ext_info) -> std::pair<bool, std::string> {
-        if (ext_info->is_instance_extension()) {
-            // Check if promoted to instance's API version
-            if (ext_info->promoted_to_version <= instance_vk_api_version) {
-                return {true, ""}; // Instance extension is promoted, no need to enable
-            }
-            if (physical_device->get_instance()->extension_enabled(ext_info->name)) {
-                return {true, ""};
-            }
-            return {false, fmt::format("instance extension {} is not enabled!", ext_info->name)};
-        }
-
-        // already enabled or not necessary
-        if (enabled_extensions.contains(ext_info->name)) {
-            return {true, ""};
-        }
-        if (ext_info->promoted_to_version <= device_vk_api_version) {
-            SPDLOG_DEBUG("{} skipped (provided by API version)", ext_info->name);
-            return {true, ""};
-        }
-        if (ext_info->deprecated_by != nullptr &&
-            physical_device->extension_supported(ext_info->deprecated_by->name)) {
-            SPDLOG_DEBUG("{} skipped (deprecated by {})", ext_info->name,
-                         ext_info->deprecated_by->name);
-            return self(self, ext_info->deprecated_by);
-        }
-
-        if (!physical_device->extension_supported(ext_info->name)) {
-            return {false, fmt::format("{} not supported by physical device!", ext_info->name)};
-        }
-
-        // Check dependencies - at least one dependency branch must be satisfiable
-        std::vector<ExtensionDependency> dependencies(ext_info->dependencies.begin(),
-                                                      ext_info->dependencies.end());
-        std::sort(dependencies.begin(), dependencies.end(),
-                  [](const ExtensionDependency& a, const ExtensionDependency& b) -> bool {
-                      return a.required_extensions.size() < b.required_extensions.size();
-                  });
-        for (const ExtensionDependency& dep : dependencies) {
-            
-            
-            // For each required extension in this dependency branch
-            for (const ExtensionInfo* req_ext : dep.required_extensions) {
-                auto [deps_supported, reason] = self(self, req_ext);
-                if (!deps_supported) {
-                    // This branch can't be satisfied, try next one
-                    // (For now, we just warn but don't fail the whole extension)
-                    SPDLOG_DEBUG("dependency branch requires {} which is not supported: {}",
-                                 req_ext->name, reason);
-                }
-            }
-        }
-
-        enabled_extensions.emplace(ext_info->name);
-        all_extensions.emplace_back(ext_info->name);
-        SPDLOG_DEBUG(ext_info->name);
-        return {true, ""};
-    };
-
-    const auto add_extension = [&](const auto* const ext) {
-        if (enabled_extensions.contains(ext)) {
-            return;
-        }
-        auto [supported, reason] =
-            add_extension_recurse(add_extension_recurse, get_extension_info(ext));
-        if (!supported) {
-            SPDLOG_WARN("{} requested but not supported, reason: {}", ext, reason);
-        }
-    };
-
-    for (const auto* const ext : additional_extensions) {
-        add_extension(ext);
-    }
-    for (const auto* const ext : feature_extensions) {
-        add_extension(ext);
-    }
+    : physical_device(physical_device), enabled_extensions(extensions.begin(), extensions.end()),
+      enabled_features(features) {
 
     void* p_next_chain = enabled_features.build_chain_for_device_creation(physical_device, p_next);
-    const vk::DeviceCreateInfo device_create_info{{}, queue_create_infos, {}, all_extensions,
-                                                  {}, p_next_chain};
+    const vk::DeviceCreateInfo device_create_info{
+        {}, queue_create_infos, {}, extensions, {}, p_next_chain,
+    };
 
     device = physical_device->get_physical_device().createDevice(device_create_info);
-
-    [[maybe_unused]] const uint32_t physical_device_vk_api_version =
-        physical_device->get_physical_device_vk_api_version();
-    [[maybe_unused]] const uint32_t target_vk_api_version =
-        physical_device->get_instance()->get_target_vk_api_version();
-    SPDLOG_INFO(
-        "device ({}) created. (Vulkan supported: {}.{}.{}, target: {}.{}.{}, effective: "
-        "{}.{}.{})",
-        fmt::ptr(VkDevice(device)), VK_API_VERSION_MAJOR(physical_device_vk_api_version),
-        VK_API_VERSION_MINOR(physical_device_vk_api_version),
-        VK_API_VERSION_PATCH(physical_device_vk_api_version),
-        VK_API_VERSION_MAJOR(target_vk_api_version), VK_API_VERSION_MINOR(target_vk_api_version),
-        VK_API_VERSION_PATCH(target_vk_api_version), VK_API_VERSION_MAJOR(device_vk_api_version),
-        VK_API_VERSION_MINOR(device_vk_api_version), VK_API_VERSION_PATCH(device_vk_api_version));
+    SPDLOG_INFO("device ({}) created. (Vulkan supported: {}, target: {}, effective: "
+                "{}, features: [{}], extensions: [{}])",
+                fmt::ptr(VkDevice(device)),
+                format_vk_api_version(physical_device->get_physical_device_vk_api_version()),
+                format_vk_api_version(physical_device->get_instance()->get_target_vk_api_version()),
+                format_vk_api_version(physical_device->get_vk_api_version()),
+                fmt::join(features.get_enabled_features(), ", "),
+                fmt::join(enabled_extensions, ", "));
 
     SPDLOG_DEBUG("create pipeline cache");
     vk::PipelineCacheCreateInfo pipeline_cache_create_info{};

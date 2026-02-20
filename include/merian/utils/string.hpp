@@ -1,11 +1,13 @@
 #pragma once
 
+#include "merian/shader/spirv_utils.hpp"
 #include <cmath>
 #include <cstdint>
 #include <fmt/format.h>
 #include <functional>
 #include <string>
 #include <vector>
+#include <vulkan/vulkan_core.h>
 
 namespace merian {
 
@@ -42,6 +44,16 @@ namespace merian {
     if (prefix.size() > value.size())
         return false;
     return std::equal(prefix.begin(), prefix.end(), value.begin());
+}
+
+inline std::string format_vk_api_version(const uint32_t vk_api_version) {
+    return fmt::format("{}.{}.{}", VK_API_VERSION_MAJOR(vk_api_version),
+                       VK_API_VERSION_MINOR(vk_api_version), VK_API_VERSION_PATCH(vk_api_version));
+}
+
+inline std::string format_spirv_version(const uint32_t spirv_version) {
+    return fmt::format("{}.{}", MERIAN_SPIRV_VERSION_MAJOR(spirv_version),
+                       MERIAN_SPIRV_VERSION_MINOR(spirv_version));
 }
 
 inline void split(const std::string& value,

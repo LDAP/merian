@@ -51,7 +51,7 @@ struct InstanceSupportQueryInfo {
  *
  * The extension must guarantee that all required resources are available when it returns true. If
  * it returns false, the extension may still populate the requirements with the resources that would
- * have been needed, for the purpose of generating error messages.
+ * have been needed, for the purpose of generating error messages and retrying.
  */
 struct DeviceSupportQueryInfo;
 
@@ -82,7 +82,8 @@ struct DeviceSupportInfo {
         DeviceSupportInfo result;
         result.supported = a.supported && b.supported;
 
-        if (!a.unsupported_reason.empty() && !b.unsupported_reason.empty()) {
+        if (!a.unsupported_reason.empty() && !b.unsupported_reason.empty() &&
+            a.unsupported_reason != b.unsupported_reason) {
             result.unsupported_reason = a.unsupported_reason + "; " + b.unsupported_reason;
         } else if (!a.unsupported_reason.empty()) {
             result.unsupported_reason = a.unsupported_reason;
@@ -244,8 +245,8 @@ class ContextExtension {
     virtual void on_instance_created(const InstanceHandle& /*unused*/,
                                      const ExtensionContainer& /*extension_container*/) {}
 
-    /* Called after the physical device was select and before extensions are checked for
-     * compatibility and check_support is called.*/
+    /* Called after the physical device was selected and before extensions are checked for
+     * compatibility.*/
     virtual void on_physical_device_selected(const PhysicalDeviceHandle& /*unused*/,
                                              const ExtensionContainer& /*extension_container*/) {}
 
@@ -253,10 +254,6 @@ class ContextExtension {
                                        [[maybe_unused]] const PhysicalDeviceHandle& physical_device,
                                        [[maybe_unused]] std::size_t queue_family_index) {
         return true;
-    }
-
-    virtual void
-    on_extension_support_confirmed([[maybe_unused]] const ExtensionContainer& extension_container) {
     }
 
     /**
