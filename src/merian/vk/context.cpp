@@ -188,7 +188,7 @@ void Context::determine_instance_extension_layer_support(const uint32_t targeted
                 } else {
                     support.supported = false;
                     unsupported_reasons.insert(
-                        fmt::format("requires {}, which is unsupported because {}.",
+                        fmt::format("requires {}, which is unsupported because {}",
                                     req_dep_ext->name, dep_support.info));
                     break;
                 }
