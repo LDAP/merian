@@ -60,7 +60,7 @@ template <class T> void check_size(const std::vector<T>& vector, std::size_t ind
     }
 }
 
-template <class T> void remove_duplicates(std::vector<T>& vector) {
+template <class T> void sort_and_remove_duplicates(std::vector<T>& vector) {
     std::sort(vector.begin(), vector.end());
     vector.erase(std::unique(vector.begin(), vector.end()), vector.end());
 }

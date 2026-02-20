@@ -22,7 +22,7 @@ static bool spirv_extension_supported_by_physical_device(
     return all_supported;
 }
 
-void PhysicalDevice::determine_device_extension_support() {
+const std::unordered_set<std::string>& PhysicalDevice::determine_device_extension_support() {
     const uint32_t effective_vk_instance_api_version = instance->get_vk_api_version();
     const uint32_t effective_vk_device_api_version = get_vk_api_version();
 
@@ -71,9 +71,20 @@ void PhysicalDevice::determine_device_extension_support() {
         std::unordered_set<std::string> unsupported_reasons;
         for (const ExtensionDependency& dep : dependencies) {
             if (dep.required_version > effective_vk_device_api_version) {
-                unsupported_reasons.insert(
-                    fmt::format("Vulkan API version {} is required",
-                                format_vk_api_version(dep.required_version)));
+                if (dep.required_extensions.empty()) {
+                    unsupported_reasons.insert(
+                        fmt::format("Vulkan API version {} is required",
+                                    format_vk_api_version(dep.required_version)));
+                } else {
+                    std::vector<const char*> dep_ext_names;
+                    for (const ExtensionInfo* dep_ext : dep.required_extensions) {
+                        dep_ext_names.emplace_back(dep_ext->name);
+                    }
+                    unsupported_reasons.insert(
+                        fmt::format("Vulkan API version {} and {} are required",
+                                    format_vk_api_version(dep.required_version),
+                                    fmt::join(dep_ext_names, ", ")));
+                }
                 continue;
             }
 
@@ -97,11 +108,14 @@ void PhysicalDevice::determine_device_extension_support() {
                     support.missing_instance_extensions.insert(
                         dep_support.missing_instance_extensions.begin(),
                         dep_support.missing_instance_extensions.end());
+                    support.dependencies.insert(dep_ext->name);
+                    support.dependencies.insert(dep_support.dependencies.begin(),
+                                                dep_support.dependencies.end());
                 } else {
                     support.supported = false;
                     support.missing_instance_extensions.clear();
                     unsupported_reasons.insert(
-                        fmt::format("requires {}, which is unsupported because {}.", dep_ext->name,
+                        fmt::format("requires {}, which is unsupported because {}", dep_ext->name,
                                     dep_support.info));
                     break;
                 }
@@ -126,7 +140,7 @@ void PhysicalDevice::determine_device_extension_support() {
         return ins_it->second;
     };
 
-    SPDLOG_DEBUG("checking device extension support...");
+    SPDLOG_TRACE("checking device extension support...");
     [[maybe_unused]] const auto format_support =
         [](const DeviceExtensionSupport& support) -> std::string {
         std::string support_str = support.supported ? "supported" : "unsupported";
@@ -150,17 +164,16 @@ void PhysicalDevice::determine_device_extension_support() {
         if (support.supported) {
             supported_extension_names.emplace(ext);
         }
-        SPDLOG_DEBUG("{} {}", ext, format_support(support));
+        SPDLOG_TRACE("{} {}", ext, format_support(support));
     }
+
+    return supported_extension_names;
 }
 
 PhysicalDevice::PhysicalDevice(const InstanceHandle& instance,
                                const vk::PhysicalDevice& physical_device)
     : instance(instance), physical_device(physical_device), properties(physical_device, instance),
-      supported_features(physical_device, properties) {
-
-    // Extension support
-    determine_device_extension_support();
+      supported_features(physical_device, determine_device_extension_support(), properties) {
 
     // Query additional properties
     physical_device_memory_properties = physical_device.getMemoryProperties2();

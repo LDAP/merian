@@ -14,12 +14,8 @@
 namespace merian {
 
 VulkanFeatures::VulkanFeatures(const vk::PhysicalDevice& physical_device,
+                               const std::unordered_set<std::string>& device_extensions,
                                const VulkanProperties& properties) {
-    // Enumerate device extensions to check support
-    std::unordered_set<std::string> device_extensions;
-    for (const auto& ext : physical_device.enumerateDeviceExtensionProperties()) {
-        device_extensions.insert(ext.extensionName);
-    }
 
     // Get effective API version from properties
     const uint32_t vk_api_version = properties.get_vk_api_version();

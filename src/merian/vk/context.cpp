@@ -121,10 +121,10 @@ void Context::determine_instance_extension_layer_support(const uint32_t targeted
     const uint32_t effective_vk_instance_api_version =
         std::min(targeted_vk_api_version, Instance::get_instance_vk_api_version());
 
-    SPDLOG_DEBUG("checking instance layer support...");
+    SPDLOG_TRACE("checking instance layer support...");
     for (const auto& instance_layer : vk::enumerateInstanceLayerProperties()) {
         supported_instance_layers.emplace(instance_layer.layerName.data());
-        SPDLOG_DEBUG("{} supported", instance_layer.layerName.data());
+        SPDLOG_TRACE("{} supported", instance_layer.layerName.data());
     }
 
     std::unordered_set<std::string> all_instance_extensions;
@@ -206,7 +206,7 @@ void Context::determine_instance_extension_layer_support(const uint32_t targeted
         return ins_it->second;
     };
 
-    SPDLOG_DEBUG("checking instance extension support...");
+    SPDLOG_TRACE("checking instance extension support...");
     [[maybe_unused]] const auto format_support =
         [](const InstanceExtensionSupport& support) -> std::string {
         std::string support_str = support.supported ? "supported" : "unsupported";
@@ -223,7 +223,7 @@ void Context::determine_instance_extension_layer_support(const uint32_t targeted
         const char* const ext = ext_props.extensionName.data();
         [[maybe_unused]] const InstanceExtensionSupport& support =
             check_extension_recurse(check_extension_recurse, ext);
-        SPDLOG_DEBUG("{} {}", ext, format_support(support));
+        SPDLOG_TRACE("{} {}", ext, format_support(support));
     }
 }
 
@@ -450,10 +450,8 @@ void Context::create_instance(const uint32_t targeted_vk_api_version,
             i++;
         }
 
-        std::sort(instance_layer_names.begin(), instance_layer_names.end());
-        remove_duplicates(instance_layer_names);
-        std::sort(instance_extension_names.begin(), instance_extension_names.end());
-        remove_duplicates(instance_extension_names);
+        sort_and_remove_duplicates(instance_layer_names);
+        sort_and_remove_duplicates(instance_extension_names);
     }
 
     // -----------------
@@ -772,8 +770,7 @@ Context::FeatureExtensionCheckResult Context::determine_features_extensions(
     }
     insert_all(all_desired_extensions, all_desired_features.get_required_extensions());
 
-    std::sort(all_desired_extensions.begin(), all_desired_extensions.end());
-    remove_duplicates(all_desired_extensions);
+    sort_and_remove_duplicates(all_desired_extensions);
 
     Context::FeatureExtensionCheckResult result;
 
@@ -822,9 +819,7 @@ Context::FeatureExtensionCheckResult Context::determine_features_extensions(
         result.extensions.emplace_back(ext);
     }
 
-    // --- cleanup
-    std::sort(result.extensions.begin(), result.extensions.end());
-    remove_duplicates(result.extensions);
+    sort_and_remove_duplicates(result.extensions);
 
     return result;
 }

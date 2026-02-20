@@ -167,7 +167,7 @@ def generate_static_extension_infos(extensions) -> list[str]:
             if ext.type == "device"
             else "ExtensionType::Instance"
         )
-        promoted = ext.promotedto if ext.promotedto else (ext.deprecatedby if ext.deprecatedby and not ext.deprecatedby.startswith("VK_API_VERSION") else "(uint32_t)-1")
+        promoted = ext.promotedto if ext.promotedto else "(uint32_t)-1"
         deprecated_by = f"&{make_var_name(ext.deprecatedby)}" if ext.deprecatedby and not ext.deprecatedby.startswith("VK_API_VERSION") else "{}"
 
         lines.append(f"const ExtensionInfo {var_name} = {{")

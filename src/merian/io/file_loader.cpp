@@ -213,7 +213,7 @@ void FileLoader::add_search_path(const vk::ArrayProxy<std::filesystem::path>& pa
     }
 
     std::sort(search_paths.begin(), search_paths.end());
-    remove_duplicates(search_paths);
+    sort_and_remove_duplicates(search_paths);
 }
 
 void FileLoader::add_search_path(const vk::ArrayProxy<std::string>& paths) {
@@ -231,7 +231,7 @@ void FileLoader::add_search_path(const vk::ArrayProxy<std::string>& paths) {
     }
 
     std::sort(search_paths.begin(), search_paths.end());
-    remove_duplicates(search_paths);
+    sort_and_remove_duplicates(search_paths);
 }
 
 bool FileLoader::remove_search_path(const std::filesystem::path& path) {

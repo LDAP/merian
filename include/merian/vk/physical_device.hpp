@@ -116,7 +116,7 @@ class PhysicalDevice : public std::enable_shared_from_this<PhysicalDevice> {
     // ----------------------------------------
 
   private:
-    void determine_device_extension_support();
+    const std::unordered_set<std::string>& determine_device_extension_support();
 
   private:
     const InstanceHandle instance;
