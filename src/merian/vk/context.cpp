@@ -232,7 +232,19 @@ Context::Context(const ContextCreateInfo& create_info)
       application_vk_version(create_info.application_vk_version) {
     merian::Stopwatch sw;
 
-    const uint32_t target_vk_api_version = VK_HEADER_VERSION_COMPLETE;
+    uint32_t target_vk_api_version = VK_HEADER_VERSION_COMPLETE;
+    const char* env_target_version_str = std::getenv("MERIAN_TARGET_VK_API_VERSION");
+    if (env_target_version_str != nullptr) {
+        const uint32_t env_target_version = parse_vk_api_version(env_target_version_str);
+        if (VK_API_VERSION_1_0 <= env_target_version &&
+            env_target_version <= VK_HEADER_VERSION_COMPLETE) {
+            target_vk_api_version = env_target_version;
+        } else {
+            SPDLOG_ERROR("MERIAN_TARGET_VK_API_VERSION must be between {} and {}.",
+                         format_vk_api_version(VK_API_VERSION_1_0),
+                         format_vk_api_version(VK_HEADER_VERSION_COMPLETE));
+        }
+    }
 
     SPDLOG_INFO("\n\n\
 __  __ ___ ___ ___   _   _  _ \n\

@@ -56,6 +56,17 @@ inline std::string format_spirv_version(const uint32_t spirv_version) {
                        MERIAN_SPIRV_VERSION_MINOR(spirv_version));
 }
 
+inline uint32_t parse_vk_api_version(const char* version_str) {
+    uint32_t a = 0;
+    uint32_t b = 0;
+    uint32_t c = 0;
+    uint32_t d = 0;
+    const int count = std::sscanf(version_str, "%u.%u.%u.%u", &a, &b, &c, &d);
+    if (count == 4)
+        return VK_MAKE_API_VERSION(a, b, c, d);
+    return VK_MAKE_API_VERSION(0, a, b, c); // major.minor.patch (no variant)
+}
+
 inline void split(const std::string& value,
                   const std::string& delim,
                   const std::function<void(const std::string&)>& function) {
