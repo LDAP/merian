@@ -295,11 +295,11 @@ Target API Version: {}\n\
 
         support_cache =
             select_physical_device(create_info.filter_vendor_id, create_info.filter_device_id,
-                                   create_info.filter_device_name, create_info.vulkan_features,
+                                   create_info.filter_device_name, create_info.features,
                                    create_info.device_extensions);
 
         feat_ext_result = determine_features_extensions(
-            create_info.vulkan_features, create_info.device_extensions, support_cache);
+            create_info.features, create_info.device_extensions, support_cache);
 
     } while (!did_recreate && !feat_ext_result.missing_instance_extensions.empty());
 

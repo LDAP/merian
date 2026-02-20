@@ -109,7 +109,7 @@ using ConfigureExtensionsCallback = std::function<void(ExtensionContainer&)>;
 
 struct ContextCreateInfo {
     // Set your desired Vulkan features.
-    VulkanFeatures vulkan_features{};
+    VulkanFeatures features{};
     // Set your desired instance extensions, extension dependencies are added
     // automatically.
     std::vector<const char*> instance_extensions{};
@@ -135,7 +135,7 @@ struct ContextCreateInfo {
     uint32_t filter_vendor_id = -1;
     // Set to a number greater or equal to 0 to only consider devices with this device id.
     uint32_t filter_device_id = -1;
-    // Set to a nonempty string this name.
+    // Set to a non-empty string to only consider devices with this name.
     std::string filter_device_name = "";
 };
 
