@@ -8,6 +8,7 @@
 #include <memory>
 #include <string>
 #include <optional>
+#include <unordered_set>
 #include <vector>
 
 namespace merian {
@@ -290,6 +291,7 @@ class VulkanFeatures {
 
     /// Constructor: query features from physical device
     VulkanFeatures(const vk::PhysicalDevice& physical_device,
+                   const std::unordered_set<std::string>& device_extensions,
                    const VulkanProperties& properties);
 
     /// Constructor: enable features from feature names

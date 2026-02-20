@@ -8,1030 +8,4218 @@
 
 namespace merian {
 
-const ExtensionInfo* const VK_AMD_ANTI_LAG_INFO_DEPS[] = {
+const ExtensionInfo* const VK_AMD_ANTI_LAG_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_AMD_DEVICE_COHERENT_MEMORY_INFO_DEPS[] = {
+const ExtensionDependency VK_AMD_ANTI_LAG_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_AMD_ANTI_LAG_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_AMD_DEVICE_COHERENT_MEMORY_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_AMD_DISPLAY_NATIVE_HDR_INFO_DEPS[] = {
+const ExtensionDependency VK_AMD_DEVICE_COHERENT_MEMORY_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_AMD_DEVICE_COHERENT_MEMORY_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_AMD_DISPLAY_NATIVE_HDR_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
     &VK_KHR_GET_SURFACE_CAPABILITIES2_INFO,
     &VK_KHR_SWAPCHAIN_INFO,
 };
-const ExtensionInfo* const VK_AMD_SHADER_CORE_PROPERTIES_INFO_DEPS[] = {
+const ExtensionInfo* const VK_AMD_DISPLAY_NATIVE_HDR_INFO_DEP1_EXTS[] = {
+    &VK_KHR_GET_SURFACE_CAPABILITIES2_INFO,
+    &VK_KHR_SWAPCHAIN_INFO,
+};
+const ExtensionDependency VK_AMD_DISPLAY_NATIVE_HDR_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_AMD_DISPLAY_NATIVE_HDR_INFO_DEP0_EXTS, 3),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_AMD_DISPLAY_NATIVE_HDR_INFO_DEP1_EXTS, 2),
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_AMD_SHADER_CORE_PROPERTIES_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_AMD_SHADER_CORE_PROPERTIES2_INFO_DEPS[] = {
+const ExtensionDependency VK_AMD_SHADER_CORE_PROPERTIES_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_AMD_SHADER_CORE_PROPERTIES_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_AMD_SHADER_CORE_PROPERTIES2_INFO_DEP0_EXTS[] = {
     &VK_AMD_SHADER_CORE_PROPERTIES_INFO,
 };
-const ExtensionInfo* const VK_AMD_SHADER_EARLY_AND_LATE_FRAGMENT_TESTS_INFO_DEPS[] = {
+const ExtensionDependency VK_AMD_SHADER_CORE_PROPERTIES2_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_AMD_SHADER_CORE_PROPERTIES2_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_AMD_SHADER_EARLY_AND_LATE_FRAGMENT_TESTS_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_AMD_TEXTURE_GATHER_BIAS_LOD_INFO_DEPS[] = {
+const ExtensionDependency VK_AMD_SHADER_EARLY_AND_LATE_FRAGMENT_TESTS_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_AMD_SHADER_EARLY_AND_LATE_FRAGMENT_TESTS_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_AMD_TEXTURE_GATHER_BIAS_LOD_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_ARM_DATA_GRAPH_INFO_DEPS[] = {
+const ExtensionDependency VK_AMD_TEXTURE_GATHER_BIAS_LOD_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_AMD_TEXTURE_GATHER_BIAS_LOD_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_ARM_DATA_GRAPH_INFO_DEP0_EXTS[] = {
     &VK_KHR_DEFERRED_HOST_OPERATIONS_INFO,
     &VK_KHR_MAINTENANCE5_INFO,
 };
-const ExtensionInfo* const VK_ARM_FORMAT_PACK_INFO_DEPS[] = {
+const ExtensionDependency VK_ARM_DATA_GRAPH_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_ARM_DATA_GRAPH_INFO_DEP0_EXTS, 2),
+        VK_API_VERSION_1_3,
+    },
+};
+const ExtensionInfo* const VK_ARM_FORMAT_PACK_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_ARM_PERFORMANCE_COUNTERS_BY_REGION_INFO_DEPS[] = {
+const ExtensionDependency VK_ARM_FORMAT_PACK_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_ARM_FORMAT_PACK_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_ARM_PERFORMANCE_COUNTERS_BY_REGION_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_ARM_PIPELINE_OPACITY_MICROMAP_INFO_DEPS[] = {
+const ExtensionDependency VK_ARM_PERFORMANCE_COUNTERS_BY_REGION_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_ARM_PERFORMANCE_COUNTERS_BY_REGION_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_ARM_PIPELINE_OPACITY_MICROMAP_INFO_DEP0_EXTS[] = {
     &VK_EXT_OPACITY_MICROMAP_INFO,
 };
-const ExtensionInfo* const VK_ARM_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_INFO_DEPS[] = {
+const ExtensionDependency VK_ARM_PIPELINE_OPACITY_MICROMAP_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_ARM_PIPELINE_OPACITY_MICROMAP_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_ARM_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_ARM_RENDER_PASS_STRIPED_INFO_DEPS[] = {
+const ExtensionDependency VK_ARM_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_ARM_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_ARM_RENDER_PASS_STRIPED_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
     &VK_KHR_SYNCHRONIZATION2_INFO,
 };
-const ExtensionInfo* const VK_ARM_SCHEDULING_CONTROLS_INFO_DEPS[] = {
+const ExtensionInfo* const VK_ARM_RENDER_PASS_STRIPED_INFO_DEP1_EXTS[] = {
+    &VK_KHR_SYNCHRONIZATION2_INFO,
+};
+const ExtensionDependency VK_ARM_RENDER_PASS_STRIPED_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_ARM_RENDER_PASS_STRIPED_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_ARM_RENDER_PASS_STRIPED_INFO_DEP1_EXTS, 1),
+        VK_API_VERSION_1_1,
+    },
+    {
+        {},
+        VK_API_VERSION_1_3,
+    },
+};
+const ExtensionInfo* const VK_ARM_SCHEDULING_CONTROLS_INFO_DEP0_EXTS[] = {
     &VK_ARM_SHADER_CORE_BUILTINS_INFO,
 };
-const ExtensionInfo* const VK_ARM_SHADER_CORE_BUILTINS_INFO_DEPS[] = {
+const ExtensionDependency VK_ARM_SCHEDULING_CONTROLS_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_ARM_SCHEDULING_CONTROLS_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_ARM_SHADER_CORE_BUILTINS_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_4444_FORMATS_INFO_DEPS[] = {
+const ExtensionDependency VK_ARM_SHADER_CORE_BUILTINS_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_ARM_SHADER_CORE_BUILTINS_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionDependency VK_ARM_SHADER_CORE_PROPERTIES_INFO_DEPS[] = {
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionDependency VK_ARM_TENSORS_INFO_DEPS[] = {
+    {
+        {},
+        VK_API_VERSION_1_3,
+    },
+};
+const ExtensionInfo* const VK_EXT_4444_FORMATS_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_ACQUIRE_DRM_DISPLAY_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_4444_FORMATS_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_4444_FORMATS_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_ACQUIRE_DRM_DISPLAY_INFO_DEP0_EXTS[] = {
     &VK_EXT_DIRECT_MODE_DISPLAY_INFO,
 };
-const ExtensionInfo* const VK_EXT_ASTC_DECODE_MODE_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_ACQUIRE_DRM_DISPLAY_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_ACQUIRE_DRM_DISPLAY_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_EXT_ASTC_DECODE_MODE_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_ATTACHMENT_FEEDBACK_LOOP_DYNAMIC_STATE_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_ASTC_DECODE_MODE_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_ASTC_DECODE_MODE_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_ATTACHMENT_FEEDBACK_LOOP_DYNAMIC_STATE_INFO_DEP0_EXTS[] = {
     &VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_INFO,
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_INFO_DEPS[] = {
+const ExtensionInfo* const VK_EXT_ATTACHMENT_FEEDBACK_LOOP_DYNAMIC_STATE_INFO_DEP1_EXTS[] = {
+    &VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_INFO,
+};
+const ExtensionDependency VK_EXT_ATTACHMENT_FEEDBACK_LOOP_DYNAMIC_STATE_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_ATTACHMENT_FEEDBACK_LOOP_DYNAMIC_STATE_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_ATTACHMENT_FEEDBACK_LOOP_DYNAMIC_STATE_INFO_DEP1_EXTS, 1),
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_BLEND_OPERATION_ADVANCED_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_BLEND_OPERATION_ADVANCED_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_BORDER_COLOR_SWIZZLE_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_BLEND_OPERATION_ADVANCED_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_BLEND_OPERATION_ADVANCED_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_BORDER_COLOR_SWIZZLE_INFO_DEP0_EXTS[] = {
     &VK_EXT_CUSTOM_BORDER_COLOR_INFO,
 };
-const ExtensionInfo* const VK_EXT_BUFFER_DEVICE_ADDRESS_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_BORDER_COLOR_SWIZZLE_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_BORDER_COLOR_SWIZZLE_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_EXT_BUFFER_DEVICE_ADDRESS_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_CALIBRATED_TIMESTAMPS_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_BUFFER_DEVICE_ADDRESS_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_BUFFER_DEVICE_ADDRESS_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_CALIBRATED_TIMESTAMPS_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_COLOR_WRITE_ENABLE_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_CALIBRATED_TIMESTAMPS_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_CALIBRATED_TIMESTAMPS_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_COLOR_WRITE_ENABLE_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_CONDITIONAL_RENDERING_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_COLOR_WRITE_ENABLE_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_COLOR_WRITE_ENABLE_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_CONDITIONAL_RENDERING_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_CONSERVATIVE_RASTERIZATION_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_CONDITIONAL_RENDERING_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_CONDITIONAL_RENDERING_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_CONSERVATIVE_RASTERIZATION_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_CUSTOM_BORDER_COLOR_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_CONSERVATIVE_RASTERIZATION_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_CONSERVATIVE_RASTERIZATION_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_CUSTOM_BORDER_COLOR_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_CUSTOM_RESOLVE_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_CUSTOM_BORDER_COLOR_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_CUSTOM_BORDER_COLOR_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_CUSTOM_RESOLVE_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_DEBUG_MARKER_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_CUSTOM_RESOLVE_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_CUSTOM_RESOLVE_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_DEBUG_MARKER_INFO_DEP0_EXTS[] = {
     &VK_EXT_DEBUG_REPORT_INFO,
 };
-const ExtensionInfo* const VK_EXT_DEPTH_BIAS_CONTROL_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_DEBUG_MARKER_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_DEBUG_MARKER_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_EXT_DEPTH_BIAS_CONTROL_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_DEPTH_CLAMP_CONTROL_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_DEPTH_BIAS_CONTROL_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_DEPTH_BIAS_CONTROL_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_DEPTH_CLAMP_CONTROL_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_DEPTH_CLAMP_ZERO_ONE_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_DEPTH_CLAMP_CONTROL_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_DEPTH_CLAMP_CONTROL_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_DEPTH_CLAMP_ZERO_ONE_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_DEPTH_CLIP_CONTROL_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_DEPTH_CLAMP_ZERO_ONE_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_DEPTH_CLAMP_ZERO_ONE_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_DEPTH_CLIP_CONTROL_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_DEPTH_CLIP_ENABLE_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_DEPTH_CLIP_CONTROL_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_DEPTH_CLIP_CONTROL_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_DEPTH_CLIP_ENABLE_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_DESCRIPTOR_BUFFER_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_DEPTH_CLIP_ENABLE_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_DEPTH_CLIP_ENABLE_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_DESCRIPTOR_BUFFER_INFO_DEP0_EXTS[] = {
     &VK_EXT_DESCRIPTOR_INDEXING_INFO,
     &VK_KHR_BUFFER_DEVICE_ADDRESS_INFO,
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
     &VK_KHR_SYNCHRONIZATION2_INFO,
 };
-const ExtensionInfo* const VK_EXT_DESCRIPTOR_HEAP_INFO_DEPS[] = {
+const ExtensionInfo* const VK_EXT_DESCRIPTOR_BUFFER_INFO_DEP1_EXTS[] = {
+    &VK_EXT_DESCRIPTOR_INDEXING_INFO,
+    &VK_KHR_BUFFER_DEVICE_ADDRESS_INFO,
+    &VK_KHR_SYNCHRONIZATION2_INFO,
+};
+const ExtensionInfo* const VK_EXT_DESCRIPTOR_BUFFER_INFO_DEP2_EXTS[] = {
+    &VK_KHR_SYNCHRONIZATION2_INFO,
+};
+const ExtensionDependency VK_EXT_DESCRIPTOR_BUFFER_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_DESCRIPTOR_BUFFER_INFO_DEP0_EXTS, 4),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_DESCRIPTOR_BUFFER_INFO_DEP1_EXTS, 3),
+        VK_API_VERSION_1_1,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_DESCRIPTOR_BUFFER_INFO_DEP2_EXTS, 1),
+        VK_API_VERSION_1_2,
+    },
+    {
+        {},
+        VK_API_VERSION_1_3,
+    },
+};
+const ExtensionInfo* const VK_EXT_DESCRIPTOR_HEAP_INFO_DEP0_EXTS[] = {
     &VK_KHR_BUFFER_DEVICE_ADDRESS_INFO,
     &VK_KHR_MAINTENANCE5_INFO,
 };
-const ExtensionInfo* const VK_EXT_DESCRIPTOR_INDEXING_INFO_DEPS[] = {
+const ExtensionInfo* const VK_EXT_DESCRIPTOR_HEAP_INFO_DEP1_EXTS[] = {
+    &VK_KHR_MAINTENANCE5_INFO,
+};
+const ExtensionDependency VK_EXT_DESCRIPTOR_HEAP_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_DESCRIPTOR_HEAP_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_DESCRIPTOR_HEAP_INFO_DEP1_EXTS, 1),
+        VK_API_VERSION_1_2,
+    },
+};
+const ExtensionInfo* const VK_EXT_DESCRIPTOR_INDEXING_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
     &VK_KHR_MAINTENANCE3_INFO,
 };
-const ExtensionInfo* const VK_EXT_DEVICE_ADDRESS_BINDING_REPORT_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_DESCRIPTOR_INDEXING_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_DESCRIPTOR_INDEXING_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_DEVICE_ADDRESS_BINDING_REPORT_INFO_DEP0_EXTS[] = {
     &VK_EXT_DEBUG_UTILS_INFO,
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_DEVICE_FAULT_INFO_DEPS[] = {
+const ExtensionInfo* const VK_EXT_DEVICE_ADDRESS_BINDING_REPORT_INFO_DEP1_EXTS[] = {
+    &VK_EXT_DEBUG_UTILS_INFO,
+};
+const ExtensionDependency VK_EXT_DEVICE_ADDRESS_BINDING_REPORT_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_DEVICE_ADDRESS_BINDING_REPORT_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_DEVICE_ADDRESS_BINDING_REPORT_INFO_DEP1_EXTS, 1),
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_DEVICE_FAULT_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_DEVICE_GENERATED_COMMANDS_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_DEVICE_FAULT_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_DEVICE_FAULT_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_DEVICE_GENERATED_COMMANDS_INFO_DEP0_EXTS[] = {
     &VK_KHR_BUFFER_DEVICE_ADDRESS_INFO,
     &VK_KHR_MAINTENANCE5_INFO,
 };
-const ExtensionInfo* const VK_EXT_DEVICE_MEMORY_REPORT_INFO_DEPS[] = {
+const ExtensionInfo* const VK_EXT_DEVICE_GENERATED_COMMANDS_INFO_DEP1_EXTS[] = {
+    &VK_KHR_MAINTENANCE5_INFO,
+};
+const ExtensionDependency VK_EXT_DEVICE_GENERATED_COMMANDS_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_DEVICE_GENERATED_COMMANDS_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_DEVICE_GENERATED_COMMANDS_INFO_DEP1_EXTS, 1),
+        VK_API_VERSION_1_2,
+    },
+    {
+        {},
+        VK_API_VERSION_1_3,
+    },
+};
+const ExtensionInfo* const VK_EXT_DEVICE_MEMORY_REPORT_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_DIRECT_MODE_DISPLAY_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_DEVICE_MEMORY_REPORT_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_DEVICE_MEMORY_REPORT_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_DIRECT_MODE_DISPLAY_INFO_DEP0_EXTS[] = {
     &VK_KHR_DISPLAY_INFO,
 };
-const ExtensionInfo* const VK_EXT_DISCARD_RECTANGLES_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_DIRECT_MODE_DISPLAY_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_DIRECT_MODE_DISPLAY_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_EXT_DISCARD_RECTANGLES_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_DISPLAY_CONTROL_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_DISCARD_RECTANGLES_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_DISCARD_RECTANGLES_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_DISPLAY_CONTROL_INFO_DEP0_EXTS[] = {
     &VK_EXT_DISPLAY_SURFACE_COUNTER_INFO,
     &VK_KHR_SWAPCHAIN_INFO,
 };
-const ExtensionInfo* const VK_EXT_DISPLAY_SURFACE_COUNTER_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_DISPLAY_CONTROL_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_DISPLAY_CONTROL_INFO_DEP0_EXTS, 2),
+        0,
+    },
+};
+const ExtensionInfo* const VK_EXT_DISPLAY_SURFACE_COUNTER_INFO_DEP0_EXTS[] = {
     &VK_KHR_DISPLAY_INFO,
 };
-const ExtensionInfo* const VK_EXT_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_DISPLAY_SURFACE_COUNTER_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_DISPLAY_SURFACE_COUNTER_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_EXT_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_INFO_DEP0_EXTS[] = {
     &VK_KHR_DYNAMIC_RENDERING_INFO,
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_EXTENDED_DYNAMIC_STATE_INFO_DEPS[] = {
+const ExtensionInfo* const VK_EXT_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_INFO_DEP1_EXTS[] = {
+    &VK_KHR_DYNAMIC_RENDERING_INFO,
+};
+const ExtensionDependency VK_EXT_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_INFO_DEP1_EXTS, 1),
+        VK_API_VERSION_1_1,
+    },
+    {
+        {},
+        VK_API_VERSION_1_3,
+    },
+};
+const ExtensionInfo* const VK_EXT_EXTENDED_DYNAMIC_STATE_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_EXTENDED_DYNAMIC_STATE2_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_EXTENDED_DYNAMIC_STATE_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_EXTENDED_DYNAMIC_STATE_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_EXTENDED_DYNAMIC_STATE2_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_EXTENDED_DYNAMIC_STATE3_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_EXTENDED_DYNAMIC_STATE2_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_EXTENDED_DYNAMIC_STATE2_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_EXTENDED_DYNAMIC_STATE3_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_EXTERNAL_MEMORY_ACQUIRE_UNMODIFIED_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_EXTENDED_DYNAMIC_STATE3_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_EXTENDED_DYNAMIC_STATE3_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_EXTERNAL_MEMORY_ACQUIRE_UNMODIFIED_INFO_DEP0_EXTS[] = {
     &VK_KHR_EXTERNAL_MEMORY_INFO,
 };
-const ExtensionInfo* const VK_EXT_EXTERNAL_MEMORY_DMA_BUF_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_EXTERNAL_MEMORY_ACQUIRE_UNMODIFIED_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_EXTERNAL_MEMORY_ACQUIRE_UNMODIFIED_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_EXTERNAL_MEMORY_DMA_BUF_INFO_DEP0_EXTS[] = {
     &VK_KHR_EXTERNAL_MEMORY_FD_INFO,
 };
-const ExtensionInfo* const VK_EXT_EXTERNAL_MEMORY_HOST_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_EXTERNAL_MEMORY_DMA_BUF_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_EXTERNAL_MEMORY_DMA_BUF_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_EXT_EXTERNAL_MEMORY_HOST_INFO_DEP0_EXTS[] = {
     &VK_KHR_EXTERNAL_MEMORY_INFO,
 };
-const ExtensionInfo* const VK_EXT_FRAGMENT_DENSITY_MAP_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_EXTERNAL_MEMORY_HOST_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_EXTERNAL_MEMORY_HOST_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_FRAGMENT_DENSITY_MAP_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_FRAGMENT_DENSITY_MAP2_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_FRAGMENT_DENSITY_MAP_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_FRAGMENT_DENSITY_MAP_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_FRAGMENT_DENSITY_MAP2_INFO_DEP0_EXTS[] = {
     &VK_EXT_FRAGMENT_DENSITY_MAP_INFO,
 };
-const ExtensionInfo* const VK_EXT_FRAGMENT_DENSITY_MAP_OFFSET_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_FRAGMENT_DENSITY_MAP2_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_FRAGMENT_DENSITY_MAP2_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_EXT_FRAGMENT_DENSITY_MAP_OFFSET_INFO_DEP0_EXTS[] = {
+    &VK_EXT_FRAGMENT_DENSITY_MAP_INFO,
+    &VK_KHR_CREATE_RENDERPASS2_INFO,
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
+};
+const ExtensionInfo* const VK_EXT_FRAGMENT_DENSITY_MAP_OFFSET_INFO_DEP1_EXTS[] = {
     &VK_EXT_FRAGMENT_DENSITY_MAP_INFO,
     &VK_KHR_CREATE_RENDERPASS2_INFO,
     &VK_KHR_DYNAMIC_RENDERING_INFO,
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_FRAGMENT_SHADER_INTERLOCK_INFO_DEPS[] = {
+const ExtensionInfo* const VK_EXT_FRAGMENT_DENSITY_MAP_OFFSET_INFO_DEP2_EXTS[] = {
+    &VK_EXT_FRAGMENT_DENSITY_MAP_INFO,
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_FRAME_BOUNDARY_INFO_DEPS[] = {
+const ExtensionInfo* const VK_EXT_FRAGMENT_DENSITY_MAP_OFFSET_INFO_DEP3_EXTS[] = {
+    &VK_EXT_FRAGMENT_DENSITY_MAP_INFO,
+    &VK_KHR_DYNAMIC_RENDERING_INFO,
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_GLOBAL_PRIORITY_QUERY_INFO_DEPS[] = {
+const ExtensionInfo* const VK_EXT_FRAGMENT_DENSITY_MAP_OFFSET_INFO_DEP4_EXTS[] = {
+    &VK_EXT_FRAGMENT_DENSITY_MAP_INFO,
+    &VK_KHR_CREATE_RENDERPASS2_INFO,
+};
+const ExtensionInfo* const VK_EXT_FRAGMENT_DENSITY_MAP_OFFSET_INFO_DEP5_EXTS[] = {
+    &VK_EXT_FRAGMENT_DENSITY_MAP_INFO,
+    &VK_KHR_CREATE_RENDERPASS2_INFO,
+    &VK_KHR_DYNAMIC_RENDERING_INFO,
+};
+const ExtensionInfo* const VK_EXT_FRAGMENT_DENSITY_MAP_OFFSET_INFO_DEP6_EXTS[] = {
+    &VK_EXT_FRAGMENT_DENSITY_MAP_INFO,
+};
+const ExtensionInfo* const VK_EXT_FRAGMENT_DENSITY_MAP_OFFSET_INFO_DEP7_EXTS[] = {
+    &VK_EXT_FRAGMENT_DENSITY_MAP_INFO,
+    &VK_KHR_DYNAMIC_RENDERING_INFO,
+};
+const ExtensionDependency VK_EXT_FRAGMENT_DENSITY_MAP_OFFSET_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_FRAGMENT_DENSITY_MAP_OFFSET_INFO_DEP0_EXTS, 3),
+        VK_API_VERSION_1_3,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_FRAGMENT_DENSITY_MAP_OFFSET_INFO_DEP1_EXTS, 4),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_FRAGMENT_DENSITY_MAP_OFFSET_INFO_DEP2_EXTS, 2),
+        VK_API_VERSION_1_3,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_FRAGMENT_DENSITY_MAP_OFFSET_INFO_DEP3_EXTS, 3),
+        VK_API_VERSION_1_2,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_FRAGMENT_DENSITY_MAP_OFFSET_INFO_DEP4_EXTS, 2),
+        VK_API_VERSION_1_3,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_FRAGMENT_DENSITY_MAP_OFFSET_INFO_DEP5_EXTS, 3),
+        VK_API_VERSION_1_1,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_FRAGMENT_DENSITY_MAP_OFFSET_INFO_DEP6_EXTS, 1),
+        VK_API_VERSION_1_3,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_FRAGMENT_DENSITY_MAP_OFFSET_INFO_DEP7_EXTS, 2),
+        VK_API_VERSION_1_2,
+    },
+};
+const ExtensionInfo* const VK_EXT_FRAGMENT_SHADER_INTERLOCK_INFO_DEP0_EXTS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
+};
+const ExtensionDependency VK_EXT_FRAGMENT_SHADER_INTERLOCK_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_FRAGMENT_SHADER_INTERLOCK_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_FRAME_BOUNDARY_INFO_DEP0_EXTS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
+};
+const ExtensionDependency VK_EXT_FRAME_BOUNDARY_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_FRAME_BOUNDARY_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_GLOBAL_PRIORITY_QUERY_INFO_DEP0_EXTS[] = {
     &VK_EXT_GLOBAL_PRIORITY_INFO,
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_GRAPHICS_PIPELINE_LIBRARY_INFO_DEPS[] = {
+const ExtensionInfo* const VK_EXT_GLOBAL_PRIORITY_QUERY_INFO_DEP1_EXTS[] = {
+    &VK_EXT_GLOBAL_PRIORITY_INFO,
+};
+const ExtensionDependency VK_EXT_GLOBAL_PRIORITY_QUERY_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_GLOBAL_PRIORITY_QUERY_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_GLOBAL_PRIORITY_QUERY_INFO_DEP1_EXTS, 1),
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_GRAPHICS_PIPELINE_LIBRARY_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
     &VK_KHR_PIPELINE_LIBRARY_INFO,
 };
-const ExtensionInfo* const VK_EXT_HDR_METADATA_INFO_DEPS[] = {
+const ExtensionInfo* const VK_EXT_GRAPHICS_PIPELINE_LIBRARY_INFO_DEP1_EXTS[] = {
+    &VK_KHR_PIPELINE_LIBRARY_INFO,
+};
+const ExtensionDependency VK_EXT_GRAPHICS_PIPELINE_LIBRARY_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_INFO_DEP1_EXTS, 1),
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_HDR_METADATA_INFO_DEP0_EXTS[] = {
     &VK_KHR_SWAPCHAIN_INFO,
 };
-const ExtensionInfo* const VK_EXT_HEADLESS_SURFACE_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_HDR_METADATA_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_HDR_METADATA_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_EXT_HEADLESS_SURFACE_INFO_DEP0_EXTS[] = {
     &VK_KHR_SURFACE_INFO,
 };
-const ExtensionInfo* const VK_EXT_HOST_IMAGE_COPY_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_HEADLESS_SURFACE_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_HEADLESS_SURFACE_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_EXT_HOST_IMAGE_COPY_INFO_DEP0_EXTS[] = {
     &VK_KHR_COPY_COMMANDS2_INFO,
     &VK_KHR_FORMAT_FEATURE_FLAGS2_INFO,
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_HOST_QUERY_RESET_INFO_DEPS[] = {
+const ExtensionInfo* const VK_EXT_HOST_IMAGE_COPY_INFO_DEP1_EXTS[] = {
+    &VK_KHR_COPY_COMMANDS2_INFO,
+    &VK_KHR_FORMAT_FEATURE_FLAGS2_INFO,
+};
+const ExtensionDependency VK_EXT_HOST_IMAGE_COPY_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_HOST_IMAGE_COPY_INFO_DEP0_EXTS, 3),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_HOST_IMAGE_COPY_INFO_DEP1_EXTS, 2),
+        VK_API_VERSION_1_1,
+    },
+    {
+        {},
+        VK_API_VERSION_1_3,
+    },
+};
+const ExtensionInfo* const VK_EXT_HOST_QUERY_RESET_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_IMAGE_2D_VIEW_OF_3D_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_HOST_QUERY_RESET_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_HOST_QUERY_RESET_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_IMAGE_2D_VIEW_OF_3D_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
     &VK_KHR_MAINTENANCE1_INFO,
 };
-const ExtensionInfo* const VK_EXT_IMAGE_COMPRESSION_CONTROL_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_IMAGE_2D_VIEW_OF_3D_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_IMAGE_2D_VIEW_OF_3D_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_IMAGE_COMPRESSION_CONTROL_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_IMAGE_COMPRESSION_CONTROL_SWAPCHAIN_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_IMAGE_COMPRESSION_CONTROL_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_IMAGE_COMPRESSION_CONTROL_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_IMAGE_COMPRESSION_CONTROL_SWAPCHAIN_INFO_DEP0_EXTS[] = {
     &VK_EXT_IMAGE_COMPRESSION_CONTROL_INFO,
 };
-const ExtensionInfo* const VK_EXT_IMAGE_DRM_FORMAT_MODIFIER_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_IMAGE_COMPRESSION_CONTROL_SWAPCHAIN_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_IMAGE_COMPRESSION_CONTROL_SWAPCHAIN_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_EXT_IMAGE_DRM_FORMAT_MODIFIER_INFO_DEP0_EXTS[] = {
     &VK_KHR_BIND_MEMORY2_INFO,
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
     &VK_KHR_IMAGE_FORMAT_LIST_INFO,
     &VK_KHR_SAMPLER_YCBCR_CONVERSION_INFO,
 };
-const ExtensionInfo* const VK_EXT_IMAGE_ROBUSTNESS_INFO_DEPS[] = {
+const ExtensionInfo* const VK_EXT_IMAGE_DRM_FORMAT_MODIFIER_INFO_DEP1_EXTS[] = {
+    &VK_KHR_IMAGE_FORMAT_LIST_INFO,
+};
+const ExtensionDependency VK_EXT_IMAGE_DRM_FORMAT_MODIFIER_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_IMAGE_DRM_FORMAT_MODIFIER_INFO_DEP0_EXTS, 4),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_IMAGE_DRM_FORMAT_MODIFIER_INFO_DEP1_EXTS, 1),
+        VK_API_VERSION_1_1,
+    },
+    {
+        {},
+        VK_API_VERSION_1_2,
+    },
+};
+const ExtensionInfo* const VK_EXT_IMAGE_ROBUSTNESS_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_IMAGE_SLICED_VIEW_OF_3D_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_IMAGE_ROBUSTNESS_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_IMAGE_ROBUSTNESS_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_IMAGE_SLICED_VIEW_OF_3D_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
     &VK_KHR_MAINTENANCE1_INFO,
 };
-const ExtensionInfo* const VK_EXT_IMAGE_VIEW_MIN_LOD_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_IMAGE_SLICED_VIEW_OF_3D_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_IMAGE_SLICED_VIEW_OF_3D_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_IMAGE_VIEW_MIN_LOD_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_INDEX_TYPE_UINT8_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_IMAGE_VIEW_MIN_LOD_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_IMAGE_VIEW_MIN_LOD_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_INDEX_TYPE_UINT8_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_INLINE_UNIFORM_BLOCK_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_INDEX_TYPE_UINT8_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_INDEX_TYPE_UINT8_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_INLINE_UNIFORM_BLOCK_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
     &VK_KHR_MAINTENANCE1_INFO,
 };
-const ExtensionInfo* const VK_EXT_LEGACY_DITHERING_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_INLINE_UNIFORM_BLOCK_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_INLINE_UNIFORM_BLOCK_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_LEGACY_DITHERING_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_LEGACY_VERTEX_ATTRIBUTES_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_LEGACY_DITHERING_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_LEGACY_DITHERING_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_LEGACY_VERTEX_ATTRIBUTES_INFO_DEP0_EXTS[] = {
     &VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_INFO,
 };
-const ExtensionInfo* const VK_EXT_LINE_RASTERIZATION_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_LEGACY_VERTEX_ATTRIBUTES_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_LEGACY_VERTEX_ATTRIBUTES_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_EXT_LINE_RASTERIZATION_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_MAP_MEMORY_PLACED_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_LINE_RASTERIZATION_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_LINE_RASTERIZATION_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_MAP_MEMORY_PLACED_INFO_DEP0_EXTS[] = {
     &VK_KHR_MAP_MEMORY2_INFO,
 };
-const ExtensionInfo* const VK_EXT_MEMORY_BUDGET_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_MAP_MEMORY_PLACED_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_MAP_MEMORY_PLACED_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_4,
+    },
+};
+const ExtensionInfo* const VK_EXT_MEMORY_BUDGET_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_MEMORY_DECOMPRESSION_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_MEMORY_BUDGET_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_MEMORY_BUDGET_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_MEMORY_DECOMPRESSION_INFO_DEP0_EXTS[] = {
     &VK_KHR_BUFFER_DEVICE_ADDRESS_INFO,
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_MEMORY_PRIORITY_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_MEMORY_DECOMPRESSION_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_MEMORY_DECOMPRESSION_INFO_DEP0_EXTS, 2),
+        0,
+    },
+};
+const ExtensionInfo* const VK_EXT_MEMORY_PRIORITY_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_MESH_SHADER_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_MEMORY_PRIORITY_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_MEMORY_PRIORITY_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_MESH_SHADER_INFO_DEP0_EXTS[] = {
     &VK_KHR_SPIRV_1_4_INFO,
 };
-const ExtensionInfo* const VK_EXT_MULTI_DRAW_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_MESH_SHADER_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_MESH_SHADER_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_2,
+    },
+};
+const ExtensionInfo* const VK_EXT_MULTI_DRAW_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_MULTISAMPLED_RENDER_TO_SINGLE_SAMPLED_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_MULTI_DRAW_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_MULTI_DRAW_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_MULTISAMPLED_RENDER_TO_SINGLE_SAMPLED_INFO_DEP0_EXTS[] = {
     &VK_KHR_CREATE_RENDERPASS2_INFO,
     &VK_KHR_DEPTH_STENCIL_RESOLVE_INFO,
 };
-const ExtensionInfo* const VK_EXT_MUTABLE_DESCRIPTOR_TYPE_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_MULTISAMPLED_RENDER_TO_SINGLE_SAMPLED_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_MULTISAMPLED_RENDER_TO_SINGLE_SAMPLED_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_2,
+    },
+};
+const ExtensionInfo* const VK_EXT_MUTABLE_DESCRIPTOR_TYPE_INFO_DEP0_EXTS[] = {
     &VK_KHR_MAINTENANCE3_INFO,
 };
-const ExtensionInfo* const VK_EXT_NESTED_COMMAND_BUFFER_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_MUTABLE_DESCRIPTOR_TYPE_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_MUTABLE_DESCRIPTOR_TYPE_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_NESTED_COMMAND_BUFFER_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_NON_SEAMLESS_CUBE_MAP_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_NESTED_COMMAND_BUFFER_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_NESTED_COMMAND_BUFFER_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_NON_SEAMLESS_CUBE_MAP_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_OPACITY_MICROMAP_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_NON_SEAMLESS_CUBE_MAP_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_NON_SEAMLESS_CUBE_MAP_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_OPACITY_MICROMAP_INFO_DEP0_EXTS[] = {
     &VK_KHR_ACCELERATION_STRUCTURE_INFO,
     &VK_KHR_SYNCHRONIZATION2_INFO,
 };
-const ExtensionInfo* const VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_INFO_DEPS[] = {
+const ExtensionInfo* const VK_EXT_OPACITY_MICROMAP_INFO_DEP1_EXTS[] = {
+    &VK_KHR_ACCELERATION_STRUCTURE_INFO,
+};
+const ExtensionDependency VK_EXT_OPACITY_MICROMAP_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_OPACITY_MICROMAP_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_OPACITY_MICROMAP_INFO_DEP1_EXTS, 1),
+        VK_API_VERSION_1_3,
+    },
+};
+const ExtensionInfo* const VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_INFO_DEP0_EXTS[] = {
     &VK_EXT_MEMORY_PRIORITY_INFO,
 };
-const ExtensionInfo* const VK_EXT_PCI_BUS_INFO_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_EXT_PCI_BUS_INFO_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_PHYSICAL_DEVICE_DRM_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_PCI_BUS_INFO_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_PCI_BUS_INFO_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_PHYSICAL_DEVICE_DRM_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_PIPELINE_CREATION_CACHE_CONTROL_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_PHYSICAL_DEVICE_DRM_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_PHYSICAL_DEVICE_DRM_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_PIPELINE_CREATION_CACHE_CONTROL_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_PIPELINE_LIBRARY_GROUP_HANDLES_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_PIPELINE_CREATION_CACHE_CONTROL_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_PIPELINE_CREATION_CACHE_CONTROL_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_PIPELINE_LIBRARY_GROUP_HANDLES_INFO_DEP0_EXTS[] = {
     &VK_KHR_PIPELINE_LIBRARY_INFO,
     &VK_KHR_RAY_TRACING_PIPELINE_INFO,
 };
-const ExtensionInfo* const VK_EXT_PIPELINE_PROPERTIES_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_PIPELINE_LIBRARY_GROUP_HANDLES_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_PIPELINE_LIBRARY_GROUP_HANDLES_INFO_DEP0_EXTS, 2),
+        0,
+    },
+};
+const ExtensionInfo* const VK_EXT_PIPELINE_PROPERTIES_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_PIPELINE_PROTECTED_ACCESS_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_PIPELINE_PROPERTIES_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_PIPELINE_PROPERTIES_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_PIPELINE_PROTECTED_ACCESS_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_PIPELINE_ROBUSTNESS_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_PIPELINE_PROTECTED_ACCESS_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_PIPELINE_PROTECTED_ACCESS_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_PIPELINE_ROBUSTNESS_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_PRESENT_MODE_FIFO_LATEST_READY_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_PIPELINE_ROBUSTNESS_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_PIPELINE_ROBUSTNESS_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_PRESENT_MODE_FIFO_LATEST_READY_INFO_DEP0_EXTS[] = {
     &VK_KHR_SWAPCHAIN_INFO,
 };
-const ExtensionInfo* const VK_EXT_PRESENT_TIMING_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_PRESENT_MODE_FIFO_LATEST_READY_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_PRESENT_MODE_FIFO_LATEST_READY_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_EXT_PRESENT_TIMING_INFO_DEP0_EXTS[] = {
     &VK_KHR_CALIBRATED_TIMESTAMPS_INFO,
     &VK_KHR_GET_SURFACE_CAPABILITIES2_INFO,
     &VK_KHR_PRESENT_ID2_INFO,
     &VK_KHR_SWAPCHAIN_INFO,
 };
-const ExtensionInfo* const VK_EXT_PRIMITIVE_TOPOLOGY_LIST_RESTART_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_PRESENT_TIMING_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_PRESENT_TIMING_INFO_DEP0_EXTS, 4),
+        0,
+    },
+};
+const ExtensionInfo* const VK_EXT_PRIMITIVE_TOPOLOGY_LIST_RESTART_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_PRIMITIVES_GENERATED_QUERY_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_PRIMITIVE_TOPOLOGY_LIST_RESTART_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_PRIMITIVE_TOPOLOGY_LIST_RESTART_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_PRIMITIVES_GENERATED_QUERY_INFO_DEP0_EXTS[] = {
     &VK_EXT_TRANSFORM_FEEDBACK_INFO,
 };
-const ExtensionInfo* const VK_EXT_PRIVATE_DATA_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_PRIMITIVES_GENERATED_QUERY_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_PRIMITIVES_GENERATED_QUERY_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_EXT_PRIVATE_DATA_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_PROVOKING_VERTEX_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_PRIVATE_DATA_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_PRIVATE_DATA_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_PROVOKING_VERTEX_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_QUEUE_FAMILY_FOREIGN_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_PROVOKING_VERTEX_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_PROVOKING_VERTEX_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_QUEUE_FAMILY_FOREIGN_INFO_DEP0_EXTS[] = {
     &VK_KHR_EXTERNAL_MEMORY_INFO,
 };
-const ExtensionInfo* const VK_EXT_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_QUEUE_FAMILY_FOREIGN_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_QUEUE_FAMILY_FOREIGN_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_RAY_TRACING_INVOCATION_REORDER_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_RAY_TRACING_INVOCATION_REORDER_INFO_DEP0_EXTS[] = {
     &VK_KHR_RAY_TRACING_PIPELINE_INFO,
 };
-const ExtensionInfo* const VK_EXT_RGBA10X6_FORMATS_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_RAY_TRACING_INVOCATION_REORDER_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_RAY_TRACING_INVOCATION_REORDER_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_EXT_RGBA10X6_FORMATS_INFO_DEP0_EXTS[] = {
     &VK_KHR_SAMPLER_YCBCR_CONVERSION_INFO,
 };
-const ExtensionInfo* const VK_EXT_ROBUSTNESS2_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_RGBA10X6_FORMATS_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_RGBA10X6_FORMATS_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_ROBUSTNESS2_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_SAMPLE_LOCATIONS_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_ROBUSTNESS2_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_ROBUSTNESS2_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_SAMPLE_LOCATIONS_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_SAMPLER_FILTER_MINMAX_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_SAMPLE_LOCATIONS_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_SAMPLE_LOCATIONS_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_SAMPLER_FILTER_MINMAX_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_SCALAR_BLOCK_LAYOUT_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_SAMPLER_FILTER_MINMAX_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_SAMPLER_FILTER_MINMAX_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_SCALAR_BLOCK_LAYOUT_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_SHADER_64BIT_INDEXING_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_SCALAR_BLOCK_LAYOUT_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_SCALAR_BLOCK_LAYOUT_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_SHADER_64BIT_INDEXING_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_SHADER_ATOMIC_FLOAT_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_SHADER_64BIT_INDEXING_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_SHADER_64BIT_INDEXING_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_SHADER_ATOMIC_FLOAT_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_SHADER_ATOMIC_FLOAT2_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_SHADER_ATOMIC_FLOAT_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_SHADER_ATOMIC_FLOAT_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_SHADER_ATOMIC_FLOAT2_INFO_DEP0_EXTS[] = {
     &VK_EXT_SHADER_ATOMIC_FLOAT_INFO,
 };
-const ExtensionInfo* const VK_EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_SHADER_ATOMIC_FLOAT2_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_SHADER_ATOMIC_FLOAT2_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_SHADER_FLOAT8_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_SHADER_FLOAT8_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_SHADER_IMAGE_ATOMIC_INT64_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_SHADER_FLOAT8_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_SHADER_FLOAT8_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_SHADER_IMAGE_ATOMIC_INT64_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_SHADER_MODULE_IDENTIFIER_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_SHADER_IMAGE_ATOMIC_INT64_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_SHADER_IMAGE_ATOMIC_INT64_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionDependency VK_EXT_SHADER_LONG_VECTOR_INFO_DEPS[] = {
+    {
+        {},
+        VK_API_VERSION_1_2,
+    },
+};
+const ExtensionInfo* const VK_EXT_SHADER_MODULE_IDENTIFIER_INFO_DEP0_EXTS[] = {
     &VK_EXT_PIPELINE_CREATION_CACHE_CONTROL_INFO,
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_SHADER_OBJECT_INFO_DEPS[] = {
+const ExtensionInfo* const VK_EXT_SHADER_MODULE_IDENTIFIER_INFO_DEP1_EXTS[] = {
+    &VK_EXT_PIPELINE_CREATION_CACHE_CONTROL_INFO,
+};
+const ExtensionDependency VK_EXT_SHADER_MODULE_IDENTIFIER_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_SHADER_MODULE_IDENTIFIER_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_SHADER_MODULE_IDENTIFIER_INFO_DEP1_EXTS, 1),
+        VK_API_VERSION_1_1,
+    },
+    {
+        {},
+        VK_API_VERSION_1_3,
+    },
+};
+const ExtensionInfo* const VK_EXT_SHADER_OBJECT_INFO_DEP0_EXTS[] = {
     &VK_KHR_DYNAMIC_RENDERING_INFO,
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_SHADER_REPLICATED_COMPOSITES_INFO_DEPS[] = {
+const ExtensionInfo* const VK_EXT_SHADER_OBJECT_INFO_DEP1_EXTS[] = {
+    &VK_KHR_DYNAMIC_RENDERING_INFO,
+};
+const ExtensionDependency VK_EXT_SHADER_OBJECT_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_SHADER_OBJECT_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_SHADER_OBJECT_INFO_DEP1_EXTS, 1),
+        VK_API_VERSION_1_1,
+    },
+    {
+        {},
+        VK_API_VERSION_1_3,
+    },
+};
+const ExtensionInfo* const VK_EXT_SHADER_REPLICATED_COMPOSITES_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_SHADER_SUBGROUP_PARTITIONED_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_SHADER_REPLICATED_COMPOSITES_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_SHADER_REPLICATED_COMPOSITES_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_SHADER_SUBGROUP_PARTITIONED_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_SHADER_UNIFORM_BUFFER_UNSIZED_ARRAY_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_SHADER_SUBGROUP_PARTITIONED_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_SHADER_SUBGROUP_PARTITIONED_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionDependency VK_EXT_SHADER_TILE_IMAGE_INFO_DEPS[] = {
+    {
+        {},
+        VK_API_VERSION_1_3,
+    },
+};
+const ExtensionInfo* const VK_EXT_SHADER_UNIFORM_BUFFER_UNSIZED_ARRAY_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_SUBPASS_MERGE_FEEDBACK_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_SHADER_UNIFORM_BUFFER_UNSIZED_ARRAY_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_SHADER_UNIFORM_BUFFER_UNSIZED_ARRAY_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionDependency VK_EXT_SUBGROUP_SIZE_CONTROL_INFO_DEPS[] = {
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_SUBPASS_MERGE_FEEDBACK_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_EXT_SURFACE_MAINTENANCE1_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_SUBPASS_MERGE_FEEDBACK_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_SUBPASS_MERGE_FEEDBACK_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_SURFACE_MAINTENANCE1_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_SURFACE_CAPABILITIES2_INFO,
     &VK_KHR_SURFACE_INFO,
 };
-const ExtensionInfo* const VK_EXT_SWAPCHAIN_COLORSPACE_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_SURFACE_MAINTENANCE1_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_SURFACE_MAINTENANCE1_INFO_DEP0_EXTS, 2),
+        0,
+    },
+};
+const ExtensionInfo* const VK_EXT_SWAPCHAIN_COLORSPACE_INFO_DEP0_EXTS[] = {
     &VK_KHR_SURFACE_INFO,
 };
-const ExtensionInfo* const VK_EXT_SWAPCHAIN_MAINTENANCE1_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_SWAPCHAIN_COLORSPACE_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_SWAPCHAIN_COLORSPACE_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_EXT_SWAPCHAIN_MAINTENANCE1_INFO_DEP0_EXTS[] = {
     &VK_EXT_SURFACE_MAINTENANCE1_INFO,
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
     &VK_KHR_SWAPCHAIN_INFO,
 };
-const ExtensionInfo* const VK_EXT_TEXEL_BUFFER_ALIGNMENT_INFO_DEPS[] = {
-    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
-};
-const ExtensionInfo* const VK_EXT_TEXTURE_COMPRESSION_ASTC_3D_INFO_DEPS[] = {
-    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
-};
-const ExtensionInfo* const VK_EXT_TEXTURE_COMPRESSION_ASTC_HDR_INFO_DEPS[] = {
-    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
-};
-const ExtensionInfo* const VK_EXT_TRANSFORM_FEEDBACK_INFO_DEPS[] = {
-    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
-};
-const ExtensionInfo* const VK_EXT_VERTEX_ATTRIBUTE_DIVISOR_INFO_DEPS[] = {
-    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
-};
-const ExtensionInfo* const VK_EXT_VERTEX_ATTRIBUTE_ROBUSTNESS_INFO_DEPS[] = {
-    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
-};
-const ExtensionInfo* const VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_INFO_DEPS[] = {
-    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
-};
-const ExtensionInfo* const VK_EXT_YCBCR_2PLANE_444_FORMATS_INFO_DEPS[] = {
-    &VK_KHR_SAMPLER_YCBCR_CONVERSION_INFO,
-};
-const ExtensionInfo* const VK_EXT_YCBCR_IMAGE_ARRAYS_INFO_DEPS[] = {
-    &VK_KHR_SAMPLER_YCBCR_CONVERSION_INFO,
-};
-const ExtensionInfo* const VK_EXT_ZERO_INITIALIZE_DEVICE_MEMORY_INFO_DEPS[] = {
-    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
-};
-const ExtensionInfo* const VK_GOOGLE_DISPLAY_TIMING_INFO_DEPS[] = {
+const ExtensionInfo* const VK_EXT_SWAPCHAIN_MAINTENANCE1_INFO_DEP1_EXTS[] = {
+    &VK_EXT_SURFACE_MAINTENANCE1_INFO,
     &VK_KHR_SWAPCHAIN_INFO,
 };
-const ExtensionInfo* const VK_GOOGLE_SURFACELESS_QUERY_INFO_DEPS[] = {
-    &VK_KHR_SURFACE_INFO,
+const ExtensionDependency VK_EXT_SWAPCHAIN_MAINTENANCE1_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_SWAPCHAIN_MAINTENANCE1_INFO_DEP0_EXTS, 3),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_SWAPCHAIN_MAINTENANCE1_INFO_DEP1_EXTS, 2),
+        VK_API_VERSION_1_1,
+    },
 };
-const ExtensionInfo* const VK_HUAWEI_CLUSTER_CULLING_SHADER_INFO_DEPS[] = {
+const ExtensionInfo* const VK_EXT_TEXEL_BUFFER_ALIGNMENT_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_HUAWEI_HDR_VIVID_INFO_DEPS[] = {
+const ExtensionDependency VK_EXT_TEXEL_BUFFER_ALIGNMENT_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_TEXEL_BUFFER_ALIGNMENT_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_TEXTURE_COMPRESSION_ASTC_3D_INFO_DEP0_EXTS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
+};
+const ExtensionDependency VK_EXT_TEXTURE_COMPRESSION_ASTC_3D_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_TEXTURE_COMPRESSION_ASTC_3D_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_TEXTURE_COMPRESSION_ASTC_HDR_INFO_DEP0_EXTS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
+};
+const ExtensionDependency VK_EXT_TEXTURE_COMPRESSION_ASTC_HDR_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_TEXTURE_COMPRESSION_ASTC_HDR_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_TRANSFORM_FEEDBACK_INFO_DEP0_EXTS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
+};
+const ExtensionDependency VK_EXT_TRANSFORM_FEEDBACK_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_TRANSFORM_FEEDBACK_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_VERTEX_ATTRIBUTE_DIVISOR_INFO_DEP0_EXTS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
+};
+const ExtensionDependency VK_EXT_VERTEX_ATTRIBUTE_DIVISOR_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_VERTEX_ATTRIBUTE_DIVISOR_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_VERTEX_ATTRIBUTE_ROBUSTNESS_INFO_DEP0_EXTS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
+};
+const ExtensionDependency VK_EXT_VERTEX_ATTRIBUTE_ROBUSTNESS_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_VERTEX_ATTRIBUTE_ROBUSTNESS_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_INFO_DEP0_EXTS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
+};
+const ExtensionDependency VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_YCBCR_2PLANE_444_FORMATS_INFO_DEP0_EXTS[] = {
+    &VK_KHR_SAMPLER_YCBCR_CONVERSION_INFO,
+};
+const ExtensionDependency VK_EXT_YCBCR_2PLANE_444_FORMATS_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_YCBCR_2PLANE_444_FORMATS_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_YCBCR_IMAGE_ARRAYS_INFO_DEP0_EXTS[] = {
+    &VK_KHR_SAMPLER_YCBCR_CONVERSION_INFO,
+};
+const ExtensionDependency VK_EXT_YCBCR_IMAGE_ARRAYS_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_YCBCR_IMAGE_ARRAYS_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_EXT_ZERO_INITIALIZE_DEVICE_MEMORY_INFO_DEP0_EXTS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
+};
+const ExtensionDependency VK_EXT_ZERO_INITIALIZE_DEVICE_MEMORY_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_EXT_ZERO_INITIALIZE_DEVICE_MEMORY_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_GOOGLE_DISPLAY_TIMING_INFO_DEP0_EXTS[] = {
+    &VK_KHR_SWAPCHAIN_INFO,
+};
+const ExtensionDependency VK_GOOGLE_DISPLAY_TIMING_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_GOOGLE_DISPLAY_TIMING_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_GOOGLE_SURFACELESS_QUERY_INFO_DEP0_EXTS[] = {
+    &VK_KHR_SURFACE_INFO,
+};
+const ExtensionDependency VK_GOOGLE_SURFACELESS_QUERY_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_GOOGLE_SURFACELESS_QUERY_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_HUAWEI_CLUSTER_CULLING_SHADER_INFO_DEP0_EXTS[] = {
+    &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
+};
+const ExtensionDependency VK_HUAWEI_CLUSTER_CULLING_SHADER_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_HUAWEI_CLUSTER_CULLING_SHADER_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_HUAWEI_HDR_VIVID_INFO_DEP0_EXTS[] = {
     &VK_EXT_HDR_METADATA_INFO,
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
     &VK_KHR_SWAPCHAIN_INFO,
 };
-const ExtensionInfo* const VK_HUAWEI_INVOCATION_MASK_INFO_DEPS[] = {
+const ExtensionInfo* const VK_HUAWEI_HDR_VIVID_INFO_DEP1_EXTS[] = {
+    &VK_EXT_HDR_METADATA_INFO,
+    &VK_KHR_SWAPCHAIN_INFO,
+};
+const ExtensionDependency VK_HUAWEI_HDR_VIVID_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_HUAWEI_HDR_VIVID_INFO_DEP0_EXTS, 3),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_HUAWEI_HDR_VIVID_INFO_DEP1_EXTS, 2),
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_HUAWEI_INVOCATION_MASK_INFO_DEP0_EXTS[] = {
     &VK_KHR_RAY_TRACING_PIPELINE_INFO,
     &VK_KHR_SYNCHRONIZATION2_INFO,
 };
-const ExtensionInfo* const VK_HUAWEI_SUBPASS_SHADING_INFO_DEPS[] = {
+const ExtensionInfo* const VK_HUAWEI_INVOCATION_MASK_INFO_DEP1_EXTS[] = {
+    &VK_KHR_RAY_TRACING_PIPELINE_INFO,
+};
+const ExtensionDependency VK_HUAWEI_INVOCATION_MASK_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_HUAWEI_INVOCATION_MASK_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_HUAWEI_INVOCATION_MASK_INFO_DEP1_EXTS, 1),
+        VK_API_VERSION_1_3,
+    },
+};
+const ExtensionInfo* const VK_HUAWEI_SUBPASS_SHADING_INFO_DEP0_EXTS[] = {
     &VK_KHR_CREATE_RENDERPASS2_INFO,
     &VK_KHR_SYNCHRONIZATION2_INFO,
 };
-const ExtensionInfo* const VK_IMG_RELAXED_LINE_RASTERIZATION_INFO_DEPS[] = {
+const ExtensionInfo* const VK_HUAWEI_SUBPASS_SHADING_INFO_DEP1_EXTS[] = {
+    &VK_KHR_SYNCHRONIZATION2_INFO,
+};
+const ExtensionDependency VK_HUAWEI_SUBPASS_SHADING_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_HUAWEI_SUBPASS_SHADING_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_HUAWEI_SUBPASS_SHADING_INFO_DEP1_EXTS, 1),
+        VK_API_VERSION_1_2,
+    },
+    {
+        {},
+        VK_API_VERSION_1_3,
+    },
+};
+const ExtensionInfo* const VK_IMG_RELAXED_LINE_RASTERIZATION_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_INTEL_SHADER_INTEGER_FUNCTIONS2_INFO_DEPS[] = {
+const ExtensionDependency VK_IMG_RELAXED_LINE_RASTERIZATION_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_IMG_RELAXED_LINE_RASTERIZATION_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_INTEL_SHADER_INTEGER_FUNCTIONS2_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_16BIT_STORAGE_INFO_DEPS[] = {
+const ExtensionDependency VK_INTEL_SHADER_INTEGER_FUNCTIONS2_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_INTEL_SHADER_INTEGER_FUNCTIONS2_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_16BIT_STORAGE_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
     &VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_INFO,
 };
-const ExtensionInfo* const VK_KHR_8BIT_STORAGE_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_16BIT_STORAGE_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_16BIT_STORAGE_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_8BIT_STORAGE_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
     &VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_INFO,
 };
-const ExtensionInfo* const VK_KHR_ACCELERATION_STRUCTURE_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_8BIT_STORAGE_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_8BIT_STORAGE_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_ACCELERATION_STRUCTURE_INFO_DEP0_EXTS[] = {
     &VK_EXT_DESCRIPTOR_INDEXING_INFO,
     &VK_KHR_BUFFER_DEVICE_ADDRESS_INFO,
     &VK_KHR_DEFERRED_HOST_OPERATIONS_INFO,
 };
-const ExtensionInfo* const VK_KHR_BUFFER_DEVICE_ADDRESS_INFO_DEPS[] = {
+const ExtensionInfo* const VK_KHR_ACCELERATION_STRUCTURE_INFO_DEP1_EXTS[] = {
+    &VK_KHR_DEFERRED_HOST_OPERATIONS_INFO,
+};
+const ExtensionDependency VK_KHR_ACCELERATION_STRUCTURE_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_ACCELERATION_STRUCTURE_INFO_DEP0_EXTS, 3),
+        VK_API_VERSION_1_1,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_ACCELERATION_STRUCTURE_INFO_DEP1_EXTS, 1),
+        VK_API_VERSION_1_2,
+    },
+};
+const ExtensionInfo* const VK_KHR_BUFFER_DEVICE_ADDRESS_INFO_DEP0_EXTS[] = {
     &VK_KHR_DEVICE_GROUP_INFO,
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_CALIBRATED_TIMESTAMPS_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_BUFFER_DEVICE_ADDRESS_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_BUFFER_DEVICE_ADDRESS_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_CALIBRATED_TIMESTAMPS_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_COMPUTE_SHADER_DERIVATIVES_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_CALIBRATED_TIMESTAMPS_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_CALIBRATED_TIMESTAMPS_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_COMPUTE_SHADER_DERIVATIVES_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_COOPERATIVE_MATRIX_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_COMPUTE_SHADER_DERIVATIVES_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_COMPUTE_SHADER_DERIVATIVES_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_COOPERATIVE_MATRIX_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_COPY_COMMANDS2_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_COOPERATIVE_MATRIX_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_COOPERATIVE_MATRIX_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_COPY_COMMANDS2_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_COPY_MEMORY_INDIRECT_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_COPY_COMMANDS2_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_COPY_COMMANDS2_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_COPY_MEMORY_INDIRECT_INFO_DEP0_EXTS[] = {
     &VK_KHR_BUFFER_DEVICE_ADDRESS_INFO,
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_CREATE_RENDERPASS2_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_COPY_MEMORY_INDIRECT_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_COPY_MEMORY_INDIRECT_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_2,
+    },
+};
+const ExtensionInfo* const VK_KHR_CREATE_RENDERPASS2_INFO_DEP0_EXTS[] = {
     &VK_KHR_MAINTENANCE2_INFO,
     &VK_KHR_MULTIVIEW_INFO,
 };
-const ExtensionInfo* const VK_KHR_DEDICATED_ALLOCATION_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_CREATE_RENDERPASS2_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_CREATE_RENDERPASS2_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_DEDICATED_ALLOCATION_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_MEMORY_REQUIREMENTS2_INFO,
 };
-const ExtensionInfo* const VK_KHR_DEPTH_CLAMP_ZERO_ONE_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_DEDICATED_ALLOCATION_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_DEDICATED_ALLOCATION_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_DEPTH_CLAMP_ZERO_ONE_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_DEPTH_STENCIL_RESOLVE_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_DEPTH_CLAMP_ZERO_ONE_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_DEPTH_CLAMP_ZERO_ONE_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_DEPTH_STENCIL_RESOLVE_INFO_DEP0_EXTS[] = {
     &VK_KHR_CREATE_RENDERPASS2_INFO,
 };
-const ExtensionInfo* const VK_KHR_DEVICE_GROUP_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_DEPTH_STENCIL_RESOLVE_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_DEPTH_STENCIL_RESOLVE_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_2,
+    },
+};
+const ExtensionInfo* const VK_KHR_DEVICE_GROUP_INFO_DEP0_EXTS[] = {
     &VK_KHR_DEVICE_GROUP_CREATION_INFO,
 };
-const ExtensionInfo* const VK_KHR_DISPLAY_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_DEVICE_GROUP_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_DEVICE_GROUP_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_KHR_DISPLAY_INFO_DEP0_EXTS[] = {
     &VK_KHR_SURFACE_INFO,
 };
-const ExtensionInfo* const VK_KHR_DISPLAY_SWAPCHAIN_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_DISPLAY_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_DISPLAY_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_KHR_DISPLAY_SWAPCHAIN_INFO_DEP0_EXTS[] = {
     &VK_KHR_DISPLAY_INFO,
     &VK_KHR_SWAPCHAIN_INFO,
 };
-const ExtensionInfo* const VK_KHR_DRIVER_PROPERTIES_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_DISPLAY_SWAPCHAIN_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_DISPLAY_SWAPCHAIN_INFO_DEP0_EXTS, 2),
+        0,
+    },
+};
+const ExtensionInfo* const VK_KHR_DRIVER_PROPERTIES_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_DYNAMIC_RENDERING_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_DRIVER_PROPERTIES_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_DRIVER_PROPERTIES_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_DYNAMIC_RENDERING_INFO_DEP0_EXTS[] = {
     &VK_KHR_DEPTH_STENCIL_RESOLVE_INFO,
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_INFO_DEPS[] = {
+const ExtensionInfo* const VK_KHR_DYNAMIC_RENDERING_INFO_DEP1_EXTS[] = {
+    &VK_KHR_DEPTH_STENCIL_RESOLVE_INFO,
+};
+const ExtensionDependency VK_KHR_DYNAMIC_RENDERING_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_DYNAMIC_RENDERING_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_DYNAMIC_RENDERING_INFO_DEP1_EXTS, 1),
+        VK_API_VERSION_1_1,
+    },
+    {
+        {},
+        VK_API_VERSION_1_2,
+    },
+};
+const ExtensionInfo* const VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_INFO_DEP0_EXTS[] = {
     &VK_KHR_DYNAMIC_RENDERING_INFO,
 };
-const ExtensionInfo* const VK_KHR_EXTERNAL_FENCE_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_3,
+    },
+};
+const ExtensionInfo* const VK_KHR_EXTERNAL_FENCE_INFO_DEP0_EXTS[] = {
     &VK_KHR_EXTERNAL_FENCE_CAPABILITIES_INFO,
 };
-const ExtensionInfo* const VK_KHR_EXTERNAL_FENCE_CAPABILITIES_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_EXTERNAL_FENCE_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_EXTERNAL_FENCE_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_KHR_EXTERNAL_FENCE_CAPABILITIES_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_EXTERNAL_FENCE_FD_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_EXTERNAL_FENCE_CAPABILITIES_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_EXTERNAL_FENCE_CAPABILITIES_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_EXTERNAL_FENCE_FD_INFO_DEP0_EXTS[] = {
     &VK_KHR_EXTERNAL_FENCE_INFO,
 };
-const ExtensionInfo* const VK_KHR_EXTERNAL_MEMORY_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_EXTERNAL_FENCE_FD_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_EXTERNAL_FENCE_FD_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_EXTERNAL_MEMORY_INFO_DEP0_EXTS[] = {
     &VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_INFO,
 };
-const ExtensionInfo* const VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_EXTERNAL_MEMORY_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_EXTERNAL_MEMORY_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_EXTERNAL_MEMORY_FD_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_EXTERNAL_MEMORY_FD_INFO_DEP0_EXTS[] = {
     &VK_KHR_EXTERNAL_MEMORY_INFO,
 };
-const ExtensionInfo* const VK_KHR_EXTERNAL_SEMAPHORE_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_EXTERNAL_MEMORY_FD_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_EXTERNAL_MEMORY_FD_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_EXTERNAL_SEMAPHORE_INFO_DEP0_EXTS[] = {
     &VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_INFO,
 };
-const ExtensionInfo* const VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_EXTERNAL_SEMAPHORE_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_EXTERNAL_SEMAPHORE_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_EXTERNAL_SEMAPHORE_FD_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_EXTERNAL_SEMAPHORE_FD_INFO_DEP0_EXTS[] = {
     &VK_KHR_EXTERNAL_SEMAPHORE_INFO,
 };
-const ExtensionInfo* const VK_KHR_FORMAT_FEATURE_FLAGS2_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_EXTERNAL_SEMAPHORE_FD_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_EXTERNAL_SEMAPHORE_FD_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_FORMAT_FEATURE_FLAGS2_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_FRAGMENT_SHADER_BARYCENTRIC_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_FORMAT_FEATURE_FLAGS2_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_FORMAT_FEATURE_FLAGS2_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_FRAGMENT_SHADER_BARYCENTRIC_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_FRAGMENT_SHADING_RATE_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_FRAGMENT_SHADER_BARYCENTRIC_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_FRAGMENT_SHADER_BARYCENTRIC_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_FRAGMENT_SHADING_RATE_INFO_DEP0_EXTS[] = {
     &VK_KHR_CREATE_RENDERPASS2_INFO,
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_GET_DISPLAY_PROPERTIES2_INFO_DEPS[] = {
+const ExtensionInfo* const VK_KHR_FRAGMENT_SHADING_RATE_INFO_DEP1_EXTS[] = {
+    &VK_KHR_CREATE_RENDERPASS2_INFO,
+};
+const ExtensionDependency VK_KHR_FRAGMENT_SHADING_RATE_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_FRAGMENT_SHADING_RATE_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_FRAGMENT_SHADING_RATE_INFO_DEP1_EXTS, 1),
+        VK_API_VERSION_1_1,
+    },
+    {
+        {},
+        VK_API_VERSION_1_2,
+    },
+};
+const ExtensionInfo* const VK_KHR_GET_DISPLAY_PROPERTIES2_INFO_DEP0_EXTS[] = {
     &VK_KHR_DISPLAY_INFO,
 };
-const ExtensionInfo* const VK_KHR_GET_SURFACE_CAPABILITIES2_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_GET_DISPLAY_PROPERTIES2_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_GET_DISPLAY_PROPERTIES2_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_KHR_GET_SURFACE_CAPABILITIES2_INFO_DEP0_EXTS[] = {
     &VK_KHR_SURFACE_INFO,
 };
-const ExtensionInfo* const VK_KHR_GLOBAL_PRIORITY_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_GET_SURFACE_CAPABILITIES2_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_GET_SURFACE_CAPABILITIES2_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_KHR_GLOBAL_PRIORITY_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_IMAGELESS_FRAMEBUFFER_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_GLOBAL_PRIORITY_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_GLOBAL_PRIORITY_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_IMAGELESS_FRAMEBUFFER_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
     &VK_KHR_IMAGE_FORMAT_LIST_INFO,
     &VK_KHR_MAINTENANCE2_INFO,
 };
-const ExtensionInfo* const VK_KHR_INCREMENTAL_PRESENT_INFO_DEPS[] = {
+const ExtensionInfo* const VK_KHR_IMAGELESS_FRAMEBUFFER_INFO_DEP1_EXTS[] = {
+    &VK_KHR_IMAGE_FORMAT_LIST_INFO,
+};
+const ExtensionDependency VK_KHR_IMAGELESS_FRAMEBUFFER_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_IMAGELESS_FRAMEBUFFER_INFO_DEP0_EXTS, 3),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_IMAGELESS_FRAMEBUFFER_INFO_DEP1_EXTS, 1),
+        VK_API_VERSION_1_1,
+    },
+    {
+        {},
+        VK_API_VERSION_1_2,
+    },
+};
+const ExtensionInfo* const VK_KHR_INCREMENTAL_PRESENT_INFO_DEP0_EXTS[] = {
     &VK_KHR_SWAPCHAIN_INFO,
 };
-const ExtensionInfo* const VK_KHR_INDEX_TYPE_UINT8_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_INCREMENTAL_PRESENT_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_INCREMENTAL_PRESENT_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_KHR_INDEX_TYPE_UINT8_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_LINE_RASTERIZATION_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_INDEX_TYPE_UINT8_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_INDEX_TYPE_UINT8_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionDependency VK_KHR_INTERNALLY_SYNCHRONIZED_QUEUES_INFO_DEPS[] = {
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_LINE_RASTERIZATION_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_MAINTENANCE10_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_LINE_RASTERIZATION_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_LINE_RASTERIZATION_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_MAINTENANCE10_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_MAINTENANCE3_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_MAINTENANCE10_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_MAINTENANCE10_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_MAINTENANCE3_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_MAINTENANCE5_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_MAINTENANCE3_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_MAINTENANCE3_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionDependency VK_KHR_MAINTENANCE4_INFO_DEPS[] = {
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_MAINTENANCE5_INFO_DEP0_EXTS[] = {
     &VK_KHR_DYNAMIC_RENDERING_INFO,
 };
-const ExtensionInfo* const VK_KHR_MAINTENANCE9_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_MAINTENANCE5_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_MAINTENANCE5_INFO_DEP0_EXTS, 1),
+        VK_API_VERSION_1_1,
+    },
+    {
+        {},
+        VK_API_VERSION_1_3,
+    },
+};
+const ExtensionDependency VK_KHR_MAINTENANCE6_INFO_DEPS[] = {
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionDependency VK_KHR_MAINTENANCE7_INFO_DEPS[] = {
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionDependency VK_KHR_MAINTENANCE8_INFO_DEPS[] = {
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_MAINTENANCE9_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_MULTIVIEW_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_MAINTENANCE9_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_MAINTENANCE9_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_MULTIVIEW_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_PERFORMANCE_QUERY_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_MULTIVIEW_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_MULTIVIEW_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_PERFORMANCE_QUERY_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_PIPELINE_BINARY_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_PERFORMANCE_QUERY_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_PERFORMANCE_QUERY_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_PIPELINE_BINARY_INFO_DEP0_EXTS[] = {
     &VK_KHR_MAINTENANCE5_INFO,
 };
-const ExtensionInfo* const VK_KHR_PIPELINE_EXECUTABLE_PROPERTIES_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_PIPELINE_BINARY_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_PIPELINE_BINARY_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_4,
+    },
+};
+const ExtensionInfo* const VK_KHR_PIPELINE_EXECUTABLE_PROPERTIES_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_PRESENT_ID_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_PIPELINE_EXECUTABLE_PROPERTIES_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_PIPELINE_EXECUTABLE_PROPERTIES_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_PRESENT_ID_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
     &VK_KHR_SWAPCHAIN_INFO,
 };
-const ExtensionInfo* const VK_KHR_PRESENT_ID2_INFO_DEPS[] = {
+const ExtensionInfo* const VK_KHR_PRESENT_ID_INFO_DEP1_EXTS[] = {
+    &VK_KHR_SWAPCHAIN_INFO,
+};
+const ExtensionDependency VK_KHR_PRESENT_ID_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_PRESENT_ID_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_PRESENT_ID_INFO_DEP1_EXTS, 1),
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_PRESENT_ID2_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_SURFACE_CAPABILITIES2_INFO,
     &VK_KHR_SURFACE_INFO,
     &VK_KHR_SWAPCHAIN_INFO,
 };
-const ExtensionInfo* const VK_KHR_PRESENT_MODE_FIFO_LATEST_READY_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_PRESENT_ID2_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_PRESENT_ID2_INFO_DEP0_EXTS, 3),
+        0,
+    },
+};
+const ExtensionInfo* const VK_KHR_PRESENT_MODE_FIFO_LATEST_READY_INFO_DEP0_EXTS[] = {
     &VK_KHR_SWAPCHAIN_INFO,
 };
-const ExtensionInfo* const VK_KHR_PRESENT_WAIT_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_PRESENT_MODE_FIFO_LATEST_READY_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_PRESENT_MODE_FIFO_LATEST_READY_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_KHR_PRESENT_WAIT_INFO_DEP0_EXTS[] = {
     &VK_KHR_PRESENT_ID_INFO,
     &VK_KHR_SWAPCHAIN_INFO,
 };
-const ExtensionInfo* const VK_KHR_PRESENT_WAIT2_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_PRESENT_WAIT_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_PRESENT_WAIT_INFO_DEP0_EXTS, 2),
+        0,
+    },
+};
+const ExtensionInfo* const VK_KHR_PRESENT_WAIT2_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_SURFACE_CAPABILITIES2_INFO,
     &VK_KHR_PRESENT_ID2_INFO,
     &VK_KHR_SURFACE_INFO,
     &VK_KHR_SWAPCHAIN_INFO,
 };
-const ExtensionInfo* const VK_KHR_PUSH_DESCRIPTOR_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_PRESENT_WAIT2_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_PRESENT_WAIT2_INFO_DEP0_EXTS, 4),
+        0,
+    },
+};
+const ExtensionInfo* const VK_KHR_PUSH_DESCRIPTOR_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_RAY_QUERY_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_PUSH_DESCRIPTOR_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_PUSH_DESCRIPTOR_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_RAY_QUERY_INFO_DEP0_EXTS[] = {
     &VK_KHR_ACCELERATION_STRUCTURE_INFO,
     &VK_KHR_SPIRV_1_4_INFO,
 };
-const ExtensionInfo* const VK_KHR_RAY_TRACING_MAINTENANCE1_INFO_DEPS[] = {
+const ExtensionInfo* const VK_KHR_RAY_QUERY_INFO_DEP1_EXTS[] = {
     &VK_KHR_ACCELERATION_STRUCTURE_INFO,
 };
-const ExtensionInfo* const VK_KHR_RAY_TRACING_PIPELINE_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_RAY_QUERY_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_RAY_QUERY_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_RAY_QUERY_INFO_DEP1_EXTS, 1),
+        VK_API_VERSION_1_2,
+    },
+};
+const ExtensionInfo* const VK_KHR_RAY_TRACING_MAINTENANCE1_INFO_DEP0_EXTS[] = {
+    &VK_KHR_ACCELERATION_STRUCTURE_INFO,
+};
+const ExtensionDependency VK_KHR_RAY_TRACING_MAINTENANCE1_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_RAY_TRACING_MAINTENANCE1_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_KHR_RAY_TRACING_PIPELINE_INFO_DEP0_EXTS[] = {
     &VK_KHR_ACCELERATION_STRUCTURE_INFO,
     &VK_KHR_SPIRV_1_4_INFO,
 };
-const ExtensionInfo* const VK_KHR_RAY_TRACING_POSITION_FETCH_INFO_DEPS[] = {
+const ExtensionInfo* const VK_KHR_RAY_TRACING_PIPELINE_INFO_DEP1_EXTS[] = {
     &VK_KHR_ACCELERATION_STRUCTURE_INFO,
 };
-const ExtensionInfo* const VK_KHR_ROBUSTNESS2_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_RAY_TRACING_PIPELINE_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_RAY_TRACING_PIPELINE_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_RAY_TRACING_PIPELINE_INFO_DEP1_EXTS, 1),
+        VK_API_VERSION_1_2,
+    },
+};
+const ExtensionInfo* const VK_KHR_RAY_TRACING_POSITION_FETCH_INFO_DEP0_EXTS[] = {
+    &VK_KHR_ACCELERATION_STRUCTURE_INFO,
+};
+const ExtensionDependency VK_KHR_RAY_TRACING_POSITION_FETCH_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_RAY_TRACING_POSITION_FETCH_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_KHR_ROBUSTNESS2_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_SAMPLER_YCBCR_CONVERSION_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_ROBUSTNESS2_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_ROBUSTNESS2_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_SAMPLER_YCBCR_CONVERSION_INFO_DEP0_EXTS[] = {
     &VK_KHR_BIND_MEMORY2_INFO,
     &VK_KHR_GET_MEMORY_REQUIREMENTS2_INFO,
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
     &VK_KHR_MAINTENANCE1_INFO,
 };
-const ExtensionInfo* const VK_KHR_SEPARATE_DEPTH_STENCIL_LAYOUTS_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_SAMPLER_YCBCR_CONVERSION_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_SAMPLER_YCBCR_CONVERSION_INFO_DEP0_EXTS, 4),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_SEPARATE_DEPTH_STENCIL_LAYOUTS_INFO_DEP0_EXTS[] = {
     &VK_KHR_CREATE_RENDERPASS2_INFO,
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_SHADER_ATOMIC_INT64_INFO_DEPS[] = {
+const ExtensionInfo* const VK_KHR_SEPARATE_DEPTH_STENCIL_LAYOUTS_INFO_DEP1_EXTS[] = {
+    &VK_KHR_CREATE_RENDERPASS2_INFO,
+};
+const ExtensionDependency VK_KHR_SEPARATE_DEPTH_STENCIL_LAYOUTS_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_SEPARATE_DEPTH_STENCIL_LAYOUTS_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_SEPARATE_DEPTH_STENCIL_LAYOUTS_INFO_DEP1_EXTS, 1),
+        VK_API_VERSION_1_1,
+    },
+    {
+        {},
+        VK_API_VERSION_1_2,
+    },
+};
+const ExtensionInfo* const VK_KHR_SHADER_ATOMIC_INT64_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_SHADER_BFLOAT16_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_SHADER_ATOMIC_INT64_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_SHADER_ATOMIC_INT64_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_SHADER_BFLOAT16_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_SHADER_CLOCK_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_SHADER_BFLOAT16_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_SHADER_BFLOAT16_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_SHADER_CLOCK_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_SHADER_EXPECT_ASSUME_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_SHADER_CLOCK_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_SHADER_CLOCK_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_SHADER_EXPECT_ASSUME_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_SHADER_FLOAT16_INT8_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_SHADER_EXPECT_ASSUME_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_SHADER_EXPECT_ASSUME_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_SHADER_FLOAT16_INT8_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_SHADER_FLOAT_CONTROLS_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_SHADER_FLOAT16_INT8_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_SHADER_FLOAT16_INT8_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_SHADER_FLOAT_CONTROLS_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_SHADER_FLOAT_CONTROLS2_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_SHADER_FLOAT_CONTROLS_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_SHADER_FLOAT_CONTROLS_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_SHADER_FLOAT_CONTROLS2_INFO_DEP0_EXTS[] = {
     &VK_KHR_SHADER_FLOAT_CONTROLS_INFO,
 };
-const ExtensionInfo* const VK_KHR_SHADER_FMA_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_SHADER_FLOAT_CONTROLS2_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_SHADER_FLOAT_CONTROLS2_INFO_DEP0_EXTS, 1),
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_SHADER_FMA_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_SHADER_INTEGER_DOT_PRODUCT_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_SHADER_FMA_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_SHADER_FMA_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_SHADER_INTEGER_DOT_PRODUCT_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_SHADER_QUAD_CONTROL_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_SHADER_INTEGER_DOT_PRODUCT_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_SHADER_INTEGER_DOT_PRODUCT_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionDependency VK_KHR_SHADER_MAXIMAL_RECONVERGENCE_INFO_DEPS[] = {
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_SHADER_QUAD_CONTROL_INFO_DEP0_EXTS[] = {
     &VK_KHR_SHADER_MAXIMAL_RECONVERGENCE_INFO,
     &VK_KHR_VULKAN_MEMORY_MODEL_INFO,
 };
-const ExtensionInfo* const VK_KHR_SHADER_RELAXED_EXTENDED_INSTRUCTION_INFO_DEPS[] = {
+const ExtensionInfo* const VK_KHR_SHADER_QUAD_CONTROL_INFO_DEP1_EXTS[] = {
+    &VK_KHR_SHADER_MAXIMAL_RECONVERGENCE_INFO,
+};
+const ExtensionDependency VK_KHR_SHADER_QUAD_CONTROL_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_SHADER_QUAD_CONTROL_INFO_DEP0_EXTS, 2),
+        VK_API_VERSION_1_1,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_SHADER_QUAD_CONTROL_INFO_DEP1_EXTS, 1),
+        VK_API_VERSION_1_2,
+    },
+};
+const ExtensionInfo* const VK_KHR_SHADER_RELAXED_EXTENDED_INSTRUCTION_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_SHADER_SUBGROUP_ROTATE_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_SHADER_RELAXED_EXTENDED_INSTRUCTION_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_SHADER_RELAXED_EXTENDED_INSTRUCTION_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionDependency VK_KHR_SHADER_SUBGROUP_EXTENDED_TYPES_INFO_DEPS[] = {
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_SHADER_SUBGROUP_ROTATE_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_SHADER_TERMINATE_INVOCATION_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_SHADER_SUBGROUP_ROTATE_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_SHADER_SUBGROUP_ROTATE_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionDependency VK_KHR_SHADER_SUBGROUP_UNIFORM_CONTROL_FLOW_INFO_DEPS[] = {
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_SHADER_TERMINATE_INVOCATION_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_SHADER_UNTYPED_POINTERS_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_SHADER_TERMINATE_INVOCATION_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_SHADER_TERMINATE_INVOCATION_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_SHADER_UNTYPED_POINTERS_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_SHARED_PRESENTABLE_IMAGE_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_SHADER_UNTYPED_POINTERS_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_SHADER_UNTYPED_POINTERS_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_KHR_SHARED_PRESENTABLE_IMAGE_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
     &VK_KHR_GET_SURFACE_CAPABILITIES2_INFO,
     &VK_KHR_SWAPCHAIN_INFO,
 };
-const ExtensionInfo* const VK_KHR_SPIRV_1_4_INFO_DEPS[] = {
+const ExtensionInfo* const VK_KHR_SHARED_PRESENTABLE_IMAGE_INFO_DEP1_EXTS[] = {
+    &VK_KHR_GET_SURFACE_CAPABILITIES2_INFO,
+    &VK_KHR_SWAPCHAIN_INFO,
+};
+const ExtensionDependency VK_KHR_SHARED_PRESENTABLE_IMAGE_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_SHARED_PRESENTABLE_IMAGE_INFO_DEP0_EXTS, 3),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_SHARED_PRESENTABLE_IMAGE_INFO_DEP1_EXTS, 2),
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_SPIRV_1_4_INFO_DEP0_EXTS[] = {
     &VK_KHR_SHADER_FLOAT_CONTROLS_INFO,
 };
-const ExtensionInfo* const VK_KHR_SURFACE_MAINTENANCE1_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_SPIRV_1_4_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_SPIRV_1_4_INFO_DEP0_EXTS, 1),
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_SURFACE_MAINTENANCE1_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_SURFACE_CAPABILITIES2_INFO,
     &VK_KHR_SURFACE_INFO,
 };
-const ExtensionInfo* const VK_KHR_SURFACE_PROTECTED_CAPABILITIES_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_SURFACE_MAINTENANCE1_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_SURFACE_MAINTENANCE1_INFO_DEP0_EXTS, 2),
+        0,
+    },
+};
+const ExtensionInfo* const VK_KHR_SURFACE_PROTECTED_CAPABILITIES_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_SURFACE_CAPABILITIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_SWAPCHAIN_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_SURFACE_PROTECTED_CAPABILITIES_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_SURFACE_PROTECTED_CAPABILITIES_INFO_DEP0_EXTS, 1),
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_SWAPCHAIN_INFO_DEP0_EXTS[] = {
     &VK_KHR_SURFACE_INFO,
 };
-const ExtensionInfo* const VK_KHR_SWAPCHAIN_MAINTENANCE1_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_SWAPCHAIN_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_SWAPCHAIN_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_KHR_SWAPCHAIN_MAINTENANCE1_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
     &VK_KHR_SURFACE_MAINTENANCE1_INFO,
     &VK_KHR_SWAPCHAIN_INFO,
 };
-const ExtensionInfo* const VK_KHR_SWAPCHAIN_MUTABLE_FORMAT_INFO_DEPS[] = {
+const ExtensionInfo* const VK_KHR_SWAPCHAIN_MAINTENANCE1_INFO_DEP1_EXTS[] = {
+    &VK_KHR_SURFACE_MAINTENANCE1_INFO,
+    &VK_KHR_SWAPCHAIN_INFO,
+};
+const ExtensionDependency VK_KHR_SWAPCHAIN_MAINTENANCE1_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_SWAPCHAIN_MAINTENANCE1_INFO_DEP0_EXTS, 3),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_SWAPCHAIN_MAINTENANCE1_INFO_DEP1_EXTS, 2),
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_SWAPCHAIN_MUTABLE_FORMAT_INFO_DEP0_EXTS[] = {
     &VK_KHR_IMAGE_FORMAT_LIST_INFO,
     &VK_KHR_MAINTENANCE2_INFO,
     &VK_KHR_SWAPCHAIN_INFO,
 };
-const ExtensionInfo* const VK_KHR_SYNCHRONIZATION2_INFO_DEPS[] = {
+const ExtensionInfo* const VK_KHR_SWAPCHAIN_MUTABLE_FORMAT_INFO_DEP1_EXTS[] = {
+    &VK_KHR_MAINTENANCE2_INFO,
+    &VK_KHR_SWAPCHAIN_INFO,
+};
+const ExtensionInfo* const VK_KHR_SWAPCHAIN_MUTABLE_FORMAT_INFO_DEP2_EXTS[] = {
+    &VK_KHR_IMAGE_FORMAT_LIST_INFO,
+    &VK_KHR_SWAPCHAIN_INFO,
+};
+const ExtensionInfo* const VK_KHR_SWAPCHAIN_MUTABLE_FORMAT_INFO_DEP3_EXTS[] = {
+    &VK_KHR_SWAPCHAIN_INFO,
+};
+const ExtensionDependency VK_KHR_SWAPCHAIN_MUTABLE_FORMAT_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_SWAPCHAIN_MUTABLE_FORMAT_INFO_DEP0_EXTS, 3),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_SWAPCHAIN_MUTABLE_FORMAT_INFO_DEP1_EXTS, 2),
+        VK_API_VERSION_1_2,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_SWAPCHAIN_MUTABLE_FORMAT_INFO_DEP2_EXTS, 2),
+        VK_API_VERSION_1_1,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_SWAPCHAIN_MUTABLE_FORMAT_INFO_DEP3_EXTS, 1),
+        VK_API_VERSION_1_2,
+    },
+};
+const ExtensionInfo* const VK_KHR_SYNCHRONIZATION2_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_TIMELINE_SEMAPHORE_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_SYNCHRONIZATION2_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_SYNCHRONIZATION2_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_TIMELINE_SEMAPHORE_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_UNIFIED_IMAGE_LAYOUTS_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_TIMELINE_SEMAPHORE_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_TIMELINE_SEMAPHORE_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_UNIFIED_IMAGE_LAYOUTS_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_UNIFORM_BUFFER_STANDARD_LAYOUT_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_UNIFIED_IMAGE_LAYOUTS_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_UNIFIED_IMAGE_LAYOUTS_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_UNIFORM_BUFFER_STANDARD_LAYOUT_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_VARIABLE_POINTERS_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_UNIFORM_BUFFER_STANDARD_LAYOUT_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_UNIFORM_BUFFER_STANDARD_LAYOUT_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_VARIABLE_POINTERS_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
     &VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_INFO,
 };
-const ExtensionInfo* const VK_KHR_VERTEX_ATTRIBUTE_DIVISOR_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_VARIABLE_POINTERS_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_VARIABLE_POINTERS_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_VERTEX_ATTRIBUTE_DIVISOR_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_VIDEO_DECODE_AV1_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_VERTEX_ATTRIBUTE_DIVISOR_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_VERTEX_ATTRIBUTE_DIVISOR_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_VIDEO_DECODE_AV1_INFO_DEP0_EXTS[] = {
     &VK_KHR_VIDEO_DECODE_QUEUE_INFO,
 };
-const ExtensionInfo* const VK_KHR_VIDEO_DECODE_H264_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_VIDEO_DECODE_AV1_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_DECODE_AV1_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_KHR_VIDEO_DECODE_H264_INFO_DEP0_EXTS[] = {
     &VK_KHR_VIDEO_DECODE_QUEUE_INFO,
 };
-const ExtensionInfo* const VK_KHR_VIDEO_DECODE_H265_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_VIDEO_DECODE_H264_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_DECODE_H264_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_KHR_VIDEO_DECODE_H265_INFO_DEP0_EXTS[] = {
     &VK_KHR_VIDEO_DECODE_QUEUE_INFO,
 };
-const ExtensionInfo* const VK_KHR_VIDEO_DECODE_QUEUE_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_VIDEO_DECODE_H265_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_DECODE_H265_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_KHR_VIDEO_DECODE_QUEUE_INFO_DEP0_EXTS[] = {
     &VK_KHR_SYNCHRONIZATION2_INFO,
     &VK_KHR_VIDEO_QUEUE_INFO,
 };
-const ExtensionInfo* const VK_KHR_VIDEO_DECODE_VP9_INFO_DEPS[] = {
+const ExtensionInfo* const VK_KHR_VIDEO_DECODE_QUEUE_INFO_DEP1_EXTS[] = {
+    &VK_KHR_VIDEO_QUEUE_INFO,
+};
+const ExtensionDependency VK_KHR_VIDEO_DECODE_QUEUE_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_DECODE_QUEUE_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_DECODE_QUEUE_INFO_DEP1_EXTS, 1),
+        VK_API_VERSION_1_3,
+    },
+};
+const ExtensionInfo* const VK_KHR_VIDEO_DECODE_VP9_INFO_DEP0_EXTS[] = {
     &VK_KHR_VIDEO_DECODE_QUEUE_INFO,
 };
-const ExtensionInfo* const VK_KHR_VIDEO_ENCODE_AV1_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_VIDEO_DECODE_VP9_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_DECODE_VP9_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_KHR_VIDEO_ENCODE_AV1_INFO_DEP0_EXTS[] = {
     &VK_KHR_VIDEO_ENCODE_QUEUE_INFO,
 };
-const ExtensionInfo* const VK_KHR_VIDEO_ENCODE_H264_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_VIDEO_ENCODE_AV1_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_ENCODE_AV1_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_KHR_VIDEO_ENCODE_H264_INFO_DEP0_EXTS[] = {
     &VK_KHR_VIDEO_ENCODE_QUEUE_INFO,
 };
-const ExtensionInfo* const VK_KHR_VIDEO_ENCODE_H265_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_VIDEO_ENCODE_H264_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_ENCODE_H264_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_KHR_VIDEO_ENCODE_H265_INFO_DEP0_EXTS[] = {
     &VK_KHR_VIDEO_ENCODE_QUEUE_INFO,
 };
-const ExtensionInfo* const VK_KHR_VIDEO_ENCODE_INTRA_REFRESH_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_VIDEO_ENCODE_H265_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_ENCODE_H265_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_KHR_VIDEO_ENCODE_INTRA_REFRESH_INFO_DEP0_EXTS[] = {
     &VK_KHR_VIDEO_ENCODE_QUEUE_INFO,
 };
-const ExtensionInfo* const VK_KHR_VIDEO_ENCODE_QUANTIZATION_MAP_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_VIDEO_ENCODE_INTRA_REFRESH_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_ENCODE_INTRA_REFRESH_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_KHR_VIDEO_ENCODE_QUANTIZATION_MAP_INFO_DEP0_EXTS[] = {
     &VK_KHR_FORMAT_FEATURE_FLAGS2_INFO,
     &VK_KHR_VIDEO_ENCODE_QUEUE_INFO,
 };
-const ExtensionInfo* const VK_KHR_VIDEO_ENCODE_QUEUE_INFO_DEPS[] = {
+const ExtensionInfo* const VK_KHR_VIDEO_ENCODE_QUANTIZATION_MAP_INFO_DEP1_EXTS[] = {
+    &VK_KHR_VIDEO_ENCODE_QUEUE_INFO,
+};
+const ExtensionDependency VK_KHR_VIDEO_ENCODE_QUANTIZATION_MAP_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_ENCODE_QUANTIZATION_MAP_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_ENCODE_QUANTIZATION_MAP_INFO_DEP1_EXTS, 1),
+        VK_API_VERSION_1_3,
+    },
+};
+const ExtensionInfo* const VK_KHR_VIDEO_ENCODE_QUEUE_INFO_DEP0_EXTS[] = {
     &VK_KHR_SYNCHRONIZATION2_INFO,
     &VK_KHR_VIDEO_QUEUE_INFO,
 };
-const ExtensionInfo* const VK_KHR_VIDEO_MAINTENANCE1_INFO_DEPS[] = {
+const ExtensionInfo* const VK_KHR_VIDEO_ENCODE_QUEUE_INFO_DEP1_EXTS[] = {
     &VK_KHR_VIDEO_QUEUE_INFO,
 };
-const ExtensionInfo* const VK_KHR_VIDEO_MAINTENANCE2_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_VIDEO_ENCODE_QUEUE_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_ENCODE_QUEUE_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_ENCODE_QUEUE_INFO_DEP1_EXTS, 1),
+        VK_API_VERSION_1_3,
+    },
+};
+const ExtensionInfo* const VK_KHR_VIDEO_MAINTENANCE1_INFO_DEP0_EXTS[] = {
     &VK_KHR_VIDEO_QUEUE_INFO,
 };
-const ExtensionInfo* const VK_KHR_VIDEO_QUEUE_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_VIDEO_MAINTENANCE1_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_MAINTENANCE1_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_KHR_VIDEO_MAINTENANCE2_INFO_DEP0_EXTS[] = {
+    &VK_KHR_VIDEO_QUEUE_INFO,
+};
+const ExtensionDependency VK_KHR_VIDEO_MAINTENANCE2_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_MAINTENANCE2_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_KHR_VIDEO_QUEUE_INFO_DEP0_EXTS[] = {
     &VK_KHR_SYNCHRONIZATION2_INFO,
 };
-const ExtensionInfo* const VK_KHR_VULKAN_MEMORY_MODEL_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_VIDEO_QUEUE_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_QUEUE_INFO_DEP0_EXTS, 1),
+        VK_API_VERSION_1_1,
+    },
+    {
+        {},
+        VK_API_VERSION_1_3,
+    },
+};
+const ExtensionInfo* const VK_KHR_VULKAN_MEMORY_MODEL_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_WORKGROUP_MEMORY_EXPLICIT_LAYOUT_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_VULKAN_MEMORY_MODEL_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_VULKAN_MEMORY_MODEL_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_WORKGROUP_MEMORY_EXPLICIT_LAYOUT_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_KHR_ZERO_INITIALIZE_WORKGROUP_MEMORY_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_WORKGROUP_MEMORY_EXPLICIT_LAYOUT_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_WORKGROUP_MEMORY_EXPLICIT_LAYOUT_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_KHR_ZERO_INITIALIZE_WORKGROUP_MEMORY_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_MESA_IMAGE_ALIGNMENT_CONTROL_INFO_DEPS[] = {
+const ExtensionDependency VK_KHR_ZERO_INITIALIZE_WORKGROUP_MEMORY_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_KHR_ZERO_INITIALIZE_WORKGROUP_MEMORY_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_MESA_IMAGE_ALIGNMENT_CONTROL_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_MSFT_LAYERED_DRIVER_INFO_DEPS[] = {
+const ExtensionDependency VK_MESA_IMAGE_ALIGNMENT_CONTROL_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_MESA_IMAGE_ALIGNMENT_CONTROL_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_MSFT_LAYERED_DRIVER_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_NVX_MULTIVIEW_PER_VIEW_ATTRIBUTES_INFO_DEPS[] = {
+const ExtensionDependency VK_MSFT_LAYERED_DRIVER_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_MSFT_LAYERED_DRIVER_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_NVX_MULTIVIEW_PER_VIEW_ATTRIBUTES_INFO_DEP0_EXTS[] = {
     &VK_KHR_MULTIVIEW_INFO,
 };
-const ExtensionInfo* const VK_NV_CLUSTER_ACCELERATION_STRUCTURE_INFO_DEPS[] = {
+const ExtensionDependency VK_NVX_MULTIVIEW_PER_VIEW_ATTRIBUTES_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NVX_MULTIVIEW_PER_VIEW_ATTRIBUTES_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_NV_CLUSTER_ACCELERATION_STRUCTURE_INFO_DEP0_EXTS[] = {
     &VK_KHR_ACCELERATION_STRUCTURE_INFO,
 };
-const ExtensionInfo* const VK_NV_COMMAND_BUFFER_INHERITANCE_INFO_DEPS[] = {
+const ExtensionDependency VK_NV_CLUSTER_ACCELERATION_STRUCTURE_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_CLUSTER_ACCELERATION_STRUCTURE_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_NV_COMMAND_BUFFER_INHERITANCE_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_NV_COMPUTE_OCCUPANCY_PRIORITY_INFO_DEPS[] = {
+const ExtensionDependency VK_NV_COMMAND_BUFFER_INHERITANCE_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_COMMAND_BUFFER_INHERITANCE_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_NV_COMPUTE_OCCUPANCY_PRIORITY_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_NV_COMPUTE_SHADER_DERIVATIVES_INFO_DEPS[] = {
+const ExtensionDependency VK_NV_COMPUTE_OCCUPANCY_PRIORITY_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_COMPUTE_OCCUPANCY_PRIORITY_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_NV_COMPUTE_SHADER_DERIVATIVES_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_NV_COOPERATIVE_MATRIX_INFO_DEPS[] = {
+const ExtensionDependency VK_NV_COMPUTE_SHADER_DERIVATIVES_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_COMPUTE_SHADER_DERIVATIVES_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_NV_COOPERATIVE_MATRIX_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_NV_COOPERATIVE_MATRIX2_INFO_DEPS[] = {
+const ExtensionDependency VK_NV_COOPERATIVE_MATRIX_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_COOPERATIVE_MATRIX_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_NV_COOPERATIVE_MATRIX2_INFO_DEP0_EXTS[] = {
     &VK_KHR_COOPERATIVE_MATRIX_INFO,
 };
-const ExtensionInfo* const VK_NV_COOPERATIVE_VECTOR_INFO_DEPS[] = {
+const ExtensionDependency VK_NV_COOPERATIVE_MATRIX2_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_COOPERATIVE_MATRIX2_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_NV_COOPERATIVE_VECTOR_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_NV_COPY_MEMORY_INDIRECT_INFO_DEPS[] = {
+const ExtensionDependency VK_NV_COOPERATIVE_VECTOR_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_COOPERATIVE_VECTOR_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_NV_COPY_MEMORY_INDIRECT_INFO_DEP0_EXTS[] = {
     &VK_KHR_BUFFER_DEVICE_ADDRESS_INFO,
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_NV_CORNER_SAMPLED_IMAGE_INFO_DEPS[] = {
+const ExtensionInfo* const VK_NV_COPY_MEMORY_INDIRECT_INFO_DEP1_EXTS[] = {
+    &VK_KHR_BUFFER_DEVICE_ADDRESS_INFO,
+};
+const ExtensionDependency VK_NV_COPY_MEMORY_INDIRECT_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_COPY_MEMORY_INDIRECT_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_COPY_MEMORY_INDIRECT_INFO_DEP1_EXTS, 1),
+        VK_API_VERSION_1_1,
+    },
+    {
+        {},
+        VK_API_VERSION_1_2,
+    },
+};
+const ExtensionInfo* const VK_NV_CORNER_SAMPLED_IMAGE_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_NV_COVERAGE_REDUCTION_MODE_INFO_DEPS[] = {
+const ExtensionDependency VK_NV_CORNER_SAMPLED_IMAGE_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_CORNER_SAMPLED_IMAGE_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_NV_COVERAGE_REDUCTION_MODE_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
     &VK_NV_FRAMEBUFFER_MIXED_SAMPLES_INFO,
 };
-const ExtensionInfo* const VK_NV_DEDICATED_ALLOCATION_IMAGE_ALIASING_INFO_DEPS[] = {
+const ExtensionInfo* const VK_NV_COVERAGE_REDUCTION_MODE_INFO_DEP1_EXTS[] = {
+    &VK_NV_FRAMEBUFFER_MIXED_SAMPLES_INFO,
+};
+const ExtensionDependency VK_NV_COVERAGE_REDUCTION_MODE_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_COVERAGE_REDUCTION_MODE_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_COVERAGE_REDUCTION_MODE_INFO_DEP1_EXTS, 1),
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_NV_DEDICATED_ALLOCATION_IMAGE_ALIASING_INFO_DEP0_EXTS[] = {
     &VK_KHR_DEDICATED_ALLOCATION_INFO,
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_INFO_DEPS[] = {
+const ExtensionDependency VK_NV_DEDICATED_ALLOCATION_IMAGE_ALIASING_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_DEDICATED_ALLOCATION_IMAGE_ALIASING_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionDependency VK_NV_DESCRIPTOR_POOL_OVERALLOCATION_INFO_DEPS[] = {
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_NV_DEVICE_DIAGNOSTICS_CONFIG_INFO_DEPS[] = {
+const ExtensionDependency VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_NV_DEVICE_DIAGNOSTICS_CONFIG_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_NV_DEVICE_GENERATED_COMMANDS_INFO_DEPS[] = {
+const ExtensionDependency VK_NV_DEVICE_DIAGNOSTICS_CONFIG_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_DEVICE_DIAGNOSTICS_CONFIG_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_NV_DEVICE_GENERATED_COMMANDS_INFO_DEP0_EXTS[] = {
     &VK_KHR_BUFFER_DEVICE_ADDRESS_INFO,
 };
-const ExtensionInfo* const VK_NV_DEVICE_GENERATED_COMMANDS_COMPUTE_INFO_DEPS[] = {
+const ExtensionDependency VK_NV_DEVICE_GENERATED_COMMANDS_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_DEVICE_GENERATED_COMMANDS_INFO_DEP0_EXTS, 1),
+        VK_API_VERSION_1_1,
+    },
+    {
+        {},
+        VK_API_VERSION_1_2,
+    },
+};
+const ExtensionInfo* const VK_NV_DEVICE_GENERATED_COMMANDS_COMPUTE_INFO_DEP0_EXTS[] = {
     &VK_NV_DEVICE_GENERATED_COMMANDS_INFO,
 };
-const ExtensionInfo* const VK_NV_DISPLAY_STEREO_INFO_DEPS[] = {
+const ExtensionDependency VK_NV_DEVICE_GENERATED_COMMANDS_COMPUTE_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_DEVICE_GENERATED_COMMANDS_COMPUTE_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_NV_DISPLAY_STEREO_INFO_DEP0_EXTS[] = {
     &VK_KHR_DISPLAY_INFO,
     &VK_KHR_GET_DISPLAY_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_NV_EXTENDED_SPARSE_ADDRESS_SPACE_INFO_DEPS[] = {
+const ExtensionDependency VK_NV_DISPLAY_STEREO_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_DISPLAY_STEREO_INFO_DEP0_EXTS, 2),
+        0,
+    },
+};
+const ExtensionInfo* const VK_NV_EXTENDED_SPARSE_ADDRESS_SPACE_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_NV_EXTERNAL_MEMORY_INFO_DEPS[] = {
+const ExtensionDependency VK_NV_EXTENDED_SPARSE_ADDRESS_SPACE_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_EXTENDED_SPARSE_ADDRESS_SPACE_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_NV_EXTERNAL_MEMORY_INFO_DEP0_EXTS[] = {
     &VK_NV_EXTERNAL_MEMORY_CAPABILITIES_INFO,
 };
-const ExtensionInfo* const VK_NV_EXTERNAL_MEMORY_RDMA_INFO_DEPS[] = {
+const ExtensionDependency VK_NV_EXTERNAL_MEMORY_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_EXTERNAL_MEMORY_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_NV_EXTERNAL_MEMORY_RDMA_INFO_DEP0_EXTS[] = {
     &VK_KHR_EXTERNAL_MEMORY_INFO,
 };
-const ExtensionInfo* const VK_NV_FRAGMENT_SHADER_BARYCENTRIC_INFO_DEPS[] = {
+const ExtensionDependency VK_NV_EXTERNAL_MEMORY_RDMA_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_EXTERNAL_MEMORY_RDMA_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_NV_FRAGMENT_SHADER_BARYCENTRIC_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_NV_FRAGMENT_SHADING_RATE_ENUMS_INFO_DEPS[] = {
+const ExtensionDependency VK_NV_FRAGMENT_SHADER_BARYCENTRIC_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_FRAGMENT_SHADER_BARYCENTRIC_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_NV_FRAGMENT_SHADING_RATE_ENUMS_INFO_DEP0_EXTS[] = {
     &VK_KHR_FRAGMENT_SHADING_RATE_INFO,
 };
-const ExtensionInfo* const VK_NV_INHERITED_VIEWPORT_SCISSOR_INFO_DEPS[] = {
+const ExtensionDependency VK_NV_FRAGMENT_SHADING_RATE_ENUMS_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_FRAGMENT_SHADING_RATE_ENUMS_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_NV_INHERITED_VIEWPORT_SCISSOR_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_NV_LINEAR_COLOR_ATTACHMENT_INFO_DEPS[] = {
+const ExtensionDependency VK_NV_INHERITED_VIEWPORT_SCISSOR_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_INHERITED_VIEWPORT_SCISSOR_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_NV_LINEAR_COLOR_ATTACHMENT_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_NV_LOW_LATENCY2_INFO_DEPS[] = {
+const ExtensionDependency VK_NV_LINEAR_COLOR_ATTACHMENT_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_LINEAR_COLOR_ATTACHMENT_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_NV_LOW_LATENCY2_INFO_DEP0_EXTS[] = {
     &VK_KHR_PRESENT_ID_INFO,
+};
+const ExtensionInfo* const VK_NV_LOW_LATENCY2_INFO_DEP1_EXTS[] = {
+    &VK_KHR_PRESENT_ID2_INFO,
+};
+const ExtensionInfo* const VK_NV_LOW_LATENCY2_INFO_DEP2_EXTS[] = {
+    &VK_KHR_PRESENT_ID_INFO,
+    &VK_KHR_TIMELINE_SEMAPHORE_INFO,
+};
+const ExtensionInfo* const VK_NV_LOW_LATENCY2_INFO_DEP3_EXTS[] = {
     &VK_KHR_PRESENT_ID2_INFO,
     &VK_KHR_TIMELINE_SEMAPHORE_INFO,
 };
-const ExtensionInfo* const VK_NV_MEMORY_DECOMPRESSION_INFO_DEPS[] = {
+const ExtensionDependency VK_NV_LOW_LATENCY2_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_LOW_LATENCY2_INFO_DEP0_EXTS, 1),
+        VK_API_VERSION_1_2,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_LOW_LATENCY2_INFO_DEP1_EXTS, 1),
+        VK_API_VERSION_1_2,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_LOW_LATENCY2_INFO_DEP2_EXTS, 2),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_LOW_LATENCY2_INFO_DEP3_EXTS, 2),
+        0,
+    },
+};
+const ExtensionInfo* const VK_NV_MEMORY_DECOMPRESSION_INFO_DEP0_EXTS[] = {
     &VK_KHR_BUFFER_DEVICE_ADDRESS_INFO,
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_NV_MESH_SHADER_INFO_DEPS[] = {
+const ExtensionInfo* const VK_NV_MEMORY_DECOMPRESSION_INFO_DEP1_EXTS[] = {
+    &VK_KHR_BUFFER_DEVICE_ADDRESS_INFO,
+};
+const ExtensionDependency VK_NV_MEMORY_DECOMPRESSION_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_MEMORY_DECOMPRESSION_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_MEMORY_DECOMPRESSION_INFO_DEP1_EXTS, 1),
+        VK_API_VERSION_1_1,
+    },
+    {
+        {},
+        VK_API_VERSION_1_2,
+    },
+};
+const ExtensionInfo* const VK_NV_MESH_SHADER_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_NV_OPTICAL_FLOW_INFO_DEPS[] = {
+const ExtensionDependency VK_NV_MESH_SHADER_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_MESH_SHADER_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_NV_OPTICAL_FLOW_INFO_DEP0_EXTS[] = {
     &VK_KHR_FORMAT_FEATURE_FLAGS2_INFO,
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
     &VK_KHR_SYNCHRONIZATION2_INFO,
 };
-const ExtensionInfo* const VK_NV_PARTITIONED_ACCELERATION_STRUCTURE_INFO_DEPS[] = {
+const ExtensionInfo* const VK_NV_OPTICAL_FLOW_INFO_DEP1_EXTS[] = {
+    &VK_KHR_FORMAT_FEATURE_FLAGS2_INFO,
+    &VK_KHR_SYNCHRONIZATION2_INFO,
+};
+const ExtensionDependency VK_NV_OPTICAL_FLOW_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_OPTICAL_FLOW_INFO_DEP0_EXTS, 3),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_OPTICAL_FLOW_INFO_DEP1_EXTS, 2),
+        VK_API_VERSION_1_1,
+    },
+    {
+        {},
+        VK_API_VERSION_1_3,
+    },
+};
+const ExtensionInfo* const VK_NV_PARTITIONED_ACCELERATION_STRUCTURE_INFO_DEP0_EXTS[] = {
     &VK_KHR_ACCELERATION_STRUCTURE_INFO,
 };
-const ExtensionInfo* const VK_NV_PER_STAGE_DESCRIPTOR_SET_INFO_DEPS[] = {
+const ExtensionDependency VK_NV_PARTITIONED_ACCELERATION_STRUCTURE_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_PARTITIONED_ACCELERATION_STRUCTURE_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_NV_PER_STAGE_DESCRIPTOR_SET_INFO_DEP0_EXTS[] = {
     &VK_KHR_MAINTENANCE6_INFO,
 };
-const ExtensionInfo* const VK_NV_PRESENT_BARRIER_INFO_DEPS[] = {
+const ExtensionDependency VK_NV_PER_STAGE_DESCRIPTOR_SET_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_PER_STAGE_DESCRIPTOR_SET_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_4,
+    },
+};
+const ExtensionInfo* const VK_NV_PRESENT_BARRIER_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
     &VK_KHR_GET_SURFACE_CAPABILITIES2_INFO,
     &VK_KHR_SURFACE_INFO,
     &VK_KHR_SWAPCHAIN_INFO,
 };
-const ExtensionInfo* const VK_NV_RAW_ACCESS_CHAINS_INFO_DEPS[] = {
+const ExtensionInfo* const VK_NV_PRESENT_BARRIER_INFO_DEP1_EXTS[] = {
+    &VK_KHR_GET_SURFACE_CAPABILITIES2_INFO,
+    &VK_KHR_SURFACE_INFO,
+    &VK_KHR_SWAPCHAIN_INFO,
+};
+const ExtensionDependency VK_NV_PRESENT_BARRIER_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_PRESENT_BARRIER_INFO_DEP0_EXTS, 4),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_PRESENT_BARRIER_INFO_DEP1_EXTS, 3),
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_NV_RAW_ACCESS_CHAINS_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_NV_RAY_TRACING_INFO_DEPS[] = {
+const ExtensionDependency VK_NV_RAW_ACCESS_CHAINS_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_RAW_ACCESS_CHAINS_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_NV_RAY_TRACING_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_MEMORY_REQUIREMENTS2_INFO,
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_NV_RAY_TRACING_INVOCATION_REORDER_INFO_DEPS[] = {
+const ExtensionDependency VK_NV_RAY_TRACING_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_RAY_TRACING_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_NV_RAY_TRACING_INVOCATION_REORDER_INFO_DEP0_EXTS[] = {
     &VK_KHR_RAY_TRACING_PIPELINE_INFO,
 };
-const ExtensionInfo* const VK_NV_RAY_TRACING_LINEAR_SWEPT_SPHERES_INFO_DEPS[] = {
+const ExtensionDependency VK_NV_RAY_TRACING_INVOCATION_REORDER_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_RAY_TRACING_INVOCATION_REORDER_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_NV_RAY_TRACING_LINEAR_SWEPT_SPHERES_INFO_DEP0_EXTS[] = {
     &VK_KHR_RAY_TRACING_PIPELINE_INFO,
 };
-const ExtensionInfo* const VK_NV_RAY_TRACING_MOTION_BLUR_INFO_DEPS[] = {
+const ExtensionDependency VK_NV_RAY_TRACING_LINEAR_SWEPT_SPHERES_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_RAY_TRACING_LINEAR_SWEPT_SPHERES_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_NV_RAY_TRACING_MOTION_BLUR_INFO_DEP0_EXTS[] = {
     &VK_KHR_RAY_TRACING_PIPELINE_INFO,
 };
-const ExtensionInfo* const VK_NV_RAY_TRACING_VALIDATION_INFO_DEPS[] = {
+const ExtensionDependency VK_NV_RAY_TRACING_MOTION_BLUR_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_RAY_TRACING_MOTION_BLUR_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_NV_RAY_TRACING_VALIDATION_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_NV_REPRESENTATIVE_FRAGMENT_TEST_INFO_DEPS[] = {
+const ExtensionDependency VK_NV_RAY_TRACING_VALIDATION_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_RAY_TRACING_VALIDATION_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_NV_REPRESENTATIVE_FRAGMENT_TEST_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_NV_SCISSOR_EXCLUSIVE_INFO_DEPS[] = {
+const ExtensionDependency VK_NV_REPRESENTATIVE_FRAGMENT_TEST_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_REPRESENTATIVE_FRAGMENT_TEST_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_NV_SCISSOR_EXCLUSIVE_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_NV_SHADER_ATOMIC_FLOAT16_VECTOR_INFO_DEPS[] = {
+const ExtensionDependency VK_NV_SCISSOR_EXCLUSIVE_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_SCISSOR_EXCLUSIVE_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_NV_SHADER_ATOMIC_FLOAT16_VECTOR_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_NV_SHADER_IMAGE_FOOTPRINT_INFO_DEPS[] = {
+const ExtensionDependency VK_NV_SHADER_ATOMIC_FLOAT16_VECTOR_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_SHADER_ATOMIC_FLOAT16_VECTOR_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_NV_SHADER_IMAGE_FOOTPRINT_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_NV_SHADING_RATE_IMAGE_INFO_DEPS[] = {
+const ExtensionDependency VK_NV_SHADER_IMAGE_FOOTPRINT_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_SHADER_IMAGE_FOOTPRINT_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionDependency VK_NV_SHADER_SM_BUILTINS_INFO_DEPS[] = {
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionDependency VK_NV_SHADER_SUBGROUP_PARTITIONED_INFO_DEPS[] = {
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_NV_SHADING_RATE_IMAGE_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_QCOM_COOPERATIVE_MATRIX_CONVERSION_INFO_DEPS[] = {
+const ExtensionDependency VK_NV_SHADING_RATE_IMAGE_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_NV_SHADING_RATE_IMAGE_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_QCOM_COOPERATIVE_MATRIX_CONVERSION_INFO_DEP0_EXTS[] = {
     &VK_KHR_COOPERATIVE_MATRIX_INFO,
 };
-const ExtensionInfo* const VK_QCOM_DATA_GRAPH_MODEL_INFO_DEPS[] = {
+const ExtensionDependency VK_QCOM_COOPERATIVE_MATRIX_CONVERSION_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_QCOM_COOPERATIVE_MATRIX_CONVERSION_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_QCOM_DATA_GRAPH_MODEL_INFO_DEP0_EXTS[] = {
     &VK_ARM_DATA_GRAPH_INFO,
 };
-const ExtensionInfo* const VK_QCOM_FILTER_CUBIC_CLAMP_INFO_DEPS[] = {
+const ExtensionDependency VK_QCOM_DATA_GRAPH_MODEL_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_QCOM_DATA_GRAPH_MODEL_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_QCOM_FILTER_CUBIC_CLAMP_INFO_DEP0_EXTS[] = {
+    &VK_EXT_FILTER_CUBIC_INFO,
+};
+const ExtensionInfo* const VK_QCOM_FILTER_CUBIC_CLAMP_INFO_DEP1_EXTS[] = {
     &VK_EXT_FILTER_CUBIC_INFO,
     &VK_EXT_SAMPLER_FILTER_MINMAX_INFO,
 };
-const ExtensionInfo* const VK_QCOM_FILTER_CUBIC_WEIGHTS_INFO_DEPS[] = {
+const ExtensionDependency VK_QCOM_FILTER_CUBIC_CLAMP_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_QCOM_FILTER_CUBIC_CLAMP_INFO_DEP0_EXTS, 1),
+        VK_API_VERSION_1_2,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_QCOM_FILTER_CUBIC_CLAMP_INFO_DEP1_EXTS, 2),
+        0,
+    },
+};
+const ExtensionInfo* const VK_QCOM_FILTER_CUBIC_WEIGHTS_INFO_DEP0_EXTS[] = {
     &VK_EXT_FILTER_CUBIC_INFO,
 };
-const ExtensionInfo* const VK_QCOM_FRAGMENT_DENSITY_MAP_OFFSET_INFO_DEPS[] = {
+const ExtensionDependency VK_QCOM_FILTER_CUBIC_WEIGHTS_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_QCOM_FILTER_CUBIC_WEIGHTS_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_QCOM_FRAGMENT_DENSITY_MAP_OFFSET_INFO_DEP0_EXTS[] = {
     &VK_EXT_FRAGMENT_DENSITY_MAP_INFO,
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_QCOM_IMAGE_PROCESSING_INFO_DEPS[] = {
+const ExtensionInfo* const VK_QCOM_FRAGMENT_DENSITY_MAP_OFFSET_INFO_DEP1_EXTS[] = {
+    &VK_EXT_FRAGMENT_DENSITY_MAP_INFO,
+};
+const ExtensionDependency VK_QCOM_FRAGMENT_DENSITY_MAP_OFFSET_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_QCOM_FRAGMENT_DENSITY_MAP_OFFSET_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_QCOM_FRAGMENT_DENSITY_MAP_OFFSET_INFO_DEP1_EXTS, 1),
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_QCOM_IMAGE_PROCESSING_INFO_DEP0_EXTS[] = {
     &VK_KHR_FORMAT_FEATURE_FLAGS2_INFO,
 };
-const ExtensionInfo* const VK_QCOM_IMAGE_PROCESSING2_INFO_DEPS[] = {
+const ExtensionDependency VK_QCOM_IMAGE_PROCESSING_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_QCOM_IMAGE_PROCESSING_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_3,
+    },
+};
+const ExtensionInfo* const VK_QCOM_IMAGE_PROCESSING2_INFO_DEP0_EXTS[] = {
     &VK_QCOM_IMAGE_PROCESSING_INFO,
 };
-const ExtensionInfo* const VK_QCOM_MULTIVIEW_PER_VIEW_RENDER_AREAS_INFO_DEPS[] = {
+const ExtensionDependency VK_QCOM_IMAGE_PROCESSING2_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_QCOM_IMAGE_PROCESSING2_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_QCOM_MULTIVIEW_PER_VIEW_RENDER_AREAS_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_QCOM_MULTIVIEW_PER_VIEW_VIEWPORTS_INFO_DEPS[] = {
+const ExtensionDependency VK_QCOM_MULTIVIEW_PER_VIEW_RENDER_AREAS_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_QCOM_MULTIVIEW_PER_VIEW_RENDER_AREAS_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_QCOM_MULTIVIEW_PER_VIEW_VIEWPORTS_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_QCOM_ROTATED_COPY_COMMANDS_INFO_DEPS[] = {
+const ExtensionDependency VK_QCOM_MULTIVIEW_PER_VIEW_VIEWPORTS_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_QCOM_MULTIVIEW_PER_VIEW_VIEWPORTS_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_QCOM_ROTATED_COPY_COMMANDS_INFO_DEP0_EXTS[] = {
     &VK_KHR_COPY_COMMANDS2_INFO,
 };
-const ExtensionInfo* const VK_QCOM_TILE_MEMORY_HEAP_INFO_DEPS[] = {
+const ExtensionDependency VK_QCOM_ROTATED_COPY_COMMANDS_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_QCOM_ROTATED_COPY_COMMANDS_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_3,
+    },
+};
+const ExtensionInfo* const VK_QCOM_TILE_MEMORY_HEAP_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_MEMORY_REQUIREMENTS2_INFO,
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_QCOM_TILE_PROPERTIES_INFO_DEPS[] = {
+const ExtensionDependency VK_QCOM_TILE_MEMORY_HEAP_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_QCOM_TILE_MEMORY_HEAP_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_QCOM_TILE_PROPERTIES_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_QCOM_TILE_SHADING_INFO_DEPS[] = {
+const ExtensionDependency VK_QCOM_TILE_PROPERTIES_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_QCOM_TILE_PROPERTIES_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_QCOM_TILE_SHADING_INFO_DEP0_EXTS[] = {
     &VK_QCOM_TILE_PROPERTIES_INFO,
 };
-const ExtensionInfo* const VK_QCOM_YCBCR_DEGAMMA_INFO_DEPS[] = {
+const ExtensionDependency VK_QCOM_TILE_SHADING_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_QCOM_TILE_SHADING_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_QCOM_YCBCR_DEGAMMA_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_SEC_AMIGO_PROFILING_INFO_DEPS[] = {
+const ExtensionDependency VK_QCOM_YCBCR_DEGAMMA_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_QCOM_YCBCR_DEGAMMA_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_SEC_AMIGO_PROFILING_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_SEC_PIPELINE_CACHE_INCREMENTAL_MODE_INFO_DEPS[] = {
+const ExtensionDependency VK_SEC_AMIGO_PROFILING_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_SEC_AMIGO_PROFILING_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_SEC_PIPELINE_CACHE_INCREMENTAL_MODE_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_VALVE_DESCRIPTOR_SET_HOST_MAPPING_INFO_DEPS[] = {
+const ExtensionDependency VK_SEC_PIPELINE_CACHE_INCREMENTAL_MODE_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_SEC_PIPELINE_CACHE_INCREMENTAL_MODE_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_VALVE_DESCRIPTOR_SET_HOST_MAPPING_INFO_DEP0_EXTS[] = {
     &VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO,
 };
-const ExtensionInfo* const VK_VALVE_FRAGMENT_DENSITY_MAP_LAYERED_INFO_DEPS[] = {
+const ExtensionDependency VK_VALVE_DESCRIPTOR_SET_HOST_MAPPING_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_VALVE_DESCRIPTOR_SET_HOST_MAPPING_INFO_DEP0_EXTS, 1),
+        0,
+    },
+    {
+        {},
+        VK_API_VERSION_1_1,
+    },
+};
+const ExtensionInfo* const VK_VALVE_FRAGMENT_DENSITY_MAP_LAYERED_INFO_DEP0_EXTS[] = {
     &VK_EXT_FRAGMENT_DENSITY_MAP_INFO,
     &VK_KHR_MAINTENANCE5_INFO,
 };
-const ExtensionInfo* const VK_VALVE_MUTABLE_DESCRIPTOR_TYPE_INFO_DEPS[] = {
+const ExtensionInfo* const VK_VALVE_FRAGMENT_DENSITY_MAP_LAYERED_INFO_DEP1_EXTS[] = {
+    &VK_EXT_FRAGMENT_DENSITY_MAP_INFO,
+};
+const ExtensionDependency VK_VALVE_FRAGMENT_DENSITY_MAP_LAYERED_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_VALVE_FRAGMENT_DENSITY_MAP_LAYERED_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_VALVE_FRAGMENT_DENSITY_MAP_LAYERED_INFO_DEP1_EXTS, 1),
+        VK_API_VERSION_1_4,
+    },
+};
+const ExtensionInfo* const VK_VALVE_MUTABLE_DESCRIPTOR_TYPE_INFO_DEP0_EXTS[] = {
     &VK_KHR_MAINTENANCE3_INFO,
 };
-const ExtensionInfo* const VK_VALVE_VIDEO_ENCODE_RGB_CONVERSION_INFO_DEPS[] = {
+const ExtensionDependency VK_VALVE_MUTABLE_DESCRIPTOR_TYPE_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_VALVE_MUTABLE_DESCRIPTOR_TYPE_INFO_DEP0_EXTS, 1),
+        0,
+    },
+};
+const ExtensionInfo* const VK_VALVE_VIDEO_ENCODE_RGB_CONVERSION_INFO_DEP0_EXTS[] = {
     &VK_KHR_SAMPLER_YCBCR_CONVERSION_INFO,
     &VK_KHR_VIDEO_ENCODE_QUEUE_INFO,
+};
+const ExtensionInfo* const VK_VALVE_VIDEO_ENCODE_RGB_CONVERSION_INFO_DEP1_EXTS[] = {
+    &VK_KHR_VIDEO_ENCODE_QUEUE_INFO,
+};
+const ExtensionDependency VK_VALVE_VIDEO_ENCODE_RGB_CONVERSION_INFO_DEPS[] = {
+    {
+        std::span<const ExtensionInfo* const>(VK_VALVE_VIDEO_ENCODE_RGB_CONVERSION_INFO_DEP0_EXTS, 2),
+        0,
+    },
+    {
+        std::span<const ExtensionInfo* const>(VK_VALVE_VIDEO_ENCODE_RGB_CONVERSION_INFO_DEP1_EXTS, 1),
+        VK_API_VERSION_1_1,
+    },
 };
 
 const vk::StructureType VK_AMD_SHADER_CORE_PROPERTIES_INFO_PROPERTIES[] = {
@@ -1711,7 +4899,7 @@ const vk::StructureType VK_VALVE_VIDEO_ENCODE_RGB_CONVERSION_INFO_FEATURES[] = {
 const ExtensionInfo VK_AMD_ANTI_LAG_INFO = {
     VK_AMD_ANTI_LAG_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_AMD_ANTI_LAG_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_AMD_ANTI_LAG_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -1729,7 +4917,7 @@ const ExtensionInfo VK_AMD_BUFFER_MARKER_INFO = {
 const ExtensionInfo VK_AMD_DEVICE_COHERENT_MEMORY_INFO = {
     VK_AMD_DEVICE_COHERENT_MEMORY_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_AMD_DEVICE_COHERENT_MEMORY_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_AMD_DEVICE_COHERENT_MEMORY_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -1738,7 +4926,7 @@ const ExtensionInfo VK_AMD_DEVICE_COHERENT_MEMORY_INFO = {
 const ExtensionInfo VK_AMD_DISPLAY_NATIVE_HDR_INFO = {
     VK_AMD_DISPLAY_NATIVE_HDR_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_AMD_DISPLAY_NATIVE_HDR_INFO_DEPS, 3),
+    std::span<const ExtensionDependency>(VK_AMD_DISPLAY_NATIVE_HDR_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -1766,7 +4954,7 @@ const ExtensionInfo VK_AMD_GPU_SHADER_HALF_FLOAT_INFO = {
     VK_AMD_GPU_SHADER_HALF_FLOAT_EXTENSION_NAME,
     ExtensionType::Device,
     {},
-    VK_KHR_shader_float16_int8,
+    (uint32_t)-1,
     &VK_KHR_SHADER_FLOAT16_INT8_INFO,
     {},
     {},
@@ -1775,7 +4963,7 @@ const ExtensionInfo VK_AMD_GPU_SHADER_INT16_INFO = {
     VK_AMD_GPU_SHADER_INT16_EXTENSION_NAME,
     ExtensionType::Device,
     {},
-    VK_KHR_shader_float16_int8,
+    (uint32_t)-1,
     &VK_KHR_SHADER_FLOAT16_INT8_INFO,
     {},
     {},
@@ -1837,7 +5025,7 @@ const ExtensionInfo VK_AMD_SHADER_BALLOT_INFO = {
 const ExtensionInfo VK_AMD_SHADER_CORE_PROPERTIES_INFO = {
     VK_AMD_SHADER_CORE_PROPERTIES_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_AMD_SHADER_CORE_PROPERTIES_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_AMD_SHADER_CORE_PROPERTIES_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     std::span<const vk::StructureType>(VK_AMD_SHADER_CORE_PROPERTIES_INFO_PROPERTIES, 1),
@@ -1846,7 +5034,7 @@ const ExtensionInfo VK_AMD_SHADER_CORE_PROPERTIES_INFO = {
 const ExtensionInfo VK_AMD_SHADER_CORE_PROPERTIES2_INFO = {
     VK_AMD_SHADER_CORE_PROPERTIES_2_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_AMD_SHADER_CORE_PROPERTIES2_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_AMD_SHADER_CORE_PROPERTIES2_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     std::span<const vk::StructureType>(VK_AMD_SHADER_CORE_PROPERTIES2_INFO_PROPERTIES, 1),
@@ -1855,7 +5043,7 @@ const ExtensionInfo VK_AMD_SHADER_CORE_PROPERTIES2_INFO = {
 const ExtensionInfo VK_AMD_SHADER_EARLY_AND_LATE_FRAGMENT_TESTS_INFO = {
     VK_AMD_SHADER_EARLY_AND_LATE_FRAGMENT_TESTS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_AMD_SHADER_EARLY_AND_LATE_FRAGMENT_TESTS_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_AMD_SHADER_EARLY_AND_LATE_FRAGMENT_TESTS_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -1909,7 +5097,7 @@ const ExtensionInfo VK_AMD_SHADER_TRINARY_MINMAX_INFO = {
 const ExtensionInfo VK_AMD_TEXTURE_GATHER_BIAS_LOD_INFO = {
     VK_AMD_TEXTURE_GATHER_BIAS_LOD_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_AMD_TEXTURE_GATHER_BIAS_LOD_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_AMD_TEXTURE_GATHER_BIAS_LOD_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -1918,7 +5106,7 @@ const ExtensionInfo VK_AMD_TEXTURE_GATHER_BIAS_LOD_INFO = {
 const ExtensionInfo VK_ARM_DATA_GRAPH_INFO = {
     VK_ARM_DATA_GRAPH_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_ARM_DATA_GRAPH_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_ARM_DATA_GRAPH_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -1927,7 +5115,7 @@ const ExtensionInfo VK_ARM_DATA_GRAPH_INFO = {
 const ExtensionInfo VK_ARM_FORMAT_PACK_INFO = {
     VK_ARM_FORMAT_PACK_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_ARM_FORMAT_PACK_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_ARM_FORMAT_PACK_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -1936,7 +5124,7 @@ const ExtensionInfo VK_ARM_FORMAT_PACK_INFO = {
 const ExtensionInfo VK_ARM_PERFORMANCE_COUNTERS_BY_REGION_INFO = {
     VK_ARM_PERFORMANCE_COUNTERS_BY_REGION_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_ARM_PERFORMANCE_COUNTERS_BY_REGION_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_ARM_PERFORMANCE_COUNTERS_BY_REGION_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -1945,7 +5133,7 @@ const ExtensionInfo VK_ARM_PERFORMANCE_COUNTERS_BY_REGION_INFO = {
 const ExtensionInfo VK_ARM_PIPELINE_OPACITY_MICROMAP_INFO = {
     VK_ARM_PIPELINE_OPACITY_MICROMAP_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_ARM_PIPELINE_OPACITY_MICROMAP_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_ARM_PIPELINE_OPACITY_MICROMAP_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -1954,7 +5142,7 @@ const ExtensionInfo VK_ARM_PIPELINE_OPACITY_MICROMAP_INFO = {
 const ExtensionInfo VK_ARM_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_INFO = {
     VK_ARM_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_ARM_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_ARM_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -1963,7 +5151,7 @@ const ExtensionInfo VK_ARM_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_INFO = {
 const ExtensionInfo VK_ARM_RENDER_PASS_STRIPED_INFO = {
     VK_ARM_RENDER_PASS_STRIPED_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_ARM_RENDER_PASS_STRIPED_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_ARM_RENDER_PASS_STRIPED_INFO_DEPS, 3),
     (uint32_t)-1,
     {},
     {},
@@ -1972,7 +5160,7 @@ const ExtensionInfo VK_ARM_RENDER_PASS_STRIPED_INFO = {
 const ExtensionInfo VK_ARM_SCHEDULING_CONTROLS_INFO = {
     VK_ARM_SCHEDULING_CONTROLS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_ARM_SCHEDULING_CONTROLS_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_ARM_SCHEDULING_CONTROLS_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -1981,7 +5169,7 @@ const ExtensionInfo VK_ARM_SCHEDULING_CONTROLS_INFO = {
 const ExtensionInfo VK_ARM_SHADER_CORE_BUILTINS_INFO = {
     VK_ARM_SHADER_CORE_BUILTINS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_ARM_SHADER_CORE_BUILTINS_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_ARM_SHADER_CORE_BUILTINS_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -1990,7 +5178,7 @@ const ExtensionInfo VK_ARM_SHADER_CORE_BUILTINS_INFO = {
 const ExtensionInfo VK_ARM_SHADER_CORE_PROPERTIES_INFO = {
     VK_ARM_SHADER_CORE_PROPERTIES_EXTENSION_NAME,
     ExtensionType::Device,
-    {},
+    std::span<const ExtensionDependency>(VK_ARM_SHADER_CORE_PROPERTIES_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     std::span<const vk::StructureType>(VK_ARM_SHADER_CORE_PROPERTIES_INFO_PROPERTIES, 1),
@@ -1999,7 +5187,7 @@ const ExtensionInfo VK_ARM_SHADER_CORE_PROPERTIES_INFO = {
 const ExtensionInfo VK_ARM_TENSORS_INFO = {
     VK_ARM_TENSORS_EXTENSION_NAME,
     ExtensionType::Device,
-    {},
+    std::span<const ExtensionDependency>(VK_ARM_TENSORS_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -2008,7 +5196,7 @@ const ExtensionInfo VK_ARM_TENSORS_INFO = {
 const ExtensionInfo VK_EXT_4444_FORMATS_INFO = {
     VK_EXT_4444_FORMATS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_4444_FORMATS_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_4444_FORMATS_INFO_DEPS, 2),
     VK_API_VERSION_1_3,
     {},
     {},
@@ -2017,7 +5205,7 @@ const ExtensionInfo VK_EXT_4444_FORMATS_INFO = {
 const ExtensionInfo VK_EXT_ACQUIRE_DRM_DISPLAY_INFO = {
     VK_EXT_ACQUIRE_DRM_DISPLAY_EXTENSION_NAME,
     ExtensionType::Instance,
-    std::span<const ExtensionInfo* const>(VK_EXT_ACQUIRE_DRM_DISPLAY_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_ACQUIRE_DRM_DISPLAY_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -2026,7 +5214,7 @@ const ExtensionInfo VK_EXT_ACQUIRE_DRM_DISPLAY_INFO = {
 const ExtensionInfo VK_EXT_ASTC_DECODE_MODE_INFO = {
     VK_EXT_ASTC_DECODE_MODE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_ASTC_DECODE_MODE_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_ASTC_DECODE_MODE_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2035,7 +5223,7 @@ const ExtensionInfo VK_EXT_ASTC_DECODE_MODE_INFO = {
 const ExtensionInfo VK_EXT_ATTACHMENT_FEEDBACK_LOOP_DYNAMIC_STATE_INFO = {
     VK_EXT_ATTACHMENT_FEEDBACK_LOOP_DYNAMIC_STATE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_ATTACHMENT_FEEDBACK_LOOP_DYNAMIC_STATE_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_EXT_ATTACHMENT_FEEDBACK_LOOP_DYNAMIC_STATE_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2044,7 +5232,7 @@ const ExtensionInfo VK_EXT_ATTACHMENT_FEEDBACK_LOOP_DYNAMIC_STATE_INFO = {
 const ExtensionInfo VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_INFO = {
     VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2053,7 +5241,7 @@ const ExtensionInfo VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_INFO = {
 const ExtensionInfo VK_EXT_BLEND_OPERATION_ADVANCED_INFO = {
     VK_EXT_BLEND_OPERATION_ADVANCED_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_BLEND_OPERATION_ADVANCED_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_BLEND_OPERATION_ADVANCED_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2062,7 +5250,7 @@ const ExtensionInfo VK_EXT_BLEND_OPERATION_ADVANCED_INFO = {
 const ExtensionInfo VK_EXT_BORDER_COLOR_SWIZZLE_INFO = {
     VK_EXT_BORDER_COLOR_SWIZZLE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_BORDER_COLOR_SWIZZLE_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_BORDER_COLOR_SWIZZLE_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -2071,8 +5259,8 @@ const ExtensionInfo VK_EXT_BORDER_COLOR_SWIZZLE_INFO = {
 const ExtensionInfo VK_EXT_BUFFER_DEVICE_ADDRESS_INFO = {
     VK_EXT_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_BUFFER_DEVICE_ADDRESS_INFO_DEPS, 1),
-    VK_KHR_buffer_device_address,
+    std::span<const ExtensionDependency>(VK_EXT_BUFFER_DEVICE_ADDRESS_INFO_DEPS, 2),
+    (uint32_t)-1,
     &VK_KHR_BUFFER_DEVICE_ADDRESS_INFO,
     {},
     std::span<const vk::StructureType>(VK_EXT_BUFFER_DEVICE_ADDRESS_INFO_FEATURES, 1),
@@ -2080,7 +5268,7 @@ const ExtensionInfo VK_EXT_BUFFER_DEVICE_ADDRESS_INFO = {
 const ExtensionInfo VK_EXT_CALIBRATED_TIMESTAMPS_INFO = {
     VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_CALIBRATED_TIMESTAMPS_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_CALIBRATED_TIMESTAMPS_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2089,7 +5277,7 @@ const ExtensionInfo VK_EXT_CALIBRATED_TIMESTAMPS_INFO = {
 const ExtensionInfo VK_EXT_COLOR_WRITE_ENABLE_INFO = {
     VK_EXT_COLOR_WRITE_ENABLE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_COLOR_WRITE_ENABLE_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_COLOR_WRITE_ENABLE_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2098,7 +5286,7 @@ const ExtensionInfo VK_EXT_COLOR_WRITE_ENABLE_INFO = {
 const ExtensionInfo VK_EXT_CONDITIONAL_RENDERING_INFO = {
     VK_EXT_CONDITIONAL_RENDERING_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_CONDITIONAL_RENDERING_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_CONDITIONAL_RENDERING_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2107,7 +5295,7 @@ const ExtensionInfo VK_EXT_CONDITIONAL_RENDERING_INFO = {
 const ExtensionInfo VK_EXT_CONSERVATIVE_RASTERIZATION_INFO = {
     VK_EXT_CONSERVATIVE_RASTERIZATION_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_CONSERVATIVE_RASTERIZATION_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_CONSERVATIVE_RASTERIZATION_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     std::span<const vk::StructureType>(VK_EXT_CONSERVATIVE_RASTERIZATION_INFO_PROPERTIES, 1),
@@ -2116,7 +5304,7 @@ const ExtensionInfo VK_EXT_CONSERVATIVE_RASTERIZATION_INFO = {
 const ExtensionInfo VK_EXT_CUSTOM_BORDER_COLOR_INFO = {
     VK_EXT_CUSTOM_BORDER_COLOR_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_CUSTOM_BORDER_COLOR_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_CUSTOM_BORDER_COLOR_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2125,7 +5313,7 @@ const ExtensionInfo VK_EXT_CUSTOM_BORDER_COLOR_INFO = {
 const ExtensionInfo VK_EXT_CUSTOM_RESOLVE_INFO = {
     VK_EXT_CUSTOM_RESOLVE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_CUSTOM_RESOLVE_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_CUSTOM_RESOLVE_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2134,7 +5322,7 @@ const ExtensionInfo VK_EXT_CUSTOM_RESOLVE_INFO = {
 const ExtensionInfo VK_EXT_DEBUG_MARKER_INFO = {
     VK_EXT_DEBUG_MARKER_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_DEBUG_MARKER_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_DEBUG_MARKER_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -2144,7 +5332,7 @@ const ExtensionInfo VK_EXT_DEBUG_REPORT_INFO = {
     VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
     ExtensionType::Instance,
     {},
-    VK_EXT_debug_utils,
+    (uint32_t)-1,
     &VK_EXT_DEBUG_UTILS_INFO,
     {},
     {},
@@ -2161,7 +5349,7 @@ const ExtensionInfo VK_EXT_DEBUG_UTILS_INFO = {
 const ExtensionInfo VK_EXT_DEPTH_BIAS_CONTROL_INFO = {
     VK_EXT_DEPTH_BIAS_CONTROL_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_DEPTH_BIAS_CONTROL_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_DEPTH_BIAS_CONTROL_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2170,7 +5358,7 @@ const ExtensionInfo VK_EXT_DEPTH_BIAS_CONTROL_INFO = {
 const ExtensionInfo VK_EXT_DEPTH_CLAMP_CONTROL_INFO = {
     VK_EXT_DEPTH_CLAMP_CONTROL_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_DEPTH_CLAMP_CONTROL_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_DEPTH_CLAMP_CONTROL_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2179,7 +5367,7 @@ const ExtensionInfo VK_EXT_DEPTH_CLAMP_CONTROL_INFO = {
 const ExtensionInfo VK_EXT_DEPTH_CLAMP_ZERO_ONE_INFO = {
     VK_EXT_DEPTH_CLAMP_ZERO_ONE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_DEPTH_CLAMP_ZERO_ONE_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_DEPTH_CLAMP_ZERO_ONE_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2188,7 +5376,7 @@ const ExtensionInfo VK_EXT_DEPTH_CLAMP_ZERO_ONE_INFO = {
 const ExtensionInfo VK_EXT_DEPTH_CLIP_CONTROL_INFO = {
     VK_EXT_DEPTH_CLIP_CONTROL_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_DEPTH_CLIP_CONTROL_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_DEPTH_CLIP_CONTROL_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2197,7 +5385,7 @@ const ExtensionInfo VK_EXT_DEPTH_CLIP_CONTROL_INFO = {
 const ExtensionInfo VK_EXT_DEPTH_CLIP_ENABLE_INFO = {
     VK_EXT_DEPTH_CLIP_ENABLE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_DEPTH_CLIP_ENABLE_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_DEPTH_CLIP_ENABLE_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2215,8 +5403,8 @@ const ExtensionInfo VK_EXT_DEPTH_RANGE_UNRESTRICTED_INFO = {
 const ExtensionInfo VK_EXT_DESCRIPTOR_BUFFER_INFO = {
     VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_DESCRIPTOR_BUFFER_INFO_DEPS, 4),
-    VK_EXT_descriptor_heap,
+    std::span<const ExtensionDependency>(VK_EXT_DESCRIPTOR_BUFFER_INFO_DEPS, 4),
+    (uint32_t)-1,
     &VK_EXT_DESCRIPTOR_HEAP_INFO,
     std::span<const vk::StructureType>(VK_EXT_DESCRIPTOR_BUFFER_INFO_PROPERTIES, 1),
     {},
@@ -2224,7 +5412,7 @@ const ExtensionInfo VK_EXT_DESCRIPTOR_BUFFER_INFO = {
 const ExtensionInfo VK_EXT_DESCRIPTOR_HEAP_INFO = {
     VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_DESCRIPTOR_HEAP_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_EXT_DESCRIPTOR_HEAP_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     std::span<const vk::StructureType>(VK_EXT_DESCRIPTOR_HEAP_INFO_PROPERTIES, 1),
@@ -2233,7 +5421,7 @@ const ExtensionInfo VK_EXT_DESCRIPTOR_HEAP_INFO = {
 const ExtensionInfo VK_EXT_DESCRIPTOR_INDEXING_INFO = {
     VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_DESCRIPTOR_INDEXING_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_EXT_DESCRIPTOR_INDEXING_INFO_DEPS, 2),
     VK_API_VERSION_1_2,
     {},
     {},
@@ -2242,7 +5430,7 @@ const ExtensionInfo VK_EXT_DESCRIPTOR_INDEXING_INFO = {
 const ExtensionInfo VK_EXT_DEVICE_ADDRESS_BINDING_REPORT_INFO = {
     VK_EXT_DEVICE_ADDRESS_BINDING_REPORT_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_DEVICE_ADDRESS_BINDING_REPORT_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_EXT_DEVICE_ADDRESS_BINDING_REPORT_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2251,7 +5439,7 @@ const ExtensionInfo VK_EXT_DEVICE_ADDRESS_BINDING_REPORT_INFO = {
 const ExtensionInfo VK_EXT_DEVICE_FAULT_INFO = {
     VK_EXT_DEVICE_FAULT_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_DEVICE_FAULT_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_DEVICE_FAULT_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2260,7 +5448,7 @@ const ExtensionInfo VK_EXT_DEVICE_FAULT_INFO = {
 const ExtensionInfo VK_EXT_DEVICE_GENERATED_COMMANDS_INFO = {
     VK_EXT_DEVICE_GENERATED_COMMANDS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_DEVICE_GENERATED_COMMANDS_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_EXT_DEVICE_GENERATED_COMMANDS_INFO_DEPS, 3),
     (uint32_t)-1,
     {},
     {},
@@ -2269,7 +5457,7 @@ const ExtensionInfo VK_EXT_DEVICE_GENERATED_COMMANDS_INFO = {
 const ExtensionInfo VK_EXT_DEVICE_MEMORY_REPORT_INFO = {
     VK_EXT_DEVICE_MEMORY_REPORT_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_DEVICE_MEMORY_REPORT_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_DEVICE_MEMORY_REPORT_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2278,7 +5466,7 @@ const ExtensionInfo VK_EXT_DEVICE_MEMORY_REPORT_INFO = {
 const ExtensionInfo VK_EXT_DIRECT_MODE_DISPLAY_INFO = {
     VK_EXT_DIRECT_MODE_DISPLAY_EXTENSION_NAME,
     ExtensionType::Instance,
-    std::span<const ExtensionInfo* const>(VK_EXT_DIRECT_MODE_DISPLAY_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_DIRECT_MODE_DISPLAY_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -2287,7 +5475,7 @@ const ExtensionInfo VK_EXT_DIRECT_MODE_DISPLAY_INFO = {
 const ExtensionInfo VK_EXT_DISCARD_RECTANGLES_INFO = {
     VK_EXT_DISCARD_RECTANGLES_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_DISCARD_RECTANGLES_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_DISCARD_RECTANGLES_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     std::span<const vk::StructureType>(VK_EXT_DISCARD_RECTANGLES_INFO_PROPERTIES, 1),
@@ -2296,7 +5484,7 @@ const ExtensionInfo VK_EXT_DISCARD_RECTANGLES_INFO = {
 const ExtensionInfo VK_EXT_DISPLAY_CONTROL_INFO = {
     VK_EXT_DISPLAY_CONTROL_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_DISPLAY_CONTROL_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_EXT_DISPLAY_CONTROL_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -2305,7 +5493,7 @@ const ExtensionInfo VK_EXT_DISPLAY_CONTROL_INFO = {
 const ExtensionInfo VK_EXT_DISPLAY_SURFACE_COUNTER_INFO = {
     VK_EXT_DISPLAY_SURFACE_COUNTER_EXTENSION_NAME,
     ExtensionType::Instance,
-    std::span<const ExtensionInfo* const>(VK_EXT_DISPLAY_SURFACE_COUNTER_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_DISPLAY_SURFACE_COUNTER_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -2314,7 +5502,7 @@ const ExtensionInfo VK_EXT_DISPLAY_SURFACE_COUNTER_INFO = {
 const ExtensionInfo VK_EXT_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_INFO = {
     VK_EXT_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_EXT_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_INFO_DEPS, 3),
     (uint32_t)-1,
     {},
     {},
@@ -2323,7 +5511,7 @@ const ExtensionInfo VK_EXT_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_INFO = {
 const ExtensionInfo VK_EXT_EXTENDED_DYNAMIC_STATE_INFO = {
     VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_EXTENDED_DYNAMIC_STATE_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_EXTENDED_DYNAMIC_STATE_INFO_DEPS, 2),
     VK_API_VERSION_1_3,
     {},
     {},
@@ -2332,7 +5520,7 @@ const ExtensionInfo VK_EXT_EXTENDED_DYNAMIC_STATE_INFO = {
 const ExtensionInfo VK_EXT_EXTENDED_DYNAMIC_STATE2_INFO = {
     VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_EXTENDED_DYNAMIC_STATE2_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_EXTENDED_DYNAMIC_STATE2_INFO_DEPS, 2),
     VK_API_VERSION_1_3,
     {},
     {},
@@ -2341,7 +5529,7 @@ const ExtensionInfo VK_EXT_EXTENDED_DYNAMIC_STATE2_INFO = {
 const ExtensionInfo VK_EXT_EXTENDED_DYNAMIC_STATE3_INFO = {
     VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_EXTENDED_DYNAMIC_STATE3_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_EXTENDED_DYNAMIC_STATE3_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2350,7 +5538,7 @@ const ExtensionInfo VK_EXT_EXTENDED_DYNAMIC_STATE3_INFO = {
 const ExtensionInfo VK_EXT_EXTERNAL_MEMORY_ACQUIRE_UNMODIFIED_INFO = {
     VK_EXT_EXTERNAL_MEMORY_ACQUIRE_UNMODIFIED_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_EXTERNAL_MEMORY_ACQUIRE_UNMODIFIED_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_EXTERNAL_MEMORY_ACQUIRE_UNMODIFIED_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2359,7 +5547,7 @@ const ExtensionInfo VK_EXT_EXTERNAL_MEMORY_ACQUIRE_UNMODIFIED_INFO = {
 const ExtensionInfo VK_EXT_EXTERNAL_MEMORY_DMA_BUF_INFO = {
     VK_EXT_EXTERNAL_MEMORY_DMA_BUF_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_EXTERNAL_MEMORY_DMA_BUF_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_EXTERNAL_MEMORY_DMA_BUF_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -2368,7 +5556,7 @@ const ExtensionInfo VK_EXT_EXTERNAL_MEMORY_DMA_BUF_INFO = {
 const ExtensionInfo VK_EXT_EXTERNAL_MEMORY_HOST_INFO = {
     VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_EXTERNAL_MEMORY_HOST_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_EXTERNAL_MEMORY_HOST_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2386,7 +5574,7 @@ const ExtensionInfo VK_EXT_FILTER_CUBIC_INFO = {
 const ExtensionInfo VK_EXT_FRAGMENT_DENSITY_MAP_INFO = {
     VK_EXT_FRAGMENT_DENSITY_MAP_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_FRAGMENT_DENSITY_MAP_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_FRAGMENT_DENSITY_MAP_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2395,7 +5583,7 @@ const ExtensionInfo VK_EXT_FRAGMENT_DENSITY_MAP_INFO = {
 const ExtensionInfo VK_EXT_FRAGMENT_DENSITY_MAP2_INFO = {
     VK_EXT_FRAGMENT_DENSITY_MAP_2_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_FRAGMENT_DENSITY_MAP2_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_FRAGMENT_DENSITY_MAP2_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -2404,7 +5592,7 @@ const ExtensionInfo VK_EXT_FRAGMENT_DENSITY_MAP2_INFO = {
 const ExtensionInfo VK_EXT_FRAGMENT_DENSITY_MAP_OFFSET_INFO = {
     VK_EXT_FRAGMENT_DENSITY_MAP_OFFSET_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_FRAGMENT_DENSITY_MAP_OFFSET_INFO_DEPS, 4),
+    std::span<const ExtensionDependency>(VK_EXT_FRAGMENT_DENSITY_MAP_OFFSET_INFO_DEPS, 8),
     (uint32_t)-1,
     {},
     {},
@@ -2413,7 +5601,7 @@ const ExtensionInfo VK_EXT_FRAGMENT_DENSITY_MAP_OFFSET_INFO = {
 const ExtensionInfo VK_EXT_FRAGMENT_SHADER_INTERLOCK_INFO = {
     VK_EXT_FRAGMENT_SHADER_INTERLOCK_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_FRAGMENT_SHADER_INTERLOCK_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_FRAGMENT_SHADER_INTERLOCK_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2422,7 +5610,7 @@ const ExtensionInfo VK_EXT_FRAGMENT_SHADER_INTERLOCK_INFO = {
 const ExtensionInfo VK_EXT_FRAME_BOUNDARY_INFO = {
     VK_EXT_FRAME_BOUNDARY_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_FRAME_BOUNDARY_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_FRAME_BOUNDARY_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2440,7 +5628,7 @@ const ExtensionInfo VK_EXT_GLOBAL_PRIORITY_INFO = {
 const ExtensionInfo VK_EXT_GLOBAL_PRIORITY_QUERY_INFO = {
     VK_EXT_GLOBAL_PRIORITY_QUERY_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_GLOBAL_PRIORITY_QUERY_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_EXT_GLOBAL_PRIORITY_QUERY_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2449,7 +5637,7 @@ const ExtensionInfo VK_EXT_GLOBAL_PRIORITY_QUERY_INFO = {
 const ExtensionInfo VK_EXT_GRAPHICS_PIPELINE_LIBRARY_INFO = {
     VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2458,7 +5646,7 @@ const ExtensionInfo VK_EXT_GRAPHICS_PIPELINE_LIBRARY_INFO = {
 const ExtensionInfo VK_EXT_HDR_METADATA_INFO = {
     VK_EXT_HDR_METADATA_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_HDR_METADATA_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_HDR_METADATA_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -2467,7 +5655,7 @@ const ExtensionInfo VK_EXT_HDR_METADATA_INFO = {
 const ExtensionInfo VK_EXT_HEADLESS_SURFACE_INFO = {
     VK_EXT_HEADLESS_SURFACE_EXTENSION_NAME,
     ExtensionType::Instance,
-    std::span<const ExtensionInfo* const>(VK_EXT_HEADLESS_SURFACE_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_HEADLESS_SURFACE_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -2476,7 +5664,7 @@ const ExtensionInfo VK_EXT_HEADLESS_SURFACE_INFO = {
 const ExtensionInfo VK_EXT_HOST_IMAGE_COPY_INFO = {
     VK_EXT_HOST_IMAGE_COPY_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_HOST_IMAGE_COPY_INFO_DEPS, 3),
+    std::span<const ExtensionDependency>(VK_EXT_HOST_IMAGE_COPY_INFO_DEPS, 3),
     VK_API_VERSION_1_4,
     {},
     {},
@@ -2485,7 +5673,7 @@ const ExtensionInfo VK_EXT_HOST_IMAGE_COPY_INFO = {
 const ExtensionInfo VK_EXT_HOST_QUERY_RESET_INFO = {
     VK_EXT_HOST_QUERY_RESET_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_HOST_QUERY_RESET_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_HOST_QUERY_RESET_INFO_DEPS, 2),
     VK_API_VERSION_1_2,
     {},
     {},
@@ -2494,7 +5682,7 @@ const ExtensionInfo VK_EXT_HOST_QUERY_RESET_INFO = {
 const ExtensionInfo VK_EXT_IMAGE_2D_VIEW_OF_3D_INFO = {
     VK_EXT_IMAGE_2D_VIEW_OF_3D_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_IMAGE_2D_VIEW_OF_3D_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_EXT_IMAGE_2D_VIEW_OF_3D_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2503,7 +5691,7 @@ const ExtensionInfo VK_EXT_IMAGE_2D_VIEW_OF_3D_INFO = {
 const ExtensionInfo VK_EXT_IMAGE_COMPRESSION_CONTROL_INFO = {
     VK_EXT_IMAGE_COMPRESSION_CONTROL_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_IMAGE_COMPRESSION_CONTROL_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_IMAGE_COMPRESSION_CONTROL_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2512,7 +5700,7 @@ const ExtensionInfo VK_EXT_IMAGE_COMPRESSION_CONTROL_INFO = {
 const ExtensionInfo VK_EXT_IMAGE_COMPRESSION_CONTROL_SWAPCHAIN_INFO = {
     VK_EXT_IMAGE_COMPRESSION_CONTROL_SWAPCHAIN_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_IMAGE_COMPRESSION_CONTROL_SWAPCHAIN_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_IMAGE_COMPRESSION_CONTROL_SWAPCHAIN_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -2521,7 +5709,7 @@ const ExtensionInfo VK_EXT_IMAGE_COMPRESSION_CONTROL_SWAPCHAIN_INFO = {
 const ExtensionInfo VK_EXT_IMAGE_DRM_FORMAT_MODIFIER_INFO = {
     VK_EXT_IMAGE_DRM_FORMAT_MODIFIER_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_IMAGE_DRM_FORMAT_MODIFIER_INFO_DEPS, 4),
+    std::span<const ExtensionDependency>(VK_EXT_IMAGE_DRM_FORMAT_MODIFIER_INFO_DEPS, 3),
     (uint32_t)-1,
     {},
     {},
@@ -2530,7 +5718,7 @@ const ExtensionInfo VK_EXT_IMAGE_DRM_FORMAT_MODIFIER_INFO = {
 const ExtensionInfo VK_EXT_IMAGE_ROBUSTNESS_INFO = {
     VK_EXT_IMAGE_ROBUSTNESS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_IMAGE_ROBUSTNESS_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_IMAGE_ROBUSTNESS_INFO_DEPS, 2),
     VK_API_VERSION_1_3,
     {},
     {},
@@ -2539,7 +5727,7 @@ const ExtensionInfo VK_EXT_IMAGE_ROBUSTNESS_INFO = {
 const ExtensionInfo VK_EXT_IMAGE_SLICED_VIEW_OF_3D_INFO = {
     VK_EXT_IMAGE_SLICED_VIEW_OF_3D_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_IMAGE_SLICED_VIEW_OF_3D_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_EXT_IMAGE_SLICED_VIEW_OF_3D_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2548,7 +5736,7 @@ const ExtensionInfo VK_EXT_IMAGE_SLICED_VIEW_OF_3D_INFO = {
 const ExtensionInfo VK_EXT_IMAGE_VIEW_MIN_LOD_INFO = {
     VK_EXT_IMAGE_VIEW_MIN_LOD_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_IMAGE_VIEW_MIN_LOD_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_IMAGE_VIEW_MIN_LOD_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2557,7 +5745,7 @@ const ExtensionInfo VK_EXT_IMAGE_VIEW_MIN_LOD_INFO = {
 const ExtensionInfo VK_EXT_INDEX_TYPE_UINT8_INFO = {
     VK_EXT_INDEX_TYPE_UINT8_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_INDEX_TYPE_UINT8_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_INDEX_TYPE_UINT8_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2566,7 +5754,7 @@ const ExtensionInfo VK_EXT_INDEX_TYPE_UINT8_INFO = {
 const ExtensionInfo VK_EXT_INLINE_UNIFORM_BLOCK_INFO = {
     VK_EXT_INLINE_UNIFORM_BLOCK_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_INLINE_UNIFORM_BLOCK_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_EXT_INLINE_UNIFORM_BLOCK_INFO_DEPS, 2),
     VK_API_VERSION_1_3,
     {},
     {},
@@ -2584,7 +5772,7 @@ const ExtensionInfo VK_EXT_LAYER_SETTINGS_INFO = {
 const ExtensionInfo VK_EXT_LEGACY_DITHERING_INFO = {
     VK_EXT_LEGACY_DITHERING_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_LEGACY_DITHERING_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_LEGACY_DITHERING_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2593,7 +5781,7 @@ const ExtensionInfo VK_EXT_LEGACY_DITHERING_INFO = {
 const ExtensionInfo VK_EXT_LEGACY_VERTEX_ATTRIBUTES_INFO = {
     VK_EXT_LEGACY_VERTEX_ATTRIBUTES_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_LEGACY_VERTEX_ATTRIBUTES_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_LEGACY_VERTEX_ATTRIBUTES_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -2602,7 +5790,7 @@ const ExtensionInfo VK_EXT_LEGACY_VERTEX_ATTRIBUTES_INFO = {
 const ExtensionInfo VK_EXT_LINE_RASTERIZATION_INFO = {
     VK_EXT_LINE_RASTERIZATION_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_LINE_RASTERIZATION_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_LINE_RASTERIZATION_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2620,7 +5808,7 @@ const ExtensionInfo VK_EXT_LOAD_STORE_OP_NONE_INFO = {
 const ExtensionInfo VK_EXT_MAP_MEMORY_PLACED_INFO = {
     VK_EXT_MAP_MEMORY_PLACED_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_MAP_MEMORY_PLACED_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_MAP_MEMORY_PLACED_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2629,7 +5817,7 @@ const ExtensionInfo VK_EXT_MAP_MEMORY_PLACED_INFO = {
 const ExtensionInfo VK_EXT_MEMORY_BUDGET_INFO = {
     VK_EXT_MEMORY_BUDGET_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_MEMORY_BUDGET_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_MEMORY_BUDGET_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2638,7 +5826,7 @@ const ExtensionInfo VK_EXT_MEMORY_BUDGET_INFO = {
 const ExtensionInfo VK_EXT_MEMORY_DECOMPRESSION_INFO = {
     VK_EXT_MEMORY_DECOMPRESSION_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_MEMORY_DECOMPRESSION_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_EXT_MEMORY_DECOMPRESSION_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -2647,7 +5835,7 @@ const ExtensionInfo VK_EXT_MEMORY_DECOMPRESSION_INFO = {
 const ExtensionInfo VK_EXT_MEMORY_PRIORITY_INFO = {
     VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_MEMORY_PRIORITY_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_MEMORY_PRIORITY_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2656,7 +5844,7 @@ const ExtensionInfo VK_EXT_MEMORY_PRIORITY_INFO = {
 const ExtensionInfo VK_EXT_MESH_SHADER_INFO = {
     VK_EXT_MESH_SHADER_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_MESH_SHADER_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_MESH_SHADER_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2665,7 +5853,7 @@ const ExtensionInfo VK_EXT_MESH_SHADER_INFO = {
 const ExtensionInfo VK_EXT_MULTI_DRAW_INFO = {
     VK_EXT_MULTI_DRAW_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_MULTI_DRAW_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_MULTI_DRAW_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2674,7 +5862,7 @@ const ExtensionInfo VK_EXT_MULTI_DRAW_INFO = {
 const ExtensionInfo VK_EXT_MULTISAMPLED_RENDER_TO_SINGLE_SAMPLED_INFO = {
     VK_EXT_MULTISAMPLED_RENDER_TO_SINGLE_SAMPLED_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_MULTISAMPLED_RENDER_TO_SINGLE_SAMPLED_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_EXT_MULTISAMPLED_RENDER_TO_SINGLE_SAMPLED_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2683,7 +5871,7 @@ const ExtensionInfo VK_EXT_MULTISAMPLED_RENDER_TO_SINGLE_SAMPLED_INFO = {
 const ExtensionInfo VK_EXT_MUTABLE_DESCRIPTOR_TYPE_INFO = {
     VK_EXT_MUTABLE_DESCRIPTOR_TYPE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_MUTABLE_DESCRIPTOR_TYPE_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_MUTABLE_DESCRIPTOR_TYPE_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2692,7 +5880,7 @@ const ExtensionInfo VK_EXT_MUTABLE_DESCRIPTOR_TYPE_INFO = {
 const ExtensionInfo VK_EXT_NESTED_COMMAND_BUFFER_INFO = {
     VK_EXT_NESTED_COMMAND_BUFFER_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_NESTED_COMMAND_BUFFER_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_NESTED_COMMAND_BUFFER_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2701,7 +5889,7 @@ const ExtensionInfo VK_EXT_NESTED_COMMAND_BUFFER_INFO = {
 const ExtensionInfo VK_EXT_NON_SEAMLESS_CUBE_MAP_INFO = {
     VK_EXT_NON_SEAMLESS_CUBE_MAP_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_NON_SEAMLESS_CUBE_MAP_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_NON_SEAMLESS_CUBE_MAP_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2710,7 +5898,7 @@ const ExtensionInfo VK_EXT_NON_SEAMLESS_CUBE_MAP_INFO = {
 const ExtensionInfo VK_EXT_OPACITY_MICROMAP_INFO = {
     VK_EXT_OPACITY_MICROMAP_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_OPACITY_MICROMAP_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_EXT_OPACITY_MICROMAP_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2719,7 +5907,7 @@ const ExtensionInfo VK_EXT_OPACITY_MICROMAP_INFO = {
 const ExtensionInfo VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_INFO = {
     VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -2728,7 +5916,7 @@ const ExtensionInfo VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_INFO = {
 const ExtensionInfo VK_EXT_PCI_BUS_INFO_INFO = {
     VK_EXT_PCI_BUS_INFO_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_PCI_BUS_INFO_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_PCI_BUS_INFO_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     std::span<const vk::StructureType>(VK_EXT_PCI_BUS_INFO_INFO_PROPERTIES, 1),
@@ -2737,7 +5925,7 @@ const ExtensionInfo VK_EXT_PCI_BUS_INFO_INFO = {
 const ExtensionInfo VK_EXT_PHYSICAL_DEVICE_DRM_INFO = {
     VK_EXT_PHYSICAL_DEVICE_DRM_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_PHYSICAL_DEVICE_DRM_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_PHYSICAL_DEVICE_DRM_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     std::span<const vk::StructureType>(VK_EXT_PHYSICAL_DEVICE_DRM_INFO_PROPERTIES, 1),
@@ -2746,7 +5934,7 @@ const ExtensionInfo VK_EXT_PHYSICAL_DEVICE_DRM_INFO = {
 const ExtensionInfo VK_EXT_PIPELINE_CREATION_CACHE_CONTROL_INFO = {
     VK_EXT_PIPELINE_CREATION_CACHE_CONTROL_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_PIPELINE_CREATION_CACHE_CONTROL_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_PIPELINE_CREATION_CACHE_CONTROL_INFO_DEPS, 2),
     VK_API_VERSION_1_3,
     {},
     {},
@@ -2764,7 +5952,7 @@ const ExtensionInfo VK_EXT_PIPELINE_CREATION_FEEDBACK_INFO = {
 const ExtensionInfo VK_EXT_PIPELINE_LIBRARY_GROUP_HANDLES_INFO = {
     VK_EXT_PIPELINE_LIBRARY_GROUP_HANDLES_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_PIPELINE_LIBRARY_GROUP_HANDLES_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_EXT_PIPELINE_LIBRARY_GROUP_HANDLES_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -2773,7 +5961,7 @@ const ExtensionInfo VK_EXT_PIPELINE_LIBRARY_GROUP_HANDLES_INFO = {
 const ExtensionInfo VK_EXT_PIPELINE_PROPERTIES_INFO = {
     VK_EXT_PIPELINE_PROPERTIES_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_PIPELINE_PROPERTIES_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_PIPELINE_PROPERTIES_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2782,7 +5970,7 @@ const ExtensionInfo VK_EXT_PIPELINE_PROPERTIES_INFO = {
 const ExtensionInfo VK_EXT_PIPELINE_PROTECTED_ACCESS_INFO = {
     VK_EXT_PIPELINE_PROTECTED_ACCESS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_PIPELINE_PROTECTED_ACCESS_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_PIPELINE_PROTECTED_ACCESS_INFO_DEPS, 2),
     VK_API_VERSION_1_4,
     {},
     {},
@@ -2791,7 +5979,7 @@ const ExtensionInfo VK_EXT_PIPELINE_PROTECTED_ACCESS_INFO = {
 const ExtensionInfo VK_EXT_PIPELINE_ROBUSTNESS_INFO = {
     VK_EXT_PIPELINE_ROBUSTNESS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_PIPELINE_ROBUSTNESS_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_PIPELINE_ROBUSTNESS_INFO_DEPS, 2),
     VK_API_VERSION_1_4,
     {},
     {},
@@ -2809,7 +5997,7 @@ const ExtensionInfo VK_EXT_POST_DEPTH_COVERAGE_INFO = {
 const ExtensionInfo VK_EXT_PRESENT_MODE_FIFO_LATEST_READY_INFO = {
     VK_EXT_PRESENT_MODE_FIFO_LATEST_READY_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_PRESENT_MODE_FIFO_LATEST_READY_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_PRESENT_MODE_FIFO_LATEST_READY_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -2818,7 +6006,7 @@ const ExtensionInfo VK_EXT_PRESENT_MODE_FIFO_LATEST_READY_INFO = {
 const ExtensionInfo VK_EXT_PRESENT_TIMING_INFO = {
     VK_EXT_PRESENT_TIMING_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_PRESENT_TIMING_INFO_DEPS, 4),
+    std::span<const ExtensionDependency>(VK_EXT_PRESENT_TIMING_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -2827,7 +6015,7 @@ const ExtensionInfo VK_EXT_PRESENT_TIMING_INFO = {
 const ExtensionInfo VK_EXT_PRIMITIVE_TOPOLOGY_LIST_RESTART_INFO = {
     VK_EXT_PRIMITIVE_TOPOLOGY_LIST_RESTART_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_PRIMITIVE_TOPOLOGY_LIST_RESTART_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_PRIMITIVE_TOPOLOGY_LIST_RESTART_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2836,7 +6024,7 @@ const ExtensionInfo VK_EXT_PRIMITIVE_TOPOLOGY_LIST_RESTART_INFO = {
 const ExtensionInfo VK_EXT_PRIMITIVES_GENERATED_QUERY_INFO = {
     VK_EXT_PRIMITIVES_GENERATED_QUERY_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_PRIMITIVES_GENERATED_QUERY_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_PRIMITIVES_GENERATED_QUERY_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -2845,7 +6033,7 @@ const ExtensionInfo VK_EXT_PRIMITIVES_GENERATED_QUERY_INFO = {
 const ExtensionInfo VK_EXT_PRIVATE_DATA_INFO = {
     VK_EXT_PRIVATE_DATA_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_PRIVATE_DATA_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_PRIVATE_DATA_INFO_DEPS, 2),
     VK_API_VERSION_1_3,
     {},
     {},
@@ -2854,7 +6042,7 @@ const ExtensionInfo VK_EXT_PRIVATE_DATA_INFO = {
 const ExtensionInfo VK_EXT_PROVOKING_VERTEX_INFO = {
     VK_EXT_PROVOKING_VERTEX_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_PROVOKING_VERTEX_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_PROVOKING_VERTEX_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2863,7 +6051,7 @@ const ExtensionInfo VK_EXT_PROVOKING_VERTEX_INFO = {
 const ExtensionInfo VK_EXT_QUEUE_FAMILY_FOREIGN_INFO = {
     VK_EXT_QUEUE_FAMILY_FOREIGN_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_QUEUE_FAMILY_FOREIGN_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_QUEUE_FAMILY_FOREIGN_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2872,7 +6060,7 @@ const ExtensionInfo VK_EXT_QUEUE_FAMILY_FOREIGN_INFO = {
 const ExtensionInfo VK_EXT_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_INFO = {
     VK_EXT_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2881,7 +6069,7 @@ const ExtensionInfo VK_EXT_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_INFO = {
 const ExtensionInfo VK_EXT_RAY_TRACING_INVOCATION_REORDER_INFO = {
     VK_EXT_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_RAY_TRACING_INVOCATION_REORDER_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_RAY_TRACING_INVOCATION_REORDER_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     std::span<const vk::StructureType>(VK_EXT_RAY_TRACING_INVOCATION_REORDER_INFO_PROPERTIES, 1),
@@ -2890,7 +6078,7 @@ const ExtensionInfo VK_EXT_RAY_TRACING_INVOCATION_REORDER_INFO = {
 const ExtensionInfo VK_EXT_RGBA10X6_FORMATS_INFO = {
     VK_EXT_RGBA10X6_FORMATS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_RGBA10X6_FORMATS_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_RGBA10X6_FORMATS_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2899,7 +6087,7 @@ const ExtensionInfo VK_EXT_RGBA10X6_FORMATS_INFO = {
 const ExtensionInfo VK_EXT_ROBUSTNESS2_INFO = {
     VK_EXT_ROBUSTNESS_2_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_ROBUSTNESS2_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_ROBUSTNESS2_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2908,7 +6096,7 @@ const ExtensionInfo VK_EXT_ROBUSTNESS2_INFO = {
 const ExtensionInfo VK_EXT_SAMPLE_LOCATIONS_INFO = {
     VK_EXT_SAMPLE_LOCATIONS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_SAMPLE_LOCATIONS_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_SAMPLE_LOCATIONS_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2917,7 +6105,7 @@ const ExtensionInfo VK_EXT_SAMPLE_LOCATIONS_INFO = {
 const ExtensionInfo VK_EXT_SAMPLER_FILTER_MINMAX_INFO = {
     VK_EXT_SAMPLER_FILTER_MINMAX_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_SAMPLER_FILTER_MINMAX_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_SAMPLER_FILTER_MINMAX_INFO_DEPS, 2),
     VK_API_VERSION_1_2,
     {},
     {},
@@ -2926,7 +6114,7 @@ const ExtensionInfo VK_EXT_SAMPLER_FILTER_MINMAX_INFO = {
 const ExtensionInfo VK_EXT_SCALAR_BLOCK_LAYOUT_INFO = {
     VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_SCALAR_BLOCK_LAYOUT_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_SCALAR_BLOCK_LAYOUT_INFO_DEPS, 2),
     VK_API_VERSION_1_2,
     {},
     {},
@@ -2944,7 +6132,7 @@ const ExtensionInfo VK_EXT_SEPARATE_STENCIL_USAGE_INFO = {
 const ExtensionInfo VK_EXT_SHADER_64BIT_INDEXING_INFO = {
     VK_EXT_SHADER_64BIT_INDEXING_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_SHADER_64BIT_INDEXING_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_SHADER_64BIT_INDEXING_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2953,7 +6141,7 @@ const ExtensionInfo VK_EXT_SHADER_64BIT_INDEXING_INFO = {
 const ExtensionInfo VK_EXT_SHADER_ATOMIC_FLOAT_INFO = {
     VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_SHADER_ATOMIC_FLOAT_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_SHADER_ATOMIC_FLOAT_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2962,7 +6150,7 @@ const ExtensionInfo VK_EXT_SHADER_ATOMIC_FLOAT_INFO = {
 const ExtensionInfo VK_EXT_SHADER_ATOMIC_FLOAT2_INFO = {
     VK_EXT_SHADER_ATOMIC_FLOAT_2_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_SHADER_ATOMIC_FLOAT2_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_SHADER_ATOMIC_FLOAT2_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -2971,7 +6159,7 @@ const ExtensionInfo VK_EXT_SHADER_ATOMIC_FLOAT2_INFO = {
 const ExtensionInfo VK_EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION_INFO = {
     VK_EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION_INFO_DEPS, 2),
     VK_API_VERSION_1_3,
     {},
     {},
@@ -2980,7 +6168,7 @@ const ExtensionInfo VK_EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION_INFO = {
 const ExtensionInfo VK_EXT_SHADER_FLOAT8_INFO = {
     VK_EXT_SHADER_FLOAT8_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_SHADER_FLOAT8_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_SHADER_FLOAT8_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2989,7 +6177,7 @@ const ExtensionInfo VK_EXT_SHADER_FLOAT8_INFO = {
 const ExtensionInfo VK_EXT_SHADER_IMAGE_ATOMIC_INT64_INFO = {
     VK_EXT_SHADER_IMAGE_ATOMIC_INT64_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_SHADER_IMAGE_ATOMIC_INT64_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_SHADER_IMAGE_ATOMIC_INT64_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -2998,7 +6186,7 @@ const ExtensionInfo VK_EXT_SHADER_IMAGE_ATOMIC_INT64_INFO = {
 const ExtensionInfo VK_EXT_SHADER_LONG_VECTOR_INFO = {
     VK_EXT_SHADER_LONG_VECTOR_EXTENSION_NAME,
     ExtensionType::Device,
-    {},
+    std::span<const ExtensionDependency>(VK_EXT_SHADER_LONG_VECTOR_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -3007,7 +6195,7 @@ const ExtensionInfo VK_EXT_SHADER_LONG_VECTOR_INFO = {
 const ExtensionInfo VK_EXT_SHADER_MODULE_IDENTIFIER_INFO = {
     VK_EXT_SHADER_MODULE_IDENTIFIER_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_SHADER_MODULE_IDENTIFIER_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_EXT_SHADER_MODULE_IDENTIFIER_INFO_DEPS, 3),
     (uint32_t)-1,
     {},
     {},
@@ -3016,7 +6204,7 @@ const ExtensionInfo VK_EXT_SHADER_MODULE_IDENTIFIER_INFO = {
 const ExtensionInfo VK_EXT_SHADER_OBJECT_INFO = {
     VK_EXT_SHADER_OBJECT_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_SHADER_OBJECT_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_EXT_SHADER_OBJECT_INFO_DEPS, 3),
     (uint32_t)-1,
     {},
     {},
@@ -3025,7 +6213,7 @@ const ExtensionInfo VK_EXT_SHADER_OBJECT_INFO = {
 const ExtensionInfo VK_EXT_SHADER_REPLICATED_COMPOSITES_INFO = {
     VK_EXT_SHADER_REPLICATED_COMPOSITES_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_SHADER_REPLICATED_COMPOSITES_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_SHADER_REPLICATED_COMPOSITES_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -3052,7 +6240,7 @@ const ExtensionInfo VK_EXT_SHADER_SUBGROUP_BALLOT_INFO = {
 const ExtensionInfo VK_EXT_SHADER_SUBGROUP_PARTITIONED_INFO = {
     VK_EXT_SHADER_SUBGROUP_PARTITIONED_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_SHADER_SUBGROUP_PARTITIONED_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_SHADER_SUBGROUP_PARTITIONED_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -3070,7 +6258,7 @@ const ExtensionInfo VK_EXT_SHADER_SUBGROUP_VOTE_INFO = {
 const ExtensionInfo VK_EXT_SHADER_TILE_IMAGE_INFO = {
     VK_EXT_SHADER_TILE_IMAGE_EXTENSION_NAME,
     ExtensionType::Device,
-    {},
+    std::span<const ExtensionDependency>(VK_EXT_SHADER_TILE_IMAGE_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -3079,7 +6267,7 @@ const ExtensionInfo VK_EXT_SHADER_TILE_IMAGE_INFO = {
 const ExtensionInfo VK_EXT_SHADER_UNIFORM_BUFFER_UNSIZED_ARRAY_INFO = {
     VK_EXT_SHADER_UNIFORM_BUFFER_UNSIZED_ARRAY_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_SHADER_UNIFORM_BUFFER_UNSIZED_ARRAY_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_SHADER_UNIFORM_BUFFER_UNSIZED_ARRAY_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -3097,7 +6285,7 @@ const ExtensionInfo VK_EXT_SHADER_VIEWPORT_INDEX_LAYER_INFO = {
 const ExtensionInfo VK_EXT_SUBGROUP_SIZE_CONTROL_INFO = {
     VK_EXT_SUBGROUP_SIZE_CONTROL_EXTENSION_NAME,
     ExtensionType::Device,
-    {},
+    std::span<const ExtensionDependency>(VK_EXT_SUBGROUP_SIZE_CONTROL_INFO_DEPS, 1),
     VK_API_VERSION_1_3,
     {},
     {},
@@ -3106,7 +6294,7 @@ const ExtensionInfo VK_EXT_SUBGROUP_SIZE_CONTROL_INFO = {
 const ExtensionInfo VK_EXT_SUBPASS_MERGE_FEEDBACK_INFO = {
     VK_EXT_SUBPASS_MERGE_FEEDBACK_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_SUBPASS_MERGE_FEEDBACK_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_SUBPASS_MERGE_FEEDBACK_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -3115,7 +6303,7 @@ const ExtensionInfo VK_EXT_SUBPASS_MERGE_FEEDBACK_INFO = {
 const ExtensionInfo VK_EXT_SURFACE_MAINTENANCE1_INFO = {
     VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME,
     ExtensionType::Instance,
-    std::span<const ExtensionInfo* const>(VK_EXT_SURFACE_MAINTENANCE1_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_EXT_SURFACE_MAINTENANCE1_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -3124,7 +6312,7 @@ const ExtensionInfo VK_EXT_SURFACE_MAINTENANCE1_INFO = {
 const ExtensionInfo VK_EXT_SWAPCHAIN_COLORSPACE_INFO = {
     VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME,
     ExtensionType::Instance,
-    std::span<const ExtensionInfo* const>(VK_EXT_SWAPCHAIN_COLORSPACE_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_SWAPCHAIN_COLORSPACE_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -3133,7 +6321,7 @@ const ExtensionInfo VK_EXT_SWAPCHAIN_COLORSPACE_INFO = {
 const ExtensionInfo VK_EXT_SWAPCHAIN_MAINTENANCE1_INFO = {
     VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_SWAPCHAIN_MAINTENANCE1_INFO_DEPS, 3),
+    std::span<const ExtensionDependency>(VK_EXT_SWAPCHAIN_MAINTENANCE1_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -3142,7 +6330,7 @@ const ExtensionInfo VK_EXT_SWAPCHAIN_MAINTENANCE1_INFO = {
 const ExtensionInfo VK_EXT_TEXEL_BUFFER_ALIGNMENT_INFO = {
     VK_EXT_TEXEL_BUFFER_ALIGNMENT_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_TEXEL_BUFFER_ALIGNMENT_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_TEXEL_BUFFER_ALIGNMENT_INFO_DEPS, 2),
     VK_API_VERSION_1_3,
     {},
     {},
@@ -3151,7 +6339,7 @@ const ExtensionInfo VK_EXT_TEXEL_BUFFER_ALIGNMENT_INFO = {
 const ExtensionInfo VK_EXT_TEXTURE_COMPRESSION_ASTC_3D_INFO = {
     VK_EXT_TEXTURE_COMPRESSION_ASTC_3D_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_TEXTURE_COMPRESSION_ASTC_3D_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_TEXTURE_COMPRESSION_ASTC_3D_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -3160,7 +6348,7 @@ const ExtensionInfo VK_EXT_TEXTURE_COMPRESSION_ASTC_3D_INFO = {
 const ExtensionInfo VK_EXT_TEXTURE_COMPRESSION_ASTC_HDR_INFO = {
     VK_EXT_TEXTURE_COMPRESSION_ASTC_HDR_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_TEXTURE_COMPRESSION_ASTC_HDR_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_TEXTURE_COMPRESSION_ASTC_HDR_INFO_DEPS, 2),
     VK_API_VERSION_1_3,
     {},
     {},
@@ -3178,7 +6366,7 @@ const ExtensionInfo VK_EXT_TOOLING_INFO_INFO = {
 const ExtensionInfo VK_EXT_TRANSFORM_FEEDBACK_INFO = {
     VK_EXT_TRANSFORM_FEEDBACK_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_TRANSFORM_FEEDBACK_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_TRANSFORM_FEEDBACK_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -3197,7 +6385,7 @@ const ExtensionInfo VK_EXT_VALIDATION_FEATURES_INFO = {
     VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME,
     ExtensionType::Instance,
     {},
-    VK_EXT_layer_settings,
+    (uint32_t)-1,
     &VK_EXT_LAYER_SETTINGS_INFO,
     {},
     {},
@@ -3206,7 +6394,7 @@ const ExtensionInfo VK_EXT_VALIDATION_FLAGS_INFO = {
     VK_EXT_VALIDATION_FLAGS_EXTENSION_NAME,
     ExtensionType::Instance,
     {},
-    VK_EXT_layer_settings,
+    (uint32_t)-1,
     &VK_EXT_LAYER_SETTINGS_INFO,
     {},
     {},
@@ -3214,7 +6402,7 @@ const ExtensionInfo VK_EXT_VALIDATION_FLAGS_INFO = {
 const ExtensionInfo VK_EXT_VERTEX_ATTRIBUTE_DIVISOR_INFO = {
     VK_EXT_VERTEX_ATTRIBUTE_DIVISOR_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_VERTEX_ATTRIBUTE_DIVISOR_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_VERTEX_ATTRIBUTE_DIVISOR_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     std::span<const vk::StructureType>(VK_EXT_VERTEX_ATTRIBUTE_DIVISOR_INFO_PROPERTIES, 1),
@@ -3223,7 +6411,7 @@ const ExtensionInfo VK_EXT_VERTEX_ATTRIBUTE_DIVISOR_INFO = {
 const ExtensionInfo VK_EXT_VERTEX_ATTRIBUTE_ROBUSTNESS_INFO = {
     VK_EXT_VERTEX_ATTRIBUTE_ROBUSTNESS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_VERTEX_ATTRIBUTE_ROBUSTNESS_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_VERTEX_ATTRIBUTE_ROBUSTNESS_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -3232,7 +6420,7 @@ const ExtensionInfo VK_EXT_VERTEX_ATTRIBUTE_ROBUSTNESS_INFO = {
 const ExtensionInfo VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_INFO = {
     VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -3241,7 +6429,7 @@ const ExtensionInfo VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_INFO = {
 const ExtensionInfo VK_EXT_YCBCR_2PLANE_444_FORMATS_INFO = {
     VK_EXT_YCBCR_2PLANE_444_FORMATS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_YCBCR_2PLANE_444_FORMATS_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_YCBCR_2PLANE_444_FORMATS_INFO_DEPS, 2),
     VK_API_VERSION_1_3,
     {},
     {},
@@ -3250,7 +6438,7 @@ const ExtensionInfo VK_EXT_YCBCR_2PLANE_444_FORMATS_INFO = {
 const ExtensionInfo VK_EXT_YCBCR_IMAGE_ARRAYS_INFO = {
     VK_EXT_YCBCR_IMAGE_ARRAYS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_YCBCR_IMAGE_ARRAYS_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_YCBCR_IMAGE_ARRAYS_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -3259,7 +6447,7 @@ const ExtensionInfo VK_EXT_YCBCR_IMAGE_ARRAYS_INFO = {
 const ExtensionInfo VK_EXT_ZERO_INITIALIZE_DEVICE_MEMORY_INFO = {
     VK_EXT_ZERO_INITIALIZE_DEVICE_MEMORY_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_EXT_ZERO_INITIALIZE_DEVICE_MEMORY_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_EXT_ZERO_INITIALIZE_DEVICE_MEMORY_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -3277,7 +6465,7 @@ const ExtensionInfo VK_GOOGLE_DECORATE_STRING_INFO = {
 const ExtensionInfo VK_GOOGLE_DISPLAY_TIMING_INFO = {
     VK_GOOGLE_DISPLAY_TIMING_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_GOOGLE_DISPLAY_TIMING_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_GOOGLE_DISPLAY_TIMING_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -3295,7 +6483,7 @@ const ExtensionInfo VK_GOOGLE_HLSL_FUNCTIONALITY1_INFO = {
 const ExtensionInfo VK_GOOGLE_SURFACELESS_QUERY_INFO = {
     VK_GOOGLE_SURFACELESS_QUERY_EXTENSION_NAME,
     ExtensionType::Instance,
-    std::span<const ExtensionInfo* const>(VK_GOOGLE_SURFACELESS_QUERY_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_GOOGLE_SURFACELESS_QUERY_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -3313,7 +6501,7 @@ const ExtensionInfo VK_GOOGLE_USER_TYPE_INFO = {
 const ExtensionInfo VK_HUAWEI_CLUSTER_CULLING_SHADER_INFO = {
     VK_HUAWEI_CLUSTER_CULLING_SHADER_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_HUAWEI_CLUSTER_CULLING_SHADER_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_HUAWEI_CLUSTER_CULLING_SHADER_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -3322,7 +6510,7 @@ const ExtensionInfo VK_HUAWEI_CLUSTER_CULLING_SHADER_INFO = {
 const ExtensionInfo VK_HUAWEI_HDR_VIVID_INFO = {
     VK_HUAWEI_HDR_VIVID_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_HUAWEI_HDR_VIVID_INFO_DEPS, 3),
+    std::span<const ExtensionDependency>(VK_HUAWEI_HDR_VIVID_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -3331,7 +6519,7 @@ const ExtensionInfo VK_HUAWEI_HDR_VIVID_INFO = {
 const ExtensionInfo VK_HUAWEI_INVOCATION_MASK_INFO = {
     VK_HUAWEI_INVOCATION_MASK_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_HUAWEI_INVOCATION_MASK_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_HUAWEI_INVOCATION_MASK_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -3340,7 +6528,7 @@ const ExtensionInfo VK_HUAWEI_INVOCATION_MASK_INFO = {
 const ExtensionInfo VK_HUAWEI_SUBPASS_SHADING_INFO = {
     VK_HUAWEI_SUBPASS_SHADING_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_HUAWEI_SUBPASS_SHADING_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_HUAWEI_SUBPASS_SHADING_INFO_DEPS, 3),
     (uint32_t)-1,
     {},
     {},
@@ -3367,7 +6555,7 @@ const ExtensionInfo VK_IMG_FORMAT_PVRTC_INFO = {
 const ExtensionInfo VK_IMG_RELAXED_LINE_RASTERIZATION_INFO = {
     VK_IMG_RELAXED_LINE_RASTERIZATION_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_IMG_RELAXED_LINE_RASTERIZATION_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_IMG_RELAXED_LINE_RASTERIZATION_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -3385,7 +6573,7 @@ const ExtensionInfo VK_INTEL_PERFORMANCE_QUERY_INFO = {
 const ExtensionInfo VK_INTEL_SHADER_INTEGER_FUNCTIONS2_INFO = {
     VK_INTEL_SHADER_INTEGER_FUNCTIONS_2_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_INTEL_SHADER_INTEGER_FUNCTIONS2_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_INTEL_SHADER_INTEGER_FUNCTIONS2_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -3394,7 +6582,7 @@ const ExtensionInfo VK_INTEL_SHADER_INTEGER_FUNCTIONS2_INFO = {
 const ExtensionInfo VK_KHR_16BIT_STORAGE_INFO = {
     VK_KHR_16BIT_STORAGE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_16BIT_STORAGE_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_KHR_16BIT_STORAGE_INFO_DEPS, 2),
     VK_API_VERSION_1_1,
     {},
     {},
@@ -3403,7 +6591,7 @@ const ExtensionInfo VK_KHR_16BIT_STORAGE_INFO = {
 const ExtensionInfo VK_KHR_8BIT_STORAGE_INFO = {
     VK_KHR_8BIT_STORAGE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_8BIT_STORAGE_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_KHR_8BIT_STORAGE_INFO_DEPS, 2),
     VK_API_VERSION_1_2,
     {},
     {},
@@ -3412,7 +6600,7 @@ const ExtensionInfo VK_KHR_8BIT_STORAGE_INFO = {
 const ExtensionInfo VK_KHR_ACCELERATION_STRUCTURE_INFO = {
     VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_ACCELERATION_STRUCTURE_INFO_DEPS, 3),
+    std::span<const ExtensionDependency>(VK_KHR_ACCELERATION_STRUCTURE_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -3430,7 +6618,7 @@ const ExtensionInfo VK_KHR_BIND_MEMORY2_INFO = {
 const ExtensionInfo VK_KHR_BUFFER_DEVICE_ADDRESS_INFO = {
     VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_BUFFER_DEVICE_ADDRESS_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_KHR_BUFFER_DEVICE_ADDRESS_INFO_DEPS, 2),
     VK_API_VERSION_1_2,
     {},
     {},
@@ -3439,7 +6627,7 @@ const ExtensionInfo VK_KHR_BUFFER_DEVICE_ADDRESS_INFO = {
 const ExtensionInfo VK_KHR_CALIBRATED_TIMESTAMPS_INFO = {
     VK_KHR_CALIBRATED_TIMESTAMPS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_CALIBRATED_TIMESTAMPS_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_CALIBRATED_TIMESTAMPS_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -3448,7 +6636,7 @@ const ExtensionInfo VK_KHR_CALIBRATED_TIMESTAMPS_INFO = {
 const ExtensionInfo VK_KHR_COMPUTE_SHADER_DERIVATIVES_INFO = {
     VK_KHR_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_COMPUTE_SHADER_DERIVATIVES_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_COMPUTE_SHADER_DERIVATIVES_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -3457,7 +6645,7 @@ const ExtensionInfo VK_KHR_COMPUTE_SHADER_DERIVATIVES_INFO = {
 const ExtensionInfo VK_KHR_COOPERATIVE_MATRIX_INFO = {
     VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_COOPERATIVE_MATRIX_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_COOPERATIVE_MATRIX_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -3466,7 +6654,7 @@ const ExtensionInfo VK_KHR_COOPERATIVE_MATRIX_INFO = {
 const ExtensionInfo VK_KHR_COPY_COMMANDS2_INFO = {
     VK_KHR_COPY_COMMANDS_2_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_COPY_COMMANDS2_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_COPY_COMMANDS2_INFO_DEPS, 2),
     VK_API_VERSION_1_3,
     {},
     {},
@@ -3475,7 +6663,7 @@ const ExtensionInfo VK_KHR_COPY_COMMANDS2_INFO = {
 const ExtensionInfo VK_KHR_COPY_MEMORY_INDIRECT_INFO = {
     VK_KHR_COPY_MEMORY_INDIRECT_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_COPY_MEMORY_INDIRECT_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_KHR_COPY_MEMORY_INDIRECT_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -3484,7 +6672,7 @@ const ExtensionInfo VK_KHR_COPY_MEMORY_INDIRECT_INFO = {
 const ExtensionInfo VK_KHR_CREATE_RENDERPASS2_INFO = {
     VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_CREATE_RENDERPASS2_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_KHR_CREATE_RENDERPASS2_INFO_DEPS, 2),
     VK_API_VERSION_1_2,
     {},
     {},
@@ -3493,7 +6681,7 @@ const ExtensionInfo VK_KHR_CREATE_RENDERPASS2_INFO = {
 const ExtensionInfo VK_KHR_DEDICATED_ALLOCATION_INFO = {
     VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_DEDICATED_ALLOCATION_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_DEDICATED_ALLOCATION_INFO_DEPS, 2),
     VK_API_VERSION_1_1,
     {},
     {},
@@ -3511,7 +6699,7 @@ const ExtensionInfo VK_KHR_DEFERRED_HOST_OPERATIONS_INFO = {
 const ExtensionInfo VK_KHR_DEPTH_CLAMP_ZERO_ONE_INFO = {
     VK_KHR_DEPTH_CLAMP_ZERO_ONE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_DEPTH_CLAMP_ZERO_ONE_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_DEPTH_CLAMP_ZERO_ONE_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -3520,7 +6708,7 @@ const ExtensionInfo VK_KHR_DEPTH_CLAMP_ZERO_ONE_INFO = {
 const ExtensionInfo VK_KHR_DEPTH_STENCIL_RESOLVE_INFO = {
     VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_DEPTH_STENCIL_RESOLVE_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_DEPTH_STENCIL_RESOLVE_INFO_DEPS, 2),
     VK_API_VERSION_1_2,
     {},
     {},
@@ -3538,7 +6726,7 @@ const ExtensionInfo VK_KHR_DESCRIPTOR_UPDATE_TEMPLATE_INFO = {
 const ExtensionInfo VK_KHR_DEVICE_GROUP_INFO = {
     VK_KHR_DEVICE_GROUP_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_DEVICE_GROUP_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_DEVICE_GROUP_INFO_DEPS, 1),
     VK_API_VERSION_1_1,
     {},
     {},
@@ -3556,7 +6744,7 @@ const ExtensionInfo VK_KHR_DEVICE_GROUP_CREATION_INFO = {
 const ExtensionInfo VK_KHR_DISPLAY_INFO = {
     VK_KHR_DISPLAY_EXTENSION_NAME,
     ExtensionType::Instance,
-    std::span<const ExtensionInfo* const>(VK_KHR_DISPLAY_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_DISPLAY_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -3565,7 +6753,7 @@ const ExtensionInfo VK_KHR_DISPLAY_INFO = {
 const ExtensionInfo VK_KHR_DISPLAY_SWAPCHAIN_INFO = {
     VK_KHR_DISPLAY_SWAPCHAIN_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_DISPLAY_SWAPCHAIN_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_KHR_DISPLAY_SWAPCHAIN_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -3583,7 +6771,7 @@ const ExtensionInfo VK_KHR_DRAW_INDIRECT_COUNT_INFO = {
 const ExtensionInfo VK_KHR_DRIVER_PROPERTIES_INFO = {
     VK_KHR_DRIVER_PROPERTIES_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_DRIVER_PROPERTIES_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_DRIVER_PROPERTIES_INFO_DEPS, 2),
     VK_API_VERSION_1_2,
     {},
     {},
@@ -3592,7 +6780,7 @@ const ExtensionInfo VK_KHR_DRIVER_PROPERTIES_INFO = {
 const ExtensionInfo VK_KHR_DYNAMIC_RENDERING_INFO = {
     VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_DYNAMIC_RENDERING_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_KHR_DYNAMIC_RENDERING_INFO_DEPS, 3),
     VK_API_VERSION_1_3,
     {},
     {},
@@ -3601,7 +6789,7 @@ const ExtensionInfo VK_KHR_DYNAMIC_RENDERING_INFO = {
 const ExtensionInfo VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_INFO = {
     VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_INFO_DEPS, 2),
     VK_API_VERSION_1_4,
     {},
     {},
@@ -3610,7 +6798,7 @@ const ExtensionInfo VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_INFO = {
 const ExtensionInfo VK_KHR_EXTERNAL_FENCE_INFO = {
     VK_KHR_EXTERNAL_FENCE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_EXTERNAL_FENCE_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_EXTERNAL_FENCE_INFO_DEPS, 1),
     VK_API_VERSION_1_1,
     {},
     {},
@@ -3619,7 +6807,7 @@ const ExtensionInfo VK_KHR_EXTERNAL_FENCE_INFO = {
 const ExtensionInfo VK_KHR_EXTERNAL_FENCE_CAPABILITIES_INFO = {
     VK_KHR_EXTERNAL_FENCE_CAPABILITIES_EXTENSION_NAME,
     ExtensionType::Instance,
-    std::span<const ExtensionInfo* const>(VK_KHR_EXTERNAL_FENCE_CAPABILITIES_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_EXTERNAL_FENCE_CAPABILITIES_INFO_DEPS, 2),
     VK_API_VERSION_1_1,
     {},
     {},
@@ -3628,7 +6816,7 @@ const ExtensionInfo VK_KHR_EXTERNAL_FENCE_CAPABILITIES_INFO = {
 const ExtensionInfo VK_KHR_EXTERNAL_FENCE_FD_INFO = {
     VK_KHR_EXTERNAL_FENCE_FD_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_EXTERNAL_FENCE_FD_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_EXTERNAL_FENCE_FD_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -3637,7 +6825,7 @@ const ExtensionInfo VK_KHR_EXTERNAL_FENCE_FD_INFO = {
 const ExtensionInfo VK_KHR_EXTERNAL_MEMORY_INFO = {
     VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_EXTERNAL_MEMORY_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_EXTERNAL_MEMORY_INFO_DEPS, 2),
     VK_API_VERSION_1_1,
     {},
     {},
@@ -3646,7 +6834,7 @@ const ExtensionInfo VK_KHR_EXTERNAL_MEMORY_INFO = {
 const ExtensionInfo VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_INFO = {
     VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME,
     ExtensionType::Instance,
-    std::span<const ExtensionInfo* const>(VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_INFO_DEPS, 2),
     VK_API_VERSION_1_1,
     {},
     {},
@@ -3655,7 +6843,7 @@ const ExtensionInfo VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_INFO = {
 const ExtensionInfo VK_KHR_EXTERNAL_MEMORY_FD_INFO = {
     VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_EXTERNAL_MEMORY_FD_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_EXTERNAL_MEMORY_FD_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -3664,7 +6852,7 @@ const ExtensionInfo VK_KHR_EXTERNAL_MEMORY_FD_INFO = {
 const ExtensionInfo VK_KHR_EXTERNAL_SEMAPHORE_INFO = {
     VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_EXTERNAL_SEMAPHORE_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_EXTERNAL_SEMAPHORE_INFO_DEPS, 1),
     VK_API_VERSION_1_1,
     {},
     {},
@@ -3673,7 +6861,7 @@ const ExtensionInfo VK_KHR_EXTERNAL_SEMAPHORE_INFO = {
 const ExtensionInfo VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_INFO = {
     VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME,
     ExtensionType::Instance,
-    std::span<const ExtensionInfo* const>(VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_INFO_DEPS, 2),
     VK_API_VERSION_1_1,
     {},
     {},
@@ -3682,7 +6870,7 @@ const ExtensionInfo VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_INFO = {
 const ExtensionInfo VK_KHR_EXTERNAL_SEMAPHORE_FD_INFO = {
     VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_EXTERNAL_SEMAPHORE_FD_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_EXTERNAL_SEMAPHORE_FD_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -3691,7 +6879,7 @@ const ExtensionInfo VK_KHR_EXTERNAL_SEMAPHORE_FD_INFO = {
 const ExtensionInfo VK_KHR_FORMAT_FEATURE_FLAGS2_INFO = {
     VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_FORMAT_FEATURE_FLAGS2_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_FORMAT_FEATURE_FLAGS2_INFO_DEPS, 2),
     VK_API_VERSION_1_3,
     {},
     {},
@@ -3700,7 +6888,7 @@ const ExtensionInfo VK_KHR_FORMAT_FEATURE_FLAGS2_INFO = {
 const ExtensionInfo VK_KHR_FRAGMENT_SHADER_BARYCENTRIC_INFO = {
     VK_KHR_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_FRAGMENT_SHADER_BARYCENTRIC_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_FRAGMENT_SHADER_BARYCENTRIC_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -3709,7 +6897,7 @@ const ExtensionInfo VK_KHR_FRAGMENT_SHADER_BARYCENTRIC_INFO = {
 const ExtensionInfo VK_KHR_FRAGMENT_SHADING_RATE_INFO = {
     VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_FRAGMENT_SHADING_RATE_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_KHR_FRAGMENT_SHADING_RATE_INFO_DEPS, 3),
     (uint32_t)-1,
     {},
     {},
@@ -3718,7 +6906,7 @@ const ExtensionInfo VK_KHR_FRAGMENT_SHADING_RATE_INFO = {
 const ExtensionInfo VK_KHR_GET_DISPLAY_PROPERTIES2_INFO = {
     VK_KHR_GET_DISPLAY_PROPERTIES_2_EXTENSION_NAME,
     ExtensionType::Instance,
-    std::span<const ExtensionInfo* const>(VK_KHR_GET_DISPLAY_PROPERTIES2_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_GET_DISPLAY_PROPERTIES2_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -3745,7 +6933,7 @@ const ExtensionInfo VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES2_INFO = {
 const ExtensionInfo VK_KHR_GET_SURFACE_CAPABILITIES2_INFO = {
     VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME,
     ExtensionType::Instance,
-    std::span<const ExtensionInfo* const>(VK_KHR_GET_SURFACE_CAPABILITIES2_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_GET_SURFACE_CAPABILITIES2_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -3754,7 +6942,7 @@ const ExtensionInfo VK_KHR_GET_SURFACE_CAPABILITIES2_INFO = {
 const ExtensionInfo VK_KHR_GLOBAL_PRIORITY_INFO = {
     VK_KHR_GLOBAL_PRIORITY_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_GLOBAL_PRIORITY_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_GLOBAL_PRIORITY_INFO_DEPS, 2),
     VK_API_VERSION_1_4,
     {},
     {},
@@ -3772,7 +6960,7 @@ const ExtensionInfo VK_KHR_IMAGE_FORMAT_LIST_INFO = {
 const ExtensionInfo VK_KHR_IMAGELESS_FRAMEBUFFER_INFO = {
     VK_KHR_IMAGELESS_FRAMEBUFFER_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_IMAGELESS_FRAMEBUFFER_INFO_DEPS, 3),
+    std::span<const ExtensionDependency>(VK_KHR_IMAGELESS_FRAMEBUFFER_INFO_DEPS, 3),
     VK_API_VERSION_1_2,
     {},
     {},
@@ -3781,7 +6969,7 @@ const ExtensionInfo VK_KHR_IMAGELESS_FRAMEBUFFER_INFO = {
 const ExtensionInfo VK_KHR_INCREMENTAL_PRESENT_INFO = {
     VK_KHR_INCREMENTAL_PRESENT_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_INCREMENTAL_PRESENT_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_INCREMENTAL_PRESENT_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -3790,7 +6978,7 @@ const ExtensionInfo VK_KHR_INCREMENTAL_PRESENT_INFO = {
 const ExtensionInfo VK_KHR_INDEX_TYPE_UINT8_INFO = {
     VK_KHR_INDEX_TYPE_UINT8_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_INDEX_TYPE_UINT8_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_INDEX_TYPE_UINT8_INFO_DEPS, 2),
     VK_API_VERSION_1_4,
     {},
     {},
@@ -3799,7 +6987,7 @@ const ExtensionInfo VK_KHR_INDEX_TYPE_UINT8_INFO = {
 const ExtensionInfo VK_KHR_INTERNALLY_SYNCHRONIZED_QUEUES_INFO = {
     VK_KHR_INTERNALLY_SYNCHRONIZED_QUEUES_EXTENSION_NAME,
     ExtensionType::Device,
-    {},
+    std::span<const ExtensionDependency>(VK_KHR_INTERNALLY_SYNCHRONIZED_QUEUES_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -3808,7 +6996,7 @@ const ExtensionInfo VK_KHR_INTERNALLY_SYNCHRONIZED_QUEUES_INFO = {
 const ExtensionInfo VK_KHR_LINE_RASTERIZATION_INFO = {
     VK_KHR_LINE_RASTERIZATION_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_LINE_RASTERIZATION_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_LINE_RASTERIZATION_INFO_DEPS, 2),
     VK_API_VERSION_1_4,
     {},
     {},
@@ -3835,7 +7023,7 @@ const ExtensionInfo VK_KHR_MAINTENANCE1_INFO = {
 const ExtensionInfo VK_KHR_MAINTENANCE10_INFO = {
     VK_KHR_MAINTENANCE_10_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_MAINTENANCE10_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_MAINTENANCE10_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -3853,7 +7041,7 @@ const ExtensionInfo VK_KHR_MAINTENANCE2_INFO = {
 const ExtensionInfo VK_KHR_MAINTENANCE3_INFO = {
     VK_KHR_MAINTENANCE_3_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_MAINTENANCE3_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_MAINTENANCE3_INFO_DEPS, 2),
     VK_API_VERSION_1_1,
     {},
     std::span<const vk::StructureType>(VK_KHR_MAINTENANCE3_INFO_PROPERTIES, 1),
@@ -3862,7 +7050,7 @@ const ExtensionInfo VK_KHR_MAINTENANCE3_INFO = {
 const ExtensionInfo VK_KHR_MAINTENANCE4_INFO = {
     VK_KHR_MAINTENANCE_4_EXTENSION_NAME,
     ExtensionType::Device,
-    {},
+    std::span<const ExtensionDependency>(VK_KHR_MAINTENANCE4_INFO_DEPS, 1),
     VK_API_VERSION_1_3,
     {},
     {},
@@ -3871,7 +7059,7 @@ const ExtensionInfo VK_KHR_MAINTENANCE4_INFO = {
 const ExtensionInfo VK_KHR_MAINTENANCE5_INFO = {
     VK_KHR_MAINTENANCE_5_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_MAINTENANCE5_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_MAINTENANCE5_INFO_DEPS, 2),
     VK_API_VERSION_1_4,
     {},
     {},
@@ -3880,7 +7068,7 @@ const ExtensionInfo VK_KHR_MAINTENANCE5_INFO = {
 const ExtensionInfo VK_KHR_MAINTENANCE6_INFO = {
     VK_KHR_MAINTENANCE_6_EXTENSION_NAME,
     ExtensionType::Device,
-    {},
+    std::span<const ExtensionDependency>(VK_KHR_MAINTENANCE6_INFO_DEPS, 1),
     VK_API_VERSION_1_4,
     {},
     {},
@@ -3889,7 +7077,7 @@ const ExtensionInfo VK_KHR_MAINTENANCE6_INFO = {
 const ExtensionInfo VK_KHR_MAINTENANCE7_INFO = {
     VK_KHR_MAINTENANCE_7_EXTENSION_NAME,
     ExtensionType::Device,
-    {},
+    std::span<const ExtensionDependency>(VK_KHR_MAINTENANCE7_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -3898,7 +7086,7 @@ const ExtensionInfo VK_KHR_MAINTENANCE7_INFO = {
 const ExtensionInfo VK_KHR_MAINTENANCE8_INFO = {
     VK_KHR_MAINTENANCE_8_EXTENSION_NAME,
     ExtensionType::Device,
-    {},
+    std::span<const ExtensionDependency>(VK_KHR_MAINTENANCE8_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -3907,7 +7095,7 @@ const ExtensionInfo VK_KHR_MAINTENANCE8_INFO = {
 const ExtensionInfo VK_KHR_MAINTENANCE9_INFO = {
     VK_KHR_MAINTENANCE_9_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_MAINTENANCE9_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_MAINTENANCE9_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -3925,7 +7113,7 @@ const ExtensionInfo VK_KHR_MAP_MEMORY2_INFO = {
 const ExtensionInfo VK_KHR_MULTIVIEW_INFO = {
     VK_KHR_MULTIVIEW_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_MULTIVIEW_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_MULTIVIEW_INFO_DEPS, 2),
     VK_API_VERSION_1_1,
     {},
     {},
@@ -3934,7 +7122,7 @@ const ExtensionInfo VK_KHR_MULTIVIEW_INFO = {
 const ExtensionInfo VK_KHR_PERFORMANCE_QUERY_INFO = {
     VK_KHR_PERFORMANCE_QUERY_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_PERFORMANCE_QUERY_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_PERFORMANCE_QUERY_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -3943,7 +7131,7 @@ const ExtensionInfo VK_KHR_PERFORMANCE_QUERY_INFO = {
 const ExtensionInfo VK_KHR_PIPELINE_BINARY_INFO = {
     VK_KHR_PIPELINE_BINARY_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_PIPELINE_BINARY_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_PIPELINE_BINARY_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -3952,7 +7140,7 @@ const ExtensionInfo VK_KHR_PIPELINE_BINARY_INFO = {
 const ExtensionInfo VK_KHR_PIPELINE_EXECUTABLE_PROPERTIES_INFO = {
     VK_KHR_PIPELINE_EXECUTABLE_PROPERTIES_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_PIPELINE_EXECUTABLE_PROPERTIES_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_PIPELINE_EXECUTABLE_PROPERTIES_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -3979,7 +7167,7 @@ const ExtensionInfo VK_KHR_PORTABILITY_ENUMERATION_INFO = {
 const ExtensionInfo VK_KHR_PRESENT_ID_INFO = {
     VK_KHR_PRESENT_ID_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_PRESENT_ID_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_KHR_PRESENT_ID_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -3988,7 +7176,7 @@ const ExtensionInfo VK_KHR_PRESENT_ID_INFO = {
 const ExtensionInfo VK_KHR_PRESENT_ID2_INFO = {
     VK_KHR_PRESENT_ID_2_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_PRESENT_ID2_INFO_DEPS, 3),
+    std::span<const ExtensionDependency>(VK_KHR_PRESENT_ID2_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -3997,7 +7185,7 @@ const ExtensionInfo VK_KHR_PRESENT_ID2_INFO = {
 const ExtensionInfo VK_KHR_PRESENT_MODE_FIFO_LATEST_READY_INFO = {
     VK_KHR_PRESENT_MODE_FIFO_LATEST_READY_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_PRESENT_MODE_FIFO_LATEST_READY_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_PRESENT_MODE_FIFO_LATEST_READY_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -4006,7 +7194,7 @@ const ExtensionInfo VK_KHR_PRESENT_MODE_FIFO_LATEST_READY_INFO = {
 const ExtensionInfo VK_KHR_PRESENT_WAIT_INFO = {
     VK_KHR_PRESENT_WAIT_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_PRESENT_WAIT_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_KHR_PRESENT_WAIT_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -4015,7 +7203,7 @@ const ExtensionInfo VK_KHR_PRESENT_WAIT_INFO = {
 const ExtensionInfo VK_KHR_PRESENT_WAIT2_INFO = {
     VK_KHR_PRESENT_WAIT_2_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_PRESENT_WAIT2_INFO_DEPS, 4),
+    std::span<const ExtensionDependency>(VK_KHR_PRESENT_WAIT2_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -4024,7 +7212,7 @@ const ExtensionInfo VK_KHR_PRESENT_WAIT2_INFO = {
 const ExtensionInfo VK_KHR_PUSH_DESCRIPTOR_INFO = {
     VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_PUSH_DESCRIPTOR_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_PUSH_DESCRIPTOR_INFO_DEPS, 2),
     VK_API_VERSION_1_4,
     {},
     std::span<const vk::StructureType>(VK_KHR_PUSH_DESCRIPTOR_INFO_PROPERTIES, 1),
@@ -4033,7 +7221,7 @@ const ExtensionInfo VK_KHR_PUSH_DESCRIPTOR_INFO = {
 const ExtensionInfo VK_KHR_RAY_QUERY_INFO = {
     VK_KHR_RAY_QUERY_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_RAY_QUERY_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_KHR_RAY_QUERY_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -4042,7 +7230,7 @@ const ExtensionInfo VK_KHR_RAY_QUERY_INFO = {
 const ExtensionInfo VK_KHR_RAY_TRACING_MAINTENANCE1_INFO = {
     VK_KHR_RAY_TRACING_MAINTENANCE_1_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_RAY_TRACING_MAINTENANCE1_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_RAY_TRACING_MAINTENANCE1_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -4051,7 +7239,7 @@ const ExtensionInfo VK_KHR_RAY_TRACING_MAINTENANCE1_INFO = {
 const ExtensionInfo VK_KHR_RAY_TRACING_PIPELINE_INFO = {
     VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_RAY_TRACING_PIPELINE_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_KHR_RAY_TRACING_PIPELINE_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -4060,7 +7248,7 @@ const ExtensionInfo VK_KHR_RAY_TRACING_PIPELINE_INFO = {
 const ExtensionInfo VK_KHR_RAY_TRACING_POSITION_FETCH_INFO = {
     VK_KHR_RAY_TRACING_POSITION_FETCH_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_RAY_TRACING_POSITION_FETCH_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_RAY_TRACING_POSITION_FETCH_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -4078,7 +7266,7 @@ const ExtensionInfo VK_KHR_RELAXED_BLOCK_LAYOUT_INFO = {
 const ExtensionInfo VK_KHR_ROBUSTNESS2_INFO = {
     VK_KHR_ROBUSTNESS_2_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_ROBUSTNESS2_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_ROBUSTNESS2_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -4096,7 +7284,7 @@ const ExtensionInfo VK_KHR_SAMPLER_MIRROR_CLAMP_TO_EDGE_INFO = {
 const ExtensionInfo VK_KHR_SAMPLER_YCBCR_CONVERSION_INFO = {
     VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_SAMPLER_YCBCR_CONVERSION_INFO_DEPS, 4),
+    std::span<const ExtensionDependency>(VK_KHR_SAMPLER_YCBCR_CONVERSION_INFO_DEPS, 2),
     VK_API_VERSION_1_1,
     {},
     {},
@@ -4105,7 +7293,7 @@ const ExtensionInfo VK_KHR_SAMPLER_YCBCR_CONVERSION_INFO = {
 const ExtensionInfo VK_KHR_SEPARATE_DEPTH_STENCIL_LAYOUTS_INFO = {
     VK_KHR_SEPARATE_DEPTH_STENCIL_LAYOUTS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_SEPARATE_DEPTH_STENCIL_LAYOUTS_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_KHR_SEPARATE_DEPTH_STENCIL_LAYOUTS_INFO_DEPS, 3),
     VK_API_VERSION_1_2,
     {},
     {},
@@ -4114,7 +7302,7 @@ const ExtensionInfo VK_KHR_SEPARATE_DEPTH_STENCIL_LAYOUTS_INFO = {
 const ExtensionInfo VK_KHR_SHADER_ATOMIC_INT64_INFO = {
     VK_KHR_SHADER_ATOMIC_INT64_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_SHADER_ATOMIC_INT64_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_SHADER_ATOMIC_INT64_INFO_DEPS, 2),
     VK_API_VERSION_1_2,
     {},
     {},
@@ -4123,7 +7311,7 @@ const ExtensionInfo VK_KHR_SHADER_ATOMIC_INT64_INFO = {
 const ExtensionInfo VK_KHR_SHADER_BFLOAT16_INFO = {
     VK_KHR_SHADER_BFLOAT16_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_SHADER_BFLOAT16_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_SHADER_BFLOAT16_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -4132,7 +7320,7 @@ const ExtensionInfo VK_KHR_SHADER_BFLOAT16_INFO = {
 const ExtensionInfo VK_KHR_SHADER_CLOCK_INFO = {
     VK_KHR_SHADER_CLOCK_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_SHADER_CLOCK_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_SHADER_CLOCK_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -4150,7 +7338,7 @@ const ExtensionInfo VK_KHR_SHADER_DRAW_PARAMETERS_INFO = {
 const ExtensionInfo VK_KHR_SHADER_EXPECT_ASSUME_INFO = {
     VK_KHR_SHADER_EXPECT_ASSUME_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_SHADER_EXPECT_ASSUME_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_SHADER_EXPECT_ASSUME_INFO_DEPS, 2),
     VK_API_VERSION_1_4,
     {},
     {},
@@ -4159,7 +7347,7 @@ const ExtensionInfo VK_KHR_SHADER_EXPECT_ASSUME_INFO = {
 const ExtensionInfo VK_KHR_SHADER_FLOAT16_INT8_INFO = {
     VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_SHADER_FLOAT16_INT8_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_SHADER_FLOAT16_INT8_INFO_DEPS, 2),
     VK_API_VERSION_1_2,
     {},
     {},
@@ -4168,7 +7356,7 @@ const ExtensionInfo VK_KHR_SHADER_FLOAT16_INT8_INFO = {
 const ExtensionInfo VK_KHR_SHADER_FLOAT_CONTROLS_INFO = {
     VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_SHADER_FLOAT_CONTROLS_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_SHADER_FLOAT_CONTROLS_INFO_DEPS, 2),
     VK_API_VERSION_1_2,
     {},
     std::span<const vk::StructureType>(VK_KHR_SHADER_FLOAT_CONTROLS_INFO_PROPERTIES, 1),
@@ -4177,7 +7365,7 @@ const ExtensionInfo VK_KHR_SHADER_FLOAT_CONTROLS_INFO = {
 const ExtensionInfo VK_KHR_SHADER_FLOAT_CONTROLS2_INFO = {
     VK_KHR_SHADER_FLOAT_CONTROLS_2_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_SHADER_FLOAT_CONTROLS2_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_SHADER_FLOAT_CONTROLS2_INFO_DEPS, 1),
     VK_API_VERSION_1_4,
     {},
     {},
@@ -4186,7 +7374,7 @@ const ExtensionInfo VK_KHR_SHADER_FLOAT_CONTROLS2_INFO = {
 const ExtensionInfo VK_KHR_SHADER_FMA_INFO = {
     VK_KHR_SHADER_FMA_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_SHADER_FMA_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_SHADER_FMA_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -4195,7 +7383,7 @@ const ExtensionInfo VK_KHR_SHADER_FMA_INFO = {
 const ExtensionInfo VK_KHR_SHADER_INTEGER_DOT_PRODUCT_INFO = {
     VK_KHR_SHADER_INTEGER_DOT_PRODUCT_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_SHADER_INTEGER_DOT_PRODUCT_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_SHADER_INTEGER_DOT_PRODUCT_INFO_DEPS, 2),
     VK_API_VERSION_1_3,
     {},
     {},
@@ -4204,7 +7392,7 @@ const ExtensionInfo VK_KHR_SHADER_INTEGER_DOT_PRODUCT_INFO = {
 const ExtensionInfo VK_KHR_SHADER_MAXIMAL_RECONVERGENCE_INFO = {
     VK_KHR_SHADER_MAXIMAL_RECONVERGENCE_EXTENSION_NAME,
     ExtensionType::Device,
-    {},
+    std::span<const ExtensionDependency>(VK_KHR_SHADER_MAXIMAL_RECONVERGENCE_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -4222,7 +7410,7 @@ const ExtensionInfo VK_KHR_SHADER_NON_SEMANTIC_INFO_INFO = {
 const ExtensionInfo VK_KHR_SHADER_QUAD_CONTROL_INFO = {
     VK_KHR_SHADER_QUAD_CONTROL_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_SHADER_QUAD_CONTROL_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_KHR_SHADER_QUAD_CONTROL_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -4231,7 +7419,7 @@ const ExtensionInfo VK_KHR_SHADER_QUAD_CONTROL_INFO = {
 const ExtensionInfo VK_KHR_SHADER_RELAXED_EXTENDED_INSTRUCTION_INFO = {
     VK_KHR_SHADER_RELAXED_EXTENDED_INSTRUCTION_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_SHADER_RELAXED_EXTENDED_INSTRUCTION_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_SHADER_RELAXED_EXTENDED_INSTRUCTION_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -4240,7 +7428,7 @@ const ExtensionInfo VK_KHR_SHADER_RELAXED_EXTENDED_INSTRUCTION_INFO = {
 const ExtensionInfo VK_KHR_SHADER_SUBGROUP_EXTENDED_TYPES_INFO = {
     VK_KHR_SHADER_SUBGROUP_EXTENDED_TYPES_EXTENSION_NAME,
     ExtensionType::Device,
-    {},
+    std::span<const ExtensionDependency>(VK_KHR_SHADER_SUBGROUP_EXTENDED_TYPES_INFO_DEPS, 1),
     VK_API_VERSION_1_2,
     {},
     {},
@@ -4249,7 +7437,7 @@ const ExtensionInfo VK_KHR_SHADER_SUBGROUP_EXTENDED_TYPES_INFO = {
 const ExtensionInfo VK_KHR_SHADER_SUBGROUP_ROTATE_INFO = {
     VK_KHR_SHADER_SUBGROUP_ROTATE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_SHADER_SUBGROUP_ROTATE_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_SHADER_SUBGROUP_ROTATE_INFO_DEPS, 2),
     VK_API_VERSION_1_4,
     {},
     {},
@@ -4258,7 +7446,7 @@ const ExtensionInfo VK_KHR_SHADER_SUBGROUP_ROTATE_INFO = {
 const ExtensionInfo VK_KHR_SHADER_SUBGROUP_UNIFORM_CONTROL_FLOW_INFO = {
     VK_KHR_SHADER_SUBGROUP_UNIFORM_CONTROL_FLOW_EXTENSION_NAME,
     ExtensionType::Device,
-    {},
+    std::span<const ExtensionDependency>(VK_KHR_SHADER_SUBGROUP_UNIFORM_CONTROL_FLOW_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -4267,7 +7455,7 @@ const ExtensionInfo VK_KHR_SHADER_SUBGROUP_UNIFORM_CONTROL_FLOW_INFO = {
 const ExtensionInfo VK_KHR_SHADER_TERMINATE_INVOCATION_INFO = {
     VK_KHR_SHADER_TERMINATE_INVOCATION_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_SHADER_TERMINATE_INVOCATION_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_SHADER_TERMINATE_INVOCATION_INFO_DEPS, 2),
     VK_API_VERSION_1_3,
     {},
     {},
@@ -4276,7 +7464,7 @@ const ExtensionInfo VK_KHR_SHADER_TERMINATE_INVOCATION_INFO = {
 const ExtensionInfo VK_KHR_SHADER_UNTYPED_POINTERS_INFO = {
     VK_KHR_SHADER_UNTYPED_POINTERS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_SHADER_UNTYPED_POINTERS_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_SHADER_UNTYPED_POINTERS_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -4285,7 +7473,7 @@ const ExtensionInfo VK_KHR_SHADER_UNTYPED_POINTERS_INFO = {
 const ExtensionInfo VK_KHR_SHARED_PRESENTABLE_IMAGE_INFO = {
     VK_KHR_SHARED_PRESENTABLE_IMAGE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_SHARED_PRESENTABLE_IMAGE_INFO_DEPS, 3),
+    std::span<const ExtensionDependency>(VK_KHR_SHARED_PRESENTABLE_IMAGE_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -4294,7 +7482,7 @@ const ExtensionInfo VK_KHR_SHARED_PRESENTABLE_IMAGE_INFO = {
 const ExtensionInfo VK_KHR_SPIRV_1_4_INFO = {
     VK_KHR_SPIRV_1_4_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_SPIRV_1_4_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_SPIRV_1_4_INFO_DEPS, 1),
     VK_API_VERSION_1_2,
     {},
     {},
@@ -4321,7 +7509,7 @@ const ExtensionInfo VK_KHR_SURFACE_INFO = {
 const ExtensionInfo VK_KHR_SURFACE_MAINTENANCE1_INFO = {
     VK_KHR_SURFACE_MAINTENANCE_1_EXTENSION_NAME,
     ExtensionType::Instance,
-    std::span<const ExtensionInfo* const>(VK_KHR_SURFACE_MAINTENANCE1_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_KHR_SURFACE_MAINTENANCE1_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -4330,7 +7518,7 @@ const ExtensionInfo VK_KHR_SURFACE_MAINTENANCE1_INFO = {
 const ExtensionInfo VK_KHR_SURFACE_PROTECTED_CAPABILITIES_INFO = {
     VK_KHR_SURFACE_PROTECTED_CAPABILITIES_EXTENSION_NAME,
     ExtensionType::Instance,
-    std::span<const ExtensionInfo* const>(VK_KHR_SURFACE_PROTECTED_CAPABILITIES_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_SURFACE_PROTECTED_CAPABILITIES_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -4339,7 +7527,7 @@ const ExtensionInfo VK_KHR_SURFACE_PROTECTED_CAPABILITIES_INFO = {
 const ExtensionInfo VK_KHR_SWAPCHAIN_INFO = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_SWAPCHAIN_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_SWAPCHAIN_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -4348,7 +7536,7 @@ const ExtensionInfo VK_KHR_SWAPCHAIN_INFO = {
 const ExtensionInfo VK_KHR_SWAPCHAIN_MAINTENANCE1_INFO = {
     VK_KHR_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_SWAPCHAIN_MAINTENANCE1_INFO_DEPS, 3),
+    std::span<const ExtensionDependency>(VK_KHR_SWAPCHAIN_MAINTENANCE1_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -4357,7 +7545,7 @@ const ExtensionInfo VK_KHR_SWAPCHAIN_MAINTENANCE1_INFO = {
 const ExtensionInfo VK_KHR_SWAPCHAIN_MUTABLE_FORMAT_INFO = {
     VK_KHR_SWAPCHAIN_MUTABLE_FORMAT_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_SWAPCHAIN_MUTABLE_FORMAT_INFO_DEPS, 3),
+    std::span<const ExtensionDependency>(VK_KHR_SWAPCHAIN_MUTABLE_FORMAT_INFO_DEPS, 4),
     (uint32_t)-1,
     {},
     {},
@@ -4366,7 +7554,7 @@ const ExtensionInfo VK_KHR_SWAPCHAIN_MUTABLE_FORMAT_INFO = {
 const ExtensionInfo VK_KHR_SYNCHRONIZATION2_INFO = {
     VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_SYNCHRONIZATION2_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_SYNCHRONIZATION2_INFO_DEPS, 2),
     VK_API_VERSION_1_3,
     {},
     {},
@@ -4375,7 +7563,7 @@ const ExtensionInfo VK_KHR_SYNCHRONIZATION2_INFO = {
 const ExtensionInfo VK_KHR_TIMELINE_SEMAPHORE_INFO = {
     VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_TIMELINE_SEMAPHORE_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_TIMELINE_SEMAPHORE_INFO_DEPS, 2),
     VK_API_VERSION_1_2,
     {},
     {},
@@ -4384,7 +7572,7 @@ const ExtensionInfo VK_KHR_TIMELINE_SEMAPHORE_INFO = {
 const ExtensionInfo VK_KHR_UNIFIED_IMAGE_LAYOUTS_INFO = {
     VK_KHR_UNIFIED_IMAGE_LAYOUTS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_UNIFIED_IMAGE_LAYOUTS_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_UNIFIED_IMAGE_LAYOUTS_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -4393,7 +7581,7 @@ const ExtensionInfo VK_KHR_UNIFIED_IMAGE_LAYOUTS_INFO = {
 const ExtensionInfo VK_KHR_UNIFORM_BUFFER_STANDARD_LAYOUT_INFO = {
     VK_KHR_UNIFORM_BUFFER_STANDARD_LAYOUT_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_UNIFORM_BUFFER_STANDARD_LAYOUT_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_UNIFORM_BUFFER_STANDARD_LAYOUT_INFO_DEPS, 2),
     VK_API_VERSION_1_2,
     {},
     {},
@@ -4402,7 +7590,7 @@ const ExtensionInfo VK_KHR_UNIFORM_BUFFER_STANDARD_LAYOUT_INFO = {
 const ExtensionInfo VK_KHR_VARIABLE_POINTERS_INFO = {
     VK_KHR_VARIABLE_POINTERS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_VARIABLE_POINTERS_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_KHR_VARIABLE_POINTERS_INFO_DEPS, 2),
     VK_API_VERSION_1_1,
     {},
     {},
@@ -4411,7 +7599,7 @@ const ExtensionInfo VK_KHR_VARIABLE_POINTERS_INFO = {
 const ExtensionInfo VK_KHR_VERTEX_ATTRIBUTE_DIVISOR_INFO = {
     VK_KHR_VERTEX_ATTRIBUTE_DIVISOR_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_VERTEX_ATTRIBUTE_DIVISOR_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_VERTEX_ATTRIBUTE_DIVISOR_INFO_DEPS, 2),
     VK_API_VERSION_1_4,
     {},
     std::span<const vk::StructureType>(VK_KHR_VERTEX_ATTRIBUTE_DIVISOR_INFO_PROPERTIES, 1),
@@ -4420,7 +7608,7 @@ const ExtensionInfo VK_KHR_VERTEX_ATTRIBUTE_DIVISOR_INFO = {
 const ExtensionInfo VK_KHR_VIDEO_DECODE_AV1_INFO = {
     VK_KHR_VIDEO_DECODE_AV1_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_DECODE_AV1_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_VIDEO_DECODE_AV1_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -4429,7 +7617,7 @@ const ExtensionInfo VK_KHR_VIDEO_DECODE_AV1_INFO = {
 const ExtensionInfo VK_KHR_VIDEO_DECODE_H264_INFO = {
     VK_KHR_VIDEO_DECODE_H264_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_DECODE_H264_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_VIDEO_DECODE_H264_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -4438,7 +7626,7 @@ const ExtensionInfo VK_KHR_VIDEO_DECODE_H264_INFO = {
 const ExtensionInfo VK_KHR_VIDEO_DECODE_H265_INFO = {
     VK_KHR_VIDEO_DECODE_H265_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_DECODE_H265_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_VIDEO_DECODE_H265_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -4447,7 +7635,7 @@ const ExtensionInfo VK_KHR_VIDEO_DECODE_H265_INFO = {
 const ExtensionInfo VK_KHR_VIDEO_DECODE_QUEUE_INFO = {
     VK_KHR_VIDEO_DECODE_QUEUE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_DECODE_QUEUE_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_KHR_VIDEO_DECODE_QUEUE_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -4456,7 +7644,7 @@ const ExtensionInfo VK_KHR_VIDEO_DECODE_QUEUE_INFO = {
 const ExtensionInfo VK_KHR_VIDEO_DECODE_VP9_INFO = {
     VK_KHR_VIDEO_DECODE_VP9_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_DECODE_VP9_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_VIDEO_DECODE_VP9_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -4465,7 +7653,7 @@ const ExtensionInfo VK_KHR_VIDEO_DECODE_VP9_INFO = {
 const ExtensionInfo VK_KHR_VIDEO_ENCODE_AV1_INFO = {
     VK_KHR_VIDEO_ENCODE_AV1_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_ENCODE_AV1_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_VIDEO_ENCODE_AV1_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -4474,7 +7662,7 @@ const ExtensionInfo VK_KHR_VIDEO_ENCODE_AV1_INFO = {
 const ExtensionInfo VK_KHR_VIDEO_ENCODE_H264_INFO = {
     VK_KHR_VIDEO_ENCODE_H264_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_ENCODE_H264_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_VIDEO_ENCODE_H264_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -4483,7 +7671,7 @@ const ExtensionInfo VK_KHR_VIDEO_ENCODE_H264_INFO = {
 const ExtensionInfo VK_KHR_VIDEO_ENCODE_H265_INFO = {
     VK_KHR_VIDEO_ENCODE_H265_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_ENCODE_H265_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_VIDEO_ENCODE_H265_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -4492,7 +7680,7 @@ const ExtensionInfo VK_KHR_VIDEO_ENCODE_H265_INFO = {
 const ExtensionInfo VK_KHR_VIDEO_ENCODE_INTRA_REFRESH_INFO = {
     VK_KHR_VIDEO_ENCODE_INTRA_REFRESH_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_ENCODE_INTRA_REFRESH_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_VIDEO_ENCODE_INTRA_REFRESH_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -4501,7 +7689,7 @@ const ExtensionInfo VK_KHR_VIDEO_ENCODE_INTRA_REFRESH_INFO = {
 const ExtensionInfo VK_KHR_VIDEO_ENCODE_QUANTIZATION_MAP_INFO = {
     VK_KHR_VIDEO_ENCODE_QUANTIZATION_MAP_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_ENCODE_QUANTIZATION_MAP_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_KHR_VIDEO_ENCODE_QUANTIZATION_MAP_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -4510,7 +7698,7 @@ const ExtensionInfo VK_KHR_VIDEO_ENCODE_QUANTIZATION_MAP_INFO = {
 const ExtensionInfo VK_KHR_VIDEO_ENCODE_QUEUE_INFO = {
     VK_KHR_VIDEO_ENCODE_QUEUE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_ENCODE_QUEUE_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_KHR_VIDEO_ENCODE_QUEUE_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -4519,7 +7707,7 @@ const ExtensionInfo VK_KHR_VIDEO_ENCODE_QUEUE_INFO = {
 const ExtensionInfo VK_KHR_VIDEO_MAINTENANCE1_INFO = {
     VK_KHR_VIDEO_MAINTENANCE_1_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_MAINTENANCE1_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_VIDEO_MAINTENANCE1_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -4528,7 +7716,7 @@ const ExtensionInfo VK_KHR_VIDEO_MAINTENANCE1_INFO = {
 const ExtensionInfo VK_KHR_VIDEO_MAINTENANCE2_INFO = {
     VK_KHR_VIDEO_MAINTENANCE_2_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_MAINTENANCE2_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_VIDEO_MAINTENANCE2_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -4537,7 +7725,7 @@ const ExtensionInfo VK_KHR_VIDEO_MAINTENANCE2_INFO = {
 const ExtensionInfo VK_KHR_VIDEO_QUEUE_INFO = {
     VK_KHR_VIDEO_QUEUE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_VIDEO_QUEUE_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_VIDEO_QUEUE_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -4546,7 +7734,7 @@ const ExtensionInfo VK_KHR_VIDEO_QUEUE_INFO = {
 const ExtensionInfo VK_KHR_VULKAN_MEMORY_MODEL_INFO = {
     VK_KHR_VULKAN_MEMORY_MODEL_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_VULKAN_MEMORY_MODEL_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_VULKAN_MEMORY_MODEL_INFO_DEPS, 2),
     VK_API_VERSION_1_2,
     {},
     {},
@@ -4555,7 +7743,7 @@ const ExtensionInfo VK_KHR_VULKAN_MEMORY_MODEL_INFO = {
 const ExtensionInfo VK_KHR_WORKGROUP_MEMORY_EXPLICIT_LAYOUT_INFO = {
     VK_KHR_WORKGROUP_MEMORY_EXPLICIT_LAYOUT_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_WORKGROUP_MEMORY_EXPLICIT_LAYOUT_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_WORKGROUP_MEMORY_EXPLICIT_LAYOUT_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -4564,7 +7752,7 @@ const ExtensionInfo VK_KHR_WORKGROUP_MEMORY_EXPLICIT_LAYOUT_INFO = {
 const ExtensionInfo VK_KHR_ZERO_INITIALIZE_WORKGROUP_MEMORY_INFO = {
     VK_KHR_ZERO_INITIALIZE_WORKGROUP_MEMORY_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_KHR_ZERO_INITIALIZE_WORKGROUP_MEMORY_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_KHR_ZERO_INITIALIZE_WORKGROUP_MEMORY_INFO_DEPS, 2),
     VK_API_VERSION_1_3,
     {},
     {},
@@ -4582,7 +7770,7 @@ const ExtensionInfo VK_LUNARG_DIRECT_DRIVER_LOADING_INFO = {
 const ExtensionInfo VK_MESA_IMAGE_ALIGNMENT_CONTROL_INFO = {
     VK_MESA_IMAGE_ALIGNMENT_CONTROL_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_MESA_IMAGE_ALIGNMENT_CONTROL_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_MESA_IMAGE_ALIGNMENT_CONTROL_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -4591,7 +7779,7 @@ const ExtensionInfo VK_MESA_IMAGE_ALIGNMENT_CONTROL_INFO = {
 const ExtensionInfo VK_MSFT_LAYERED_DRIVER_INFO = {
     VK_MSFT_LAYERED_DRIVER_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_MSFT_LAYERED_DRIVER_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_MSFT_LAYERED_DRIVER_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     std::span<const vk::StructureType>(VK_MSFT_LAYERED_DRIVER_INFO_PROPERTIES, 1),
@@ -4618,7 +7806,7 @@ const ExtensionInfo VK_NVX_IMAGE_VIEW_HANDLE_INFO = {
 const ExtensionInfo VK_NVX_MULTIVIEW_PER_VIEW_ATTRIBUTES_INFO = {
     VK_NVX_MULTIVIEW_PER_VIEW_ATTRIBUTES_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NVX_MULTIVIEW_PER_VIEW_ATTRIBUTES_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_NVX_MULTIVIEW_PER_VIEW_ATTRIBUTES_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     std::span<const vk::StructureType>(VK_NVX_MULTIVIEW_PER_VIEW_ATTRIBUTES_INFO_PROPERTIES, 1),
@@ -4636,7 +7824,7 @@ const ExtensionInfo VK_NV_CLIP_SPACE_W_SCALING_INFO = {
 const ExtensionInfo VK_NV_CLUSTER_ACCELERATION_STRUCTURE_INFO = {
     VK_NV_CLUSTER_ACCELERATION_STRUCTURE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_CLUSTER_ACCELERATION_STRUCTURE_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_NV_CLUSTER_ACCELERATION_STRUCTURE_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -4645,7 +7833,7 @@ const ExtensionInfo VK_NV_CLUSTER_ACCELERATION_STRUCTURE_INFO = {
 const ExtensionInfo VK_NV_COMMAND_BUFFER_INHERITANCE_INFO = {
     VK_NV_COMMAND_BUFFER_INHERITANCE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_COMMAND_BUFFER_INHERITANCE_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_NV_COMMAND_BUFFER_INHERITANCE_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -4654,7 +7842,7 @@ const ExtensionInfo VK_NV_COMMAND_BUFFER_INHERITANCE_INFO = {
 const ExtensionInfo VK_NV_COMPUTE_OCCUPANCY_PRIORITY_INFO = {
     VK_NV_COMPUTE_OCCUPANCY_PRIORITY_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_COMPUTE_OCCUPANCY_PRIORITY_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_NV_COMPUTE_OCCUPANCY_PRIORITY_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -4663,7 +7851,7 @@ const ExtensionInfo VK_NV_COMPUTE_OCCUPANCY_PRIORITY_INFO = {
 const ExtensionInfo VK_NV_COMPUTE_SHADER_DERIVATIVES_INFO = {
     VK_NV_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_COMPUTE_SHADER_DERIVATIVES_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_NV_COMPUTE_SHADER_DERIVATIVES_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -4672,7 +7860,7 @@ const ExtensionInfo VK_NV_COMPUTE_SHADER_DERIVATIVES_INFO = {
 const ExtensionInfo VK_NV_COOPERATIVE_MATRIX_INFO = {
     VK_NV_COOPERATIVE_MATRIX_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_COOPERATIVE_MATRIX_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_NV_COOPERATIVE_MATRIX_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -4681,7 +7869,7 @@ const ExtensionInfo VK_NV_COOPERATIVE_MATRIX_INFO = {
 const ExtensionInfo VK_NV_COOPERATIVE_MATRIX2_INFO = {
     VK_NV_COOPERATIVE_MATRIX_2_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_COOPERATIVE_MATRIX2_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_NV_COOPERATIVE_MATRIX2_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -4690,7 +7878,7 @@ const ExtensionInfo VK_NV_COOPERATIVE_MATRIX2_INFO = {
 const ExtensionInfo VK_NV_COOPERATIVE_VECTOR_INFO = {
     VK_NV_COOPERATIVE_VECTOR_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_COOPERATIVE_VECTOR_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_NV_COOPERATIVE_VECTOR_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     std::span<const vk::StructureType>(VK_NV_COOPERATIVE_VECTOR_INFO_PROPERTIES, 1),
@@ -4699,7 +7887,7 @@ const ExtensionInfo VK_NV_COOPERATIVE_VECTOR_INFO = {
 const ExtensionInfo VK_NV_COPY_MEMORY_INDIRECT_INFO = {
     VK_NV_COPY_MEMORY_INDIRECT_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_COPY_MEMORY_INDIRECT_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_NV_COPY_MEMORY_INDIRECT_INFO_DEPS, 3),
     (uint32_t)-1,
     {},
     {},
@@ -4708,7 +7896,7 @@ const ExtensionInfo VK_NV_COPY_MEMORY_INDIRECT_INFO = {
 const ExtensionInfo VK_NV_CORNER_SAMPLED_IMAGE_INFO = {
     VK_NV_CORNER_SAMPLED_IMAGE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_CORNER_SAMPLED_IMAGE_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_NV_CORNER_SAMPLED_IMAGE_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -4717,7 +7905,7 @@ const ExtensionInfo VK_NV_CORNER_SAMPLED_IMAGE_INFO = {
 const ExtensionInfo VK_NV_COVERAGE_REDUCTION_MODE_INFO = {
     VK_NV_COVERAGE_REDUCTION_MODE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_COVERAGE_REDUCTION_MODE_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_NV_COVERAGE_REDUCTION_MODE_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -4727,7 +7915,7 @@ const ExtensionInfo VK_NV_DEDICATED_ALLOCATION_INFO = {
     VK_NV_DEDICATED_ALLOCATION_EXTENSION_NAME,
     ExtensionType::Device,
     {},
-    VK_KHR_dedicated_allocation,
+    (uint32_t)-1,
     &VK_KHR_DEDICATED_ALLOCATION_INFO,
     {},
     {},
@@ -4735,7 +7923,7 @@ const ExtensionInfo VK_NV_DEDICATED_ALLOCATION_INFO = {
 const ExtensionInfo VK_NV_DEDICATED_ALLOCATION_IMAGE_ALIASING_INFO = {
     VK_NV_DEDICATED_ALLOCATION_IMAGE_ALIASING_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_DEDICATED_ALLOCATION_IMAGE_ALIASING_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_NV_DEDICATED_ALLOCATION_IMAGE_ALIASING_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -4744,7 +7932,7 @@ const ExtensionInfo VK_NV_DEDICATED_ALLOCATION_IMAGE_ALIASING_INFO = {
 const ExtensionInfo VK_NV_DESCRIPTOR_POOL_OVERALLOCATION_INFO = {
     VK_NV_DESCRIPTOR_POOL_OVERALLOCATION_EXTENSION_NAME,
     ExtensionType::Device,
-    {},
+    std::span<const ExtensionDependency>(VK_NV_DESCRIPTOR_POOL_OVERALLOCATION_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -4753,7 +7941,7 @@ const ExtensionInfo VK_NV_DESCRIPTOR_POOL_OVERALLOCATION_INFO = {
 const ExtensionInfo VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_INFO = {
     VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -4762,7 +7950,7 @@ const ExtensionInfo VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_INFO = {
 const ExtensionInfo VK_NV_DEVICE_DIAGNOSTICS_CONFIG_INFO = {
     VK_NV_DEVICE_DIAGNOSTICS_CONFIG_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_DEVICE_DIAGNOSTICS_CONFIG_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_NV_DEVICE_DIAGNOSTICS_CONFIG_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -4771,7 +7959,7 @@ const ExtensionInfo VK_NV_DEVICE_DIAGNOSTICS_CONFIG_INFO = {
 const ExtensionInfo VK_NV_DEVICE_GENERATED_COMMANDS_INFO = {
     VK_NV_DEVICE_GENERATED_COMMANDS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_DEVICE_GENERATED_COMMANDS_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_NV_DEVICE_GENERATED_COMMANDS_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     std::span<const vk::StructureType>(VK_NV_DEVICE_GENERATED_COMMANDS_INFO_PROPERTIES, 1),
@@ -4780,7 +7968,7 @@ const ExtensionInfo VK_NV_DEVICE_GENERATED_COMMANDS_INFO = {
 const ExtensionInfo VK_NV_DEVICE_GENERATED_COMMANDS_COMPUTE_INFO = {
     VK_NV_DEVICE_GENERATED_COMMANDS_COMPUTE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_DEVICE_GENERATED_COMMANDS_COMPUTE_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_NV_DEVICE_GENERATED_COMMANDS_COMPUTE_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -4789,7 +7977,7 @@ const ExtensionInfo VK_NV_DEVICE_GENERATED_COMMANDS_COMPUTE_INFO = {
 const ExtensionInfo VK_NV_DISPLAY_STEREO_INFO = {
     VK_NV_DISPLAY_STEREO_EXTENSION_NAME,
     ExtensionType::Instance,
-    std::span<const ExtensionInfo* const>(VK_NV_DISPLAY_STEREO_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_NV_DISPLAY_STEREO_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -4798,7 +7986,7 @@ const ExtensionInfo VK_NV_DISPLAY_STEREO_INFO = {
 const ExtensionInfo VK_NV_EXTENDED_SPARSE_ADDRESS_SPACE_INFO = {
     VK_NV_EXTENDED_SPARSE_ADDRESS_SPACE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_EXTENDED_SPARSE_ADDRESS_SPACE_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_NV_EXTENDED_SPARSE_ADDRESS_SPACE_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -4816,8 +8004,8 @@ const ExtensionInfo VK_NV_EXTERNAL_COMPUTE_QUEUE_INFO = {
 const ExtensionInfo VK_NV_EXTERNAL_MEMORY_INFO = {
     VK_NV_EXTERNAL_MEMORY_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_EXTERNAL_MEMORY_INFO_DEPS, 1),
-    VK_KHR_external_memory,
+    std::span<const ExtensionDependency>(VK_NV_EXTERNAL_MEMORY_INFO_DEPS, 1),
+    (uint32_t)-1,
     &VK_KHR_EXTERNAL_MEMORY_INFO,
     {},
     {},
@@ -4826,7 +8014,7 @@ const ExtensionInfo VK_NV_EXTERNAL_MEMORY_CAPABILITIES_INFO = {
     VK_NV_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME,
     ExtensionType::Instance,
     {},
-    VK_KHR_external_memory_capabilities,
+    (uint32_t)-1,
     &VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_INFO,
     {},
     {},
@@ -4834,7 +8022,7 @@ const ExtensionInfo VK_NV_EXTERNAL_MEMORY_CAPABILITIES_INFO = {
 const ExtensionInfo VK_NV_EXTERNAL_MEMORY_RDMA_INFO = {
     VK_NV_EXTERNAL_MEMORY_RDMA_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_EXTERNAL_MEMORY_RDMA_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_NV_EXTERNAL_MEMORY_RDMA_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -4861,7 +8049,7 @@ const ExtensionInfo VK_NV_FRAGMENT_COVERAGE_TO_COLOR_INFO = {
 const ExtensionInfo VK_NV_FRAGMENT_SHADER_BARYCENTRIC_INFO = {
     VK_NV_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_FRAGMENT_SHADER_BARYCENTRIC_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_NV_FRAGMENT_SHADER_BARYCENTRIC_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -4870,7 +8058,7 @@ const ExtensionInfo VK_NV_FRAGMENT_SHADER_BARYCENTRIC_INFO = {
 const ExtensionInfo VK_NV_FRAGMENT_SHADING_RATE_ENUMS_INFO = {
     VK_NV_FRAGMENT_SHADING_RATE_ENUMS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_FRAGMENT_SHADING_RATE_ENUMS_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_NV_FRAGMENT_SHADING_RATE_ENUMS_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -4906,7 +8094,7 @@ const ExtensionInfo VK_NV_GLSL_SHADER_INFO = {
 const ExtensionInfo VK_NV_INHERITED_VIEWPORT_SCISSOR_INFO = {
     VK_NV_INHERITED_VIEWPORT_SCISSOR_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_INHERITED_VIEWPORT_SCISSOR_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_NV_INHERITED_VIEWPORT_SCISSOR_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -4915,7 +8103,7 @@ const ExtensionInfo VK_NV_INHERITED_VIEWPORT_SCISSOR_INFO = {
 const ExtensionInfo VK_NV_LINEAR_COLOR_ATTACHMENT_INFO = {
     VK_NV_LINEAR_COLOR_ATTACHMENT_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_LINEAR_COLOR_ATTACHMENT_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_NV_LINEAR_COLOR_ATTACHMENT_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -4933,7 +8121,7 @@ const ExtensionInfo VK_NV_LOW_LATENCY_INFO = {
 const ExtensionInfo VK_NV_LOW_LATENCY2_INFO = {
     VK_NV_LOW_LATENCY_2_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_LOW_LATENCY2_INFO_DEPS, 3),
+    std::span<const ExtensionDependency>(VK_NV_LOW_LATENCY2_INFO_DEPS, 4),
     (uint32_t)-1,
     {},
     {},
@@ -4942,7 +8130,7 @@ const ExtensionInfo VK_NV_LOW_LATENCY2_INFO = {
 const ExtensionInfo VK_NV_MEMORY_DECOMPRESSION_INFO = {
     VK_NV_MEMORY_DECOMPRESSION_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_MEMORY_DECOMPRESSION_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_NV_MEMORY_DECOMPRESSION_INFO_DEPS, 3),
     (uint32_t)-1,
     {},
     {},
@@ -4951,7 +8139,7 @@ const ExtensionInfo VK_NV_MEMORY_DECOMPRESSION_INFO = {
 const ExtensionInfo VK_NV_MESH_SHADER_INFO = {
     VK_NV_MESH_SHADER_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_MESH_SHADER_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_NV_MESH_SHADER_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -4960,7 +8148,7 @@ const ExtensionInfo VK_NV_MESH_SHADER_INFO = {
 const ExtensionInfo VK_NV_OPTICAL_FLOW_INFO = {
     VK_NV_OPTICAL_FLOW_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_OPTICAL_FLOW_INFO_DEPS, 3),
+    std::span<const ExtensionDependency>(VK_NV_OPTICAL_FLOW_INFO_DEPS, 3),
     (uint32_t)-1,
     {},
     {},
@@ -4969,7 +8157,7 @@ const ExtensionInfo VK_NV_OPTICAL_FLOW_INFO = {
 const ExtensionInfo VK_NV_PARTITIONED_ACCELERATION_STRUCTURE_INFO = {
     VK_NV_PARTITIONED_ACCELERATION_STRUCTURE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_PARTITIONED_ACCELERATION_STRUCTURE_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_NV_PARTITIONED_ACCELERATION_STRUCTURE_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -4978,7 +8166,7 @@ const ExtensionInfo VK_NV_PARTITIONED_ACCELERATION_STRUCTURE_INFO = {
 const ExtensionInfo VK_NV_PER_STAGE_DESCRIPTOR_SET_INFO = {
     VK_NV_PER_STAGE_DESCRIPTOR_SET_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_PER_STAGE_DESCRIPTOR_SET_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_NV_PER_STAGE_DESCRIPTOR_SET_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -4987,7 +8175,7 @@ const ExtensionInfo VK_NV_PER_STAGE_DESCRIPTOR_SET_INFO = {
 const ExtensionInfo VK_NV_PRESENT_BARRIER_INFO = {
     VK_NV_PRESENT_BARRIER_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_PRESENT_BARRIER_INFO_DEPS, 4),
+    std::span<const ExtensionDependency>(VK_NV_PRESENT_BARRIER_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -5005,7 +8193,7 @@ const ExtensionInfo VK_NV_PUSH_CONSTANT_BANK_INFO = {
 const ExtensionInfo VK_NV_RAW_ACCESS_CHAINS_INFO = {
     VK_NV_RAW_ACCESS_CHAINS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_RAW_ACCESS_CHAINS_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_NV_RAW_ACCESS_CHAINS_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -5014,8 +8202,8 @@ const ExtensionInfo VK_NV_RAW_ACCESS_CHAINS_INFO = {
 const ExtensionInfo VK_NV_RAY_TRACING_INFO = {
     VK_NV_RAY_TRACING_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_RAY_TRACING_INFO_DEPS, 2),
-    VK_KHR_ray_tracing_pipeline,
+    std::span<const ExtensionDependency>(VK_NV_RAY_TRACING_INFO_DEPS, 2),
+    (uint32_t)-1,
     &VK_KHR_RAY_TRACING_PIPELINE_INFO,
     {},
     {},
@@ -5023,7 +8211,7 @@ const ExtensionInfo VK_NV_RAY_TRACING_INFO = {
 const ExtensionInfo VK_NV_RAY_TRACING_INVOCATION_REORDER_INFO = {
     VK_NV_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_RAY_TRACING_INVOCATION_REORDER_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_NV_RAY_TRACING_INVOCATION_REORDER_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     std::span<const vk::StructureType>(VK_NV_RAY_TRACING_INVOCATION_REORDER_INFO_PROPERTIES, 1),
@@ -5032,7 +8220,7 @@ const ExtensionInfo VK_NV_RAY_TRACING_INVOCATION_REORDER_INFO = {
 const ExtensionInfo VK_NV_RAY_TRACING_LINEAR_SWEPT_SPHERES_INFO = {
     VK_NV_RAY_TRACING_LINEAR_SWEPT_SPHERES_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_RAY_TRACING_LINEAR_SWEPT_SPHERES_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_NV_RAY_TRACING_LINEAR_SWEPT_SPHERES_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -5041,7 +8229,7 @@ const ExtensionInfo VK_NV_RAY_TRACING_LINEAR_SWEPT_SPHERES_INFO = {
 const ExtensionInfo VK_NV_RAY_TRACING_MOTION_BLUR_INFO = {
     VK_NV_RAY_TRACING_MOTION_BLUR_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_RAY_TRACING_MOTION_BLUR_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_NV_RAY_TRACING_MOTION_BLUR_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -5050,7 +8238,7 @@ const ExtensionInfo VK_NV_RAY_TRACING_MOTION_BLUR_INFO = {
 const ExtensionInfo VK_NV_RAY_TRACING_VALIDATION_INFO = {
     VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_RAY_TRACING_VALIDATION_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_NV_RAY_TRACING_VALIDATION_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -5059,7 +8247,7 @@ const ExtensionInfo VK_NV_RAY_TRACING_VALIDATION_INFO = {
 const ExtensionInfo VK_NV_REPRESENTATIVE_FRAGMENT_TEST_INFO = {
     VK_NV_REPRESENTATIVE_FRAGMENT_TEST_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_REPRESENTATIVE_FRAGMENT_TEST_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_NV_REPRESENTATIVE_FRAGMENT_TEST_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -5077,7 +8265,7 @@ const ExtensionInfo VK_NV_SAMPLE_MASK_OVERRIDE_COVERAGE_INFO = {
 const ExtensionInfo VK_NV_SCISSOR_EXCLUSIVE_INFO = {
     VK_NV_SCISSOR_EXCLUSIVE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_SCISSOR_EXCLUSIVE_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_NV_SCISSOR_EXCLUSIVE_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -5086,7 +8274,7 @@ const ExtensionInfo VK_NV_SCISSOR_EXCLUSIVE_INFO = {
 const ExtensionInfo VK_NV_SHADER_ATOMIC_FLOAT16_VECTOR_INFO = {
     VK_NV_SHADER_ATOMIC_FLOAT16_VECTOR_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_SHADER_ATOMIC_FLOAT16_VECTOR_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_NV_SHADER_ATOMIC_FLOAT16_VECTOR_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -5095,7 +8283,7 @@ const ExtensionInfo VK_NV_SHADER_ATOMIC_FLOAT16_VECTOR_INFO = {
 const ExtensionInfo VK_NV_SHADER_IMAGE_FOOTPRINT_INFO = {
     VK_NV_SHADER_IMAGE_FOOTPRINT_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_SHADER_IMAGE_FOOTPRINT_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_NV_SHADER_IMAGE_FOOTPRINT_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -5104,7 +8292,7 @@ const ExtensionInfo VK_NV_SHADER_IMAGE_FOOTPRINT_INFO = {
 const ExtensionInfo VK_NV_SHADER_SM_BUILTINS_INFO = {
     VK_NV_SHADER_SM_BUILTINS_EXTENSION_NAME,
     ExtensionType::Device,
-    {},
+    std::span<const ExtensionDependency>(VK_NV_SHADER_SM_BUILTINS_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     std::span<const vk::StructureType>(VK_NV_SHADER_SM_BUILTINS_INFO_PROPERTIES, 1),
@@ -5113,7 +8301,7 @@ const ExtensionInfo VK_NV_SHADER_SM_BUILTINS_INFO = {
 const ExtensionInfo VK_NV_SHADER_SUBGROUP_PARTITIONED_INFO = {
     VK_NV_SHADER_SUBGROUP_PARTITIONED_EXTENSION_NAME,
     ExtensionType::Device,
-    {},
+    std::span<const ExtensionDependency>(VK_NV_SHADER_SUBGROUP_PARTITIONED_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -5122,7 +8310,7 @@ const ExtensionInfo VK_NV_SHADER_SUBGROUP_PARTITIONED_INFO = {
 const ExtensionInfo VK_NV_SHADING_RATE_IMAGE_INFO = {
     VK_NV_SHADING_RATE_IMAGE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_NV_SHADING_RATE_IMAGE_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_NV_SHADING_RATE_IMAGE_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -5149,7 +8337,7 @@ const ExtensionInfo VK_NV_VIEWPORT_SWIZZLE_INFO = {
 const ExtensionInfo VK_QCOM_COOPERATIVE_MATRIX_CONVERSION_INFO = {
     VK_QCOM_COOPERATIVE_MATRIX_CONVERSION_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_QCOM_COOPERATIVE_MATRIX_CONVERSION_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_QCOM_COOPERATIVE_MATRIX_CONVERSION_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -5158,7 +8346,7 @@ const ExtensionInfo VK_QCOM_COOPERATIVE_MATRIX_CONVERSION_INFO = {
 const ExtensionInfo VK_QCOM_DATA_GRAPH_MODEL_INFO = {
     VK_QCOM_DATA_GRAPH_MODEL_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_QCOM_DATA_GRAPH_MODEL_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_QCOM_DATA_GRAPH_MODEL_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -5167,7 +8355,7 @@ const ExtensionInfo VK_QCOM_DATA_GRAPH_MODEL_INFO = {
 const ExtensionInfo VK_QCOM_FILTER_CUBIC_CLAMP_INFO = {
     VK_QCOM_FILTER_CUBIC_CLAMP_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_QCOM_FILTER_CUBIC_CLAMP_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_QCOM_FILTER_CUBIC_CLAMP_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -5176,7 +8364,7 @@ const ExtensionInfo VK_QCOM_FILTER_CUBIC_CLAMP_INFO = {
 const ExtensionInfo VK_QCOM_FILTER_CUBIC_WEIGHTS_INFO = {
     VK_QCOM_FILTER_CUBIC_WEIGHTS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_QCOM_FILTER_CUBIC_WEIGHTS_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_QCOM_FILTER_CUBIC_WEIGHTS_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -5185,7 +8373,7 @@ const ExtensionInfo VK_QCOM_FILTER_CUBIC_WEIGHTS_INFO = {
 const ExtensionInfo VK_QCOM_FRAGMENT_DENSITY_MAP_OFFSET_INFO = {
     VK_QCOM_FRAGMENT_DENSITY_MAP_OFFSET_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_QCOM_FRAGMENT_DENSITY_MAP_OFFSET_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_QCOM_FRAGMENT_DENSITY_MAP_OFFSET_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -5194,7 +8382,7 @@ const ExtensionInfo VK_QCOM_FRAGMENT_DENSITY_MAP_OFFSET_INFO = {
 const ExtensionInfo VK_QCOM_IMAGE_PROCESSING_INFO = {
     VK_QCOM_IMAGE_PROCESSING_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_QCOM_IMAGE_PROCESSING_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_QCOM_IMAGE_PROCESSING_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -5203,7 +8391,7 @@ const ExtensionInfo VK_QCOM_IMAGE_PROCESSING_INFO = {
 const ExtensionInfo VK_QCOM_IMAGE_PROCESSING2_INFO = {
     VK_QCOM_IMAGE_PROCESSING_2_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_QCOM_IMAGE_PROCESSING2_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_QCOM_IMAGE_PROCESSING2_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -5212,7 +8400,7 @@ const ExtensionInfo VK_QCOM_IMAGE_PROCESSING2_INFO = {
 const ExtensionInfo VK_QCOM_MULTIVIEW_PER_VIEW_RENDER_AREAS_INFO = {
     VK_QCOM_MULTIVIEW_PER_VIEW_RENDER_AREAS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_QCOM_MULTIVIEW_PER_VIEW_RENDER_AREAS_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_QCOM_MULTIVIEW_PER_VIEW_RENDER_AREAS_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -5221,7 +8409,7 @@ const ExtensionInfo VK_QCOM_MULTIVIEW_PER_VIEW_RENDER_AREAS_INFO = {
 const ExtensionInfo VK_QCOM_MULTIVIEW_PER_VIEW_VIEWPORTS_INFO = {
     VK_QCOM_MULTIVIEW_PER_VIEW_VIEWPORTS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_QCOM_MULTIVIEW_PER_VIEW_VIEWPORTS_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_QCOM_MULTIVIEW_PER_VIEW_VIEWPORTS_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -5257,7 +8445,7 @@ const ExtensionInfo VK_QCOM_RENDER_PASS_TRANSFORM_INFO = {
 const ExtensionInfo VK_QCOM_ROTATED_COPY_COMMANDS_INFO = {
     VK_QCOM_ROTATED_COPY_COMMANDS_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_QCOM_ROTATED_COPY_COMMANDS_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_QCOM_ROTATED_COPY_COMMANDS_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -5266,7 +8454,7 @@ const ExtensionInfo VK_QCOM_ROTATED_COPY_COMMANDS_INFO = {
 const ExtensionInfo VK_QCOM_TILE_MEMORY_HEAP_INFO = {
     VK_QCOM_TILE_MEMORY_HEAP_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_QCOM_TILE_MEMORY_HEAP_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_QCOM_TILE_MEMORY_HEAP_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -5275,7 +8463,7 @@ const ExtensionInfo VK_QCOM_TILE_MEMORY_HEAP_INFO = {
 const ExtensionInfo VK_QCOM_TILE_PROPERTIES_INFO = {
     VK_QCOM_TILE_PROPERTIES_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_QCOM_TILE_PROPERTIES_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_QCOM_TILE_PROPERTIES_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -5284,7 +8472,7 @@ const ExtensionInfo VK_QCOM_TILE_PROPERTIES_INFO = {
 const ExtensionInfo VK_QCOM_TILE_SHADING_INFO = {
     VK_QCOM_TILE_SHADING_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_QCOM_TILE_SHADING_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_QCOM_TILE_SHADING_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -5293,7 +8481,7 @@ const ExtensionInfo VK_QCOM_TILE_SHADING_INFO = {
 const ExtensionInfo VK_QCOM_YCBCR_DEGAMMA_INFO = {
     VK_QCOM_YCBCR_DEGAMMA_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_QCOM_YCBCR_DEGAMMA_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_QCOM_YCBCR_DEGAMMA_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -5302,7 +8490,7 @@ const ExtensionInfo VK_QCOM_YCBCR_DEGAMMA_INFO = {
 const ExtensionInfo VK_SEC_AMIGO_PROFILING_INFO = {
     VK_SEC_AMIGO_PROFILING_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_SEC_AMIGO_PROFILING_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_SEC_AMIGO_PROFILING_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -5311,7 +8499,7 @@ const ExtensionInfo VK_SEC_AMIGO_PROFILING_INFO = {
 const ExtensionInfo VK_SEC_PIPELINE_CACHE_INCREMENTAL_MODE_INFO = {
     VK_SEC_PIPELINE_CACHE_INCREMENTAL_MODE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_SEC_PIPELINE_CACHE_INCREMENTAL_MODE_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_SEC_PIPELINE_CACHE_INCREMENTAL_MODE_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -5320,7 +8508,7 @@ const ExtensionInfo VK_SEC_PIPELINE_CACHE_INCREMENTAL_MODE_INFO = {
 const ExtensionInfo VK_VALVE_DESCRIPTOR_SET_HOST_MAPPING_INFO = {
     VK_VALVE_DESCRIPTOR_SET_HOST_MAPPING_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_VALVE_DESCRIPTOR_SET_HOST_MAPPING_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_VALVE_DESCRIPTOR_SET_HOST_MAPPING_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -5329,7 +8517,7 @@ const ExtensionInfo VK_VALVE_DESCRIPTOR_SET_HOST_MAPPING_INFO = {
 const ExtensionInfo VK_VALVE_FRAGMENT_DENSITY_MAP_LAYERED_INFO = {
     VK_VALVE_FRAGMENT_DENSITY_MAP_LAYERED_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_VALVE_FRAGMENT_DENSITY_MAP_LAYERED_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_VALVE_FRAGMENT_DENSITY_MAP_LAYERED_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},
@@ -5338,7 +8526,7 @@ const ExtensionInfo VK_VALVE_FRAGMENT_DENSITY_MAP_LAYERED_INFO = {
 const ExtensionInfo VK_VALVE_MUTABLE_DESCRIPTOR_TYPE_INFO = {
     VK_VALVE_MUTABLE_DESCRIPTOR_TYPE_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_VALVE_MUTABLE_DESCRIPTOR_TYPE_INFO_DEPS, 1),
+    std::span<const ExtensionDependency>(VK_VALVE_MUTABLE_DESCRIPTOR_TYPE_INFO_DEPS, 1),
     (uint32_t)-1,
     {},
     {},
@@ -5347,7 +8535,7 @@ const ExtensionInfo VK_VALVE_MUTABLE_DESCRIPTOR_TYPE_INFO = {
 const ExtensionInfo VK_VALVE_VIDEO_ENCODE_RGB_CONVERSION_INFO = {
     VK_VALVE_VIDEO_ENCODE_RGB_CONVERSION_EXTENSION_NAME,
     ExtensionType::Device,
-    std::span<const ExtensionInfo* const>(VK_VALVE_VIDEO_ENCODE_RGB_CONVERSION_INFO_DEPS, 2),
+    std::span<const ExtensionDependency>(VK_VALVE_VIDEO_ENCODE_RGB_CONVERSION_INFO_DEPS, 2),
     (uint32_t)-1,
     {},
     {},

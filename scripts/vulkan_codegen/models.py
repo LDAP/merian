@@ -5,6 +5,13 @@ from typing import Optional
 
 
 @dataclass
+class Dependency:
+    """Represents one OR branch of a depends expression."""
+    extensions: list[str] = field(default_factory=list)  # AND'd extension names
+    version: Optional[str] = None  # Required API version (VK_API_VERSION_X_Y) or None
+
+
+@dataclass
 class Extension:
     """Represents a Vulkan extension."""
 
@@ -12,7 +19,7 @@ class Extension:
     name_macro: str  # e.g., VK_KHR_SWAPCHAIN_EXTENSION_NAME
     type: str  # device or instance
     extension_number: Optional[int] = None  # e.g., 81 (higher = newer extension)
-    dependencies: list[str] = field(default_factory=list)  # e.g., ["VK_KHR_swapchain"] (flattened expression, only extensions)
+    dependencies: list[Dependency] = field(default_factory=list)  # Structured dependency objects
     promotedto: Optional[str] = None  # e.g., VK_API_VERSION_1_3
     deprecatedby: Optional[str] = None  # e.g., VK_KHR_buffer_device_address, VK_API_VERSION_1_3
     property_types: list[str] = field(default_factory=list)  # e.g., ["ePhysicalDeviceProperties2"]

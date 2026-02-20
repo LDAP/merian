@@ -9,6 +9,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -19,6 +20,14 @@ class PhysicalDevice : public std::enable_shared_from_this<PhysicalDevice> {
     PhysicalDevice(const InstanceHandle& instance, const vk::PhysicalDevice& physical_device);
 
   public:
+    struct DeviceExtensionSupport {
+        bool supported;
+        std::string info{};
+        std::unordered_set<const char*> dependencies{};
+        // if this non-empty this must be the only reason for this extension to be unsupported.
+        std::unordered_set<const char*> missing_instance_extensions{};
+    };
+
     static PhysicalDeviceHandle create(const InstanceHandle& instance,
                                        const vk::PhysicalDevice& physical_device);
 
@@ -43,10 +52,14 @@ class PhysicalDevice : public std::enable_shared_from_this<PhysicalDevice> {
     // ----------------------------------------
 
     bool extension_supported(const std::string& name) const {
-        return supported_extensions.contains(name);
+        return supported_extension_names.contains(name);
     }
 
     const std::unordered_set<std::string>& get_supported_extensions() {
+        return supported_extension_names;
+    }
+
+    const std::unordered_map<std::string, DeviceExtensionSupport>& get_extension_support() {
         return supported_extensions;
     }
 
@@ -71,6 +84,10 @@ class PhysicalDevice : public std::enable_shared_from_this<PhysicalDevice> {
 
     const vk::PhysicalDeviceLimits& get_device_limits() const {
         return properties.get_properties2().properties.limits;
+    }
+
+    const std::vector<vk::CooperativeMatrixPropertiesKHR>& get_cooperative_matrix_properties() {
+        return cooperative_matrix_properties;
     }
 
     // ----------------------------------------
@@ -99,10 +116,14 @@ class PhysicalDevice : public std::enable_shared_from_this<PhysicalDevice> {
     // ----------------------------------------
 
   private:
+    const std::unordered_set<std::string>& determine_device_extension_support();
+
+  private:
     const InstanceHandle instance;
     const vk::PhysicalDevice physical_device;
 
-    std::unordered_set<std::string> supported_extensions;
+    std::unordered_map<std::string, DeviceExtensionSupport> supported_extensions;
+    std::unordered_set<std::string> supported_extension_names;
 
     VulkanProperties properties;
     VulkanFeatures supported_features;
@@ -110,6 +131,8 @@ class PhysicalDevice : public std::enable_shared_from_this<PhysicalDevice> {
     vk::PhysicalDeviceMemoryProperties2 physical_device_memory_properties;
 
     std::vector<vk::ExtensionProperties> physical_device_extension_properties;
+
+    std::vector<vk::CooperativeMatrixPropertiesKHR> cooperative_matrix_properties;
 
     std::unordered_set<std::string> supported_spirv_extensions;
     std::unordered_set<std::string> supported_spirv_capabilities;

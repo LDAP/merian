@@ -10,22 +10,23 @@ namespace merian {
 
 class Device : public std::enable_shared_from_this<Device> {
   private:
-    // features and extensions are checked for support and skipped if not available.
+    // The caller is responsible to ensure that the extensions and features are valid and supported
     Device(const PhysicalDeviceHandle& physical_device,
            const VulkanFeatures& features,
-           const vk::ArrayProxyNoTemporaries<const char*>& additional_extensions,
+           const vk::ArrayProxyNoTemporaries<const char*>& extensions,
            const vk::ArrayProxyNoTemporaries<const vk::DeviceQueueCreateInfo>& queue_create_infos,
            void* p_next);
 
   public:
+    // The caller is responsible to ensure that the extensions and features are valid and supported
     static DeviceHandle
     create(const PhysicalDeviceHandle& physical_device,
            const VulkanFeatures& features,
-           const vk::ArrayProxyNoTemporaries<const char*>& user_extensions,
+           const vk::ArrayProxyNoTemporaries<const char*>& extensions,
            const vk::ArrayProxyNoTemporaries<const vk::DeviceQueueCreateInfo>& queue_create_infos,
            void* p_next) {
         return DeviceHandle(
-            new Device(physical_device, features, user_extensions, queue_create_infos, p_next));
+            new Device(physical_device, features, extensions, queue_create_infos, p_next));
     }
 
     ~Device();

@@ -110,8 +110,14 @@ using ConfigureExtensionsCallback = std::function<void(ExtensionContainer&)>;
 struct ContextCreateInfo {
     // Set your desired Vulkan features.
     VulkanFeatures vulkan_features{};
-    // Set your desired Vulkan extensions, extension dependencies are added automatically.
-    std::vector<const char*> vulkan_extensions{};
+    // Set your desired instance extensions, extension dependencies are added
+    // automatically.
+    std::vector<const char*> instance_extensions{};
+    // Set your desired device extensions, extension dependencies are added
+    // automatically.
+    std::vector<const char*> device_extensions{};
+    // Set your desired instance layers.
+    std::vector<const char*> instance_layers{};
     // Set your desired merian Context extensions.
     std::vector<std::string> context_extensions{};
     // Called when all extensions are loaded. You can get_context_extensions<>() to configure.
@@ -188,22 +194,27 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
 
   private: // Vulkan initialization
     void load_extensions(const std::vector<std::string>& extension_names);
+    void determine_instance_extension_layer_support(const uint32_t targeted_vk_api_version);
     void create_instance(const uint32_t targeted_vk_api_version,
-                         const VulkanFeatures& desired_features,
-                         const std::vector<const char*>& desired_additional_extensions);
+                         const std::vector<const char*>& desired_additional_extensions,
+                         const std::vector<const char*>& desired_additional_layers);
     struct DeviceSupportCache;
-
     DeviceSupportCache
     select_physical_device(uint32_t filter_vendor_id,
                            uint32_t filter_device_id,
                            std::string filter_device_name,
-                           const VulkanFeatures& desired_features,
+                           const VulkanFeatures& desired_additional_features,
                            const std::vector<const char*>& desired_additional_extensions);
-    QueueInfo determine_queues(const PhysicalDeviceHandle& physical_device);
-    void create_device_and_queues(uint32_t preferred_number_compute_queues,
-                                  const VulkanFeatures& desired_features,
+    struct FeatureExtensionCheckResult;
+    FeatureExtensionCheckResult
+    determine_features_extensions(const VulkanFeatures& desired_additional_features,
                                   const std::vector<const char*>& desired_additional_extensions,
                                   const DeviceSupportCache& support_cache);
+    QueueInfo determine_queues(const PhysicalDeviceHandle& physical_device);
+
+    void create_device_and_queues(uint32_t preferred_number_compute_queues,
+                                  VulkanFeatures& features,
+                                  std::vector<const char*>& extensions);
     void prepare_file_loader(const ContextCreateInfo& create_info);
 
   public: // Getter
@@ -254,10 +265,18 @@ class Context : public std::enable_shared_from_this<Context>, public ExtensionCo
     const ShaderCompileContextHandle& get_shader_compile_context() const;
 
   private:
-    // in create_device_and_queues
-
     const std::string application_name;
     const uint32_t application_vk_version;
+
+    // in determine_instance_extension_layer_support
+
+    struct InstanceExtensionSupport {
+        bool supported;
+        std::string info{};
+        std::unordered_set<const char*> dependencies{};
+    };
+    std::unordered_set<std::string> supported_instance_layers;
+    std::unordered_map<std::string, InstanceExtensionSupport> supported_instance_extensions;
 
     // in create_instance
 

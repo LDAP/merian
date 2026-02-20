@@ -18,14 +18,19 @@ enum class ExtensionType : uint8_t {
 
 struct ExtensionInfo;
 
+struct ExtensionDependency {
+    std::span<const ExtensionInfo* const> required_extensions;  // All must be enabled
+    uint32_t required_version;  // AND minimum API version must be met (0 if no version requirement)
+};
+
 struct ExtensionInfo {
-    const char* name;
-    ExtensionType type;
-    std::span<const ExtensionInfo* const> dependencies;
-    uint32_t promoted_to_version;
-    const ExtensionInfo* const deprecated_by;
-    std::span<const vk::StructureType> property_types;
-    std::span<const vk::StructureType> feature_types;
+    const char* name;  // Extension name (e.g., VK_KHR_swapchain)
+    ExtensionType type;  // Instance or Device extension
+    std::span<const ExtensionDependency> dependencies;  // At least one must be satisfied (OR)
+    uint32_t promoted_to_version;  // API version this was promoted to, or -1
+    const ExtensionInfo* const deprecated_by;  // Extension that deprecated this, or nullptr
+    std::span<const vk::StructureType> property_types;  // Property structure types
+    std::span<const vk::StructureType> feature_types;  // Feature structure types
 
     bool is_device_extension() const { return type == ExtensionType::Device; }
     bool is_instance_extension() const { return type == ExtensionType::Instance; }
