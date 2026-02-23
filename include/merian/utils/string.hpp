@@ -3,6 +3,7 @@
 #include "merian/shader/spirv_utils.hpp"
 #include <cmath>
 #include <cstdint>
+#include <regex>
 #include <fmt/format.h>
 #include <functional>
 #include <string>
@@ -57,14 +58,13 @@ inline std::string format_spirv_version(const uint32_t spirv_version) {
 }
 
 inline uint32_t parse_vk_api_version(const char* version_str) {
-    uint32_t a = 0;
-    uint32_t b = 0;
-    uint32_t c = 0;
-    uint32_t d = 0;
-    const int count = std::sscanf(version_str, "%u.%u.%u.%u", &a, &b, &c, &d);
-    if (count == 4)
-        return VK_MAKE_API_VERSION(a, b, c, d);
-    return VK_MAKE_API_VERSION(0, a, b, c); // major.minor.patch (no variant)
+    static const std::regex re(R"((\d+)\.(\d+)\.(\d+)(?:\.(\d+))?)");
+    std::cmatch m;
+    if (!std::regex_match(version_str, m, re))
+        return 0;
+    if (m[4].matched)
+        return VK_MAKE_API_VERSION(std::stoul(m[1]), std::stoul(m[2]), std::stoul(m[3]), std::stoul(m[4]));
+    return VK_MAKE_API_VERSION(0, std::stoul(m[1]), std::stoul(m[2]), std::stoul(m[3])); // major.minor.patch (no variant)
 }
 
 inline void split(const std::string& value,

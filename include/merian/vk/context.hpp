@@ -132,9 +132,9 @@ struct ContextCreateInfo {
     // number of additional compute queues.
     uint32_t preferred_number_compute_queues = 1;
     // Set to a number greater or equal to 0 to only consider devices with this vendor id.
-    uint32_t filter_vendor_id = -1;
+    uint32_t filter_vendor_id = (uint32_t)-1;
     // Set to a number greater or equal to 0 to only consider devices with this device id.
-    uint32_t filter_device_id = -1;
+    uint32_t filter_device_id = (uint32_t)-1;
     // Set to a non-empty string to only consider devices with this name.
     std::string filter_device_name = "";
 };
