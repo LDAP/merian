@@ -2,7 +2,7 @@ project(
   'vulkan',
   'cpp',
   license: 'MIT',
-  version: run_command(['git', 'describe', '--exact-match', '--tags']).stdout().substring(1),
+  version: run_command(['git', 'describe', '--exact-match', '--tags']).stdout().replace('vulkan-sdk-', '').replace('v', ''),
   meson_version: '>=0.64.0',
 )
 

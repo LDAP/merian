@@ -11,7 +11,8 @@ project(
     meson_version: '>=1.5.0',
 )
 
-vulkan_target_api_version = '1.4.342'
+# attempt to stick to Vulkan SDK versions (vulkan-sdk-X.X.XXX.X tags and update the version in the wrap file).
+vulkan_target_api_version = '1.4.341'
 
 cmake = import('cmake')
 py = import('python').find_installation('python3')
@@ -57,10 +58,7 @@ add_project_arguments('-DMERIAN_DEVELOPMENT_INCLUDE_DIR="@0@"'.format(join_paths
 
 
 # Dependencies
-vulkan_subp = subproject('vulkan', version: ['>=' + vulkan_target_api_version])
-vulkan = vulkan_subp.get_variable('vulkan_dep')
-# ensure subprojects are using the same version of the header!
-meson.override_dependency('vulkan', vulkan)
+vulkan = dependency('vulkan', version: ['>=' + vulkan_target_api_version])
 
 spirv_headers_subp = cmake.subproject('SPIRV-Headers')
 spirv_headers = spirv_headers_subp.dependency('SPIRV-Headers')
