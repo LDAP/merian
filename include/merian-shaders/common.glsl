@@ -1,4 +1,3 @@
-
 #ifndef _MERIAN_SHADERS_COMMON_H_
 #define _MERIAN_SHADERS_COMMON_H_
 
@@ -77,6 +76,17 @@ float signpow(const float a, const float x) {
 // cube root
 float cbrt(const float a) {
     return signpow(a, 0.333333333333);
+}
+
+vec3 debug_color(const float v) {
+    if (isinf(v)) {
+        return vec3(1, 0, 0);
+    } else if (isnan(v)) {
+        return vec3(0, 0, 1);
+    } else if (v < 0) {
+        return vec3(0, -v, 0);
+    }
+    return vec3(v);
 }
 
 #endif // _MERIAN_SHADERS_COMMON_H_
