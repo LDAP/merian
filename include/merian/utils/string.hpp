@@ -1,11 +1,12 @@
 #pragma once
 
 #include "merian/shader/spirv_utils.hpp"
+#include "spdlog/spdlog.h"
 #include <cmath>
 #include <cstdint>
-#include <regex>
 #include <fmt/format.h>
 #include <functional>
+#include <regex>
 #include <string>
 #include <vector>
 #include <vulkan/vulkan_core.h>
@@ -60,11 +61,15 @@ inline std::string format_spirv_version(const uint32_t spirv_version) {
 inline uint32_t parse_vk_api_version(const char* version_str) {
     static const std::regex re(R"((\d+)\.(\d+)\.(\d+)(?:\.(\d+))?)");
     std::cmatch m;
-    if (!std::regex_match(version_str, m, re))
+    if (!std::regex_match(version_str, m, re)) {
+        SPDLOG_ERROR("Invalid Vulkan API version: {}", version_str);
         return 0;
+    }
     if (m[4].matched)
-        return VK_MAKE_API_VERSION(std::stoul(m[1]), std::stoul(m[2]), std::stoul(m[3]), std::stoul(m[4]));
-    return VK_MAKE_API_VERSION(0, std::stoul(m[1]), std::stoul(m[2]), std::stoul(m[3])); // major.minor.patch (no variant)
+        return VK_MAKE_API_VERSION(std::stoul(m[1]), std::stoul(m[2]), std::stoul(m[3]),
+                                   std::stoul(m[4]));
+    return VK_MAKE_API_VERSION(0, std::stoul(m[1]), std::stoul(m[2]),
+                               std::stoul(m[3])); // major.minor.patch (no variant)
 }
 
 inline void split(const std::string& value,
