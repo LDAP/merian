@@ -44,7 +44,7 @@ std::string FileLoader::load_file_as_string(const std::filesystem::path& path) {
     std::string result(size, '\0');
     f.read(result.data(), (std::streamsize)size);
 
-    SPDLOG_DEBUG("load {} of data from {}", format_size(size), path.string());
+    SPDLOG_TRACE("load {} of data from {}", format_size(size), path.string());
 
     return result;
 }
