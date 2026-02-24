@@ -38,6 +38,9 @@ const std::unordered_set<std::string>& PhysicalDevice::determine_device_extensio
             return it->second;
         }
 
+        const ExtensionInfo* ext_info = get_extension_info(ext);
+        assert(ext_info == nullptr || ext_info->is_device_extension());
+
         // can happen as part of a dependency
         if (!all_device_extensions.contains(ext)) {
             const auto [ins_it, inserted] = supported_extensions.emplace(
@@ -46,13 +49,11 @@ const std::unordered_set<std::string>& PhysicalDevice::determine_device_extensio
             return ins_it->second;
         }
 
-        const ExtensionInfo* ext_info = get_extension_info(ext);
         if (ext_info == nullptr) {
             const auto [ins_it, inserted] = supported_extensions.emplace(
                 ext, DeviceExtensionSupport{true, "the extension is unknown", {}});
             return ins_it->second;
         }
-        assert(ext_info->is_device_extension());
 
         if (ext_info->dependencies.empty()) {
             const auto [ins_it, inserted] =

@@ -181,6 +181,7 @@ void Context::determine_instance_extension_layer_support(const uint32_t targeted
             InstanceExtensionSupport support{true};
             for (const ExtensionInfo* req_dep_ext : dep.required_extensions) {
                 const InstanceExtensionSupport& dep_support = self(self, req_dep_ext->name);
+                assert(req_dep_ext->is_instance_extension());
                 if (dep_support.supported) {
                     support.dependencies.insert(req_dep_ext->name);
                     support.dependencies.insert(dep_support.dependencies.begin(),
@@ -293,10 +294,9 @@ Target API Version: {}\n\
         create_instance(target_vk_api_version, additional_instance_extensions,
                         create_info.instance_layers);
 
-        support_cache =
-            select_physical_device(create_info.filter_vendor_id, create_info.filter_device_id,
-                                   create_info.filter_device_name, create_info.features,
-                                   create_info.device_extensions);
+        support_cache = select_physical_device(
+            create_info.filter_vendor_id, create_info.filter_device_id,
+            create_info.filter_device_name, create_info.features, create_info.device_extensions);
 
         feat_ext_result = determine_features_extensions(
             create_info.features, create_info.device_extensions, support_cache);
@@ -768,11 +768,23 @@ Context::FeatureExtensionCheckResult Context::determine_features_extensions(
                 get_spirv_capability_features(spirv_cap, effective_device_vk_api_version));
         }
     }
-    insert_all(all_desired_extensions, all_desired_features.get_required_extensions());
-
-    sort_and_remove_duplicates(all_desired_extensions);
 
     Context::FeatureExtensionCheckResult result;
+
+    for (const char* ext : all_desired_features.get_required_extensions()) {
+        const ExtensionInfo* ext_info = get_extension_info(ext);
+        if (ext_info != nullptr && ext_info->is_instance_extension()) {
+            if (instance->get_vk_api_version() < ext_info->promoted_to_version &&
+                !instance->extension_enabled(ext) && supported_instance_extensions.contains(ext) &&
+                supported_instance_extensions.at(ext).supported) {
+                result.missing_instance_extensions.emplace_back(ext);
+            }
+        } else {
+            all_desired_extensions.emplace_back(ext);
+        }
+    }
+
+    sort_and_remove_duplicates(all_desired_extensions);
 
     SPDLOG_DEBUG("checking features...");
     for (const auto& feature_name : all_desired_features.get_enabled_features()) {
