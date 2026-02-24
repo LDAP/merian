@@ -1,4 +1,6 @@
-merian_shaders_src = []
+merian_shaders_src = [
+    'scene/scene.cpp',
+]
 
 merian_shaders_lib = static_library(
     'merian-shaders',

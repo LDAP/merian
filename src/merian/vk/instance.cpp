@@ -1,4 +1,6 @@
 #include "merian/vk/instance.hpp"
+#include "fmt/ranges.h"
+#include "merian/utils/string.hpp"
 #include "merian/vk/physical_device.hpp"
 
 #include "spdlog/spdlog.h"
@@ -16,16 +18,13 @@ Instance::Instance(const vk::InstanceCreateInfo& instance_create_info)
       enabled_extensions(instance_create_info.ppEnabledExtensionNames,
                          instance_create_info.ppEnabledExtensionNames +
                              instance_create_info.enabledExtensionCount) {
-    [[maybe_unused]] const uint32_t vk_instance_version = get_instance_vk_api_version();
-    SPDLOG_INFO(
-        "instance ({}) created. (Vulkan supported: {}.{}.{}, target: {}.{}.{}, effective: "
-        "{}.{}.{})",
-        fmt::ptr(VkInstance(instance)), VK_API_VERSION_MAJOR(vk_instance_version),
-        VK_API_VERSION_MINOR(vk_instance_version), VK_API_VERSION_PATCH(vk_instance_version),
-        VK_API_VERSION_MAJOR(target_vk_api_version), VK_API_VERSION_MINOR(target_vk_api_version),
-        VK_API_VERSION_PATCH(target_vk_api_version), VK_API_VERSION_MAJOR(effective_vk_api_version),
-        VK_API_VERSION_MINOR(effective_vk_api_version),
-        VK_API_VERSION_PATCH(effective_vk_api_version));
+
+    SPDLOG_INFO("instance ({}) created. (Vulkan supported: {}, target: {}, effective: "
+                "{}, layers: [{}], extensions: [{}])",
+                fmt::ptr(VkInstance(instance)), format_vk_api_version(get_instance_vk_api_version()),
+                format_vk_api_version(target_vk_api_version),
+                format_vk_api_version(effective_vk_api_version), fmt::join(enabled_layers, ", "),
+                fmt::join(enabled_extensions, ", "));
 
     vk_get_instance_proc_addr = VULKAN_HPP_DEFAULT_DISPATCHER.vkGetInstanceProcAddr;
 }

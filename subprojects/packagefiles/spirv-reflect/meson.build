@@ -22,12 +22,12 @@ src = files(
   'spirv_reflect.c',
 )
 
-spirv_reflect = library(
+spirv_reflect = static_library(
   'spirv-reflect',
   src,
   include_directories: include_dirs,
   install: true,
-  cpp_args: global_args,
+  c_args: global_args,
   dependencies: deps,
 )
 

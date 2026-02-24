@@ -44,7 +44,7 @@ std::string FileLoader::load_file_as_string(const std::filesystem::path& path) {
     std::string result(size, '\0');
     f.read(result.data(), (std::streamsize)size);
 
-    SPDLOG_DEBUG("load {} of data from {}", format_size(size), path.string());
+    SPDLOG_TRACE("load {} of data from {}", format_size(size), path.string());
 
     return result;
 }
@@ -213,7 +213,7 @@ void FileLoader::add_search_path(const vk::ArrayProxy<std::filesystem::path>& pa
     }
 
     std::sort(search_paths.begin(), search_paths.end());
-    remove_duplicates(search_paths);
+    sort_and_remove_duplicates(search_paths);
 }
 
 void FileLoader::add_search_path(const vk::ArrayProxy<std::string>& paths) {
@@ -231,7 +231,7 @@ void FileLoader::add_search_path(const vk::ArrayProxy<std::string>& paths) {
     }
 
     std::sort(search_paths.begin(), search_paths.end());
-    remove_duplicates(search_paths);
+    sort_and_remove_duplicates(search_paths);
 }
 
 bool FileLoader::remove_search_path(const std::filesystem::path& path) {

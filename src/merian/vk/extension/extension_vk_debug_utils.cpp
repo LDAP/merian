@@ -116,10 +116,14 @@ void ExtensionVkDebugUtils::on_instance_created(
     const InstanceHandle& instance,
     [[maybe_unused]] const ExtensionContainer& extension_container) {
     this->create_info.setPNext(nullptr);
-    messenger = (**instance).createDebugUtilsMessengerEXT(create_info);
-    assert(this->instance == nullptr);
+
+    if (this->instance != nullptr) {
+        SPDLOG_WARN("detaching debug messenger from old instance");
+        this->instance->get_instance().destroyDebugUtilsMessengerEXT(messenger);
+    }
 
     this->instance = instance;
+    messenger = (**instance).createDebugUtilsMessengerEXT(create_info);
 }
 
 } // namespace merian

@@ -10,6 +10,7 @@
 #include <fmt/ranges.h>
 #include <numeric>
 #include <queue>
+#include <ranges>
 #include <spdlog/spdlog.h>
 #include <tuple>
 
@@ -19,6 +20,12 @@ namespace merian {
 
 struct Context::DeviceSupportCache {
     std::unordered_map<std::shared_ptr<ContextExtension>, DeviceSupportInfo> results;
+};
+
+struct Context::FeatureExtensionCheckResult {
+    VulkanFeatures features;
+    std::vector<const char*> extensions;
+    std::vector<const char*> missing_instance_extensions;
 };
 
 ContextHandle Context::create(const ContextCreateInfo& create_info) {
@@ -110,24 +117,148 @@ void Context::load_extensions(const std::vector<std::string>& extension_names) {
     }
 }
 
+void Context::determine_instance_extension_layer_support(const uint32_t targeted_vk_api_version) {
+    const uint32_t effective_vk_instance_api_version =
+        std::min(targeted_vk_api_version, Instance::get_instance_vk_api_version());
+
+    SPDLOG_TRACE("checking instance layer support...");
+    for (const auto& instance_layer : vk::enumerateInstanceLayerProperties()) {
+        supported_instance_layers.emplace(instance_layer.layerName.data());
+        SPDLOG_TRACE("{} supported", instance_layer.layerName.data());
+    }
+
+    std::unordered_set<std::string> all_instance_extensions;
+    for (const auto& ext_props : vk::enumerateInstanceExtensionProperties()) {
+        all_instance_extensions.insert(ext_props.extensionName.data());
+    }
+
+    const auto check_extension_recurse = [&](const auto& self,
+                                             const char* ext) -> const InstanceExtensionSupport& {
+        const auto it = supported_instance_extensions.find(ext);
+        if (it != supported_instance_extensions.end()) {
+            return it->second;
+        }
+
+        // can happen as part of a dependency
+        if (!all_instance_extensions.contains(ext)) {
+            const auto [ins_it, inserted] = supported_instance_extensions.emplace(
+                ext, InstanceExtensionSupport{
+                         false, "the extension is not advertised as supported", {}});
+            return ins_it->second;
+        }
+
+        const ExtensionInfo* ext_info = get_extension_info(ext);
+        if (ext_info == nullptr) {
+            const auto [ins_it, inserted] = supported_instance_extensions.emplace(
+                ext, InstanceExtensionSupport{true, "extension unknown", {}});
+            return ins_it->second;
+        }
+        assert(ext_info->is_instance_extension());
+
+        if (ext_info->dependencies.empty()) {
+            const auto [ins_it, inserted] =
+                supported_instance_extensions.emplace(ext, InstanceExtensionSupport{true, "", {}});
+            return ins_it->second;
+        }
+
+        // Check dependency branches in order of increasing dependent extension count
+        std::vector<ExtensionDependency> dependencies(ext_info->dependencies.begin(),
+                                                      ext_info->dependencies.end());
+        std::sort(dependencies.begin(), dependencies.end(),
+                  [](const ExtensionDependency& a, const ExtensionDependency& b) -> bool {
+                      return a.required_extensions.size() < b.required_extensions.size();
+                  });
+
+        std::unordered_set<std::string> unsupported_reasons;
+        for (const ExtensionDependency& dep : dependencies) {
+            if (dep.required_version > effective_vk_instance_api_version) {
+                unsupported_reasons.insert(
+                    fmt::format("Vulkan API version {} is required",
+                                format_vk_api_version(dep.required_version)));
+                continue;
+            }
+
+            InstanceExtensionSupport support{true};
+            for (const ExtensionInfo* req_dep_ext : dep.required_extensions) {
+                const InstanceExtensionSupport& dep_support = self(self, req_dep_ext->name);
+                assert(req_dep_ext->is_instance_extension());
+                if (dep_support.supported) {
+                    support.dependencies.insert(req_dep_ext->name);
+                    support.dependencies.insert(dep_support.dependencies.begin(),
+                                                dep_support.dependencies.end());
+                } else {
+                    support.supported = false;
+                    unsupported_reasons.insert(
+                        fmt::format("requires {}, which is unsupported because {}",
+                                    req_dep_ext->name, dep_support.info));
+                    break;
+                }
+            }
+            if (support.supported) {
+                const auto [ins_it, inserted] =
+                    supported_instance_extensions.emplace(ext, std::move(support));
+                return ins_it->second;
+            }
+        }
+
+        const auto [ins_it, inserted] = supported_instance_extensions.emplace(
+            ext, InstanceExtensionSupport{
+                     false, fmt::format("{}", fmt::join(unsupported_reasons, " or ")), {}});
+        return ins_it->second;
+    };
+
+    SPDLOG_TRACE("checking instance extension support...");
+    [[maybe_unused]] const auto format_support =
+        [](const InstanceExtensionSupport& support) -> std::string {
+        std::string support_str = support.supported ? "supported" : "unsupported";
+        if (!support.info.empty()) {
+            support_str += fmt::format(" ({})", support.info);
+        }
+        if (!support.dependencies.empty()) {
+            support_str +=
+                fmt::format(" dependencies: [{}]", fmt::join(support.dependencies, ", "));
+        }
+        return support_str;
+    };
+    for (const auto& ext_props : vk::enumerateInstanceExtensionProperties()) {
+        const char* const ext = ext_props.extensionName.data();
+        [[maybe_unused]] const InstanceExtensionSupport& support =
+            check_extension_recurse(check_extension_recurse, ext);
+        SPDLOG_TRACE("{} {}", ext, format_support(support));
+    }
+}
+
 Context::Context(const ContextCreateInfo& create_info)
     : application_name(create_info.application_name),
       application_vk_version(create_info.application_vk_version) {
     merian::Stopwatch sw;
+
+    uint32_t target_vk_api_version = VK_HEADER_VERSION_COMPLETE;
+    const char* env_target_version_str = std::getenv("MERIAN_TARGET_VK_API_VERSION");
+    if (env_target_version_str != nullptr) {
+        const uint32_t env_target_version = parse_vk_api_version(env_target_version_str);
+        if (VK_API_VERSION_1_0 <= env_target_version &&
+            env_target_version <= VK_HEADER_VERSION_COMPLETE) {
+            target_vk_api_version = env_target_version;
+        } else {
+            SPDLOG_ERROR("MERIAN_TARGET_VK_API_VERSION must be between {} and {}.",
+                         format_vk_api_version(VK_API_VERSION_1_0),
+                         format_vk_api_version(VK_HEADER_VERSION_COMPLETE));
+        }
+    }
 
     SPDLOG_INFO("\n\n\
 __  __ ___ ___ ___   _   _  _ \n\
 |  \\/  | __| _ \\_ _| /_\\ | \\| |\n\
 | |\\/| | _||   /| | / _ \\| .` |\n\
 |_|  |_|___|_|_\\___/_/ \\_\\_|\\_|\n\n\
-Version: {}\n\n",
-                MERIAN_VERSION);
+Version: {}\n\n\
+Vulkan-Headers Version: {}\n\
+Target API Version: {}\n\
+\n\n",
+                MERIAN_VERSION, format_vk_api_version(VK_HEADER_VERSION_COMPLETE),
+                format_vk_api_version(target_vk_api_version));
     SPDLOG_INFO("context initializing...");
-
-    SPDLOG_DEBUG("compiled with Vulkan header: {}.{}.{}",
-                 VK_API_VERSION_MAJOR(VK_HEADER_VERSION_COMPLETE),
-                 VK_API_VERSION_MINOR(VK_HEADER_VERSION_COMPLETE),
-                 VK_API_VERSION_PATCH(VK_HEADER_VERSION_COMPLETE));
 
     SPDLOG_DEBUG("initializing dynamic loader");
     VULKAN_HPP_DEFAULT_DISPATCHER.init();
@@ -147,21 +278,53 @@ Version: {}\n\n",
                                      file_loader, create_info);
     }
 
-    const uint32_t target_vk_api_version = VK_HEADER_VERSION_COMPLETE;
-    create_instance(target_vk_api_version, create_info.vulkan_features,
-                    create_info.vulkan_extensions);
+    determine_instance_extension_layer_support(target_vk_api_version);
 
-    auto support_cache = select_physical_device(
-        create_info.filter_vendor_id, create_info.filter_device_id, create_info.filter_device_name,
-        create_info.vulkan_features, create_info.vulkan_extensions);
+    bool did_recreate = false;
+    Context::FeatureExtensionCheckResult feat_ext_result;
+    Context::DeviceSupportCache support_cache;
+    do {
+        did_recreate = !feat_ext_result.missing_instance_extensions.empty();
+        if (did_recreate) {
+            SPDLOG_WARN("recreating instance to enable missing extensions");
+        }
 
-    for (const auto& ext : get_extensions()) {
-        ext->on_extension_support_confirmed(*this);
+        std::vector<const char*> additional_instance_extensions = create_info.instance_extensions;
+        insert_all(additional_instance_extensions, feat_ext_result.missing_instance_extensions);
+        create_instance(target_vk_api_version, additional_instance_extensions,
+                        create_info.instance_layers);
+
+        support_cache = select_physical_device(
+            create_info.filter_vendor_id, create_info.filter_device_id,
+            create_info.filter_device_name, create_info.features, create_info.device_extensions);
+
+        feat_ext_result = determine_features_extensions(
+            create_info.features, create_info.device_extensions, support_cache);
+
+    } while (!did_recreate && !feat_ext_result.missing_instance_extensions.empty());
+
+    {
+        std::vector<std::type_index> unsupported_extensions;
+        for (const auto& ext : get_extensions()) {
+            const auto& result = support_cache.results.at(ext);
+            if (!result.supported) {
+                ext->on_unsupported(result.unsupported_reason.empty()
+                                        ? "extension device support check failed."
+                                        : result.unsupported_reason);
+                unsupported_extensions.push_back(typeindex_from_pointer(ext));
+            }
+        }
+        for (const auto& type_idx : unsupported_extensions) {
+            remove_extension(type_idx);
+        }
+
+        for (const auto& ext : get_extensions()) {
+            ext->on_physical_device_selected(physical_device, *this);
+        }
     }
 
-    create_device_and_queues(create_info.preferred_number_compute_queues,
-                             create_info.vulkan_features, create_info.vulkan_extensions,
-                             support_cache);
+    create_device_and_queues(create_info.preferred_number_compute_queues, feat_ext_result.features,
+                             feat_ext_result.extensions);
 
     shader_compile_context = ShaderCompileContext::create(file_loader->get_search_paths(), device);
 
@@ -173,38 +336,16 @@ Context::~Context() {
 }
 
 void Context::create_instance(const uint32_t targeted_vk_api_version,
-                              const VulkanFeatures& desired_features,
-                              const std::vector<const char*>& desired_additional_extensions) {
+                              const std::vector<const char*>& desired_additional_extensions,
+                              const std::vector<const char*>& desired_additional_layers) {
     const uint32_t effective_vk_instance_api_version =
         std::min(targeted_vk_api_version, Instance::get_instance_vk_api_version());
 
-    std::unordered_set<std::string> supported_instance_layers;
-    std::unordered_set<std::string> supported_instance_extensions;
-    for (const auto& instance_layer : vk::enumerateInstanceLayerProperties()) {
-        supported_instance_layers.emplace(instance_layer.layerName.data());
-    }
-    for (const auto& instance_ext : vk::enumerateInstanceExtensionProperties()) {
-        supported_instance_extensions.emplace(instance_ext.extensionName.data());
-    }
-
-    InstanceSupportQueryInfo instance_query_info{file_loader, supported_instance_extensions,
-                                                 supported_instance_layers, *this};
-
-    // Check instance support and collect unsupported extensions
-    std::vector<std::type_index> unsupported_extensions;
-    for (const auto& ext : get_extensions()) {
-        auto support_info = ext->query_instance_support(instance_query_info);
-        if (!support_info.supported) {
-            ext->on_unsupported(support_info.unsupported_reason.empty()
-                                    ? "extension instance support check failed."
-                                    : support_info.unsupported_reason);
-            unsupported_extensions.push_back(typeid(*ext));
+    std::unordered_set<std::string> supported_instance_extension_names;
+    for (const auto& [name, support] : supported_instance_extensions) {
+        if (support.supported) {
+            supported_instance_extension_names.insert(name);
         }
-    }
-
-    // Remove unsupported extensions
-    for (const auto& type_idx : unsupported_extensions) {
-        remove_extension(type_idx);
     }
 
     // -----------------
@@ -214,56 +355,107 @@ void Context::create_instance(const uint32_t targeted_vk_api_version,
 
     // minimum requirements for Merian
     if (effective_vk_instance_api_version < VK_API_VERSION_1_1) {
-        if (!supported_instance_extensions.contains(
+        if (!supported_instance_extension_names.contains(
                 VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME)) {
-            throw MerianException{
-                fmt::format("Merian needs Vulkan 1.1 or {}",
-                            VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME)};
+            throw MerianException{fmt::format(
+                "Merian needs Vulkan {} or {}", format_vk_api_version(VK_API_VERSION_1_1),
+                VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME)};
         }
         instance_extension_names.emplace_back(
             VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     }
 
-    // we ignore context extensions here, since we assume that they already do the right checks.
-    std::vector<const char*> device_extensions = desired_features.get_required_extensions();
-    for (const auto& ext : desired_additional_extensions) {
-        device_extensions.emplace_back(ext);
-    }
-    const auto add_instance_extensions = [&](const auto& self, const char* ext) -> void {
-        const ExtensionInfo* const ext_info = get_extension_info(ext);
-        if (ext_info == nullptr) {
-            throw std::invalid_argument{fmt::format("extension {} unknown", ext)};
-        }
-        for (const ExtensionInfo* dep : ext_info->dependencies) {
-            if (dep->is_instance_extension() &&
-                dep->promoted_to_version > effective_vk_instance_api_version) {
-                if (supported_instance_extensions.contains(dep->name)) {
-                    instance_extension_names.emplace_back(dep->name);
-                } else {
-                    SPDLOG_WARN("instance extension {} (indirectly) requested but not supported.",
-                                dep->name);
-                }
+    // User (and auto added extension from context)
+    {
+        for (const char* layer : desired_additional_layers) {
+            if (supported_instance_layers.contains(layer)) {
+                instance_layer_names.push_back(layer);
+            } else {
+                SPDLOG_WARN("instance layer {} requested but not available", layer);
             }
-            self(self, dep->name);
         }
-    };
-    for (const auto& ext : device_extensions) {
-        add_instance_extensions(add_instance_extensions, ext);
+        for (const char* ext : desired_additional_extensions) {
+            if (supported_instance_extension_names.contains(ext)) {
+                instance_extension_names.push_back(ext);
+            } else {
+                SPDLOG_WARN("instance extension {} requested but not available", ext);
+            }
+        }
     }
 
-    for (const auto& ext : get_extensions()) {
-        auto support_info = ext->query_instance_support(instance_query_info);
-        insert_all(instance_layer_names, support_info.required_layers);
-        insert_all(instance_extension_names, support_info.required_extensions);
+    // Extensions
+    {
+        InstanceSupportQueryInfo instance_query_info{
+            file_loader, supported_instance_extension_names, supported_instance_layers, *this};
+
+        // Check instance support and collect extensions, layers then remove unsupported extensions.
+        std::vector<std::type_index> unsupported_extensions;
+        for (const auto& ext : get_extensions()) {
+            auto support_info = ext->query_instance_support(instance_query_info);
+            if (support_info.supported) {
+                insert_all(instance_layer_names, support_info.required_layers);
+                insert_all(instance_extension_names, support_info.required_extensions);
+            } else {
+                ext->on_unsupported(support_info.unsupported_reason.empty()
+                                        ? "extension instance support check failed."
+                                        : support_info.unsupported_reason);
+                unsupported_extensions.push_back(typeindex_from_pointer(ext));
+            }
+        }
+        // Remove unsupported extensions
+        for (const auto& type_idx : unsupported_extensions) {
+            remove_extension(type_idx);
+        }
     }
-    remove_duplicates(instance_layer_names);
-    remove_duplicates(instance_extension_names);
+
+    // ------------------------
+    // Add dependencies and sanitize
+    {
+        for (uint32_t i = 0; i < instance_extension_names.size();) {
+            const char* ext = instance_extension_names[i];
+            const auto support_it = supported_instance_extensions.find(ext);
+            if (support_it == supported_instance_extensions.end()) {
+                SPDLOG_WARN("removed instance extension {} that is not advertised as supported. ",
+                            ext);
+                std::swap(instance_extension_names[i], instance_extension_names.back());
+                instance_extension_names.pop_back();
+                continue;
+            }
+            if (!support_it->second.supported) {
+                SPDLOG_WARN("removed instance extension {} that is unsupported because {}. ", ext,
+                            support_it->second.info);
+                std::swap(instance_extension_names[i], instance_extension_names.back());
+                instance_extension_names.pop_back();
+                continue;
+            }
+            const ExtensionInfo* ext_info = get_extension_info(ext);
+            if (ext_info != nullptr &&
+                ext_info->promoted_to_version <= effective_vk_instance_api_version) {
+                SPDLOG_DEBUG(
+                    "removed instance extension {} that is already provided by API version", ext);
+                std::swap(instance_extension_names[i], instance_extension_names.back());
+                instance_extension_names.pop_back();
+                continue;
+            }
+            if (ext_info != nullptr && ext_info->deprecated_by != nullptr &&
+                supported_instance_extension_names.contains(ext_info->deprecated_by->name)) {
+                SPDLOG_DEBUG("removed deprecated instance extension {} and replaced with {}", ext,
+                             ext_info->deprecated_by->name);
+                std::swap(instance_extension_names[i], instance_extension_names.back());
+                instance_extension_names.pop_back();
+                continue;
+            }
+
+            insert_all(instance_extension_names, support_it->second.dependencies);
+            i++;
+        }
+
+        sort_and_remove_duplicates(instance_layer_names);
+        sort_and_remove_duplicates(instance_extension_names);
+    }
 
     // -----------------
     // Create instance
-
-    SPDLOG_DEBUG("enabling instance layers: [{}]", fmt::join(instance_layer_names, ", "));
-    SPDLOG_DEBUG("enabling instance extensions: [{}]", fmt::join(instance_extension_names, ", "));
 
     void* p_next = nullptr;
     for (const auto& ext : get_extensions()) {
@@ -295,7 +487,7 @@ Context::DeviceSupportCache
 Context::select_physical_device(uint32_t filter_vendor_id,
                                 uint32_t filter_device_id,
                                 std::string filter_device_name,
-                                const VulkanFeatures& desired_features,
+                                const VulkanFeatures& desired_additional_features,
                                 const std::vector<const char*>& desired_additional_extensions) {
     const std::vector<PhysicalDeviceHandle> physical_devices = instance->get_physical_devices();
     if (physical_devices.empty()) {
@@ -382,7 +574,7 @@ Context::select_physical_device(uint32_t filter_vendor_id,
     auto count_features_supported =
         [&](const std::pair<PhysicalDeviceHandle, QueueInfo>& match) -> uint32_t {
         uint32_t count = 0;
-        for (const auto& name : desired_features.get_enabled_features())
+        for (const auto& name : desired_additional_features.get_enabled_features())
             count += static_cast<uint32_t>(match.first->get_supported_features().get_feature(name));
         for (const auto& [_, result] : query_support(match).results)
             for (const auto& feat : result.required_features)
@@ -429,27 +621,9 @@ Context::select_physical_device(uint32_t filter_vendor_id,
     SPDLOG_INFO("selected physical device {}, vendor id: {}, device id: {}, driver: {}, {}",
                 props.deviceName.data(), props.vendorID, props.deviceID, driver_id, driver_info);
 
-    auto selected_support = query_support(*best);
-    std::vector<std::type_index> unsupported_extensions;
-    for (const auto& ext : get_extensions()) {
-        const auto& result = selected_support.results.at(ext);
-        if (!result.supported) {
-            ext->on_unsupported(result.unsupported_reason.empty()
-                                    ? "extension device support check failed."
-                                    : result.unsupported_reason);
-            unsupported_extensions.push_back(typeid(*ext));
-        }
-    }
+    const auto support = query_support(*best);
 
-    for (const auto& type_idx : unsupported_extensions) {
-        remove_extension(type_idx);
-    }
-
-    for (const auto& ext : get_extensions()) {
-        ext->on_physical_device_selected(physical_device, *this);
-    }
-
-    return selected_support;
+    return support;
 }
 
 QueueInfo Context::determine_queues(const PhysicalDeviceHandle& physical_device) {
@@ -568,11 +742,103 @@ QueueInfo Context::determine_queues(const PhysicalDeviceHandle& physical_device)
     return q_info;
 }
 
-void Context::create_device_and_queues(
-    uint32_t preferred_number_compute_queues,
-    const VulkanFeatures& desired_features,
+Context::FeatureExtensionCheckResult Context::determine_features_extensions(
+    const VulkanFeatures& desired_additional_features,
     const std::vector<const char*>& desired_additional_extensions,
     const DeviceSupportCache& support_cache) {
+
+    VulkanFeatures all_desired_features = desired_additional_features;
+    std::vector<const char*> all_desired_extensions = desired_additional_extensions;
+
+    const uint32_t effective_device_vk_api_version = physical_device->get_vk_api_version();
+
+    for (const auto& ext : get_extensions()) {
+        const auto& support_info = support_cache.results.at(ext);
+        insert_all(all_desired_extensions, support_info.required_extensions);
+        for (const auto* feature_name : support_info.required_features) {
+            all_desired_features.set_feature(feature_name, true);
+        }
+        for (const auto* spirv_ext : support_info.required_spirv_extensions)
+            insert_all(all_desired_extensions, get_spirv_extension_requirements(
+                                                   spirv_ext, effective_device_vk_api_version));
+        for (const auto* spirv_cap : support_info.required_spirv_capabilities) {
+            insert_all(all_desired_extensions,
+                       get_spirv_capability_extensions(spirv_cap, effective_device_vk_api_version));
+            all_desired_features.enable_features(
+                get_spirv_capability_features(spirv_cap, effective_device_vk_api_version));
+        }
+    }
+
+    Context::FeatureExtensionCheckResult result;
+
+    for (const char* ext : all_desired_features.get_required_extensions()) {
+        const ExtensionInfo* ext_info = get_extension_info(ext);
+        if (ext_info != nullptr && ext_info->is_instance_extension()) {
+            if (instance->get_vk_api_version() < ext_info->promoted_to_version &&
+                !instance->extension_enabled(ext) && supported_instance_extensions.contains(ext) &&
+                supported_instance_extensions.at(ext).supported) {
+                result.missing_instance_extensions.emplace_back(ext);
+            }
+        } else {
+            all_desired_extensions.emplace_back(ext);
+        }
+    }
+
+    sort_and_remove_duplicates(all_desired_extensions);
+
+    SPDLOG_DEBUG("checking features...");
+    for (const auto& feature_name : all_desired_features.get_enabled_features()) {
+        if (physical_device->get_supported_features().get_feature(feature_name)) {
+            result.features.set_feature(feature_name, true);
+            SPDLOG_DEBUG("enable {}", feature_name);
+        } else {
+            SPDLOG_WARN("{} requested but not supported", feature_name);
+        }
+    }
+
+    SPDLOG_DEBUG("checking extensions...");
+    for (uint32_t i = 0; i < all_desired_extensions.size(); i++) {
+        const char* ext = all_desired_extensions[i];
+        const auto support_it = physical_device->get_extension_support().find(ext);
+        if (support_it == physical_device->get_extension_support().end()) {
+            SPDLOG_WARN("removed device extension {} that is not advertised as supported", ext);
+            continue;
+        }
+        if (!support_it->second.supported) {
+            SPDLOG_WARN("removed device extension {} that is unsupported because {}", ext,
+                        support_it->second.info);
+            insert_all(result.missing_instance_extensions,
+                       support_it->second.missing_instance_extensions);
+            continue;
+        }
+        const ExtensionInfo* ext_info = get_extension_info(ext);
+        if (ext_info != nullptr &&
+            ext_info->promoted_to_version <= effective_device_vk_api_version) {
+            SPDLOG_DEBUG("removed device extension {} that is already provided by API version",
+                         ext);
+            continue;
+        }
+        if (ext_info != nullptr && ext_info->deprecated_by != nullptr &&
+            physical_device->extension_supported(ext_info->deprecated_by->name)) {
+            SPDLOG_DEBUG("removed deprecated device extension {} and replaced with {}", ext,
+                         ext_info->deprecated_by->name);
+            continue;
+        }
+
+        insert_all(all_desired_extensions, support_it->second.dependencies);
+
+        SPDLOG_DEBUG("enable {}", ext);
+        result.extensions.emplace_back(ext);
+    }
+
+    sort_and_remove_duplicates(result.extensions);
+
+    return result;
+}
+
+void Context::create_device_and_queues(uint32_t preferred_number_compute_queues,
+                                       VulkanFeatures& features,
+                                       std::vector<const char*>& extensions) {
 
     // -------------------------------
     // PREPARE QUEUES
@@ -617,34 +883,8 @@ void Context::create_device_and_queues(
                                           queue_priorities.data()});
         }
     }
-    // -------------------------------
-    // DEVICE EXTENSIONS
-    VulkanFeatures features = desired_features;
-    std::vector<const char*> extensions = desired_additional_extensions;
-
-    const uint32_t vk_api_version = VK_HEADER_VERSION_COMPLETE;
-
-    for (const auto& ext : get_extensions()) {
-        const auto& support_info = support_cache.results.at(ext);
-
-        insert_all(extensions, support_info.required_extensions);
-
-        for (const auto* feature_name : support_info.required_features)
-            features.set_feature(feature_name, true);
-
-        for (const auto* spirv_ext : support_info.required_spirv_extensions)
-            insert_all(extensions, get_spirv_extension_requirements(spirv_ext, vk_api_version));
-
-        for (const auto* spirv_cap : support_info.required_spirv_capabilities) {
-            insert_all(extensions, get_spirv_capability_extensions(spirv_cap, vk_api_version));
-            features.enable_features(get_spirv_capability_features(spirv_cap, vk_api_version));
-        }
-    }
 
     // -------------------------------
-
-    std::sort(extensions.begin(), extensions.end());
-    remove_duplicates(extensions);
 
     // Setup p_next for extensions
     // Extensions can enable features of their extensions

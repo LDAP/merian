@@ -95,10 +95,9 @@ class SpirvReflect {
 
         const uint32_t vk_api_version = vulkan_api_version_for_spriv_version(get_spirv_version());
         if (vk_api_version > query_info.physical_device->get_vk_api_version()) {
-            return DeviceSupportInfo{false, fmt::format("Requires Vulkan {}.{}.{}",
-                                                        VK_API_VERSION_MAJOR(vk_api_version),
-                                                        VK_API_VERSION_MINOR(vk_api_version),
-                                                        VK_API_VERSION_PATCH(vk_api_version))};
+            return DeviceSupportInfo{false, fmt::format("Spirv version {} requires Vulkan {}",
+                                                        format_spirv_version(get_spirv_version()),
+                                                        format_vk_api_version(vk_api_version))};
         }
 
         const auto& supported_caps = query_info.physical_device->get_supported_spirv_capabilities();

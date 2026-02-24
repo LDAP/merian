@@ -27,7 +27,7 @@ endforeach
 stb = static_library(
   'stb',
   implementations,
-  cpp_args: args,
+  c_args: args,
   include_directories: include_dirs,
   install: true,
 )
