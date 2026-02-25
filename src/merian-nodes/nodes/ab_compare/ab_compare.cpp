@@ -32,6 +32,8 @@ void ABSplit::process([[maybe_unused]] GraphRun& run,
     cmd_blit_fit(cmd, b, vk::ImageLayout::eTransferSrcOptimal, b->get_extent(), result,
                  vk::ImageLayout::eTransferDstOptimal, result->get_extent());
 
+    cmd->barrier(result->barrier2(vk::ImageLayout::eTransferDstOptimal));
+
     vk::Extent3D a_extent = a->get_extent();
     a_extent.width /= 2;
     vk::Extent3D result_extent = result->get_extent();
