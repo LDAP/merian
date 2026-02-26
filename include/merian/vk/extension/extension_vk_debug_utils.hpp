@@ -48,7 +48,7 @@ class ExtensionVkDebugUtils : public ContextExtension {
     }
 
     void on_instance_created(const InstanceHandle& /*unused*/,
-                            const ExtensionContainer& /*extension_container*/) override;
+                             const ExtensionContainer& /*extension_container*/) override;
 
     void* pnext_instance_create_info(void* const p_next) override;
 
@@ -88,9 +88,7 @@ class ExtensionVkDebugUtils : public ContextExtension {
     vk::DebugUtilsMessengerCreateInfoEXT create_info;
     vk::DebugUtilsMessengerEXT messenger = VK_NULL_HANDLE;
 
-    std::vector<vk::ValidationFeatureEnableEXT> validation_feature_enables = {
-        vk::ValidationFeatureEnableEXT::eDebugPrintf,
-    };
+    std::vector<vk::ValidationFeatureEnableEXT> validation_feature_enables = {};
     vk::ValidationFeaturesEXT validation_features;
 };
 
