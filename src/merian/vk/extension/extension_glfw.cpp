@@ -7,14 +7,6 @@ namespace merian {
 
 ExtensionGLFW::ExtensionGLFW() : ContextExtension() {
     glfwSetErrorCallback(glfw_error_callback);
-
-    SPDLOG_DEBUG("Initialize GLFW");
-    glfw_initialized = glfwInit();
-    if (glfw_initialized == GLFW_FALSE) {
-        SPDLOG_WARN("GLFW initialization failed!");
-    }
-
-    SPDLOG_DEBUG("Initialized GLFW: {}", glfw_initialized == GLFW_TRUE);
 }
 
 ExtensionGLFW::~ExtensionGLFW() {
@@ -27,11 +19,19 @@ void ExtensionGLFW::on_context_initializing(const PFN_vkGetInstanceProcAddr load
                                             [[maybe_unused]] const FileLoaderHandle& file_loader,
                                             [[maybe_unused]] const ContextCreateInfo& create_info) {
 
-    SPDLOG_DEBUG("Querying Vulkan support");
     glfwInitVulkanLoader(loader);
-    glfw_vulkan_support = glfwVulkanSupported();
-    if (glfw_vulkan_support == GLFW_FALSE) {
-        SPDLOG_WARN("...failed! GLFW reports to have no Vulkan support!");
+
+    SPDLOG_DEBUG("Initialize GLFW...");
+    glfw_initialized = glfwInit();
+
+    if (glfw_initialized == GLFW_TRUE) {
+        SPDLOG_DEBUG("Querying Vulkan support...");
+        glfw_vulkan_support = glfwVulkanSupported();
+    }
+
+    if (glfw_initialized == GLFW_FALSE || glfw_vulkan_support == GLFW_FALSE) {
+        SPDLOG_WARN("...failed! GLFW initialized: {}, Vulkan support: {}", bool(glfw_initialized),
+                    bool(glfw_vulkan_support));
     } else {
         SPDLOG_DEBUG("...success!");
     }
