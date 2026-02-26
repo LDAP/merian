@@ -21,7 +21,7 @@ void ExtensionGLFW::on_context_initializing(const PFN_vkGetInstanceProcAddr load
 
     glfwInitVulkanLoader(loader);
 
-    SPDLOG_DEBUG("Initialize GLFW...");
+    SPDLOG_DEBUG("Initialize GLFW {}...", glfwGetVersionString());
     glfw_initialized = glfwInit();
 
     if (glfw_initialized == GLFW_TRUE) {
