@@ -12,9 +12,15 @@ using SEVERITY = vk::DebugUtilsMessageSeverityFlagBitsEXT;
 using MESSAGE = vk::DebugUtilsMessageTypeFlagBitsEXT;
 
 class ExtensionVkDebugUtils : public ContextExtension {
+  private:
+    static bool assert_message_default() {
+        const char* env = std::getenv("MERIAN_ASSERT_VALIDATION_ERROR");
+        return env == nullptr || !(std::string_view(env) == "false");
+    }
+
   public:
     // Set assert_message to true to throw if an message with severity error is emitted.
-    ExtensionVkDebugUtils(bool assert_message = true,
+    ExtensionVkDebugUtils(bool assert_message = assert_message_default(),
                           const std::unordered_set<int32_t>& ignore_message_ids = {648835635,
                                                                                    767975156})
         : ContextExtension(), user_data(ignore_message_ids, assert_message) {
