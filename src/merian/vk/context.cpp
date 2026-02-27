@@ -470,6 +470,15 @@ void Context::create_instance(const uint32_t targeted_vk_api_version,
         targeted_vk_api_version,
     };
 
+    {
+        const InstanceSupportQueryInfo support_info{file_loader, supported_instance_extension_names,
+                                                    supported_instance_layers, *this};
+        for (const auto& ext : get_extensions()) {
+            ext->on_create_instance(support_info, application_info, instance_layer_names,
+                                    instance_extension_names);
+        }
+    }
+
     vk::InstanceCreateInfo instance_create_info{
         {}, &application_info, instance_layer_names, instance_extension_names, p_next,
     };

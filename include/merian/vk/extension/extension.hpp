@@ -242,6 +242,12 @@ class ContextExtension {
         return p_next;
     }
 
+    virtual void on_create_instance([[maybe_unused]] const InstanceSupportQueryInfo& support_info,
+                                    [[maybe_unused]] const vk::ApplicationInfo& application_info,
+                                    [[maybe_unused]] std::vector<const char*>& layer_names,
+                                    [[maybe_unused]] std::vector<const char*>& extension_names) {
+    }
+
     virtual void on_instance_created(const InstanceHandle& /*unused*/,
                                      const ExtensionContainer& /*extension_container*/) {}
 
