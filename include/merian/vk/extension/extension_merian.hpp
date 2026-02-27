@@ -16,6 +16,9 @@ class ExtensionMerian : public ContextExtension {
         return {
             "merian-mitigations",
             "merian-compatibility",
+#ifndef NDEBUG
+            "merian-debug-utils",
+#endif
         };
     }
 

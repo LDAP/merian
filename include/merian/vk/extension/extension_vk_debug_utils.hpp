@@ -43,10 +43,6 @@ class ExtensionVkDebugUtils : public ContextExtension {
         InstanceSupportInfo info;
         info.required_extensions = {
             VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
-            VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
-        };
-        info.required_layers = {
-            "VK_LAYER_KHRONOS_validation",
         };
         info.supported =
             query_info.supported_extensions.contains(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);

@@ -8,6 +8,7 @@
 #include "merian/vk/extension/extension_resources.hpp"
 #include "merian/vk/extension/extension_vk_debug_utils.hpp"
 #include "merian/vk/extension/extension_vk_layer_settings.hpp"
+#include "merian/vk/extension/extension_vk_validation_layers.hpp"
 #include "merian/vk/extension/extension_vma.hpp"
 
 namespace merian {
@@ -24,8 +25,9 @@ ExtensionRegistry::ExtensionRegistry() {
     register_extension<ExtensionMerian>("merian");
     register_extension<ExtensionMitigations>("merian-mitigations");
     register_extension<ExtensionResources>("merian-resources");
-    register_extension<ExtensionVkDebugUtils>("vk_debug_utils");
-    register_extension<ExtensionVkLayerSettings>("vk_layer_settings");
+    register_extension<ExtensionVkDebugUtils>("merian-debug-utils");
+    register_extension<ExtensionVkLayerSettings>("merian-layer-settings");
+    register_extension<ExtensionVkValidationLayers>("merian-validation-layers");
     register_extension<ExtensionVMA>("merian-vma");
 }
 
