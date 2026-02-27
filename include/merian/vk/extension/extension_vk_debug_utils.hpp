@@ -14,7 +14,7 @@ using MESSAGE = vk::DebugUtilsMessageTypeFlagBitsEXT;
 class ExtensionVkDebugUtils : public ContextExtension {
   private:
     static bool assert_message_default() {
-        const char* env = std::getenv("MERIAN_ASSERT_VALIDATION_ERROR");
+        const char* env = std::getenv("MERIAN_DEBUG_UTILS_ASSERT_ERROR");
         return env == nullptr || !(std::string_view(env) == "false");
     }
 
