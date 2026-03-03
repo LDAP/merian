@@ -90,7 +90,7 @@ class SlangSession {
         slang_session_desc.searchPaths = search_paths.data();
         slang_session_desc.searchPathCount = (SlangInt)search_paths.size();
 
-        std::array<slang::CompilerOptionEntry, 2> options = {
+        std::array<slang::CompilerOptionEntry, 3> options = {
             {
                 {
                     slang::CompilerOptionName::EmitSpirvDirectly,
@@ -100,6 +100,12 @@ class SlangSession {
                     slang::CompilerOptionName::Optimization,
                     {slang::CompilerOptionValueKind::Int,
                      static_cast<int32_t>(shader_compile_context->get_optimization_level()), 0,
+                     nullptr, nullptr},
+                },
+                {
+                    slang::CompilerOptionName::DebugInformation,
+                    {slang::CompilerOptionValueKind::Int,
+                     static_cast<int32_t>(shader_compile_context->should_generate_debug_info()), 0,
                      nullptr, nullptr},
                 },
             },

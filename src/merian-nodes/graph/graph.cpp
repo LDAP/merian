@@ -179,19 +179,7 @@ void Graph::run() {
                 SPDLOG_TRACE("running node: {}", node_debug_name);
             }
 
-            try {
-                run_node(graph_run, node, data, profiler);
-            } catch (const graph_errors::node_error& e) {
-                data.errors_queued.emplace_back(fmt::format("node error: {}", e.what()));
-            } catch (const GLSLShaderCompiler::compilation_failed& e) {
-                data.errors_queued.emplace_back(fmt::format("compilation failed: {}", e.what()));
-            }
-            if (!data.errors_queued.empty()) {
-                SPDLOG_ERROR("executing node '{}' failed:\n - {}", data.identifier,
-                             fmt::join(data.errors_queued, "\n   - "));
-                request_reconnect();
-                SPDLOG_ERROR("emergency reconnect.");
-            }
+            run_node(graph_run, node, data, profiler);
 
             if (debug_utils)
                 debug_utils->cmd_end_label(*graph_run.get_cmd());
@@ -352,7 +340,20 @@ void Graph::run_node(GraphRun& run,
     }
 
     {
-        node->process(run, descriptor_set, data.resource_maps[set_idx]);
+        try {
+            node->process(run, descriptor_set, data.resource_maps[set_idx]);
+        } catch (const graph_errors::node_error& e) {
+            data.errors_queued.emplace_back(fmt::format("node error: {}", e.what()));
+        } catch (const GLSLShaderCompiler::compilation_failed& e) {
+            data.errors_queued.emplace_back(fmt::format("compilation failed: {}", e.what()));
+        }
+        if (!data.errors_queued.empty()) {
+            SPDLOG_ERROR("executing node '{}' failed:\n - {}", data.identifier,
+                         fmt::join(data.errors_queued, "\n   - "));
+            request_reconnect();
+            SPDLOG_ERROR("emergency reconnect.");
+        }
+
 #ifndef NDEBUG
         if (run.needs_reconnect && !get_needs_reconnect()) {
             SPDLOG_DEBUG("node {} requested reconnect in process", data.identifier);

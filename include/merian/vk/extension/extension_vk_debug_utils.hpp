@@ -12,9 +12,15 @@ using SEVERITY = vk::DebugUtilsMessageSeverityFlagBitsEXT;
 using MESSAGE = vk::DebugUtilsMessageTypeFlagBitsEXT;
 
 class ExtensionVkDebugUtils : public ContextExtension {
+  private:
+    static bool assert_message_default() {
+        const char* env = std::getenv("MERIAN_DEBUG_UTILS_ASSERT_ERROR");
+        return env == nullptr || !(std::string_view(env) == "false");
+    }
+
   public:
     // Set assert_message to true to throw if an message with severity error is emitted.
-    ExtensionVkDebugUtils(bool assert_message = true,
+    ExtensionVkDebugUtils(bool assert_message = assert_message_default(),
                           const std::unordered_set<int32_t>& ignore_message_ids = {648835635,
                                                                                    767975156})
         : ContextExtension(), user_data(ignore_message_ids, assert_message) {
@@ -37,10 +43,6 @@ class ExtensionVkDebugUtils : public ContextExtension {
         InstanceSupportInfo info;
         info.required_extensions = {
             VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
-            VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
-        };
-        info.required_layers = {
-            "VK_LAYER_KHRONOS_validation",
         };
         info.supported =
             query_info.supported_extensions.contains(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
@@ -48,7 +50,7 @@ class ExtensionVkDebugUtils : public ContextExtension {
     }
 
     void on_instance_created(const InstanceHandle& /*unused*/,
-                            const ExtensionContainer& /*extension_container*/) override;
+                             const ExtensionContainer& /*extension_container*/) override;
 
     void* pnext_instance_create_info(void* const p_next) override;
 
@@ -88,9 +90,7 @@ class ExtensionVkDebugUtils : public ContextExtension {
     vk::DebugUtilsMessengerCreateInfoEXT create_info;
     vk::DebugUtilsMessengerEXT messenger = VK_NULL_HANDLE;
 
-    std::vector<vk::ValidationFeatureEnableEXT> validation_feature_enables = {
-        vk::ValidationFeatureEnableEXT::eDebugPrintf,
-    };
+    std::vector<vk::ValidationFeatureEnableEXT> validation_feature_enables = {};
     vk::ValidationFeaturesEXT validation_features;
 };
 
