@@ -8,7 +8,6 @@
 #include "merian/vk/memory/resource_allocations.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
 #include "merian/vk/renderpass/framebuffer.hpp"
-#include "merian/vk/utils/check_result.hpp"
 #include "merian/vk/utils/query_pool.hpp"
 
 #include <vulkan/vulkan.hpp>
@@ -20,6 +19,9 @@
 #endif
 
 namespace merian {
+
+class ShaderBindingTable;
+using ShaderBindingTableHandle = std::shared_ptr<ShaderBindingTable>;
 
 class CommandBuffer;
 using CommandBufferHandle = std::shared_ptr<CommandBuffer>;
@@ -488,6 +490,15 @@ class CommandBuffer : public std::enable_shared_from_this<CommandBuffer> {
     // computes the group count from the extent and local size.
     void
     dispatch(const vk::Extent2D& extent, const uint32_t local_size_x, const uint32_t local_size_y);
+
+    // Dispatch ray tracing. Pipeline must already be bound via bind().
+    void trace_rays(const ShaderBindingTableHandle& sbt,
+                    uint32_t width,
+                    uint32_t height,
+                    uint32_t depth = 1);
+
+    void trace_rays(const ShaderBindingTableHandle& sbt, const vk::Extent3D& extent);
+    void trace_rays(const ShaderBindingTableHandle& sbt, const vk::Extent2D& extent);
 
     // ------------------------------------------------------------
     // MISC
