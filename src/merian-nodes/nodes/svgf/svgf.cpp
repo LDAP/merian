@@ -16,6 +16,19 @@ SVGF::SVGF() {}
 SVGF::~SVGF() {}
 
 DeviceSupportInfo SVGF::query_device_support(const DeviceSupportQueryInfo& query_info) {
+    const uint32_t shared_memory_size =
+        query_info.physical_device->get_device_limits().maxComputeSharedMemorySize;
+    if ((filter_local_size + SVGF_FILTER_HALO_RADIUS * 2) *
+            (filter_local_size + SVGF_FILTER_HALO_RADIUS * 2) * FILTER_SHARED_MEMORY_PER_PIXEL >
+        shared_memory_size) {
+        return DeviceSupportInfo{false, "not enough shared memory for filter."};
+    }
+    if ((variance_estimate_local_size + SVGF_VE_HALO_RADIUS * 2) *
+            (variance_estimate_local_size + SVGF_VE_HALO_RADIUS * 2) * VE_SHARED_MEMORY_PER_PIXEL >
+        shared_memory_size) {
+        return DeviceSupportInfo{false, "not enough shared memory for variance estimate."};
+    }
+
     ShaderCompileContextHandle compilation_ctx = ShaderCompileContext::create(
         query_info.file_loader->get_search_paths(), query_info.physical_device);
     compilation_ctx->add_search_path("merian-nodes/nodes/svgf");
@@ -73,15 +86,6 @@ std::vector<OutputConnectorDescriptor> SVGF::describe_outputs(const NodeIOLayout
 
 SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
                                          const DescriptorSetLayoutHandle& graph_layout) {
-    variance_estimate_local_size = workgroup_size_for_shared_memory_with_halo(
-        context, VE_SHARED_MEMORY_PER_PIXEL, SVGF_VE_HALO_RADIUS, 32, 16);
-    if (kaleidoscope && kaleidoscope_use_shmem) {
-        filter_local_size = workgroup_size_for_shared_memory_with_halo(
-            context, FILTER_SHARED_MEMORY_PER_PIXEL, SVGF_FILTER_HALO_RADIUS, 32, 16);
-    } else {
-        filter_local_size = 32;
-    }
-
     if (!ping_pong_layout) {
         ping_pong_layout = DescriptorSetLayoutBuilder()
                                .add_binding_combined_sampler() // irradiance
