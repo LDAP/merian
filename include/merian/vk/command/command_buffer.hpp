@@ -113,6 +113,9 @@ class CommandBuffer : public std::enable_shared_from_this<CommandBuffer> {
               const BufferHandle& dst_buffer,
               const vk::ArrayProxy<const vk::BufferCopy>& regions);
 
+    // Copies the min of both sizes to to and from offset 0.
+    void copy(const BufferHandle& src_buffer, const BufferHandle& dst_buffer);
+
     void fill(const BufferHandle& buffer, const uint32_t data = 0);
 
     template <typename DataType>

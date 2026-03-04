@@ -73,6 +73,11 @@ void CommandBuffer::copy(const BufferHandle& src_buffer,
     keep_until_pool_reset(dst_buffer);
 }
 
+void CommandBuffer::copy(const BufferHandle& src_buffer, const BufferHandle& dst_buffer) {
+    copy(src_buffer, dst_buffer,
+         vk::BufferCopy{0, 0, std::min(src_buffer->get_size(), dst_buffer->get_size())});
+}
+
 void CommandBuffer::fill(const BufferHandle& buffer, const uint32_t data) {
     cmd.fillBuffer(*buffer, 0, VK_WHOLE_SIZE, data);
     keep_until_pool_reset(buffer);
