@@ -142,8 +142,19 @@ ShadercCompiler::compile_glsl(const std::string& source,
     const shaderc_shader_kind kind = shaderc_shader_kind_for_stage_flag_bit(shader_kind);
 
     shaderc::CompileOptions compile_options;
-    if (shader_compile_context->should_generate_debug_info())
+    if (shader_compile_context->should_generate_debug_info()) {
         compile_options.SetGenerateDebugInfo();
+        compile_options.SetOptimizationLevel(
+            shaderc_optimization_level::shaderc_optimization_level_zero);
+    } else {
+        if (shader_compile_context->get_optimization_level() > 0) {
+            compile_options.SetOptimizationLevel(
+                shaderc_optimization_level::shaderc_optimization_level_performance);
+        } else {
+            compile_options.SetOptimizationLevel(
+                shaderc_optimization_level::shaderc_optimization_level_zero);
+        }
+    }
 
     for (const auto& [key, value] : shader_compile_context->get_preprocessor_macros()) {
         compile_options.AddMacroDefinition(key, value);
@@ -152,10 +163,6 @@ ShadercCompiler::compile_glsl(const std::string& source,
     auto includer =
         std::make_unique<FileIncluder>(shader_compile_context->get_search_path_file_loader());
     compile_options.SetIncluder(std::move(includer));
-    if (shader_compile_context->get_optimization_level() > 0) {
-        compile_options.SetOptimizationLevel(
-            shaderc_optimization_level::shaderc_optimization_level_performance);
-    }
 
     if (shader_compile_context->get_target_vk_api_version() == VK_API_VERSION_1_0) {
         compile_options.SetTargetEnvironment(shaderc_target_env_vulkan,
