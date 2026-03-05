@@ -15,12 +15,15 @@ class Shadertoy : public AbstractCompute {
 
   private:
     struct PushConstant {
+        merian::float4 iMouse{};
+        merian::float4 iDate{};
         merian::float2 iResolution{};
         float iTime{};
         float iTimeDelta{};
         int32_t iFrame{};
-        merian::float4 iMouse{};
-        merian::float4 iDate{};
+        int32_t pad_1{};
+        int32_t pad_2{};
+        int32_t pad_3{};
     };
 
   public:
