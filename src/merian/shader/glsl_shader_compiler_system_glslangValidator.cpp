@@ -59,7 +59,7 @@ BlobHandle SystemGlslangValidatorCompiler::compile_glsl(
     }
 
     if (shader_compile_context->should_generate_debug_info()) {
-        command.emplace_back("-g");
+        command.emplace_back("-gVS");
     }
 
     const std::string output_file = temporary_file();

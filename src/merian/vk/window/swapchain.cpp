@@ -181,13 +181,19 @@ vk::Extent2D Swapchain::create_swapchain(const uint32_t width, const uint32_t he
     vk::SwapchainKHR old = VK_NULL_HANDLE;
 
     if (old_swapchain) {
-        SPDLOG_DEBUG("recreate swapchain (old: {})", fmt::ptr(VkSwapchainKHR(old_swapchain->swapchain)));
+        SPDLOG_DEBUG("recreate swapchain (old: {})",
+                     fmt::ptr(VkSwapchainKHR(old_swapchain->swapchain)));
         old = old_swapchain->swapchain;
     } else {
         SPDLOG_DEBUG("create swapchain");
     }
 
     const auto& capabilities = surface->get_capabilities();
+    SPDLOG_DEBUG("surface info, min images: {}, max images: {}, min extent {}x{}, max "
+                 "extent: {}x{}",
+                 capabilities.minImageCount, capabilities.maxImageCount,
+                 capabilities.minImageExtent.width, capabilities.minImageExtent.height,
+                 capabilities.maxImageExtent.width, capabilities.maxImageExtent.height);
 
     info = SwapchainInfo();
     info->extent = make_extent2D(capabilities, width, height);
@@ -259,8 +265,8 @@ vk::Extent2D Swapchain::create_swapchain(const uint32_t width, const uint32_t he
 
     swapchain = context->get_device()->get_device().createSwapchainKHR(create_info, nullptr);
 
-    info->cur_width = width;
-    info->cur_height = height;
+    info->cur_width = info->extent.width;
+    info->cur_height = info->extent.height;
     info->present_mode = new_present_mode;
     info->surface_format = new_surface_format;
     info->images = context->get_device()->get_device().getSwapchainImagesKHR(swapchain);
@@ -298,7 +304,7 @@ Swapchain::acquire(const vk::Extent2D extent, const uint64_t timeout) {
 
     if (!swapchain) {
         create_swapchain(extent.width, extent.height);
-    } else if (extent.width != info->cur_width || extent.height != info->cur_height) {
+    } else if (extent != info->extent) {
         info.reset();
         throw needs_recreate("changed framebuffer size");
     } else if (new_present_mode != info->present_mode) {
