@@ -20,6 +20,8 @@ class GLFWWindow : public Window {
         : context(context) {
         SPDLOG_DEBUG("create window ({})", fmt::ptr(this));
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+        glfwWindowHint(GLFW_SCALE_FRAMEBUFFER, GLFW_TRUE);
+        glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_TRUE);
         window = glfwCreateWindow(width, height, title, nullptr, nullptr);
     }
 
