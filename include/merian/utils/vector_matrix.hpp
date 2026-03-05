@@ -82,19 +82,19 @@ concept AllNumericOrGlm = (NumericOrGlm<Args> && ...);
 template <int R, int C, int D, typename T>
 matRxC<R, D, T> constexpr mul(const matRxC<R, C, T>& m1, const matRxC<C, D, T>& m2) {
     // see above: glm is column-major so we need to adapt the operations to our row-major view.
-    return m2 * m1;
+    return glm::operator*(m2, m1);
 }
 
 template <int R, int C, typename T>
 vecL<R, T> constexpr mul(const matRxC<R, C, T>& m, const vecL<C, T>& v) {
     // see above: glm is column-major so we need to adapt the operations to our row-major view.
-    return v * m;
+    return glm::operator*(v, m);
 }
 
 template <int R, int C, typename T>
 vecL<C, T> constexpr mul(const vecL<R, T>& v, const matRxC<R, C, T>& m) {
     // see above: glm is column-major so we need to adapt the operations to our row-major view.
-    return m * v;
+    return glm::operator*(m, v);
 }
 
 using glm::normalize;
