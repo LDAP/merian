@@ -115,6 +115,28 @@ class PhysicalDevice : public std::enable_shared_from_this<PhysicalDevice> {
 
     // ----------------------------------------
 
+    bool is_amd() const {
+        return properties.get_properties().vendorID == 0x1002;
+    }
+
+    bool is_nvidia() const {
+        return properties.get_properties().vendorID == 0x10DE;
+    }
+
+    bool is_intel() const {
+        return properties.get_properties().vendorID == 0x8086;
+    }
+
+    bool is_arm() const {
+        return properties.get_properties().vendorID == 0x13B5;
+    }
+
+    bool is_qualcomm() const {
+        return properties.get_properties().vendorID == 0x5143;
+    }
+
+    // ----------------------------------------
+
   private:
     const std::unordered_set<std::string>& determine_device_extension_support();
 

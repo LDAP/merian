@@ -73,14 +73,18 @@ std::vector<OutputConnectorDescriptor> SVGF::describe_outputs(const NodeIOLayout
 
 SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
                                          const DescriptorSetLayoutHandle& graph_layout) {
+    const uint32_t max_wg_size_vendor = context->get_physical_device()->is_amd() ? 32 : 16;
+
     variance_estimate_local_size = workgroup_size_for_shared_memory_with_halo(
         context, VE_SHARED_MEMORY_PER_PIXEL, SVGF_VE_HALO_RADIUS, 32, 16);
     if (kaleidoscope && kaleidoscope_use_shmem) {
         filter_local_size = workgroup_size_for_shared_memory_with_halo(
-            context, FILTER_SHARED_MEMORY_PER_PIXEL, SVGF_FILTER_HALO_RADIUS, 32, 16);
+            context, FILTER_SHARED_MEMORY_PER_PIXEL, SVGF_FILTER_HALO_RADIUS,
+            max_wg_size_vendor, 16);
     } else {
-        filter_local_size = 32;
+        filter_local_size = max_wg_size_vendor;
     }
+    taa_local_size = max_wg_size_vendor;
 
     if (!ping_pong_layout) {
         ping_pong_layout = DescriptorSetLayoutBuilder()

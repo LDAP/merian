@@ -64,8 +64,7 @@ class SVGF : public Node {
     // depends on available shared memory
     uint32_t variance_estimate_local_size;
     uint32_t filter_local_size;
-
-    const uint32_t taa_local_size = 32;
+    uint32_t taa_local_size;
 
     VkSampledImageInHandle con_prev_out = VkSampledImageIn::compute_read(1);
     VkSampledImageInHandle con_src = VkSampledImageIn::compute_read();

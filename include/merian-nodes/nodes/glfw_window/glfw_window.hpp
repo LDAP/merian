@@ -120,6 +120,7 @@ class GLFWWindowNode : public Node {
             SwapchainHandle swapchain = get_swapchain();
             run.add_submit_callback([index, swapchain](const QueueHandle& queue, GraphRun& run) {
                 try {
+                    MERIAN_PROFILE_SCOPE(run.get_profiler(), "present");
                     Stopwatch present_duration;
                     swapchain->present(queue, index);
                     run.hint_external_wait_time(present_duration.duration());
