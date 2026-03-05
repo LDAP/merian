@@ -16,15 +16,8 @@ void ExtensionGLSLCompiler::on_context_initializing(
     [[maybe_unused]] const FileLoaderHandle& file_loader,
     [[maybe_unused]] const ContextCreateInfo& create_info) {
 
-    // Try to use shaderc (preferred)
-    auto shaderc = std::make_shared<ShadercCompiler>();
-    if (shaderc->available()) {
-        SPDLOG_DEBUG("using shipped shaderc for GLSL compilation");
-        compiler = shaderc;
-        return;
-    }
-
-    // Fall back to system glslangValidator
+    // Try system glslangValidator
+    // Generates best debug information
     auto glslang = std::make_shared<SystemGlslangValidatorCompiler>();
     if (glslang->available()) {
         SPDLOG_DEBUG("using system glslangValidator for GLSL compilation");
@@ -32,7 +25,15 @@ void ExtensionGLSLCompiler::on_context_initializing(
         return;
     }
 
-    // Fall back to system glslc
+    // Try bundled shaderc
+    auto shaderc = std::make_shared<ShadercCompiler>();
+    if (shaderc->available()) {
+        SPDLOG_DEBUG("using shipped shaderc for GLSL compilation");
+        compiler = shaderc;
+        return;
+    }
+
+    // Try system glslc
     auto glslc = std::make_shared<SystemGlslcCompiler>();
     if (glslc->available()) {
         SPDLOG_DEBUG("using system glslc for GLSL compilation");

@@ -59,10 +59,8 @@ SystemGlslcCompiler::compile_glsl(const std::string& source,
 
     if (shader_compile_context->should_generate_debug_info()) {
         command.emplace_back("-g");
-    }
-
-    // turn on optimization
-    if (shader_compile_context->get_optimization_level() > 0) {
+        command.emplace_back("-O0");
+    } else if (shader_compile_context->get_optimization_level() > 0) {
         command.emplace_back("-O");
     }
 
