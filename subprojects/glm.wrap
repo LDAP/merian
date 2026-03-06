@@ -2,7 +2,7 @@
 directory = glm
 
 url = https://github.com/g-truc/glm
-revision = 1.0.2
+revision = 1.0.3
 depth = 1
 
 patch_directory = glm

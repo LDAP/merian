@@ -23,7 +23,6 @@ GLFWImGui::~GLFWImGui() {
     if (imgui_initialized) {
         context->get_device()->get_device().waitIdle();
 
-        ImGui_ImplVulkan_DestroyFontsTexture();
         ImGui_ImplVulkan_Shutdown();
 
         ImGui_ImplGlfw_RestoreCallbacks(window);
@@ -71,6 +70,7 @@ void GLFWImGui::create_render_pass(const SwapchainAcquireResult& aquire_result) 
 
 void GLFWImGui::init_vulkan(const SwapchainAcquireResult& aquire_result, const QueueHandle& queue) {
     ImGui_ImplVulkan_InitInfo init_info = {};
+    init_info.ApiVersion = queue->get_context()->get_instance()->get_vk_api_version();
     init_info.Instance = context->get_instance()->get_instance();
     init_info.PhysicalDevice = context->get_physical_device()->get_physical_device();
     init_info.Device = context->get_device()->get_device();
@@ -78,19 +78,17 @@ void GLFWImGui::init_vulkan(const SwapchainAcquireResult& aquire_result, const Q
     init_info.Queue = queue->get_queue();
     init_info.PipelineCache = context->get_device()->get_pipeline_cache();
     init_info.DescriptorPool = imgui_pool;
-    init_info.Subpass = 0;
     init_info.MinImageCount = aquire_result.min_images;
     init_info.ImageCount = aquire_result.num_images;
-    init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
     init_info.Allocator = VK_NULL_HANDLE;
     init_info.CheckVkResultFn = nullptr;
-    init_info.RenderPass = **renderpass;
+    init_info.PipelineInfoMain.Subpass = 0;
+    init_info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+    init_info.PipelineInfoMain.RenderPass = **renderpass;
 
     current_surface_format = aquire_result.image_view->get_image()->get_format();
 
     ImGui_ImplVulkan_Init(&init_info);
-
-    ImGui_ImplVulkan_CreateFontsTexture();
 }
 
 void GLFWImGui::init_imgui(GLFWwindow* window,
@@ -134,7 +132,6 @@ FramebufferHandle GLFWImGui::new_frame(QueueHandle& queue,
     } else if (aquire_result.did_recreate) {
         // Workaround: needs vulkan backend restart (surface format and min images)
         context->get_device()->get_device().waitIdle();
-        ImGui_ImplVulkan_DestroyFontsTexture();
         ImGui_ImplVulkan_Shutdown();
         init_vulkan(aquire_result, queue);
     }

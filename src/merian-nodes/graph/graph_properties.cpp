@@ -93,7 +93,7 @@ void Graph::profiler_properties(Properties& props) {
                         *std::max_element(cpu_samples, cpu_samples + cpu_time_history.size() - 1);
                 }
 
-                props.output_plot_line("", cpu_samples, cpu_time_history.size() - 1, 0, cpu_max);
+                props.output_plot_line("cpu", cpu_samples, cpu_time_history.size() - 1, 0, cpu_max);
                 cpu_auto &= !props.config_float("cpu max ms", cpu_max, 0, 1000);
                 props.st_no_space();
                 props.config_bool("cpu auto", cpu_auto);
@@ -108,7 +108,7 @@ void Graph::profiler_properties(Properties& props) {
                         *std::max_element(gpu_samples, gpu_samples + gpu_time_history.size() - 1);
                 }
 
-                props.output_plot_line("", gpu_samples, gpu_time_history.size() - 1, 0, gpu_max);
+                props.output_plot_line("gpu", gpu_samples, gpu_time_history.size() - 1, 0, gpu_max);
                 gpu_auto &= !props.config_float("gpu max ms", gpu_max, 0, 1000);
                 props.st_no_space();
                 props.config_bool("gpu auto", gpu_auto);
