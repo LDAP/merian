@@ -327,6 +327,10 @@ endif()
 
 if(ENABLE_SPIRV)
     add_subdirectory(SPIRV)
+    # @LDAP: create glslang/SPIRV/ symlink in the generated include dir so that
+    # #include "glslang/SPIRV/GlslangToSpv.h" works consistently with the install layout.
+    file(MAKE_DIRECTORY "${GLSLANG_GENERATED_INCLUDEDIR}/glslang")
+    file(CREATE_LINK "${CMAKE_CURRENT_SOURCE_DIR}/SPIRV" "${GLSLANG_GENERATED_INCLUDEDIR}/glslang/SPIRV" SYMBOLIC COPY_ON_ERROR)
 endif()
 add_subdirectory(glslang)
 if(ENABLE_GLSLANG_BINARIES)

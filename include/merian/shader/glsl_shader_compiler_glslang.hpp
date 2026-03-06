@@ -2,17 +2,14 @@
 
 #include "merian/shader/glsl_shader_compiler.hpp"
 
-#ifdef MERIAN_SHADERC_ENABLED
-#include <shaderc/shaderc.hpp>
-#endif
-
 namespace merian {
 
-class ShadercCompiler : public GLSLShaderCompiler {
+// Uses linked glslang to compile shaders.
+class GlslangCompiler : public GLSLShaderCompiler {
   public:
-    ShadercCompiler();
+    GlslangCompiler();
 
-    ~ShadercCompiler();
+    ~GlslangCompiler();
 
     BlobHandle
     compile_glsl(const std::string& source,
@@ -21,11 +18,6 @@ class ShadercCompiler : public GLSLShaderCompiler {
                  const ShaderCompileContextHandle& shader_compile_context) const override;
 
     bool available() const override;
-
-  private:
-#ifdef MERIAN_SHADERC_ENABLED
-    shaderc::Compiler shader_compiler{};
-#endif
 };
 
 } // namespace merian

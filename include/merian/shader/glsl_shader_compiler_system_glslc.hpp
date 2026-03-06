@@ -7,7 +7,6 @@ namespace merian {
 // Uses shaderc executable to compile shaders.
 class SystemGlslcCompiler : public GLSLShaderCompiler {
   public:
-    // Include paths for the merian-nodes library are automatically added
     SystemGlslcCompiler();
 
     ~SystemGlslcCompiler();

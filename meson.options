@@ -11,12 +11,21 @@ option('loglevel',
     value : 'auto'
 )
 
+# Shader compiler
 option(
     'shaderc',
     type: 'feature',
     value: 'auto',
     description: 'Enable support for shaderc.'
 )
+option(
+    'glslang',
+    type: 'feature',
+    value: 'auto',
+    description: 'Enable support for glslang.'
+)
+
+# Geometry and other features
 option(
     'tinygltf',
     type: 'feature',

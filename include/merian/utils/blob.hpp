@@ -63,7 +63,7 @@ template <typename T> class VectorBlob : public Blob {
     }
 
     std::size_t get_size() override {
-        return data.size();
+        return data.size() * sizeof(T);
     }
 
     std::vector<T>& get_vector() {

@@ -8,7 +8,7 @@
 
 namespace merian {
 
-// Include paths for the merian-nodes library are automatically added
+
 SystemGlslcCompiler::SystemGlslcCompiler()
     : GLSLShaderCompiler(), compiler_executable(subprocess::find_program("glslc")) {}
 

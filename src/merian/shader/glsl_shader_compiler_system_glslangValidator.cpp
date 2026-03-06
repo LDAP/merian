@@ -8,7 +8,6 @@
 
 namespace merian {
 
-// Include paths for the merian-nodes library are automatically added
 SystemGlslangValidatorCompiler::SystemGlslangValidatorCompiler()
     : GLSLShaderCompiler(), compiler_executable(subprocess::find_program("glslangValidator")) {}
 

@@ -2,6 +2,8 @@
 
 namespace merian {
 
+#ifdef MERIAN_SHADERC_ENABLED
+
 class FileIncluder final : public shaderc::CompileOptions::IncluderInterface {
   public:
     FileIncluder(const FileLoader& file_loader) : file_loader(file_loader) {}
@@ -204,5 +206,26 @@ ShadercCompiler::compile_glsl(const std::string& source,
 bool ShadercCompiler::available() const {
     return true;
 }
+
+#else
+
+ShadercCompiler::ShadercCompiler() : GLSLShaderCompiler() {}
+
+ShadercCompiler::~ShadercCompiler() {}
+
+BlobHandle ShadercCompiler::compile_glsl(
+    [[maybe_unused]] const std::string& source,
+    [[maybe_unused]] const std::string& source_name,
+    [[maybe_unused]] const vk::ShaderStageFlagBits shader_kind,
+    [[maybe_unused]] const ShaderCompileContextHandle& shader_compile_context) const {
+    throw merian::ShaderCompiler::compilation_failed{
+        "shaderc is not available (was not found or enabled at compile time)"};
+}
+
+bool ShadercCompiler::available() const {
+    return false;
+}
+
+#endif
 
 } // namespace merian

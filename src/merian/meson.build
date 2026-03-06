@@ -74,6 +74,7 @@ merian_lib = static_library(
         fmt,
         glfw,
         glm,
+        glslang,
         imgui,
         nlohmann_json,
         sdl2,

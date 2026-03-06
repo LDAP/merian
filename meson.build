@@ -103,23 +103,53 @@ if not shaderc.found() and get_option('shaderc').enabled()
     shaderc_subp = cmake.subproject('shaderc', options: shaderc_options)
     # ideally we would use shaderc_subp.dependency('shaderc_combined') but that does not work
     # therefore we combine all dependencies into one.
-    shaderc = declare_dependency(
-        dependencies: [
-            shaderc_subp.dependency('shaderc'),
-            shaderc_subp.dependency('glslang'),
-            shaderc_subp.dependency('MachineIndependent'),
-            shaderc_subp.dependency('GenericCodeGen'),
-            shaderc_subp.dependency('shaderc_util'),
-            shaderc_subp.dependency('SPIRV'),
-            shaderc_subp.dependency('SPIRV-Tools-static'),
-            shaderc_subp.dependency('SPIRV-Tools-opt'),
-        ],
-    )
+    shaderc = declare_dependency(dependencies: [
+        shaderc_subp.dependency('shaderc'),
+        shaderc_subp.dependency('glslang'),
+        shaderc_subp.dependency('MachineIndependent'),
+        shaderc_subp.dependency('GenericCodeGen'),
+        shaderc_subp.dependency('shaderc_util'),
+        shaderc_subp.dependency('SPIRV'),
+        shaderc_subp.dependency('SPIRV-Tools-static'),
+        shaderc_subp.dependency('SPIRV-Tools-opt'),
+    ])
 endif
-if shaderc.found()
-    global_args += ['-DMERIAN_SHADERC_AVAILABLE']
+if get_option('shaderc').enable_auto_if(shaderc.found()).enabled()
+    global_args += ['-DMERIAN_SHADERC_ENABLED']
 endif
+
+
+glslc = find_program('glslangValidator', required: false)
+glslang = dependency('glslang', version: ['>=16.2.0'], required: false, method: 'cmake',
+    modules: ['glslang::glslang', 'glslang::glslang-default-resource-limits', 'glslang::SPIRV'])
+shader_generator_deps = []
+if not glslc.found() or (not glslang.found() and get_option('glslang').enabled())
+    glslang_options = cmake.subproject_options()
+    glslang_options.add_cmake_defines({'GLSLANG_TESTS': false})
+    glslang_options.add_cmake_defines({'GLSLANG_ENABLE_INSTALL': false})
+    glslang_options.add_cmake_defines({'ENABLE_SPIRV': true})
+    glslang_options.set_install(false)
+    # installs as glslang_standalone
+    # glslang_options.set_install(true, target: 'glslang-standalone')
+    glslang_subp = cmake.subproject('glslang', options: glslang_options)
+    glslc = glslang_subp.target('glslang-standalone')
+    glslang = declare_dependency(dependencies: [
+        glslang_subp.dependency('glslang'),
+        glslang_subp.dependency('glslang-default-resource-limits'),
+        glslang_subp.dependency('SPIRV'),
+    ])
+    shader_generator_deps = [glslc]
+endif
+if get_option('glslang').enable_auto_if(glslang.found()).enabled()
+    global_args += ['-DMERIAN_GLSLANG_ENABLED']
+endif
+glslc_path = glslc.full_path()
+
 slang = dependency('slang', version: ['>=2025.14.3'], fallback: ['slang', 'slang_dep'])
+slangc = find_program('slangc', required: false)
+if not slangc.found()
+    slangc = subproject('slang').get_variable('slangc')
+endif
 
 generator_scripts = [
     'scripts/generate_enum_string_map.py',
@@ -142,30 +172,6 @@ project_root = meson.current_source_dir()
 inc_dirs = [
     include_directories('./include'),
 ]
-
-glslc = find_program('glslangValidator', required: false)
-if glslc.found()
-    glslc_path = glslc.full_path()
-    shader_generator_deps = []
-else
-    # :( in this case we have to build glslangValidator ourselves
-    glslang_options = cmake.subproject_options()
-    glslang_options.add_cmake_defines({'GLSLANG_TESTS': false})
-    glslang_options.add_cmake_defines({'GLSLANG_ENABLE_INSTALL': false})
-    glslang_options.set_install(false)
-    # installs as glslang_standalone
-    # glslang_options.set_install(true, target: 'glslang-standalone')
-    glslang_subp = cmake.subproject('glslang', options: glslang_options)
-    glslc_tgt = glslang_subp.target('glslang-standalone')
-    glslc_path = glslc_tgt.full_path()
-    shader_generator_deps = [glslc_tgt]
-endif
-
-slangc = find_program('slangc', required: false)
-if not slangc.found()
-    slangc = subproject('slang').get_variable('slangc')
-endif
-
 spv_compile_script = [
     meson.project_source_root() + '/scripts/compile_shader.py',
     '--glslc_path', glslc_path,
@@ -203,6 +209,7 @@ merian_dep = declare_dependency(
         fmt,
         glfw,
         glm,
+        glslang,
         imgui,
         nlohmann_json,
         shaderc,

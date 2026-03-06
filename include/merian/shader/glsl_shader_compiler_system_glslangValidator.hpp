@@ -7,7 +7,6 @@ namespace merian {
 // Uses glslangValidator executable to compile shaders.
 class SystemGlslangValidatorCompiler : public GLSLShaderCompiler {
   public:
-    // Include paths for the merian-nodes library are automatically added
     SystemGlslangValidatorCompiler();
 
     ~SystemGlslangValidatorCompiler();

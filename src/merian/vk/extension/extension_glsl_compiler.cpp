@@ -1,4 +1,5 @@
 #include "merian/vk/extension/extension_glsl_compiler.hpp"
+#include "merian/shader/glsl_shader_compiler_glslang.hpp"
 #include "merian/shader/glsl_shader_compiler_shaderc.hpp"
 #include "merian/shader/glsl_shader_compiler_system_glslangValidator.hpp"
 #include "merian/shader/glsl_shader_compiler_system_glslc.hpp"
@@ -16,19 +17,29 @@ void ExtensionGLSLCompiler::on_context_initializing(
     [[maybe_unused]] const FileLoaderHandle& file_loader,
     [[maybe_unused]] const ContextCreateInfo& create_info) {
 
-    // Try system glslangValidator
-    // Generates best debug information
-    auto glslang = std::make_shared<SystemGlslangValidatorCompiler>();
+    // Note: glslang and glslangValidator provide the best experience in debugging and profiling
+    // tools.
+
+    // Try linked glslang
+    auto glslang = std::make_shared<GlslangCompiler>();
     if (glslang->available()) {
-        SPDLOG_DEBUG("using system glslangValidator for GLSL compilation");
+        SPDLOG_DEBUG("using linked glslang for GLSL compilation");
         compiler = glslang;
+        return;
+    }
+
+    // Try system glslangValidator
+    auto glslang_validator = std::make_shared<SystemGlslangValidatorCompiler>();
+    if (glslang_validator->available()) {
+        SPDLOG_DEBUG("using system glslangValidator for GLSL compilation");
+        compiler = glslang_validator;
         return;
     }
 
     // Try bundled shaderc
     auto shaderc = std::make_shared<ShadercCompiler>();
     if (shaderc->available()) {
-        SPDLOG_DEBUG("using shipped shaderc for GLSL compilation");
+        SPDLOG_DEBUG("using linked shaderc for GLSL compilation");
         compiler = shaderc;
         return;
     }

@@ -4,6 +4,8 @@ merian_src += shader_generator.process('fullscreen_triangle.vert',
 merian_src += files(
     'entry_point.cpp',
     'glsl_shader_compiler.cpp',
+    'glsl_shader_compiler_glslang.cpp',
+    'glsl_shader_compiler_shaderc.cpp',
     'glsl_shader_compiler_system_glslangValidator.cpp',
     'glsl_shader_compiler_system_glslc.cpp',
     'shader_compiler.cpp',
@@ -19,9 +21,3 @@ merian_src += files(
     'slang_session.cpp',
     'slang_utils.cpp',
 )
-
-if shaderc.found()
-    merian_src += files('glsl_shader_compiler_shaderc.cpp')
-else
-    merian_src += files('glsl_shader_compiler_shaderc_stub.cpp')
-endif
