@@ -10,21 +10,30 @@ Merian provides a builder for `DescriptorSetLayouts` as well as a `DescriptorSet
 ### Example
 
 ```c++
-auto builder = merian::DescriptorSetLayoutBuilder()
-    .add_binding_storage_buffer()           // result
-    .add_binding_acceleration_structure()   // top-level acceleration structure
-    .add_binding_storage_buffer()           // vertex buffer
-    .add_binding_storage_buffer();          // index buffer
+auto desc_layout = merian::DescriptorSetLayoutBuilder()
+    .add_binding_storage_buffer()           // binding 0: result buffer
+    .add_binding_acceleration_structure()   // binding 1: top-level AS
+    .add_binding_storage_buffer()           // binding 2: vertex buffer
+    .add_binding_storage_buffer()           // binding 3: index buffer
+    .build_layout(context);
 
-auto desc_layout = builder.build_layout(context);
-// Shared pointers are used -> allows automatic destruction in the right order.
-auto desc_pool = std::make_shared<merian::DescriptorPool>(desc_layout);
-auto desc_set = std::make_shared<merian::DescriptorSet>(desc_pool);
+// DescriptorPool::create() is the public factory. DescriptorSet is allocated from the pool.
+// (DescriptorSet constructor is private — use desc_pool->allocate())
+auto desc_pool = merian::DescriptorPool::create(desc_layout);
+auto desc_set  = desc_pool->allocate(desc_layout);
 
-merian::DescriptorSetUpdate(desc_set)
-    .write_descriptor_buffer(0, result)
-    .write_descriptor_acceleration_structure(1, {as})
-    .write_descriptor_buffer(2, vertex_buffer)
-    .write_descriptor_buffer(3, index_buffer)
-    .update(context);
+desc_set->queue_descriptor_write_buffer(0, result_buffer)
+         .queue_descriptor_write_acceleration_structure(1, tlas)
+         .queue_descriptor_write_buffer(2, vertex_buffer)
+         .queue_descriptor_write_buffer(3, index_buffer);
+desc_set->update();
+```
+
+### Push descriptors
+
+For pipelines that use push descriptors (the graph uses push descriptors internally), resources can be pushed directly from the command buffer without allocating a descriptor pool or set:
+
+```cpp
+// Convenience overloads accept BufferHandle, TextureHandle, ImageViewHandle, ...
+cmd->push_descriptor_set(pipeline, set_index, buffer, texture, image_view);
 ```
