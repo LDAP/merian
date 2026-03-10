@@ -30,6 +30,39 @@ namespace merian {
  * - Value: Object's data is embedded in parent's buffer/descriptor set
  */
 
+/* Example:
+ *
+ * class ExampleObject : public merian::ShaderObject{
+ *   public:
+ *      ExampleObject(const merian::ContextHandle& context)
+ *         : merian::ShaderObject(context, "path_to_slang.slang",
+ * "ExampleObjectNameInSlang") {}
+ *
+ *     void set_src(const merian::BufferHandle& buf) {
+ *         src = buf;
+ *         get_cursor()["src"] = buf;
+ *     }
+ *
+ *     void set_dst(const merian::BufferHandle& buf) {
+ *         dst = buf;
+ *         get_cursor()["dst"] = buf;
+ *     }
+ *
+ *     // Called by the ShaderObject system when this object is bound to a new cursor
+ *     // position. Replays the current state so the new location is fully populated.
+ *     void write_to(merian::ShaderCursor& cursor) override {
+ *         cursor["src"] = src;
+ *         cursor["dst"] = dst;
+ *     }
+ *
+ *   private:
+ *     merian::BufferHandle src;
+ *     merian::BufferHandle dst;
+ * };
+ * 
+ * TODO: ideally implementing write_to should not be necessary and we could just to cursor = root_cursor.
+ */
+
 class ShaderObject;
 using ShaderObjectHandle = std::shared_ptr<ShaderObject>;
 
@@ -102,14 +135,23 @@ class ShaderObject : public std::enable_shared_from_this<ShaderObject> {
     /**
      * @brief Get the root cursor for this object.
      *
-     * This cursor tracks all locations where this object is bound.
-     * Writing through this cursor updates all binding locations.
+     * This cursor tracks all locations (cursors) (as root or nested in other obejcts) where this
+     * object is bound. Writing through this cursor updates all binding locations.
      *
      * @return Reference to the root cursor
      */
     ShaderCursor& get_cursor() {
         return *root_cursor;
     }
+
+    /**
+     * @brief Get the root cursor for this object.
+     *
+     * This cursor tracks all locations (cursors) (as root or nested in other obejcts) where this
+     * object is bound. Writing through this cursor updates all binding locations.
+     *
+     * @return Reference to the root cursor
+     */
     const ShaderCursor& get_cursor() const {
         return *root_cursor;
     }
