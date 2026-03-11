@@ -122,6 +122,16 @@ endif
 glslc = find_program('glslangValidator', required: false)
 glslang = dependency('glslang', version: ['>=16.2.0'], required: false, method: 'cmake',
     modules: ['glslang::glslang', 'glslang::glslang-default-resource-limits', 'glslang::SPIRV'])
+if glslang.found()
+    # glslang::SPIRV depends on SPIRV-Tools but there may be no cmake config for it,
+    # so meson's cmake integration doesn't resolve the transitive dependency automatically.
+    # see https://github.com/mesonbuild/meson/issues/8232
+    glslang = declare_dependency(dependencies: [glslang,
+        ccx.find_library('SPIRV-Tools', required: false),
+        ccx.find_library('SPIRV-Tools-opt', required: false),
+        ccx.find_library('SPIRV-Tools-link', required: false),
+    ])
+endif
 shader_generator_deps = []
 if not glslc.found() or (not glslang.found() and get_option('glslang').enabled())
     glslang_options = cmake.subproject_options()
