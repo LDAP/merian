@@ -12,6 +12,9 @@ using SEVERITY = vk::DebugUtilsMessageSeverityFlagBitsEXT;
 using MESSAGE = vk::DebugUtilsMessageTypeFlagBitsEXT;
 
 class ExtensionVkDebugUtils : public ContextExtension {
+  public:
+    static constexpr const char* name = "merian-debug-utils";
+
   private:
     static bool assert_message_default() {
         const char* env = std::getenv("MERIAN_DEBUG_UTILS_ASSERT_ERROR");

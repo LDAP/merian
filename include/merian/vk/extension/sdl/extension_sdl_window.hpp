@@ -1,6 +1,8 @@
 #pragma once
 
 #include "merian/vk/extension/extension.hpp"
+#include "merian/vk/extension/sdl/extension_sdl.hpp"
+#include "merian/vk/window/window_provider.hpp"
 
 #include <memory>
 
@@ -9,8 +11,10 @@ namespace merian {
 class SDLWindow;
 using SDLWindowHandle = std::shared_ptr<SDLWindow>;
 
-class ExtensionSDLWindow : public ContextExtension {
+class ExtensionSDLWindow : public ContextExtension, public WindowProvider {
   public:
+    static constexpr const char* name = "SDL Window";
+
     ExtensionSDLWindow();
 
     ~ExtensionSDLWindow();
@@ -25,12 +29,11 @@ class ExtensionSDLWindow : public ContextExtension {
                                const PhysicalDeviceHandle& physical_device,
                                std::size_t queue_family_index) override;
 
-    SDLWindowHandle create_window(const DeviceHandle& device,
-                                  int width = 1280,
-                                  int height = 720,
-                                  const char* title = "") const;
+    WindowHandle create_window(const DeviceHandle& device,
+                               const WindowCreateInfo& create_info = {}) const override;
 
   private:
+    std::shared_ptr<ExtensionSDL> sdl_ext;
     bool video_initialized = false;
     bool sdl_vulkan_support = false;
 };

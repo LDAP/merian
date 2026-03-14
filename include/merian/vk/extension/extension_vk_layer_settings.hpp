@@ -9,6 +9,8 @@ namespace merian {
 
 class ExtensionVkLayerSettings : public ContextExtension {
   public:
+    static constexpr const char* name = "merian-layer-settings";
+
     inline static const vk::LayerSettingEXT ENABLE_VALIDATION_LAYER_PRINTF{
         "VK_LAYER_KHRONOS_validation",
         "enables",

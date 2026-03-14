@@ -8,6 +8,9 @@ namespace merian {
  * Hooks into context to prevent known driver bugs.
  */
 class ExtensionCompatibility : public ContextExtension {
+  public:
+    static constexpr const char* name = "merian-compatibility";
+
   private:
     static bool check_running_in_nsight(const InstanceSupportQueryInfo& query_info) {
         static constexpr std::string_view nsight_layer_prefixes[] = {

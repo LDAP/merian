@@ -22,19 +22,19 @@ ExtensionRegistry& ExtensionRegistry::get_instance() {
 }
 
 ExtensionRegistry::ExtensionRegistry() {
-    register_extension<ExtensionGLFW>("merian-glfw");
-    register_extension<ExtensionSDL>("merian-sdl");
-    register_extension<ExtensionSDLAudio>("merian-sdl-audio");
-    register_extension<ExtensionSDLWindow>("merian-sdl-window");
-    register_extension<ExtensionCompatibility>("merian-compatibility");
-    register_extension<ExtensionGLSLCompiler>("merian-glsl-compiler");
-    register_extension<ExtensionMerian>("merian");
-    register_extension<ExtensionMitigations>("merian-mitigations");
-    register_extension<ExtensionResources>("merian-resources");
-    register_extension<ExtensionVkDebugUtils>("merian-debug-utils");
-    register_extension<ExtensionVkLayerSettings>("merian-layer-settings");
-    register_extension<ExtensionVkValidationLayers>("merian-validation-layers");
-    register_extension<ExtensionVMA>("merian-vma");
+    register_extension<ExtensionGLFW>(ExtensionGLFW::name);
+    register_extension<ExtensionSDL>(ExtensionSDL::name);
+    register_extension<ExtensionSDLAudio>(ExtensionSDLAudio::name);
+    register_extension<ExtensionSDLWindow>(ExtensionSDLWindow::name);
+    register_extension<ExtensionCompatibility>(ExtensionCompatibility::name);
+    register_extension<ExtensionGLSLCompiler>(ExtensionGLSLCompiler::name);
+    register_extension<ExtensionMerian>(ExtensionMerian::name);
+    register_extension<ExtensionMitigations>(ExtensionMitigations::name);
+    register_extension<ExtensionResources>(ExtensionResources::name);
+    register_extension<ExtensionVkDebugUtils>(ExtensionVkDebugUtils::name);
+    register_extension<ExtensionVkLayerSettings>(ExtensionVkLayerSettings::name);
+    register_extension<ExtensionVkValidationLayers>(ExtensionVkValidationLayers::name);
+    register_extension<ExtensionVMA>(ExtensionVMA::name);
 }
 
 std::shared_ptr<ContextExtension> ExtensionRegistry::create(const std::string& name) const {

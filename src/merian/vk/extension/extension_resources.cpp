@@ -1,4 +1,5 @@
 #include "merian/vk/extension/extension_resources.hpp"
+#include "merian/vk/extension/extension_vma.hpp"
 #include "merian/vk/memory/memory_allocator_vma.hpp"
 
 #include <fmt/ranges.h>
@@ -6,7 +7,7 @@
 namespace merian {
 
 std::vector<std::string> ExtensionResources::request_extensions() {
-    return {"merian-vma"};
+    return {ExtensionVMA::name};
 }
 
 void ExtensionResources::on_context_created(const ContextHandle& context,

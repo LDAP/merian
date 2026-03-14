@@ -17,10 +17,7 @@ class GLFWWindow : public Window, public InputController {
     friend class ExtensionGLFW;
 
   private:
-    GLFWWindow(const DeviceHandle& device,
-               const int width = 1280,
-               const int height = 720,
-               const char* title = "");
+    GLFWWindow(const DeviceHandle& device, const WindowCreateInfo& create_info = {});
 
   public:
     ~GLFWWindow() override;

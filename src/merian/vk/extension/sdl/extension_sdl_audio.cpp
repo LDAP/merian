@@ -1,7 +1,9 @@
 #include "merian/vk/extension/sdl/extension_sdl_audio.hpp"
+#include "merian/vk/extension/sdl/extension_sdl.hpp"
 #include "merian/vk/extension/sdl/sdl_audio_device.hpp"
 
 #include <SDL3/SDL.h>
+#include <fmt/format.h>
 #include <spdlog/spdlog.h>
 
 namespace merian {
@@ -16,11 +18,15 @@ ExtensionSDLAudio::~ExtensionSDLAudio() {
 }
 
 std::vector<std::string> ExtensionSDLAudio::request_extensions() {
-    return {"merian-sdl"};
+    return {ExtensionSDL::name};
 }
 
 InstanceSupportInfo
-ExtensionSDLAudio::query_instance_support(const InstanceSupportQueryInfo& /*query_info*/) {
+ExtensionSDLAudio::query_instance_support(const InstanceSupportQueryInfo& query_info) {
+    sdl_ext = query_info.extension_container.get_context_extension<ExtensionSDL>(true);
+    if (!sdl_ext)
+        return InstanceSupportInfo{false, fmt::format("{} not available", ExtensionSDL::name)};
+
     if (!SDL_InitSubSystem(SDL_INIT_AUDIO)) {
         SPDLOG_WARN("SDL_InitSubSystem(SDL_INIT_AUDIO) failed: {}", SDL_GetError());
         audio_initialized = false;

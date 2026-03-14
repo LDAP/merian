@@ -10,13 +10,15 @@ namespace merian {
 
 class MerianNodesExtension : public ContextExtension {
   public:
+    static constexpr const char* name = "merian-nodes";
+
     MerianNodesExtension() : ContextExtension() {}
 
     std::vector<std::string> request_extensions() override {
         std::vector<std::string> aggregated;
 
         // Request compiler extensions for nodes that need shader compilation
-        aggregated.push_back("merian-glsl-compiler");
+        aggregated.push_back(ExtensionGLSLCompiler::name);
 
         auto& registry = NodeRegistry::get_instance();
         for (const auto& type_name : registry.node_type_names()) {

@@ -4,51 +4,64 @@
 #include "merian-nodes/graph/errors.hpp"
 #include "merian-nodes/graph/node.hpp"
 
-#include "merian/vk/extension/glfw/extension_glfw.hpp"
+#include "merian/vk/extension/extension_registry.hpp"
 #include "merian/vk/utils/blits.hpp"
 #include "merian/vk/utils/profiler.hpp"
-#include "merian/vk/extension/glfw/glfw_window.hpp"
 #include "merian/vk/window/swapchain.hpp"
 #include "merian/vk/window/swapchain_manager.hpp"
+#include "merian/vk/window/window_provider.hpp"
 #include <csignal>
 
 namespace merian {
 
 /*
- * Outputs to a GLFW window.
- * This node requires the error handling features of ExtensionVkGLFW
+ * Outputs to a window. The window provider is selected from available WindowProvider extensions.
+ * Provider selection and window create info are configurable via properties().
+ * The window is (re)created in on_connected() when the provider changes.
  */
-class GLFWWindowNode : public Node {
+class WindowNode : public Node {
   public:
-    GLFWWindowNode() = default;
-
     void initialize(const ContextHandle& context,
                     const ResourceAllocatorHandle& /*allocator*/) override {
-        const auto glfw_ext = context->get_context_extension<ExtensionGLFW>();
-        if (glfw_ext) {
-            window = glfw_ext->create_window(context->get_device());
+        this->context = context;
+        providers = context->find_providers<WindowProvider>();
+        if (providers.empty()) {
+            throw graph_errors::node_error{"WindowNode requires at least one WindowProvider"};
+        }
+    }
+
+    NodeStatusFlags on_connected(const NodeIOLayout& /*io_layout*/,
+                                 const DescriptorSetLayoutHandle& /*dsl*/) override {
+        const auto& selected = get_selected_provider();
+        if (!window || selected != active_provider) {
+            window = selected->create_window(context->get_device(), create_info);
+            active_provider = selected;
 
             const SwapchainHandle swapchain =
                 std::make_shared<merian::Swapchain>(context, window->get_surface());
             swapchain_manager.emplace(swapchain);
+
+            if (on_window_created)
+                on_window_created(window);
         }
+        return {};
     }
 
     virtual std::vector<InputConnectorDescriptor> describe_inputs() override {
-        if (!window) {
-            throw graph_errors::node_error{"node requires ExtensionVkGLFW context extension"};
+        if (providers.empty()) {
+            throw graph_errors::node_error{"WindowNode requires at least one WindowProvider"};
         }
-
         return {{"src", image_in}};
     }
 
     virtual NodeStatusFlags pre_process([[maybe_unused]] const GraphRun& run,
                                         [[maybe_unused]] const NodeIO& io) override {
-
-        if (on_should_close_remove_node && window && window->should_close()) {
-            return NodeStatusFlagBits::REMOVE_NODE;
+        if (window) {
+            window->poll_events();
+            if (on_should_close_remove_node && window->should_close()) {
+                return NodeStatusFlagBits::REMOVE_NODE;
+            }
         }
-
         return {};
     }
 
@@ -57,7 +70,6 @@ class GLFWWindowNode : public Node {
                          const NodeIO& io) override {
         assert(swapchain_manager);
 
-        // swapchain only supports up to get_swapchain()->get_max_image_count() frames in flight.
         const int64_t signed_max_img_count = get_swapchain()->get_max_image_count();
         const int64_t signed_iteration = (int64_t)run.get_iteration();
         throttle = !run.get_iteration_semaphore()->wait(
@@ -65,7 +77,6 @@ class GLFWWindowNode : public Node {
         run.get_iteration_semaphore()->wait(
             std::max((int64_t)0, signed_iteration - signed_max_img_count + 1));
 
-        // move to on_connected when there is an API for iterations_in_flight.
         get_swapchain()->set_min_images(run.get_iterations_in_flight());
         std::optional<SwapchainAcquireResult> acquire;
         {
@@ -97,7 +108,6 @@ class GLFWWindowNode : public Node {
                                 vk::FormatFeatureFlagBits::eSampledImageFilterLinear
                             ? vk::Filter::eLinear
                             : vk::Filter::eNearest;
-
                     cmd_blit(mode, cmd, src_image, vk::ImageLayout::eTransferSrcOptimal,
                              src_image->get_extent(), image, vk::ImageLayout::eTransferDstOptimal,
                              image->get_extent(), vk::ClearColorValue{}, filter);
@@ -124,8 +134,7 @@ class GLFWWindowNode : public Node {
                     Stopwatch present_duration;
                     swapchain->present(queue, index);
                     run.hint_external_wait_time(present_duration.duration());
-                } catch (const Swapchain::needs_recreate& e) {
-                    // do nothing and hope for the best
+                } catch (const Swapchain::needs_recreate&) {
                     return;
                 }
             });
@@ -135,17 +144,15 @@ class GLFWWindowNode : public Node {
         }
 
         if (window && window->should_close()) {
-            if (on_should_close_sigint) {
+            if (on_should_close_sigint)
                 raise(SIGINT);
-            }
-            if (on_should_close_sigterm) {
+            if (on_should_close_sigterm)
                 raise(SIGTERM);
-            }
         }
     }
 
     const SwapchainHandle& get_swapchain() {
-        assert(swapchain_manager && "ExtensionVkGLFW not avaliable");
+        assert(swapchain_manager);
         return swapchain_manager->get_swapchain();
     }
 
@@ -154,33 +161,32 @@ class GLFWWindowNode : public Node {
             config.output_text("WARN: throttling CPU, too many frames in flight for swapchain!");
         }
 
+        NodeStatusFlags flags{};
+
+        // Provider selector
+        if (providers.size() > 1) {
+            const auto& registry = ExtensionRegistry::get_instance();
+            std::vector<std::string> provider_names;
+            provider_names.reserve(providers.size());
+            for (const auto& p : providers) {
+                provider_names.push_back(registry.get_name(p));
+            }
+            if (config.config_options("provider", selected_provider, provider_names)) {
+                flags |= NodeStatusFlagBits::NEEDS_RECONNECT;
+            }
+        }
+
         if (current_src_array_size > 0) {
             config.config_uint("source array element", src_array_element, 0,
                                current_src_array_size - 1);
         }
 
-        GLFWmonitor* monitor = window ? glfwGetWindowMonitor(*window) : nullptr;
-        int fullscreen = static_cast<int>(monitor != nullptr);
-        const int old_fullscreen = fullscreen;
-        config.config_options("mode", fullscreen, {"windowed", "fullscreen"});
-        if (window && fullscreen != old_fullscreen) {
-            if (fullscreen != 0) {
-                try {
-                    glfwGetWindowPos(*window, &windowed_pos_size[0], &windowed_pos_size[1]);
-                } catch (const ExtensionGLFW::glfw_error& e) {
-                    if (e.id != GLFW_FEATURE_UNAVAILABLE) {
-                        throw e;
-                    }
-                    windowed_pos_size[0] = windowed_pos_size[1] = 0;
-                }
-                glfwGetWindowSize(*window, &windowed_pos_size[2], &windowed_pos_size[3]);
-                monitor = glfwGetPrimaryMonitor();
-                const GLFWvidmode* vidmode = glfwGetVideoMode(monitor);
-                glfwSetWindowMonitor(*window, monitor, 0, 0, vidmode->width, vidmode->height,
-                                     vidmode->refreshRate);
-            } else {
-                glfwSetWindowMonitor(*window, NULL, windowed_pos_size[0], windowed_pos_size[1],
-                                     windowed_pos_size[2], windowed_pos_size[3], GLFW_DONT_CARE);
+        if (window) {
+            int fullscreen = static_cast<int>(window->is_fullscreen());
+            const int old_fullscreen = fullscreen;
+            config.config_options("mode", fullscreen, {"windowed", "fullscreen"});
+            if (fullscreen != old_fullscreen) {
+                window->set_fullscreen(fullscreen != 0);
             }
         }
 
@@ -230,14 +236,12 @@ class GLFWWindowNode : public Node {
             config.config_bool("send sigint", on_should_close_sigint);
             config.config_bool("send sigterm", on_should_close_sigterm);
             config.config_bool("remove node", on_should_close_remove_node);
-
             config.st_end_child();
         }
 
         if (swapchain_manager) {
             const std::optional<Swapchain::SwapchainInfo>& swapchain_info =
                 get_swapchain()->get_swapchain_info();
-
             if (swapchain_info) {
                 config.output_text(fmt::format(
                     "surface format: {}\ncolor space: {}\nimage count: "
@@ -249,40 +253,49 @@ class GLFWWindowNode : public Node {
             }
         }
 
-        return {};
+        return flags;
     }
 
-    // Window can be nullptr if GLFW extension is not available
-    const GLFWWindowHandle& get_window() const {
+    const WindowHandle& get_window() const {
         return window;
     }
 
-    // Set a callback for when the blit of the node input was completed.
-    // The image will have vk::ImageLayout::ePresentSrcKHR.
-    void
-    set_on_blit_completed(const std::function<void(const CommandBufferHandle& cmd,
-                                                   const SwapchainAcquireResult& acquire_result)>&
-                              on_blit_completed) {
-        this->on_blit_completed = on_blit_completed;
+    void set_on_window_created(const std::function<void(const WindowHandle&)>& cb) {
+        on_window_created = cb;
+    }
+
+    void set_on_blit_completed(
+        const std::function<void(const CommandBufferHandle&, const SwapchainAcquireResult&)>& cb) {
+        on_blit_completed = cb;
     }
 
   private:
     uint32_t src_array_element = 0;
     uint32_t current_src_array_size = 1;
 
-    GLFWWindowHandle window = nullptr;
+    const std::shared_ptr<WindowProvider>& get_selected_provider() const {
+        return providers[std::min(selected_provider, (int)providers.size() - 1)];
+    }
+
+    ContextHandle context;
+    std::vector<std::shared_ptr<WindowProvider>> providers;
+    int selected_provider = 0;
+    std::shared_ptr<WindowProvider> active_provider;
+
+    WindowCreateInfo create_info;
+    WindowHandle window;
     std::optional<SwapchainManager> swapchain_manager = std::nullopt;
 
     BlitMode mode = FIT;
 
-    std::function<void(const CommandBufferHandle& cmd,
-                       const SwapchainAcquireResult& acquire_result)>
-        on_blit_completed = []([[maybe_unused]] const CommandBufferHandle& cmd,
-                               [[maybe_unused]] const SwapchainAcquireResult& acquire_result) {};
+    std::function<void(const WindowHandle&)> on_window_created;
+
+    std::function<void(const CommandBufferHandle&, const SwapchainAcquireResult&)>
+        on_blit_completed = []([[maybe_unused]] const CommandBufferHandle&,
+                               [[maybe_unused]] const SwapchainAcquireResult&) {};
 
     VkImageInHandle image_in = VkImageIn::transfer_src(0, true);
 
-    std::array<int, 4> windowed_pos_size;
     bool request_rebuild_on_recreate = false;
     uint64_t acquire_timeout_ns = 1000L * 1000L * 100L; // .1s
 

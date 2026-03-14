@@ -9,6 +9,8 @@ namespace merian {
  */
 class ExtensionMerian : public ContextExtension {
   public:
+    static constexpr const char* name = "merian";
+
     ExtensionMerian() : ContextExtension() {}
     ~ExtensionMerian() {}
 

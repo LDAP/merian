@@ -8,6 +8,12 @@
 
 namespace merian {
 
+struct WindowCreateInfo {
+    int width = 1280;
+    int height = 720;
+    std::string title = "merian";
+};
+
 class InputController;
 using InputControllerHandle = std::shared_ptr<InputController>;
 

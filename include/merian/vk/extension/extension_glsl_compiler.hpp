@@ -13,6 +13,8 @@ namespace merian {
  */
 class ExtensionGLSLCompiler : public ContextExtension {
   public:
+    static constexpr const char* name = "merian-glsl-compiler";
+
     ExtensionGLSLCompiler();
 
     ~ExtensionGLSLCompiler() override;

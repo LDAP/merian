@@ -1,27 +1,15 @@
 #include "merian/vk/extension/sdl/extension_sdl_window.hpp"
+#include "merian/vk/extension/sdl/extension_sdl.hpp"
 #include "merian/vk/extension/sdl/sdl_window.hpp"
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
+#include <fmt/format.h>
 #include <spdlog/spdlog.h>
 
 namespace merian {
 
-ExtensionSDLWindow::ExtensionSDLWindow() : ContextExtension() {
-    if (!SDL_InitSubSystem(SDL_INIT_VIDEO)) {
-        SPDLOG_WARN("SDL_InitSubSystem(SDL_INIT_VIDEO) failed: {}", SDL_GetError());
-        video_initialized = false;
-        sdl_vulkan_support = false;
-        return;
-    }
-    video_initialized = true;
-
-    sdl_vulkan_support = SDL_Vulkan_LoadLibrary(nullptr);
-    if (!sdl_vulkan_support)
-        SPDLOG_WARN("SDL Vulkan support unavailable: {}", SDL_GetError());
-    else
-        SPDLOG_DEBUG("SDL video + Vulkan initialized");
-}
+ExtensionSDLWindow::ExtensionSDLWindow() : ContextExtension() {}
 
 ExtensionSDLWindow::~ExtensionSDLWindow() {
     if (sdl_vulkan_support)
@@ -33,11 +21,29 @@ ExtensionSDLWindow::~ExtensionSDLWindow() {
 }
 
 std::vector<std::string> ExtensionSDLWindow::request_extensions() {
-    return {"merian-sdl"};
+    return {ExtensionSDL::name};
 }
 
 InstanceSupportInfo
-ExtensionSDLWindow::query_instance_support(const InstanceSupportQueryInfo& /*query_info*/) {
+ExtensionSDLWindow::query_instance_support(const InstanceSupportQueryInfo& query_info) {
+    sdl_ext = query_info.extension_container.get_context_extension<ExtensionSDL>(true);
+    if (!sdl_ext)
+        return InstanceSupportInfo{false, fmt::format("{} not available", ExtensionSDL::name)};
+
+    if (!video_initialized) {
+        if (!SDL_InitSubSystem(SDL_INIT_VIDEO)) {
+            SPDLOG_WARN("SDL_InitSubSystem(SDL_INIT_VIDEO) failed: {}", SDL_GetError());
+            return InstanceSupportInfo{false, "SDL_InitSubSystem(SDL_INIT_VIDEO) failed"};
+        }
+        video_initialized = true;
+
+        sdl_vulkan_support = SDL_Vulkan_LoadLibrary(nullptr);
+        if (!sdl_vulkan_support)
+            SPDLOG_WARN("SDL Vulkan support unavailable: {}", SDL_GetError());
+        else
+            SPDLOG_DEBUG("SDL video + Vulkan initialized");
+    }
+
     InstanceSupportInfo info;
     info.supported = sdl_vulkan_support;
 
@@ -57,14 +63,12 @@ ExtensionSDLWindow::query_device_support(const DeviceSupportQueryInfo& query_inf
     if (!sdl_vulkan_support)
         return DeviceSupportInfo{false, "SDL Vulkan support unavailable"};
 
-    // Check swapchain extension availability
     DeviceSupportInfo info =
         DeviceSupportInfo::check(query_info, {}, {}, {VK_KHR_SWAPCHAIN_EXTENSION_NAME});
 
     if (!info.supported)
         return info;
 
-    // Verify presentation support for the selected queue family via SDL3's dedicated API
     const bool present_supported = SDL_Vulkan_GetPresentationSupport(
         **(query_info.physical_device->get_instance()), **query_info.physical_device,
         query_info.queue_info.queue_family_idx_GCT);
@@ -77,18 +81,17 @@ ExtensionSDLWindow::query_device_support(const DeviceSupportQueryInfo& query_inf
 }
 
 bool ExtensionSDLWindow::accept_graphics_queue(const InstanceHandle& instance,
-                                                const PhysicalDeviceHandle& physical_device,
-                                                std::size_t queue_family_index) {
+                                               const PhysicalDeviceHandle& physical_device,
+                                               std::size_t queue_family_index) {
     return !sdl_vulkan_support ||
            SDL_Vulkan_GetPresentationSupport(**instance, **physical_device,
                                              static_cast<Uint32>(queue_family_index));
 }
 
-SDLWindowHandle ExtensionSDLWindow::create_window(const DeviceHandle& device,
-                                                   const int width,
-                                                   const int height,
-                                                   const char* title) const {
-    return std::shared_ptr<SDLWindow>(new SDLWindow(device, width, height, title));
+WindowHandle ExtensionSDLWindow::create_window(const DeviceHandle& device,
+                                               const WindowCreateInfo& create_info) const {
+    return std::shared_ptr<SDLWindow>(
+        new SDLWindow(device, create_info.width, create_info.height, create_info.title.c_str()));
 }
 
 } // namespace merian

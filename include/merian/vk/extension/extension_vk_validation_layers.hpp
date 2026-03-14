@@ -9,6 +9,8 @@ namespace merian {
 class ExtensionVkValidationLayers : public ContextExtension {
 
   public:
+    static constexpr const char* name = "merian-validation-layers";
+
     ExtensionVkValidationLayers() = default;
 
     std::vector<std::string> request_extensions() override {

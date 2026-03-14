@@ -8,7 +8,6 @@
 #include "merian-nodes/nodes/exposure/exposure.hpp"
 #include "merian-nodes/nodes/fxaa/fxaa.hpp"
 #include "merian-nodes/nodes/gbuffer_rt/gbuffer.hpp"
-#include "merian-nodes/nodes/glfw_window/glfw_window.hpp"
 #include "merian-nodes/nodes/image_read/hdr_image.hpp"
 #include "merian-nodes/nodes/image_read/ldr_image.hpp"
 #include "merian-nodes/nodes/image_write/image_write.hpp"
@@ -20,6 +19,7 @@
 #include "merian-nodes/nodes/taa/taa.hpp"
 #include "merian-nodes/nodes/tonemap/tonemap.hpp"
 #include "merian-nodes/nodes/vkdt_filmcurv/vkdt_filmcurv.hpp"
+#include "merian-nodes/nodes/window/window_node.hpp"
 
 namespace merian {
 
@@ -46,7 +46,7 @@ NodeRegistry::NodeRegistry() {
                              "anti-aliasing algorithm created by Timothy Lottes at NVIDIA.");
     register_node_type<GBufferRTNode>(
         "GBuffer (Raytraced)", "Creates a GBuffer for the Merian scene format using Raytracing.");
-    register_node_type<GLFWWindowNode>("Window (GLFW)", "Outputs to a window created with GLFW.");
+    register_node_type<WindowNode>("Window", "Outputs to a window.");
     register_node_type<HDRImageRead>("HDR Image", "Loads an HDR image.");
     register_node_type<LDRImageRead>("LDR Image", "Loads a LDR image.");
     register_node_type<ImageWrite>("Image Write", "Stores a graph output as image file.");

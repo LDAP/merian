@@ -1,6 +1,7 @@
 #pragma once
 
 #include "merian/vk/extension/extension.hpp"
+#include "merian/vk/extension/sdl/extension_sdl.hpp"
 
 #include <memory>
 
@@ -11,6 +12,8 @@ using SDLAudioDeviceHandle = std::shared_ptr<SDLAudioDevice>;
 
 class ExtensionSDLAudio : public ContextExtension {
   public:
+    static constexpr const char* name = "SDL Audio";
+
     ExtensionSDLAudio();
 
     ~ExtensionSDLAudio();
@@ -22,6 +25,7 @@ class ExtensionSDLAudio : public ContextExtension {
     SDLAudioDeviceHandle create_audio_device() const;
 
   private:
+    std::shared_ptr<ExtensionSDL> sdl_ext;
     bool audio_initialized = false;
 };
 

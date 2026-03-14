@@ -2,6 +2,7 @@
 
 #include "merian/vk/extension/extension.hpp"
 #include "merian/vk/extension/glfw/glfw_window.hpp"
+#include "merian/vk/window/window_provider.hpp"
 
 #include <GLFW/glfw3.h>
 #include <spdlog/logger.h>
@@ -12,8 +13,10 @@ namespace merian {
 /*
  * @brief      Initializes GLFW and makes sure the graphics queue supports present.
  */
-class ExtensionGLFW : public ContextExtension {
+class ExtensionGLFW : public ContextExtension, public WindowProvider {
   public:
+    static constexpr const char* name = "GLFW";
+
     struct glfw_error : public std::runtime_error {
         glfw_error(int id, const char* desc)
             : std::runtime_error(fmt::format("GLFW: {}: {}", id, desc)), desc(desc), id(id) {}
@@ -46,7 +49,8 @@ class ExtensionGLFW : public ContextExtension {
 
     // ----------------------------------------
 
-    GLFWWindowHandle create_window(const DeviceHandle& device) const;
+    WindowHandle create_window(const DeviceHandle& device,
+                               const WindowCreateInfo& create_info = {}) const override;
 
   private:
     int glfw_initialized = GLFW_FALSE;

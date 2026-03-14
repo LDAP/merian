@@ -12,6 +12,8 @@ namespace merian {
  */
 class ExtensionVMA : public ContextExtension {
   public:
+    static constexpr const char* name = "VulkanMemoryAllocator";
+
     ExtensionVMA() : ContextExtension() {}
     ~ExtensionVMA() {}
 

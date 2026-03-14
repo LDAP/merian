@@ -12,6 +12,8 @@ namespace merian {
  */
 class ExtensionResources : public ContextExtension {
   public:
+    static constexpr const char* name = "merian-resources";
+
     ExtensionResources() : ContextExtension() {}
     ~ExtensionResources() {}
 

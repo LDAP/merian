@@ -81,8 +81,9 @@ bool ExtensionGLFW::accept_graphics_queue(const InstanceHandle& instance,
                                                     queue_family_index) == GLFW_TRUE;
 }
 
-GLFWWindowHandle ExtensionGLFW::create_window(const DeviceHandle& device) const {
-    return std::shared_ptr<GLFWWindow>(new GLFWWindow(device));
+WindowHandle ExtensionGLFW::create_window(const DeviceHandle& device,
+                                           const WindowCreateInfo& create_info) const {
+    return std::shared_ptr<GLFWWindow>(new GLFWWindow(device, create_info));
 }
 
 } // namespace merian

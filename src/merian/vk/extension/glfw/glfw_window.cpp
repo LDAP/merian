@@ -106,16 +106,14 @@ void GLFWWindow::cb_scroll(GLFWwindow* w, const double xoffset, const double yof
         self->prev_scroll_cb(w, xoffset, yoffset);
 }
 
-GLFWWindow::GLFWWindow(const DeviceHandle& device,
-                       const int width,
-                       const int height,
-                       const char* title)
+GLFWWindow::GLFWWindow(const DeviceHandle& device, const WindowCreateInfo& create_info)
     : device(device) {
     SPDLOG_DEBUG("create window ({})", fmt::ptr(this));
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_SCALE_FRAMEBUFFER, GLFW_TRUE);
     glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_TRUE);
-    window = glfwCreateWindow(width, height, title, nullptr, nullptr);
+    window = glfwCreateWindow(create_info.width, create_info.height, create_info.title.c_str(),
+                              nullptr, nullptr);
 
     glfwSetWindowUserPointer(window, this);
     glfwSetWindowCloseCallback(window, cb_close);

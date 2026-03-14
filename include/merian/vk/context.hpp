@@ -75,6 +75,33 @@ class VulkanException : public MerianException {
 class ExtensionContainer {
 
   public:
+    // Returns all loaded extensions that implement or derive from T.
+    template <class T>
+    std::vector<std::shared_ptr<T>> find_providers() const {
+        std::vector<std::shared_ptr<T>> result;
+        for (const auto& ext : ordered_extensions) {
+            if (auto cast = std::dynamic_pointer_cast<T>(ext)) {
+                result.push_back(std::move(cast));
+            }
+        }
+        return result;
+    }
+
+    // Returns the first loaded extension that implements or derives from T.
+    template <class T>
+    std::shared_ptr<T> find_provider(const bool null_ok = false) const {
+        for (const auto& ext : ordered_extensions) {
+            if (auto cast = std::dynamic_pointer_cast<T>(ext)) {
+                return cast;
+            }
+        }
+        if (null_ok) {
+            return nullptr;
+        }
+        throw MissingExtension{
+            fmt::format("no provider for type {} loaded.", typeid(T).name())};
+    }
+
     // Returns the loaded extension of type T, or nullptr / throws MissingExtension.
     template <class ContextExtension>
     std::shared_ptr<ContextExtension> get_context_extension(const bool null_ok = false) const {
