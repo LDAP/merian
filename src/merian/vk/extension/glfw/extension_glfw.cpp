@@ -1,5 +1,5 @@
-#include "merian/vk/extension/extension_glfw.hpp"
-#include "merian/vk/window/glfw_window.hpp"
+#include "merian/vk/extension/glfw/extension_glfw.hpp"
+#include "merian/vk/extension/glfw/glfw_window.hpp"
 
 #include <spdlog/spdlog.h>
 
@@ -81,15 +81,8 @@ bool ExtensionGLFW::accept_graphics_queue(const InstanceHandle& instance,
                                                     queue_family_index) == GLFW_TRUE;
 }
 
-void ExtensionGLFW::on_context_created(const ContextHandle& context,
-                                       const ExtensionContainer& /*extension_container*/) {
-    weak_context = context;
-}
-
-GLFWWindowHandle ExtensionGLFW::create_window() const {
-    assert(!weak_context.expired());
-
-    return std::shared_ptr<GLFWWindow>(new GLFWWindow(weak_context.lock()));
+GLFWWindowHandle ExtensionGLFW::create_window(const DeviceHandle& device) const {
+    return std::shared_ptr<GLFWWindow>(new GLFWWindow(device));
 }
 
 } // namespace merian

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "merian/vk/context.hpp"
+#include "merian/vk/device.hpp"
 
 #include <memory>
 #include <spdlog/spdlog.h>
@@ -11,14 +11,14 @@ class Surface : public std::enable_shared_from_this<Surface> {
 
   public:
     // Manage the supplied surface.
-    Surface(const ContextHandle& context, const vk::SurfaceKHR& surface)
-        : context(context), surface(surface) {
+    Surface(const DeviceHandle& device, const vk::SurfaceKHR& surface)
+        : device(device), surface(surface) {
         SPDLOG_DEBUG("create surface ({})", fmt::ptr(this));
     }
 
     ~Surface() {
         SPDLOG_DEBUG("destroy surface ({})", fmt::ptr(this));
-        context->get_instance()->get_instance().destroySurfaceKHR(surface);
+        device->get_physical_device()->get_instance()->get_instance().destroySurfaceKHR(surface);
     }
 
     operator const vk::SurfaceKHR&() const {
@@ -30,12 +30,12 @@ class Surface : public std::enable_shared_from_this<Surface> {
     }
 
     vk::SurfaceCapabilitiesKHR get_capabilities() const {
-        return context->get_physical_device()->get_physical_device().getSurfaceCapabilitiesKHR(
+        return device->get_physical_device()->get_physical_device().getSurfaceCapabilitiesKHR(
             surface);
     }
 
   private:
-    const ContextHandle context;
+    const DeviceHandle device;
     vk::SurfaceKHR surface;
 };
 

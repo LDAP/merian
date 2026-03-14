@@ -83,17 +83,7 @@ tinybvh = dependency('tinybvh', required: false)
 if not tinybvh.found() and get_option('tinybvh').enabled()
     tinybvh = dependency('tinybvh', fallback: ['tinybvh', 'tinybvh_dep'])
 endif
-sdl2 = dependency('sdl2', required: false)
-if not sdl2.found()
-    # Workaround because SDL2 ships Vulkan which conflicts
-    # This is basically the same declare_dependency they have without "deps"
-    sdl2_subp = subproject('sdl2')
-    sdl2 = declare_dependency(
-        link_with : sdl2_subp.get_variable('sdl2'),
-        include_directories : sdl2_subp.get_variable('core_inc'),
-        compile_args : sdl2_subp.get_variable('c_args')
-    )
-endif
+sdl3 = dependency('sdl3', version: ['>=3.4.0'], required: false, fallback: ['sdl3', 'sdl3_dep'])
 shaderc = dependency('shaderc', version: ['>=2025.3'], required: false)
 if not shaderc.found() and get_option('shaderc').enabled()
     shaderc_options = cmake.subproject_options()

@@ -7,6 +7,7 @@
 #include <fmt/ranges.h>
 #include <spdlog/spdlog.h>
 #include <string>
+#include <typeindex>
 #include <vector>
 
 namespace merian {

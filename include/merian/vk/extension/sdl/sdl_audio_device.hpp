@@ -11,11 +11,17 @@ struct SDL_AudioStream;
 
 namespace merian {
 
+class ExtensionSDLAudio;
+
 class SDLAudioDevice : public AudioDevice {
   public:
+    friend class ExtensionSDLAudio;
+
+  private:
     SDLAudioDevice();
 
-    ~SDLAudioDevice();
+  public:
+    ~SDLAudioDevice() override;
 
     std::optional<SDLAudioDevice::AudioSpec>
     open_device(const AudioSpec& desired_audio_spec,

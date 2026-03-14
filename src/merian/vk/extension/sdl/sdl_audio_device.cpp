@@ -1,4 +1,4 @@
-#include "merian/utils/audio/sdl_audio_device.hpp"
+#include "merian/vk/extension/sdl/sdl_audio_device.hpp"
 
 #include <SDL3/SDL.h>
 #include <spdlog/spdlog.h>
@@ -41,15 +41,10 @@ static void SDLCALL stream_callback(void* userdata,
     SDL_PutAudioStreamData(stream, buf.data(), additional_amount);
 }
 
-SDLAudioDevice::SDLAudioDevice() : AudioDevice() {
-    if (!SDL_InitSubSystem(SDL_INIT_AUDIO)) {
-        SPDLOG_WARN("SDL_InitSubSystem(SDL_INIT_AUDIO) failed: {}", SDL_GetError());
-    }
-}
+SDLAudioDevice::SDLAudioDevice() : AudioDevice() {}
 
 SDLAudioDevice::~SDLAudioDevice() {
     close_device();
-    SDL_QuitSubSystem(SDL_INIT_AUDIO);
 }
 
 std::optional<SDLAudioDevice::AudioSpec>

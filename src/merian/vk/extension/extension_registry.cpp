@@ -1,7 +1,10 @@
 #include "merian/vk/extension/extension_registry.hpp"
 
 #include "merian/vk/extension/extension_compatibility.hpp"
-#include "merian/vk/extension/extension_glfw.hpp"
+#include "merian/vk/extension/glfw/extension_glfw.hpp"
+#include "merian/vk/extension/sdl/extension_sdl.hpp"
+#include "merian/vk/extension/sdl/extension_sdl_audio.hpp"
+#include "merian/vk/extension/sdl/extension_sdl_window.hpp"
 #include "merian/vk/extension/extension_glsl_compiler.hpp"
 #include "merian/vk/extension/extension_merian.hpp"
 #include "merian/vk/extension/extension_mitigations.hpp"
@@ -20,6 +23,9 @@ ExtensionRegistry& ExtensionRegistry::get_instance() {
 
 ExtensionRegistry::ExtensionRegistry() {
     register_extension<ExtensionGLFW>("merian-glfw");
+    register_extension<ExtensionSDL>("merian-sdl");
+    register_extension<ExtensionSDLAudio>("merian-sdl-audio");
+    register_extension<ExtensionSDLWindow>("merian-sdl-window");
     register_extension<ExtensionCompatibility>("merian-compatibility");
     register_extension<ExtensionGLSLCompiler>("merian-glsl-compiler");
     register_extension<ExtensionMerian>("merian");

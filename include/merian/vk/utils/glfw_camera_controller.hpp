@@ -1,7 +1,7 @@
 #pragma once
 
 #include "merian/utils/camera/camera_animator.hpp"
-#include "merian/vk/window/glfw_window.hpp"
+#include "merian/vk/extension/glfw/glfw_window.hpp"
 #include <memory>
 
 namespace merian {

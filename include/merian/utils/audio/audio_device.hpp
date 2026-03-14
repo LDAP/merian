@@ -28,14 +28,6 @@ class AudioDevice : public std::enable_shared_from_this<AudioDevice> {
         unsigned char channels;
     };
 
-    using AllowedChangesFlags = uint32_t;
-    enum AllowedChangesFlagBits {
-        SAMPLERATE_CHANGE = 0b1,
-        FORMAT_CHANGE = 0b10,
-        CHANNELS_CHANGE = 0b100,
-        BUFFERSIZE_CHANGE = 0b1000,
-    };
-
     AudioDevice() {}
 
     virtual ~AudioDevice() = 0;
@@ -47,8 +39,7 @@ class AudioDevice : public std::enable_shared_from_this<AudioDevice> {
     // This can be empty if you want to call queue audio manually using queue_audio() (push_mode).
     virtual std::optional<AudioSpec>
     open_device(const AudioSpec& desired_audio_spec,
-                const std::function<void(uint8_t* stream, int len)>& callback = {},
-                const AllowedChangesFlags& allowed_changes = {}) = 0;
+                const std::function<void(uint8_t* stream, int len)>& callback = {}) = 0;
 
     // Queue more audio to devices which were opened without callback.
     // Audio is buffered internally and forwarded to the device automatically.
@@ -74,5 +65,7 @@ class AudioDevice : public std::enable_shared_from_this<AudioDevice> {
 
     virtual void unpause_audio() = 0;
 };
+
+using AudioDeviceHandle = std::shared_ptr<AudioDevice>;
 
 } // namespace merian

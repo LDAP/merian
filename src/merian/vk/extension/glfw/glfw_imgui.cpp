@@ -1,4 +1,4 @@
-#include "merian/vk/window/glfw_imgui.hpp"
+#include "merian/vk/extension/glfw/glfw_imgui.hpp"
 
 #include "merian/vk/command/command_buffer.hpp"
 

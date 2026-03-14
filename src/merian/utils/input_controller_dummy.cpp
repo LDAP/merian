@@ -19,9 +19,9 @@ void DummyInputController::reset() {}
 
 void DummyInputController::set_active(bool /*active*/) {}
 
-void DummyInputController::set_mouse_cursor_callback(MouseCursorEventCallback /*cb*/) {}
-void DummyInputController::set_mouse_button_callback(MouseButtonEventCallback /*cb*/) {}
-void DummyInputController::set_scroll_event_callback(ScrollEventCallback /*cb*/) {}
-void DummyInputController::set_key_event_callback(KeyEventCallback /*cb*/) {}
+void DummyInputController::set_mouse_cursor_callback(const MouseCursorEventCallback& /*cb*/) {}
+void DummyInputController::set_mouse_button_callback(const MouseButtonEventCallback& /*cb*/) {}
+void DummyInputController::set_scroll_event_callback(const ScrollEventCallback& /*cb*/) {}
+void DummyInputController::set_key_event_callback(const KeyEventCallback& /*cb*/) {}
 
 } // namespace merian

@@ -75,8 +75,7 @@ class VulkanException : public MerianException {
 class ExtensionContainer {
 
   public:
-    // returns the context extension if loaded, otherwise nullptr (if null_ok == true) or throws
-    // MissingExtension.
+    // Returns the loaded extension of type T, or nullptr / throws MissingExtension.
     template <class ContextExtension>
     std::shared_ptr<ContextExtension> get_context_extension(const bool null_ok = false) const {
         if (context_extensions.contains(typeid(ContextExtension))) {
@@ -91,7 +90,6 @@ class ExtensionContainer {
     }
 
   protected:
-    // returns the extensions ordered by their requirements
     const std::vector<std::shared_ptr<ContextExtension>>& get_extensions() const {
         return ordered_extensions;
     }
@@ -118,9 +116,9 @@ struct ContextCreateInfo {
     std::vector<const char*> device_extensions{};
     // Set your desired instance layers.
     std::vector<const char*> instance_layers{};
-    // Set your desired merian Context extensions.
+    // Extensions to load by name (from the registry).
     std::vector<std::string> context_extensions{};
-    // Called when all extensions are loaded. You can get_context_extensions<>() to configure.
+    // Called when all extensions are loaded. You can get_context_extension<>() to configure.
     std::optional<ConfigureExtensionsCallback> configure_extensions_callback{};
     // Search paths for shader compiler and file loader.
     std::vector<std::filesystem::path> additional_search_paths{};

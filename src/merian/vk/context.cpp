@@ -45,7 +45,6 @@ void ExtensionContainer::add_extension(const std::shared_ptr<ContextExtension>& 
 }
 
 void ExtensionContainer::remove_extension(const std::type_index& type) {
-    // Remove from map
     context_extensions.erase(type);
 
     auto it =
@@ -55,6 +54,7 @@ void ExtensionContainer::remove_extension(const std::type_index& type) {
 
     assert(ordered_extensions.size() == context_extensions.size());
 }
+
 
 void Context::load_extensions(const std::vector<std::string>& extension_names) {
     std::unordered_set<std::string> loaded_extensions;

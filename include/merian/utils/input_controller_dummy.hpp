@@ -21,10 +21,10 @@ class DummyInputController : public InputController {
 
     virtual void set_active(bool active) override;
 
-    virtual void set_mouse_cursor_callback(MouseCursorEventCallback cb) override;
-    virtual void set_mouse_button_callback(MouseButtonEventCallback cb) override;
-    virtual void set_scroll_event_callback(ScrollEventCallback cb) override;
-    virtual void set_key_event_callback(KeyEventCallback cb) override;
+    virtual void set_mouse_cursor_callback(const MouseCursorEventCallback& cb) override;
+    virtual void set_mouse_button_callback(const MouseButtonEventCallback& cb) override;
+    virtual void set_scroll_event_callback(const ScrollEventCallback& cb) override;
+    virtual void set_key_event_callback(const KeyEventCallback& cb) override;
 };
 
 } // namespace merian

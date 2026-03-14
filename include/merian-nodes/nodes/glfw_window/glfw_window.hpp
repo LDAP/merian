@@ -4,10 +4,10 @@
 #include "merian-nodes/graph/errors.hpp"
 #include "merian-nodes/graph/node.hpp"
 
-#include "merian/vk/extension/extension_glfw.hpp"
+#include "merian/vk/extension/glfw/extension_glfw.hpp"
 #include "merian/vk/utils/blits.hpp"
 #include "merian/vk/utils/profiler.hpp"
-#include "merian/vk/window/glfw_window.hpp"
+#include "merian/vk/extension/glfw/glfw_window.hpp"
 #include "merian/vk/window/swapchain.hpp"
 #include "merian/vk/window/swapchain_manager.hpp"
 #include <csignal>
@@ -26,7 +26,7 @@ class GLFWWindowNode : public Node {
                     const ResourceAllocatorHandle& /*allocator*/) override {
         const auto glfw_ext = context->get_context_extension<ExtensionGLFW>();
         if (glfw_ext) {
-            window = glfw_ext->create_window();
+            window = glfw_ext->create_window(context->get_device());
 
             const SwapchainHandle swapchain =
                 std::make_shared<merian::Swapchain>(context, window->get_surface());
