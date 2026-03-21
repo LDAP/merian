@@ -116,11 +116,16 @@ class WindowNode : public Node {
                 }
             }
 
-            cmd->barrier(image->barrier2(vk::ImageLayout::ePresentSrcKHR));
-
             {
                 MERIAN_PROFILE_SCOPE_GPU(run.get_profiler(), cmd, "on_blit_completed callback");
-                on_blit_completed(cmd, *acquire);
+                on_blit_completed(cmd, *acquire, run.get_profiler());
+            }
+
+            {
+                if (image->get_current_layout() != vk::ImageLayout::ePresentSrcKHR ||
+                    image->get_current_layout() != vk::ImageLayout::eSharedPresentKHR) {
+                    cmd->barrier(image->barrier2(vk::ImageLayout::ePresentSrcKHR));
+                }
             }
 
             run.add_wait_semaphore(acquire->wait_semaphore, vk::PipelineStageFlagBits::eTransfer);
@@ -264,8 +269,9 @@ class WindowNode : public Node {
         on_window_created = cb;
     }
 
-    void set_on_blit_completed(
-        const std::function<void(const CommandBufferHandle&, const SwapchainAcquireResult&)>& cb) {
+    void set_on_blit_completed(const std::function<void(const CommandBufferHandle&,
+                                                        const SwapchainAcquireResult&,
+                                                        const ProfilerHandle&)>& cb) {
         on_blit_completed = cb;
     }
 
@@ -290,9 +296,11 @@ class WindowNode : public Node {
 
     std::function<void(const WindowHandle&)> on_window_created;
 
-    std::function<void(const CommandBufferHandle&, const SwapchainAcquireResult&)>
+    std::function<void(
+        const CommandBufferHandle&, const SwapchainAcquireResult&, const ProfilerHandle&)>
         on_blit_completed = []([[maybe_unused]] const CommandBufferHandle&,
-                               [[maybe_unused]] const SwapchainAcquireResult&) {};
+                               [[maybe_unused]] const SwapchainAcquireResult&,
+                               [[maybe_unused]] const ProfilerHandle&) {};
 
     VkImageInHandle image_in = VkImageIn::transfer_src(0, true);
 

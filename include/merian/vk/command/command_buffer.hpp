@@ -474,6 +474,51 @@ class CommandBuffer : public std::enable_shared_from_this<CommandBuffer> {
                        const void* values);
 
     // ------------------------------------------------------------
+    // DYNAMIC RENDERING
+
+    void begin_rendering(const vk::RenderingInfo& rendering_info) {
+        cmd.beginRendering(rendering_info);
+    }
+
+    void end_rendering() {
+        cmd.endRendering();
+    }
+
+    // ------------------------------------------------------------
+    // GRAPHICS STATE
+
+    void set_viewport(const vk::Viewport& viewport, const uint32_t first_viewport = 0) {
+        cmd.setViewport(first_viewport, viewport);
+    }
+
+    void set_scissor(const vk::Rect2D& scissor, const uint32_t first_scissor = 0) {
+        cmd.setScissor(first_scissor, scissor);
+    }
+
+    void bind_vertex_buffer(const BufferHandle& buffer,
+                            const uint32_t binding = 0,
+                            const vk::DeviceSize offset = 0) {
+        const vk::Buffer vk_buf = *buffer;
+        cmd.bindVertexBuffers(binding, 1, &vk_buf, &offset);
+        keep_until_pool_reset(buffer);
+    }
+
+    void bind_index_buffer(const BufferHandle& buffer,
+                           const vk::IndexType index_type,
+                           const vk::DeviceSize offset = 0) {
+        cmd.bindIndexBuffer(*buffer, offset, index_type);
+        keep_until_pool_reset(buffer);
+    }
+
+    void draw_indexed(const uint32_t index_count,
+                      const uint32_t instance_count = 1,
+                      const uint32_t first_index = 0,
+                      const int32_t vertex_offset = 0,
+                      const uint32_t first_instance = 0) {
+        cmd.drawIndexed(index_count, instance_count, first_index, vertex_offset, first_instance);
+    }
+
+    // ------------------------------------------------------------
     // PIPELINE
 
     void bind(const PipelineHandle& pipeline);

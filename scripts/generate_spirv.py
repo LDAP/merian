@@ -23,9 +23,9 @@ from vulkan_codegen.naming import vk_name_to_cpp_name
 from vulkan_codegen.parsing import find_all_structures
 from vulkan_codegen.spec import (
     PROPERTY_STRUCT_BASE,
-    VULKAN_SPEC_VERSION,
     build_skiplist,
     get_output_paths,
+    is_up_to_date,
     load_vendor_tags,
     load_vulkan_spec,
 )
@@ -312,7 +312,7 @@ def generate_header(
     extensions: list[SpirvExtension], capabilities: list[SpirvCapability]
 ) -> str:
     """Generate the vulkan_spirv.hpp header file content."""
-    lines = generate_file_header(VULKAN_SPEC_VERSION) + [
+    lines = generate_file_header() + [
         "#pragma once",
         "",
         '#include "merian/vk/utils/vulkan_features.hpp"',
@@ -876,7 +876,7 @@ def generate_implementation(
     struct_map: dict[str, dict],
 ) -> str:
     """Generate the vulkan_spirv.cpp implementation file content."""
-    lines = generate_file_header(VULKAN_SPEC_VERSION) + [
+    lines = generate_file_header() + [
         '#include "merian/vk/utils/vulkan_spirv.hpp"',
         "",
         "#include <string_view>",
@@ -900,6 +900,9 @@ def generate_implementation(
 
 
 def main():
+    if is_up_to_date(include_path / "vulkan_spirv.hpp", out_path / "vulkan_spirv.cpp"):
+        print("Already up to date, skipping.")
+        return
     xml_root = load_vulkan_spec()
     tags = load_vendor_tags(xml_root)
 

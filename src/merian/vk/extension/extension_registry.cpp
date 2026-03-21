@@ -1,10 +1,6 @@
 #include "merian/vk/extension/extension_registry.hpp"
 
 #include "merian/vk/extension/extension_compatibility.hpp"
-#include "merian/vk/extension/glfw/extension_glfw.hpp"
-#include "merian/vk/extension/sdl/extension_sdl.hpp"
-#include "merian/vk/extension/sdl/extension_sdl_audio.hpp"
-#include "merian/vk/extension/sdl/extension_sdl_window.hpp"
 #include "merian/vk/extension/extension_glsl_compiler.hpp"
 #include "merian/vk/extension/extension_merian.hpp"
 #include "merian/vk/extension/extension_mitigations.hpp"
@@ -13,6 +9,15 @@
 #include "merian/vk/extension/extension_vk_layer_settings.hpp"
 #include "merian/vk/extension/extension_vk_validation_layers.hpp"
 #include "merian/vk/extension/extension_vma.hpp"
+#include "merian/vk/imgui/extension_imgui.hpp"
+#ifdef MERIAN_GLFW_ENABLED
+#include "merian/vk/extension/glfw/extension_glfw.hpp"
+#endif
+#ifdef MERIAN_SDL_ENABLED
+#include "merian/vk/extension/sdl/extension_sdl.hpp"
+#include "merian/vk/extension/sdl/extension_sdl_audio.hpp"
+#include "merian/vk/extension/sdl/extension_sdl_video.hpp"
+#endif
 
 namespace merian {
 
@@ -22,10 +27,14 @@ ExtensionRegistry& ExtensionRegistry::get_instance() {
 }
 
 ExtensionRegistry::ExtensionRegistry() {
+#ifdef MERIAN_GLFW_ENABLED
     register_extension<ExtensionGLFW>(ExtensionGLFW::name);
+#endif
+#ifdef MERIAN_SDL_ENABLED
     register_extension<ExtensionSDL>(ExtensionSDL::name);
     register_extension<ExtensionSDLAudio>(ExtensionSDLAudio::name);
-    register_extension<ExtensionSDLWindow>(ExtensionSDLWindow::name);
+    register_extension<ExtensionSDLVideo>(ExtensionSDLVideo::name);
+#endif
     register_extension<ExtensionCompatibility>(ExtensionCompatibility::name);
     register_extension<ExtensionGLSLCompiler>(ExtensionGLSLCompiler::name);
     register_extension<ExtensionMerian>(ExtensionMerian::name);
@@ -35,6 +44,7 @@ ExtensionRegistry::ExtensionRegistry() {
     register_extension<ExtensionVkLayerSettings>(ExtensionVkLayerSettings::name);
     register_extension<ExtensionVkValidationLayers>(ExtensionVkValidationLayers::name);
     register_extension<ExtensionVMA>(ExtensionVMA::name);
+    register_extension<ExtensionImGui>(ExtensionImGui::name);
 }
 
 std::shared_ptr<ContextExtension> ExtensionRegistry::create(const std::string& name) const {

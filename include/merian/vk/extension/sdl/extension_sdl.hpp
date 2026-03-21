@@ -6,7 +6,7 @@ namespace merian {
 
 class ExtensionSDL : public ContextExtension {
   public:
-    static constexpr const char* name = "SDL";
+    static constexpr const char* name = "SDL3";
 
     ExtensionSDL();
 

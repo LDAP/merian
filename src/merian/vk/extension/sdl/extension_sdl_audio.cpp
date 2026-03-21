@@ -37,8 +37,8 @@ ExtensionSDLAudio::query_instance_support(const InstanceSupportQueryInfo& query_
     return InstanceSupportInfo{audio_initialized};
 }
 
-SDLAudioDeviceHandle ExtensionSDLAudio::create_audio_device() const {
-    return std::shared_ptr<SDLAudioDevice>(new SDLAudioDevice());
+AudioDeviceHandle ExtensionSDLAudio::create_audio_device() const {
+    return AudioDeviceHandle(new SDLAudioDevice());
 }
 
 } // namespace merian

@@ -30,9 +30,9 @@ from vulkan_codegen.parsing import build_extension_map, find_all_structures
 from vulkan_codegen.spec import (
     DEVICE_CREATE_INFO,
     FEATURE_STRUCT_BASE,
-    VULKAN_SPEC_VERSION,
     build_skiplist,
     get_output_paths,
+    is_up_to_date,
     load_vendor_tags,
     load_vulkan_spec,
 )
@@ -199,7 +199,7 @@ def generate_class_methods_declaration(features: list[FeatureStruct]) -> list[st
 
 def generate_header(features: list[FeatureStruct]) -> str:
     """Generate the vulkan_features.hpp header file content."""
-    lines = generate_file_header(VULKAN_SPEC_VERSION) + [
+    lines = generate_file_header() + [
         "#pragma once",
         "",
         '#include "vulkan/vulkan.hpp"',
@@ -1219,7 +1219,7 @@ def generate_string_features_methods(feature_map: dict) -> list[str]:
 
 def generate_implementation(features: list[FeatureStruct], tags) -> str:
     """Generate the vulkan_features.cpp implementation file content."""
-    lines = generate_file_header(VULKAN_SPEC_VERSION) + [
+    lines = generate_file_header() + [
         '#include "merian/vk/utils/vulkan_features.hpp"',
         "",
         '#include "merian/vk/physical_device.hpp"',
@@ -1254,6 +1254,9 @@ def generate_implementation(features: list[FeatureStruct], tags) -> str:
 
 
 def main():
+    if is_up_to_date(include_path / "vulkan_features.hpp", out_path / "vulkan_features.cpp"):
+        print("Already up to date, skipping.")
+        return
     xml_root = load_vulkan_spec()
     tags = load_vendor_tags(xml_root)
 

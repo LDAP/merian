@@ -2,11 +2,11 @@ merian_src = files(
     'io/file_loader.cpp',
     'io/tinyobj.cpp',
     'utils/audio/audio_device.cpp',
-    'utils/audio/sdl_audio_device.cpp',
     'utils/camera/camera.cpp',
     'utils/camera/camera_animator.cpp',
     'utils/concurrent/thread_pool.cpp',
     'utils/imgui_spdlog_sink.cpp',
+    'utils/input_controller.cpp',
     'utils/input_controller_dummy.cpp',
     'utils/normal_encoding.cpp',
     'utils/properties_imgui.cpp',
@@ -30,12 +30,6 @@ merian_src = files(
     'vk/physical_device.cpp',
     'vk/extension/extension.cpp',
     'vk/extension/extension_registry.cpp',
-    'vk/extension/glfw/extension_glfw.cpp',
-    'vk/extension/sdl/extension_sdl.cpp',
-    'vk/extension/sdl/extension_sdl_audio.cpp',
-    'vk/extension/sdl/extension_sdl_window.cpp',
-    'vk/extension/sdl/sdl_audio_device.cpp',
-    'vk/extension/sdl/sdl_window.cpp',
     'vk/extension/extension_glsl_compiler.cpp',
     'vk/extension/extension_resources.cpp',
     'vk/extension/extension_vk_debug_utils.cpp',
@@ -64,12 +58,29 @@ merian_src = files(
     'vk/utils/cpu_queue.cpp',
     'vk/utils/profiler.cpp',
     'vk/utils/vk_enums.cpp',
-    'vk/extension/glfw/glfw_imgui.cpp',
-    'vk/extension/glfw/glfw_window.cpp',
     'vk/window/swapchain.cpp',
+    'vk/window/window.cpp',
 )
 
+if get_option('glfw').enable_auto_if(glfw.found()).enabled()
+    merian_src += files(
+        'vk/extension/glfw/extension_glfw.cpp',
+        'vk/extension/glfw/glfw_window.cpp',
+    )
+endif
+
+if get_option('sdl').enable_auto_if(sdl3.found()).enabled()
+    merian_src += files(
+        'vk/extension/sdl/extension_sdl.cpp',
+        'vk/extension/sdl/extension_sdl_audio.cpp',
+        'vk/extension/sdl/extension_sdl_video.cpp',
+        'vk/extension/sdl/sdl_audio_device.cpp',
+        'vk/extension/sdl/sdl_window.cpp',
+    )
+endif
+
 subdir('shader')
+subdir('vk/imgui')
 
 merian_lib = static_library(
     'merian',

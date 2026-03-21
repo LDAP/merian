@@ -54,6 +54,17 @@ class GraphicsPipeline : public Pipeline {
                        .value;
     }
 
+    // Construct from a pre-built pipeline (e.g. created with dynamic rendering).
+    GraphicsPipeline(const vk::Pipeline vk_pipeline,
+                     const PipelineLayoutHandle& pipeline_layout,
+                     const vk::PipelineCreateFlags flags = {},
+                     const std::shared_ptr<Pipeline>& base_pipeline = {})
+        : Pipeline(pipeline_layout->get_context(), pipeline_layout, flags),
+          base_pipeline(base_pipeline) {
+        SPDLOG_DEBUG("create GraphicsPipeline ({})", fmt::ptr(this));
+        pipeline = vk_pipeline;
+    }
+
     ~GraphicsPipeline() {
         SPDLOG_DEBUG("destroy GraphicsPipeline ({})", fmt::ptr(this));
         context->get_device()->get_device().destroyPipeline(pipeline);

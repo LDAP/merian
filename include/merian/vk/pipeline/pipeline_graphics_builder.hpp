@@ -205,6 +205,12 @@ class GraphicsPipelineBuilder {
                                  const uint32_t subpass = 0,
                                  const std::shared_ptr<Pipeline>& opt_base_pipeline = {});
 
+    // Build a pipeline using dynamic rendering (no render pass).
+    // color_attachment_format: the VkFormat of the single color attachment.
+    GraphicsPipelineHandle build_dynamic_rendering(const PipelineLayoutHandle& pipeline_layout,
+                                                   vk::Format color_attachment_format,
+                                                   const std::shared_ptr<Pipeline>& opt_base_pipeline = {});
+
   private:
     // Shaders
     std::optional<VulkanEntryPointHandle> vertex_shader = std::nullopt;

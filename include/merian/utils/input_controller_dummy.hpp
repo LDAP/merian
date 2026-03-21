@@ -7,24 +7,9 @@ namespace merian {
 class DummyInputController : public InputController {
 
   public:
-    explicit DummyInputController();
+    explicit DummyInputController() = default;
+    ~DummyInputController() = default;
 
-    ~DummyInputController();
-
-    virtual bool request_raw_mouse_input(bool enable) override;
-
-    // Returns true if raw mouse input is enabled.
-    virtual bool get_raw_mouse_input() override;
-
-    // Clear all callbacks
-    virtual void reset() override;
-
-    virtual void set_active(bool active) override;
-
-    virtual void set_mouse_cursor_callback(const MouseCursorEventCallback& cb) override;
-    virtual void set_mouse_button_callback(const MouseButtonEventCallback& cb) override;
-    virtual void set_scroll_event_callback(const ScrollEventCallback& cb) override;
-    virtual void set_key_event_callback(const KeyEventCallback& cb) override;
 };
 
 } // namespace merian

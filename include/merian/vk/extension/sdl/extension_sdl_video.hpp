@@ -11,13 +11,13 @@ namespace merian {
 class SDLWindow;
 using SDLWindowHandle = std::shared_ptr<SDLWindow>;
 
-class ExtensionSDLWindow : public ContextExtension, public WindowProvider {
+class ExtensionSDLVideo : public ContextExtension, public WindowProvider {
   public:
-    static constexpr const char* name = "SDL Window";
+    static constexpr const char* name = "SDL3 (Video Subsystem)";
 
-    ExtensionSDLWindow();
+    ExtensionSDLVideo();
 
-    ~ExtensionSDLWindow();
+    ~ExtensionSDLVideo();
 
     std::vector<std::string> request_extensions() override;
 

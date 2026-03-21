@@ -25,6 +25,7 @@ class GLFWWindow : public Window, public InputController {
     // --- Window interface ---
 
     vk::Extent2D framebuffer_extent() override;
+    vk::Extent2D window_extent() override;
     SurfaceHandle get_surface() override;
 
     bool should_close() const override;
@@ -42,16 +43,19 @@ class GLFWWindow : public Window, public InputController {
 
     void set_close_callback(const CloseCallback& cb) override;
 
-    // --- InputController interface ---
+    WindowPlatform get_platform_type() const override {
+        return WindowPlatform::GLFW;
+    }
 
-    bool request_raw_mouse_input(bool enable) override;
-    bool get_raw_mouse_input() override;
-    void reset() override;
-    void set_active(bool active) override;
-    void set_mouse_cursor_callback(const MouseCursorEventCallback& cb) override;
-    void set_mouse_button_callback(const MouseButtonEventCallback& cb) override;
-    void set_scroll_event_callback(const ScrollEventCallback& cb) override;
-    void set_key_event_callback(const KeyEventCallback& cb) override;
+    // --- Platform services ---
+
+    void set_cursor_pos(double x, double y) override;
+    void set_cursor(WindowCursorShape shape) override;
+    bool set_mouse_grabbed(bool grabbed) override;
+    bool is_mouse_grabbed() const override;
+    void set_clipboard_text(const char* text) override;
+    const char* get_clipboard_text() override;
+    float get_display_scale() override;
 
     // --- GLFW-specific ---
 
@@ -59,13 +63,17 @@ class GLFWWindow : public Window, public InputController {
     GLFWwindow* get_window() const;
 
   private:
-    // Static GLFW callback handlers — valid C function pointers, access private
-    // members via glfwGetWindowUserPointer (the standard GLFW pattern for state).
+    // Static GLFW callback handlers.
     static void cb_close(GLFWwindow* w);
     static void cb_cursor(GLFWwindow* w, double xpos, double ypos);
     static void cb_mouse_button(GLFWwindow* w, int button, int action, int mods);
     static void cb_key(GLFWwindow* w, int key, int scancode, int action, int mods);
     static void cb_scroll(GLFWwindow* w, double xoffset, double yoffset);
+    static void cb_char(GLFWwindow* w, unsigned int codepoint);
+    static void cb_framebuffer_size(GLFWwindow* w, int width, int height);
+    static void cb_content_scale(GLFWwindow* w, float xscale, float yscale);
+    static void cb_focus(GLFWwindow* w, int focused);
+    static void cb_iconify(GLFWwindow* w, int iconified);
 
     DeviceHandle device;
     GLFWwindow* window = nullptr;
@@ -73,20 +81,11 @@ class GLFWWindow : public Window, public InputController {
     // saved when entering fullscreen, restored on exit
     std::array<int, 4> windowed_pos_size{100, 100, 1280, 720};
 
+    // Pre-created system cursors indexed by WindowCursorShape; nullptr for Hidden and Count.
+    std::array<GLFWcursor*, static_cast<size_t>(WindowCursorShape::Count)> cursors{};
+    WindowCursorShape current_cursor_shape = WindowCursorShape::Arrow;
+
     CloseCallback close_cb;
-
-    // InputController state
-    MouseCursorEventCallback cursor_cb{nullptr};
-    MouseButtonEventCallback mbutton_cb{nullptr};
-    KeyEventCallback key_cb{nullptr};
-    ScrollEventCallback scroll_cb{nullptr};
-    bool input_active = true;
-
-    // Previously registered GLFW callbacks, saved for chaining.
-    GLFWcursorposfun prev_cursor_cb{nullptr};
-    GLFWmousebuttonfun prev_mbutton_cb{nullptr};
-    GLFWkeyfun prev_key_cb{nullptr};
-    GLFWscrollfun prev_scroll_cb{nullptr};
 };
 
 using GLFWWindowHandle = std::shared_ptr<GLFWWindow>;

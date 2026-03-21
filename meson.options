@@ -1,3 +1,17 @@
+# Window backends
+option(
+    'glfw',
+    type: 'feature',
+    value: 'auto',
+    description: 'Enable GLFW window backend.'
+)
+option(
+    'sdl',
+    type: 'feature',
+    value: 'auto',
+    description: 'Enable SDL3 window backend.'
+)
+
 option(
     'performance_profiling',
     type: 'boolean',

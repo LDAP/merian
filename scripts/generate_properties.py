@@ -34,9 +34,9 @@ from vulkan_codegen.codegen import (
 )
 from vulkan_codegen.spec import (
     PROPERTY_STRUCT_BASE,
-    VULKAN_SPEC_VERSION,
     build_skiplist,
     get_output_paths,
+    is_up_to_date,
     load_vendor_tags,
     load_vulkan_spec,
 )
@@ -234,7 +234,7 @@ def generate_class_declaration(properties: list[PropertyStruct]) -> list[str]:
 
 def generate_header(extensions, properties: list[PropertyStruct]) -> str:
     """Generate the vulkan_properties.hpp header file content."""
-    lines = generate_file_header(VULKAN_SPEC_VERSION) + [
+    lines = generate_file_header() + [
         "#pragma once",
         "",
         '#include "vulkan/vulkan.hpp"',
@@ -527,7 +527,7 @@ def generate_api_version_property_types(xml_root, tags) -> list[str]:
 
 def generate_implementation(extensions, properties: list[PropertyStruct], tags, xml_root) -> str:
     """Generate the vulkan_properties.cpp implementation file content."""
-    lines = generate_file_header(VULKAN_SPEC_VERSION) + [
+    lines = generate_file_header() + [
         '#include "merian/vk/utils/vulkan_properties.hpp"',
         '#include "merian/vk/utils/vulkan_extensions.hpp"',
         '#include "merian/vk/instance.hpp"',
@@ -558,6 +558,9 @@ def generate_implementation(extensions, properties: list[PropertyStruct], tags, 
 
 
 def main():
+    if is_up_to_date(include_path / "vulkan_properties.hpp", out_path / "vulkan_properties.cpp"):
+        print("Already up to date, skipping.")
+        return
     xml_root = load_vulkan_spec()
     tags = load_vendor_tags(xml_root)
 

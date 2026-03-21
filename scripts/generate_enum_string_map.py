@@ -3,21 +3,26 @@
 from vulkan_codegen.codegen import generate_file_header
 from vulkan_codegen.naming import remove_tag, to_camel_case, to_upper_case
 from vulkan_codegen.spec import (
-    VULKAN_SPEC_VERSION,
     build_skiplist,
     get_output_paths,
+    is_up_to_date,
     load_vendor_tags,
     load_vulkan_spec,
 )
 
+out_path, _ = get_output_paths()
+
+if is_up_to_date(out_path / "vk_enums.cpp"):
+    print("Already up to date, skipping.")
+    raise SystemExit(0)
+
 xml = load_vulkan_spec()
 tags = load_vendor_tags(xml)
 skiplist = build_skiplist(xml)
-out_path, _ = get_output_paths()
 
 with open(out_path / "vk_enums.cpp", "w") as impl:
     # Write file header
-    for line in generate_file_header(VULKAN_SPEC_VERSION):
+    for line in generate_file_header():
         impl.write(line + "\n")
 
     impl.write(

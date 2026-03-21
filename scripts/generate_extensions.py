@@ -15,8 +15,8 @@ from warnings import deprecated
 from vulkan_codegen.codegen import generate_file_header
 from vulkan_codegen.parsing import enrich_extensions_with_struct_types, find_extensions
 from vulkan_codegen.spec import (
-    VULKAN_SPEC_VERSION,
     get_output_paths,
+    is_up_to_date,
     load_vendor_tags,
     load_vulkan_spec,
 )
@@ -26,7 +26,7 @@ out_path, include_path = get_output_paths()
 
 def generate_header(extensions) -> str:
     """Generate the vulkan_extensions.hpp header file."""
-    lines = generate_file_header(VULKAN_SPEC_VERSION) + [
+    lines = generate_file_header() + [
         "#pragma once",
         "",
         '#include "vulkan/vulkan.hpp"',
@@ -223,7 +223,7 @@ def generate_get_extension_info_impl(extensions) -> list[str]:
 
 def generate_implementation(extensions) -> str:
     """Generate the vulkan_extensions.cpp implementation file."""
-    lines = generate_file_header(VULKAN_SPEC_VERSION) + [
+    lines = generate_file_header() + [
         '#include "merian/vk/utils/vulkan_extensions.hpp"',
         "",
         "#include <cstring>",
@@ -242,6 +242,9 @@ def generate_implementation(extensions) -> str:
 
 
 def main():
+    if is_up_to_date(include_path / "vulkan_extensions.hpp", out_path / "vulkan_extensions.cpp"):
+        print("Already up to date, skipping.")
+        return
     xml_root = load_vulkan_spec()
     tags = load_vendor_tags(xml_root)
 

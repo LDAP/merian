@@ -16,7 +16,8 @@ inline vk::AccessFlags access_flags_for_image_layout(const vk::ImageLayout& layo
     case vk::ImageLayout::eColorAttachmentOptimal:
         return vk::AccessFlagBits::eColorAttachmentWrite;
     case vk::ImageLayout::eDepthStencilAttachmentOptimal:
-        return vk::AccessFlagBits::eDepthStencilAttachmentWrite;
+        return vk::AccessFlagBits::eDepthStencilAttachmentWrite |
+               vk::AccessFlagBits::eDepthStencilAttachmentRead;
     case vk::ImageLayout::eShaderReadOnlyOptimal:
         return vk::AccessFlagBits::eShaderRead;
     default:
@@ -34,7 +35,8 @@ inline vk::AccessFlags2 access_flags2_for_image_layout(const vk::ImageLayout& la
     case vk::ImageLayout::eTransferSrcOptimal:
         return vk::AccessFlagBits2::eTransferRead;
     case vk::ImageLayout::eColorAttachmentOptimal:
-        return vk::AccessFlagBits2::eColorAttachmentWrite;
+        return vk::AccessFlagBits2::eColorAttachmentWrite |
+               vk::AccessFlagBits2::eColorAttachmentRead;
     case vk::ImageLayout::eDepthStencilAttachmentOptimal:
         return vk::AccessFlagBits2::eDepthStencilAttachmentWrite;
     case vk::ImageLayout::eShaderReadOnlyOptimal:

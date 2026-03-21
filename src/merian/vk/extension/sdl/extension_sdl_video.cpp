@@ -1,4 +1,4 @@
-#include "merian/vk/extension/sdl/extension_sdl_window.hpp"
+#include "merian/vk/extension/sdl/extension_sdl_video.hpp"
 #include "merian/vk/extension/sdl/extension_sdl.hpp"
 #include "merian/vk/extension/sdl/sdl_window.hpp"
 
@@ -9,9 +9,9 @@
 
 namespace merian {
 
-ExtensionSDLWindow::ExtensionSDLWindow() : ContextExtension() {}
+ExtensionSDLVideo::ExtensionSDLVideo() : ContextExtension() {}
 
-ExtensionSDLWindow::~ExtensionSDLWindow() {
+ExtensionSDLVideo::~ExtensionSDLVideo() {
     if (sdl_vulkan_support)
         SDL_Vulkan_UnloadLibrary();
     if (video_initialized) {
@@ -20,17 +20,20 @@ ExtensionSDLWindow::~ExtensionSDLWindow() {
     }
 }
 
-std::vector<std::string> ExtensionSDLWindow::request_extensions() {
+std::vector<std::string> ExtensionSDLVideo::request_extensions() {
     return {ExtensionSDL::name};
 }
 
 InstanceSupportInfo
-ExtensionSDLWindow::query_instance_support(const InstanceSupportQueryInfo& query_info) {
+ExtensionSDLVideo::query_instance_support(const InstanceSupportQueryInfo& query_info) {
     sdl_ext = query_info.extension_container.get_context_extension<ExtensionSDL>(true);
     if (!sdl_ext)
         return InstanceSupportInfo{false, fmt::format("{} not available", ExtensionSDL::name)};
 
     if (!video_initialized) {
+        if (getenv("WAYLAND_DISPLAY") != nullptr) {
+            SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "wayland");
+        }
         if (!SDL_InitSubSystem(SDL_INIT_VIDEO)) {
             SPDLOG_WARN("SDL_InitSubSystem(SDL_INIT_VIDEO) failed: {}", SDL_GetError());
             return InstanceSupportInfo{false, "SDL_InitSubSystem(SDL_INIT_VIDEO) failed"};
@@ -59,7 +62,7 @@ ExtensionSDLWindow::query_instance_support(const InstanceSupportQueryInfo& query
 }
 
 DeviceSupportInfo
-ExtensionSDLWindow::query_device_support(const DeviceSupportQueryInfo& query_info) {
+ExtensionSDLVideo::query_device_support(const DeviceSupportQueryInfo& query_info) {
     if (!sdl_vulkan_support)
         return DeviceSupportInfo{false, "SDL Vulkan support unavailable"};
 
@@ -80,16 +83,16 @@ ExtensionSDLWindow::query_device_support(const DeviceSupportQueryInfo& query_inf
     return info;
 }
 
-bool ExtensionSDLWindow::accept_graphics_queue(const InstanceHandle& instance,
-                                               const PhysicalDeviceHandle& physical_device,
-                                               std::size_t queue_family_index) {
+bool ExtensionSDLVideo::accept_graphics_queue(const InstanceHandle& instance,
+                                              const PhysicalDeviceHandle& physical_device,
+                                              std::size_t queue_family_index) {
     return !sdl_vulkan_support ||
            SDL_Vulkan_GetPresentationSupport(**instance, **physical_device,
                                              static_cast<Uint32>(queue_family_index));
 }
 
-WindowHandle ExtensionSDLWindow::create_window(const DeviceHandle& device,
-                                               const WindowCreateInfo& create_info) const {
+WindowHandle ExtensionSDLVideo::create_window(const DeviceHandle& device,
+                                              const WindowCreateInfo& create_info) const {
     return std::shared_ptr<SDLWindow>(
         new SDLWindow(device, create_info.width, create_info.height, create_info.title.c_str()));
 }

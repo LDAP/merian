@@ -67,7 +67,10 @@ meson.override_dependency('SPIRV-Headers', spirv_headers)
 fmt = dependency('fmt', version : ['>=12.1.0'], fallback : ['fmt', 'fmt_dep'])
 spdlog = dependency('spdlog', version : ['>=1.17.0'], fallback : ['spdlog', 'spdlog_dep'], default_options : ['external_fmt=enabled'])
 spirv_reflect = dependency('spirv-reflect', fallback: ['spirv-reflect', 'spirv_reflect_dep'])
-glfw = dependency('glfw3', version: ['>=3.4.0'], fallback: ['glfw', 'glfw_dep'])
+glfw = dependency('glfw3', version: ['>=3.4.0'], required: get_option('glfw'), fallback: ['glfw', 'glfw_dep'])
+if get_option('glfw').enable_auto_if(glfw.found()).enabled()
+    global_args += ['-DMERIAN_GLFW_ENABLED']
+endif
 subprocess = dependency('subprocess', version: ['>=0.4.0'], fallback: ['subprocess', 'subprocess_dep'])
 glm = dependency('glm', fallback : ['glm', 'glm_dep'], version: ['>=1.0.3'])
 tol = dependency('tinyobjloader', fallback : ['tinyobjloader', 'tinyobjloader_dep'])
@@ -83,7 +86,10 @@ tinybvh = dependency('tinybvh', required: false)
 if not tinybvh.found() and get_option('tinybvh').enabled()
     tinybvh = dependency('tinybvh', fallback: ['tinybvh', 'tinybvh_dep'])
 endif
-sdl3 = dependency('sdl3', version: ['>=3.4.0'], required: false, fallback: ['sdl3', 'sdl3_dep'])
+sdl3 = dependency('sdl3', version: ['>=3.4.0'], required: get_option('sdl'), fallback: ['sdl3', 'sdl3_dep'])
+if get_option('sdl').enable_auto_if(sdl3.found()).enabled()
+    global_args += ['-DMERIAN_SDL_ENABLED']
+endif
 shaderc = dependency('shaderc', version: ['>=2025.3'], required: false)
 if not shaderc.found() and get_option('shaderc').enabled()
     shaderc_options = cmake.subproject_options()
@@ -162,7 +168,10 @@ message('Generating Vulkan code generators for version v@0@...'.format(vulkan_ta
 foreach script : generator_scripts
     message(run_command(
         py, meson.current_source_dir() / script,
-        env: {'VULKAN_SPEC_VERSION': 'v' + vulkan_target_api_version},
+        env: {
+            'VULKAN_SPEC_VERSION': 'v' + vulkan_target_api_version,
+            'MERIAN_BUILD_DIR': meson.global_build_root(),
+        },
         check: true
     ).stdout())
 endforeach
@@ -207,7 +216,7 @@ merian_dep = declare_dependency(
     include_directories : inc_dirs,
     dependencies : [
         fmt,
-        glfw,
+        glfw.found() ? glfw : [],
         glm,
         glslang,
         imgui,

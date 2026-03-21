@@ -8,15 +8,16 @@
 
 // Forward declarations to avoid including SDL headers from this header
 struct SDL_Window;
+struct SDL_Cursor;
 union SDL_Event;
 
 namespace merian {
 
-class ExtensionSDLWindow;
+class ExtensionSDLVideo;
 
 class SDLWindow : public Window, public InputController {
   public:
-    friend class ExtensionSDLWindow;
+    friend class ExtensionSDLVideo;
 
   private:
     SDLWindow(const DeviceHandle& device,
@@ -30,6 +31,7 @@ class SDLWindow : public Window, public InputController {
     // --- Window interface ---
 
     vk::Extent2D framebuffer_extent() override;
+    vk::Extent2D window_extent() override;
     SurfaceHandle get_surface() override;
 
     bool should_close() const override;
@@ -45,16 +47,19 @@ class SDLWindow : public Window, public InputController {
 
     void set_close_callback(const CloseCallback& cb) override;
 
-    // --- InputController interface ---
+    WindowPlatform get_platform_type() const override {
+        return WindowPlatform::SDL;
+    }
 
-    bool request_raw_mouse_input(bool enable) override;
-    bool get_raw_mouse_input() override;
-    void reset() override;
-    void set_active(bool active) override;
-    void set_mouse_cursor_callback(const MouseCursorEventCallback& cb) override;
-    void set_mouse_button_callback(const MouseButtonEventCallback& cb) override;
-    void set_scroll_event_callback(const ScrollEventCallback& cb) override;
-    void set_key_event_callback(const KeyEventCallback& cb) override;
+    // --- Platform services ---
+
+    void set_cursor_pos(double x, double y) override;
+    void set_cursor(WindowCursorShape shape) override;
+    bool set_mouse_grabbed(bool grabbed) override;
+    bool is_mouse_grabbed() const override;
+    void set_clipboard_text(const char* text) override;
+    const char* get_clipboard_text() override;
+    float get_display_scale() override;
 
     // --- SDL-specific ---
 
@@ -71,14 +76,19 @@ class SDLWindow : public Window, public InputController {
     bool close_requested = false;
 
     CloseCallback close_cb;
+    char* clipboard = nullptr;
 
-    // InputController state
-    MouseCursorEventCallback cursor_cb{nullptr};
-    MouseButtonEventCallback mbutton_cb{nullptr};
-    KeyEventCallback key_cb{nullptr};
-    ScrollEventCallback scroll_cb{nullptr};
-    bool input_active = true;
-    bool raw_mouse = false;
+    // Pre-created system cursors indexed by WindowCursorShape; nullptr for Hidden and Count.
+    std::array<SDL_Cursor*, static_cast<size_t>(WindowCursorShape::Count)> cursors{};
+    WindowCursorShape current_cursor_shape = WindowCursorShape::Arrow;
+
+    // Accumulated relative motion — reset when entering relative mode.
+    double rel_accum_x = 0;
+    double rel_accum_y = 0;
+
+    // Cursor position saved on grab; restored on ungrab.
+    float saved_cursor_x = 0;
+    float saved_cursor_y = 0;
 };
 
 using SDLWindowHandle = std::shared_ptr<SDLWindow>;

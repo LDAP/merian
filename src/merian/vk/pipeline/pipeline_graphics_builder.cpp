@@ -394,4 +394,61 @@ GraphicsPipelineBuilder::build(const PipelineLayoutHandle& pipeline_layout,
         dynamic_state, pipeline_layout, renderpass, subpass, flags, base_pipeline);
 }
 
+GraphicsPipelineHandle
+GraphicsPipelineBuilder::build_dynamic_rendering(const PipelineLayoutHandle& pipeline_layout,
+                                                  const vk::Format color_attachment_format,
+                                                  const std::shared_ptr<Pipeline>& base_pipeline) {
+    assert(pipeline_layout);
+    assert(vertex_shader);
+    assert(fragment_shader);
+
+    const vk::PipelineVertexInputStateCreateInfo vertex_input_state{
+        vertex_input_create_flags, vertex_input_bindings, vertex_input_attributes};
+    const vk::PipelineViewportStateCreateInfo viewport_state{viewport_create_flags, viewports,
+                                                             scissors};
+    color_blend_state.pAttachments = attachment_blend_states.data();
+    color_blend_state.attachmentCount = attachment_blend_states.size();
+    const vk::PipelineDynamicStateCreateInfo dynamic_state{dynamic_state_create_flags,
+                                                           dynamic_states};
+
+    std::vector<vk::PipelineShaderStageCreateInfo> stages;
+    if (vertex_shader)
+        stages.emplace_back(
+            vertex_shader.value()->get_shader_stage_create_info(pipeline_layout->get_context()));
+    if (fragment_shader)
+        stages.emplace_back(
+            fragment_shader.value()->get_shader_stage_create_info(pipeline_layout->get_context()));
+
+    vk::PipelineRenderingCreateInfo rendering_info;
+    rendering_info.colorAttachmentCount = 1;
+    rendering_info.pColorAttachmentFormats = &color_attachment_format;
+
+    vk::GraphicsPipelineCreateInfo info{flags,
+                                        stages,
+                                        &vertex_input_state,
+                                        &input_assembly_state,
+                                        &tessellation_state,
+                                        &viewport_state,
+                                        &rasterization_state,
+                                        &multisample_state,
+                                        &depth_stencil_state,
+                                        &color_blend_state,
+                                        &dynamic_state,
+                                        *pipeline_layout,
+                                        VK_NULL_HANDLE,
+                                        0,
+                                        base_pipeline ? base_pipeline->get_pipeline() : nullptr,
+                                        0};
+    info.pNext = &rendering_info;
+
+    const auto& context = pipeline_layout->get_context();
+    vk::Pipeline vk_pipeline =
+        context->get_device()
+            ->get_device()
+            .createGraphicsPipeline(context->get_device()->get_pipeline_cache(), info)
+            .value;
+
+    return std::make_shared<GraphicsPipeline>(vk_pipeline, pipeline_layout, flags, base_pipeline);
+}
+
 } // namespace merian
