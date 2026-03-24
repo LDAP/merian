@@ -1,4 +1,5 @@
 #include "merian/vk/extension/extension_vma.hpp"
+#include "merian/vk/memory/memory_allocator_vma.hpp"
 #include "merian/vk/physical_device.hpp"
 #include "vk_mem_alloc.h"
 
@@ -55,6 +56,10 @@ void ExtensionVMA::on_physical_device_selected(
         flags |= VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
         SPDLOG_DEBUG("VMA extension: enable VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT");
     }
+}
+
+MemoryAllocatorHandle ExtensionVMA::create_memory_allocator(const ContextHandle& context) const {
+    return VMAMemoryAllocator::create(context);
 }
 
 } // namespace merian

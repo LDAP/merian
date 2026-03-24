@@ -17,8 +17,6 @@ class ExtensionResources : public ContextExtension {
     ExtensionResources() : ContextExtension() {}
     ~ExtensionResources() {}
 
-    std::vector<std::string> request_extensions() override;
-
     void on_context_created(const ContextHandle& context,
                             const ExtensionContainer& extension_container) override;
 

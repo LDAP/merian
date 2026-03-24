@@ -14,16 +14,6 @@ class ExtensionMerian : public ContextExtension {
     ExtensionMerian() : ContextExtension() {}
     ~ExtensionMerian() {}
 
-    std::vector<std::string> request_extensions() override {
-        return {
-            "merian-mitigations",
-            "merian-compatibility",
-#ifndef NDEBUG
-            "merian-debug-utils",
-#endif
-        };
-    }
-
     DeviceSupportInfo query_device_support(const DeviceSupportQueryInfo& query_info) override {
         return DeviceSupportInfo::check(query_info,
                                         {

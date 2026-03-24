@@ -18,6 +18,7 @@ InstanceSupportInfo
 ExtensionSDL::query_instance_support(const InstanceSupportQueryInfo& /*query_info*/) {
     if (!sdl_initialized) {
         SPDLOG_DEBUG("Initialize SDL {}...", SDL_GetRevision());
+        SDL_SetHint(SDL_HINT_NO_SIGNAL_HANDLERS, "1");
         if (!SDL_Init(0)) {
             SPDLOG_WARN("SDL_Init failed: {}", SDL_GetError());
         } else {

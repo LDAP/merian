@@ -1,14 +1,9 @@
 #include "merian/vk/extension/extension_resources.hpp"
-#include "merian/vk/extension/extension_vma.hpp"
-#include "merian/vk/memory/memory_allocator_vma.hpp"
+#include "merian/vk/memory/memory_allocator_provider.hpp"
 
 #include <fmt/ranges.h>
 
 namespace merian {
-
-std::vector<std::string> ExtensionResources::request_extensions() {
-    return {ExtensionVMA::name};
-}
 
 void ExtensionResources::on_context_created(const ContextHandle& context,
                                             const ExtensionContainer& /*extension_container*/) {
@@ -20,7 +15,9 @@ void ExtensionResources::on_context_created(const ContextHandle& context,
 MemoryAllocatorHandle ExtensionResources::memory_allocator() {
     if (_memory_allocator.expired()) {
         assert(!weak_context.expired());
-        auto ptr = VMAMemoryAllocator::create(weak_context.lock());
+        auto context = weak_context.lock();
+        auto ptr =
+            context->find_provider<MemoryAllocatorProvider>()->create_memory_allocator(context);
         _memory_allocator = ptr;
         return ptr;
     }

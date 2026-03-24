@@ -75,31 +75,44 @@ class VulkanException : public MerianException {
 class ExtensionContainer {
 
   public:
-    // Returns all loaded extensions that implement or derive from T.
-    template <class T>
-    std::vector<std::shared_ptr<T>> find_providers() const {
-        std::vector<std::shared_ptr<T>> result;
+    // Returns all loaded extensions that implement or derive from T, sorted by priority (highest
+    // first). Priority is looked up per-interface from the ExtensionRegistry.
+    template <class T> std::vector<std::shared_ptr<T>> find_providers() const {
+        const std::type_index iface = typeid(T);
+        std::vector<std::pair<int, std::shared_ptr<T>>> with_priority;
         for (const auto& ext : ordered_extensions) {
             if (auto cast = std::dynamic_pointer_cast<T>(ext)) {
-                result.push_back(std::move(cast));
+                with_priority.emplace_back(get_extension_priority(ext, iface), std::move(cast));
             }
         }
+        std::sort(with_priority.begin(), with_priority.end(),
+                  [](const auto& a, const auto& b) { return a.first > b.first; });
+        std::vector<std::shared_ptr<T>> result;
+        result.reserve(with_priority.size());
+        for (auto& [_, p] : with_priority)
+            result.push_back(std::move(p));
         return result;
     }
 
-    // Returns the first loaded extension that implements or derives from T.
-    template <class T>
-    std::shared_ptr<T> find_provider(const bool null_ok = false) const {
+    // Returns the highest-priority loaded extension that implements or derives from T.
+    // Priority is per-interface, looked up from the ExtensionRegistry.
+    template <class T> std::shared_ptr<T> find_provider(const bool null_ok = false) const {
+        const std::type_index iface = typeid(T);
+        std::shared_ptr<T> best;
+        int best_priority = std::numeric_limits<int>::min();
         for (const auto& ext : ordered_extensions) {
             if (auto cast = std::dynamic_pointer_cast<T>(ext)) {
-                return cast;
+                const int p = get_extension_priority(ext, iface);
+                if (p > best_priority) {
+                    best = std::move(cast);
+                    best_priority = p;
+                }
             }
         }
-        if (null_ok) {
-            return nullptr;
+        if (best || null_ok) {
+            return best;
         }
-        throw MissingExtension{
-            fmt::format("no provider for type {} loaded.", typeid(T).name())};
+        throw MissingExtension{fmt::format("no provider for type {} loaded.", typeid(T).name())};
     }
 
     // Returns the loaded extension of type T, or nullptr / throws MissingExtension.
@@ -124,6 +137,11 @@ class ExtensionContainer {
     void add_extension(const std::shared_ptr<ContextExtension>& extension);
 
     void remove_extension(const std::type_index& type);
+
+    // Looks up the per-interface priority for an extension via the ExtensionRegistry.
+    // Implemented in context.cpp to avoid a circular include with extension_registry.hpp.
+    int get_extension_priority(const std::shared_ptr<ContextExtension>& ext,
+                               const std::type_index& interface_type) const;
 
   private:
     std::unordered_map<std::type_index, std::shared_ptr<ContextExtension>> context_extensions;

@@ -1,5 +1,6 @@
 #include "merian/vk/extension/extension_registry.hpp"
 
+#include "merian/utils/audio/audio_device_provider.hpp"
 #include "merian/vk/extension/extension_compatibility.hpp"
 #include "merian/vk/extension/extension_glsl_compiler.hpp"
 #include "merian/vk/extension/extension_merian.hpp"
@@ -10,6 +11,7 @@
 #include "merian/vk/extension/extension_vk_validation_layers.hpp"
 #include "merian/vk/extension/extension_vma.hpp"
 #include "merian/vk/imgui/extension_imgui.hpp"
+#include "merian/vk/memory/memory_allocator_provider.hpp"
 #ifdef MERIAN_GLFW_ENABLED
 #include "merian/vk/extension/glfw/extension_glfw.hpp"
 #endif
@@ -28,23 +30,25 @@ ExtensionRegistry& ExtensionRegistry::get_instance() {
 
 ExtensionRegistry::ExtensionRegistry() {
 #ifdef MERIAN_GLFW_ENABLED
-    register_extension<ExtensionGLFW>(ExtensionGLFW::name);
+    register_extension<ExtensionGLFW>(ExtensionGLFW::name, true);
 #endif
 #ifdef MERIAN_SDL_ENABLED
-    register_extension<ExtensionSDL>(ExtensionSDL::name);
-    register_extension<ExtensionSDLAudio>(ExtensionSDLAudio::name);
-    register_extension<ExtensionSDLVideo>(ExtensionSDLVideo::name);
+    register_extension<ExtensionSDL>(ExtensionSDL::name, true);
+    register_extension<ExtensionSDLAudio>(ExtensionSDLAudio::name, true,
+                                          {ProviderPriority<AudioDeviceProvider>{50}});
+    register_extension<ExtensionSDLVideo>(ExtensionSDLVideo::name, true);
 #endif
-    register_extension<ExtensionCompatibility>(ExtensionCompatibility::name);
-    register_extension<ExtensionGLSLCompiler>(ExtensionGLSLCompiler::name);
-    register_extension<ExtensionMerian>(ExtensionMerian::name);
-    register_extension<ExtensionMitigations>(ExtensionMitigations::name);
-    register_extension<ExtensionResources>(ExtensionResources::name);
-    register_extension<ExtensionVkDebugUtils>(ExtensionVkDebugUtils::name);
-    register_extension<ExtensionVkLayerSettings>(ExtensionVkLayerSettings::name);
-    register_extension<ExtensionVkValidationLayers>(ExtensionVkValidationLayers::name);
-    register_extension<ExtensionVMA>(ExtensionVMA::name);
-    register_extension<ExtensionImGui>(ExtensionImGui::name);
+    register_extension<ExtensionCompatibility>(ExtensionCompatibility::name, true);
+    register_extension<ExtensionMitigations>(ExtensionMitigations::name, true);
+    register_extension<ExtensionVkDebugUtils>(ExtensionVkDebugUtils::name, Context::IS_DEBUG_BUILD);
+    register_extension<ExtensionGLSLCompiler>(ExtensionGLSLCompiler::name, true);
+    register_extension<ExtensionMerian>(ExtensionMerian::name, true);
+    register_extension<ExtensionVMA>(ExtensionVMA::name, true,
+                                     {ProviderPriority<MemoryAllocatorProvider>{50}});
+    register_extension<ExtensionResources>(ExtensionResources::name, true);
+    register_extension<ExtensionVkLayerSettings>(ExtensionVkLayerSettings::name, true);
+    register_extension<ExtensionVkValidationLayers>(ExtensionVkValidationLayers::name, false);
+    register_extension<ExtensionImGui>(ExtensionImGui::name, true);
 }
 
 std::shared_ptr<ContextExtension> ExtensionRegistry::create(const std::string& name) const {
@@ -57,6 +61,15 @@ std::shared_ptr<ContextExtension> ExtensionRegistry::create(const std::string& n
 
 bool ExtensionRegistry::is_registered(const std::string& name) const {
     return name_to_factory.contains(name);
+}
+
+int ExtensionRegistry::get_priority(const std::string& name,
+                                    const std::type_index& interface_type) const {
+    auto ext_it = name_to_provider_priority.find(name);
+    if (ext_it == name_to_provider_priority.end())
+        return 0;
+    auto iface_it = ext_it->second.find(interface_type);
+    return iface_it != ext_it->second.end() ? iface_it->second : 0;
 }
 
 std::vector<std::string> ExtensionRegistry::get_registered_extensions() const {

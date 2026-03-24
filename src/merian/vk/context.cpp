@@ -38,6 +38,12 @@ ContextHandle Context::create(const ContextCreateInfo& create_info) {
     return context;
 }
 
+int ExtensionContainer::get_extension_priority(const std::shared_ptr<ContextExtension>& ext,
+                                               const std::type_index& interface_type) const {
+    const auto& reg = ExtensionRegistry::get_instance();
+    return reg.get_priority(reg.get_name(ext), interface_type);
+}
+
 void ExtensionContainer::add_extension(const std::shared_ptr<ContextExtension>& extension) {
     const std::type_index type_idx = typeindex_from_pointer(extension);
     context_extensions[type_idx] = extension;
@@ -55,14 +61,15 @@ void ExtensionContainer::remove_extension(const std::type_index& type) {
     assert(ordered_extensions.size() == context_extensions.size());
 }
 
-
 void Context::load_extensions(const std::vector<std::string>& extension_names) {
     std::unordered_set<std::string> loaded_extensions;
     std::unordered_map<std::string, std::shared_ptr<ContextExtension>> pending_extensions;
     std::queue<std::string> to_process;
 
-    // Queue initial extensions
-    to_process.push("merian");
+    // Queue auto-load extensions first, then user-requested extensions
+    for (const auto& ext_name : ExtensionRegistry::get_instance().get_auto_load_names()) {
+        to_process.push(ext_name);
+    }
     for (const auto& ext_name : extension_names) {
         to_process.push(ext_name);
     }

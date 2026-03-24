@@ -15,6 +15,32 @@ template <typename ExtensionClass> std::shared_ptr<ContextExtension> create_exte
     return std::make_shared<ExtensionClass>();
 }
 
+// Type-erased priority entry for one provider interface. Constructed via ProviderPriority<T>.
+struct ProviderPriorityEntry {
+    std::type_index interface_type;
+    int priority;
+#ifndef NDEBUG
+    std::function<bool(const std::shared_ptr<ContextExtension>&)> check_fn;
+#endif
+};
+
+// Typed helper — construct as ProviderPriority<MyInterface>{50}. Implicitly converts to
+// ProviderPriorityEntry. In debug builds the entry carries a runtime check that verifies the
+// extension actually implements the interface.
+template <typename InterfaceType> struct ProviderPriority {
+    int priority;
+
+    operator ProviderPriorityEntry() const {
+        return {typeid(InterfaceType), priority,
+#ifndef NDEBUG
+                [](const std::shared_ptr<ContextExtension>& ext) {
+                    return std::dynamic_pointer_cast<InterfaceType>(ext) != nullptr;
+                }
+#endif
+        };
+    }
+};
+
 class ExtensionRegistry {
   public:
     using ExtensionFactory = std::function<std::shared_ptr<ContextExtension>()>;
@@ -29,7 +55,10 @@ class ExtensionRegistry {
     // -----------------------------------
 
     template <typename EXTENSION_TYPE>
-    void register_extension(const std::string& name, const ExtensionFactory& factory) {
+    void register_extension(const std::string& name,
+                            const ExtensionFactory& factory,
+                            const bool auto_load = false,
+                            std::initializer_list<ProviderPriorityEntry> provider_priorities = {}) {
         const std::type_index type = typeid(std::remove_pointer_t<EXTENSION_TYPE>);
 
         if (type_to_name.contains(type)) {
@@ -43,10 +72,36 @@ class ExtensionRegistry {
 
         type_to_name[type] = name;
         name_to_factory[name] = factory;
+        for (const auto& e : provider_priorities)
+            name_to_provider_priority[name][e.interface_type] = e.priority;
+        if (auto_load)
+            auto_load_extension_names.push_back(name);
+
+#ifndef NDEBUG
+        if (!provider_priorities.size())
+            return;
+        auto test_instance = factory();
+        for (const auto& e : provider_priorities) {
+            if (!e.check_fn(test_instance)) {
+                throw std::invalid_argument{
+                    fmt::format("extension '{}' does not implement provider '{}'", name,
+                                e.interface_type.name())};
+            }
+        }
+#endif
     }
 
-    template <typename EXTENSION_TYPE> void register_extension(const std::string& name) {
-        register_extension<EXTENSION_TYPE>(name, create_extension<EXTENSION_TYPE>);
+    template <typename EXTENSION_TYPE>
+    void register_extension(const std::string& name,
+                            const bool auto_load = false,
+                            std::initializer_list<ProviderPriorityEntry> provider_priorities = {}) {
+        register_extension<EXTENSION_TYPE>(name, create_extension<EXTENSION_TYPE>, auto_load,
+                                           provider_priorities);
+    }
+
+    // Names of extensions registered with auto_load=true, in registration order.
+    const std::vector<std::string>& get_auto_load_names() const {
+        return auto_load_extension_names;
     }
 
     std::shared_ptr<ContextExtension> create(const std::string& name) const;
@@ -80,11 +135,17 @@ class ExtensionRegistry {
 
     std::vector<std::string> get_registered_extensions() const;
 
+    // Returns the registered priority for (name, interface_type), or 0 if not set.
+    int get_priority(const std::string& name, const std::type_index& interface_type) const;
+
   private:
     ExtensionRegistry();
 
     std::unordered_map<std::type_index, std::string> type_to_name;
     std::unordered_map<std::string, ExtensionFactory> name_to_factory;
+    std::unordered_map<std::string, std::unordered_map<std::type_index, int>>
+        name_to_provider_priority;
+    std::vector<std::string> auto_load_extension_names;
 };
 
 template <typename EXTENSION_TYPE> class ExtensionRegisterer {
