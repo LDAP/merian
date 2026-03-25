@@ -12,7 +12,6 @@ namespace merian {
 // Window-attached platform backend for Dear ImGui.
 //
 // Registers input and window listeners, wires up clipboard and OS cursor shape updates.
-// Recreate this object whenever the window changes — do not call attach() on the old instance.
 //
 // Usage:
 //   auto ctx     = std::make_shared<ImGuiContext>();

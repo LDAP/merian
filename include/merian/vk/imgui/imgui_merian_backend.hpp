@@ -7,16 +7,13 @@
 
 namespace merian {
 
-// Minimal platform backend for Dear ImGui (no window attached).
+// Minimal platform backend for ImGui (no window attached).
 //
 // Usage:
 //   auto ctx     = std::make_shared<ImGuiContext>();
 //   auto backend = std::make_shared<ImGuiMerianBackend>(ctx);
 //   // each frame, before ImGui UI:
 //   backend->new_frame(dt_seconds);
-//
-// For a window-attached backend that handles input, cursor shape, and clipboard,
-// use ImGuiMerianWindowBackend instead.
 class ImGuiMerianBackend {
   public:
     explicit ImGuiMerianBackend(const ImGuiContextHandle& ctx);

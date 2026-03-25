@@ -1,6 +1,8 @@
 #include "merian/vk/imgui/imgui_input_listener.hpp"
 #include "merian/vk/imgui/imgui_context.hpp"
 
+#include <spdlog/spdlog.h>
+
 namespace merian {
 
 namespace {
@@ -119,23 +121,33 @@ ImGuiKey imgui_key_from_merian(const InputController::Key key) {
 }
 // clang-format on
 
+void update_mods(ImGuiIO& io, int mods) {
+    io.AddKeyEvent(ImGuiMod_Ctrl, (mods & InputController::CONTROL) != 0);
+    io.AddKeyEvent(ImGuiMod_Shift, (mods & InputController::SHIFT) != 0);
+    io.AddKeyEvent(ImGuiMod_Alt, (mods & InputController::ALT) != 0);
+    io.AddKeyEvent(ImGuiMod_Super, (mods & InputController::SUPER) != 0);
+}
+
 } // namespace
 
 ImGuiInputListener::ImGuiInputListener(ImGuiContextHandle ctx) : ctx(std::move(ctx)) {}
 
 bool ImGuiInputListener::on_cursor(InputController& c, const double xpos, const double ypos) {
-    if (c.is_mouse_grabbed())
+    if (c.is_mouse_grabbed()) {
         return false;
-    ctx->get_io().AddMousePosEvent(static_cast<float>(xpos), static_cast<float>(ypos));
-    return false;
+    }
+
+    ImGuiIO& io = ctx->get_io();
+    io.AddMousePosEvent(static_cast<float>(xpos), static_cast<float>(ypos));
+    return io.WantCaptureMouse;
 }
 
 bool ImGuiInputListener::on_mouse_button(InputController& /*c*/,
                                          const InputController::MouseButton button,
-                                         const InputController::KeyStatus status,
-                                         int /*mods*/) {
+                                         const InputController::KeyStatus status) {
     ImGuiIO& io = ctx->get_io();
     io.AddMouseButtonEvent(static_cast<int>(button), status != InputController::KeyStatus::RELEASE);
+
     return io.WantCaptureMouse;
 }
 
@@ -144,6 +156,7 @@ bool ImGuiInputListener::on_scroll(InputController& /*c*/,
                                    const double yoffset) {
     ImGuiIO& io = ctx->get_io();
     io.AddMouseWheelEvent(static_cast<float>(xoffset), static_cast<float>(yoffset));
+
     return io.WantCaptureMouse;
 }
 
@@ -152,19 +165,18 @@ bool ImGuiInputListener::on_key(InputController& /*c*/,
                                 const InputController::KeyStatus action,
                                 const int mods) {
     ImGuiIO& io = ctx->get_io();
-    io.AddKeyEvent(ImGuiMod_Ctrl, (mods & InputController::CONTROL) != 0);
-    io.AddKeyEvent(ImGuiMod_Shift, (mods & InputController::SHIFT) != 0);
-    io.AddKeyEvent(ImGuiMod_Alt, (mods & InputController::ALT) != 0);
-    io.AddKeyEvent(ImGuiMod_Super, (mods & InputController::SUPER) != 0);
+    update_mods(io, mods);
     const ImGuiKey imgui_key = imgui_key_from_merian(key);
     if (imgui_key != ImGuiKey_None)
         io.AddKeyEvent(imgui_key, action != InputController::KeyStatus::RELEASE);
+
     return io.WantCaptureKeyboard;
 }
 
 bool ImGuiInputListener::on_char(InputController& /*c*/, const unsigned int codepoint) {
     ImGuiIO& io = ctx->get_io();
     io.AddInputCharacter(codepoint);
+
     return io.WantCaptureKeyboard;
 }
 

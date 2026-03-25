@@ -8,8 +8,6 @@ namespace merian {
  * Extension that enables the Vulkan features required by ImGuiRenderer:
  *   - dynamicRendering feature (Vulkan 1.3 core)
  *   - VK_KHR_push_descriptor device extension
- *
- * Add "merian-imgui" to your context_extensions to enable this.
  */
 class ExtensionImGui : public ContextExtension {
   public:

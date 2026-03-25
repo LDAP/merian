@@ -53,9 +53,7 @@ bool InputController::dispatch_cursor(const double xpos, const double ypos) {
     return false;
 }
 
-bool InputController::dispatch_mouse_button(const MouseButton button,
-                                            const KeyStatus status,
-                                            const int mods) {
+bool InputController::dispatch_mouse_button(const MouseButton button, const KeyStatus status) {
     if (!input_active)
         return false;
     auto it = listeners.begin();
@@ -65,7 +63,7 @@ bool InputController::dispatch_mouse_button(const MouseButton button,
             it = listeners.erase(it);
             continue;
         }
-        if (sp->on_mouse_button(*this, button, status, mods))
+        if (sp->on_mouse_button(*this, button, status))
             return true;
         ++it;
     }

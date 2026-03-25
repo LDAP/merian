@@ -22,8 +22,7 @@ class InputListener {
     }
     virtual bool on_mouse_button(InputController& /*controller*/,
                                  InputController::MouseButton /*button*/,
-                                 InputController::KeyStatus /*status*/,
-                                 int /*mods*/) {
+                                 InputController::KeyStatus /*status*/) {
         return false;
     }
     virtual bool

@@ -1,7 +1,6 @@
 #include "merian/vk/extension/extension_registry.hpp"
 
 #include "merian/shader/glsl_compiler_provider.hpp"
-#include "merian/utils/audio/audio_device_provider.hpp"
 #include "merian/vk/extension/extension_compatibility.hpp"
 #include "merian/vk/extension/extension_glslang_compiler.hpp"
 #include "merian/vk/extension/extension_glslangvalidator_compiler.hpp"
@@ -16,9 +15,11 @@
 #include "merian/vk/extension/extension_vma.hpp"
 #include "merian/vk/imgui/extension_imgui.hpp"
 #include "merian/vk/memory/memory_allocator_provider.hpp"
+
 #ifdef MERIAN_GLFW_ENABLED
 #include "merian/vk/extension/glfw/extension_glfw.hpp"
 #endif
+
 #ifdef MERIAN_SDL_ENABLED
 #include "merian/vk/extension/sdl/extension_sdl.hpp"
 #include "merian/vk/extension/sdl/extension_sdl_audio.hpp"
@@ -34,13 +35,15 @@ ExtensionRegistry& ExtensionRegistry::get_instance() {
 
 ExtensionRegistry::ExtensionRegistry() {
 #ifdef MERIAN_GLFW_ENABLED
-    register_extension<ExtensionGLFW>(ExtensionGLFW::name, true);
+    register_extension<ExtensionGLFW>(ExtensionGLFW::name, true,
+                                      {ProviderPriority<WindowProvider>{40}});
 #endif
 #ifdef MERIAN_SDL_ENABLED
     register_extension<ExtensionSDL>(ExtensionSDL::name, true);
     register_extension<ExtensionSDLAudio>(ExtensionSDLAudio::name, true,
                                           {ProviderPriority<AudioDeviceProvider>{50}});
-    register_extension<ExtensionSDLVideo>(ExtensionSDLVideo::name, true);
+    register_extension<ExtensionSDLVideo>(ExtensionSDLVideo::name, true,
+                                          {ProviderPriority<WindowProvider>{50}});
 #endif
     register_extension<ExtensionCompatibility>(ExtensionCompatibility::name, true);
     register_extension<ExtensionMitigations>(ExtensionMitigations::name, true);

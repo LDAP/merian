@@ -168,19 +168,6 @@ class WindowNode : public Node {
 
         NodeStatusFlags flags{};
 
-        // Provider selector
-        if (providers.size() > 1) {
-            const auto& registry = ExtensionRegistry::get_instance();
-            std::vector<std::string> provider_names;
-            provider_names.reserve(providers.size());
-            for (const auto& p : providers) {
-                provider_names.push_back(registry.get_name(p));
-            }
-            if (config.config_options("provider", selected_provider, provider_names)) {
-                flags |= NodeStatusFlagBits::NEEDS_RECONNECT;
-            }
-        }
-
         if (current_src_array_size > 0) {
             config.config_uint("source array element", src_array_element, 0,
                                current_src_array_size - 1);
@@ -256,6 +243,23 @@ class WindowNode : public Node {
                     swapchain_info->images.size(), swapchain_info->extent.width,
                     swapchain_info->extent.height, vk::to_string(swapchain_info->present_mode)));
             }
+        }
+
+        const auto& registry = ExtensionRegistry::get_instance();
+        if (providers.size() > 1) {
+            std::vector<std::string> provider_names;
+            provider_names.reserve(providers.size());
+            for (const auto& p : providers) {
+                provider_names.push_back(registry.get_name(p));
+            }
+            if (config.config_options("backend", selected_provider, provider_names,
+                                      Properties::OptionsStyle::LIST_BOX)) {
+                flags |= NodeStatusFlagBits::NEEDS_RECONNECT;
+            }
+        }
+
+        if (active_provider) {
+            config.output_text("backend: ", registry.get_name(active_provider));
         }
 
         return flags;

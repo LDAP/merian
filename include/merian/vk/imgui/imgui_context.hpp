@@ -9,8 +9,7 @@ namespace merian {
 
 // Owns the lifetime of a Dear ImGui context and provides a safe multi-context API.
 //
-// Use with_context() to run Dear ImGui calls against this specific context.
-// register_input_listener() / register_window_listener() are handled by ImGuiMerianBackend.
+// Use with_context() to run ImGui calls against this specific context.
 class ImGuiContext : public std::enable_shared_from_this<ImGuiContext> {
   public:
     // Creates the Dear ImGui context and loads JetBrainsMono as the default font.

@@ -13,7 +13,7 @@
 namespace merian {
 
 /*
- * Custom Vulkan ImGui renderer using merian abstractions (No dependency on imgui_impl_vulkan).
+ * Custom Vulkan ImGui renderer using merian abstractions.
  *
  * Uses dynamic rendering.
  *
@@ -41,11 +41,9 @@ class ImGuiRenderer {
     ImTextureID register_texture(const TextureHandle& texture);
 
     // Release a previously registered texture slot (sets it to null).
-    // The font texture (ID 0) cannot be unregistered.
     void unregister_texture(ImTextureID id);
 
     // Calls ImGui::Render() then draws ImGui draw data into the given image view.
-    // Transitions the image to eColorAttachmentOptimal before rendering.
     void render(const CommandBufferHandle& cmd,
                 const ImageViewHandle& image_view,
                 const ProfilerHandle& profiler = nullptr);
@@ -70,10 +68,8 @@ class ImGuiRenderer {
     PipelineLayoutHandle pipeline_layout;
     DescriptorSetLayoutHandle descriptor_layout;
 
-    // Texture registry: index = ImTextureID.  [0] = font atlas.
     std::vector<TextureHandle> textures;
 
-    // Per-frame vertex + index buffers (HOST_VISIBLE, grown as needed).
     BufferHandle vertex_buffer;
     BufferHandle index_buffer;
 };

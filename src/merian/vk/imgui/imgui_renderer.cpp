@@ -10,7 +10,6 @@
 #include "merian/vk/pipeline/pipeline_graphics_builder.hpp"
 #include "merian/vk/pipeline/pipeline_layout.hpp"
 
-#include <cstring>
 #include <limits>
 #include <stdexcept>
 
@@ -26,8 +25,8 @@ struct PushConstants {
 } // namespace
 
 ImGuiRenderer::ImGuiRenderer(const ContextHandle& context,
-                              const ResourceAllocatorHandle& alloc,
-                              const ImGuiContextHandle& imgui_ctx)
+                             const ResourceAllocatorHandle& alloc,
+                             const ImGuiContextHandle& imgui_ctx)
     : context(context), alloc(alloc), imgui_ctx(imgui_ctx) {
     if (!context->get_context_extension<ExtensionImGui>(/*null_ok=*/true)) {
         throw std::runtime_error("ImGuiRenderer requires the 'merian-imgui' context extension. "
@@ -148,10 +147,14 @@ void ImGuiRenderer::ensure_buffers(const ImDrawData* draw_data) {
         static_cast<vk::DeviceSize>(draw_data->TotalVtxCount) * sizeof(ImDrawVert);
     const vk::DeviceSize idx_size =
         static_cast<vk::DeviceSize>(draw_data->TotalIdxCount) * sizeof(ImDrawIdx);
-    alloc->ensure_buffer_size(vertex_buffer, vtx_size, vk::BufferUsageFlagBits::eVertexBuffer,
-                              "imgui_vertices", MemoryMappingType::HOST_ACCESS_SEQUENTIAL_WRITE);
-    alloc->ensure_buffer_size(index_buffer, idx_size, vk::BufferUsageFlagBits::eIndexBuffer,
-                              "imgui_indices", MemoryMappingType::HOST_ACCESS_SEQUENTIAL_WRITE);
+    alloc->ensure_buffer_size(vertex_buffer, vtx_size,
+                              vk::BufferUsageFlagBits::eVertexBuffer |
+                                  vk::BufferUsageFlagBits::eTransferDst,
+                              "imgui_vertices");
+    alloc->ensure_buffer_size(index_buffer, idx_size,
+                              vk::BufferUsageFlagBits::eIndexBuffer |
+                                  vk::BufferUsageFlagBits::eTransferDst,
+                              "imgui_indices");
 }
 
 void ImGuiRenderer::render(const CommandBufferHandle& cmd,
@@ -183,23 +186,33 @@ void ImGuiRenderer::render(const CommandBufferHandle& cmd,
 
     ensure_buffers(draw_data);
 
-    // Upload vertex and index data
+    // Upload vertex and index data via staging (staging manager rotates internally)
     {
         MERIAN_PROFILE_SCOPE(profiler, "ImGui::upload_buffers");
-        auto* vtx_dst = vertex_buffer->get_memory()->map_as<ImDrawVert>();
-        auto* idx_dst = index_buffer->get_memory()->map_as<ImDrawIdx>();
+        vk::DeviceSize vtx_offset = 0;
+        vk::DeviceSize idx_offset = 0;
         for (int n = 0; n < draw_data->CmdListsCount; ++n) {
             const ImDrawList* list = draw_data->CmdLists[n];
-            std::memcpy(vtx_dst, list->VtxBuffer.Data,
-                        static_cast<std::size_t>(list->VtxBuffer.Size) * sizeof(ImDrawVert));
-            std::memcpy(idx_dst, list->IdxBuffer.Data,
-                        static_cast<std::size_t>(list->IdxBuffer.Size) * sizeof(ImDrawIdx));
-            vtx_dst += list->VtxBuffer.Size;
-            idx_dst += list->IdxBuffer.Size;
+            const vk::DeviceSize vtx_bytes =
+                static_cast<vk::DeviceSize>(list->VtxBuffer.Size) * sizeof(ImDrawVert);
+            const vk::DeviceSize idx_bytes =
+                static_cast<vk::DeviceSize>(list->IdxBuffer.Size) * sizeof(ImDrawIdx);
+            alloc->get_staging()->cmd_to_device(cmd, vertex_buffer, list->VtxBuffer.Data,
+                                                vtx_offset, vtx_bytes);
+            alloc->get_staging()->cmd_to_device(cmd, index_buffer, list->IdxBuffer.Data, idx_offset,
+                                                idx_bytes);
+            vtx_offset += vtx_bytes;
+            idx_offset += idx_bytes;
         }
-        vertex_buffer->get_memory()->unmap();
-        index_buffer->get_memory()->unmap();
     }
+
+    // Barrier: transfer writes must complete before vertex/index reads in the draw
+    cmd->barrier(vertex_buffer->buffer_barrier2(
+        vk::PipelineStageFlagBits2::eTransfer, vk::PipelineStageFlagBits2::eVertexAttributeInput,
+        vk::AccessFlagBits2::eTransferWrite, vk::AccessFlagBits2::eVertexAttributeRead));
+    cmd->barrier(index_buffer->buffer_barrier2(
+        vk::PipelineStageFlagBits2::eTransfer, vk::PipelineStageFlagBits2::eIndexInput,
+        vk::AccessFlagBits2::eTransferWrite, vk::AccessFlagBits2::eIndexRead));
 
     // Transition swapchain image: current → eColorAttachmentOptimal (preserve contents for eLoad)
     cmd->barrier(image->barrier2(vk::ImageLayout::eColorAttachmentOptimal));

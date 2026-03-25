@@ -173,8 +173,9 @@ void GLFWWindow::cb_mouse_button(GLFWwindow* w,
                                  const int action,
                                  const int glfw_mods) {
     auto* self = static_cast<GLFWWindow*>(glfwGetWindowUserPointer(w));
-    self->dispatch_mouse_button(mouse_button_from_glfw(glfw_button), status_from_glfw(action),
-                                mods_from_glfw(glfw_mods));
+    // dispatch mods
+    self->dispatch_key(Key::UNKNOWN, KeyStatus::UNKNOWN, mods_from_glfw(glfw_mods));
+    self->dispatch_mouse_button(mouse_button_from_glfw(glfw_button), status_from_glfw(action));
 }
 
 void GLFWWindow::cb_key(
@@ -201,7 +202,9 @@ void GLFWWindow::cb_framebuffer_size(GLFWwindow* w, const int width, const int h
                           {static_cast<uint32_t>(ww), static_cast<uint32_t>(wh)});
 }
 
-void GLFWWindow::cb_content_scale(GLFWwindow* w, const float xscale, [[maybe_unused]] const float yscale) {
+void GLFWWindow::cb_content_scale(GLFWwindow* w,
+                                  const float xscale,
+                                  [[maybe_unused]] const float yscale) {
     auto* self = static_cast<GLFWWindow*>(glfwGetWindowUserPointer(w));
     self->dispatch_display_scale_changed(xscale);
 }
@@ -384,11 +387,11 @@ float GLFWWindow::get_display_scale() {
 }
 
 void GLFWWindow::set_clipboard_text(const char* text) {
-    glfwSetClipboardString(window, text);
+    glfwSetClipboardString(nullptr, text);
 }
 
 const char* GLFWWindow::get_clipboard_text() {
-    return glfwGetClipboardString(window);
+    return glfwGetClipboardString(nullptr);
 }
 
 GLFWWindow::operator GLFWwindow*() const {

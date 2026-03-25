@@ -65,9 +65,13 @@ class InputController {
 
     // Grab/ungrab mouse: hide cursor, enable raw/relative input, confine to window.
     // Returns true if supported.
-    virtual bool set_mouse_grabbed(bool /*grabbed*/) { return false; }
+    virtual bool set_mouse_grabbed(bool /*grabbed*/) {
+        return false;
+    }
     // Returns true if the mouse is currently grabbed (cursor hidden, confined, raw input active).
-    virtual bool is_mouse_grabbed() const { return false; }
+    virtual bool is_mouse_grabbed() const {
+        return false;
+    }
 
     // Register a listener. Higher priority means it is called first.
     // The controller stores a weak_ptr; expired listeners are removed
@@ -85,7 +89,7 @@ class InputController {
     // Dispatch helpers — call from derived window implementations.
     // Return true if any listener consumed the event.
     bool dispatch_cursor(double xpos, double ypos);
-    bool dispatch_mouse_button(MouseButton button, KeyStatus status, int mods);
+    bool dispatch_mouse_button(MouseButton button, KeyStatus status);
     bool dispatch_scroll(double xoffset, double yoffset);
     bool dispatch_key(Key key, KeyStatus action, int mods);
     bool dispatch_char(unsigned int codepoint);
