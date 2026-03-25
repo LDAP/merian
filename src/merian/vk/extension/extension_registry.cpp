@@ -1,11 +1,15 @@
 #include "merian/vk/extension/extension_registry.hpp"
 
+#include "merian/shader/glsl_compiler_provider.hpp"
 #include "merian/utils/audio/audio_device_provider.hpp"
 #include "merian/vk/extension/extension_compatibility.hpp"
-#include "merian/vk/extension/extension_glsl_compiler.hpp"
+#include "merian/vk/extension/extension_glslang_compiler.hpp"
+#include "merian/vk/extension/extension_glslangvalidator_compiler.hpp"
+#include "merian/vk/extension/extension_glslc_compiler.hpp"
 #include "merian/vk/extension/extension_merian.hpp"
 #include "merian/vk/extension/extension_mitigations.hpp"
 #include "merian/vk/extension/extension_resources.hpp"
+#include "merian/vk/extension/extension_shaderc_compiler.hpp"
 #include "merian/vk/extension/extension_vk_debug_utils.hpp"
 #include "merian/vk/extension/extension_vk_layer_settings.hpp"
 #include "merian/vk/extension/extension_vk_validation_layers.hpp"
@@ -41,7 +45,15 @@ ExtensionRegistry::ExtensionRegistry() {
     register_extension<ExtensionCompatibility>(ExtensionCompatibility::name, true);
     register_extension<ExtensionMitigations>(ExtensionMitigations::name, true);
     register_extension<ExtensionVkDebugUtils>(ExtensionVkDebugUtils::name, Context::IS_DEBUG_BUILD);
-    register_extension<ExtensionGLSLCompiler>(ExtensionGLSLCompiler::name, true);
+    register_extension<ExtensionGlslangCompiler>(ExtensionGlslangCompiler::name, true,
+                                                 {ProviderPriority<GLSLCompilerProvider>{100}});
+    register_extension<ExtensionGlslangValidatorCompiler>(
+        ExtensionGlslangValidatorCompiler::name, true,
+        {ProviderPriority<GLSLCompilerProvider>{80}});
+    register_extension<ExtensionShadercCompiler>(ExtensionShadercCompiler::name, true,
+                                                 {ProviderPriority<GLSLCompilerProvider>{60}});
+    register_extension<ExtensionGlslcCompiler>(ExtensionGlslcCompiler::name, true,
+                                               {ProviderPriority<GLSLCompilerProvider>{40}});
     register_extension<ExtensionMerian>(ExtensionMerian::name, true);
     register_extension<ExtensionVMA>(ExtensionVMA::name, true,
                                      {ProviderPriority<MemoryAllocatorProvider>{50}});

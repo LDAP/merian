@@ -2,9 +2,13 @@
 
 #include "merian-nodes/graph/graph.hpp"
 #include "merian-nodes/graph/node_registry.hpp"
+#include "merian/shader/glsl_compiler_provider.hpp"
 #include "merian/utils/vector.hpp"
 #include "merian/vk/extension/extension.hpp"
-#include "merian/vk/extension/extension_glsl_compiler.hpp"
+#include "merian/vk/extension/extension_glslang_compiler.hpp"
+#include "merian/vk/extension/extension_glslangvalidator_compiler.hpp"
+#include "merian/vk/extension/extension_glslc_compiler.hpp"
+#include "merian/vk/extension/extension_shaderc_compiler.hpp"
 
 namespace merian {
 
@@ -18,7 +22,10 @@ class MerianNodesExtension : public ContextExtension {
         std::vector<std::string> aggregated;
 
         // Request compiler extensions for nodes that need shader compilation
-        aggregated.push_back(ExtensionGLSLCompiler::name);
+        aggregated.push_back(ExtensionGlslangCompiler::name);
+        aggregated.push_back(ExtensionGlslangValidatorCompiler::name);
+        aggregated.push_back(ExtensionShadercCompiler::name);
+        aggregated.push_back(ExtensionGlslcCompiler::name);
 
         auto& registry = NodeRegistry::get_instance();
         for (const auto& type_name : registry.node_type_names()) {
@@ -62,9 +69,8 @@ class MerianNodesExtension : public ContextExtension {
             return aggregated;
         }
 
-        if (query_info.extension_container.get_context_extension<ExtensionGLSLCompiler>(true) ==
-            nullptr) {
-            return DeviceSupportInfo{false, "merian-glsl-compiler must be supported."};
+        if (query_info.extension_container.find_provider<GLSLCompilerProvider>(true) == nullptr) {
+            return DeviceSupportInfo{false, "no GLSL compiler available."};
         }
 
         auto& registry = NodeRegistry::get_instance();

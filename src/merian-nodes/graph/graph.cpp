@@ -1,6 +1,6 @@
 #include "merian-nodes/graph/graph.hpp"
 #include "merian-nodes/merian_nodes_extension.hpp"
-#include "merian/vk/extension/extension_glsl_compiler.hpp"
+#include "merian/shader/glsl_compiler_provider.hpp"
 #include "merian/vk/extension/extension_registry.hpp"
 
 #include <spdlog/spdlog.h>
@@ -42,7 +42,7 @@ Graph::Graph(const GraphCreateInfo& create_info)
                 cpu_queue,
                 resource_allocator,
                 queue,
-                context->get_context_extension<ExtensionGLSLCompiler>()->get_compiler()) {
+                context->find_provider<GLSLCompilerProvider>()->get_glsl_compiler()) {
 
     debug_utils = context->get_context_extension<ExtensionVkDebugUtils>(true);
     time_connect_reference = time_reference = std::chrono::high_resolution_clock::now();

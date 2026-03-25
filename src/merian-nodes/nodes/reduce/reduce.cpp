@@ -3,7 +3,7 @@
 #include "merian-nodes/connectors/image/vk_image_out_managed.hpp"
 
 #include "merian-nodes/graph/errors.hpp"
-#include "merian/vk/extension/extension_glsl_compiler.hpp"
+#include "merian/shader/glsl_compiler_provider.hpp"
 #include "merian/vk/pipeline/specialization_info_builder.hpp"
 #include "merian/vk/utils/math.hpp"
 
@@ -115,10 +115,10 @@ void main() {
 }
 )");
 
-    auto glsl_compiler_ext = context->get_context_extension<ExtensionGLSLCompiler>();
+    auto glsl_compiler = context->find_provider<GLSLCompilerProvider>()->get_glsl_compiler();
     ShaderCompileContextHandle compilation_session_desc = ShaderCompileContext::create(context);
     shader = EntryPoint::create("main", vk::ShaderStageFlagBits::eCompute,
-                                glsl_compiler_ext->get_compiler()->compile_glsl_to_shadermodule(
+                                glsl_compiler->compile_glsl_to_shadermodule(
                                     context, source, "<memory>add.comp",
                                     vk::ShaderStageFlagBits::eCompute, compilation_session_desc),
                                 spec_info);
