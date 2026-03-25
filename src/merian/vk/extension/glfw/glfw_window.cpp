@@ -289,7 +289,11 @@ bool GLFWWindow::should_close() const {
 }
 
 void GLFWWindow::poll_events() {
-    glfwPollEvents();
+    try {
+        glfwPollEvents();
+    } catch (merian::ExtensionGLFW::glfw_error& e) {
+        SPDLOG_ERROR("glfw poll events failed: {}", e.what());
+    }
 }
 
 bool GLFWWindow::is_fullscreen() const {
@@ -387,11 +391,36 @@ float GLFWWindow::get_display_scale() {
 }
 
 void GLFWWindow::set_clipboard_text(const char* text) {
-    glfwSetClipboardString(nullptr, text);
+    // there is a single global lock on windows which sometimes cannot be acqired.
+    const uint32_t tries = 5;
+    uint32_t t = 0;
+    while (true) {
+        try {
+            glfwSetClipboardString(nullptr, text);
+            return;
+        } catch (merian::ExtensionGLFW::glfw_error& e) {
+            if (t++ > tries) {
+                SPDLOG_ERROR("glfw failed to set the clipboard: {}", e.what());
+                return;
+            }
+        }
+    }
 }
 
 const char* GLFWWindow::get_clipboard_text() {
-    return glfwGetClipboardString(nullptr);
+    // there is a single global lock on windows which sometimes cannot be acqired.
+    const uint32_t tries = 5;
+    uint32_t t = 0;
+    while (true) {
+        try {
+            return glfwGetClipboardString(nullptr);
+        } catch (merian::ExtensionGLFW::glfw_error& e) {
+            if (t++ > tries) {
+                SPDLOG_ERROR("glfw failed to set the clipboard: {}", e.what());
+                return nullptr;
+            }
+        }
+    }
 }
 
 GLFWWindow::operator GLFWwindow*() const {
