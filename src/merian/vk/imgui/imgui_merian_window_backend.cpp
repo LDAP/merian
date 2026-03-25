@@ -35,6 +35,23 @@ ImGuiMerianWindowBackend::ImGuiMerianWindowBackend(const ImGuiContextHandle& ctx
             return backend->window->get_clipboard_text();
         return nullptr;
     };
+    ctx->get()->PlatformIO.Platform_SetImeDataFn = [](::ImGuiContext* c, ImGuiViewport*,
+                                                      ImGuiPlatformImeData* data) {
+        auto* backend = static_cast<ImGuiMerianWindowBackend*>(c->IO.BackendPlatformUserData);
+        if (!backend || !backend->window)
+            return;
+        const bool want = data->WantVisible || data->WantTextInput;
+        if (!want) {
+            if (backend->window->is_text_input_active())
+                backend->window->stop_text_input();
+            return;
+        }
+        backend->window->set_text_input_area(static_cast<int>(data->InputPos.x),
+                                             static_cast<int>(data->InputPos.y), 1,
+                                             static_cast<int>(data->InputLineHeight));
+        if (!backend->window->is_text_input_active())
+            backend->window->start_text_input();
+    };
 }
 
 ImGuiMerianWindowBackend::~ImGuiMerianWindowBackend() {
@@ -44,7 +61,10 @@ ImGuiMerianWindowBackend::~ImGuiMerianWindowBackend() {
             ~(ImGuiBackendFlags_HasMouseCursors | ImGuiBackendFlags_HasSetMousePos);
         raw->PlatformIO.Platform_SetClipboardTextFn = nullptr;
         raw->PlatformIO.Platform_GetClipboardTextFn = nullptr;
+        raw->PlatformIO.Platform_SetImeDataFn = nullptr;
     }
+    if (window && window->is_text_input_active())
+        window->stop_text_input();
 }
 
 void ImGuiMerianWindowBackend::new_frame(const float delta_time) {

@@ -581,4 +581,21 @@ const char* SDLWindow::get_clipboard_text() {
     return clipboard;
 }
 
+void SDLWindow::start_text_input() {
+    SDL_StartTextInput(window);
+}
+
+void SDLWindow::stop_text_input() {
+    SDL_StopTextInput(window);
+}
+
+bool SDLWindow::is_text_input_active() const {
+    return SDL_TextInputActive(window);
+}
+
+void SDLWindow::set_text_input_area(const int x, const int y, const int w, const int h) {
+    SDL_Rect r{x, y, w, h};
+    SDL_SetTextInputArea(window, &r, 0);
+}
+
 } // namespace merian

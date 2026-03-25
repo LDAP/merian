@@ -61,6 +61,11 @@ class SDLWindow : public Window, public InputController {
     const char* get_clipboard_text() override;
     float get_display_scale() override;
 
+    void start_text_input() override;
+    void stop_text_input() override;
+    bool is_text_input_active() const override;
+    void set_text_input_area(int x, int y, int w, int h) override;
+
     // --- SDL-specific ---
 
     SDL_Window* get_window() const;

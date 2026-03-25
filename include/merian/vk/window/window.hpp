@@ -125,6 +125,16 @@ class Window : public std::enable_shared_from_this<Window> {
         return nullptr;
     }
 
+    // Text input / IME control. Platforms that require explicit opt-in (e.g. to show a soft
+    // keyboard or enable IME composition) should override these; others leave them as no-ops.
+    virtual void start_text_input() {}
+    virtual void stop_text_input() {}
+    virtual bool is_text_input_active() const {
+        return false;
+    }
+    // Hint to the platform IME where the text cursor is (window coordinates, height in pixels).
+    virtual void set_text_input_area(int /*x*/, int /*y*/, int /*w*/, int /*h*/) {}
+
     // --- Window listener dispatch ---
 
     void add_window_listener(std::weak_ptr<WindowListener> listener);
