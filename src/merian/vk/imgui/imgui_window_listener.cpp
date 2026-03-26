@@ -10,11 +10,10 @@ void ImGuiWindowListener::on_resize(vk::Extent2D framebuffer_extent, vk::Extent2
     io.DisplaySize =
         ImVec2(static_cast<float>(window_extent.width), static_cast<float>(window_extent.height));
     if (window_extent.width > 0 && window_extent.height > 0) {
-        io.DisplayFramebufferScale =
-            ImVec2(static_cast<float>(framebuffer_extent.width) /
-                       static_cast<float>(window_extent.width),
-                   static_cast<float>(framebuffer_extent.height) /
-                       static_cast<float>(window_extent.height));
+        io.DisplayFramebufferScale = ImVec2(static_cast<float>(framebuffer_extent.width) /
+                                                static_cast<float>(window_extent.width),
+                                            static_cast<float>(framebuffer_extent.height) /
+                                                static_cast<float>(window_extent.height));
     }
 }
 

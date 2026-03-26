@@ -93,6 +93,14 @@ if win_dep.found()
   dependencies += win_dep
 endif
 
+# misc
+freetype_dep = dependency('freetype2', required: get_option('freetype'))
+if freetype_dep.found()
+  sources += 'misc/freetype/imgui_freetype.cpp'
+  dependencies += freetype_dep
+  dependencies += declare_dependency(compile_args: '-DIMGUI_ENABLE_FREETYPE')
+endif
+
 # frameworks
 allegro5_dep = dependency('allegro-5', required: get_option('allegro5'))
 allegro5_primitives_dep = dependency('allegro_primitives-5', required: get_option('allegro5'))

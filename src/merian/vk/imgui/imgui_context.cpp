@@ -6,8 +6,16 @@ namespace merian {
 
 ImGuiContext::ImGuiContext() {
     ctx = ImGui::CreateContext();
-    ctx->IO.Fonts->AddFontFromMemoryCompressedTTF(JetBrainsMono_compressed_data,
-                                                  JetBrainsMono_compressed_size, 16.0f);
+
+    // If we're not using freetype (which does not need oversampling) force higher oversampling for
+    // crisper fonts.
+    ImFontConfig font_config;
+    font_config.OversampleH = 3;
+    font_config.OversampleV = 1;
+    font_config.FontDataOwnedByAtlas = false;
+    ImFont* font = ctx->IO.Fonts->AddFontFromMemoryCompressedTTF(
+        JetBrainsMono_compressed_data, JetBrainsMono_compressed_size, 16.0f, &font_config);
+    ctx->IO.FontDefault = font;
 }
 
 } // namespace merian
