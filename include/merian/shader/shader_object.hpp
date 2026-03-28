@@ -1,198 +1,189 @@
 #pragma once
 
 #include "merian/shader/shader_cursor.hpp"
+#include "merian/shader/shader_object_allocator.hpp"
+#include "merian/shader/slang_object_layout.hpp"
 #include "merian/shader/slang_utils.hpp"
 #include "merian/vk/descriptors/descriptor_container.hpp"
+#include "merian/vk/descriptors/descriptor_set.hpp"
 #include "merian/vk/memory/resource_allocations.hpp"
+#include "merian/vk/pipeline/pipeline.hpp"
 #include "slang.h"
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
-#include <set>
 #include <vector>
 
 namespace merian {
-
-/*
- * Shader parameter system based on Slang reflection API and shader cursors.
- *
- * Key concepts:
- * - ShaderObject: Represents shader parameters (uniform data + resources)
- * - ShaderCursor: Points to position(s) in shader parameter space
- * - All cursors are implicitly multi-cursors (list of locations)
- * - When an object is bound in multiple places, its cursor tracks all locations
- * - Updates automatically propagate to all binding locations
- *
- * Binding modes:
- * - Parameter Block: Object gets its own descriptor set (e.g., ParameterBlock<T>)
- * - Constant Buffer: Object gets its own buffer, bound to parent's descriptor set
- * - Value: Object's data is embedded in parent's buffer/descriptor set
- */
-
-/* Example:
- *
- * class ExampleObject : public merian::ShaderObject{
- *   public:
- *      ExampleObject(const merian::ContextHandle& context)
- *         : merian::ShaderObject(context, "path_to_slang.slang",
- * "ExampleObjectNameInSlang") {}
- *
- *     void set_src(const merian::BufferHandle& buf) {
- *         src = buf;
- *         get_cursor()["src"] = buf;
- *     }
- *
- *     void set_dst(const merian::BufferHandle& buf) {
- *         dst = buf;
- *         get_cursor()["dst"] = buf;
- *     }
- *
- *     // Called by the ShaderObject system when this object is bound to a new cursor
- *     // position. Replays the current state so the new location is fully populated.
- *     void write_to(merian::ShaderCursor& cursor) override {
- *         cursor["src"] = src;
- *         cursor["dst"] = dst;
- *     }
- *
- *   private:
- *     merian::BufferHandle src;
- *     merian::BufferHandle dst;
- * };
- * 
- * TODO: ideally implementing write_to should not be necessary and we could just to cursor = root_cursor.
- */
 
 class ShaderObject;
 using ShaderObjectHandle = std::shared_ptr<ShaderObject>;
 
 /**
- * @brief Base class for shader parameter objects.
+ * @brief Represents a structured collection of shader parameters backed by Slang reflection.
  *
- * Represents a structured collection of shader parameters that can be bound
- * as parameter blocks, constant buffers, or embedded values.
+ * A ShaderObject maps to a Slang struct/type. It manages:
+ * - Descriptor state (cached for incremental updates across frames)
+ * - Ordinary data (uniform data uploaded via staging memory manager)
+ * - Sub-objects (ConstantBuffer and ParameterBlock children, indexed by sub-object range)
  *
- * Each object maintains a root cursor that tracks all binding locations.
- * Updates through the cursor automatically propagate to all locations.
+ * Sub-objects are stored in a flat array indexed by Slang's sub-object range index
+ * (one slot per ConstantBuffer or ParameterBlock field in the type). This matches
+ * the slang-rhi data model and avoids field_index ambiguity with value-embedded structs.
+ *
+ * Example:
+ *   auto obj = std::make_shared<ShaderObject>(context, object_layout, allocator);
+ *   obj->get_cursor()["my_texture"] = texture;
+ *   obj->get_cursor()["my_value"] = 3.14f;
+ *   obj->bind_as_parameter_block(allocator, cmd, pipeline, 0);
  */
 class ShaderObject : public std::enable_shared_from_this<ShaderObject> {
-
   public:
-    struct ParameterBlock {
-        // Ordinary data buffer (for uniform data) of this object and all objects that are value
-        // members of this object.
-        //
-        // Can be nullptr if this object was only bound as value to parents (then their ordinary
-        // data buffer is used). Do not write to this buffer directly but use the cursor in the
-        // binding instead.
-        BufferHandle ordinary_data = nullptr;
-        std::vector<uint8_t> ordinary_data_staging;
-
-        // All descriptor sets that should be updated whenever this object changes
-        // Only non-empty if were used as parameter block somewhere. Do not write to these sets
-        // directly but use the cursor in the binding instead.
-        std::set<std::weak_ptr<DescriptorContainer>, std::owner_less<DescriptorContainerHandle>>
-            descriptor_sets;
-    };
-
-  public:
-    ShaderObject(const ContextHandle& context, slang::TypeLayoutReflection* type_layout);
+    ShaderObject(const ContextHandle& context,
+                 const SlangObjectLayoutHandle& object_layout,
+                 const ShaderObjectAllocatorHandle& allocator);
 
     virtual ~ShaderObject() = default;
 
-    /**
-     * @brief Initialize this object as a parameter block.
-     *
-     * Creates a descriptor set and ordinary data buffer (if needed).
-     * The object can then be bound to different pipelines at different set indices.
-     *
-     * @param allocator Allocator for descriptor sets
-     * @return The descriptor set handle (for binding to command buffer)
-     */
-    DescriptorContainerHandle initialize_as_parameter_block(ShaderObjectAllocator& allocator);
+    // ---------------------------------------------------------------
+    // Binding
 
     /**
-     * @brief Bind this object to a cursor position.
+     * @brief Bind this object as a parameter block (its descriptor set) to the command buffer.
      *
-     * Depending on the cursor's type (parameter block, constant buffer, or value),
-     * this will either create a new descriptor set or merge into the parent's resources.
+     * - Gets a descriptor set from allocator
+     * - If new: registers it and replays cached descriptor state
+     * - Uploads ordinary data and ConstantBuffer sub-objects' data
+     * - Writes nested ConstantBuffer descriptors to this set
+     * - Flushes queued writes and binds
      *
-     * @param cursor The cursor indicating where to bind
-     * @param allocator Allocator for descriptor sets (if needed)
+     * This only binds this object, however ParameterBlock sub-objects are NOT bound here. Use
+     * entry_point->bind() to handle those (with reflection-derived set indices).
      */
-    void bind_to(ShaderCursor& cursor, ShaderObjectAllocator& allocator);
+    void bind_as_parameter_block(const CommandBufferHandle& cmd,
+                                 const PipelineHandle& pipeline,
+                                 uint32_t set_index);
+
+    // ---------------------------------------------------------------
+    // Cursor access
 
     /**
-     * @brief Populate this object's parameters through a cursor.
+     * @brief Get a cursor pointing to the root of this object.
      *
-     * Subclasses override this to write their data to the shader.
-     * This is called during initialization and when binding.
-     *
-     * @param cursor The cursor to write data through
+     * Use this to write parameters: get_cursor()["field"] = value;
      */
-    virtual void write_to(ShaderCursor& cursor) = 0;
+    ShaderCursor get_cursor();
+
+    // ---------------------------------------------------------------
+    // Sub-object creation and access
 
     /**
-     * @brief Get the root cursor for this object.
+     * @brief Create a new ShaderObject for a named ConstantBuffer or ParameterBlock field.
      *
-     * This cursor tracks all locations (cursors) (as root or nested in other obejcts) where this
-     * object is bound. Writing through this cursor updates all binding locations.
-     *
-     * @return Reference to the root cursor
+     * Uses the pre-computed element layout from SlangObjectLayout.
+     * The caller is responsible for assigning the result via set_sub_object(field_name, object).
      */
-    ShaderCursor& get_cursor() {
-        return *root_cursor;
+    ShaderObjectHandle create_sub_object(const std::string& field_name);
+
+    /**
+     * @brief Assign a ShaderObject as a sub-object for a named ConstantBuffer / ParameterBlock
+     * field.
+     *
+     * Replaces any existing sub-object at that field. For ConstantBuffer fields,
+     * also writes the object's buffer to this object's descriptor set.
+     */
+    void set_sub_object(const std::string& field_name, const ShaderObjectHandle& object);
+
+    const ShaderObjectHandle& get_sub_object(uint32_t sub_object_range_index) const {
+        assert(sub_object_range_index < sub_objects.size());
+        return sub_objects[sub_object_range_index];
     }
 
     /**
-     * @brief Get the root cursor for this object.
+     * @brief Set a sub-object by sub-object range index.
      *
-     * This cursor tracks all locations (cursors) (as root or nested in other obejcts) where this
-     * object is bound. Writing through this cursor updates all binding locations.
-     *
-     * @return Reference to the root cursor
+     * For ConstantBuffer sub-objects, writes the CB's UBO descriptor to the owning PB's
+     * descriptor storage (not the immediate parent's). This ensures descriptor writes happen
+     * at update time, not bind time, enabling zero-write frames when nothing changes.
      */
-    const ShaderCursor& get_cursor() const {
-        return *root_cursor;
+    void set_sub_object(uint32_t sub_object_range_index, const ShaderObjectHandle& object);
+
+    uint32_t get_sub_object_count() const {
+        return static_cast<uint32_t>(sub_objects.size());
     }
 
-    /**
-     * @brief Get the descriptor sets and ordinary data buffer as parameter block.
-     *
-     * @return the parameter block. The members can be empty or nullptr respectivly if there is no
-     * data buffer or this object was never used as parameter block.
-     */
-    const ParameterBlock& get_parameter_block() const {
-        return parameter_block;
-    }
+    // ---------------------------------------------------------------
+    // Write operations (called by ShaderCursor)
 
-    // Write operations - called by cursors
     void write(const ShaderOffset& offset, const ImageViewHandle& image);
     void write(const ShaderOffset& offset, const BufferHandle& buffer);
     void write(const ShaderOffset& offset, const TextureHandle& texture);
     void write(const ShaderOffset& offset, const SamplerHandle& sampler);
     void write(const ShaderOffset& offset, const void* data, std::size_t size);
 
+    // ---------------------------------------------------------------
+    // Accessors
+
     slang::TypeLayoutReflection* get_type_layout() const {
-        return type_layout;
+        return object_layout->get_type_layout();
     }
+
     const ContextHandle& get_context() const {
         return context;
     }
 
-  private:
-    void for_each_descriptor_set(const std::function<void(const DescriptorContainerHandle&)>& f);
+    const SlangObjectLayoutHandle& get_object_layout() const {
+        return object_layout;
+    }
+
+    const ShaderObjectAllocatorHandle& get_allocator() const {
+        return allocator;
+    }
+
+    // Print debug info
+    std::string format_debug(const std::string& indent = "") const;
 
   private:
-    // The root cursor - tracks all binding locations for this object
-    std::optional<ShaderCursor> root_cursor;
+    // Recursively upload staging data for nested ConstantBuffer sub-objects.
+    // Descriptor writes are handled at update time by set_sub_object.
+    void upload_constant_buffer_tree(ShaderObject* cb_obj, const CommandBufferHandle& cmd);
 
-    ParameterBlock parameter_block;
+    // Call fn on each live registered set, prune expired entries.
+    void for_each_registered_set(const std::function<void(DescriptorContainer&)>& fn);
 
-    slang::TypeLayoutReflection* type_layout;
+  private:
+    SlangObjectLayoutHandle object_layout;
     ContextHandle context;
+    ShaderObjectAllocatorHandle allocator;
+
+    // Source of truth for all descriptor writes.
+    // Replayed to the descriptor set at bind time.
+    DescriptorStorageHandle descriptors;
+
+    // Ordinary data (uniform buffer)
+    BufferHandle ordinary_data_buffer;
+    std::vector<uint8_t> ordinary_data_staging;
+    bool ordinary_data_dirty = false;
+
+    // Sub-objects indexed by sub-object range (one slot per ConstantBuffer/ParameterBlock field)
+    std::vector<ShaderObjectHandle> sub_objects;
+
+    // Registered descriptor sets for incremental write propagation.
+    std::vector<std::weak_ptr<DescriptorSet>> registered_sets;
+
+    // For ConstantBuffer sub-objects: references to all owning ParameterBlocks and
+    // the base binding offset for this CB's element content in each PB's descriptor set.
+    // A CB can be shared across multiple PBs; each gets its own descriptor write.
+    struct PBBinding {
+        std::weak_ptr<ShaderObject> pb;
+        uint32_t element_binding;
+    };
+    std::vector<PBBinding> pb_bindings_;
 
     friend class ShaderCursor;
+    friend class SlangProgramEntryPoint;
 };
 
 } // namespace merian

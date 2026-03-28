@@ -1,0 +1,10 @@
+struct Params {
+    float val;
+    RWStructuredBuffer<uint> output;
+};
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void main(ParameterBlock<Params> params) {
+    params.output[0] = asuint(params.val);
+}

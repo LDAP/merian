@@ -16,6 +16,7 @@ merian_src += files(
     'shader_object_allocator.cpp',
     'slang_composition.cpp',
     'slang_entry_point.cpp',
+    'slang_object_layout.cpp',
     'slang_global_session.cpp',
     'slang_program.cpp',
     'slang_session.cpp',

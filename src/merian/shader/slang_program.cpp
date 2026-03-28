@@ -1,4 +1,5 @@
 #include "merian/shader/slang_program.hpp"
+#include "merian/shader/slang_utils.hpp"
 
 namespace merian {
 
@@ -50,6 +51,83 @@ uint64_t SlangProgram::get_entry_point_index(const std::string& entry_point_name
 
 const SlangCompositionHandle& SlangProgram::get_composition() {
     return composition;
+}
+
+// ---------------------------------------------------------------
+// Global parameter discovery
+
+uint32_t SlangProgram::get_global_parameter_count() const {
+    return get_program_reflection()->getParameterCount();
+}
+
+slang::VariableLayoutReflection* SlangProgram::get_global_parameter(uint32_t index) const {
+    return get_program_reflection()->getParameterByIndex(index);
+}
+
+slang::VariableLayoutReflection*
+SlangProgram::find_global_parameter(const std::string& name) const {
+    auto* layout = get_program_reflection();
+    for (uint32_t i = 0; i < layout->getParameterCount(); i++) {
+        auto* param = layout->getParameterByIndex(i);
+        if (name == param->getName()) {
+            return param;
+        }
+    }
+    return nullptr;
+}
+
+std::vector<std::string> SlangProgram::get_global_parameter_names() const {
+    auto* layout = get_program_reflection();
+    std::vector<std::string> names;
+    names.reserve(layout->getParameterCount());
+    for (uint32_t i = 0; i < layout->getParameterCount(); i++) {
+        names.emplace_back(layout->getParameterByIndex(i)->getName());
+    }
+    return names;
+}
+
+bool SlangProgram::has_global_parameter(const std::string& name) const {
+    return find_global_parameter(name) != nullptr;
+}
+
+// ---------------------------------------------------------------
+// Debug
+
+std::string SlangProgram::format_reflection() const {
+    auto* layout = get_program_reflection();
+    std::string out;
+    out += fmt::format("SlangProgram\n");
+
+    out += fmt::format("  entry_points ({}):\n", layout->getEntryPointCount());
+    for (uint64_t i = 0; i < layout->getEntryPointCount(); i++) {
+        auto* ep = layout->getEntryPointByIndex(i);
+        out += fmt::format("    [{}] '{}'\n", i, ep->getNameOverride());
+
+        out += fmt::format("      parameters ({}):\n", ep->getParameterCount());
+        for (uint32_t p = 0; p < ep->getParameterCount(); p++) {
+            auto* param = ep->getParameterByIndex(p);
+            auto* tl = param->getTypeLayout();
+            out += fmt::format("        [{}] '{}': kind={}\n", p, param->getName(),
+                               slang_type_kind_to_string(tl->getKind()));
+            if (tl->getKind() == slang::TypeReflection::Kind::ParameterBlock ||
+                tl->getKind() == slang::TypeReflection::Kind::ConstantBuffer) {
+                out += format_type_layout(tl->getElementTypeLayout(), "          ", 1);
+            }
+        }
+    }
+
+    uint32_t global_count = layout->getParameterCount();
+    if (global_count > 0) {
+        out += fmt::format("  global_parameters ({}):\n", global_count);
+        for (uint32_t i = 0; i < global_count; i++) {
+            auto* param = layout->getParameterByIndex(i);
+            auto* tl = param->getTypeLayout();
+            out += fmt::format("    [{}] '{}': kind={}\n", i, param->getName(),
+                               slang_type_kind_to_string(tl->getKind()));
+        }
+    }
+
+    return out;
 }
 
 SlangProgramHandle SlangProgram::create(const ShaderCompileContextHandle& compile_context,

@@ -3,30 +3,59 @@
 
 namespace merian {
 
-DescriptorSetShaderObjectAllocator::DescriptorSetShaderObjectAllocator(
+// --- SimpleShaderObjectAllocator ---
+
+SimpleShaderObjectAllocator::SimpleShaderObjectAllocator(const ResourceAllocatorHandle& allocator)
+    : allocator(allocator) {}
+
+DescriptorSetHandle SimpleShaderObjectAllocator::allocate(const ShaderObjectHandle& object) {
+
+    return allocator->allocate_descriptor_set(
+        object->get_object_layout()->get_descriptor_set_layout());
+}
+
+BufferHandle SimpleShaderObjectAllocator::allocate_uniform_buffer(const vk::DeviceSize size) {
+    return allocator->create_buffer(size, vk::BufferUsageFlagBits::eUniformBuffer |
+                                              vk::BufferUsageFlagBits::eTransferDst);
+}
+
+StagingMemoryManagerHandle SimpleShaderObjectAllocator::get_staging() const {
+    return allocator->get_staging();
+}
+
+// --- FrameCachingShaderObjectAllocator ---
+
+FrameCachingShaderObjectAllocator::FrameCachingShaderObjectAllocator(
     const ResourceAllocatorHandle& allocator, const uint32_t iterations_in_flight)
     : allocator(allocator), iterations_in_flight(iterations_in_flight) {}
 
-DescriptorContainerHandle
-DescriptorSetShaderObjectAllocator::get_or_create_descriptor_set(const ShaderObjectHandle& object) {
+DescriptorSetHandle FrameCachingShaderObjectAllocator::allocate(const ShaderObjectHandle& object) {
     auto it = sets.find(object);
 
     if (it == sets.end()) {
-        const DescriptorSetLayoutHandle layout = create_descriptor_set_layout_from_slang_type_layout(
-            allocator->get_context(), object->get_type_layout());
-
         std::tie(it, std::ignore) =
-            sets.emplace(object, allocator->allocate_descriptor_set(layout, iterations_in_flight));
+            sets.emplace(object, allocator->allocate_descriptor_set(
+                                     object->get_object_layout()->get_descriptor_set_layout(),
+                                     iterations_in_flight));
     }
 
-    return it->second[iteration_in_flight];
+    return it->second[current_iteration];
 }
 
-void DescriptorSetShaderObjectAllocator::set_iteration(const uint32_t iteration) {
-    iteration_in_flight = iteration;
+BufferHandle FrameCachingShaderObjectAllocator::allocate_uniform_buffer(const vk::DeviceSize size) {
+    return allocator->create_buffer(size, vk::BufferUsageFlagBits::eUniformBuffer |
+                                              vk::BufferUsageFlagBits::eTransferDst);
 }
 
-void DescriptorSetShaderObjectAllocator::reset() {
+StagingMemoryManagerHandle FrameCachingShaderObjectAllocator::get_staging() const {
+    return allocator->get_staging();
+}
+
+void FrameCachingShaderObjectAllocator::set_iteration(const uint32_t iteration) {
+    current_iteration = iteration % iterations_in_flight;
+}
+
+void FrameCachingShaderObjectAllocator::reset() {
     sets.clear();
 }
 

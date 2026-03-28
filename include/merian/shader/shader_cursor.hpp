@@ -1,10 +1,12 @@
 #pragma once
 
-#include "merian/shader/shader_object_allocator.hpp"
 #include "merian/shader/slang_utils.hpp"
 #include "merian/vk/memory/resource_allocations.hpp"
 
 #include <memory>
+#include <optional>
+#include <string>
+#include <vector>
 
 namespace merian {
 
@@ -14,12 +16,13 @@ using ShaderObjectHandle = std::shared_ptr<ShaderObject>;
 /**
  * @brief Cursor for navigating and writing shader parameter space.
  *
- * All cursors are implicitly multi-cursors, containing a list of locations.
- * Navigation and write operations traverse all locations automatically.
+ * A cursor points at a ShaderOffset in a ShaderObject (TypeLayout).
+ *
+ * Write operations go through the ShaderObject, which handles broadcast
+ * to all binding sites (other ShaderObjects where it's embedded).
  *
  * Example:
  *   cursor["material"]["roughness"] = 0.5f;
- * // If cursor tracks 3 locations, all 3 get updated
  */
 class ShaderCursor {
   public:
@@ -29,47 +32,43 @@ class ShaderCursor {
     ShaderCursor() = default;
 
     /**
-     * @brief Create a cursor with a single location.
-     *
-     * @param base_object The object this cursor points into
+     * @brief Create a cursor pointing to the root of a ShaderObject.
      */
     ShaderCursor(const ShaderObjectHandle& base_object);
 
-    // Navigation - all operations traverse all locations
+    // Navigation
 
     /**
      * @brief Navigate to a struct field by name.
-     *
-     * @param name Field name
-     * @return New cursor pointing to the field in all locations
      */
     ShaderCursor field(const std::string& name);
 
     /**
      * @brief Navigate to a struct field by index.
-     *
-     * @param index Field index
-     * @return New cursor pointing to the field in all locations
      */
     ShaderCursor field(uint32_t index);
 
     /**
      * @brief Navigate to an array element.
-     *
-     * @param index Element index
-     * @return New cursor pointing to the element in all locations
      */
     ShaderCursor element(uint32_t index);
 
     ShaderCursor operator[](const std::string& name) {
         return field(name);
     }
+
+    /**
+     * @brief Navigate to an array element or field index, depending on current location.
+     */
     ShaderCursor operator[](uint32_t index);
+
+    // Write operations
 
     ShaderCursor& write(const ImageViewHandle& image);
     ShaderCursor& write(const BufferHandle& buffer);
     ShaderCursor& write(const TextureHandle& texture);
     ShaderCursor& write(const SamplerHandle& sampler);
+    ShaderCursor& write(const ShaderObjectHandle& object);
     ShaderCursor& write(const void* data, std::size_t size);
 
     template <class T> ShaderCursor& write(const T& data) {
@@ -77,50 +76,31 @@ class ShaderCursor {
         return *this;
     }
 
-    // Assignment operators
+    // Assignment operators (explicit overloads must come before template)
     ShaderCursor& operator=(const ImageViewHandle& image) {
-        write(image);
-        return *this;
+        return write(image);
     }
     ShaderCursor& operator=(const BufferHandle& buffer) {
-        write(buffer);
-        return *this;
+        return write(buffer);
     }
     ShaderCursor& operator=(const TextureHandle& texture) {
-        write(texture);
-        return *this;
+        return write(texture);
     }
     ShaderCursor& operator=(const SamplerHandle& sampler) {
-        write(sampler);
-        return *this;
+        return write(sampler);
+    }
+    ShaderCursor& operator=(const ShaderObjectHandle& object) {
+        return write(object);
     }
 
     template <class T> ShaderCursor& operator=(const T& data) {
-        write(data);
-        return *this;
+        return write(data);
     }
-
-    /**
-     * @brief Bind a nested shader object at this cursor position.
-     *
-     * Depending on the type (parameter block, constant buffer, value),
-     * the object will be bound appropriately.
-     *
-     * @param object The object to bind
-     * @param allocator Allocator for descriptor sets (if needed)
-     */
-    // void bind_object(const ShaderObjectHandle& object, ShaderObjectAllocator& allocator);
 
     // Query operations
 
     bool is_valid() const {
-        return !locations.empty() && type_layout != nullptr;
-    }
-    bool is_empty() const {
-        return locations.empty();
-    }
-    size_t location_count() const {
-        return locations.size();
+        return base_object != nullptr && type_layout != nullptr;
     }
 
     slang::TypeReflection::Kind get_kind() const {
@@ -135,27 +115,131 @@ class ShaderCursor {
         return get_kind() == slang::TypeReflection::Kind::ConstantBuffer;
     }
 
+    bool is_struct() const {
+        return get_kind() == slang::TypeReflection::Kind::Struct;
+    }
+
+    bool is_array() const {
+        return get_kind() == slang::TypeReflection::Kind::Array;
+    }
+
+    bool is_resource() const {
+        return get_kind() == slang::TypeReflection::Kind::Resource;
+    }
+
+    bool is_scalar() const {
+        return get_kind() == slang::TypeReflection::Kind::Scalar;
+    }
+
+    bool is_vector() const {
+        return get_kind() == slang::TypeReflection::Kind::Vector;
+    }
+
+    bool is_matrix() const {
+        return get_kind() == slang::TypeReflection::Kind::Matrix;
+    }
+
+    // ---------------------------------------------------------------
+    // Struct introspection
+
     /**
-     * @brief Add locations from another cursor to this one.
-     *
-     * Used when an object is bound in multiple places.
-     *
-     * @param other The cursor whose locations to add
+     * @brief Number of fields (for struct types).
      */
-    void add_locations(const ShaderCursor& other);
+    uint32_t get_field_count() const {
+        return type_layout->getFieldCount();
+    }
+
+    /**
+     * @brief Get the name of a field by index.
+     */
+    const char* get_field_name(uint32_t index) const {
+        assert(index < type_layout->getFieldCount());
+        return type_layout->getFieldByIndex(index)->getVariable()->getName();
+    }
+
+    /**
+     * @brief Get names of all fields.
+     */
+    std::vector<std::string> get_field_names() const;
+
+    /**
+     * @brief Check if a field with the given name exists.
+     */
+    bool has_field(const std::string& name) const {
+        return type_layout->findFieldIndexByName(name.c_str()) >= 0;
+    }
+
+    /**
+     * @brief Try to navigate to a field. Returns invalid cursor if not found.
+     */
+    std::optional<ShaderCursor> try_field(const std::string& name);
+
+    // ---------------------------------------------------------------
+    // Array introspection
+
+    /**
+     * @brief Number of elements (for array types).
+     */
+    uint32_t get_element_count() const {
+        return static_cast<uint32_t>(type_layout->getElementCount());
+    }
+
+    /**
+     * @brief Stride between array elements in bytes.
+     */
+    std::size_t get_element_stride() const {
+        return type_layout->getElementStride(SLANG_PARAMETER_CATEGORY_UNIFORM);
+    }
+
+    // ---------------------------------------------------------------
+    // Size and type info
+
+    /**
+     * @brief Get the name of the type at this cursor.
+     */
+    const char* get_type_name() const {
+        return type_layout->getName();
+    }
+
+    /**
+     * @brief Get the uniform data size of the type at this cursor.
+     */
+    std::size_t get_uniform_size() const {
+        return type_layout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM);
+    }
+
+    /**
+     * @brief Number of binding ranges (resource bindings) in this type.
+     */
+    uint32_t get_binding_range_count() const {
+        return type_layout->getBindingRangeCount();
+    }
+
+    // ---------------------------------------------------------------
+    // Debug
+
+    // Print cursor position: type, kind, offset, field names
+    std::string format_debug() const;
+
+    // ---------------------------------------------------------------
+    // Raw accessors
+
+    slang::TypeLayoutReflection* get_type_layout() const {
+        return type_layout;
+    }
+
+    const ShaderOffset& get_offset() const {
+        return offset;
+    }
+
+    const ShaderObjectHandle& get_base_object() const {
+        return base_object;
+    }
 
   private:
-    struct WeakLocation {
-        std::weak_ptr<ShaderObject> base_object;
-        ShaderOffset offset;
-    };
-
-    void for_each_location(const std::function<void(const ShaderObjectHandle& base_object,
-                                                    const ShaderOffset& offset)>& f);
-
-  private:
-    std::vector<WeakLocation> locations;
+    ShaderObjectHandle base_object;
     slang::TypeLayoutReflection* type_layout = nullptr;
+    ShaderOffset offset;
 
     friend class ShaderObject;
 };

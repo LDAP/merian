@@ -53,3 +53,11 @@ option(
     description: 'Build with tinybvh support.'
 )
 
+# Tests
+option(
+    'tests',
+    type: 'boolean',
+    value: false,
+    description: 'Build and register tests.'
+)
+

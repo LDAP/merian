@@ -4,24 +4,7 @@
 namespace merian {
 
 ShaderCursor::ShaderCursor(const ShaderObjectHandle& base_object)
-    : type_layout(base_object->get_type_layout()) {
-    locations.emplace_back(base_object, ShaderOffset());
-}
-
-void ShaderCursor::for_each_location(const std::function<void(const ShaderObjectHandle& base_object,
-                                                              const ShaderOffset& offset)>& f) {
-    for (uint32_t i = 0; i < locations.size();) {
-        auto& loc = locations[i];
-        if (loc.base_object.expired()) {
-            std::swap(loc, locations.back());
-            locations.pop_back();
-            continue;
-        }
-
-        f(loc.base_object.lock(), loc.offset);
-        i++;
-    }
-}
+    : base_object(base_object), type_layout(base_object->get_type_layout()) {}
 
 ShaderCursor ShaderCursor::field(const std::string& name) {
     if (!is_valid()) {
@@ -46,19 +29,46 @@ ShaderCursor ShaderCursor::field(uint32_t index) {
 
     assert(index < type_layout->getFieldCount());
 
-    slang::VariableLayoutReflection* field = type_layout->getFieldByIndex(index);
+    slang::VariableLayoutReflection* field_var = type_layout->getFieldByIndex(index);
+    auto* field_type_layout = field_var->getTypeLayout();
+    auto field_kind = field_type_layout->getKind();
 
+    // For ConstantBuffer<T> and ParameterBlock<T> fields: auto-create the sub-object
+    // if it doesn't exist, and return a cursor into the sub-object.
+    if (field_kind == slang::TypeReflection::Kind::ConstantBuffer ||
+        field_kind == slang::TypeReflection::Kind::ParameterBlock) {
+
+        // Compute the binding range for this field, accounting for offset accumulation
+        // through value-embedded structs.
+        uint32_t br = offset.binding_range_offset + type_layout->getFieldBindingRangeOffset(index);
+
+        // Look up the sub-object range in the root object's layout
+        int32_t sor = base_object->get_object_layout()->find_sub_object_range(br);
+        assert(sor >= 0 && "CB/PB field must have a sub-object range");
+
+        auto& sub = base_object->sub_objects[sor];
+        if (!sub) {
+            // Auto-create using the pre-computed element layout
+            const auto& range_info = base_object->get_object_layout()->get_sub_object_range(sor);
+            assert(range_info.element_layout);
+            sub = std::make_shared<ShaderObject>(base_object->get_context(),
+                                                 range_info.element_layout,
+                                                 base_object->get_allocator());
+            // set_sub_object handles CB descriptor writes to the owning PB
+            base_object->set_sub_object(sor, sub);
+        }
+
+        // Return cursor into the sub-object (dereferenced to element type T)
+        return sub->get_cursor();
+    }
+
+    // For value fields: adjust offset and keep the same base_object
     ShaderCursor result;
-    result.type_layout = field->getTypeLayout();
-    result.locations.reserve(locations.size());
-
-    for_each_location([&](const ShaderObjectHandle& base_object, const ShaderOffset& offset) {
-        ShaderOffset new_offset = offset;
-        new_offset.uniform_byte_offset += field->getOffset();
-        new_offset.binding_range_offset += type_layout->getFieldBindingRangeOffset(index);
-
-        result.locations.emplace_back(base_object, new_offset);
-    });
+    result.base_object = base_object;
+    result.type_layout = field_type_layout;
+    result.offset = offset;
+    result.offset.uniform_byte_offset += field_var->getOffset();
+    result.offset.binding_range_offset += type_layout->getFieldBindingRangeOffset(index);
 
     return result;
 }
@@ -76,17 +86,12 @@ ShaderCursor ShaderCursor::element(uint32_t index) {
     }
 
     ShaderCursor result;
+    result.base_object = base_object;
     result.type_layout = element_type_layout;
-    result.locations.reserve(locations.size());
-
-    for_each_location([&](const ShaderObjectHandle& base_object, const ShaderOffset& offset) {
-        ShaderOffset new_offset = offset;
-        new_offset.uniform_byte_offset += index * element_type_layout->getStride();
-        new_offset.binding_array_index =
-            (offset.binding_array_index * type_layout->getElementCount()) + index;
-
-        result.locations.emplace_back(base_object, new_offset);
-    });
+    result.offset = offset;
+    result.offset.uniform_byte_offset += index * element_type_layout->getStride();
+    result.offset.binding_array_index =
+        (offset.binding_array_index * type_layout->getElementCount()) + index;
 
     return result;
 }
@@ -99,68 +104,106 @@ ShaderCursor ShaderCursor::operator[](uint32_t index) {
     return field(index);
 }
 
+std::vector<std::string> ShaderCursor::get_field_names() const {
+    std::vector<std::string> names;
+    const uint32_t count = type_layout->getFieldCount();
+    names.reserve(count);
+    for (uint32_t i = 0; i < count; i++) {
+        names.emplace_back(type_layout->getFieldByIndex(i)->getVariable()->getName());
+    }
+    return names;
+}
+
+std::optional<ShaderCursor> ShaderCursor::try_field(const std::string& name) {
+    if (!is_valid()) {
+        return std::nullopt;
+    }
+    SlangInt idx = type_layout->findFieldIndexByName(name.c_str());
+    if (idx < 0) {
+        return std::nullopt;
+    }
+    return field(static_cast<uint32_t>(idx));
+}
+
 ShaderCursor& ShaderCursor::write(const ImageViewHandle& image) {
-    for_each_location([&](const ShaderObjectHandle& base_object, const ShaderOffset& offset) {
-        base_object->write(offset, image);
-    });
+    base_object->write(offset, image);
     return *this;
 }
 
 ShaderCursor& ShaderCursor::write(const BufferHandle& buffer) {
-    for_each_location([&](const ShaderObjectHandle& base_object, const ShaderOffset& offset) {
-        base_object->write(offset, buffer);
-    });
+    base_object->write(offset, buffer);
     return *this;
 }
 
 ShaderCursor& ShaderCursor::write(const TextureHandle& texture) {
-    for_each_location([&](const ShaderObjectHandle& base_object, const ShaderOffset& offset) {
-        base_object->write(offset, texture);
-    });
+    base_object->write(offset, texture);
     return *this;
 }
 
 ShaderCursor& ShaderCursor::write(const SamplerHandle& sampler) {
-    for_each_location([&](const ShaderObjectHandle& base_object, const ShaderOffset& offset) {
-        base_object->write(offset, sampler);
-    });
+    base_object->write(offset, sampler);
+    return *this;
+}
+
+ShaderCursor& ShaderCursor::write(const ShaderObjectHandle& object) {
+    // Determine what kind of field this cursor points at
+    auto kind = type_layout->getKind();
+
+    if (kind == slang::TypeReflection::Kind::ConstantBuffer ||
+        kind == slang::TypeReflection::Kind::ParameterBlock) {
+        // Find the sub-object range for this CB/PB in the root object's layout
+        int32_t sor =
+            base_object->get_object_layout()->find_sub_object_range(offset.binding_range_offset);
+        assert(sor >= 0 && "CB/PB cursor must map to a sub-object range");
+
+        // set_sub_object handles CB descriptor writes to the owning PB
+        base_object->set_sub_object(static_cast<uint32_t>(sor), object);
+    } else {
+        SPDLOG_ERROR("write(ShaderObjectHandle) only supported for ConstantBuffer/ParameterBlock "
+                     "cursor positions");
+    }
+
     return *this;
 }
 
 ShaderCursor& ShaderCursor::write(const void* data, std::size_t size) {
-    for_each_location([&](const ShaderObjectHandle& base_object, const ShaderOffset& offset) {
-        base_object->write(offset, data, size);
-    });
+    base_object->write(offset, data, size);
     return *this;
 }
 
-// void ShaderCursor::bind_object(const ShaderObjectHandle& object, ShaderObjectAllocator&
-// allocator) { if (!is_valid()) {
-//     SPDLOG_ERROR("Cannot bind object to invalid cursor");
-//     return;
-// }
+std::string ShaderCursor::format_debug() const {
+    if (!is_valid())
+        return "(invalid cursor)\n";
 
-// auto kind = type_layout->getType()->getKind();
+    std::string out;
+    const char* name = type_layout->getName();
+    out += fmt::format("ShaderCursor at {}\n", format_shader_offset(offset));
+    out += fmt::format("  type: '{}', kind={}\n", name ? name : "(anonymous)",
+                       slang_type_kind_to_string(type_layout->getKind()));
+    out += fmt::format("  uniform_size: {} bytes\n",
+                       type_layout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM));
 
-// if (kind == slang::TypeReflection::Kind::ParameterBlock) {
-//     // Nested parameter block - gets its own descriptor set
-//     if (!object->get_descriptor_set()) {
-//         object->initialize_as_parameter_block(allocator);
-//     }
-//     // The nested parameter block's descriptor set is bound separately at draw time
-
-// } else {
-//     // Constant buffer or value - bind to all our locations
-//     object->bind_to(*this, allocator);
-// }
-// }
-
-void ShaderCursor::add_locations(const ShaderCursor& other) {
-    assert(type_layout == other.type_layout || !type_layout);
-    if (type_layout == nullptr) {
-        type_layout = other.type_layout;
+    uint32_t field_count = type_layout->getFieldCount();
+    if (field_count > 0) {
+        out += fmt::format("  fields ({}):\n", field_count);
+        for (uint32_t f = 0; f < field_count; f++) {
+            auto* fv = type_layout->getFieldByIndex(f);
+            auto* ftl = fv->getTypeLayout();
+            const char* fname = fv->getVariable()->getName();
+            out += fmt::format("    [{}] '{}': kind={}, uniform_offset={}, "
+                               "binding_range_offset={}\n",
+                               f, fname ? fname : "?", slang_type_kind_to_string(ftl->getKind()),
+                               fv->getOffset(SLANG_PARAMETER_CATEGORY_UNIFORM),
+                               type_layout->getFieldBindingRangeOffset(f));
+        }
     }
-    locations.insert(locations.end(), other.locations.begin(), other.locations.end());
+
+    if (type_layout->getKind() == slang::TypeReflection::Kind::Array) {
+        out += fmt::format("  array: element_count={}, stride={}\n", type_layout->getElementCount(),
+                           type_layout->getElementStride(SLANG_PARAMETER_CATEGORY_UNIFORM));
+    }
+
+    return out;
 }
 
 } // namespace merian

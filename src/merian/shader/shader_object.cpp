@@ -5,184 +5,330 @@
 
 namespace merian {
 
-ShaderObject::ShaderObject(const ContextHandle& context, slang::TypeLayoutReflection* layout)
-    : type_layout(layout), context(context) {
-    assert(type_layout);
-}
+ShaderObject::ShaderObject(const ContextHandle& context,
+                           const SlangObjectLayoutHandle& object_layout,
+                           const ShaderObjectAllocatorHandle& allocator)
+    : object_layout(object_layout), context(context), allocator(allocator) {
+    assert(object_layout);
+    assert(allocator);
 
-DescriptorContainerHandle
-ShaderObject::initialize_as_parameter_block(ShaderObjectAllocator& allocator) {
-    // // Get or create descriptor set layout from Slang reflection
-    // auto layout = create_descriptor_set_layout_from_slang(context, type_layout);
+    // Create descriptor storage for caching writes (incremental update model)
+    descriptors = DescriptorStorage::create(object_layout->get_descriptor_set_layout());
 
-    // // Get or allocate descriptor set
-    // descriptor_set = allocator.get_or_create_descriptor_set(shared_from_this(), layout);
+    // Pre-size sub-object array: one slot per CB/PB field
+    sub_objects.resize(object_layout->get_sub_object_range_count());
 
-    // // Allocate ordinary data buffer if needed
-    // size_t ordinary_size = type_layout->getSize();
-    // if (ordinary_size > 0) {
-    //     vk::BufferCreateInfo buffer_info{{},
-    //                                      ordinary_size,
-    //                                      vk::BufferUsageFlagBits::eUniformBuffer |
-    //                                          vk::BufferUsageFlagBits::eTransferDst,
-    //                                      vk::SharingMode::eExclusive};
+    // Eagerly create ordinary data buffer if needed
+    const vk::DeviceSize uniform_size = object_layout->get_uniform_size();
+    if (uniform_size > 0) {
+        ordinary_data_staging.resize(uniform_size, 0);
+        ordinary_data_buffer = allocator->allocate_uniform_buffer(uniform_size);
 
-    //     // TODO: Use project-specific buffer creation method
-    //     // ordinary_data = create_buffer(...);
-    //     ordinary_data_staging.resize(ordinary_size);
-
-    //     SPDLOG_DEBUG("Allocated ordinary data buffer of size {} for ShaderObject {}",
-    //     ordinary_size,
-    //                  fmt::ptr(this));
-    // }
-
-    // // Initialize root cursor with this single location
-    // root_cursor = ShaderCursor(shared_from_this());
-
-    // // Populate with initial data
-    // populate(*root_cursor);
-
-    // // Update descriptor set and buffer
-    // if (ordinary_data) {
-    //     // TODO: Upload staging buffer to GPU
-    //     // map, memcpy, unmap
-    // }
-    // descriptor_set->update();
-
-    // return descriptor_set;
-
-    return nullptr;
-}
-
-void ShaderObject::bind_to(ShaderCursor& cursor, ShaderObjectAllocator& allocator) {
-    // auto kind = cursor.get_kind();
-
-    // if (kind == slang::TypeReflection::Kind::ParameterBlock) {
-    //     // Initialize as parameter block if not already done
-    //     if (!descriptor_set) {
-    //         initialize_as_parameter_block(allocator);
-    //     }
-    //     // Nested parameter blocks are bound separately at draw time
-
-    // } else if (kind == slang::TypeReflection::Kind::ConstantBuffer) {
-    //     // Allocate our own buffer if needed
-    //     if (!ordinary_data) {
-    //         size_t buffer_size = type_layout->getSize();
-
-    //         vk::BufferCreateInfo buffer_info{{},
-    //                                          buffer_size,
-    //                                          vk::BufferUsageFlagBits::eUniformBuffer |
-    //                                              vk::BufferUsageFlagBits::eTransferDst,
-    //                                          vk::SharingMode::eExclusive};
-
-    //         // TODO: Use project-specific buffer creation method
-    //         // ordinary_data = create_buffer(...);
-    //         ordinary_data_staging.resize(buffer_size);
-    //     }
-
-    //     // Bind our buffer to all parent descriptor sets
-    //     for (size_t i = 0; i < cursor.locations.size(); i++) {
-    //         auto& loc = cursor.locations[i];
-    //         auto binding_info =
-    //             get_binding_info_from_offset(loc.offset, loc.base_object->get_type_layout());
-    //         auto parent_desc_set = loc.base_object->get_descriptor_set();
-
-    //         if (parent_desc_set) {
-    //             parent_desc_set->queue_descriptor_write_buffer(binding_info.binding,
-    //             ordinary_data,
-    //                                                            0, VK_WHOLE_SIZE,
-    //                                                            loc.offset.binding_array_index);
-    //         }
-    //     }
-
-    //     // Initialize our root cursor if empty
-    //     if (!root_cursor) {
-    //         root_cursor = ShaderCursor(shared_from_this(), type_layout);
-    //     }
-
-    //     // Populate our buffer
-    //     populate(*root_cursor);
-
-    //     // Upload and update parent descriptor sets
-    //     if (ordinary_data) {
-    //         // TODO: Upload buffer
-    //     }
-
-    //     for (auto& loc : cursor.locations) {
-    //         if (auto parent_desc_set = loc.base_object->get_descriptor_set()) {
-    //             parent_desc_set->update();
-    //         }
-    //     }
-
-    // } else {
-    //     // Nested as value - add all cursor locations to our root cursor
-    //     if (!root_cursor) {
-    //         // First binding - adopt the cursor locations
-    //         root_cursor = cursor;
-    //     } else {
-    //         // Additional binding - merge locations
-    //         root_cursor->add_locations(cursor);
-    //     }
-
-    //     // Populate through the cursor
-    //     populate(cursor);
-    // }
-}
-
-void ShaderObject::for_each_descriptor_set(
-    const std::function<void(const DescriptorContainerHandle&)>& f) {
-    auto it = parameter_block.descriptor_sets.begin();
-    while (it != parameter_block.descriptor_sets.end()) {
-        if (it->expired()) {
-            it = parameter_block.descriptor_sets.erase(it);
-            continue;
-        }
-
-        f(it->lock());
-        it++;
+        // Write buffer to descriptor storage so it gets replayed to new sets
+        descriptors->queue_descriptor_write_buffer(SlangObjectLayout::ORDINARY_DATA_BUFFER_BINDING,
+                                                   ordinary_data_buffer, 0, uniform_size);
     }
 }
 
+// ---------------------------------------------------------------
+// Cursor
+
+ShaderCursor ShaderObject::get_cursor() {
+    return ShaderCursor(shared_from_this());
+}
+
+// ---------------------------------------------------------------
+// Binding
+
+// Compute the sub-range offset, container offset (UBO binding), and element offset
+// for a ConstantBuffer sub-object range within a parent type layout.
+// Returns {ubo_binding_delta, element_binding_delta} relative to parent's base binding.
+static std::pair<uint32_t, uint32_t> compute_cb_binding_deltas(
+    slang::TypeLayoutReflection* parent_tl, uint32_t sor, uint32_t binding_range_index) {
+    uint32_t sub_range_offset = 0;
+    if (auto* range_var = parent_tl->getSubObjectRangeOffset(sor)) {
+        sub_range_offset = static_cast<uint32_t>(
+            range_var->getOffset(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT));
+    }
+
+    auto* leaf_tl = parent_tl->getBindingRangeLeafTypeLayout(binding_range_index);
+    assert(leaf_tl && "CB sub-object range must have leaf type layout");
+
+    uint32_t container_offset = 0;
+    if (auto* cv = leaf_tl->getContainerVarLayout()) {
+        container_offset =
+            static_cast<uint32_t>(cv->getOffset(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT));
+    }
+
+    uint32_t element_offset = 0;
+    if (auto* ev = leaf_tl->getElementVarLayout()) {
+        element_offset =
+            static_cast<uint32_t>(ev->getOffset(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT));
+    }
+
+    return {sub_range_offset + container_offset, sub_range_offset + element_offset};
+}
+
+void ShaderObject::set_sub_object(uint32_t sub_object_range_index,
+                                  const ShaderObjectHandle& object) {
+    assert(sub_object_range_index < sub_objects.size());
+    sub_objects[sub_object_range_index] = object;
+
+    const auto& range = object_layout->get_sub_object_range(sub_object_range_index);
+    if (range.binding_type != slang::BindingType::ConstantBuffer || !object ||
+        !object->ordinary_data_buffer) {
+        return;
+    }
+
+    // For CB sub-objects: write the UBO descriptor to the owning PB's storage/sets
+    // and set the CB's PB context for nested CB propagation.
+    auto* tl = object_layout->get_type_layout();
+    auto [ubo_delta, element_delta] =
+        compute_cb_binding_deltas(tl, sub_object_range_index, range.binding_range_index);
+
+    if (!pb_bindings_.empty()) {
+        // This object is a CB inside one or more PBs — propagate to all owning PBs.
+        for (auto it = pb_bindings_.begin(); it != pb_bindings_.end();) {
+            auto pb = it->pb.lock();
+            if (!pb) {
+                it = pb_bindings_.erase(it);
+                continue;
+            }
+
+            uint32_t ubo_binding = it->element_binding + ubo_delta;
+            uint32_t element_binding = it->element_binding + element_delta;
+
+            pb->descriptors->queue_descriptor_write_buffer(
+                ubo_binding, object->ordinary_data_buffer, 0, VK_WHOLE_SIZE);
+            pb->for_each_registered_set([&](DescriptorContainer& set) {
+                set.queue_descriptor_write_buffer(ubo_binding, object->ordinary_data_buffer, 0,
+                                                  VK_WHOLE_SIZE);
+            });
+
+            object->pb_bindings_.push_back(PBBinding{it->pb, element_binding});
+            ++it;
+        }
+    } else {
+        // This object IS the PB. Use binding_info_cache for the Vulkan binding (same path
+        // the old cursor code used via write()), and compute element_binding from reflection
+        // for nested CB propagation.
+        const auto& info = object_layout->get_binding_info(range.binding_range_index);
+        descriptors->queue_descriptor_write_buffer(info.binding, object->ordinary_data_buffer, 0,
+                                                   VK_WHOLE_SIZE);
+        for_each_registered_set([&](DescriptorContainer& set) {
+            set.queue_descriptor_write_buffer(info.binding, object->ordinary_data_buffer, 0,
+                                              VK_WHOLE_SIZE);
+        });
+
+        uint32_t pb_element_offset = object_layout->has_ordinary_data_buffer() ? 1 : 0;
+        object->pb_bindings_.push_back(
+            PBBinding{shared_from_this(), pb_element_offset + element_delta});
+    }
+}
+
+void ShaderObject::upload_constant_buffer_tree(ShaderObject* cb_obj,
+                                               const CommandBufferHandle& cmd) {
+    // Upload this CB's staging data if dirty
+    if (cb_obj->ordinary_data_buffer && cb_obj->ordinary_data_dirty) {
+        allocator->get_staging()->cmd_to_device(cmd, cb_obj->ordinary_data_buffer,
+                                                cb_obj->ordinary_data_staging.data(), 0,
+                                                cb_obj->ordinary_data_staging.size());
+        cb_obj->ordinary_data_dirty = false;
+    }
+
+    // Recurse into nested CB sub-objects for staging uploads
+    for (uint32_t sor = 0; sor < cb_obj->object_layout->get_sub_object_range_count(); sor++) {
+        const auto& range = cb_obj->object_layout->get_sub_object_range(sor);
+        if (range.binding_type != slang::BindingType::ConstantBuffer)
+            continue;
+
+        auto& nested = cb_obj->sub_objects[sor];
+        if (!nested || !nested->ordinary_data_buffer)
+            continue;
+
+        upload_constant_buffer_tree(nested.get(), cmd);
+    }
+}
+
+void ShaderObject::for_each_registered_set(const std::function<void(DescriptorContainer&)>& fn) {
+    for (auto it = registered_sets.begin(); it != registered_sets.end();) {
+        if (auto set = it->lock()) {
+            fn(*set);
+            ++it;
+        } else {
+            it = registered_sets.erase(it);
+        }
+    }
+}
+
+void ShaderObject::bind_as_parameter_block(const CommandBufferHandle& cmd,
+                                           const PipelineHandle& pipeline,
+                                           const uint32_t set_index) {
+    // Ask allocator for a descriptor set (handles frame cycling)
+    auto set = allocator->allocate(shared_from_this());
+
+    // If new set, register and replay cached descriptor state
+    bool found = false;
+    for (auto it = registered_sets.begin(); it != registered_sets.end();) {
+        if (it->expired()) {
+            it = registered_sets.erase(it);
+            continue;
+        }
+        if (it->lock() == set)
+            found = true;
+        ++it;
+    }
+    if (!found) {
+        registered_sets.emplace_back(set);
+        descriptors->replay_to(*set);
+    }
+
+    // Upload this PB's own ordinary data
+    if (ordinary_data_buffer && ordinary_data_dirty) {
+        allocator->get_staging()->cmd_to_device(cmd, ordinary_data_buffer,
+                                                ordinary_data_staging.data(), 0,
+                                                ordinary_data_staging.size());
+        ordinary_data_dirty = false;
+    }
+
+    // Upload staging data for ConstantBuffer sub-objects (recursive, dirty-guarded).
+    // Descriptor writes are handled by set_sub_object at update time.
+    for (uint32_t sor = 0; sor < object_layout->get_sub_object_range_count(); sor++) {
+        const auto& range = object_layout->get_sub_object_range(sor);
+        if (range.binding_type != slang::BindingType::ConstantBuffer)
+            continue;
+
+        auto& sub = sub_objects[sor];
+        if (!sub)
+            continue;
+
+        upload_constant_buffer_tree(sub.get(), cmd);
+    }
+
+    // Flush queued descriptor writes and bind
+    set->update();
+    set->bind(cmd, pipeline, set_index);
+
+    // ParameterBlock sub-objects are bound by SlangProgramEntryPoint::bind_nested_pbs
+}
+
+// ---------------------------------------------------------------
+// Sub-object creation
+
+ShaderObjectHandle ShaderObject::create_sub_object(const std::string& field_name) {
+    auto* tl = object_layout->get_type_layout();
+    SlangInt field_index = tl->findFieldIndexByName(field_name.c_str());
+    assert(field_index >= 0 && "Field not found");
+
+    // Find the sub-object range for this field
+    uint32_t br = tl->getFieldBindingRangeOffset(static_cast<uint32_t>(field_index));
+    int32_t sor = object_layout->find_sub_object_range(br);
+    assert(sor >= 0 && "Field must be a ConstantBuffer or ParameterBlock");
+
+    const auto& range_info = object_layout->get_sub_object_range(sor);
+    assert(range_info.element_layout);
+
+    return std::make_shared<ShaderObject>(context, range_info.element_layout, allocator);
+}
+
+void ShaderObject::set_sub_object(const std::string& field_name, const ShaderObjectHandle& object) {
+    auto* tl = object_layout->get_type_layout();
+    SlangInt field_index = tl->findFieldIndexByName(field_name.c_str());
+    assert(field_index >= 0 && "Field not found");
+
+    int32_t sor = object_layout->find_sub_object_range(
+        tl->getFieldBindingRangeOffset(static_cast<uint32_t>(field_index)));
+    assert(sor >= 0 && "Field must be a ConstantBuffer or ParameterBlock");
+
+    // Delegate to the sor-based version which handles CB descriptor writes
+    set_sub_object(static_cast<uint32_t>(sor), object);
+}
+
+// ---------------------------------------------------------------
+// Write operations
+
 void ShaderObject::write(const ShaderOffset& offset, const ImageViewHandle& image) {
-    const auto binding_info = get_binding_info_from_offset(offset, type_layout);
-    for_each_descriptor_set([&](const DescriptorContainerHandle& set) {
-        set->queue_descriptor_write_image(binding_info.binding, image, offset.binding_array_index);
+    const auto& info = object_layout->get_binding_info(offset.binding_range_offset);
+    assert(info.type == slang::BindingType::Texture ||
+           info.type == slang::BindingType::MutableTexture);
+    assert(offset.binding_array_index < info.count);
+
+    descriptors->queue_descriptor_write_image(info.binding, image, offset.binding_array_index);
+    for_each_registered_set([&](DescriptorContainer& set) {
+        set.queue_descriptor_write_image(info.binding, image, offset.binding_array_index);
     });
 }
 
 void ShaderObject::write(const ShaderOffset& offset, const BufferHandle& buffer) {
-    const auto binding_info = get_binding_info_from_offset(offset, type_layout);
-    for_each_descriptor_set([&](const DescriptorContainerHandle& set) {
-        set->queue_descriptor_write_buffer(binding_info.binding, buffer,
-                                           offset.binding_array_index);
+    const auto& info = object_layout->get_binding_info(offset.binding_range_offset);
+    assert(info.type == slang::BindingType::RawBuffer ||
+           info.type == slang::BindingType::MutableRawBuffer ||
+           info.type == slang::BindingType::ConstantBuffer);
+    assert(offset.binding_array_index < info.count);
+
+    descriptors->queue_descriptor_write_buffer(info.binding, buffer, 0, VK_WHOLE_SIZE,
+                                               offset.binding_array_index);
+    for_each_registered_set([&](DescriptorContainer& set) {
+        set.queue_descriptor_write_buffer(info.binding, buffer, 0, VK_WHOLE_SIZE,
+                                          offset.binding_array_index);
     });
 }
 
 void ShaderObject::write(const ShaderOffset& offset, const TextureHandle& texture) {
-    const auto binding_info = get_binding_info_from_offset(offset, type_layout);
-    for_each_descriptor_set([&](const DescriptorContainerHandle& set) {
-        set->queue_descriptor_write_texture(binding_info.binding, texture,
-                                            offset.binding_array_index);
+    const auto& info = object_layout->get_binding_info(offset.binding_range_offset);
+    assert(info.type == slang::BindingType::CombinedTextureSampler);
+    assert(offset.binding_array_index < info.count);
+
+    descriptors->queue_descriptor_write_texture(info.binding, texture, offset.binding_array_index);
+    for_each_registered_set([&](DescriptorContainer& set) {
+        set.queue_descriptor_write_texture(info.binding, texture, offset.binding_array_index);
     });
 }
 
 void ShaderObject::write(const ShaderOffset& offset, const SamplerHandle& sampler) {
-    const auto binding_info = get_binding_info_from_offset(offset, type_layout);
-    for_each_descriptor_set([&](const DescriptorContainerHandle& set) {
-        set->queue_descriptor_write_sampler(binding_info.binding, sampler,
-                                            offset.binding_array_index);
+    const auto& info = object_layout->get_binding_info(offset.binding_range_offset);
+    assert(info.type == slang::BindingType::Sampler);
+    assert(offset.binding_array_index < info.count);
+
+    descriptors->queue_descriptor_write_sampler(info.binding, sampler, offset.binding_array_index);
+    for_each_registered_set([&](DescriptorContainer& set) {
+        set.queue_descriptor_write_sampler(info.binding, sampler, offset.binding_array_index);
     });
 }
 
-void ShaderObject::write(const ShaderOffset& offset, const void* data, std::size_t size) {
-    // Write to our staging buffer if we have one
-    if (!parameter_block.ordinary_data_staging.empty()) {
-        assert(offset.uniform_byte_offset + size <= parameter_block.ordinary_data_staging.size());
-        std::memcpy(parameter_block.ordinary_data_staging.data() + offset.uniform_byte_offset, data,
-                    size);
+void ShaderObject::write(const ShaderOffset& offset, const void* data, const std::size_t size) {
+    if (!ordinary_data_staging.empty()) {
+        assert(offset.uniform_byte_offset + size <= ordinary_data_staging.size());
+        std::memcpy(ordinary_data_staging.data() + offset.uniform_byte_offset, data, size);
+        ordinary_data_dirty = true;
     }
+}
 
-    // TODO: mark dirty and upload to GPU later (when binding)
+// ---------------------------------------------------------------
+// Debug
+
+std::string ShaderObject::format_debug(const std::string& indent) const {
+    std::string out;
+    const char* name = get_type_layout()->getName();
+    out += fmt::format("{}ShaderObject '{}'\n", indent, (name != nullptr) ? name : "(anonymous)");
+    out += fmt::format("{}  ordinary_data: {} bytes, dirty={}, has_buffer={}\n", indent,
+                       ordinary_data_staging.size(), ordinary_data_dirty,
+                       ordinary_data_buffer != nullptr);
+    out += fmt::format("{}  registered_sets: {}\n", indent, registered_sets.size());
+    out += fmt::format("{}  sub_objects ({}):\n", indent, sub_objects.size());
+    for (uint32_t i = 0; i < sub_objects.size(); i++) {
+        if (!sub_objects[i])
+            continue;
+        const auto& range = object_layout->get_sub_object_range(i);
+        const char* sub_name = sub_objects[i]->get_type_layout()->getName();
+        out +=
+            fmt::format("{}    [sor {}] br={}, type={}: -> '{}'\n", indent, i,
+                        range.binding_range_index, slang_binding_type_to_string(range.binding_type),
+                        (sub_name != nullptr) ? sub_name : "(anonymous)");
+    }
+    out += fmt::format("{}  layout:\n", indent);
+    out += object_layout->format_reflection(indent + "    ");
+    return out;
 }
 
 } // namespace merian

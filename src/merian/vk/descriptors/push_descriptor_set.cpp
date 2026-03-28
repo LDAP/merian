@@ -3,6 +3,8 @@
 
 namespace merian {
 
+PushDescriptorSet::~PushDescriptorSet() = default;
+
 void PushDescriptorSet::bind(const CommandBufferHandle& cmd,
                              const PipelineHandle& pipeline,
                              const uint32_t descriptor_set_index) const {

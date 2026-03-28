@@ -8,6 +8,9 @@
 #include "slang-com-ptr.h"
 #include "slang.h"
 
+#include <string>
+#include <vector>
+
 namespace merian {
 
 class SlangProgram;
@@ -35,6 +38,40 @@ class SlangProgram : public std::enable_shared_from_this<SlangProgram> {
     uint64_t get_entry_point_index(const std::string& entry_point_name) const;
 
     const SlangCompositionHandle& get_composition();
+
+    // ---------------------------------------------------------------
+    // Global parameter discovery
+
+    /**
+     * @brief Number of global parameters.
+     */
+    uint32_t get_global_parameter_count() const;
+
+    /**
+     * @brief Get a global parameter's variable layout by index.
+     */
+    slang::VariableLayoutReflection* get_global_parameter(uint32_t index) const;
+
+    /**
+     * @brief Get a global parameter's variable layout by name. Returns nullptr if not found.
+     */
+    slang::VariableLayoutReflection* find_global_parameter(const std::string& name) const;
+
+    /**
+     * @brief Get names of all global parameters.
+     */
+    std::vector<std::string> get_global_parameter_names() const;
+
+    /**
+     * @brief Check if a global parameter exists.
+     */
+    bool has_global_parameter(const std::string& name) const;
+
+    // ---------------------------------------------------------------
+    // Debug
+
+    // Print full reflection: entry points, global params, type layouts
+    std::string format_reflection() const;
 
   public:
     static SlangProgramHandle create(const ShaderCompileContextHandle& compile_context,

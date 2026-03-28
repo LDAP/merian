@@ -27,6 +27,7 @@ class DescriptorContainer : public std::enable_shared_from_this<DescriptorContai
 
     DescriptorContainer(const DescriptorSetLayoutHandle& layout) : layout(layout) {
         resources.resize(layout->get_descriptor_count());
+        infos.resize(layout->get_descriptor_count());
         write_resources.resize(layout->get_descriptor_count());
         write_infos.resize(layout->get_descriptor_count());
     }
@@ -239,6 +240,19 @@ class DescriptorContainer : public std::enable_shared_from_this<DescriptorContai
 
     // --------------------------------------
 
+    /**
+     * @brief Replay all current resource bindings to another DescriptorContainer.
+     *
+     * Iterates over all currently bound resources and re-queues the corresponding
+     * descriptor writes on the target. Works across all DescriptorContainer implementations
+     * (DescriptorSet, PushDescriptorSet, etc.) since it uses the public write API.
+     *
+     * Both containers must have the same layout.
+     */
+    void replay_to(DescriptorContainer& target) const;
+
+    // --------------------------------------
+
     virtual uint32_t update_count() const noexcept = 0;
 
     virtual bool has_updates() const noexcept = 0;
@@ -267,22 +281,58 @@ class DescriptorContainer : public std::enable_shared_from_this<DescriptorContai
         assert(write_resources[index] && "this can be called exactly ONCE for a queued update");
 
         resources[index] = std::move(write_resources[index]);
+        infos[index] = write_infos[index];
     }
 
   private:
     const DescriptorSetLayoutHandle layout;
 
-    // Has entry for each array element. Use resource_index_for_binding to access.
+    // Committed state (after apply_update_for)
     std::vector<std::shared_ptr<Resource>> resources;
-    // Has entry for each array element. Use resource_index_for_binding to access.
+    std::vector<DescriptorInfo> infos;
+    // Queued state (before apply_update_for)
     std::vector<std::shared_ptr<Resource>> write_resources;
-    // Has entry for each array element. Use resource_index_for_binding to access.
-    std::vector<std::variant<vk::DescriptorBufferInfo,
-                             vk::DescriptorImageInfo,
-                             vk::WriteDescriptorSetAccelerationStructureKHR>>
-        write_infos;
+    std::vector<DescriptorInfo> write_infos;
 };
 
 using DescriptorContainerHandle = std::shared_ptr<DescriptorContainer>;
+
+/**
+ * @brief A DescriptorContainer that immediately commits writes when queued.
+ *
+ * Used as a write template in ShaderObject — stores the current state of all descriptors
+ * so they can be replayed to new descriptor sets. Unlike DescriptorSet or PushDescriptorSet,
+ * this does not interact with Vulkan directly.
+ */
+class DescriptorStorage : public DescriptorContainer {
+  public:
+    DescriptorStorage(const DescriptorSetLayoutHandle& layout) : DescriptorContainer(layout) {}
+
+    uint32_t update_count() const noexcept override {
+        return 0;
+    }
+
+    bool has_updates() const noexcept override {
+        return false;
+    }
+
+    void bind([[maybe_unused]] const CommandBufferHandle& cmd,
+              [[maybe_unused]] const PipelineHandle& pipeline,
+              [[maybe_unused]] const uint32_t descriptor_set_index) const override {
+        assert(false && "DescriptorStorage cannot be bound");
+    }
+
+    static std::shared_ptr<DescriptorStorage> create(const DescriptorSetLayoutHandle& layout) {
+        return std::make_shared<DescriptorStorage>(layout);
+    }
+
+  protected:
+    void queue_write([[maybe_unused]] vk::WriteDescriptorSet&& write) override {
+        // Auto-apply: immediately commit the write
+        apply_update_for(write.dstBinding, write.dstArrayElement);
+    }
+};
+
+using DescriptorStorageHandle = std::shared_ptr<DescriptorStorage>;
 
 } // namespace merian
