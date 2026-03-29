@@ -131,13 +131,54 @@ PipelineLayoutHandle SlangProgramEntryPoint::get_pipeline_layout(const ContextHa
         return cached_pipeline_layout;
     }
 
+    auto* program_layout = program->get_program_reflection();
     auto* entry_reflection = get_entry_point_reflection();
     PipelineLayoutBuilder builder(context);
 
-    // Set indices are assigned sequentially in DFS order of ParameterBlock nesting.
-    // This matches Slang's SPIR-V output where PBs get consecutive descriptor set indices.
+    // Set indices are assigned sequentially: global sets first, then PB sets in DFS order.
+    // This matches Slang's SPIR-V output.
     uint32_t next_set = 0;
 
+    // ---- Global parameters ----
+    auto* global_tl = program_layout->getGlobalParamsTypeLayout();
+    if (global_tl != nullptr) {
+        // Direct global descriptor sets (resources, CBs at global scope)
+        const uint32_t global_ds_count = global_tl->getDescriptorSetCount();
+        for (uint32_t ds = 0; ds < global_ds_count; ds++) {
+            auto layout =
+                create_descriptor_set_layout_from_slang_type_layout(context, global_tl, ds);
+            if (!layout->get_bindings().empty()) {
+                if (!global_object_layout) {
+                    global_object_layout =
+                        std::make_shared<SlangObjectLayout>(context, global_tl, program);
+                    global_set_index = next_set;
+                }
+                global_set_layouts.push_back(layout);
+                builder.add_descriptor_set_layout(layout);
+                next_set++;
+            }
+        }
+
+        // Create global object layout even if no direct bindings,
+        // as long as there are sub-object ranges (PB/CB fields at global scope)
+        if (!global_object_layout && global_tl->getSubObjectRangeCount() > 0) {
+            global_object_layout = std::make_shared<SlangObjectLayout>(context, global_tl, program);
+        }
+
+        // Collect nested PB sub-objects from global scope (global ParameterBlock fields)
+        if (global_object_layout) {
+            collect_nested_pb_layouts(global_object_layout, builder, next_set,
+                                      global_nested_pb_infos);
+        }
+
+        // Push constants
+        push_constant_size = global_tl->getSize(SLANG_PARAMETER_CATEGORY_PUSH_CONSTANT_BUFFER);
+        if (push_constant_size > 0) {
+            builder.add_push_constant(static_cast<uint32_t>(push_constant_size));
+        }
+    }
+
+    // ---- Entry point ParameterBlock parameters ----
     for (uint32_t i = 0; i < entry_reflection->getParameterCount(); i++) {
         auto* param = entry_reflection->getParameterByIndex(i);
         auto* type_layout = param->getTypeLayout();
@@ -202,6 +243,49 @@ void SlangProgramEntryPoint::bind_nested_pbs(const ShaderObjectHandle& object,
         }
         bind_nested_pbs(sub, ni.children, allocator, cmd, pipeline);
     }
+}
+
+// ---------------------------------------------------------------
+// Global parameter support
+
+bool SlangProgramEntryPoint::has_globals(const ContextHandle& context) {
+    get_pipeline_layout(context); // ensure layout is built
+    return global_set_index != NO_DESCRIPTOR_SET;
+}
+
+ShaderObjectHandle
+SlangProgramEntryPoint::create_global_shader_object(const ContextHandle& context,
+                                                    const ShaderObjectAllocatorHandle& allocator) {
+    get_pipeline_layout(context); // ensure layout is built
+    assert(global_object_layout && "No global parameters in this program");
+    return std::make_shared<ShaderObject>(context, global_object_layout, allocator);
+}
+
+void SlangProgramEntryPoint::bind_globals(const ShaderObjectHandle& globals,
+                                          const CommandBufferHandle& cmd,
+                                          const PipelineHandle& pipeline) {
+    if (global_set_index != NO_DESCRIPTOR_SET) {
+        globals->bind_as_parameter_block(cmd, pipeline, global_set_index);
+    }
+    // Bind global ParameterBlock sub-objects at their own set indices
+    if (!global_nested_pb_infos.empty()) {
+        bind_nested_pbs(globals, global_nested_pb_infos, {}, cmd, pipeline);
+    }
+}
+
+DescriptorSetLayoutHandle SlangProgramEntryPoint::get_global_set_layout(uint32_t set_index) const {
+    if (set_index < global_set_layouts.size()) {
+        return global_set_layouts[set_index];
+    }
+    return nullptr;
+}
+
+uint32_t SlangProgramEntryPoint::get_global_set_count() const {
+    return static_cast<uint32_t>(global_set_layouts.size());
+}
+
+vk::DeviceSize SlangProgramEntryPoint::get_push_constant_size() const {
+    return push_constant_size;
 }
 
 // ---------------------------------------------------------------

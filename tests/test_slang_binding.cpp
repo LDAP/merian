@@ -718,7 +718,111 @@ TEST_F(SlangBindingTest, FullMix) {
 }
 
 // ===========================================================================
-// 10. Shared sub-objects
+// 10. Global parameters
+// ===========================================================================
+
+TEST_F(SlangBindingTest, GlobalResource) {
+    auto program = SlangProgram::create(compile_context, "slang_binding/global_resource.slang");
+    auto entry_point = SlangProgramEntryPoint::create(program, "main");
+    auto pipe_layout = entry_point->get_pipeline_layout(context);
+    auto vulkan_ep = entry_point->specialize();
+    auto pipeline = ComputePipeline::create(pipe_layout, vulkan_ep);
+    auto obj_allocator = std::make_shared<SimpleShaderObjectAllocator>(allocator);
+
+    auto output_buffer = allocator->create_buffer(
+        2 * sizeof(uint32_t),
+        vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
+        MemoryMappingType::HOST_ACCESS_RANDOM, "test_output");
+
+    ASSERT_TRUE(entry_point->has_globals(context));
+    ASSERT_EQ(entry_point->get_global_set_count(), 1u);
+
+    auto globals = entry_point->create_global_shader_object(context, obj_allocator);
+    auto cursor = globals->get_cursor();
+    cursor["cb"]["x"] = 3.14f;
+    cursor["cb"]["y"] = -42;
+    cursor["output"] = output_buffer;
+
+    queue->submit_wait([&](const CommandBufferHandle& cmd) {
+        cmd->bind(pipeline);
+        entry_point->bind_globals(globals, cmd, pipeline);
+        cmd->dispatch(1, 1, 1);
+    });
+
+    auto result = readback(output_buffer, 2);
+    EXPECT_EQ(result.data[0], float_bits(3.14f));
+    EXPECT_EQ(result.data[1], int_bits(-42));
+}
+
+TEST_F(SlangBindingTest, GlobalPB) {
+    auto program = SlangProgram::create(compile_context, "slang_binding/global_pb.slang");
+    auto entry_point = SlangProgramEntryPoint::create(program, "main");
+    auto pipe_layout = entry_point->get_pipeline_layout(context);
+    auto vulkan_ep = entry_point->specialize();
+    auto pipeline = ComputePipeline::create(pipe_layout, vulkan_ep);
+    auto obj_allocator = std::make_shared<SimpleShaderObjectAllocator>(allocator);
+
+    auto output_buffer = allocator->create_buffer(
+        2 * sizeof(uint32_t),
+        vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
+        MemoryMappingType::HOST_ACCESS_RANDOM, "test_output");
+
+    auto globals = entry_point->create_global_shader_object(context, obj_allocator);
+    auto cursor = globals->get_cursor();
+    cursor["params"]["x"] = 1.5f;
+    cursor["params"]["y"] = -7;
+    cursor["params"]["output"] = output_buffer;
+
+    queue->submit_wait([&](const CommandBufferHandle& cmd) {
+        cmd->bind(pipeline);
+        entry_point->bind_globals(globals, cmd, pipeline);
+        cmd->dispatch(1, 1, 1);
+    });
+
+    auto result = readback(output_buffer, 2);
+    EXPECT_EQ(result.data[0], float_bits(1.5f));
+    EXPECT_EQ(result.data[1], int_bits(-7));
+}
+
+TEST_F(SlangBindingTest, GlobalWithPB) {
+    auto program = SlangProgram::create(compile_context, "slang_binding/global_with_pb.slang");
+    auto entry_point = SlangProgramEntryPoint::create(program, "main");
+    auto pipe_layout = entry_point->get_pipeline_layout(context);
+    auto vulkan_ep = entry_point->specialize();
+    auto pipeline = ComputePipeline::create(pipe_layout, vulkan_ep);
+    auto obj_allocator = std::make_shared<SimpleShaderObjectAllocator>(allocator);
+
+    auto output_buffer = allocator->create_buffer(
+        2 * sizeof(uint32_t),
+        vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
+        MemoryMappingType::HOST_ACCESS_RANDOM, "test_output");
+
+    ASSERT_TRUE(entry_point->has_globals(context));
+
+    // Set global resources
+    auto globals = entry_point->create_global_shader_object(context, obj_allocator);
+    globals->get_cursor()["g_output"] = output_buffer;
+
+    // Set PB params
+    auto params = entry_point->create_shader_object(context, "params", obj_allocator);
+    auto cursor = params->get_cursor();
+    cursor["x"] = 1.5f;
+    cursor["y"] = -7;
+
+    queue->submit_wait([&](const CommandBufferHandle& cmd) {
+        cmd->bind(pipeline);
+        entry_point->bind_globals(globals, cmd, pipeline);
+        entry_point->bind("params", params, obj_allocator, cmd, pipeline);
+        cmd->dispatch(1, 1, 1);
+    });
+
+    auto result = readback(output_buffer, 2);
+    EXPECT_EQ(result.data[0], float_bits(1.5f));
+    EXPECT_EQ(result.data[1], int_bits(-7));
+}
+
+// ===========================================================================
+// 11. Shared sub-objects
 // ===========================================================================
 
 TEST_F(SlangBindingTest, SharedCBacrossPBs) {

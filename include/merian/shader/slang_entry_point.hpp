@@ -61,22 +61,62 @@ class SlangProgramEntryPoint : public EntryPoint {
     /**
      * @brief Build and cache a pipeline layout from program reflection.
      *
-     * Walks all descriptor sets in the entry point, creates a DescriptorSetLayout for each.
-     * Does NOT require a ShaderObjectAllocator — standalone utility.
+     * Includes global parameter descriptor sets, push constants, and entry point
+     * ParameterBlock descriptor sets. Global sets come first, then PB sets.
      */
     PipelineLayoutHandle get_pipeline_layout(const ContextHandle& context);
 
     /**
      * @brief Bind a named ParameterBlock parameter and all its nested PB sub-objects.
-     *
-     * Uses reflection-derived set indices (getBindingSpace()) — handles explicit
-     * [[vk::binding(b, s)]] annotations and non-sequential set indices correctly.
      */
     void bind(const std::string& param_name,
               const ShaderObjectHandle& object,
               const ShaderObjectAllocatorHandle& allocator,
               const CommandBufferHandle& cmd,
               const PipelineHandle& pipeline);
+
+    // ---------------------------------------------------------------
+    // Global parameter support
+
+    /**
+     * @brief Check if the program has global parameters that need a descriptor set.
+     */
+    bool has_globals(const ContextHandle& context);
+
+    /**
+     * @brief Create a ShaderObject for the global parameter scope (set 0 of globals).
+     *
+     * Use the returned object's cursor to set global resources and uniform data.
+     * For multi-set globals (explicit [vk::binding(b, s)] across sets), this only
+     * manages set 0. Additional sets must be managed manually.
+     */
+    ShaderObjectHandle create_global_shader_object(const ContextHandle& context,
+                                                   const ShaderObjectAllocatorHandle& allocator);
+
+    /**
+     * @brief Bind the global ShaderObject at its descriptor set index.
+     */
+    void bind_globals(const ShaderObjectHandle& globals,
+                      const CommandBufferHandle& cmd,
+                      const PipelineHandle& pipeline);
+
+    /**
+     * @brief Get the descriptor set layout for a specific global descriptor set.
+     *
+     * Useful for manually allocating descriptor sets for multi-set globals.
+     * Returns nullptr if the set index is out of range.
+     */
+    DescriptorSetLayoutHandle get_global_set_layout(uint32_t set_index) const;
+
+    /**
+     * @brief Get the number of global descriptor sets.
+     */
+    uint32_t get_global_set_count() const;
+
+    /**
+     * @brief Get the push constant size (bytes) derived from reflection, or 0 if none.
+     */
+    vk::DeviceSize get_push_constant_size() const;
 
     // ---------------------------------------------------------------
     // Debug
@@ -144,6 +184,13 @@ class SlangProgramEntryPoint : public EntryPoint {
     // Cached per-parameter info
     std::unordered_map<std::string, ParameterBlockInfo> param_cache;
     PipelineLayoutHandle cached_pipeline_layout;
+
+    // Global parameter support
+    SlangObjectLayoutHandle global_object_layout;
+    uint32_t global_set_index = UINT32_MAX;
+    std::vector<DescriptorSetLayoutHandle> global_set_layouts;
+    std::vector<NestedPBInfo> global_nested_pb_infos;
+    vk::DeviceSize push_constant_size = 0;
 };
 
 } // namespace merian

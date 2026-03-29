@@ -29,9 +29,8 @@ vk::DescriptorType map_slang_to_vk_descriptor_type(slang::BindingType type) {
     }
 }
 
-DescriptorSetLayoutHandle
-create_descriptor_set_layout_from_slang_type_layout(const ContextHandle& context,
-                                                    slang::TypeLayoutReflection* type_layout) {
+DescriptorSetLayoutHandle create_descriptor_set_layout_from_slang_type_layout(
+    const ContextHandle& context, slang::TypeLayoutReflection* type_layout, uint32_t set_index) {
 
     // Track bindings by index to avoid duplicates. CB element types (obtained via
     // getElementVarLayout()->getTypeLayout()) may report a ConstantBuffer descriptor
@@ -40,27 +39,33 @@ create_descriptor_set_layout_from_slang_type_layout(const ContextHandle& context
 
     // If the type has uniform (ordinary) data, Slang generates a ConstantBuffer at binding 0
     // in the SPIR-V. We need to include this in the descriptor set layout.
-    const size_t uniform_size = type_layout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM);
-    if (uniform_size > 0) {
-        binding_map[0] = vk::DescriptorSetLayoutBinding{0, vk::DescriptorType::eUniformBuffer, 1,
-                                                        vk::ShaderStageFlagBits::eAll, nullptr};
+    // Uniform data UBO only lives in set 0.
+    if (set_index == 0) {
+        const size_t uniform_size = type_layout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM);
+        if (uniform_size > 0) {
+            binding_map[0] = vk::DescriptorSetLayoutBinding{
+                0, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eAll, nullptr};
+        }
     }
 
     // Iterate through the descriptor set's descriptor ranges.
     // For a ParameterBlock element type, descriptor set 0 contains all resource bindings.
+    // For global type layouts, each set_index corresponds to a separate Vulkan descriptor set.
     const uint32_t desc_set_count = type_layout->getDescriptorSetCount();
-    if (desc_set_count > 0) {
-        const uint32_t range_count = type_layout->getDescriptorSetDescriptorRangeCount(0);
+    if (set_index < desc_set_count) {
+        const uint32_t range_count = type_layout->getDescriptorSetDescriptorRangeCount(set_index);
 
         for (uint32_t r = 0; r < range_count; r++) {
-            const slang::BindingType kind = type_layout->getDescriptorSetDescriptorRangeType(0, r);
+            const slang::BindingType kind =
+                type_layout->getDescriptorSetDescriptorRangeType(set_index, r);
             const uint32_t count =
-                type_layout->getDescriptorSetDescriptorRangeDescriptorCount(0, r);
+                type_layout->getDescriptorSetDescriptorRangeDescriptorCount(set_index, r);
             const vk::DescriptorType desc_type = map_slang_to_vk_descriptor_type(kind);
 
             // Get the actual Vulkan binding index from Slang reflection.
             // This accounts for the ConstantBuffer at binding 0 when uniform data exists.
-            const uint32_t binding = type_layout->getDescriptorSetDescriptorRangeIndexOffset(0, r);
+            const uint32_t binding =
+                type_layout->getDescriptorSetDescriptorRangeIndexOffset(set_index, r);
 
             // The manual UBO at binding 0 takes priority over descriptor ranges
             if (!binding_map.contains(binding)) {

@@ -38,11 +38,13 @@ struct BindingInfo {
  *
  * @param context Vulkan context
  * @param type_layout Slang type layout
+ * @param set_index Which descriptor set to extract (default 0).
+ *                  For PB element types, set 0 contains all bindings.
+ *                  For global type layouts, each set_index corresponds to a Vulkan descriptor set.
  * @return Descriptor set layout handle
  */
-DescriptorSetLayoutHandle
-create_descriptor_set_layout_from_slang_type_layout(const ContextHandle& context,
-                                                    slang::TypeLayoutReflection* type_layout);
+DescriptorSetLayoutHandle create_descriptor_set_layout_from_slang_type_layout(
+    const ContextHandle& context, slang::TypeLayoutReflection* type_layout, uint32_t set_index = 0);
 
 /**
  * @brief Map Slang binding type to Vulkan descriptor type.
