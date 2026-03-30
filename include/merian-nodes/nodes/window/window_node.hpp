@@ -256,10 +256,8 @@ class WindowNode : public Node {
                                       Properties::OptionsStyle::LIST_BOX)) {
                 flags |= NodeStatusFlagBits::NEEDS_RECONNECT;
             }
-        }
-
-        if (active_provider) {
-            config.output_text("backend: ", registry.get_name(active_provider));
+        } else if (active_provider) {
+            config.output_text("active backend: {}", registry.get_name(active_provider));
         }
 
         return flags;
