@@ -65,7 +65,7 @@ InputController::Key key_from_glfw(const int key) {
     case GLFW_KEY_TAB:            return K::TAB;
     case GLFW_KEY_BACKSPACE:      return K::BACKSPACE;
     case GLFW_KEY_INSERT:         return K::INSERT;
-    case GLFW_KEY_DELETE:         return K::DELETE;
+    case GLFW_KEY_DELETE:         return K::DELETE_KEY;
     case GLFW_KEY_RIGHT:          return K::RIGHT;
     case GLFW_KEY_LEFT:           return K::LEFT;
     case GLFW_KEY_DOWN:           return K::DOWN;

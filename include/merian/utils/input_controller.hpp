@@ -40,8 +40,8 @@ class InputController {
         A, B, C, D, E, F, G, H, I, J, K, L, M,
         N, O, P, Q, R, S, T, U, V, W, X, Y, Z,
 
-        // Control
-        ESCAPE, ENTER, TAB, BACKSPACE, INSERT, DELETE,
+        // Control (DELETE is a macro on MSVC...)
+        ESCAPE, ENTER, TAB, BACKSPACE, INSERT, DELETE_KEY,
         RIGHT, LEFT, DOWN, UP,
         PAGE_UP, PAGE_DOWN, HOME, END,
         CAPS_LOCK, SCROLL_LOCK, NUM_LOCK, PRINT_SCREEN, PAUSE,

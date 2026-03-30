@@ -75,7 +75,7 @@ InputController::Key key_from_sdl(const SDL_Keycode keycode, const SDL_Scancode 
     case SDLK_INSERT:
         return K::INSERT;
     case SDLK_DELETE:
-        return K::DELETE;
+        return K::DELETE_KEY;
     case SDLK_BACKSPACE:
         return K::BACKSPACE;
     case SDLK_SPACE:

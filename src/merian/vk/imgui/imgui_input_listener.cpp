@@ -21,7 +21,7 @@ ImGuiKey imgui_key_from_merian(const InputController::Key key) {
     case K::HOME:          return ImGuiKey_Home;
     case K::END:           return ImGuiKey_End;
     case K::INSERT:        return ImGuiKey_Insert;
-    case K::DELETE:        return ImGuiKey_Delete;
+    case K::DELETE_KEY:        return ImGuiKey_Delete;
     case K::BACKSPACE:     return ImGuiKey_Backspace;
     case K::SPACE:         return ImGuiKey_Space;
     case K::ENTER:         return ImGuiKey_Enter;
