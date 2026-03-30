@@ -163,7 +163,7 @@ void GBufferRTNode::process(GraphRun& run,
     // Bind pipeline and descriptor sets, then dispatch
     obj_allocator->set_iteration(run.get_in_flight_index());
     cmd->bind(pipeline);
-    entry_point->bind("params", params, obj_allocator, cmd, pipeline);
+    entry_point->bind_entry_point_parameter("params", params, cmd, pipeline);
 
     const vk::Extent3D extent = io[con_out]->get_extent();
     cmd->dispatch(extent, 16, 16);

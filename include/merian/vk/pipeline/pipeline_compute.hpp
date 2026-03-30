@@ -66,8 +66,16 @@ class ComputePipeline : public Pipeline {
     // Overrides
     // ---------------------------------------------------------------------------
 
-    virtual vk::PipelineBindPoint get_pipeline_bind_point() const override {
+    vk::PipelineBindPoint get_pipeline_bind_point() const override {
         return vk::PipelineBindPoint::eCompute;
+    }
+
+    vk::PipelineStageFlags get_pipeline_stage_flags() const override {
+        return vk::PipelineStageFlagBits::eComputeShader;
+    }
+
+    vk::PipelineStageFlags2 get_pipeline_stage_flags2() const override {
+        return vk::PipelineStageFlagBits2::eComputeShader;
     }
 
     // ---------------------------------------------------------------------------

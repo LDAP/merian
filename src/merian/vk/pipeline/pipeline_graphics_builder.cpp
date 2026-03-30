@@ -423,32 +423,10 @@ GraphicsPipelineBuilder::build_dynamic_rendering(const PipelineLayoutHandle& pip
     rendering_info.colorAttachmentCount = 1;
     rendering_info.pColorAttachmentFormats = &color_attachment_format;
 
-    vk::GraphicsPipelineCreateInfo info{flags,
-                                        stages,
-                                        &vertex_input_state,
-                                        &input_assembly_state,
-                                        &tessellation_state,
-                                        &viewport_state,
-                                        &rasterization_state,
-                                        &multisample_state,
-                                        &depth_stencil_state,
-                                        &color_blend_state,
-                                        &dynamic_state,
-                                        *pipeline_layout,
-                                        VK_NULL_HANDLE,
-                                        0,
-                                        base_pipeline ? base_pipeline->get_pipeline() : nullptr,
-                                        0};
-    info.pNext = &rendering_info;
-
-    const auto& context = pipeline_layout->get_context();
-    vk::Pipeline vk_pipeline =
-        context->get_device()
-            ->get_device()
-            .createGraphicsPipeline(context->get_device()->get_pipeline_cache(), info)
-            .value;
-
-    return std::make_shared<GraphicsPipeline>(vk_pipeline, pipeline_layout, flags, base_pipeline);
+    return std::make_shared<GraphicsPipeline>(
+        stages, vertex_input_state, input_assembly_state, tessellation_state, viewport_state,
+        rasterization_state, multisample_state, depth_stencil_state, color_blend_state,
+        dynamic_state, pipeline_layout, nullptr, 0, flags, base_pipeline, &rendering_info);
 }
 
 } // namespace merian

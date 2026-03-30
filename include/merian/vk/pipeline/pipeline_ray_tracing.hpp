@@ -207,6 +207,14 @@ class RayTracingPipeline : public Pipeline {
         return vk::PipelineBindPoint::eRayTracingKHR;
     }
 
+    vk::PipelineStageFlags get_pipeline_stage_flags() const override {
+        return vk::PipelineStageFlagBits::eRayTracingShaderKHR;
+    }
+
+    vk::PipelineStageFlags2 get_pipeline_stage_flags2() const override {
+        return vk::PipelineStageFlagBits2::eRayTracingShaderKHR;
+    }
+
     // True when created without a raygen group (eLibraryKHR was set automatically).
     bool is_library() const {
         return bool(flags & vk::PipelineCreateFlagBits::eLibraryKHR);

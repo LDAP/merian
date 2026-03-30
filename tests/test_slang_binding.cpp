@@ -98,7 +98,7 @@ class SlangBindingTest : public ::testing::Test {
         // Dispatch
         queue->submit_wait([&](const CommandBufferHandle& cmd) {
             cmd->bind(pipeline);
-            entry_point->bind("params", params, obj_allocator, cmd, pipeline);
+            entry_point->bind_entry_point_parameter("params", params, cmd, pipeline);
             cmd->dispatch(1, 1, 1);
         });
 
@@ -381,8 +381,8 @@ TEST_F(SlangBindingTest, TwoEntryPointPBs) {
 
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(ctx.pipeline);
-        ctx.entry_point->bind("pa", pa, ctx.obj_allocator, cmd, ctx.pipeline);
-        ctx.entry_point->bind("pb", pb, ctx.obj_allocator, cmd, ctx.pipeline);
+        ctx.entry_point->bind_entry_point_parameter("pa", pa, cmd, ctx.pipeline);
+        ctx.entry_point->bind_entry_point_parameter("pb", pb, cmd, ctx.pipeline);
         cmd->dispatch(1, 1, 1);
     });
 
@@ -417,7 +417,7 @@ TEST_F(SlangBindingTest, IncrementalValueUpdate) {
     cursor["val"] = 1.0f;
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(pipeline);
-        entry_point->bind("params", params, obj_allocator, cmd, pipeline);
+        entry_point->bind_entry_point_parameter("params", params, cmd, pipeline);
         cmd->dispatch(1, 1, 1);
     });
 
@@ -431,7 +431,7 @@ TEST_F(SlangBindingTest, IncrementalValueUpdate) {
     cursor["val"] = 2.0f;
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(pipeline);
-        entry_point->bind("params", params, obj_allocator, cmd, pipeline);
+        entry_point->bind_entry_point_parameter("params", params, cmd, pipeline);
         cmd->dispatch(1, 1, 1);
     });
 
@@ -538,7 +538,7 @@ TEST_F(SlangBindingTest, SingleNestedPB) {
 
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(ctx.pipeline);
-        ctx.entry_point->bind("params", params, ctx.obj_allocator, cmd, ctx.pipeline);
+        ctx.entry_point->bind_entry_point_parameter("params", params, cmd, ctx.pipeline);
         cmd->dispatch(1, 1, 1);
     });
 
@@ -564,7 +564,7 @@ TEST_F(SlangBindingTest, PBWithCB) {
 
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(ctx.pipeline);
-        ctx.entry_point->bind("params", params, ctx.obj_allocator, cmd, ctx.pipeline);
+        ctx.entry_point->bind_entry_point_parameter("params", params, cmd, ctx.pipeline);
         cmd->dispatch(1, 1, 1);
     });
 
@@ -598,7 +598,7 @@ TEST_F(SlangBindingTest, IncrementalCBUpdate) {
     cursor["cb"]["val"] = 1.0f;
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(pipeline);
-        entry_point->bind("params", params, obj_allocator, cmd, pipeline);
+        entry_point->bind_entry_point_parameter("params", params, cmd, pipeline);
         cmd->dispatch(1, 1, 1);
     });
     {
@@ -611,7 +611,7 @@ TEST_F(SlangBindingTest, IncrementalCBUpdate) {
     cursor["cb"]["val"] = 2.0f;
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(pipeline);
-        entry_point->bind("params", params, obj_allocator, cmd, pipeline);
+        entry_point->bind_entry_point_parameter("params", params, cmd, pipeline);
         cmd->dispatch(1, 1, 1);
     });
     {
@@ -660,7 +660,7 @@ TEST_F(SlangBindingTest, IncrementalResourceUpdate) {
     cursor["input"] = input_a;
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(pipeline);
-        entry_point->bind("params", params, obj_allocator, cmd, pipeline);
+        entry_point->bind_entry_point_parameter("params", params, cmd, pipeline);
         cmd->dispatch(1, 1, 1);
     });
     {
@@ -673,7 +673,7 @@ TEST_F(SlangBindingTest, IncrementalResourceUpdate) {
     cursor["input"] = input_b;
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(pipeline);
-        entry_point->bind("params", params, obj_allocator, cmd, pipeline);
+        entry_point->bind_entry_point_parameter("params", params, cmd, pipeline);
         cmd->dispatch(1, 1, 1);
     });
     {
@@ -745,7 +745,7 @@ TEST_F(SlangBindingTest, GlobalResource) {
 
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(pipeline);
-        entry_point->bind_globals(globals, cmd, pipeline);
+        entry_point->bind_global_parameter(globals, cmd, pipeline);
         cmd->dispatch(1, 1, 1);
     });
 
@@ -775,7 +775,7 @@ TEST_F(SlangBindingTest, GlobalPB) {
 
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(pipeline);
-        entry_point->bind_globals(globals, cmd, pipeline);
+        entry_point->bind_global_parameter(globals, cmd, pipeline);
         cmd->dispatch(1, 1, 1);
     });
 
@@ -811,8 +811,8 @@ TEST_F(SlangBindingTest, GlobalWithPB) {
 
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(pipeline);
-        entry_point->bind_globals(globals, cmd, pipeline);
-        entry_point->bind("params", params, obj_allocator, cmd, pipeline);
+        entry_point->bind_global_parameter(globals, cmd, pipeline);
+        entry_point->bind_entry_point_parameter("params", params, cmd, pipeline);
         cmd->dispatch(1, 1, 1);
     });
 
@@ -859,8 +859,8 @@ TEST_F(SlangBindingTest, SharedCBacrossPBs) {
     // Dispatch
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(ctx.pipeline);
-        ctx.entry_point->bind("a", a_obj, ctx.obj_allocator, cmd, ctx.pipeline);
-        ctx.entry_point->bind("b", b_obj, ctx.obj_allocator, cmd, ctx.pipeline);
+        ctx.entry_point->bind_entry_point_parameter("a", a_obj, cmd, ctx.pipeline);
+        ctx.entry_point->bind_entry_point_parameter("b", b_obj, cmd, ctx.pipeline);
         cmd->dispatch(1, 1, 1);
     });
 

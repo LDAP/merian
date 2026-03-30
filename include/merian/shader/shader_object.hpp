@@ -5,7 +5,6 @@
 #include "merian/shader/slang_object_layout.hpp"
 #include "merian/shader/slang_utils.hpp"
 #include "merian/vk/descriptors/descriptor_container.hpp"
-#include "merian/vk/descriptors/descriptor_set.hpp"
 #include "merian/vk/memory/resource_allocations.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
 #include "slang.h"
@@ -34,18 +33,17 @@ using ShaderObjectHandle = std::shared_ptr<ShaderObject>;
  * the slang-rhi data model and avoids field_index ambiguity with value-embedded structs.
  *
  * Example:
- *   auto obj = std::make_shared<ShaderObject>(context, object_layout, allocator);
+ *   auto obj = std::make_shared<ShaderObject>(object_layout, allocator);
  *   obj->get_cursor()["my_texture"] = texture;
  *   obj->get_cursor()["my_value"] = 3.14f;
- *   obj->bind_as_parameter_block(allocator, cmd, pipeline, 0);
+ *   obj->bind_as_parameter_block(cmd, pipeline, 0);
  */
 class ShaderObject : public std::enable_shared_from_this<ShaderObject> {
   public:
-    ShaderObject(const ContextHandle& context,
-                 const SlangObjectLayoutHandle& object_layout,
+    ShaderObject(const SlangObjectLayoutHandle& object_layout,
                  const ShaderObjectAllocatorHandle& allocator);
 
-    virtual ~ShaderObject() = default;
+    ~ShaderObject();
 
     // ---------------------------------------------------------------
     // Binding
@@ -60,7 +58,7 @@ class ShaderObject : public std::enable_shared_from_this<ShaderObject> {
      * - Flushes queued writes and binds
      *
      * This only binds this object, however ParameterBlock sub-objects are NOT bound here. Use
-     * entry_point->bind() to handle those (with reflection-derived set indices).
+     * entry_point->bind_entry_point_parameter() to handle those (with reflection-derived set indices).
      */
     void bind_as_parameter_block(const CommandBufferHandle& cmd,
                                  const PipelineHandle& pipeline,
@@ -130,10 +128,6 @@ class ShaderObject : public std::enable_shared_from_this<ShaderObject> {
         return object_layout->get_type_layout();
     }
 
-    const ContextHandle& get_context() const {
-        return context;
-    }
-
     const SlangObjectLayoutHandle& get_object_layout() const {
         return object_layout;
     }
@@ -155,7 +149,6 @@ class ShaderObject : public std::enable_shared_from_this<ShaderObject> {
 
   private:
     SlangObjectLayoutHandle object_layout;
-    ContextHandle context;
     ShaderObjectAllocatorHandle allocator;
 
     // Source of truth for all descriptor writes.
@@ -171,7 +164,7 @@ class ShaderObject : public std::enable_shared_from_this<ShaderObject> {
     std::vector<ShaderObjectHandle> sub_objects;
 
     // Registered descriptor sets for incremental write propagation.
-    std::vector<std::weak_ptr<DescriptorSet>> registered_sets;
+    std::vector<std::weak_ptr<DescriptorContainer>> registered_sets;
 
     // For ConstantBuffer sub-objects: references to all owning ParameterBlocks and
     // the base binding offset for this CB's element content in each PB's descriptor set.

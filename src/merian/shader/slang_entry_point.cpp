@@ -90,7 +90,7 @@ SlangProgramEntryPoint::create_shader_object(const ContextHandle& context,
                                              const std::string& param_name,
                                              const ShaderObjectAllocatorHandle& allocator) {
     auto layout = get_object_layout(context, param_name);
-    return std::make_shared<ShaderObject>(context, layout, allocator);
+    return std::make_shared<ShaderObject>(layout, allocator);
 }
 
 // Recursively collect descriptor set layouts for nested ParameterBlock fields (DFS order).
@@ -211,14 +211,24 @@ PipelineLayoutHandle SlangProgramEntryPoint::get_pipeline_layout(const ContextHa
 // ---------------------------------------------------------------
 // Binding
 
-void SlangProgramEntryPoint::bind(const std::string& param_name,
-                                  const ShaderObjectHandle& object,
-                                  const ShaderObjectAllocatorHandle& allocator,
-                                  const CommandBufferHandle& cmd,
-                                  const PipelineHandle& pipeline) {
+void SlangProgramEntryPoint::bind_entry_point_parameter(const std::string& param_name,
+                                                        const ShaderObjectHandle& object,
+                                                        const CommandBufferHandle& cmd,
+                                                        const PipelineHandle& pipeline) {
+    const auto& context = pipeline->get_layout()->get_context();
     // Ensure pipeline layout + param info is populated
-    get_pipeline_layout(object->get_context());
-    auto& info = find_or_create_param_info(object->get_context(), param_name);
+    get_pipeline_layout(context);
+    auto& info = find_or_create_param_info(context, param_name);
+
+    const auto shader_stages = pipeline->get_pipeline_stage_flags2();
+
+    // Barrier: prior shader reads on UBOs → transfer writes for staging uploads
+    cmd->barrier(vk::MemoryBarrier2{
+        shader_stages,
+        vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eUniformRead,
+        vk::PipelineStageFlagBits2::eTransfer,
+        vk::AccessFlagBits2::eTransferWrite,
+    });
 
     // Bind this PB at its cached set index (skip if type has no bindings)
     if (info.descriptor_set_index != NO_DESCRIPTOR_SET) {
@@ -226,12 +236,19 @@ void SlangProgramEntryPoint::bind(const std::string& param_name,
     }
 
     // Bind nested PB sub-objects using cached set indices from pipeline layout construction
-    bind_nested_pbs(object, info.nested_pb_infos, allocator, cmd, pipeline);
+    bind_nested_pbs(object, info.nested_pb_infos, cmd, pipeline);
+
+    // Barrier: transfer writes complete → shader reads
+    cmd->barrier(vk::MemoryBarrier2{
+        vk::PipelineStageFlagBits2::eTransfer,
+        vk::AccessFlagBits2::eTransferWrite,
+        shader_stages,
+        vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eUniformRead,
+    });
 }
 
 void SlangProgramEntryPoint::bind_nested_pbs(const ShaderObjectHandle& object,
                                              const std::vector<NestedPBInfo>& nested_infos,
-                                             const ShaderObjectAllocatorHandle& allocator,
                                              const CommandBufferHandle& cmd,
                                              const PipelineHandle& pipeline) {
     for (const auto& ni : nested_infos) {
@@ -241,7 +258,7 @@ void SlangProgramEntryPoint::bind_nested_pbs(const ShaderObjectHandle& object,
         if (ni.set_index != NO_DESCRIPTOR_SET) {
             sub->bind_as_parameter_block(cmd, pipeline, ni.set_index);
         }
-        bind_nested_pbs(sub, ni.children, allocator, cmd, pipeline);
+        bind_nested_pbs(sub, ni.children, cmd, pipeline);
     }
 }
 
@@ -258,19 +275,37 @@ SlangProgramEntryPoint::create_global_shader_object(const ContextHandle& context
                                                     const ShaderObjectAllocatorHandle& allocator) {
     get_pipeline_layout(context); // ensure layout is built
     assert(global_object_layout && "No global parameters in this program");
-    return std::make_shared<ShaderObject>(context, global_object_layout, allocator);
+    return std::make_shared<ShaderObject>(global_object_layout, allocator);
 }
 
-void SlangProgramEntryPoint::bind_globals(const ShaderObjectHandle& globals,
-                                          const CommandBufferHandle& cmd,
-                                          const PipelineHandle& pipeline) {
+void SlangProgramEntryPoint::bind_global_parameter(const ShaderObjectHandle& globals,
+                                                   const CommandBufferHandle& cmd,
+                                                   const PipelineHandle& pipeline) {
+    const auto shader_stages = pipeline->get_pipeline_stage_flags2();
+
+    // Barrier: prior shader reads on UBOs → transfer writes for staging uploads
+    cmd->barrier(vk::MemoryBarrier2{
+        shader_stages,
+        vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eUniformRead,
+        vk::PipelineStageFlagBits2::eTransfer,
+        vk::AccessFlagBits2::eTransferWrite,
+    });
+
     if (global_set_index != NO_DESCRIPTOR_SET) {
         globals->bind_as_parameter_block(cmd, pipeline, global_set_index);
     }
     // Bind global ParameterBlock sub-objects at their own set indices
     if (!global_nested_pb_infos.empty()) {
-        bind_nested_pbs(globals, global_nested_pb_infos, {}, cmd, pipeline);
+        bind_nested_pbs(globals, global_nested_pb_infos, cmd, pipeline);
     }
+
+    // Barrier: transfer writes complete → shader reads
+    cmd->barrier(vk::MemoryBarrier2{
+        vk::PipelineStageFlagBits2::eTransfer,
+        vk::AccessFlagBits2::eTransferWrite,
+        shader_stages,
+        vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eUniformRead,
+    });
 }
 
 DescriptorSetLayoutHandle SlangProgramEntryPoint::get_global_set_layout(uint32_t set_index) const {

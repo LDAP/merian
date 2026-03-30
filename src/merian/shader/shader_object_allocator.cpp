@@ -8,11 +8,12 @@ namespace merian {
 SimpleShaderObjectAllocator::SimpleShaderObjectAllocator(const ResourceAllocatorHandle& allocator)
     : allocator(allocator) {}
 
-DescriptorSetHandle SimpleShaderObjectAllocator::allocate(const ShaderObjectHandle& object) {
-
+DescriptorContainerHandle SimpleShaderObjectAllocator::allocate(ShaderObject* object) {
     return allocator->allocate_descriptor_set(
         object->get_object_layout()->get_descriptor_set_layout());
 }
+
+void SimpleShaderObjectAllocator::free(ShaderObject*) {}
 
 BufferHandle SimpleShaderObjectAllocator::allocate_uniform_buffer(const vk::DeviceSize size) {
     return allocator->create_buffer(size, vk::BufferUsageFlagBits::eUniformBuffer |
@@ -29,17 +30,21 @@ FrameCachingShaderObjectAllocator::FrameCachingShaderObjectAllocator(
     const ResourceAllocatorHandle& allocator, const uint32_t iterations_in_flight)
     : allocator(allocator), iterations_in_flight(iterations_in_flight) {}
 
-DescriptorSetHandle FrameCachingShaderObjectAllocator::allocate(const ShaderObjectHandle& object) {
-    auto it = sets.find(object);
+DescriptorContainerHandle FrameCachingShaderObjectAllocator::allocate(ShaderObject* object) {
+    auto it = cache.find(object);
 
-    if (it == sets.end()) {
+    if (it == cache.end()) {
         std::tie(it, std::ignore) =
-            sets.emplace(object, allocator->allocate_descriptor_set(
-                                     object->get_object_layout()->get_descriptor_set_layout(),
-                                     iterations_in_flight));
+            cache.emplace(object, allocator->allocate_descriptor_set(
+                                      object->get_object_layout()->get_descriptor_set_layout(),
+                                      iterations_in_flight));
     }
 
     return it->second[current_iteration];
+}
+
+void FrameCachingShaderObjectAllocator::free(ShaderObject* object) {
+    cache.erase(object);
 }
 
 BufferHandle FrameCachingShaderObjectAllocator::allocate_uniform_buffer(const vk::DeviceSize size) {
@@ -56,7 +61,7 @@ void FrameCachingShaderObjectAllocator::set_iteration(const uint32_t iteration) 
 }
 
 void FrameCachingShaderObjectAllocator::reset() {
-    sets.clear();
+    cache.clear();
 }
 
 } // namespace merian

@@ -51,8 +51,7 @@ ShaderCursor ShaderCursor::field(uint32_t index) {
             // Auto-create using the pre-computed element layout
             const auto& range_info = base_object->get_object_layout()->get_sub_object_range(sor);
             assert(range_info.element_layout);
-            sub = std::make_shared<ShaderObject>(base_object->get_context(),
-                                                 range_info.element_layout,
+            sub = std::make_shared<ShaderObject>(range_info.element_layout,
                                                  base_object->get_allocator());
             // set_sub_object handles CB descriptor writes to the owning PB
             base_object->set_sub_object(sor, sub);

@@ -5,10 +5,9 @@
 
 namespace merian {
 
-ShaderObject::ShaderObject(const ContextHandle& context,
-                           const SlangObjectLayoutHandle& object_layout,
+ShaderObject::ShaderObject(const SlangObjectLayoutHandle& object_layout,
                            const ShaderObjectAllocatorHandle& allocator)
-    : object_layout(object_layout), context(context), allocator(allocator) {
+    : object_layout(object_layout), allocator(allocator) {
     assert(object_layout);
     assert(allocator);
 
@@ -164,23 +163,23 @@ void ShaderObject::for_each_registered_set(const std::function<void(DescriptorCo
 void ShaderObject::bind_as_parameter_block(const CommandBufferHandle& cmd,
                                            const PipelineHandle& pipeline,
                                            const uint32_t set_index) {
-    // Ask allocator for a descriptor set (handles frame cycling)
-    auto set = allocator->allocate(shared_from_this());
+    // Ask allocator for a descriptor container (handles frame cycling)
+    auto container = allocator->allocate(this);
 
-    // If new set, register and replay cached descriptor state
+    // If new container, register and replay cached descriptor state
     bool found = false;
     for (auto it = registered_sets.begin(); it != registered_sets.end();) {
         if (it->expired()) {
             it = registered_sets.erase(it);
             continue;
         }
-        if (it->lock() == set)
+        if (it->lock() == container)
             found = true;
         ++it;
     }
     if (!found) {
-        registered_sets.emplace_back(set);
-        descriptors->replay_to(*set);
+        registered_sets.emplace_back(container);
+        descriptors->replay_to(*container);
     }
 
     // Upload this PB's own ordinary data
@@ -206,8 +205,8 @@ void ShaderObject::bind_as_parameter_block(const CommandBufferHandle& cmd,
     }
 
     // Flush queued descriptor writes and bind
-    set->update();
-    set->bind(cmd, pipeline, set_index);
+    container->update();
+    container->bind(cmd, pipeline, set_index);
 
     // ParameterBlock sub-objects are bound by SlangProgramEntryPoint::bind_nested_pbs
 }
@@ -228,7 +227,11 @@ ShaderObjectHandle ShaderObject::create_sub_object(const std::string& field_name
     const auto& range_info = object_layout->get_sub_object_range(sor);
     assert(range_info.element_layout);
 
-    return std::make_shared<ShaderObject>(context, range_info.element_layout, allocator);
+    return std::make_shared<ShaderObject>(range_info.element_layout, allocator);
+}
+
+ShaderObject::~ShaderObject() {
+    allocator->free(this);
 }
 
 void ShaderObject::set_sub_object(const std::string& field_name, const ShaderObjectHandle& object) {

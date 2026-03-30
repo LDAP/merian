@@ -69,11 +69,10 @@ class SlangProgramEntryPoint : public EntryPoint {
     /**
      * @brief Bind a named ParameterBlock parameter and all its nested PB sub-objects.
      */
-    void bind(const std::string& param_name,
-              const ShaderObjectHandle& object,
-              const ShaderObjectAllocatorHandle& allocator,
-              const CommandBufferHandle& cmd,
-              const PipelineHandle& pipeline);
+    void bind_entry_point_parameter(const std::string& param_name,
+                                    const ShaderObjectHandle& object,
+                                    const CommandBufferHandle& cmd,
+                                    const PipelineHandle& pipeline);
 
     // ---------------------------------------------------------------
     // Global parameter support
@@ -96,9 +95,9 @@ class SlangProgramEntryPoint : public EntryPoint {
     /**
      * @brief Bind the global ShaderObject at its descriptor set index.
      */
-    void bind_globals(const ShaderObjectHandle& globals,
-                      const CommandBufferHandle& cmd,
-                      const PipelineHandle& pipeline);
+    void bind_global_parameter(const ShaderObjectHandle& globals,
+                               const CommandBufferHandle& cmd,
+                               const PipelineHandle& pipeline);
 
     /**
      * @brief Get the descriptor set layout for a specific global descriptor set.
@@ -174,7 +173,6 @@ class SlangProgramEntryPoint : public EntryPoint {
 
     void bind_nested_pbs(const ShaderObjectHandle& object,
                          const std::vector<NestedPBInfo>& nested_infos,
-                         const ShaderObjectAllocatorHandle& allocator,
                          const CommandBufferHandle& cmd,
                          const PipelineHandle& pipeline);
 

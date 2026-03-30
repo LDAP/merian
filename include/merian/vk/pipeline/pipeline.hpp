@@ -44,6 +44,10 @@ class Pipeline : public std::enable_shared_from_this<Pipeline>, public Object {
 
     virtual vk::PipelineBindPoint get_pipeline_bind_point() const = 0;
 
+    virtual vk::PipelineStageFlags get_pipeline_stage_flags() const = 0;
+
+    virtual vk::PipelineStageFlags2 get_pipeline_stage_flags2() const = 0;
+
   protected:
     const ContextHandle context;
     const PipelineLayoutHandle pipeline_layout;
