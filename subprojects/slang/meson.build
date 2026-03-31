@@ -1,6 +1,6 @@
 project('slang',
         'cpp',
-        version: '2025.14.3')
+        version: '2026.5.2')
 
 fs = import('fs')
 python = import('python').find_installation()
@@ -110,11 +110,13 @@ install_subdir('lib', install_dir: get_option('libdir'), strip_directory: true)
 
 deps = [
   cc.find_library('gfx', dirs: lib_search_path),
-  cc.find_library('slang', dirs: lib_search_path),
-  cc.find_library('slang-glslang', dirs: lib_search_path, required: false),
-  cc.find_library('slang-glsl-module', dirs: lib_search_path, required: false),
-  cc.find_library('slang-llvm', dirs: lib_search_path, required: false), # does not exist in the aarch64 package
+  cc.find_library('slang-compiler', dirs: lib_search_path),
   cc.find_library('slang-rt', dirs: lib_search_path),
+
+  cc.find_library('slang-llvm', dirs: lib_search_path, required: false), # does not exist in the aarch64 package
+
+  cc.find_library('slang-glslang-@0@'.format(meson.project_version()), dirs: lib_search_path, required: false),
+  cc.find_library('slang-glsl-module-@0@'.format(meson.project_version()), dirs: lib_search_path, required: false),
 ]
 
 exe_search_path = abs_extract_dir / 'bin'

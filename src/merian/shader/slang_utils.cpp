@@ -96,22 +96,53 @@ DescriptorSetLayoutHandle create_descriptor_set_layout_from_slang_type_layout(
     return std::make_shared<DescriptorSetLayout>(context, bindings);
 }
 
-// clang-format off
-static constexpr const char* TYPE_KIND_NAMES[] = {
-    "None", "Struct", "Array", "Matrix", "Vector", "Scalar",
-    "ConstantBuffer", "Resource", "SamplerState", "TextureBuffer",
-    "ShaderStorageBuffer", "ParameterBlock", "GenericTypeParameter",
-    "Interface", "OutputStream", "MeshOutput", "Specialized",
-    "Feedback", "Pointer", "DynamicResource",
-};
-// clang-format on
-static_assert(std::size(TYPE_KIND_NAMES) == SLANG_TYPE_KIND_COUNT);
-
 const char* slang_type_kind_to_string(slang::TypeReflection::Kind kind) {
-    const auto i = static_cast<uint32_t>(kind);
-    if (i < std::size(TYPE_KIND_NAMES))
-        return TYPE_KIND_NAMES[i];
-    return "Unknown";
+    switch (kind) {
+    case slang::TypeReflection::Kind::None:
+        return "None";
+    case slang::TypeReflection::Kind::Struct:
+        return "Struct";
+    case slang::TypeReflection::Kind::Array:
+        return "Array";
+    case slang::TypeReflection::Kind::Matrix:
+        return "Matrix";
+    case slang::TypeReflection::Kind::Vector:
+        return "Vector";
+    case slang::TypeReflection::Kind::Scalar:
+        return "Scalar";
+    case slang::TypeReflection::Kind::ConstantBuffer:
+        return "ConstantBuffer";
+    case slang::TypeReflection::Kind::Resource:
+        return "Resource";
+    case slang::TypeReflection::Kind::SamplerState:
+        return "SamplerState";
+    case slang::TypeReflection::Kind::TextureBuffer:
+        return "TextureBuffer";
+    case slang::TypeReflection::Kind::ShaderStorageBuffer:
+        return "ShaderStorageBuffer";
+    case slang::TypeReflection::Kind::ParameterBlock:
+        return "ParameterBlock";
+    case slang::TypeReflection::Kind::GenericTypeParameter:
+        return "GenericTypeParameter";
+    case slang::TypeReflection::Kind::Interface:
+        return "Interface";
+    case slang::TypeReflection::Kind::OutputStream:
+        return "OutputStream";
+    case slang::TypeReflection::Kind::Specialized:
+        return "Specialized";
+    case slang::TypeReflection::Kind::Feedback:
+        return "Feedback";
+    case slang::TypeReflection::Kind::Pointer:
+        return "Pointer";
+    case slang::TypeReflection::Kind::DynamicResource:
+        return "DynamicResource";
+    case slang::TypeReflection::Kind::MeshOutput:
+        return "MeshOutput";
+    case slang::TypeReflection::Kind::Enum:
+        return "Enum";
+    default:
+        return "Unknown";
+    }
 }
 
 const char* slang_binding_type_to_string(slang::BindingType type) {
