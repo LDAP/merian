@@ -155,7 +155,7 @@ class SlangProgramEntryPoint : public EntryPoint {
   public:
     // Tree of nested PB info: sub-object range index in parent → Vulkan set index + children
     struct NestedPBInfo {
-        uint32_t sub_object_range_index;
+        uint32_t subobject_range_index;
         uint32_t set_index;
         std::vector<NestedPBInfo> children; // deeply nested PBs within this PB
     };

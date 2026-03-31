@@ -450,9 +450,9 @@ TEST_F(SlangBindingTest, ManualCBAssignment) {
     auto result = dispatch_and_readback(
         "single_cb", 5,
         [](const SlangProgramEntryPointHandle&, ShaderCursor& cursor, const BufferHandle& output) {
-            // Use create_sub_object + set_sub_object instead of cursor.dereference()
+            // Use create_subobject + set_subobject instead of cursor.dereference()
             auto base_obj = cursor.get_base_object();
-            auto cb_obj = base_obj->create_sub_object("cb");
+            auto cb_obj = base_obj->create_subobject("cb");
             auto cb_cursor = cb_obj->get_cursor();
             cb_cursor["x"] = 10.0f;
             cb_cursor["y"] = 20;
@@ -460,7 +460,7 @@ TEST_F(SlangBindingTest, ManualCBAssignment) {
                 float x, y, z;
             };
             cb_cursor["z"] = float3{30.0f, 40.0f, 50.0f};
-            base_obj->set_sub_object("cb", cb_obj);
+            base_obj->set_subobject("cb", cb_obj);
             cursor["output"] = output;
         });
 
@@ -479,7 +479,7 @@ TEST_F(SlangBindingTest, SubObjectReassignment) {
             auto base_obj = cursor.get_base_object();
 
             // First assignment
-            auto cb1 = base_obj->create_sub_object("cb");
+            auto cb1 = base_obj->create_subobject("cb");
             {
                 auto c = cb1->get_cursor();
                 c["x"] = 1.0f;
@@ -489,10 +489,10 @@ TEST_F(SlangBindingTest, SubObjectReassignment) {
                 };
                 c["z"] = float3{1.0f, 1.0f, 1.0f};
             }
-            base_obj->set_sub_object("cb", cb1);
+            base_obj->set_subobject("cb", cb1);
 
             // Reassign with different values
-            auto cb2 = base_obj->create_sub_object("cb");
+            auto cb2 = base_obj->create_subobject("cb");
             {
                 auto c = cb2->get_cursor();
                 c["x"] = 99.0f;
@@ -502,7 +502,7 @@ TEST_F(SlangBindingTest, SubObjectReassignment) {
                 };
                 c["z"] = float3{88.0f, 77.0f, 66.0f};
             }
-            base_obj->set_sub_object("cb", cb2);
+            base_obj->set_subobject("cb", cb2);
 
             cursor["output"] = output;
         });
@@ -529,12 +529,12 @@ TEST_F(SlangBindingTest, SingleNestedPB) {
     auto inner = ctx.entry_point->create_shader_object(context, "params", ctx.obj_allocator);
     // Actually, the nested PB ("inner") is a sub-object of params, not a separate entry point PB.
     // We need to create it through the params object.
-    auto inner_obj = params->create_sub_object("inner");
+    auto inner_obj = params->create_subobject("inner");
     auto inner_cursor = inner_obj->get_cursor();
     inner_cursor["a"] = 5.0f;
     inner_cursor["b"] = -10;
     inner_cursor["output"] = ctx.output_buffer;
-    params->set_sub_object("inner", inner_obj);
+    params->set_subobject("inner", inner_obj);
 
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(ctx.pipeline);
@@ -554,13 +554,13 @@ TEST_F(SlangBindingTest, PBWithCB) {
     auto params = ctx.entry_point->create_shader_object(context, "params", ctx.obj_allocator);
 
     // The nested PB "inner" needs manual setup since it contains a CB
-    auto inner_obj = params->create_sub_object("inner");
+    auto inner_obj = params->create_subobject("inner");
     auto inner_cursor = inner_obj->get_cursor();
     inner_cursor["cb"]["x"] = 3.0f;
     inner_cursor["cb"]["y"] = -7;
     inner_cursor["z"] = 99u;
     inner_cursor["output"] = ctx.output_buffer;
-    params->set_sub_object("inner", inner_obj);
+    params->set_subobject("inner", inner_obj);
 
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
         cmd->bind(ctx.pipeline);
@@ -841,7 +841,7 @@ TEST_F(SlangBindingTest, SharedCBacrossPBs) {
     auto b_obj = ctx.entry_point->create_shader_object(context, "b", ctx.obj_allocator);
 
     // Create ONE shared CB and write values to it
-    auto shared_cb = a_obj->create_sub_object("cb");
+    auto shared_cb = a_obj->create_subobject("cb");
     {
         auto c = shared_cb->get_cursor();
         c["x"] = 7.5f;
@@ -849,8 +849,8 @@ TEST_F(SlangBindingTest, SharedCBacrossPBs) {
     }
 
     // Assign the same CB to both PBs
-    a_obj->set_sub_object("cb", shared_cb);
-    b_obj->set_sub_object("cb", shared_cb);
+    a_obj->set_subobject("cb", shared_cb);
+    b_obj->set_subobject("cb", shared_cb);
 
     // Set outputs
     a_obj->get_cursor()["output"] = output_a;

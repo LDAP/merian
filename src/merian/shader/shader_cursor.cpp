@@ -12,9 +12,9 @@ ShaderCursor ShaderCursor::field(const std::string& name) {
         return ShaderCursor();
     }
 
-    SlangInt field_index = type_layout->findFieldIndexByName(name.c_str());
+    const SlangInt field_index = type_layout->findFieldIndexByName(name.c_str());
     if (field_index < 0) {
-        SPDLOG_ERROR("Field '{}' not found in type", name);
+        SPDLOG_ERROR("Field '{}' not found in type {}", name, type_layout->getName());
         return ShaderCursor();
     }
 
@@ -30,38 +30,39 @@ ShaderCursor ShaderCursor::field(uint32_t index) {
     assert(index < type_layout->getFieldCount());
 
     slang::VariableLayoutReflection* field_var = type_layout->getFieldByIndex(index);
-    auto* field_type_layout = field_var->getTypeLayout();
-    auto field_kind = field_type_layout->getKind();
+    slang::TypeLayoutReflection* field_type_layout = field_var->getTypeLayout();
+    slang::TypeReflection::Kind field_kind = field_type_layout->getKind();
 
-    // For ConstantBuffer<T> and ParameterBlock<T> fields: auto-create the sub-object
-    // if it doesn't exist, and return a cursor into the sub-object.
+    // For ConstantBuffer<T> and ParameterBlock<T> fields: find the shader object that is assigned
+    // to the current shader object at this cursor position and return a cursor to the subobject.
     if (field_kind == slang::TypeReflection::Kind::ConstantBuffer ||
         field_kind == slang::TypeReflection::Kind::ParameterBlock) {
 
-        // Compute the binding range for this field, accounting for offset accumulation
-        // through value-embedded structs.
-        uint32_t br = offset.binding_range_offset + type_layout->getFieldBindingRangeOffset(index);
+        const uint32_t field_binding_range =
+            offset.binding_range_offset + type_layout->getFieldBindingRangeOffset(index);
+        const int32_t subobject_range_index =
+            base_object->get_object_layout()->find_subobject_range_index(field_binding_range);
+        assert(subobject_range_index >= 0 &&
+               "ConstantBuffer and ParameterBlock field must have a sub-object range");
 
-        // Look up the sub-object range in the root object's layout
-        int32_t sor = base_object->get_object_layout()->find_sub_object_range(br);
-        assert(sor >= 0 && "CB/PB field must have a sub-object range");
+        ShaderObjectHandle subobject = base_object->subobjects[subobject_range_index];
+        if (!subobject) {
+            // Convenience: auto-create the subobject as we already have the the pre-computed
+            // element layout then assign the subobject at the current cursors field index position
+            // and return the cursor pointing to the subobject.
+            const auto& subobject_range_info =
+                base_object->get_object_layout()->get_subobject_range_info(subobject_range_index);
+            assert(subobject_range_info.element_layout);
+            subobject = std::make_shared<ShaderObject>(subobject_range_info.element_layout,
+                                                       base_object->get_allocator());
 
-        auto& sub = base_object->sub_objects[sor];
-        if (!sub) {
-            // Auto-create using the pre-computed element layout
-            const auto& range_info = base_object->get_object_layout()->get_sub_object_range(sor);
-            assert(range_info.element_layout);
-            sub = std::make_shared<ShaderObject>(range_info.element_layout,
-                                                 base_object->get_allocator());
-            // set_sub_object handles CB descriptor writes to the owning PB
-            base_object->set_sub_object(sor, sub);
+            base_object->set_subobject(subobject_range_index, subobject);
         }
 
         // Return cursor into the sub-object (dereferenced to element type T)
-        return sub->get_cursor();
+        return subobject->get_cursor();
     }
 
-    // For value fields: adjust offset and keep the same base_object
     ShaderCursor result;
     result.base_object = base_object;
     result.type_layout = field_type_layout;
@@ -78,50 +79,54 @@ ShaderCursor ShaderCursor::element(uint32_t index) {
         return ShaderCursor();
     }
 
-    slang::TypeLayoutReflection* element_type_layout = type_layout->getElementTypeLayout();
-    if (element_type_layout == nullptr) {
-        SPDLOG_ERROR("Type is not an array, cannot access element {}", index);
+    const slang::TypeReflection::Kind kind = get_kind();
+    switch (kind) {
+    case slang::TypeReflection::Kind::Array: {
+        assert(get_element_type_layout());
+
+        ShaderCursor result;
+        result.base_object = base_object;
+        result.type_layout = get_element_type_layout();
+        result.offset = offset;
+        result.offset.uniform_byte_offset += index * get_element_stride();
+        result.offset.binding_array_index =
+            (offset.binding_array_index * type_layout->getElementCount()) + index;
+        return result;
+    }
+    case slang::TypeReflection::Kind::Vector:
+    case slang::TypeReflection::Kind::Matrix: {
+        assert(get_element_type_layout());
+
+        ShaderCursor result;
+        result.base_object = base_object;
+        result.type_layout = get_element_type_layout();
+        result.offset = offset;
+        result.offset.uniform_byte_offset += index * get_element_stride();
+        return result;
+    }
+    case slang::TypeReflection::Kind::Struct:
+        return field(index);
+    default:
+        SPDLOG_ERROR("Type {} of kind {} cannot be accessed by element", type_layout->getName(),
+                     slang_type_kind_to_string(kind));
         return ShaderCursor();
     }
-
-    ShaderCursor result;
-    result.base_object = base_object;
-    result.type_layout = element_type_layout;
-    result.offset = offset;
-    result.offset.uniform_byte_offset += index * element_type_layout->getStride();
-    result.offset.binding_array_index =
-        (offset.binding_array_index * type_layout->getElementCount()) + index;
-
-    return result;
 }
 
 ShaderCursor ShaderCursor::operator[](uint32_t index) {
-    if (type_layout->getType()->getKind() == slang::TypeReflection::Kind::Array) {
-        return element(index);
-    }
-
-    return field(index);
+    return element(index);
 }
 
 std::vector<std::string> ShaderCursor::get_field_names() const {
     std::vector<std::string> names;
-    const uint32_t count = type_layout->getFieldCount();
+    const uint32_t count = get_field_count();
     names.reserve(count);
+
     for (uint32_t i = 0; i < count; i++) {
         names.emplace_back(type_layout->getFieldByIndex(i)->getVariable()->getName());
     }
-    return names;
-}
 
-std::optional<ShaderCursor> ShaderCursor::try_field(const std::string& name) {
-    if (!is_valid()) {
-        return std::nullopt;
-    }
-    SlangInt idx = type_layout->findFieldIndexByName(name.c_str());
-    if (idx < 0) {
-        return std::nullopt;
-    }
-    return field(static_cast<uint32_t>(idx));
+    return names;
 }
 
 ShaderCursor& ShaderCursor::write(const ImageViewHandle& image) {
@@ -144,62 +149,61 @@ ShaderCursor& ShaderCursor::write(const SamplerHandle& sampler) {
     return *this;
 }
 
-ShaderCursor& ShaderCursor::write(const ShaderObjectHandle& object) {
-    // Determine what kind of field this cursor points at
-    auto kind = type_layout->getKind();
-
-    if (kind == slang::TypeReflection::Kind::ConstantBuffer ||
-        kind == slang::TypeReflection::Kind::ParameterBlock) {
-        // Find the sub-object range for this CB/PB in the root object's layout
-        int32_t sor =
-            base_object->get_object_layout()->find_sub_object_range(offset.binding_range_offset);
-        assert(sor >= 0 && "CB/PB cursor must map to a sub-object range");
-
-        // set_sub_object handles CB descriptor writes to the owning PB
-        base_object->set_sub_object(static_cast<uint32_t>(sor), object);
-    } else {
-        SPDLOG_ERROR("write(ShaderObjectHandle) only supported for ConstantBuffer/ParameterBlock "
-                     "cursor positions");
-    }
-
-    return *this;
-}
-
 ShaderCursor& ShaderCursor::write(const void* data, std::size_t size) {
     base_object->write(offset, data, size);
     return *this;
 }
 
-std::string ShaderCursor::format_debug() const {
-    if (!is_valid())
-        return "(invalid cursor)\n";
+ShaderCursor& ShaderCursor::write(const ShaderObjectHandle& object) {
+    const slang::TypeReflection::Kind kind = get_kind();
 
-    std::string out;
-    const char* name = type_layout->getName();
-    out += fmt::format("ShaderCursor at {}\n", format_shader_offset(offset));
-    out += fmt::format("  type: '{}', kind={}\n", name ? name : "(anonymous)",
-                       slang_type_kind_to_string(type_layout->getKind()));
-    out += fmt::format("  uniform_size: {} bytes\n",
-                       type_layout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM));
+    if (kind == slang::TypeReflection::Kind::ConstantBuffer ||
+        kind == slang::TypeReflection::Kind::ParameterBlock) {
+        int32_t subobject_range_index =
+            base_object->get_object_layout()->find_subobject_range_index(
+                offset.binding_range_offset);
+        assert(subobject_range_index >= 0 &&
+               "Cursor must point to a ConstantBuffer or ParameterBlock sub-object range");
 
-    uint32_t field_count = type_layout->getFieldCount();
-    if (field_count > 0) {
-        out += fmt::format("  fields ({}):\n", field_count);
-        for (uint32_t f = 0; f < field_count; f++) {
-            auto* fv = type_layout->getFieldByIndex(f);
-            auto* ftl = fv->getTypeLayout();
-            const char* fname = fv->getVariable()->getName();
-            out += fmt::format("    [{}] '{}': kind={}, uniform_offset={}, "
-                               "binding_range_offset={}\n",
-                               f, fname ? fname : "?", slang_type_kind_to_string(ftl->getKind()),
-                               fv->getOffset(SLANG_PARAMETER_CATEGORY_UNIFORM),
-                               type_layout->getFieldBindingRangeOffset(f));
-        }
+        base_object->set_subobject(static_cast<uint32_t>(subobject_range_index), object);
+        return *this;
     }
 
-    if (type_layout->getKind() == slang::TypeReflection::Kind::Array) {
+    throw std::runtime_error("write(ShaderObjectHandle) only supported for ConstantBuffer / "
+                             "ParameterBlock cursor positions");
+}
+
+std::string format_as(const ShaderCursor& cursor) {
+    if (!cursor.is_valid())
+        return "(invalid cursor)";
+
+    slang::TypeLayoutReflection* type_layout = cursor.get_type_layout();
+    const char* type_name = (cursor.get_type_name() != nullptr) ? cursor.get_type_name() : "<none>";
+
+    std::string out;
+    out += fmt::format("ShaderCursor at {}\n", cursor.get_offset());
+    out += fmt::format("  type name: {}\n", type_name);
+    out += fmt::format("  kind: {}\n", slang_type_kind_to_string(cursor.get_kind()));
+    out += fmt::format("  uniform size: {}\n", format_size(cursor.get_uniform_size()));
+
+    if (cursor.get_kind() == slang::TypeReflection::Kind::Array) {
         out += fmt::format("  array: element_count={}, stride={}\n", type_layout->getElementCount(),
                            type_layout->getElementStride(SLANG_PARAMETER_CATEGORY_UNIFORM));
+    }
+
+    const uint32_t field_count = type_layout->getFieldCount();
+    out += fmt::format("  field count: {}\n", field_count);
+    for (uint32_t field_index = 0; field_index < field_count; field_index++) {
+        auto* field = type_layout->getFieldByIndex(field_index);
+        auto* field_type = field->getTypeLayout();
+        const char* field_name = field->getVariable()->getName();
+
+        out += fmt::format(
+            "    field {:02}: name={}, kind={}, uniform_offset={}, binding_range_offset={}\n",
+            field_index, (field_name != nullptr) ? field_name : "<none>",
+            slang_type_kind_to_string(field_type->getKind()),
+            field->getOffset(SLANG_PARAMETER_CATEGORY_UNIFORM),
+            type_layout->getFieldBindingRangeOffset(field_index));
     }
 
     return out;

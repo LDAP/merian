@@ -101,26 +101,26 @@ void GBufferRTNode::process(GraphRun& run,
 
         // ===========================================================
         // TEST: Explicit ShaderObject creation + assignment (CB)
-        // Create a ShaderObject manually, set its value, install via set_sub_object.
+        // Create a ShaderObject manually, set its value, install via set_subobject.
         // ===========================================================
-        manual_cb_obj = params->create_sub_object("manual_cb");
+        manual_cb_obj = params->create_subobject("manual_cb");
         manual_cb_obj->get_cursor()["manual_cb_val"] = 11.0f;
-        params->set_sub_object("manual_cb", manual_cb_obj);
+        params->set_subobject("manual_cb", manual_cb_obj);
 
         // ===========================================================
         // TEST: Explicit ShaderObject creation + assignment (PB)
         // manual_pb_tex is set per-frame (needs graph image).
         // ===========================================================
-        manual_pb_obj = params->create_sub_object("manual_pb");
+        manual_pb_obj = params->create_subobject("manual_pb");
         manual_pb_obj->get_cursor()["manual_pb_val"] = 22.0f;
-        params->set_sub_object("manual_pb", manual_pb_obj);
+        params->set_subobject("manual_pb", manual_pb_obj);
 
         // ===========================================================
         // TEST: Reassignment — initial CB, will be replaced later
         // ===========================================================
-        replace_cb_obj = params->create_sub_object("replace_cb");
+        replace_cb_obj = params->create_subobject("replace_cb");
         replace_cb_obj->get_cursor()["replace_val"] = 33.0f;
-        params->set_sub_object("replace_cb", replace_cb_obj);
+        params->set_subobject("replace_cb", replace_cb_obj);
     }
 
     // =====================================================================
@@ -155,9 +155,9 @@ void GBufferRTNode::process(GraphRun& run,
     // ===========================================================
     frame_count++;
     if (frame_count == 3) {
-        replace_cb_obj = params->create_sub_object("replace_cb");
+        replace_cb_obj = params->create_subobject("replace_cb");
         replace_cb_obj->get_cursor()["replace_val"] = 77.0f; // changed from 33.0
-        params->set_sub_object("replace_cb", replace_cb_obj);
+        params->set_subobject("replace_cb", replace_cb_obj);
     }
 
     // Bind pipeline and descriptor sets, then dispatch

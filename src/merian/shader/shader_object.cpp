@@ -15,7 +15,7 @@ ShaderObject::ShaderObject(const SlangObjectLayoutHandle& object_layout,
     descriptors = DescriptorStorage::create(object_layout->get_descriptor_set_layout());
 
     // Pre-size sub-object array: one slot per CB/PB field
-    sub_objects.resize(object_layout->get_sub_object_range_count());
+    subobjects.resize(object_layout->get_subobject_range_count());
 
     // Eagerly create ordinary data buffer if needed
     const vk::DeviceSize uniform_size = object_layout->get_uniform_size();
@@ -68,12 +68,11 @@ static std::pair<uint32_t, uint32_t> compute_cb_binding_deltas(
     return {sub_range_offset + container_offset, sub_range_offset + element_offset};
 }
 
-void ShaderObject::set_sub_object(uint32_t sub_object_range_index,
-                                  const ShaderObjectHandle& object) {
-    assert(sub_object_range_index < sub_objects.size());
-    sub_objects[sub_object_range_index] = object;
+void ShaderObject::set_subobject(uint32_t subobject_range_index, const ShaderObjectHandle& object) {
+    assert(subobject_range_index < subobjects.size());
+    subobjects[subobject_range_index] = object;
 
-    const auto& range = object_layout->get_sub_object_range(sub_object_range_index);
+    const auto& range = object_layout->get_subobject_range_info(subobject_range_index);
     if (range.binding_type != slang::BindingType::ConstantBuffer || !object ||
         !object->ordinary_data_buffer) {
         return;
@@ -83,7 +82,7 @@ void ShaderObject::set_sub_object(uint32_t sub_object_range_index,
     // and set the CB's PB context for nested CB propagation.
     auto* tl = object_layout->get_type_layout();
     auto [ubo_delta, element_delta] =
-        compute_cb_binding_deltas(tl, sub_object_range_index, range.binding_range_index);
+        compute_cb_binding_deltas(tl, subobject_range_index, range.binding_range_index);
 
     if (!pb_bindings_.empty()) {
         // This object is a CB inside one or more PBs — propagate to all owning PBs.
@@ -136,12 +135,12 @@ void ShaderObject::upload_constant_buffer_tree(ShaderObject* cb_obj,
     }
 
     // Recurse into nested CB sub-objects for staging uploads
-    for (uint32_t sor = 0; sor < cb_obj->object_layout->get_sub_object_range_count(); sor++) {
-        const auto& range = cb_obj->object_layout->get_sub_object_range(sor);
+    for (uint32_t sor = 0; sor < cb_obj->object_layout->get_subobject_range_count(); sor++) {
+        const auto& range = cb_obj->object_layout->get_subobject_range_info(sor);
         if (range.binding_type != slang::BindingType::ConstantBuffer)
             continue;
 
-        auto& nested = cb_obj->sub_objects[sor];
+        auto& nested = cb_obj->subobjects[sor];
         if (!nested || !nested->ordinary_data_buffer)
             continue;
 
@@ -191,13 +190,13 @@ void ShaderObject::bind_as_parameter_block(const CommandBufferHandle& cmd,
     }
 
     // Upload staging data for ConstantBuffer sub-objects (recursive, dirty-guarded).
-    // Descriptor writes are handled by set_sub_object at update time.
-    for (uint32_t sor = 0; sor < object_layout->get_sub_object_range_count(); sor++) {
-        const auto& range = object_layout->get_sub_object_range(sor);
+    // Descriptor writes are handled by set_subobject at update time.
+    for (uint32_t sor = 0; sor < object_layout->get_subobject_range_count(); sor++) {
+        const auto& range = object_layout->get_subobject_range_info(sor);
         if (range.binding_type != slang::BindingType::ConstantBuffer)
             continue;
 
-        auto& sub = sub_objects[sor];
+        auto& sub = subobjects[sor];
         if (!sub)
             continue;
 
@@ -214,17 +213,17 @@ void ShaderObject::bind_as_parameter_block(const CommandBufferHandle& cmd,
 // ---------------------------------------------------------------
 // Sub-object creation
 
-ShaderObjectHandle ShaderObject::create_sub_object(const std::string& field_name) {
+ShaderObjectHandle ShaderObject::create_subobject(const std::string& field_name) {
     auto* tl = object_layout->get_type_layout();
     SlangInt field_index = tl->findFieldIndexByName(field_name.c_str());
     assert(field_index >= 0 && "Field not found");
 
     // Find the sub-object range for this field
     uint32_t br = tl->getFieldBindingRangeOffset(static_cast<uint32_t>(field_index));
-    int32_t sor = object_layout->find_sub_object_range(br);
+    int32_t sor = object_layout->find_subobject_range_index(br);
     assert(sor >= 0 && "Field must be a ConstantBuffer or ParameterBlock");
 
-    const auto& range_info = object_layout->get_sub_object_range(sor);
+    const auto& range_info = object_layout->get_subobject_range_info(sor);
     assert(range_info.element_layout);
 
     return std::make_shared<ShaderObject>(range_info.element_layout, allocator);
@@ -234,17 +233,17 @@ ShaderObject::~ShaderObject() {
     allocator->free(this);
 }
 
-void ShaderObject::set_sub_object(const std::string& field_name, const ShaderObjectHandle& object) {
+void ShaderObject::set_subobject(const std::string& field_name, const ShaderObjectHandle& object) {
     auto* tl = object_layout->get_type_layout();
     SlangInt field_index = tl->findFieldIndexByName(field_name.c_str());
     assert(field_index >= 0 && "Field not found");
 
-    int32_t sor = object_layout->find_sub_object_range(
+    int32_t sor = object_layout->find_subobject_range_index(
         tl->getFieldBindingRangeOffset(static_cast<uint32_t>(field_index)));
     assert(sor >= 0 && "Field must be a ConstantBuffer or ParameterBlock");
 
     // Delegate to the sor-based version which handles CB descriptor writes
-    set_sub_object(static_cast<uint32_t>(sor), object);
+    set_subobject(static_cast<uint32_t>(sor), object);
 }
 
 // ---------------------------------------------------------------
@@ -318,12 +317,12 @@ std::string ShaderObject::format_debug(const std::string& indent) const {
                        ordinary_data_staging.size(), ordinary_data_dirty,
                        ordinary_data_buffer != nullptr);
     out += fmt::format("{}  registered_sets: {}\n", indent, registered_sets.size());
-    out += fmt::format("{}  sub_objects ({}):\n", indent, sub_objects.size());
-    for (uint32_t i = 0; i < sub_objects.size(); i++) {
-        if (!sub_objects[i])
+    out += fmt::format("{}  subobjects ({}):\n", indent, subobjects.size());
+    for (uint32_t i = 0; i < subobjects.size(); i++) {
+        if (!subobjects[i])
             continue;
-        const auto& range = object_layout->get_sub_object_range(i);
-        const char* sub_name = sub_objects[i]->get_type_layout()->getName();
+        const auto& range = object_layout->get_subobject_range_info(i);
+        const char* sub_name = subobjects[i]->get_type_layout()->getName();
         out +=
             fmt::format("{}    [sor {}] br={}, type={}: -> '{}'\n", indent, i,
                         range.binding_range_index, slang_binding_type_to_string(range.binding_type),

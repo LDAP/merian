@@ -41,10 +41,10 @@ SlangObjectLayout::SlangObjectLayout(const ContextHandle& context,
     // Only create element layouts for ConstantBuffer and ParameterBlock types
     // (other types like RWStructuredBuffer would cause infinite recursion).
     const uint32_t sor_count = type_layout->getSubObjectRangeCount();
-    sub_object_ranges.resize(sor_count);
+    subobject_ranges.resize(sor_count);
     for (uint32_t i = 0; i < sor_count; i++) {
         const uint32_t br_index = type_layout->getSubObjectRangeBindingRangeIndex(i);
-        binding_range_to_sub_object_range[br_index] = i;
+        binding_range_to_subobject_range[br_index] = i;
 
         const slang::BindingType kind = type_layout->getBindingRangeType(br_index);
         auto* leaf_tl = type_layout->getBindingRangeLeafTypeLayout(br_index);
@@ -72,12 +72,12 @@ SlangObjectLayout::SlangObjectLayout(const ContextHandle& context,
             }
         }
 
-        sub_object_ranges[i] = SubObjectRangeInfo{br_index, kind, element_layout};
+        subobject_ranges[i] = SubObjectRangeInfo{br_index, kind, element_layout};
     }
 }
 
 std::string SlangObjectLayout::format_reflection(const std::string& indent) const {
-    return format_type_layout(type_layout, indent);
+    return format_type_layout(type_layout, 2, indent);
 }
 
 } // namespace merian

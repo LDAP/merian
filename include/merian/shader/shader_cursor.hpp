@@ -44,21 +44,21 @@ class ShaderCursor {
     ShaderCursor field(const std::string& name);
 
     /**
-     * @brief Navigate to a struct field by index.
+     * @brief Navigate to a struct field by name.
      */
-    ShaderCursor field(uint32_t index);
-
-    /**
-     * @brief Navigate to an array element.
-     */
-    ShaderCursor element(uint32_t index);
-
     ShaderCursor operator[](const std::string& name) {
         return field(name);
     }
 
     /**
-     * @brief Navigate to an array element or field index, depending on current location.
+     * @brief Navigate to an array element, matrix, vector or field index, depending on current
+     * location.
+     */
+    ShaderCursor element(uint32_t index);
+
+    /**
+     * @brief Navigate to an array element, matrix, vector or field index, depending on current
+     * location.
      */
     ShaderCursor operator[](uint32_t index);
 
@@ -68,13 +68,12 @@ class ShaderCursor {
     ShaderCursor& write(const BufferHandle& buffer);
     ShaderCursor& write(const TextureHandle& texture);
     ShaderCursor& write(const SamplerHandle& sampler);
-    ShaderCursor& write(const ShaderObjectHandle& object);
     ShaderCursor& write(const void* data, std::size_t size);
-
     template <class T> ShaderCursor& write(const T& data) {
         write(&data, sizeof(T));
         return *this;
     }
+    ShaderCursor& write(const ShaderObjectHandle& object);
 
     // Assignment operators (explicit overloads must come before template)
     ShaderCursor& operator=(const ImageViewHandle& image) {
@@ -89,12 +88,11 @@ class ShaderCursor {
     ShaderCursor& operator=(const SamplerHandle& sampler) {
         return write(sampler);
     }
-    ShaderCursor& operator=(const ShaderObjectHandle& object) {
-        return write(object);
-    }
-
     template <class T> ShaderCursor& operator=(const T& data) {
         return write(data);
+    }
+    ShaderCursor& operator=(const ShaderObjectHandle& object) {
+        return write(object);
     }
 
     // Query operations
@@ -169,26 +167,28 @@ class ShaderCursor {
         return type_layout->findFieldIndexByName(name.c_str()) >= 0;
     }
 
-    /**
-     * @brief Try to navigate to a field. Returns invalid cursor if not found.
-     */
-    std::optional<ShaderCursor> try_field(const std::string& name);
-
     // ---------------------------------------------------------------
-    // Array introspection
+    // Array / Vector / Matrix introspection
 
     /**
-     * @brief Number of elements (for array types).
+     * @brief Number of elements (for array, vector, matrix vector types).
      */
     uint32_t get_element_count() const {
         return static_cast<uint32_t>(type_layout->getElementCount());
     }
 
     /**
-     * @brief Stride between array elements in bytes.
+     * @brief Stride between array, vector, matrix elements in bytes.
      */
     std::size_t get_element_stride() const {
         return type_layout->getElementStride(SLANG_PARAMETER_CATEGORY_UNIFORM);
+    }
+
+    /**
+     * @brief TypeLayout of array, vector, matrix elements.
+     */
+    slang::TypeLayoutReflection* get_element_type_layout() const {
+        return type_layout->getElementTypeLayout();
     }
 
     // ---------------------------------------------------------------
@@ -216,12 +216,6 @@ class ShaderCursor {
     }
 
     // ---------------------------------------------------------------
-    // Debug
-
-    // Print cursor position: type, kind, offset, field names
-    std::string format_debug() const;
-
-    // ---------------------------------------------------------------
     // Raw accessors
 
     slang::TypeLayoutReflection* get_type_layout() const {
@@ -237,11 +231,22 @@ class ShaderCursor {
     }
 
   private:
+    /**
+     * @brief Navigate to a struct field by index.
+     *
+     * Autocreates subobjects if necessary. This is for internal use, user code call operator[] or
+     * element(uint32_t).
+     */
+    ShaderCursor field(uint32_t index);
+
+  private:
     ShaderObjectHandle base_object;
     slang::TypeLayoutReflection* type_layout = nullptr;
     ShaderOffset offset;
 
     friend class ShaderObject;
 };
+
+std::string format_as(const ShaderCursor& cursor);
 
 } // namespace merian

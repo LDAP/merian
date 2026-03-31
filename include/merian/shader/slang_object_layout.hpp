@@ -59,29 +59,29 @@ class SlangObjectLayout {
         return program;
     }
 
-    // O(1) lookup: binding_range_index → BindingInfo{vulkan_binding, type, count}
+    // lookup: binding_range_index → BindingInfo{vulkan_binding, type, count}
     const BindingInfo& get_binding_info(uint32_t binding_range_index) const {
         assert(binding_range_index < binding_info_cache.size());
         return binding_info_cache[binding_range_index];
     }
 
-    // O(1) lookup: binding_range_index → sub_object_range_index. Returns -1 if not found.
-    int32_t find_sub_object_range(uint32_t binding_range_index) const {
-        auto it = binding_range_to_sub_object_range.find(binding_range_index);
-        if (it != binding_range_to_sub_object_range.end()) {
+    // lookup: binding_range_index → subobject_range_index. Returns -1 if not found.
+    int32_t find_subobject_range_index(uint32_t binding_range_index) const {
+        auto it = binding_range_to_subobject_range.find(binding_range_index);
+        if (it != binding_range_to_subobject_range.end()) {
             return static_cast<int32_t>(it->second);
         }
         return -1;
     }
 
     // Sub-object range access
-    uint32_t get_sub_object_range_count() const {
-        return static_cast<uint32_t>(sub_object_ranges.size());
+    uint32_t get_subobject_range_count() const {
+        return static_cast<uint32_t>(subobject_ranges.size());
     }
 
-    const SubObjectRangeInfo& get_sub_object_range(uint32_t index) const {
-        assert(index < sub_object_ranges.size());
-        return sub_object_ranges[index];
+    const SubObjectRangeInfo& get_subobject_range_info(uint32_t index) const {
+        assert(index < subobject_ranges.size());
+        return subobject_ranges[index];
     }
 
     // Print full reflection info for debugging
@@ -96,11 +96,11 @@ class SlangObjectLayout {
     // Precomputed binding info for each binding range
     std::vector<BindingInfo> binding_info_cache;
 
-    // Maps binding_range_index → sub_object_range_index
-    std::unordered_map<uint32_t, uint32_t> binding_range_to_sub_object_range;
+    // Maps binding_range_index → subobject_range_index
+    std::unordered_map<uint32_t, uint32_t> binding_range_to_subobject_range;
 
     // Pre-computed sub-object range info (one per CB/PB field)
-    std::vector<SubObjectRangeInfo> sub_object_ranges;
+    std::vector<SubObjectRangeInfo> subobject_ranges;
 };
 
 } // namespace merian

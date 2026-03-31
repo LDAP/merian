@@ -111,7 +111,7 @@ std::string SlangProgram::format_reflection() const {
                                slang_type_kind_to_string(tl->getKind()));
             if (tl->getKind() == slang::TypeReflection::Kind::ParameterBlock ||
                 tl->getKind() == slang::TypeReflection::Kind::ConstantBuffer) {
-                out += format_type_layout(tl->getElementTypeLayout(), "          ", 1);
+                out += format_type_layout(tl->getElementTypeLayout(), 2, "          ");
             }
         }
     }

@@ -24,76 +24,8 @@ vk::DescriptorType map_slang_to_vk_descriptor_type(slang::BindingType type) {
     case slang::BindingType::InputRenderTarget:
         return vk::DescriptorType::eInputAttachment;
     default:
-        SPDLOG_WARN("Unmapped Slang binding type: {}", (int)type);
-        return vk::DescriptorType::eUniformBuffer;
+        throw std::invalid_argument{"unknown binding type."};
     }
-}
-
-DescriptorSetLayoutHandle create_descriptor_set_layout_from_slang_type_layout(
-    const ContextHandle& context, slang::TypeLayoutReflection* type_layout, uint32_t set_index) {
-
-    // Track bindings by index to avoid duplicates. CB element types (obtained via
-    // getElementVarLayout()->getTypeLayout()) may report a ConstantBuffer descriptor
-    // range at binding 0, overlapping with the implicit UBO for uniform data.
-    std::map<uint32_t, vk::DescriptorSetLayoutBinding> binding_map;
-
-    // If the type has uniform (ordinary) data, Slang generates a ConstantBuffer at binding 0
-    // in the SPIR-V. We need to include this in the descriptor set layout.
-    // Uniform data UBO only lives in set 0.
-    if (set_index == 0) {
-        const size_t uniform_size = type_layout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM);
-        if (uniform_size > 0) {
-            binding_map[0] = vk::DescriptorSetLayoutBinding{
-                0, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eAll, nullptr};
-        }
-    }
-
-    // Iterate through the descriptor set's descriptor ranges.
-    // For a ParameterBlock element type, descriptor set 0 contains all resource bindings.
-    // For global type layouts, each set_index corresponds to a separate Vulkan descriptor set.
-    const uint32_t desc_set_count = type_layout->getDescriptorSetCount();
-    if (set_index < desc_set_count) {
-        const uint32_t range_count = type_layout->getDescriptorSetDescriptorRangeCount(set_index);
-
-        for (uint32_t r = 0; r < range_count; r++) {
-            const slang::BindingType kind =
-                type_layout->getDescriptorSetDescriptorRangeType(set_index, r);
-            const uint32_t count =
-                type_layout->getDescriptorSetDescriptorRangeDescriptorCount(set_index, r);
-            const vk::DescriptorType desc_type = map_slang_to_vk_descriptor_type(kind);
-
-            // Get the actual Vulkan binding index from Slang reflection.
-            // This accounts for the ConstantBuffer at binding 0 when uniform data exists.
-            const uint32_t binding =
-                type_layout->getDescriptorSetDescriptorRangeIndexOffset(set_index, r);
-
-            // The manual UBO at binding 0 takes priority over descriptor ranges
-            if (!binding_map.contains(binding)) {
-                binding_map[binding] = vk::DescriptorSetLayoutBinding{
-                    binding, desc_type, count, vk::ShaderStageFlagBits::eAll, nullptr};
-            }
-        }
-    }
-
-    std::vector<vk::DescriptorSetLayoutBinding> bindings;
-    bindings.reserve(binding_map.size());
-    for (const auto& [idx, b] : binding_map) {
-        bindings.push_back(b);
-    }
-
-    if (bindings.empty()) {
-        SPDLOG_WARN("Created descriptor set layout with no bindings for type '{}'",
-                    type_layout->getName() ? type_layout->getName() : "(anonymous)");
-    }
-
-    SPDLOG_DEBUG("Creating descriptor set layout for '{}' with {} bindings",
-                 type_layout->getName() ? type_layout->getName() : "(anonymous)", bindings.size());
-    for (size_t i = 0; i < bindings.size(); i++) {
-        SPDLOG_DEBUG("  binding[{}]: binding={}, type={}, count={}", i, bindings[i].binding,
-                     vk::to_string(bindings[i].descriptorType), bindings[i].descriptorCount);
-    }
-
-    return std::make_shared<DescriptorSetLayout>(context, bindings);
 }
 
 const char* slang_type_kind_to_string(slang::TypeReflection::Kind kind) {
@@ -188,14 +120,75 @@ const char* slang_binding_type_to_string(slang::BindingType type) {
     }
 }
 
-std::string format_shader_offset(const ShaderOffset& offset) {
-    return fmt::format("(uniform_byte={}, binding_range={}, binding_array={})",
-                       offset.uniform_byte_offset, offset.binding_range_offset,
-                       offset.binding_array_index);
+DescriptorSetLayoutHandle create_descriptor_set_layout_from_slang_type_layout(
+    const ContextHandle& context, slang::TypeLayoutReflection* type_layout, uint32_t set_index) {
+
+    // Track bindings by index to avoid duplicates. CB element types (obtained via
+    // getElementVarLayout()->getTypeLayout()) may report a ConstantBuffer descriptor
+    // range at binding 0, overlapping with the implicit UBO for uniform data.
+    std::map<uint32_t, vk::DescriptorSetLayoutBinding> binding_map;
+
+    // If the type has uniform (ordinary) data, Slang generates a ConstantBuffer at binding 0
+    // in the SPIR-V. We need to include this in the descriptor set layout.
+    // Uniform data UBO only lives in set 0.
+    if (set_index == 0) {
+        const size_t uniform_size = type_layout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM);
+        if (uniform_size > 0) {
+            binding_map[0] = vk::DescriptorSetLayoutBinding{
+                0, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eAll, nullptr};
+        }
+    }
+
+    // Iterate through the descriptor set's descriptor ranges.
+    // For a ParameterBlock element type, descriptor set 0 contains all resource bindings.
+    // For global type layouts, each set_index corresponds to a separate Vulkan descriptor set.
+    const uint32_t desc_set_count = type_layout->getDescriptorSetCount();
+    if (set_index < desc_set_count) {
+        const uint32_t range_count = type_layout->getDescriptorSetDescriptorRangeCount(set_index);
+
+        for (uint32_t r = 0; r < range_count; r++) {
+            const slang::BindingType kind =
+                type_layout->getDescriptorSetDescriptorRangeType(set_index, r);
+            const uint32_t count =
+                type_layout->getDescriptorSetDescriptorRangeDescriptorCount(set_index, r);
+            const vk::DescriptorType desc_type = map_slang_to_vk_descriptor_type(kind);
+
+            // Get the actual Vulkan binding index from Slang reflection.
+            // This accounts for the ConstantBuffer at binding 0 when uniform data exists.
+            const uint32_t binding =
+                type_layout->getDescriptorSetDescriptorRangeIndexOffset(set_index, r);
+
+            // The manual UBO at binding 0 takes priority over descriptor ranges
+            if (!binding_map.contains(binding)) {
+                binding_map[binding] = vk::DescriptorSetLayoutBinding{
+                    binding, desc_type, count, vk::ShaderStageFlagBits::eAll, nullptr};
+            }
+        }
+    }
+
+    std::vector<vk::DescriptorSetLayoutBinding> bindings;
+    bindings.reserve(binding_map.size());
+    for (const auto& [idx, b] : binding_map) {
+        bindings.push_back(b);
+    }
+
+    if (bindings.empty()) {
+        SPDLOG_WARN("Created descriptor set layout with no bindings for type '{}'",
+                    type_layout->getName() ? type_layout->getName() : "(anonymous)");
+    }
+
+    SPDLOG_DEBUG("Creating descriptor set layout for '{}' with {} bindings",
+                 type_layout->getName() ? type_layout->getName() : "(anonymous)", bindings.size());
+    for (size_t i = 0; i < bindings.size(); i++) {
+        SPDLOG_DEBUG("  binding[{}]: binding={}, type={}, count={}", i, bindings[i].binding,
+                     vk::to_string(bindings[i].descriptorType), bindings[i].descriptorCount);
+    }
+
+    return std::make_shared<DescriptorSetLayout>(context, bindings);
 }
 
 std::string
-format_type_layout(slang::TypeLayoutReflection* tl, const std::string& indent, uint32_t max_depth) {
+format_type_layout(slang::TypeLayoutReflection* tl, uint32_t max_depth, const std::string& indent) {
     if (!tl)
         return indent + "(null TypeLayout)\n";
 
@@ -232,7 +225,7 @@ format_type_layout(slang::TypeLayoutReflection* tl, const std::string& indent, u
                     inner = ftl->getElementTypeLayout();
                 }
                 if (inner) {
-                    out += format_type_layout(inner, indent + "      ", max_depth - 1);
+                    out += format_type_layout(inner, max_depth - 1, indent + "      ");
                 }
             }
         }
@@ -276,7 +269,7 @@ format_type_layout(slang::TypeLayoutReflection* tl, const std::string& indent, u
     // Sub-object ranges
     uint32_t so_count = tl->getSubObjectRangeCount();
     if (so_count > 0) {
-        out += fmt::format("{}  sub_object_ranges ({}):\n", indent, so_count);
+        out += fmt::format("{}  subobject_ranges ({}):\n", indent, so_count);
         for (uint32_t i = 0; i < so_count; i++) {
             auto br_idx = tl->getSubObjectRangeBindingRangeIndex(i);
             out += fmt::format("{}    [{}] binding_range={}\n", indent, i, br_idx);

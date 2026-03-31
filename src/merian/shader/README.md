@@ -31,8 +31,8 @@ and which Slang/Merian functions bridge between them.
      getFieldByIndex()  Count/Type/...   DescriptorRange     Count/BindingRange
           |                |            Count/Type/Index          Index/Offset
           v                |            Offset(set, r)              |
-  VariableLayoutReflection |                |                      |
-    getName()              v                v                      v
+  VariableLayoutReflection |                |                       |
+    getName()              v                v                       v
     getOffset(UNIFORM)  BindingRanges    DescriptorRanges    SubObjectRanges
     getTypeLayout()     (abstract:       (concrete:          (CB/PB fields that
                          "this field      "binding N in       contain child
@@ -46,17 +46,17 @@ and which Slang/Merian functions bridge between them.
                            |       |        |          v
                            |       +------->+    Vulkan binding
                            |                     number (uint32_t)
-                           v                          |
+                           v                           |
                     slang::BindingType                 v
                     (Texture, CB,           VkDescriptorSetLayoutBinding
                      MutableRawBuffer,        { binding, type, count }
-                     ParameterBlock, ...)            |
-                           |                         |
-                     map_slang_to_vk_                 v
+                     ParameterBlock, ...)              |
+                           |                           |
+                     map_slang_to_vk_                  v
                      descriptor_type()        VkDescriptorSetLayout
                            |                  (DescriptorSetLayout)
-                           v                         |
-                    VkDescriptorType                  v
+                           v                           |
+                    VkDescriptorType                   v
                                               VkPipelineLayout
                                               (one set layout per PB,
                                                empty PBs skipped)
@@ -77,7 +77,7 @@ and which Slang/Merian functions bridge between them.
              (gives clean struct layout without flattened CB descriptor ranges)
 
 
-    CB binding offset computation (set_sub_object / compute_cb_binding_deltas):
+    CB binding offset computation (set_subobject / compute_cb_binding_deltas):
     ===========================================================================
 
     parent TypeLayout
@@ -236,7 +236,7 @@ are placed in the nearest enclosing ParameterBlock's descriptor set. The Slang r
 API provides the correct binding offsets via `getContainerVarLayout()` and
 `getElementVarLayout()` on the leaf type layout (see [Concept Map](#concept-map)).
 Descriptor writes for nested CBs are propagated to the owning PB at update time (when
-`set_sub_object` is called), not at bind time.
+`set_subobject` is called), not at bind time.
 
 ### Explicit Binding Annotations
 
@@ -542,7 +542,7 @@ TypeLayout 'MyParams' (uniform_size=16)
     set 0:
       range [0]: type=ConstantBuffer, count=1, vk_binding=1
       range [1]: type=Texture,        count=1, vk_binding=2
-  sub_object_ranges (2):
+  subobject_ranges (2):
     [0] binding_range=0  (ConstantBuffer)
     [1] binding_range=1  (ParameterBlock)
 ```
@@ -599,14 +599,14 @@ type and reused. Stores:
 - `DescriptorSetLayout` built from reflection
 - Uniform data size (0 for resource-only types)
 - `binding_info_cache`: O(1) lookup from binding range index to `BindingInfo{vk_binding, type, count}`
-- `binding_range_to_sub_object_range`: maps binding ranges to sub-object ranges
-- `sub_object_ranges`: pre-computed sub-object info with element layouts for CB and PB
+- `binding_range_to_subobject_range`: maps binding ranges to sub-object ranges
+- `subobject_ranges`: pre-computed sub-object info with element layouts for CB and PB
   types (other types like RWStructuredBuffer are skipped to prevent infinite recursion)
 
 **`ShaderObject`** -- The runtime parameter container. Stores:
 - `DescriptorStorage` for caching descriptor writes (replayed to new sets each frame)
 - `ordinary_data_staging` + `ordinary_data_buffer` for uniform data
-- `sub_objects` vector indexed by sub-object range
+- `subobjects` vector indexed by sub-object range
 - `registered_sets` (weak pointers) for incremental write propagation
 - `pb_bindings_` for CB sub-objects: tracks all owning PBs so nested CB descriptors
   are written at update time, not bind time
@@ -625,7 +625,7 @@ the current frame's cache slot.
 ### Descriptor Write Model: Update-Time, Not Bind-Time
 
 All descriptor writes happen eagerly when the user sets a value (via cursor or
-`set_sub_object`), NOT at bind time. This means a steady-state frame where nothing
+`set_subobject`), NOT at bind time. This means a steady-state frame where nothing
 changed requires zero descriptor writes.
 
 ```
@@ -637,13 +637,13 @@ cursor["tex"] = texture;                            bind_as_parameter_block()
   +-> descriptors->queue_write(...)  (storage)        +-> allocate set
   +-> for_each_registered_set(...)   (live sets)      +-> if new: replay from storage
                                                       +-> upload dirty staging data
-set_sub_object(sor, cb_obj):                          +-> set->update() + bind()
+set_subobject(sor, cb_obj):                          +-> set->update() + bind()
   |
   +-> write CB UBO to owning PB's storage/sets        (zero writes if nothing changed
   +-> set cb's pb_bindings_ for nested propagation     and set was already tracked)
 ```
 
-For ConstantBuffer sub-objects, `set_sub_object` writes the CB's UBO descriptor to
+For ConstantBuffer sub-objects, `set_subobject` writes the CB's UBO descriptor to
 the owning ParameterBlock's descriptor storage and all registered sets. The CB tracks
 its owning PBs via `pb_bindings_` (a vector, since a CB can be shared across multiple
 PBs). Nested CBs (CB inside CB) propagate writes through the `pb_bindings_` chain to
@@ -701,7 +701,7 @@ entry_point->bind("params", params, allocator, cmd, pipeline)
 ```
 
 **Key design point:** CB descriptor writes (light's UBO at binding 1, etc.) were already
-written to the PB's descriptor storage by `set_sub_object` when the cursor navigated to
+written to the PB's descriptor storage by `set_subobject` when the cursor navigated to
 `cursor["light"]`. At bind time, only staging data uploads (dirty-guarded) and
 descriptor set binding occur. In a steady-state frame, `bind_as_parameter_block` is
 essentially: get cached set, bind it.
@@ -724,7 +724,7 @@ SPIR-V output. The assignment happens in `get_pipeline_layout()` via
 //     ParameterBlock<Inner>        -> set 0  (has bindings)
 ```
 
-The indices are cached in a tree of `NestedPBInfo{sub_object_range_index, set_index, children}`.
+The indices are cached in a tree of `NestedPBInfo{subobject_range_index, set_index, children}`.
 This tree mirrors the ParameterBlock nesting structure and is used by `bind_nested_pbs`
 to know which set index to pass to each nested ParameterBlock during binding.
 PBs with `set_index == NO_DESCRIPTOR_SET` (UINT32_MAX) are skipped at bind time.
@@ -737,11 +737,11 @@ automatically creates the sub-object if it doesn't exist:
 ```cpp
 // In ShaderCursor::field(uint32_t index):
 if (field_kind == ConstantBuffer || field_kind == ParameterBlock) {
-    auto& sub = base_object->sub_objects[sor];
+    auto& sub = base_object->subobjects[sor];
     if (!sub) {
         sub = make_shared<ShaderObject>(context, element_layout, allocator);
-        // set_sub_object handles CB descriptor writes to the owning PB
-        base_object->set_sub_object(sor, sub);
+        // set_subobject handles CB descriptor writes to the owning PB
+        base_object->set_subobject(sor, sub);
     }
     // Return cursor into the sub-object's element type (auto-dereference)
     return sub->get_cursor();
@@ -762,7 +762,7 @@ writes and can replay them to newly allocated descriptor sets. The write is also
 immediately applied to all registered (live) descriptor sets. This means if the
 allocator gives back an existing set, no replay is needed.
 
-CB descriptor writes follow a different path: `set_sub_object` writes the CB's UBO
+CB descriptor writes follow a different path: `set_subobject` writes the CB's UBO
 descriptor directly to the owning PB's storage and registered sets. For nested CBs
 (CB inside CB), the write propagates through the `pb_bindings_` chain. Since a CB can
 be shared across multiple PBs, `pb_bindings_` is a vector of `{weak_ptr<PB>, binding}`
@@ -825,13 +825,13 @@ implementation inspired by slang-rhi but with different design choices.
 | **Descriptor management** | Deferred: all writes happen at bind time via `BindingDataBuilder` | Eager: writes cached in `DescriptorStorage`, replayed to new sets |
 | **Uniform data** | CPU byte buffer (`m_data`), bulk-copied to pooled buffer at bind time | CPU staging buffer, uploaded via `StagingMemoryManager` per-buffer |
 | **Resource storage** | Flat `m_slots` array of `ResourceSlot` tagged unions | `DescriptorStorage` (mirrors `VkDescriptorSet` writes) |
-| **Sub-object storage** | Flat `m_objects` array indexed by sub-object range | `sub_objects` vector indexed by sub-object range |
+| **Sub-object storage** | Flat `m_objects` array indexed by sub-object range | `subobjects` vector indexed by sub-object range |
 | **Pipeline layout** | `RootShaderObjectLayout` owns `VkPipelineLayout` + all set layouts | `SlangProgramEntryPoint` builds and caches pipeline layout |
 | **Push constants** | Built-in: entry point data routed to push constants | Not used (all data goes through descriptor sets) |
 | **Specialization** | Built-in: existential/interface types with RTTI + witness tables | Not yet supported |
 | **Caching** | Version-based (`m_uid` + `m_version`) with `finalize()` | Frame-based via `FrameCachingShaderObjectAllocator` |
 | **Parameter navigation** | `ShaderCursor` (library-provided, stateless) | `ShaderCursor` (similar, but auto-creates sub-objects) |
-| **CB descriptor writes** | At bind time via `BindingDataBuilder` tree walk | At update time via `set_sub_object` with `pb_bindings_` propagation |
+| **CB descriptor writes** | At bind time via `BindingDataBuilder` tree walk | At update time via `set_subobject` with `pb_bindings_` propagation |
 
 ### Key Design Decisions
 

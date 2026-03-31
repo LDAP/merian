@@ -81,9 +81,9 @@ class ShaderObject : public std::enable_shared_from_this<ShaderObject> {
      * @brief Create a new ShaderObject for a named ConstantBuffer or ParameterBlock field.
      *
      * Uses the pre-computed element layout from SlangObjectLayout.
-     * The caller is responsible for assigning the result via set_sub_object(field_name, object).
+     * The caller is responsible for assigning the result via set_subobject(field_name, object).
      */
-    ShaderObjectHandle create_sub_object(const std::string& field_name);
+    ShaderObjectHandle create_subobject(const std::string& field_name);
 
     /**
      * @brief Assign a ShaderObject as a sub-object for a named ConstantBuffer / ParameterBlock
@@ -92,11 +92,11 @@ class ShaderObject : public std::enable_shared_from_this<ShaderObject> {
      * Replaces any existing sub-object at that field. For ConstantBuffer fields,
      * also writes the object's buffer to this object's descriptor set.
      */
-    void set_sub_object(const std::string& field_name, const ShaderObjectHandle& object);
+    void set_subobject(const std::string& field_name, const ShaderObjectHandle& object);
 
-    const ShaderObjectHandle& get_sub_object(uint32_t sub_object_range_index) const {
-        assert(sub_object_range_index < sub_objects.size());
-        return sub_objects[sub_object_range_index];
+    const ShaderObjectHandle& get_subobject(uint32_t subobject_range_index) const {
+        assert(subobject_range_index < subobjects.size());
+        return subobjects[subobject_range_index];
     }
 
     /**
@@ -106,10 +106,10 @@ class ShaderObject : public std::enable_shared_from_this<ShaderObject> {
      * descriptor storage (not the immediate parent's). This ensures descriptor writes happen
      * at update time, not bind time, enabling zero-write frames when nothing changes.
      */
-    void set_sub_object(uint32_t sub_object_range_index, const ShaderObjectHandle& object);
+    void set_subobject(uint32_t subobject_range_index, const ShaderObjectHandle& object);
 
-    uint32_t get_sub_object_count() const {
-        return static_cast<uint32_t>(sub_objects.size());
+    uint32_t get_subobject_count() const {
+        return static_cast<uint32_t>(subobjects.size());
     }
 
     // ---------------------------------------------------------------
@@ -141,7 +141,7 @@ class ShaderObject : public std::enable_shared_from_this<ShaderObject> {
 
   private:
     // Recursively upload staging data for nested ConstantBuffer sub-objects.
-    // Descriptor writes are handled at update time by set_sub_object.
+    // Descriptor writes are handled at update time by set_subobject.
     void upload_constant_buffer_tree(ShaderObject* cb_obj, const CommandBufferHandle& cmd);
 
     // Call fn on each live registered set, prune expired entries.
@@ -161,7 +161,7 @@ class ShaderObject : public std::enable_shared_from_this<ShaderObject> {
     bool ordinary_data_dirty = false;
 
     // Sub-objects indexed by sub-object range (one slot per ConstantBuffer/ParameterBlock field)
-    std::vector<ShaderObjectHandle> sub_objects;
+    std::vector<ShaderObjectHandle> subobjects;
 
     // Registered descriptor sets for incremental write propagation.
     std::vector<std::weak_ptr<DescriptorContainer>> registered_sets;

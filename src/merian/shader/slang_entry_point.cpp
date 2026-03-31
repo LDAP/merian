@@ -102,8 +102,8 @@ collect_nested_pb_layouts(const SlangObjectLayoutHandle& parent_layout,
                           PipelineLayoutBuilder& builder,
                           uint32_t& next_set,
                           std::vector<SlangProgramEntryPoint::NestedPBInfo>& nested_pb_infos) {
-    for (uint32_t sor = 0; sor < parent_layout->get_sub_object_range_count(); sor++) {
-        const auto& range = parent_layout->get_sub_object_range(sor);
+    for (uint32_t sor = 0; sor < parent_layout->get_subobject_range_count(); sor++) {
+        const auto& range = parent_layout->get_subobject_range_info(sor);
         if (range.binding_type != slang::BindingType::ParameterBlock || !range.element_layout)
             continue;
 
@@ -252,7 +252,7 @@ void SlangProgramEntryPoint::bind_nested_pbs(const ShaderObjectHandle& object,
                                              const CommandBufferHandle& cmd,
                                              const PipelineHandle& pipeline) {
     for (const auto& ni : nested_infos) {
-        const auto& sub = object->get_sub_object(ni.sub_object_range_index);
+        const auto& sub = object->get_subobject(ni.subobject_range_index);
         if (!sub)
             continue;
         if (ni.set_index != NO_DESCRIPTOR_SET) {
@@ -367,8 +367,8 @@ static void format_nested_pb_tree(const std::vector<SlangProgramEntryPoint::Nest
                                   std::string& out,
                                   const std::string& indent) {
     for (const auto& ni : infos) {
-        out += fmt::format("{}sub_object_range={}, set_index={}\n", indent,
-                           ni.sub_object_range_index, ni.set_index);
+        out += fmt::format("{}subobject_range={}, set_index={}\n", indent,
+                           ni.subobject_range_index, ni.set_index);
         if (!ni.children.empty()) {
             format_nested_pb_tree(ni.children, out, indent + "  ");
         }
@@ -394,7 +394,7 @@ std::string SlangProgramEntryPoint::format_reflection(const ContextHandle& conte
         if (tl->getKind() == slang::TypeReflection::Kind::ParameterBlock) {
             auto* element_tl = tl->getElementTypeLayout();
             out += fmt::format("      element type:\n");
-            out += format_type_layout(element_tl, "        ");
+            out += format_type_layout(element_tl, 2, "        ");
         }
     }
 
