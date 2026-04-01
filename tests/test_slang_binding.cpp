@@ -92,6 +92,7 @@ class SlangBindingTest : public ::testing::Test {
 
         // Create params and set values
         auto params = entry_point->create_shader_object(context, "params", obj_allocator);
+        SPDLOG_DEBUG("ShaderObject:\n{}", *params);
         auto cursor = params->get_cursor();
         setup_fn(entry_point, cursor, output_buffer);
 

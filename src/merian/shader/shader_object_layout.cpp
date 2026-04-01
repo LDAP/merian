@@ -1,11 +1,11 @@
-#include "merian/shader/slang_object_layout.hpp"
+#include "merian/shader/shader_object_layout.hpp"
 #include "merian/shader/slang_utils.hpp"
 
 namespace merian {
 
-SlangObjectLayout::SlangObjectLayout(const ContextHandle& context,
-                                     slang::TypeLayoutReflection* type_layout,
-                                     const SlangProgramHandle& program)
+ShaderObjectLayout::ShaderObjectLayout(const ContextHandle& context,
+                                       slang::TypeLayoutReflection* type_layout,
+                                       const SlangProgramHandle& program)
     : type_layout(type_layout), program(program) {
     assert(type_layout);
     assert(program);
@@ -49,7 +49,7 @@ SlangObjectLayout::SlangObjectLayout(const ContextHandle& context,
         const slang::BindingType kind = type_layout->getBindingRangeType(br_index);
         auto* leaf_tl = type_layout->getBindingRangeLeafTypeLayout(br_index);
 
-        SlangObjectLayoutHandle element_layout;
+        ShaderObjectLayoutHandle element_layout;
         if (leaf_tl != nullptr) {
             if (kind == slang::BindingType::ParameterBlock) {
                 // For PBs, use getElementTypeLayout() which preserves descriptor set context
@@ -57,7 +57,7 @@ SlangObjectLayout::SlangObjectLayout(const ContextHandle& context,
                 auto* element_tl = leaf_tl->getElementTypeLayout();
                 if (element_tl != nullptr) {
                     element_layout =
-                        std::make_shared<SlangObjectLayout>(context, element_tl, program);
+                        std::make_shared<ShaderObjectLayout>(context, element_tl, program);
                 }
             } else if (kind == slang::BindingType::ConstantBuffer) {
                 // For CBs, use getElementVarLayout()->getTypeLayout() for clean struct layouts
@@ -66,7 +66,7 @@ SlangObjectLayout::SlangObjectLayout(const ContextHandle& context,
                     auto* sub_type_layout = var_layout->getTypeLayout();
                     if (sub_type_layout != nullptr) {
                         element_layout =
-                            std::make_shared<SlangObjectLayout>(context, sub_type_layout, program);
+                            std::make_shared<ShaderObjectLayout>(context, sub_type_layout, program);
                     }
                 }
             }
@@ -76,8 +76,27 @@ SlangObjectLayout::SlangObjectLayout(const ContextHandle& context,
     }
 }
 
-std::string SlangObjectLayout::format_reflection(const std::string& indent) const {
-    return format_type_layout(type_layout, 2, indent);
+std::string format_as(const ShaderObjectLayout& shader_object_layout, const std::string& indent) {
+    std::string out;
+    out += fmt::format("{}type layout:\n", indent);
+    out += format_type_layout(shader_object_layout.get_type_layout(), 0, indent + "  ");
+
+    out += fmt::format("{}subobjects: subobject_range_count={}\n", indent,
+                       shader_object_layout.get_subobject_range_count());
+    for (uint32_t subobject_range_index = 0;
+         subobject_range_index < shader_object_layout.get_subobject_range_count();
+         subobject_range_index++) {
+        const auto& subobject_range_info =
+            shader_object_layout.get_subobject_range_info(subobject_range_index);
+        out += fmt::format("{}  {:>2}: binding_range_index={}, type={}\n", indent,
+                           subobject_range_index, subobject_range_info.binding_range_index,
+                           slang_binding_type_to_string(subobject_range_info.binding_type));
+        if (subobject_range_info.element_layout) {
+            out += format_as(*subobject_range_info.element_layout, indent + "    ");
+        }
+    }
+
+    return out;
 }
 
 } // namespace merian

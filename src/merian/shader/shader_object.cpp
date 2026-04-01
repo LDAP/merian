@@ -5,7 +5,7 @@
 
 namespace merian {
 
-ShaderObject::ShaderObject(const SlangObjectLayoutHandle& object_layout,
+ShaderObject::ShaderObject(const ShaderObjectLayoutHandle& object_layout,
                            const ShaderObjectAllocatorHandle& allocator)
     : object_layout(object_layout), allocator(allocator) {
     assert(object_layout);
@@ -24,7 +24,7 @@ ShaderObject::ShaderObject(const SlangObjectLayoutHandle& object_layout,
         ordinary_data_buffer = allocator->allocate_uniform_buffer(uniform_size);
 
         // Write buffer to descriptor storage so it gets replayed to new sets
-        descriptors->queue_descriptor_write_buffer(SlangObjectLayout::ORDINARY_DATA_BUFFER_BINDING,
+        descriptors->queue_descriptor_write_buffer(ShaderObjectLayout::ORDINARY_DATA_BUFFER_BINDING,
                                                    ordinary_data_buffer, 0, uniform_size);
     }
 }
@@ -84,12 +84,12 @@ void ShaderObject::set_subobject(uint32_t subobject_range_index, const ShaderObj
     auto [ubo_delta, element_delta] =
         compute_cb_binding_deltas(tl, subobject_range_index, range.binding_range_index);
 
-    if (!pb_bindings_.empty()) {
+    if (!cb_owners.empty()) {
         // This object is a CB inside one or more PBs — propagate to all owning PBs.
-        for (auto it = pb_bindings_.begin(); it != pb_bindings_.end();) {
+        for (auto it = cb_owners.begin(); it != cb_owners.end();) {
             auto pb = it->pb.lock();
             if (!pb) {
-                it = pb_bindings_.erase(it);
+                it = cb_owners.erase(it);
                 continue;
             }
 
@@ -103,7 +103,7 @@ void ShaderObject::set_subobject(uint32_t subobject_range_index, const ShaderObj
                                                   VK_WHOLE_SIZE);
             });
 
-            object->pb_bindings_.push_back(PBBinding{it->pb, element_binding});
+            object->cb_owners.push_back(OwnerConstantBufferBindings{it->pb, element_binding});
             ++it;
         }
     } else {
@@ -119,8 +119,8 @@ void ShaderObject::set_subobject(uint32_t subobject_range_index, const ShaderObj
         });
 
         uint32_t pb_element_offset = object_layout->has_ordinary_data_buffer() ? 1 : 0;
-        object->pb_bindings_.push_back(
-            PBBinding{shared_from_this(), pb_element_offset + element_delta});
+        object->cb_owners.push_back(
+            OwnerConstantBufferBindings{shared_from_this(), pb_element_offset + element_delta});
     }
 }
 
@@ -306,30 +306,13 @@ void ShaderObject::write(const ShaderOffset& offset, const void* data, const std
     }
 }
 
-// ---------------------------------------------------------------
-// Debug
-
-std::string ShaderObject::format_debug(const std::string& indent) const {
+std::string format_as(const ShaderObject& shader_object, const std::string& indent) {
     std::string out;
-    const char* name = get_type_layout()->getName();
-    out += fmt::format("{}ShaderObject '{}'\n", indent, (name != nullptr) ? name : "(anonymous)");
-    out += fmt::format("{}  ordinary_data: {} bytes, dirty={}, has_buffer={}\n", indent,
-                       ordinary_data_staging.size(), ordinary_data_dirty,
-                       ordinary_data_buffer != nullptr);
-    out += fmt::format("{}  registered_sets: {}\n", indent, registered_sets.size());
-    out += fmt::format("{}  subobjects ({}):\n", indent, subobjects.size());
-    for (uint32_t i = 0; i < subobjects.size(); i++) {
-        if (!subobjects[i])
-            continue;
-        const auto& range = object_layout->get_subobject_range_info(i);
-        const char* sub_name = subobjects[i]->get_type_layout()->getName();
-        out +=
-            fmt::format("{}    [sor {}] br={}, type={}: -> '{}'\n", indent, i,
-                        range.binding_range_index, slang_binding_type_to_string(range.binding_type),
-                        (sub_name != nullptr) ? sub_name : "(anonymous)");
-    }
-    out += fmt::format("{}  layout:\n", indent);
-    out += object_layout->format_reflection(indent + "    ");
+    out += fmt::format("{}registered_sets: {}\n", indent, shader_object.registered_sets.size());
+    out +=
+        fmt::format("{}owned as constant buffer by: {}\n", indent, shader_object.cb_owners.size());
+    out += fmt::format("{}shader object layout: \n", indent);
+    out += format_as(*shader_object.get_object_layout(), indent + "  ");
     return out;
 }
 

@@ -57,7 +57,7 @@ SlangProgramEntryPoint::find_or_create_param_info(const ContextHandle& context,
         if (param_name == param->getName()) {
             auto* element_type_layout = type_layout->getElementTypeLayout();
             auto object_layout =
-                std::make_shared<SlangObjectLayout>(context, element_type_layout, program);
+                std::make_shared<ShaderObjectLayout>(context, element_type_layout, program);
 
             // Set index will be assigned by get_pipeline_layout() during DFS walk.
             // Initialize to 0; get_pipeline_layout() updates it before bind() uses it.
@@ -74,7 +74,7 @@ SlangProgramEntryPoint::find_or_create_param_info(const ContextHandle& context,
     return dummy;
 }
 
-SlangObjectLayoutHandle SlangProgramEntryPoint::get_object_layout(const ContextHandle& context,
+ShaderObjectLayoutHandle SlangProgramEntryPoint::get_object_layout(const ContextHandle& context,
                                                                   const std::string& param_name) {
     return find_or_create_param_info(context, param_name).object_layout;
 }
@@ -98,7 +98,7 @@ SlangProgramEntryPoint::create_shader_object(const ContextHandle& context,
 static constexpr uint32_t NO_DESCRIPTOR_SET = UINT32_MAX;
 
 static void
-collect_nested_pb_layouts(const SlangObjectLayoutHandle& parent_layout,
+collect_nested_pb_layouts(const ShaderObjectLayoutHandle& parent_layout,
                           PipelineLayoutBuilder& builder,
                           uint32_t& next_set,
                           std::vector<SlangProgramEntryPoint::NestedPBInfo>& nested_pb_infos) {
@@ -150,7 +150,7 @@ PipelineLayoutHandle SlangProgramEntryPoint::get_pipeline_layout(const ContextHa
             if (!layout->get_bindings().empty()) {
                 if (!global_object_layout) {
                     global_object_layout =
-                        std::make_shared<SlangObjectLayout>(context, global_tl, program);
+                        std::make_shared<ShaderObjectLayout>(context, global_tl, program);
                     global_set_index = next_set;
                 }
                 global_set_layouts.push_back(layout);
@@ -162,7 +162,7 @@ PipelineLayoutHandle SlangProgramEntryPoint::get_pipeline_layout(const ContextHa
         // Create global object layout even if no direct bindings,
         // as long as there are sub-object ranges (PB/CB fields at global scope)
         if (!global_object_layout && global_tl->getSubObjectRangeCount() > 0) {
-            global_object_layout = std::make_shared<SlangObjectLayout>(context, global_tl, program);
+            global_object_layout = std::make_shared<ShaderObjectLayout>(context, global_tl, program);
         }
 
         // Collect nested PB sub-objects from global scope (global ParameterBlock fields)

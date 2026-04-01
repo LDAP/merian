@@ -187,92 +187,102 @@ DescriptorSetLayoutHandle create_descriptor_set_layout_from_slang_type_layout(
     return std::make_shared<DescriptorSetLayout>(context, bindings);
 }
 
-std::string
-format_type_layout(slang::TypeLayoutReflection* tl, uint32_t max_depth, const std::string& indent) {
-    if (!tl)
-        return indent + "(null TypeLayout)\n";
+std::string format_type_layout(slang::TypeLayoutReflection* type_layout,
+                               uint32_t max_depth,
+                               const std::string& indent) {
+    assert(type_layout);
+
+    const char* type_name = (type_layout->getName() != nullptr) ? type_layout->getName() : "<none>";
+    const size_t uniform_size = type_layout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM);
+    const slang::TypeReflection::Kind kind = type_layout->getKind();
 
     std::string out;
-    const char* name = tl->getName();
-    auto kind = tl->getKind();
-    size_t uniform_size = tl->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM);
+    out += fmt::format("{}name: {}\n", indent, type_name);
+    out += fmt::format("{}uniform size: {}\n", indent, format_size(uniform_size));
+    out += fmt::format("{}kind: {}\n", indent, slang_type_kind_to_string(kind));
 
-    out += fmt::format("{}{} '{}' (uniform_size={} bytes)\n", indent,
-                       slang_type_kind_to_string(kind), name ? name : "(anonymous)", uniform_size);
-
-    // Fields
-    uint32_t field_count = tl->getFieldCount();
-    if (field_count > 0) {
-        out += fmt::format("{}  fields ({}):\n", indent, field_count);
-        for (uint32_t f = 0; f < field_count; f++) {
-            auto* fv = tl->getFieldByIndex(f);
-            auto* ftl = fv->getTypeLayout();
-            const char* fname = fv->getVariable()->getName();
-            auto fkind = ftl->getKind();
-            out += fmt::format("{}    [{}] '{}': kind={}, uniform_offset={}, "
-                               "binding_range_offset={}, binding_space={}\n",
-                               indent, f, fname ? fname : "?", slang_type_kind_to_string(fkind),
-                               fv->getOffset(SLANG_PARAMETER_CATEGORY_UNIFORM),
-                               tl->getFieldBindingRangeOffset(f), fv->getBindingSpace());
-
-            // Recurse into compound fields
-            if (max_depth > 0 && (fkind == slang::TypeReflection::Kind::Struct ||
-                                  fkind == slang::TypeReflection::Kind::ConstantBuffer ||
-                                  fkind == slang::TypeReflection::Kind::ParameterBlock)) {
-                auto* inner = ftl;
-                if (fkind == slang::TypeReflection::Kind::ConstantBuffer ||
-                    fkind == slang::TypeReflection::Kind::ParameterBlock) {
-                    inner = ftl->getElementTypeLayout();
-                }
-                if (inner) {
-                    out += format_type_layout(inner, max_depth - 1, indent + "      ");
-                }
-            }
-        }
+    if (kind == slang::TypeReflection::Kind::Array || kind == slang::TypeReflection::Kind::Matrix ||
+        kind == slang::TypeReflection::Kind::Vector) {
+        out +=
+            fmt::format("{}element count: {}, stride: {}\n", indent, type_layout->getElementCount(),
+                        type_layout->getElementStride(SLANG_PARAMETER_CATEGORY_UNIFORM));
     }
 
     // Binding ranges
-    uint32_t br_count = tl->getBindingRangeCount();
-    if (br_count > 0) {
-        out += fmt::format("{}  binding_ranges ({}):\n", indent, br_count);
-        for (uint32_t br = 0; br < br_count; br++) {
-            auto btype = tl->getBindingRangeType(br);
-            auto bcount = tl->getBindingRangeBindingCount(br);
-            SlangInt first_dr = tl->getBindingRangeFirstDescriptorRangeIndex(br);
-            uint32_t vk_binding = 0;
-            if (btype != slang::BindingType::ParameterBlock && first_dr >= 0) {
-                vk_binding = tl->getDescriptorSetDescriptorRangeIndexOffset(0, first_dr);
-            }
-            out += fmt::format(
-                "{}    [{}] type={}, count={}, first_descriptor_range={}, vk_binding={}\n", indent,
-                br, slang_binding_type_to_string(btype), bcount, first_dr, vk_binding);
-        }
+    uint32_t binding_range_count = type_layout->getBindingRangeCount();
+    out += fmt::format("{}binding ranges: count={}\n", indent, binding_range_count);
+    for (uint32_t br = 0; br < binding_range_count; br++) {
+        auto br_type = type_layout->getBindingRangeType(br);
+        auto br_binding_count = type_layout->getBindingRangeBindingCount(br);
+
+        // Is this the map from CombinedTextureSampler -> Texture array, Sampler array on some
+        // platforms?
+        SlangInt br_first_desc_range_index =
+            type_layout->getBindingRangeFirstDescriptorRangeIndex(br);
+        SlangInt br_descriptor_range_count = type_layout->getBindingRangeDescriptorRangeCount(br);
+
+        out += fmt::format("{}  {:>2}: type={}, binding count={}, first_descriptor_range_index={}, "
+                           "descriptor_range_count={}\n",
+                           indent, br, slang_binding_type_to_string(br_type), br_binding_count,
+                           br_first_desc_range_index, br_descriptor_range_count);
     }
 
     // Descriptor set ranges
-    uint32_t ds_count = tl->getDescriptorSetCount();
-    if (ds_count > 0) {
-        out += fmt::format("{}  descriptor_sets ({}):\n", indent, ds_count);
-        for (uint32_t ds = 0; ds < ds_count; ds++) {
-            uint32_t range_count = tl->getDescriptorSetDescriptorRangeCount(ds);
-            out += fmt::format("{}    set {} ({} ranges):\n", indent, ds, range_count);
-            for (uint32_t r = 0; r < range_count; r++) {
-                auto rtype = tl->getDescriptorSetDescriptorRangeType(ds, r);
-                auto rcount = tl->getDescriptorSetDescriptorRangeDescriptorCount(ds, r);
-                auto roffset = tl->getDescriptorSetDescriptorRangeIndexOffset(ds, r);
-                out += fmt::format("{}      [{}] vk_binding={}, type={}, count={}\n", indent, r,
-                                   roffset, slang_binding_type_to_string(rtype), rcount);
-            }
+    uint32_t ds_count = type_layout->getDescriptorSetCount();
+    out += fmt::format("{}descriptor sets: count={}\n", indent, ds_count);
+    for (uint32_t ds = 0; ds < ds_count; ds++) {
+        uint32_t range_count = type_layout->getDescriptorSetDescriptorRangeCount(ds);
+        out += fmt::format("{}  {:>2}: descriptor_range_count={}\n", indent, ds, range_count);
+        for (uint32_t r = 0; r < range_count; r++) {
+            auto descriptor_range_type = type_layout->getDescriptorSetDescriptorRangeType(ds, r);
+            auto descriptor_count =
+                type_layout->getDescriptorSetDescriptorRangeDescriptorCount(ds, r);
+            auto descriptor_offset = type_layout->getDescriptorSetDescriptorRangeIndexOffset(ds, r);
+            out += fmt::format("{}    {:>2}: type={}, count={}, descriptor_offset={}\n", indent, r,
+                               slang_binding_type_to_string(descriptor_range_type),
+                               descriptor_count, descriptor_offset);
         }
     }
 
     // Sub-object ranges
-    uint32_t so_count = tl->getSubObjectRangeCount();
-    if (so_count > 0) {
-        out += fmt::format("{}  subobject_ranges ({}):\n", indent, so_count);
-        for (uint32_t i = 0; i < so_count; i++) {
-            auto br_idx = tl->getSubObjectRangeBindingRangeIndex(i);
-            out += fmt::format("{}    [{}] binding_range={}\n", indent, i, br_idx);
+    uint32_t so_count = type_layout->getSubObjectRangeCount();
+    out += fmt::format("{}subobject ranges: count={}\n", indent, so_count);
+    for (uint32_t i = 0; i < so_count; i++) {
+        auto br_idx = type_layout->getSubObjectRangeBindingRangeIndex(i);
+        auto space_offset = type_layout->getSubObjectRangeSpaceOffset(i);
+        out += fmt::format("{}  {:>2}: binding_range_index={}, space_offset=space_offset\n", indent,
+                           i, br_idx, space_offset);
+    }
+
+    // Fields
+    const uint32_t field_count = type_layout->getFieldCount();
+    out += fmt::format("{}fields: count={}\n", indent, field_count);
+    for (uint32_t field_index = 0; field_index < field_count; field_index++) {
+        auto* field = type_layout->getFieldByIndex(field_index);
+        auto* field_type = field->getTypeLayout();
+        const char* field_name = field->getVariable()->getName();
+        auto field_kind = field_type->getKind();
+
+        out += fmt::format("{}  {:>2}: name={}, kind={}, uniform_offset={}, "
+                           "binding_range_offset={}, binding_space={}\n",
+                           indent, field_index, (field_name != nullptr) ? field_name : "<none>",
+                           slang_type_kind_to_string(field_kind),
+                           field->getOffset(SLANG_PARAMETER_CATEGORY_UNIFORM),
+                           type_layout->getFieldBindingRangeOffset(field_index),
+                           field->getBindingSpace());
+
+        if (max_depth > 0 && (field_kind == slang::TypeReflection::Kind::Struct ||
+                              field_kind == slang::TypeReflection::Kind::ConstantBuffer ||
+                              field_kind == slang::TypeReflection::Kind::ParameterBlock)) {
+            auto* inner = field_type;
+            if (field_kind == slang::TypeReflection::Kind::ConstantBuffer ||
+                field_kind == slang::TypeReflection::Kind::ParameterBlock) {
+                // unpack / dereference
+                inner = field_type->getElementTypeLayout();
+            }
+            if (inner != nullptr) {
+                out += format_type_layout(inner, max_depth - 1, indent + "  ");
+            }
         }
     }
 

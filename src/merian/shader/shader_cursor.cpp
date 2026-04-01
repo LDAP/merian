@@ -177,34 +177,8 @@ std::string format_as(const ShaderCursor& cursor) {
     if (!cursor.is_valid())
         return "(invalid cursor)";
 
-    slang::TypeLayoutReflection* type_layout = cursor.get_type_layout();
-    const char* type_name = (cursor.get_type_name() != nullptr) ? cursor.get_type_name() : "<none>";
-
-    std::string out;
-    out += fmt::format("ShaderCursor at {}\n", cursor.get_offset());
-    out += fmt::format("  type name: {}\n", type_name);
-    out += fmt::format("  kind: {}\n", slang_type_kind_to_string(cursor.get_kind()));
-    out += fmt::format("  uniform size: {}\n", format_size(cursor.get_uniform_size()));
-
-    if (cursor.get_kind() == slang::TypeReflection::Kind::Array) {
-        out += fmt::format("  array: element_count={}, stride={}\n", type_layout->getElementCount(),
-                           type_layout->getElementStride(SLANG_PARAMETER_CATEGORY_UNIFORM));
-    }
-
-    const uint32_t field_count = type_layout->getFieldCount();
-    out += fmt::format("  field count: {}\n", field_count);
-    for (uint32_t field_index = 0; field_index < field_count; field_index++) {
-        auto* field = type_layout->getFieldByIndex(field_index);
-        auto* field_type = field->getTypeLayout();
-        const char* field_name = field->getVariable()->getName();
-
-        out += fmt::format(
-            "    field {:02}: name={}, kind={}, uniform_offset={}, binding_range_offset={}\n",
-            field_index, (field_name != nullptr) ? field_name : "<none>",
-            slang_type_kind_to_string(field_type->getKind()),
-            field->getOffset(SLANG_PARAMETER_CATEGORY_UNIFORM),
-            type_layout->getFieldBindingRangeOffset(field_index));
-    }
+    std::string out = fmt::format("ShaderCursor at {} of shader object:\n", cursor.get_offset());
+    out += format_as(*cursor.get_base_object(), "  ");
 
     return out;
 }

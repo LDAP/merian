@@ -107,7 +107,7 @@ std::string SlangProgram::format_reflection() const {
         for (uint32_t p = 0; p < ep->getParameterCount(); p++) {
             auto* param = ep->getParameterByIndex(p);
             auto* tl = param->getTypeLayout();
-            out += fmt::format("        [{}] '{}': kind={}\n", p, param->getName(),
+            out += fmt::format("        {:>2}: '{}': kind={}\n", p, param->getName(),
                                slang_type_kind_to_string(tl->getKind()));
             if (tl->getKind() == slang::TypeReflection::Kind::ParameterBlock ||
                 tl->getKind() == slang::TypeReflection::Kind::ConstantBuffer) {
@@ -122,7 +122,7 @@ std::string SlangProgram::format_reflection() const {
         for (uint32_t i = 0; i < global_count; i++) {
             auto* param = layout->getParameterByIndex(i);
             auto* tl = param->getTypeLayout();
-            out += fmt::format("    [{}] '{}': kind={}\n", i, param->getName(),
+            out += fmt::format("    {:>2}: '{}': kind={}\n", i, param->getName(),
                                slang_type_kind_to_string(tl->getKind()));
         }
     }

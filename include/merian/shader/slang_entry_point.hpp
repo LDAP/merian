@@ -2,7 +2,7 @@
 
 #include "merian/shader/entry_point.hpp"
 #include "merian/shader/shader_object_allocator.hpp"
-#include "merian/shader/slang_object_layout.hpp"
+#include "merian/shader/shader_object_layout.hpp"
 #include "merian/shader/slang_program.hpp"
 #include "merian/vk/command/command_buffer.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
@@ -43,8 +43,8 @@ class SlangProgramEntryPoint : public EntryPoint {
     /**
      * @brief Get cached SlangObjectLayout for a named ParameterBlock parameter.
      */
-    SlangObjectLayoutHandle get_object_layout(const ContextHandle& context,
-                                              const std::string& param_name);
+    ShaderObjectLayoutHandle get_object_layout(const ContextHandle& context,
+                                               const std::string& param_name);
 
     /**
      * @brief Get descriptor set index for a named ParameterBlock parameter.
@@ -162,7 +162,7 @@ class SlangProgramEntryPoint : public EntryPoint {
 
   private:
     struct ParameterBlockInfo {
-        SlangObjectLayoutHandle object_layout;
+        ShaderObjectLayoutHandle object_layout;
         uint32_t descriptor_set_index;
         std::vector<NestedPBInfo>
             nested_pb_infos; // nested PBs discovered during layout construction
@@ -184,7 +184,7 @@ class SlangProgramEntryPoint : public EntryPoint {
     PipelineLayoutHandle cached_pipeline_layout;
 
     // Global parameter support
-    SlangObjectLayoutHandle global_object_layout;
+    ShaderObjectLayoutHandle global_object_layout;
     uint32_t global_set_index = UINT32_MAX;
     std::vector<DescriptorSetLayoutHandle> global_set_layouts;
     std::vector<NestedPBInfo> global_nested_pb_infos;

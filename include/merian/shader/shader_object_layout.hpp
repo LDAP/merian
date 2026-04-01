@@ -12,8 +12,8 @@
 
 namespace merian {
 
-class SlangObjectLayout;
-using SlangObjectLayoutHandle = std::shared_ptr<SlangObjectLayout>;
+class ShaderObjectLayout;
+using ShaderObjectLayoutHandle = std::shared_ptr<ShaderObjectLayout>;
 
 /**
  * @brief Cached, reflection-derived description of a Slang type's Vulkan resource needs.
@@ -22,19 +22,22 @@ using SlangObjectLayoutHandle = std::shared_ptr<SlangObjectLayout>;
  * Precomputes O(1) binding info lookups and sub-object range info.
  * Keeps the SlangProgram alive to ensure TypeLayoutReflection* pointers remain valid.
  */
-class SlangObjectLayout {
+class ShaderObjectLayout {
   public:
+    // Vulkan binding index for the ordinary data uniform buffer (0 when present)
+    static constexpr uint32_t ORDINARY_DATA_BUFFER_BINDING = 0;
+
     // Pre-computed info for each sub-object range (ConstantBuffer or ParameterBlock field).
     struct SubObjectRangeInfo {
-        uint32_t binding_range_index;           // index into binding_info_cache
-        slang::BindingType binding_type;        // ConstantBuffer or ParameterBlock
-        SlangObjectLayoutHandle element_layout; // layout for the element type T inside
-                                                // ConstantBuffer<T>/ParameterBlock<T>
+        uint32_t binding_range_index;            // index into binding_info_cache
+        slang::BindingType binding_type;         // ConstantBuffer or ParameterBlock
+        ShaderObjectLayoutHandle element_layout; // layout for the element type T inside
+                                                 // ConstantBuffer<T>/ParameterBlock<T>
     };
 
-    SlangObjectLayout(const ContextHandle& context,
-                      slang::TypeLayoutReflection* type_layout,
-                      const SlangProgramHandle& program);
+    ShaderObjectLayout(const ContextHandle& context,
+                       slang::TypeLayoutReflection* type_layout,
+                       const SlangProgramHandle& program);
 
     const DescriptorSetLayoutHandle& get_descriptor_set_layout() const {
         return descriptor_set_layout;
@@ -47,9 +50,6 @@ class SlangObjectLayout {
     bool has_ordinary_data_buffer() const {
         return uniform_size > 0;
     }
-
-    // Vulkan binding index for the ordinary data uniform buffer (0 when present)
-    static constexpr uint32_t ORDINARY_DATA_BUFFER_BINDING = 0;
 
     slang::TypeLayoutReflection* get_type_layout() const {
         return type_layout;
@@ -76,20 +76,18 @@ class SlangObjectLayout {
 
     // Sub-object range access
     uint32_t get_subobject_range_count() const {
-        return static_cast<uint32_t>(subobject_ranges.size());
+        return subobject_ranges.size();
     }
 
     const SubObjectRangeInfo& get_subobject_range_info(uint32_t index) const {
-        assert(index < subobject_ranges.size());
+        assert(index < get_subobject_range_count());
         return subobject_ranges[index];
     }
-
-    // Print full reflection info for debugging
-    std::string format_reflection(const std::string& indent = "") const;
 
   private:
     slang::TypeLayoutReflection* type_layout;
     SlangProgramHandle program; // keeps session alive so type_layout pointers remain valid
+
     DescriptorSetLayoutHandle descriptor_set_layout;
     vk::DeviceSize uniform_size;
 
@@ -102,5 +100,8 @@ class SlangObjectLayout {
     // Pre-computed sub-object range info (one per CB/PB field)
     std::vector<SubObjectRangeInfo> subobject_ranges;
 };
+
+std::string format_as(const ShaderObjectLayout& shader_object_layout,
+                      const std::string& indent = "");
 
 } // namespace merian
