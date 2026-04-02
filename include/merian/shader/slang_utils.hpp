@@ -66,9 +66,8 @@ const char* slang_binding_type_to_string(slang::BindingType type);
  *
  * @param context Vulkan context
  * @param type_layout Slang type layout
- * @param set_index Which descriptor set to extract (default 0).
- *                  For ParameterBlock element types, set 0 contains all bindings.
- *                  For global type layouts, each set_index corresponds to a Vulkan descriptor set.
+ * @param set_index The (relative) descriptor set to extract, i.e. for ParameterBlock element types,
+ *                  set 0 contains all bindings.
  * @return Descriptor set layout handle
  */
 DescriptorSetLayoutHandle create_descriptor_set_layout_from_slang_type_layout(

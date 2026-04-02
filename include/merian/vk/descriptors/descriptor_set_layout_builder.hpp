@@ -189,6 +189,8 @@ class DescriptorSetLayoutBuilder {
         return make_shared<DescriptorSetLayout>(context, std::move(sorted_bindings), flags);
     }
 
+    // Convenience method for build_layout(context, flags |
+    // vk::DescriptorSetLayoutCreateFlagBits::ePushDescriptorKHR);
     DescriptorSetLayoutHandle
     build_push_descriptor_layout(const ContextHandle& context,
                                  const vk::DescriptorSetLayoutCreateFlags flags = {}) {
