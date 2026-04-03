@@ -111,7 +111,7 @@ void ShaderObject::set_subobject(uint32_t subobject_range_index, const ShaderObj
         // This object IS the PB. Use binding_info_cache for the Vulkan binding (same path
         // the old cursor code used via write()), and compute element_binding from reflection
         // for nested CB propagation.
-        const auto& info = object_layout->get_binding_info(range.binding_range_index);
+        const auto& info = object_layout->get_binding_range_info(range.binding_range_index);
         descriptors->queue_descriptor_write_buffer(info.binding, object->ordinary_data_buffer, 0,
                                                    VK_WHOLE_SIZE);
         for_each_registered_set([&](DescriptorContainer& set) {
@@ -253,7 +253,7 @@ void ShaderObject::set_subobject(const std::string& field_name, const ShaderObje
 // Write operations
 
 void ShaderObject::write(const ShaderOffset& offset, const ImageViewHandle& image) {
-    const auto& info = object_layout->get_binding_info(offset.binding_range_offset);
+    const auto& info = object_layout->get_binding_range_info(offset.binding_range_offset);
     assert(info.type == slang::BindingType::Texture ||
            info.type == slang::BindingType::MutableTexture);
     assert(offset.binding_array_index < info.count);
@@ -265,7 +265,7 @@ void ShaderObject::write(const ShaderOffset& offset, const ImageViewHandle& imag
 }
 
 void ShaderObject::write(const ShaderOffset& offset, const BufferHandle& buffer) {
-    const auto& info = object_layout->get_binding_info(offset.binding_range_offset);
+    const auto& info = object_layout->get_binding_range_info(offset.binding_range_offset);
     assert(info.type == slang::BindingType::RawBuffer ||
            info.type == slang::BindingType::MutableRawBuffer ||
            info.type == slang::BindingType::ConstantBuffer);
@@ -280,7 +280,7 @@ void ShaderObject::write(const ShaderOffset& offset, const BufferHandle& buffer)
 }
 
 void ShaderObject::write(const ShaderOffset& offset, const TextureHandle& texture) {
-    const auto& info = object_layout->get_binding_info(offset.binding_range_offset);
+    const auto& info = object_layout->get_binding_range_info(offset.binding_range_offset);
     assert(info.type == slang::BindingType::CombinedTextureSampler);
     assert(offset.binding_array_index < info.count);
 
@@ -291,7 +291,7 @@ void ShaderObject::write(const ShaderOffset& offset, const TextureHandle& textur
 }
 
 void ShaderObject::write(const ShaderOffset& offset, const SamplerHandle& sampler) {
-    const auto& info = object_layout->get_binding_info(offset.binding_range_offset);
+    const auto& info = object_layout->get_binding_range_info(offset.binding_range_offset);
     assert(info.type == slang::BindingType::Sampler);
     assert(offset.binding_array_index < info.count);
 

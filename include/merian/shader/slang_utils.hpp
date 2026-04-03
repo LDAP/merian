@@ -40,12 +40,34 @@ inline std::string format_as(const ShaderOffset& offset) {
                        offset.binding_array_index);
 }
 
-// Binding information extracted from Slang reflection
-struct BindingInfo {
-    uint32_t binding;        // Vulkan binding number
-    slang::BindingType type; // Slang binding type
-    uint32_t count;          // Descriptor count
+// Describe the locations where shader parameter are bound. Most shader parameters in Vulkan
+// simply consume a single `binding` in a set, but we also need to deal with
+// parameters that represent push-constant ranges and subobjects which may be bound at set offset.
+struct BindingOffset {
+    uint32_t set = 0;
+    uint32_t binding = 0;
+    uint32_t push_constant_range = 0;
+
+    BindingOffset operator+(const BindingOffset& o) const {
+        return {
+            set + o.set,
+            binding + o.binding,
+            push_constant_range + o.push_constant_range,
+        };
+    }
+
+    BindingOffset& operator+=(const BindingOffset& o) {
+        set += o.set;
+        binding += o.binding;
+        push_constant_range += o.push_constant_range;
+        return *this;
+    }
 };
+
+inline std::string format_as(const BindingOffset& offset) {
+    return fmt::format("(set_offset={}, binding_offset={}, push_constant_range={})", offset.set,
+                       offset.binding, offset.push_constant_range);
+}
 
 /**
  * @brief Map Slang binding type to Vulkan descriptor type.

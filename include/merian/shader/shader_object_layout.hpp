@@ -1,7 +1,6 @@
 #pragma once
 
 #include "merian/shader/slang_program.hpp"
-#include "merian/shader/slang_utils.hpp"
 #include "merian/vk/descriptors/descriptor_set_layout.hpp"
 
 #include "slang.h"
@@ -16,11 +15,23 @@ class ShaderObjectLayout;
 using ShaderObjectLayoutHandle = std::shared_ptr<ShaderObjectLayout>;
 
 /**
- * @brief Cached, reflection-derived description of a Slang type's Vulkan resource needs.
+ * @brief Describes the layout of a shader object (a Slang struct).
  *
- * Stores the descriptor set layout and uniform data size for a Slang type layout.
- * Precomputes O(1) binding info lookups and sub-object range info.
- * Keeps the SlangProgram alive to ensure TypeLayoutReflection* pointers remain valid.
+ * The layout is always "relative" to an outer object, i.e. this struct might be a value,
+ * ConstantBuffer or ParameterBlock member of the outer struct. This allows the same ShaderObject to
+ * be nested in other objects at arbitrary position. However, this also means when writing
+ * descriptors or values the writes must be forwareded with the correct offsets. Depending on the
+ * nesting method, ShaderOffsets and BindingOffsets must be computed differently.
+ *
+ * ShaderOffsets are simply added for value nesting. For ConstantBuffer nesting, the uniform offset
+ * needs to be reset, for ParameterBlock nestings uniform and binding offsets need to be reset.
+ *
+ * Doing it like so requires any type layout that describes this object, however, this also means
+ * when binding (to a command buffer) we need to use the type layout of the concrete shader to
+ * compute binding offsets to assign the object to the correct set.
+ *
+ * Note that ParameterCategory::DescriptorTableSlot maps to a binding in Vulkan and
+ * ParameterCategory::SubElementRegisterSpace to a set.
  */
 class ShaderObjectLayout {
   public:
@@ -28,12 +39,22 @@ class ShaderObjectLayout {
     static constexpr uint32_t ORDINARY_DATA_BUFFER_BINDING = 0;
 
     // Pre-computed info for each sub-object range (ConstantBuffer or ParameterBlock field).
-    struct SubObjectRangeInfo {
+    struct SubobjectRangeInfo {
         uint32_t binding_range_index;            // index into binding_info_cache
         slang::BindingType binding_type;         // ConstantBuffer or ParameterBlock
         ShaderObjectLayoutHandle element_layout; // layout for the element type T inside
                                                  // ConstantBuffer<T>/ParameterBlock<T>
     };
+
+    // Binding information extracted from Slang reflection
+    struct BindingRangeInfo {
+        uint32_t binding;                   // Vulkan binding number
+        slang::BindingType type;            // Slang binding type
+        uint32_t count;                     // Descriptor count
+        int32_t subobject_range_index = -1; // Subobject range index or -1 if none.
+    };
+
+    // -------------------------------------
 
     ShaderObjectLayout(const ContextHandle& context,
                        slang::TypeLayoutReflection* type_layout,
@@ -41,7 +62,12 @@ class ShaderObjectLayout {
 
     // -------------------------------------
 
+    bool has_descriptor_set() const {
+        return descriptor_set_layout != nullptr;
+    }
+
     const DescriptorSetLayoutHandle& get_descriptor_set_layout() const {
+        assert(has_descriptor_set());
         return descriptor_set_layout;
     }
 
@@ -65,29 +91,22 @@ class ShaderObjectLayout {
 
     // -------------------------------------
 
-    // lookup: binding_range_index → BindingInfo{vulkan_binding, type, count}
-    const BindingInfo& get_binding_info(uint32_t binding_range_index) const {
-        assert(binding_range_index < binding_info_cache.size());
-        return binding_info_cache[binding_range_index];
+    const BindingRangeInfo& get_binding_range_info(uint32_t binding_range_index) const {
+        assert(binding_range_index < binding_ranges.size());
+        return binding_ranges[binding_range_index];
     }
 
-    // lookup: binding_range_index → subobject_range_index. Returns -1 if not found.
+    // Returns the binding_range_index for a subobject_range_index. Returns -1 if none.
     int32_t find_subobject_range_index(uint32_t binding_range_index) const {
-        auto it = binding_range_to_subobject_range.find(binding_range_index);
-        if (it != binding_range_to_subobject_range.end()) {
-            return static_cast<int32_t>(it->second);
-        }
-        return -1;
+        assert(binding_range_index < binding_ranges.size());
+        return binding_ranges[binding_range_index].subobject_range_index;
     }
 
-    // -------------------------------------
-
-    // Sub-object range access
     uint32_t get_subobject_range_count() const {
         return subobject_ranges.size();
     }
 
-    const SubObjectRangeInfo& get_subobject_range_info(uint32_t index) const {
+    const SubobjectRangeInfo& get_subobject_range_info(uint32_t index) const {
         assert(index < get_subobject_range_count());
         return subobject_ranges[index];
     }
@@ -100,13 +119,10 @@ class ShaderObjectLayout {
     vk::DeviceSize uniform_size = 0;
 
     // Precomputed binding info for each binding range
-    std::vector<BindingInfo> binding_info_cache;
-
-    // Maps binding_range_index → subobject_range_index
-    std::unordered_map<uint32_t, uint32_t> binding_range_to_subobject_range;
+    std::vector<BindingRangeInfo> binding_ranges;
 
     // Pre-computed sub-object range info (one per CB/PB field)
-    std::vector<SubObjectRangeInfo> subobject_ranges;
+    std::vector<SubobjectRangeInfo> subobject_ranges;
 };
 
 std::string format_as(const ShaderObjectLayout& shader_object_layout,

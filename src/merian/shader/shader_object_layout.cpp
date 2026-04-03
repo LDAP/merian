@@ -15,37 +15,30 @@ ShaderObjectLayout::ShaderObjectLayout(const ContextHandle& context,
 
     uniform_size = type_layout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM);
 
-    // Precompute binding info cache: binding_range_index → BindingInfo
     const uint32_t binding_range_count = type_layout->getBindingRangeCount();
-    binding_info_cache.resize(binding_range_count);
+    binding_ranges.resize(binding_range_count);
     for (uint32_t br = 0; br < binding_range_count; br++) {
         const slang::BindingType kind = type_layout->getBindingRangeType(br);
         const uint32_t count = type_layout->getBindingRangeBindingCount(br);
 
         uint32_t vulkan_binding = 0;
-
-        // ParameterBlock binding ranges don't have descriptors in set 0
-        if (kind != slang::BindingType::ParameterBlock) {
-            const SlangInt first_dr = type_layout->getBindingRangeFirstDescriptorRangeIndex(br);
-            if (first_dr >= 0) {
-                vulkan_binding =
-                    type_layout->getDescriptorSetDescriptorRangeIndexOffset(0, first_dr);
-            }
+        const SlangInt first_dr = type_layout->getBindingRangeFirstDescriptorRangeIndex(br);
+        if (first_dr >= 0) {
+            // ParameterBlock binding ranges don't have descriptors in set 0
+            vulkan_binding = type_layout->getDescriptorSetDescriptorRangeIndexOffset(0, first_dr);
         }
 
-        binding_info_cache[br] = BindingInfo{vulkan_binding, kind, count};
+        binding_ranges[br] = BindingRangeInfo{vulkan_binding, kind, count};
     }
 
-    // Precompute sub-object ranges: one entry per CB/PB field, with element layout.
-    // Follows slang-rhi's approach: use getElementVarLayout()->getTypeLayout() to get the
-    // unwrapped element type for all sub-object ranges, skip ExistentialValue.
-    // Only create element layouts for ConstantBuffer and ParameterBlock types
-    // (other types like RWStructuredBuffer would cause infinite recursion).
+    // Precompute sub-object range infos:
     const uint32_t sor_count = type_layout->getSubObjectRangeCount();
     subobject_ranges.resize(sor_count);
     for (uint32_t i = 0; i < sor_count; i++) {
         const uint32_t br_index = type_layout->getSubObjectRangeBindingRangeIndex(i);
-        binding_range_to_subobject_range[br_index] = i;
+        assert(binding_ranges[br_index].subobject_range_index == -1 &&
+               "multiple subobject ranges map to the same binding range which is not supported.");
+        binding_ranges[br_index].subobject_range_index = static_cast<int32_t>(i);
 
         const slang::BindingType kind = type_layout->getBindingRangeType(br_index);
         auto* leaf_tl = type_layout->getBindingRangeLeafTypeLayout(br_index);
@@ -73,7 +66,7 @@ ShaderObjectLayout::ShaderObjectLayout(const ContextHandle& context,
             }
         }
 
-        subobject_ranges[i] = SubObjectRangeInfo{br_index, kind, element_layout};
+        subobject_ranges[i] = SubobjectRangeInfo{br_index, kind, element_layout};
     }
 }
 
