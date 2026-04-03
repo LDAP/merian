@@ -179,6 +179,10 @@ class DescriptorSetLayoutBuilder {
     DescriptorSetLayoutHandle build_layout(const ContextHandle& context,
                                            const vk::DescriptorSetLayoutCreateFlags flags = {}) {
 
+        if (bindings.empty()) {
+            SPDLOG_WARN("building empty descriptor set layout.");
+        }
+
         std::vector<vk::DescriptorSetLayoutBinding> sorted_bindings(bindings.size());
 
         for (uint32_t i = 0; i < bindings.size(); i++) {
@@ -189,6 +193,8 @@ class DescriptorSetLayoutBuilder {
         return make_shared<DescriptorSetLayout>(context, std::move(sorted_bindings), flags);
     }
 
+    // Convenience method for build_layout(context, flags |
+    // vk::DescriptorSetLayoutCreateFlagBits::ePushDescriptorKHR);
     DescriptorSetLayoutHandle
     build_push_descriptor_layout(const ContextHandle& context,
                                  const vk::DescriptorSetLayoutCreateFlags flags = {}) {

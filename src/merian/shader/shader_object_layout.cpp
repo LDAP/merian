@@ -12,6 +12,7 @@ ShaderObjectLayout::ShaderObjectLayout(const ContextHandle& context,
 
     descriptor_set_layout =
         create_descriptor_set_layout_from_slang_type_layout(context, type_layout);
+
     uniform_size = type_layout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM);
 
     // Precompute binding info cache: binding_range_index → BindingInfo

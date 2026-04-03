@@ -14,14 +14,15 @@ ShaderObject::ShaderObject(const ShaderObjectLayoutHandle& object_layout,
     // Create descriptor storage for caching writes (incremental update model)
     descriptors = DescriptorStorage::create(object_layout->get_descriptor_set_layout());
 
-    // Pre-size sub-object array: one slot per CB/PB field
     subobjects.resize(object_layout->get_subobject_range_count());
 
-    // Eagerly create ordinary data buffer if needed
-    const vk::DeviceSize uniform_size = object_layout->get_uniform_size();
-    if (uniform_size > 0) {
+    if (object_layout->has_ordinary_data_buffer()) {
+        const vk::DeviceSize uniform_size = object_layout->get_uniform_size();
+
         ordinary_data_staging.resize(uniform_size, 0);
         ordinary_data_buffer = allocator->allocate_uniform_buffer(uniform_size);
+
+        assert(descriptors);
 
         // Write buffer to descriptor storage so it gets replayed to new sets
         descriptors->queue_descriptor_write_buffer(ShaderObjectLayout::ORDINARY_DATA_BUFFER_BINDING,
@@ -162,25 +163,6 @@ void ShaderObject::for_each_registered_set(const std::function<void(DescriptorCo
 void ShaderObject::bind_as_parameter_block(const CommandBufferHandle& cmd,
                                            const PipelineHandle& pipeline,
                                            const uint32_t set_index) {
-    // Ask allocator for a descriptor container (handles frame cycling)
-    auto container = allocator->allocate(this);
-
-    // If new container, register and replay cached descriptor state
-    bool found = false;
-    for (auto it = registered_sets.begin(); it != registered_sets.end();) {
-        if (it->expired()) {
-            it = registered_sets.erase(it);
-            continue;
-        }
-        if (it->lock() == container)
-            found = true;
-        ++it;
-    }
-    if (!found) {
-        registered_sets.emplace_back(container);
-        descriptors->replay_to(*container);
-    }
-
     // Upload this PB's own ordinary data
     if (ordinary_data_buffer && ordinary_data_dirty) {
         allocator->get_staging()->cmd_to_device(cmd, ordinary_data_buffer,
@@ -201,6 +183,27 @@ void ShaderObject::bind_as_parameter_block(const CommandBufferHandle& cmd,
             continue;
 
         upload_constant_buffer_tree(sub.get(), cmd);
+    }
+
+    assert(descriptors);
+
+    // Ask allocator for a descriptor container (handles frame cycling)
+    auto container = allocator->allocate(this);
+
+    // If new container, register and replay cached descriptor state
+    bool found = false;
+    for (auto it = registered_sets.begin(); it != registered_sets.end();) {
+        if (it->expired()) {
+            it = registered_sets.erase(it);
+            continue;
+        }
+        if (it->lock() == container)
+            found = true;
+        ++it;
+    }
+    if (!found) {
+        registered_sets.emplace_back(container);
+        descriptors->replay_to(*container);
     }
 
     // Flush queued descriptor writes and bind
