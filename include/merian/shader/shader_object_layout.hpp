@@ -39,6 +39,8 @@ class ShaderObjectLayout {
                        slang::TypeLayoutReflection* type_layout,
                        const SlangProgramHandle& program);
 
+    // -------------------------------------
+
     const DescriptorSetLayoutHandle& get_descriptor_set_layout() const {
         return descriptor_set_layout;
     }
@@ -48,8 +50,10 @@ class ShaderObjectLayout {
     }
 
     bool has_ordinary_data_buffer() const {
-        return uniform_size > 0;
+        return uniform_size != 0;
     }
+
+    // -------------------------------------
 
     slang::TypeLayoutReflection* get_type_layout() const {
         return type_layout;
@@ -58,6 +62,8 @@ class ShaderObjectLayout {
     const SlangProgramHandle& get_program() const {
         return program;
     }
+
+    // -------------------------------------
 
     // lookup: binding_range_index → BindingInfo{vulkan_binding, type, count}
     const BindingInfo& get_binding_info(uint32_t binding_range_index) const {
@@ -74,6 +80,8 @@ class ShaderObjectLayout {
         return -1;
     }
 
+    // -------------------------------------
+
     // Sub-object range access
     uint32_t get_subobject_range_count() const {
         return subobject_ranges.size();
@@ -88,8 +96,8 @@ class ShaderObjectLayout {
     slang::TypeLayoutReflection* type_layout;
     SlangProgramHandle program; // keeps session alive so type_layout pointers remain valid
 
-    DescriptorSetLayoutHandle descriptor_set_layout;
-    vk::DeviceSize uniform_size;
+    DescriptorSetLayoutHandle descriptor_set_layout = nullptr;
+    vk::DeviceSize uniform_size = 0;
 
     // Precomputed binding info for each binding range
     std::vector<BindingInfo> binding_info_cache;

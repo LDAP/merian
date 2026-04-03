@@ -149,7 +149,7 @@ class ShaderObject : public std::enable_shared_from_this<ShaderObject> {
 
     // Stores the current descriptor sets state for replay to new descriptor sets and to keep bound
     // resources alive.
-    DescriptorStorageHandle descriptors;
+    DescriptorStorageHandle descriptors = nullptr;
 
     // Registered descriptor sets for incremental write propagation.
     std::vector<std::weak_ptr<DescriptorContainer>> registered_sets;

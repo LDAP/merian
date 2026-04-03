@@ -179,6 +179,10 @@ class DescriptorSetLayoutBuilder {
     DescriptorSetLayoutHandle build_layout(const ContextHandle& context,
                                            const vk::DescriptorSetLayoutCreateFlags flags = {}) {
 
+        if (bindings.empty()) {
+            SPDLOG_WARN("building empty descriptor set layout.");
+        }
+
         std::vector<vk::DescriptorSetLayoutBinding> sorted_bindings(bindings.size());
 
         for (uint32_t i = 0; i < bindings.size(); i++) {

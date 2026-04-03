@@ -62,7 +62,8 @@ const char* slang_type_kind_to_string(slang::TypeReflection::Kind kind);
 const char* slang_binding_type_to_string(slang::BindingType type);
 
 /**
- * @brief Create a Vulkan descriptor set layout from Slang type reflection.
+ * @brief Create a Vulkan descriptor set layout from Slang type reflection, assuming that the
+ * offsets are all 0, i.e. this might not result in the correct layout for nested objects.
  *
  * @param context Vulkan context
  * @param type_layout Slang type layout
