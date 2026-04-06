@@ -13,50 +13,6 @@ namespace merian {
 // Composition & Layout
 // ---------------------------------------------------------------------------
 
-static SlangCompositionHandle
-build_composition(const MaterialSystemHandle& material_system,
-                  uint32_t index_buffer_count,
-                  uint32_t vertex_buffer_count,
-                  uint32_t prev_vertex_buffer_count,
-                  uint32_t geometry_count,
-                  bool build_as) {
-    auto c = SlangComposition::create();
-    c->add_composition(material_system->get_composition());
-    c->add_module_from_path("merian-shaders/scene/scene.slang");
-    c->add_module_from_path("merian-shaders/scene/camera.slang");
-    c->add_module_from_path("merian-shaders/scene/environment-map.slang");
-    c->add_module_from_path("merian-shaders/scene/acceleration-structure.slang");
-
-    c->add_module_from_string(
-        "scene_constants",
-        fmt::format("namespace merian {{\n"
-                    "export static const int merian_scene_index_buffers_count = {};\n"
-                    "export static const int merian_scene_vertex_buffers_count = {};\n"
-                    "export static const int merian_scene_prev_vertex_buffers_count = {};\n"
-                    "export static const int merian_scene_geometry_count = {};\n"
-                    "}}",
-                    std::max(index_buffer_count, 1u), std::max(vertex_buffer_count, 1u),
-                    std::max(prev_vertex_buffer_count, 1u), std::max(geometry_count, 1u)));
-
-    // TODO: use link-time type for AS once Slang's lookupExternDeclRefType is fixed
-    // if (build_as) {
-    //     c->add_module_from_string(
-    //         "scene_as_type",
-    //         "import merian_shaders.scene.acceleration_structure;\n"
-    //         "namespace merian { export struct SceneAccelerationStructure : AccelerationStructure "
-    //         "= HWAccelerationStructure; }");
-    // } else {
-    //     c->add_module_from_string(
-    //         "scene_as_type",
-    //         "import merian_shaders.scene.acceleration_structure;\n"
-    //         "namespace merian { export struct SceneAccelerationStructure : AccelerationStructure "
-    //         "= NullAccelerationStructure; }");
-    // }
-
-    return c;
-}
-
-
 // ---------------------------------------------------------------------------
 // Constructor
 // ---------------------------------------------------------------------------
@@ -74,21 +30,52 @@ Scene::Scene(const ShaderCompileContextHandle& compile_context,
                    .get_acceleration_structure_features_khr()
                    .accelerationStructure == VK_TRUE;
 
-    rebuild_composition();
+    // Build composition once — subsequent changes modify in-place.
+    composition = SlangComposition::create();
+    composition->add_composition(material_system->get_composition());
+    composition->add_module_from_path("merian-shaders/scene/scene.slang");
+    composition->add_module_from_path("merian-shaders/scene/camera.slang");
+    composition->add_module_from_path("merian-shaders/scene/environment-map.slang");
+    composition->add_module_from_path("merian-shaders/scene/acceleration-structure.slang");
+    update_composition_constants();
+
+    // TODO: use link-time type for AS once Slang's lookupExternDeclRefType is fixed
+    // if (build_as) {
+    //     composition->add_module_from_string(
+    //         "scene_as_type",
+    //         "import merian_shaders.scene.acceleration_structure;\n"
+    //         "namespace merian { export struct SceneAccelerationStructure : AccelerationStructure "
+    //         "= HWAccelerationStructure; }");
+    // } else {
+    //     composition->add_module_from_string(
+    //         "scene_as_type",
+    //         "import merian_shaders.scene.acceleration_structure;\n"
+    //         "namespace merian { export struct SceneAccelerationStructure : AccelerationStructure "
+    //         "= NullAccelerationStructure; }");
+    // }
+
+    layout_program = SlangProgram::create(compile_context, composition);
     rebuild_shader_object();
 }
 
-void Scene::rebuild_shader_object() {
-    layout_program = SlangProgram::create(compile_context, composition);
-    shader_object = layout_program->create_shader_object(context, "merian::Scene", obj_allocator);
-    shader_object->get_cursor()["material_system"] = material_system;
+void Scene::update_composition_constants() {
+    composition->add_module_from_string(
+        "scene_constants",
+        fmt::format("namespace merian {{\n"
+                    "export static const int merian_scene_index_buffers_count = {};\n"
+                    "export static const int merian_scene_vertex_buffers_count = {};\n"
+                    "export static const int merian_scene_prev_vertex_buffers_count = {};\n"
+                    "export static const int merian_scene_geometry_count = {};\n"
+                    "}}",
+                    static_cast<uint32_t>(std::max(index_buffers.size(), size_t(1))),
+                    static_cast<uint32_t>(std::max(vertex_buffers.size(), size_t(1))),
+                    0u,
+                    static_cast<uint32_t>(std::max(geometry_instance_data.size(), size_t(1)))));
 }
 
-void Scene::rebuild_composition() {
-    composition = build_composition(
-        material_system, static_cast<uint32_t>(std::max(index_buffers.size(), size_t(1))),
-        static_cast<uint32_t>(std::max(vertex_buffers.size(), size_t(1))), 0,
-        static_cast<uint32_t>(std::max(geometry_instance_data.size(), size_t(1))), build_as);
+void Scene::rebuild_shader_object() {
+    shader_object = layout_program->create_shader_object(context, "merian::Scene", obj_allocator);
+    shader_object->get_cursor()["material_system"] = material_system;
 }
 
 // ---------------------------------------------------------------------------
@@ -99,7 +86,7 @@ bool Scene::set_build_acceleration_structure(bool build) {
     if (build_as == build)
         return false;
     build_as = build;
-    rebuild_composition();
+    // TODO: rebuild composition once link-time AS type is re-enabled
     return true;
 }
 
@@ -290,7 +277,8 @@ void Scene::upload_geometry_buffers(const CommandBufferHandle& cmd) {
         vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eAccelerationStructureReadKHR,
     });
 
-    rebuild_composition();
+    update_composition_constants();
+    rebuild_shader_object();
     geometry_dirty = false;
 }
 
@@ -389,7 +377,7 @@ void Scene::build_tlas(const CommandBufferHandle& cmd) {
                 const auto& t = scene_graph[nid].global_transform;
                 for (int row = 0; row < 3; row++)
                     for (int col = 0; col < 4; col++)
-                        inst.transform.matrix[row][col] = t[col][row]; // GLM column-major → row-major
+                        inst.transform.matrix[row][col] = t[row][col];
             }
 
             inst.instanceCustomIndex = instance_id;
@@ -416,23 +404,23 @@ void Scene::build_tlas(const CommandBufferHandle& cmd) {
     if (instances.empty())
         return;
 
-    auto instances_buffer = allocator->create_buffer(
+    tlas_instances_buffer = allocator->create_buffer(
         instances.size() * sizeof(vk::AccelerationStructureInstanceKHR),
         vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR |
             vk::BufferUsageFlagBits::eTransferDst |
             vk::BufferUsageFlagBits::eShaderDeviceAddress,
         MemoryMappingType::NONE, "Scene::tlas_instances");
-    allocator->get_staging()->cmd_to_device(cmd, instances_buffer, instances.data(), 0,
+    allocator->get_staging()->cmd_to_device(cmd, tlas_instances_buffer, instances.data(), 0,
                                             instances.size() *
                                                 sizeof(vk::AccelerationStructureInstanceKHR));
 
-    cmd->barrier(instances_buffer->buffer_barrier2(
+    cmd->barrier(tlas_instances_buffer->buffer_barrier2(
         vk::PipelineStageFlagBits2::eTransfer,
         vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
         vk::AccessFlagBits2::eTransferWrite,
-        vk::AccessFlagBits2::eAccelerationStructureReadKHR));
+        vk::AccessFlagBits2::eAccelerationStructureReadKHR | vk::AccessFlagBits2::eShaderRead));
 
-    tlas = as_builder->queue_build(static_cast<uint32_t>(instances.size()), instances_buffer);
+    tlas = as_builder->queue_build(static_cast<uint32_t>(instances.size()), tlas_instances_buffer);
     as_builder->get_cmds_tlas(cmd, scratch_buffer);
 }
 

@@ -59,9 +59,7 @@ const SlangCompositionHandle& SlangProgram::get_composition() {
 // Type layout
 
 slang::TypeLayoutReflection* SlangProgram::get_type_layout(const std::string& type_name) const {
-    // TODO: ShaderObjects should use plain struct layouts (no PB offset) and a wrapping
-    // ParameterBlock ShaderObject should account for the UBO binding offset. For now we
-    // look up ParameterBlock<T> to get the element layout which has correct descriptor
+    // Look up ParameterBlock<T> to get the element layout which has correct descriptor
     // offsets when the type contains uniform data.
     auto pb_name = fmt::format("ParameterBlock<{}>", type_name);
     auto* pb_type = get_program_reflection()->findTypeByName(pb_name.c_str());

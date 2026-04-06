@@ -123,7 +123,7 @@ class Scene : public Versionable,
     std::vector<SceneNode> scene_graph;
 
   private:
-    void rebuild_composition();
+    void update_composition_constants();
     void rebuild_shader_object();
     void upload_geometry_buffers(const CommandBufferHandle& cmd);
     void create_mesh_groups();
@@ -153,6 +153,7 @@ class Scene : public Versionable,
     std::optional<ASBuilder> as_builder;
     std::vector<AccelerationStructureHandle> blas_list;
     AccelerationStructureHandle tlas;
+    BufferHandle tlas_instances_buffer;
     BufferHandle scratch_buffer;
     bool bvh_dirty = true;
 
