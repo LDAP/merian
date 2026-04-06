@@ -4,6 +4,11 @@ merian_shaders_src = [
     'utils/texture_manager.cpp',
 ]
 
+
+if tgltf.found()
+    merian_shaders_src += 'scene/gltf_scene.cpp'
+endif
+
 merian_shaders_lib = static_library(
     'merian-shaders',
     merian_shaders_src,
@@ -14,6 +19,7 @@ merian_shaders_lib = static_library(
         slang,
         spdlog,
         stb,
+        tgltf,
         vma,
         vulkan,
     ],
