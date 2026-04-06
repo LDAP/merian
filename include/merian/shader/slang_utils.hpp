@@ -94,7 +94,10 @@ const char* slang_binding_type_to_string(slang::BindingType type);
  * @return Descriptor set layout handle
  */
 DescriptorSetLayoutHandle create_descriptor_set_layout_from_slang_type_layout(
-    const ContextHandle& context, slang::TypeLayoutReflection* type_layout, uint32_t set_index = 0);
+    const ContextHandle& context,
+    slang::TypeLayoutReflection* type_layout,
+    slang::ProgramLayout* program_layout = nullptr,
+    uint32_t set_index = 0);
 
 /**
  * @brief Recursively format a Slang TypeLayoutReflection for debug output.

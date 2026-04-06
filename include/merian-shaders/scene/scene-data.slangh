@@ -1,6 +1,9 @@
 #pragma once
 
+#ifdef __cplusplus
 #include "merian-shaders/shading/materials/material-system-data.slangh"
+#include "merian-shaders/types.slang.h"
+#endif
 
 namespace merian {
 
@@ -15,18 +18,20 @@ struct GeometryData {
     uint16_t index_buffer_index;
     // might be uint(-1) if no vertex buffer. Used to access the descriptor array.
     uint16_t vertex_buffer_index;
-}
+};
 
 // InstanceID + GeometryIndex
 typedef uint32_t GeometryID;
 
 struct VertexData {
     float3 position;
+    uint encoded_normal;    // oct30 encoded (use encoding.slang)
     half2 uv;
-}
+    uint encoded_tangent;   // oct30 encoded + sign bit for bitangent handedness
+};
 
 struct PrevVertexData {
     float3 position;
-}
+};
 
 }

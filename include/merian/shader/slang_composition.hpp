@@ -3,6 +3,7 @@
 #include "merian/io/file_loader.hpp"
 #include "merian/shader/shader_compiler.hpp"
 #include "merian/utils/hash.hpp"
+#include "merian/utils/versionable.hpp"
 
 #include "slang-com-ptr.h"
 #include "slang.h"
@@ -22,7 +23,8 @@ using SlangCompositionHandle = std::shared_ptr<SlangComposition>;
 // Which can be (lazyly) compiled to a SlangProgram and entry points.
 //
 // A slang composition used a single slang session for compilation.
-class SlangComposition : public std::enable_shared_from_this<SlangComposition> {
+class SlangComposition : public Versionable,
+                         public std::enable_shared_from_this<SlangComposition> {
     friend class SlangSession;
 
   private:
@@ -72,7 +74,7 @@ class SlangComposition : public std::enable_shared_from_this<SlangComposition> {
         }
 
         // can be empty if is from source string.
-        const std::optional<std::filesystem::path>& get_source_path() {
+        const std::optional<std::filesystem::path>& get_source_path() const {
             return source_path;
         }
 
@@ -122,8 +124,6 @@ class SlangComposition : public std::enable_shared_from_this<SlangComposition> {
 
         // name in module, exported name in composite
         std::map<std::string, std::string> entry_points_map;
-
-        Slang::ComPtr<slang::IModule> module;
     };
 
     class TypeConformance {
@@ -216,6 +216,12 @@ class SlangComposition : public std::enable_shared_from_this<SlangComposition> {
                               const bool with_entry_points = false,
                               const std::map<std::string, std::string>& entry_point_renames = {});
 
+    // shortcut for SlangModule::from_source
+    void add_module_from_string(const std::string& name,
+                                const std::string& source,
+                                const bool with_entry_points = false,
+                                const std::map<std::string, std::string>& entry_point_renames = {});
+
     void add_type_conformance(const std::string& interface_name,
                               const std::string& type_name,
                               const int64_t dynamic_dispatch_id = -1);
@@ -232,6 +238,27 @@ class SlangComposition : public std::enable_shared_from_this<SlangComposition> {
 
     void add_composition(const SlangCompositionHandle& composition);
 
+    // ---------------------------------------------------------------
+    // Reload
+
+    /**
+     * @brief Check all path-based modules (and sub-compositions) for source file changes.
+     *
+     * Compares file modification times against the last known state.
+     * If any source changed, increments version (triggering downstream rebuild).
+     *
+     * @param file_loader Used to resolve module source paths.
+     * @return true if changes were detected and version was incremented.
+     */
+    bool reload(const FileLoader& file_loader);
+
+    /**
+     * @brief Unconditionally trigger a full rebuild of the downstream chain.
+     *
+     * Increments version regardless of whether sources changed.
+     */
+    void force_reload();
+
   public:
     static SlangCompositionHandle create();
 
@@ -241,6 +268,9 @@ class SlangComposition : public std::enable_shared_from_this<SlangComposition> {
     std::map<TypeConformance, int64_t> type_conformances;
     std::set<EntryPoint> entry_points;
     std::set<SlangCompositionHandle> compositions;
+
+    // Last known modification times for path-based modules (for reload detection)
+    std::map<std::filesystem::path, std::filesystem::file_time_type> module_mtimes;
 };
 
 } // namespace merian

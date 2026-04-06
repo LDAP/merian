@@ -3,13 +3,40 @@
 
 namespace merian {
 
-ShaderCursor::ShaderCursor(const ShaderObjectHandle& base_object)
+ShaderCursor::ShaderCursor(ShaderObject* base_object)
     : base_object(base_object), type_layout(base_object->get_type_layout()) {}
+
+ShaderCursor ShaderCursor::dereference() {
+    assert(is_parameter_block() || is_constant_buffer());
+
+    const int32_t subobject_range_index =
+        base_object->get_object_layout()->find_subobject_range_index(offset.binding_range_offset);
+    assert(subobject_range_index >= 0 &&
+           "ConstantBuffer and ParameterBlock field must have a sub-object range");
+
+    ShaderObjectHandle subobject = base_object->subobjects[subobject_range_index];
+    if (!subobject) {
+        // Auto-create the subobject from the pre-computed element layout.
+        const auto& subobject_range_info =
+            base_object->get_object_layout()->get_subobject_range_info(subobject_range_index);
+        assert(subobject_range_info.element_layout);
+        subobject = std::make_shared<ShaderObject>(subobject_range_info.element_layout,
+                                                   base_object->get_allocator());
+        base_object->set_subobject(subobject_range_index, subobject);
+    }
+
+    return subobject->get_cursor();
+}
 
 ShaderCursor ShaderCursor::field(const std::string& name) {
     if (!is_valid()) {
         SPDLOG_ERROR("Cannot navigate field '{}' on invalid cursor", name);
         return ShaderCursor();
+    }
+
+    // Auto-dereference PB/CB to navigate into their element type
+    if (is_parameter_block() || is_constant_buffer()) {
+        return dereference().field(name);
     }
 
     const SlangInt field_index = type_layout->findFieldIndexByName(name.c_str());
@@ -31,37 +58,6 @@ ShaderCursor ShaderCursor::field(uint32_t index) {
 
     slang::VariableLayoutReflection* field_var = type_layout->getFieldByIndex(index);
     slang::TypeLayoutReflection* field_type_layout = field_var->getTypeLayout();
-    slang::TypeReflection::Kind field_kind = field_type_layout->getKind();
-
-    // For ConstantBuffer<T> and ParameterBlock<T> fields: find the shader object that is assigned
-    // to the current shader object at this cursor position and return a cursor to the subobject.
-    if (field_kind == slang::TypeReflection::Kind::ConstantBuffer ||
-        field_kind == slang::TypeReflection::Kind::ParameterBlock) {
-
-        const uint32_t field_binding_range =
-            offset.binding_range_offset + type_layout->getFieldBindingRangeOffset(index);
-        const int32_t subobject_range_index =
-            base_object->get_object_layout()->find_subobject_range_index(field_binding_range);
-        assert(subobject_range_index >= 0 &&
-               "ConstantBuffer and ParameterBlock field must have a sub-object range");
-
-        ShaderObjectHandle subobject = base_object->subobjects[subobject_range_index];
-        if (!subobject) {
-            // Convenience: auto-create the subobject as we already have the the pre-computed
-            // element layout then assign the subobject at the current cursors field index position
-            // and return the cursor pointing to the subobject.
-            const auto& subobject_range_info =
-                base_object->get_object_layout()->get_subobject_range_info(subobject_range_index);
-            assert(subobject_range_info.element_layout);
-            subobject = std::make_shared<ShaderObject>(subobject_range_info.element_layout,
-                                                       base_object->get_allocator());
-
-            base_object->set_subobject(subobject_range_index, subobject);
-        }
-
-        // Return cursor into the sub-object (dereferenced to element type T)
-        return subobject->get_cursor();
-    }
 
     ShaderCursor result;
     result.base_object = base_object;
@@ -77,6 +73,11 @@ ShaderCursor ShaderCursor::element(uint32_t index) {
     if (!is_valid()) {
         SPDLOG_ERROR("Cannot navigate element {} on invalid cursor", index);
         return ShaderCursor();
+    }
+
+    // Auto-dereference PB/CB to navigate into their element type
+    if (is_parameter_block() || is_constant_buffer()) {
+        return dereference().element(index);
     }
 
     const slang::TypeReflection::Kind kind = get_kind();

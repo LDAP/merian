@@ -14,15 +14,9 @@ class ShaderObject;
 using ShaderObjectHandle = std::shared_ptr<ShaderObject>;
 
 /**
- * @brief Cursor for navigating and writing shader parameter space.
+ * @brief Lightweight cursor for navigating and writing shader parameter space.
  *
- * A cursor points at a ShaderOffset in a ShaderObject (TypeLayout).
- *
- * Write operations go through the ShaderObject, which handles broadcast
- * to all binding sites (other ShaderObjects where it's embedded).
- *
- * Example:
- *   cursor["material"]["roughness"] = 0.5f;
+ * The ShaderObject must outlive the cursor.
  */
 class ShaderCursor {
   public:
@@ -33,8 +27,10 @@ class ShaderCursor {
 
     /**
      * @brief Create a cursor pointing to the root of a ShaderObject.
+     *
+     * Uses a raw pointer — the caller must ensure the ShaderObject outlives the cursor.
      */
-    ShaderCursor(const ShaderObjectHandle& base_object);
+    ShaderCursor(ShaderObject* base_object);
 
     // Navigation
 
@@ -93,6 +89,14 @@ class ShaderCursor {
     }
     ShaderCursor& operator=(const ShaderObjectHandle& object) {
         return write(object);
+    }
+
+    // Accept shared_ptr<T> where T provides operator const ShaderObjectHandle&()
+    template <class T>
+        requires(!std::is_same_v<T, ShaderObject> &&
+                 std::is_convertible_v<const T&, const ShaderObjectHandle&>)
+    ShaderCursor& operator=(const std::shared_ptr<T>& object) {
+        return write(static_cast<const ShaderObjectHandle&>(*object));
     }
 
     // Query operations
@@ -226,21 +230,24 @@ class ShaderCursor {
         return offset;
     }
 
-    const ShaderObjectHandle& get_base_object() const {
+    ShaderObject* get_base_object() const {
         return base_object;
     }
 
   private:
     /**
      * @brief Navigate to a struct field by index.
-     *
-     * Autocreates subobjects if necessary. This is for internal use, user code call operator[] or
-     * element(uint32_t).
      */
     ShaderCursor field(uint32_t index);
 
+    /**
+     * @brief Dereference a ParameterBlock/ConstantBuffer cursor into its element type,
+     * auto-creating the subobject if needed.
+     */
+    ShaderCursor dereference();
+
   private:
-    ShaderObjectHandle base_object;
+    ShaderObject* base_object = nullptr;
     slang::TypeLayoutReflection* type_layout = nullptr;
     ShaderOffset offset;
 

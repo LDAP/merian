@@ -54,6 +54,13 @@ SlangProgramEntryPoint::find_or_create_param_info(const ContextHandle& context,
             continue;
         }
 
+        SPDLOG_DEBUG("Parameter element type layout:\n{}",
+                     format_type_layout(type_layout->getElementTypeLayout()));
+        SPDLOG_DEBUG("Parameter element var (type) layout:\n{}",
+                     format_type_layout(type_layout->getElementVarLayout()->getTypeLayout()));
+        SPDLOG_DEBUG("Parameter container type layout:\n{}",
+                     format_type_layout(type_layout->getContainerVarLayout()->getTypeLayout()));
+
         if (param_name == param->getName()) {
             auto* element_type_layout = type_layout->getElementTypeLayout();
             auto object_layout =
@@ -75,7 +82,7 @@ SlangProgramEntryPoint::find_or_create_param_info(const ContextHandle& context,
 }
 
 ShaderObjectLayoutHandle SlangProgramEntryPoint::get_object_layout(const ContextHandle& context,
-                                                                  const std::string& param_name) {
+                                                                   const std::string& param_name) {
     return find_or_create_param_info(context, param_name).object_layout;
 }
 
@@ -146,7 +153,7 @@ PipelineLayoutHandle SlangProgramEntryPoint::get_pipeline_layout(const ContextHa
         const uint32_t global_ds_count = global_tl->getDescriptorSetCount();
         for (uint32_t ds = 0; ds < global_ds_count; ds++) {
             auto layout =
-                create_descriptor_set_layout_from_slang_type_layout(context, global_tl, ds);
+                create_descriptor_set_layout_from_slang_type_layout(context, global_tl, program_layout, ds);
             if (!layout->get_bindings().empty()) {
                 if (!global_object_layout) {
                     global_object_layout =
@@ -162,7 +169,8 @@ PipelineLayoutHandle SlangProgramEntryPoint::get_pipeline_layout(const ContextHa
         // Create global object layout even if no direct bindings,
         // as long as there are sub-object ranges (PB/CB fields at global scope)
         if (!global_object_layout && global_tl->getSubObjectRangeCount() > 0) {
-            global_object_layout = std::make_shared<ShaderObjectLayout>(context, global_tl, program);
+            global_object_layout =
+                std::make_shared<ShaderObjectLayout>(context, global_tl, program);
         }
 
         // Collect nested PB sub-objects from global scope (global ParameterBlock fields)
@@ -367,8 +375,8 @@ static void format_nested_pb_tree(const std::vector<SlangProgramEntryPoint::Nest
                                   std::string& out,
                                   const std::string& indent) {
     for (const auto& ni : infos) {
-        out += fmt::format("{}subobject_range={}, set_index={}\n", indent,
-                           ni.subobject_range_index, ni.set_index);
+        out += fmt::format("{}subobject_range={}, set_index={}\n", indent, ni.subobject_range_index,
+                           ni.set_index);
         if (!ni.children.empty()) {
             format_nested_pb_tree(ni.children, out, indent + "  ");
         }
@@ -411,11 +419,27 @@ std::string SlangProgramEntryPoint::format_reflection(const ContextHandle& conte
 }
 
 // ---------------------------------------------------------------
+// Rebuild
+
+void SlangProgramEntryPoint::rebuild() {
+    param_cache.clear();
+    cached_pipeline_layout = nullptr;
+    global_object_layout = nullptr;
+    global_set_index = UINT32_MAX;
+    global_set_layouts.clear();
+    global_nested_pb_infos.clear();
+    push_constant_size = 0;
+    increment_version();
+}
+
+// ---------------------------------------------------------------
 // Factory methods
 
 SlangProgramEntryPointHandle SlangProgramEntryPoint::create(const SlangProgramHandle& program,
                                                             const uint64_t entry_point_index) {
-    return SlangProgramEntryPointHandle(new SlangProgramEntryPoint(program, entry_point_index));
+    auto ep = SlangProgramEntryPointHandle(new SlangProgramEntryPoint(program, entry_point_index));
+    program->on_changed(ep, [raw = ep.get()]() { raw->rebuild(); });
+    return ep;
 }
 
 SlangProgramEntryPointHandle SlangProgramEntryPoint::create(const SlangProgramHandle& program,

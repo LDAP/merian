@@ -6,29 +6,13 @@ __exported import merian_shaders.utils.texture_manager;
 __exported import merian_shaders.utils.random;
 __exported import merian_shaders.shading.shading_data;
 __exported import merian_shaders.shading.bsdfs.bsdf;
+__exported import merian_shaders.shading.materials.material_system_data;
 
 namespace merian {
 
 [Flags]
 enum MaterialFlags : uint8_t {
     NO_NORMAL_MAPPING,
-}
-
-struct MaterialHeader {
-    uint16_t material_model_type_id;
-    TextureID alpha_texture_id = TextureID(-1);
-
-    Optional<TextureID> get_alpha_texture_id() {
-        if (alpha_texture_id != TextureID(-1)) {
-            return alpha_texture_id;
-        }
-
-        return {};
-    }
-
-    bool has_alpha_mask() {
-        return alpha_texture_id != TextureID(-1);
-    }
 }
 
 // This represents the definition of the material (before being evaluated at a shading point), e.g.

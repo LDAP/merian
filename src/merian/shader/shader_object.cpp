@@ -34,7 +34,7 @@ ShaderObject::ShaderObject(const ShaderObjectLayoutHandle& object_layout,
 // Cursor
 
 ShaderCursor ShaderObject::get_cursor() {
-    return ShaderCursor(shared_from_this());
+    return ShaderCursor(this);
 }
 
 // ---------------------------------------------------------------

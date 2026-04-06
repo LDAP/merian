@@ -20,13 +20,19 @@ class ExtensionMerian : public ContextExtension {
                                             "synchronization2", // for all kinds of sync
                                         },
                                         {
-                                            "maintenance4",     // for memory allocator
-                                            "samplerAnisotropy" // for sampler pool
-
+                                            "maintenance4",              // for memory allocator
+                                            "samplerAnisotropy",         // for sampler pool
+                                            "storageBuffer16BitAccess",              // for material system
+                                            "uniformAndStorageBuffer16BitAccess",    // for material system
+                                            "shaderInt16",                           // for material system
+                                            "shaderFloat16",                         // for shading (half types)
+                                            "accelerationStructure",                 // for scene AS
                                         },
                                         {},
                                         {
                                             VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME,
+                                            VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
+                                            VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
                                         });
     }
 

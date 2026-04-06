@@ -1,7 +1,32 @@
 #pragma once
 
+#ifdef __cplusplus
+#include "merian-shaders/utils/texture-manager-data.slangh"
+#include <cstdint>
+#endif
+
 namespace merian {
 
 typedef uint16_t MaterialID;
+typedef uint16_t MaterialModelID;
+
+struct MaterialHeader {
+    MaterialModelID material_model_type_id;
+    TextureID alpha_texture_id;
+
+#ifndef __cplusplus
+    Optional<TextureID> get_alpha_texture_id() {
+        if (alpha_texture_id != TextureID(-1)) {
+            return alpha_texture_id;
+        }
+
+        return {};
+    }
+
+    bool has_alpha_mask() {
+        return alpha_texture_id != TextureID(-1);
+    }
+#endif
+};
 
 }

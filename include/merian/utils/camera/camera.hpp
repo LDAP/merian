@@ -1,5 +1,6 @@
 #pragma once
 
+#include "merian/shader/shader_cursor.hpp"
 #include "merian/utils/vector_matrix.hpp"
 
 #include <memory>
@@ -87,6 +88,17 @@ class Camera {
 
     float get_field_of_view() const noexcept;
 
+    float get_aspect_ratio() const noexcept;
+
+    float get_near_plane() const noexcept;
+
+    float get_far_plane() const noexcept;
+
+    const float3& get_forward() noexcept;
+    const float3& get_right() noexcept;
+
+    void write_to(ShaderCursor cursor);
+
     // High level operations
     // -----------------------------------------------------------------------------
 
@@ -147,6 +159,14 @@ class Camera {
     // Do not use diectly
     float4x4 projection_cache;
     uint32_t projection_change_id_cache = 0;
+
+    // RAY BASIS (depends on both view and projection)
+
+    float3 forward_cache;
+    float3 right_cache;
+    uint64_t ray_basis_change_id_cache = 0;
+
+    void recompute_ray_basis();
 };
 using CameraHandle = std::shared_ptr<Camera>;
 

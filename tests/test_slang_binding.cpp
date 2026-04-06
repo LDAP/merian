@@ -874,3 +874,78 @@ TEST_F(SlangBindingTest, SharedCBacrossPBs) {
     EXPECT_EQ(result_b.data[0], float_bits(7.5f));
     EXPECT_EQ(result_b.data[1], int_bits(-42));
 }
+
+// ---------------------------------------------------------------------------
+// Versionable chain tests
+// ---------------------------------------------------------------------------
+
+TEST_F(SlangBindingTest, CompositionChangePropagatesToProgram) {
+    auto composition = SlangComposition::create();
+    composition->add_module_from_string("constants",
+                                        "namespace test { export static const int N = 1; }");
+
+    auto program = SlangProgram::create(compile_context, composition);
+    auto v0 = program->get_version();
+
+    // Modify the composition in-place (same module name, different content)
+    composition->add_module_from_string("constants",
+                                        "namespace test { export static const int N = 2; }");
+
+    EXPECT_GT(program->get_version(), v0)
+        << "Program version should increment when composition changes";
+}
+
+TEST_F(SlangBindingTest, CompositionChangePropagatesToEntryPoint) {
+    auto composition = SlangComposition::create();
+    composition->add_module_from_string("constants",
+                                        "namespace test { export static const int N = 1; }");
+    composition->add_module_from_string(
+        "shader",
+        "[shader(\"compute\")][numthreads(1,1,1)] void main() {}", true);
+
+    auto program = SlangProgram::create(compile_context, composition);
+    auto entry_point = SlangProgramEntryPoint::create(program, "main");
+    auto v0 = entry_point->get_version();
+
+    composition->add_module_from_string("constants",
+                                        "namespace test { export static const int N = 2; }");
+
+    EXPECT_GT(entry_point->get_version(), v0)
+        << "EntryPoint version should increment when composition changes";
+}
+
+TEST_F(SlangBindingTest, SubCompositionChangePropagatesToParent) {
+    auto sub = SlangComposition::create();
+    sub->add_module_from_string("sub_const",
+                                "namespace sub { export static const int X = 1; }");
+
+    auto parent = SlangComposition::create();
+    parent->add_composition(sub);
+    auto v0 = parent->get_version();
+
+    sub->add_module_from_string("sub_const",
+                                "namespace sub { export static const int X = 2; }");
+
+    EXPECT_GT(parent->get_version(), v0)
+        << "Parent composition version should increment when sub-composition changes";
+}
+
+TEST_F(SlangBindingTest, ForceReloadTriggersFullChain) {
+    auto composition = SlangComposition::create();
+    composition->add_module_from_string(
+        "shader",
+        "[shader(\"compute\")][numthreads(1,1,1)] void main() {}", true);
+
+    auto program = SlangProgram::create(compile_context, composition);
+    auto entry_point = SlangProgramEntryPoint::create(program, "main");
+
+    auto comp_v0 = composition->get_version();
+    auto prog_v0 = program->get_version();
+    auto ep_v0 = entry_point->get_version();
+
+    composition->force_reload();
+
+    EXPECT_GT(composition->get_version(), comp_v0);
+    EXPECT_GT(program->get_version(), prog_v0);
+    EXPECT_GT(entry_point->get_version(), ep_v0);
+}

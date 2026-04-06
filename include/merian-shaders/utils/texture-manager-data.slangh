@@ -1,0 +1,11 @@
+#pragma once
+
+#ifdef __cplusplus
+#include <cstdint>
+#endif
+
+namespace merian {
+
+typedef uint16_t TextureID;
+
+}

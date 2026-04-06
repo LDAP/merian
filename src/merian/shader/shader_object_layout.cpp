@@ -10,8 +10,8 @@ ShaderObjectLayout::ShaderObjectLayout(const ContextHandle& context,
     assert(type_layout);
     assert(program);
 
-    descriptor_set_layout =
-        create_descriptor_set_layout_from_slang_type_layout(context, type_layout);
+    descriptor_set_layout = create_descriptor_set_layout_from_slang_type_layout(
+        context, type_layout, program->get_program_reflection());
 
     uniform_size = type_layout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM);
 
@@ -19,7 +19,17 @@ ShaderObjectLayout::ShaderObjectLayout(const ContextHandle& context,
     binding_ranges.resize(binding_range_count);
     for (uint32_t br = 0; br < binding_range_count; br++) {
         const slang::BindingType kind = type_layout->getBindingRangeType(br);
-        const uint32_t count = type_layout->getBindingRangeBindingCount(br);
+        SlangInt raw_count = type_layout->getBindingRangeBindingCount(br);
+        if (raw_count == static_cast<SlangInt>(SLANG_UNKNOWN_SIZE)) {
+            auto* leaf_var = type_layout->getBindingRangeLeafVariable(br);
+            assert(leaf_var);
+            auto* leaf_type = leaf_var->getType();
+            assert(leaf_type && leaf_type->isArray());
+            raw_count = static_cast<SlangInt>(
+                leaf_type->getElementCount((SlangReflection*)program->get_program_reflection()));
+            assert(raw_count != static_cast<SlangInt>(SLANG_UNKNOWN_SIZE));
+        }
+        const uint32_t count = static_cast<uint32_t>(raw_count);
 
         uint32_t vulkan_binding = 0;
         const SlangInt first_dr = type_layout->getBindingRangeFirstDescriptorRangeIndex(br);

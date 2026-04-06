@@ -4,8 +4,7 @@ __exported import merian_shaders.scene.camera;
 __exported import merian_shaders.scene.acceleration_structure;
 __exported import merian_shaders.scene.environment_map;
 __exported import merian_shaders.shading.materials.material_system;
-
-#include "merian-shaders/scene/scene-data.slangh"
+__exported import merian_shaders.scene.scene_data;
 
 namespace merian {
 
@@ -38,8 +37,12 @@ extern static const int merian_scene_vertex_buffers_count;
 extern static const int merian_scene_prev_vertex_buffers_count;
 extern static const int merian_scene_geometry_count;
 
+// TODO: use link-time type once Slang's lookupExternDeclRefType is fixed
+// extern struct SceneAccelerationStructure : AccelerationStructure;
+typedef HWAccelerationStructure SceneAccelerationStructure;
+
 struct Scene {
-    AccelerationStructure as;
+    SceneAccelerationStructure as;
 
     // indexed with instance_id, offset.
     StructuredBuffer<uint3> index_buffers[merian_scene_index_buffers_count];
@@ -55,6 +58,7 @@ struct Scene {
     EnvMap env_map;
 
     Camera camera;
+    Camera prev_camera;
 
     // Global scene parameters
     uint frame;

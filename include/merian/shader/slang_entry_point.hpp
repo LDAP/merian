@@ -4,6 +4,7 @@
 #include "merian/shader/shader_object_allocator.hpp"
 #include "merian/shader/shader_object_layout.hpp"
 #include "merian/shader/slang_program.hpp"
+#include "merian/utils/versionable.hpp"
 #include "merian/vk/command/command_buffer.hpp"
 #include "merian/vk/pipeline/pipeline.hpp"
 #include "merian/vk/pipeline/pipeline_layout.hpp"
@@ -21,7 +22,14 @@ using ShaderObjectHandle = std::shared_ptr<ShaderObject>;
 class SlangProgramEntryPoint;
 using SlangProgramEntryPointHandle = std::shared_ptr<SlangProgramEntryPoint>;
 
-class SlangProgramEntryPoint : public EntryPoint {
+/**
+ * @brief Wraps a SlangProgram entry point with reflection-based binding helpers.
+ *
+ * Implements Versionable: when the underlying program rebuilds, this entry point
+ * invalidates all cached layouts and pipeline state, then increments its version.
+ * Consumers (e.g. pipeline owners) should listen and recreate their pipelines.
+ */
+class SlangProgramEntryPoint : public Versionable, public EntryPoint {
 
   protected:
     SlangProgramEntryPoint(const SlangProgramHandle& program, const uint64_t entry_point_index);
@@ -38,37 +46,30 @@ class SlangProgramEntryPoint : public EntryPoint {
     const SlangProgramHandle& get_program() const;
 
     // ---------------------------------------------------------------
-    // ShaderObject helpers
+    // Rebuild
 
     /**
-     * @brief Get cached SlangObjectLayout for a named ParameterBlock parameter.
+     * @brief Invalidate all cached state and increment version.
+     *
+     * Called automatically when the underlying program rebuilds.
+     * Clears param_cache, pipeline layout, global layouts, etc.
      */
+    void rebuild();
+
+    // ---------------------------------------------------------------
+    // ShaderObject helpers
+
     ShaderObjectLayoutHandle get_object_layout(const ContextHandle& context,
                                                const std::string& param_name);
 
-    /**
-     * @brief Get descriptor set index for a named ParameterBlock parameter.
-     */
     uint32_t get_descriptor_set_index(const std::string& param_name);
 
-    /**
-     * @brief Create a ShaderObject for a named ParameterBlock parameter.
-     */
     ShaderObjectHandle create_shader_object(const ContextHandle& context,
                                             const std::string& param_name,
                                             const ShaderObjectAllocatorHandle& allocator);
 
-    /**
-     * @brief Build and cache a pipeline layout from program reflection.
-     *
-     * Includes global parameter descriptor sets, push constants, and entry point
-     * ParameterBlock descriptor sets. Global sets come first, then PB sets.
-     */
     PipelineLayoutHandle get_pipeline_layout(const ContextHandle& context);
 
-    /**
-     * @brief Bind a named ParameterBlock parameter and all its nested PB sub-objects.
-     */
     void bind_entry_point_parameter(const std::string& param_name,
                                     const ShaderObjectHandle& object,
                                     const CommandBufferHandle& cmd,
@@ -77,68 +78,33 @@ class SlangProgramEntryPoint : public EntryPoint {
     // ---------------------------------------------------------------
     // Global parameter support
 
-    /**
-     * @brief Check if the program has global parameters that need a descriptor set.
-     */
     bool has_globals(const ContextHandle& context);
 
-    /**
-     * @brief Create a ShaderObject for the global parameter scope (set 0 of globals).
-     *
-     * Use the returned object's cursor to set global resources and uniform data.
-     * For multi-set globals (explicit [vk::binding(b, s)] across sets), this only
-     * manages set 0. Additional sets must be managed manually.
-     */
     ShaderObjectHandle create_global_shader_object(const ContextHandle& context,
                                                    const ShaderObjectAllocatorHandle& allocator);
 
-    /**
-     * @brief Bind the global ShaderObject at its descriptor set index.
-     */
     void bind_global_parameter(const ShaderObjectHandle& globals,
                                const CommandBufferHandle& cmd,
                                const PipelineHandle& pipeline);
 
-    /**
-     * @brief Get the descriptor set layout for a specific global descriptor set.
-     *
-     * Useful for manually allocating descriptor sets for multi-set globals.
-     * Returns nullptr if the set index is out of range.
-     */
     DescriptorSetLayoutHandle get_global_set_layout(uint32_t set_index) const;
 
-    /**
-     * @brief Get the number of global descriptor sets.
-     */
     uint32_t get_global_set_count() const;
 
-    /**
-     * @brief Get the push constant size (bytes) derived from reflection, or 0 if none.
-     */
     vk::DeviceSize get_push_constant_size() const;
 
     // ---------------------------------------------------------------
     // Debug
 
-    // Print full reflection: entry point params, pipeline layout, nested PB tree
     std::string format_reflection(const ContextHandle& context);
 
     // ---------------------------------------------------------------
     // Parameter discovery
 
-    /**
-     * @brief Check if a named ParameterBlock parameter exists in this entry point.
-     */
     bool has_parameter(const std::string& param_name) const;
 
-    /**
-     * @brief Get names of all ParameterBlock parameters in this entry point.
-     */
     std::vector<std::string> get_parameter_block_names() const;
 
-    /**
-     * @brief Get names of all entry point parameters (including non-PB like system values).
-     */
     std::vector<std::string> get_all_parameter_names() const;
 
   public:

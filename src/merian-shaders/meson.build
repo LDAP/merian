@@ -1,5 +1,7 @@
 merian_shaders_src = [
     'scene/scene.cpp',
+    'shading/materials/material_system.cpp',
+    'utils/texture_manager.cpp',
 ]
 
 merian_shaders_lib = static_library(
@@ -8,6 +10,7 @@ merian_shaders_lib = static_library(
     dependencies: [
         fmt,
         glm,
+        nlohmann_json,
         slang,
         spdlog,
         stb,

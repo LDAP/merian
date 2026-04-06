@@ -13,6 +13,9 @@
 
 namespace merian {
 
+class SlangProgram;
+using SlangProgramHandle = std::shared_ptr<SlangProgram>;
+
 class SlangSession;
 using SlangSessionHandle = std::shared_ptr<SlangSession>;
 
@@ -584,12 +587,30 @@ class SlangSession {
                                    entry_point_name);
     }
 
+    // Find the TypeLayoutReflection* for a named type in a composition or module.
+    // Caller must keep the returned SlangProgramHandle alive to keep the pointer valid.
+    struct TypeLayoutResult {
+        slang::TypeLayoutReflection* type_layout;
+        SlangProgramHandle program;
+    };
+
+    static TypeLayoutResult get_type_layout(const ShaderCompileContextHandle& compile_context,
+                                            const SlangCompositionHandle& composition,
+                                            const std::string& type_name);
+
+    static TypeLayoutResult get_type_layout(const ShaderCompileContextHandle& compile_context,
+                                            const std::filesystem::path& module_path,
+                                            const std::string& type_name);
+
   public:
     static SlangSessionHandle create(const ShaderCompileContextHandle& shader_compile_context);
 
-    // returns a cached session for the context or creates one if none is avaiable.
+    // Returns a cached session for the context or creates one if none is available.
+    // Pass force_new=true to always create a fresh session (e.g. after composition changes
+    // that require reloading modules with the same name but different content).
     static SlangSessionHandle
-    get_or_create(const ShaderCompileContextHandle& shader_compile_context);
+    get_or_create(const ShaderCompileContextHandle& shader_compile_context,
+                  bool force_new = false);
 
   private:
     static std::string diagnostics_as_string(Slang::ComPtr<slang::IBlob>& diagnostics_blob) {

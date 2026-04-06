@@ -1,8 +1,10 @@
 #include "merian/utils/camera/camera.hpp"
 
+#include "merian/shader/shader_cursor.hpp"
 #include "merian/vk/utils/math.hpp"
 
 #include <cassert>
+#include <cmath>
 
 namespace merian {
 
@@ -152,6 +154,54 @@ void Camera::set_far_plane(const float far_plane) noexcept {
 
 float Camera::get_field_of_view() const noexcept {
     return field_of_view;
+}
+
+float Camera::get_aspect_ratio() const noexcept {
+    return aspect_ratio;
+}
+
+float Camera::get_near_plane() const noexcept {
+    return near_plane;
+}
+
+float Camera::get_far_plane() const noexcept {
+    return far_plane;
+}
+
+void Camera::recompute_ray_basis() {
+    forward_cache = normalize(target - position);
+    right_cache = normalize(cross(forward_cache, up));
+}
+
+const float3& Camera::get_forward() noexcept {
+    if (has_changed(get_change_id(), ray_basis_change_id_cache)) {
+        recompute_ray_basis();
+    }
+    return forward_cache;
+}
+
+const float3& Camera::get_right() noexcept {
+    if (has_changed(get_change_id(), ray_basis_change_id_cache)) {
+        recompute_ray_basis();
+    }
+    return right_cache;
+}
+
+void Camera::write_to(ShaderCursor cursor) {
+    const float half_fov_tan = std::tan(radians(field_of_view * 0.5f));
+    const float3& fwd = get_forward();
+    const float3& rgt = get_right();
+
+    cursor["position"] = position;
+    cursor["target"] = target;
+    cursor["up"] = up;
+    cursor["U"] = rgt * (half_fov_tan * aspect_ratio);
+    cursor["V"] = cross(rgt, fwd) * half_fov_tan;
+    cursor["W"] = fwd;
+    cursor["near"] = near_plane;
+    cursor["far"] = far_plane;
+    cursor["aspect_ratio"] = aspect_ratio;
+    cursor["aperture_radius"] = 0.0f;
 }
 
 // High level operations

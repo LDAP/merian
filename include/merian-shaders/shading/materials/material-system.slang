@@ -1,9 +1,6 @@
 #pragma once
 
-__exported import merian_shaders.utils.texture_manager;
 __exported import merian_shaders.shading.materials.material;
-
-#include "merian-shaders/shading/materials/material-system-data.slangh"
 
 namespace merian {
 
@@ -35,7 +32,7 @@ struct MaterialSystem {
                     const LODSampler sampler = ImplicitLODSampler()) {
         const MaterialHeader header = materials[material_id].header;
         if (let texture_id = header.get_alpha_texture_id()) {
-            const float alpha = sampler.sample(texture_manager.get_sampler2D(texture_id), uv);
+            const float alpha = sampler.sample(texture_manager.get_sampler2D(texture_id), uv).a;
             return alpha < merian_alpha_test_threshold;
         }
 

@@ -1,8 +1,8 @@
 #pragma once
 
-namespace merian {
+__exported import merian_shaders.utils.texture_manager_data;
 
-typealias TextureID = uint16_t;
+namespace merian {
 
 extern static const int merian_texture_manager_texture_count;
 
