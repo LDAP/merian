@@ -150,6 +150,11 @@ ShaderCursor& ShaderCursor::write(const SamplerHandle& sampler) {
     return *this;
 }
 
+ShaderCursor& ShaderCursor::write(const AccelerationStructureHandle& as) {
+    base_object->write(offset, as);
+    return *this;
+}
+
 ShaderCursor& ShaderCursor::write(const void* data, std::size_t size) {
     base_object->write(offset, data, size);
     return *this;

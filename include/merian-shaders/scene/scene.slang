@@ -14,10 +14,15 @@ struct Hit {
     uint primitive_id;
     uint geometry_index;
 
-    __init(uint instance_id, uint primitive_id, uint geometry_index) {
+    // Barycentric coordinates of the hit point (u, v).
+    // The third coordinate is 1 - u - v.
+    float2 barycentrics;
+
+    __init(uint instance_id, uint primitive_id, uint geometry_index, float2 barycentrics) {
         this.instance_id = instance_id;
         this.primitive_id = primitive_id;
         this.geometry_index = geometry_index;
+        this.barycentrics = barycentrics;
     }
 
     // invalid hit
@@ -25,10 +30,16 @@ struct Hit {
         this.instance_id = uint(-1);
         this.primitive_id = uint(-1);
         this.geometry_index = uint(-1);
+        this.barycentrics = float2(0);
     }
 
     bool is_valid() {
         return instance_id != uint(-1);
+    }
+
+    // Returns (1 - u - v, u, v) for vertex interpolation
+    float3 get_barycentrics3() {
+        return float3(1.0 - barycentrics.x - barycentrics.y, barycentrics.x, barycentrics.y);
     }
 }
 
@@ -48,7 +59,7 @@ struct Scene {
     StructuredBuffer<uint3> index_buffers[merian_scene_index_buffers_count];
     // indexed with instance_id, offset.
     StructuredBuffer<VertexData> vertex_buffers[merian_scene_vertex_buffers_count];
-    // indexed with instance_id, geometry_index. Only for dynamic meshes only
+    // indexed with instance_id, geometry_index. Only for dynamic meshes
     StructuredBuffer<PrevVertexData> prev_vertex_buffers[merian_scene_prev_vertex_buffers_count];
     // indexed with (instance_id + geometry_index). The CPU side ensures that instance_ids are
     // offset correctly.
@@ -79,7 +90,7 @@ struct Scene {
 
         if (rq.CommittedStatus() == COMMITTED_TRIANGLE_HIT) {
             return Hit(rq.CommittedInstanceID(), rq.CommittedPrimitiveIndex(),
-                       rq.CommittedGeometryIndex());
+                       rq.CommittedGeometryIndex(), rq.CommittedRayBarycentrics());
         }
 
         return Hit();
@@ -141,18 +152,23 @@ struct Scene {
 
     // -----------------------------------------
 
-    void _proceed_ray<RQ : IRayQuery>(inout RQ rq) {
+    // NOTE: Using concrete RayQuery instead of generic <RQ : IRayQuery> to work around
+    // Slang SPIR-V codegen crash in IRBuilder::getSet() with generics (Slang 2026.5.2).
+    void _proceed_ray(inout RayQuery rq) {
         while (rq.Proceed()) {
 
             if (rq.CandidateType() == CANDIDATE_NON_OPAQUE_TRIANGLE) {
                 const GeometryData geometry_data =
                     get_geometry_data(rq.CandidateInstanceID(), rq.CandidateGeometryIndex());
 
+                float2 bary = rq.CandidateRayBarycentrics();
+                float3 bary3 = float3(1.0 - bary.x - bary.y, bary.x, bary.y);
+
                 if (material_system.alpha_test(geometry_data.material_id,
                                                get_uv(geometry_data.index_buffer_index,
                                                       rq.CandidatePrimitiveIndex(),
                                                       geometry_data.vertex_buffer_index,
-                                                      rq.CandidateRayBarycentrics2()))) {
+                                                      bary3))) {
                     continue;
                 }
 

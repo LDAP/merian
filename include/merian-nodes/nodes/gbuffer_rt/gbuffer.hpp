@@ -1,10 +1,10 @@
 #pragma once
 
-#include "merian-nodes/connectors/image/vk_image_in_sampled.hpp"
 #include "merian-nodes/connectors/image/vk_image_out_managed.hpp"
+#include "merian-nodes/connectors/ptr_in.hpp"
 #include "merian-nodes/graph/node.hpp"
+#include "merian-shaders/scene/scene.hpp"
 
-#include "merian/shader/shader_compile_context.hpp"
 #include "merian/shader/shader_object.hpp"
 #include "merian/shader/shader_object_allocator.hpp"
 #include "merian/shader/slang_entry_point.hpp"
@@ -13,18 +13,15 @@
 
 namespace merian {
 
-/**
- * @brief Test node for the ShaderObject/ShaderCursor API.
- *
- * A simple compute node that takes a sampled image input and writes a packed GBuffer output.
- * This serves as a placeholder/test for the Slang parameter binding system.
- */
 class GBufferRTNode : public Node {
 
   public:
     GBufferRTNode();
 
     ~GBufferRTNode() override = default;
+
+    DeviceSupportInfo
+    query_device_support(const DeviceSupportQueryInfo& query_info) override;
 
     void initialize(const ContextHandle& context,
                     const ResourceAllocatorHandle& allocator) override;
@@ -39,31 +36,30 @@ class GBufferRTNode : public Node {
     void
     process(GraphRun& run, const DescriptorSetHandle& descriptor_set, const NodeIO& io) override;
 
+    NodeStatusFlags properties(Properties& config) override;
+
   private:
     ContextHandle context;
     ResourceAllocatorHandle resource_allocator;
+    ShaderCompileContextHandle compile_context;
 
     // Connectors
-    VkSampledImageInHandle con_src = VkSampledImageIn::compute_read();
-    ManagedVkImageOutHandle con_out;
+    PtrInHandle<Scene> con_scene = PtrIn<Scene>::create();
+    ManagedVkImageOutHandle con_position;
+    ManagedVkImageOutHandle con_normal;
+    ManagedVkImageOutHandle con_albedo;
+
+    // Resolution
+    vk::Extent3D extent = vk::Extent3D{1920, 1080, 1};
 
     // Slang program + pipeline
-    ShaderCompileContextHandle compile_context;
     SlangProgramHandle program;
     SlangProgramEntryPointHandle entry_point;
     PipelineHandle pipeline;
 
-    // ShaderObject for parameter binding
-    ShaderObjectHandle params;
+    // ShaderObject for GBuffer output parameter
+    ShaderObjectHandle gbuffer_obj;
     std::shared_ptr<FrameCachingShaderObjectAllocator> obj_allocator;
-
-    // Test sub-objects created explicitly via write(ShaderObjectHandle)
-    ShaderObjectHandle manual_cb_obj;
-    ShaderObjectHandle manual_pb_obj;
-
-    // Reassignment test: replaced after N frames
-    ShaderObjectHandle replace_cb_obj;
-    uint32_t frame_count = 0;
 };
 
 } // namespace merian

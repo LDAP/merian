@@ -357,6 +357,52 @@ void GLTFScene::load(const CommandBufferHandle& cmd, const std::filesystem::path
 
     compute_world_transforms();
 
+    // Load cameras from nodes that reference a glTF camera
+    for (size_t ni = 0; ni < model.nodes.size(); ni++) {
+        const auto& gnode = model.nodes[ni];
+        if (gnode.camera < 0 || gnode.camera >= static_cast<int>(model.cameras.size()))
+            continue;
+
+        const auto& gcam = model.cameras[gnode.camera];
+        NodeID nid = node_map[ni];
+
+        // Extract position and orientation from the node's world transform
+        const float4x4& xform = get_scene_graph()[nid].global_transform;
+        // Columns of the rotation part (merian row-major convention: row = column)
+        float3 right   = normalize(float3(xform[0][0], xform[0][1], xform[0][2]));
+        float3 up_vec  = normalize(float3(xform[1][0], xform[1][1], xform[1][2]));
+        float3 forward = normalize(float3(xform[2][0], xform[2][1], xform[2][2]));
+        float3 eye     = float3(xform[3][0], xform[3][1], xform[3][2]);
+
+        // glTF cameras look down -Z in local space
+        float3 center = eye - forward;
+
+        float fov = 60.f;
+        float aspect = 1.f;
+        float znear = 0.01f;
+        float zfar = 1000.f;
+
+        if (gcam.type == "perspective") {
+            fov = static_cast<float>(glm::degrees(gcam.perspective.yfov));
+            if (gcam.perspective.aspectRatio > 0)
+                aspect = static_cast<float>(gcam.perspective.aspectRatio);
+            znear = static_cast<float>(gcam.perspective.znear);
+            if (gcam.perspective.zfar > 0)
+                zfar = static_cast<float>(gcam.perspective.zfar);
+        }
+
+        add_camera(std::make_shared<Camera>(eye, center, up_vec, fov, aspect, znear, zfar));
+        SPDLOG_INFO("GLTFScene: loaded {} camera '{}' at ({},{},{})",
+                    gcam.type, gcam.name, eye.x, eye.y, eye.z);
+    }
+
+    // Fallback: add a default camera if the scene doesn't have one
+    if (!get_active_camera()) {
+        add_camera(std::make_shared<Camera>(
+            float3(3, 3, 3), float3(0, 0, 0), float3(0, 1, 0), 60.f, 1920.f / 1080.f, 0.01f, 1000.f));
+        SPDLOG_INFO("GLTFScene: no cameras in file, using default camera");
+    }
+
     // Gather stats
     size_t total_vertices = 0;
     size_t total_triangles = 0;

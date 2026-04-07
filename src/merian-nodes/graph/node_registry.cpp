@@ -8,6 +8,7 @@
 #include "merian-nodes/nodes/exposure/exposure.hpp"
 #include "merian-nodes/nodes/fxaa/fxaa.hpp"
 #include "merian-nodes/nodes/gbuffer_rt/gbuffer.hpp"
+#include "merian-nodes/nodes/gltf_scene/gltf_scene_node.hpp"
 #include "merian-nodes/nodes/image_read/hdr_image.hpp"
 #include "merian-nodes/nodes/image_read/ldr_image.hpp"
 #include "merian-nodes/nodes/image_write/image_write.hpp"
@@ -46,6 +47,7 @@ NodeRegistry::NodeRegistry() {
                              "anti-aliasing algorithm created by Timothy Lottes at NVIDIA.");
     register_node_type<GBufferRTNode>(
         "GBuffer (Raytraced)", "Creates a GBuffer for the Merian scene format using Raytracing.");
+    register_node_type<GLTFSceneNode>("GLTF Scene", "Loads a glTF/GLB scene file.");
     register_node_type<WindowNode>("Window", "Outputs to a window.");
     register_node_type<HDRImageRead>("HDR Image", "Loads an HDR image.");
     register_node_type<LDRImageRead>("LDR Image", "Loads a LDR image.");

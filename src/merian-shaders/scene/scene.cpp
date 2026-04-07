@@ -460,7 +460,7 @@ void Scene::update(const CommandBufferHandle& cmd, const float time, const float
     c["time_diff"] = time_diff;
 
     if (build_as && tlas) {
-        c["as"] = tlas;
+        c["as"]["as"] = tlas;
     }
 
     auto cam = get_active_camera();

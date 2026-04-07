@@ -7,7 +7,8 @@ namespace merian {
 
 interface IRayQuery {
     uint CommittedStatus();
-    uint CommittedInstanceID();
+    uint CommittedInstanceID(); // user-defined ID assigned to the instance when the TLAS was built,
+                                // CommitedInstanceIndex() is the fixed instance index.
     uint CommittedPrimitiveIndex();
     uint CommittedGeometryIndex();
     float2 CommittedRayBarycentrics();
@@ -74,21 +75,46 @@ struct HWAccelerationStructure : AccelerationStructure {
 // ---------------------------------------
 
 struct NullRayQuery : IRayQuery {
-    uint CommittedStatus() { return COMMITTED_NOTHING; }
-    uint CommittedInstanceID() { return 0; }
-    uint CommittedPrimitiveIndex() { return 0; }
-    uint CommittedGeometryIndex() { return 0; }
-    float2 CommittedRayBarycentrics() { return float2(0); }
+    uint CommittedStatus() {
+        return COMMITTED_NOTHING;
+    }
+    uint CommittedInstanceID() {
+        return 0;
+    }
+    uint CommittedPrimitiveIndex() {
+        return 0;
+    }
+    uint CommittedGeometryIndex() {
+        return 0;
+    }
+    float2 CommittedRayBarycentrics() {
+        return float2(0);
+    }
 
-    uint CandidateType() { return 0; }
-    uint CandidateInstanceID() { return 0; }
-    uint CandidatePrimitiveIndex() { return 0; }
-    uint CandidateGeometryIndex() { return 0; }
-    float2 CandidateRayBarycentrics() { return float2(0); }
+    uint CandidateType() {
+        return 0;
+    }
+    uint CandidateInstanceID() {
+        return 0;
+    }
+    uint CandidatePrimitiveIndex() {
+        return 0;
+    }
+    uint CandidateGeometryIndex() {
+        return 0;
+    }
+    float2 CandidateRayBarycentrics() {
+        return float2(0);
+    }
 
-    [mutating] bool Proceed() { return false; }
-    [mutating] void CommitNonOpaqueTriangleHit() {}
-    [mutating] void CommitProceduralPrimitiveHit(float t) {}
+    [mutating]
+    bool Proceed() {
+        return false;
+    }
+    [mutating]
+    void CommitNonOpaqueTriangleHit() {}
+    [mutating]
+    void CommitProceduralPrimitiveHit(float t) {}
 }
 
 struct NullAccelerationStructure : AccelerationStructure {
@@ -103,3 +129,29 @@ struct NullAccelerationStructure : AccelerationStructure {
 }
 
 }
+
+    
+    
+    
+        
+    
+    
+        
+    
+        
+    
+        
+    
+        
+    
+        
+    
+        
+    
+        
+    
+        
+    
+        
+    
+        

@@ -119,6 +119,7 @@ class ShaderObject : public std::enable_shared_from_this<ShaderObject> {
     void write(const ShaderOffset& offset, const BufferHandle& buffer);
     void write(const ShaderOffset& offset, const TextureHandle& texture);
     void write(const ShaderOffset& offset, const SamplerHandle& sampler);
+    void write(const ShaderOffset& offset, const AccelerationStructureHandle& as);
     void write(const ShaderOffset& offset, const void* data, std::size_t size);
 
     // ---------------------------------------------------------------

@@ -226,6 +226,7 @@ merian_dep = declare_dependency(
         spdlog,
         spirv_reflect,
         tinybvh,
+        tgltf,
         tol,
         vma,
         vulkan,

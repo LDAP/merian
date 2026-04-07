@@ -16,6 +16,7 @@ merian_nodes_lib = static_library(
         spdlog,
         spirv_reflect,
         stb,
+        tgltf,
         vma,
         vulkan,
     ],

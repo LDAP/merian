@@ -64,6 +64,7 @@ class ShaderCursor {
     ShaderCursor& write(const BufferHandle& buffer);
     ShaderCursor& write(const TextureHandle& texture);
     ShaderCursor& write(const SamplerHandle& sampler);
+    ShaderCursor& write(const AccelerationStructureHandle& as);
     ShaderCursor& write(const void* data, std::size_t size);
     template <class T> ShaderCursor& write(const T& data) {
         write(&data, sizeof(T));
@@ -83,6 +84,9 @@ class ShaderCursor {
     }
     ShaderCursor& operator=(const SamplerHandle& sampler) {
         return write(sampler);
+    }
+    ShaderCursor& operator=(const AccelerationStructureHandle& as) {
+        return write(as);
     }
     template <class T> ShaderCursor& operator=(const T& data) {
         return write(data);

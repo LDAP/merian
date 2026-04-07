@@ -301,6 +301,19 @@ void ShaderObject::write(const ShaderOffset& offset, const SamplerHandle& sample
     });
 }
 
+void ShaderObject::write(const ShaderOffset& offset, const AccelerationStructureHandle& as) {
+    const auto& info = object_layout->get_binding_range_info(offset.binding_range_offset);
+    assert(info.type == slang::BindingType::RayTracingAccelerationStructure);
+    assert(offset.binding_array_index < info.count);
+
+    descriptors->queue_descriptor_write_acceleration_structure(info.binding, as,
+                                                               offset.binding_array_index);
+    for_each_registered_set([&](DescriptorContainer& set) {
+        set.queue_descriptor_write_acceleration_structure(info.binding, as,
+                                                          offset.binding_array_index);
+    });
+}
+
 void ShaderObject::write(const ShaderOffset& offset, const void* data, const std::size_t size) {
     if (!ordinary_data_staging.empty()) {
         assert(offset.uniform_byte_offset + size <= ordinary_data_staging.size());

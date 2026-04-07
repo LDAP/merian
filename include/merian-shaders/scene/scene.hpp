@@ -103,6 +103,10 @@ class Scene : public Versionable,
     CameraHandle get_active_camera() const;
     void set_active_camera(uint32_t index);
 
+    bool has_geometry() const {
+        return !meshes.empty();
+    }
+
     const std::vector<SceneNode>& get_scene_graph() const {
         return scene_graph;
     }
