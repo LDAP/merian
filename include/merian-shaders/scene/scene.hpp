@@ -111,6 +111,13 @@ class Scene : public Versionable,
         return scene_graph;
     }
 
+    // Bake single-instance dynamic mesh world transforms on CPU at upload time
+    // (small scenes / debugging). Static meshes are always pre-transformed.
+    bool get_pretransform_dynamic() const {
+        return pretransform_dynamic;
+    }
+    void set_pretransform_dynamic(bool value);
+
   protected:
     virtual void on_update(float time, float time_diff) {
         (void)time;
@@ -125,6 +132,7 @@ class Scene : public Versionable,
 
     std::vector<Mesh> meshes;
     std::vector<SceneNode> scene_graph;
+    bool pretransform_dynamic = false;
 
   private:
     void update_composition_constants();
@@ -152,6 +160,7 @@ class Scene : public Versionable,
     std::vector<BufferHandle> vertex_buffers;
     std::vector<BufferHandle> index_buffers;
     BufferHandle geometry_data_buffer;
+    BufferHandle instance_transforms_buffer;
 
     bool build_as = false;
     std::optional<ASBuilder> as_builder;

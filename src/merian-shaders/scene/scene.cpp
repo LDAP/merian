@@ -1,6 +1,7 @@
 #include "merian-shaders/scene/scene.hpp"
 
 #include "merian/shader/slang_program.hpp"
+#include "merian/utils/normal_encoding.hpp"
 
 #include <cassert>
 #include <fmt/format.h>
@@ -8,6 +9,63 @@
 #include <unordered_map>
 
 namespace merian {
+
+namespace {
+
+// Transform a 3x3 direction vector by the upper-left 3x3 of a 4x4.
+float3 mul3x3(const float4x4& m, const float3& v) {
+    return float3(m[0][0] * v.x + m[0][1] * v.y + m[0][2] * v.z,
+                  m[1][0] * v.x + m[1][1] * v.y + m[1][2] * v.z,
+                  m[2][0] * v.x + m[2][1] * v.y + m[2][2] * v.z);
+}
+
+// Bake world transform into a copy of `mesh`. Positions: M*p. Normals use
+// inverse-transpose of M_3x3. Tangents use M_3x3 directly (sign bit kept).
+Mesh apply_world_transform(const Mesh& mesh, const float4x4& M) {
+    Mesh out = mesh;
+
+    float3x3 M3;
+    for (int i = 0; i < 3; i++)
+        for (int j = 0; j < 3; j++)
+            M3[i][j] = M[i][j];
+    const float3x3 N = transpose(inverse(M3));
+
+    for (auto& vd : out.vertices) {
+        vd.position = float3(
+            M[0][0] * vd.position.x + M[0][1] * vd.position.y + M[0][2] * vd.position.z + M[0][3],
+            M[1][0] * vd.position.x + M[1][1] * vd.position.y + M[1][2] * vd.position.z + M[1][3],
+            M[2][0] * vd.position.x + M[2][1] * vd.position.y + M[2][2] * vd.position.z + M[2][3]);
+
+        const float3 n_obj = decode_normal(vd.encoded_normal);
+        vd.encoded_normal = encode_normal(normalize(
+            float3(N[0][0] * n_obj.x + N[0][1] * n_obj.y + N[0][2] * n_obj.z,
+                   N[1][0] * n_obj.x + N[1][1] * n_obj.y + N[1][2] * n_obj.z,
+                   N[2][0] * n_obj.x + N[2][1] * n_obj.y + N[2][2] * n_obj.z)));
+
+        const uint32_t sign_bit = vd.encoded_tangent & 1u;
+        const float3 t_obj = decode_normal(vd.encoded_tangent & ~1u);
+        vd.encoded_tangent = (encode_normal(normalize(mul3x3(M, t_obj))) & ~1u) | sign_bit;
+    }
+
+    return out;
+}
+
+struct AffineTransform3x4 {
+    float m[3][4];
+};
+static_assert(sizeof(AffineTransform3x4) == 48);
+
+AffineTransform3x4 to_3x4(const float4x4& t) {
+    AffineTransform3x4 out;
+    for (int row = 0; row < 3; row++)
+        for (int col = 0; col < 4; col++)
+            out.m[row][col] = t[row][col];
+    return out;
+}
+
+constexpr AffineTransform3x4 IDENTITY_3X4 = {{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}}};
+
+} // namespace
 
 // ---------------------------------------------------------------------------
 // Composition & Layout
@@ -130,12 +188,21 @@ void Scene::set_active_camera(const uint32_t index) {
     active_camera = index;
 }
 
+void Scene::set_pretransform_dynamic(bool value) {
+    if (pretransform_dynamic == value)
+        return;
+    pretransform_dynamic = value;
+    geometry_dirty = true;
+    bvh_dirty = true;
+}
+
 void Scene::compute_world_transforms() {
     for (auto& node : scene_graph) {
         if (node.parent == NODE_ID_INVALID) {
             node.global_transform = node.local_transform;
         } else {
-            node.global_transform = scene_graph[node.parent].global_transform * node.local_transform;
+            node.global_transform =
+                mul(scene_graph[node.parent].global_transform, node.local_transform);
         }
     }
 }
@@ -161,8 +228,8 @@ void Scene::create_mesh_groups() {
             continue;
 
         if (mesh.instances.size() == 1) {
-            // Non-instanced
-            if (mesh.flags & GeometryFlags::IsDynamic) {
+            const bool is_dynamic = mesh.flags & GeometryFlags::IsDynamic;
+            if (is_dynamic && !pretransform_dynamic) {
                 dynamic_by_node[*mesh.instances.begin()].push_back(mid);
             } else {
                 static_meshes.push_back(mid);
@@ -205,9 +272,9 @@ void Scene::create_mesh_groups() {
 
                 GeometryData gd{};
                 gd.material_id = meshes[mid].material_id;
-                // vertex/index buffer indices set during upload
                 gd.vertex_buffer_index = static_cast<uint16_t>(mid);
                 gd.index_buffer_index = static_cast<uint16_t>(mid);
+                gd.flags = group.is_static ? GEOMETRY_FLAG_PRETRANSFORMED : 0;
                 geometry_instance_data.push_back(gd);
 
                 geometry_instance_id++;
@@ -232,10 +299,28 @@ void Scene::upload_geometry_buffers(const CommandBufferHandle& cmd) {
     vertex_buffers.resize(meshes.size());
     index_buffers.resize(meshes.size());
 
+    // Meshes uploaded in a static group are baked into world space on CPU.
+    std::vector<bool> pretransform_mesh(meshes.size(), false);
+    for (const auto& group : mesh_groups) {
+        if (!group.is_static)
+            continue;
+        for (MeshID mid : group.mesh_list)
+            pretransform_mesh[mid] = true;
+    }
+
     for (MeshID mid = 0; mid < static_cast<MeshID>(meshes.size()); mid++) {
         const auto& mesh = meshes[mid];
         if (mesh.instances.empty())
             continue;
+
+        const VertexData* vertex_src = mesh.vertices.data();
+        std::vector<VertexData> baked_vertices;
+        if (pretransform_mesh[mid]) {
+            const NodeID nid = *mesh.instances.begin();
+            const Mesh baked = apply_world_transform(mesh, scene_graph[nid].global_transform);
+            baked_vertices = std::move(baked.vertices);
+            vertex_src = baked_vertices.data();
+        }
 
         auto vb = allocator->create_buffer(
             mesh.vertices.size() * sizeof(VertexData),
@@ -243,7 +328,7 @@ void Scene::upload_geometry_buffers(const CommandBufferHandle& cmd) {
                 vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR |
                 vk::BufferUsageFlagBits::eShaderDeviceAddress,
             MemoryMappingType::NONE, fmt::format("Scene::vb[{}]", mid));
-        allocator->get_staging()->cmd_to_device(cmd, vb, mesh.vertices.data(), 0,
+        allocator->get_staging()->cmd_to_device(cmd, vb, vertex_src, 0,
                                                 mesh.vertices.size() * sizeof(VertexData));
         vertex_buffers[mid] = vb;
 
@@ -267,6 +352,11 @@ void Scene::upload_geometry_buffers(const CommandBufferHandle& cmd) {
         allocator->get_staging()->cmd_to_device(
             cmd, geometry_data_buffer, geometry_instance_data.data(), 0,
             geometry_instance_data.size() * sizeof(GeometryData));
+
+        instance_transforms_buffer = allocator->create_buffer(
+            geometry_instance_data.size() * sizeof(AffineTransform3x4),
+            vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
+            MemoryMappingType::NONE, "Scene::instance_transforms");
     }
 
     // Barrier: all geometry transfers → shader reads + AS build reads
@@ -442,6 +532,30 @@ void Scene::update(const CommandBufferHandle& cmd, const float time, const float
         bvh_dirty = false;
     }
 
+    // Upload instance transforms each frame (dynamic groups change every frame).
+    if (instance_transforms_buffer && !geometry_instance_data.empty()) {
+        std::vector<AffineTransform3x4> transforms(geometry_instance_data.size(), IDENTITY_3X4);
+        uint32_t geom_id = 0;
+        for (const auto& group : mesh_groups) {
+            const auto& instances = meshes[group.mesh_list[0]].instances;
+            auto node_it = instances.begin();
+            for (uint32_t inst_idx = 0; inst_idx < instances.size(); inst_idx++, ++node_it) {
+                for (uint32_t geom_idx = 0; geom_idx < group.mesh_list.size(); geom_idx++) {
+                    if (!group.is_static) {
+                        transforms[geom_id] = to_3x4(scene_graph[*node_it].global_transform);
+                    }
+                    geom_id++;
+                }
+            }
+        }
+        allocator->get_staging()->cmd_to_device(cmd, instance_transforms_buffer, transforms.data(),
+                                                0, transforms.size() * sizeof(AffineTransform3x4));
+        cmd->barrier(vk::MemoryBarrier2{
+            vk::PipelineStageFlagBits2::eTransfer, vk::AccessFlagBits2::eTransferWrite,
+            vk::PipelineStageFlagBits2::eAllCommands, vk::AccessFlagBits2::eShaderRead,
+        });
+    }
+
     auto c = shader_object->get_cursor();
     for (uint32_t i = 0; i < vertex_buffers.size(); i++) {
         if (vertex_buffers[i])
@@ -453,6 +567,8 @@ void Scene::update(const CommandBufferHandle& cmd, const float time, const float
     }
     if (geometry_data_buffer)
         c["geometries"] = geometry_data_buffer;
+    if (instance_transforms_buffer)
+        c["instance_transforms"] = instance_transforms_buffer;
 
     c["material_system"] = material_system->get_shader_object();
     c["frame"] = frame;

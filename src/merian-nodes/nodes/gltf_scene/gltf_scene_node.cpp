@@ -6,6 +6,11 @@ namespace merian {
 
 GLTFSceneNode::GLTFSceneNode() : Node() {}
 
+DeviceSupportInfo GLTFSceneNode::query_device_support(const DeviceSupportQueryInfo& query_info) {
+    return DeviceSupportInfo::check(query_info,
+                                    {"accelerationStructure", "scalarBlockLayout"});
+}
+
 void GLTFSceneNode::initialize(const ContextHandle& context,
                                const ResourceAllocatorHandle& allocator) {
     this->context = context;
@@ -54,6 +59,11 @@ GLTFSceneNode::NodeStatusFlags GLTFSceneNode::properties(Properties& config) {
     }
 
     if (scene) {
+        bool pretransform = scene->get_pretransform_dynamic();
+        if (config.config_bool("pretransform dynamic", pretransform,
+                               "Bake dynamic mesh transforms on CPU (debug / small scenes)")) {
+            scene->set_pretransform_dynamic(pretransform);
+        }
         config.output_text("nodes: {}, meshes: {}, materials: {}",
                            scene->get_scene_graph().size(), 0 /* no public mesh count */, 0);
     }

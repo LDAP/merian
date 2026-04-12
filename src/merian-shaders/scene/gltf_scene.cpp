@@ -45,9 +45,9 @@ template <typename T> T read_strided(const uint8_t* base, int byte_stride, size_
 
 float4x4 gltf_node_transform(const tinygltf::Node& node) {
     if (node.matrix.size() == 16) {
-        // glTF matrices are column-major; GLM stores column-major too.
-        // Merian interprets GLM columns as rows (row-major convention),
-        // so we transpose: swap [i][j] <-> [j][i].
+        // glTF stores a 4x4 matrix column-major: node.matrix[col * 4 + row]
+        // holds the math element (row, col). Merian is row-major, so
+        // m[row][col] == math(row, col).
         float4x4 m;
         for (int col = 0; col < 4; col++)
             for (int row = 0; row < 4; row++)
@@ -60,9 +60,10 @@ float4x4 gltf_node_transform(const tinygltf::Node& node) {
     float4x4 S = identity();
 
     if (node.translation.size() == 3) {
-        T[3][0] = static_cast<float>(node.translation[0]);
-        T[3][1] = static_cast<float>(node.translation[1]);
-        T[3][2] = static_cast<float>(node.translation[2]);
+        // merian is row-major: translation in last column
+        T[0][3] = static_cast<float>(node.translation[0]);
+        T[1][3] = static_cast<float>(node.translation[1]);
+        T[2][3] = static_cast<float>(node.translation[2]);
     }
 
     if (node.rotation.size() == 4) {
@@ -70,7 +71,8 @@ float4x4 gltf_node_transform(const tinygltf::Node& node) {
         glm::quat q(static_cast<float>(node.rotation[3]), static_cast<float>(node.rotation[0]),
                     static_cast<float>(node.rotation[1]), static_cast<float>(node.rotation[2]));
         glm::mat4 rm = glm::mat4_cast(q);
-        // Transpose: GLM column-major -> merian row-major convention
+        // glm stores the rotation column-major; transpose into merian row-major
+        // so that R[row][col] == math(row, col).
         for (int i = 0; i < 4; i++)
             for (int j = 0; j < 4; j++)
                 R[i][j] = rm[j][i];
@@ -82,7 +84,7 @@ float4x4 gltf_node_transform(const tinygltf::Node& node) {
         S[2][2] = static_cast<float>(node.scale[2]);
     }
 
-    return T * R * S;
+    return mul(mul(T, R), S);
 }
 
 } // namespace
@@ -366,13 +368,11 @@ void GLTFScene::load(const CommandBufferHandle& cmd, const std::filesystem::path
         const auto& gcam = model.cameras[gnode.camera];
         NodeID nid = node_map[ni];
 
-        // Extract position and orientation from the node's world transform
+        // merian row-major: basis in columns 0..2, translation in column 3
         const float4x4& xform = get_scene_graph()[nid].global_transform;
-        // Columns of the rotation part (merian row-major convention: row = column)
-        float3 right   = normalize(float3(xform[0][0], xform[0][1], xform[0][2]));
-        float3 up_vec  = normalize(float3(xform[1][0], xform[1][1], xform[1][2]));
-        float3 forward = normalize(float3(xform[2][0], xform[2][1], xform[2][2]));
-        float3 eye     = float3(xform[3][0], xform[3][1], xform[3][2]);
+        float3 up_vec  = normalize(float3(xform[0][1], xform[1][1], xform[2][1]));
+        float3 forward = normalize(float3(xform[0][2], xform[1][2], xform[2][2]));
+        float3 eye     = float3(xform[0][3], xform[1][3], xform[2][3]);
 
         // glTF cameras look down -Z in local space
         float3 center = eye - forward;

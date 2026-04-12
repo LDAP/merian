@@ -36,6 +36,7 @@ void main(uint3 tid : SV_DispatchThreadID,
     }
 
     GeometryData gd = scene.get_geometry_data(hit.instance_id, hit.geometry_index);
+    GeometryID gid = hit.instance_id + hit.geometry_index;
     uint3 indices = scene.get_vertex_indices(gd.index_buffer_index, hit.primitive_id);
 
     VertexData v0 = scene.get_vertex_data(gd.vertex_buffer_index, indices.x);
@@ -44,12 +45,14 @@ void main(uint3 tid : SV_DispatchThreadID,
 
     float3 bary = hit.get_barycentrics3();
 
+    // Interpolate in object space, then transform once
     float3 pos = bary.x * v0.position + bary.y * v1.position + bary.z * v2.position;
+    pos = scene.to_world_position(gd, gid, pos);
 
-    // Flat geometric normal from triangle edges
     float3 edge1 = v1.position - v0.position;
     float3 edge2 = v2.position - v0.position;
     float3 normal = normalize(cross(edge1, edge2));
+    normal = scene.to_world_direction(gd, gid, normal);
 
     gbuffer.position[pixel] = float4(pos, length(pos - ray.Origin));
     gbuffer.normal[pixel] = float4(normal * 0.5 + 0.5, 1);

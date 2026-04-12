@@ -7,6 +7,8 @@
 
 namespace merian {
 
+static const uint16_t GEOMETRY_FLAG_PRETRANSFORMED = 0x1;
+
 /**
  * General description of geometry. In Merians scene each geometry has its own world transform and
  * material. Geometries are identified using an InstanceID and GeometryIndex (which map to the
@@ -14,10 +16,9 @@ namespace merian {
  */
 struct GeometryData {
     MaterialID material_id;
-    // might be uint(-1) if no index buffer. Used to access the descriptor array.
     uint16_t index_buffer_index;
-    // might be uint(-1) if no vertex buffer. Used to access the descriptor array.
     uint16_t vertex_buffer_index;
+    uint16_t flags;
 };
 
 // InstanceID + GeometryIndex
@@ -33,5 +34,11 @@ struct VertexData {
 struct PrevVertexData {
     float3 position;
 };
+
+#ifdef __cplusplus
+static_assert(sizeof(VertexData) == 24, "VertexData must match Slang scalar layout");
+static_assert(alignof(VertexData) == 4, "VertexData must be 4-byte aligned");
+static_assert(sizeof(GeometryData) == 8, "GeometryData layout mismatch");
+#endif
 
 }

@@ -16,4 +16,7 @@ uint32_t encode_normal(float* vec) noexcept;
 // almost like oct30
 uint32_t encode_normal(float3 vec) noexcept;
 
+// Inverse of encode_normal.
+float3 decode_normal(uint32_t enc) noexcept;
+
 } // namespace

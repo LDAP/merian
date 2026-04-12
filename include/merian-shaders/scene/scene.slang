@@ -55,15 +55,14 @@ typedef HWAccelerationStructure SceneAccelerationStructure;
 struct Scene {
     SceneAccelerationStructure as;
 
-    // indexed with instance_id, offset.
-    StructuredBuffer<uint3> index_buffers[merian_scene_index_buffers_count];
-    // indexed with instance_id, offset.
-    StructuredBuffer<VertexData> vertex_buffers[merian_scene_vertex_buffers_count];
-    // indexed with instance_id, geometry_index. Only for dynamic meshes
-    StructuredBuffer<PrevVertexData> prev_vertex_buffers[merian_scene_prev_vertex_buffers_count];
-    // indexed with (instance_id + geometry_index). The CPU side ensures that instance_ids are
-    // offset correctly.
-    StructuredBuffer<GeometryData> geometries;
+    // Scalar layout matches packed C++ structs byte-for-byte.
+    StructuredBuffer<uint3, ScalarDataLayout> index_buffers[merian_scene_index_buffers_count];
+    StructuredBuffer<VertexData, ScalarDataLayout>
+        vertex_buffers[merian_scene_vertex_buffers_count];
+    StructuredBuffer<PrevVertexData, ScalarDataLayout>
+        prev_vertex_buffers[merian_scene_prev_vertex_buffers_count];
+    StructuredBuffer<GeometryData, ScalarDataLayout> geometries;
+    StructuredBuffer<float3x4, ScalarDataLayout> instance_transforms;
 
     ParameterBlock<MaterialSystem> material_system;
     EnvMap env_map;
@@ -148,6 +147,28 @@ struct Scene {
         return barycentrics.x * get_vertex_uv(vertex_buffer, indices.x) +
                barycentrics.y * get_vertex_uv(vertex_buffer, indices.y) +
                barycentrics.z * get_vertex_uv(vertex_buffer, indices.z);
+    }
+
+    float3x4 get_instance_transform(const GeometryID geometry_id) {
+        return instance_transforms[geometry_id];
+    }
+
+    float3x4 get_instance_transform(const uint instance_id, const uint geometry_index) {
+        return get_instance_transform(instance_id + geometry_index);
+    }
+
+    // Transform object-space position to world space. Skips load+multiply for pre-transformed geometry.
+    float3 to_world_position(const GeometryData gd, const GeometryID gid, const float3 object_pos) {
+        if (gd.flags & GEOMETRY_FLAG_PRETRANSFORMED)
+            return object_pos;
+        return mul(get_instance_transform(gid), float4(object_pos, 1.0));
+    }
+
+    // Transform object-space direction to world space. Skips load+multiply for pre-transformed geometry.
+    float3 to_world_direction(const GeometryData gd, const GeometryID gid, const float3 object_dir) {
+        if (gd.flags & GEOMETRY_FLAG_PRETRANSFORMED)
+            return object_dir;
+        return normalize(mul(get_instance_transform(gid), float4(object_dir, 0.0)));
     }
 
     // -----------------------------------------

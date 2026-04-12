@@ -114,38 +114,27 @@ TEST_F(SceneTest, SceneGraphTransforms) {
     auto scene = std::make_shared<TestScene>(compile_context, context, allocator, obj_allocator,
                                              material_system);
 
-    // Root node with translation
     SceneNode root;
     root.name = "root";
-    root.local_transform = float4x4(
-        1, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0, 1, 0,
-        2, 0, 0, 1); // translate x+2
+    root.local_transform = translation(float3(2, 0, 0));
     NodeID root_id = scene->add_node(root);
     EXPECT_EQ(root_id, 0u);
 
-    // Child node with its own translation
     SceneNode child;
     child.name = "child";
     child.parent = root_id;
-    child.local_transform = float4x4(
-        1, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0, 1, 0,
-        0, 3, 0, 1); // translate y+3
+    child.local_transform = translation(float3(0, 3, 0));
     NodeID child_id = scene->add_node(child);
     EXPECT_EQ(child_id, 1u);
 
     scene->compute_world_transforms();
 
     const auto& graph = scene->get_scene_graph();
-    // Root: global == local
-    EXPECT_FLOAT_EQ(graph[root_id].global_transform[3][0], 2.0f);
-    EXPECT_FLOAT_EQ(graph[root_id].global_transform[3][1], 0.0f);
-    // Child: global = root * child => translate (2, 3, 0)
-    EXPECT_FLOAT_EQ(graph[child_id].global_transform[3][0], 2.0f);
-    EXPECT_FLOAT_EQ(graph[child_id].global_transform[3][1], 3.0f);
+    EXPECT_FLOAT_EQ(graph[root_id].global_transform[0][3], 2.0f);
+    EXPECT_FLOAT_EQ(graph[root_id].global_transform[1][3], 0.0f);
+    // Child: global = mul(root, child) => translate (2, 3, 0)
+    EXPECT_FLOAT_EQ(graph[child_id].global_transform[0][3], 2.0f);
+    EXPECT_FLOAT_EQ(graph[child_id].global_transform[1][3], 3.0f);
 }
 
 // ---------------------------------------------------------------------------

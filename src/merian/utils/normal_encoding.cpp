@@ -28,4 +28,19 @@ uint32_t encode_normal(float3 vec) noexcept {
     return encode_normal(&vec.x);
 }
 
+float3 decode_normal(uint32_t enc) noexcept {
+    const int16_t* p = reinterpret_cast<const int16_t*>(&enc);
+    float x = p[0] / 32768.0f;
+    float y = p[1] / 32768.0f;
+    float z = 1.0f - fabsf(x) - fabsf(y);
+    if (z < 0.0f) {
+        const float ox = (1.0f - fabsf(y)) * (x < 0.0f ? -1.0f : 1.0f);
+        const float oy = (1.0f - fabsf(x)) * (y < 0.0f ? -1.0f : 1.0f);
+        x = ox;
+        y = oy;
+    }
+    const float len = sqrtf(x * x + y * y + z * z);
+    return float3(x / len, y / len, z / len);
+}
+
 } // namespace merian
