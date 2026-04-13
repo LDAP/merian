@@ -63,7 +63,7 @@ void main(int2 ipos: SV_DispatchThreadID) {
             float4(0) // Extra constants for 360 FXAA Console only.
         );
     else
-        output_color = img_src.Load(int3(ipos, 0));
+        output_color = img_src[ipos];
 
     img_output.Store(ipos, output_color);
 }

@@ -95,7 +95,7 @@ void main(const int2 pixel: SV_DispatchThreadID) {
         motion_vector *= -1;
     }
 
-    const float4 current_color = img_current_frame.Load(int3(pixel, 0));
+    const float4 current_color = img_current_frame[pixel];
     float4 previous_color =
         catmull_rom(img_previous_frame, (pixel + motion_vector + .5) / float2(resolution));
 

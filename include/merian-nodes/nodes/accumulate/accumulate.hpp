@@ -76,12 +76,19 @@ class Accumulate : public Node {
     static constexpr uint32_t FILTER_LOCAL_SIZE_Y = 16;
 
     // Graph IO
+    // binding 0
     VkSampledImageInHandle con_src = VkSampledImageIn::compute_read();
-    GBufferInHandle con_gbuf = GBufferIn::compute_read();
-    VkSampledImageInHandle con_mv = VkSampledImageIn::compute_read(0, true);
-
+    // bindings 1,2,3 (GBuffer: tex0, tex1, tex2)
+    VkSampledImageInHandle con_gbuf_tex0 = VkSampledImageIn::compute_read();
+    VkSampledImageInHandle con_gbuf_tex1 = VkSampledImageIn::compute_read();
+    VkSampledImageInHandle con_gbuf_tex2 = VkSampledImageIn::compute_read();
+    // binding 4
     VkSampledImageInHandle con_prev_out = VkSampledImageIn::compute_read(1);
-    GBufferInHandle con_prev_gbuf = GBufferIn::compute_read(1);
+    // bindings 5,6,7 (prev GBuffer: tex0, tex1, tex2)
+    VkSampledImageInHandle con_prev_gbuf_tex0 = VkSampledImageIn::compute_read(1);
+    VkSampledImageInHandle con_prev_gbuf_tex1 = VkSampledImageIn::compute_read(1);
+    VkSampledImageInHandle con_prev_gbuf_tex2 = VkSampledImageIn::compute_read(1);
+    // binding 8
     VkSampledImageInHandle con_prev_history = VkSampledImageIn::compute_read(1);
 
     ManagedVkImageOutHandle con_out;

@@ -2,6 +2,13 @@
 
 namespace merian {
 
+typealias RRWWTexture1D<T : ITexelElement, int access, int sampleCount = 0, int format = 0> =
+    _Texture<T, __Shape1D, 0, 0, sampleCount, access, 0, 0, format>;
+typealias RRWWTexture2D<T : ITexelElement, int access, int sampleCount = 0, int format = 0> =
+    _Texture<T, __Shape2D, 0, 0, sampleCount, access, 0, 0, format>;
+typealias RRWWTexture3D<T : ITexelElement, int access, int sampleCount = 0, int format = 0> =
+    _Texture<T, __Shape3D, 0, 0, sampleCount, access, 0, 0, format>;
+
 uint texture_dimensions<T : ITexelElement, int sampleCount, int access, int isCombined, int format>(
     const _Texture<T, __Shape1D, 0, 0, sampleCount, access, 0, isCombined, format> tex,
     const int level) {
@@ -170,7 +177,7 @@ T texelFetchClamp<T : ITexelElement, int sampleCount, int isCombined, int format
     int2 texel_coord, _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, isCombined, format> tex) {
     int2 coord =
         clamp(texel_coord, int2(0, 0), int2(texture_dimensions(tex, uint(0))) - int2(1, 1));
-    return tex.Load(int3(coord, 0));
+    return tex[coord];
 }
 
 // Find longest motion vector inside a window, return motion vector in texture space (i.e. [0,1]^2)!

@@ -1,13 +1,11 @@
 #pragma once
 
-#include "merian-nodes/connectors/connector_utils.hpp"
 #include "merian-nodes/connectors/image/vk_image_out_managed.hpp"
 #include "merian-nodes/connectors/ptr_in.hpp"
-#include "merian-nodes/connectors/ptr_out.hpp"
 #include "merian-nodes/graph/node.hpp"
 #include "merian-nodes/nodes/gbuffer_rt/gbuffer_resource.hpp"
-#include "merian-shaders/scene/scene.hpp"
 
+#include "merian/shader/shader_compile_context.hpp"
 #include "merian/shader/shader_object.hpp"
 #include "merian/shader/shader_object_allocator.hpp"
 #include "merian/shader/slang_entry_point.hpp"
@@ -16,22 +14,31 @@
 
 namespace merian {
 
-class GBufferRTNode : public Node {
+class GBufferDebugNode : public Node {
 
   public:
-    GBufferRTNode();
+    enum FieldSelect : int {
+        FIELD_NORMAL = 0,
+        FIELD_LINEAR_Z = 1,
+        FIELD_GRAD_Z = 2,
+        FIELD_DELTA_Z = 3,
+        FIELD_MOTION_VECTORS = 4,
+        FIELD_INSTANCE_ID = 5,
+        FIELD_PRIMITIVE_ID = 6,
+        FIELD_BARYCENTRICS = 7,
+    };
 
-    ~GBufferRTNode() override = default;
+    GBufferDebugNode();
 
-    DeviceSupportInfo
-    query_device_support(const DeviceSupportQueryInfo& query_info) override;
+    ~GBufferDebugNode() override = default;
 
     void initialize(const ContextHandle& context,
                     const ResourceAllocatorHandle& allocator) override;
 
     std::vector<InputConnectorDescriptor> describe_inputs() override;
 
-    std::vector<OutputConnectorDescriptor> describe_outputs(const NodeIOLayout& io_layout) override;
+    std::vector<OutputConnectorDescriptor>
+    describe_outputs(const NodeIOLayout& io_layout) override;
 
     NodeStatusFlags on_connected(const NodeIOLayout& io_layout,
                                  const DescriptorSetLayoutHandle& descriptor_set_layout) override;
@@ -47,28 +54,19 @@ class GBufferRTNode : public Node {
     ShaderCompileContextHandle compile_context;
 
     // Connectors
-    PtrInHandle<Scene> con_scene = PtrIn<Scene>::create();
-    PtrOutHandle<GBufferResource> con_gbuffer;
+    PtrInHandle<GBufferResource> con_gbuffer = PtrIn<GBufferResource>::create();
+    ManagedVkImageOutHandle con_output;
 
-    // Image connectors (managed by graph, also exposed individually)
-    ManagedVkImageOutHandle con_denoiser;
-    ManagedVkImageOutHandle con_hit_info;
-    ManagedVkImageOutHandle con_mv;
-
-    // Resolution
     vk::Extent3D extent = vk::Extent3D{1920, 1080, 1};
+    FieldSelect selected_field = FIELD_NORMAL;
 
     // Slang program + pipeline
     SlangProgramHandle program;
     SlangProgramEntryPointHandle entry_point;
     PipelineHandle pipeline;
 
-    // ShaderObject for GBuffer parameter
-    ShaderObjectHandle gbuffer_obj;
+    ShaderObjectHandle debug_gbuffer_obj;
     std::shared_ptr<FrameCachingShaderObjectAllocator> obj_allocator;
-
-    // GBuffer composition (for the gbuffer module)
-    SlangCompositionHandle gbuffer_composition;
 };
 
 } // namespace merian

@@ -51,7 +51,7 @@ void main(const int2 ipos: SV_DispatchThreadID) {
     if (not_on_texture(ipos, img_out))
         return;
 
-    float3 col0 = img_in.Load(int3(ipos, 0)).rgb;
+    float3 col0 = img_in[ipos].rgb;
     // Operates in rec2020
     col0 = rec709_to_rec2020(col0);
 

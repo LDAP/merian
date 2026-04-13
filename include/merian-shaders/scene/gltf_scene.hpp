@@ -3,7 +3,6 @@
 #include "merian-shaders/scene/scene.hpp"
 
 #include <filesystem>
-#include <string>
 
 namespace tinygltf {
 class Model;
@@ -20,12 +19,12 @@ class GLTFScene : public Scene {
               const ShaderObjectAllocatorHandle& obj_allocator,
               const MaterialSystemHandle& material_system);
 
-    // Load a glTF file (.gltf or .glb). Populates the scene graph, meshes, and materials.
-    // Must be called before the first update().
+    // Load a glTF file (.gltf or .glb)
     void load(const CommandBufferHandle& cmd, const std::filesystem::path& path);
 
   private:
-    void load_materials(const CommandBufferHandle& cmd, const tinygltf::Model& model,
+    void load_materials(const CommandBufferHandle& cmd,
+                        const tinygltf::Model& model,
                         const std::filesystem::path& base_dir);
     void load_node(const tinygltf::Model& model, int gltf_node_index, NodeID parent_id);
 

@@ -7,6 +7,7 @@
 #include "merian-nodes/nodes/color_image/color_output.hpp"
 #include "merian-nodes/nodes/exposure/exposure.hpp"
 #include "merian-nodes/nodes/fxaa/fxaa.hpp"
+#include "merian-nodes/nodes/gbuffer_debug/gbuffer_debug.hpp"
 #include "merian-nodes/nodes/gbuffer_rt/gbuffer.hpp"
 #include "merian-nodes/nodes/gltf_scene/gltf_scene_node.hpp"
 #include "merian-nodes/nodes/image_read/hdr_image.hpp"
@@ -45,6 +46,8 @@ NodeRegistry::NodeRegistry() {
     register_node_type<FXAA>("FXAA",
                              "Fast approximate anti-aliasing (FXAA) is a screen-space "
                              "anti-aliasing algorithm created by Timothy Lottes at NVIDIA.");
+    register_node_type<GBufferDebugNode>(
+        "GBuffer Debug", "Visualize GBuffer fields (normal, depth, hit info, motion vectors).");
     register_node_type<GBufferRTNode>(
         "GBuffer (Raytraced)", "Creates a GBuffer for the Merian scene format using Raytracing.");
     register_node_type<GLTFSceneNode>("GLTF Scene", "Loads a glTF/GLB scene file.");

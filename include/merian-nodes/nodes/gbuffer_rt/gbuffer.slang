@@ -1,26 +1,17 @@
 import merian_shaders.scene.scene;
-import merian_shaders.utils.encoding;
+import merian_shaders.gbuffer;
 
 namespace merian {
-
-struct GBufferOutput {
-    // .xyz = world position, .w = hit distance (< 0 = miss)
-    RWTexture2D<float4> position;
-    // .xyz = world normal (decoded), .w = 0
-    RWTexture2D<float4> normal;
-    // .xyzw = base color (albedo)
-    RWTexture2D<float4> albedo;
-};
 
 [shader("compute")]
 [numthreads(16, 16, 1)]
 void main(uint3 tid : SV_DispatchThreadID,
           ParameterBlock<Scene> scene,
-          ParameterBlock<GBufferOutput> gbuffer) {
+          ParameterBlock<WGBuffer> gbuffer) {
 
     uint2 pixel = tid.xy;
     uint2 dims;
-    gbuffer.position.GetDimensions(dims.x, dims.y);
+    gbuffer.tex0.GetDimensions(dims.x, dims.y);
     if (any(pixel >= dims))
         return;
 
@@ -28,10 +19,7 @@ void main(uint3 tid : SV_DispatchThreadID,
     Hit hit = scene.trace_ray(ray);
 
     if (!hit.is_valid()) {
-        // miss: blue-ish background so we can tell misses from errors
-        gbuffer.position[pixel] = float4(0, 0, 0, -1);
-        gbuffer.normal[pixel] = float4(0.1, 0.1, 0.3, 0);
-        gbuffer.albedo[pixel] = float4(0.1, 0.1, 0.3, 0);
+        gbuffer.clear(pixel);
         return;
     }
 
@@ -45,18 +33,41 @@ void main(uint3 tid : SV_DispatchThreadID,
 
     float3 bary = hit.get_barycentrics3();
 
-    // Interpolate in object space, then transform once
+    // Interpolate position in object space, then transform
     float3 pos = bary.x * v0.position + bary.y * v1.position + bary.z * v2.position;
     pos = scene.to_world_position(gd, gid, pos);
 
+    // Geometric normal from triangle edges
     float3 edge1 = v1.position - v0.position;
     float3 edge2 = v2.position - v0.position;
-    float3 normal = normalize(cross(edge1, edge2));
-    normal = scene.to_world_direction(gd, gid, normal);
+    float3 geo_normal = normalize(cross(edge1, edge2));
+    geo_normal = scene.to_world_direction(gd, gid, geo_normal);
 
-    gbuffer.position[pixel] = float4(pos, length(pos - ray.Origin));
-    gbuffer.normal[pixel] = float4(normal * 0.5 + 0.5, 1);
-    gbuffer.albedo[pixel] = float4(1, 1, 1, 1);
+    // Shading normal (use geometric for now, could interpolate vertex normals)
+    float3 shading_normal = geo_normal;
+
+    // Depth
+    float linear_z = length(pos - ray.Origin);
+
+    // Depth gradient: change of linear_z per pixel in x and y
+    float3 r_x = scene.camera.generate_ray_pinhole(pixel + uint2(1, 0), dims).Direction;
+    float3 r_y = scene.camera.generate_ray_pinhole(pixel + uint2(0, 1), dims).Direction;
+    float grad_z_x = dot(geo_normal, pos - ray.Origin) / dot(geo_normal, r_x) - linear_z;
+    float grad_z_y = dot(geo_normal, pos - ray.Origin) / dot(geo_normal, r_y) - linear_z;
+    half2 grad_z = half2(grad_z_x, grad_z_y);
+
+    // Delta z: difference in depth from previous frame camera
+    float3 prev_pos = pos; // TODO: use prev_vertex_buffers when available
+    float delta_z = length(prev_pos - scene.prev_camera.position) - linear_z;
+
+    // Motion vectors: project previous position onto previous camera
+    float2 prev_pixel = scene.prev_camera.project_pinhole(prev_pos, dims);
+    float2 mv = prev_pixel - float2(pixel);
+
+    // Store
+    gbuffer.store_surface(pixel, shading_normal, linear_z, grad_z, delta_z);
+    gbuffer.store_hit(pixel, hit);
+    gbuffer.store_motion_vectors(pixel, mv);
 }
 
 }

@@ -25,7 +25,7 @@ void main(int2 ipos: SV_DispatchThreadID) {
 
     switch (MODE) {
     case 0: {
-        img_out.Store(ipos, float4(img_src.Load(int3(ipos, 0)).rgb + pc.strength * bloom, 1));
+        img_out.Store(ipos, float4(img_src[ipos].rgb + pc.strength * bloom, 1));
         break;
     }
     case 1: {
@@ -33,7 +33,7 @@ void main(int2 ipos: SV_DispatchThreadID) {
         break;
     }
     case 2: {
-        img_out.Store(ipos, float4(img_src.Load(int3(ipos, 0)).rgb, 1));
+        img_out.Store(ipos, float4(img_src[ipos].rgb, 1));
         break;
     }
     }

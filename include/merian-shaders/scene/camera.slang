@@ -46,6 +46,21 @@ struct Camera {
         return ray;
     }
 
+    // Project a world-space position to fractional pixel coordinates using pinhole model.
+    // U, V, W must be orthogonal (standard pinhole camera).
+    float2 project_pinhole(const float3 world_pos, const uint2 frame_dimensions) {
+        float3 d = world_pos - position;
+        // t such that t*d lies on the focal plane (where W lives)
+        float t = dot(W, W) / dot(d, W);
+        float3 plane_pos = t * d - W;
+        float2 ndc = float2(dot(plane_pos, U) / dot(U, U),
+                            dot(plane_pos, V) / dot(V, V));
+        // Inverse of pixel_to_ndc: ndc = float2(2,-2) * p + float2(-1,1)
+        // => p = (ndc - float2(-1,1)) / float2(2,-2)
+        float2 p = (ndc - float2(-1, 1)) / float2(2, -2);
+        return p * float2(frame_dimensions) - float2(0.5, 0.5);
+    }
+
     RayDesc generate_ray_thinlens(const uint2 pixel, const uint2 frame_dimensions, inout RandomGenerator rng) {
         RayDesc ray;
         const float2 ndc = pixel_to_ndc(pixel, frame_dimensions);

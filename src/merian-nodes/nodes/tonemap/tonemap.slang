@@ -40,7 +40,7 @@ void main(int2 ipos: SV_DispatchThreadID) {
     if (not_on_texture(ipos, img_output))
         return;
 
-    const float4 rgb_in = img_src.Load(int3(ipos, 0));
+    const float4 rgb_in = img_src[ipos];
     float3 rgb_out;
 
     switch (tonemap) {

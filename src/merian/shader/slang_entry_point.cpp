@@ -179,10 +179,40 @@ PipelineLayoutHandle SlangProgramEntryPoint::get_pipeline_layout(const ContextHa
                                       global_nested_pb_infos);
         }
 
-        // Push constants
+        // Push constants: check global params first, then entry point
         push_constant_size = global_tl->getSize(SLANG_PARAMETER_CATEGORY_PUSH_CONSTANT_BUFFER);
         if (push_constant_size > 0) {
             builder.add_push_constant(static_cast<uint32_t>(push_constant_size));
+        }
+    }
+
+    // Also check entry point type layout for push constants
+    if (push_constant_size == 0) {
+        auto* entry_tl = entry_reflection->getTypeLayout();
+        if (entry_tl) {
+            push_constant_size =
+                entry_tl->getSize(SLANG_PARAMETER_CATEGORY_PUSH_CONSTANT_BUFFER);
+            if (push_constant_size > 0) {
+                builder.add_push_constant(static_cast<uint32_t>(push_constant_size));
+            }
+        }
+    }
+
+    // Scan global params for push constant bindings if still not found
+    if (push_constant_size == 0 && global_tl != nullptr) {
+        for (uint32_t br = 0; br < global_tl->getBindingRangeCount(); br++) {
+            if (global_tl->getBindingRangeType(br) == slang::BindingType::PushConstant) {
+                auto* leaf_tl = global_tl->getBindingRangeLeafTypeLayout(br);
+                if (leaf_tl) {
+                    // For ConstantBuffer<T>, the element type layout has the actual size
+                    auto* elem_tl = leaf_tl->getElementTypeLayout();
+                    push_constant_size = elem_tl ? elem_tl->getSize() : leaf_tl->getSize();
+                }
+                if (push_constant_size > 0) {
+                    builder.add_push_constant(static_cast<uint32_t>(push_constant_size));
+                }
+                break;
+            }
         }
     }
 

@@ -20,7 +20,7 @@ void main(int2 ipos: SV_DispatchThreadID) {
     const float exposure =
         min(max(max_luminance_to_exposure(luminance[0]), params.min_exposure), params.max_exposure);
 
-    float4 color = img_src.Load(int3(ipos, 0));
+    float4 color = img_src[ipos];
     color.rgb *= exposure;
 
     img_out.Store(ipos, color);

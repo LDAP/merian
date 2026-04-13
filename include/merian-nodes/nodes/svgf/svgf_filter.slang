@@ -79,7 +79,7 @@ float get_sigma_l(float center, int2 ipos) {
         for (int xx = -r; xx <= r; xx++) {
             if (xx != 0 || yy != 0) {
                 const int2 p = ipos + int2(xx, yy);
-                const float v = img_filter_in.Load(int3(p, 0)).a;
+                const float v = img_filter_in[p].a;
                 const float w = gaussian_kernel[xx + 1][yy + 1];
                 sum += v * w;
             }
@@ -145,14 +145,14 @@ void _tap(const int2 offset, const float kernel_weight) {
     float p_z;
     shmem_read(ipos_shared + offset, p_n, p_z, p_irr_var);
 #else
-    const float4 p_irr_var = img_filter_in.Load(int3(ipos + offset, 0));
-    const float3 p_n = decode_normal(img_gbuf_in.Load(int3(ipos + offset, 0)).x);
-    const float p_z = asfloat(img_gbuf_in.Load(int3(ipos + offset, 0)).y);
+    const float4 p_irr_var = img_filter_in[ipos + offset];
+    const float3 p_n = decode_normal(img_gbuf_in[ipos + offset].x);
+    const float p_z = asfloat(img_gbuf_in[ipos + offset].y);
 #endif
 
 #define grad_offset (offset * GAP)
 #else
-    const float4 p_irr_var = img_filter_in.Load(int3(ipos + offset, 0));
+    const float4 p_irr_var = img_filter_in[ipos + offset];
     const float3 p_n = GBuffer.load_and_decompress_normal(gbuffer, ipos + offset);
     const float p_z = GBuffer.load_and_decompress_linear_z(gbuffer, ipos + offset);
 #define grad_offset offset
@@ -185,8 +185,8 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
     ipos = int2(dispatch_thread_id);
     ipos_shared = int2(group_thread_id) + SVGF_FILTER_HALO_RADIUS;
 
-    filter_irr_var = img_filter_in.Load(int3(ipos, 0));
-    const uint3 c_gbuf = img_gbuf_in.Load(int3(ipos, 0)).rgb;
+    filter_irr_var = img_filter_in[ipos];
+    const uint3 c_gbuf = img_gbuf_in[ipos].rgb;
     c_n = decode_normal(c_gbuf.x);
     c_z = asfloat(c_gbuf.y);
     c_grad_z = unpackHalf2x16ToFloat(c_gbuf.z);
@@ -201,9 +201,9 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
                             shared_index, global_index)) {
             const int2 global_read =
                 texturewrap_mirror_repeat(global_index, texture_dimensions(img_filter_in, 0));
-            const uint3 p_gbuf = img_gbuf_in.Load(int3(global_read, 0)).rgb;
-            shmem_write(shared_index, img_filter_in.Load(int3(global_read, 0)),
-                        decode_normal(p_gbuf.x), asfloat(p_gbuf.y));
+            const uint3 p_gbuf = img_gbuf_in[global_read].rgb;
+            shmem_write(shared_index, img_filter_in[global_read], decode_normal(p_gbuf.x),
+                        asfloat(p_gbuf.y));
         }
         GroupMemoryBarrierWithGroupSync();
     }
@@ -215,8 +215,8 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
     if (not_on_texture(ipos, img_filter_out))
         return;
 
-    filter_irr_var = img_filter_in.Load(int3(ipos, 0));
-    const uint3 c_gbuf = img_gbuf_in.Load(uint3(ipos, 0)).rgb;
+    filter_irr_var = img_filter_in[ipos];
+    const uint3 c_gbuf = img_gbuf_in[ipos].rgb;
     c_n = decode_normal(c_gbuf.x);
     c_z = asfloat(c_gbuf.y);
     c_grad_z = unpackHalf2x16ToFloat(c_gbuf.z);
@@ -226,7 +226,7 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
     if (not_on_texture(ipos, img_filter_out))
         return;
 
-    filter_irr_var = img_filter_in.Load(int3(ipos, 0));
+    filter_irr_var = img_filter_in[ipos];
     const CompressedGBuffer c_gbuf = GBuffer.load_compressed(gbuffer, ipos);
     c_n = c_gbuf.decompress_normal();
     c_z = c_gbuf.decompress_linear_z();

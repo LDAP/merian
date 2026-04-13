@@ -40,10 +40,13 @@ void Accumulate::initialize(const ContextHandle& context,
 std::vector<InputConnectorDescriptor> Accumulate::describe_inputs() {
     return {
         {"src", con_src},
-        {"gbuffer", con_gbuf},
-        {"mv", con_mv},
+        {"gbuffer.tex0", con_gbuf_tex0},
+        {"gbuffer.tex1", con_gbuf_tex1},
+        {"gbuffer.tex2", con_gbuf_tex2},
         {"prev_out", con_prev_out},
-        {"prev_gbuffer", con_prev_gbuf},
+        {"prev_gbuffer.tex0", con_prev_gbuf_tex0},
+        {"prev_gbuffer.tex1", con_prev_gbuf_tex1},
+        {"prev_gbuffer.tex2", con_prev_gbuf_tex2},
         {"prev_history", con_prev_history},
     };
 }
@@ -133,7 +136,7 @@ Accumulate::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
     const uint32_t wg_rounded_irr_size_y = percentile_group_count_y * PERCENTILE_LOCAL_SIZE_Y;
     accum_spec_builder.add_entry(FILTER_LOCAL_SIZE_X, FILTER_LOCAL_SIZE_Y, wg_rounded_irr_size_x,
                                  wg_rounded_irr_size_y, filter_mode, extended_search, reuse_border,
-                                 enable_mv && io_layout.is_connected(con_mv));
+                                 enable_mv);
     const auto accum_spec = accum_spec_builder.build();
     accumulate = ComputePipeline::create(accum_pipe_layout, accumulate_module, accum_spec);
 

@@ -10,12 +10,8 @@ namespace merian {
 
 struct Hit {
     uint instance_id;
-
     uint primitive_id;
     uint geometry_index;
-
-    // Barycentric coordinates of the hit point (u, v).
-    // The third coordinate is 1 - u - v.
     float2 barycentrics;
 
     __init(uint instance_id, uint primitive_id, uint geometry_index, float2 barycentrics) {
@@ -55,7 +51,6 @@ typedef HWAccelerationStructure SceneAccelerationStructure;
 struct Scene {
     SceneAccelerationStructure as;
 
-    // Scalar layout matches packed C++ structs byte-for-byte.
     StructuredBuffer<uint3, ScalarDataLayout> index_buffers[merian_scene_index_buffers_count];
     StructuredBuffer<VertexData, ScalarDataLayout>
         vertex_buffers[merian_scene_vertex_buffers_count];
@@ -157,15 +152,18 @@ struct Scene {
         return get_instance_transform(instance_id + geometry_index);
     }
 
-    // Transform object-space position to world space. Skips load+multiply for pre-transformed geometry.
+    // Transform object-space position to world space. Skips load+multiply for pre-transformed
+    // geometry.
     float3 to_world_position(const GeometryData gd, const GeometryID gid, const float3 object_pos) {
         if (gd.flags & GEOMETRY_FLAG_PRETRANSFORMED)
             return object_pos;
         return mul(get_instance_transform(gid), float4(object_pos, 1.0));
     }
 
-    // Transform object-space direction to world space. Skips load+multiply for pre-transformed geometry.
-    float3 to_world_direction(const GeometryData gd, const GeometryID gid, const float3 object_dir) {
+    // Transform object-space direction to world space. Skips load+multiply for pre-transformed
+    // geometry.
+    float3
+    to_world_direction(const GeometryData gd, const GeometryID gid, const float3 object_dir) {
         if (gd.flags & GEOMETRY_FLAG_PRETRANSFORMED)
             return object_dir;
         return normalize(mul(get_instance_transform(gid), float4(object_dir, 0.0)));
@@ -188,8 +186,7 @@ struct Scene {
                 if (material_system.alpha_test(geometry_data.material_id,
                                                get_uv(geometry_data.index_buffer_index,
                                                       rq.CandidatePrimitiveIndex(),
-                                                      geometry_data.vertex_buffer_index,
-                                                      bary3))) {
+                                                      geometry_data.vertex_buffer_index, bary3))) {
                     continue;
                 }
 
@@ -200,3 +197,7 @@ struct Scene {
 }
 
 }
+
+ 
+ 
+ 

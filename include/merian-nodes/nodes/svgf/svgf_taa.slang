@@ -40,14 +40,14 @@ void main(const int2 ipos: SV_DispatchThreadID) {
     float2 mv;
     if (USE_MOTION_VECTORS) {
         if (MV_SAMPLING == 0)
-            mv = img_mv.Load(uint3(ipos, 0)).rg;
+            mv = img_mv[ipos].rg;
         else if (MV_SAMPLING == 1)
             mv = sample_motion_vector(img_mv, ipos, 1);
     } else {
         mv = float2(0);
     }
 
-    const float4 filter_result = img_filter_result.Load(uint3(ipos, 0));
+    const float4 filter_result = img_filter_result[ipos];
 
     if (DEBUG == 1) {
         img_out.Store(ipos, float4(filter_result.rgb, 1));

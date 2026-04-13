@@ -98,7 +98,7 @@ void main(uint3 ipos: SV_DispatchThreadID) {
     float max_history = pc.accum_max_hist;
     RandomGenerator rng = XorShift32(pcg3d16(uint3(ipos.xy, pc.iteration)));
     if (USE_MOTION_VECTORS) {
-        const float2 mv = img_mv.Load(ipos);
+        const float2 mv = gbuffer.get_motion_vectors(ipos.xy);
         float2 prev_pos = ipos.xy + mv;
 
         if (REUSE_BORDER) {
@@ -123,7 +123,7 @@ void main(uint3 ipos: SV_DispatchThreadID) {
     }
 
     // GET CURRENT PIXEL INFO
-    GBuffer gbuf = GBuffer::load(gbuffer, ipos.xy);
+    SurfaceData gbuf = gbuffer.load_surface(ipos.xy);
 
     // GET PREVIOUS PIXEL
     float prev_history = 0.0;
@@ -131,14 +131,14 @@ void main(uint3 ipos: SV_DispatchThreadID) {
 
     bool found = false;
     if (is_on_texture(prev_ipos, img_src)) {
-        const CompressedGBuffer prev_gbuf = GBuffer::load_compressed(prev_gbuffer, prev_ipos);
-        found = reprojection_valid(gbuf.get_normal(), prev_gbuf.decompress_normal(),
-                                   pc.normal_reject_cos, gbuf.get_linear_z(), gbuf.get_delta_z(),
-                                   prev_gbuf.decompress_linear_z(), pc.z_reject_percent);
+        const SurfaceData prev_gbuf = prev_gbuffer.load_surface(prev_ipos);
+        found = reprojection_valid(gbuf.normal, prev_gbuf.normal,
+                                   pc.normal_reject_cos, gbuf.linear_z, gbuf.delta_z,
+                                   prev_gbuf.linear_z, pc.z_reject_percent);
 
         if (found) {
-            prev_history = img_prev_history.Load(int3(prev_ipos, 0)).r;
-            prev_out = img_prev_out.Load(int3(prev_ipos, 0));
+            prev_history = img_prev_history[prev_ipos].r;
+            prev_out = img_prev_out[prev_ipos];
         }
     }
 
@@ -154,16 +154,16 @@ void main(uint3 ipos: SV_DispatchThreadID) {
                 if (not_on_texture(tc, img_src))
                     continue;
 
-                const CompressedGBuffer prev_gbuf = GBuffer::load_compressed(prev_gbuffer, tc);
+                const SurfaceData prev_gbuf = prev_gbuffer.load_surface(tc);
 
                 const float w = reprojection_weight(
-                    gbuf.get_normal(), prev_gbuf.decompress_normal(), pc.normal_reject_cos * 0.8,
-                    gbuf.get_linear_z(), gbuf.get_delta_z(), offset, gbuf.get_grad_z(),
-                    prev_gbuf.decompress_linear_z(), pc.z_reject_percent * 2.);
+                    gbuf.normal, prev_gbuf.normal, pc.normal_reject_cos * 0.8,
+                    gbuf.linear_z, gbuf.delta_z, offset, gbuf.grad_z,
+                    prev_gbuf.linear_z, pc.z_reject_percent * 2.);
 
                 if (w > 0.0001) {
-                    prev_history += w * img_prev_history.Load(uint3(tc, 0)).r;
-                    prev_out += w * img_prev_out.Load(uint3(tc, 0));
+                    prev_history += w * img_prev_history[tc].r;
+                    prev_out += w * img_prev_out[tc];
                     sum_w += w;
                 }
             }

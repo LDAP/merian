@@ -53,7 +53,7 @@ void main(int2 ipos: SV_DispatchThreadID, int local_index: SV_GroupIndex) {
         }
 
         if (mask) {
-            const float3 color = img_src.Load(int3(ipos, 0)).rgb;
+            const float3 color = img_src[ipos].rgb;
             const uint bin = get_bin(color, hist_size);
             InterlockedAdd(local_hist[bin], 1);
             InterlockedAdd(count, 1);

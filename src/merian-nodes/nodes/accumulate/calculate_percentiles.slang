@@ -33,7 +33,7 @@ void main(uint3 gl_WorkGroupID: SV_GroupID,
     int2 pixel = min(gl_GlobalInvocationID.xy, int2(merian::texture_dimensions(img_src)) - 1);
 
     // Sort luminance using odd even sort
-    sort[group_index] = merian::yuv_luminance(img_src.Load(int3(pixel, 0)).rgb);
+    sort[group_index] = merian::yuv_luminance(img_src[pixel].rgb);
     GroupMemoryBarrierWithGroupSync();
 
     if (group_index < workgroup_size - 1) {

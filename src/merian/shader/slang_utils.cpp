@@ -152,6 +152,11 @@ DescriptorSetLayoutHandle create_descriptor_set_layout_from_slang_type_layout(
         for (SlangInt dr = first_dr; dr < first_dr + dr_count; dr++) {
             const slang::BindingType binding_type =
                 type_layout->getDescriptorSetDescriptorRangeType(set_index, dr);
+
+            // PushConstants are not descriptors — skip them.
+            if (binding_type == slang::BindingType::PushConstant)
+                continue;
+
             SlangInt count =
                 type_layout->getDescriptorSetDescriptorRangeDescriptorCount(set_index, dr);
             const uint32_t binding =
