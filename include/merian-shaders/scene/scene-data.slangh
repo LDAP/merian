@@ -3,6 +3,8 @@
 #ifdef __cplusplus
 #include "merian-shaders/shading/materials/material-system-data.slangh"
 #include "merian-shaders/types.slang.h"
+#else
+import merian_shaders.utils.encoding;
 #endif
 
 namespace merian {
@@ -26,9 +28,18 @@ typedef uint32_t GeometryID;
 
 struct VertexData {
     float3 position;
-    uint encoded_normal;    // oct30 encoded (use encoding.slang)
+    uint encoded_normal; // oct30 encoded (use encoding.slang)
     half2 uv;
-    uint encoded_tangent;   // oct30 encoded + sign bit for bitangent handedness
+    uint encoded_tangent; // oct30 encoded + sign bit for bitangent handedness
+
+#ifndef __cplusplus
+    __init(float3 position, float3 normal, float2 uv, float3 tangent) {
+        this.position = position;
+        this.encoded_normal = encode_normal(normal);
+        this.uv = half2(uv);
+        this.encoded_tangent = encode_normal(tangent);
+    }
+#endif
 };
 
 struct PrevVertexData {

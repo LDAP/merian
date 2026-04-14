@@ -35,8 +35,10 @@ static constexpr NodeID NODE_ID_INVALID = UINT32_MAX;
 struct Mesh {
     std::vector<VertexData> vertices;
     std::vector<uint3> indices;
+
     MaterialID material_id;
     GeometryFlags flags = GeometryFlags::IsOpaque;
+
     // Set of scene graph nodes that instance this mesh.
     // Populated by add_mesh_instance. A mesh with >1 instance shares a BLAS.
     std::set<NodeID> instances;
@@ -45,14 +47,16 @@ struct Mesh {
 // Scene graph node (transform hierarchy).
 struct SceneNode {
     NodeID parent = NODE_ID_INVALID;
+
     std::string name;
+
     float4x4 local_transform = identity();
     float4x4 global_transform = identity();
+
     std::vector<NodeID> children;
 };
 
 // A group of meshes that share a BLAS.
-// Falcor pattern:
 // - Static non-instanced: all in one group, pre-transformed, TLAS identity.
 // - Dynamic non-instanced: grouped by shared globalMatrixID.
 // - Instanced: grouped by identical instance set (same NodeIDs).
@@ -61,8 +65,7 @@ struct MeshGroup {
     bool is_static = true;
 };
 
-class Scene : public Versionable,
-              public std::enable_shared_from_this<Scene> {
+class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
   public:
     Scene(const ShaderCompileContextHandle& compile_context,
           const ContextHandle& context,

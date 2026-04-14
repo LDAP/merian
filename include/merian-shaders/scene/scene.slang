@@ -6,6 +6,8 @@ __exported import merian_shaders.scene.environment_map;
 __exported import merian_shaders.shading.materials.material_system;
 __exported import merian_shaders.scene.scene_data;
 
+import merian_shaders.utils.encoding;
+
 namespace merian {
 
 struct Hit {
@@ -37,6 +39,10 @@ struct Hit {
     float3 get_barycentrics3() {
         return float3(1.0 - barycentrics.x - barycentrics.y, barycentrics.x, barycentrics.y);
     }
+
+    GeometryID get_geometry_id() {
+        return instance_id + geometry_index;
+    }
 }
 
 extern static const int merian_scene_index_buffers_count;
@@ -52,12 +58,19 @@ struct Scene {
     SceneAccelerationStructure as;
 
     StructuredBuffer<uint3, ScalarDataLayout> index_buffers[merian_scene_index_buffers_count];
+
     StructuredBuffer<VertexData, ScalarDataLayout>
         vertex_buffers[merian_scene_vertex_buffers_count];
     StructuredBuffer<PrevVertexData, ScalarDataLayout>
         prev_vertex_buffers[merian_scene_prev_vertex_buffers_count];
+
     StructuredBuffer<GeometryData, ScalarDataLayout> geometries;
+
     StructuredBuffer<float3x4, ScalarDataLayout> instance_transforms;
+    // StructuredBuffer<float3x4, ScalarDataLayout> inverse_transposed_instance_transforms;
+
+    // StructuredBuffer<float3x4, ScalarDataLayout> prev_instance_transforms;
+    // StructuredBuffer<float3x4, ScalarDataLayout> prev_inverse_transposed_instance_transforms;
 
     ParameterBlock<MaterialSystem> material_system;
     EnvMap env_map;
@@ -76,6 +89,10 @@ struct Scene {
 
     // -----------------------------------------
 
+    /* Traces the ray agains the scenes acceleration structure.
+     *
+     * Returns the hit information.
+     */
     Hit trace_ray(const RayDesc ray,
                   const uint ray_flags = RAY_FLAG_NONE,
                   const uint instances_mask = 0xff) {
@@ -90,6 +107,10 @@ struct Scene {
         return Hit();
     }
 
+    /* Traces the ray agains the scenes acceleration structure.
+     *
+     * Returns if visible, i.e. if nothing was hit.
+     */
     bool trace_visibility_ray(const RayDesc ray,
                               const uint ray_flags = RAY_FLAG_NONE,
                               const uint instances_mask = 0xff) {
@@ -99,74 +120,127 @@ struct Scene {
         return rq.CommittedStatus() == COMMITTED_NOTHING;
     }
 
+    // -----------------------------------------
+
+    // Loads the geometry data from memory.
     GeometryData get_geometry_data(const GeometryID geometry_id) {
         return geometries[geometry_id];
     }
 
+    // Loads the geometry data from memory.
     GeometryData get_geometry_data(const uint instance_id, const uint geometry_index) {
         return get_geometry_data(instance_id + geometry_index);
     }
 
-    MaterialID get_material_id(const GeometryID geometry_id) {
-        return get_geometry_data(geometry_id).material_id;
-    }
-
-    MaterialID get_material_id(const uint instance_id, const uint geometry_index) {
-        return get_geometry_data(instance_id, geometry_index).material_id;
-    }
-
-    // Convenience method for get_geometry_data(hit).material_id;
-    MaterialID get_material_id(const Hit hit) {
-        return get_material_id(hit.instance_id, hit.geometry_index);
-    }
-
-    uint3 get_vertex_indices(const uint index_buffer, const uint primitive_id) {
-        return index_buffers[index_buffer][primitive_id];
-    }
-
-    // interface might change.
-    VertexData get_vertex_data(const uint vertex_buffer, const uint vertex_index) {
-        return vertex_buffers[vertex_buffer][vertex_index];
-    }
-
-    float2 get_vertex_uv(const uint vertex_buffer, const uint vertex_index) {
-        return get_vertex_data(vertex_buffer, vertex_index).uv;
-    }
-
-    float2 get_uv(const uint index_buffer,
-                  const uint primitive_id,
-                  const uint vertex_buffer,
-                  const float3 barycentrics) {
-        const uint3 indices = get_vertex_indices(index_buffer, primitive_id);
-
-        return barycentrics.x * get_vertex_uv(vertex_buffer, indices.x) +
-               barycentrics.y * get_vertex_uv(vertex_buffer, indices.y) +
-               barycentrics.z * get_vertex_uv(vertex_buffer, indices.z);
-    }
-
+    // Loads the instance transform for a geometry from memory.
     float3x4 get_instance_transform(const GeometryID geometry_id) {
         return instance_transforms[geometry_id];
     }
 
-    float3x4 get_instance_transform(const uint instance_id, const uint geometry_index) {
-        return get_instance_transform(instance_id + geometry_index);
+    // Loads the inverse transposed instance transform for a geometry from memory (for transforming
+    // directions / normals).
+    float3x4 get_inverse_transposed_instance_transform(const GeometryID geometry_id) {
+        return instance_transforms[geometry_id];
+        // TODO:
+        // return inverse_transposed_instance_transforms[geometry_id];
     }
 
-    // Transform object-space position to world space. Skips load+multiply for pre-transformed
-    // geometry.
+    // Conventience method for get_geometry_data(...).material_id;.
+    MaterialID get_material_id(const GeometryID geometry_id) {
+        return get_geometry_data(geometry_id).material_id;
+    }
+
+    // Convenience method for get_geometry_data(...).material_id;
+    MaterialID get_material_id(const Hit hit) {
+        return get_material_id(hit.get_geometry_id());
+    }
+
+    // Loads the vertex indicens from memory.
+    uint3 get_vertex_indices(const uint index_buffer, const uint primitive_id) {
+        return index_buffers[index_buffer][primitive_id];
+    }
+
+    // Loads the vertex data from memory.
+    VertexData get_vertex_data(const uint vertex_buffer, const uint vertex_index) {
+        return vertex_buffers[vertex_buffer][vertex_index];
+    }
+
+    // Convenience method for get_vertex_data(...).uv
+    float2 get_vertex_uv(const uint vertex_buffer, const uint vertex_index) {
+        return get_vertex_data(vertex_buffer, vertex_index).uv;
+    }
+
+    vector<VertexData, 3> get_vertex_data(const GeometryData geometry_data,
+                                          const uint primitive_id,
+                                          const float3 barycentrics) {
+        const uint3 indices = get_vertex_indices(geometry_data.index_buffer_index, primitive_id);
+        return { get_vertex_data(geometry_data.vertex_buffer_index, indices.x),
+                 get_vertex_data(geometry_data.vertex_buffer_index, indices.y),
+                 get_vertex_data(geometry_data.vertex_buffer_index, indices.z) };
+    }
+
+    VertexData get_interpolated_vertex_data(const GeometryData geometry_data,
+                                            const uint primitive_id,
+                                            const float3 barycentrics) {
+        const uint3 indices = get_vertex_indices(geometry_data.index_buffer_index, primitive_id);
+
+        float3 position = float3(0);
+        float3 normal = float3(0);
+        float2 uv = float2(0);
+        float3 tangent = float3(0);
+
+        {
+            const VertexData v0 = get_vertex_data(geometry_data.vertex_buffer_index, indices.x);
+            position += barycentrics.x * v0.position;
+            normal += barycentrics.x * decode_normal(v0.encoded_normal);
+            uv += barycentrics.x * v0.uv;
+            tangent += barycentrics.x * decode_normal(v0.encoded_tangent);
+        }
+        {
+            const VertexData v1 = get_vertex_data(geometry_data.vertex_buffer_index, indices.y);
+            position += barycentrics.y * v1.position;
+            normal += barycentrics.y * decode_normal(v1.encoded_normal);
+            uv += barycentrics.y * v1.uv;
+            tangent += barycentrics.y * decode_normal(v1.encoded_tangent);
+        }
+        {
+            const VertexData v2 = get_vertex_data(geometry_data.vertex_buffer_index, indices.z);
+            position += barycentrics.z * v2.position;
+            normal += barycentrics.z * decode_normal(v2.encoded_normal);
+            uv += barycentrics.z * v2.uv;
+            tangent += barycentrics.z * decode_normal(v2.encoded_tangent);
+        }
+
+        return VertexData(position, normal, uv, tangent);
+    }
+
+    // Convenience method to load the vertices
+    float2 get_interpolated_uv(const GeometryData geometry_data,
+                               const uint primitive_id,
+                               const float3 barycentrics) {
+        const uint3 indices = get_vertex_indices(geometry_data.index_buffer_index, primitive_id);
+
+        return barycentrics.x * get_vertex_uv(geometry_data.vertex_buffer_index, indices.x) +
+               barycentrics.y * get_vertex_uv(geometry_data.vertex_buffer_index, indices.y) +
+               barycentrics.z * get_vertex_uv(geometry_data.vertex_buffer_index, indices.z);
+    }
+
+    // -----------------------------------------
+
+    // Transform object-space position to world space.
     float3 to_world_position(const GeometryData gd, const GeometryID gid, const float3 object_pos) {
         if (gd.flags & GEOMETRY_FLAG_PRETRANSFORMED)
             return object_pos;
         return mul(get_instance_transform(gid), float4(object_pos, 1.0));
     }
 
-    // Transform object-space direction to world space. Skips load+multiply for pre-transformed
-    // geometry.
+    // Transform object-space direction to world space.
     float3
     to_world_direction(const GeometryData gd, const GeometryID gid, const float3 object_dir) {
         if (gd.flags & GEOMETRY_FLAG_PRETRANSFORMED)
             return object_dir;
-        return normalize(mul(get_instance_transform(gid), float4(object_dir, 0.0)));
+        return normalize(
+            mul(get_inverse_transposed_instance_transform(gid), float4(object_dir, 0.0)));
     }
 
     // -----------------------------------------
@@ -183,10 +257,9 @@ struct Scene {
                 float2 bary = rq.CandidateRayBarycentrics();
                 float3 bary3 = float3(1.0 - bary.x - bary.y, bary.x, bary.y);
 
-                if (material_system.alpha_test(geometry_data.material_id,
-                                               get_uv(geometry_data.index_buffer_index,
-                                                      rq.CandidatePrimitiveIndex(),
-                                                      geometry_data.vertex_buffer_index, bary3))) {
+                if (material_system.alpha_test(
+                        geometry_data.material_id,
+                        get_interpolated_uv(geometry_data, rq.CandidatePrimitiveIndex(), bary3))) {
                     continue;
                 }
 
@@ -198,6 +271,3 @@ struct Scene {
 
 }
 
- 
- 
- 
