@@ -153,8 +153,8 @@ void _tap(const int2 offset, const float kernel_weight) {
 #define grad_offset (offset * GAP)
 #else
     const float4 p_irr_var = img_filter_in[ipos + offset];
-    const float3 p_n = GBuffer.load_and_decompress_normal(gbuffer, ipos + offset);
-    const float p_z = GBuffer.load_and_decompress_linear_z(gbuffer, ipos + offset);
+    const float3 p_n = gbuffer.get_normal(uint2(ipos + offset));
+    const float p_z = gbuffer.get_linear_z(uint2(ipos + offset));
 #define grad_offset offset
 #endif
 
@@ -227,10 +227,10 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
         return;
 
     filter_irr_var = img_filter_in[ipos];
-    const CompressedGBuffer c_gbuf = GBuffer.load_compressed(gbuffer, ipos);
-    c_n = c_gbuf.decompress_normal();
-    c_z = c_gbuf.decompress_linear_z();
-    c_grad_z = c_gbuf.decompress_grad_z();
+    const SurfaceData c_surf = gbuffer.load_surface(uint2(ipos));
+    c_n = c_surf.normal;
+    c_z = c_surf.linear_z;
+    c_grad_z = float2(c_surf.grad_z);
 #endif
 
     c_l = filter_irr_var.r;

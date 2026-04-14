@@ -95,7 +95,8 @@ Accumulate::on_connected([[maybe_unused]] const NodeIOLayout& io_layout,
 
     vk::ImageCreateInfo quartile_image_create_info = irr_create_info;
     quartile_image_create_info.format = vk::Format::eR32G32B32A32Sfloat;
-    quartile_image_create_info.usage |= vk::ImageUsageFlagBits::eSampled;
+    quartile_image_create_info.usage |=
+        vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eStorage;
     quartile_image_create_info.setExtent({percentile_group_count_x, percentile_group_count_y, 1});
     const ImageHandle quartile_image = allocator->create_image(
         quartile_image_create_info, MemoryMappingType::NONE, "accum node, quartiles");

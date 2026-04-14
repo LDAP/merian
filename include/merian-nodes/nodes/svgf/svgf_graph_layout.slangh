@@ -16,10 +16,8 @@ Sampler2D<float4> img_history;
 [vk::binding(3)]
 Sampler2D<float4> img_albedo;
 [vk::binding(4)]
-Sampler2D<float4> img_mv;
-[vk::binding(5)]
-GBufferBinding gbuffer;
-[vk::binding(6)]
-GBufferBinding prev_gbuffer;
+GBuffer gbuffer;
 [vk::binding(7)]
+GBuffer prev_gbuffer;
+[vk::binding(10)]
 RWTexture2D<float4> img_out;

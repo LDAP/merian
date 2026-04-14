@@ -62,6 +62,18 @@ extension __GBuffer<0> {
     half2 get_grad_z(uint2 pixel) { return unpackHalf2x16ToHalf(tex0[pixel].z); }
     float get_delta_z(uint2 pixel) { return asfloat(tex0[pixel].w); }
     float2 get_motion_vectors(uint2 pixel) { return tex2[pixel]; }
+    float2 get_motion_vectors_dilated(int2 pixel, int radius) {
+        int2 tex_size = int2(texture_dimensions(tex2));
+        float2 longest = float2(0);
+        for (int j = -radius; j <= radius; j++) {
+            for (int i = -radius; i <= radius; i++) {
+                float2 mv = tex2[uint2(clamp(pixel + int2(i, j), int2(0), tex_size - 1))];
+                if (dot(mv, mv) > dot(longest, longest))
+                    longest = mv;
+            }
+        }
+        return longest;
+    }
     Hit get_hit(uint2 pixel) { return reinterpret<PackedHitInfo>(tex1[pixel]).unpack(); }
 
     // Batch loaders (single texture load, all fields decoded)

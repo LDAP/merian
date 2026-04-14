@@ -75,13 +75,13 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
         {
             // center
             {
-                const GBuffer gbuf = GBuffer::load(gbuffer, mirror_repeat_ipos);
+                const SurfaceData surf = gbuffer.load_surface(uint2(mirror_repeat_ipos));
                 irr_moments = img_irr.Load(uint3(mirror_repeat_ipos, 0));
                 irr_moments.rgb = rgb_to_yuv(irr_moments.rgb);
 
                 center_irr_moments = irr_moments;
-                center_normal_z = float4(gbuf.get_normal(), gbuf.get_linear_z());
-                center_grad_z = gbuf.get_grad_z();
+                center_normal_z = float4(surf.normal, surf.linear_z);
+                center_grad_z = surf.grad_z;
             }
 
             // halo
@@ -91,12 +91,11 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
                                 shared_index, global_index)) {
                 const int2 halo_mirror_repeat_ipos =
                     texturewrap_mirror_repeat(global_index, texture_dimensions(img_irr, 0));
-                const GBuffer gbuf = GBuffer::load(gbuffer, halo_mirror_repeat_ipos);
-
                 shared_irr_moments[shared_index.y][shared_index.x] =
                     img_irr.Load(uint3(halo_mirror_repeat_ipos, 0));
                 shared_normal_z[shared_index.y][shared_index.x] =
-                    float4(gbuf.get_normal(), gbuf.get_linear_z());
+                    float4(gbuffer.get_normal(uint2(halo_mirror_repeat_ipos)),
+                           gbuffer.get_linear_z(uint2(halo_mirror_repeat_ipos)));
             }
 
             GroupMemoryBarrierWithGroupSync();

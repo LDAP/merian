@@ -40,9 +40,9 @@ void main(const int2 ipos: SV_DispatchThreadID) {
     float2 mv;
     if (USE_MOTION_VECTORS) {
         if (MV_SAMPLING == 0)
-            mv = img_mv[ipos].rg;
+            mv = gbuffer.get_motion_vectors(uint2(ipos));
         else if (MV_SAMPLING == 1)
-            mv = sample_motion_vector(img_mv, ipos, 1);
+            mv = gbuffer.get_motion_vectors_dilated(ipos, 1);
     } else {
         mv = float2(0);
     }
@@ -58,12 +58,12 @@ void main(const int2 ipos: SV_DispatchThreadID) {
         return;
     }
     if (DEBUG == 3) {
-        const float3 normal = GBuffer.load_and_decompress_normal(gbuffer, ipos);
+        const float3 normal = gbuffer.get_normal(uint2(ipos));
         img_out.Store(ipos, float4(normal, 1));
         return;
     }
     if (DEBUG == 4) {
-        img_out.Store(ipos, float4(GBuffer.load_and_decompress_linear_z(gbuffer, ipos) / 1000));
+        img_out.Store(ipos, float4(gbuffer.get_linear_z(uint2(ipos)) / 1000));
         return;
     }
     if (DEBUG == 5) {
@@ -71,7 +71,7 @@ void main(const int2 ipos: SV_DispatchThreadID) {
         return;
     }
     if (DEBUG == 6) {
-        img_out.Store(ipos, float4(GBuffer.load_and_decompress_grad_z(gbuffer, ipos), 0, 0));
+        img_out.Store(ipos, float4(float2(gbuffer.get_grad_z(uint2(ipos))), 0, 0));
         return;
     }
     if (DEBUG == 7) {
@@ -80,9 +80,9 @@ void main(const int2 ipos: SV_DispatchThreadID) {
         return;
     }
     if (DEBUG == 8) {
-        const float2 size = texture_dimensions(img_mv, 0);
+        const float2 size = texture_dimensions(gbuffer.tex2, 0);
         img_out.Store(ipos,
-                      float4(abs(img_mv.Load(uint3(ipos, 0)).rg) / max(size.x, size.y), 0, 0));
+                      float4(abs(gbuffer.get_motion_vectors(uint2(ipos))) / max(size.x, size.y), 0, 0));
         return;
     }
 

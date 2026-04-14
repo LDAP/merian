@@ -55,9 +55,12 @@ std::vector<InputConnectorDescriptor> SVGF::describe_inputs() {
         {"src", con_src},
         {"history", con_history},
         {"albedo", con_albedo},
-        {"mv", con_mv},
-        {"gbuffer", con_gbuffer},
-        {"prev_gbuffer", con_prev_gbuffer},
+        {"gbuffer.tex0", con_gbuf_tex0},
+        {"gbuffer.tex1", con_gbuf_tex1},
+        {"gbuffer.tex2", con_gbuf_tex2},
+        {"prev_gbuffer.tex0", con_prev_gbuf_tex0},
+        {"prev_gbuffer.tex1", con_prev_gbuf_tex1},
+        {"prev_gbuffer.tex2", con_prev_gbuf_tex2},
     };
 }
 
@@ -202,8 +205,7 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
         {
             auto spec_builder = SpecializationInfoBuilder();
             spec_builder.add_entry(taa_local_size, taa_local_size, taa_debug, taa_filter_prev,
-                                   taa_clamping, taa_mv_sampling,
-                                   enable_mv && io_layout.is_connected(con_mv));
+                                   taa_clamping, taa_mv_sampling, enable_mv);
             SpecializationInfoHandle taa_spec = spec_builder.build();
             taa = ComputePipeline::create(taa_pipe_layout, taa_module, taa_spec);
         }

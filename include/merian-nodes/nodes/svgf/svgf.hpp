@@ -66,13 +66,22 @@ class SVGF : public Node {
     uint32_t filter_local_size;
     uint32_t taa_local_size;
 
+    // binding 0
     VkSampledImageInHandle con_prev_out = VkSampledImageIn::compute_read(1);
+    // binding 1
     VkSampledImageInHandle con_src = VkSampledImageIn::compute_read();
+    // binding 2
     VkSampledImageInHandle con_history = VkSampledImageIn::compute_read();
+    // binding 3
     VkSampledImageInHandle con_albedo = VkSampledImageIn::compute_read();
-    VkSampledImageInHandle con_mv = VkSampledImageIn::compute_read(0, true);
-    GBufferInHandle con_gbuffer = GBufferIn::compute_read();
-    GBufferInHandle con_prev_gbuffer = GBufferIn::compute_read(1);
+    // bindings 4,5,6 (GBuffer: tex0, tex1, tex2)
+    VkSampledImageInHandle con_gbuf_tex0 = VkSampledImageIn::compute_read();
+    VkSampledImageInHandle con_gbuf_tex1 = VkSampledImageIn::compute_read();
+    VkSampledImageInHandle con_gbuf_tex2 = VkSampledImageIn::compute_read();
+    // bindings 7,8,9 (prev GBuffer: tex0, tex1, tex2)
+    VkSampledImageInHandle con_prev_gbuf_tex0 = VkSampledImageIn::compute_read(1);
+    VkSampledImageInHandle con_prev_gbuf_tex1 = VkSampledImageIn::compute_read(1);
+    VkSampledImageInHandle con_prev_gbuf_tex2 = VkSampledImageIn::compute_read(1);
 
     ManagedVkImageOutHandle con_out;
 
