@@ -227,7 +227,7 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
         return;
 
     filter_irr_var = img_filter_in[ipos];
-    const SurfaceData c_surf = gbuffer.load_surface(uint2(ipos));
+    const SurfaceData c_surf = gbuffer.get_surface(uint2(ipos));
     c_n = c_surf.normal;
     c_z = c_surf.linear_z;
     c_grad_z = float2(c_surf.grad_z);

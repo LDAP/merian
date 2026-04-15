@@ -123,7 +123,7 @@ void main(uint3 ipos: SV_DispatchThreadID) {
     }
 
     // GET CURRENT PIXEL INFO
-    SurfaceData gbuf = gbuffer.load_surface(ipos.xy);
+    SurfaceData gbuf = gbuffer.get_surface(ipos.xy);
 
     // GET PREVIOUS PIXEL
     float prev_history = 0.0;
@@ -131,7 +131,7 @@ void main(uint3 ipos: SV_DispatchThreadID) {
 
     bool found = false;
     if (is_on_texture(prev_ipos, img_src)) {
-        const SurfaceData prev_gbuf = prev_gbuffer.load_surface(prev_ipos);
+        const SurfaceData prev_gbuf = prev_gbuffer.get_surface(prev_ipos);
         found = reprojection_valid(gbuf.normal, prev_gbuf.normal,
                                    pc.normal_reject_cos, gbuf.linear_z, gbuf.delta_z,
                                    prev_gbuf.linear_z, pc.z_reject_percent);
@@ -154,7 +154,7 @@ void main(uint3 ipos: SV_DispatchThreadID) {
                 if (not_on_texture(tc, img_src))
                     continue;
 
-                const SurfaceData prev_gbuf = prev_gbuffer.load_surface(tc);
+                const SurfaceData prev_gbuf = prev_gbuffer.get_surface(tc);
 
                 const float w = reprojection_weight(
                     gbuf.normal, prev_gbuf.normal, pc.normal_reject_cos * 0.8,

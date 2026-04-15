@@ -1,6 +1,8 @@
 #pragma once
 
+#include "glm/detail/type_half.hpp"
 #include "glm/glm.hpp"
+#include "glm/gtc/packing.hpp"
 #include "glm/gtc/type_ptr.hpp"
 #include <fmt/ranges.h>
 
@@ -25,11 +27,20 @@ using uint2 = vecL<2, std::uint32_t>;
 using uint3 = vecL<3, std::uint32_t>;
 using uint4 = vecL<4, std::uint32_t>;
 
+struct half {
+    uint16_t data;
+    half() = default;
+    half(float f) : data(static_cast<uint16_t>(glm::detail::toFloat16(f))) {}
+    operator float() const {
+        return glm::detail::toFloat32(static_cast<glm::detail::hdata>(data));
+    }
+};
 // using half = std::float16_t;
-// using half1 = glm::vec<1, std::float16_t, defaultp>;
-// using half2 = glm::vec<2, std::float16_t, defaultp>;
-// using half3 = glm::vec<3, std::float16_t, defaultp>;
-// using half4 = glm::vec<4, std::float16_t, defaultp>;
+
+using half1 = glm::vec<1, half, glm::defaultp>;
+using half2 = glm::vec<2, half, glm::defaultp>;
+using half3 = glm::vec<3, half, glm::defaultp>;
+using half4 = glm::vec<4, half, glm::defaultp>;
 
 // MATRICES (rows x columns)
 

@@ -8,14 +8,14 @@
 
 namespace merian {
 
-Camera::Camera(const float3& eye,
-               const float3& center,
+Camera::Camera(const float3& position,
+               const float3& target,
                const float3& up,
                const float field_of_view,
                const float aspect_ratio,
                const float near_plane,
                const float far_plane)
-    : position(eye), target(center), up(normalize(up)), field_of_view(field_of_view),
+    : position(position), target(target), up(normalize(up)), field_of_view(field_of_view),
       aspect_ratio(aspect_ratio), near_plane(near_plane), far_plane(far_plane) {
 
     assert(field_of_view < 179.99);
@@ -59,31 +59,31 @@ uint64_t Camera::get_change_id() const noexcept {
 
 // -----------------------------------------------------------------------------
 
-void Camera::look_at(const float3& eye, const float3& center, const float3& up) noexcept {
-    this->position = eye;
-    this->target = center;
+void Camera::look_at(const float3& position, const float3& target, const float3& up) noexcept {
+    this->position = position;
+    this->target = target;
     this->up = normalize(up);
     view_change_id++;
 }
 
-void Camera::look_at(const float3& eye,
-                     const float3& center,
+void Camera::look_at(const float3& position,
+                     const float3& target,
                      const float3& up,
                      const float field_of_view) noexcept {
-    this->position = eye;
-    this->target = center;
+    this->position = position;
+    this->target = target;
     this->up = normalize(up);
     this->field_of_view = field_of_view;
     view_change_id++;
     projection_change_id++;
 }
 
-void Camera::set_eye(const float3& eye) noexcept {
-    this->position = eye;
+void Camera::set_position(const float3& position) noexcept {
+    this->position = position;
     view_change_id++;
 }
 
-void Camera::set_center(const float3& center) noexcept {
+void Camera::set_target(const float3& center) noexcept {
     this->target = center;
     view_change_id++;
 }
@@ -93,11 +93,11 @@ void Camera::set_up(const float3& up) noexcept {
     view_change_id++;
 }
 
-const float3& Camera::get_eye() const noexcept {
+const float3& Camera::get_position() const noexcept {
     return position;
 }
 
-const float3& Camera::get_center() const noexcept {
+const float3& Camera::get_target() const noexcept {
     return target;
 }
 
@@ -297,6 +297,43 @@ void Camera::rotate(const float d_phi, const float d_theta) {
 void Camera::orbit(const float d_phi, const float d_theta) {
     rotate_around(position, target, up, d_phi, d_theta);
     view_change_id++;
+}
+
+void Camera::properties(Properties& props) {
+    if (props.config_vec("position", position)) {
+        view_change_id++;
+    }
+    if (props.config_vec("target", target)) {
+        view_change_id++;
+    }
+    if (props.config_vec("up", up)) {
+        view_change_id++;
+    }
+
+    props.st_separate();
+
+    if (props.config_float("fov", field_of_view, 0.01, 179.9)) {
+        projection_change_id++;
+    }
+    if (props.config_float("near", near_plane, 0, far_plane - 0.1f)) {
+        projection_change_id++;
+    }
+    if (props.config_float("far", far_plane, near_plane + 0.1f, 10000)) {
+        projection_change_id++;
+    }
+    if (props.config_float("aspect", aspect_ratio)) {
+        projection_change_id++;
+    }
+
+    props.st_separate();
+    float3 d_fly(0);
+    if (props.config_vec("fly", d_fly)) {
+        fly(d_fly.x, d_fly.y, d_fly.z);
+    }
+    float3 d_move(0);
+    if (props.config_vec("move", d_move)) {
+        move(d_move.x, d_move.y, d_move.z);
+    }
 }
 
 } // namespace merian

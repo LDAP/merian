@@ -75,7 +75,7 @@ void main(const int2 dispatch_thread_id: SV_DispatchThreadID,
         {
             // center
             {
-                const SurfaceData surf = gbuffer.load_surface(uint2(mirror_repeat_ipos));
+                const SurfaceData surf = gbuffer.get_surface(uint2(mirror_repeat_ipos));
                 irr_moments = img_irr.Load(uint3(mirror_repeat_ipos, 0));
                 irr_moments.rgb = rgb_to_yuv(irr_moments.rgb);
 

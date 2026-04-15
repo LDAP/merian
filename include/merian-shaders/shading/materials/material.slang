@@ -35,17 +35,17 @@ interface MaterialModel {
 // textures, etc. are resolved here.
 interface MaterialSample {
 
-    associatedtype ShadingFunctionImpl : ShadingFunction;
+    associatedtype BSDFImpl : BSDF;
 
     // The local shading frame (for surfaces).
     Frame get_shading_frame() {
         return IdentityFrame();
     }
 
-    // The BSDF or PhaseFunction for this Material. BSDFs assume a local tangent space with n = (0,
+    // The BSDF for this Material. BSDFs assume a local tangent space with n = (0,
     // 0, 1), t = (1, 0, 0), b = (0, 1, 0). The incident and outgoing direction point away from the
     // shading location.
-    ShadingFunctionImpl get_shading_function();
+    BSDFImpl get_bsdf();
 
     // ------------------------------------------
 

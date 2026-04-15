@@ -46,9 +46,10 @@ interface IRayQuery {
 interface AccelerationStructure {
     associatedtype RayQueryImpl : IRayQuery;
 
-    RayQueryImpl trace_ray(const RayDesc ray,
-                           const uint ray_flags = RAY_FLAG_NONE,
-                           const uint instances_mask = 0xff);
+    void trace_ray(inout RayQueryImpl rq,
+                   const RayDesc ray,
+                   const uint ray_flags = RAY_FLAG_NONE,
+                   const uint instances_mask = 0xff);
 }
 
 // ---------------------------------------
@@ -63,12 +64,11 @@ struct HWAccelerationStructure : AccelerationStructure {
 
     typealias RayQueryImpl = RayQuery;
 
-    RayQueryImpl trace_ray(const RayDesc ray,
-                           const uint ray_flags = RAY_FLAG_NONE,
-                           const uint instances_mask = 0xff) {
-        RayQuery rq;
+    void trace_ray(inout RayQueryImpl rq,
+                   const RayDesc ray,
+                   const uint ray_flags = RAY_FLAG_NONE,
+                   const uint instances_mask = 0xff) {
         rq.TraceRayInline(as, ray_flags, instances_mask, ray);
-        return rq;
     }
 }
 
@@ -120,38 +120,11 @@ struct NullRayQuery : IRayQuery {
 struct NullAccelerationStructure : AccelerationStructure {
     typealias RayQueryImpl = NullRayQuery;
 
-    RayQueryImpl trace_ray(const RayDesc ray,
-                           const uint ray_flags = RAY_FLAG_NONE,
-                           const uint instances_mask = 0xff) {
-        NullRayQuery rq;
-        return rq;
-    }
+    void trace_ray(inout RayQueryImpl rq,
+                   const RayDesc ray,
+                   const uint ray_flags = RAY_FLAG_NONE,
+                   const uint instances_mask = 0xff) {}
 }
 
 }
 
-    
-    
-    
-        
-    
-    
-        
-    
-        
-    
-        
-    
-        
-    
-        
-    
-        
-    
-        
-    
-        
-    
-        
-    
-        

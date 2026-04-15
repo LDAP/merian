@@ -281,6 +281,16 @@ void ShaderObject::write(const ShaderOffset& offset, const BufferHandle& buffer)
 
 void ShaderObject::write(const ShaderOffset& offset, const TextureHandle& texture) {
     const auto& info = object_layout->get_binding_range_info(offset.binding_range_offset);
+    if (info.type == slang::BindingType::Texture ||
+        info.type == slang::BindingType::MutableTexture) {
+        write(offset, texture->get_view());
+        return;
+    }
+    if (info.type == slang::BindingType::Sampler) {
+        write(offset, texture->get_sampler());
+        return;
+    }
+
     assert(info.type == slang::BindingType::CombinedTextureSampler);
     assert(offset.binding_array_index < info.count);
 

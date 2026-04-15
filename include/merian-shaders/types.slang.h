@@ -15,11 +15,10 @@ using int3 = merian::int3;
 using uint2 = merian::uint2;
 using uint3 = merian::uint3;
 
-// half2 mapped to packed representation (two float16 values)
-struct half2 {
-    uint16_t x;
-    uint16_t y;
-};
+using half = merian::half;
+using half2 = merian::half2;
+using half3 = merian::half2;
+using half4 = merian::half2;
 
 #endif
 

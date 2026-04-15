@@ -74,9 +74,9 @@ endif
 subprocess = dependency('subprocess', version: ['>=0.4.0'], fallback: ['subprocess', 'subprocess_dep'])
 glm = dependency('glm', fallback : ['glm', 'glm_dep'], version: ['>=1.0.3'])
 tol = dependency('tinyobjloader', fallback : ['tinyobjloader', 'tinyobjloader_dep'])
-tgltf = dependency('tinygltf', required: false)
-if not tgltf.found() and get_option('tinygltf').enabled()
-    tgltf = dependency('tinygltf', required: get_option('tinygltf').enabled(), fallback: ['tinygltf', 'tinygltf_dep'])
+tgltf = dependency('tinygltf', required: get_option('tinygltf'), fallback: ['tinygltf', 'tinygltf_dep'])
+if get_option('tinygltf').enable_auto_if(tgltf.found()).enabled()
+    global_args += ['-DMERIAN_TINYGLTF_ENABLED']
 endif
 imgui = dependency('imgui', version: ['>=1.92.6'], fallback: ['imgui', 'imgui_dep'], static: true)
 nlohmann_json = dependency('nlohmann_json', version: ['>=3.11.3'], fallback: ['nlohmann_json', 'nlohmann_json_dep'])

@@ -106,9 +106,14 @@ void StagingMemoryManager::cmd_to_device(const CommandBufferHandle& cmd,
     assert(offset < buffer->get_size());
     assert(!optional_size || *optional_size <= buffer->get_size());
     assert(!optional_size || *optional_size + offset <= buffer->get_size());
-    assert(data);
 
     const vk::DeviceSize size = optional_size.value_or(buffer->get_size() - offset);
+
+    if (size == 0) {
+        return;
+    }
+
+    assert(data);
 
     if (size <= CMD_UPDATE_BUFFER_THRESHOLD && size % 4 == 0 && offset % 4 == 0) {
         // Requirements for vkCmdUpdateBuffer are met.

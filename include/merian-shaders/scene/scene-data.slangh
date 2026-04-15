@@ -28,7 +28,34 @@ typedef uint32_t GeometryID;
 
 struct VertexData {
     float3 position;
-    uint encoded_normal; // oct30 encoded (use encoding.slang)
+    float3 normal;
+    float2 uv;
+    float3 tangent;
+};
+
+#ifndef __cplusplus
+
+VertexData operator +(const VertexData a, const VertexData b) {
+    return VertexData(a.position + b.position, a.normal + b.normal, a.uv + b.uv,
+                      a.tangent + b.tangent);
+}
+
+void operator +=(inout VertexData a, const VertexData b) {
+    a.position += b.position;
+    a.normal += b.normal;
+    a.uv += b.uv;
+    a.tangent += b.tangent;
+}
+
+VertexData operator *(const float a, const VertexData b) {
+    return VertexData(a * b.position, a * b.normal, a * b.uv, a * b.tangent);
+}
+
+#endif
+
+struct PackedVertexData {
+    float3 position;
+    uint encoded_normal; // oct30 encoded
     half2 uv;
     uint encoded_tangent; // oct30 encoded + sign bit for bitangent handedness
 
@@ -39,16 +66,28 @@ struct VertexData {
         this.uv = half2(uv);
         this.encoded_tangent = encode_normal(tangent);
     }
+
+    __init(VertexData vertex_data) {
+        this.position = vertex_data.position;
+        this.encoded_normal = encode_normal(vertex_data.normal);
+        this.uv = half2(vertex_data.uv);
+        this.encoded_tangent = encode_normal(vertex_data.tangent);
+    }
+
+    VertexData unpack() {
+        return VertexData(position, decode_normal(encoded_normal), uv,
+                          decode_normal(encoded_tangent));
+    }
 #endif
 };
 
-struct PrevVertexData {
+struct PackedPrevVertexData {
     float3 position;
 };
 
 #ifdef __cplusplus
-static_assert(sizeof(VertexData) == 24, "VertexData must match Slang scalar layout");
-static_assert(alignof(VertexData) == 4, "VertexData must be 4-byte aligned");
+static_assert(sizeof(PackedVertexData) == 24, "PackedVertexData must match Slang scalar layout");
+static_assert(alignof(PackedVertexData) == 4, "PackedVertexData must be 4-byte aligned");
 static_assert(sizeof(GeometryData) == 8, "GeometryData layout mismatch");
 #endif
 

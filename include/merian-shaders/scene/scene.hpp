@@ -33,7 +33,7 @@ using MeshID = uint32_t;
 static constexpr NodeID NODE_ID_INVALID = UINT32_MAX;
 
 struct Mesh {
-    std::vector<VertexData> vertices;
+    std::vector<PackedVertexData> vertices;
     std::vector<uint3> indices;
 
     MaterialID material_id;
@@ -63,6 +63,11 @@ struct SceneNode {
 struct MeshGroup {
     std::vector<MeshID> mesh_list;
     bool is_static = true;
+};
+
+class SceneError : std::runtime_error {
+  public:
+    SceneError(const std::string& msg) : std::runtime_error(msg) {}
 };
 
 class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
@@ -121,6 +126,8 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     }
     void set_pretransform_dynamic(bool value);
 
+    void properties(Properties& props);
+
   protected:
     virtual void on_update(float time, float time_diff) {
         (void)time;
@@ -164,6 +171,10 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     std::vector<BufferHandle> index_buffers;
     BufferHandle geometry_data_buffer;
     BufferHandle instance_transforms_buffer;
+    BufferHandle inverse_transposed_instance_transforms_buffer;
+    BufferHandle prev_instance_transforms_buffer;
+    BufferHandle prev_inverse_transposed_instance_transforms_buffer;
+    std::vector<float4x4> prev_instance_transforms_data;
 
     bool build_as = false;
     std::optional<ASBuilder> as_builder;

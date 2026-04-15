@@ -1,14 +1,12 @@
 #pragma once
 
-#include "merian-nodes/connectors/connector_utils.hpp"
 #include "merian-nodes/connectors/image/vk_image_out_managed.hpp"
 #include "merian-nodes/connectors/ptr_in.hpp"
 #include "merian-nodes/connectors/ptr_out.hpp"
 #include "merian-nodes/graph/node.hpp"
-#include "merian-nodes/nodes/gbuffer_rt/gbuffer_resource.hpp"
+#include "merian-shaders/gbuffer.hpp"
 #include "merian-shaders/scene/scene.hpp"
 
-#include "merian/shader/shader_object.hpp"
 #include "merian/shader/shader_object_allocator.hpp"
 #include "merian/shader/slang_entry_point.hpp"
 #include "merian/shader/slang_program.hpp"
@@ -23,8 +21,7 @@ class GBufferRTNode : public Node {
 
     ~GBufferRTNode() override = default;
 
-    DeviceSupportInfo
-    query_device_support(const DeviceSupportQueryInfo& query_info) override;
+    DeviceSupportInfo query_device_support(const DeviceSupportQueryInfo& query_info) override;
 
     void initialize(const ContextHandle& context,
                     const ResourceAllocatorHandle& allocator) override;
@@ -48,12 +45,13 @@ class GBufferRTNode : public Node {
 
     // Connectors
     PtrInHandle<Scene> con_scene = PtrIn<Scene>::create();
-    PtrOutHandle<GBufferResource> con_gbuffer;
+    PtrOutHandle<GBuffer> con_gbuffer;
 
     // Image connectors (managed by graph, also exposed individually)
     ManagedVkImageOutHandle con_denoiser;
     ManagedVkImageOutHandle con_hit_info;
     ManagedVkImageOutHandle con_mv;
+    ManagedVkImageOutHandle con_albedo;
 
     // Resolution
     vk::Extent3D extent = vk::Extent3D{1920, 1080, 1};
@@ -64,11 +62,8 @@ class GBufferRTNode : public Node {
     PipelineHandle pipeline;
 
     // ShaderObject for GBuffer parameter
-    ShaderObjectHandle gbuffer_obj;
+    GBufferHandle gbuffer_obj;
     std::shared_ptr<FrameCachingShaderObjectAllocator> obj_allocator;
-
-    // GBuffer composition (for the gbuffer module)
-    SlangCompositionHandle gbuffer_composition;
 };
 
 } // namespace merian

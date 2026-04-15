@@ -119,11 +119,11 @@ const char* slang_binding_type_to_string(slang::BindingType type) {
     }
 }
 
-DescriptorSetLayoutHandle create_descriptor_set_layout_from_slang_type_layout(
-    const ContextHandle& context,
-    slang::TypeLayoutReflection* type_layout,
-    slang::ProgramLayout* program_layout,
-    uint32_t set_index) {
+DescriptorSetLayoutHandle
+create_descriptor_set_layout_from_slang_type_layout(const ContextHandle& context,
+                                                    slang::TypeLayoutReflection* type_layout,
+                                                    slang::ProgramLayout* program_layout,
+                                                    uint32_t set_index) {
 
     SPDLOG_DEBUG(format_type_layout(type_layout));
 
@@ -175,8 +175,7 @@ DescriptorSetLayoutHandle create_descriptor_set_layout_from_slang_type_layout(
                 assert(leaf_var);
                 auto* leaf_type = leaf_var->getType();
                 assert(leaf_type && leaf_type->isArray());
-                size_t resolved =
-                    leaf_type->getElementCount((SlangReflection*)program_layout);
+                size_t resolved = leaf_type->getElementCount((SlangReflection*)program_layout);
                 if (resolved == SLANG_UNKNOWN_SIZE || resolved == SLANG_UNBOUNDED_SIZE) {
                     throw std::runtime_error(
                         "link-time constant array size could not be resolved. "

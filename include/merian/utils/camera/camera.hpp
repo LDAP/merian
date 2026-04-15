@@ -24,8 +24,8 @@ class Camera {
     }
 
   public:
-    Camera(const float3& eye = float3(0),
-           const float3& center = float3(1, 0, 0),
+    Camera(const float3& position = float3(0),
+           const float3& target = float3(1, 0, 0),
            const float3& up = float3(0, 0, 1),
            const float field_of_view = 60.f,
            const float aspect_ratio = 1.f,
@@ -50,23 +50,23 @@ class Camera {
 
     // -----------------------------------------------------------------------------
 
-    void look_at(const float3& eye, const float3& center, const float3& up) noexcept;
+    void look_at(const float3& position, const float3& target, const float3& up) noexcept;
 
-    void look_at(const float3& eye,
-                 const float3& center,
+    void look_at(const float3& position,
+                 const float3& target,
                  const float3& up,
                  const float field_of_view) noexcept;
 
-    void set_eye(const float3& eye) noexcept;
+    void set_position(const float3& position) noexcept;
 
-    void set_center(const float3& center) noexcept;
+    void set_target(const float3& center) noexcept;
 
     // this method normalizes up for you
     void set_up(const float3& up) noexcept;
 
-    const float3& get_eye() const noexcept;
+    const float3& get_position() const noexcept;
 
-    const float3& get_center() const noexcept;
+    const float3& get_target() const noexcept;
 
     const float3& get_up() const noexcept;
 
@@ -125,6 +125,8 @@ class Camera {
     // Orbit around the "center" horizontally (phi) or vertically (theta).
     //  * pi equals a full turn.
     void orbit(const float d_phi, const float d_theta);
+
+    void properties(Properties& props);
 
   private:
     // VIEW

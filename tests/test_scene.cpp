@@ -76,7 +76,7 @@ class SceneTest : public ::testing::Test {
         m.material_id = mat_id;
         m.flags = flags;
 
-        VertexData v0{}, v1{}, v2{};
+        PackedVertexData v0{}, v1{}, v2{};
         v0.position = float3(0, 0, 0);
         v1.position = float3(1, 0, 0);
         v2.position = float3(0, 1, 0);

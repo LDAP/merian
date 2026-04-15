@@ -60,7 +60,7 @@ bool ImGuiProperties::config_float(const std::string& id,
                                    const std::string& desc,
                                    const int components) {
     const bool value_changed =
-        ImGui::InputScalarN(id.c_str(), ImGuiDataType_Float, value, components);
+        ImGui::DragScalarN(id.c_str(), ImGuiDataType_Float, value, components);
     tooltip(desc);
     return value_changed;
 }
@@ -68,8 +68,7 @@ bool ImGuiProperties::config_int(const std::string& id,
                                  int32_t* value,
                                  const std::string& desc,
                                  const int components) {
-    const bool value_changed =
-        ImGui::InputScalarN(id.c_str(), ImGuiDataType_S32, value, components);
+    const bool value_changed = ImGui::DragScalarN(id.c_str(), ImGuiDataType_S32, value, components);
     tooltip(desc);
     return value_changed;
 }
@@ -77,8 +76,7 @@ bool ImGuiProperties::config_uint(const std::string& id,
                                   uint32_t* value,
                                   const std::string& desc,
                                   const int components) {
-    const bool value_changed =
-        ImGui::InputScalarN(id.c_str(), ImGuiDataType_U32, value, components);
+    const bool value_changed = ImGui::DragScalarN(id.c_str(), ImGuiDataType_U32, value, components);
     tooltip(desc);
     return value_changed;
 }
@@ -86,8 +84,7 @@ bool ImGuiProperties::config_uint64(const std::string& id,
                                     uint64_t* value,
                                     const std::string& desc,
                                     const int components) {
-    const bool value_changed =
-        ImGui::InputScalarN(id.c_str(), ImGuiDataType_U64, value, components);
+    const bool value_changed = ImGui::DragScalarN(id.c_str(), ImGuiDataType_U64, value, components);
     tooltip(desc);
     return value_changed;
 }

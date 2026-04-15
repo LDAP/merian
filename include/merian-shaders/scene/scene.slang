@@ -59,18 +59,17 @@ struct Scene {
 
     StructuredBuffer<uint3, ScalarDataLayout> index_buffers[merian_scene_index_buffers_count];
 
-    StructuredBuffer<VertexData, ScalarDataLayout>
+    StructuredBuffer<PackedVertexData, ScalarDataLayout>
         vertex_buffers[merian_scene_vertex_buffers_count];
-    StructuredBuffer<PrevVertexData, ScalarDataLayout>
+    StructuredBuffer<PackedPrevVertexData, ScalarDataLayout>
         prev_vertex_buffers[merian_scene_prev_vertex_buffers_count];
 
     StructuredBuffer<GeometryData, ScalarDataLayout> geometries;
 
-    StructuredBuffer<float3x4, ScalarDataLayout> instance_transforms;
-    // StructuredBuffer<float3x4, ScalarDataLayout> inverse_transposed_instance_transforms;
-
-    // StructuredBuffer<float3x4, ScalarDataLayout> prev_instance_transforms;
-    // StructuredBuffer<float3x4, ScalarDataLayout> prev_inverse_transposed_instance_transforms;
+    StructuredBuffer<float4x4, ScalarDataLayout> instance_transforms;
+    StructuredBuffer<float4x4, ScalarDataLayout> inverse_transposed_instance_transforms;
+    StructuredBuffer<float4x4, ScalarDataLayout> prev_instance_transforms;
+    StructuredBuffer<float4x4, ScalarDataLayout> prev_inverse_transposed_instance_transforms;
 
     ParameterBlock<MaterialSystem> material_system;
     EnvMap env_map;
@@ -96,7 +95,8 @@ struct Scene {
     Hit trace_ray(const RayDesc ray,
                   const uint ray_flags = RAY_FLAG_NONE,
                   const uint instances_mask = 0xff) {
-        var rq = as.trace_ray(ray, ray_flags, instances_mask);
+        SceneAccelerationStructure::RayQueryImpl rq;
+        as.trace_ray(rq, ray, ray_flags, instances_mask);
         _proceed_ray(rq);
 
         if (rq.CommittedStatus() == COMMITTED_TRIANGLE_HIT) {
@@ -114,7 +114,8 @@ struct Scene {
     bool trace_visibility_ray(const RayDesc ray,
                               const uint ray_flags = RAY_FLAG_NONE,
                               const uint instances_mask = 0xff) {
-        var rq = as.trace_ray(ray, ray_flags, instances_mask);
+        SceneAccelerationStructure::RayQueryImpl rq;
+        as.trace_ray(rq, ray, ray_flags, instances_mask);
         _proceed_ray(rq);
 
         return rq.CommittedStatus() == COMMITTED_NOTHING;
@@ -133,16 +134,24 @@ struct Scene {
     }
 
     // Loads the instance transform for a geometry from memory.
-    float3x4 get_instance_transform(const GeometryID geometry_id) {
+    float4x4 get_instance_transform(const GeometryID geometry_id) {
         return instance_transforms[geometry_id];
     }
 
     // Loads the inverse transposed instance transform for a geometry from memory (for transforming
     // directions / normals).
-    float3x4 get_inverse_transposed_instance_transform(const GeometryID geometry_id) {
-        return instance_transforms[geometry_id];
-        // TODO:
-        // return inverse_transposed_instance_transforms[geometry_id];
+    float4x4 get_inverse_transposed_instance_transform(const GeometryID geometry_id) {
+        return inverse_transposed_instance_transforms[geometry_id];
+    }
+
+    // Loads the previous frame instance transform for a geometry from memory.
+    float4x4 get_prev_instance_transform(const GeometryID geometry_id) {
+        return prev_instance_transforms[geometry_id];
+    }
+
+    // Loads the previous frame inverse transposed instance transform for a geometry from memory.
+    float4x4 get_prev_inverse_transposed_instance_transform(const GeometryID geometry_id) {
+        return prev_inverse_transposed_instance_transforms[geometry_id];
     }
 
     // Conventience method for get_geometry_data(...).material_id;.
@@ -161,22 +170,22 @@ struct Scene {
     }
 
     // Loads the vertex data from memory.
-    VertexData get_vertex_data(const uint vertex_buffer, const uint vertex_index) {
+    PackedVertexData get_packed_vertex_data(const uint vertex_buffer, const uint vertex_index) {
         return vertex_buffers[vertex_buffer][vertex_index];
     }
 
-    // Convenience method for get_vertex_data(...).uv
+    // Convenience method for get_packed_vertex_data(...).uv
     float2 get_vertex_uv(const uint vertex_buffer, const uint vertex_index) {
-        return get_vertex_data(vertex_buffer, vertex_index).uv;
+        return get_packed_vertex_data(vertex_buffer, vertex_index).uv;
     }
 
-    vector<VertexData, 3> get_vertex_data(const GeometryData geometry_data,
-                                          const uint primitive_id,
-                                          const float3 barycentrics) {
+    vector<PackedVertexData, 3> get_packed_vertex_data(const GeometryData geometry_data,
+                                                       const uint primitive_id,
+                                                       const float3 barycentrics) {
         const uint3 indices = get_vertex_indices(geometry_data.index_buffer_index, primitive_id);
-        return { get_vertex_data(geometry_data.vertex_buffer_index, indices.x),
-                 get_vertex_data(geometry_data.vertex_buffer_index, indices.y),
-                 get_vertex_data(geometry_data.vertex_buffer_index, indices.z) };
+        return { get_packed_vertex_data(geometry_data.vertex_buffer_index, indices.x),
+                 get_packed_vertex_data(geometry_data.vertex_buffer_index, indices.y),
+                 get_packed_vertex_data(geometry_data.vertex_buffer_index, indices.z) };
     }
 
     VertexData get_interpolated_vertex_data(const GeometryData geometry_data,
@@ -184,34 +193,20 @@ struct Scene {
                                             const float3 barycentrics) {
         const uint3 indices = get_vertex_indices(geometry_data.index_buffer_index, primitive_id);
 
-        float3 position = float3(0);
-        float3 normal = float3(0);
-        float2 uv = float2(0);
-        float3 tangent = float3(0);
+        VertexData v =
+            barycentrics.x *
+            get_packed_vertex_data(geometry_data.vertex_buffer_index, indices.x).unpack();
 
-        {
-            const VertexData v0 = get_vertex_data(geometry_data.vertex_buffer_index, indices.x);
-            position += barycentrics.x * v0.position;
-            normal += barycentrics.x * decode_normal(v0.encoded_normal);
-            uv += barycentrics.x * v0.uv;
-            tangent += barycentrics.x * decode_normal(v0.encoded_tangent);
-        }
-        {
-            const VertexData v1 = get_vertex_data(geometry_data.vertex_buffer_index, indices.y);
-            position += barycentrics.y * v1.position;
-            normal += barycentrics.y * decode_normal(v1.encoded_normal);
-            uv += barycentrics.y * v1.uv;
-            tangent += barycentrics.y * decode_normal(v1.encoded_tangent);
-        }
-        {
-            const VertexData v2 = get_vertex_data(geometry_data.vertex_buffer_index, indices.z);
-            position += barycentrics.z * v2.position;
-            normal += barycentrics.z * decode_normal(v2.encoded_normal);
-            uv += barycentrics.z * v2.uv;
-            tangent += barycentrics.z * decode_normal(v2.encoded_tangent);
-        }
+        v += barycentrics.y *
+             get_packed_vertex_data(geometry_data.vertex_buffer_index, indices.y).unpack();
 
-        return VertexData(position, normal, uv, tangent);
+        v += barycentrics.z *
+             get_packed_vertex_data(geometry_data.vertex_buffer_index, indices.z).unpack();
+
+        v.normal = normalize(v.normal);
+        v.tangent = normalize(v.tangent);
+
+        return v;
     }
 
     // Convenience method to load the vertices
@@ -231,7 +226,7 @@ struct Scene {
     float3 to_world_position(const GeometryData gd, const GeometryID gid, const float3 object_pos) {
         if (gd.flags & GEOMETRY_FLAG_PRETRANSFORMED)
             return object_pos;
-        return mul(get_instance_transform(gid), float4(object_pos, 1.0));
+        return mul(get_instance_transform(gid), float4(object_pos, 1.0)).xyz;
     }
 
     // Transform object-space direction to world space.
@@ -240,7 +235,24 @@ struct Scene {
         if (gd.flags & GEOMETRY_FLAG_PRETRANSFORMED)
             return object_dir;
         return normalize(
-            mul(get_inverse_transposed_instance_transform(gid), float4(object_dir, 0.0)));
+            mul(get_inverse_transposed_instance_transform(gid), float4(object_dir, 0.0)).xyz);
+    }
+
+    // Transform object-space position to previous frame world space.
+    float3
+    to_prev_world_position(const GeometryData gd, const GeometryID gid, const float3 object_pos) {
+        if (gd.flags & GEOMETRY_FLAG_PRETRANSFORMED)
+            return object_pos;
+        return mul(get_prev_instance_transform(gid), float4(object_pos, 1.0)).xyz;
+    }
+
+    // Transform object-space direction to previous frame world space.
+    float3
+    to_prev_world_direction(const GeometryData gd, const GeometryID gid, const float3 object_dir) {
+        if (gd.flags & GEOMETRY_FLAG_PRETRANSFORMED)
+            return object_dir;
+        return normalize(
+            mul(get_prev_inverse_transposed_instance_transform(gid), float4(object_dir, 0.0)).xyz);
     }
 
     // -----------------------------------------

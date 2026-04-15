@@ -16,6 +16,8 @@ static const float BSDF_MIN_COS_THETA = 1e-6f;
 
 interface BSDF : ShadingFunction {
 
+    // The incident direction points away from the
+    // shading location.
     Albedo get_albedo(const float3 wi);
 }
 

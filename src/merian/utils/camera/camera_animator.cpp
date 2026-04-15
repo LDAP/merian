@@ -31,7 +31,7 @@ void CameraAnimator::update(const chrono_clock::time_point now) {
     float interpolated_fov =
         lerp(animation_start.get_field_of_view(), animation_end.get_field_of_view(), smoothed);
     float3 interpolated_center =
-        lerp(animation_start.get_center(), animation_end.get_center(), smoothed);
+        lerp(animation_start.get_target(), animation_end.get_target(), smoothed);
     float3 interpolated_up = lerp(animation_start.get_up(), animation_end.get_up(), smoothed);
     float3 interpolated_eye =
         evaluate_bezier(smoothed, eye_animation_bezier_points[0], eye_animation_bezier_points[1],
@@ -66,12 +66,12 @@ bool CameraAnimator::is_animating() {
 }
 
 void CameraAnimator::calculate_eye_animation_bezier_points() {
-    const float3 p0 = animation_start.get_eye();
-    const float3 p2 = animation_end.get_eye();
+    const float3 p0 = animation_start.get_position();
+    const float3 p2 = animation_end.get_position();
     float3 p1, pc;
 
     // point of interest
-    const float3 pi = (animation_end.get_center() + animation_start.get_center()) * 0.5f;
+    const float3 pi = (animation_end.get_target() + animation_start.get_target()) * 0.5f;
 
     const float3 p02 = (p0 + p2) * 0.5f; // mid p0-p2
     const float radius =

@@ -214,7 +214,7 @@ void GLTFScene::load_node(const tinygltf::Model& model, int gltf_node_index, Nod
             }
 
             // Build vertex data
-            std::vector<VertexData> vertices(vertex_count);
+            std::vector<PackedVertexData> vertices(vertex_count);
             for (size_t v = 0; v < vertex_count; v++) {
                 auto& vd = vertices[v];
 
@@ -338,7 +338,7 @@ void GLTFScene::load(const CommandBufferHandle& cmd, const std::filesystem::path
         SPDLOG_WARN("GLTFScene: {}", warn);
     }
     if (!ok) {
-        throw std::runtime_error(
+        throw merian::SceneError(
             fmt::format("GLTFScene: failed to load '{}': {}", path.string(), err));
     }
 
@@ -370,9 +370,9 @@ void GLTFScene::load(const CommandBufferHandle& cmd, const std::filesystem::path
 
         // merian row-major: basis in columns 0..2, translation in column 3
         const float4x4& xform = get_scene_graph()[nid].global_transform;
-        float3 up_vec  = normalize(float3(xform[0][1], xform[1][1], xform[2][1]));
+        float3 up_vec = normalize(float3(xform[0][1], xform[1][1], xform[2][1]));
         float3 forward = normalize(float3(xform[0][2], xform[1][2], xform[2][2]));
-        float3 eye     = float3(xform[0][3], xform[1][3], xform[2][3]);
+        float3 eye = float3(xform[0][3], xform[1][3], xform[2][3]);
 
         // glTF cameras look down -Z in local space
         float3 center = eye - forward;
@@ -392,29 +392,20 @@ void GLTFScene::load(const CommandBufferHandle& cmd, const std::filesystem::path
         }
 
         add_camera(std::make_shared<Camera>(eye, center, up_vec, fov, aspect, znear, zfar));
-        SPDLOG_INFO("GLTFScene: loaded {} camera '{}' at ({},{},{})",
-                    gcam.type, gcam.name, eye.x, eye.y, eye.z);
+        SPDLOG_INFO("GLTFScene: loaded {} camera '{}' at ({},{},{})", gcam.type, gcam.name, eye.x,
+                    eye.y, eye.z);
     }
 
     // Fallback: add a default camera if the scene doesn't have one
     if (!get_active_camera()) {
-        add_camera(std::make_shared<Camera>(
-            float3(3, 3, 3), float3(0, 0, 0), float3(0, 1, 0), 60.f, 1920.f / 1080.f, 0.01f, 1000.f));
+        add_camera(std::make_shared<Camera>(float3(3, 3, 3), float3(0, 0, 0), float3(0, 1, 0), 60.f,
+                                            1920.f / 1080.f, 0.01f, 1000.f));
         SPDLOG_INFO("GLTFScene: no cameras in file, using default camera");
     }
 
-    // Gather stats
-    size_t total_vertices = 0;
-    size_t total_triangles = 0;
-    for (const auto& m : meshes) {
-        total_vertices += m.vertices.size();
-        total_triangles += m.indices.size();
-    }
-
-    SPDLOG_INFO("GLTFScene: loaded '{}' nodes: {}, meshes: {}, materials: {}, textures: {} "
-                "vertices: {}, triangles: {}",
+    SPDLOG_INFO("GLTFScene: loaded '{}' nodes: {}, meshes: {}, materials: {}, textures: {}",
                 path.filename().string(), scene_graph.size(), meshes.size(), material_map.size(),
-                model.images.size(), total_vertices, total_triangles);
+                model.images.size());
 }
 
 } // namespace merian

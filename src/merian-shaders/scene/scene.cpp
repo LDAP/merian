@@ -37,10 +37,10 @@ Mesh apply_world_transform(const Mesh& mesh, const float4x4& M) {
             M[2][0] * vd.position.x + M[2][1] * vd.position.y + M[2][2] * vd.position.z + M[2][3]);
 
         const float3 n_obj = decode_normal(vd.encoded_normal);
-        vd.encoded_normal = encode_normal(normalize(
-            float3(N[0][0] * n_obj.x + N[0][1] * n_obj.y + N[0][2] * n_obj.z,
-                   N[1][0] * n_obj.x + N[1][1] * n_obj.y + N[1][2] * n_obj.z,
-                   N[2][0] * n_obj.x + N[2][1] * n_obj.y + N[2][2] * n_obj.z)));
+        vd.encoded_normal = encode_normal(
+            normalize(float3(N[0][0] * n_obj.x + N[0][1] * n_obj.y + N[0][2] * n_obj.z,
+                             N[1][0] * n_obj.x + N[1][1] * n_obj.y + N[1][2] * n_obj.z,
+                             N[2][0] * n_obj.x + N[2][1] * n_obj.y + N[2][2] * n_obj.z)));
 
         const uint32_t sign_bit = vd.encoded_tangent & 1u;
         const float3 t_obj = decode_normal(vd.encoded_tangent & ~1u);
@@ -50,20 +50,23 @@ Mesh apply_world_transform(const Mesh& mesh, const float4x4& M) {
     return out;
 }
 
-struct AffineTransform3x4 {
-    float m[3][4];
-};
-static_assert(sizeof(AffineTransform3x4) == 48);
-
-AffineTransform3x4 to_3x4(const float4x4& t) {
-    AffineTransform3x4 out;
-    for (int row = 0; row < 3; row++)
-        for (int col = 0; col < 4; col++)
-            out.m[row][col] = t[row][col];
+// Builds the inverse-transpose of the 3x3 linear part of a 4x4 transform,
+// returned as a float4x4 with a zeroed translation column.
+// Used for transforming normals/directions (multiply with w=0 vectors).
+float4x4 to_inv_transposed(const float4x4& t) {
+    float3x3 M3;
+    for (int i = 0; i < 3; i++)
+        for (int j = 0; j < 3; j++)
+            M3[i][j] = t[i][j];
+    const float3x3 N = transpose(inverse(M3));
+    float4x4 out = identity();
+    for (int row = 0; row < 3; row++) {
+        for (int col = 0; col < 3; col++)
+            out[row][col] = N[row][col];
+        out[row][3] = 0.f;
+    }
     return out;
 }
-
-constexpr AffineTransform3x4 IDENTITY_3X4 = {{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}}};
 
 } // namespace
 
@@ -102,13 +105,15 @@ Scene::Scene(const ShaderCompileContextHandle& compile_context,
     //     composition->add_module_from_string(
     //         "scene_as_type",
     //         "import merian_shaders.scene.acceleration_structure;\n"
-    //         "namespace merian { export struct SceneAccelerationStructure : AccelerationStructure "
+    //         "namespace merian { export struct SceneAccelerationStructure : AccelerationStructure
+    //         "
     //         "= HWAccelerationStructure; }");
     // } else {
     //     composition->add_module_from_string(
     //         "scene_as_type",
     //         "import merian_shaders.scene.acceleration_structure;\n"
-    //         "namespace merian { export struct SceneAccelerationStructure : AccelerationStructure "
+    //         "namespace merian { export struct SceneAccelerationStructure : AccelerationStructure
+    //         "
     //         "= NullAccelerationStructure; }");
     // }
 
@@ -126,8 +131,7 @@ void Scene::update_composition_constants() {
                     "export static const int merian_scene_geometry_count = {};\n"
                     "}}",
                     static_cast<uint32_t>(std::max(index_buffers.size(), size_t(1))),
-                    static_cast<uint32_t>(std::max(vertex_buffers.size(), size_t(1))),
-                    0u,
+                    static_cast<uint32_t>(std::max(vertex_buffers.size(), size_t(1))), 0u,
                     static_cast<uint32_t>(std::max(geometry_instance_data.size(), size_t(1)))));
 }
 
@@ -196,6 +200,32 @@ void Scene::set_pretransform_dynamic(bool value) {
     bvh_dirty = true;
 }
 
+void Scene::properties(Properties& props) {
+    if (!cameras.empty()) {
+        if (cameras.size() > 1) {
+            props.config_uint("active camera", active_camera, 0, cameras.size());
+        }
+
+        if (props.st_begin_child("active camera", "Camera")) {
+            get_active_camera()->properties(props);
+            props.st_end_child();
+        }
+    }
+
+    std::size_t total_vertices = 0;
+    std::size_t total_triangles = 0;
+    for (const auto& m : meshes) {
+        total_vertices += m.vertices.size();
+        total_triangles += m.indices.size();
+    }
+
+    props.output_text("nodes: {}\nmeshes: {}\nvertices: {}\ntriangles: {}\nmaterials: "
+                      "{}\ntextures: {}",
+                      scene_graph.size(), meshes.size(), total_vertices, total_triangles,
+                      material_system->get_material_count(),
+                      get_texture_manager()->get_texture_count());
+}
+
 void Scene::compute_world_transforms() {
     for (auto& node : scene_graph) {
         if (node.parent == NODE_ID_INVALID) {
@@ -208,7 +238,7 @@ void Scene::compute_world_transforms() {
 }
 
 // ---------------------------------------------------------------------------
-// Mesh grouping (Falcor pattern)
+// Mesh grouping
 // ---------------------------------------------------------------------------
 
 void Scene::create_mesh_groups() {
@@ -313,8 +343,8 @@ void Scene::upload_geometry_buffers(const CommandBufferHandle& cmd) {
         if (mesh.instances.empty())
             continue;
 
-        const VertexData* vertex_src = mesh.vertices.data();
-        std::vector<VertexData> baked_vertices;
+        const PackedVertexData* vertex_src = mesh.vertices.data();
+        std::vector<PackedVertexData> baked_vertices;
         if (pretransform_mesh[mid]) {
             const NodeID nid = *mesh.instances.begin();
             const Mesh baked = apply_world_transform(mesh, scene_graph[nid].global_transform);
@@ -323,13 +353,13 @@ void Scene::upload_geometry_buffers(const CommandBufferHandle& cmd) {
         }
 
         auto vb = allocator->create_buffer(
-            mesh.vertices.size() * sizeof(VertexData),
+            mesh.vertices.size() * sizeof(PackedVertexData),
             vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst |
                 vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR |
                 vk::BufferUsageFlagBits::eShaderDeviceAddress,
             MemoryMappingType::NONE, fmt::format("Scene::vb[{}]", mid));
         allocator->get_staging()->cmd_to_device(cmd, vb, vertex_src, 0,
-                                                mesh.vertices.size() * sizeof(VertexData));
+                                                mesh.vertices.size() * sizeof(PackedVertexData));
         vertex_buffers[mid] = vb;
 
         auto ib = allocator->create_buffer(
@@ -353,10 +383,21 @@ void Scene::upload_geometry_buffers(const CommandBufferHandle& cmd) {
             cmd, geometry_data_buffer, geometry_instance_data.data(), 0,
             geometry_instance_data.size() * sizeof(GeometryData));
 
+        const auto transform_size = geometry_instance_data.size() * sizeof(float4x4);
+        const auto transform_usage =
+            vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst;
         instance_transforms_buffer = allocator->create_buffer(
-            geometry_instance_data.size() * sizeof(AffineTransform3x4),
-            vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
-            MemoryMappingType::NONE, "Scene::instance_transforms");
+            transform_size, transform_usage, MemoryMappingType::NONE, "Scene::instance_transforms");
+        inverse_transposed_instance_transforms_buffer =
+            allocator->create_buffer(transform_size, transform_usage, MemoryMappingType::NONE,
+                                     "Scene::inv_transposed_instance_transforms");
+        prev_instance_transforms_buffer =
+            allocator->create_buffer(transform_size, transform_usage, MemoryMappingType::NONE,
+                                     "Scene::prev_instance_transforms");
+        prev_inverse_transposed_instance_transforms_buffer =
+            allocator->create_buffer(transform_size, transform_usage, MemoryMappingType::NONE,
+                                     "Scene::prev_inv_transposed_instance_transforms");
+        prev_instance_transforms_data.clear();
     }
 
     // Barrier: all geometry transfers → shader reads + AS build reads
@@ -400,7 +441,7 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
             vk::AccelerationStructureGeometryTrianglesDataKHR triangles;
             triangles.vertexFormat = vk::Format::eR32G32B32Sfloat;
             triangles.vertexData = vertex_buffers[mid]->get_device_address();
-            triangles.vertexStride = sizeof(VertexData);
+            triangles.vertexStride = sizeof(PackedVertexData);
             triangles.maxVertex = static_cast<uint32_t>(mesh.vertices.size() - 1);
             triangles.indexType = vk::IndexType::eUint32;
             triangles.indexData = index_buffers[mid]->get_device_address();
@@ -472,7 +513,8 @@ void Scene::build_tlas(const CommandBufferHandle& cmd) {
 
             inst.instanceCustomIndex = instance_id;
             inst.mask = 0xFF;
-            inst.accelerationStructureReference = blas_list[gi]->get_acceleration_structure_device_address();
+            inst.accelerationStructureReference =
+                blas_list[gi]->get_acceleration_structure_device_address();
 
             // Set opaque flag if all meshes in group are opaque
             bool all_opaque = true;
@@ -497,8 +539,7 @@ void Scene::build_tlas(const CommandBufferHandle& cmd) {
     tlas_instances_buffer = allocator->create_buffer(
         instances.size() * sizeof(vk::AccelerationStructureInstanceKHR),
         vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR |
-            vk::BufferUsageFlagBits::eTransferDst |
-            vk::BufferUsageFlagBits::eShaderDeviceAddress,
+            vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eShaderDeviceAddress,
         MemoryMappingType::NONE, "Scene::tlas_instances");
     allocator->get_staging()->cmd_to_device(cmd, tlas_instances_buffer, instances.data(), 0,
                                             instances.size() *
@@ -518,7 +559,9 @@ void Scene::build_tlas(const CommandBufferHandle& cmd) {
 // Update
 // ---------------------------------------------------------------------------
 
-void Scene::update(const CommandBufferHandle& cmd, const float time, const float time_diff,
+void Scene::update(const CommandBufferHandle& cmd,
+                   const float time,
+                   const float time_diff,
                    const uint32_t frame) {
     on_update(time, time_diff);
     compute_world_transforms();
@@ -534,7 +577,7 @@ void Scene::update(const CommandBufferHandle& cmd, const float time, const float
 
     // Upload instance transforms each frame (dynamic groups change every frame).
     if (instance_transforms_buffer && !geometry_instance_data.empty()) {
-        std::vector<AffineTransform3x4> transforms(geometry_instance_data.size(), IDENTITY_3X4);
+        std::vector<float4x4> transforms(geometry_instance_data.size(), identity());
         uint32_t geom_id = 0;
         for (const auto& group : mesh_groups) {
             const auto& instances = meshes[group.mesh_list[0]].instances;
@@ -542,18 +585,44 @@ void Scene::update(const CommandBufferHandle& cmd, const float time, const float
             for (uint32_t inst_idx = 0; inst_idx < instances.size(); inst_idx++, ++node_it) {
                 for (uint32_t geom_idx = 0; geom_idx < group.mesh_list.size(); geom_idx++) {
                     if (!group.is_static) {
-                        transforms[geom_id] = to_3x4(scene_graph[*node_it].global_transform);
+                        transforms[geom_id] = scene_graph[*node_it].global_transform;
                     }
                     geom_id++;
                 }
             }
         }
-        allocator->get_staging()->cmd_to_device(cmd, instance_transforms_buffer, transforms.data(),
-                                                0, transforms.size() * sizeof(AffineTransform3x4));
+
+        // Use current transforms as prev on first frame or after geometry rebuild.
+        if (prev_instance_transforms_data.size() != transforms.size())
+            prev_instance_transforms_data = transforms;
+
+        // Compute inverse-transposed transforms for normal/direction transformation.
+        std::vector<float4x4> inv_transposed(transforms.size());
+        std::vector<float4x4> prev_inv_transposed(transforms.size());
+        for (size_t i = 0; i < transforms.size(); i++) {
+            inv_transposed[i] = to_inv_transposed(transforms[i]);
+            prev_inv_transposed[i] = to_inv_transposed(prev_instance_transforms_data[i]);
+        }
+
+        const auto buf_size = transforms.size() * sizeof(float4x4);
+        auto staging = allocator->get_staging();
+        staging->cmd_to_device(cmd, instance_transforms_buffer, transforms.data(), 0, buf_size);
+        staging->cmd_to_device(cmd, inverse_transposed_instance_transforms_buffer,
+                               inv_transposed.data(), 0, buf_size);
+        staging->cmd_to_device(cmd, prev_instance_transforms_buffer,
+                               prev_instance_transforms_data.data(), 0, buf_size);
+        staging->cmd_to_device(cmd, prev_inverse_transposed_instance_transforms_buffer,
+                               prev_inv_transposed.data(), 0, buf_size);
+
         cmd->barrier(vk::MemoryBarrier2{
-            vk::PipelineStageFlagBits2::eTransfer, vk::AccessFlagBits2::eTransferWrite,
-            vk::PipelineStageFlagBits2::eAllCommands, vk::AccessFlagBits2::eShaderRead,
+            vk::PipelineStageFlagBits2::eTransfer,
+            vk::AccessFlagBits2::eTransferWrite,
+            vk::PipelineStageFlagBits2::eAllCommands,
+            vk::AccessFlagBits2::eShaderRead,
         });
+
+        // Save current transforms as previous for next frame.
+        prev_instance_transforms_data = std::move(transforms);
     }
 
     auto c = shader_object->get_cursor();
@@ -565,10 +634,13 @@ void Scene::update(const CommandBufferHandle& cmd, const float time, const float
         if (index_buffers[i])
             c["index_buffers"][i] = index_buffers[i];
     }
-    if (geometry_data_buffer)
-        c["geometries"] = geometry_data_buffer;
-    if (instance_transforms_buffer)
-        c["instance_transforms"] = instance_transforms_buffer;
+
+    c["geometries"] = geometry_data_buffer;
+    c["instance_transforms"] = instance_transforms_buffer;
+    c["inverse_transposed_instance_transforms"] = inverse_transposed_instance_transforms_buffer;
+    c["prev_instance_transforms"] = prev_instance_transforms_buffer;
+    c["prev_inverse_transposed_instance_transforms"] =
+        prev_inverse_transposed_instance_transforms_buffer;
 
     c["material_system"] = material_system->get_shader_object();
     c["frame"] = frame;

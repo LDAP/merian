@@ -2,12 +2,14 @@
 
 #include "merian-nodes/connectors/ptr_out.hpp"
 #include "merian-nodes/graph/node.hpp"
-#include "merian-shaders/scene/gltf_scene.hpp"
+#include "merian-shaders/scene/scene.hpp"
 
+#ifdef MERIAN_TINYGLTF_ENABLED
+#include "merian-shaders/scene/gltf_scene.hpp"
 #include "merian/shader/shader_compile_context.hpp"
 #include "merian/shader/shader_object_allocator.hpp"
-
 #include <filesystem>
+#endif
 
 namespace merian {
 
@@ -31,17 +33,19 @@ class GLTFSceneNode : public Node {
     NodeStatusFlags properties(Properties& config) override;
 
   private:
+#ifdef MERIAN_TINYGLTF_ENABLED
     ContextHandle context;
     ResourceAllocatorHandle allocator;
     ShaderCompileContextHandle compile_context;
-    ShaderObjectAllocatorHandle obj_allocator;
+    std::shared_ptr<FrameCachingShaderObjectAllocator> obj_allocator;
     TextureManagerHandle texture_manager;
     MaterialSystemHandle material_system;
 
     GLTFSceneHandle scene;
     std::filesystem::path file_path;
     bool needs_load = false;
-    uint32_t frame = 0;
+
+#endif
 
     PtrOutHandle<Scene> con_scene = PtrOut<Scene>::create(true);
 };
