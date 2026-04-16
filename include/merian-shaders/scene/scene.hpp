@@ -30,31 +30,48 @@ inline bool operator&(GeometryFlags a, GeometryFlags b) {
 
 using NodeID = uint32_t;
 using MeshID = uint32_t;
+using CameraID = uint32_t;
+
+// Means this node is a root node and its local transform is the global transform.
 static constexpr NodeID NODE_ID_INVALID = UINT32_MAX;
+static constexpr CameraID CAMERA_ID_INVALID = UINT32_MAX;
 
 struct Mesh {
+    std::string name;
+
     std::vector<PackedVertexData> vertices;
     std::vector<uint3> indices;
 
     MaterialID material_id;
     GeometryFlags flags = GeometryFlags::IsOpaque;
 
-    // Set of scene graph nodes that instance this mesh.
     // Populated by add_mesh_instance. A mesh with >1 instance shares a BLAS.
     std::set<NodeID> instances;
 };
 
-// Scene graph node (transform hierarchy).
-struct SceneNode {
-    NodeID parent = NODE_ID_INVALID;
+inline std::string format_as(const Mesh& mesh) {
+    return fmt::format("vertices: {}\ntriangles: {}\nmaterial id: {}\nnum instances: {}",
+                       mesh.vertices.size(), mesh.indices.size(), mesh.material_id,
+                       mesh.instances.size());
+}
 
+struct SceneNode {
     std::string name;
 
-    float4x4 local_transform = identity();
-    float4x4 global_transform = identity();
-
+    NodeID parent = NODE_ID_INVALID;
     std::vector<NodeID> children;
+
+    float4x4 local_transform = identity();
+    // empty if invalidated. In this case all children must be invalidated as well.
+    std::optional<float4x4> global_transform;
 };
+
+inline std::string format_as(const SceneNode& node) {
+    return fmt::format(
+        "name: {}\nparent: {}\nnum children: {}\nlocal_transform:\n{}\nglobal_transform:\n{}",
+        node.name.empty() ? "<none>" : node.name, node.parent, node.children.size(),
+        node.local_transform, node.global_transform.value_or(float4x4(0)));
+}
 
 // A group of meshes that share a BLAS.
 // - Static non-instanced: all in one group, pre-transformed, TLAS identity.
@@ -80,7 +97,11 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
 
     virtual ~Scene() = default;
 
+    // ------------------------------
+
     void update(const CommandBufferHandle& cmd, float time, float time_diff, uint32_t frame);
+
+    // ------------------------------
 
     const SlangCompositionHandle& get_composition() const {
         return composition;
@@ -108,7 +129,12 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         return shader_object;
     }
 
+    std::vector<CameraHandle> get_cameras() const;
+
+    CameraHandle get_camera(const CameraID camera_id) const;
+
     CameraHandle get_active_camera() const;
+
     void set_active_camera(uint32_t index);
 
     bool has_geometry() const {
@@ -119,12 +145,39 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         return scene_graph;
     }
 
+    const std::vector<Mesh>& get_meshes() const {
+        return meshes;
+    }
+
+    const SceneNode& get_node(const NodeID node_id) {
+        assert(node_id < scene_graph.size());
+        return scene_graph[node_id];
+    }
+
+    // Guarantees that the global transform is available (unlike get_node).
+    const float4x4& get_global_transform(const NodeID node_id) {
+        assert(scene_graph[node_id].global_transform);
+        return scene_graph[node_id].global_transform.value();
+    }
+
+    const Mesh& get_mesh(const MeshID mesh_id) {
+        assert(mesh_id < scene_graph.size());
+        return meshes[mesh_id];
+    }
+
     // Bake single-instance dynamic mesh world transforms on CPU at upload time
     // (small scenes / debugging). Static meshes are always pre-transformed.
     bool get_pretransform_dynamic() const {
         return pretransform_dynamic;
     }
     void set_pretransform_dynamic(bool value);
+
+    // A the scenes up direction
+    virtual float3 get_up() {
+        return float3(0, 0, 1);
+    }
+
+    // ------------------------------
 
     void properties(Properties& props);
 
@@ -135,16 +188,18 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     }
 
     MeshID add_mesh(Mesh mesh);
-    NodeID add_node(SceneNode node);
-    void add_mesh_instance(MeshID mesh_id, NodeID node_id);
-    void add_camera(CameraHandle camera);
-    void compute_world_transforms();
 
-    std::vector<Mesh> meshes;
-    std::vector<SceneNode> scene_graph;
-    bool pretransform_dynamic = false;
+    NodeID add_node(SceneNode node);
+
+    void add_mesh_instance(MeshID mesh_id, NodeID node_id);
+
+    CameraID add_camera(CameraHandle camera);
+
+    // can be invalid if information is not available.
+    AABB aabb;
 
   private:
+    void node_properties(Properties& props, const SceneNode& node);
     void update_composition_constants();
     void rebuild_shader_object();
     void upload_geometry_buffers(const CommandBufferHandle& cmd);
@@ -152,13 +207,37 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     void build_blas(const CommandBufferHandle& cmd);
     void build_tlas(const CommandBufferHandle& cmd);
 
+  private:
+    // --------------------------
+    // Context etc.
+
     ShaderCompileContextHandle compile_context;
     ContextHandle context;
     ResourceAllocatorHandle allocator;
     ShaderObjectAllocatorHandle obj_allocator;
-    MaterialSystemHandle material_system;
 
+    SlangCompositionHandle composition;
+    SlangProgramHandle layout_program;
+    ShaderObjectHandle shader_object;
+
+    // --------------------------
+    // Scene Definition
+
+    MaterialSystemHandle material_system;
+    std::vector<Mesh> meshes;
+    std::vector<SceneNode> scene_graph;
+    bool pretransform_dynamic = false;
     std::vector<MeshGroup> mesh_groups;
+    std::vector<CameraHandle> cameras;
+    uint32_t active_camera = 0;
+
+    // --------------------------
+    // Debug
+    bool enable_debug_camera = false;
+    CameraID debug_camera_id = CAMERA_ID_INVALID;
+
+    // --------------------------
+    // Cached and Precomputed
 
     // Per-mesh: list of geometry instance indices for each instance of this mesh.
     // mesh_id_to_instance_ids[mesh_id][i] = global geometry instance index.
@@ -166,7 +245,6 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
 
     // Flat array of GeometryData ordered for InstanceID+GeometryIndex lookup.
     std::vector<GeometryData> geometry_instance_data;
-
     std::vector<BufferHandle> vertex_buffers;
     std::vector<BufferHandle> index_buffers;
     BufferHandle geometry_data_buffer;
@@ -183,15 +261,8 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     BufferHandle tlas_instances_buffer;
     BufferHandle scratch_buffer;
     bool bvh_dirty = true;
-
-    std::vector<CameraHandle> cameras;
-    uint32_t active_camera = 0;
     Camera prev_active_camera;
     bool geometry_dirty = true;
-
-    SlangCompositionHandle composition;
-    SlangProgramHandle layout_program;
-    ShaderObjectHandle shader_object;
 };
 
 using SceneHandle = std::shared_ptr<Scene>;

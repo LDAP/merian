@@ -2,6 +2,7 @@
 
 #include "merian/shader/shader_cursor.hpp"
 #include "merian/utils/vector_matrix.hpp"
+#include "merian/utils/aabb.hpp"
 
 #include <memory>
 
@@ -104,7 +105,7 @@ class Camera {
 
     // Fitting the camera position and interest to see the bounding box
     // tight: Fit bounding box exactly, not tight: fit bounding sphere
-    void look_at_bounding_box(const float3& box_min, const float3& box_max, bool tight = false);
+    void look_at_bounding_box(const AABB& aabb);
 
     // Move your camera left-right (truck), up-down (pedestal) or in-out (dolly) according to
     // world-space coordinates, while the rotation stays the same. Note: dolly and truck requires a
@@ -171,6 +172,5 @@ class Camera {
     void recompute_ray_basis();
 };
 using CameraHandle = std::shared_ptr<Camera>;
-
 
 } // namespace merian

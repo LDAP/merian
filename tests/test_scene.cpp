@@ -25,9 +25,6 @@ class TestScene : public Scene {
     using Scene::add_mesh;
     using Scene::add_mesh_instance;
     using Scene::add_node;
-    using Scene::compute_world_transforms;
-    using Scene::meshes;
-    using Scene::scene_graph;
 };
 
 class SceneTest : public ::testing::Test {
@@ -54,9 +51,9 @@ class SceneTest : public ::testing::Test {
         compile_context->add_search_path(TEST_SHADER_DIR);
         obj_allocator = std::make_shared<SimpleShaderObjectAllocator>(allocator);
         texture_manager = std::make_shared<TextureManager>(compile_context, context, allocator,
-                                                            obj_allocator, 16);
+                                                           obj_allocator, 16);
         material_system = std::make_shared<MaterialSystem>(compile_context, context, allocator,
-                                                            obj_allocator, texture_manager);
+                                                           obj_allocator, texture_manager);
     }
 
     static void TearDownTestSuite() {
@@ -127,14 +124,12 @@ TEST_F(SceneTest, SceneGraphTransforms) {
     NodeID child_id = scene->add_node(child);
     EXPECT_EQ(child_id, 1u);
 
-    scene->compute_world_transforms();
-
     const auto& graph = scene->get_scene_graph();
-    EXPECT_FLOAT_EQ(graph[root_id].global_transform[0][3], 2.0f);
-    EXPECT_FLOAT_EQ(graph[root_id].global_transform[1][3], 0.0f);
+    EXPECT_FLOAT_EQ(graph[root_id].global_transform.value()[0][3], 2.0f);
+    EXPECT_FLOAT_EQ(graph[root_id].global_transform.value()[1][3], 0.0f);
     // Child: global = mul(root, child) => translate (2, 3, 0)
-    EXPECT_FLOAT_EQ(graph[child_id].global_transform[0][3], 2.0f);
-    EXPECT_FLOAT_EQ(graph[child_id].global_transform[1][3], 3.0f);
+    EXPECT_FLOAT_EQ(graph[child_id].global_transform.value()[0][3], 2.0f);
+    EXPECT_FLOAT_EQ(graph[child_id].global_transform.value()[1][3], 3.0f);
 }
 
 // ---------------------------------------------------------------------------
@@ -155,13 +150,11 @@ TEST_F(SceneTest, MeshGroupingStatic) {
     scene->add_mesh_instance(m1, nid);
 
     // Trigger update which calls create_mesh_groups + upload
-    queue->submit_wait([&](const CommandBufferHandle& cmd) {
-        scene->update(cmd, 0.0f, 0.0f, 0);
-    });
+    queue->submit_wait([&](const CommandBufferHandle& cmd) { scene->update(cmd, 0.0f, 0.0f, 0); });
 
     // Both meshes are static non-instanced → single group with both meshes
-    EXPECT_EQ(scene->meshes[m0].instances.size(), 1u);
-    EXPECT_EQ(scene->meshes[m1].instances.size(), 1u);
+    EXPECT_EQ(scene->get_mesh(m0).instances.size(), 1u);
+    EXPECT_EQ(scene->get_mesh(m1).instances.size(), 1u);
 }
 
 // ---------------------------------------------------------------------------
@@ -182,11 +175,9 @@ TEST_F(SceneTest, MeshGroupingInstanced) {
     scene->add_mesh_instance(mid, nid0);
     scene->add_mesh_instance(mid, nid1);
 
-    EXPECT_EQ(scene->meshes[mid].instances.size(), 2u);
+    EXPECT_EQ(scene->get_mesh(mid).instances.size(), 2u);
 
-    queue->submit_wait([&](const CommandBufferHandle& cmd) {
-        scene->update(cmd, 0.0f, 0.0f, 0);
-    });
+    queue->submit_wait([&](const CommandBufferHandle& cmd) { scene->update(cmd, 0.0f, 0.0f, 0); });
 }
 
 // ---------------------------------------------------------------------------
@@ -204,18 +195,18 @@ TEST_F(SceneTest, MeshGroupingDynamic) {
     NodeID nid1 = scene->add_node(n1);
 
     // Two dynamic meshes on different nodes
-    MeshID m0 = scene->add_mesh(make_triangle(0, GeometryFlags::IsOpaque | GeometryFlags::IsDynamic));
-    MeshID m1 = scene->add_mesh(make_triangle(0, GeometryFlags::IsOpaque | GeometryFlags::IsDynamic));
+    MeshID m0 =
+        scene->add_mesh(make_triangle(0, GeometryFlags::IsOpaque | GeometryFlags::IsDynamic));
+    MeshID m1 =
+        scene->add_mesh(make_triangle(0, GeometryFlags::IsOpaque | GeometryFlags::IsDynamic));
     scene->add_mesh_instance(m0, nid0);
     scene->add_mesh_instance(m1, nid1);
 
-    queue->submit_wait([&](const CommandBufferHandle& cmd) {
-        scene->update(cmd, 0.0f, 0.0f, 0);
-    });
+    queue->submit_wait([&](const CommandBufferHandle& cmd) { scene->update(cmd, 0.0f, 0.0f, 0); });
 
     // Each dynamic mesh on a different node → separate groups
-    EXPECT_EQ(scene->meshes[m0].instances.size(), 1u);
-    EXPECT_EQ(scene->meshes[m1].instances.size(), 1u);
+    EXPECT_EQ(scene->get_mesh(m0).instances.size(), 1u);
+    EXPECT_EQ(scene->get_mesh(m1).instances.size(), 1u);
 }
 
 // ---------------------------------------------------------------------------

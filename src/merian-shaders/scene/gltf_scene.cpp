@@ -93,9 +93,7 @@ float4x4 gltf_node_transform(const tinygltf::Node& node) {
 // Material loading
 // ---------------------------------------------------------------------------
 
-void GLTFScene::load_materials(const CommandBufferHandle& cmd,
-                               const tinygltf::Model& model,
-                               const std::filesystem::path& /*base_dir*/) {
+void GLTFScene::load_materials(const CommandBufferHandle& cmd, const tinygltf::Model& model) {
     auto tex_mgr = get_texture_manager();
 
     // Load glTF images -> TextureIDs
@@ -150,28 +148,17 @@ void GLTFScene::load_materials(const CommandBufferHandle& cmd,
     }
 }
 
-// ---------------------------------------------------------------------------
-// Node/mesh loading
-// ---------------------------------------------------------------------------
+void GLTFScene::load_meshes(const tinygltf::Model& model) {
+    mesh_map.resize(model.meshes.size());
 
-void GLTFScene::load_node(const tinygltf::Model& model, int gltf_node_index, NodeID parent_id) {
-    const auto& gnode = model.nodes[gltf_node_index];
+    for (uint32_t gltf_mesh_id = 0; gltf_mesh_id < model.meshes.size(); gltf_mesh_id++) {
+        const auto& gmesh = model.meshes[gltf_mesh_id];
 
-    SceneNode sn;
-    sn.name = gnode.name;
-    sn.parent = parent_id;
-    sn.local_transform = gltf_node_transform(gnode);
+        for (uint32_t primitive_index = 0; primitive_index < gmesh.primitives.size();
+             primitive_index++) {
+            const auto& prim = gmesh.primitives[primitive_index];
 
-    NodeID nid = add_node(sn);
-    node_map[gltf_node_index] = nid;
-
-    // Process mesh primitives
-    if (gnode.mesh >= 0 && gnode.mesh < static_cast<int>(model.meshes.size())) {
-        const auto& gmesh = model.meshes[gnode.mesh];
-
-        for (const auto& prim : gmesh.primitives) {
-            // Only support triangles
-            if (prim.mode != -1 && prim.mode != 4 /* TINYGLTF_MODE_TRIANGLES */)
+            if (prim.mode != -1 && prim.mode != TINYGLTF_MODE_TRIANGLES)
                 continue;
 
             auto pos_it = prim.attributes.find("POSITION");
@@ -213,7 +200,6 @@ void GLTFScene::load_node(const tinygltf::Model& model, int gltf_node_index, Nod
                 tan_stride = get_accessor_byte_stride(model, tan_it->second);
             }
 
-            // Build vertex data
             std::vector<PackedVertexData> vertices(vertex_count);
             for (size_t v = 0; v < vertex_count; v++) {
                 auto& vd = vertices[v];
@@ -247,7 +233,6 @@ void GLTFScene::load_node(const tinygltf::Model& model, int gltf_node_index, Nod
                 }
             }
 
-            // Build index data
             std::vector<uint3> indices;
             if (prim.indices >= 0) {
                 const auto& idx_acc = model.accessors[prim.indices];
@@ -302,19 +287,143 @@ void GLTFScene::load_node(const tinygltf::Model& model, int gltf_node_index, Nod
             }
 
             Mesh mesh;
+            mesh.name =
+                gmesh.primitives.size() > 1
+                    ? fmt::format("{} ({:02})",
+                                  gmesh.name.empty() ? fmt::format("GLTF Mesh {}", gltf_mesh_id)
+                                                     : gmesh.name,
+                                  primitive_index)
+                    : gmesh.name;
             mesh.vertices = std::move(vertices);
             mesh.indices = std::move(indices);
             mesh.material_id = mat_id;
             mesh.flags = flags;
 
-            MeshID mid = add_mesh(std::move(mesh));
-            add_mesh_instance(mid, nid);
+            const MeshID mesh_id = add_mesh(std::move(mesh));
+            mesh_map[gltf_mesh_id].emplace_back(mesh_id);
+        }
+    }
+}
+
+void GLTFScene::load_node(const tinygltf::Model& model, int gltf_node_index, NodeID parent_id) {
+    const auto& gnode = model.nodes[gltf_node_index];
+
+    SceneNode sn;
+    sn.name = gnode.name.empty() ? fmt::format("GLTF Node {:02}", gltf_node_index) : gnode.name;
+    sn.parent = parent_id;
+    sn.local_transform = gltf_node_transform(gnode);
+
+    NodeID nid = add_node(sn);
+    node_map[gltf_node_index] = nid;
+
+    if (gnode.mesh >= 0) {
+        for (const MeshID mesh_id : mesh_map[gnode.mesh]) {
+            add_mesh_instance(mesh_id, nid);
         }
     }
 
     // Recurse into children
     for (int child_idx : gnode.children) {
         load_node(model, child_idx, nid);
+    }
+}
+
+void GLTFScene::load_cameras(const tinygltf::Model& model) {
+    for (size_t ni = 0; ni < model.nodes.size(); ni++) {
+        const auto& gnode = model.nodes[ni];
+        if (gnode.camera < 0 || gnode.camera >= static_cast<int>(model.cameras.size()))
+            continue;
+
+        const auto& gcam = model.cameras[gnode.camera];
+        NodeID nid = node_map[ni];
+
+        // merian row-major: basis in columns 0..2, translation in column 3
+        const float4x4& mat = get_global_transform(nid);
+        float3 up_vec = normalize(float3(mat[0][1], mat[1][1], mat[2][1]));
+        float3 forward = normalize(float3(mat[0][2], mat[1][2], mat[2][2]));
+        float3 eye = float3(mat[0][3], mat[1][3], mat[2][3]);
+
+        // glTF cameras look down -Z in local space
+        float3 center = eye - forward;
+
+        if (gcam.type == "perspective") {
+            float fov = 60.f;
+            float aspect = 1.f;
+            float znear = 0.01f;
+            float zfar = 1000.f;
+
+            fov = static_cast<float>(glm::degrees(gcam.perspective.yfov));
+            if (gcam.perspective.aspectRatio > 0)
+                aspect = static_cast<float>(gcam.perspective.aspectRatio);
+            znear = static_cast<float>(gcam.perspective.znear);
+            if (gcam.perspective.zfar > 0)
+                zfar = static_cast<float>(gcam.perspective.zfar);
+
+            add_camera(std::make_shared<Camera>(eye, center, up_vec, fov, aspect, znear, zfar));
+            SPDLOG_DEBUG("GLTFScene: loaded {} camera '{}' at ({},{},{})", gcam.type, gcam.name,
+                         eye.x, eye.y, eye.z);
+        } else {
+            SPDLOG_WARN("GLTFScene: Camera with type {} not supported.", gcam.type);
+            continue;
+        }
+    }
+
+    // Fallback: add a default camera if the scene doesn't have one
+    if (get_cameras().empty()) {
+        SPDLOG_INFO("GLTFScene: no cameras in file, adding default camera");
+
+        add_camera(std::make_shared<Camera>(float3(3, 3, 3), float3(0, 0, 0), get_up(), 60.f,
+                                            1920.f / 1080.f, 0.01f, 1000.f));
+
+        if (aabb.is_valid()) {
+            get_active_camera()->look_at(float3(1.3) * aabb.get_max().y, aabb.get_center(),
+                                         get_up());
+            get_active_camera()->look_at_bounding_box(aabb);
+        }
+    }
+}
+
+void GLTFScene::compute_aabb(const tinygltf::Model& model) {
+    aabb.reset();
+
+    for (uint32_t gltf_node_index = 0; gltf_node_index < node_map.size(); gltf_node_index++) {
+        NodeID node_id = node_map[gltf_node_index];
+
+        if (node_id == NODE_ID_INVALID) {
+            // node not used by the current loaded model
+            continue;
+        }
+
+        const auto& gnode = model.nodes[gltf_node_index];
+        if (gnode.mesh >= 0) {
+            const auto& mesh = model.meshes[gnode.mesh];
+            for (const auto& prim : mesh.primitives) {
+                auto it = prim.attributes.find("POSITION");
+                if (it == prim.attributes.end())
+                    continue;
+
+                const tinygltf::Accessor& accessor = model.accessors[it->second];
+
+                if (accessor.minValues.size() == 3 && accessor.maxValues.size() == 3) {
+                    float4 minv = {
+                        static_cast<float>(accessor.minValues[0]),
+                        static_cast<float>(accessor.minValues[1]),
+                        static_cast<float>(accessor.minValues[2]),
+                        1,
+                    };
+
+                    float4 maxv = {
+                        static_cast<float>(accessor.maxValues[0]),
+                        static_cast<float>(accessor.maxValues[1]),
+                        static_cast<float>(accessor.maxValues[2]),
+                        1,
+                    };
+
+                    aabb.expand(mul(get_global_transform(node_id), minv));
+                    aabb.expand(mul(get_global_transform(node_id), maxv));
+                }
+            }
+        }
     }
 }
 
@@ -342,70 +451,28 @@ void GLTFScene::load(const CommandBufferHandle& cmd, const std::filesystem::path
             fmt::format("GLTFScene: failed to load '{}': {}", path.string(), err));
     }
 
-    auto base_dir = path.parent_path();
+    // ----------------
 
-    // Load materials and textures
-    load_materials(cmd, model, base_dir);
+    load_materials(cmd, model);
 
-    // Load scene graph
+    load_meshes(model);
+
+    // Scene graph
+    const int scene_index = model.defaultScene >= 0 ? model.defaultScene : 0;
+    assert(scene_index < static_cast<int>(model.scenes.size()));
     node_map.resize(model.nodes.size(), NODE_ID_INVALID);
-
-    int scene_index = model.defaultScene >= 0 ? model.defaultScene : 0;
-    if (scene_index < static_cast<int>(model.scenes.size())) {
-        for (int root_node : model.scenes[scene_index].nodes) {
-            load_node(model, root_node, NODE_ID_INVALID);
-        }
+    for (int root_node : model.scenes[scene_index].nodes) {
+        load_node(model, root_node, NODE_ID_INVALID);
     }
 
-    compute_world_transforms();
+    // AABB and cameras need the scene graph
+    compute_aabb(model);
 
-    // Load cameras from nodes that reference a glTF camera
-    for (size_t ni = 0; ni < model.nodes.size(); ni++) {
-        const auto& gnode = model.nodes[ni];
-        if (gnode.camera < 0 || gnode.camera >= static_cast<int>(model.cameras.size()))
-            continue;
-
-        const auto& gcam = model.cameras[gnode.camera];
-        NodeID nid = node_map[ni];
-
-        // merian row-major: basis in columns 0..2, translation in column 3
-        const float4x4& xform = get_scene_graph()[nid].global_transform;
-        float3 up_vec = normalize(float3(xform[0][1], xform[1][1], xform[2][1]));
-        float3 forward = normalize(float3(xform[0][2], xform[1][2], xform[2][2]));
-        float3 eye = float3(xform[0][3], xform[1][3], xform[2][3]);
-
-        // glTF cameras look down -Z in local space
-        float3 center = eye - forward;
-
-        float fov = 60.f;
-        float aspect = 1.f;
-        float znear = 0.01f;
-        float zfar = 1000.f;
-
-        if (gcam.type == "perspective") {
-            fov = static_cast<float>(glm::degrees(gcam.perspective.yfov));
-            if (gcam.perspective.aspectRatio > 0)
-                aspect = static_cast<float>(gcam.perspective.aspectRatio);
-            znear = static_cast<float>(gcam.perspective.znear);
-            if (gcam.perspective.zfar > 0)
-                zfar = static_cast<float>(gcam.perspective.zfar);
-        }
-
-        add_camera(std::make_shared<Camera>(eye, center, up_vec, fov, aspect, znear, zfar));
-        SPDLOG_INFO("GLTFScene: loaded {} camera '{}' at ({},{},{})", gcam.type, gcam.name, eye.x,
-                    eye.y, eye.z);
-    }
-
-    // Fallback: add a default camera if the scene doesn't have one
-    if (!get_active_camera()) {
-        add_camera(std::make_shared<Camera>(float3(3, 3, 3), float3(0, 0, 0), float3(0, 1, 0), 60.f,
-                                            1920.f / 1080.f, 0.01f, 1000.f));
-        SPDLOG_INFO("GLTFScene: no cameras in file, using default camera");
-    }
+    load_cameras(model);
 
     SPDLOG_INFO("GLTFScene: loaded '{}' nodes: {}, meshes: {}, materials: {}, textures: {}",
-                path.filename().string(), scene_graph.size(), meshes.size(), material_map.size(),
-                model.images.size());
+                path.filename().string(), get_scene_graph().size(), get_meshes().size(),
+                material_map.size(), model.images.size());
 }
 
 } // namespace merian

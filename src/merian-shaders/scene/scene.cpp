@@ -71,10 +71,6 @@ float4x4 to_inv_transposed(const float4x4& t) {
 } // namespace
 
 // ---------------------------------------------------------------------------
-// Composition & Layout
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
 // Constructor
 // ---------------------------------------------------------------------------
 
@@ -163,8 +159,15 @@ NodeID Scene::add_node(SceneNode node) {
     auto id = static_cast<NodeID>(scene_graph.size());
     if (node.parent != NODE_ID_INVALID) {
         assert(node.parent < scene_graph.size());
-        scene_graph[node.parent].children.push_back(id);
+
+        SceneNode& parent = scene_graph[node.parent];
+        parent.children.push_back(id);
+        assert(parent.global_transform);
+        node.global_transform = mul(*parent.global_transform, node.local_transform);
+    } else {
+        node.global_transform = node.local_transform;
     }
+
     scene_graph.push_back(std::move(node));
     return id;
 }
@@ -177,13 +180,23 @@ void Scene::add_mesh_instance(const MeshID mesh_id, const NodeID node_id) {
     bvh_dirty = true;
 }
 
-void Scene::add_camera(CameraHandle camera) {
+CameraID Scene::add_camera(CameraHandle camera) {
+    const CameraID id = cameras.size();
     cameras.push_back(std::move(camera));
+    return id;
+}
+
+std::vector<CameraHandle> Scene::get_cameras() const {
+    return cameras;
+}
+
+CameraHandle Scene::get_camera(const CameraID camera_id) const {
+    assert(camera_id < cameras.size());
+    return cameras[camera_id];
 }
 
 CameraHandle Scene::get_active_camera() const {
-    if (cameras.empty())
-        return nullptr;
+    assert(!cameras.empty());
     return cameras[active_camera];
 }
 
@@ -200,40 +213,109 @@ void Scene::set_pretransform_dynamic(bool value) {
     bvh_dirty = true;
 }
 
-void Scene::properties(Properties& props) {
-    if (!cameras.empty()) {
-        if (cameras.size() > 1) {
-            props.config_uint("active camera", active_camera, 0, cameras.size());
-        }
+void Scene::node_properties(Properties& props, const SceneNode& node) {
+    props.output_text("{}", node);
 
-        if (props.st_begin_child("active camera", "Camera")) {
-            get_active_camera()->properties(props);
+    for (uint32_t i = 0; i < node.children.size(); i++) {
+        const SceneNode& child = scene_graph[node.children[i]];
+        if (props.st_begin_child(fmt::format("child_{:02} ({})", i, child.name),
+                                 fmt::format("Child {:02} ({})", i, child.name))) {
+            Scene::node_properties(props, child);
             props.st_end_child();
         }
     }
-
-    std::size_t total_vertices = 0;
-    std::size_t total_triangles = 0;
-    for (const auto& m : meshes) {
-        total_vertices += m.vertices.size();
-        total_triangles += m.indices.size();
-    }
-
-    props.output_text("nodes: {}\nmeshes: {}\nvertices: {}\ntriangles: {}\nmaterials: "
-                      "{}\ntextures: {}",
-                      scene_graph.size(), meshes.size(), total_vertices, total_triangles,
-                      material_system->get_material_count(),
-                      get_texture_manager()->get_texture_count());
 }
 
-void Scene::compute_world_transforms() {
-    for (auto& node : scene_graph) {
-        if (node.parent == NODE_ID_INVALID) {
-            node.global_transform = node.local_transform;
-        } else {
-            node.global_transform =
-                mul(scene_graph[node.parent].global_transform, node.local_transform);
+void Scene::properties(Properties& props) {
+
+    if (props.st_begin_child("scene", "Explorer")) {
+        if (props.st_begin_child("cameras", "Cameras")) {
+            if (!cameras.empty()) {
+                props.config_uint("active", active_camera, 0, cameras.size());
+                if (props.is_ui()) {
+                    props.st_separate("Active Camera");
+                    get_active_camera()->properties(props);
+                    if (aabb.is_valid() &&
+                        props.config_bool("Fit AABB",
+                                          "Rotates and moves the camera to fit the scene AABB.")) {
+                        get_active_camera()->look_at_bounding_box(aabb);
+                    }
+                }
+            }
+            props.st_separate("Debug");
+            if (props.config_bool("debug camera", enable_debug_camera) && enable_debug_camera) {
+                if (debug_camera_id == CAMERA_ID_INVALID) {
+                    auto db = std::make_shared<Camera>(float3(1, 0, 0), float3(0, 0, 0), get_up(),
+                                                       60.f, 1920.f / 1080.f, 0.01f, 1000.f);
+                    if (aabb.is_valid()) {
+                        db->look_at_bounding_box(aabb);
+                    }
+                    debug_camera_id = add_camera(db);
+                    set_active_camera(debug_camera_id);
+                }
+            }
+            if (enable_debug_camera) {
+                if (props.config_bool("make active")) {
+                    set_active_camera(debug_camera_id);
+                }
+                if (!props.is_ui()) {
+                    get_camera(debug_camera_id)->properties(props);
+                }
+            }
+
+            props.st_end_child();
         }
+
+        if (props.st_begin_child("meshes", "Meshes")) {
+            for (uint32_t id = 0; id < meshes.size(); id++) {
+                if (props.st_begin_child(fmt::format("mesh_{:02} ", id),
+                                         fmt::format("{:02}: {}", id, meshes[id].name))) {
+                    props.output_text("{}", meshes[id]);
+                    props.st_end_child();
+                }
+            }
+            props.st_end_child();
+        }
+
+        if (props.st_begin_child("graph", "Graph")) {
+            for (uint32_t id = 0; id < scene_graph.size(); id++) {
+                const SceneNode& node = scene_graph[id];
+                if (node.parent != NODE_ID_INVALID) {
+                    continue;
+                }
+                if (props.st_begin_child(fmt::format("node_{:02} ", id),
+                                         fmt::format("{:02}: {}", id, node.name))) {
+                    node_properties(props, node);
+                    props.st_end_child();
+                }
+            }
+            props.st_end_child();
+        }
+        props.st_end_child();
+    }
+
+    if (props.st_begin_child("stats", "Statistics")) {
+        std::size_t total_vertices = 0;
+        std::size_t total_triangles = 0;
+        for (const auto& m : meshes) {
+            total_vertices += m.vertices.size();
+            total_triangles += m.indices.size();
+        }
+
+        props.output_text("nodes: {}\nmeshes: {}\nvertices: {}\ntriangles: {}\nmaterials: "
+                          "{}\ntextures: {}",
+                          scene_graph.size(), meshes.size(), total_vertices, total_triangles,
+                          material_system->get_material_count(),
+                          get_texture_manager()->get_texture_count());
+
+        if (aabb.is_valid()) {
+            props.output_text("aabb: min={}, max={}, size={}", aabb.get_min(), aabb.get_max(),
+                              aabb.get_max() - aabb.get_min());
+        } else {
+            props.output_text("aabb: <not available>");
+        }
+
+        props.st_end_child();
     }
 }
 
@@ -347,7 +429,7 @@ void Scene::upload_geometry_buffers(const CommandBufferHandle& cmd) {
         std::vector<PackedVertexData> baked_vertices;
         if (pretransform_mesh[mid]) {
             const NodeID nid = *mesh.instances.begin();
-            const Mesh baked = apply_world_transform(mesh, scene_graph[nid].global_transform);
+            const Mesh baked = apply_world_transform(mesh, *scene_graph[nid].global_transform);
             baked_vertices = std::move(baked.vertices);
             vertex_src = baked_vertices.data();
         }
@@ -505,7 +587,7 @@ void Scene::build_tlas(const CommandBufferHandle& cmd) {
             } else {
                 // Dynamic: apply node's global transform
                 NodeID nid = *node_it;
-                const auto& t = scene_graph[nid].global_transform;
+                const auto& t = *scene_graph[nid].global_transform;
                 for (int row = 0; row < 3; row++)
                     for (int col = 0; col < 4; col++)
                         inst.transform.matrix[row][col] = t[row][col];
@@ -564,7 +646,9 @@ void Scene::update(const CommandBufferHandle& cmd,
                    const float time_diff,
                    const uint32_t frame) {
     on_update(time, time_diff);
-    compute_world_transforms();
+
+    assert(!cameras.empty() &&
+           "the scene implementation must ensure that there is at least one camera");
 
     material_system->upload(cmd);
     upload_geometry_buffers(cmd);
@@ -585,7 +669,7 @@ void Scene::update(const CommandBufferHandle& cmd,
             for (uint32_t inst_idx = 0; inst_idx < instances.size(); inst_idx++, ++node_it) {
                 for (uint32_t geom_idx = 0; geom_idx < group.mesh_list.size(); geom_idx++) {
                     if (!group.is_static) {
-                        transforms[geom_id] = scene_graph[*node_it].global_transform;
+                        transforms[geom_id] = *scene_graph[*node_it].global_transform;
                     }
                     geom_id++;
                 }

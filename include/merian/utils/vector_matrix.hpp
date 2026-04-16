@@ -1,8 +1,6 @@
 #pragma once
 
 #include "glm/detail/type_half.hpp"
-#include "glm/glm.hpp"
-#include "glm/gtc/packing.hpp"
 #include "glm/gtc/type_ptr.hpp"
 #include <fmt/ranges.h>
 
@@ -131,6 +129,14 @@ using glm::min;
 using glm::radians;
 
 using glm::any;
+
+using glm::lessThan;
+
+using glm::lessThanEqual;
+
+using glm::greaterThan;
+
+using glm::greaterThanEqual;
 
 using glm::value_ptr;
 

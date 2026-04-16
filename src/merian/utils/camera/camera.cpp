@@ -120,6 +120,8 @@ void Camera::set_perspective(const float field_of_view,
     this->aspect_ratio = aspect_ratio;
     this->near_plane = near_plane;
     this->far_plane = far_plane;
+
+    projection_change_id++;
 }
 
 void Camera::set_field_of_view(const float field_of_view) noexcept {
@@ -207,49 +209,31 @@ void Camera::write_to(ShaderCursor cursor) {
 // High level operations
 // -----------------------------------------------------------------------------
 
-void Camera::look_at_bounding_box(const float3& box_min, const float3& box_max, bool tight) {
-    const float3 bb_half_dimensions = (box_max - box_min) * .5f;
-    const float3 bb_center = box_min + bb_half_dimensions;
+void Camera::look_at_bounding_box(const AABB& aabb) {
+    assert(aabb.is_valid());
+
+    look_at(float3(1.3) * (aabb.get_max().y + 1e-3f), aabb.get_center(), get_up());
+
+    // ------------------
+    // First look at the bounding sphere of the aabb
+    const float3 bb_half_dimensions = (aabb.get_max() - aabb.get_min()) * .5f;
+    const float3 bb_center = aabb.get_min() + bb_half_dimensions;
 
     float offset = 0;
     float yfov = field_of_view;
-    float xfov = field_of_view * aspect_ratio;
+    float xfov = std::atan(std::tan(yfov) * aspect_ratio);
 
-    if (!tight) {
-        // Using the bounding sphere
-        float radius = length(bb_half_dimensions);
-        if (aspect_ratio > 1.f)
-            offset = radius / sin(merian::radians(yfov * 0.5f));
-        else
-            offset = radius / sin(merian::radians(xfov * 0.5f));
-    } else {
-        // keep only rotation
-        float4x4 view = merian::look_at(position, bb_center, up);
+    float radius = length(bb_half_dimensions);
+    if (aspect_ratio > 1.f)
+        offset = radius / std::sin(merian::radians(yfov * 0.5f));
+    else
+        offset = radius / std::sin(merian::radians(xfov * 0.5f));
 
-        for (int i = 0; i < 8; i++) {
-            float4 vct(i & 1 ? bb_half_dimensions.x : -bb_half_dimensions.x,
-                       i & 2 ? bb_half_dimensions.y : -bb_half_dimensions.y,
-                       i & 4 ? bb_half_dimensions.z : -bb_half_dimensions.z, 0.f);
-            vct = mul(view, vct);
-
-            if (vct.z < 0) // Take only points in front of the center
-            {
-                // Keep the largest offset to see that vertex
-                offset = std::max(std::abs(vct.y) / std::tan(merian::radians(yfov * 0.5f)) +
-                                      std::abs(vct.z),
-                                  offset);
-                offset = std::max(std::abs(vct.x) / std::tan(merian::radians(xfov * 0.5f)) +
-                                      std::abs(vct.z),
-                                  offset);
-            }
-        }
-    }
-
-    auto view_direction = normalize(position - target);
+    auto view_direction = normalize(position - bb_center);
     auto new_eye = bb_center + view_direction * offset;
-
-    // updates all matrices and change id
     look_at(new_eye, bb_center, up);
+
+    // TODO: Get a tighter fit, that accounts for the perspective transformation.
 }
 
 void Camera::move(const float dx, const float dup, const float dz) {
