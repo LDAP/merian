@@ -212,28 +212,58 @@ void Camera::write_to(ShaderCursor cursor) {
 void Camera::look_at_bounding_box(const AABB& aabb) {
     assert(aabb.is_valid());
 
+    // reduce field of view to make the fit not tight => looks better
+    const float field_of_view = this->field_of_view * 0.85f;
+
+    const float half_yfov = merian::radians(field_of_view * 0.5f);
+    const float half_xfov = std::atan(std::tan(half_yfov) * aspect_ratio);
+    const float tan_hx = std::tan(half_xfov);
+    const float tan_hy = std::tan(half_yfov);
+
+    // Establish an initial view direction
     look_at(float3(1.3) * (aabb.get_max().y + 1e-3f), aabb.get_center(), get_up());
 
-    // ------------------
-    // First look at the bounding sphere of the aabb
-    const float3 bb_half_dimensions = (aabb.get_max() - aabb.get_min()) * .5f;
-    const float3 bb_center = aabb.get_min() + bb_half_dimensions;
+    // Iteratively: pan to center the projected AABB, then compute distance to fit.
+    // Pan shifts both position and target, preserving the view direction.
+    for (int iter = 0; iter < 3; iter++) {
+        const float3& fwd = get_forward();
+        const float3& r = get_right();
+        const float3 u = cross(r, fwd);
 
-    float offset = 0;
-    float yfov = field_of_view;
-    float xfov = std::atan(std::tan(yfov) * aspect_ratio);
+        // Project all 8 corners and find the projected bounding rect center
+        float px_min = std::numeric_limits<float>::max();
+        float px_max = std::numeric_limits<float>::lowest();
+        float py_min = std::numeric_limits<float>::max();
+        float py_max = std::numeric_limits<float>::lowest();
 
-    float radius = length(bb_half_dimensions);
-    if (aspect_ratio > 1.f)
-        offset = radius / std::sin(merian::radians(yfov * 0.5f));
-    else
-        offset = radius / std::sin(merian::radians(xfov * 0.5f));
+        for (uint32_t i = 0; i < 8; i++) {
+            const float3 v = aabb.get_corner(i) - position;
+            const float d = dot(v, fwd);
+            const float px = dot(v, r) / d;
+            const float py = dot(v, u) / d;
+            px_min = std::min(px_min, px);
+            px_max = std::max(px_max, px);
+            py_min = std::min(py_min, py);
+            py_max = std::max(py_max, py);
+        }
 
-    auto view_direction = normalize(position - bb_center);
-    auto new_eye = bb_center + view_direction * offset;
-    look_at(new_eye, bb_center, up);
+        const float target_depth = dot(target - position, fwd);
+        const float3 shift = ((px_min + px_max) * 0.5f * target_depth) * r +
+                             ((py_min + py_max) * 0.5f * target_depth) * u;
+        look_at(position + shift, target + shift, up);
 
-    // TODO: Get a tighter fit, that accounts for the perspective transformation.
+        // Compute the distance to fit all corners with the recentered view
+        float dist = 0.f;
+        for (uint32_t i = 0; i < 8; i++) {
+            const float3 v = aabb.get_corner(i) - target;
+            const float depth = dot(v, fwd);
+            const float dx = (std::abs(dot(v, r)) / tan_hx) - depth;
+            const float dy = (std::abs(dot(v, u)) / tan_hy) - depth;
+            dist = std::max({dist, dx, dy});
+        }
+
+        set_position(target - fwd * dist);
+    }
 }
 
 void Camera::move(const float dx, const float dup, const float dz) {

@@ -99,12 +99,15 @@ void GLTFScene::load_materials(const CommandBufferHandle& cmd, const tinygltf::M
     // Load glTF images -> TextureIDs
     std::vector<TextureID> image_to_texture;
     image_to_texture.reserve(model.images.size());
-    for (const auto& img : model.images) {
+    for (uint32_t i = 0; i < model.images.size(); i++) {
+        const auto& img = model.images[i];
         if (img.image.empty() || img.width <= 0 || img.height <= 0) {
             SPDLOG_WARN("GLTFScene: skipping invalid image '{}'", img.name);
             image_to_texture.push_back(TextureID(-1));
             continue;
         }
+
+        SPDLOG_DEBUG("GLFWScene: loading image {:>2}/{} {}", i + 1, model.images.size(), img.name);
 
         // tinygltf decodes images to RGBA 8-bit by default (component == 4)
         if (img.component == 4 && img.bits == 8) {
@@ -153,6 +156,9 @@ void GLTFScene::load_meshes(const tinygltf::Model& model) {
 
     for (uint32_t gltf_mesh_id = 0; gltf_mesh_id < model.meshes.size(); gltf_mesh_id++) {
         const auto& gmesh = model.meshes[gltf_mesh_id];
+
+        SPDLOG_DEBUG("GLFWScene: loading mesh {:>2}/{} {}", gltf_mesh_id + 1, model.meshes.size(),
+                     gmesh.name);
 
         for (uint32_t primitive_index = 0; primitive_index < gmesh.primitives.size();
              primitive_index++) {
@@ -435,6 +441,8 @@ void GLTFScene::load(const CommandBufferHandle& cmd, const std::filesystem::path
     tinygltf::Model model;
     tinygltf::TinyGLTF loader;
     std::string err, warn;
+
+    SPDLOG_INFO("GLFWScene: loading {}", path.string());
 
     bool ok;
     if (path.extension() == ".glb") {
