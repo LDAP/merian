@@ -12,59 +12,22 @@ namespace merian {
 
 namespace {
 
-// Transform a 3x3 direction vector by the upper-left 3x3 of a 4x4.
-float3 mul3x3(const float4x4& m, const float3& v) {
-    return float3(m[0][0] * v.x + m[0][1] * v.y + m[0][2] * v.z,
-                  m[1][0] * v.x + m[1][1] * v.y + m[1][2] * v.z,
-                  m[2][0] * v.x + m[2][1] * v.y + m[2][2] * v.z);
-}
-
-// Bake world transform into a copy of `mesh`. Positions: M*p. Normals use
-// inverse-transpose of M_3x3. Tangents use M_3x3 directly (sign bit kept).
 Mesh apply_world_transform(const Mesh& mesh, const float4x4& M) {
+    // this is expensive...
     Mesh out = mesh;
 
-    float3x3 M3;
-    for (int i = 0; i < 3; i++)
-        for (int j = 0; j < 3; j++)
-            M3[i][j] = M[i][j];
-    const float3x3 N = transpose(inverse(M3));
+    float4x4 inverse_transposed = inverse(transpose(M));
 
     for (auto& vd : out.vertices) {
-        vd.position = float3(
-            M[0][0] * vd.position.x + M[0][1] * vd.position.y + M[0][2] * vd.position.z + M[0][3],
-            M[1][0] * vd.position.x + M[1][1] * vd.position.y + M[1][2] * vd.position.z + M[1][3],
-            M[2][0] * vd.position.x + M[2][1] * vd.position.y + M[2][2] * vd.position.z + M[2][3]);
-
-        const float3 n_obj = decode_normal(vd.encoded_normal);
+        vd.position = mul(M, float4(vd.position, 1));
         vd.encoded_normal = encode_normal(
-            normalize(float3(N[0][0] * n_obj.x + N[0][1] * n_obj.y + N[0][2] * n_obj.z,
-                             N[1][0] * n_obj.x + N[1][1] * n_obj.y + N[1][2] * n_obj.z,
-                             N[2][0] * n_obj.x + N[2][1] * n_obj.y + N[2][2] * n_obj.z)));
+            normalize(mul(inverse_transposed, float4(decode_normal(vd.encoded_normal), 0))));
 
         const uint32_t sign_bit = vd.encoded_tangent & 1u;
         const float3 t_obj = decode_normal(vd.encoded_tangent & ~1u);
-        vd.encoded_tangent = (encode_normal(normalize(mul3x3(M, t_obj))) & ~1u) | sign_bit;
+        vd.encoded_tangent = (encode_normal(normalize(mul(M, float4(t_obj, 0)))) & ~1u) | sign_bit;
     }
 
-    return out;
-}
-
-// Builds the inverse-transpose of the 3x3 linear part of a 4x4 transform,
-// returned as a float4x4 with a zeroed translation column.
-// Used for transforming normals/directions (multiply with w=0 vectors).
-float4x4 to_inv_transposed(const float4x4& t) {
-    float3x3 M3;
-    for (int i = 0; i < 3; i++)
-        for (int j = 0; j < 3; j++)
-            M3[i][j] = t[i][j];
-    const float3x3 N = transpose(inverse(M3));
-    float4x4 out = identity();
-    for (int row = 0; row < 3; row++) {
-        for (int col = 0; col < 3; col++)
-            out[row][col] = N[row][col];
-        out[row][3] = 0.f;
-    }
     return out;
 }
 
@@ -320,7 +283,7 @@ void Scene::properties(Properties& props) {
 }
 
 // ---------------------------------------------------------------------------
-// Mesh grouping
+// Scene update
 // ---------------------------------------------------------------------------
 
 void Scene::create_mesh_groups() {
@@ -394,10 +357,6 @@ void Scene::create_mesh_groups() {
         }
     }
 }
-
-// ---------------------------------------------------------------------------
-// Geometry upload
-// ---------------------------------------------------------------------------
 
 void Scene::upload_geometry_buffers(const CommandBufferHandle& cmd) {
     if (!geometry_dirty)
@@ -495,10 +454,6 @@ void Scene::upload_geometry_buffers(const CommandBufferHandle& cmd) {
     geometry_dirty = false;
 }
 
-// ---------------------------------------------------------------------------
-// BLAS building
-// ---------------------------------------------------------------------------
-
 void Scene::build_blas(const CommandBufferHandle& cmd) {
     if (!build_as || mesh_groups.empty())
         return;
@@ -557,10 +512,6 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
     // Keep the new BLAS list (previous ones released when shared_ptrs drop)
     blas_list = std::move(new_blas_list);
 }
-
-// ---------------------------------------------------------------------------
-// TLAS building
-// ---------------------------------------------------------------------------
 
 void Scene::build_tlas(const CommandBufferHandle& cmd) {
     if (!build_as || blas_list.empty())
@@ -637,15 +588,11 @@ void Scene::build_tlas(const CommandBufferHandle& cmd) {
     as_builder->get_cmds_tlas(cmd, scratch_buffer);
 }
 
-// ---------------------------------------------------------------------------
-// Update
-// ---------------------------------------------------------------------------
-
 void Scene::update(const CommandBufferHandle& cmd,
                    const float time,
                    const float time_diff,
                    const uint32_t frame) {
-    on_update(time, time_diff);
+    on_update(time, time_diff, frame);
 
     assert(!cameras.empty() &&
            "the scene implementation must ensure that there is at least one camera");
@@ -684,8 +631,8 @@ void Scene::update(const CommandBufferHandle& cmd,
         std::vector<float4x4> inv_transposed(transforms.size());
         std::vector<float4x4> prev_inv_transposed(transforms.size());
         for (size_t i = 0; i < transforms.size(); i++) {
-            inv_transposed[i] = to_inv_transposed(transforms[i]);
-            prev_inv_transposed[i] = to_inv_transposed(prev_instance_transforms_data[i]);
+            inv_transposed[i] = inverse(transpose(transforms[i]));
+            prev_inv_transposed[i] = inverse(transpose(prev_instance_transforms_data[i]));
         }
 
         const auto buf_size = transforms.size() * sizeof(float4x4);

@@ -54,6 +54,7 @@ extern static const int merian_scene_geometry_count;
 // extern struct SceneAccelerationStructure : AccelerationStructure;
 typedef HWAccelerationStructure SceneAccelerationStructure;
 
+// // See scene.hpp for details.
 struct Scene {
     SceneAccelerationStructure as;
 
@@ -66,6 +67,8 @@ struct Scene {
 
     StructuredBuffer<GeometryData, ScalarDataLayout> geometries;
 
+    // TODO: Currently accessed with GeometryID, but instance_index is the better choice because
+    // there is one transform for each instance.
     StructuredBuffer<float4x4, ScalarDataLayout> instance_transforms;
     StructuredBuffer<float4x4, ScalarDataLayout> inverse_transposed_instance_transforms;
     StructuredBuffer<float4x4, ScalarDataLayout> prev_instance_transforms;

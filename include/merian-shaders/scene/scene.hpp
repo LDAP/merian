@@ -88,6 +88,33 @@ class SceneError : std::runtime_error {
 };
 
 class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
+
+    // We use a BLAS / TLAS organization that is inspired by by Falcor.
+    // https://github.com/NVIDIAGameWorks/Falcor/blob/master/Source/Falcor/Scene/Scene.h
+    //
+    // BLASs (one for each group)
+    // - static, non-instanced -> pretransform and put in single group
+    // - dynamic, non-instanced -> group if same transform
+    // - instanced -> one BLAS for each group with identical instances
+    // - procedural -> own group / BLAS
+    //
+    // TLAS
+    // - We set InstanceID as the prefix sum of the number of geometries with lower InstanceIndex.
+    // That means InstanceID + GeometryIndex is unique. We call that GeometryID.
+    //
+    // clang-format off
+    //                           ----------------------------------------------------------------------------------------------
+    //                           |                                         Value(s)                                           |
+    //    ---------------------------------------------------------------------------------------------------------------------
+    //    | InstanceID           |  0                    |  4  |  5  |  6  |  7  |  8  |  9     |  10          |  13          |
+    //    | InstanceContribution |  0                    |  4  |  5  |  6  |  7  |  7  |  7     |  8           |  8           |
+    //    | BLAS Geometry Index  |  0  ,  1  ,  2  ,  3  |  0  |  0  |  0  |  0                 |  0 , 1 , 2   |  0 , 1 , 2   |
+    //    ---------------------------------------------------------------------------------------------------------------------
+    //    | Notes                | Four geometries in    | One instance    | Multiple instances | Two instances of three      |
+    //    |                      | one BLAS              | per geom/BLAS   | of same geom/BLAS  | geometries in one BLAS      |
+    //    --------------------------------------------------------------------------------------------------------------------|
+    // clang-format on
+
   public:
     Scene(const ShaderCompileContextHandle& compile_context,
           const ContextHandle& context,
@@ -182,9 +209,10 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     void properties(Properties& props);
 
   protected:
-    virtual void on_update(float time, float time_diff) {
+    virtual void on_update(float time, float time_diff, uint32_t frame) {
         (void)time;
         (void)time_diff;
+        (void)frame;
     }
 
     MeshID add_mesh(Mesh mesh);

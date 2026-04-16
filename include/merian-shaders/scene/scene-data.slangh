@@ -11,11 +11,8 @@ namespace merian {
 
 static const uint16_t GEOMETRY_FLAG_PRETRANSFORMED = 0x1;
 
-/**
- * General description of geometry. In Merians scene each geometry has its own world transform and
- * material. Geometries are identified using an InstanceID and GeometryIndex (which map to the
- * Vulkan TLAS, BLAS interface). The index in the buffer is InstanceID + GeometryIndex.
- */
+// See scene.hpp for details.
+
 struct GeometryData {
     MaterialID material_id;
     uint16_t index_buffer_index;
@@ -47,7 +44,7 @@ void operator +=(inout VertexData a, const VertexData b) {
     a.tangent += b.tangent;
 }
 
-VertexData operator *(const float a, const VertexData b) {
+VertexData operator*(const float a, const VertexData b) {
     return VertexData(a * b.position, a * b.normal, a * b.uv, a * b.tangent);
 }
 
