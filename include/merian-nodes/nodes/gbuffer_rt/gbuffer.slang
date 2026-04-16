@@ -46,6 +46,7 @@ void main(uint3 tid: SV_DispatchThreadID,
 
     // Shading normal (use geometric for now, could interpolate vertex normals)
     float3 shading_normal = scene.get_interpolated_vertex_data(gd, hit.primitive_id, bary).normal;
+    shading_normal = scene.to_world_direction(gd, gid, shading_normal);
 
     // Depth
     float linear_z = length(pos - ray.Origin);
