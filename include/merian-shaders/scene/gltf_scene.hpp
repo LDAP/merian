@@ -3,6 +3,7 @@
 #include "merian-shaders/scene/scene.hpp"
 
 #include <filesystem>
+#include <memory>
 
 namespace tinygltf {
 class Model;
@@ -19,6 +20,8 @@ class GLTFScene : public Scene {
               const ShaderObjectAllocatorHandle& obj_allocator,
               const MaterialSystemHandle& material_system);
 
+    ~GLTFScene() override;
+
     // Load a glTF file (.gltf or .glb)
     void load(const CommandBufferHandle& cmd, const std::filesystem::path& path);
 
@@ -27,15 +30,18 @@ class GLTFScene : public Scene {
     }
 
   private:
-    void load_materials(const CommandBufferHandle& cmd, const tinygltf::Model& model);
+    void load_materials(const CommandBufferHandle& cmd);
 
-    void load_meshes(const tinygltf::Model& model);
+    void load_meshes();
 
-    void load_node(const tinygltf::Model& model, int gltf_node_index, NodeID parent_id);
+    void load_node(int gltf_node_index, NodeID parent_id);
 
-    void load_cameras(const tinygltf::Model& model);
+    void load_cameras();
 
-    void compute_aabb(const tinygltf::Model& model);
+    void compute_aabb();
+
+    // Owned so GLTFMesh can reference buffer data directly.
+    std::unique_ptr<tinygltf::Model> model;
 
     // glTF material index -> MaterialID
     std::vector<MaterialID> material_map;

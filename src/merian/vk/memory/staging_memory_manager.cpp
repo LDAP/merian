@@ -135,6 +135,28 @@ void StagingMemoryManager::cmd_to_device(const CommandBufferHandle& cmd,
 }
 
 MemoryAllocationHandle
+StagingMemoryManager::cmd_to_device(const CommandBufferHandle& cmd,
+                                    const BufferHandle& buffer,
+                                    const vk::DeviceSize offset,
+                                    const std::optional<vk::DeviceSize> optional_size) {
+    assert(offset < buffer->get_size());
+    assert(!optional_size || *optional_size <= buffer->get_size());
+    assert(!optional_size || *optional_size + offset <= buffer->get_size());
+
+    const vk::DeviceSize size = optional_size.value_or(buffer->get_size() - offset);
+
+    BufferHandle upload_buffer;
+    vk::DeviceSize upload_buffer_offset;
+    const MemoryAllocationHandle memory =
+        get_upload_staging_space(size, upload_buffer, upload_buffer_offset);
+
+    const vk::BufferCopy copy{upload_buffer_offset, offset, size};
+    cmd->copy(upload_buffer, buffer, copy);
+
+    return memory;
+}
+
+MemoryAllocationHandle
 StagingMemoryManager::cmd_from_device(const CommandBufferHandle& cmd,
                                       const BufferHandle& buffer,
                                       const vk::DeviceSize offset,

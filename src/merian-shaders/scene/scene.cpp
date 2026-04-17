@@ -12,26 +12,56 @@ namespace merian {
 
 namespace {
 
-Mesh apply_world_transform(const Mesh& mesh, const float4x4& M) {
-    // this is expensive...
-    Mesh out = mesh;
-
-    float4x4 inverse_transposed = inverse(transpose(M));
-
-    for (auto& vd : out.vertices) {
-        vd.position = mul(M, float4(vd.position, 1));
-        vd.encoded_normal = encode_normal(
-            normalize(mul(inverse_transposed, float4(decode_normal(vd.encoded_normal), 0))));
-
-        const uint32_t sign_bit = vd.encoded_tangent & 1u;
-        const float3 t_obj = decode_normal(vd.encoded_tangent & ~1u);
-        vd.encoded_tangent = (encode_normal(normalize(mul(M, float4(t_obj, 0)))) & ~1u) | sign_bit;
-    }
-
-    return out;
+uint32_t pack_tangent(const float3 tangent_dir, const float sign) {
+    const uint32_t enc = encode_normal(tangent_dir);
+    return (enc & ~1u) | (sign < 0.f ? 1u : 0u);
 }
 
 } // namespace
+
+// ---------------------------------------------------------------------------
+// Mesh
+// ---------------------------------------------------------------------------
+
+PackedVertexData Mesh::get_packed_vertex(uint32_t vertex_idx) const {
+    PackedVertexData v;
+    v.position = get_position(vertex_idx);
+    v.encoded_normal = encode_normal(get_normal(vertex_idx));
+    const float2 uv = get_uv(vertex_idx);
+    v.uv = half2(uv.x, uv.y);
+    const float4 t = get_tangent(vertex_idx);
+    v.encoded_tangent = pack_tangent(float3(t.x, t.y, t.z), t.w);
+    return v;
+}
+
+PackedVertexData Mesh::get_packed_vertex_pretransformed(uint32_t vertex_idx,
+                                                        const SceneNode& node) const {
+    assert(node.global_transform && node.global_inverse_transposed);
+    const float4x4& M = *node.global_transform;
+    const float4x4& IT = *node.global_inverse_transposed;
+
+    PackedVertexData v;
+    v.position = mul(M, float4(get_position(vertex_idx), 1.f));
+    v.encoded_normal =
+        encode_normal(normalize(float3(mul(IT, float4(get_normal(vertex_idx), 0.f)))));
+    const float2 uv = get_uv(vertex_idx);
+    v.uv = half2(uv.x, uv.y);
+    const float4 t = get_tangent(vertex_idx);
+    const float3 tw = normalize(float3(mul(M, float4(t.x, t.y, t.z, 0.f))));
+    v.encoded_tangent = pack_tangent(tw, t.w);
+    return v;
+}
+
+float3 SimpleMesh::get_normal(uint32_t vertex_idx) const {
+    return decode_normal(vertices[vertex_idx].encoded_normal);
+}
+
+float4 SimpleMesh::get_tangent(uint32_t vertex_idx) const {
+    const uint32_t enc = vertices[vertex_idx].encoded_tangent;
+    const float3 t = decode_normal(enc & ~1u);
+    const float sign = (enc & 1u) ? -1.f : 1.f;
+    return float4(t.x, t.y, t.z, sign);
+}
 
 // ---------------------------------------------------------------------------
 // Constructor
@@ -111,7 +141,8 @@ bool Scene::set_build_acceleration_structure(bool build) {
     return true;
 }
 
-MeshID Scene::add_mesh(Mesh mesh) {
+MeshID Scene::add_mesh(MeshHandle mesh) {
+    assert(mesh);
     auto id = static_cast<MeshID>(meshes.size());
     meshes.push_back(std::move(mesh));
     geometry_dirty = true;
@@ -130,6 +161,7 @@ NodeID Scene::add_node(SceneNode node) {
     } else {
         node.global_transform = node.local_transform;
     }
+    node.global_inverse_transposed = inverse(transpose(*node.global_transform));
 
     scene_graph.push_back(std::move(node));
     return id;
@@ -138,7 +170,7 @@ NodeID Scene::add_node(SceneNode node) {
 void Scene::add_mesh_instance(const MeshID mesh_id, const NodeID node_id) {
     assert(mesh_id < meshes.size());
     assert(node_id < scene_graph.size());
-    meshes[mesh_id].instances.insert(node_id);
+    meshes[mesh_id]->instances.insert(node_id);
     geometry_dirty = true;
     bvh_dirty = true;
 }
@@ -232,8 +264,8 @@ void Scene::properties(Properties& props) {
         if (props.st_begin_child("meshes", "Meshes")) {
             for (uint32_t id = 0; id < meshes.size(); id++) {
                 if (props.st_begin_child(fmt::format("mesh_{:02} ", id),
-                                         fmt::format("{:02}: {}", id, meshes[id].name))) {
-                    props.output_text("{}", meshes[id]);
+                                         fmt::format("{:02}: {}", id, meshes[id]->name))) {
+                    props.output_text("{}", *meshes[id]);
                     props.st_end_child();
                 }
             }
@@ -261,8 +293,8 @@ void Scene::properties(Properties& props) {
         std::size_t total_vertices = 0;
         std::size_t total_triangles = 0;
         for (const auto& m : meshes) {
-            total_vertices += m.vertices.size();
-            total_triangles += m.indices.size();
+            total_vertices += m->get_vertex_count();
+            total_triangles += m->get_primitive_count();
         }
 
         props.output_text("nodes: {}\nmeshes: {}\nvertices: {}\ntriangles: {}\nmaterials: "
@@ -298,7 +330,7 @@ void Scene::create_mesh_groups() {
     std::map<std::set<NodeID>, std::vector<MeshID>> instanced_by_set;
 
     for (MeshID mid = 0; mid < static_cast<MeshID>(meshes.size()); mid++) {
-        const auto& mesh = meshes[mid];
+        const Mesh& mesh = *meshes[mid];
         if (mesh.instances.empty())
             continue;
 
@@ -337,7 +369,7 @@ void Scene::create_mesh_groups() {
     for (const auto& group : mesh_groups) {
         // All meshes in a group have the same instance set (for non-instanced: size 1)
         assert(!group.mesh_list.empty());
-        const auto& instances = meshes[group.mesh_list[0]].instances;
+        const auto& instances = meshes[group.mesh_list[0]]->instances;
         uint32_t instance_count = static_cast<uint32_t>(instances.size());
 
         for (uint32_t inst_idx = 0; inst_idx < instance_count; inst_idx++) {
@@ -346,7 +378,7 @@ void Scene::create_mesh_groups() {
                 mesh_id_to_instance_ids[mid].push_back(geometry_instance_id);
 
                 GeometryData gd{};
-                gd.material_id = meshes[mid].material_id;
+                gd.material_id = meshes[mid]->material_id;
                 gd.vertex_buffer_index = static_cast<uint16_t>(mid);
                 gd.index_buffer_index = static_cast<uint16_t>(mid);
                 gd.flags = group.is_static ? GEOMETRY_FLAG_PRETRANSFORMED : 0;
@@ -379,38 +411,52 @@ void Scene::upload_geometry_buffers(const CommandBufferHandle& cmd) {
             pretransform_mesh[mid] = true;
     }
 
+    const auto staging = allocator->get_staging();
+
     for (MeshID mid = 0; mid < static_cast<MeshID>(meshes.size()); mid++) {
-        const auto& mesh = meshes[mid];
+        const Mesh& mesh = *meshes[mid];
         if (mesh.instances.empty())
             continue;
 
-        const PackedVertexData* vertex_src = mesh.vertices.data();
-        std::vector<PackedVertexData> baked_vertices;
+        const uint32_t vertex_count = mesh.get_vertex_count();
+        const uint32_t primitive_count = mesh.get_primitive_count();
+        const vk::DeviceSize vb_size = vertex_count * sizeof(PackedVertexData);
+        const vk::DeviceSize ib_size = primitive_count * sizeof(uint3);
+
+        const SceneNode* pretransform_node = nullptr;
         if (pretransform_mesh[mid]) {
-            const NodeID nid = *mesh.instances.begin();
-            const Mesh baked = apply_world_transform(mesh, *scene_graph[nid].global_transform);
-            baked_vertices = std::move(baked.vertices);
-            vertex_src = baked_vertices.data();
+            pretransform_node = &scene_graph[*mesh.instances.begin()];
         }
 
-        auto vb = allocator->create_buffer(
-            mesh.vertices.size() * sizeof(PackedVertexData),
+        const auto buffer_usage =
             vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst |
-                vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR |
-                vk::BufferUsageFlagBits::eShaderDeviceAddress,
-            MemoryMappingType::NONE, fmt::format("Scene::vb[{}]", mid));
-        allocator->get_staging()->cmd_to_device(cmd, vb, vertex_src, 0,
-                                                mesh.vertices.size() * sizeof(PackedVertexData));
+            vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR |
+            vk::BufferUsageFlagBits::eShaderDeviceAddress;
+
+        auto vb = allocator->create_buffer(vb_size, buffer_usage, MemoryMappingType::NONE,
+                                           fmt::format("Scene::vb[{}]", mid));
+        const MemoryAllocationHandle vb_staging = staging->cmd_to_device(cmd, vb);
+        auto* vb_mapped = static_cast<PackedVertexData*>(vb_staging->map());
+        if (pretransform_node) {
+            for (uint32_t v = 0; v < vertex_count; v++) {
+                vb_mapped[v] = mesh.get_packed_vertex_pretransformed(v, *pretransform_node);
+            }
+        } else {
+            for (uint32_t v = 0; v < vertex_count; v++) {
+                vb_mapped[v] = mesh.get_packed_vertex(v);
+            }
+        }
+        vb_staging->unmap();
         vertex_buffers[mid] = vb;
 
-        auto ib = allocator->create_buffer(
-            mesh.indices.size() * sizeof(uint3),
-            vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst |
-                vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR |
-                vk::BufferUsageFlagBits::eShaderDeviceAddress,
-            MemoryMappingType::NONE, fmt::format("Scene::ib[{}]", mid));
-        allocator->get_staging()->cmd_to_device(cmd, ib, mesh.indices.data(), 0,
-                                                mesh.indices.size() * sizeof(uint3));
+        auto ib = allocator->create_buffer(ib_size, buffer_usage, MemoryMappingType::NONE,
+                                           fmt::format("Scene::ib[{}]", mid));
+        const MemoryAllocationHandle ib_staging = staging->cmd_to_device(cmd, ib);
+        auto* ib_mapped = static_cast<uint3*>(ib_staging->map());
+        for (uint32_t p = 0; p < primitive_count; p++) {
+            ib_mapped[p] = mesh.get_indices(p);
+        }
+        ib_staging->unmap();
         index_buffers[mid] = ib;
     }
 
@@ -426,7 +472,8 @@ void Scene::upload_geometry_buffers(const CommandBufferHandle& cmd) {
 
         uint32_t tlas_instance_count = 0;
         for (const auto& group : mesh_groups) {
-            tlas_instance_count += static_cast<uint32_t>(meshes[group.mesh_list[0]].instances.size());
+            tlas_instance_count +=
+                static_cast<uint32_t>(meshes[group.mesh_list[0]]->instances.size());
         }
 
         const auto transform_size = tlas_instance_count * sizeof(float4x4);
@@ -478,13 +525,13 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
         auto& bg = blas_geoms[gi];
 
         for (MeshID mid : group.mesh_list) {
-            const auto& mesh = meshes[mid];
+            const Mesh& mesh = *meshes[mid];
 
             vk::AccelerationStructureGeometryTrianglesDataKHR triangles;
             triangles.vertexFormat = vk::Format::eR32G32B32Sfloat;
             triangles.vertexData = vertex_buffers[mid]->get_device_address();
             triangles.vertexStride = sizeof(PackedVertexData);
-            triangles.maxVertex = static_cast<uint32_t>(mesh.vertices.size() - 1);
+            triangles.maxVertex = mesh.get_vertex_count() - 1;
             triangles.indexType = vk::IndexType::eUint32;
             triangles.indexData = index_buffers[mid]->get_device_address();
 
@@ -496,7 +543,7 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
             }
 
             vk::AccelerationStructureBuildRangeInfoKHR range{};
-            range.primitiveCount = static_cast<uint32_t>(mesh.indices.size());
+            range.primitiveCount = mesh.get_primitive_count();
 
             bg.geometries.push_back(geom);
             bg.ranges.push_back(range);
@@ -527,7 +574,7 @@ void Scene::build_tlas(const CommandBufferHandle& cmd) {
 
     for (uint32_t gi = 0; gi < mesh_groups.size(); gi++) {
         const auto& group = mesh_groups[gi];
-        const auto& first_mesh_instances = meshes[group.mesh_list[0]].instances;
+        const auto& first_mesh_instances = meshes[group.mesh_list[0]]->instances;
         uint32_t instance_count = static_cast<uint32_t>(first_mesh_instances.size());
 
         // Iterate each instance of this group
@@ -557,7 +604,7 @@ void Scene::build_tlas(const CommandBufferHandle& cmd) {
             // Set opaque flag if all meshes in group are opaque
             bool all_opaque = true;
             for (MeshID mid : group.mesh_list) {
-                if (!(meshes[mid].flags & GeometryFlags::IsOpaque)) {
+                if (!(meshes[mid]->flags & GeometryFlags::IsOpaque)) {
                     all_opaque = false;
                     break;
                 }
@@ -617,12 +664,12 @@ void Scene::update(const CommandBufferHandle& cmd,
         uint32_t tlas_instance_count = 0;
         for (const auto& group : mesh_groups) {
             tlas_instance_count +=
-                static_cast<uint32_t>(meshes[group.mesh_list[0]].instances.size());
+                static_cast<uint32_t>(meshes[group.mesh_list[0]]->instances.size());
         }
         std::vector<float4x4> transforms(tlas_instance_count, identity());
         uint32_t tlas_inst_id = 0;
         for (const auto& group : mesh_groups) {
-            const auto& instances = meshes[group.mesh_list[0]].instances;
+            const auto& instances = meshes[group.mesh_list[0]]->instances;
             auto node_it = instances.begin();
             for (uint32_t inst_idx = 0; inst_idx < instances.size(); inst_idx++, ++node_it) {
                 if (!group.is_static) {

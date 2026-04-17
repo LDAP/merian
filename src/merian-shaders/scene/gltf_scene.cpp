@@ -20,17 +20,19 @@ GLTFScene::GLTFScene(const ShaderCompileContextHandle& compile_context,
         "merian::DiffuseMaterial", "merian-shaders/shading/materials/diffuse-material.slang");
 }
 
+GLTFScene::~GLTFScene() = default;
+
 // ---------------------------------------------------------------------------
 // Accessor helpers
 // ---------------------------------------------------------------------------
 
 namespace {
 
-template <typename T> const T* get_accessor_data(const tinygltf::Model& model, int accessor_index) {
+const uint8_t* get_accessor_base(const tinygltf::Model& model, int accessor_index) {
     const auto& accessor = model.accessors[accessor_index];
     const auto& bv = model.bufferViews[accessor.bufferView];
     const auto& buf = model.buffers[bv.buffer];
-    return reinterpret_cast<const T*>(buf.data.data() + bv.byteOffset + accessor.byteOffset);
+    return buf.data.data() + bv.byteOffset + accessor.byteOffset;
 }
 
 int get_accessor_byte_stride(const tinygltf::Model& model, int accessor_index) {
@@ -39,9 +41,70 @@ int get_accessor_byte_stride(const tinygltf::Model& model, int accessor_index) {
     return accessor.ByteStride(bv);
 }
 
-template <typename T> T read_strided(const uint8_t* base, int byte_stride, size_t index) {
+template <typename T> T read_strided(const uint8_t* base, int byte_stride, uint32_t index) {
     return *reinterpret_cast<const T*>(base + byte_stride * index);
 }
+
+// Mesh referencing buffer data in a tinygltf::Model (owned by GLTFScene).
+class GLTFMesh : public Mesh {
+  public:
+    const uint8_t* pos_base = nullptr;
+    int pos_stride = 0;
+    const uint8_t* nrm_base = nullptr;
+    int nrm_stride = 0;
+    const uint8_t* uv_base = nullptr;
+    int uv_stride = 0;
+    const uint8_t* tan_base = nullptr;
+    int tan_stride = 0;
+    uint32_t vertex_count = 0;
+
+    // null -> sequential indices
+    const uint8_t* idx_base = nullptr;
+    int idx_component_type = 0; // 5121=ubyte, 5123=ushort, 5125=uint
+    uint32_t primitive_count = 0;
+
+    uint32_t get_vertex_count() const override {
+        return vertex_count;
+    }
+    uint32_t get_primitive_count() const override {
+        return primitive_count;
+    }
+
+    float3 get_position(uint32_t v) const override {
+        return read_strided<float3>(pos_base, pos_stride, v);
+    }
+    float3 get_normal(uint32_t v) const override {
+        if (nrm_base == nullptr)
+            return float3(0, 1, 0);
+        return read_strided<float3>(nrm_base, nrm_stride, v);
+    }
+    float2 get_uv(uint32_t v) const override {
+        if (uv_base == nullptr)
+            return float2(0, 0);
+        return read_strided<float2>(uv_base, uv_stride, v);
+    }
+    float4 get_tangent(uint32_t v) const override {
+        if (tan_base == nullptr)
+            return float4(1, 0, 0, 1);
+        return read_strided<float4>(tan_base, tan_stride, v);
+    }
+
+    uint3 get_indices(uint32_t p) const override {
+        if (idx_base == nullptr) {
+            return uint3(p * 3, p * 3 + 1, p * 3 + 2);
+        }
+        if (idx_component_type == 5123) {
+            const auto* src = reinterpret_cast<const uint16_t*>(idx_base);
+            return uint3(src[p * 3], src[p * 3 + 1], src[p * 3 + 2]);
+        }
+        if (idx_component_type == 5125) {
+            const auto* src = reinterpret_cast<const uint32_t*>(idx_base);
+            return uint3(src[p * 3], src[p * 3 + 1], src[p * 3 + 2]);
+        }
+        // UNSIGNED_BYTE (5121)
+        return uint3(idx_base[p * 3], idx_base[p * 3 + 1], idx_base[p * 3 + 2]);
+    }
+};
 
 float4x4 gltf_node_transform(const tinygltf::Node& node) {
     if (node.matrix.size() == 16) {
@@ -93,21 +156,21 @@ float4x4 gltf_node_transform(const tinygltf::Node& node) {
 // Material loading
 // ---------------------------------------------------------------------------
 
-void GLTFScene::load_materials(const CommandBufferHandle& cmd, const tinygltf::Model& model) {
+void GLTFScene::load_materials(const CommandBufferHandle& cmd) {
     auto tex_mgr = get_texture_manager();
 
     // Load glTF images -> TextureIDs
     std::vector<TextureID> image_to_texture;
-    image_to_texture.reserve(model.images.size());
-    for (uint32_t i = 0; i < model.images.size(); i++) {
-        const auto& img = model.images[i];
+    image_to_texture.reserve(model->images.size());
+    for (uint32_t i = 0; i < model->images.size(); i++) {
+        const auto& img = model->images[i];
         if (img.image.empty() || img.width <= 0 || img.height <= 0) {
             SPDLOG_WARN("GLTFScene: skipping invalid image '{}'", img.name);
             image_to_texture.push_back(TextureID(-1));
             continue;
         }
 
-        SPDLOG_DEBUG("GLFWScene: loading image {:>2}/{} {}", i + 1, model.images.size(), img.name);
+        SPDLOG_DEBUG("GLFWScene: loading image {:>2}/{} {}", i + 1, model->images.size(), img.name);
 
         // tinygltf decodes images to RGBA 8-bit by default (component == 4)
         if (img.component == 4 && img.bits == 8) {
@@ -123,9 +186,9 @@ void GLTFScene::load_materials(const CommandBufferHandle& cmd, const tinygltf::M
     }
 
     // Convert glTF materials -> DiffuseMaterial
-    material_map.resize(model.materials.size());
-    for (size_t i = 0; i < model.materials.size(); i++) {
-        const auto& gmat = model.materials[i];
+    material_map.resize(model->materials.size());
+    for (size_t i = 0; i < model->materials.size(); i++) {
+        const auto& gmat = model->materials[i];
         const auto& pbr = gmat.pbrMetallicRoughness;
 
         DiffuseMaterial mat;
@@ -135,7 +198,7 @@ void GLTFScene::load_materials(const CommandBufferHandle& cmd, const tinygltf::M
 
         // Alpha texture from base color texture
         if (pbr.baseColorTexture.index >= 0) {
-            const auto& tex = model.textures[pbr.baseColorTexture.index];
+            const auto& tex = model->textures[pbr.baseColorTexture.index];
             if (tex.source >= 0 && tex.source < static_cast<int>(image_to_texture.size())) {
                 mat.header.alpha_texture_id = image_to_texture[tex.source];
             }
@@ -151,13 +214,13 @@ void GLTFScene::load_materials(const CommandBufferHandle& cmd, const tinygltf::M
     }
 }
 
-void GLTFScene::load_meshes(const tinygltf::Model& model) {
-    mesh_map.resize(model.meshes.size());
+void GLTFScene::load_meshes() {
+    mesh_map.resize(model->meshes.size());
 
-    for (uint32_t gltf_mesh_id = 0; gltf_mesh_id < model.meshes.size(); gltf_mesh_id++) {
-        const auto& gmesh = model.meshes[gltf_mesh_id];
+    for (uint32_t gltf_mesh_id = 0; gltf_mesh_id < model->meshes.size(); gltf_mesh_id++) {
+        const auto& gmesh = model->meshes[gltf_mesh_id];
 
-        SPDLOG_DEBUG("GLFWScene: loading mesh {:>2}/{} {}", gltf_mesh_id + 1, model.meshes.size(),
+        SPDLOG_DEBUG("GLFWScene: loading mesh {:>2}/{} {}", gltf_mesh_id + 1, model->meshes.size(),
                      gmesh.name);
 
         for (uint32_t primitive_index = 0; primitive_index < gmesh.primitives.size();
@@ -171,109 +234,33 @@ void GLTFScene::load_meshes(const tinygltf::Model& model) {
             if (pos_it == prim.attributes.end())
                 continue;
 
-            const auto& pos_acc = model.accessors[pos_it->second];
-            const size_t vertex_count = pos_acc.count;
+            auto mesh = std::make_unique<GLTFMesh>();
 
-            // Get attribute data pointers and strides
-            const uint8_t* pos_base =
-                reinterpret_cast<const uint8_t*>(get_accessor_data<uint8_t>(model, pos_it->second));
-            int pos_stride = get_accessor_byte_stride(model, pos_it->second);
+            const auto& pos_acc = model->accessors[pos_it->second];
+            mesh->vertex_count = static_cast<uint32_t>(pos_acc.count);
+            mesh->pos_base = get_accessor_base(*model, pos_it->second);
+            mesh->pos_stride = get_accessor_byte_stride(*model, pos_it->second);
 
-            const uint8_t* nrm_base = nullptr;
-            int nrm_stride = 0;
-            auto nrm_it = prim.attributes.find("NORMAL");
-            if (nrm_it != prim.attributes.end()) {
-                nrm_base = reinterpret_cast<const uint8_t*>(
-                    get_accessor_data<uint8_t>(model, nrm_it->second));
-                nrm_stride = get_accessor_byte_stride(model, nrm_it->second);
+            if (auto it = prim.attributes.find("NORMAL"); it != prim.attributes.end()) {
+                mesh->nrm_base = get_accessor_base(*model, it->second);
+                mesh->nrm_stride = get_accessor_byte_stride(*model, it->second);
+            }
+            if (auto it = prim.attributes.find("TEXCOORD_0"); it != prim.attributes.end()) {
+                mesh->uv_base = get_accessor_base(*model, it->second);
+                mesh->uv_stride = get_accessor_byte_stride(*model, it->second);
+            }
+            if (auto it = prim.attributes.find("TANGENT"); it != prim.attributes.end()) {
+                mesh->tan_base = get_accessor_base(*model, it->second);
+                mesh->tan_stride = get_accessor_byte_stride(*model, it->second);
             }
 
-            const uint8_t* uv_base = nullptr;
-            int uv_stride = 0;
-            auto uv_it = prim.attributes.find("TEXCOORD_0");
-            if (uv_it != prim.attributes.end()) {
-                uv_base = reinterpret_cast<const uint8_t*>(
-                    get_accessor_data<uint8_t>(model, uv_it->second));
-                uv_stride = get_accessor_byte_stride(model, uv_it->second);
-            }
-
-            const uint8_t* tan_base = nullptr;
-            int tan_stride = 0;
-            auto tan_it = prim.attributes.find("TANGENT");
-            if (tan_it != prim.attributes.end()) {
-                tan_base = reinterpret_cast<const uint8_t*>(
-                    get_accessor_data<uint8_t>(model, tan_it->second));
-                tan_stride = get_accessor_byte_stride(model, tan_it->second);
-            }
-
-            std::vector<PackedVertexData> vertices(vertex_count);
-            for (size_t v = 0; v < vertex_count; v++) {
-                auto& vd = vertices[v];
-
-                auto pos = read_strided<float3>(pos_base, pos_stride, v);
-                vd.position = pos;
-
-                if (nrm_base) {
-                    auto n = read_strided<float3>(nrm_base, nrm_stride, v);
-                    vd.encoded_normal = encode_normal(n);
-                } else {
-                    vd.encoded_normal = encode_normal(float3(0, 1, 0));
-                }
-
-                if (uv_base) {
-                    auto uv = read_strided<float2>(uv_base, uv_stride, v);
-                    vd.uv = half2(uv.x, uv.y);
-                } else {
-                    vd.uv = half2(0, 0);
-                }
-
-                if (tan_base) {
-                    auto t = read_strided<float4>(tan_base, tan_stride, v);
-                    float3 tangent_dir(t.x, t.y, t.z);
-                    uint32_t enc = encode_normal(tangent_dir);
-                    // Store sign bit in the LSB
-                    enc = (enc & ~1u) | (t.w < 0.f ? 1u : 0u);
-                    vd.encoded_tangent = enc;
-                } else {
-                    vd.encoded_tangent = 0;
-                }
-            }
-
-            std::vector<uint3> indices;
             if (prim.indices >= 0) {
-                const auto& idx_acc = model.accessors[prim.indices];
-                const size_t tri_count = idx_acc.count / 3;
-                indices.resize(tri_count);
-
-                const auto& bv = model.bufferViews[idx_acc.bufferView];
-                const auto& buf = model.buffers[bv.buffer];
-                const uint8_t* idx_base = buf.data.data() + bv.byteOffset + idx_acc.byteOffset;
-
-                if (idx_acc.componentType == 5123 /* UNSIGNED_SHORT */) {
-                    const auto* src = reinterpret_cast<const uint16_t*>(idx_base);
-                    for (size_t t = 0; t < tri_count; t++) {
-                        indices[t] = uint3(src[t * 3 + 0], src[t * 3 + 1], src[t * 3 + 2]);
-                    }
-                } else if (idx_acc.componentType == 5125 /* UNSIGNED_INT */) {
-                    const auto* src = reinterpret_cast<const uint32_t*>(idx_base);
-                    for (size_t t = 0; t < tri_count; t++) {
-                        indices[t] = uint3(src[t * 3 + 0], src[t * 3 + 1], src[t * 3 + 2]);
-                    }
-                } else if (idx_acc.componentType == 5121 /* UNSIGNED_BYTE */) {
-                    for (size_t t = 0; t < tri_count; t++) {
-                        indices[t] =
-                            uint3(idx_base[t * 3 + 0], idx_base[t * 3 + 1], idx_base[t * 3 + 2]);
-                    }
-                }
+                const auto& idx_acc = model->accessors[prim.indices];
+                mesh->idx_base = get_accessor_base(*model, prim.indices);
+                mesh->idx_component_type = idx_acc.componentType;
+                mesh->primitive_count = static_cast<uint32_t>(idx_acc.count / 3);
             } else {
-                // Non-indexed: generate sequential indices
-                const size_t tri_count = vertex_count / 3;
-                indices.resize(tri_count);
-                for (size_t t = 0; t < tri_count; t++) {
-                    indices[t] =
-                        uint3(static_cast<uint32_t>(t * 3), static_cast<uint32_t>(t * 3 + 1),
-                              static_cast<uint32_t>(t * 3 + 2));
-                }
+                mesh->primitive_count = mesh->vertex_count / 3;
             }
 
             // Determine material
@@ -284,26 +271,23 @@ void GLTFScene::load_meshes(const tinygltf::Model& model) {
 
             // Determine flags
             GeometryFlags flags = GeometryFlags::None;
-            if (prim.material >= 0 && prim.material < static_cast<int>(model.materials.size())) {
-                if (model.materials[prim.material].alphaMode == "OPAQUE") {
+            if (prim.material >= 0 && prim.material < static_cast<int>(model->materials.size())) {
+                if (model->materials[prim.material].alphaMode == "OPAQUE") {
                     flags = flags | GeometryFlags::IsOpaque;
                 }
             } else {
                 flags = flags | GeometryFlags::IsOpaque;
             }
 
-            Mesh mesh;
-            mesh.name =
+            mesh->name =
                 gmesh.primitives.size() > 1
                     ? fmt::format("{} ({:02})",
                                   gmesh.name.empty() ? fmt::format("GLTF Mesh {}", gltf_mesh_id)
                                                      : gmesh.name,
                                   primitive_index)
                     : gmesh.name;
-            mesh.vertices = std::move(vertices);
-            mesh.indices = std::move(indices);
-            mesh.material_id = mat_id;
-            mesh.flags = flags;
+            mesh->material_id = mat_id;
+            mesh->flags = flags;
 
             const MeshID mesh_id = add_mesh(std::move(mesh));
             mesh_map[gltf_mesh_id].emplace_back(mesh_id);
@@ -311,8 +295,8 @@ void GLTFScene::load_meshes(const tinygltf::Model& model) {
     }
 }
 
-void GLTFScene::load_node(const tinygltf::Model& model, int gltf_node_index, NodeID parent_id) {
-    const auto& gnode = model.nodes[gltf_node_index];
+void GLTFScene::load_node(int gltf_node_index, NodeID parent_id) {
+    const auto& gnode = model->nodes[gltf_node_index];
 
     SceneNode sn;
     sn.name = gnode.name.empty() ? fmt::format("GLTF Node {:02}", gltf_node_index) : gnode.name;
@@ -330,17 +314,17 @@ void GLTFScene::load_node(const tinygltf::Model& model, int gltf_node_index, Nod
 
     // Recurse into children
     for (int child_idx : gnode.children) {
-        load_node(model, child_idx, nid);
+        load_node(child_idx, nid);
     }
 }
 
-void GLTFScene::load_cameras(const tinygltf::Model& model) {
-    for (size_t ni = 0; ni < model.nodes.size(); ni++) {
-        const auto& gnode = model.nodes[ni];
-        if (gnode.camera < 0 || gnode.camera >= static_cast<int>(model.cameras.size()))
+void GLTFScene::load_cameras() {
+    for (size_t ni = 0; ni < model->nodes.size(); ni++) {
+        const auto& gnode = model->nodes[ni];
+        if (gnode.camera < 0 || gnode.camera >= static_cast<int>(model->cameras.size()))
             continue;
 
-        const auto& gcam = model.cameras[gnode.camera];
+        const auto& gcam = model->cameras[gnode.camera];
         NodeID nid = node_map[ni];
 
         // merian row-major: basis in columns 0..2, translation in column 3
@@ -389,7 +373,7 @@ void GLTFScene::load_cameras(const tinygltf::Model& model) {
     }
 }
 
-void GLTFScene::compute_aabb(const tinygltf::Model& model) {
+void GLTFScene::compute_aabb() {
     aabb.reset();
 
     for (uint32_t gltf_node_index = 0; gltf_node_index < node_map.size(); gltf_node_index++) {
@@ -400,15 +384,15 @@ void GLTFScene::compute_aabb(const tinygltf::Model& model) {
             continue;
         }
 
-        const auto& gnode = model.nodes[gltf_node_index];
+        const auto& gnode = model->nodes[gltf_node_index];
         if (gnode.mesh >= 0) {
-            const auto& mesh = model.meshes[gnode.mesh];
+            const auto& mesh = model->meshes[gnode.mesh];
             for (const auto& prim : mesh.primitives) {
                 auto it = prim.attributes.find("POSITION");
                 if (it == prim.attributes.end())
                     continue;
 
-                const tinygltf::Accessor& accessor = model.accessors[it->second];
+                const tinygltf::Accessor& accessor = model->accessors[it->second];
 
                 if (accessor.minValues.size() == 3 && accessor.maxValues.size() == 3) {
                     float4 minv = {
@@ -438,7 +422,7 @@ void GLTFScene::compute_aabb(const tinygltf::Model& model) {
 // ---------------------------------------------------------------------------
 
 void GLTFScene::load(const CommandBufferHandle& cmd, const std::filesystem::path& path) {
-    tinygltf::Model model;
+    model = std::make_unique<tinygltf::Model>();
     tinygltf::TinyGLTF loader;
     std::string err, warn;
 
@@ -446,9 +430,9 @@ void GLTFScene::load(const CommandBufferHandle& cmd, const std::filesystem::path
 
     bool ok;
     if (path.extension() == ".glb") {
-        ok = loader.LoadBinaryFromFile(&model, &err, &warn, path.string());
+        ok = loader.LoadBinaryFromFile(model.get(), &err, &warn, path.string());
     } else {
-        ok = loader.LoadASCIIFromFile(&model, &err, &warn, path.string());
+        ok = loader.LoadASCIIFromFile(model.get(), &err, &warn, path.string());
     }
 
     if (!warn.empty()) {
@@ -461,26 +445,26 @@ void GLTFScene::load(const CommandBufferHandle& cmd, const std::filesystem::path
 
     // ----------------
 
-    load_materials(cmd, model);
+    load_materials(cmd);
 
-    load_meshes(model);
+    load_meshes();
 
     // Scene graph
-    const int scene_index = model.defaultScene >= 0 ? model.defaultScene : 0;
-    assert(scene_index < static_cast<int>(model.scenes.size()));
-    node_map.resize(model.nodes.size(), NODE_ID_INVALID);
-    for (int root_node : model.scenes[scene_index].nodes) {
-        load_node(model, root_node, NODE_ID_INVALID);
+    const int scene_index = model->defaultScene >= 0 ? model->defaultScene : 0;
+    assert(scene_index < static_cast<int>(model->scenes.size()));
+    node_map.resize(model->nodes.size(), NODE_ID_INVALID);
+    for (int root_node : model->scenes[scene_index].nodes) {
+        load_node(root_node, NODE_ID_INVALID);
     }
 
     // AABB and cameras need the scene graph
-    compute_aabb(model);
+    compute_aabb();
 
-    load_cameras(model);
+    load_cameras();
 
     SPDLOG_INFO("GLTFScene: loaded '{}' nodes: {}, meshes: {}, materials: {}, textures: {}",
                 path.filename().string(), get_scene_graph().size(), get_meshes().size(),
-                material_map.size(), model.images.size());
+                material_map.size(), model->images.size());
 }
 
 } // namespace merian

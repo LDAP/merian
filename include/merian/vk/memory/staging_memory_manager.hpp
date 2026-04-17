@@ -83,6 +83,14 @@ class StagingMemoryManager : public std::enable_shared_from_this<StagingMemoryMa
                        const vk::DeviceSize offset = 0ul,
                        const std::optional<vk::DeviceSize> optional_size = std::nullopt);
 
+    /* Returns a staging allocation; the caller fills it via map()/unmap(). The copy to buffer is
+     * already queued in cmd. Size defaults to buffer->get_size() - offset. */
+    MemoryAllocationHandle
+    cmd_to_device(const CommandBufferHandle& cmd,
+                  const BufferHandle& buffer,
+                  const vk::DeviceSize offset = 0ul,
+                  const std::optional<vk::DeviceSize> optional_size = std::nullopt);
+
     /* You must make sure that "data" matches the buffer size. Copies [data, data + data.get_size())
      * to buffer::get_buffer_address + offset. Size defaults to data.size() * sizeof(T).*/
     template <class T>

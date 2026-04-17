@@ -36,25 +36,6 @@ using CameraID = uint32_t;
 static constexpr NodeID NODE_ID_INVALID = UINT32_MAX;
 static constexpr CameraID CAMERA_ID_INVALID = UINT32_MAX;
 
-struct Mesh {
-    std::string name;
-
-    std::vector<PackedVertexData> vertices;
-    std::vector<uint3> indices;
-
-    MaterialID material_id;
-    GeometryFlags flags = GeometryFlags::IsOpaque;
-
-    // Populated by add_mesh_instance. A mesh with >1 instance shares a BLAS.
-    std::set<NodeID> instances;
-};
-
-inline std::string format_as(const Mesh& mesh) {
-    return fmt::format("vertices: {}\ntriangles: {}\nmaterial id: {}\nnum instances: {}",
-                       mesh.vertices.size(), mesh.indices.size(), mesh.material_id,
-                       mesh.instances.size());
-}
-
 struct SceneNode {
     std::string name;
 
@@ -62,8 +43,10 @@ struct SceneNode {
     std::vector<NodeID> children;
 
     float4x4 local_transform = identity();
-    // empty if invalidated. In this case all children must be invalidated as well.
+    // Empty if invalidated; all children must be invalidated as well.
     std::optional<float4x4> global_transform;
+    // Cached inverse-transpose of global_transform; computed alongside global_transform.
+    std::optional<float4x4> global_inverse_transposed;
 };
 
 inline std::string format_as(const SceneNode& node) {
@@ -72,6 +55,68 @@ inline std::string format_as(const SceneNode& node) {
         node.name.empty() ? "<none>" : node.name, node.parent, node.children.size(),
         node.local_transform, node.global_transform.value_or(float4x4(0)));
 }
+
+class Mesh {
+  public:
+    std::string name;
+    MaterialID material_id{};
+    GeometryFlags flags = GeometryFlags::IsOpaque;
+
+    // Populated by add_mesh_instance. A mesh with >1 instance shares a BLAS.
+    std::set<NodeID> instances;
+
+    virtual ~Mesh() = default;
+
+    virtual uint32_t get_vertex_count() const = 0;
+    virtual uint32_t get_primitive_count() const = 0;
+
+    virtual float3 get_position(uint32_t vertex_idx) const = 0;
+    virtual float3 get_normal(uint32_t vertex_idx) const = 0;
+    virtual float2 get_uv(uint32_t vertex_idx) const = 0;
+    // xyz = tangent direction, w = bitangent sign (+1 or -1)
+    virtual float4 get_tangent(uint32_t vertex_idx) const = 0;
+
+    virtual uint3 get_indices(uint32_t primitive_idx) const = 0;
+
+    PackedVertexData get_packed_vertex(uint32_t vertex_idx) const;
+    PackedVertexData get_packed_vertex_pretransformed(uint32_t vertex_idx,
+                                                      const SceneNode& node) const;
+};
+
+using MeshHandle = std::unique_ptr<Mesh>;
+
+inline std::string format_as(const Mesh& mesh) {
+    return fmt::format("vertices: {}\ntriangles: {}\nmaterial id: {}\nnum instances: {}",
+                       mesh.get_vertex_count(), mesh.get_primitive_count(), mesh.material_id,
+                       mesh.instances.size());
+}
+
+// Concrete Mesh that owns its vertex/index data.
+class SimpleMesh : public Mesh {
+  public:
+    std::vector<PackedVertexData> vertices;
+    std::vector<uint3> indices;
+
+    uint32_t get_vertex_count() const override {
+        return static_cast<uint32_t>(vertices.size());
+    }
+    uint32_t get_primitive_count() const override {
+        return static_cast<uint32_t>(indices.size());
+    }
+
+    float3 get_position(uint32_t vertex_idx) const override {
+        return vertices[vertex_idx].position;
+    }
+    float3 get_normal(uint32_t vertex_idx) const override;
+    float2 get_uv(uint32_t vertex_idx) const override {
+        return float2(vertices[vertex_idx].uv);
+    }
+    float4 get_tangent(uint32_t vertex_idx) const override;
+
+    uint3 get_indices(uint32_t primitive_idx) const override {
+        return indices[primitive_idx];
+    }
+};
 
 // A group of meshes that share a BLAS.
 // - Static non-instanced: all in one group, pre-transformed, TLAS identity.
@@ -172,7 +217,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         return scene_graph;
     }
 
-    const std::vector<Mesh>& get_meshes() const {
+    const std::vector<MeshHandle>& get_meshes() const {
         return meshes;
     }
 
@@ -188,8 +233,8 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     }
 
     const Mesh& get_mesh(const MeshID mesh_id) {
-        assert(mesh_id < scene_graph.size());
-        return meshes[mesh_id];
+        assert(mesh_id < meshes.size());
+        return *meshes[mesh_id];
     }
 
     // Bake single-instance dynamic mesh world transforms on CPU at upload time
@@ -215,7 +260,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         (void)frame;
     }
 
-    MeshID add_mesh(Mesh mesh);
+    MeshID add_mesh(MeshHandle mesh);
 
     NodeID add_node(SceneNode node);
 
@@ -252,7 +297,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     // Scene Definition
 
     MaterialSystemHandle material_system;
-    std::vector<Mesh> meshes;
+    std::vector<MeshHandle> meshes;
     std::vector<SceneNode> scene_graph;
     bool pretransform_dynamic = false;
     std::vector<MeshGroup> mesh_groups;
