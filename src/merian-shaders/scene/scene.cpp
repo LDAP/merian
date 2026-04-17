@@ -226,7 +226,8 @@ void Scene::properties(Properties& props) {
     if (props.st_begin_child("scene", "Explorer")) {
         if (props.st_begin_child("cameras", "Cameras")) {
             if (!cameras.empty()) {
-                props.config_uint("active", active_camera, 0, cameras.size());
+                props.config_uint("active", active_camera, "", 0u,
+                                  static_cast<uint32_t>(cameras.size()));
                 if (props.is_ui()) {
                     props.st_separate("Active Camera");
                     get_active_camera()->properties(props);

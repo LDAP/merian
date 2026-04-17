@@ -74,28 +74,37 @@ void JSONDumpProperties::output_plot_line(const std::string& /*label*/,
 bool JSONDumpProperties::config_float(const std::string& id,
                                       float* value,
                                       const std::string& /*desc*/,
-                                      const int components) {
+                                      const int components,
+                                      const float /*sensitivity*/,
+                                      const std::optional<float>& /*min*/,
+                                      const std::optional<float>& /*max*/) {
     current()[id] = dump(value, components);
     return false;
 }
 bool JSONDumpProperties::config_int(const std::string& id,
                                     int32_t* value,
                                     const std::string& /*desc*/,
-                                    const int components) {
+                                    const int components,
+                                    const std::optional<int32_t>& /*min*/,
+                                    const std::optional<int32_t>& /*max*/) {
     current()[id] = dump(value, components);
     return false;
 }
 bool JSONDumpProperties::config_uint(const std::string& id,
                                      uint32_t* value,
                                      const std::string& /*desc*/,
-                                     const int components) {
+                                     const int components,
+                                     const std::optional<uint32_t>& /*min*/,
+                                     const std::optional<uint32_t>& /*max*/) {
     current()[id] = dump(value, components);
     return false;
 }
 bool JSONDumpProperties::config_uint64(const std::string& id,
                                        uint64_t* value,
                                        const std::string& /*desc*/,
-                                       const int components) {
+                                       const int components,
+                                       const std::optional<uint64_t>& /*min*/,
+                                       const std::optional<uint64_t>& /*max*/) {
     current()[id] = dump(value, components);
     return false;
 }

@@ -6,6 +6,7 @@
 #include <fmt/format.h>
 
 #include <algorithm>
+#include <cmath>
 #include <stdexcept>
 
 namespace merian {
@@ -14,6 +15,31 @@ void tooltip(const std::string& tooltip) {
     if (!tooltip.empty() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
         ImGui::SetTooltip("%s", tooltip.c_str());
     }
+}
+
+static std::string format_for_sensitivity(const float sensitivity) {
+    return fmt::format("%.{}f", std::max(0, (int)std::ceil(-std::log10(sensitivity))));
+}
+
+template <typename T>
+static bool drag_or_slider(const std::string& id,
+                           const ImGuiDataType data_type,
+                           T* value,
+                           const int components,
+                           const float sensitivity,
+                           const std::optional<T>& min,
+                           const std::optional<T>& max,
+                           const char* format) {
+    if (min && max) {
+        const T min_v = *min;
+        const T max_v = *max;
+        return ImGui::SliderScalarN(id.c_str(), data_type, value, components, &min_v, &max_v,
+                                    format);
+    }
+    const T min_v = min.value_or(T{});
+    const T max_v = max.value_or(T{});
+    return ImGui::DragScalarN(id.c_str(), data_type, value, components, sensitivity,
+                              min ? &min_v : nullptr, max ? &max_v : nullptr, format);
 }
 
 ImGuiProperties::~ImGuiProperties() {}
@@ -58,33 +84,46 @@ void ImGuiProperties::output_plot_line(const std::string& label,
 bool ImGuiProperties::config_float(const std::string& id,
                                    float* value,
                                    const std::string& desc,
-                                   const int components) {
-    const bool value_changed =
-        ImGui::DragScalarN(id.c_str(), ImGuiDataType_Float, value, components);
+                                   const int components,
+                                   const float sensitivity,
+                                   const std::optional<float>& min,
+                                   const std::optional<float>& max) {
+    const std::string format = format_for_sensitivity(sensitivity);
+    const bool value_changed = drag_or_slider<float>(id, ImGuiDataType_Float, value, components,
+                                                     sensitivity, min, max, format.c_str());
     tooltip(desc);
     return value_changed;
 }
 bool ImGuiProperties::config_int(const std::string& id,
                                  int32_t* value,
                                  const std::string& desc,
-                                 const int components) {
-    const bool value_changed = ImGui::DragScalarN(id.c_str(), ImGuiDataType_S32, value, components);
+                                 const int components,
+                                 const std::optional<int32_t>& min,
+                                 const std::optional<int32_t>& max) {
+    const bool value_changed =
+        drag_or_slider<int32_t>(id, ImGuiDataType_S32, value, components, 1.0f, min, max, nullptr);
     tooltip(desc);
     return value_changed;
 }
 bool ImGuiProperties::config_uint(const std::string& id,
                                   uint32_t* value,
                                   const std::string& desc,
-                                  const int components) {
-    const bool value_changed = ImGui::DragScalarN(id.c_str(), ImGuiDataType_U32, value, components);
+                                  const int components,
+                                  const std::optional<uint32_t>& min,
+                                  const std::optional<uint32_t>& max) {
+    const bool value_changed =
+        drag_or_slider<uint32_t>(id, ImGuiDataType_U32, value, components, 1.0f, min, max, nullptr);
     tooltip(desc);
     return value_changed;
 }
 bool ImGuiProperties::config_uint64(const std::string& id,
                                     uint64_t* value,
                                     const std::string& desc,
-                                    const int components) {
-    const bool value_changed = ImGui::DragScalarN(id.c_str(), ImGuiDataType_U64, value, components);
+                                    const int components,
+                                    const std::optional<uint64_t>& min,
+                                    const std::optional<uint64_t>& max) {
+    const bool value_changed =
+        drag_or_slider<uint64_t>(id, ImGuiDataType_U64, value, components, 1.0f, min, max, nullptr);
     tooltip(desc);
     return value_changed;
 }
@@ -115,51 +154,6 @@ bool ImGuiProperties::config_angle(const std::string& id,
 }
 bool ImGuiProperties::config_percent(const std::string& id, float& value, const std::string& desc) {
     const bool value_changed = ImGui::SliderFloat(id.c_str(), &value, 0, 1, "%.06f");
-    tooltip(desc);
-    return value_changed;
-}
-bool ImGuiProperties::config_float(const std::string& id,
-                                   float& value,
-                                   const std::string& desc,
-                                   const float sensitivity) {
-    const bool value_changed = ImGui::DragFloat(
-        id.c_str(), &value, sensitivity, 0.0f, 0.0f,
-        fmt::format("%.{}f", std::max(0, (int)std::ceil(-std::log10(sensitivity)))).c_str());
-    tooltip(desc);
-    return value_changed;
-}
-bool ImGuiProperties::config_float(const std::string& id,
-                                   float& value,
-                                   const float& min,
-                                   const float& max,
-                                   const std::string& desc) {
-    const bool value_changed = ImGui::SliderFloat(id.c_str(), &value, min, max);
-    tooltip(desc);
-    return value_changed;
-}
-bool ImGuiProperties::config_int(
-    const std::string& id, int& value, const int& min, const int& max, const std::string& desc) {
-    const bool value_changed = ImGui::SliderInt(id.c_str(), &value, min, max);
-    tooltip(desc);
-    return value_changed;
-}
-bool ImGuiProperties::config_uint(const std::string& id,
-                                  uint32_t& value,
-                                  const uint32_t& min,
-                                  const uint32_t& max,
-                                  const std::string& desc) {
-    const bool value_changed =
-        ImGui::SliderScalar(id.c_str(), ImGuiDataType_U32, &value, &min, &max);
-    tooltip(desc);
-    return value_changed;
-}
-bool ImGuiProperties::config_uint64(const std::string& id,
-                                    uint64_t& value,
-                                    const uint64_t& min,
-                                    const uint64_t& max,
-                                    const std::string& desc) {
-    const bool value_changed =
-        ImGui::SliderScalar(id.c_str(), ImGuiDataType_U64, &value, &min, &max);
     tooltip(desc);
     return value_changed;
 }

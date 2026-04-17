@@ -4,6 +4,7 @@
 #include "nlohmann/json.hpp"
 
 #include <filesystem>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -40,19 +41,28 @@ class JSONLoadProperties : public Properties {
     virtual bool config_float(const std::string& id,
                               float* value,
                               const std::string& desc = "",
-                              const int components = 1) override;
+                              const int components = 1,
+                              const float sensitivity = 0.1f,
+                              const std::optional<float>& min = std::nullopt,
+                              const std::optional<float>& max = std::nullopt) override;
     virtual bool config_int(const std::string& id,
                             int32_t* value,
                             const std::string& desc = "",
-                            const int components = 1) override;
+                            const int components = 1,
+                            const std::optional<int32_t>& min = std::nullopt,
+                            const std::optional<int32_t>& max = std::nullopt) override;
     virtual bool config_uint(const std::string& id,
                              uint32_t* value,
                              const std::string& desc = "",
-                             const int components = 1) override;
+                             const int components = 1,
+                             const std::optional<uint32_t>& min = std::nullopt,
+                             const std::optional<uint32_t>& max = std::nullopt) override;
     virtual bool config_uint64(const std::string& id,
                                uint64_t* value,
                                const std::string& desc = "",
-                               const int components = 1) override;
+                               const int components = 1,
+                               const std::optional<uint64_t>& min = std::nullopt,
+                               const std::optional<uint64_t>& max = std::nullopt) override;
 
     virtual bool
     config_bool(const std::string& id, bool& value, const std::string& desc = "") override;

@@ -82,8 +82,8 @@ SVGF::NodeStatusFlags SVGF::on_connected([[maybe_unused]] const NodeIOLayout& io
         context, VE_SHARED_MEMORY_PER_PIXEL, SVGF_VE_HALO_RADIUS, 32, 16);
     if (kaleidoscope && kaleidoscope_use_shmem) {
         filter_local_size = workgroup_size_for_shared_memory_with_halo(
-            context, FILTER_SHARED_MEMORY_PER_PIXEL, SVGF_FILTER_HALO_RADIUS,
-            max_wg_size_vendor, 16);
+            context, FILTER_SHARED_MEMORY_PER_PIXEL, SVGF_FILTER_HALO_RADIUS, max_wg_size_vendor,
+            16);
     } else {
         filter_local_size = max_wg_size_vendor;
     }
@@ -320,8 +320,8 @@ SVGF::NodeStatusFlags SVGF::properties(Properties& config) {
     config.config_float("depth accept", variance_estimate_pc.depth_accept, "More means more reuse");
 
     config.st_separate("Filter");
-    needs_rebuild |= config.config_int("SVGF iterations", svgf_iterations, 0, 10,
-                                       "0 disables SVGF completely (TAA-only mode)");
+    needs_rebuild |= config.config_int("SVGF iterations", svgf_iterations,
+                                       "0 disables SVGF completely (TAA-only mode)", 0, 10);
     config.config_float("filter depth", filter_pc.param_z, "more means more blur");
     angle = std::acos(filter_pc.param_n);
     config.config_angle("filter normals", angle, "Reject with normals farther apart", 0, 180);
@@ -343,8 +343,9 @@ SVGF::NodeStatusFlags SVGF::properties(Properties& config) {
 
     config.st_separate("TAA");
     config.config_float(
-        "TAA alpha", taa_pc.blend_alpha, 0, 1,
-        "Blend factor for the final image and the previous image. More means more reuse.");
+        "TAA alpha", taa_pc.blend_alpha,
+        "Blend factor for the final image and the previous image. More means more reuse.", 0.01f,
+        0.0f, 1.0f);
 
     needs_rebuild |=
         config.config_bool("enable motion vectors", enable_mv, "uses motion vectors if connected.");

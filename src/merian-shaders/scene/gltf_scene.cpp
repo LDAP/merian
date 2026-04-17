@@ -1,5 +1,4 @@
 #include "merian-shaders/scene/gltf_scene.hpp"
-#include "merian/utils/normal_encoding.hpp"
 
 #include <fmt/format.h>
 #include <glm/gtc/quaternion.hpp>

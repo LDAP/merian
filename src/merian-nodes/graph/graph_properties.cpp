@@ -94,7 +94,7 @@ void Graph::profiler_properties(Properties& props) {
                 }
 
                 props.output_plot_line("cpu", cpu_samples, cpu_time_history.size() - 1, 0, cpu_max);
-                cpu_auto &= !props.config_float("cpu max ms", cpu_max, 0, 1000);
+                cpu_auto &= !props.config_float("cpu max ms", cpu_max, "", 0.1f, 0.0f, 1000.0f);
                 props.st_no_space();
                 props.config_bool("cpu auto", cpu_auto);
                 Profiler::get_cpu_report_as_config(props, last_run_report);
@@ -109,7 +109,7 @@ void Graph::profiler_properties(Properties& props) {
                 }
 
                 props.output_plot_line("gpu", gpu_samples, gpu_time_history.size() - 1, 0, gpu_max);
-                gpu_auto &= !props.config_float("gpu max ms", gpu_max, 0, 1000);
+                gpu_auto &= !props.config_float("gpu max ms", gpu_max, "", 0.1f, 0.0f, 1000.0f);
                 props.st_no_space();
                 props.config_bool("gpu auto", gpu_auto);
                 Profiler::get_gpu_report_as_config(props, last_run_report);

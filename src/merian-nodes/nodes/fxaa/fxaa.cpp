@@ -60,7 +60,7 @@ VulkanEntryPointHandle FXAA::get_entry_point() {
 
 AbstractCompute::NodeStatusFlags FXAA::properties(Properties& config) {
     config.config_bool("enable", pc.enable, "");
-    config.config_float("subpixel alias removal", pc.fxaaQualitySubpix, 0., 1.,
+    config.config_float("subpixel alias removal", pc.fxaaQualitySubpix,
                         R"(Choose the amount of sub-pixel aliasing removal.
 This can effect sharpness.
   1.00 - upper limit (softer)
@@ -68,21 +68,24 @@ This can effect sharpness.
   0.50 - lower limit (sharper, less sub-pixel aliasing removal)
   0.25 - almost off
   0.00 - completely off
-)");
-    config.config_float("edge threshold", pc.fxaaQualityEdgeThreshold, 0.063, 0.333,
+)",
+                        0.01f, 0.0f, 1.0f);
+    config.config_float("edge threshold", pc.fxaaQualityEdgeThreshold,
                         R"(The minimum amount of local contrast required to apply algorithm.
   0.333 - too little (faster)
   0.250 - low quality
   0.166 - default
-  0.125 - high quality 
+  0.125 - high quality
   0.063 - overkill (slower)
-)");
-    config.config_float("edge threshold min", pc.fxaaQualityEdgeThresholdMin, 0.01, 0.1,
+)",
+                        0.001f, 0.063f, 0.333f);
+    config.config_float("edge threshold min", pc.fxaaQualityEdgeThresholdMin,
                         R"(Trims the algorithm from processing darks.
   0.0833 - upper limit (default, the start of visible unfiltered edges)
   0.0625 - high quality (faster)
   0.0312 - visible limit (slower)
-)");
+)",
+                        0.001f, 0.01f, 0.1f);
 
     return {};
 }

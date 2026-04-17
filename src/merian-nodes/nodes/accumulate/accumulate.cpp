@@ -193,8 +193,9 @@ void Accumulate::process(GraphRun& run,
 Accumulate::NodeStatusFlags Accumulate::properties(Properties& config) {
     bool needs_rebuild = false;
     config.st_separate("Accumulation");
-    config.config_float("alpha", accumulate_pc.accum_alpha, 0, 1,
-                        "Blend factor with the previous information. More means more reuse");
+    config.config_float("alpha", accumulate_pc.accum_alpha,
+                        "Blend factor with the previous information. More means more reuse", 0.01f,
+                        0.0f, 1.0f);
     config.config_float("max history", accumulate_pc.accum_max_hist,
                         "artificially limit the history counter. This can be a good alternative to "
                         "reducing the blend alpha");

@@ -7,6 +7,7 @@
 
 #include <cfloat>
 #include <fmt/format.h>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -80,139 +81,167 @@ class Properties {
     virtual bool config_float(const std::string& id,
                               float* value,
                               const std::string& desc = "",
-                              const int components = 1) = 0;
+                              const int components = 1,
+                              const float sensitivity = 0.1f,
+                              const std::optional<float>& min = std::nullopt,
+                              const std::optional<float>& max = std::nullopt) = 0;
     // Returns true if the value changed.
     virtual bool config_int(const std::string& id,
                             int32_t* value,
                             const std::string& desc = "",
-                            const int components = 1) = 0;
+                            const int components = 1,
+                            const std::optional<int32_t>& min = std::nullopt,
+                            const std::optional<int32_t>& max = std::nullopt) = 0;
     // Returns true if the value changed.
     virtual bool config_uint(const std::string& id,
                              uint32_t* value,
                              const std::string& desc = "",
-                             const int components = 1) = 0;
+                             const int components = 1,
+                             const std::optional<uint32_t>& min = std::nullopt,
+                             const std::optional<uint32_t>& max = std::nullopt) = 0;
     // Returns true if the value changed.
     virtual bool config_uint64(const std::string& id,
                                uint64_t* value,
                                const std::string& desc = "",
-                               const int components = 1) = 0;
+                               const int components = 1,
+                               const std::optional<uint64_t>& min = std::nullopt,
+                               const std::optional<uint64_t>& max = std::nullopt) = 0;
 
     // Returns true if the value changed.
-    virtual bool config_float(const std::string& id,
-                              float& value,
-                              const std::string& desc = "",
-                              const float /*sensitivity*/ = 1.0f) {
-        return config_float(id, &value, desc, 1);
+    bool config_float(const std::string& id,
+                      float& value,
+                      const std::string& desc = "",
+                      const float sensitivity = 0.1f,
+                      const std::optional<float>& min = std::nullopt,
+                      const std::optional<float>& max = std::nullopt) {
+        return config_float(id, &value, desc, 1, sensitivity, min, max);
     }
     // Returns true if the value changed.
-    virtual bool config_float(const std::string& id,
-                              float& value,
-                              const float& /*min*/,
-                              const float& /*max*/,
-                              const std::string& desc = "") {
-        return config_float(id, &value, desc, 1);
+    bool config_int(const std::string& id,
+                    int32_t& value,
+                    const std::string& desc = "",
+                    const std::optional<int32_t>& min = std::nullopt,
+                    const std::optional<int32_t>& max = std::nullopt) {
+        return config_int(id, &value, desc, 1, min, max);
     }
     // Returns true if the value changed.
-    virtual bool
-    config_int(const std::string& id, int32_t& value, const std::string& desc = "") final {
-        return config_int(id, &value, desc, 1);
+    bool config_uint(const std::string& id,
+                     uint32_t& value,
+                     const std::string& desc = "",
+                     const std::optional<uint32_t>& min = std::nullopt,
+                     const std::optional<uint32_t>& max = std::nullopt) {
+        return config_uint(id, &value, desc, 1, min, max);
     }
     // Returns true if the value changed.
-    virtual bool config_int(const std::string& id,
-                            int& value,
-                            const int& /*min*/,
-                            const int& /*max*/,
-                            const std::string& desc = "") {
-        return config_int(id, &value, desc, 1);
-    }
-    // Returns true if the value changed.
-    virtual bool
-    config_uint(const std::string& id, uint32_t& value, const std::string& desc = "") final {
-        return config_uint(id, &value, desc, 1);
-    }
-    // Returns true if the value changed.
-    virtual bool config_uint(const std::string& id,
-                             uint32_t& value,
-                             const uint32_t& /*min*/,
-                             const uint32_t& /*max*/,
-                             const std::string& desc = "") {
-        return config_uint(id, &value, desc, 1);
-    }
-    // Returns true if the value changed.
-    virtual bool
-    config_uint64(const std::string& id, uint64_t& value, const std::string& desc = "") final {
-        return config_uint64(id, &value, desc, 1);
-    }
-    // Returns true if the value changed.
-    virtual bool config_uint64(const std::string& id,
-                               uint64_t& value,
-                               const uint64_t& /*min*/,
-                               const uint64_t& /*max*/,
-                               const std::string& desc = "") {
-        return config_uint64(id, &value, desc, 1);
+    bool config_uint64(const std::string& id,
+                       uint64_t& value,
+                       const std::string& desc = "",
+                       const std::optional<uint64_t>& min = std::nullopt,
+                       const std::optional<uint64_t>& max = std::nullopt) {
+        return config_uint64(id, &value, desc, 1, min, max);
     }
 
     // Returns true if the value changed.
-    virtual bool
-    config_vec(const std::string& id, float1& value, const std::string& desc = "") final {
-        return config_float(id, &value.x, desc, 1);
+    bool config_vec(const std::string& id,
+                    float1& value,
+                    const std::string& desc = "",
+                    const float sensitivity = 0.1f,
+                    const std::optional<float>& min = std::nullopt,
+                    const std::optional<float>& max = std::nullopt) {
+        return config_float(id, &value.x, desc, 1, sensitivity, min, max);
     }
     // Returns true if the value changed.
-    virtual bool
-    config_vec(const std::string& id, float2& value, const std::string& desc = "") final {
-        return config_float(id, &value.x, desc, 2);
+    bool config_vec(const std::string& id,
+                    float2& value,
+                    const std::string& desc = "",
+                    const float sensitivity = 0.1f,
+                    const std::optional<float>& min = std::nullopt,
+                    const std::optional<float>& max = std::nullopt) {
+        return config_float(id, &value.x, desc, 2, sensitivity, min, max);
     }
     // Returns true if the value changed.
-    virtual bool
-    config_vec(const std::string& id, float3& value, const std::string& desc = "") final {
-        return config_float(id, &value.x, desc, 3);
+    bool config_vec(const std::string& id,
+                    float3& value,
+                    const std::string& desc = "",
+                    const float sensitivity = 0.1f,
+                    const std::optional<float>& min = std::nullopt,
+                    const std::optional<float>& max = std::nullopt) {
+        return config_float(id, &value.x, desc, 3, sensitivity, min, max);
     }
     // Returns true if the value changed.
-    virtual bool
-    config_vec(const std::string& id, float4& value, const std::string& desc = "") final {
-        return config_float(id, &value.x, desc, 4);
-    }
-
-    // Returns true if the value changed.
-    virtual bool
-    config_vec(const std::string& id, int1& value, const std::string& desc = "") final {
-        return config_int(id, &value.x, desc, 1);
-    }
-    // Returns true if the value changed.
-    virtual bool
-    config_vec(const std::string& id, int2& value, const std::string& desc = "") final {
-        return config_int(id, &value.x, desc, 2);
-    }
-    // Returns true if the value changed.
-    virtual bool
-    config_vec(const std::string& id, int3& value, const std::string& desc = "") final {
-        return config_int(id, &value.x, desc, 3);
-    }
-    // Returns true if the value changed.
-    virtual bool
-    config_vec(const std::string& id, int4& value, const std::string& desc = "") final {
-        return config_int(id, &value.x, desc, 4);
+    bool config_vec(const std::string& id,
+                    float4& value,
+                    const std::string& desc = "",
+                    const float sensitivity = 0.1f,
+                    const std::optional<float>& min = std::nullopt,
+                    const std::optional<float>& max = std::nullopt) {
+        return config_float(id, &value.x, desc, 4, sensitivity, min, max);
     }
 
     // Returns true if the value changed.
-    virtual bool
-    config_vec(const std::string& id, uint1& value, const std::string& desc = "") final {
-        return config_uint(id, &value.x, desc, 1);
+    bool config_vec(const std::string& id,
+                    int1& value,
+                    const std::string& desc = "",
+                    const std::optional<int32_t>& min = std::nullopt,
+                    const std::optional<int32_t>& max = std::nullopt) {
+        return config_int(id, &value.x, desc, 1, min, max);
     }
     // Returns true if the value changed.
-    virtual bool
-    config_vec(const std::string& id, uint2& value, const std::string& desc = "") final {
-        return config_uint(id, &value.x, desc, 2);
+    bool config_vec(const std::string& id,
+                    int2& value,
+                    const std::string& desc = "",
+                    const std::optional<int32_t>& min = std::nullopt,
+                    const std::optional<int32_t>& max = std::nullopt) {
+        return config_int(id, &value.x, desc, 2, min, max);
     }
     // Returns true if the value changed.
-    virtual bool
-    config_vec(const std::string& id, uint3& value, const std::string& desc = "") final {
-        return config_uint(id, &value.x, desc, 3);
+    bool config_vec(const std::string& id,
+                    int3& value,
+                    const std::string& desc = "",
+                    const std::optional<int32_t>& min = std::nullopt,
+                    const std::optional<int32_t>& max = std::nullopt) {
+        return config_int(id, &value.x, desc, 3, min, max);
     }
     // Returns true if the value changed.
-    virtual bool
-    config_vec(const std::string& id, uint4& value, const std::string& desc = "") final {
-        return config_uint(id, &value.x, desc, 4);
+    bool config_vec(const std::string& id,
+                    int4& value,
+                    const std::string& desc = "",
+                    const std::optional<int32_t>& min = std::nullopt,
+                    const std::optional<int32_t>& max = std::nullopt) {
+        return config_int(id, &value.x, desc, 4, min, max);
+    }
+
+    // Returns true if the value changed.
+    bool config_vec(const std::string& id,
+                    uint1& value,
+                    const std::string& desc = "",
+                    const std::optional<uint32_t>& min = std::nullopt,
+                    const std::optional<uint32_t>& max = std::nullopt) {
+        return config_uint(id, &value.x, desc, 1, min, max);
+    }
+    // Returns true if the value changed.
+    bool config_vec(const std::string& id,
+                    uint2& value,
+                    const std::string& desc = "",
+                    const std::optional<uint32_t>& min = std::nullopt,
+                    const std::optional<uint32_t>& max = std::nullopt) {
+        return config_uint(id, &value.x, desc, 2, min, max);
+    }
+    // Returns true if the value changed.
+    bool config_vec(const std::string& id,
+                    uint3& value,
+                    const std::string& desc = "",
+                    const std::optional<uint32_t>& min = std::nullopt,
+                    const std::optional<uint32_t>& max = std::nullopt) {
+        return config_uint(id, &value.x, desc, 3, min, max);
+    }
+    // Returns true if the value changed.
+    bool config_vec(const std::string& id,
+                    uint4& value,
+                    const std::string& desc = "",
+                    const std::optional<uint32_t>& min = std::nullopt,
+                    const std::optional<uint32_t>& max = std::nullopt) {
+        return config_uint(id, &value.x, desc, 4, min, max);
     }
 
     // Returns true if the value changed.
@@ -227,13 +256,11 @@ class Properties {
     }
 
     // Returns true if the value changed.
-    virtual bool
-    config_color(const std::string& id, float3& color, const std::string& desc = "") final {
+    bool config_color(const std::string& id, float3& color, const std::string& desc = "") {
         return config_color3(id, &color.x, desc);
     }
     // Returns true if the value changed.
-    virtual bool
-    config_color(const std::string& id, float4& color, const std::string& desc = "") final {
+    bool config_color(const std::string& id, float4& color, const std::string& desc = "") {
         return config_color4(id, &color.x, desc);
     }
 
@@ -243,12 +270,12 @@ class Properties {
                               const std::string& desc = "",
                               const float min = -360,
                               const float max = 360) {
-        return config_float(id, angle, min, max, desc);
+        return config_float(id, angle, desc, 0.1f, min, max);
     }
 
     // Returns true if the value changed.
     virtual bool config_percent(const std::string& id, float& value, const std::string& desc = "") {
-        return config_float(id, value, 0.f, 1.f, desc);
+        return config_float(id, value, desc, 0.01f, 0.0f, 1.0f);
     }
 
     // Holds the supplied `value` if not changed by the configuration.

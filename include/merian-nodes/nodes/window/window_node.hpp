@@ -169,7 +169,7 @@ class WindowNode : public Node {
         NodeStatusFlags flags{};
 
         if (current_src_array_size > 0) {
-            config.config_uint("source array element", src_array_element, 0,
+            config.config_uint("source array element", src_array_element, "", 0u,
                                current_src_array_size - 1);
         }
 

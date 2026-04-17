@@ -326,13 +326,13 @@ void Camera::properties(Properties& props) {
 
     props.st_separate();
 
-    if (props.config_float("fov", field_of_view, 0.01, 179.9)) {
+    if (props.config_float("fov", field_of_view, "", 0.1f, 0.01f, 179.9f)) {
         projection_change_id++;
     }
-    if (props.config_float("near", near_plane, 0, far_plane - 0.1f)) {
+    if (props.config_float("near", near_plane, "", 0.1f, 0.0f, far_plane - 0.1f)) {
         projection_change_id++;
     }
-    if (props.config_float("far", far_plane, near_plane + 0.1f, 10000)) {
+    if (props.config_float("far", far_plane, "", 0.1f, near_plane + 0.1f, 10000.0f)) {
         projection_change_id++;
     }
     if (props.config_float("aspect", aspect_ratio)) {
