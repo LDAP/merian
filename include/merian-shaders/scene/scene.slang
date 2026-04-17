@@ -12,12 +12,18 @@ namespace merian {
 
 struct Hit {
     uint instance_id;
+    uint instance_index;
     uint primitive_id;
     uint geometry_index;
     float2 barycentrics;
 
-    __init(uint instance_id, uint primitive_id, uint geometry_index, float2 barycentrics) {
+    __init(uint instance_id,
+           uint instance_index,
+           uint primitive_id,
+           uint geometry_index,
+           float2 barycentrics) {
         this.instance_id = instance_id;
+        this.instance_index = instance_index;
         this.primitive_id = primitive_id;
         this.geometry_index = geometry_index;
         this.barycentrics = barycentrics;
@@ -26,6 +32,7 @@ struct Hit {
     // invalid hit
     __init() {
         this.instance_id = uint(-1);
+        this.instance_index = uint(-1);
         this.primitive_id = uint(-1);
         this.geometry_index = uint(-1);
         this.barycentrics = float2(0);
@@ -67,8 +74,7 @@ struct Scene {
 
     StructuredBuffer<GeometryData, ScalarDataLayout> geometries;
 
-    // TODO: Currently accessed with GeometryID, but instance_index is the better choice because
-    // there is one transform for each instance.
+    // One transform per TLAS instance, indexed by InstanceIndex().
     StructuredBuffer<float4x4, ScalarDataLayout> instance_transforms;
     StructuredBuffer<float4x4, ScalarDataLayout> inverse_transposed_instance_transforms;
     StructuredBuffer<float4x4, ScalarDataLayout> prev_instance_transforms;
@@ -103,8 +109,9 @@ struct Scene {
         _proceed_ray(rq);
 
         if (rq.CommittedStatus() == COMMITTED_TRIANGLE_HIT) {
-            return Hit(rq.CommittedInstanceID(), rq.CommittedPrimitiveIndex(),
-                       rq.CommittedGeometryIndex(), rq.CommittedRayBarycentrics());
+            return Hit(rq.CommittedInstanceID(), rq.CommittedInstanceIndex(),
+                       rq.CommittedPrimitiveIndex(), rq.CommittedGeometryIndex(),
+                       rq.CommittedRayBarycentrics());
         }
 
         return Hit();
@@ -136,25 +143,25 @@ struct Scene {
         return get_geometry_data(instance_id + geometry_index);
     }
 
-    // Loads the instance transform for a geometry from memory.
-    float4x4 get_instance_transform(const GeometryID geometry_id) {
-        return instance_transforms[geometry_id];
+    // Loads the instance transform for a TLAS instance from memory.
+    float4x4 get_instance_transform(const uint instance_index) {
+        return instance_transforms[instance_index];
     }
 
-    // Loads the inverse transposed instance transform for a geometry from memory (for transforming
-    // directions / normals).
-    float4x4 get_inverse_transposed_instance_transform(const GeometryID geometry_id) {
-        return inverse_transposed_instance_transforms[geometry_id];
+    // Loads the inverse transposed instance transform for a TLAS instance from memory (for
+    // transforming directions / normals).
+    float4x4 get_inverse_transposed_instance_transform(const uint instance_index) {
+        return inverse_transposed_instance_transforms[instance_index];
     }
 
-    // Loads the previous frame instance transform for a geometry from memory.
-    float4x4 get_prev_instance_transform(const GeometryID geometry_id) {
-        return prev_instance_transforms[geometry_id];
+    // Loads the previous frame instance transform for a TLAS instance from memory.
+    float4x4 get_prev_instance_transform(const uint instance_index) {
+        return prev_instance_transforms[instance_index];
     }
 
-    // Loads the previous frame inverse transposed instance transform for a geometry from memory.
-    float4x4 get_prev_inverse_transposed_instance_transform(const GeometryID geometry_id) {
-        return prev_inverse_transposed_instance_transforms[geometry_id];
+    // Loads the previous frame inverse transposed instance transform for a TLAS instance.
+    float4x4 get_prev_inverse_transposed_instance_transform(const uint instance_index) {
+        return prev_inverse_transposed_instance_transforms[instance_index];
     }
 
     // Conventience method for get_geometry_data(...).material_id;.
@@ -226,36 +233,43 @@ struct Scene {
     // -----------------------------------------
 
     // Transform object-space position to world space.
-    float3 to_world_position(const GeometryData gd, const GeometryID gid, const float3 object_pos) {
+    float3 to_world_position(const GeometryData gd,
+                             const uint instance_index,
+                             const float3 object_pos) {
         if (gd.flags & GEOMETRY_FLAG_PRETRANSFORMED)
             return object_pos;
-        return mul(get_instance_transform(gid), float4(object_pos, 1.0)).xyz;
+        return mul(get_instance_transform(instance_index), float4(object_pos, 1.0)).xyz;
     }
 
     // Transform object-space direction to world space.
-    float3
-    to_world_direction(const GeometryData gd, const GeometryID gid, const float3 object_dir) {
+    float3 to_world_direction(const GeometryData gd,
+                              const uint instance_index,
+                              const float3 object_dir) {
         if (gd.flags & GEOMETRY_FLAG_PRETRANSFORMED)
             return object_dir;
-        return normalize(
-            mul(get_inverse_transposed_instance_transform(gid), float4(object_dir, 0.0)).xyz);
+        return normalize(mul(get_inverse_transposed_instance_transform(instance_index),
+                             float4(object_dir, 0.0))
+                             .xyz);
     }
 
     // Transform object-space position to previous frame world space.
-    float3
-    to_prev_world_position(const GeometryData gd, const GeometryID gid, const float3 object_pos) {
+    float3 to_prev_world_position(const GeometryData gd,
+                                  const uint instance_index,
+                                  const float3 object_pos) {
         if (gd.flags & GEOMETRY_FLAG_PRETRANSFORMED)
             return object_pos;
-        return mul(get_prev_instance_transform(gid), float4(object_pos, 1.0)).xyz;
+        return mul(get_prev_instance_transform(instance_index), float4(object_pos, 1.0)).xyz;
     }
 
     // Transform object-space direction to previous frame world space.
-    float3
-    to_prev_world_direction(const GeometryData gd, const GeometryID gid, const float3 object_dir) {
+    float3 to_prev_world_direction(const GeometryData gd,
+                                   const uint instance_index,
+                                   const float3 object_dir) {
         if (gd.flags & GEOMETRY_FLAG_PRETRANSFORMED)
             return object_dir;
-        return normalize(
-            mul(get_prev_inverse_transposed_instance_transform(gid), float4(object_dir, 0.0)).xyz);
+        return normalize(mul(get_prev_inverse_transposed_instance_transform(instance_index),
+                             float4(object_dir, 0.0))
+                             .xyz);
     }
 
     // -----------------------------------------

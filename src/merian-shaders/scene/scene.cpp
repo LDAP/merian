@@ -424,7 +424,12 @@ void Scene::upload_geometry_buffers(const CommandBufferHandle& cmd) {
             cmd, geometry_data_buffer, geometry_instance_data.data(), 0,
             geometry_instance_data.size() * sizeof(GeometryData));
 
-        const auto transform_size = geometry_instance_data.size() * sizeof(float4x4);
+        uint32_t tlas_instance_count = 0;
+        for (const auto& group : mesh_groups) {
+            tlas_instance_count += static_cast<uint32_t>(meshes[group.mesh_list[0]].instances.size());
+        }
+
+        const auto transform_size = tlas_instance_count * sizeof(float4x4);
         const auto transform_usage =
             vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst;
         instance_transforms_buffer = allocator->create_buffer(
@@ -607,19 +612,23 @@ void Scene::update(const CommandBufferHandle& cmd,
     }
 
     // Upload instance transforms each frame (dynamic groups change every frame).
+    // One transform per TLAS instance, ordered to match build_tlas() so InstanceIndex() indexes it.
     if (instance_transforms_buffer && !geometry_instance_data.empty()) {
-        std::vector<float4x4> transforms(geometry_instance_data.size(), identity());
-        uint32_t geom_id = 0;
+        uint32_t tlas_instance_count = 0;
+        for (const auto& group : mesh_groups) {
+            tlas_instance_count +=
+                static_cast<uint32_t>(meshes[group.mesh_list[0]].instances.size());
+        }
+        std::vector<float4x4> transforms(tlas_instance_count, identity());
+        uint32_t tlas_inst_id = 0;
         for (const auto& group : mesh_groups) {
             const auto& instances = meshes[group.mesh_list[0]].instances;
             auto node_it = instances.begin();
             for (uint32_t inst_idx = 0; inst_idx < instances.size(); inst_idx++, ++node_it) {
-                for (uint32_t geom_idx = 0; geom_idx < group.mesh_list.size(); geom_idx++) {
-                    if (!group.is_static) {
-                        transforms[geom_id] = *scene_graph[*node_it].global_transform;
-                    }
-                    geom_id++;
+                if (!group.is_static) {
+                    transforms[tlas_inst_id] = *scene_graph[*node_it].global_transform;
                 }
+                tlas_inst_id++;
             }
         }
 

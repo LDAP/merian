@@ -23,7 +23,6 @@ void main(uint3 tid: SV_DispatchThreadID,
     }
 
     GeometryData gd = scene.get_geometry_data(hit.instance_id, hit.geometry_index);
-    GeometryID gid = hit.instance_id + hit.geometry_index;
     uint3 indices = scene.get_vertex_indices(gd.index_buffer_index, hit.primitive_id);
 
     PackedVertexData v0 = scene.get_packed_vertex_data(gd.vertex_buffer_index, indices.x);
@@ -34,7 +33,7 @@ void main(uint3 tid: SV_DispatchThreadID,
 
     // Interpolate position in object space, then transform
     float3 pos = bary.x * v0.position + bary.y * v1.position + bary.z * v2.position;
-    pos = scene.to_world_position(gd, gid, pos);
+    pos = scene.to_world_position(gd, hit.instance_index, pos);
 
     float2 uv = bary.x * v0.uv + bary.y * v1.uv + bary.z * v2.uv;
 
@@ -42,11 +41,11 @@ void main(uint3 tid: SV_DispatchThreadID,
     float3 edge1 = v1.position - v0.position;
     float3 edge2 = v2.position - v0.position;
     float3 geo_normal = normalize(cross(edge1, edge2));
-    geo_normal = scene.to_world_direction(gd, gid, geo_normal);
+    geo_normal = scene.to_world_direction(gd, hit.instance_index, geo_normal);
 
     // Shading normal (use geometric for now, could interpolate vertex normals)
     float3 shading_normal = scene.get_interpolated_vertex_data(gd, hit.primitive_id, bary).normal;
-    shading_normal = scene.to_world_direction(gd, gid, shading_normal);
+    shading_normal = scene.to_world_direction(gd, hit.instance_index, shading_normal);
 
     // Depth
     float linear_z = length(pos - ray.Origin);

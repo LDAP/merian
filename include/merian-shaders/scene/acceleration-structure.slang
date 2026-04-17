@@ -7,14 +7,15 @@ namespace merian {
 
 interface IRayQuery {
     uint CommittedStatus();
-    uint CommittedInstanceID(); // user-defined ID assigned to the instance when the TLAS was built,
-                                // CommitedInstanceIndex() is the fixed instance index.
+    uint CommittedInstanceID(); // user-defined ID assigned to the instance when the TLAS was built.
+    uint CommittedInstanceIndex(); // fixed index of the instance in the TLAS.
     uint CommittedPrimitiveIndex();
     uint CommittedGeometryIndex();
     float2 CommittedRayBarycentrics();
 
     uint CandidateType();
     uint CandidateInstanceID();
+    uint CandidateInstanceIndex();
     uint CandidatePrimitiveIndex();
     uint CandidateGeometryIndex();
     float2 CandidateRayBarycentrics();
@@ -81,6 +82,9 @@ struct NullRayQuery : IRayQuery {
     uint CommittedInstanceID() {
         return 0;
     }
+    uint CommittedInstanceIndex() {
+        return 0;
+    }
     uint CommittedPrimitiveIndex() {
         return 0;
     }
@@ -95,6 +99,9 @@ struct NullRayQuery : IRayQuery {
         return 0;
     }
     uint CandidateInstanceID() {
+        return 0;
+    }
+    uint CandidateInstanceIndex() {
         return 0;
     }
     uint CandidatePrimitiveIndex() {

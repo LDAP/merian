@@ -18,20 +18,23 @@ struct PackedSurfaceInfo {
 struct PackedHitInfo {
     uint instance_id;
     uint primitive_id;
-    uint geometry_index;
+    uint16_t geometry_index;
+    uint16_t instance_index;
     half2 barycentrics;
 
     static PackedHitInfo pack(Hit hit) {
         PackedHitInfo p;
         p.instance_id = hit.instance_id;
         p.primitive_id = hit.primitive_id;
-        p.geometry_index = hit.geometry_index;
+        p.geometry_index = uint16_t(hit.geometry_index);
+        p.instance_index = uint16_t(hit.instance_index);
         p.barycentrics = half2(hit.barycentrics);
         return p;
     }
 
     Hit unpack() {
-        return Hit(instance_id, primitive_id, geometry_index, float2(barycentrics));
+        return Hit(instance_id, uint(instance_index), primitive_id, uint(geometry_index),
+                   float2(barycentrics));
     }
 }
 
