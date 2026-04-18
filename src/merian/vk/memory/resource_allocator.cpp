@@ -27,9 +27,9 @@ ResourceAllocator::ResourceAllocator(const ContextHandle& context,
         dummy_storage_image_view = ImageView::create(dummy_storage_image);
 
         const auto img_transition = dummy_storage_image->barrier2(vk::ImageLayout::eGeneral);
-        dummy_texture = create_texture_from_rgba8(cmd, data.data(), 2, 2, vk::Filter::eNearest,
-                                                  vk::Filter::eNearest, true,
-                                                  "ResourceAllocator::dummy_texture");
+        dummy_texture = create_texture_from_rgba8(
+            cmd, data.data(), 2, 2, vk::SamplerAddressMode::eRepeat, vk::Filter::eNearest,
+            vk::Filter::eNearest, true, "ResourceAllocator::dummy_texture");
         const auto tex_transition =
             dummy_texture->get_image()->barrier2(vk::ImageLayout::eShaderReadOnlyOptimal);
 
@@ -103,8 +103,8 @@ bool ResourceAllocator::ensure_buffer_size(BufferHandle& buffer,
         return false;
     }
 
-    buffer = create_buffer(buffer_size * growth_factor, usage, mapping_type, debug_name,
-                           min_alignment);
+    buffer =
+        create_buffer(buffer_size * growth_factor, usage, mapping_type, debug_name, min_alignment);
     return true;
 }
 
@@ -261,8 +261,7 @@ ResourceAllocator::create_texture_from_rgba8(const CommandBufferHandle& cmd,
                                              const uint32_t* data,
                                              const uint32_t width,
                                              const uint32_t height,
-                                             const vk::Filter mag_filter,
-                                             const vk::Filter min_filter,
+                                             const SamplerHandle& sampler,
                                              const bool isSRGB,
                                              const std::string& debug_name,
                                              const bool generate_mipmaps,
@@ -310,10 +309,25 @@ ResourceAllocator::create_texture_from_rgba8(const CommandBufferHandle& cmd,
         image->_set_current_layout(vk::ImageLayout::eTransferSrcOptimal);
     }
 
-    merian::SamplerHandle sampler = get_sampler_pool()->for_filter_and_address_mode(
-        mag_filter, min_filter, vk::SamplerAddressMode::eRepeat);
-
     return create_texture(image, image->make_view_create_info(), sampler, debug_name);
+}
+
+TextureHandle
+ResourceAllocator::create_texture_from_rgba8(const CommandBufferHandle& cmd,
+                                             const uint32_t* data,
+                                             const uint32_t width,
+                                             const uint32_t height,
+                                             const vk::SamplerAddressMode address_mode,
+                                             const vk::Filter mag_filter,
+                                             const vk::Filter min_filter,
+                                             const bool isSRGB,
+                                             const std::string& debug_name,
+                                             const bool generate_mipmaps,
+                                             const vk::ImageUsageFlags additional_usage_flags) {
+    const SamplerHandle sampler =
+        get_sampler_pool()->for_filter_and_address_mode(mag_filter, min_filter, address_mode);
+    return create_texture_from_rgba8(cmd, data, width, height, sampler, isSRGB, debug_name,
+                                     generate_mipmaps, additional_usage_flags);
 }
 
 const TextureHandle& ResourceAllocator::get_dummy_texture() const {

@@ -59,7 +59,7 @@ class GLTFMesh : public Mesh {
 
     // null -> sequential indices
     const uint8_t* idx_base = nullptr;
-    int idx_component_type = 0; // 5121=ubyte, 5123=ushort, 5125=uint
+    int idx_component_type = 0; // TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE / _UNSIGNED_SHORT / _UNSIGNED_INT
     uint32_t primitive_count = 0;
 
     uint32_t get_vertex_count() const override {
@@ -92,15 +92,15 @@ class GLTFMesh : public Mesh {
         if (idx_base == nullptr) {
             return uint3(p * 3, p * 3 + 1, p * 3 + 2);
         }
-        if (idx_component_type == 5123) {
+        if (idx_component_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
             const auto* src = reinterpret_cast<const uint16_t*>(idx_base);
             return uint3(src[p * 3], src[p * 3 + 1], src[p * 3 + 2]);
         }
-        if (idx_component_type == 5125) {
+        if (idx_component_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT) {
             const auto* src = reinterpret_cast<const uint32_t*>(idx_base);
             return uint3(src[p * 3], src[p * 3 + 1], src[p * 3 + 2]);
         }
-        // UNSIGNED_BYTE (5121)
+        // TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE
         return uint3(idx_base[p * 3], idx_base[p * 3 + 1], idx_base[p * 3 + 2]);
     }
 };
@@ -155,36 +155,127 @@ float4x4 gltf_node_transform(const tinygltf::Node& node) {
 // Material loading
 // ---------------------------------------------------------------------------
 
+namespace {
+
+vk::Filter gltf_mag_filter_to_vk(int mag_filter) {
+    switch (mag_filter) {
+    case TINYGLTF_TEXTURE_FILTER_NEAREST:
+        return vk::Filter::eNearest;
+    case TINYGLTF_TEXTURE_FILTER_LINEAR:
+    default:
+        return vk::Filter::eLinear;
+    }
+}
+
+// Translate the glTF minFilter into the matching vk::Filter, mipmap mode and a "wants mipmaps"
+// bit. glTF couples all three via the *_MIPMAP_* enum values.
+void gltf_min_filter_to_vk(int min_filter,
+                           vk::Filter& out_filter,
+                           vk::SamplerMipmapMode& out_mipmap_mode,
+                           bool& out_wants_mipmaps) {
+    switch (min_filter) {
+    case TINYGLTF_TEXTURE_FILTER_NEAREST:
+        out_filter = vk::Filter::eNearest;
+        out_mipmap_mode = vk::SamplerMipmapMode::eNearest;
+        out_wants_mipmaps = false;
+        break;
+    case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_NEAREST:
+        out_filter = vk::Filter::eNearest;
+        out_mipmap_mode = vk::SamplerMipmapMode::eNearest;
+        out_wants_mipmaps = true;
+        break;
+    case TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_LINEAR:
+        out_filter = vk::Filter::eNearest;
+        out_mipmap_mode = vk::SamplerMipmapMode::eLinear;
+        out_wants_mipmaps = true;
+        break;
+    case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_NEAREST:
+        out_filter = vk::Filter::eLinear;
+        out_mipmap_mode = vk::SamplerMipmapMode::eNearest;
+        out_wants_mipmaps = true;
+        break;
+    case TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR:
+        out_filter = vk::Filter::eLinear;
+        out_mipmap_mode = vk::SamplerMipmapMode::eLinear;
+        out_wants_mipmaps = true;
+        break;
+    case TINYGLTF_TEXTURE_FILTER_LINEAR:
+    default:
+        out_filter = vk::Filter::eLinear;
+        out_mipmap_mode = vk::SamplerMipmapMode::eLinear;
+        out_wants_mipmaps = false;
+        break;
+    }
+}
+
+vk::SamplerAddressMode gltf_wrap_to_vk(int wrap) {
+    switch (wrap) {
+    case TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE:
+        return vk::SamplerAddressMode::eClampToEdge;
+    case TINYGLTF_TEXTURE_WRAP_MIRRORED_REPEAT:
+        return vk::SamplerAddressMode::eMirroredRepeat;
+    case TINYGLTF_TEXTURE_WRAP_REPEAT:
+    default:
+        return vk::SamplerAddressMode::eRepeat;
+    }
+}
+
+} // namespace
+
 void GLTFScene::load_materials(const CommandBufferHandle& cmd) {
-    auto tex_mgr = get_texture_manager();
+    const auto& sampler_pool = get_allocator()->get_sampler_pool();
 
-    // Load glTF images -> TextureIDs
-    std::vector<TextureID> image_to_texture;
-    image_to_texture.reserve(model->images.size());
-    for (uint32_t i = 0; i < model->images.size(); i++) {
-        const auto& img = model->images[i];
-        if (img.image.empty() || img.width <= 0 || img.height <= 0) {
-            SPDLOG_WARN("GLTFScene: skipping invalid image '{}'", img.name);
-            image_to_texture.push_back(TextureID(-1));
-            continue;
+    // Pre-acquire one VkSampler per glTF sampler. We use SamplerPool::acquire_sampler (instead of
+    // for_filter_and_address_mode) because glTF specifies wrapS / wrapT independently and the
+    // convenience helper only supports a single address mode for all axes.
+    gltf_samplers.clear();
+    gltf_samplers.reserve(model->samplers.size());
+    gltf_sampler_wants_mipmaps.assign(model->samplers.size(), false);
+    for (uint32_t i = 0; i < model->samplers.size(); i++) {
+        const auto& s = model->samplers[i];
+
+        vk::Filter mag = vk::Filter::eLinear;
+        vk::Filter min = vk::Filter::eLinear;
+        vk::SamplerMipmapMode mipmap_mode = vk::SamplerMipmapMode::eLinear;
+        bool wants_mipmaps = false;
+
+        if (s.magFilter >= 0) {
+            mag = gltf_mag_filter_to_vk(s.magFilter);
+        }
+        if (s.minFilter >= 0) {
+            gltf_min_filter_to_vk(s.minFilter, min, mipmap_mode, wants_mipmaps);
         }
 
-        SPDLOG_DEBUG("GLFWScene: loading image {:>2}/{} {}", i + 1, model->images.size(), img.name);
-
-        // tinygltf decodes images to RGBA 8-bit by default (component == 4)
-        if (img.component == 4 && img.bits == 8) {
-            auto tid = tex_mgr->add_texture_from_rgba8(
-                cmd, reinterpret_cast<const uint32_t*>(img.image.data()),
-                static_cast<uint32_t>(img.width), static_cast<uint32_t>(img.height));
-            image_to_texture.push_back(tid);
-        } else {
-            SPDLOG_WARN("GLTFScene: unsupported image format ({} components, {} bits) for '{}'",
-                        img.component, img.bits, img.name);
-            image_to_texture.push_back(TextureID(-1));
-        }
+        const vk::SamplerCreateInfo info{
+            {},
+            mag,
+            min,
+            mipmap_mode,
+            gltf_wrap_to_vk(s.wrapS),
+            gltf_wrap_to_vk(s.wrapT),
+            vk::SamplerAddressMode::eRepeat, // wrapR — irrelevant for 2D textures
+            0.f,
+            VK_FALSE, // anisotropy off (glTF 2.0 doesn't specify it)
+            0.f,
+            VK_FALSE,
+            vk::CompareOp::eNever,
+            0.f,
+            VK_LOD_CLAMP_NONE,
+        };
+        gltf_samplers.push_back(sampler_pool->acquire_sampler(info));
+        gltf_sampler_wants_mipmaps[i] = wants_mipmaps;
     }
 
-    // Convert glTF materials -> DiffuseMaterial
+    // Default sampler for textures without a sampler reference (linear, repeat, no mipmaps).
+    default_gltf_sampler =
+        sampler_pool->for_filter_and_address_mode(vk::Filter::eLinear, vk::Filter::eLinear,
+                                                  vk::SamplerAddressMode::eRepeat,
+                                                  vk::SamplerMipmapMode::eLinear, false);
+
+    // Reset slot table; textures upload lazily on first material access.
+    texture_slots.assign(model->textures.size(), GltfTextureSlot{});
+
+    // Build materials. get_or_load_texture pulls in only the textures actually referenced.
     material_map.resize(model->materials.size());
     for (size_t i = 0; i < model->materials.size(); i++) {
         const auto& gmat = model->materials[i];
@@ -195,12 +286,10 @@ void GLTFScene::load_materials(const CommandBufferHandle& cmd) {
             static_cast<float>(pbr.baseColorFactor[0]), static_cast<float>(pbr.baseColorFactor[1]),
             static_cast<float>(pbr.baseColorFactor[2]), static_cast<float>(pbr.baseColorFactor[3]));
 
-        // Alpha texture from base color texture
+        // baseColor is an sRGB color texture (glTF spec, "PBR Methodology").
         if (pbr.baseColorTexture.index >= 0) {
-            const auto& tex = model->textures[pbr.baseColorTexture.index];
-            if (tex.source >= 0 && tex.source < static_cast<int>(image_to_texture.size())) {
-                mat.header.alpha_texture_id = image_to_texture[tex.source];
-            }
+            mat.header.alpha_texture_id =
+                get_or_load_texture(cmd, pbr.baseColorTexture.index, /*linear=*/false);
         }
 
         material_map[i] = get_material_system()->add_material(diffuse_type_id, mat);
@@ -211,6 +300,77 @@ void GLTFScene::load_materials(const CommandBufferHandle& cmd) {
         DiffuseMaterial default_mat;
         material_map.push_back(get_material_system()->add_material(diffuse_type_id, default_mat));
     }
+}
+
+TextureID GLTFScene::get_or_load_texture(const CommandBufferHandle& cmd,
+                                         const int gltf_tex_idx,
+                                         const bool linear) {
+    if (gltf_tex_idx < 0 || gltf_tex_idx >= static_cast<int>(texture_slots.size())) {
+        return TextureID(-1);
+    }
+
+    GltfTextureSlot& slot = texture_slots[gltf_tex_idx];
+    TextureID& cached = linear ? slot.id_linear : slot.id_srgb;
+    if (cached != TextureID(-1)) {
+        return cached;
+    }
+
+    const auto& tex = model->textures[gltf_tex_idx];
+
+    if (tex.source < 0 || tex.source >= static_cast<int>(model->images.size())) {
+        SPDLOG_WARN("GLTFScene: texture {} has no source image", gltf_tex_idx);
+        return TextureID(-1);
+    }
+    const auto& img = model->images[tex.source];
+    if (img.image.empty() || img.width <= 0 || img.height <= 0) {
+        SPDLOG_WARN("GLTFScene: skipping invalid image '{}'", img.name);
+        return TextureID(-1);
+    }
+    // tinygltf decodes images to RGBA 8-bit by default (component == 4)
+    if (img.component != 4 || img.bits != 8) {
+        SPDLOG_WARN("GLTFScene: unsupported image format ({} components, {} bits) for '{}'",
+                    img.component, img.bits, img.name);
+        return TextureID(-1);
+    }
+
+    SamplerHandle sampler;
+    bool wants_mipmaps = false;
+    if (tex.sampler >= 0 && tex.sampler < static_cast<int>(gltf_samplers.size())) {
+        sampler = gltf_samplers[tex.sampler];
+        wants_mipmaps = gltf_sampler_wants_mipmaps[tex.sampler];
+    } else {
+        sampler = default_gltf_sampler;
+    }
+
+    // Mipmap policy:
+    //  - sRGB color textures: honor the glTF sampler, plus opt-in `force_mipmaps_color`.
+    //  - linear data textures (normal/MR/occlusion): honor the glTF sampler, but warn — naive
+    //    box-filter mipmapping degrades these (normals lose normalization, roughness/metalness/
+    //    occlusion need specialized filtering).
+    bool generate_mipmaps;
+    if (linear) {
+        if (wants_mipmaps) {
+            SPDLOG_WARN("GLTFScene: texture {} ('{}') is sampled as a normal/MR/occlusion map but "
+                        "its sampler requests *_MIPMAP_*; generating mipmaps anyway, expect "
+                        "filtering artifacts (specialized mipmap generation is not implemented)",
+                        gltf_tex_idx, img.name);
+        }
+        generate_mipmaps = wants_mipmaps;
+    } else {
+        generate_mipmaps = wants_mipmaps || force_mipmaps_color;
+    }
+
+    SPDLOG_DEBUG("GLTFScene: uploading texture {} (image '{}'), linear={}, mips={}", gltf_tex_idx,
+                 img.name, linear, generate_mipmaps);
+
+    TextureHandle texture = get_allocator()->create_texture_from_rgba8(
+        cmd, reinterpret_cast<const uint32_t*>(img.image.data()),
+        static_cast<uint32_t>(img.width), static_cast<uint32_t>(img.height), sampler, !linear,
+        img.name, generate_mipmaps);
+    cmd->barrier(texture->get_image()->barrier2(vk::ImageLayout::eShaderReadOnlyOptimal));
+
+    cached = get_texture_manager()->add_texture(texture);
+    return cached;
 }
 
 void GLTFScene::load_meshes() {

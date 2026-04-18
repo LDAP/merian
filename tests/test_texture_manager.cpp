@@ -113,7 +113,9 @@ TEST_F(TextureManagerTest, SampleTextureOnGPU) {
 
     TextureID tex_id;
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
-        tex_id = tm->add_texture_from_rgba8(cmd, &red_pixel, 1, 1, vk::Filter::eNearest, false);
+        tex_id = tm->add_texture_from_rgba8(cmd, &red_pixel, 1, 1,
+                                            vk::SamplerAddressMode::eRepeat, vk::Filter::eNearest,
+                                            vk::Filter::eNearest, false);
     });
     EXPECT_EQ(tex_id, 0u);
 

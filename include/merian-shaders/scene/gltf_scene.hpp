@@ -1,6 +1,7 @@
 #pragma once
 
 #include "merian-shaders/scene/scene.hpp"
+#include "merian/vk/memory/resource_allocations.hpp"
 
 #include <filesystem>
 #include <memory>
@@ -29,6 +30,12 @@ class GLTFScene : public Scene {
         return float3(0, 1, 0);
     }
 
+    // If true, generate mipmaps for baseColor and emissive textures even when the glTF sampler
+    // does not request a mipmap minFilter. Has no effect on normal/MR/occlusion textures.
+    void set_force_mipmaps_color(bool enable) {
+        force_mipmaps_color = enable;
+    }
+
   private:
     void load_materials(const CommandBufferHandle& cmd);
 
@@ -39,6 +46,14 @@ class GLTFScene : public Scene {
     void load_cameras();
 
     void compute_aabb();
+
+    // Returns the GPU TextureID for the given glTF texture index, sampling in the requested
+    // color space. Lazily uploads on first request. If the same image is needed in both color
+    // spaces (rare — same texture used as both color and data), the data is uploaded twice
+    // rather than aliasing the image with VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT, which would
+    // hurt sampling performance for every texture.
+    TextureID
+    get_or_load_texture(const CommandBufferHandle& cmd, int gltf_tex_idx, bool linear);
 
     // Owned so GLTFMesh can reference buffer data directly.
     std::unique_ptr<tinygltf::Model> model;
@@ -52,7 +67,23 @@ class GLTFScene : public Scene {
     // glTF mesh index -> MeshIDs (one for each gltf primitive)
     std::vector<std::vector<MeshID>> mesh_map;
 
+    // One sampler per glTF sampler index.
+    std::vector<SamplerHandle> gltf_samplers;
+    // Used when a glTF texture has no sampler set (tex.sampler == -1).
+    SamplerHandle default_gltf_sampler;
+    // Per glTF sampler index: did the sampler request mipmaps via *_MIPMAP_* minFilter?
+    std::vector<bool> gltf_sampler_wants_mipmaps;
+
+    struct GltfTextureSlot {
+        TextureID id_srgb = TextureID(-1);
+        TextureID id_linear = TextureID(-1);
+    };
+    // One entry per glTF texture index; populated lazily by get_or_load_texture.
+    std::vector<GltfTextureSlot> texture_slots;
+
     MaterialModelID diffuse_type_id;
+
+    bool force_mipmaps_color = true;
 };
 
 using GLTFSceneHandle = std::shared_ptr<GLTFScene>;

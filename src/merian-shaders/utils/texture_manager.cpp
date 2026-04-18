@@ -75,13 +75,17 @@ TextureID TextureManager::add_texture(const TextureHandle& texture) {
 }
 
 TextureID TextureManager::add_texture_from_rgba8(const CommandBufferHandle& cmd,
-                                                  const uint32_t* data,
-                                                  const uint32_t width,
-                                                  const uint32_t height,
-                                                  const vk::Filter filter,
-                                                  const bool srgb) {
-    auto texture = allocator->create_texture_from_rgba8(cmd, data, width, height, filter, filter,
-                                                        srgb);
+                                                 const uint32_t* data,
+                                                 const uint32_t width,
+                                                 const uint32_t height,
+                                                 const vk::SamplerAddressMode address_mode,
+                                                 const vk::Filter mag_filter,
+                                                 const vk::Filter min_filter,
+                                                 const bool srgb,
+                                                 const bool generate_mipmaps) {
+    auto texture =
+        allocator->create_texture_from_rgba8(cmd, data, width, height, address_mode, mag_filter,
+                                             min_filter, srgb, "", generate_mipmaps);
     cmd->barrier(texture->get_image()->barrier2(vk::ImageLayout::eShaderReadOnlyOptimal));
     return add_texture(texture);
 }

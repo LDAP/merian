@@ -174,16 +174,38 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
     // layout: the layout for the image view
     //
     // Important: You are responsible to perform the image transition!
-    TextureHandle create_texture_from_rgba8(const CommandBufferHandle& cmd,
-                                            const uint32_t* data,
-                                            const uint32_t width,
-                                            const uint32_t height,
-                                            const vk::Filter mag_filter,
-                                            const vk::Filter min_filter,
-                                            const bool isSRGB = true,
-                                            const std::string& debug_name = {},
-                                            const bool generate_mipmaps = false,
-                                            const vk::ImageUsageFlags additional_usage_flags = {});
+    // Create an image from RGBA8 data, optionally generate a mip chain, then bind a view and the
+    // supplied sampler. Use this overload when you need full control over the sampler (e.g. when
+    // you need different address modes per axis, which only `SamplerPool::acquire_sampler` exposes).
+    //
+    // Important: You are responsible to perform the image transition!
+    TextureHandle create_texture_from_rgba8(
+        const CommandBufferHandle& cmd,
+        const uint32_t* data,
+        const uint32_t width,
+        const uint32_t height,
+        const SamplerHandle& sampler,
+        const bool isSRGB = true,
+        const std::string& debug_name = {},
+        const bool generate_mipmaps = false,
+        const vk::ImageUsageFlags additional_usage_flags = {});
+
+    // Convenience wrapper: derives the sampler from filter and address mode using the sampler pool,
+    // then forwards to the sampler-taking overload above.
+    //
+    // Important: You are responsible to perform the image transition!
+    TextureHandle create_texture_from_rgba8(
+        const CommandBufferHandle& cmd,
+        const uint32_t* data,
+        const uint32_t width,
+        const uint32_t height,
+        const vk::SamplerAddressMode address_mode = vk::SamplerAddressMode::eRepeat,
+        const vk::Filter mag_filter = vk::Filter::eLinear,
+        const vk::Filter min_filter = vk::Filter::eLinear,
+        const bool isSRGB = true,
+        const std::string& debug_name = {},
+        const bool generate_mipmaps = false,
+        const vk::ImageUsageFlags additional_usage_flags = {});
 
     // Returns a dummy 4x4 texture with the "missing texture" color (1,0,1,1).
     const TextureHandle& get_dummy_texture() const;

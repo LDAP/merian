@@ -271,6 +271,14 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     // can be invalid if information is not available.
     AABB aabb;
 
+    const ContextHandle& get_context() const {
+        return context;
+    }
+
+    const ResourceAllocatorHandle& get_allocator() const {
+        return allocator;
+    }
+
   private:
     void node_properties(Properties& props, const SceneNode& node);
     void update_composition_constants();

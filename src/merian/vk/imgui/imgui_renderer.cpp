@@ -117,7 +117,8 @@ void ImGuiRenderer::upload_pending_textures(const CommandBufferHandle& cmd,
             auto texture = alloc->create_texture_from_rgba8(
                 cmd, reinterpret_cast<const uint32_t*>(tex->Pixels),
                 static_cast<uint32_t>(tex->Width), static_cast<uint32_t>(tex->Height),
-                vk::Filter::eLinear, vk::Filter::eLinear, false, "imgui_atlas");
+                vk::SamplerAddressMode::eRepeat, vk::Filter::eLinear, vk::Filter::eLinear, false,
+                "imgui_atlas");
             cmd->barrier(texture->get_image()->barrier2(
                 vk::ImageLayout::eShaderReadOnlyOptimal, vk::AccessFlagBits2::eTransferWrite,
                 vk::AccessFlagBits2::eShaderSampledRead, vk::PipelineStageFlagBits2::eTransfer,

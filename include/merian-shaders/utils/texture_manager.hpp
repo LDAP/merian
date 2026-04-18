@@ -22,12 +22,16 @@ class TextureManager : public Versionable,
 
     TextureID add_texture(const TextureHandle& texture);
 
-    TextureID add_texture_from_rgba8(const CommandBufferHandle& cmd,
-                                     const uint32_t* data,
-                                     uint32_t width,
-                                     uint32_t height,
-                                     vk::Filter filter = vk::Filter::eLinear,
-                                     bool srgb = true);
+    TextureID
+    add_texture_from_rgba8(const CommandBufferHandle& cmd,
+                           const uint32_t* data,
+                           uint32_t width,
+                           uint32_t height,
+                           vk::SamplerAddressMode address_mode = vk::SamplerAddressMode::eRepeat,
+                           vk::Filter mag_filter = vk::Filter::eLinear,
+                           vk::Filter min_filter = vk::Filter::eLinear,
+                           bool srgb = true,
+                           bool generate_mipmaps = false);
 
     void remove_texture(TextureID id);
 

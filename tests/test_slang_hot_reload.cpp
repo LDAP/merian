@@ -212,7 +212,9 @@ TEST_F(SlangHotReloadTest, TextureArrayResizeRebuildsFullPipeline) {
     const uint32_t red_pixel = 0xFF0000FF;
     TextureID tex_id;
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
-        tex_id = tm->add_texture_from_rgba8(cmd, &red_pixel, 1, 1, vk::Filter::eNearest, false);
+        tex_id = tm->add_texture_from_rgba8(cmd, &red_pixel, 1, 1,
+                                            vk::SamplerAddressMode::eRepeat, vk::Filter::eNearest,
+                                            vk::Filter::eNearest, false);
     });
     EXPECT_EQ(tm->get_capacity(), 8u);
     EXPECT_EQ(rebuild_count, 2u) << "Listener should have rebuilt pipeline after TM resize";
