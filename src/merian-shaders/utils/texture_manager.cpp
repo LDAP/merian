@@ -90,6 +90,32 @@ TextureID TextureManager::add_texture_from_rgba8(const CommandBufferHandle& cmd,
     return add_texture(texture);
 }
 
+void TextureManager::set_texture(const TextureID id, const TextureHandle& texture) {
+    assert(id < textures.size() && "set_texture: id exceeds capacity");
+    if (!textures[id])
+        texture_count++;
+    textures[id] = texture;
+    shader_object->get_cursor()["textures"][id] =
+        texture ? texture : allocator->get_dummy_texture();
+}
+
+void TextureManager::set_texture_from_rgba8(const TextureID id,
+                                            const CommandBufferHandle& cmd,
+                                            const uint32_t* data,
+                                            const uint32_t width,
+                                            const uint32_t height,
+                                            const vk::SamplerAddressMode address_mode,
+                                            const vk::Filter mag_filter,
+                                            const vk::Filter min_filter,
+                                            const bool srgb,
+                                            const bool generate_mipmaps) {
+    auto texture =
+        allocator->create_texture_from_rgba8(cmd, data, width, height, address_mode, mag_filter,
+                                             min_filter, srgb, "", generate_mipmaps);
+    cmd->barrier(texture->get_image()->barrier2(vk::ImageLayout::eShaderReadOnlyOptimal));
+    set_texture(id, texture);
+}
+
 void TextureManager::remove_texture(const TextureID id) {
     assert(id < textures.size());
     assert(textures[id] && "Removing already-removed texture");

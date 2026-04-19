@@ -122,6 +122,42 @@ MaterialID MaterialSystem::add_material(const MaterialModelID type_id, const Mat
     return id;
 }
 
+void MaterialSystem::update_material(const MaterialID id, const Material& material) {
+    assert(id < materials.size());
+
+    const uint32_t payload_bytes = material.get_payload_size();
+    assert(payload_bytes <= max_payload_size &&
+           "update_material payload larger than current max_payload_size — repack not supported here");
+
+    StoredMaterial& stored = materials[id];
+    // Header may carry alpha_texture_id and similar fields; refresh in case the
+    // caller updated them. Keep the dispatch type id we assigned at add time.
+    const auto type_id = stored.header.material_model_type_id;
+    stored.header = material.header;
+    stored.header.material_model_type_id = type_id;
+
+    stored.payload.resize(payload_bytes);
+    material.write_payload(stored.payload.data());
+
+    const uint32_t entry_sz = get_entry_size();
+    uint8_t* entry = host_buffer.data() + id * entry_sz;
+    std::memcpy(entry, &stored.header, sizeof(MaterialHeader));
+    std::memcpy(entry + sizeof(MaterialHeader), stored.payload.data(), stored.payload.size());
+
+    if (dirty_begin > id) dirty_begin = id;
+    const uint32_t end_after = id + 1u;
+    if (dirty_end < end_after) dirty_end = end_after;
+}
+
+void MaterialSystem::clear() {
+    materials.clear();
+    host_buffer.clear();
+    dirty_begin = UINT32_MAX;
+    dirty_end = 0;
+    // Keep material_buffer handle and max_payload_size; the next add_material
+    // call will repopulate from index 0.
+}
+
 void MaterialSystem::upload(const CommandBufferHandle& cmd) {
     if (dirty_begin >= dirty_end || materials.empty())
         return;

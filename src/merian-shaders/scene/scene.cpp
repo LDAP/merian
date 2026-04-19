@@ -175,6 +175,13 @@ void Scene::add_mesh_instance(const MeshID mesh_id, const NodeID node_id) {
     bvh_dirty = true;
 }
 
+void Scene::mark_mesh_data_dirty(const MeshID mesh_id) {
+    assert(mesh_id < meshes.size());
+    if (mesh_data_dirty.size() <= mesh_id)
+        mesh_data_dirty.resize(meshes.size(), false);
+    mesh_data_dirty[mesh_id] = true;
+}
+
 CameraID Scene::add_camera(CameraHandle camera) {
     const CameraID id = cameras.size();
     cameras.push_back(std::move(camera));
@@ -323,10 +330,12 @@ void Scene::create_mesh_groups() {
     mesh_groups.clear();
 
     // Classify meshes into groups:
-    // 1. Non-instanced static -> all in one group
+    // 1. Non-instanced static -> split into opaque / non-opaque buckets so the
+    //    TLAS instance flags can carry the eForceOpaque bit per BLAS.
     // 2. Non-instanced dynamic -> grouped by NodeID (same transform)
     // 3. Instanced -> grouped by identical instance set
-    std::vector<MeshID> static_meshes;
+    std::vector<MeshID> static_opaque;
+    std::vector<MeshID> static_alpha;
     std::unordered_map<NodeID, std::vector<MeshID>> dynamic_by_node;
     std::map<std::set<NodeID>, std::vector<MeshID>> instanced_by_set;
 
@@ -339,8 +348,10 @@ void Scene::create_mesh_groups() {
             const bool is_dynamic = mesh.flags & GeometryFlags::IsDynamic;
             if (is_dynamic && !pretransform_dynamic) {
                 dynamic_by_node[*mesh.instances.begin()].push_back(mid);
+            } else if (mesh.flags & GeometryFlags::IsOpaque) {
+                static_opaque.push_back(mid);
             } else {
-                static_meshes.push_back(mid);
+                static_alpha.push_back(mid);
             }
         } else {
             // Instanced: group by identical instance set
@@ -348,15 +359,29 @@ void Scene::create_mesh_groups() {
         }
     }
 
-    // Build groups
-    if (!static_meshes.empty()) {
-        mesh_groups.push_back({static_meshes, true});
+    // Build groups. is_opaque is set per group so build_tlas can apply
+    // eForceOpaque without re-walking the meshes.
+    auto group_is_opaque = [&](const std::vector<MeshID>& list) {
+        for (MeshID mid : list) {
+            if (!(meshes[mid]->flags & GeometryFlags::IsOpaque))
+                return false;
+        }
+        return true;
+    };
+
+    if (!static_opaque.empty()) {
+        mesh_groups.push_back({static_opaque, true, true});
+    }
+    if (!static_alpha.empty()) {
+        mesh_groups.push_back({static_alpha, true, false});
     }
     for (auto& [node_id, mesh_list] : dynamic_by_node) {
-        mesh_groups.push_back({std::move(mesh_list), false});
+        const bool opaque = group_is_opaque(mesh_list);
+        mesh_groups.push_back({std::move(mesh_list), false, opaque});
     }
     for (auto& [instance_set, mesh_list] : instanced_by_set) {
-        mesh_groups.push_back({std::move(mesh_list), false});
+        const bool opaque = group_is_opaque(mesh_list);
+        mesh_groups.push_back({std::move(mesh_list), false, opaque});
     }
 
     // Build geometry instance data and per-mesh instance ID mapping.
@@ -364,14 +389,20 @@ void Scene::create_mesh_groups() {
     // This ensures InstanceID() + GeometryIndex() directly indexes geometry_instance_data.
     mesh_id_to_instance_ids.clear();
     mesh_id_to_instance_ids.resize(meshes.size());
+    mesh_id_to_group_id.assign(meshes.size(), UINT32_MAX);
     geometry_instance_data.clear();
 
     uint32_t geometry_instance_id = 0;
-    for (const auto& group : mesh_groups) {
+    for (uint32_t gi = 0; gi < mesh_groups.size(); gi++) {
+        const auto& group = mesh_groups[gi];
         // All meshes in a group have the same instance set (for non-instanced: size 1)
         assert(!group.mesh_list.empty());
         const auto& instances = meshes[group.mesh_list[0]]->instances;
         uint32_t instance_count = static_cast<uint32_t>(instances.size());
+
+        for (MeshID mid : group.mesh_list) {
+            mesh_id_to_group_id[mid] = gi;
+        }
 
         for (uint32_t inst_idx = 0; inst_idx < instance_count; inst_idx++) {
             for (uint32_t geom_idx = 0; geom_idx < group.mesh_list.size(); geom_idx++) {
@@ -507,9 +538,79 @@ void Scene::upload_geometry_buffers(const CommandBufferHandle& cmd) {
     geometry_dirty = false;
 }
 
-void Scene::build_blas(const CommandBufferHandle& cmd) {
+void Scene::refresh_dirty_mesh_buffers(const CommandBufferHandle& cmd) {
+    if (mesh_data_dirty.empty())
+        return;
+
+    const auto buffer_usage = vk::BufferUsageFlagBits::eStorageBuffer |
+                              vk::BufferUsageFlagBits::eTransferDst |
+                              vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR |
+                              vk::BufferUsageFlagBits::eShaderDeviceAddress;
+
+    const auto staging = allocator->get_staging();
+    bool any_uploaded = false;
+
+    for (MeshID mid = 0; mid < static_cast<MeshID>(mesh_data_dirty.size()); mid++) {
+        if (!mesh_data_dirty[mid])
+            continue;
+        assert(mid < meshes.size());
+        const Mesh& mesh = *meshes[mid];
+        if (mesh.instances.empty())
+            continue;
+
+        // Refresh-dirty meshes are dynamic by contract (caller guarantees they
+        // are not in a static / pretransformed group).
+        const uint32_t vertex_count = mesh.get_vertex_count();
+        const uint32_t primitive_count = mesh.get_primitive_count();
+        const vk::DeviceSize vb_size = vertex_count * sizeof(PackedVertexData);
+        const vk::DeviceSize ib_size = primitive_count * sizeof(uint3);
+
+        if (vb_size == 0 || ib_size == 0)
+            continue;
+
+        if (mid >= vertex_buffers.size())
+            vertex_buffers.resize(mid + 1);
+        if (mid >= index_buffers.size())
+            index_buffers.resize(mid + 1);
+
+        allocator->ensure_buffer_size(vertex_buffers[mid], vb_size, buffer_usage,
+                                      fmt::format("Scene::vb[{}]", mid), MemoryMappingType::NONE,
+                                      std::nullopt, 1.5f);
+        allocator->ensure_buffer_size(index_buffers[mid], ib_size, buffer_usage,
+                                      fmt::format("Scene::ib[{}]", mid), MemoryMappingType::NONE,
+                                      std::nullopt, 1.5f);
+
+        const MemoryAllocationHandle vb_staging = staging->cmd_to_device(cmd, vertex_buffers[mid]);
+        auto* vb_mapped = static_cast<PackedVertexData*>(vb_staging->map());
+        for (uint32_t v = 0; v < vertex_count; v++) {
+            vb_mapped[v] = mesh.get_packed_vertex(v);
+        }
+        vb_staging->unmap();
+
+        const MemoryAllocationHandle ib_staging = staging->cmd_to_device(cmd, index_buffers[mid]);
+        auto* ib_mapped = static_cast<uint3*>(ib_staging->map());
+        for (uint32_t p = 0; p < primitive_count; p++) {
+            ib_mapped[p] = mesh.get_indices(p);
+        }
+        ib_staging->unmap();
+        any_uploaded = true;
+    }
+
+    if (any_uploaded) {
+        cmd->barrier(vk::MemoryBarrier2{
+            vk::PipelineStageFlagBits2::eTransfer,
+            vk::AccessFlagBits2::eTransferWrite,
+            vk::PipelineStageFlagBits2::eAllCommands,
+            vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eAccelerationStructureReadKHR,
+        });
+    }
+}
+
+void Scene::build_blas(const CommandBufferHandle& cmd, const std::vector<bool>& needs_build) {
     if (!build_as || mesh_groups.empty())
         return;
+
+    assert(needs_build.size() == mesh_groups.size());
 
     if (!as_builder)
         as_builder.emplace(context, allocator);
@@ -522,6 +623,8 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
     std::vector<BLASGeom> blas_geoms(mesh_groups.size());
 
     for (uint32_t gi = 0; gi < mesh_groups.size(); gi++) {
+        if (!needs_build[gi])
+            continue;
         const auto& group = mesh_groups[gi];
         auto& bg = blas_geoms[gi];
 
@@ -551,18 +654,31 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
         }
     }
 
-    // Queue all BLAS builds
-    std::vector<AccelerationStructureHandle> new_blas_list;
+    // Preserve unchanged BLAS handles, queue new builds for the dirty groups.
+    // Build-time / trace-time tradeoff: static groups are built once, so prefer
+    // fast trace; dynamic groups are rebuilt every frame, so prefer fast build.
+    std::vector<AccelerationStructureHandle> new_blas_list(mesh_groups.size());
+    bool any_queued = false;
     for (uint32_t gi = 0; gi < mesh_groups.size(); gi++) {
-        auto& bg = blas_geoms[gi];
-        auto blas = as_builder->queue_build(bg.geometries, bg.ranges);
-        new_blas_list.push_back(blas);
+        if (!needs_build[gi]) {
+            assert(gi < blas_list.size() && blas_list[gi] &&
+                   "needs_build[gi]=false requires an existing BLAS to preserve");
+            new_blas_list[gi] = blas_list[gi];
+            continue;
+        }
+        const vk::BuildAccelerationStructureFlagsKHR flags =
+            mesh_groups[gi].is_static ? vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace
+                                      : vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastBuild;
+        new_blas_list[gi] =
+            as_builder->queue_build(blas_geoms[gi].geometries, blas_geoms[gi].ranges, flags);
+        any_queued = true;
     }
 
-    // Build BLAS (this records commands and allocates scratch)
-    as_builder->get_cmds_blas(cmd, scratch_buffer);
+    // Record commands and allocate scratch only if at least one build was queued.
+    if (any_queued) {
+        as_builder->get_cmds_blas(cmd, scratch_buffer);
+    }
 
-    // Keep the new BLAS list (previous ones released when shared_ptrs drop)
     blas_list = std::move(new_blas_list);
 }
 
@@ -602,17 +718,17 @@ void Scene::build_tlas(const CommandBufferHandle& cmd) {
             inst.accelerationStructureReference =
                 blas_list[gi]->get_acceleration_structure_device_address();
 
-            // Set opaque flag if all meshes in group are opaque
-            bool all_opaque = true;
-            for (MeshID mid : group.mesh_list) {
-                if (!(meshes[mid]->flags & GeometryFlags::IsOpaque)) {
-                    all_opaque = false;
-                    break;
-                }
+            vk::GeometryInstanceFlagsKHR inst_flags{};
+            if (group.is_opaque) {
+                inst_flags |= vk::GeometryInstanceFlagBitsKHR::eForceOpaque;
             }
-            if (all_opaque) {
-                inst.flags = static_cast<uint32_t>(vk::GeometryInstanceFlagBitsKHR::eForceOpaque);
+            // Per-mesh winding flag: in this BLAS layout one mesh group is one
+            // BLAS, so all meshes in a group share an instance flag set. The
+            // builder picks the first mesh's winding; mixing is not supported.
+            if (meshes[group.mesh_list[0]]->flags & GeometryFlags::FrontCounterClockwise) {
+                inst_flags |= vk::GeometryInstanceFlagBitsKHR::eTriangleFrontCounterclockwise;
             }
+            inst.flags = static_cast<uint32_t>(inst_flags);
 
             instances.push_back(inst);
             instance_id += static_cast<uint32_t>(group.mesh_list.size());
@@ -622,14 +738,25 @@ void Scene::build_tlas(const CommandBufferHandle& cmd) {
     if (instances.empty())
         return;
 
-    tlas_instances_buffer = allocator->create_buffer(
-        instances.size() * sizeof(vk::AccelerationStructureInstanceKHR),
-        vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR |
-            vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eShaderDeviceAddress,
-        MemoryMappingType::NONE, "Scene::tlas_instances");
+    const vk::DeviceSize required_size =
+        instances.size() * sizeof(vk::AccelerationStructureInstanceKHR);
+    if (!tlas_instances_buffer || tlas_instances_buffer->get_size() < required_size) {
+        // Buffer must grow (or first allocation). Park the previous buffer in the
+        // keepalive ring so any in-flight command buffer that still references
+        // it stays valid; the slot we overwrite was last touched
+        // TLAS_INSTANCES_KEEPALIVE frames ago.
+        tlas_instances_keepalive[tlas_instances_keepalive_idx] = tlas_instances_buffer;
+        tlas_instances_keepalive_idx =
+            (tlas_instances_keepalive_idx + 1) % TLAS_INSTANCES_KEEPALIVE;
+        tlas_instances_buffer = allocator->create_buffer(
+            required_size,
+            vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR |
+                vk::BufferUsageFlagBits::eTransferDst |
+                vk::BufferUsageFlagBits::eShaderDeviceAddress,
+            MemoryMappingType::NONE, "Scene::tlas_instances");
+    }
     allocator->get_staging()->cmd_to_device(cmd, tlas_instances_buffer, instances.data(), 0,
-                                            instances.size() *
-                                                sizeof(vk::AccelerationStructureInstanceKHR));
+                                            required_size);
 
     cmd->barrier(tlas_instances_buffer->buffer_barrier2(
         vk::PipelineStageFlagBits2::eTransfer,
@@ -645,16 +772,50 @@ void Scene::update(const CommandBufferHandle& cmd,
                    const float time,
                    const float time_diff,
                    const uint32_t frame) {
-    on_update(time, time_diff, frame);
+    on_update(cmd, time, time_diff, frame);
 
     assert(!cameras.empty() &&
            "the scene implementation must ensure that there is at least one camera");
 
     material_system->upload(cmd);
-    upload_geometry_buffers(cmd);
 
-    if (build_as && bvh_dirty) {
-        build_blas(cmd);
+    // upload_geometry_buffers re-uploads everything; in that case any per-mesh
+    // dirty bits are subsumed and cleared.
+    const bool full_geometry_rebuild = geometry_dirty;
+    upload_geometry_buffers(cmd);
+    if (full_geometry_rebuild) {
+        std::fill(mesh_data_dirty.begin(), mesh_data_dirty.end(), false);
+    }
+
+    // Otherwise, refresh just the dirty meshes' vertex/index data and figure
+    // out which BLAS groups must be rebuilt.
+    std::vector<bool> group_needs_build;
+    bool any_group_dirty = false;
+    if (!full_geometry_rebuild && !mesh_data_dirty.empty()) {
+        refresh_dirty_mesh_buffers(cmd);
+        group_needs_build.assign(mesh_groups.size(), false);
+        for (MeshID mid = 0; mid < static_cast<MeshID>(mesh_data_dirty.size()); mid++) {
+            if (!mesh_data_dirty[mid])
+                continue;
+            if (mid >= mesh_id_to_group_id.size())
+                continue;
+            const uint32_t gi = mesh_id_to_group_id[mid];
+            if (gi == UINT32_MAX)
+                continue;
+            group_needs_build[gi] = true;
+            any_group_dirty = true;
+        }
+        std::fill(mesh_data_dirty.begin(), mesh_data_dirty.end(), false);
+    }
+
+    if (build_as && (bvh_dirty || any_group_dirty)) {
+        std::vector<bool> needs_build(mesh_groups.size(), false);
+        if (bvh_dirty) {
+            std::fill(needs_build.begin(), needs_build.end(), true);
+        } else {
+            needs_build = std::move(group_needs_build);
+        }
+        build_blas(cmd, needs_build);
         build_tlas(cmd);
         bvh_dirty = false;
     }
@@ -713,30 +874,84 @@ void Scene::update(const CommandBufferHandle& cmd,
         prev_instance_transforms_data = std::move(transforms);
     }
 
+    // Lazy placeholder buffer: keeps every Scene descriptor binding bound
+    // even before any mesh has been added (consumers like gbuffer_rt gate
+    // on has_geometry() before dispatching but still need valid descriptor
+    // writes). See the placeholder_buffer comment in scene.hpp.
+    // TODO: skip this when VK_EXT_robustness2 nullDescriptor is enabled.
+    if (!placeholder_buffer) {
+        const auto usage = vk::BufferUsageFlagBits::eStorageBuffer |
+                           vk::BufferUsageFlagBits::eTransferDst |
+                           vk::BufferUsageFlagBits::eShaderDeviceAddress |
+                           vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR;
+        placeholder_buffer = allocator->create_buffer(
+            sizeof(float4x4), usage, MemoryMappingType::NONE, "Scene::placeholder");
+    }
+
     auto c = shader_object->get_cursor();
-    for (uint32_t i = 0; i < vertex_buffers.size(); i++) {
+
+    // The slang composition declares the arrays with size max(N, 1), so
+    // slot 0 always exists and must be bound. Fall back to placeholder
+    // when the real mesh buffer isn't available.
+    {
+        const BufferHandle& vb0 =
+            (!vertex_buffers.empty() && vertex_buffers[0]) ? vertex_buffers[0] : placeholder_buffer;
+        const BufferHandle& ib0 =
+            (!index_buffers.empty() && index_buffers[0]) ? index_buffers[0] : placeholder_buffer;
+        c["vertex_buffers"][0] = vb0;
+        c["index_buffers"][0] = ib0;
+    }
+    for (uint32_t i = 1; i < vertex_buffers.size(); i++) {
         if (vertex_buffers[i])
             c["vertex_buffers"][i] = vertex_buffers[i];
     }
-    for (uint32_t i = 0; i < index_buffers.size(); i++) {
+    for (uint32_t i = 1; i < index_buffers.size(); i++) {
         if (index_buffers[i])
             c["index_buffers"][i] = index_buffers[i];
     }
 
-    c["geometries"] = geometry_data_buffer;
-    c["instance_transforms"] = instance_transforms_buffer;
-    c["inverse_transposed_instance_transforms"] = inverse_transposed_instance_transforms_buffer;
-    c["prev_instance_transforms"] = prev_instance_transforms_buffer;
+    c["geometries"] = geometry_data_buffer ? geometry_data_buffer : placeholder_buffer;
+    c["instance_transforms"] =
+        instance_transforms_buffer ? instance_transforms_buffer : placeholder_buffer;
+    c["inverse_transposed_instance_transforms"] =
+        inverse_transposed_instance_transforms_buffer
+            ? inverse_transposed_instance_transforms_buffer
+            : placeholder_buffer;
+    c["prev_instance_transforms"] =
+        prev_instance_transforms_buffer ? prev_instance_transforms_buffer : placeholder_buffer;
     c["prev_inverse_transposed_instance_transforms"] =
-        prev_inverse_transposed_instance_transforms_buffer;
+        prev_inverse_transposed_instance_transforms_buffer
+            ? prev_inverse_transposed_instance_transforms_buffer
+            : placeholder_buffer;
 
     c["material_system"] = material_system->get_shader_object();
     c["frame"] = frame;
-    c["time"] = time;
+    c["time"] = get_time(time);
     c["time_diff"] = time_diff;
 
-    if (build_as && tlas) {
-        c["as"]["as"] = tlas;
+    if (build_as) {
+        AccelerationStructureHandle bind_tlas = tlas;
+        if (!bind_tlas) {
+            // Build a one-shot empty TLAS (0 instances) so the AS binding
+            // is always populated. Reuses placeholder_buffer for the
+            // (unused) instance device address.
+            if (!placeholder_tlas) {
+                if (!as_builder)
+                    as_builder.emplace(context, allocator);
+                vk::AccelerationStructureGeometryInstancesDataKHR instances_data{
+                    VK_FALSE, {placeholder_buffer->get_device_address()}};
+                placeholder_tlas = as_builder->queue_build(0u, instances_data);
+                as_builder->get_cmds_tlas(cmd, scratch_buffer);
+                cmd->barrier(vk::MemoryBarrier2{
+                    vk::PipelineStageFlagBits2::eAccelerationStructureBuildKHR,
+                    vk::AccessFlagBits2::eAccelerationStructureWriteKHR,
+                    vk::PipelineStageFlagBits2::eAllCommands,
+                    vk::AccessFlagBits2::eAccelerationStructureReadKHR,
+                });
+            }
+            bind_tlas = placeholder_tlas;
+        }
+        c["as"]["as"] = bind_tlas;
     }
 
     auto cam = get_active_camera();

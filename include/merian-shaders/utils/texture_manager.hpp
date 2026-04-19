@@ -33,6 +33,25 @@ class TextureManager : public Versionable,
                            bool srgb = true,
                            bool generate_mipmaps = false);
 
+    // Place a texture at a specific predefined slot. Asserts id < capacity().
+    // Replaces any existing handle and updates the shader cursor. Use this
+    // mode when the caller owns a stable external ID space (e.g. Quake's
+    // gl_texnum). Mutually exclusive with add_texture per manager instance.
+    void set_texture(TextureID id, const TextureHandle& texture);
+
+    // Convenience: upload data and set_texture(id, ...).
+    void
+    set_texture_from_rgba8(TextureID id,
+                           const CommandBufferHandle& cmd,
+                           const uint32_t* data,
+                           uint32_t width,
+                           uint32_t height,
+                           vk::SamplerAddressMode address_mode = vk::SamplerAddressMode::eRepeat,
+                           vk::Filter mag_filter = vk::Filter::eLinear,
+                           vk::Filter min_filter = vk::Filter::eLinear,
+                           bool srgb = true,
+                           bool generate_mipmaps = false);
+
     void remove_texture(TextureID id);
 
     const TextureHandle& get_texture(TextureID id) const;

@@ -59,6 +59,17 @@ class MaterialSystem : public Versionable,
     // Add a material instance. Returns MaterialID.
     MaterialID add_material(MaterialModelID type_id, const Material& material);
 
+    // Re-pack the payload at slot `id`. Cheap: only widens the dirty range so
+    // the next upload() copies that single entry. The new material's payload
+    // size must not exceed the current max_payload_size (asserted) — pick a
+    // material model whose payload is stable across updates.
+    void update_material(MaterialID id, const Material& material);
+
+    // Drop all materials. Caller is responsible for re-adding (e.g. after a
+    // map change). The GPU buffer handle is kept; it gets overwritten on the
+    // next upload().
+    void clear();
+
     uint32_t get_material_count() const {
         return static_cast<uint32_t>(materials.size());
     }

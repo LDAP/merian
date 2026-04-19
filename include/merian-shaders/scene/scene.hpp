@@ -9,6 +9,7 @@
 #include "merian/utils/versionable.hpp"
 #include "merian/vk/raytrace/as_builder.hpp"
 
+#include <array>
 #include <optional>
 #include <set>
 #include <vector>
@@ -19,12 +20,13 @@ enum class GeometryFlags : uint32_t {
     None = 0,
     IsOpaque = 0x1,
     IsDynamic = 0x2,
+    FrontCounterClockwise = 0x4,
 };
 
-inline GeometryFlags operator|(GeometryFlags a, GeometryFlags b) {
+constexpr GeometryFlags operator|(GeometryFlags a, GeometryFlags b) {
     return static_cast<GeometryFlags>(static_cast<uint32_t>(a) | static_cast<uint32_t>(b));
 }
-inline bool operator&(GeometryFlags a, GeometryFlags b) {
+constexpr bool operator&(GeometryFlags a, GeometryFlags b) {
     return (static_cast<uint32_t>(a) & static_cast<uint32_t>(b)) != 0;
 }
 
@@ -119,12 +121,14 @@ class SimpleMesh : public Mesh {
 };
 
 // A group of meshes that share a BLAS.
-// - Static non-instanced: all in one group, pre-transformed, TLAS identity.
+// - Static non-instanced opaque: all in one group, pre-transformed, TLAS identity.
+// - Static non-instanced non-opaque: a separate group (different TLAS instance flags).
 // - Dynamic non-instanced: grouped by shared globalMatrixID.
 // - Instanced: grouped by identical instance set (same NodeIDs).
 struct MeshGroup {
     std::vector<MeshID> mesh_list;
     bool is_static = true;
+    bool is_opaque = true;
 };
 
 class SceneError : std::runtime_error {
@@ -249,12 +253,20 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         return float3(0, 0, 1);
     }
 
+    // Scene-time hook. The default returns the update time unchanged. Scenes
+    // that own a separate clock can override.
+    virtual float get_time(float time) {
+        return time;
+    }
+
     // ------------------------------
 
     void properties(Properties& props);
 
   protected:
-    virtual void on_update(float time, float time_diff, uint32_t frame) {
+    virtual void
+    on_update(const CommandBufferHandle& cmd, float time, float time_diff, uint32_t frame) {
+        (void)cmd;
         (void)time;
         (void)time_diff;
         (void)frame;
@@ -267,6 +279,16 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     void add_mesh_instance(MeshID mesh_id, NodeID node_id);
 
     CameraID add_camera(CameraHandle camera);
+
+    // Mark a mesh's vertex/index data as dirty. The next update() will
+    // re-upload that mesh's buffers and rebuild the BLAS group containing
+    // it. Other groups (in particular static groups whose meshes are not
+    // marked) are left untouched. Use this for IsDynamic meshes whose
+    // vertex contents change every frame (alias-model pose lerp,
+    // particles, sprites). The Mesh's vertex_count / primitive_count are
+    // re-queried each refresh, so topology changes (count growth) are
+    // handled.
+    void mark_mesh_data_dirty(MeshID mesh_id);
 
     // can be invalid if information is not available.
     AABB aabb;
@@ -284,8 +306,12 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     void update_composition_constants();
     void rebuild_shader_object();
     void upload_geometry_buffers(const CommandBufferHandle& cmd);
+    void refresh_dirty_mesh_buffers(const CommandBufferHandle& cmd);
     void create_mesh_groups();
-    void build_blas(const CommandBufferHandle& cmd);
+    // Build BLAS for the groups for which needs_build[gi] is true, preserving
+    // any unchanged blas_list[gi] handles. Pass an all-true mask for full
+    // rebuild.
+    void build_blas(const CommandBufferHandle& cmd, const std::vector<bool>& needs_build);
     void build_tlas(const CommandBufferHandle& cmd);
 
   private:
@@ -324,6 +350,16 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     // mesh_id_to_instance_ids[mesh_id][i] = global geometry instance index.
     std::vector<std::vector<uint32_t>> mesh_id_to_instance_ids;
 
+    // Per-mesh: index of the mesh group containing this mesh. UINT32_MAX if
+    // the mesh is not assigned to any group (no instances). Set by
+    // create_mesh_groups; consumed by mark_mesh_data_dirty handling.
+    std::vector<uint32_t> mesh_id_to_group_id;
+
+    // Per-mesh dirty bit: when true, the mesh's vertex/index data must be
+    // re-uploaded and its group's BLAS rebuilt on the next update(). Set
+    // via mark_mesh_data_dirty; cleared inside update().
+    std::vector<bool> mesh_data_dirty;
+
     // Flat array of GeometryData ordered for InstanceID+GeometryIndex lookup.
     std::vector<GeometryData> geometry_instance_data;
     std::vector<BufferHandle> vertex_buffers;
@@ -340,10 +376,29 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     std::vector<AccelerationStructureHandle> blas_list;
     AccelerationStructureHandle tlas;
     BufferHandle tlas_instances_buffer;
+    // Keepalive ring for tlas_instances_buffer: build_tlas can be called every
+    // frame for dynamic scenes, and the previous buffer may still be referenced
+    // by an in-flight command buffer. Sizing is conservative (covers up to 4
+    // frames in flight, which is more than any current swapchain config uses).
+    static constexpr uint32_t TLAS_INSTANCES_KEEPALIVE = 4;
+    std::array<BufferHandle, TLAS_INSTANCES_KEEPALIVE> tlas_instances_keepalive;
+    uint32_t tlas_instances_keepalive_idx = 0;
     BufferHandle scratch_buffer;
     bool bvh_dirty = true;
     Camera prev_active_camera;
     bool geometry_dirty = true;
+
+    // Placeholder fallback for the empty-scene case: lets us bind a real
+    // (but empty) buffer/TLAS to every Scene descriptor slot when no
+    // geometry has been added yet, so consumers that gate on
+    // has_geometry() (e.g. gbuffer_rt) can still construct/validate their
+    // descriptor sets.
+    //
+    // TODO: with VK_EXT_robustness2's nullDescriptor enabled the
+    // bindings can legally stay null and this whole fallback can be
+    // skipped. Wire a fast path once the device feature is requested.
+    BufferHandle placeholder_buffer;
+    AccelerationStructureHandle placeholder_tlas;
 };
 
 using SceneHandle = std::shared_ptr<Scene>;
