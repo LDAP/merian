@@ -38,7 +38,9 @@ const float4x4& Camera::get_view_matrix() noexcept {
 
 const float4x4& Camera::get_projection_matrix() noexcept {
     if (has_changed(projection_change_id, projection_change_id_cache)) {
-        projection_cache = merian::perspective(field_of_view, aspect_ratio, near_plane, far_plane);
+        const float fovy =
+            2.f * std::atan(std::tan(radians(field_of_view * 0.5f)) / aspect_ratio);
+        projection_cache = merian::perspective(fovy, aspect_ratio, near_plane, far_plane);
     }
     return projection_cache;
 }
@@ -197,8 +199,8 @@ void Camera::write_to(ShaderCursor cursor) {
     cursor["position"] = position;
     cursor["target"] = target;
     cursor["up"] = up;
-    cursor["U"] = rgt * (half_fov_tan * aspect_ratio);
-    cursor["V"] = cross(rgt, fwd) * half_fov_tan;
+    cursor["U"] = rgt * half_fov_tan;
+    cursor["V"] = cross(rgt, fwd) * (half_fov_tan / aspect_ratio);
     cursor["W"] = fwd;
     cursor["near"] = near_plane;
     cursor["far"] = far_plane;
@@ -215,8 +217,9 @@ void Camera::look_at_bounding_box(const AABB& aabb) {
     // reduce field of view to make the fit not tight => looks better
     const float field_of_view = this->field_of_view * 0.85f;
 
-    const float half_yfov = merian::radians(field_of_view * 0.5f);
-    const float half_xfov = std::atan(std::tan(half_yfov) * aspect_ratio);
+    // field_of_view is horizontal: derive vertical from aspect.
+    const float half_xfov = merian::radians(field_of_view * 0.5f);
+    const float half_yfov = std::atan(std::tan(half_xfov) / aspect_ratio);
     const float tan_hx = std::tan(half_xfov);
     const float tan_hy = std::tan(half_yfov);
 

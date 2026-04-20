@@ -25,10 +25,11 @@ class Camera {
     }
 
   public:
+    // fov is horizontal
     Camera(const float3& position = float3(0),
            const float3& target = float3(1, 0, 0),
            const float3& up = float3(0, 0, 1),
-           const float field_of_view = 60.f,
+           const float field_of_view = 90.f,
            const float aspect_ratio = 1.f,
            const float near_plane = 0.1f,
            const float far_plane = 1000.f);
@@ -73,7 +74,8 @@ class Camera {
 
     // -----------------------------------------------------------------------------
 
-    void set_perspective(const float field_of_view = 60.f,
+    // field_of_view is horizontal, in degrees.
+    void set_perspective(const float field_of_view = 90.f,
                          const float aspect_ratio = 1.f,
                          const float near_plane = 0.1f,
                          const float far_plane = 1000.f) noexcept;
@@ -149,7 +151,7 @@ class Camera {
     // PROJECTION
     //-------------------------------------------------
 
-    float field_of_view; // in degree
+    float field_of_view; // horizontal FOV, in degrees
     float aspect_ratio;  // aspect_ratio = width / height
     float near_plane;
     float far_plane;
