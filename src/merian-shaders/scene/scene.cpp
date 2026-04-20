@@ -725,8 +725,12 @@ void Scene::build_tlas(const CommandBufferHandle& cmd) {
             // Per-mesh winding flag: in this BLAS layout one mesh group is one
             // BLAS, so all meshes in a group share an instance flag set. The
             // builder picks the first mesh's winding; mixing is not supported.
-            if (meshes[group.mesh_list[0]]->flags & GeometryFlags::FrontCounterClockwise) {
+            const auto& head_flags = meshes[group.mesh_list[0]]->flags;
+            if (head_flags & GeometryFlags::FrontCounterClockwise) {
                 inst_flags |= vk::GeometryInstanceFlagBitsKHR::eTriangleFrontCounterclockwise;
+            }
+            if (head_flags & GeometryFlags::TwoSided) {
+                inst_flags |= vk::GeometryInstanceFlagBitsKHR::eTriangleFacingCullDisable;
             }
             inst.flags = static_cast<uint32_t>(inst_flags);
 

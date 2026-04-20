@@ -21,6 +21,7 @@ enum class GeometryFlags : uint32_t {
     IsOpaque = 0x1,
     IsDynamic = 0x2,
     FrontCounterClockwise = 0x4,
+    TwoSided = 0x8,
 };
 
 constexpr GeometryFlags operator|(GeometryFlags a, GeometryFlags b) {

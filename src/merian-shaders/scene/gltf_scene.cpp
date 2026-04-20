@@ -431,8 +431,12 @@ void GLTFScene::load_meshes() {
             // Determine flags
             GeometryFlags flags = GeometryFlags::None;
             if (prim.material >= 0 && prim.material < static_cast<int>(model->materials.size())) {
-                if (model->materials[prim.material].alphaMode == "OPAQUE") {
+                const auto& gmat = model->materials[prim.material];
+                if (gmat.alphaMode == "OPAQUE") {
                     flags = flags | GeometryFlags::IsOpaque;
+                }
+                if (gmat.doubleSided) {
+                    flags = flags | GeometryFlags::TwoSided;
                 }
             } else {
                 flags = flags | GeometryFlags::IsOpaque;
