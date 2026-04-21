@@ -11,14 +11,16 @@
 
 namespace merian {
 
-class TextureManager : public Versionable,
-                       public std::enable_shared_from_this<TextureManager> {
+class TextureManager : public Versionable, public std::enable_shared_from_this<TextureManager> {
   public:
     TextureManager(const ShaderCompileContextHandle& compile_context,
                    const ContextHandle& context,
                    const ResourceAllocatorHandle& allocator,
                    const ShaderObjectAllocatorHandle& obj_allocator,
                    uint32_t initial_capacity = 4096);
+
+    // process pending uploads
+    void update(const CommandBufferHandle& cmd);
 
     TextureID add_texture(const TextureHandle& texture);
 
@@ -33,10 +35,6 @@ class TextureManager : public Versionable,
                            bool srgb = true,
                            bool generate_mipmaps = false);
 
-    // Place a texture at a specific predefined slot. Asserts id < capacity().
-    // Replaces any existing handle and updates the shader cursor. Use this
-    // mode when the caller owns a stable external ID space (e.g. Quake's
-    // gl_texnum). Mutually exclusive with add_texture per manager instance.
     void set_texture(TextureID id, const TextureHandle& texture);
 
     // Convenience: upload data and set_texture(id, ...).

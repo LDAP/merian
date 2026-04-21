@@ -56,14 +56,14 @@ interface AccelerationStructure {
 // ---------------------------------------
 
 // extend the built in RayQuery to use it without wrapper
-extension RayQuery : IRayQuery {}
+extension<uint FLAGS> RayQuery<FLAGS> : IRayQuery {}
 
 struct HWAccelerationStructure : AccelerationStructure {
     RaytracingAccelerationStructure as;
 
     // -----------------------------------------
 
-    typealias RayQueryImpl = RayQuery;
+    typealias RayQueryImpl = RayQuery<RAY_FLAG_CULL_BACK_FACING_TRIANGLES>;
 
     void trace_ray(inout RayQueryImpl rq,
                    const RayDesc ray,

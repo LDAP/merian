@@ -75,7 +75,7 @@ class MaterialSystem : public Versionable,
     }
 
     // Upload material buffer to GPU and update ShaderObject state.
-    void upload(const CommandBufferHandle& cmd);
+    void update(const CommandBufferHandle& cmd);
 
     const SlangCompositionHandle& get_composition() const {
         return composition;

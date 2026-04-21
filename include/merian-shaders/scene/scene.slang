@@ -55,7 +55,6 @@ struct Hit {
 extern static const int merian_scene_index_buffers_count;
 extern static const int merian_scene_vertex_buffers_count;
 extern static const int merian_scene_prev_vertex_buffers_count;
-extern static const int merian_scene_geometry_count;
 
 // TODO: use link-time type once Slang's lookupExternDeclRefType is fixed
 // extern struct SceneAccelerationStructure : AccelerationStructure;
@@ -65,14 +64,14 @@ typedef HWAccelerationStructure SceneAccelerationStructure;
 struct Scene {
     SceneAccelerationStructure as;
 
+    StructuredBuffer<GeometryData, ScalarDataLayout> geometries;
+
     StructuredBuffer<uint3, ScalarDataLayout> index_buffers[merian_scene_index_buffers_count];
 
     StructuredBuffer<PackedVertexData, ScalarDataLayout>
         vertex_buffers[merian_scene_vertex_buffers_count];
     StructuredBuffer<PackedPrevVertexData, ScalarDataLayout>
         prev_vertex_buffers[merian_scene_prev_vertex_buffers_count];
-
-    StructuredBuffer<GeometryData, ScalarDataLayout> geometries;
 
     // One transform per TLAS instance, indexed by InstanceIndex().
     StructuredBuffer<float4x4, ScalarDataLayout> instance_transforms;
@@ -233,23 +232,21 @@ struct Scene {
     // -----------------------------------------
 
     // Transform object-space position to world space.
-    float3 to_world_position(const GeometryData gd,
-                             const uint instance_index,
-                             const float3 object_pos) {
+    float3
+    to_world_position(const GeometryData gd, const uint instance_index, const float3 object_pos) {
         if (gd.flags & GEOMETRY_FLAG_PRETRANSFORMED)
             return object_pos;
         return mul(get_instance_transform(instance_index), float4(object_pos, 1.0)).xyz;
     }
 
     // Transform object-space direction to world space.
-    float3 to_world_direction(const GeometryData gd,
-                              const uint instance_index,
-                              const float3 object_dir) {
+    float3
+    to_world_direction(const GeometryData gd, const uint instance_index, const float3 object_dir) {
         if (gd.flags & GEOMETRY_FLAG_PRETRANSFORMED)
             return object_dir;
-        return normalize(mul(get_inverse_transposed_instance_transform(instance_index),
-                             float4(object_dir, 0.0))
-                             .xyz);
+        return normalize(
+            mul(get_inverse_transposed_instance_transform(instance_index), float4(object_dir, 0.0))
+                .xyz);
     }
 
     // Transform object-space position to previous frame world space.
@@ -276,7 +273,7 @@ struct Scene {
 
     // NOTE: Using concrete RayQuery instead of generic <RQ : IRayQuery> to work around
     // Slang SPIR-V codegen crash in IRBuilder::getSet() with generics (Slang 2026.5.2).
-    void _proceed_ray(inout RayQuery rq) {
+    void _proceed_ray<uint FLAGS>(inout RayQuery<FLAGS> rq) {
         while (rq.Proceed()) {
 
             if (rq.CandidateType() == CANDIDATE_NON_OPAQUE_TRIANGLE) {

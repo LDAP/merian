@@ -31,15 +31,15 @@ TextureManager::TextureManager(const ShaderCompileContextHandle& compile_context
 }
 
 void TextureManager::update_composition_constants() {
-    composition->add_module_from_string(
-        "texture_manager_constants",
-        fmt::format(
-            "namespace merian {{ export static const int merian_texture_manager_texture_count = {}; }}",
-            static_cast<uint32_t>(textures.size())));
+    composition->add_module_from_string("texture_manager_constants",
+                                        fmt::format("namespace merian {{ export static const int "
+                                                    "merian_texture_manager_texture_count = {}; }}",
+                                                    static_cast<uint32_t>(textures.size())));
 }
 
 void TextureManager::rebuild_shader_object() {
-    shader_object = layout_program->create_shader_object(context, "merian::TextureManager", obj_allocator);
+    shader_object =
+        layout_program->create_shader_object(context, "merian::TextureManager", obj_allocator);
 
     // Reinitialize all texture slots
     const auto& dummy = allocator->get_dummy_texture();
@@ -51,6 +51,10 @@ void TextureManager::rebuild_shader_object() {
             cursor["textures"][i] = dummy;
         }
     }
+}
+
+void TextureManager::update(const CommandBufferHandle& /*cmd*/) {
+    // TODO: allow for textures to be queued and uploaded here.
 }
 
 TextureID TextureManager::add_texture(const TextureHandle& texture) {
@@ -83,9 +87,8 @@ TextureID TextureManager::add_texture_from_rgba8(const CommandBufferHandle& cmd,
                                                  const vk::Filter min_filter,
                                                  const bool srgb,
                                                  const bool generate_mipmaps) {
-    auto texture =
-        allocator->create_texture_from_rgba8(cmd, data, width, height, address_mode, mag_filter,
-                                             min_filter, srgb, "", generate_mipmaps);
+    auto texture = allocator->create_texture_from_rgba8(
+        cmd, data, width, height, address_mode, mag_filter, min_filter, srgb, "", generate_mipmaps);
     cmd->barrier(texture->get_image()->barrier2(vk::ImageLayout::eShaderReadOnlyOptimal));
     return add_texture(texture);
 }
@@ -109,9 +112,8 @@ void TextureManager::set_texture_from_rgba8(const TextureID id,
                                             const vk::Filter min_filter,
                                             const bool srgb,
                                             const bool generate_mipmaps) {
-    auto texture =
-        allocator->create_texture_from_rgba8(cmd, data, width, height, address_mode, mag_filter,
-                                             min_filter, srgb, "", generate_mipmaps);
+    auto texture = allocator->create_texture_from_rgba8(
+        cmd, data, width, height, address_mode, mag_filter, min_filter, srgb, "", generate_mipmaps);
     cmd->barrier(texture->get_image()->barrier2(vk::ImageLayout::eShaderReadOnlyOptimal));
     set_texture(id, texture);
 }
@@ -119,6 +121,7 @@ void TextureManager::set_texture_from_rgba8(const TextureID id,
 void TextureManager::remove_texture(const TextureID id) {
     assert(id < textures.size());
     assert(textures[id] && "Removing already-removed texture");
+
     textures[id].reset();
     free_list.push_back(id);
     texture_count--;

@@ -1,6 +1,8 @@
 #include "merian-shaders/shading/materials/material_system.hpp"
 
+#include <algorithm>
 #include <cassert>
+#include <cstddef>
 #include <cstring>
 #include <fmt/format.h>
 
@@ -19,9 +21,9 @@ MaterialSystem::MaterialSystem(const ShaderCompileContextHandle& compile_context
       obj_allocator(obj_allocator), texture_manager(texture_manager) {
 
     assert(context->get_device()
-               ->get_enabled_features()
-               .get_16_bit_storage_features()
-               .storageBuffer16BitAccess == VK_TRUE &&
+                   ->get_enabled_features()
+                   .get_16_bit_storage_features()
+                   .storageBuffer16BitAccess == VK_TRUE &&
            "MaterialSystem requires storageBuffer16BitAccess (enable the merian extension)");
 
     // Build the composition once — subsequent changes modify it in-place.
@@ -39,14 +41,14 @@ MaterialSystem::MaterialSystem(const ShaderCompileContextHandle& compile_context
 void MaterialSystem::update_composition_constants() {
     const uint32_t payload_uints = std::max(payload_size_in_uints(max_payload_size), 1u);
     composition->add_module_from_string(
-        "material_system_constants",
-        fmt::format(
-            "namespace merian {{ export static const int merian_material_system_payload_max_size = {}; }}",
-            payload_uints));
+        "material_system_constants", fmt::format("namespace merian {{ export static const int "
+                                                 "merian_material_system_payload_max_size = {}; }}",
+                                                 payload_uints));
 }
 
 void MaterialSystem::rebuild_shader_object() {
-    shader_object = layout_program->create_shader_object(context, "merian::MaterialSystem", obj_allocator);
+    shader_object =
+        layout_program->create_shader_object(context, "merian::MaterialSystem", obj_allocator);
     shader_object->get_cursor()["texture_manager"] = texture_manager->get_shader_object();
 }
 
@@ -116,7 +118,8 @@ MaterialID MaterialSystem::add_material(const MaterialModelID type_id, const Mat
     std::memcpy(entry + sizeof(MaterialHeader), materials.back().payload.data(),
                 materials.back().payload.size());
 
-    if (dirty_begin > id) dirty_begin = id;
+    if (dirty_begin > id)
+        dirty_begin = id;
     dirty_end = static_cast<uint32_t>(materials.size());
 
     return id;
@@ -126,8 +129,9 @@ void MaterialSystem::update_material(const MaterialID id, const Material& materi
     assert(id < materials.size());
 
     const uint32_t payload_bytes = material.get_payload_size();
-    assert(payload_bytes <= max_payload_size &&
-           "update_material payload larger than current max_payload_size — repack not supported here");
+    assert(
+        payload_bytes <= max_payload_size &&
+        "update_material payload larger than current max_payload_size — repack not supported here");
 
     StoredMaterial& stored = materials[id];
     // Header may carry alpha_texture_id and similar fields; refresh in case the
@@ -140,13 +144,13 @@ void MaterialSystem::update_material(const MaterialID id, const Material& materi
     material.write_payload(stored.payload.data());
 
     const uint32_t entry_sz = get_entry_size();
-    uint8_t* entry = host_buffer.data() + id * entry_sz;
+    uint8_t* entry = host_buffer.data() + static_cast<size_t>(id * entry_sz);
     std::memcpy(entry, &stored.header, sizeof(MaterialHeader));
     std::memcpy(entry + sizeof(MaterialHeader), stored.payload.data(), stored.payload.size());
 
-    if (dirty_begin > id) dirty_begin = id;
+    dirty_begin = std::min<uint32_t>(dirty_begin, id);
     const uint32_t end_after = id + 1u;
-    if (dirty_end < end_after) dirty_end = end_after;
+    dirty_end = std::max(dirty_end, end_after);
 }
 
 void MaterialSystem::clear() {
@@ -158,7 +162,7 @@ void MaterialSystem::clear() {
     // call will repopulate from index 0.
 }
 
-void MaterialSystem::upload(const CommandBufferHandle& cmd) {
+void MaterialSystem::update(const CommandBufferHandle& cmd) {
     if (dirty_begin >= dirty_end || materials.empty())
         return;
 
@@ -178,8 +182,8 @@ void MaterialSystem::upload(const CommandBufferHandle& cmd) {
     const vk::DeviceSize offset = dirty_begin * entry_sz;
     const vk::DeviceSize size = (dirty_end - dirty_begin) * entry_sz;
 
-    allocator->get_staging()->cmd_to_device(
-        cmd, material_buffer, host_buffer.data() + offset, offset, size);
+    allocator->get_staging()->cmd_to_device(cmd, material_buffer, host_buffer.data() + offset,
+                                            offset, size);
 
     cmd->barrier(material_buffer->buffer_barrier2(
         vk::PipelineStageFlagBits2::eTransfer, vk::PipelineStageFlagBits2::eAllCommands,
@@ -191,6 +195,8 @@ void MaterialSystem::upload(const CommandBufferHandle& cmd) {
 
     dirty_begin = UINT32_MAX;
     dirty_end = 0;
+
+    texture_manager->update(cmd);
 }
 
 } // namespace merian

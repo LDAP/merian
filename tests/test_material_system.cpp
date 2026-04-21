@@ -132,7 +132,7 @@ TEST_F(MaterialSystemTest, ReadMaterialOnGPU) {
     cursor["material_id"] = static_cast<uint32_t>(mat_id);
 
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
-        ms->upload(cmd);
+        ms->update(cmd);
         cmd->bind(pipeline);
         entry_point->bind_entry_point_parameter("params", params, cmd, pipeline);
         cmd->dispatch(1, 1, 1);
@@ -191,7 +191,7 @@ TEST_F(MaterialSystemTest, SampleMaterialOnGPU) {
     cursor["material_id"] = static_cast<uint32_t>(mat_id);
 
     queue->submit_wait([&](const CommandBufferHandle& cmd) {
-        ms->upload(cmd);
+        ms->update(cmd);
         cmd->bind(pipeline);
         entry_point->bind_entry_point_parameter("params", params, cmd, pipeline);
         cmd->dispatch(1, 1, 1);

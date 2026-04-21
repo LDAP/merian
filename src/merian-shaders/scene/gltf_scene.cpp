@@ -59,7 +59,8 @@ class GLTFMesh : public Mesh {
 
     // null -> sequential indices
     const uint8_t* idx_base = nullptr;
-    int idx_component_type = 0; // TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE / _UNSIGNED_SHORT / _UNSIGNED_INT
+    int idx_component_type =
+        0; // TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE / _UNSIGNED_SHORT / _UNSIGNED_INT
     uint32_t primitive_count = 0;
 
     uint32_t get_vertex_count() const override {
@@ -267,10 +268,9 @@ void GLTFScene::load_materials(const CommandBufferHandle& cmd) {
     }
 
     // Default sampler for textures without a sampler reference (linear, repeat, no mipmaps).
-    default_gltf_sampler =
-        sampler_pool->for_filter_and_address_mode(vk::Filter::eLinear, vk::Filter::eLinear,
-                                                  vk::SamplerAddressMode::eRepeat,
-                                                  vk::SamplerMipmapMode::eLinear, false);
+    default_gltf_sampler = sampler_pool->for_filter_and_address_mode(
+        vk::Filter::eLinear, vk::Filter::eLinear, vk::SamplerAddressMode::eRepeat,
+        vk::SamplerMipmapMode::eLinear, false);
 
     // Reset slot table; textures upload lazily on first material access.
     texture_slots.assign(model->textures.size(), GltfTextureSlot{});
@@ -364,9 +364,8 @@ TextureID GLTFScene::get_or_load_texture(const CommandBufferHandle& cmd,
                  img.name, linear, generate_mipmaps);
 
     TextureHandle texture = get_allocator()->create_texture_from_rgba8(
-        cmd, reinterpret_cast<const uint32_t*>(img.image.data()),
-        static_cast<uint32_t>(img.width), static_cast<uint32_t>(img.height), sampler, !linear,
-        img.name, generate_mipmaps);
+        cmd, reinterpret_cast<const uint32_t*>(img.image.data()), static_cast<uint32_t>(img.width),
+        static_cast<uint32_t>(img.height), sampler, !linear, img.name, generate_mipmaps);
     cmd->barrier(texture->get_image()->barrier2(vk::ImageLayout::eShaderReadOnlyOptimal));
 
     cached = get_texture_manager()->add_texture(texture);
@@ -508,8 +507,7 @@ void GLTFScene::load_cameras() {
             if (gcam.perspective.aspectRatio > 0)
                 aspect = static_cast<float>(gcam.perspective.aspectRatio);
             const float yfov = static_cast<float>(gcam.perspective.yfov);
-            fov = static_cast<float>(
-                glm::degrees(2.0 * std::atan(std::tan(0.5 * yfov) * aspect)));
+            fov = static_cast<float>(glm::degrees(2.0 * std::atan(std::tan(0.5 * yfov) * aspect)));
             znear = static_cast<float>(gcam.perspective.znear);
             if (gcam.perspective.zfar > 0)
                 zfar = static_cast<float>(gcam.perspective.zfar);
@@ -529,7 +527,7 @@ void GLTFScene::load_cameras() {
 
         add_camera(std::make_shared<Camera>(float3(3, 3, 3), float3(0, 0, 0), get_up(), 90.f,
                                             1920.f / 1080.f, 0.01f, 1000.f));
-
+        AABB& aabb = get_aabb();
         if (aabb.is_valid()) {
             get_active_camera()->look_at(float3(1.3) * aabb.get_max().y, aabb.get_center(),
                                          get_up());
@@ -539,6 +537,7 @@ void GLTFScene::load_cameras() {
 }
 
 void GLTFScene::compute_aabb() {
+    AABB& aabb = get_aabb();
     aabb.reset();
 
     for (uint32_t gltf_node_index = 0; gltf_node_index < node_map.size(); gltf_node_index++) {

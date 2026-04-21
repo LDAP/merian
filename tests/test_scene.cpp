@@ -68,17 +68,18 @@ class SceneTest : public ::testing::Test {
     }
 
     // Helper: create a triangle mesh
-    static Mesh make_triangle(MaterialID mat_id, GeometryFlags flags = GeometryFlags::IsOpaque) {
-        Mesh m;
-        m.material_id = mat_id;
-        m.flags = flags;
+    static MeshHandle make_triangle(MaterialID mat_id,
+                                    GeometryFlags flags = GeometryFlags::ForceOpaque) {
+        std::unique_ptr<SimpleMesh> m = std::make_unique<SimpleMesh>();
+        m->material_id = mat_id;
+        m->flags = flags;
 
         PackedVertexData v0{}, v1{}, v2{};
         v0.position = float3(0, 0, 0);
         v1.position = float3(1, 0, 0);
         v2.position = float3(0, 1, 0);
-        m.vertices = {v0, v1, v2};
-        m.indices = {uint3(0, 1, 2)};
+        m->vertices = {v0, v1, v2};
+        m->indices = {uint3(0, 1, 2)};
         return m;
     }
 };
@@ -196,9 +197,9 @@ TEST_F(SceneTest, MeshGroupingDynamic) {
 
     // Two dynamic meshes on different nodes
     MeshID m0 =
-        scene->add_mesh(make_triangle(0, GeometryFlags::IsOpaque | GeometryFlags::IsDynamic));
+        scene->add_mesh(make_triangle(0, GeometryFlags::ForceOpaque | GeometryFlags::IsDynamic));
     MeshID m1 =
-        scene->add_mesh(make_triangle(0, GeometryFlags::IsOpaque | GeometryFlags::IsDynamic));
+        scene->add_mesh(make_triangle(0, GeometryFlags::ForceOpaque | GeometryFlags::IsDynamic));
     scene->add_mesh_instance(m0, nid0);
     scene->add_mesh_instance(m1, nid1);
 
