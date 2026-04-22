@@ -93,6 +93,9 @@ class Mesh {
     virtual PackedVertexData get_packed_vertex(uint32_t vertex_idx) const;
     virtual PackedVertexData get_packed_vertex_pretransformed(uint32_t vertex_idx,
                                                               const SceneNode& node) const;
+    virtual PackedPrevVertexData get_packed_prev_vertex(uint32_t vertex_idx) const;
+    virtual PackedPrevVertexData get_packed_prev_vertex_pretransformed(uint32_t vertex_idx,
+                                                                       const SceneNode& node) const;
 
     bool is_dynamic() const {
         return flags & GeometryFlags::IsDynamic;
@@ -171,8 +174,8 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     struct MeshGroup {
         std::unordered_set<MeshID> meshes;
 
-        // flags that all meshes have set
-        GeometryFlags all;
+        // flags shared by all meshes
+        GeometryFlags flags;
 
         // ----------------
         AccelerationStructureHandle blas;
@@ -357,6 +360,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
 
     void compute_mesh_groups();
 
+    bool pretransform_mesh(const Mesh& mesh) const;
     // uploads the meshes, geometry data, and instance transforms
     void upload_geometry_buffers(const CommandBufferHandle& cmd);
 
@@ -398,7 +402,6 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     AccelerationStructureHandle tlas;
 
     // Indexed with GeometryID (InstanceID + GeometryIndex)
-    std::vector<GeometryData> geometries;
     BufferHandle geometries_buffer;
     // Indexed with geometry.index_buffer_index -> PrimitiveID
     std::vector<BufferHandle> index_buffers;
