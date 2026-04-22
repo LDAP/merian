@@ -169,7 +169,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     // Internal types
 
     struct MeshGroup {
-        std::vector<MeshID> meshes;
+        std::unordered_set<MeshID> meshes;
 
         // flags that all meshes have set
         GeometryFlags all;
@@ -357,10 +357,10 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
 
     void compute_mesh_groups();
 
+    // uploads the meshes, geometry data, and instance transforms
     void upload_geometry_buffers(const CommandBufferHandle& cmd);
-    void refresh_dirty_mesh_buffers(const CommandBufferHandle& cmd);
 
-    void build_blas(const CommandBufferHandle& cmd, const std::vector<bool>& needs_build);
+    void build_blas(const CommandBufferHandle& cmd);
     void build_tlas(const CommandBufferHandle& cmd);
 
     void node_properties(Properties& props, const SceneNode& node);
@@ -415,7 +415,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     // --------------------------
     // Cached and Precomputed
 
-    bool needs_regroup = false; // a mesh was added or instanced
+    bool needs_regroup = false; // a mesh was instanced
 
     using MeshGroupID = uint32_t;
     static const MeshGroupID MESH_GROUP_ID_INVALID = MeshGroupID(-1);
@@ -423,14 +423,6 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     // MeshID -> GroupID (MESH_GROUP_ID_INVALID if not in group, eg. because there was no instance
     // of the mesh)
     std::vector<MeshGroupID> mesh_to_group;
-
-    // have their global transforms precomputed
-    std::unordered_map<GeometryFlags, MeshGroupID> mesh_groups_static_non_instanced;
-    // have their global transforms precomputed only if enabled
-    // packed (GeometryFlags << 32 | NodeID) -> MeshGroupID
-    std::unordered_map<uint64_t, MeshGroupID> mesh_groups_dynamic_non_instanced;
-    // CANNOT have their global transforms precomputed
-    std::map<std::unordered_set<NodeID>, MeshGroupID> mesh_groups_instanced;
 
     // // Per-mesh: list of geometry instance indices for each instance of this mesh.
     // // mesh_id_to_instance_ids[mesh_id][i] = global geometry instance index.
