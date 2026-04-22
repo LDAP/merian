@@ -94,6 +94,29 @@ class Mesh {
     virtual PackedVertexData get_packed_vertex_pretransformed(uint32_t vertex_idx,
                                                               const SceneNode& node) const;
 
+    bool is_dynamic() const {
+        return flags & GeometryFlags::IsDynamic;
+    }
+
+    bool is_static() const {
+        return !(flags & GeometryFlags::IsDynamic);
+    }
+
+    bool is_front_counterclockwise() const {
+        // Vulkan default is clockwise
+        return flags & GeometryFlags::FrontCounterClockwise;
+    }
+
+    bool is_two_sided() const {
+        // if yes, needs to disable backface culling
+        return flags & GeometryFlags::TwoSided;
+    }
+
+    bool is_opaque() const {
+        // if yes, allows to set the force opaque flag when raytracing.
+        return flags & GeometryFlags::IsOpaque;
+    }
+
     // ------------------
     // Managed by Scene
 
@@ -395,14 +418,19 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     bool needs_regroup = false; // a mesh was added or instanced
 
     using MeshGroupID = uint32_t;
+    static const MeshGroupID MESH_GROUP_ID_INVALID = MeshGroupID(-1);
     std::vector<MeshGroup> mesh_groups;
+    // MeshID -> GroupID (MESH_GROUP_ID_INVALID if not in group, eg. because there was no instance
+    // of the mesh)
+    std::vector<MeshGroupID> mesh_to_group;
+
     // have their global transforms precomputed
     std::unordered_map<GeometryFlags, MeshGroupID> mesh_groups_static_non_instanced;
     // have their global transforms precomputed only if enabled
-    std::map<std::pair<GeometryFlags, NodeID>, MeshGroupID> mesh_groups_dynamic_non_instanced;
+    // packed (GeometryFlags << 32 | NodeID) -> MeshGroupID
+    std::unordered_map<uint64_t, MeshGroupID> mesh_groups_dynamic_non_instanced;
     // CANNOT have their global transforms precomputed
     std::map<std::unordered_set<NodeID>, MeshGroupID> mesh_groups_instanced;
-    std::vector<std::vector<MeshGroupID>> mesh_to_group_ids;
 
     // // Per-mesh: list of geometry instance indices for each instance of this mesh.
     // // mesh_id_to_instance_ids[mesh_id][i] = global geometry instance index.

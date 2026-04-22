@@ -185,10 +185,8 @@ void Scene::add_mesh_instance(const MeshID mesh_id, const NodeID node_id) {
     assert(mesh_id < meshes.size());
     assert(node_id < scene_graph.size());
 
-    if (meshes[mesh_id]->instances.size() == 0 ||
-        (!(meshes[mesh_id]->flags & GeometryFlags::IsDynamic) &&
-         meshes[mesh_id]->instances.size() == 1)) {
-        // - instances was 0 -> needs upload
+    if ((!(meshes[mesh_id]->flags & GeometryFlags::IsDynamic) || pretransform_dynamic) &&
+        meshes[mesh_id]->instances.size() == 1) {
         // - instances was 1 and is static: previously we could pretransform, but now this is not
         // possible anymore.
         mark_mesh_dirty(mesh_id);
@@ -355,34 +353,72 @@ void Scene::properties(Properties& props) {
 void Scene::compute_mesh_groups() {
 
     auto prev_mesh_groups = std::move(mesh_groups);
+    auto prev_mesh_to_group = std::move(mesh_to_group);
     auto prev_mesh_groups_static_non_instanced = std::move(mesh_groups_static_non_instanced);
     auto prev_mesh_groups_dynamic_non_instanced = std::move(mesh_groups_dynamic_non_instanced);
     auto prev_mesh_groups_instanced = std::move(mesh_groups_instanced);
 
     mesh_groups.clear();
+    mesh_to_group.assign(meshes.size(), MESH_GROUP_ID_INVALID);
     prev_mesh_groups_static_non_instanced.clear();
     prev_mesh_groups_dynamic_non_instanced.clear();
     prev_mesh_groups_instanced.clear();
 
+    // allow to access prev_mesh_to_group with any (new) MeshID.
+    prev_mesh_to_group.resize(meshes.size(), MESH_GROUP_ID_INVALID);
+
+    mesh_groups.reserve(std::min(meshes.size(), prev_mesh_groups.size()));
+    mesh_groups_static_non_instanced.reserve(32 /*all flags set*/);
+    mesh_groups_dynamic_non_instanced.reserve(scene_graph.size() * 2);
+
     // See description in scene.hpp for grouping logic
+
+    // 1. Group meshes according to our grouping logic
 
     for (MeshID mid = 0; mid < static_cast<MeshID>(meshes.size()); mid++) {
         const Mesh& mesh = *meshes[mid];
+        MeshGroupID group_id = MESH_GROUP_ID_INVALID;
+
         if (mesh.instances.empty()) {
+            // dont build BLASes for meshes that are not used.
             continue;
         }
 
         if (mesh.instances.size() > 1) {
             // is instanced
-
+            
         } else {
             if (mesh.flags & GeometryFlags::IsDynamic) {
                 // dynamic, non-instanced
+                assert(mesh.instances.size() == 1);
+                const uint64_t key =
+                    (static_cast<uint64_t>(mesh.flags) << 32) | (*mesh.instances.begin());
+                const auto [it, inserted] =
+                    mesh_groups_dynamic_non_instanced.try_emplace(key, mesh_groups.size());
+                if (inserted) {
+                    mesh_groups.emplace_back();
+                }
+                group_id = it->second;
             } else {
                 // static, non-instanced
+                const auto [it, inserted] =
+                    mesh_groups_static_non_instanced.try_emplace(mesh.flags, mesh_groups.size());
+                if (inserted) {
+                    mesh_groups.emplace_back();
+                }
+                group_id = it->second;
             }
         }
+
+        assert(group_id != MESH_GROUP_ID_INVALID);
+        mesh_to_group[mid] = group_id;
+        MeshGroup& group = mesh_groups[group_id];
+        group.all = group.all | mesh.flags;
+        group.blas_dirty |= mesh.dirty;
+        group.meshes.emplace_back(mid);
     }
+
+    // 2. Find previous BLASs for the groups to prevent rebuilds
 
     // // Classify meshes into groups:
     // // 1. Non-instanced static -> split into opaque / non-opaque buckets so the
@@ -474,7 +510,7 @@ void Scene::compute_mesh_groups() {
     //             geometry_instance_id++;
     //         }
     //     }
-//}
+    //}
 }
 
 // void Scene::upload_geometry_buffers(const CommandBufferHandle& cmd) {
