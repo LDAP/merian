@@ -37,7 +37,7 @@ using CameraID = uint32_t;
 static constexpr NodeID NODE_ID_INVALID = UINT32_MAX;
 static constexpr CameraID CAMERA_ID_INVALID = UINT32_MAX;
 
-class SceneNode {
+class Node {
   public:
     std::string name;
 
@@ -55,7 +55,7 @@ class SceneNode {
     std::optional<float4x4> global_inverse_transposed;
 };
 
-inline std::string format_as(const SceneNode& node) {
+inline std::string format_as(const Node& node) {
     return fmt::format(
         "name: {}\nparent: {}\nnum children: {}\nlocal_transform:\n{}\nglobal_transform:\n{}",
         node.name.empty() ? "<none>" : node.name, node.parent, node.children.size(),
@@ -92,10 +92,10 @@ class Mesh {
 
     virtual PackedVertexData get_packed_vertex(uint32_t vertex_idx) const;
     virtual PackedVertexData get_packed_vertex_pretransformed(uint32_t vertex_idx,
-                                                              const SceneNode& node) const;
+                                                              const Node& node) const;
     virtual PackedPrevVertexData get_packed_prev_vertex(uint32_t vertex_idx) const;
     virtual PackedPrevVertexData get_packed_prev_vertex_pretransformed(uint32_t vertex_idx,
-                                                                       const SceneNode& node) const;
+                                                                       const Node& node) const;
 
     bool is_dynamic() const {
         return flags & GeometryFlags::IsDynamic;
@@ -171,6 +171,8 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     // --------------------------
     // Internal types
 
+    using MeshGroupID = uint32_t;
+
     struct MeshGroup {
         std::unordered_set<MeshID> meshes;
 
@@ -181,6 +183,21 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         AccelerationStructureHandle blas;
         // a mesh changed (new mesh in group -> not the same group, never true)
         bool blas_dirty = false;
+
+        // ----------------
+
+        const std::unordered_set<NodeID>&
+        get_instances(const std::vector<MeshHandle>& meshes) const {
+            assert(!meshes.empty());
+            return meshes[*this->meshes.begin()]->instances;
+        }
+
+        bool is_pretranformed(const std::vector<MeshHandle>& meshes,
+                              bool pretransform_dynamic) const {
+            assert(!meshes.empty());
+            const Mesh& mesh = *meshes[*this->meshes.begin()];
+            return (mesh.is_static() || pretransform_dynamic) && mesh.instances.size() <= 1;
+        }
     };
 
   public:
@@ -268,7 +285,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         return !meshes.empty();
     }
 
-    const std::vector<SceneNode>& get_scene_graph() const {
+    const std::vector<Node>& get_scene_graph() const {
         return scene_graph;
     }
 
@@ -276,7 +293,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         return meshes;
     }
 
-    const SceneNode& get_node(const NodeID node_id) {
+    const Node& get_node(const NodeID node_id) {
         assert(node_id < scene_graph.size());
         return scene_graph[node_id];
     }
@@ -334,7 +351,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     // and BVHs with this mesh need to be rebuilt.
     void mark_mesh_dirty(MeshID mesh_id);
 
-    NodeID add_node(SceneNode node);
+    NodeID add_node(Node node);
 
     void add_mesh_instance(MeshID mesh_id, NodeID node_id);
 
@@ -358,16 +375,18 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
                                      const std::size_t min_vertex_buffer_count);
     void rebuild_shader_object();
 
+    // Computes mesh groups according to the grouping logic above.
+    // All groups share the same instances (transforms) -> iterating over groups and instances gives
+    // the instances One group builds one BLAS -> the instances can refer to those.
     void compute_mesh_groups();
 
-    bool pretransform_mesh(const Mesh& mesh) const;
     // uploads the meshes, geometry data, and instance transforms
     void upload_geometry_buffers(const CommandBufferHandle& cmd);
 
     void build_blas(const CommandBufferHandle& cmd);
     void build_tlas(const CommandBufferHandle& cmd);
 
-    void node_properties(Properties& props, const SceneNode& node);
+    void node_properties(Properties& props, const Node& node);
 
   private:
     static const std::size_t INITIAL_INDEX_BUFFER_COUNT = 128;
@@ -390,7 +409,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
 
     MaterialSystemHandle material_system;
     std::vector<MeshHandle> meshes;
-    std::vector<SceneNode> scene_graph;
+    std::vector<Node> scene_graph;
     bool pretransform_dynamic = false;
     std::vector<CameraHandle> cameras;
     uint32_t active_camera = 0;
@@ -403,11 +422,12 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
 
     // Indexed with GeometryID (InstanceID + GeometryIndex)
     BufferHandle geometries_buffer;
-    // Indexed with geometry.index_buffer_index -> PrimitiveID
+
+    // Indexed with MeshID / geometry.index_buffer_index -> PrimitiveID
     std::vector<BufferHandle> index_buffers;
-    // Indexed with geometry.vertex_buffer_index -> indices
+    // Indexed with MeshID / geometry.vertex_buffer_index -> indices
     std::vector<BufferHandle> vertex_buffers;
-    // Indexed with geometry.vertex_buffer_index -> indices
+    // Indexed with MeshID / geometry.vertex_buffer_index -> indices
     std::vector<BufferHandle> prev_vertex_buffers;
 
     // --------------------------
@@ -420,7 +440,6 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
 
     bool needs_regroup = false; // a mesh was instanced
 
-    using MeshGroupID = uint32_t;
     static const MeshGroupID MESH_GROUP_ID_INVALID = MeshGroupID(-1);
     std::vector<MeshGroup> mesh_groups;
     // MeshID -> GroupID (MESH_GROUP_ID_INVALID if not in group, eg. because there was no instance

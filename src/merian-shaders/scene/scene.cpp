@@ -35,7 +35,7 @@ PackedVertexData Mesh::get_packed_vertex(uint32_t vertex_idx) const {
 }
 
 PackedVertexData Mesh::get_packed_vertex_pretransformed(uint32_t vertex_idx,
-                                                        const SceneNode& node) const {
+                                                        const Node& node) const {
     assert(node.global_transform && node.global_inverse_transposed);
     const float4x4& m = *node.global_transform;
     const float4x4& it = *node.global_inverse_transposed;
@@ -57,7 +57,7 @@ PackedPrevVertexData Mesh::get_packed_prev_vertex(uint32_t vertex_idx) const {
 }
 
 PackedPrevVertexData Mesh::get_packed_prev_vertex_pretransformed(uint32_t vertex_idx,
-                                                                 const SceneNode& node) const {
+                                                                 const Node& node) const {
     assert(node.global_transform);
     const float4x4& m = *node.global_transform;
 
@@ -194,12 +194,12 @@ MeshID Scene::add_mesh(MeshHandle mesh) {
     return id;
 }
 
-NodeID Scene::add_node(SceneNode node) {
+NodeID Scene::add_node(Node node) {
     auto id = static_cast<NodeID>(scene_graph.size());
     if (node.parent != NODE_ID_INVALID) {
         assert(node.parent < scene_graph.size());
 
-        SceneNode& parent = scene_graph[node.parent];
+        Node& parent = scene_graph[node.parent];
         parent.children.push_back(id);
         assert(parent.global_transform);
         node.global_transform = mul(*parent.global_transform, node.local_transform);
@@ -270,11 +270,11 @@ void Scene::set_pretransform_dynamic(bool value) {
     }
 }
 
-void Scene::node_properties(Properties& props, const SceneNode& node) {
+void Scene::node_properties(Properties& props, const Node& node) {
     props.output_text("{}", node);
 
     for (uint32_t i = 0; i < node.children.size(); i++) {
-        const SceneNode& child = scene_graph[node.children[i]];
+        const Node& child = scene_graph[node.children[i]];
         if (props.st_begin_child(fmt::format("child_{:02} ({})", i, child.name),
                                  fmt::format("Child {:02} ({})", i, child.name))) {
             Scene::node_properties(props, child);
@@ -337,7 +337,7 @@ void Scene::properties(Properties& props) {
 
         if (props.st_begin_child("graph", "Graph")) {
             for (uint32_t id = 0; id < scene_graph.size(); id++) {
-                const SceneNode& node = scene_graph[id];
+                const Node& node = scene_graph[id];
                 if (node.parent != NODE_ID_INVALID) {
                     continue;
                 }
@@ -478,10 +478,6 @@ void Scene::compute_mesh_groups() {
     }
 }
 
-bool Scene::pretransform_mesh(const Mesh& mesh) const {
-    return (mesh.is_static() || pretransform_dynamic) && mesh.instances.size() <= 1;
-}
-
 void Scene::upload_geometry_buffers(const CommandBufferHandle& cmd) {
     // For now we have a index and vertex buffer for each mesh,
     // we could combine them per group or into single buffers in the future.
@@ -498,87 +494,93 @@ void Scene::upload_geometry_buffers(const CommandBufferHandle& cmd) {
     auto c_prev_vtx = c["prev_vertex_buffers"];
     auto c_idx = c["index_buffers"];
 
-    for (MeshID mid = 0; mid < meshes.size(); mid++) {
-        const Mesh& mesh = *meshes[mid];
-        if (!mesh.dirty) {
-            continue;
-        }
+    for (MeshGroupID group_id = 0; group_id < mesh_groups.size(); group_id++) {
+        MeshGroup& group = mesh_groups[group_id];
+        bool pretransform = group.is_pretranformed(meshes, pretransform_dynamic);
 
-        if (mesh.instances.empty()) {
-            continue;
-        }
-
-        const uint32_t vertex_count = mesh.get_vertex_count();
-        const uint32_t primitive_count = mesh.get_primitive_count();
-        const vk::DeviceSize vb_size = vertex_count * sizeof(PackedVertexData);
-        const vk::DeviceSize prev_vb_size = vertex_count * sizeof(PackedPrevVertexData);
-        const vk::DeviceSize ib_size = primitive_count * sizeof(uint3);
-
-        // Allocate / Ensure (prev)vertex and index buffers.
-        assert(mid < vertex_buffers.size());
-        auto& vb = vertex_buffers[mid];
-        if (!vb || (vb->get_size() < vb_size)) {
-            vb = allocator->create_buffer(vb_size, buffer_usage, MemoryMappingType::NONE,
-                                          fmt::format("Scene::vb[{}]: name={}", mid, mesh.name));
-            c_vtx[mid] = vb;
-        }
-
-        assert(mid < prev_vertex_buffers.size());
-        auto& prev_vb = vertex_buffers[mid];
-        if (!prev_vb || (prev_vb->get_size() < prev_vb_size)) {
-            prev_vb = allocator->create_buffer(
-                prev_vb_size, buffer_usage, MemoryMappingType::NONE,
-                fmt::format("Scene::prev_vb[{}]: name={}", mid, mesh.name));
-            c_prev_vtx[mid] = prev_vb;
-        }
-
-        assert(mid < index_buffers.size());
-        auto& ib = vertex_buffers[mid];
-        if (!ib || (ib->get_size() < ib_size)) {
-            ib = allocator->create_buffer(ib_size, buffer_usage, MemoryMappingType::NONE,
-                                          fmt::format("Scene::ib[{}]: name={}", mid, mesh.name));
-            c_idx[mid] = ib;
-        }
-
-        // Upload vertices
-        assert(mesh.instances.size() == 1);
-        const NodeID node_id = *mesh.instances.begin();
-        const SceneNode& node = scene_graph[node_id];
-
-        const MemoryAllocationHandle vb_staging = staging->cmd_to_device(cmd, vb);
-        auto* vb_mapped = vb_staging->map_as<PackedVertexData>();
-        if (pretransform_mesh(mesh)) {
-            for (uint32_t v = 0; v < vertex_count; v++) {
-                vb_mapped[v] = mesh.get_packed_vertex_pretransformed(v, node);
+        for (MeshID mid : group.meshes) {
+            Mesh& mesh = *meshes[mid];
+            if (!mesh.dirty) {
+                continue;
             }
-        } else {
-            for (uint32_t v = 0; v < vertex_count; v++) {
-                vb_mapped[v] = mesh.get_packed_vertex(v);
-            }
-        }
-        vb_staging->unmap();
+            assert(!mesh.instances.empty());
 
-        // Upload prev vertices
-        const MemoryAllocationHandle prev_vtx_staging = staging->cmd_to_device(cmd, prev_vb);
-        auto* prev_vb_mapped = prev_vtx_staging->map_as<PackedPrevVertexData>();
-        if (pretransform_mesh(mesh)) {
-            for (uint32_t v = 0; v < vertex_count; v++) {
-                prev_vb_mapped[v] = mesh.get_packed_prev_vertex_pretransformed(v, node);
-            }
-        } else {
-            for (uint32_t v = 0; v < vertex_count; v++) {
-                prev_vb_mapped[v] = mesh.get_packed_prev_vertex(v);
-            }
-        }
-        prev_vtx_staging->unmap();
+            const uint32_t vertex_count = mesh.get_vertex_count();
+            const uint32_t primitive_count = mesh.get_primitive_count();
+            const vk::DeviceSize vb_size = vertex_count * sizeof(PackedVertexData);
+            const vk::DeviceSize prev_vb_size = vertex_count * sizeof(PackedPrevVertexData);
+            const vk::DeviceSize ib_size = primitive_count * sizeof(uint3);
 
-        // Upload indices
-        const MemoryAllocationHandle ib_staging = staging->cmd_to_device(cmd, ib);
-        auto* ib_mapped = ib_staging->map_as<uint3>();
-        for (uint32_t p = 0; p < primitive_count; p++) {
-            ib_mapped[p] = mesh.get_indices(p);
+            // Allocate / Ensure (prev)vertex and index buffers.
+            assert(mid < vertex_buffers.size());
+            auto& vb = vertex_buffers[mid];
+            if (!vb || (vb->get_size() < vb_size)) {
+                vb =
+                    allocator->create_buffer(vb_size, buffer_usage, MemoryMappingType::NONE,
+                                             fmt::format("Scene::vb[{}]: name={}", mid, mesh.name));
+                c_vtx[mid] = vb;
+            }
+
+            assert(mid < prev_vertex_buffers.size());
+            auto& prev_vb = vertex_buffers[mid];
+            if (!prev_vb || (prev_vb->get_size() < prev_vb_size)) {
+                prev_vb = allocator->create_buffer(
+                    prev_vb_size, buffer_usage, MemoryMappingType::NONE,
+                    fmt::format("Scene::prev_vb[{}]: name={}", mid, mesh.name));
+                c_prev_vtx[mid] = prev_vb;
+            }
+
+            assert(mid < index_buffers.size());
+            auto& ib = vertex_buffers[mid];
+            if (!ib || (ib->get_size() < ib_size)) {
+                ib =
+                    allocator->create_buffer(ib_size, buffer_usage, MemoryMappingType::NONE,
+                                             fmt::format("Scene::ib[{}]: name={}", mid, mesh.name));
+                c_idx[mid] = ib;
+            }
+
+            // Upload vertices
+            assert(mesh.instances.size() == 1);
+            const NodeID node_id = *mesh.instances.begin();
+            const Node& node = scene_graph[node_id];
+
+            const MemoryAllocationHandle vb_staging = staging->cmd_to_device(cmd, vb);
+            auto* vb_mapped = vb_staging->map_as<PackedVertexData>();
+            if (pretransform_mesh(mesh)) {
+                for (uint32_t v = 0; v < vertex_count; v++) {
+                    vb_mapped[v] = mesh.get_packed_vertex_pretransformed(v, node);
+                }
+            } else {
+                for (uint32_t v = 0; v < vertex_count; v++) {
+                    vb_mapped[v] = mesh.get_packed_vertex(v);
+                }
+            }
+            vb_staging->unmap();
+
+            // Upload prev vertices
+            const MemoryAllocationHandle prev_vtx_staging = staging->cmd_to_device(cmd, prev_vb);
+            auto* prev_vb_mapped = prev_vtx_staging->map_as<PackedPrevVertexData>();
+            if (pretransform_mesh(mesh)) {
+                for (uint32_t v = 0; v < vertex_count; v++) {
+                    prev_vb_mapped[v] = mesh.get_packed_prev_vertex_pretransformed(v, node);
+                }
+            } else {
+                for (uint32_t v = 0; v < vertex_count; v++) {
+                    prev_vb_mapped[v] = mesh.get_packed_prev_vertex(v);
+                }
+            }
+            prev_vtx_staging->unmap();
+
+            // Upload indices
+            const MemoryAllocationHandle ib_staging = staging->cmd_to_device(cmd, ib);
+            auto* ib_mapped = ib_staging->map_as<uint3>();
+            for (uint32_t p = 0; p < primitive_count; p++) {
+                ib_mapped[p] = mesh.get_indices(p);
+            }
+            ib_staging->unmap();
+
+            mesh.dirty = false;
         }
-        ib_staging->unmap();
     }
 
     std::vector<GeometryData> geometries;
@@ -638,76 +640,6 @@ void Scene::upload_geometry_buffers(const CommandBufferHandle& cmd) {
         vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eAccelerationStructureReadKHR,
     });
 }
-
-// void Scene::refresh_dirty_mesh_buffers(const CommandBufferHandle& cmd) {
-//     if (mesh_data_dirty.empty())
-//         return;
-
-//     const auto buffer_usage = vk::BufferUsageFlagBits::eStorageBuffer |
-//                               vk::BufferUsageFlagBits::eTransferDst |
-//                               vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR
-//                               | vk::BufferUsageFlagBits::eShaderDeviceAddress;
-
-//     const auto staging = allocator->get_staging();
-//     bool any_uploaded = false;
-
-//     for (MeshID mid = 0; mid < static_cast<MeshID>(mesh_data_dirty.size()); mid++) {
-//         if (!mesh_data_dirty[mid])
-//             continue;
-//         assert(mid < meshes.size());
-//         const Mesh& mesh = *meshes[mid];
-//         if (mesh.instances.empty())
-//             continue;
-
-//         // Refresh-dirty meshes are dynamic by contract (caller guarantees they
-//         // are not in a static / pretransformed group).
-//         const uint32_t vertex_count = mesh.get_vertex_count();
-//         const uint32_t primitive_count = mesh.get_primitive_count();
-//         const vk::DeviceSize vb_size = vertex_count * sizeof(PackedVertexData);
-//         const vk::DeviceSize ib_size = primitive_count * sizeof(uint3);
-
-//         if (vb_size == 0 || ib_size == 0)
-//             continue;
-
-//         if (mid >= vertex_buffers.size())
-//             vertex_buffers.resize(mid + 1);
-//         if (mid >= index_buffers.size())
-//             index_buffers.resize(mid + 1);
-
-//         allocator->ensure_buffer_size(vertex_buffers[mid], vb_size, buffer_usage,
-//                                       fmt::format("Scene::vb[{}]", mid), MemoryMappingType::NONE,
-//                                       std::nullopt, 1.5f);
-//         allocator->ensure_buffer_size(index_buffers[mid], ib_size, buffer_usage,
-//                                       fmt::format("Scene::ib[{}]", mid), MemoryMappingType::NONE,
-//                                       std::nullopt, 1.5f);
-
-//         const MemoryAllocationHandle vb_staging = staging->cmd_to_device(cmd,
-//         vertex_buffers[mid]); auto* vb_mapped =
-//         static_cast<PackedVertexData*>(vb_staging->map()); for (uint32_t v = 0; v < vertex_count;
-//         v++) {
-//             vb_mapped[v] = mesh.get_packed_vertex(v);
-//         }
-//         vb_staging->unmap();
-
-//         const MemoryAllocationHandle ib_staging = staging->cmd_to_device(cmd,
-//         index_buffers[mid]); auto* ib_mapped = static_cast<uint3*>(ib_staging->map()); for
-//         (uint32_t p = 0; p < primitive_count; p++) {
-//             ib_mapped[p] = mesh.get_indices(p);
-//         }
-//         ib_staging->unmap();
-//         any_uploaded = true;
-//     }
-
-//     if (any_uploaded) {
-//         cmd->barrier(vk::MemoryBarrier2{
-//             vk::PipelineStageFlagBits2::eTransfer,
-//             vk::AccessFlagBits2::eTransferWrite,
-//             vk::PipelineStageFlagBits2::eAllCommands,
-//             vk::AccessFlagBits2::eShaderRead |
-//             vk::AccessFlagBits2::eAccelerationStructureReadKHR,
-//         });
-//     }
-// }
 
 // void Scene::build_blas(const CommandBufferHandle& cmd, const std::vector<bool>& needs_build) {
 //     if (!build_as || mesh_groups.empty())

@@ -460,7 +460,7 @@ void GLTFScene::load_meshes() {
 void GLTFScene::load_node(int gltf_node_index, NodeID parent_id) {
     const auto& gnode = model->nodes[gltf_node_index];
 
-    SceneNode sn;
+    Node sn;
     sn.name = gnode.name.empty() ? fmt::format("GLTF Node {:02}", gltf_node_index) : gnode.name;
     sn.parent = parent_id;
     sn.local_transform = gltf_node_transform(gnode);
