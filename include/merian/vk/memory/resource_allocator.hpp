@@ -176,19 +176,19 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
     // Important: You are responsible to perform the image transition!
     // Create an image from RGBA8 data, optionally generate a mip chain, then bind a view and the
     // supplied sampler. Use this overload when you need full control over the sampler (e.g. when
-    // you need different address modes per axis, which only `SamplerPool::acquire_sampler` exposes).
+    // you need different address modes per axis, which only `SamplerPool::acquire_sampler`
+    // exposes).
     //
     // Important: You are responsible to perform the image transition!
-    TextureHandle create_texture_from_rgba8(
-        const CommandBufferHandle& cmd,
-        const uint32_t* data,
-        const uint32_t width,
-        const uint32_t height,
-        const SamplerHandle& sampler,
-        const bool isSRGB = true,
-        const std::string& debug_name = {},
-        const bool generate_mipmaps = false,
-        const vk::ImageUsageFlags additional_usage_flags = {});
+    TextureHandle create_texture_from_rgba8(const CommandBufferHandle& cmd,
+                                            const uint32_t* data,
+                                            const uint32_t width,
+                                            const uint32_t height,
+                                            const SamplerHandle& sampler,
+                                            const bool isSRGB = true,
+                                            const std::string& debug_name = {},
+                                            const bool generate_mipmaps = false,
+                                            const vk::ImageUsageFlags additional_usage_flags = {});
 
     // Convenience wrapper: derives the sampler from filter and address mode using the sampler pool,
     // then forwards to the sampler-taking overload above.
@@ -212,6 +212,7 @@ class ResourceAllocator : public std::enable_shared_from_this<ResourceAllocator>
 
     //--------------------------------------------------------------------------------------------------
 
+    [[nodiscard]]
     AccelerationStructureHandle
     create_acceleration_structure(const vk::AccelerationStructureTypeKHR type,
                                   const vk::AccelerationStructureBuildSizesInfoKHR& size_info,

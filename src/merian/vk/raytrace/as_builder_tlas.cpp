@@ -3,6 +3,24 @@
 
 namespace merian {
 
+vk::AccelerationStructureBuildSizesInfoKHR
+ASBuilder::get_size_info(const uint32_t instance_count,
+                         const vk::AccelerationStructureGeometryInstancesDataKHR& instances_data,
+                         const vk::BuildAccelerationStructureFlagsKHR flags) {
+    vk::AccelerationStructureGeometryKHR top_as_geometry{vk::GeometryTypeKHR::eInstances,
+                                                         {instances_data}};
+    vk::AccelerationStructureBuildGeometryInfoKHR build_info{
+        vk::AccelerationStructureTypeKHR::eTopLevel,
+        flags,
+        vk::BuildAccelerationStructureModeKHR::eBuild,
+        {}, // filled out later, after we know the size
+        {}, // filled out later, after we know the size
+        top_as_geometry};
+
+    return context->get_device()->get_device().getAccelerationStructureBuildSizesKHR(
+        vk::AccelerationStructureBuildTypeKHR::eDevice, build_info, instance_count);
+}
+
 AccelerationStructureHandle
 ASBuilder::queue_build(const uint32_t instance_count,
                        const vk::AccelerationStructureGeometryInstancesDataKHR& instances_data,

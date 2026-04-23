@@ -5,6 +5,36 @@
 
 namespace merian {
 
+vk::AccelerationStructureBuildSizesInfoKHR
+ASBuilder::get_size_info(const vk::AccelerationStructureGeometryKHR* geometry,
+                         const vk::AccelerationStructureBuildRangeInfoKHR* range_info,
+                         const vk::BuildAccelerationStructureFlagsKHR build_flags,
+                         const uint32_t geometry_count) {
+    const vk::AccelerationStructureBuildGeometryInfoKHR build_info{
+        vk::AccelerationStructureTypeKHR::eBottomLevel,
+        build_flags,
+        vk::BuildAccelerationStructureModeKHR::eBuild,
+        {}, // empty here, used to find out the size to create a AS
+        {}, // empty here, used to find out the size to create a AS
+        geometry_count,
+        geometry};
+
+    // Put primitive counts in own vector
+    std::vector<uint32_t> primitive_counts(geometry_count);
+    std::transform(range_info, range_info + geometry_count, primitive_counts.begin(),
+                   [&](auto& range) { return range.primitiveCount; });
+
+    return context->get_device()->get_device().getAccelerationStructureBuildSizesKHR(
+        vk::AccelerationStructureBuildTypeKHR::eDevice, build_info, primitive_counts);
+}
+
+vk::AccelerationStructureBuildSizesInfoKHR
+ASBuilder::get_size_info(const std::vector<vk::AccelerationStructureGeometryKHR>& geometry,
+                         const std::vector<vk::AccelerationStructureBuildRangeInfoKHR>& range_info,
+                         const vk::BuildAccelerationStructureFlagsKHR build_flags) {
+    return get_size_info(geometry.data(), range_info.data(), build_flags, geometry.size());
+}
+
 AccelerationStructureHandle
 ASBuilder::queue_build(const std::vector<vk::AccelerationStructureGeometryKHR>& geometry,
                        const std::vector<vk::AccelerationStructureBuildRangeInfoKHR>& range_info,
@@ -21,25 +51,8 @@ ASBuilder::queue_build(const vk::AccelerationStructureGeometryKHR* geometry,
 
     // 1. Query the size of the AS to build
     //--------------------------------------------
-    const vk::AccelerationStructureBuildGeometryInfoKHR build_info{
-        vk::AccelerationStructureTypeKHR::eBottomLevel,
-        build_flags,
-        vk::BuildAccelerationStructureModeKHR::eBuild,
-        {}, // empty here, used to find out the size to create a AS
-        {}, // empty here, used to find out the size to create a AS
-        geometry_count,
-        geometry};
-
-    // Put primitive counts in own vector
-    std::vector<uint32_t> primitive_counts(geometry_count);
-    std::transform(range_info, range_info + geometry_count, primitive_counts.begin(),
-                   [&](auto& range) { return range.primitiveCount; });
-
     const vk::AccelerationStructureBuildSizesInfoKHR size_info =
-        context->get_device()->get_device().getAccelerationStructureBuildSizesKHR(
-            vk::AccelerationStructureBuildTypeKHR::eDevice, build_info, primitive_counts);
-
-    pending_min_scratch_buffer = std::max(pending_min_scratch_buffer, size_info.buildScratchSize);
+        get_size_info(geometry, range_info, build_flags, geometry_count);
 
     // 2. Create the AS with the aquired info
     //--------------------------------------------

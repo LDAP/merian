@@ -163,6 +163,8 @@ void MaterialSystem::clear() {
 }
 
 void MaterialSystem::update(const CommandBufferHandle& cmd) {
+    texture_manager->update(cmd);
+
     if (dirty_begin >= dirty_end || materials.empty())
         return;
 
@@ -195,8 +197,6 @@ void MaterialSystem::update(const CommandBufferHandle& cmd) {
 
     dirty_begin = UINT32_MAX;
     dirty_end = 0;
-
-    texture_manager->update(cmd);
 }
 
 } // namespace merian

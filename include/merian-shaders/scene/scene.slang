@@ -234,7 +234,7 @@ struct Scene {
     // Transform object-space position to world space.
     float3
     to_world_position(const GeometryData gd, const uint instance_index, const float3 object_pos) {
-        if (gd.flags & GEOMETRY_DATA_FLAG_PRETRANSFORMED)
+        if (gd.flags & GeometryDataFlags::Pretransformed)
             return object_pos;
         return mul(get_instance_transform(instance_index), float4(object_pos, 1.0)).xyz;
     }
@@ -242,7 +242,7 @@ struct Scene {
     // Transform object-space direction to world space.
     float3
     to_world_direction(const GeometryData gd, const uint instance_index, const float3 object_dir) {
-        if (gd.flags & GEOMETRY_DATA_FLAG_PRETRANSFORMED)
+        if (gd.flags & GeometryDataFlags::Pretransformed)
             return object_dir;
         return normalize(
             mul(get_inverse_transposed_instance_transform(instance_index), float4(object_dir, 0.0))
@@ -253,7 +253,7 @@ struct Scene {
     float3 to_prev_world_position(const GeometryData gd,
                                   const uint instance_index,
                                   const float3 object_pos) {
-        if (gd.flags & GEOMETRY_DATA_FLAG_PRETRANSFORMED)
+        if (gd.flags & GeometryDataFlags::Pretransformed)
             return object_pos;
         return mul(get_prev_instance_transform(instance_index), float4(object_pos, 1.0)).xyz;
     }
@@ -262,7 +262,7 @@ struct Scene {
     float3 to_prev_world_direction(const GeometryData gd,
                                    const uint instance_index,
                                    const float3 object_dir) {
-        if (gd.flags & GEOMETRY_DATA_FLAG_PRETRANSFORMED)
+        if (gd.flags & GeometryDataFlags::Pretransformed)
             return object_dir;
         return normalize(mul(get_prev_inverse_transposed_instance_transform(instance_index),
                              float4(object_dir, 0.0))

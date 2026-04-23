@@ -15,10 +15,6 @@ namespace merian {
  * BLASs hold the geometry, while top-level accelerations structures instances bottom-level as using
  * transformation matrices.
  *
- * This builder holds a scratch buffer that is large enough for the largest AS.
- * The scratch buffer can be released by calling release(). This class must kept alive until the
- * build has finished.
- *
  * Best practices: (from
  * https://developer.nvidia.com/blog/best-practices-using-nvidia-rtx-ray-tracing/)
  *
@@ -74,20 +70,31 @@ class ASBuilder {
     // BLAS BUILDS
     // ---------------------------------------------------------------------------
 
-    // Enqueues a BLAS to build for the next get_cmds().
-    // Returns the acceleration structure.
+    vk::AccelerationStructureBuildSizesInfoKHR
+    get_size_info(const vk::AccelerationStructureGeometryKHR* geometry,
+                  const vk::AccelerationStructureBuildRangeInfoKHR* range_info,
+                  const vk::BuildAccelerationStructureFlagsKHR build_flags,
+                  const uint32_t geometry_count);
+
+    vk::AccelerationStructureBuildSizesInfoKHR
+    get_size_info(const std::vector<vk::AccelerationStructureGeometryKHR>& geometry,
+                  const std::vector<vk::AccelerationStructureBuildRangeInfoKHR>& range_info,
+                  const vk::BuildAccelerationStructureFlagsKHR build_flags =
+                      vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace);
+
+    // Queries the sizes, allocates a acceleration structure and enqueues a BLAS to build for the
+    // next get_cmds(). Returns the acceleration structure.
     //
-    // You must wait until after calling get_cmds() to free the geometry and range_info (pointers
-    // need to remain valid)!
-    [[nodiscard]]
-    AccelerationStructureHandle
+    // You must wait until after calling get_cmds() to free the geometry and range_info
+    // (pointers need to remain valid)!
+    [[nodiscard]] AccelerationStructureHandle
     queue_build(const std::vector<vk::AccelerationStructureGeometryKHR>& geometry,
                 const std::vector<vk::AccelerationStructureBuildRangeInfoKHR>& range_info,
                 const vk::BuildAccelerationStructureFlagsKHR build_flags =
                     vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace);
 
-    // Enqueues a BLAS to build for the next get_cmds().
-    // Returns the acceleration structure.
+    // Queries the sizes, allocates a acceleration structure and enqueues a BLAS to build for the
+    // next get_cmds(). Returns the acceleration structure.
     //
     // You must wait until after calling get_cmds() to free the geometry and range_info (pointers
     // need to remain valid)!
@@ -154,7 +161,23 @@ class ASBuilder {
     // TLAS BUILDS
     // ---------------------------------------------------------------------------
 
-    // Build a TLAS from instances that are stored on the device.
+    vk::AccelerationStructureBuildSizesInfoKHR
+    get_size_info(const uint32_t instance_count,
+                  const vk::AccelerationStructureGeometryInstancesDataKHR& instances_data,
+                  const vk::BuildAccelerationStructureFlagsKHR flags);
+
+    vk::AccelerationStructureBuildSizesInfoKHR
+    get_size_info(const uint32_t instance_count,
+                  const BufferHandle& instances,
+                  const vk::BuildAccelerationStructureFlagsKHR flags =
+                      vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace) {
+        vk::AccelerationStructureGeometryInstancesDataKHR instances_data{
+            VK_FALSE, {instances->get_device_address()}};
+        return get_size_info(instance_count, instances_data, flags);
+    }
+
+    // Queries the sizes, allocates a acceleration structure and builds a TLAS from instances that
+    // are stored on the device.
     [[nodiscard]]
     AccelerationStructureHandle
     queue_build(const uint32_t instance_count,
@@ -167,7 +190,8 @@ class ASBuilder {
         return queue_build(instance_count, instances_data, flags);
     }
 
-    // Build a TLAS from instances that are stored on the device.
+    // Queries the sizes, allocates a acceleration structure and builds a TLAS from instances that
+    // are stored on the device.
     [[nodiscard]]
     AccelerationStructureHandle
     queue_build(const uint32_t instance_count,
@@ -190,7 +214,7 @@ class ASBuilder {
     // Rebuild a TLAS from instances that are stored on the device.
     //
     // The instance_count and build_flags members must have the same value which was specified when
-    // `as` was last built.
+    // `as` was last built (or check the sizes).
     void queue_build(const uint32_t instance_count,
                      const BufferHandle& instances,
                      const AccelerationStructureHandle& src_as,
@@ -227,8 +251,8 @@ class ASBuilder {
     // the build is not finished.
     //
     // Provide a BufferHandle to a (optinally null) scratch_buffer. The scratch buffer is reused if
-    // it is large enough else it is replaced with a larger one. Make sure to keep the scratch
-    // buffer alive while processing has not finished on the GPU.
+    // it is large enough else it is replaced with a larger one. The scratch buffer is kept alive on
+    // the pool.
     //
     // This command inserts a barrier for the BLAS that are built.
     void get_cmds_blas(const CommandBufferHandle& cmd,
@@ -239,15 +263,15 @@ class ASBuilder {
     // synchronization before using the TLAS (you can use the helper cmd_barrier()).
     //
     // Provide a BufferHandle to a (optinally null) scratch_buffer. The scratch buffer is reused if
-    // it is large enough else it is replaced with a larger one. Make sure to keep the scratch
-    // buffer alive while processing has not finished on the GPU.
+    // it is large enough else it is replaced with a larger one. The scratch buffer is kept alive on
+    // the pool.
     void get_cmds_tlas(const CommandBufferHandle& cmd,
                        BufferHandle& scratch_buffer,
                        const ProfilerHandle& profiler = nullptr);
 
     // Provide a BufferHandle to a (optinally null) scratch_buffer. The scratch buffer is reused if
-    // it is large enough else it is replaced with a larger one. Make sure to keep the scratch
-    // buffer alive while processing has not finished on the GPU.
+    // it is large enough else it is replaced with a larger one. The scratch buffer is kept alive on
+    // the pool.
     void get_cmds(const CommandBufferHandle& cmd,
                   BufferHandle& scratch_buffer,
                   const ProfilerHandle& profiler = nullptr) {

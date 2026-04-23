@@ -37,7 +37,7 @@ using CameraID = uint32_t;
 static constexpr NodeID NODE_ID_INVALID = UINT32_MAX;
 static constexpr CameraID CAMERA_ID_INVALID = UINT32_MAX;
 
-class Node {
+class SceneNode {
   public:
     std::string name;
 
@@ -55,7 +55,7 @@ class Node {
     std::optional<float4x4> global_inverse_transposed;
 };
 
-inline std::string format_as(const Node& node) {
+inline std::string format_as(const SceneNode& node) {
     return fmt::format(
         "name: {}\nparent: {}\nnum children: {}\nlocal_transform:\n{}\nglobal_transform:\n{}",
         node.name.empty() ? "<none>" : node.name, node.parent, node.children.size(),
@@ -76,7 +76,6 @@ class Mesh {
 
     virtual float3 get_position(uint32_t vertex_idx) const = 0;
     virtual float3 get_prev_position(uint32_t vertex_idx) const {
-        assert((flags & MeshFlags::IsDynamic) == 0);
         return get_position(vertex_idx);
     }
     virtual float3 get_normal(uint32_t vertex_idx) const = 0;
@@ -92,10 +91,10 @@ class Mesh {
 
     virtual PackedVertexData get_packed_vertex(uint32_t vertex_idx) const;
     virtual PackedVertexData get_packed_vertex_pretransformed(uint32_t vertex_idx,
-                                                              const Node& node) const;
+                                                              const SceneNode& node) const;
     virtual PackedPrevVertexData get_packed_prev_vertex(uint32_t vertex_idx) const;
     virtual PackedPrevVertexData get_packed_prev_vertex_pretransformed(uint32_t vertex_idx,
-                                                                       const Node& node) const;
+                                                                       const SceneNode& node) const;
 
     bool is_dynamic() const {
         return flags & MeshFlags::IsDynamic;
@@ -123,7 +122,7 @@ class Mesh {
     // ------------------
     // Managed by Scene
 
-    std::unordered_set<NodeID> instances;
+    std::set<NodeID> instances;
 };
 
 using MeshHandle = std::unique_ptr<Mesh>;
@@ -186,8 +185,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
 
         // ----------------
 
-        const std::unordered_set<NodeID>&
-        get_instances(const std::vector<MeshHandle>& meshes) const {
+        const std::set<NodeID>& get_instances(const std::vector<MeshHandle>& meshes) const {
             assert(!meshes.empty());
             return meshes[*this->meshes.begin()]->instances;
         }
@@ -288,7 +286,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         return !meshes.empty();
     }
 
-    const std::vector<Node>& get_scene_graph() const {
+    const std::vector<SceneNode>& get_scene_graph() const {
         return scene_graph;
     }
 
@@ -296,7 +294,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         return meshes;
     }
 
-    const Node& get_node(const NodeID node_id) {
+    const SceneNode& get_node(const NodeID node_id) {
         assert(node_id < scene_graph.size());
         return scene_graph[node_id];
     }
@@ -354,7 +352,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     // and BVHs with this mesh need to be rebuilt.
     void mark_mesh_dirty(MeshID mesh_id);
 
-    NodeID add_node(Node node);
+    NodeID add_node(SceneNode node);
 
     void add_mesh_instance(MeshID mesh_id, NodeID node_id);
 
@@ -398,7 +396,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     void build_blas(const CommandBufferHandle& cmd);
     void build_tlas(const CommandBufferHandle& cmd);
 
-    void node_properties(Properties& props, const Node& node);
+    void node_properties(Properties& props, const SceneNode& node);
 
   private:
     static const std::size_t INITIAL_INDEX_BUFFER_COUNT = 128;
@@ -416,28 +414,18 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     SlangProgramHandle layout_program;
     ShaderObjectHandle shader_object;
 
+    ASBuilder as_builder;
+
     // --------------------------
-    // CPU side scene definition
+    // Scene definition
 
     MaterialSystemHandle material_system;
     std::vector<MeshHandle> meshes;
-    std::vector<Node> scene_graph;
+    std::vector<SceneNode> scene_graph;
     bool pretransform_dynamic = false;
     std::vector<CameraHandle> cameras;
     uint32_t active_camera = 0;
     AABB aabb; // can be invalid if information is not available.
-
-    // --------------------------
-    // GPU side scene definition
-
-    AccelerationStructureHandle tlas;
-
-    // Indexed with MeshID / geometry.index_buffer_index -> PrimitiveID
-    std::vector<BufferHandle> index_buffers;
-    // Indexed with MeshID / geometry.vertex_buffer_index -> indices
-    std::vector<BufferHandle> vertex_buffers;
-    // Indexed with MeshID / geometry.vertex_buffer_index -> indices
-    std::vector<BufferHandle> prev_vertex_buffers;
 
     // --------------------------
     // Debug
@@ -449,15 +437,29 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
 
     bool needs_regroup = false; // a mesh was instanced
 
-    static const MeshGroupID MESH_GROUP_ID_INVALID = MeshGroupID(-1);
+    inline static const MeshGroupID MESH_GROUP_ID_INVALID = MeshGroupID(-1);
     std::vector<MeshGroup> mesh_groups;
     // MeshID -> GroupID (MESH_GROUP_ID_INVALID if not in group, eg. because there was no instance
     // of the mesh)
     std::vector<MeshGroupID> mesh_to_group;
 
-    // kept here to prevent reallocation.
+    // --------------------------
+    // GPU data
+
+    // Indexed with MeshID / geometry.index_buffer_index -> PrimitiveID
+    std::vector<BufferHandle> index_buffers;
+    // Indexed with MeshID / geometry.vertex_buffer_index -> indices
+    std::vector<BufferHandle> vertex_buffers;
+    // Indexed with MeshID / geometry.vertex_buffer_index -> indices
+    std::vector<BufferHandle> prev_vertex_buffers;
 
     std::vector<GeometryData> geometries;
+    struct BLASGeometry {
+        std::vector<vk::AccelerationStructureGeometryKHR> geometries;
+        std::vector<vk::AccelerationStructureBuildRangeInfoKHR> ranges;
+    };
+    std::vector<BLASGeometry> blas_geometries;
+
     std::vector<float4x4> instance_transforms;
     std::vector<float4x4> inverse_transposed_instance_transforms;
     std::vector<float4x4> prev_instance_transforms;
@@ -469,6 +471,13 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     BufferHandle inverse_transposed_instance_transforms_buffer;
     BufferHandle prev_instance_transforms_buffer;
     BufferHandle prev_inverse_transposed_instance_transforms_buffer;
+
+    std::vector<vk::AccelerationStructureInstanceKHR> tlas_instances;
+    BufferHandle tlas_instances_buffer;
+    BufferHandle as_scratch_buffer;
+    AccelerationStructureHandle tlas;
+
+    Camera prev_active_camera;
 
     // // Per-mesh: list of geometry instance indices for each instance of this mesh.
     // // mesh_id_to_instance_ids[mesh_id][i] = global geometry instance index.
@@ -496,7 +505,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     // std::vector<float4x4> prev_instance_transforms_data;
 
     // bool build_as = false;
-    // std::optional<ASBuilder> as_builder;
+    //
     // std::vector<AccelerationStructureHandle> blas_list;
     // AccelerationStructureHandle tlas;
     // BufferHandle tlas_instances_buffer;
@@ -509,7 +518,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     // uint32_t tlas_instances_keepalive_idx = 0;
     // BufferHandle scratch_buffer;
     // bool bvh_dirty = true;
-    // Camera prev_active_camera;
+    //
     // bool geometry_dirty = true;
 
     // // Placeholder fallback for the empty-scene case: lets us bind a real

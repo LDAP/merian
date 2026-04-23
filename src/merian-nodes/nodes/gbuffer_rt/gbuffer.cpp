@@ -93,6 +93,11 @@ void GBufferRTNode::process(GraphRun& run,
         cmd->dispatch(extent, 16, 16);
     }
 
+    // cmd->barrier({io[con_denoiser]->barrier2(vk::ImageLayout::eShaderReadOnlyOptimal),
+    //               io[con_hit_info]->barrier2(vk::ImageLayout::eShaderReadOnlyOptimal),
+    //               io[con_mv]->barrier2(vk::ImageLayout::eShaderReadOnlyOptimal),
+    //               io[con_albedo]->barrier2(vk::ImageLayout::eShaderReadOnlyOptimal)});
+
     io[con_gbuffer] = gbuffer_obj;
 }
 

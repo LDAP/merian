@@ -345,15 +345,16 @@ AccelerationStructureHandle ResourceAllocator::create_acceleration_structure(
                                         MemoryMappingType::NONE, debug_name);
     vk::AccelerationStructureKHR as;
     // Setting the buffer
-    vk::AccelerationStructureCreateInfoKHR createInfo{
+    vk::AccelerationStructureCreateInfoKHR create_info{
         {}, *buffer, {}, size_info.accelerationStructureSize, type};
-    check_result(context->get_device()->get_device().createAccelerationStructureKHR(&createInfo,
+    check_result(context->get_device()->get_device().createAccelerationStructureKHR(&create_info,
                                                                                     nullptr, &as),
                  "could not create acceleration structure");
 
 #ifndef NDEBUG
     if (debug_utils) {
-        debug_utils->set_object_name(context->get_device()->get_device(), **buffer, debug_name);
+        debug_utils->set_object_name(context->get_device()->get_device(), **buffer,
+                                     debug_name + " buffer");
         debug_utils->set_object_name(context->get_device()->get_device(), as, debug_name);
     }
 #endif
