@@ -192,10 +192,13 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
             return meshes[*this->meshes.begin()]->instances;
         }
 
+        // means the Scene uploads the meshes in this group pretransformed and the instance
+        // transform should be the identity.
         bool is_pretranformed(const std::vector<MeshHandle>& meshes,
                               bool pretransform_dynamic) const {
             assert(!meshes.empty());
             const Mesh& mesh = *meshes[*this->meshes.begin()];
+            assert(flags == mesh.flags);
             return (mesh.is_static() || pretransform_dynamic) && mesh.instances.size() <= 1;
         }
     };

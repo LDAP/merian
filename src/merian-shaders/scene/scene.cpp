@@ -496,7 +496,7 @@ void Scene::upload_geometry_buffers(const CommandBufferHandle& cmd) {
 
     for (MeshGroupID group_id = 0; group_id < mesh_groups.size(); group_id++) {
         MeshGroup& group = mesh_groups[group_id];
-        bool pretransform = group.is_pretranformed(meshes, pretransform_dynamic);
+        const bool pretransform_group = group.is_pretranformed(meshes, pretransform_dynamic);
 
         for (MeshID mid : group.meshes) {
             Mesh& mesh = *meshes[mid];
@@ -543,10 +543,14 @@ void Scene::upload_geometry_buffers(const CommandBufferHandle& cmd) {
             assert(mesh.instances.size() == 1);
             const NodeID node_id = *mesh.instances.begin();
             const Node& node = scene_graph[node_id];
+            assert(node.global_transform);
+            // dont pretransform if identity to save some computations
+            const bool pretransform_mesh =
+                pretransform_group && node.global_transform.value() != identity();
 
             const MemoryAllocationHandle vb_staging = staging->cmd_to_device(cmd, vb);
             auto* vb_mapped = vb_staging->map_as<PackedVertexData>();
-            if (pretransform_mesh(mesh)) {
+            if (pretransform_mesh) {
                 for (uint32_t v = 0; v < vertex_count; v++) {
                     vb_mapped[v] = mesh.get_packed_vertex_pretransformed(v, node);
                 }
@@ -560,7 +564,7 @@ void Scene::upload_geometry_buffers(const CommandBufferHandle& cmd) {
             // Upload prev vertices
             const MemoryAllocationHandle prev_vtx_staging = staging->cmd_to_device(cmd, prev_vb);
             auto* prev_vb_mapped = prev_vtx_staging->map_as<PackedPrevVertexData>();
-            if (pretransform_mesh(mesh)) {
+            if (pretransform_mesh) {
                 for (uint32_t v = 0; v < vertex_count; v++) {
                     prev_vb_mapped[v] = mesh.get_packed_prev_vertex_pretransformed(v, node);
                 }
