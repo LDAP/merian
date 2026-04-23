@@ -14,7 +14,7 @@
 
 namespace merian {
 
-enum GeometryFlags : uint32_t {
+enum MeshFlags : uint32_t {
     None = 0,
     IsDynamic = 0x1,             // default: static
     IsOpaque = 0x2,              // default: treat all as non-opaque (allow alpha mask)
@@ -22,10 +22,10 @@ enum GeometryFlags : uint32_t {
     TwoSided = 0x8,              // default: cull backfaces
 };
 
-constexpr GeometryFlags operator|(GeometryFlags a, GeometryFlags b) {
-    return static_cast<GeometryFlags>(static_cast<uint32_t>(a) | static_cast<uint32_t>(b));
+constexpr MeshFlags operator|(MeshFlags a, MeshFlags b) {
+    return static_cast<MeshFlags>(static_cast<uint32_t>(a) | static_cast<uint32_t>(b));
 }
-constexpr bool operator&(GeometryFlags a, GeometryFlags b) {
+constexpr bool operator&(MeshFlags a, MeshFlags b) {
     return (static_cast<uint32_t>(a) & static_cast<uint32_t>(b)) != 0;
 }
 
@@ -66,7 +66,7 @@ class Mesh {
   public:
     std::string name;
     MaterialID material_id{};
-    GeometryFlags flags = GeometryFlags::IsOpaque;
+    MeshFlags flags = MeshFlags::IsOpaque;
     bool dirty = true;
 
     virtual ~Mesh() = default;
@@ -76,7 +76,7 @@ class Mesh {
 
     virtual float3 get_position(uint32_t vertex_idx) const = 0;
     virtual float3 get_prev_position(uint32_t vertex_idx) const {
-        assert((flags & GeometryFlags::IsDynamic) == 0);
+        assert((flags & MeshFlags::IsDynamic) == 0);
         return get_position(vertex_idx);
     }
     virtual float3 get_normal(uint32_t vertex_idx) const = 0;
@@ -98,26 +98,26 @@ class Mesh {
                                                                        const Node& node) const;
 
     bool is_dynamic() const {
-        return flags & GeometryFlags::IsDynamic;
+        return flags & MeshFlags::IsDynamic;
     }
 
     bool is_static() const {
-        return !(flags & GeometryFlags::IsDynamic);
+        return !(flags & MeshFlags::IsDynamic);
     }
 
     bool is_front_counterclockwise() const {
         // Vulkan default is clockwise
-        return flags & GeometryFlags::FrontCounterClockwise;
+        return flags & MeshFlags::FrontCounterClockwise;
     }
 
     bool is_two_sided() const {
         // if yes, needs to disable backface culling
-        return flags & GeometryFlags::TwoSided;
+        return flags & MeshFlags::TwoSided;
     }
 
     bool is_opaque() const {
         // if yes, allows to set the force opaque flag when raytracing.
-        return flags & GeometryFlags::IsOpaque;
+        return flags & MeshFlags::IsOpaque;
     }
 
     // ------------------
@@ -177,7 +177,7 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
         std::unordered_set<MeshID> meshes;
 
         // flags shared by all meshes
-        GeometryFlags flags;
+        MeshFlags flags;
 
         // ----------------
         AccelerationStructureHandle blas;
@@ -379,12 +379,21 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     void rebuild_shader_object();
 
     // Computes mesh groups according to the grouping logic above.
-    // All groups share the same instances (transforms) -> iterating over groups and instances gives
-    // the instances One group builds one BLAS -> the instances can refer to those.
+    //
+    // instanced meshes must have the same instances and non-instanced dynamic meshes are only
+    // grouped if they share the same instance and static meshes are pretransformed and the
+    // single instance does not matter as it it replaced with the identity anyway.
+    // That means all meshes in the group share the same instances (transforms) -> iterating over
+    // groups and instances gives the instances One group builds one BLAS -> the instances can refer
+    // to those.
     void compute_mesh_groups();
 
+    // this only changes if the mesh groups changed or if a transform changes (TODO: selectively
+    // upload transforms)
+    void upload_geometry_data_and_transforms(const CommandBufferHandle& cmd);
+
     // uploads the meshes, geometry data, and instance transforms
-    void upload_geometry_buffers(const CommandBufferHandle& cmd);
+    void upload_meshes(const CommandBufferHandle& cmd);
 
     void build_blas(const CommandBufferHandle& cmd);
     void build_tlas(const CommandBufferHandle& cmd);
@@ -423,9 +432,6 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
 
     AccelerationStructureHandle tlas;
 
-    // Indexed with GeometryID (InstanceID + GeometryIndex)
-    BufferHandle geometries_buffer;
-
     // Indexed with MeshID / geometry.index_buffer_index -> PrimitiveID
     std::vector<BufferHandle> index_buffers;
     // Indexed with MeshID / geometry.vertex_buffer_index -> indices
@@ -448,6 +454,21 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     // MeshID -> GroupID (MESH_GROUP_ID_INVALID if not in group, eg. because there was no instance
     // of the mesh)
     std::vector<MeshGroupID> mesh_to_group;
+
+    // kept here to prevent reallocation.
+
+    std::vector<GeometryData> geometries;
+    std::vector<float4x4> instance_transforms;
+    std::vector<float4x4> inverse_transposed_instance_transforms;
+    std::vector<float4x4> prev_instance_transforms;
+    std::vector<float4x4> prev_inverse_transposed_instance_transforms;
+
+    // Indexed with GeometryID (InstanceID + GeometryIndex)
+    BufferHandle geometries_buffer;
+    BufferHandle instance_transforms_buffer;
+    BufferHandle inverse_transposed_instance_transforms_buffer;
+    BufferHandle prev_instance_transforms_buffer;
+    BufferHandle prev_inverse_transposed_instance_transforms_buffer;
 
     // // Per-mesh: list of geometry instance indices for each instance of this mesh.
     // // mesh_id_to_instance_ids[mesh_id][i] = global geometry instance index.

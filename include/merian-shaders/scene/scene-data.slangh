@@ -9,7 +9,9 @@ import merian_shaders.utils.encoding;
 
 namespace merian {
 
-static const uint16_t GEOMETRY_FLAG_PRETRANSFORMED = 0x1;
+enum GeometryDataFlags : uint16_t {
+    Pretransformed = 0x1,
+};
 
 // See scene.hpp for details.
 
@@ -17,7 +19,7 @@ struct GeometryData {
     MaterialID material_id;
     uint16_t index_buffer_index;
     uint16_t vertex_buffer_index;
-    uint16_t flags;
+    GeometryDataFlags flags;
 };
 
 // InstanceID + GeometryIndex

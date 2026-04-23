@@ -428,17 +428,17 @@ void GLTFScene::load_meshes() {
             }
 
             // Determine flags
-            GeometryFlags flags = GeometryFlags::None;
+            MeshFlags flags = MeshFlags::None;
             if (prim.material >= 0 && prim.material < static_cast<int>(model->materials.size())) {
                 const auto& gmat = model->materials[prim.material];
                 if (gmat.alphaMode == "OPAQUE") {
-                    flags = flags | GeometryFlags::IsOpaque;
+                    flags = flags | MeshFlags::IsOpaque;
                 }
                 if (gmat.doubleSided) {
-                    flags = flags | GeometryFlags::TwoSided;
+                    flags = flags | MeshFlags::TwoSided;
                 }
             } else {
-                flags = flags | GeometryFlags::IsOpaque;
+                flags = flags | MeshFlags::IsOpaque;
             }
 
             mesh->name =

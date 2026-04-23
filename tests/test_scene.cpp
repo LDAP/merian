@@ -69,7 +69,7 @@ class SceneTest : public ::testing::Test {
 
     // Helper: create a triangle mesh
     static MeshHandle make_triangle(MaterialID mat_id,
-                                    GeometryFlags flags = GeometryFlags::ForceOpaque) {
+                                    MeshFlags flags = MeshFlags::ForceOpaque) {
         std::unique_ptr<SimpleMesh> m = std::make_unique<SimpleMesh>();
         m->material_id = mat_id;
         m->flags = flags;
@@ -197,9 +197,9 @@ TEST_F(SceneTest, MeshGroupingDynamic) {
 
     // Two dynamic meshes on different nodes
     MeshID m0 =
-        scene->add_mesh(make_triangle(0, GeometryFlags::ForceOpaque | GeometryFlags::IsDynamic));
+        scene->add_mesh(make_triangle(0, MeshFlags::ForceOpaque | MeshFlags::IsDynamic));
     MeshID m1 =
-        scene->add_mesh(make_triangle(0, GeometryFlags::ForceOpaque | GeometryFlags::IsDynamic));
+        scene->add_mesh(make_triangle(0, MeshFlags::ForceOpaque | MeshFlags::IsDynamic));
     scene->add_mesh_instance(m0, nid0);
     scene->add_mesh_instance(m1, nid1);
 
