@@ -1,8 +1,11 @@
 import merian_shaders.scene.scene;
 import merian_shaders.gbuffer;
 import merian_shaders.utils.textures;
+import merian_shaders.colors.debug;
 
 namespace merian {
+
+// https://github.com/NVIDIAGameWorks/Falcor/blob/eb540f6748774680ce0039aaf3ac9279266ec521/Source/RenderPasses/GBuffer/GBuffer/GBufferRT.slang#L86
 
 [shader("compute")]
 [numthreads(16, 16, 1)]
