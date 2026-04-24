@@ -175,12 +175,12 @@ struct Scene {
 
     // Loads the vertex indicens from memory.
     uint3 get_vertex_indices(const uint index_buffer, const uint primitive_id) {
-        return index_buffers[index_buffer][primitive_id];
+        return index_buffers[NonUniformResourceIndex(index_buffer)][primitive_id];
     }
 
     // Loads the vertex data from memory.
     PackedVertexData get_packed_vertex_data(const uint vertex_buffer, const uint vertex_index) {
-        return vertex_buffers[vertex_buffer][vertex_index];
+        return vertex_buffers[NonUniformResourceIndex(vertex_buffer)][vertex_index];
     }
 
     // Convenience method for get_packed_vertex_data(...).uv
