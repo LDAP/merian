@@ -22,6 +22,8 @@ class TextureManager : public Versionable, public std::enable_shared_from_this<T
     // process pending uploads
     void update(const CommandBufferHandle& cmd);
 
+    void resize(const uint32_t capacity);
+
     TextureID add_texture(const TextureHandle& texture);
 
     TextureID

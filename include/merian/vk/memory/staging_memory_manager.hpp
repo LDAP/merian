@@ -24,18 +24,21 @@ class StagingMemoryManager : public std::enable_shared_from_this<StagingMemoryMa
 
     // -------------------------------------------------------------------------
 
-  private:
+  public:
+    // Request a staging area of size 'size' for uploads. The buffer and offset are returned to
+    // queue the device copy on the command buffer.
     MemoryAllocationHandle get_upload_staging_space(const vk::DeviceSize size,
                                                     BufferHandle& upload_buffer,
                                                     vk::DeviceSize& buffer_offset);
 
+    // Request a staging area of size 'size' for downloads. The buffer and offset are returned to
+    // queue the device copy on the command buffer.
     MemoryAllocationHandle get_download_staging_space(const vk::DeviceSize size,
                                                       BufferHandle& download_buffer,
                                                       vk::DeviceSize& buffer_offset);
 
     // -------------------------------------------------------------------------
 
-  public:
     /* You must make sure that "data" matches extent and format. Extent defaults to
      * image->get_extent() - offset. Size is computed from offset, extent and format by default.*/
     void cmd_to_device(const CommandBufferHandle& cmd,

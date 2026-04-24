@@ -57,6 +57,17 @@ void TextureManager::update(const CommandBufferHandle& /*cmd*/) {
     // TODO: allow for textures to be queued and uploaded here.
 }
 
+void TextureManager::resize(const uint32_t capacity) {
+    if (capacity == textures.size()) {
+        return;
+    }
+
+    textures.resize(capacity);
+    update_composition_constants();
+    rebuild_shader_object();
+    increment_version();
+}
+
 TextureID TextureManager::add_texture(const TextureHandle& texture) {
     TextureID id;
     if (!free_list.empty()) {
@@ -65,10 +76,7 @@ TextureID TextureManager::add_texture(const TextureHandle& texture) {
     } else {
         id = static_cast<TextureID>(texture_count);
         if (id >= textures.size()) {
-            textures.resize(textures.size() * 2);
-            update_composition_constants();
-            rebuild_shader_object();
-            increment_version();
+            resize(textures.size() * 2);
         }
     }
 

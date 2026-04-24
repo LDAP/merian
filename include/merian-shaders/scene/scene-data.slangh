@@ -3,6 +3,7 @@
 #ifdef __cplusplus
 #include "merian-shaders/shading/materials/material-system-data.slangh"
 #include "merian-shaders/types.slang.h"
+#include <vulkan/vulkan.hpp>
 #else
 import merian_shaders.utils.encoding;
 #endif
@@ -14,13 +15,6 @@ enum GeometryDataFlags : uint16_t {
 };
 
 // See scene.hpp for details.
-
-struct GeometryData {
-    MaterialID material_id;
-    uint16_t index_buffer_index;
-    uint16_t vertex_buffer_index;
-    GeometryDataFlags flags;
-};
 
 // InstanceID + GeometryIndex
 typedef uint32_t GeometryID;
@@ -85,9 +79,30 @@ struct PackedPrevVertexData {
 };
 
 #ifdef __cplusplus
+using VertexBufferAddress = vk::DeviceAddress;
+using IndexBufferAddress = vk::DeviceAddress;
+using PrevVertexBufferAddress = vk::DeviceAddress;
+#else
+typealias VertexBufferAddress = PackedVertexData*;
+typealias IndexBufferAddress = uint3*;
+typealias PrevVertexBufferAddress = PackedPrevVertexData*;
+#endif
+
+struct GeometryData {
+    VertexBufferAddress vertices;
+    IndexBufferAddress indices;
+    // 0 / nullptr if static: prev position equals current position.
+    PrevVertexBufferAddress prev_vertices;
+
+    MaterialID material_id;
+    GeometryDataFlags flags;
+};
+
+#ifdef __cplusplus
 static_assert(sizeof(PackedVertexData) == 24, "PackedVertexData must match Slang scalar layout");
 static_assert(alignof(PackedVertexData) == 4, "PackedVertexData must be 4-byte aligned");
-static_assert(sizeof(GeometryData) == 8, "GeometryData layout mismatch");
+static_assert(sizeof(GeometryData) == 32, "GeometryData layout mismatch");
+static_assert(alignof(GeometryData) == 8, "GeometryData must be 8-byte aligned");
 #endif
 
 }

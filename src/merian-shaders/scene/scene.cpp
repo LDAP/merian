@@ -101,7 +101,7 @@ Scene::Scene(const ShaderCompileContextHandle& compile_context,
     composition->add_module_from_path("merian-shaders/scene/environment-map.slang");
     composition->add_module_from_path("merian-shaders/scene/acceleration-structure.slang");
 
-    ensure_index_vertex_buffers(INITIAL_INDEX_BUFFER_COUNT, INITIAL_VERTEX_BUFFER_COUNT);
+    rebuild_shader_object();
 
     // TODO: use link-time type for AS once Slang's lookupExternDeclRefType is fixed
     // if (build_as) {
@@ -121,30 +121,6 @@ Scene::Scene(const ShaderCompileContextHandle& compile_context,
     // }
 }
 
-void Scene::ensure_index_vertex_buffers(const std::size_t min_index_buffer_count,
-                                        const std::size_t min_vertex_buffer_count) {
-    if (min_index_buffer_count > index_buffers.size() ||
-        min_vertex_buffer_count > vertex_buffers.size()) {
-
-        index_buffers.resize(min_index_buffer_count);
-        vertex_buffers.resize(min_index_buffer_count);
-        prev_vertex_buffers.resize(min_index_buffer_count);
-
-        composition->add_module_from_string(
-            "scene_constants",
-            fmt::format("namespace merian {{\n"
-                        "export static const int merian_scene_index_buffers_count = {};\n"
-                        "export static const int merian_scene_vertex_buffers_count = {};\n"
-                        "export static const int merian_scene_prev_vertex_buffers_count = {};\n"
-                        "}}",
-                        static_cast<uint32_t>(index_buffers.size()),
-                        static_cast<uint32_t>(vertex_buffers.size()),
-                        static_cast<uint32_t>(prev_vertex_buffers.size())));
-
-        rebuild_shader_object();
-    }
-}
-
 void Scene::rebuild_shader_object() {
     if (!layout_program) {
         layout_program = SlangProgram::create(compile_context, composition);
@@ -159,22 +135,6 @@ void Scene::rebuild_shader_object() {
         auto c = shader_object->get_cursor();
         c["material_system"] = material_system;
     });
-
-    auto c_idx = c["index_buffers"];
-    for (uint32_t i = 0; i < index_buffers.size(); i++) {
-        c_idx[i] = index_buffers[i] ? index_buffers[i] : allocator->get_dummy_buffer();
-    }
-
-    auto c_vtx = c["vertex_buffers"];
-    for (uint32_t i = 0; i < vertex_buffers.size(); i++) {
-        c_vtx[i] = vertex_buffers[i] ? vertex_buffers[i] : allocator->get_dummy_buffer();
-    }
-
-    auto c_prev_vtx = c["prev_vertex_buffers"];
-    for (uint32_t i = 0; i < prev_vertex_buffers.size(); i++) {
-        c_prev_vtx[i] =
-            prev_vertex_buffers[i] ? prev_vertex_buffers[i] : allocator->get_dummy_buffer();
-    }
 
     c["geometries"] = geometries_buffer ? geometries_buffer : allocator->get_dummy_buffer();
 
@@ -523,11 +483,15 @@ void Scene::upload_geometry_data_and_transforms(const CommandBufferHandle& cmd) 
         for (const NodeID node_id : group.get_instances(meshes)) {
             for (const MeshID mesh_id : group.meshes) {
                 Mesh& mesh = *meshes[mesh_id];
+                assert(vertex_buffers[mesh_id] && index_buffers[mesh_id]);
 
                 GeometryData gd;
                 gd.material_id = mesh.material_id;
-                gd.index_buffer_index = mesh_id;
-                gd.vertex_buffer_index = mesh_id;
+                gd.vertices = vertex_buffers[mesh_id]->get_device_address();
+                gd.indices = index_buffers[mesh_id]->get_device_address();
+                gd.prev_vertices = prev_vertex_buffers[mesh_id]
+                                       ? prev_vertex_buffers[mesh_id]->get_device_address()
+                                       : vk::DeviceAddress{0};
                 gd.flags = pretransform ? GeometryDataFlags::Pretransformed : GeometryDataFlags{};
 
                 geometries.emplace_back(gd);
@@ -613,18 +577,17 @@ void Scene::upload_geometry_data_and_transforms(const CommandBufferHandle& cmd) 
 void Scene::upload_meshes(const CommandBufferHandle& cmd) {
     // For now we have a index and vertex buffer for each mesh,
     // we could combine them per group or into single buffers in the future.
-    ensure_index_vertex_buffers(meshes.size(), meshes.size());
+    if (meshes.size() > vertex_buffers.size()) {
+        index_buffers.resize(meshes.size());
+        vertex_buffers.resize(meshes.size());
+        prev_vertex_buffers.resize(meshes.size());
+    }
 
     const auto staging = allocator->get_staging();
     const auto buffer_usage = vk::BufferUsageFlagBits::eStorageBuffer |
                               vk::BufferUsageFlagBits::eTransferDst |
                               vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR |
                               vk::BufferUsageFlagBits::eShaderDeviceAddress;
-
-    auto c = shader_object->get_cursor();
-    auto c_vtx = c["vertex_buffers"];
-    auto c_prev_vtx = c["prev_vertex_buffers"];
-    auto c_idx = c["index_buffers"];
 
     for (MeshGroupID group_id = 0; group_id < mesh_groups.size(); group_id++) {
         MeshGroup& group = mesh_groups[group_id];
@@ -644,32 +607,41 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                 const vk::DeviceSize ib_size = primitive_count * sizeof(uint3);
 
                 // Allocate / Ensure (prev)vertex and index buffers.
+                // Previous frames reference these via raw device addresses in their
+                // geometries buffer, so replaced handles must outlive in-flight work.
                 assert(mesh_id < vertex_buffers.size());
                 auto& vb = vertex_buffers[mesh_id];
                 if (!vb || (vb->get_size() < vb_size)) {
+                    if (vb)
+                        cmd->keep_until_pool_reset(std::move(vb));
                     vb = allocator->create_buffer(
                         vb_size, buffer_usage, MemoryMappingType::NONE,
                         fmt::format("Scene::vb[{}]: name={}", mesh_id, mesh.name));
-                    c_vtx[mesh_id] = vb;
                 }
 
-                // TODO: Only upload prev vertices if dynamic
+                // Only allocate prev vertices for dynamic meshes.
                 assert(mesh_id < prev_vertex_buffers.size());
                 auto& prev_vb = prev_vertex_buffers[mesh_id];
-                if (!prev_vb || (prev_vb->get_size() < prev_vb_size)) {
-                    prev_vb = allocator->create_buffer(
-                        prev_vb_size, buffer_usage, MemoryMappingType::NONE,
-                        fmt::format("Scene::prev_vb[{}]: name={}", mesh_id, mesh.name));
-                    c_prev_vtx[mesh_id] = prev_vb;
+                if (mesh.is_dynamic()) {
+                    if (!prev_vb || (prev_vb->get_size() < prev_vb_size)) {
+                        if (prev_vb)
+                            cmd->keep_until_pool_reset(std::move(prev_vb));
+                        prev_vb = allocator->create_buffer(
+                            prev_vb_size, buffer_usage, MemoryMappingType::NONE,
+                            fmt::format("Scene::prev_vb[{}]: name={}", mesh_id, mesh.name));
+                    }
+                } else if (prev_vb) {
+                    cmd->keep_until_pool_reset(std::move(prev_vb));
                 }
 
                 assert(mesh_id < index_buffers.size());
                 auto& ib = index_buffers[mesh_id];
                 if (!ib || (ib->get_size() < ib_size)) {
+                    if (ib)
+                        cmd->keep_until_pool_reset(std::move(ib));
                     ib = allocator->create_buffer(
                         ib_size, buffer_usage, MemoryMappingType::NONE,
                         fmt::format("Scene::ib[{}]: name={}", mesh_id, mesh.name));
-                    c_idx[mesh_id] = ib;
                 }
 
                 // Upload vertices
@@ -695,22 +667,25 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
                 }
                 vb_staging->unmap();
 
-                // Upload prev vertices
-                const MemoryAllocationHandle prev_vtx_staging =
-                    staging->cmd_to_device(cmd, prev_vb);
-                auto* prev_vb_mapped = prev_vtx_staging->map_as<PackedPrevVertexData>();
-                if (pretransform_mesh) {
-                    assert(mesh.instances.size() == 1 && "for pretransformed meshes the transform "
-                                                         "must be unique, i.e. there is only one!");
-                    for (uint32_t v = 0; v < vertex_count; v++) {
-                        prev_vb_mapped[v] = mesh.get_packed_prev_vertex_pretransformed(v, node);
+                // Upload prev vertices (dynamic meshes only).
+                if (prev_vb) {
+                    const MemoryAllocationHandle prev_vtx_staging =
+                        staging->cmd_to_device(cmd, prev_vb);
+                    auto* prev_vb_mapped = prev_vtx_staging->map_as<PackedPrevVertexData>();
+                    if (pretransform_mesh) {
+                        assert(mesh.instances.size() == 1 &&
+                               "for pretransformed meshes the transform "
+                               "must be unique, i.e. there is only one!");
+                        for (uint32_t v = 0; v < vertex_count; v++) {
+                            prev_vb_mapped[v] = mesh.get_packed_prev_vertex_pretransformed(v, node);
+                        }
+                    } else {
+                        for (uint32_t v = 0; v < vertex_count; v++) {
+                            prev_vb_mapped[v] = mesh.get_packed_prev_vertex(v);
+                        }
                     }
-                } else {
-                    for (uint32_t v = 0; v < vertex_count; v++) {
-                        prev_vb_mapped[v] = mesh.get_packed_prev_vertex(v);
-                    }
+                    prev_vtx_staging->unmap();
                 }
-                prev_vtx_staging->unmap();
 
                 // Upload indices
                 const MemoryAllocationHandle ib_staging = staging->cmd_to_device(cmd, ib);
@@ -901,14 +876,14 @@ void Scene::update(const CommandBufferHandle& cmd,
         compute_mesh_groups();
 
         needs_regroup = false;
-
-        // needs to be moved once nodes support animating the transforms
-        upload_geometry_data_and_transforms(cmd);
     }
 
-    // checks all meshes if they're dirty (animated) and uploads the meshes.
-    // also sets the group to dirty if one of the meshes changed.
+    // Allocate/upload vertex/index buffers first so their device addresses are available
+    // when GeometryData is written below.
     upload_meshes(cmd);
+
+    // needs to be moved once nodes support animating the transforms
+    upload_geometry_data_and_transforms(cmd);
 
     cmd->barrier(vk::MemoryBarrier2{
         vk::PipelineStageFlagBits2::eTransfer,

@@ -37,6 +37,10 @@ interface MaterialSample {
 
     associatedtype BSDFImpl : BSDF;
 
+    float3 get_emission() {
+        return float3(0);
+    }
+
     // The local shading frame (for surfaces).
     Frame get_shading_frame() {
         return IdentityFrame();

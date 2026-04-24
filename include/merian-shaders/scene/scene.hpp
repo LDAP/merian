@@ -372,8 +372,6 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     }
 
   private:
-    void ensure_index_vertex_buffers(const std::size_t min_index_buffer_count,
-                                     const std::size_t min_vertex_buffer_count);
     void rebuild_shader_object();
 
     // Computes mesh groups according to the grouping logic above.
@@ -399,9 +397,6 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     void node_properties(Properties& props, const SceneNode& node);
 
   private:
-    static const std::size_t INITIAL_INDEX_BUFFER_COUNT = 128;
-    static const std::size_t INITIAL_VERTEX_BUFFER_COUNT = 128;
-
     // --------------------------
     // Context etc.
 
@@ -446,11 +441,11 @@ class Scene : public Versionable, public std::enable_shared_from_this<Scene> {
     // --------------------------
     // GPU data
 
-    // Indexed with MeshID / geometry.index_buffer_index -> PrimitiveID
+    // Indexed with MeshID -> PrimitiveID
     std::vector<BufferHandle> index_buffers;
-    // Indexed with MeshID / geometry.vertex_buffer_index -> indices
+    // Indexed with MeshID -> indices
     std::vector<BufferHandle> vertex_buffers;
-    // Indexed with MeshID / geometry.vertex_buffer_index -> indices
+    // Indexed with MeshID -> indices. Null for static meshes.
     std::vector<BufferHandle> prev_vertex_buffers;
 
     std::vector<GeometryData> geometries;

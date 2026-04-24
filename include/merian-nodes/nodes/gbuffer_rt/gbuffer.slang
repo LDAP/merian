@@ -26,11 +26,11 @@ void main(uint3 tid: SV_DispatchThreadID,
     }
 
     GeometryData gd = scene.get_geometry_data(hit.instance_id, hit.geometry_index);
-    uint3 indices = scene.get_vertex_indices(gd.index_buffer_index, hit.primitive_id);
+    uint3 indices = scene.get_vertex_indices(gd, hit.primitive_id);
 
-    PackedVertexData v0 = scene.get_packed_vertex_data(gd.vertex_buffer_index, indices.x);
-    PackedVertexData v1 = scene.get_packed_vertex_data(gd.vertex_buffer_index, indices.y);
-    PackedVertexData v2 = scene.get_packed_vertex_data(gd.vertex_buffer_index, indices.z);
+    PackedVertexData v0 = scene.get_packed_vertex_data(gd, indices.x);
+    PackedVertexData v1 = scene.get_packed_vertex_data(gd, indices.y);
+    PackedVertexData v2 = scene.get_packed_vertex_data(gd, indices.z);
 
     float3 bary = hit.get_barycentrics3();
 

@@ -52,10 +52,6 @@ struct Hit {
     }
 }
 
-extern static const int merian_scene_index_buffers_count;
-extern static const int merian_scene_vertex_buffers_count;
-extern static const int merian_scene_prev_vertex_buffers_count;
-
 // TODO: use link-time type once Slang's lookupExternDeclRefType is fixed
 // extern struct SceneAccelerationStructure : AccelerationStructure;
 typedef HWAccelerationStructure SceneAccelerationStructure;
@@ -65,13 +61,6 @@ struct Scene {
     SceneAccelerationStructure as;
 
     StructuredBuffer<GeometryData, ScalarDataLayout> geometries;
-
-    StructuredBuffer<uint3, ScalarDataLayout> index_buffers[merian_scene_index_buffers_count];
-
-    StructuredBuffer<PackedVertexData, ScalarDataLayout>
-        vertex_buffers[merian_scene_vertex_buffers_count];
-    StructuredBuffer<PackedPrevVertexData, ScalarDataLayout>
-        prev_vertex_buffers[merian_scene_prev_vertex_buffers_count];
 
     // One transform per TLAS instance, indexed by InstanceIndex().
     StructuredBuffer<float4x4, ScalarDataLayout> instance_transforms;
@@ -173,44 +162,34 @@ struct Scene {
         return get_material_id(hit.get_geometry_id());
     }
 
-    // Loads the vertex indicens from memory.
-    uint3 get_vertex_indices(const uint index_buffer, const uint primitive_id) {
-        return index_buffers[NonUniformResourceIndex(index_buffer)][primitive_id];
+    // Loads the vertex indices from memory via buffer device address.
+    uint3 get_vertex_indices(const GeometryData geometry_data, const uint primitive_id) {
+        return geometry_data.indices[primitive_id];
     }
 
-    // Loads the vertex data from memory.
-    PackedVertexData get_packed_vertex_data(const uint vertex_buffer, const uint vertex_index) {
-        return vertex_buffers[NonUniformResourceIndex(vertex_buffer)][vertex_index];
-    }
-
-    // Convenience method for get_packed_vertex_data(...).uv
-    float2 get_vertex_uv(const uint vertex_buffer, const uint vertex_index) {
-        return get_packed_vertex_data(vertex_buffer, vertex_index).uv;
+    // Loads the vertex data from memory via buffer device address.
+    PackedVertexData get_packed_vertex_data(const GeometryData geometry_data,
+                                            const uint vertex_index) {
+        return geometry_data.vertices[vertex_index];
     }
 
     vector<PackedVertexData, 3> get_packed_vertex_data(const GeometryData geometry_data,
                                                        const uint primitive_id,
                                                        const float3 barycentrics) {
-        const uint3 indices = get_vertex_indices(geometry_data.index_buffer_index, primitive_id);
-        return { get_packed_vertex_data(geometry_data.vertex_buffer_index, indices.x),
-                 get_packed_vertex_data(geometry_data.vertex_buffer_index, indices.y),
-                 get_packed_vertex_data(geometry_data.vertex_buffer_index, indices.z) };
+        const uint3 indices = get_vertex_indices(geometry_data, primitive_id);
+        return { get_packed_vertex_data(geometry_data, indices.x),
+                 get_packed_vertex_data(geometry_data, indices.y),
+                 get_packed_vertex_data(geometry_data, indices.z) };
     }
 
     VertexData get_interpolated_vertex_data(const GeometryData geometry_data,
                                             const uint primitive_id,
                                             const float3 barycentrics) {
-        const uint3 indices = get_vertex_indices(geometry_data.index_buffer_index, primitive_id);
+        const uint3 indices = get_vertex_indices(geometry_data, primitive_id);
 
-        VertexData v =
-            barycentrics.x *
-            get_packed_vertex_data(geometry_data.vertex_buffer_index, indices.x).unpack();
-
-        v += barycentrics.y *
-             get_packed_vertex_data(geometry_data.vertex_buffer_index, indices.y).unpack();
-
-        v += barycentrics.z *
-             get_packed_vertex_data(geometry_data.vertex_buffer_index, indices.z).unpack();
+        VertexData v = barycentrics.x * get_packed_vertex_data(geometry_data, indices.x).unpack();
+        v += barycentrics.y * get_packed_vertex_data(geometry_data, indices.y).unpack();
+        v += barycentrics.z * get_packed_vertex_data(geometry_data, indices.z).unpack();
 
         v.normal = normalize(v.normal);
         v.tangent = normalize(v.tangent);
@@ -218,15 +197,33 @@ struct Scene {
         return v;
     }
 
-    // Convenience method to load the vertices
+    // Convenience method to load the vertex uvs.
     float2 get_interpolated_uv(const GeometryData geometry_data,
                                const uint primitive_id,
                                const float3 barycentrics) {
-        const uint3 indices = get_vertex_indices(geometry_data.index_buffer_index, primitive_id);
+        const uint3 indices = get_vertex_indices(geometry_data, primitive_id);
 
-        return barycentrics.x * get_vertex_uv(geometry_data.vertex_buffer_index, indices.x) +
-               barycentrics.y * get_vertex_uv(geometry_data.vertex_buffer_index, indices.y) +
-               barycentrics.z * get_vertex_uv(geometry_data.vertex_buffer_index, indices.z);
+        return barycentrics.x * float2(geometry_data.vertices[indices.x].uv) +
+               barycentrics.y * float2(geometry_data.vertices[indices.y].uv) +
+               barycentrics.z * float2(geometry_data.vertices[indices.z].uv);
+    }
+
+    // Previous-frame object-space position for a vertex.
+    // For static meshes (prev_vertices == null) this equals the current position.
+    float3 get_prev_object_position(const GeometryData geometry_data, const uint vertex_index) {
+        if (uint64_t(geometry_data.prev_vertices) == 0) {
+            return geometry_data.vertices[vertex_index].position;
+        }
+        return geometry_data.prev_vertices[vertex_index].position;
+    }
+
+    float3 get_interpolated_prev_object_position(const GeometryData geometry_data,
+                                                 const uint primitive_id,
+                                                 const float3 barycentrics) {
+        const uint3 indices = get_vertex_indices(geometry_data, primitive_id);
+        return barycentrics.x * get_prev_object_position(geometry_data, indices.x) +
+               barycentrics.y * get_prev_object_position(geometry_data, indices.y) +
+               barycentrics.z * get_prev_object_position(geometry_data, indices.z);
     }
 
     // -----------------------------------------
