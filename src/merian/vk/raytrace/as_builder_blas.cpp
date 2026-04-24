@@ -61,7 +61,7 @@ ASBuilder::queue_build(const vk::AccelerationStructureGeometryKHR* geometry,
 
     // 3. Enqueue the build with the new AS as target
     //--------------------------------------------
-    queue_build(geometry, range_info, as, build_flags, geometry_count);
+    queue_build(geometry, range_info, as, size_info, build_flags, geometry_count);
 
     return as;
 }
@@ -70,16 +70,20 @@ void ASBuilder::queue_build(
     const std::vector<vk::AccelerationStructureGeometryKHR>& geometry,
     const std::vector<vk::AccelerationStructureBuildRangeInfoKHR>& range_info,
     const AccelerationStructureHandle& as,
+    const vk::AccelerationStructureBuildSizesInfoKHR& size_info,
     const vk::BuildAccelerationStructureFlagsKHR build_flags) {
     assert(geometry.size() == range_info.size());
-    queue_build(geometry.data(), range_info.data(), as, build_flags, geometry.size());
+    queue_build(geometry.data(), range_info.data(), as, size_info, build_flags, geometry.size());
 }
 
 void ASBuilder::queue_build(const vk::AccelerationStructureGeometryKHR* geometry,
                             const vk::AccelerationStructureBuildRangeInfoKHR* range_info,
                             const AccelerationStructureHandle& as,
+                            const vk::AccelerationStructureBuildSizesInfoKHR& size_info,
                             const vk::BuildAccelerationStructureFlagsKHR build_flags,
                             const uint32_t geometry_count) {
+    assert(as->get_size() >= size_info.accelerationStructureSize);
+
     vk::AccelerationStructureBuildGeometryInfoKHR build_info{
         vk::AccelerationStructureTypeKHR::eBottomLevel,
         build_flags,
@@ -89,8 +93,7 @@ void ASBuilder::queue_build(const vk::AccelerationStructureGeometryKHR* geometry
         geometry_count,
         geometry};
 
-    pending_min_scratch_buffer =
-        std::max(pending_min_scratch_buffer, as->get_size_info().buildScratchSize);
+    pending_min_scratch_buffer = std::max(pending_min_scratch_buffer, size_info.buildScratchSize);
     pending_blas_builds.emplace_back(as, build_info, range_info);
 }
 
@@ -98,15 +101,19 @@ void ASBuilder::queue_update(
     const std::vector<vk::AccelerationStructureGeometryKHR>& geometry,
     const std::vector<vk::AccelerationStructureBuildRangeInfoKHR>& range_info,
     const AccelerationStructureHandle& as,
+    const vk::AccelerationStructureBuildSizesInfoKHR& size_info,
     const vk::BuildAccelerationStructureFlagsKHR build_flags) {
-    queue_update(geometry.data(), range_info.data(), as, build_flags);
+    queue_update(geometry.data(), range_info.data(), as, size_info, build_flags);
 }
 
 void ASBuilder::queue_update(const vk::AccelerationStructureGeometryKHR* geometry,
                              const vk::AccelerationStructureBuildRangeInfoKHR* range_info,
                              const AccelerationStructureHandle& as,
+                             const vk::AccelerationStructureBuildSizesInfoKHR& size_info,
                              const vk::BuildAccelerationStructureFlagsKHR build_flags,
                              const uint32_t geometry_count) {
+    assert(as->get_size() >= size_info.accelerationStructureSize);
+
     vk::AccelerationStructureBuildGeometryInfoKHR build_info{
         vk::AccelerationStructureTypeKHR::eBottomLevel,
         build_flags,
@@ -116,8 +123,7 @@ void ASBuilder::queue_update(const vk::AccelerationStructureGeometryKHR* geometr
         geometry_count,
         geometry};
 
-    pending_min_scratch_buffer =
-        std::max(pending_min_scratch_buffer, as->get_size_info().updateScratchSize);
+    pending_min_scratch_buffer = std::max(pending_min_scratch_buffer, size_info.updateScratchSize);
     pending_blas_builds.emplace_back(as, build_info, range_info);
 }
 

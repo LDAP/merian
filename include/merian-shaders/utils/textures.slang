@@ -300,8 +300,6 @@ struct ImplicitLODSampler : LODSampler {
     }
 }
 
-typealias DefaultLODSampler = ImplicitLODSampler;
-
 // Uses the textures ::SampleLod(...) method. In OpenGL terms this is called explicit LOD.
 struct ExplicitLODSampler : LODSampler {
     float lod;
@@ -406,5 +404,7 @@ struct GradLODSampler : LODSampler {
         return tex.SampleGrad(s, location, grad_x, grad_y);
     }
 }
+
+typealias DefaultLODSampler = LOD0Sampler;
 
 }

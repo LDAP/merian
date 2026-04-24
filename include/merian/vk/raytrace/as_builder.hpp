@@ -109,52 +109,62 @@ class ASBuilder {
     // Enqueues a BLAS to be (re)build with the next get_cmds().
     //
     // The geometry_count and build_flags members must have the same value which was specified when
-    // `as` was last built.
+    // `as` was last built. The caller must pass the current `size_info` (from get_size_info) — its
+    // buildScratchSize is used to size the scratch buffer, and its accelerationStructureSize is
+    // asserted to fit into `as`.
     //
     // You must wait until after calling get_cmds() to free the geometry and range_info (pointers
     // need to remain valid)!
     void queue_build(const std::vector<vk::AccelerationStructureGeometryKHR>& geometry,
                      const std::vector<vk::AccelerationStructureBuildRangeInfoKHR>& range_info,
                      const AccelerationStructureHandle& as,
+                     const vk::AccelerationStructureBuildSizesInfoKHR& size_info,
                      const vk::BuildAccelerationStructureFlagsKHR build_flags);
 
     // Enqueues a BLAS to be (re)build with the next get_cmds().
     //
     // The geometry_count and build_flags members must have the same value which was specified when
-    // `as` was last built.
+    // `as` was last built. The caller must pass the current `size_info` (from get_size_info) — its
+    // buildScratchSize is used to size the scratch buffer, and its accelerationStructureSize is
+    // asserted to fit into `as`.
     //
     // You must wait until after calling get_cmds() to free the geometry and range_info (pointers
     // need to remain valid)!
     void queue_build(const vk::AccelerationStructureGeometryKHR* geometry,
                      const vk::AccelerationStructureBuildRangeInfoKHR* range_info,
                      const AccelerationStructureHandle& as,
+                     const vk::AccelerationStructureBuildSizesInfoKHR& size_info,
                      const vk::BuildAccelerationStructureFlagsKHR build_flags,
                      const uint32_t geometry_count = 1);
 
     // Enqueues a BLAS to be updated with the next get_cmds().
     //
     // The geometry_count and build_flags members must have the same value which was specified when
-    // `as` was last built. Note: You should call queue_rebuild after many updates or major
-    // deformation.
+    // `as` was last built. The caller must pass the current `size_info` — its updateScratchSize is
+    // used to size the scratch buffer, and its accelerationStructureSize is asserted to fit into
+    // `as`. Note: You should call queue_build after many updates or major deformation.
     //
     // You must wait until after calling get_cmds() to free the geometry and range_info (pointers
     // need to remain valid)!
     void queue_update(const std::vector<vk::AccelerationStructureGeometryKHR>& geometry,
                       const std::vector<vk::AccelerationStructureBuildRangeInfoKHR>& range_info,
                       const AccelerationStructureHandle& as,
+                      const vk::AccelerationStructureBuildSizesInfoKHR& size_info,
                       const vk::BuildAccelerationStructureFlagsKHR build_flags);
 
     // Enqueues a BLAS to be updated with the next get_cmds().
     //
     // The geometry_count and build_flags members must have the same value which was specified when
-    // `as` was last built. Note: You should call queue_rebuild after many updates or major
-    // deformation.
+    // `as` was last built. The caller must pass the current `size_info` — its updateScratchSize is
+    // used to size the scratch buffer, and its accelerationStructureSize is asserted to fit into
+    // `as`. Note: You should call queue_build after many updates or major deformation.
     //
     // You must wait until after calling get_cmds() to free the geometry and range_info (pointers
     // need to remain valid)!
     void queue_update(const vk::AccelerationStructureGeometryKHR* geometry,
                       const vk::AccelerationStructureBuildRangeInfoKHR* range_info,
                       const AccelerationStructureHandle& as,
+                      const vk::AccelerationStructureBuildSizesInfoKHR& size_info,
                       const vk::BuildAccelerationStructureFlagsKHR build_flags,
                       const uint32_t geometry_count = 1);
 
@@ -200,48 +210,62 @@ class ASBuilder {
                     vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace);
 
     // Update a TLAS from instances that are stored on the device.
+    //
+    // The caller must pass the current `size_info` — its updateScratchSize is used to size the
+    // scratch buffer, and its accelerationStructureSize is asserted to fit into `src_as`.
     void queue_update(const uint32_t instance_count,
                       const BufferHandle& instances,
                       const AccelerationStructureHandle& src_as,
+                      const vk::AccelerationStructureBuildSizesInfoKHR& size_info,
                       const vk::BuildAccelerationStructureFlagsKHR flags =
                           vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace) {
         // Note: For some reason using a host buffer here kills the GPU (without layer error) :/
         vk::AccelerationStructureGeometryInstancesDataKHR instances_data{
             VK_FALSE, {instances->get_device_address()}};
-        queue_update(instance_count, instances_data, src_as, flags);
+        queue_update(instance_count, instances_data, src_as, size_info, flags);
     }
 
     // Rebuild a TLAS from instances that are stored on the device.
     //
     // The instance_count and build_flags members must have the same value which was specified when
-    // `as` was last built (or check the sizes).
+    // `as` was last built. The caller must pass the current `size_info` — its buildScratchSize is
+    // used to size the scratch buffer, and its accelerationStructureSize is asserted to fit into
+    // `src_as`.
     void queue_build(const uint32_t instance_count,
                      const BufferHandle& instances,
                      const AccelerationStructureHandle& src_as,
+                     const vk::AccelerationStructureBuildSizesInfoKHR& size_info,
                      const vk::BuildAccelerationStructureFlagsKHR flags =
                          vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace) {
         // Note: For some reason using a host buffer here kills the GPU (without layer error) :/
         vk::AccelerationStructureGeometryInstancesDataKHR instances_data{
             VK_FALSE, {instances->get_device_address()}};
-        queue_build(instance_count, instances_data, src_as, flags);
+        queue_build(instance_count, instances_data, src_as, size_info, flags);
     }
 
     // Rebuild a TLAS from instances that are stored on the device.
     //
     // The instance_count and build_flags members must have the same value which was specified when
-    // `as` was last built.
+    // `as` was last built. The caller must pass the current `size_info` — its buildScratchSize is
+    // used to size the scratch buffer, and its accelerationStructureSize is asserted to fit into
+    // `src_as`.
     void queue_build(const uint32_t instance_count,
                      const vk::AccelerationStructureGeometryInstancesDataKHR& instances_data,
                      const AccelerationStructureHandle& src_as,
+                     const vk::AccelerationStructureBuildSizesInfoKHR& size_info,
                      const vk::BuildAccelerationStructureFlagsKHR flags);
 
     // Update a TLAS from instances that are stored on the device.
+    //
+    // The caller must pass the current `size_info` — its updateScratchSize is used to size the
+    // scratch buffer, and its accelerationStructureSize is asserted to fit into `src_as`.
     //
     // Consider using queue_rebuild, since the rebuild is fast and updating may hurt raytracing
     // performance.
     void queue_update(const uint32_t instance_count,
                       const vk::AccelerationStructureGeometryInstancesDataKHR& instances_data,
                       const AccelerationStructureHandle& src_as,
+                      const vk::AccelerationStructureBuildSizesInfoKHR& size_info,
                       const vk::BuildAccelerationStructureFlagsKHR flags =
                           vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace);
 

@@ -565,11 +565,9 @@ TextureHandle Texture::create(const ImageViewHandle& view, const SamplerHandle& 
 
 // --------------------------------------------------------------------------
 
-AccelerationStructure::AccelerationStructure(
-    const vk::AccelerationStructureKHR& as,
-    const BufferHandle& buffer,
-    const vk::AccelerationStructureBuildSizesInfoKHR& size_info)
-    : as(as), buffer(buffer), size_info(size_info) {
+AccelerationStructure::AccelerationStructure(const vk::AccelerationStructureKHR& as,
+                                             const BufferHandle& buffer)
+    : as(as), buffer(buffer) {
     SPDLOG_TRACE("create acceleration structure ({})", fmt::ptr(this));
 }
 
@@ -628,21 +626,16 @@ vk::BufferMemoryBarrier AccelerationStructure::blas_build_barrier() const {
 }
 
 void AccelerationStructure::properties(Properties& props) {
-    props.output_text(fmt::format("Size: {}\nBuild scratch size: {}\nUpdate scratch size: {}",
-                                  format_size(size_info.accelerationStructureSize),
-                                  format_size(size_info.buildScratchSize),
-                                  format_size(size_info.updateScratchSize)));
+    props.output_text(fmt::format("Size: {}", format_size(get_size())));
     if (props.st_begin_child("buffer_info", "Buffer")) {
         buffer->properties(props);
         props.st_end_child();
     }
 }
 
-AccelerationStructureHandle
-AccelerationStructure::create(const vk::AccelerationStructureKHR& as,
-                              const BufferHandle& buffer,
-                              const vk::AccelerationStructureBuildSizesInfoKHR& size_info) {
-    return std::shared_ptr<AccelerationStructure>(new AccelerationStructure(as, buffer, size_info));
+AccelerationStructureHandle AccelerationStructure::create(const vk::AccelerationStructureKHR& as,
+                                                          const BufferHandle& buffer) {
+    return std::shared_ptr<AccelerationStructure>(new AccelerationStructure(as, buffer));
 }
 
 } // namespace merian

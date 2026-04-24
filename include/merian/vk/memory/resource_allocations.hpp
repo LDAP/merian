@@ -471,9 +471,7 @@ class AccelerationStructure : public std::enable_shared_from_this<AccelerationSt
     // Creats a AccelerationStructure objects that automatically destroys `as` when destructed.
     // The memory is not freed explicitly to let it free itself.
     // It is asserted that the memory is already bound correctly.
-    AccelerationStructure(const vk::AccelerationStructureKHR& as,
-                          const BufferHandle& buffer,
-                          const vk::AccelerationStructureBuildSizesInfoKHR& size_info);
+    AccelerationStructure(const vk::AccelerationStructureKHR& as, const BufferHandle& buffer);
 
   public:
     ~AccelerationStructure();
@@ -500,8 +498,8 @@ class AccelerationStructure : public std::enable_shared_from_this<AccelerationSt
         return as;
     }
 
-    const vk::AccelerationStructureBuildSizesInfoKHR& get_size_info() const {
-        return size_info;
+    vk::DeviceSize get_size() const {
+        return buffer->get_size();
     }
 
     vk::WriteDescriptorSetAccelerationStructureKHR get_descriptor_info() const {
@@ -538,13 +536,10 @@ class AccelerationStructure : public std::enable_shared_from_this<AccelerationSt
   private:
     const vk::AccelerationStructureKHR as;
     const BufferHandle buffer;
-    const vk::AccelerationStructureBuildSizesInfoKHR size_info;
 
   public:
-    static AccelerationStructureHandle
-    create(const vk::AccelerationStructureKHR& as,
-           const BufferHandle& buffer,
-           const vk::AccelerationStructureBuildSizesInfoKHR& size_info);
+    static AccelerationStructureHandle create(const vk::AccelerationStructureKHR& as,
+                                              const BufferHandle& buffer);
 };
 
 } // namespace merian

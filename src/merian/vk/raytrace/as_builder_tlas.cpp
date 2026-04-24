@@ -55,7 +55,10 @@ void ASBuilder::queue_update(
     const uint32_t instance_count,
     const vk::AccelerationStructureGeometryInstancesDataKHR& instances_data,
     const AccelerationStructureHandle& src_as,
+    const vk::AccelerationStructureBuildSizesInfoKHR& size_info,
     const vk::BuildAccelerationStructureFlagsKHR flags) {
+    assert(src_as->get_size() >= size_info.accelerationStructureSize);
+
     vk::AccelerationStructureGeometryKHR top_as_geometry{vk::GeometryTypeKHR::eInstances,
                                                          {instances_data}};
     vk::AccelerationStructureBuildGeometryInfoKHR build_info{
@@ -66,8 +69,7 @@ void ASBuilder::queue_update(
         *src_as,
         top_as_geometry};
 
-    pending_min_scratch_buffer =
-        std::max(pending_min_scratch_buffer, src_as->get_size_info().updateScratchSize);
+    pending_min_scratch_buffer = std::max(pending_min_scratch_buffer, size_info.updateScratchSize);
 
     pending_tlas_builds.emplace_back(build_info, instance_count, top_as_geometry, src_as);
 }
@@ -75,7 +77,10 @@ void ASBuilder::queue_update(
 void ASBuilder::queue_build(const uint32_t instance_count,
                             const vk::AccelerationStructureGeometryInstancesDataKHR& instances_data,
                             const AccelerationStructureHandle& src_as,
+                            const vk::AccelerationStructureBuildSizesInfoKHR& size_info,
                             const vk::BuildAccelerationStructureFlagsKHR flags) {
+    assert(src_as->get_size() >= size_info.accelerationStructureSize);
+
     vk::AccelerationStructureGeometryKHR top_as_geometry{vk::GeometryTypeKHR::eInstances,
                                                          {instances_data}};
     vk::AccelerationStructureBuildGeometryInfoKHR build_info{
@@ -86,8 +91,7 @@ void ASBuilder::queue_build(const uint32_t instance_count,
         *src_as,
         top_as_geometry};
 
-    pending_min_scratch_buffer =
-        std::max(pending_min_scratch_buffer, src_as->get_size_info().buildScratchSize);
+    pending_min_scratch_buffer = std::max(pending_min_scratch_buffer, size_info.buildScratchSize);
 
     pending_tlas_builds.emplace_back(build_info, instance_count, top_as_geometry, src_as);
 }

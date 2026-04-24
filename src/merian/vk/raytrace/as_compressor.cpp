@@ -48,8 +48,7 @@ ASCompressor::compact(const ContextHandle& context,
 
     std::vector<AccelerationStructureHandle> result(ass.size());
     for (uint32_t i = 0; i < ass.size(); i++) {
-
-        auto size_info = ass[i]->get_size_info();
+        vk::AccelerationStructureBuildSizesInfoKHR size_info;
         size_info.accelerationStructureSize = compact_sizes[i];
 
         // Creating a compact version of the AS

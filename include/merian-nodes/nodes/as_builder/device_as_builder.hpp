@@ -277,18 +277,22 @@ class DeviceASBuilder : public Node {
 
             } else if (blas_info.rebuild) {
                 // build reusing existing buffers and acceleration structures
+                const auto size_info = as_builder->get_size_info(
+                    blas_info.geometries, blas_info.range_infos, blas_info.build_flags);
                 pre_build_barriers.push_back(blas_info.blas->blas_build_barrier2());
                 as_builder->queue_build(blas_info.geometries, blas_info.range_infos, blas_info.blas,
-                                        blas_info.build_flags);
+                                        size_info, blas_info.build_flags);
                 tlas_build_info.rebuild = true;
                 any_release_scratch_buffer_after |= blas_info.release_scratch_buffer_after;
                 merian::insert_all(in_flight_data.build_buffers, blas_info.vtx_buffers);
                 merian::insert_all(in_flight_data.build_buffers, blas_info.idx_buffers);
             } else if (blas_info.update) {
                 // update
+                const auto size_info = as_builder->get_size_info(
+                    blas_info.geometries, blas_info.range_infos, blas_info.build_flags);
                 pre_build_barriers.push_back(blas_info.blas->blas_build_barrier2());
                 as_builder->queue_update(blas_info.geometries, blas_info.range_infos,
-                                         blas_info.blas, blas_info.build_flags);
+                                         blas_info.blas, size_info, blas_info.build_flags);
                 tlas_build_info.rebuild = true;
                 any_release_scratch_buffer_after |= blas_info.release_scratch_buffer_after;
                 merian::insert_all(in_flight_data.build_buffers, blas_info.vtx_buffers);

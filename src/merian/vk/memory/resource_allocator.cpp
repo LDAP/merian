@@ -359,7 +359,7 @@ AccelerationStructureHandle ResourceAllocator::create_acceleration_structure(
     }
 #endif
 
-    return AccelerationStructure::create(as, buffer, size_info);
+    return AccelerationStructure::create(as, buffer);
 }
 
 DescriptorSetHandle

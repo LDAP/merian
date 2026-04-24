@@ -374,6 +374,14 @@ void Scene::properties(Properties& props) {
         props.st_end_child();
     }
 
+    if (props.st_begin_child("settings", "Settings")) {
+        bool pretransform = get_pretransform_dynamic();
+        if (props.config_bool("Pretransform Dyanmic", pretransform)) {
+            set_pretransform_dynamic(pretransform);
+        }
+        props.st_end_child();
+    }
+
     if (props.st_begin_child("stats", "Statistics")) {
         std::size_t total_vertices = 0;
         std::size_t total_triangles = 0;
@@ -475,7 +483,6 @@ void Scene::compute_mesh_groups() {
         MeshGroup& group = mesh_groups[group_id];
         assert(group.meshes.empty() || group.flags == mesh.flags);
         group.flags = mesh.flags;
-        group.blas_dirty |= mesh.dirty;
         group.meshes.insert(mesh_id);
     }
 
@@ -492,8 +499,9 @@ void Scene::compute_mesh_groups() {
             MeshGroup& prev_group = prev_mesh_groups[maybe_prev_group];
             if (prev_group.meshes == group.meshes) {
                 group.blas = prev_group.blas;
-                // blas_dirty is computed from the meshes above.
-                // we later check if the blas can be actually reused or if a new one is necessary.
+                // blas_dirty is computed later when we upload the meshes, because this method is
+                // not run every frame.We later also check if the blas can be actually reused or if
+                // a new one is necessary.
             }
         }
     }
@@ -522,7 +530,7 @@ void Scene::upload_geometry_data_and_transforms(const CommandBufferHandle& cmd) 
                 gd.vertex_buffer_index = mesh_id;
                 gd.flags = pretransform ? GeometryDataFlags::Pretransformed : GeometryDataFlags{};
 
-                geometries.emplace_back(std::move(gd));
+                geometries.emplace_back(gd);
             }
 
             if (pretransform) {
@@ -624,6 +632,8 @@ void Scene::upload_meshes(const CommandBufferHandle& cmd) {
 
         for (const MeshID mesh_id : group.meshes) {
             Mesh& mesh = *meshes[mesh_id];
+            group.blas_dirty |= mesh.dirty;
+
             if (mesh.dirty) {
                 assert(!mesh.instances.empty());
 
@@ -768,15 +778,15 @@ void Scene::build_blas(const CommandBufferHandle& cmd) {
         const auto size_info =
             as_builder.get_size_info(blas_geometry.geometries, blas_geometry.ranges, flags);
 
-        if (!group.blas || group.blas->get_size_info().accelerationStructureSize <
-                               size_info.accelerationStructureSize) {
+        if (!group.blas || group.blas->get_size() < size_info.accelerationStructureSize) {
             // cannot reuse and needs to be allcated
             group.blas = allocator->create_acceleration_structure(
                 vk::AccelerationStructureTypeKHR::eBottomLevel, size_info,
                 fmt::format("Scene::blas[{}]", group_id));
         }
 
-        as_builder.queue_build(blas_geometry.geometries, blas_geometry.ranges, group.blas, flags);
+        as_builder.queue_build(blas_geometry.geometries, blas_geometry.ranges, group.blas,
+                               size_info, flags);
         group.blas_dirty = false;
     }
 
@@ -864,15 +874,14 @@ void Scene::build_tlas(const CommandBufferHandle& cmd) {
     const auto size_info =
         as_builder.get_size_info(tlas_instances.size(), tlas_instances_buffer,
                                  vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace);
-    if (!tlas ||
-        tlas->get_size_info().accelerationStructureSize < size_info.accelerationStructureSize) {
+    if (!tlas || tlas->get_size() < size_info.accelerationStructureSize) {
         // cannot reuse and needs to be allcated
         tlas = allocator->create_acceleration_structure(vk::AccelerationStructureTypeKHR::eTopLevel,
                                                         size_info);
         shader_object->get_cursor()["as"]["as"] = tlas;
     }
 
-    as_builder.queue_build(tlas_instances.size(), tlas_instances_buffer, tlas);
+    as_builder.queue_build(tlas_instances.size(), tlas_instances_buffer, tlas, size_info);
     as_builder.get_cmds_tlas(cmd, as_scratch_buffer);
 }
 
@@ -897,7 +906,8 @@ void Scene::update(const CommandBufferHandle& cmd,
         upload_geometry_data_and_transforms(cmd);
     }
 
-    // checks all meshes if they're dirty (animated)
+    // checks all meshes if they're dirty (animated) and uploads the meshes.
+    // also sets the group to dirty if one of the meshes changed.
     upload_meshes(cmd);
 
     cmd->barrier(vk::MemoryBarrier2{
