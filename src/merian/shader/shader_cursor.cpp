@@ -130,8 +130,9 @@ std::vector<std::string> ShaderCursor::get_field_names() const {
     return names;
 }
 
-ShaderCursor& ShaderCursor::write(const ImageViewHandle& image) {
-    base_object->write(offset, image);
+ShaderCursor& ShaderCursor::write(const ImageViewHandle& image,
+                                  const std::optional<vk::ImageLayout> access_layout) {
+    base_object->write(offset, image, access_layout);
     return *this;
 }
 
@@ -140,8 +141,9 @@ ShaderCursor& ShaderCursor::write(const BufferHandle& buffer) {
     return *this;
 }
 
-ShaderCursor& ShaderCursor::write(const TextureHandle& texture) {
-    base_object->write(offset, texture);
+ShaderCursor& ShaderCursor::write(const TextureHandle& texture,
+                                  const std::optional<vk::ImageLayout> access_layout) {
+    base_object->write(offset, texture, access_layout);
     return *this;
 }
 

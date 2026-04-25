@@ -2,6 +2,7 @@
 #include "merian/utils/colors.hpp"
 #include "merian/vk/command/command_buffer.hpp"
 #include "merian/vk/extension/extension_vk_debug_utils.hpp"
+#include "merian/vk/utils/blits.hpp"
 #include "merian/vk/utils/check_result.hpp"
 
 #include <spdlog/spdlog.h>
@@ -276,38 +277,7 @@ ResourceAllocator::create_texture_from_rgba8(const CommandBufferHandle& cmd,
     const merian::ImageHandle image = create_image_from_rgba8(cmd, data, width, height, usage_flags,
                                                               isSRGB, mip_levels, debug_name);
 
-    if (generate_mipmaps) {
-        for (uint32_t i = 1; i <= mip_levels; i++) {
-            const vk::ImageMemoryBarrier bar{
-                vk::AccessFlagBits::eTransferWrite,
-                vk::AccessFlagBits::eTransferRead,
-                vk::ImageLayout::eTransferDstOptimal,
-                vk::ImageLayout::eTransferSrcOptimal,
-                VK_QUEUE_FAMILY_IGNORED,
-                VK_QUEUE_FAMILY_IGNORED,
-                *image,
-                vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, i - 1, 1, 0, 1}};
-            cmd->barrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer,
-                         bar);
-            // let the loop run one iteration more to get the whole image transitioned to transfer
-            // src.
-            if (i == mip_levels) {
-                break;
-            }
-
-            vk::ImageBlit blit{
-                vk::ImageSubresourceLayers{vk::ImageAspectFlagBits::eColor, i - 1, 0, 1},
-                {},
-                vk::ImageSubresourceLayers{vk::ImageAspectFlagBits::eColor, i, 0, 1},
-                {}};
-            blit.srcOffsets[1] =
-                vk::Offset3D{int32_t(width >> (i - 1)), int32_t(height >> (i - 1)), 1};
-            blit.dstOffsets[1] = vk::Offset3D{int32_t(width >> i), int32_t(height >> i), 1};
-            cmd->blit(image, vk::ImageLayout::eTransferSrcOptimal, image,
-                      vk::ImageLayout::eTransferDstOptimal, blit, vk::Filter::eLinear);
-        }
-        image->_set_current_layout(vk::ImageLayout::eTransferSrcOptimal);
-    }
+    cmd_generate_mipmaps(cmd, image);
 
     return create_texture(image, image->make_view_create_info(), sampler, debug_name);
 }

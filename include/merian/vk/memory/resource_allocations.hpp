@@ -237,6 +237,10 @@ class Image : public std::enable_shared_from_this<Image>, public Resource {
         return create_info.usage;
     }
 
+    uint32_t get_mip_levels() const {
+        return create_info.mipLevels;
+    }
+
     const ContextHandle& get_context() const {
         return context;
     }

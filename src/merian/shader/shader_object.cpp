@@ -252,15 +252,19 @@ void ShaderObject::set_subobject(const std::string& field_name, const ShaderObje
 // ---------------------------------------------------------------
 // Write operations
 
-void ShaderObject::write(const ShaderOffset& offset, const ImageViewHandle& image) {
+void ShaderObject::write(const ShaderOffset& offset,
+                         const ImageViewHandle& image,
+                         const std::optional<vk::ImageLayout> access_layout) {
     const auto& info = object_layout->get_binding_range_info(offset.binding_range_offset);
     assert(info.type == slang::BindingType::Texture ||
            info.type == slang::BindingType::MutableTexture);
     assert(offset.binding_array_index < info.count);
 
-    descriptors->queue_descriptor_write_image(info.binding, image, offset.binding_array_index);
+    descriptors->queue_descriptor_write_image(info.binding, image, offset.binding_array_index,
+                                              access_layout);
     for_each_registered_set([&](DescriptorContainer& set) {
-        set.queue_descriptor_write_image(info.binding, image, offset.binding_array_index);
+        set.queue_descriptor_write_image(info.binding, image, offset.binding_array_index,
+                                         access_layout);
     });
 }
 
@@ -279,11 +283,13 @@ void ShaderObject::write(const ShaderOffset& offset, const BufferHandle& buffer)
     });
 }
 
-void ShaderObject::write(const ShaderOffset& offset, const TextureHandle& texture) {
+void ShaderObject::write(const ShaderOffset& offset,
+                         const TextureHandle& texture,
+                         const std::optional<vk::ImageLayout> access_layout) {
     const auto& info = object_layout->get_binding_range_info(offset.binding_range_offset);
     if (info.type == slang::BindingType::Texture ||
         info.type == slang::BindingType::MutableTexture) {
-        write(offset, texture->get_view());
+        write(offset, texture->get_view(), access_layout);
         return;
     }
     if (info.type == slang::BindingType::Sampler) {
@@ -294,9 +300,11 @@ void ShaderObject::write(const ShaderOffset& offset, const TextureHandle& textur
     assert(info.type == slang::BindingType::CombinedTextureSampler);
     assert(offset.binding_array_index < info.count);
 
-    descriptors->queue_descriptor_write_texture(info.binding, texture, offset.binding_array_index);
+    descriptors->queue_descriptor_write_texture(info.binding, texture, offset.binding_array_index,
+                                                access_layout);
     for_each_registered_set([&](DescriptorContainer& set) {
-        set.queue_descriptor_write_texture(info.binding, texture, offset.binding_array_index);
+        set.queue_descriptor_write_texture(info.binding, texture, offset.binding_array_index,
+                                           access_layout);
     });
 }
 

@@ -60,9 +60,11 @@ class ShaderCursor {
 
     // Write operations
 
-    ShaderCursor& write(const ImageViewHandle& image);
+    ShaderCursor& write(const ImageViewHandle& image,
+                        const std::optional<vk::ImageLayout> access_layout = std::nullopt);
     ShaderCursor& write(const BufferHandle& buffer);
-    ShaderCursor& write(const TextureHandle& texture);
+    ShaderCursor& write(const TextureHandle& texture,
+                        const std::optional<vk::ImageLayout> access_layout = std::nullopt);
     ShaderCursor& write(const SamplerHandle& sampler);
     ShaderCursor& write(const AccelerationStructureHandle& as);
     ShaderCursor& write(const void* data, std::size_t size);

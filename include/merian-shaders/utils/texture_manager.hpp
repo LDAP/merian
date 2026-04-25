@@ -19,7 +19,7 @@ class TextureManager : public Versionable, public std::enable_shared_from_this<T
                    const ShaderObjectAllocatorHandle& obj_allocator,
                    uint32_t initial_capacity = 4096);
 
-    // process pending uploads
+    // Records pending uploads queued by the cmd-less add_/set_ overloads.
     void update(const CommandBufferHandle& cmd);
 
     void resize(const uint32_t capacity);
@@ -29,6 +29,17 @@ class TextureManager : public Versionable, public std::enable_shared_from_this<T
     TextureID
     add_texture_from_rgba8(const CommandBufferHandle& cmd,
                            const uint32_t* data,
+                           uint32_t width,
+                           uint32_t height,
+                           vk::SamplerAddressMode address_mode = vk::SamplerAddressMode::eRepeat,
+                           vk::Filter mag_filter = vk::Filter::eLinear,
+                           vk::Filter min_filter = vk::Filter::eLinear,
+                           bool srgb = true,
+                           bool generate_mipmaps = false);
+
+    // Stages the upload; the actual GPU copy is recorded by the next update().
+    TextureID
+    add_texture_from_rgba8(const uint32_t* data,
                            uint32_t width,
                            uint32_t height,
                            vk::SamplerAddressMode address_mode = vk::SamplerAddressMode::eRepeat,
@@ -52,9 +63,24 @@ class TextureManager : public Versionable, public std::enable_shared_from_this<T
                            bool srgb = true,
                            bool generate_mipmaps = false);
 
+    // Stages the upload; the actual GPU copy is recorded by the next update().
+    void
+    set_texture_from_rgba8(TextureID id,
+                           const uint32_t* data,
+                           uint32_t width,
+                           uint32_t height,
+                           vk::SamplerAddressMode address_mode = vk::SamplerAddressMode::eRepeat,
+                           vk::Filter mag_filter = vk::Filter::eLinear,
+                           vk::Filter min_filter = vk::Filter::eLinear,
+                           bool srgb = true,
+                           bool generate_mipmaps = false);
+
     void remove_texture(TextureID id);
 
-    const TextureHandle& get_texture(TextureID id) const;
+    const TextureHandle& get_texture(TextureID id) const {
+        assert(id < textures.size());
+        return textures[id];
+    }
 
     uint32_t get_texture_count() const {
         return texture_count;
@@ -80,6 +106,19 @@ class TextureManager : public Versionable, public std::enable_shared_from_this<T
     void update_composition_constants();
     void rebuild_shader_object();
 
+    // Pulls the next slot from free_list or grows the table.
+    TextureID allocate_id();
+    // Builds image + view + sampler and queues the staging copy. Returns the
+    // texture; the upload becomes visible to shaders after the next update().
+    TextureHandle stage_rgba8(const uint32_t* data,
+                              uint32_t width,
+                              uint32_t height,
+                              vk::SamplerAddressMode address_mode,
+                              vk::Filter mag_filter,
+                              vk::Filter min_filter,
+                              bool srgb,
+                              bool generate_mipmaps);
+
     ShaderCompileContextHandle compile_context;
     ContextHandle context;
     ResourceAllocatorHandle allocator;
@@ -90,6 +129,8 @@ class TextureManager : public Versionable, public std::enable_shared_from_this<T
     SlangCompositionHandle composition;
     SlangProgramHandle layout_program;
     ShaderObjectHandle shader_object;
+
+    std::vector<StagingMemoryManager::DeviceImageCopy> pending_uploads;
 };
 
 using TextureManagerHandle = std::shared_ptr<TextureManager>;

@@ -89,6 +89,51 @@ inline void cmd_blit_fill(const CommandBufferHandle& cmd,
     cmd->blit(src_image, src_layout, dst_image, dst_layout, region, filter);
 }
 
+// Generates the mip chain by successive blits from level i-1 to i.
+// Inserts a barrier to eTransferDstOptimal first if the image is not already
+// in that layout. Leaves all levels in eTransferSrcOptimal. The image must
+// have been created with eTransferSrc and eTransferDst usage.
+inline void cmd_generate_mipmaps(const CommandBufferHandle& cmd, const ImageHandle& image) {
+    const uint32_t mip_levels = image->get_mip_levels();
+    if (mip_levels <= 1) {
+        return;
+    }
+
+    if (image->get_current_layout() != vk::ImageLayout::eTransferDstOptimal) {
+        cmd->barrier(image->barrier2(vk::ImageLayout::eTransferDstOptimal));
+    }
+
+    const uint32_t width = image->get_extent().width;
+    const uint32_t height = image->get_extent().height;
+    for (uint32_t i = 1; i <= mip_levels; i++) {
+        const vk::ImageMemoryBarrier bar{
+            vk::AccessFlagBits::eTransferWrite,
+            vk::AccessFlagBits::eTransferRead,
+            vk::ImageLayout::eTransferDstOptimal,
+            vk::ImageLayout::eTransferSrcOptimal,
+            VK_QUEUE_FAMILY_IGNORED,
+            VK_QUEUE_FAMILY_IGNORED,
+            *image,
+            vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, i - 1, 1, 0, 1}};
+        cmd->barrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer,
+                     bar);
+        // run one extra iteration to leave the last mip in TransferSrc.
+        if (i == mip_levels) {
+            break;
+        }
+
+        vk::ImageBlit blit{vk::ImageSubresourceLayers{vk::ImageAspectFlagBits::eColor, i - 1, 0, 1},
+                           {},
+                           vk::ImageSubresourceLayers{vk::ImageAspectFlagBits::eColor, i, 0, 1},
+                           {}};
+        blit.srcOffsets[1] = vk::Offset3D{int32_t(width >> (i - 1)), int32_t(height >> (i - 1)), 1};
+        blit.dstOffsets[1] = vk::Offset3D{int32_t(width >> i), int32_t(height >> i), 1};
+        cmd->blit(image, vk::ImageLayout::eTransferSrcOptimal, image,
+                  vk::ImageLayout::eTransferDstOptimal, blit, vk::Filter::eLinear);
+    }
+    image->_set_current_layout(vk::ImageLayout::eTransferSrcOptimal);
+}
+
 enum BlitMode {
     FIT,
     FILL,
